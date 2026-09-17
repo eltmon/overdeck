@@ -182,4 +182,29 @@ describe('verification pass clears verification_stuck (PAN-3847)', () => {
     expect(mockClearWorkspaceStuck).toHaveBeenCalledWith(issueId);
     expect(mockSetAgentPaused).not.toHaveBeenCalled();
   });
+
+  it('failure feedback references the immutable per-run artifact path (PAN-3847 W13)', async () => {
+    mockRunQualityGates.mockReturnValue(Effect.succeed([
+      { name: 'test', passed: false, required: true, durationMs: 5, output: 'boom' },
+    ]));
+    const perRunPath = `${workspacePath}/.overdeck/verification/2026-09-17T01-02-03-000Z-abcd1234.json`;
+    mockWriteArtifact.mockReturnValue({ path: perRunPath });
+
+    const result = await Effect.runPromise(runVerificationForIssueInProcess(
+      issueId,
+      workspacePath,
+      { isRemote: false },
+      'test',
+      { syncTargetBranch: false, skipPlanChecklist: true },
+    ));
+
+    expect(result.outcome).toBe('failed');
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(issueId, expect.objectContaining({
+      verificationStatus: 'failed',
+      verificationNotes: expect.stringContaining('.overdeck/verification/'),
+    }));
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(issueId, expect.objectContaining({
+      verificationNotes: expect.stringContaining(perRunPath),
+    }));
+  });
 });

@@ -419,6 +419,9 @@ async function runVerificationForIssuePromise(
   }
 
   setReviewStatusSync(issueId, { verificationStatus: 'running' });
+  // PAN-3847 (FR-11): the run timestamp is captured once here and names the
+  // immutable per-run artifact written when the run terminates.
+  const runStartedAt = new Date().toISOString();
   console.log(`[${logPrefix}] Running verification gate for ${issueId} (attempt ${currentCycles + 1}/${VERIFICATION_MAX_CYCLES})`);
 
   try {
@@ -657,8 +660,20 @@ async function runVerificationForIssuePromise(
 
     // Durable terminal record of this gate run, surfaced by the issue tree's
     // Test/Lint node (replaces the incremental 'running' writes above).
+    // PAN-3847 (FR-11): also written to an immutable per-run file named by run
+    // time and head, so feedback references a path later runs cannot overwrite.
+    let head8: string | undefined;
     try {
-      writeVerificationArtifact(workspacePath, issueId, gateResults);
+      const { stdout } = await execAsync('git rev-parse --short=8 HEAD', { cwd: workspacePath, encoding: 'utf-8', timeout: 10_000 });
+      head8 = stdout.trim() || undefined;
+    } catch { /* non-fatal — fall back to the latest-only write */ }
+    let runArtifactPath: string | undefined;
+    try {
+      const finalArtifact = writeVerificationArtifact(workspacePath, issueId, gateResults, {
+        ranAt: runStartedAt,
+        ...(head8 ? { head8 } : {}),
+      });
+      runArtifactPath = finalArtifact.path;
     } catch (artifactErr: any) {
       console.warn(`[${logPrefix}] Could not write verification artifact for ${issueId}: ${artifactErr.message}`);
     }
@@ -666,7 +681,7 @@ async function runVerificationForIssuePromise(
     if (failedGate) {
       const newCycleCount = currentCycles + 1;
       const failedCheck = failedGate.name;
-      const fullOutputPath = verificationArtifactPath(workspacePath);
+      const fullOutputPath = runArtifactPath ?? verificationArtifactPath(workspacePath);
       const summary = `Verification FAILED at ${failedCheck} (${failedGate.durationMs}ms).\n\nFull gate output: ${fullOutputPath}`;
 
       setReviewStatusSync(issueId, {
