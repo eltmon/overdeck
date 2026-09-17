@@ -134,7 +134,7 @@ describe('coordinateSwarmSlots enumerate-swarms', () => {
     const failedMergeIndex = source.indexOf('const failedMergeRetryActions = await checkFailedMergeRetry();');
     const strikeLandingIndex = source.indexOf('for (const a of await patrolStrikeLandings())');
     const swarmIndex = source.indexOf('const swarmActions = await swarmJanitorPass();');
-    const staleMergeIndex = source.indexOf('const staleMergeActions = await reconcileStaleMergeStatus();');
+    const staleMergeIndex = source.indexOf("const staleMergeActions = await runShadowablePatrol('reconcileStaleMergeStatus'");
 
     expect(failedMergeIndex).toBeGreaterThanOrEqual(0);
     expect(source).toContain("import { patrolStrikeLandings } from './deacon-strike-landing.js';");

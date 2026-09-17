@@ -45,6 +45,7 @@ import {
 import type { RuntimeName } from '../runtimes/types.js';
 import { resolveStateReadHomeSync } from '../state-read-home.js';
 import {
+  commitAutoCommits,
   flushAutoCommits,
   pushPendingStateCommits,
   queueAutoCommit,
@@ -52,7 +53,7 @@ import {
   type FlushResult,
 } from './auto-commit.js';
 import { withRecordFsLock } from './fs-lock.js';
-import { withStateGitLock } from './state-git-lock.js';
+import { withStateGitLock, withStateRepoLock } from './state-git-lock.js';
 
 export const AGENT_PLANE_DIRNAME = 'agents';
 export const AGENT_PLANE_VERSION = 1 as const;
@@ -308,26 +309,39 @@ async function reconcileAgentPlanePush(
       if (status) return { committed: true, pushed: false, reason: 'agent-plane reconciliation blocked by dirty state worktree' };
 
       await git(context.root, ['fetch', 'origin', 'overdeck-state']);
-      try {
-        await git(context.root, ['merge', '--no-edit', 'origin/overdeck-state']);
-      } catch (mergeError) {
-        const conflicts = (await git(context.root, ['diff', '--name-only', '--diff-filter=U']))
-          .split('\n').map((path) => path.trim()).filter(Boolean);
-        if (conflicts.length !== 1 || conflicts[0] !== relativePath) {
-          await abortAgentPlaneMerge(context.root);
-          return {
-            committed: true,
-            pushed: false,
-            reason: `agent-plane reconciliation conflicted outside ${relativePath}: ${conflicts.join(', ') || gitFailureMessage(mergeError)}`,
-          };
-        }
+      // Mutating section under the repo-scoped lock (PAN-3848 F7): the fetch
+      // above and the push below touch no local index state, but the merge
+      // and conflict resolution must never run concurrently with another
+      // writer's git mutation on this checkout — in this process or another.
+      const merged = await withStateRepoLock(
+        context.root,
+        `agent-plane-reconcile:${safeAgentId(desired.agentId)}`,
+        async (): Promise<'merged' | FlushResult> => {
+          try {
+            await git(context.root, ['merge', '--no-edit', 'origin/overdeck-state']);
+            return 'merged';
+          } catch (mergeError) {
+            const conflicts = (await git(context.root, ['diff', '--name-only', '--diff-filter=U']))
+              .split('\n').map((path) => path.trim()).filter(Boolean);
+            if (conflicts.length !== 1 || conflicts[0] !== relativePath) {
+              await abortAgentPlaneMerge(context.root);
+              return {
+                committed: true,
+                pushed: false,
+                reason: `agent-plane reconciliation conflicted outside ${relativePath}: ${conflicts.join(', ') || gitFailureMessage(mergeError)}`,
+              };
+            }
 
-        await git(context.root, ['checkout', '--theirs', '--', relativePath]);
-        const remote = readAgentPlaneRecordAtPath(context.path);
-        writeAgentPlaneRecordAtomicSync(context.path, mergeAgentPlaneRecords(remote, desired));
-        await git(context.root, ['add', '--', relativePath]);
-        await git(context.root, ['-c', 'core.editor=true', 'commit', '--no-edit']);
-      }
+            await git(context.root, ['checkout', '--theirs', '--', relativePath]);
+            const remote = readAgentPlaneRecordAtPath(context.path);
+            writeAgentPlaneRecordAtomicSync(context.path, mergeAgentPlaneRecords(remote, desired));
+            await git(context.root, ['add', '--', relativePath]);
+            await git(context.root, ['-c', 'core.editor=true', 'commit', '--no-edit']);
+            return 'merged';
+          }
+        },
+      );
+      if (merged !== 'merged') return merged;
 
       try {
         await git(context.root, ['push', 'origin', 'overdeck-state']);
@@ -531,30 +545,44 @@ export async function flushAgentPlaneWrites(issueId: string, agentId: string): P
   const desired = readAgentPlaneRecordAtPath(context.path);
   if (!desired) return null;
 
-  return withStateGitLock(context.root, `agent-plane-flush:${safeAgentId(agentId)}`, context.path, async () => {
-    const flushed = await Effect.runPromise(flushAutoCommits(context.project.path));
-    if (flushed.errored) return flushed;
-    if (flushed.committed && flushed.pushed !== true) {
-      if (!isRemoteRefRaceError(flushed.reason ?? '')) return flushed;
-      return reconcileAgentPlanePush(context, desired);
-    }
-
-    const reconciled = await Effect.runPromise(reconcileStatePlaneDrift(context.project.path));
-    if (reconciled.errored || (reconciled.committed && reconciled.pushed !== true)) {
-      return reconciled;
-    }
-    if (flushed.committed || reconciled.committed) {
-      return { committed: true, pushed: true };
-    }
-
-    const push = await Effect.runPromise(pushPendingStateCommits(context.project.path));
-    if (push?.pushed === false && isRemoteRefRaceError(push.reason ?? '')) {
-      return reconcileAgentPlanePush(context, desired);
-    }
-    return {
-      committed: false,
-      pushed: push?.pushed,
-      reason: push?.reason ?? reconciled.reason ?? flushed.reason,
-    };
+  // Phase 1 — locked local commit (PAN-3848 F2). commitAutoCommits defers the
+  // push, and deferred waiting covers the commit phase alone, so the
+  // per-issue lock is never held across a network push the way the old
+  // flushAutoCommits call was.
+  const committed = await withStateGitLock(context.root, issueId, `agent-plane-flush:${safeAgentId(agentId)}`, context.path, async () => {
+    const result = await Effect.runPromise(commitAutoCommits(context.project.path));
+    return result;
   });
+  if (committed.errored) return committed;
+  // The locked commit may have carried newer plane writes than the
+  // pre-lock snapshot; reconcile the settled record.
+  const settled = readAgentPlaneRecordAtPath(context.path) ?? desired;
+
+  // Phase 2 — unlocked push and reconciliation. Drift, settle, push, and
+  // push-race reconciliation may wait on the network without starving peer
+  // writers.
+  const reconciled = await Effect.runPromise(reconcileStatePlaneDrift(context.project.path));
+  if (reconciled.errored || (reconciled.committed && reconciled.pushed !== true)) {
+    return reconciled;
+  }
+
+  // Settle overlapping background flushes (a timer-fired flush from an
+  // earlier plane write may still be in its detached push) so the push below
+  // carries every local commit and `pushed: true` still means settled.
+  const background = await Effect.runPromise(flushAutoCommits(context.project.path));
+  if (background.errored) return background;
+
+  const push = await Effect.runPromise(pushPendingStateCommits(context.root));
+  if (push?.pushed === false && isRemoteRefRaceError(push.reason ?? '')) {
+    const r = await reconcileAgentPlanePush(context, settled);
+    return r;
+  }
+  if (committed.committed || reconciled.committed || background.committed) {
+    return { committed: true, pushed: push?.pushed, reason: push?.reason };
+  }
+  return {
+    committed: false,
+    pushed: push?.pushed,
+    reason: push?.reason ?? reconciled.reason ?? background.reason ?? committed.reason,
+  };
 }

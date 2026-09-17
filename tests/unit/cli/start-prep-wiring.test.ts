@@ -1,4 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mockUpdateIssueRecord = vi.hoisted(() => vi.fn());
+const mockRequireAutomaticStateMigration = vi.hoisted(() => vi.fn());
+const mockGetProjectSync = vi.hoisted(() => vi.fn());
+
+vi.mock('../../../src/lib/pan-dir/record-update.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/pan-dir/record-update.js')>()),
+  updateIssueRecord: mockUpdateIssueRecord,
+}));
+vi.mock('../../../src/lib/state-auto-migrate.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/state-auto-migrate.js')>()),
+  requireAutomaticStateMigration: mockRequireAutomaticStateMigration,
+}));
+vi.mock('../../../src/lib/projects.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/projects.js')>()),
+  getProjectSync: mockGetProjectSync,
+}));
+
 import { __testInternals } from '../../../src/cli/commands/start.js';
 import {
   createPlanningProgress,
@@ -8,9 +26,11 @@ import {
   START_PREP_STEP_POLICIES,
   warnSyncMainFailure,
 } from '../../../src/cli/commands/start-prep-progress.js';
+import { applyStartPolicyOptionsAfterSpawn } from '../../../src/cli/commands/start-policy-overrides.js';
+import { RecordLockError } from '../../../src/lib/pan-dir/fs-lock.js';
 import { UnsafeSyncMainStateError } from '../../../src/lib/cloister/sync-main-git.js';
 
-const { runStartPrepStep } = __testInternals;
+const { runStartPrepStep, reconcileStartState } = __testInternals;
 type PrepProgress = Parameters<typeof runStartPrepStep>[0];
 type PrepStepName = keyof typeof START_PREP_STEP_POLICIES;
 
@@ -140,7 +160,9 @@ describe('pan start prep step wiring', () => {
     );
   });
 
-  it('fails fast when state reconciliation exceeds its budget', async () => {
+  it('degrades when state reconciliation exceeds its budget (PAN-3848 W24)', async () => {
+    // state-reconcile is best-effort migration at spawn time (FR-19); a slow
+    // reconcile warns and continues instead of failing the start.
     const prep = createTimeoutPrep();
     const spinner = { warn: vi.fn() };
     const resultPromise = runStartPrepStep(
@@ -148,19 +170,18 @@ describe('pan start prep step wiring', () => {
       spinner,
       'state-reconcile',
       () => new Promise<never>(() => undefined),
+      undefined,
     );
-    const rejection = expect(resultPromise).rejects.toMatchObject({
-      name: 'PrepStepTimeoutError',
-      message: "Prep step 'state-reconcile' exceeded its 60s budget",
-    });
 
     await vi.advanceTimersByTimeAsync(60_000);
 
-    await rejection;
-    expect(spinner.warn).not.toHaveBeenCalled();
+    await expect(resultPromise).resolves.toBeUndefined();
+    expect(spinner.warn).toHaveBeenCalledWith(
+      "Prep step 'state-reconcile' exceeded its 60s budget",
+    );
   });
 
-  it('aborts local reconciliation and waits for cleanup before returning its timeout', async () => {
+  it('aborts local reconciliation and waits for cleanup before degrading', async () => {
     const prep = createPrepProgress(
       { text: '' },
       { stream: { isTTY: false, write: vi.fn() } },
@@ -180,10 +201,12 @@ describe('pan start prep step wiring', () => {
     expect(receivedSignal?.aborted).toBe(true);
     expect(settled).toBe(false);
     finishCleanup();
-    await expect(resultPromise).rejects.toMatchObject({
-      name: 'PrepStepTimeoutError',
-      message: "Prep step 'state-reconcile' exceeded its 60s budget",
-    });
+    // PAN-3848 (W24): state-reconcile degrades — the timeout warns and the
+    // start continues instead of rejecting.
+    await expect(resultPromise).resolves.toBeUndefined();
+    expect(spinner.warn).toHaveBeenCalledWith(
+      "Prep step 'state-reconcile' exceeded its 60s budget",
+    );
     expect(vi.getTimerCount()).toBe(0);
   });
 
@@ -219,5 +242,51 @@ describe('pan start prep step wiring', () => {
       message: "Prep step 'spawn' exceeded its 600s budget",
     });
     expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe('pan start record-lock wiring (PAN-3848 W24)', () => {
+  beforeEach(() => {
+    mockUpdateIssueRecord.mockReset();
+    mockRequireAutomaticStateMigration.mockReset();
+    mockGetProjectSync.mockReset();
+  });
+
+  it('state-reconcile runs the migration only and never touches the record write door', async () => {
+    const resolved = {
+      projectKey: 'test',
+      projectName: 'Test',
+      projectPath: '/tmp/test',
+    } as unknown as Parameters<typeof reconcileStartState>[0];
+
+    await reconcileStartState(resolved, new AbortController().signal);
+
+    expect(mockRequireAutomaticStateMigration).toHaveBeenCalledTimes(1);
+    expect(mockUpdateIssueRecord).not.toHaveBeenCalled();
+  });
+
+  it('a RecordLockError from the post-spawn override write warns instead of failing the start', async () => {
+    mockGetProjectSync.mockReturnValue({ name: 'Test', path: '/tmp/test' });
+    mockUpdateIssueRecord.mockRejectedValue(new RecordLockError('/lock/PAN-1.lock', 'other-writer', 'PAN-1'));
+    const warn = vi.fn();
+    const resolved = {
+      projectKey: 'test',
+      projectName: 'Test',
+      projectPath: '/tmp/test',
+    } as unknown as Parameters<typeof applyStartPolicyOptionsAfterSpawn>[0];
+
+    await expect(applyStartPolicyOptionsAfterSpawn(
+      resolved,
+      'PAN-1',
+      { model: 'claude-opus-5' },
+      false,
+      warn,
+    )).resolves.toBeUndefined();
+
+    expect(mockUpdateIssueRecord).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(
+      'Model override recorded in agent state only; record write failed:',
+    ));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('PAN-1'));
   });
 });

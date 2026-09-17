@@ -9,6 +9,7 @@ import {
 } from '../review-status.js';
 import { killSession, listSessionNames } from '../tmux.js';
 import { selectMergedAdvancingSessions } from './reap-terminal-sessions.js';
+import { recordWouldFire } from './patrol-would-fire.js';
 
 const JOURNAL_RECONCILE_STATES = new Set([
   'pending',
@@ -102,6 +103,10 @@ export async function reconcileInFlightJournals(
       // pipeline progress. Keep reconciling the journal through the read door,
       // but do not emit a repeated no-op advancement action while CI is red.
       if (hasFailingChecks(after)) continue;
+      // PAN-3848 (W30): count the would-fire. This patrol's action IS the
+      // reconciling read through the read door, so shadow mode has nothing
+      // further to suppress — every getReviewStatusSync read reconciles.
+      recordWouldFire('reconcileInFlightJournals', issueId);
       actions.push(`Reconciled journaled advancing verdict for ${issueId}`);
     } catch (error) {
       deps.warn(`[deacon] reconcileInFlightJournals: failed to reconcile ${issueId}: ${error instanceof Error ? error.message : String(error)}`);
