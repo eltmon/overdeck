@@ -170,7 +170,7 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-17T01:17:32.912Z",
+  "updated": "2026-09-17T01:17:36.061Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "passed",
@@ -351,8 +351,16 @@
   ],
   "workModel": "claude-opus-5",
   "tasks": {
-    "sequence": 29,
-    "claims": {},
+    "sequence": 30,
+    "claims": {
+      "docs-fitness": {
+        "writerId": "agent-pan-3842",
+        "agentId": "agent-pan-3842",
+        "pid": 32145,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T01:17:36.060Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3842",
@@ -517,8 +525,8 @@
         "updatedAt": "2026-09-17T01:09:05.107Z"
       },
       "docs-fitness": {
-        "reason": "Document literal-first classification (R1), grouped mixed-difficulty wording (R2), and provider-scoping (F-1)",
-        "updatedAt": "2026-09-17T01:17:32.912Z"
+        "reason": "docs for the three corrections",
+        "updatedAt": "2026-09-17T01:17:36.060Z"
       }
     }
   },
@@ -561,7 +569,7 @@
     "settings-badges.ac3": "completed",
     "settings-badges.ac4": "completed",
     "settings-badges.ac5": "completed",
-    "docs-fitness": "pending",
+    "docs-fitness": "running",
     "docs-fitness.ac1": "pending",
     "docs-fitness.ac2": "pending",
     "docs-fitness.ac3": "pending",
