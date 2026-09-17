@@ -156,18 +156,18 @@
     "recordedAt": "2026-09-17T01:23:42.409Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T01:23:42.410Z",
+  "updated": "2026-09-17T01:23:43.464Z",
   "pipeline": {
     "issueId": "PAN-3841",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "uatStatus": "failed",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-17T01:10:18.620Z",
+    "updatedAt": "2026-09-17T01:23:43.461Z",
     "reviewNotes": "Verification failed at typecheck — fix and resubmit",
     "testNotes": "From /home/eltmon/Projects/overdeck/workspaces/feature-pan-3841: npm run typecheck exits 0 (dashboard/frontend/acp/hooks/evals guards all pass, no new errors). npm run lint exits 0 (eslint + all sub-lints: skills, slash-commands, prompts, prompt-trailer [roles/retrospective.md carries its Prompt-Change trailer], file-size, source-introspection, circular-deps, ratchet-audit, quarantine-audit, effect-diagnostics — all green, no new findings). npm test exits 0: 1527 test files / 14320 tests passed, 51 skipped (unrelated pre-existing skips), plus the frontend issueActions suite (4 files / 64 tests) all green.",
     "verificationNotes": "Verification FAILED at typecheck (7617ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3841/.overdeck/verification-latest.json",
@@ -175,7 +175,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3844",
     "reviewedAtCommit": "bf27cbe09fc5d26dc43bdb997c44fcaaa9eefd6d",
     "lastVerifiedCommit": "1199e01ffef113ab3c9aa9498b9931123eb2c898",
-    "reviewRequestedAt": "2026-09-17T01:00:06.981Z",
+    "reviewRequestedAt": "2026-09-17T01:23:43.461Z",
     "reviewSpawnedAt": "2026-09-17T01:08:19.957Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -220,7 +220,7 @@
         "tests/unit/lib/overdeck/no-loss-matrix.ts",
         "tests/unit/prompts/retrospective-template.test.ts"
       ],
-      "recordedAt": "2026-09-17T01:00:05.968Z"
+      "recordedAt": "2026-09-17T01:23:42.409Z"
     },
     "deaconIgnored": true,
     "deaconIgnoredAt": "2026-09-16T22:55:47.467Z",
