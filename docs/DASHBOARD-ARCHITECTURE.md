@@ -87,13 +87,33 @@ broken instruction). Records are filtered to `updated >= windowStart` and
 projected to a bounded per-issue snapshot preserving `pipeline`, `feedback`,
 `sessionHistory`, `recoveryTrips`, and `scopeDrift`.
 
-Every omission is disclosed in the rendered text rather than dropped
-silently: out-of-window counts, records with no usable timestamp, per-issue
-and per-project cap overflow, and a read door that threw (which renders as
-`EVIDENCE UNAVAILABLE` and tells the agent not to infer that nothing
-happened). Caps live in `EVIDENCE_LIMITS`. This is what keeps the feature
-inside the single-source-of-truth rule: the conversation consumes a snapshot
-produced by the read door, and never reaches for a store itself. Note the standing gap: no `pan` verb and no
+The window is closed on both ends (`start <= updated <= now`): a future-dated
+record — clock skew or a hand edit — would otherwise satisfy `>= start` for
+every window and sort to the top of all of them, so those are excluded and
+counted separately. The nested arrays (`feedback`, `sessionHistory`,
+`recoveryTrips`) are stored append-only oldest-first, so the renderer sorts
+them newest-first *before* applying the per-issue caps; slicing an unsorted
+append-only list keeps the oldest entries and discards exactly the recent
+activity a retrospective exists to explain.
+
+Every omission is disclosed in the rendered text rather than dropped silently:
+out-of-window and future-dated counts, records with no usable timestamp,
+per-issue and per-project cap overflow (counted across *both* scope-drift
+arrays, since a disclosure that under-reports is worse than none), paths the
+read door could not read, and a read door that threw (which renders as
+`EVIDENCE UNAVAILABLE`). Both failure disclosures tell the agent not to infer
+that nothing happened. Caps live in `EVIDENCE_LIMITS`, including
+`maxRenderedBytes` — a global byte budget, because per-row caps do not bound
+the whole snapshot and `handleConversationCreate` caps the entire kickoff
+message, so an unbounded snapshot can push the instructions themselves out.
+
+The enumeration itself is bounded and honest: `listIssueRecordsDetailed`
+reads under a concurrency ceiling and returns `{ records, failures }`, so an
+unreadable directory is distinguishable from an empty one. (`listIssueRecords`
+keeps its array-only signature for its other callers and delegates.) This is
+what keeps the feature inside the single-source-of-truth rule: the
+conversation consumes a snapshot produced by the read door, and never reaches
+for a store itself. Note the standing gap: no `pan` verb and no
 dashboard endpoint returns a **full** record to a shell consumer — `pan show
 --json` is the runtime lens and `pan task show --json` is a single plan item,
 so neither reaches `feedback`, `scopeDrift`, `sessionHistory`, or
