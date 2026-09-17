@@ -244,7 +244,7 @@ async function deliverVerificationFeedback(
   if ('agentId' in target) {
     // PAN-2668: verification feedback owes rework — a stopped-by-user agent
     // with a completed handoff is re-driven, not silently queued mail.
-    await messageAgent(target.agentId, message, 'internal', { owesRework: true });
+    await messageAgent(target.agentId, message, 'internal', { owesRework: true, feedbackRedelivery: true });
     console.log(`[${logPrefix}] Sent verification feedback for ${issueId} to ${target.agentId}`);
     return;
   }

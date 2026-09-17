@@ -447,10 +447,30 @@ describe('messageAgent', () => {
         'agent-pan-2262',
         expect.stringContaining('messageAgent confirmed turn in session-2262'),
       );
-      // A confirmed delivery clears a stale feedback_delivery_needs_you flag
-      // for the agent's issue (PAN-3846; replaces the retirement patrol).
-      expect(mocks.getReviewStatusFromDbSync).toHaveBeenCalledWith('PAN-2262');
+      // A plain confirmed message is NOT a feedback redelivery: the
+      // escalation flag stays (PR #3870 finding 3).
+      expect(mocks.getReviewStatusFromDbSync).not.toHaveBeenCalled();
+      expect(mocks.clearWorkspaceStuck).not.toHaveBeenCalled();
+    });
+
+    it('clears the escalation flag only for a confirmed feedback redelivery (PR #3870 finding 3)', async () => {
+      mocks.getReviewStatusFromDbSync.mockReturnValue({ stuck: true, stuckReason: 'feedback_delivery_needs_you' });
+      mocks.probeTranscriptSince.mockResolvedValue({ matchedUserRecord: true, realAssistantTurnCount: 0 });
+
+      const promise = messageAgent('agent-pan-2262', 'review feedback', 'internal', { owesRework: true, feedbackRedelivery: true });
+      await vi.advanceTimersByTimeAsync(1_000);
+      await expect(promise).resolves.toEqual({ delivered: true, queuedToMail: true, confirmed: true });
       expect(mocks.clearWorkspaceStuck).toHaveBeenCalledWith('PAN-2262');
+    });
+
+    it('keeps the escalation flag when the stuck row is unrelated to feedback delivery', async () => {
+      mocks.getReviewStatusFromDbSync.mockReturnValue({ stuck: true, stuckReason: 'review-not-converging' });
+      mocks.probeTranscriptSince.mockResolvedValue({ matchedUserRecord: true, realAssistantTurnCount: 0 });
+
+      const promise = messageAgent('agent-pan-2262', 'review feedback', 'internal', { owesRework: true, feedbackRedelivery: true });
+      await vi.advanceTimersByTimeAsync(1_000);
+      await expect(promise).resolves.toEqual({ delivered: true, queuedToMail: true, confirmed: true });
+      expect(mocks.clearWorkspaceStuck).not.toHaveBeenCalled();
     });
 
     it('returns delivered:false, confirmed:false when no turn appears in either attempt', async () => {

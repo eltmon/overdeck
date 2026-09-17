@@ -211,6 +211,7 @@ async function deliverReviewVerdictFeedbackPromise(
               try {
                 deliveryOutcome = await messageAgent(target.agentId, message, 'internal', {
                   owesRework: true,
+                  feedbackRedelivery: true,
                   ...(dedupKey ? { dedupKey } : {}),
                 });
                 break;
@@ -244,7 +245,7 @@ async function deliverReviewVerdictFeedbackPromise(
                   target.agentId,
                   message,
                   'internal',
-                  { owesRework: true },
+                  { owesRework: true, feedbackRedelivery: true },
                 );
                 break;
               }

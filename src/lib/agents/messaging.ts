@@ -626,19 +626,19 @@ export async function messageAgent(
       return { delivered: false, queuedToMail: true, confirmed: false, reason };
     }
     logAgentLifecycleSync(normalizedId, `messageAgent confirmed turn in ${transcriptSessionId} (caller: ${caller})`);
-    // A confirmed delivery repairs the state the feedback-delivery retirement
-    // patrol used to clear: once a message provably lands, the
-    // feedback_delivery_needs_you escalation it recorded is stale (PAN-3846).
-    if (agentState.issueId) {
+    if (agentState.issueId && opts.feedbackRedelivery === true) {
       try {
-        // A confirmed delivery repairs the state the retired feedback-delivery
-        // retirement patrol used to clear. Lazy import through the DB sync door
-        // (not review-status.js, whose import graph cycles back into agents).
+        // A confirmed FEEDBACK REDELIVERY repairs the state the retired
+        // retirement patrol used to clear. Any other confirmed message (a
+        // pan tell, a dead-end nudge) leaves the escalation in place — the
+        // feedback file it recorded may still be unread (PR #3870 review).
+        // Lazy import through the DB sync door (not review-status.js, whose
+        // import graph cycles back into agents).
         const { getReviewStatusFromDbSync, clearWorkspaceStuck } = await import('../overdeck/review-status-sync.js');
         const row = getReviewStatusFromDbSync(agentState.issueId);
         if (row?.stuck === true && row.stuckReason === 'feedback_delivery_needs_you') {
           clearWorkspaceStuck(agentState.issueId);
-          logAgentLifecycleSync(normalizedId, `messageAgent cleared feedback_delivery_needs_you for ${agentState.issueId} after confirmed delivery`);
+          logAgentLifecycleSync(normalizedId, `messageAgent cleared feedback_delivery_needs_you for ${agentState.issueId} after confirmed feedback redelivery`);
         }
       } catch (clearError) {
         console.warn(`[agents] ${normalizedId}: failed to clear feedback-delivery stuck flag for ${agentState.issueId}: ${clearError instanceof Error ? clearError.message : String(clearError)}`);
