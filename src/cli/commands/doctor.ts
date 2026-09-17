@@ -7,7 +7,7 @@ import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { getAgentSessionsSync, listSessionNamesSync } from '../../lib/tmux.js';
 import { listProjectsSync, type ProjectConfig } from '../../lib/projects.js';
-import { isPatrolShadowMode, readWouldFireCounts } from '../../lib/cloister/patrol-would-fire.js';
+import { isPatrolShadowMode, readWouldFireCounts, readWouldFireRecorderHealth, wouldFireRecorderHealthPath } from '../../lib/cloister/patrol-would-fire.js';
 import { homedir } from 'os';
 import { isAbsolute, join, resolve } from 'path';
 import {
@@ -342,6 +342,28 @@ function countItems(path: string): number {
  * patrols detect but never act; a week of zeroes is the deletion gate's
  * evidence. Outside a soak the counts show which patrols actually fired.
  */
+/**
+ * PAN-3848 (F1): the would-fire JSONL is soak evidence for patrol deletion —
+ * a dropped append reads back as a false zero. A failed append leaves
+ * `would-fire.unhealthy.json` behind; report it as an error (with a fix) so a
+ * tainted zero can never silently gate a deletion.
+ */
+export function checkPatrolSoakEvidence(): CheckResult[] {
+  const results: CheckResult[] = [];
+  const health = readWouldFireRecorderHealth();
+  if (!health.healthy) {
+    const since = health.firstFailureAt ?? 'unknown time';
+    const failures = health.failureCount ?? 1;
+    results.push({
+      name: 'Patrol soak evidence',
+      status: 'error',
+      message: `would-fire recorder unhealthy since ${since} (${failures} failed append(s)}${health.lastError ? `: ${health.lastError}` : ''} — counts may be false zeroes, soak evidence is invalid`,
+      fix: `Inspect disk space and permissions for the deacon state dir, then delete ${wouldFireRecorderHealthPath()} to re-arm. Zeroes recorded during the outage stay untrustworthy — restart the soak window for any patrol gated on them.`,
+    });
+  }
+  return results;
+}
+
 export function printPatrolWouldFireTable(): void {
   const sinceIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const counts = readWouldFireCounts(sinceIso);
@@ -938,6 +960,10 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Check inotify watch budget and persistence (PAN-3063)
   for (const c of await checkInotify()) checks.push(c);
+
+  // Patrol soak evidence (PAN-3848 F1): an unhealthy would-fire recorder or
+  // mixed-mode counts invalidate the deletion gate's zeroes.
+  for (const c of checkPatrolSoakEvidence()) checks.push(c);
 
   // Check for legacy command invocations in shell rc files (PAN-705)
   const legacyPatterns = [

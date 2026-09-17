@@ -43,13 +43,15 @@ import {
   getInMemoryWouldFireCounts,
   isPatrolShadowMode,
   readWouldFireCounts,
+  readWouldFireRecorderHealth,
   recordWouldFire,
   resetInMemoryWouldFireCounts,
   runShadowablePatrol,
   wouldFireLogPath,
+  wouldFireRecorderHealthPath,
 } from '../../../../src/lib/cloister/patrol-would-fire.js';
 import { checkStuckReviewing } from '../../../../src/lib/cloister/deacon-review-unsignaled.js';
-import { printPatrolWouldFireTable } from '../../../../src/cli/commands/doctor.js';
+import { checkPatrolSoakEvidence, printPatrolWouldFireTable } from '../../../../src/cli/commands/doctor.js';
 
 describe('patrol would-fire counters (PAN-3848 W30)', () => {
   let home: string;
@@ -190,5 +192,92 @@ describe('patrol would-fire counters (PAN-3848 W30)', () => {
       console.log = originalLog;
     }
     expect(lines.join('\n')).toContain('(no would-fire events recorded)');
+  });
+});
+
+describe('would-fire recorder health (PAN-3848 F1)', () => {
+  let home: string;
+  const originalHome = process.env.OVERDECK_HOME;
+
+  beforeEach(() => {
+    home = mkdtempSync(join(tmpdir(), 'pan-would-fire-health-'));
+    process.env.OVERDECK_HOME = home;
+    delete process.env.OVERDECK_PATROL_SHADOW;
+    resetInMemoryWouldFireCounts();
+  });
+
+  afterEach(() => {
+    if (originalHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalHome;
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it('a failed JSONL append marks the recorder unhealthy instead of a quiet zero', () => {
+    // A directory where the log file should be: the append fails no matter
+    // which user runs the test, while the sibling health marker still writes.
+    mkdirSync(wouldFireLogPath(), { recursive: true });
+
+    const originalWarn = console.warn;
+    console.warn = () => {};
+    try {
+      recordWouldFire('checkStuckReviewing', 'PAN-1');
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    // Observability is preserved and the patrol itself does not fail...
+    expect(getInMemoryWouldFireCounts()).toEqual({ checkStuckReviewing: 1 });
+    // ...but the soak evidence is marked invalid instead of reading as zero.
+    const health = readWouldFireRecorderHealth();
+    expect(health.healthy).toBe(false);
+    expect(health.failureCount).toBe(1);
+    expect(typeof health.firstFailureAt).toBe('string');
+    expect(typeof health.lastFailureAt).toBe('string');
+  });
+
+  it('repeated append failures accumulate on the marker rather than resetting it', () => {
+    mkdirSync(wouldFireLogPath(), { recursive: true });
+
+    const originalWarn = console.warn;
+    console.warn = () => {};
+    try {
+      recordWouldFire('checkStuckReviewing', 'PAN-1');
+      recordWouldFire('checkStuckReviewing', 'PAN-2');
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    const health = readWouldFireRecorderHealth();
+    expect(health.healthy).toBe(false);
+    expect(health.failureCount).toBe(2);
+  });
+
+  it('no marker reads as healthy; a torn marker reads as unhealthy (fail-closed)', () => {
+    expect(readWouldFireRecorderHealth()).toEqual({ healthy: true });
+
+    const healthPath = wouldFireRecorderHealthPath();
+    mkdirSync(dirname(healthPath), { recursive: true });
+    writeFileSync(healthPath, 'not json{{{');
+    expect(readWouldFireRecorderHealth()).toEqual({ healthy: false });
+  });
+
+  it('pan doctor reports an error while the recorder is unhealthy, and nothing when healthy', () => {
+    expect(checkPatrolSoakEvidence()).toEqual([]);
+
+    mkdirSync(wouldFireLogPath(), { recursive: true });
+    const originalWarn = console.warn;
+    console.warn = () => {};
+    try {
+      recordWouldFire('checkStuckReviewing');
+    } finally {
+      console.warn = originalWarn;
+    }
+
+    const results = checkPatrolSoakEvidence();
+    expect(results).toHaveLength(1);
+    expect(results[0]!.status).toBe('error');
+    expect(results[0]!.name).toBe('Patrol soak evidence');
+    expect(results[0]!.message).toContain('false zeroes');
+    expect(results[0]!.fix).toContain('would-fire.unhealthy.json');
   });
 });

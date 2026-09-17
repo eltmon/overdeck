@@ -10,7 +10,7 @@
  * unreachable and the deletion is safe. `pan doctor` prints the 7-day table.
  */
 
-import { appendFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { join } from 'node:path';
 
@@ -39,6 +39,70 @@ export function wouldFireLogPath(): string {
   return join(getOverdeckHome(), 'deacon', 'would-fire.jsonl');
 }
 
+export interface WouldFireRecorderHealth {
+  healthy: boolean;
+  firstFailureAt?: string;
+  lastFailureAt?: string;
+  failureCount?: number;
+  lastError?: string;
+  patrol?: string;
+}
+
+/**
+ * Externally observable recorder health (PAN-3848 F1). A dropped JSONL append
+ * reads back as a false zero, which the soak gate could mistake for "this
+ * patrol never fires" and delete a live patrol. The failure is therefore
+ * recorded HERE — beside the log, not in it — where `pan doctor` reports it
+ * as an error until an operator clears it.
+ */
+export function wouldFireRecorderHealthPath(): string {
+  return join(getOverdeckHome(), 'deacon', 'would-fire.unhealthy.json');
+}
+
+/** Fail-closed: a missing marker is healthy, anything else is not. */
+export function readWouldFireRecorderHealth(): WouldFireRecorderHealth {
+  let raw: string;
+  try {
+    raw = readFileSync(wouldFireRecorderHealthPath(), 'utf8');
+  } catch {
+    return { healthy: true };
+  }
+  try {
+    const parsed = JSON.parse(raw) as Partial<WouldFireRecorderHealth>;
+    return {
+      healthy: false,
+      ...(typeof parsed.firstFailureAt === 'string' ? { firstFailureAt: parsed.firstFailureAt } : {}),
+      ...(typeof parsed.lastFailureAt === 'string' ? { lastFailureAt: parsed.lastFailureAt } : {}),
+      ...(typeof parsed.failureCount === 'number' ? { failureCount: parsed.failureCount } : {}),
+      ...(typeof parsed.lastError === 'string' ? { lastError: parsed.lastError } : {}),
+      ...(typeof parsed.patrol === 'string' ? { patrol: parsed.patrol } : {}),
+    };
+  } catch {
+    // A torn marker must not read as healthy.
+    return { healthy: false };
+  }
+}
+
+function markWouldFireRecorderUnhealthy(patrol: string, error: unknown): void {
+  try {
+    const path = wouldFireRecorderHealthPath();
+    mkdirSync(dirname(path), { recursive: true });
+    const previous = readWouldFireRecorderHealth();
+    const now = new Date().toISOString();
+    const marker = {
+      healthy: false,
+      firstFailureAt: previous.healthy ? now : (previous.firstFailureAt ?? now),
+      lastFailureAt: now,
+      failureCount: (previous.healthy ? 0 : (previous.failureCount ?? 0)) + 1,
+      lastError: error instanceof Error ? error.message : String(error),
+      patrol,
+    };
+    writeFileSync(path, `${JSON.stringify(marker)}\n`, 'utf8');
+  } catch (markerError) {
+    console.warn(`[patrol-would-fire] failed to record recorder health for ${patrol}: ${markerError instanceof Error ? markerError.message : String(markerError)}`);
+  }
+}
+
 /**
  * Record one would-have-fired event for a patrol. Best-effort: the counter is
  * observability, never a reason to fail a patrol.
@@ -57,6 +121,11 @@ export function recordWouldFire(patrol: string, issueId?: string): void {
     appendFileSync(path, `${JSON.stringify(entry)}\n`, 'utf8');
   } catch (error) {
     console.warn(`[patrol-would-fire] failed to append ${patrol}: ${error instanceof Error ? error.message : String(error)}`);
+    // A dropped append is a false zero in the soak evidence, not a quiet
+    // skip: mark the recorder unhealthy. Deliberately NOT cleared on the next
+    // success — a later success cannot un-taint the counts already lost, so
+    // the marker stands until an operator removes it (see `pan doctor`).
+    markWouldFireRecorderUnhealthy(patrol, error);
   }
 }
 
