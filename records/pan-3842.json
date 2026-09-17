@@ -170,7 +170,7 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-17T00:39:35.367Z",
+  "updated": "2026-09-17T00:39:52.895Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "passed",
@@ -351,8 +351,16 @@
   ],
   "workModel": "claude-opus-5",
   "tasks": {
-    "sequence": 17,
-    "claims": {},
+    "sequence": 18,
+    "claims": {
+      "spawn-single-log": {
+        "writerId": "agent-pan-3842",
+        "agentId": "agent-pan-3842",
+        "pid": 3550819,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T00:39:52.895Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3842",
@@ -465,8 +473,8 @@
         "updatedAt": "2026-09-16T20:06:58.713Z"
       },
       "spawn-single-log": {
-        "reason": "Adjudicated experiment RESULTS.md: real spawn-entry regression — resolveSingleWorkTierSpawnParams calls getDispatchableItems before the explicit-override branch, breaking 15 tests in agents-spawn-supervisor.test.ts",
-        "updatedAt": "2026-09-17T00:39:35.367Z"
+        "reason": "Fixing explicit-override ordering regression",
+        "updatedAt": "2026-09-17T00:39:52.895Z"
       },
       "settings-badges": {
         "reason": "Settings crew rows and supervisor block render draft-computed fitness badges via tierFitnessWarnings in tiered-crews.ts; 32 section tests pass incl. 6 new PAN-3842 cases; typecheck+lint green (cycle and introspection guards fixed via doctor CheckResult re-declare and audited baseline accept).",
@@ -506,7 +514,7 @@
     "spawn-slot-log.ac2": "completed",
     "spawn-slot-log.ac3": "completed",
     "spawn-slot-log.ac4": "completed",
-    "spawn-single-log": "pending",
+    "spawn-single-log": "running",
     "spawn-single-log.ac1": "pending",
     "spawn-single-log.ac2": "pending",
     "spawn-single-log.ac3": "pending",
