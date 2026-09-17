@@ -83,7 +83,7 @@ the public contract and lists every allowed value.
 | `merge_kind` | `pipeline` |
 | `model_family` | `claude`, `gpt`, `gemini`, `kimi`, `minimax`, `glm`, `mimo`, `other` |
 | `pipeline_stage` | `work_done`, `review_passed`, `verification_passed`, `merged`, `closed_out` |
-| `project_mode` | `existing`, `new` |
+| `project_mode` | `clone`, `existing`, `new` |
 
 Raw counts and timings are never sent. Pipeline attribution is emitted only
 after the canonical pipeline-membership resolver confirms that the issue is in
