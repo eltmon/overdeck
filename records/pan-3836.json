@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T02:09:50.953Z",
+  "updated": "2026-09-17T02:10:04.912Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,8 +678,16 @@
     }
   ],
   "tasks": {
-    "sequence": 66,
-    "claims": {},
+    "sequence": 67,
+    "claims": {
+      "wire-entry-points-no-loss": {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 840194,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T02:10:04.912Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3836",
@@ -1084,7 +1092,7 @@
     "new-project-page.ac3": "completed",
     "new-project-page.ac4": "completed",
     "new-project-page.ac5": "completed",
-    "wire-entry-points-no-loss": "pending",
+    "wire-entry-points-no-loss": "running",
     "wire-entry-points-no-loss.ac1": "pending",
     "wire-entry-points-no-loss.ac2": "pending",
     "wire-entry-points-no-loss.ac3": "pending",
