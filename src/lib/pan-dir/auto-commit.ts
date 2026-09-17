@@ -728,19 +728,66 @@ function pushStateBranch(
     DEFAULT_STATE_PUSH_TIMEOUT_MS,
   );
 
-  return runGitWithTimeout(['push', 'origin', branch], gitRoot, timeoutMs).pipe(
-    Effect.matchEffect({
-      onSuccess: () => Effect.succeed({ pushed: true }),
-      onFailure: (err) => {
-        const message = err.stderr || err._tag;
-        // The paths-only queue has no mutation intent and must never replay or
-        // rebase. Domain writers resolve non-fast-forward conflicts before
-        // enqueuing a new concrete file version (PAN-2541 D10).
-        warnAutoPush(branch, `push failed: ${message}`);
-        return Effect.succeed({ pushed: false, reason: `push failed: ${message}` });
-      },
+  return Effect.promise(() =>
+    pushWithRetry(async () => {
+      const outcome = await Effect.runPromise(
+        Effect.either(runGitWithTimeout(['push', 'origin', branch], gitRoot, timeoutMs)),
+      );
+      return outcome._tag === 'Right'
+        ? { ok: true as const }
+        : { ok: false as const, message: outcome.left.stderr || outcome.left._tag };
+    }),
+  ).pipe(
+    Effect.map((result) => {
+      // The paths-only queue has no mutation intent and must never replay or
+      // rebase. Domain writers resolve non-fast-forward conflicts before
+      // enqueuing a new concrete file version (PAN-2541 D10).
+      if (!result.pushed) warnAutoPush(branch, result.reason ?? 'push failed');
+      return result;
     }),
   );
+}
+
+const PUSH_RETRY_DELAYS_MS = [500, 1500, 3000] as const;
+const PUSH_MAX_ATTEMPTS = PUSH_RETRY_DELAYS_MS.length + 1;
+
+/**
+ * A rejected push is retried only when another writer plausibly landed a
+ * commit on the same local branch concurrently — the rejection is transient
+ * and a plain retry succeeds once the ref lock clears. Anything else
+ * (auth, network, hooks) fails immediately as before. No fetch, no rebase,
+ * no force. Total added delay is at most 5s (D11: the record writer's state
+ * git lock has a 30s durability budget).
+ */
+function isRetryablePushRejection(message: string): boolean {
+  return message.includes('cannot lock ref')
+    || message.includes('failed to push some refs')
+    || message.includes('non-fast-forward');
+}
+
+interface PushAttemptOutcome {
+  ok: boolean;
+  message?: string;
+}
+
+async function pushWithRetry(
+  attempt: () => Promise<PushAttemptOutcome>,
+  sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+): Promise<PushResult> {
+  let lastMessage = 'unknown error';
+  for (let n = 1; n <= PUSH_MAX_ATTEMPTS; n++) {
+    const outcome = await attempt();
+    if (outcome.ok) return { pushed: true };
+    lastMessage = outcome.message ?? 'unknown error';
+    if (n < PUSH_MAX_ATTEMPTS && isRetryablePushRejection(lastMessage)) {
+      const delayMs = PUSH_RETRY_DELAYS_MS[n - 1]!;
+      console.log(`[auto-commit] push rejected (attempt ${n}/${PUSH_MAX_ATTEMPTS}): ${lastMessage.split('\n')[0]}; retrying in ${delayMs}ms`);
+      await sleep(delayMs);
+      continue;
+    }
+    break;
+  }
+  return { pushed: false, reason: `push failed: ${lastMessage}` };
 }
 
 function pushOriginMain(gitRoot: string, branch: string, retry: boolean): Effect.Effect<PushResult, never> {
@@ -852,6 +899,7 @@ export const __testInternals = {
   boundStateFlush,
   startSerializedFlush,
   waitForFlush,
+  pushWithRetry,
   /**
    * The flush a timer turn (or an explicit flush) started for `projectRoot`,
    * or `undefined` when nothing is in flight. Tests use this to await the

@@ -796,3 +796,57 @@ describe('deriveProjectRoot', () => {
     expect(deriveProjectRoot('/work/myproj/src/lib/foo.ts')).toBeNull();
   });
 });
+
+describe('pushWithRetry', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('retries lock-ref rejections and succeeds on the third attempt', async () => {
+    let calls = 0;
+    const promise = __testInternals.pushWithRetry(async () => {
+      calls++;
+      return calls < 3
+        ? { ok: false, message: "error: cannot lock ref 'refs/heads/overdeck-state': is at abc but expected def" }
+        : { ok: true };
+    });
+    await vi.advanceTimersByTimeAsync(500);
+    await vi.advanceTimersByTimeAsync(1500);
+    const result = await promise;
+
+    expect(result).toEqual({ pushed: true });
+    expect(calls).toBe(3);
+  });
+
+  it('does not retry a non-retryable failure', async () => {
+    let calls = 0;
+    const promise = __testInternals.pushWithRetry(async () => {
+      calls++;
+      return { ok: false, message: 'Permission denied (publickey)' };
+    });
+    const result = await promise;
+
+    expect(result).toEqual({ pushed: false, reason: 'push failed: Permission denied (publickey)' });
+    expect(calls).toBe(1);
+  });
+
+  it('gives up after four attempts and reports the last reason', async () => {
+    let calls = 0;
+    const promise = __testInternals.pushWithRetry(async () => {
+      calls++;
+      return { ok: false, message: `error: cannot lock ref 'refs/heads/overdeck-state' (rejection ${calls})` };
+    });
+    await vi.advanceTimersByTimeAsync(5000);
+    const result = await promise;
+
+    expect(result).toEqual({
+      pushed: false,
+      reason: "push failed: error: cannot lock ref 'refs/heads/overdeck-state' (rejection 4)",
+    });
+    expect(calls).toBe(4);
+  });
+});
