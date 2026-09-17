@@ -37,4 +37,15 @@ describe('PAN-3859 dead-code no-loss audit', () => {
     // on existed only to guard the legacy mapping and was deleted with it.
     await expect(import('../../../../src/lib/cloister/router.js')).rejects.toThrow();
   });
+
+  it('W4: the legacy complexity→model chain is gone; detection helpers survive', async () => {
+    // complexityToModel (hardcoded haiku/sonnet/opus literals) and
+    // legacyComplexityTierConfig fed only the deleted ModelRouter. The live
+    // detection helpers (detectComplexity, parseDifficultyLabel) are kept.
+    const mod = await import('../../../../src/lib/cloister/complexity.js');
+    expect('complexityToModel' in mod).toBe(false);
+    expect('legacyComplexityTierConfig' in mod).toBe(false);
+    expect(typeof mod.detectComplexity).toBe('function');
+    expect(typeof mod.parseDifficultyLabel).toBe('function');
+  });
 });
