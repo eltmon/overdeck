@@ -40,6 +40,7 @@ vi.mock('../../../../src/lib/cloister/review-convoy-liveness.js', async (importO
 }));
 
 import {
+  findMixedWouldFireModes,
   getInMemoryWouldFireCounts,
   isPatrolShadowMode,
   readWouldFireCounts,
@@ -94,7 +95,7 @@ describe('patrol would-fire counters (PAN-3848 W30)', () => {
     expect(typeof first.ts).toBe('string');
   });
 
-  it('readWouldFireCounts filters by sinceIso and skips torn lines', () => {
+  it('readWouldFireCounts splits by recorded mode, filters by sinceIso, skips torn lines', () => {
     const path = wouldFireLogPath();
     mkdirSync(dirname(path), { recursive: true });
     const now = Date.now();
@@ -105,13 +106,30 @@ describe('patrol would-fire counters (PAN-3848 W30)', () => {
       JSON.stringify({ ts: recent, patrol: 'a', shadow: true }),
       JSON.stringify({ ts: recent, patrol: 'b', shadow: false }),
       JSON.stringify({ ts: old, patrol: 'a', shadow: true }),
+      // No flag: counted as live, so an unknown firing blocks the deletion
+      // gate instead of vanishing into a zero.
+      JSON.stringify({ ts: recent, patrol: 'c' }),
       'not json',
       '',
     ].join('\n'));
 
     expect(readWouldFireCounts(new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString()))
-      .toEqual({ a: 2, b: 1 });
-    expect(readWouldFireCounts()).toEqual({ a: 3, b: 1 });
+      .toEqual({ shadow: { a: 2 }, normal: { b: 1, c: 1 } });
+    expect(readWouldFireCounts()).toEqual({ shadow: { a: 3 }, normal: { b: 1, c: 1 } });
+  });
+
+  it('findMixedWouldFireModes names patrols recorded in both modes', () => {
+    const path = wouldFireLogPath();
+    mkdirSync(dirname(path), { recursive: true });
+    const ts = new Date().toISOString();
+    writeFileSync(path, [
+      JSON.stringify({ ts, patrol: 'mixed', shadow: true }),
+      JSON.stringify({ ts, patrol: 'mixed', shadow: false }),
+      JSON.stringify({ ts, patrol: 'pure-shadow', shadow: true }),
+      JSON.stringify({ ts, patrol: 'pure-live', shadow: false }),
+    ].join('\n'));
+
+    expect(findMixedWouldFireModes()).toEqual(['mixed']);
   });
 
   it('shadow mode: a wrapped patrol detects and counts but never acts', async () => {
@@ -159,7 +177,7 @@ describe('patrol would-fire counters (PAN-3848 W30)', () => {
     expect(actions).toHaveLength(1);
   });
 
-  it('pan doctor prints a per-patrol would-fire table for the last 7 days', () => {
+  it('pan doctor prints per-mode would-fire counts without claiming this process mode', () => {
     mkdirSync(dirname(wouldFireLogPath()), { recursive: true });
     writeFileSync(wouldFireLogPath(), [
       JSON.stringify({ ts: new Date().toISOString(), patrol: 'checkOrphanedCompletions', issueId: 'PAN-1', shadow: true }),
@@ -167,6 +185,9 @@ describe('patrol would-fire counters (PAN-3848 W30)', () => {
       JSON.stringify({ ts: new Date().toISOString(), patrol: 'checkStuckReviewing', issueId: 'PAN-3', shadow: false }),
     ].join('\n'));
 
+    // Even with shadow mode ON in THIS process, the table reports the
+    // recorded mode per entry — never the reader's environment.
+    process.env.OVERDECK_PATROL_SHADOW = '1';
     const lines: string[] = [];
     const originalLog = console.log;
     console.log = (...args: unknown[]) => { lines.push(args.map(String).join(' ')); };
@@ -177,9 +198,35 @@ describe('patrol would-fire counters (PAN-3848 W30)', () => {
     }
 
     const out = lines.join('\n');
-    expect(out).toContain('Patrol would-fire counts (last 7 days');
-    expect(out).toContain('checkOrphanedCompletions: 2');
-    expect(out).toContain('checkStuckReviewing: 1');
+    expect(out).toContain('Patrol would-fire counts (last 7 days, by recorded mode)');
+    expect(out).not.toContain('shadow mode ON');
+    expect(out).toContain('checkOrphanedCompletions: shadow=2 live=0');
+    expect(out).toContain('checkStuckReviewing: shadow=0 live=1');
+  });
+
+  it('pan doctor flags a mixed-mode patrol in the table and as soak-evidence error', () => {
+    mkdirSync(dirname(wouldFireLogPath()), { recursive: true });
+    const ts = new Date().toISOString();
+    writeFileSync(wouldFireLogPath(), [
+      JSON.stringify({ ts, patrol: 'checkStuckReviewing', shadow: true }),
+      JSON.stringify({ ts, patrol: 'checkStuckReviewing', shadow: false }),
+    ].join('\n'));
+
+    const lines: string[] = [];
+    const originalLog = console.log;
+    console.log = (...args: unknown[]) => { lines.push(args.map(String).join(' ')); };
+    try {
+      printPatrolWouldFireTable();
+    } finally {
+      console.log = originalLog;
+    }
+    expect(lines.join('\n')).toContain('checkStuckReviewing: shadow=1 live=1 (MIXED — soak evidence invalid)');
+
+    const results = checkPatrolSoakEvidence();
+    expect(results).toHaveLength(1);
+    expect(results[0]!.status).toBe('error');
+    expect(results[0]!.message).toContain('checkStuckReviewing');
+    expect(results[0]!.message).toContain('both shadow and live');
   });
 
   it('pan doctor prints an empty table line when nothing was recorded', () => {

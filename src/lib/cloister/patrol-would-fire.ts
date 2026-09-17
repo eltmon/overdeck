@@ -130,17 +130,28 @@ export function recordWouldFire(patrol: string, issueId?: string): void {
 }
 
 /**
- * Per-patrol would-fire counts since `sinceIso` (inclusive). Unparseable lines
- * are skipped — a torn write must not break the doctor table.
+ * Per-patrol would-fire counts since `sinceIso` (inclusive), split by the
+ * shadow mode RECORDED WITH EACH ENTRY — not the mode of the reading process
+ * (PAN-3848 F3). `pan doctor` runs in its own environment, which can differ
+ * from the daemon's; the per-entry flag is the only trustworthy mode signal.
+ * Entries without a boolean flag predate nothing (the flag has always been
+ * written) but are counted as live: for a deletion gate, an unknown firing
+ * must block, never vanish. Unparseable lines are skipped — a torn write must
+ * not break the doctor table.
  */
-export function readWouldFireCounts(sinceIso?: string): Record<string, number> {
+export interface WouldFireModeCounts {
+  shadow: Record<string, number>;
+  normal: Record<string, number>;
+}
+
+export function readWouldFireCounts(sinceIso?: string): WouldFireModeCounts {
   let raw: string;
   try {
     raw = readFileSync(wouldFireLogPath(), 'utf8');
   } catch {
-    return {};
+    return { shadow: {}, normal: {} };
   }
-  const counts: Record<string, number> = {};
+  const counts: WouldFireModeCounts = { shadow: {}, normal: {} };
   for (const line of raw.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
@@ -152,9 +163,20 @@ export function readWouldFireCounts(sinceIso?: string): Record<string, number> {
     }
     if (typeof entry.patrol !== 'string' || typeof entry.ts !== 'string') continue;
     if (sinceIso && entry.ts < sinceIso) continue;
-    counts[entry.patrol] = (counts[entry.patrol] ?? 0) + 1;
+    const bucket = entry.shadow === true ? counts.shadow : counts.normal;
+    bucket[entry.patrol] = (bucket[entry.patrol] ?? 0) + 1;
   }
   return counts;
+}
+
+/**
+ * Patrols with BOTH shadow and live firings in the window (PAN-3848 F3). A
+ * mixed patrol's zeroes prove nothing about either mode, so its soak evidence
+ * is invalid until the window holds a single mode again.
+ */
+export function findMixedWouldFireModes(sinceIso?: string): string[] {
+  const counts = readWouldFireCounts(sinceIso);
+  return Object.keys(counts.shadow).filter((patrol) => (counts.normal[patrol] ?? 0) > 0).sort();
 }
 
 /** Test hook: the process-local counts, without touching the JSONL file. */

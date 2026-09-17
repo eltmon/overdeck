@@ -7,7 +7,7 @@ import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { getAgentSessionsSync, listSessionNamesSync } from '../../lib/tmux.js';
 import { listProjectsSync, type ProjectConfig } from '../../lib/projects.js';
-import { isPatrolShadowMode, readWouldFireCounts, readWouldFireRecorderHealth, wouldFireRecorderHealthPath } from '../../lib/cloister/patrol-would-fire.js';
+import { findMixedWouldFireModes, readWouldFireCounts, readWouldFireRecorderHealth, wouldFireRecorderHealthPath } from '../../lib/cloister/patrol-would-fire.js';
 import { homedir } from 'os';
 import { isAbsolute, join, resolve } from 'path';
 import {
@@ -361,23 +361,43 @@ export function checkPatrolSoakEvidence(): CheckResult[] {
       fix: `Inspect disk space and permissions for the deacon state dir, then delete ${wouldFireRecorderHealthPath()} to re-arm. Zeroes recorded during the outage stay untrustworthy — restart the soak window for any patrol gated on them.`,
     });
   }
+  const sinceIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  for (const patrol of findMixedWouldFireModes(sinceIso)) {
+    results.push({
+      name: 'Patrol soak evidence',
+      status: 'error',
+      message: `${patrol} recorded both shadow and live firings in the last 7 days — its zeroes prove nothing about either mode, soak evidence is invalid`,
+      fix: `Decide which mode ${patrol} should soak in, keep it there for a full 7-day window, then re-check. Entries carry their own shadow flag; the daemon's OVERDECK_PATROL_SHADOW and this shell's may differ.`,
+    });
+  }
   return results;
 }
 
+/**
+ * PAN-3848 (W30, F3): print the per-patrol would-have-fired counts for the
+ * last 7 days, split by the shadow mode recorded with each entry. During a
+ * soak (OVERDECK_PATROL_SHADOW=1 on the dashboard) the wrapped patrols detect
+ * but never act; a week of zeroes is the deletion gate's evidence. The mode
+ * shown is the recorder's, never this process's environment — the two can
+ * differ, and the header must not claim otherwise.
+ */
 export function printPatrolWouldFireTable(): void {
   const sinceIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const counts = readWouldFireCounts(sinceIso);
-  const shadow = isPatrolShadowMode();
 
-  console.log(chalk.bold(`Patrol would-fire counts (last 7 days${shadow ? ', shadow mode ON — patrols are suppressed' : ''}):`));
-  const entries = Object.entries(counts).sort(([a], [b]) => a.localeCompare(b));
-  if (entries.length === 0) {
+  console.log(chalk.bold('Patrol would-fire counts (last 7 days, by recorded mode):'));
+  const patrols = [...new Set([...Object.keys(counts.shadow), ...Object.keys(counts.normal)])]
+    .sort((a, b) => a.localeCompare(b));
+  if (patrols.length === 0) {
     console.log(chalk.dim('  (no would-fire events recorded)'));
     return;
   }
-  for (const [patrol, count] of entries) {
-    const line = `  ${patrol}: ${count}`;
-    console.log(count > 0 && shadow ? chalk.yellow(line) : line);
+  for (const patrol of patrols) {
+    const shadow = counts.shadow[patrol] ?? 0;
+    const normal = counts.normal[patrol] ?? 0;
+    const mixed = shadow > 0 && normal > 0;
+    const line = `  ${patrol}: shadow=${shadow} live=${normal}${mixed ? ' (MIXED — soak evidence invalid)' : ''}`;
+    console.log(mixed ? chalk.red(line) : line);
   }
 }
 
