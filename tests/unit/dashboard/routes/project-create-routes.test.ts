@@ -528,6 +528,151 @@ describe('project-create routes', () => {
       });
     });
   });
+
+  // ─── AC-2: the operation-and-target guard (WI-2) ───────────────────────────
+  //
+  // The guard only earns its keep if the route calls it. These tests fail if
+  // POST /api/projects goes back to ignoring `operationId`, which is exactly
+  // how the dedup layer became dead code once before.
+
+  describe('POST /api/projects operation deduplication', () => {
+    it('AC2.1: a repeat of the same operation id with the same input joins the first job', async () => {
+      const intent = makeResolvedIntent('clone');
+      routeMocks.resolveProjectCreateIntent.mockResolvedValue(intent);
+      routeMocks.performProjectCreate.mockImplementation(() => new Promise(() => {}));
+
+      const body = JSON.stringify({ mode: 'clone', url: 'o/r', operationId: 'op-same' });
+      const first = await requestProjectsRoute('/api/projects', { method: 'POST', body });
+      const second = await requestProjectsRoute('/api/projects', { method: 'POST', body });
+
+      expect(first.status).toBe(202);
+      expect(second.status).toBe(202);
+      expect((second.body as any).jobId).toBe((first.body as any).jobId);
+      expect((first.body as any).operationId).toBe('op-same');
+      // One clone, not two: this is the whole point of the retry story.
+      expect(routeMocks.performProjectCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it('AC2.2: the same operation id with different input is a conflict, not a silent overwrite', async () => {
+      routeMocks.performProjectCreate.mockImplementation(() => new Promise(() => {}));
+      routeMocks.resolveProjectCreateIntent.mockResolvedValueOnce(makeResolvedIntent('clone'));
+
+      const first = await requestProjectsRoute('/api/projects', {
+        method: 'POST',
+        body: JSON.stringify({ mode: 'clone', url: 'o/r', operationId: 'op-drift' }),
+      });
+      expect(first.status).toBe(202);
+
+      routeMocks.resolveProjectCreateIntent.mockResolvedValueOnce(
+        makeResolvedIntent('clone', { path: '/home/user/Projects/other', key: 'other' }),
+      );
+      const second = await requestProjectsRoute('/api/projects', {
+        method: 'POST',
+        body: JSON.stringify({ mode: 'clone', url: 'o/other', operationId: 'op-drift' }),
+      });
+
+      expect(second.status).toBe(409);
+      expect((second.body as any).code).toBe('conflict');
+      expect(routeMocks.performProjectCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it('AC2.3: two different operations aimed at one directory cannot both run', async () => {
+      const intent = makeResolvedIntent('clone');
+      routeMocks.resolveProjectCreateIntent.mockResolvedValue(intent);
+      routeMocks.performProjectCreate.mockImplementation(() => new Promise(() => {}));
+
+      const first = await requestProjectsRoute('/api/projects', {
+        method: 'POST',
+        body: JSON.stringify({ mode: 'clone', url: 'o/r', operationId: 'op-a' }),
+      });
+      const second = await requestProjectsRoute('/api/projects', {
+        method: 'POST',
+        body: JSON.stringify({ mode: 'clone', url: 'o/r', operationId: 'op-b' }),
+      });
+
+      expect(first.status).toBe(202);
+      expect(second.status).toBe(409);
+      expect((second.body as any).code).toBe('target-busy');
+      expect((second.body as any).error).toMatch(/\/home\/user\/Projects\/test-proj/);
+      // The second tab must not have started a clone into a directory the first
+      // one is still writing into.
+      expect(routeMocks.performProjectCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it('AC2.4: a settled operation replays its result instead of creating twice', async () => {
+      const intent = makeResolvedIntent('existing');
+      const result: ProjectCreateResult = {
+        key: 'test-proj',
+        name: 'Test Project',
+        path: '/home/user/Projects/test-proj',
+        mainWorkspaceId: 'ws-123',
+        seededContextLayer: false,
+        hooksInstalled: 0,
+      };
+      routeMocks.resolveProjectCreateIntent.mockResolvedValue(intent);
+      routeMocks.performProjectCreate.mockResolvedValue(result);
+
+      const body = JSON.stringify({ mode: 'existing', path: '/home/user/proj', operationId: 'op-done' });
+      const first = await requestProjectsRoute('/api/projects', { method: 'POST', body });
+      const second = await requestProjectsRoute('/api/projects', { method: 'POST', body });
+
+      expect(first.status).toBe(200);
+      expect(second.status).toBe(200);
+      expect(second.body).toMatchObject({ key: 'test-proj', operationId: 'op-done' });
+      expect(routeMocks.performProjectCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it('AC2.5: a failed synchronous create releases the destination', async () => {
+      const intent = makeResolvedIntent('existing');
+      routeMocks.resolveProjectCreateIntent.mockResolvedValue(intent);
+      routeMocks.performProjectCreate.mockRejectedValueOnce(new Error('Filesystem error'));
+
+      const failed = await requestProjectsRoute('/api/projects', {
+        method: 'POST',
+        body: JSON.stringify({ mode: 'existing', path: '/home/user/proj', operationId: 'op-fail' }),
+      });
+      expect(failed.status).toBe(500);
+
+      // Without a settle on the failure path the destination would stay pinned
+      // as target-busy for the life of the process, and no later attempt at this
+      // directory could ever succeed.
+      routeMocks.performProjectCreate.mockResolvedValueOnce({
+        key: 'test-proj',
+        name: 'Test Project',
+        path: '/home/user/Projects/test-proj',
+        mainWorkspaceId: 'ws-123',
+        seededContextLayer: false,
+        hooksInstalled: 0,
+      });
+      const retried = await requestProjectsRoute('/api/projects', {
+        method: 'POST',
+        body: JSON.stringify({ mode: 'existing', path: '/home/user/proj', operationId: 'op-retry' }),
+      });
+
+      expect(retried.status).toBe(200);
+      expect(retried.body).toMatchObject({ key: 'test-proj' });
+    });
+
+    it('AC2.6: a request with no operation id still excludes a concurrent one at the same target', async () => {
+      const intent = makeResolvedIntent('clone');
+      routeMocks.resolveProjectCreateIntent.mockResolvedValue(intent);
+      routeMocks.performProjectCreate.mockImplementation(() => new Promise(() => {}));
+
+      const first = await requestProjectsRoute('/api/projects', {
+        method: 'POST',
+        body: JSON.stringify({ mode: 'clone', url: 'o/r' }),
+      });
+      const second = await requestProjectsRoute('/api/projects', {
+        method: 'POST',
+        body: JSON.stringify({ mode: 'clone', url: 'o/r' }),
+      });
+
+      expect(first.status).toBe(202);
+      expect((first.body as any).operationId).toEqual(expect.any(String));
+      expect(second.status).toBe(409);
+      expect((second.body as any).code).toBe('target-busy');
+    });
+  });
 });
 
 // ─── New surfaces from WI-2 ──────────────────────────────────────────────────
@@ -565,6 +710,37 @@ describe('POST /api/projects/create-jobs/reconcile', () => {
     });
 
     expect(status).toBe(400);
+  });
+
+  it('hands back the live job when only the operation id survived', async () => {
+    const intent = makeResolvedIntent('clone');
+    routeMocks.resolveProjectCreateIntent.mockResolvedValue(intent);
+    routeMocks.performProjectCreate.mockImplementation(() => new Promise(() => {}));
+    routeMocks.resolveProjectCreateRecovery.mockResolvedValue({ status: 'conflict', reason: 'half-written' });
+
+    const created = await requestProjectsRoute('/api/projects', {
+      method: 'POST',
+      body: JSON.stringify({ mode: 'clone', url: 'o/r', operationId: 'op-lost' }),
+    });
+    expect(created.status).toBe(202);
+
+    // The client lost the POST response, so it has no jobId — only the
+    // operationId it stored before submitting. Falling through to disk would
+    // inspect a directory the clone is still writing into and call it a
+    // conflict, stranding the operator on a dead end.
+    const { status, body } = await requestProjectsRoute('/api/projects/create-jobs/reconcile', {
+      method: 'POST',
+      body: JSON.stringify({
+        mode: 'clone',
+        key: 'test-proj',
+        expectedPath: '/home/user/Projects/test-proj',
+        operationId: 'op-lost',
+      }),
+    });
+
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ status: 'job', job: { id: (created.body as any).jobId } });
+    expect(routeMocks.resolveProjectCreateRecovery).not.toHaveBeenCalled();
   });
 
   it('passes the expected identity through to the read-only resolver', async () => {

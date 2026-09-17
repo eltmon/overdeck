@@ -214,10 +214,10 @@ to a 4 KiB tail before they reach a response, a log, or a job record.
 | Route | Auth | Behavior |
 | --- | --- | --- |
 | `POST /api/projects/resolve` | mutation guard (auth + origin + CSRF) despite read-only semantics | 200 with the safe intent and its `findings`. Forces `homeBoundary: true` and does **not** refresh the remote probe — it runs once per settled keystroke and must read the 60 s memo. |
-| `POST /api/projects` | mutation guard | 422 on findings; 202 `{jobId}` for clone; 200 `{key, name, path}` for existing/new; 409 for a real conflict; 500 for an unexpected failure. Refreshes the probe, because this one is about to write. |
+| `POST /api/projects` | mutation guard | 422 on findings; 202 `{jobId, operationId}` for clone; 200 `{key, name, path, operationId}` for existing/new; 409 for a real conflict — `conflict` when the body's `operationId` was already used for different input, `target-busy` when another operation owns the destination; 500 for an unexpected failure. Reserves the operation and its destination **after** resolving, because the fingerprint and target path are only known once the intent is resolved; every exit past the reservation settles it, so a failure releases the destination instead of pinning it. Refreshes the probe, because this one is about to write. |
 | `GET /api/projects/create-jobs/:jobId` | read guard | Safe job status. **404 means unknown to this runtime, not confirmed failure.** |
 | `POST /api/projects/create-jobs/:jobId/cancel` | mutation guard | 202 `cancelling` while the child is stopping; 409 `cannot-cancel-setup` once registration began; the terminal result if it already finished; 404 for an unknown job. Idempotent. |
-| `POST /api/projects/create-jobs/reconcile` | mutation guard | Read-only. Returns `completed`, `needs-setup`, `conflict`, or `unknown`. Never registers, clones, or repairs. |
+| `POST /api/projects/create-jobs/reconcile` | mutation guard | Read-only. Returns `job` when this runtime still owns the clone — found by the client's `jobId`, or by its `operationId` when the POST response that carried the job id was lost — and otherwise `completed`, `needs-setup`, `conflict`, or `unknown`. Never registers, clones, or repairs. |
 | `POST /api/projects/:projectKey/finish-setup` | mutation guard | Idempotent repair through the shared helper. 409 on identity mismatch, 500 on an unexpected failure. Never clones. |
 
 ### Operations, jobs, and their limits
@@ -225,10 +225,13 @@ to a 4 KiB tail before they reach a response, a log, or a job record.
 `src/dashboard/server/routes/project-create-jobs.ts` is the only owner of this
 runtime state; routes never keep their own maps.
 
-- **Operations.** The client generates one `operationId` per submission. The
-  same id with the same input *joins* the first attempt, which is what makes a
-  retry after a lost POST response safe. The same id with different input is a
-  409. Two different ids aimed at the same directory cannot run together.
+- **Operations.** The client generates one `operationId` per submission and
+  sends it on `POST /api/projects`; a request without one still gets target
+  exclusion under a server-generated id, it simply has nothing to correlate a
+  retry with. The same id with the same input *joins* the first attempt, which
+  is what makes a retry after a lost POST response safe. The same id with
+  different input is a 409. Two different ids aimed at the same directory cannot
+  run together.
 - **Cancellation.** The job owns the `AbortController`. "Cancel requested" and
   "cancelled" stay distinct: the job is cancelled only once the child has closed
   and cleanup has settled, so the UI never offers a retry into a directory

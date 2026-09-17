@@ -286,6 +286,31 @@ describe('polling and lost contact', () => {
     expect(fetchMock.mock.calls.filter(([url]) => url === '/api/projects')).toHaveLength(1);
   });
 
+  it('resumes polling when reconcile says the server still owns the job', async () => {
+    let polls = 0;
+    route((url) => {
+      if (url === '/api/projects') return jsonResponse({ jobId: 'job-1' }, 202);
+      if (url === '/api/projects/create-jobs/reconcile') {
+        return jsonResponse({ status: 'job', job: { id: 'job-2', phase: 'cloning', percent: 42 } });
+      }
+      if (url === '/api/projects/create-jobs/job-2') {
+        polls += 1;
+        return jsonResponse({ status: 'cloning', phase: 'cloning', percent: 60 });
+      }
+      return jsonResponse({ error: 'Unknown job' }, 404);
+    });
+
+    const result = await runningHook();
+    // The first job id 404s, so the hook reconciles — and gets a live job back.
+    // Treating that as exhausted would strand the operator while a clone runs.
+    await act(async () => {
+      vi.advanceTimersByTime(POLL_INTERVAL_MS);
+    });
+
+    await waitFor(() => expect(result.current.submission.kind).toBe('running'));
+    await waitFor(() => expect(polls).toBeGreaterThan(0));
+  });
+
   it('surfaces a completed reconcile as success', async () => {
     route((url) => {
       if (url === '/api/projects') return jsonResponse({ jobId: 'job-1' }, 202);

@@ -241,6 +241,12 @@ export function useProjectCreateIntent({
     pollTimer.current = window.setTimeout(run, delay);
   }, [clearPoll]);
 
+  // `reconcile` can hand control back to the poller, and the poller calls
+  // `reconcile` on a 404. A ref breaks that declaration cycle without making
+  // either callback depend on the other's identity — which would rebuild both
+  // on every render and restart the poll.
+  const pollJobRef = useRef<((o: ProjectCreateObservation, g: number) => void) | null>(null);
+
   const reconcile = useCallback(
     async (observation: ProjectCreateObservation, gen: number): Promise<void> => {
       try {
@@ -272,7 +278,7 @@ export function useProjectCreateIntent({
           | { status: 'needs-setup'; key: string; path: string; reason: string }
           | { status: 'conflict'; reason: string }
           | { status: 'unknown'; reason: string }
-          | { status: 'job' };
+          | { status: 'job'; job: { id: string; phase: string; percent: number | null } };
         if (gen !== generation.current) return;
 
         if (body.status === 'completed') {
@@ -299,8 +305,23 @@ export function useProjectCreateIntent({
           });
           return;
         }
-        // conflict / unknown / a job we cannot read: nothing is proved, so the
-        // operator reviews rather than the page retrying into a live clone.
+        if (body.status === 'job') {
+          // The server still owns this clone. Nothing is lost — pick the poll
+          // back up rather than stranding the operator on a dead-end screen.
+          const withJob = { ...observation, jobId: body.job.id };
+          writeObservation(withJob);
+          setSubmission({
+            kind: 'running',
+            operationId: observation.operationId,
+            jobId: body.job.id,
+            progress: { phase: body.job.phase, percent: body.job.percent },
+          });
+          retryIndex.current = 0;
+          pollJobRef.current?.(withJob, gen);
+          return;
+        }
+        // conflict / unknown: nothing is proved, so the operator reviews rather
+        // than the page retrying into a live clone.
         setSubmission({
           kind: 'connection-lost',
           operationId: observation.operationId,
@@ -423,6 +444,7 @@ export function useProjectCreateIntent({
     },
     [finish, reconcile, scheduleNextPoll],
   );
+  pollJobRef.current = (o, g) => void pollJob(o, g);
 
   // ─── Resume observation after a reload ─────────────────────────────────────
   useEffect(() => {
@@ -478,8 +500,11 @@ export function useProjectCreateIntent({
       if (response.status === 202) {
         const { jobId } = (await response.json()) as { jobId?: string };
         if (!jobId) {
-          // A 202 without a job id is a protocol error. Something may be running,
-          // so this is unknown — never an invitation to submit again.
+          // A 202 with no job id means the server joined this submission to one
+          // already in flight that has not started a job yet. Something is
+          // running, so this is unknown — never an invitation to submit again.
+          // Store the observation first, or Check again has nothing to read.
+          writeObservation(observation);
           setSubmission({ kind: 'connection-lost', operationId, exhausted: true });
           return;
         }

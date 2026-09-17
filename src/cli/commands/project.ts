@@ -234,9 +234,13 @@ export async function projectAddCommand(
     regResult = { ...regResult, config: updated };
   }
 
-  console.log(chalk.green(`✓ Added project: ${name}`));
-  console.log(chalk.dim(`  Key: ${key}`));
-  console.log(chalk.dim(`  Path: ${fullPath}`));
+  // Report what registration actually wrote, not what this command proposed:
+  // key selection belongs to registerProjectFromPath, and a de-duplicated key
+  // printed as the proposed one sends the operator to a project that is not
+  // there.
+  console.log(chalk.green(`✓ Added project: ${regResult.config.name}`));
+  console.log(chalk.dim(`  Key: ${regResult.key}`));
+  console.log(chalk.dim(`  Path: ${regResult.config.path}`));
   if (regResult.seededContextLayer) {
     console.log(chalk.dim('  Context layer: .overdeck/context/project.md (commit this)'));
   }

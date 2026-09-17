@@ -27,7 +27,7 @@ import { mkdir, rm, stat, lstat, readFile, appendFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { promisify } from 'util';
 
-import { getProjectSync, type ProjectConfig } from '../projects.js';
+import { getProjectSync, listProjectsSync, type ProjectConfig } from '../projects.js';
 import { registerProjectFromPath, installGitHooksInDir } from '../project-registration.js';
 import { ensureProjectLayer } from '../context-layers/index.js';
 import { resolveWorkspaceCreateIntent, performWorkspaceCreate } from '../workspaces/create.js';
@@ -339,6 +339,22 @@ export async function finishProjectSetup(args: {
  * disk and retrying create would either clone a second copy or hit the duplicate
  * guard forever.
  */
+/**
+ * The registered project whose canonical path is `path`, if any.
+ *
+ * Path is the identity that matters here: two projects cannot share a
+ * directory, while the key is chosen inside registration and is not returned by
+ * a call that threw.
+ */
+async function findRegisteredProjectAtPath(
+  path: string,
+): Promise<{ key: string; config: ProjectConfig } | null> {
+  for (const entry of listProjectsSync()) {
+    if ((await canonicalizePath(entry.config.path)) === path) return entry;
+  }
+  return null;
+}
+
 export async function performProjectCreate(
   intent: ResolvedProjectIntent,
   hooks: ProjectCreateHooks = {},
@@ -403,10 +419,17 @@ export async function performProjectCreate(
     // registerProjectFromPath writes the config before its later steps, so a
     // throw does not prove nothing landed. Reread the canonical registry rather
     // than inferring from whether the promise rejected.
-    const current = getProjectSync(intent.key);
-    if (current && (await canonicalizePath(current.path)) === intent.path) {
+    //
+    // Look the entry up by *path*, not by `intent.key`. The two keys agree
+    // today only because both are slugged from the same name; this recovery
+    // does not own that derivation, and if registration ever changes how it
+    // picks a key, a key lookup would silently miss the row we just wrote and
+    // the cleanup below would delete a directory a registered project points
+    // at. A path cannot drift that way — two projects cannot share a directory.
+    const landed = await findRegisteredProjectAtPath(intent.path);
+    if (landed) {
       throw new ProjectCreateFailureError(
-        setupIncompleteFailure({ key: intent.key, path: intent.path, cause: err }),
+        setupIncompleteFailure({ key: landed.key, path: intent.path, cause: err }),
       );
     }
     await removeOwnedTarget(intent.path, createdTarget, createdIdentity);

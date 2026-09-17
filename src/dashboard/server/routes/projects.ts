@@ -42,8 +42,6 @@ import {
   type ProjectCreateInput,
   type ResolvedProjectIntent,
 } from '../../../lib/projects/create.js';
-import { performProjectCreate } from '../../../lib/projects/create-perform.js';
-import { startProjectCreateJob } from './project-create-jobs.js';
 import { projectCreateJobRoutesLayer } from './project-create-routes.js';
 import { readProjectJsonBody } from './project-body.js';
 import {
@@ -958,80 +956,6 @@ const postProjectsResolveRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: POST /api/projects ───────────────────────────────────────────────
-// PAN-1970: register a project in mode='existing' or create one in mode='new'.
-
-const postProjectsRoute = HttpRouter.add(
-  'POST',
-  '/api/projects',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const authError = rejectUnsafeDashboardMutationRequest(request);
-    if (authError) return authError;
-
-    const body = (yield* readProjectJsonBody) as {
-      mode?: unknown;
-      url?: unknown;
-      path?: unknown;
-      parentDir?: unknown;
-      name?: unknown;
-      issuePrefix?: unknown;
-    };
-
-    // Validate mode
-    const mode = body.mode;
-    if (mode !== 'clone' && mode !== 'existing' && mode !== 'new') {
-      return jsonResponse({ error: "mode must be 'clone', 'existing', or 'new'" }, { status: 400 });
-    }
-
-    const input: ProjectCreateInput = {
-      mode,
-      url: typeof body.url === 'string' ? body.url : undefined,
-      path: typeof body.path === 'string' ? body.path : undefined,
-      parentDir: typeof body.parentDir === 'string' ? body.parentDir : undefined,
-      name: typeof body.name === 'string' ? body.name : undefined,
-      issuePrefix: typeof body.issuePrefix === 'string' ? body.issuePrefix : undefined,
-      homeBoundary: true,
-      refreshRemote: true,
-    };
-
-    // Resolve intent first to check for findings
-    const intent = yield* Effect.promise(() => resolveProjectCreateIntent(input));
-
-    // If there are findings, return 422 with them
-    if (intent.findings.length > 0) {
-      return jsonResponse({ findings: intent.findings }, { status: 422 });
-    }
-
-    // For clone mode, start a background job and return 202
-    if (intent.mode === 'clone') {
-      const jobId = startProjectCreateJob(intent);
-      return jsonResponse({ jobId }, { status: 202 });
-    }
-
-    // For existing/new modes, perform the create and return the result
-    const created = yield* Effect.promise(() =>
-      performProjectCreate(intent)
-        .then((result) => ({ ok: true as const, key: result.key, name: result.name, path: result.path }))
-        .catch((err: unknown) => {
-          if (err instanceof DuplicateProjectError) {
-            return { ok: false as const, status: 409, error: `project key '${err.key}' is already registered`, key: err.key, existingPath: err.existingPath };
-          }
-          // 409 means "already registered"; a permission error or a failed git init
-          // is a server-side failure, and the UI renders the two differently.
-          return { ok: false as const, status: 500, error: err instanceof Error ? err.message : String(err) };
-        }),
-    );
-    if (!created.ok) {
-      return jsonResponse(
-        { error: created.error, ...(created.key ? { key: created.key, existingPath: created.existingPath } : {}) },
-        { status: created.status },
-      );
-    }
-    return jsonResponse({ key: created.key, name: created.name, path: created.path });
-  })),
-);
-
 export const projectsRouteLayer = Layer.mergeAll(
   getProjectSessionTreeRoute,
   getAllSessionTreesRoute,
@@ -1052,7 +976,6 @@ export const projectsRouteLayer = Layer.mergeAll(
   // they are merged first so their literal path segments win over
   // /api/projects/:projectKey/*.
   projectCreateJobRoutesLayer,
-  postProjectsRoute,
 );
 
 export default projectsRouteLayer;

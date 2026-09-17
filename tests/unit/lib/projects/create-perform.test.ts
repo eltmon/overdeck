@@ -17,7 +17,7 @@ import { mkdirSync, rmSync, writeFileSync, existsSync, readFileSync, statSync } 
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-const { TEST_HOME, spawnMock, execFileMock, workspaceMocks } = vi.hoisted(() => {
+const { TEST_HOME, spawnMock, execFileMock, workspaceMocks, contextLayerMocks } = vi.hoisted(() => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { join: j } = require('node:path') as typeof import('node:path');
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -31,6 +31,7 @@ const { TEST_HOME, spawnMock, execFileMock, workspaceMocks } = vi.hoisted(() => 
       performWorkspaceCreate: vi.fn(),
       getMainWorkspace: vi.fn(),
     },
+    contextLayerMocks: { ensureProjectLayer: vi.fn() },
   };
 });
 
@@ -52,7 +53,7 @@ vi.mock('../../../../src/lib/workspace-manager.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/context-layers/index.js', () => ({
-  ensureProjectLayer: vi.fn().mockReturnValue(true),
+  ensureProjectLayer: contextLayerMocks.ensureProjectLayer,
 }));
 
 vi.mock('../../../../src/lib/workspaces/resolver.js', () => ({
@@ -111,6 +112,8 @@ async function cloneIntentInto(parentDir: string, name = 'widget') {
 }
 
 beforeEach(() => {
+  contextLayerMocks.ensureProjectLayer.mockReset();
+  contextLayerMocks.ensureProjectLayer.mockReturnValue(true);
   mkdirSync(TEST_HOME, { recursive: true });
   try {
     rmSync(PROJECTS_CONFIG_FILE);
@@ -367,6 +370,37 @@ describe('performProjectCreate — partial registration is repairable, not stran
     });
 
     // The clone output and the registration both survive for the repair to use.
+    expect(existsSync(intent.path!)).toBe(true);
+    expect(getProjectSync('widget')).toBeTruthy();
+  });
+
+  it('finds the landed registration by path when registration itself throws', async () => {
+    const parent = join(TEST_HOME, 'threw');
+    mkdirSync(parent, { recursive: true });
+    const intent = await cloneIntentInto(parent);
+    const child = armCloneChild();
+
+    // registerProjectFromPath writes the config entry and *then* seeds the
+    // context layer. A throw from that later step leaves a registered project
+    // behind while `registered.key` never comes back to us, so the recovery has
+    // to find the entry itself — by path, the one identity it can be sure of.
+    contextLayerMocks.ensureProjectLayer.mockImplementation(() => {
+      throw new Error('context layer write failed');
+    });
+
+    const running = performProjectCreate(intent);
+    await vi.waitFor(() => expect(spawnMock).toHaveBeenCalled());
+    child.emit('close', 0);
+
+    const failure = (await running.catch((e) => e)) as ProjectCreateFailureError;
+    expect(failure.failure.code).toBe('setup-incomplete');
+    expect(failure.failure.recovery).toEqual({
+      action: 'finish-setup',
+      key: 'widget',
+      path: intent.path,
+    });
+    // Deleting the clone would destroy the very directory the registered
+    // project now points at.
     expect(existsSync(intent.path!)).toBe(true);
     expect(getProjectSync('widget')).toBeTruthy();
   });
