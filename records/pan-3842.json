@@ -170,7 +170,7 @@
     "recordedAt": "2026-09-16T21:34:52.900Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-17T01:17:29.838Z",
+  "updated": "2026-09-17T01:17:32.912Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "passed",
@@ -351,7 +351,7 @@
   ],
   "workModel": "claude-opus-5",
   "tasks": {
-    "sequence": 28,
+    "sequence": 29,
     "claims": {},
     "claimHistory": [
       {
@@ -517,8 +517,8 @@
         "updatedAt": "2026-09-17T01:09:05.107Z"
       },
       "docs-fitness": {
-        "reason": "Added Tier fitness warnings to TIERED-EXECUTION.md, Capability classes to MODEL_ROUTING.md, and the doctor-row sentence to troubleshooting.mdx; all four verify greps print matches.",
-        "updatedAt": "2026-09-16T20:27:26.202Z"
+        "reason": "Document literal-first classification (R1), grouped mixed-difficulty wording (R2), and provider-scoping (F-1)",
+        "updatedAt": "2026-09-17T01:17:32.912Z"
       }
     }
   },
@@ -561,10 +561,10 @@
     "settings-badges.ac3": "completed",
     "settings-badges.ac4": "completed",
     "settings-badges.ac5": "completed",
-    "docs-fitness": "completed",
-    "docs-fitness.ac1": "completed",
-    "docs-fitness.ac2": "completed",
-    "docs-fitness.ac3": "completed",
-    "docs-fitness.ac4": "completed"
+    "docs-fitness": "pending",
+    "docs-fitness.ac1": "pending",
+    "docs-fitness.ac2": "pending",
+    "docs-fitness.ac3": "pending",
+    "docs-fitness.ac4": "pending"
   }
 }
