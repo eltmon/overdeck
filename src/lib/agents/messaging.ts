@@ -30,6 +30,7 @@ import {
   type Role,
 } from './agent-state.js';
 import { getLatestSessionIdSync } from './activity.js';
+import { clearFeedbackDeliveryStuck } from '../review-status.js';
 import {
   deliverAgentMessage,
   deliverMessageWithTranscriptConfirmation,
@@ -626,6 +627,16 @@ export async function messageAgent(
       return { delivered: false, queuedToMail: true, confirmed: false, reason };
     }
     logAgentLifecycleSync(normalizedId, `messageAgent confirmed turn in ${transcriptSessionId} (caller: ${caller})`);
+    // A confirmed delivery repairs the state the feedback-delivery retirement
+    // patrol used to clear: once a message provably lands, the
+    // feedback_delivery_needs_you escalation it recorded is stale (PAN-3846).
+    if (agentState.issueId) {
+      try {
+        clearFeedbackDeliveryStuck(agentState.issueId);
+      } catch (clearError) {
+        console.warn(`[agents] ${normalizedId}: failed to clear feedback-delivery stuck flag for ${agentState.issueId}: ${clearError instanceof Error ? clearError.message : String(clearError)}`);
+      }
+    }
     return { delivered: true, queuedToMail: true, confirmed: true };
   }
 

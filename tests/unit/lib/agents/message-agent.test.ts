@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   getLatestSessionIdSync: vi.fn(),
   captureTranscriptUserRecordSnapshot: vi.fn(),
   probeTranscriptSince: vi.fn(),
+  clearFeedbackDeliveryStuck: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
@@ -101,6 +102,10 @@ vi.mock('../../../../src/lib/activity-logger.js', () => ({
 
 vi.mock('../../../../src/lib/persistent-logger.js', () => ({
   logAgentLifecycleSync: mocks.logAgentLifecycleSync,
+}));
+
+vi.mock('../../../../src/lib/review-status.js', () => ({
+  clearFeedbackDeliveryStuck: mocks.clearFeedbackDeliveryStuck,
 }));
 
 vi.mock('../../../../src/lib/providers.js', () => ({
@@ -381,6 +386,9 @@ describe('messageAgent', () => {
         'agent-pan-2262',
         expect.stringContaining('messageAgent confirmed turn in session-2262'),
       );
+      // A confirmed delivery clears a stale feedback_delivery_needs_you flag
+      // for the agent's issue (PAN-3846; replaces the retirement patrol).
+      expect(mocks.clearFeedbackDeliveryStuck).toHaveBeenCalledWith('PAN-2262');
     });
 
     it('returns delivered:false, confirmed:false when no turn appears in either attempt', async () => {
@@ -400,6 +408,8 @@ describe('messageAgent', () => {
         'agent-pan-2262',
         expect.stringContaining('messageAgent NOT confirmed'),
       );
+      // No confirmed turn, no stuck-flag repair.
+      expect(mocks.clearFeedbackDeliveryStuck).not.toHaveBeenCalled();
     });
   });
 });
