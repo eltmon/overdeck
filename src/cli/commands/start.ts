@@ -95,7 +95,7 @@ import { requireAutomaticStateMigration } from '../../lib/state-auto-migrate.js'
 import { checkActiveOrderDispatch } from '../../lib/orders/dispatch-gate.js';
 import { withActiveOrderDispatchReservation } from '../../lib/orders/dispatch-reservation.js';
 import type { IssueOptions } from './start-options.js';
-import { applyStartPolicyOptionsAfterSpawn } from './start-policy-overrides.js';
+import { applyStartPolicyOptionsAfterSpawn, persistStartPoliciesThenCheckKickoff } from './start-policy-overrides.js';
 import { prepareFreshWorkAgentSession } from './start-fresh-session.js';
 
 /**
@@ -1207,16 +1207,22 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       throw new Error(admitted.check.decision.message ?? `Order-book dispatch blocked for ${id}`);
     }
     const agent = admitted.result;
-    if (agent.role === 'work' && agent.kickoffDelivered === false) {
+    // PAN-3848 (F4): policy overrides persist BEFORE the kickoff-failure
+    // return — the live session already carries them through state.json.
+    const kickoffFailed = await persistStartPoliciesThenCheckKickoff(
+      resolved,
+      agent,
+      id,
+      options,
+      false,
+      (message) => spinner.warn(message),
+    );
+    if (kickoffFailed) {
       spinner.fail(`Agent spawned but kickoff delivery was not confirmed: ${agent.id}`);
       for (const line of ['', chalk.red(`Kickoff delivery did not land for ${agent.id}.`), chalk.dim('The live session is preserved and the agent may be idle until the kickoff lands.'), chalk.dim('Deacon will retry delivery after the stuck threshold, or you can send a manual message now:'), `  pan tell ${id} "continue from your kickoff brief"`]) console.log(line);
       process.exitCode = 1; return;
     }
     spinner.succeed(`Agent spawned: ${agent.id}`);
-
-    if (resolved) {
-      await applyStartPolicyOptionsAfterSpawn(resolved, id, options, false, (message) => spinner.warn(message));
-    }
 
     try {
       const transition = await transitionStartedXBrief(projectRoot, id);

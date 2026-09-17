@@ -75,7 +75,7 @@ export async function applyStartPolicyOptions(
 }
 
 /**
- * PAN-3848 (W24, FR-19): the policy-override record write runs after the spawn
+ * PAN-3848 (F4): the policy-override record write runs after the spawn
  * step, never before it — spawning must not take the record lock (F1: the
  * project-wide lock held across pushes starved a spawn). The override already
  * reached the running agent through state.json (spawn.ts writes
@@ -94,4 +94,26 @@ export async function applyStartPolicyOptionsAfterSpawn(
   } catch (error) {
     warn(`Model override recorded in agent state only; record write failed: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+/**
+ * PAN-3848 (F4): persist policy overrides BEFORE the kickoff-failure return.
+ * The live session already carries the policy through state.json, so when
+ * kickoff delivery fails the record must still catch up — returning early
+ * with the previous policy persisted leaves the session and the record
+ * disagreeing. Returns true when the caller should take the kickoff-failure
+ * return path (work role whose kickoff was never confirmed delivered).
+ */
+export async function persistStartPoliciesThenCheckKickoff(
+  resolved: ResolvedProject | null | undefined,
+  agent: { role: string; kickoffDelivered?: boolean },
+  issueId: string,
+  options: StartPolicyOptions,
+  dryRun: boolean,
+  warn: (message: string) => void,
+): Promise<boolean> {
+  if (resolved) {
+    await applyStartPolicyOptionsAfterSpawn(resolved, issueId, options, dryRun, warn);
+  }
+  return agent.role === 'work' && agent.kickoffDelivered === false;
 }
