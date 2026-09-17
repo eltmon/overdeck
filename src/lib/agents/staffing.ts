@@ -27,6 +27,8 @@ import { readIssueRecordSync } from '../pan-dir/record.js';
 import { getBuiltInDefaultHarness, getProviderForModelSync } from '../providers.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { fmix32, fnv1a32 } from '../config-yaml/percent.js';
+import type { TierOverridesMap } from '../xbrief/io.js';
+import { applyEffectiveDifficulty } from './tier-escalation.js';
 import { resolveTier } from './resolve-tier.js';
 import { resolveTieredExecutionEnabled, type TierDistributionEntry } from './tier-table.js';
 
@@ -53,6 +55,12 @@ export interface ResolveStaffingOptions {
   config?: Pick<NormalizedConfig, 'roles' | 'workhorses' | 'tieredExecution' | 'providerHarnesses'>;
   /** Issue whose durable work-model override should be applied. */
   issueId?: string;
+  /**
+   * Recorded tier promotions for the workspace (`readTierOverrides`). Applied
+   * to the item's difficulty before `resolveTier` so a promoted item staffs at
+   * its promoted tier (PAN-3858: promotions must reach live staffing).
+   */
+  tierOverrides?: TierOverridesMap;
 }
 
 /** Per-issue work-model override from the issue record, or undefined. */
@@ -113,7 +121,10 @@ export function resolveStaffing(
 
   if (tiered && resolveTieredExecutionEnabled(tiered, options.planMetadata)) {
     try {
-      const tier = resolveTier(item, tiered);
+      const effectiveItem = options.tierOverrides
+        ? applyEffectiveDifficulty(item, options.tierOverrides)
+        : item;
+      const tier = resolveTier(effectiveItem, tiered);
       // PAN-2391: a distribution tier spreads beads across weighted
       // model+harness entries. Selection is deterministic per bead so
       // replay/re-resolution always lands on the same entry. A per-bead

@@ -21,13 +21,14 @@ import { requireModelOverrideSync } from '../model-validation.js';
 import type { MemoryIdentity } from '@overdeck/contracts';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
-import { readWorkspacePlanSync } from '../xbrief/io.js';
+import { readTierOverrides, readWorkspacePlanSync, type TierOverridesMap } from '../xbrief/io.js';
 import type { XBriefDocument, XBriefDifficulty, XBriefItem, XBriefItemStatus } from '../xbrief/types.js';
 import { type Role } from './agent-state.js';
 import type { TierAssignment } from './dispatch-tier.js';
 import { normalizeFlywheelRunId } from './provenance.js';
 import { clearStaleClosedOutBeforeSpawn } from './reopen-guard.js';
 import { resolveStaffing } from './staffing.js';
+import { applyEffectiveDifficulty } from './tier-escalation.js';
 import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue, type ValidatedTieredExecutionConfig } from './tier-table.js';
 import {
   buildCavemanExports,
@@ -279,7 +280,9 @@ export function resolveSlotTierSpawnParams(
   // PAN-2397 (Always Tiered): staffing ALWAYS resolves — explicit tier table
   // when enabled, else the implicit roles.work tier (same resolveModel +
   // spawnKey as determineModel, so distributions stay deterministic).
-  const staffing = resolveStaffing(item, { planMetadata, spawnKey, config, issueId: issueId ?? undefined });
+  // PAN-3858: recorded promotions must reach staffing.
+  const tierOverrides = readTierOverrides(baseWorkspace);
+  const staffing = resolveStaffing(item, { planMetadata, spawnKey, config, issueId: issueId ?? undefined, tierOverrides });
   return {
     model: staffing.model,
     harness: staffing.implicit ? undefined : staffing.harness,
@@ -330,17 +333,20 @@ function effectiveItemDifficulty(
  * remaining item in the plan. The agent executes the whole plan, so keying on
  * the first dispatchable item misrouted every plan whose hard items come
  * later. Ties break to the earliest item in plan order; items with no
- * resolvable difficulty sort below every ranked item.
+ * resolvable difficulty sort below every ranked item. Recorded tier
+ * promotions (PAN-3858) raise an item's effective difficulty before ranking.
  */
-function selectStaffingItem(
+export function selectStaffingItem(
   doc: XBriefDocument,
   tiered: Pick<ValidatedTieredExecutionConfig, 'difficultyToTier' | 'byKind'> | undefined,
+  tierOverrides?: TierOverridesMap,
 ): XBriefItem | undefined {
   let best: XBriefItem | undefined;
   let bestRank = -1;
   for (const item of doc.plan.items) {
     if (SINGLE_WORK_NON_CANDIDATE_STATUSES.has(item.status)) continue;
-    const difficulty = effectiveItemDifficulty(item, tiered);
+    const effectiveItem = tierOverrides ? applyEffectiveDifficulty(item, tierOverrides) : item;
+    const difficulty = effectiveItemDifficulty(effectiveItem, tiered);
     const rank = difficulty === undefined ? -1 : DIFFICULTY_RANK[difficulty];
     if (best === undefined || rank > bestRank) {
       best = item;
@@ -380,7 +386,11 @@ export function resolveSingleWorkTierSpawnParams(
     ? resolveTieredExecutionEnabledForIssue(tiered, issueId, planMetadata)
     : resolveTieredExecutionEnabled(tiered, planMetadata);
 
-  const item = selectStaffingItem(doc, tiered);
+  // PAN-3858: recorded promotions must reach staffing — they raise an item's
+  // effective difficulty both when picking the staffing item and when
+  // resolving its tier.
+  const tierOverrides = readTierOverrides(workspace);
+  const item = selectStaffingItem(doc, tiered, tierOverrides);
   if (!item) return {};
 
   // PAN-2397 (Always Tiered): the single-work path staffs through the same
@@ -390,6 +400,7 @@ export function resolveSingleWorkTierSpawnParams(
     planMetadata,
     spawnKey,
     issueId: issueId ?? undefined,
+    tierOverrides,
     config: { ...config, tieredExecution: { ...tiered, enabled: effectiveTieredEnabled } },
   });
   return {

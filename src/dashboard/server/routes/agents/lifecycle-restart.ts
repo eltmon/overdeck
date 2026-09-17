@@ -10,7 +10,7 @@ import {
   detectPendingOperatorDecision,
   type PendingOperatorDecision,
 } from '../../../../lib/agents/pending-decision-gate.js';
-import { findPlanSync, readWorkspacePlanSync } from '../../../../lib/xbrief/io.js';
+import { findPlanSync, readTierOverrides, readWorkspacePlanSync } from '../../../../lib/xbrief/io.js';
 import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue } from '../../../../lib/agents/tier-table.js';
 import { getDispatchableItems } from '../../../../lib/xbrief/dag.js';
 import { loadConfigSync } from '../../../../lib/config-yaml.js';
@@ -918,6 +918,7 @@ async function resolveCurrentStaffing(agentId: string, agentState: any, issueId:
       planMetadata: plan.plan.metadata,
       spawnKey: `work:${issueId.toLowerCase()}`,
       issueId,
+      tierOverrides: readTierOverrides(workspacePath),
       config: { ...config, tieredExecution: { ...tiered, enabled: effectiveTieredEnabled } },
     });
 
