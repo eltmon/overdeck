@@ -121,6 +121,7 @@ describe('specialists done command', () => {
   });
 
   it('allows review to signal blocked status', async () => {
+    mockSnapshotWorkspaceHeads.mockResolvedValue('blocked-head');
     const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
 
     await doneCommand('review', 'pan-1059', {
@@ -129,9 +130,12 @@ describe('specialists done command', () => {
       runId: 'agent-pan-1059-review-abcdef12',
     });
 
+    // PAN-3847: verdict and anchor land in ONE write through the verdict door.
+    expect(mockSetReviewStatus).toHaveBeenCalledTimes(1);
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
       reviewStatus: 'blocked',
       reviewNotes: 'correctness blocker',
+      reviewedAtCommit: 'blocked-head',
     });
     expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledWith({
       issueId: 'PAN-1059',
@@ -142,7 +146,7 @@ describe('specialists done command', () => {
     });
   });
 
-  it('anchors a blocked verdict after feedback delivery', async () => {
+  it('anchors a blocked verdict in the verdict write itself (PAN-3847)', async () => {
     mockSnapshotWorkspaceHeads.mockResolvedValue('blocked-head');
     const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
 
@@ -155,20 +159,23 @@ describe('specialists done command', () => {
       'PAN-1059',
       '/project/workspaces/feature-pan-1059',
     );
-    expect(mockSetReviewStatus).toHaveBeenNthCalledWith(1, 'PAN-1059', {
+    // One write carries both the verdict and its anchor — there is no second write.
+    expect(mockSetReviewStatus).toHaveBeenCalledTimes(1);
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
       reviewStatus: 'blocked',
       reviewNotes: 'correctness blocker',
-    });
-    expect(mockSetReviewStatus).toHaveBeenNthCalledWith(2, 'PAN-1059', {
       reviewedAtCommit: 'blocked-head',
     });
-    expect(mockDeliverReviewVerdictFeedback.mock.invocationCallOrder[0]).toBeLessThan(
-      mockSetReviewStatus.mock.invocationCallOrder[1]!,
+    expect(mockSnapshotWorkspaceHeads.mock.invocationCallOrder[0]).toBeLessThan(
+      mockSetReviewStatus.mock.invocationCallOrder[0]!,
     );
+    expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledOnce();
   });
 
-  it('preserves a blocked verdict when the post-feedback HEAD snapshot fails', async () => {
+  it('refuses a blocked verdict when the HEAD snapshot fails (PAN-3847)', async () => {
     mockSnapshotWorkspaceHeads.mockRejectedValue(new Error('git unavailable'));
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
 
     await expect(doneCommand('review', 'pan-1059', {
@@ -176,15 +183,18 @@ describe('specialists done command', () => {
       notes: 'correctness blocker',
     })).resolves.toBeUndefined();
 
-    expect(mockSetReviewStatus).toHaveBeenCalledTimes(1);
-    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
-      reviewStatus: 'blocked',
-      reviewNotes: 'correctness blocker',
-    });
-    expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledOnce();
+    // The verdict write door refuses anchorless terminal verdicts, so the CLI exits
+    // non-zero BEFORE any row write or feedback delivery.
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(error.mock.calls.map((call) => String(call[0])).join('\n')).toContain(
+      'Cannot record a review verdict without the workspace head',
+    );
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+    expect(mockDeliverReviewVerdictFeedback).not.toHaveBeenCalled();
   });
 
   it('delivers synthesis feedback when review signals failed status', async () => {
+    mockSnapshotWorkspaceHeads.mockResolvedValue('failed-head');
     const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
 
     await doneCommand('review', 'pan-1059', {
@@ -195,6 +205,7 @@ describe('specialists done command', () => {
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
       reviewStatus: 'failed',
       reviewNotes: 'synthesis crashed',
+      reviewedAtCommit: 'failed-head',
     });
     expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledWith({
       issueId: 'PAN-1059',
@@ -205,6 +216,7 @@ describe('specialists done command', () => {
   });
 
   it('does not deliver feedback when review passes', async () => {
+    mockSnapshotWorkspaceHeads.mockResolvedValue('passed-head');
     const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
 
     await doneCommand('review', 'pan-1059', {
@@ -215,7 +227,7 @@ describe('specialists done command', () => {
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
       reviewStatus: 'passed',
       reviewNotes: 'approved',
-      reviewedAtCommit: undefined,
+      reviewedAtCommit: 'passed-head',
       verificationStatus: 'passed',
       verificationNotes: 'Cleared by `pan specialists done review --status passed` override (PAN-1215)',
     });
@@ -242,6 +254,7 @@ describe('specialists done command', () => {
 
   it('PAN-3642: allows summary resume plus all same-key retry stages to settle', async () => {
     vi.useFakeTimers();
+    mockSnapshotWorkspaceHeads.mockResolvedValue('blocked-head');
     const stages: string[] = [];
     const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
     mockDeliverReviewVerdictFeedback.mockReturnValue(Effect.promise(async () => {
@@ -282,6 +295,7 @@ describe('specialists done command', () => {
 
   it('PAN-2524/PAN-3642: persists the verdict and a retryable stuck state on outer timeout', async () => {
     vi.useFakeTimers();
+    mockSnapshotWorkspaceHeads.mockResolvedValue('blocked-head');
     mockDeliverReviewVerdictFeedback.mockReturnValue(Effect.never);
     const {
       doneCommand,
@@ -293,9 +307,13 @@ describe('specialists done command', () => {
       notes: 'durable first',
       runId: 'agent-pan-1059-review-abcdef12',
     });
+    // Flush the pre-write HEAD snapshot (PAN-3847: the anchor is probed before the
+    // durable verdict write) so the verdict has landed before we assert on it.
+    await vi.advanceTimersByTimeAsync(0);
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
       reviewStatus: 'blocked',
       reviewNotes: 'durable first',
+      reviewedAtCommit: 'blocked-head',
     });
 
     await vi.advanceTimersByTimeAsync(FEEDBACK_DELIVERY_TIMEOUT_MS);

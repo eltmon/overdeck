@@ -319,12 +319,12 @@ describe('reviewedAtCommit DB persistence (specialists/done snapshot layer)', ()
     expect(row?.reviewedAtCommit).toBe(sha);
   });
 
-  it('writes the HTTP blocked anchor only after feedback delivery', async () => {
+  it('writes the HTTP blocked anchor with the verdict in one write (PAN-3847)', async () => {
     mockExecHeadSha = 'blocked-http-head';
     mockDeliverReviewVerdictFeedback.mockImplementation(() => {
       const duringDelivery = getReviewStatusFromDbSync('PAN-RAC-HTTP');
       expect(duringDelivery?.reviewStatus).toBe('blocked');
-      expect(duringDelivery?.reviewedAtCommit).toBeUndefined();
+      expect(duringDelivery?.reviewedAtCommit).toBe('blocked-http-head');
       return Effect.succeed({ prCommentPosted: false, agentMessageSent: true });
     });
 
@@ -345,9 +345,10 @@ describe('reviewedAtCommit DB persistence (specialists/done snapshot layer)', ()
       'PAN-RAC-HTTP',
       '/fake/project/workspaces/feature-pan-rac-http',
     );
+    // The anchor is snapshotted before the verdict write, which precedes feedback.
     expect(
-      mockDeliverReviewVerdictFeedback.mock.invocationCallOrder[0],
-    ).toBeLessThan(mockSnapshotWorkspaceHeads.mock.invocationCallOrder[0]!);
+      mockSnapshotWorkspaceHeads.mock.invocationCallOrder[0],
+    ).toBeLessThan(mockDeliverReviewVerdictFeedback.mock.invocationCallOrder[0]!);
     expect(getReviewStatusFromDbSync('PAN-RAC-HTTP')).toMatchObject({
       reviewStatus: 'blocked',
       reviewedAtCommit: 'blocked-http-head',
