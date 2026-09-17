@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
-import type { FlyProvider } from '../../../src/lib/remote/fly-provider.js';
-import { sendToRemoteAgent } from '../../../src/lib/remote/remote-agents.js';
+import type { FlyProvider } from '../../../../src/lib/remote/fly-provider.js';
+import { sendToRemoteAgent } from '../../../../src/lib/remote/remote-agents.js';
 
 /** Provider whose ssh exit codes are scripted per call index. */
 function fakeProvider(exitCodes: number[]): { provider: FlyProvider; commands: string[] } {
