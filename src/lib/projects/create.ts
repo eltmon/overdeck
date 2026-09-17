@@ -171,13 +171,6 @@ function pruneRemoteProbeMemo(now: number): void {
   }
 }
 
-/** True when a clone URL names both an owner and a repository, not a half-typed path. */
-function hasCompleteRepoPath(cloneUrl: string): boolean {
-  const afterHost = cloneUrl.replace(/^[a-z+]+:\/\/[^/]+\//i, '');
-  const segments = afterHost.replace(/\.git$/, '').split('/').filter(Boolean);
-  return segments.length >= 2;
-}
-
 /** Probe a remote repository for its default branch via git ls-remote. Memoized. */
 async function probeRemote(
   cloneUrl: string,
@@ -297,8 +290,8 @@ export async function resolveProjectCreateIntent(
 
   // 1. Mode-specific source validation
   if (input.mode === 'clone') {
-    const parsed = input.url ? parseRepoUrl(input.url.trim()) : null;
-    if (!parsed || !parsed.cloneUrl) {
+    const parsed = input.url ? parseRepoUrl(input.url) : null;
+    if (!parsed) {
       findings.push({
         field: 'url',
         code: 'url-invalid',
@@ -410,9 +403,9 @@ export async function resolveProjectCreateIntent(
   // 4. Detection
   if (input.mode === 'clone' && intent.cloneUrl) {
     // Each probe is a real `git ls-remote` child process, so skip it while the form
-    // already has something to fix and while the URL is still half-typed — otherwise
-    // every settled keystroke after the first slash spawns one.
-    if (findings.length === 0 && hasCompleteRepoPath(intent.cloneUrl)) {
+    // already has something to fix. A half-typed URL never gets this far: the
+    // parser rejects an incomplete known-provider path as `url-invalid`.
+    if (findings.length === 0) {
       const probe = await probeRemote(intent.cloneUrl, { refresh: input.refreshRemote });
       intent.remoteChecked = true;
       if (probe.ok) {
