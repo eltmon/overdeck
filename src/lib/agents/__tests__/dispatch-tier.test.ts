@@ -256,9 +256,9 @@ describe('resolveSingleWorkTierSpawnParams', () => {
     ], { tiered_execution: 'on' }));
 
     expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({
-      model: 'claude-haiku-4-5',
+      model: 'claude-opus-4-8',
       harness: 'claude-code',
-      tierName: 'cheap',
+      tierName: 'frontier',
       implicit: false,
     });
   });
@@ -279,17 +279,68 @@ describe('resolveSingleWorkTierSpawnParams', () => {
     expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({});
   });
 
-  it('uses the first dispatchable item and skips completed blockers', () => {
+  // PAN-3857 (D4): the single work agent executes the whole plan, so it is
+  // staffed for the plan's hardest remaining item — not the first dispatchable
+  // one (which misrouted plans whose hard items come later).
+  it("keys on the plan's max difficulty, not the first dispatchable item", () => {
     mockConfig(TIER_CONFIG);
     vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
-      planItem('done', { difficulty: 'simple' }, 'completed'),
-      planItem('frontier', { difficulty: 'expert' }),
+      planItem('first', { difficulty: 'simple' }),
+      planItem('later', { difficulty: 'complex' }),
     ]));
 
     expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({
-      model: 'claude-opus-4-8',
+      model: 'claude-sonnet-5',
       harness: 'claude-code',
-      tierName: 'frontier',
+      tierName: 'standard',
+      implicit: false,
+    });
+  });
+
+  it('excludes completed, cancelled, running, and blocked items from the max', () => {
+    mockConfig(TIER_CONFIG);
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+      planItem('done', { difficulty: 'expert' }, 'completed'),
+      planItem('cancelled', { difficulty: 'expert' }, 'cancelled'),
+      planItem('running', { difficulty: 'expert' }, 'running'),
+      planItem('blocked', { difficulty: 'expert' }, 'blocked'),
+      planItem('next', { difficulty: 'simple' }),
+    ]));
+
+    expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({
+      model: 'claude-haiku-4-5',
+      harness: 'claude-code',
+      tierName: 'cheap',
+      implicit: false,
+    });
+  });
+
+  it("applies by_kind per item before taking the max, so a design item counts as its tier's difficulty", () => {
+    mockConfig({ ...TIER_CONFIG, byKind: { design: 'standard' } });
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+      planItem('code', { difficulty: 'simple' }),
+      planItem('ux', { kind: 'design' }),
+    ]));
+
+    expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({
+      model: 'claude-sonnet-5',
+      harness: 'claude-code',
+      tierName: 'standard',
+      implicit: false,
+    });
+  });
+
+  it("lets by_kind outrank an item's own difficulty, exactly as resolveTier applies it", () => {
+    mockConfig({ ...TIER_CONFIG, byKind: { design: 'standard' } });
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+      planItem('ux', { kind: 'design', difficulty: 'trivial' }),
+      planItem('code', { difficulty: 'simple' }),
+    ]));
+
+    expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({
+      model: 'claude-sonnet-5',
+      harness: 'claude-code',
+      tierName: 'standard',
       implicit: false,
     });
   });
