@@ -19,4 +19,15 @@ describe('PAN-3859 dead-code no-loss audit', () => {
     await expect(import('../../../../src/lib/planning/triage-agent.js')).rejects.toThrow();
     await expect(import('../../../../src/lib/planning/index.js')).rejects.toThrow();
   });
+
+  it('W2: the /api/issues/:id/analyze helper is gone from issue-reads', async () => {
+    // The route called analyzeIssue, an inline substring matcher that required
+    // LinearClient and 404'd for every PAN issue (the tracker is GitHub). The
+    // route registration itself stays locked by the PAN-2148 route-surface
+    // audit (tests/unit/dashboard/routes/issues-no-loss.test.ts, now 34).
+    const mod = await import('../../../../src/lib/overdeck/issue-reads.js');
+    expect('analyzeIssue' in mod).toBe(false);
+    expect(typeof mod.getIssueTasks).toBe('function');
+    expect(typeof mod.getIssuePrd).toBe('function');
+  });
 });

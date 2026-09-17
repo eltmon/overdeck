@@ -6,7 +6,6 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
-import { LinearClient } from '../../dashboard/server/services/linear-client.js';
 import {
   getCachedResourceAllocatedIssues,
   getResourceDetailIdentifiers,
@@ -96,84 +95,6 @@ async function pathIsDirectory(path: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-export function analyzeIssue(id: string) {
-  return Effect.gen(function* () {
-    const linear = yield* LinearClient;
-
-    const issue = yield* Effect.promise(() =>
-      Effect.runPromise(linear.getIssue(id).pipe(Effect.catch(() => Effect.succeed(null)))),
-    );
-
-    if (!issue) {
-      return jsonResponse({ error: 'Issue not found' }, { status: 404 });
-    }
-
-    const desc = (issue.description || '').toLowerCase();
-    const title = issue.title.toLowerCase();
-    const combined = `${title} ${desc}`;
-
-    const reasons: string[] = [];
-    const subsystems: string[] = [];
-    let estimatedTasks = 1;
-
-    if (combined.includes('frontend') || combined.includes('ui') || combined.includes('component')) subsystems.push('frontend');
-    if (combined.includes('backend') || combined.includes('api') || combined.includes('endpoint')) subsystems.push('backend');
-    if (combined.includes('database') || combined.includes('migration') || combined.includes('schema')) subsystems.push('database');
-    if (combined.includes('test') || combined.includes('e2e') || combined.includes('playwright')) subsystems.push('tests');
-
-    if (subsystems.length > 1) {
-      reasons.push(`Multiple subsystems involved: ${subsystems.join(', ')}`);
-      estimatedTasks += subsystems.length;
-    }
-
-    const ambiguousPatterns = ['should we', 'maybe', 'or', 'consider', 'option', 'approach', 'tbd', 'unclear'];
-    for (const pattern of ambiguousPatterns) {
-      if (combined.includes(pattern)) { reasons.push('Requirements may be ambiguous'); break; }
-    }
-
-    const architecturePatterns = ['refactor', 'architecture', 'redesign', 'migrate', 'integration', 'authentication'];
-    for (const pattern of architecturePatterns) {
-      if (combined.includes(pattern)) {
-        reasons.push(`Architecture decision needed: ${pattern}`);
-        estimatedTasks += 2;
-        break;
-      }
-    }
-
-    if (desc.length > 500) { reasons.push('Detailed description suggests complexity'); estimatedTasks += 1; }
-
-    const labels = issue.labels.map((l) => l.name);
-    const complexLabels = ['complex', 'large', 'epic', 'multi-phase', 'architecture'];
-    for (const label of labels) {
-      if (complexLabels.some((cl: string) => label.toLowerCase().includes(cl))) {
-        reasons.push(`Label indicates complexity: ${label}`);
-        estimatedTasks += 2;
-      }
-    }
-
-    const isComplex = reasons.length >= 2 || subsystems.length > 1 || estimatedTasks >= 4;
-
-    return jsonResponse({
-      issue: {
-        id: issue.id,
-        identifier: issue.identifier,
-        title: issue.title,
-        description: issue.description,
-        status: issue.state.name,
-        priority: issue.priority,
-        url: issue.url,
-        labels,
-      },
-      complexity: {
-        isComplex,
-        reasons,
-        subsystems,
-        estimatedTasks: Math.max(estimatedTasks, subsystems.length + 1),
-      },
-    });
-  });
 }
 
 export function getIssueTasks(id: string) {

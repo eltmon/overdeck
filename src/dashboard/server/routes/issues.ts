@@ -5,7 +5,6 @@ import { httpHandler } from './http-handler.js';
  *
  * Implements all /api/issues/* endpoints from the Express server:
  *   GET  /api/issues
- *   GET  /api/issues/:id/analyze
  *   POST /api/issues/:id/plan
  *   POST /api/issues/:issueId/close
  *   POST /api/issues/:id/start-planning
@@ -121,7 +120,6 @@ import {
 import { bulkCloseOut, closeOutIssue } from '../../../lib/overdeck/issue-close-out.js';
 import { DOD_ROWS, type DodRowId } from '../../../lib/lifecycle/dod.js';
 import {
-  analyzeIssue,
   getIssuePrd,
   getIssueTasks,
   getIssueResourceDetails,
@@ -262,21 +260,6 @@ const getIssuesRoute = HttpRouter.add(
             ? { available: true, inPipeline: false, bucket: 'clean_terminal' as const, labelDrift: null }
             : unavailablePipelineMembership()),
     })));
-  })),
-);
-
-// ─── Route: GET /api/issues/:id/analyze ──────────────────────────────────────
-
-const getIssueAnalyzeRoute = HttpRouter.add(
-  'GET',
-  '/api/issues/:id/analyze',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
-      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
-    }
-    return yield* analyzeIssue(id);
   })),
 );
 
@@ -943,7 +926,6 @@ const getIssueResourceDetailsRoute = HttpRouter.add(
 
 export const issuesRouteLayer = Layer.mergeAll(
   getIssuesRoute,
-  getIssueAnalyzeRoute,
   getIssueShipLogRoute,
   getIssueVerificationRoute,
   postIssueCloseRoute,
