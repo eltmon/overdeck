@@ -73,3 +73,25 @@ export async function applyStartPolicyOptions(
   if (!project) throw new Error(`Project configuration not found for ${resolved.projectName}`);
   await persistStartPolicyOverrides(project, issueId, overrides, signal);
 }
+
+/**
+ * PAN-3848 (W24, FR-19): the policy-override record write runs after the spawn
+ * step, never before it — spawning must not take the record lock (F1: the
+ * project-wide lock held across pushes starved a spawn). The override already
+ * reached the running agent through state.json (spawn.ts writes
+ * `model: selectedModel`), so a record-write failure here degrades to a
+ * warning instead of failing the start.
+ */
+export async function applyStartPolicyOptionsAfterSpawn(
+  resolved: ResolvedProject,
+  issueId: string,
+  options: StartPolicyOptions,
+  dryRun: boolean,
+  warn: (message: string) => void,
+): Promise<void> {
+  try {
+    await applyStartPolicyOptions(resolved, issueId, options, dryRun);
+  } catch (error) {
+    warn(`Model override recorded in agent state only; record write failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
