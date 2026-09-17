@@ -9,7 +9,9 @@ import { readTierOverrides, readTierRetries } from '../../../../lib/xbrief/io.js
 import type { XBriefDifficulty, XBriefDocument, XBriefItem } from '../../../../lib/xbrief/types.js';
 import {
   handleTieredInspectFailureEscalation,
+  handleTieredVerificationFailureEscalation,
   type TieredInspectFailureEscalationDeps,
+  type TieredVerificationFailureEscalationDeps,
 } from '../tiered-inspect-escalation.js';
 
 const ISSUE_ID = 'PAN-9999';
@@ -18,8 +20,8 @@ const NOTES = 'Supervisor BLOCKED commit abc123 — Bead item-1';
 let projectRoot: string;
 let workspacePath: string;
 
-function planItem(id: string, difficulty: XBriefDifficulty): XBriefItem {
-  return { id, title: id, status: 'pending', metadata: { difficulty } };
+function planItem(id: string, difficulty: XBriefDifficulty, status: XBriefItem['status'] = 'pending'): XBriefItem {
+  return { id, title: id, status, metadata: { difficulty } };
 }
 
 function planDoc(items: XBriefItem[]): XBriefDocument {
@@ -110,5 +112,63 @@ describe('handleTieredInspectFailureEscalation (PAN-3858 retry attempts)', () =>
     );
     expect(decision).toMatchObject({ action: 'promote', from: 'simple', to: 'medium' });
     expect(readTierRetries(workspacePath)).toEqual({});
+  });
+});
+
+describe('handleTieredVerificationFailureEscalation (PAN-3858 verification-failed trigger)', () => {
+  function verificationDeps(items: XBriefItem[], escalation: Record<string, unknown> = {}): TieredVerificationFailureEscalationDeps {
+    return {
+      loadConfig: (() => ({
+        config: {
+          tieredExecution: {
+            enabled: true,
+            escalation: escalationConfig(escalation),
+          },
+        },
+      })) as unknown as typeof loadConfigSync,
+      readPlan: (() => planDoc(items)) as never,
+    };
+  }
+
+  it('attributes the failure to the plan’s hardest item even when it is completed', () => {
+    // Items are marked completed by the time verification runs, so attribution
+    // must be status-blind.
+    const decision = handleTieredVerificationFailureEscalation(
+      ISSUE_ID,
+      workspacePath,
+      'verification failed at typecheck',
+      verificationDeps([
+        planItem('easy', 'simple'),
+        planItem('hard', 'complex', 'completed'),
+      ], { retries_at_tier: 0 }),
+    );
+
+    expect(decision).toMatchObject({ action: 'promote', from: 'complex', to: 'expert' });
+    expect(readTierOverrides(workspacePath)['hard']?.effectiveDifficulty).toBe('expert');
+    expect(readTierOverrides(workspacePath)['easy']).toBeUndefined();
+  });
+
+  it('retries first with retries_at_tier: 1, then promotes on the next failure', () => {
+    const itemDeps = verificationDeps([planItem('item-1', 'medium', 'completed')]);
+
+    expect(handleTieredVerificationFailureEscalation(ISSUE_ID, workspacePath, 'failed at lint', itemDeps))
+      .toEqual({ action: 'retry', attempt: 1 });
+    expect(readTierRetries(workspacePath)['item-1']).toEqual({ difficulty: 'medium', attempts: 1 });
+
+    expect(handleTieredVerificationFailureEscalation(ISSUE_ID, workspacePath, 'failed at lint', itemDeps))
+      .toMatchObject({ action: 'promote', from: 'medium', to: 'complex' });
+    expect(readTierOverrides(workspacePath)['item-1']?.effectiveDifficulty).toBe('complex');
+    expect(readTierRetries(workspacePath)['item-1']).toBeUndefined();
+  });
+
+  it('returns null when escalation is disabled', () => {
+    const decision = handleTieredVerificationFailureEscalation(
+      ISSUE_ID,
+      workspacePath,
+      'verification failed at typecheck',
+      verificationDeps([planItem('item-1', 'simple')], { enabled: false }),
+    );
+    expect(decision).toBeNull();
+    expect(readTierOverrides(workspacePath)).toEqual({});
   });
 });

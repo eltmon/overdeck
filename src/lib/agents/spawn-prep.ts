@@ -341,10 +341,35 @@ export function selectStaffingItem(
   tiered: Pick<ValidatedTieredExecutionConfig, 'difficultyToTier' | 'byKind'> | undefined,
   tierOverrides?: TierOverridesMap,
 ): XBriefItem | undefined {
+  return selectHardestItem(
+    doc.plan.items.filter((item) => !SINGLE_WORK_NON_CANDIDATE_STATUSES.has(item.status)),
+    tiered,
+    tierOverrides,
+  );
+}
+
+/**
+ * The plan's hardest item regardless of status (PAN-3858). Verification-failed
+ * escalation attributes to this item: verification runs against the whole
+ * submitted diff after items are already marked completed, so the
+ * status-filtered staffing pick would find nothing to promote.
+ */
+export function selectHardestPlanItem(
+  doc: XBriefDocument,
+  tiered: Pick<ValidatedTieredExecutionConfig, 'difficultyToTier' | 'byKind'> | undefined,
+  tierOverrides?: TierOverridesMap,
+): XBriefItem | undefined {
+  return selectHardestItem(doc.plan.items, tiered, tierOverrides);
+}
+
+function selectHardestItem(
+  items: readonly XBriefItem[],
+  tiered: Pick<ValidatedTieredExecutionConfig, 'difficultyToTier' | 'byKind'> | undefined,
+  tierOverrides?: TierOverridesMap,
+): XBriefItem | undefined {
   let best: XBriefItem | undefined;
   let bestRank = -1;
-  for (const item of doc.plan.items) {
-    if (SINGLE_WORK_NON_CANDIDATE_STATUSES.has(item.status)) continue;
+  for (const item of items) {
     const effectiveItem = tierOverrides ? applyEffectiveDifficulty(item, tierOverrides) : item;
     const difficulty = effectiveItemDifficulty(effectiveItem, tiered);
     const rank = difficulty === undefined ? -1 : DIFFICULTY_RANK[difficulty];

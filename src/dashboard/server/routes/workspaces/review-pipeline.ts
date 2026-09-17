@@ -366,6 +366,16 @@ const postWorkspaceReviewRoute = HttpRouter.add(
                 reviewNotes: `Verification failed at ${verifyOutcome.failedCheck}`,
               });
               try {
+                const { reportTieredVerificationFailureEscalation } = await import('../tiered-inspect-escalation.js');
+                await reportTieredVerificationFailureEscalation(
+                  issueId,
+                  workspacePath,
+                  `verification failed at ${verifyOutcome.failedCheck}`,
+                );
+              } catch (escalationErr: unknown) {
+                console.warn(`[review] Tier escalation handling failed for ${issueId}: ${errorMessage(escalationErr)}`);
+              }
+              try {
                 (await Effect.runPromise(eventStore.append({
                   type: 'pipeline.verification-failed',
                   timestamp: new Date().toISOString(),
