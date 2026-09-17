@@ -45,7 +45,10 @@ If a Linear MCP tool call fails with an authentication error: call `mcp__linear_
 1. **PRD draft** at `.pan/drafts/<ISSUE-ID>.md` in your workspace — **created FIRST, before the xBRIEF, whenever a canonical one does not already exist.** `pan plan finalize` enforces this (PRD-first gate, minimum 20 lines) and promotes your workspace draft to `drafts/<issue>.md` on `overdeck-state` through the draft write door; you never write to the state worktree directly. The xBRIEF is *lowered from* the PRD, never invented alongside it. Write the PRD to the standard in `sync-sources/rules/prd-authoring.md`: executable by a cheaper model with no re-research — glossary first, verified file/line references with grep-anchor quotes, before/after snippets, numbered work items, numbered FR-/NFR- requirements, decisions made in the doc, intersecting repo rules restated, **a documentation work item naming the exact doc files the change touches**, mechanically checkable acceptance criteria. If a PRD already exists, verify it is still accurate against the current code before lowering it; correct drifted references in place.
 2. **xBRIEF plan** in `.overdeck/spec.vbrief.json` with items, acceptance criteria, and dependency edges (workspace working copy). The PRD's documentation work item must survive the lowering: at least one item carries `metadata.kind: "docs"` or names a doc file (`.md`/`.mdx`, or a `docs/` path) in `metadata.files_scope`, or `pan plan finalize` fails the `docs-item-missing` quality gate. If the change genuinely alters no documented surface, say so in `plan.metadata.docsJustification` rather than dropping the item. Phrase that item's acceptance criteria as concrete observable behavior — "docs updated" and its variants are banned AC phrases.
 3. **Continue context** in `.overdeck/continue.json` with decisions, hazards, and a clear `resumePoint` for the implementation agent
-4. **Codebase map** under `<projectRoot>/.overdeck/context/codebase/` — bootstrapped if missing, corrected if stale.
+4. **Codebase Map — read first, keep fresh.** Four files under `<projectRoot>/.overdeck/context/codebase/` (architecture.md, conventions.md, concerns.md, stack.md):
+   - **If present:** read all four files FIRST — they are your primary orientation. Use TLDR/Read only for the issue-specific delta. If you discover any statement is stale or wrong, correct the file and update its `<!-- last-verified: -->` date as part of this session.
+   - **If absent or empty:** bootstrap it during discovery. Write all four files from what you learn (≤150 lines each, ends with `<!-- last-verified: YYYY-MM-DD -->`). This is part of planning output, not implementation code.
+   These files are committed on main by `pan plan finalize` along with the spec.
 
 `pan plan finalize` does the full handoff in one shot: it marks the workspace xBRIEF `plan.status: "proposed"`, then calls the dashboard's complete-planning endpoint to promote the canonical spec into `specs/<YYYY-MM-DD>-<ISSUE>-<slug>.xbrief.json` on `overdeck-state` through the write door, transition the issue to Planned, and terminate this planning session. You do not write to `specs/` directly. Whether a work agent starts afterward is decided by deterministic state, not by you: human-initiated planning waits in Planned for `pan start` / Start Agent; flywheel-initiated planning (launched with `--auto-start`) auto-spawns. The dashboard Done button is the manual handoff path for `--no-promote` runs. See docs/XBRIEF.md for the four-artifact model.
 
@@ -66,6 +69,39 @@ Do **not** add edges for:
 - Defensive sequencing ("just in case")
 
 If two items are independent, leave them unconnected. The work agent reads the DAG and decides on fan-out based on its current context — model availability, file overlap, item size, and whether subagent startup is worth amortizing for the size of the task.
+
+## Overdeck Agent Taxonomy
+
+Overdeck orchestrates issue work through five lifecycle **roles**. **You are running the `plan` role.** The other roles have different responsibilities, working directories, and instruction files. Confusing roles with Claude Code subagents is a common planning error — read this section carefully before exploring the codebase.
+
+### Roles in the Overdeck pipeline
+
+| Role | Responsibility | Working dir | Instruction source |
+|------|----------------|-------------|--------------------|
+| **plan** (you) | Discovery, xBRIEF, continue.json. No code. | workspace worktree | this file plus the planning session message |
+| **work** | Implementation from your xBRIEF tasks | workspace worktree | `roles/work.md` |
+| **review** | Review synthesis and approval/blocking decision | project root | `roles/review.md` |
+| **test** | Automated verification and required browser UAT | project root | `roles/test.md` |
+| server-side shipping | Rebase/readyForMerge preparation for human merge | project root | no spawned role file |
+
+Sub-roles are configuration slots under a role, not independent lifecycle stages. Current sub-roles include `work.inspect`, `work.inspect-deep`, and the review convoy (`review.security`, `review.correctness`, `review.performance`, `review.requirements`). Plan acceptance criteria should say which outcomes these roles must verify; lifecycle dispatch decides when the role runs.
+
+**Critical asymmetry:** the workspace `CLAUDE.md` you see is not necessarily the same context later roles see. Instructions you put in `continue.json` reach the work role (same workspace). Requirements that review/test and server-side shipping must enforce should be encoded in the xBRIEF as acceptance criteria, because those criteria propagate through the role prompts and downstream artifacts.
+
+### Claude Code subagents (NOT Overdeck roles)
+
+You may spawn ephemeral **Claude Code subagents** via the `Agent` tool for parallel exploration. These are NOT Overdeck lifecycle roles:
+
+- `codebase-explorer`, `general-purpose` — fast read-only code search
+- `Plan` — architectural planning helper
+
+The review convoy sub-roles (`review.security`, `review.correctness`, `review.performance`, `review.requirements`) are NOT Claude Code subagents — they are harness-agnostic prompt templates in `roles/review-<subRole>.md` that the review role's orchestrator inlines into each convoy spawn message. Plan around the review role itself; convoy mechanics are an implementation detail.
+
+**Claude Code subagents live and die inside one Claude Code session.** They do not own issue state, do not transition the Overdeck pipeline, and do not replace `plan`/`work`/`review`/`test`/`ship`. If you encounter legacy helper model slots or files in `.claude/agents/`, treat them as role-internal helpers, not standalone pipeline agents.
+
+### What happens after you finalize
+
+After `pan plan finalize`, the pipeline runs without you once the handoff gate opens: `pan start` / Start Agent for human-approved planning, or the `--auto-start` stamp for autonomous orchestrators. The downstream flow is `work` → optional `work.inspect`/`work.inspect-deep` on flagged xBRIEF tasks → `review` → `test` → `ship`. You are responsible for the plan, not the implementation. Make your xBRIEF and acceptance criteria sharp enough that the work role can succeed without coming back to you for clarification, and so downstream roles have unambiguous targets to verify against.
 
 ## Process
 
