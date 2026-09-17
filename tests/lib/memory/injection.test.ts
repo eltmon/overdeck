@@ -335,6 +335,16 @@ describe('prompt-time memory injection', () => {
   });
 
   it('renders an issue turn byte-identically (PAN-3286 WI-7 regression lock on the cross-workspace change)', async () => {
+    // Rank scores carry a recency decay computed against wall-clock time —
+    // injectPromptTimeMemory's fixed `now` is not threaded into searchMemory
+    // (src/lib/memory/search.ts), so the decay drifts with real time and the
+    // rounded score sits on a toFixed(6) knife edge (0.300001 vs 0.300000).
+    // Freeze the clock at the same instant passed as `now` so the decay term
+    // is deterministic; the snapshot then holds forever. Do NOT re-record the
+    // snapshot to chase the current wall clock — that re-arms the same bomb.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-16T22:30:00.000Z'));
+    try {
     await writeStatus();
     await insertRow({ content: 'prompt injection memory retrieval summary observation hit', doc_type: 'observation' });
     await insertRow({
@@ -363,11 +373,12 @@ describe('prompt-time memory injection', () => {
     });
 
     expect(result.status).toBe('injected');
-    // Rank scores carry a recency decay computed against wall-clock time —
-    // injectPromptTimeMemory's fixed `now` is not threaded into searchMemory —
-    // so they drift in the 11th decimal between runs. Round them; everything
-    // else in the rendered context must stay byte-identical.
+    // Scores are frozen by the fake clock above, so rounding only collapses
+    // float-repr noise; everything else in the render must stay byte-identical.
     expect(normalizeRankScores(result.context)).toMatchSnapshot();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   // PAN-3286 FR-11 supersedes the PAN-1990 D-6 skip: a turn with no issue used
