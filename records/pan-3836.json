@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T02:10:31.503Z",
+  "updated": "2026-09-17T02:10:34.776Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,15 +678,8 @@
     }
   ],
   "tasks": {
-    "sequence": 75,
+    "sequence": 76,
     "claims": {
-      "delete-new-project-modal": {
-        "writerId": "agent-pan-3836",
-        "agentId": "agent-pan-3836",
-        "pid": 841092,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-17T02:10:11.345Z"
-      },
       "registration-extras": {
         "writerId": "agent-pan-3836",
         "agentId": "agent-pan-3836",
@@ -1006,6 +999,17 @@
         "outcome": "completed",
         "reason": "WI-5: no-loss audit rewritten as real interactions against the real page and hook (network mocked only), covering the inventory incl. folder browsing, telemetry-once, entry presets and the guidance link. Commit c870fae1f4e.",
         "releasedAt": "2026-09-17T02:10:31.503Z"
+      },
+      {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 841092,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T02:10:11.345Z",
+        "itemId": "delete-new-project-modal",
+        "outcome": "completed",
+        "reason": "WI-6: audited. git grep NewProjectModal src/ now finds only historical prose; the stale NewProjectWiring header comment is corrected. Commit c870fae1f4e.",
+        "releasedAt": "2026-09-17T02:10:34.775Z"
       }
     ],
     "statusReasons": {
@@ -1054,8 +1058,8 @@
         "updatedAt": "2026-09-17T02:10:31.503Z"
       },
       "delete-new-project-modal": {
-        "reason": "revised PRD",
-        "updatedAt": "2026-09-17T02:10:08.123Z"
+        "reason": "WI-6: audited. git grep NewProjectModal src/ now finds only historical prose; the stale NewProjectWiring header comment is corrected. Commit c870fae1f4e.",
+        "updatedAt": "2026-09-17T02:10:34.775Z"
       },
       "docs-projects-and-workspaces": {
         "reason": "revised PRD",
@@ -1130,10 +1134,10 @@
     "wire-entry-points-no-loss.ac3": "completed",
     "wire-entry-points-no-loss.ac4": "completed",
     "wire-entry-points-no-loss.ac5": "completed",
-    "delete-new-project-modal": "running",
-    "delete-new-project-modal.ac1": "pending",
-    "delete-new-project-modal.ac2": "pending",
-    "delete-new-project-modal.ac3": "pending",
+    "delete-new-project-modal": "completed",
+    "delete-new-project-modal.ac1": "completed",
+    "delete-new-project-modal.ac2": "completed",
+    "delete-new-project-modal.ac3": "completed",
     "docs-projects-and-workspaces": "running",
     "docs-projects-and-workspaces.ac1": "pending",
     "docs-projects-and-workspaces.ac2": "pending",
