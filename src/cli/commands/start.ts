@@ -695,23 +695,7 @@ async function repairMainBranchWorkspace(workspace: string, normalizedId: string
   }
 }
 
-/** PAN-2410: --fresh means fresh STAFFING, not just a fresh session. Never
- * inherit the dead agent's recorded model — with no explicit --model the
- * tier/role resolvers run against current config. A plain restart (no
- * --fresh) keeps the recorded staffing, by design.
- * A `pending-`-prefixed recorded model is a mid-spawn placeholder written
- * before real model resolution (spawn-helpers/lifecycle-restart); a spawn that
- * died mid-flight leaves it behind, and inheriting it crashes resolution with
- * "Unknown model" (same guard resume.ts applies). Treat it as no recorded
- * model so staffing re-runs. */
-export function resolveSpawnModel(
-  explicitModel: string | undefined,
-  fresh: boolean | undefined,
-  recordedModel: string | undefined,
-): string | undefined {
-  const recorded = recordedModel?.startsWith('pending-') ? undefined : recordedModel;
-  return explicitModel || (fresh ? undefined : recorded);
-}
+import { resolveStartSpawnModel } from './start-spawn-model.js';
 
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
   process.env['OVERDECK_AGENT_STARTED_BY'] = resolveCliStartedBy('operator:cli:pan-start');
@@ -732,8 +716,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   const normalizedId = id.toLowerCase();
   const agentId = `agent-${normalizedId}`;
   const existingAgentState = getAgentStateSync(agentId);
-  // PAN-3857 (D2/D3): only explicit --model overrides; the prior agent's model is resume continuity (dropped by --fresh); record.workModel is honored via the issue-override tier, never read back here.
-  const spawnModel = options.model ?? resolveSpawnModel(undefined, options.fresh, existingAgentState?.model);
+  const spawnModel = resolveStartSpawnModel(options.model, options.fresh, existingAgentState?.model);
   // PAN-636 — validate only an explicit --harness flag up front. Flagless
   // spawns intentionally forward undefined so spawnAgent's resolveHarness()
   // applies role/provider defaults after model resolution.
