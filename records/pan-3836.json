@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T02:10:41.184Z",
+  "updated": "2026-09-17T02:10:44.339Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,16 +678,8 @@
     }
   ],
   "tasks": {
-    "sequence": 78,
-    "claims": {
-      "skill-pan-new-project": {
-        "writerId": "agent-pan-3836",
-        "agentId": "agent-pan-3836",
-        "pid": 842809,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-17T02:10:28.289Z"
-      }
-    },
+    "sequence": 79,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3836",
@@ -1018,6 +1010,17 @@
         "outcome": "completed",
         "reason": "WI-7: WORKSPACES-AND-PROJECTS rewritten (modules, route table, operation/job lifecycle, what counts as success, restart limitation), projects.mdx registration section rewritten, CLAUDE.md line added. Commit 368c70abd6a.",
         "releasedAt": "2026-09-17T02:10:41.184Z"
+      },
+      {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 842809,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T02:10:28.289Z",
+        "itemId": "skill-pan-new-project",
+        "outcome": "completed",
+        "reason": "WI-7: skill Steps 2/3/6 and the WHY table rewritten for detected registration; Step 6 now points at .git/info/exclude instead of the tracked .gitignore; nonexistent 'pan project new' removed. pan sync ran clean. Commit 368c70abd6a.",
+        "releasedAt": "2026-09-17T02:10:44.339Z"
       }
     ],
     "statusReasons": {
@@ -1074,8 +1077,8 @@
         "updatedAt": "2026-09-17T02:10:41.184Z"
       },
       "skill-pan-new-project": {
-        "reason": "Cycle-10 review BLOCKING [requirements FR-9/AC-7]: sync-sources/skills/pan-new-project was not rewritten per WI-7: step 2 must become 'run pan project clone <url> or pan project add <path>; both detect remote, default branch and prefix and create the main workspace'; step 3 drops issue_prefix/github_repo/default_branch from the minimum config. Details: .pan/review/agent-pan-3836-review-437d88d5/synthesis.md",
-        "updatedAt": "2026-09-16T22:59:55.373Z"
+        "reason": "WI-7: skill Steps 2/3/6 and the WHY table rewritten for detected registration; Step 6 now points at .git/info/exclude instead of the tracked .gitignore; nonexistent 'pan project new' removed. pan sync ran clean. Commit 368c70abd6a.",
+        "updatedAt": "2026-09-17T02:10:44.339Z"
       }
     }
   },
@@ -1150,10 +1153,10 @@
     "docs-projects-and-workspaces.ac1": "completed",
     "docs-projects-and-workspaces.ac2": "completed",
     "docs-projects-and-workspaces.ac3": "completed",
-    "skill-pan-new-project": "running",
-    "skill-pan-new-project.ac1": "pending",
-    "skill-pan-new-project.ac2": "pending",
-    "skill-pan-new-project.ac3": "pending"
+    "skill-pan-new-project": "completed",
+    "skill-pan-new-project.ac1": "completed",
+    "skill-pan-new-project.ac2": "completed",
+    "skill-pan-new-project.ac3": "completed"
   },
   "workModel": "claude-opus-5"
 }
