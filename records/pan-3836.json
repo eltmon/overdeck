@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T00:35:28.857Z",
+  "updated": "2026-09-17T00:40:38.153Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -666,7 +666,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3836",
@@ -678,16 +678,8 @@
     }
   ],
   "tasks": {
-    "sequence": 44,
-    "claims": {
-      "repo-url-parser": {
-        "writerId": "agent-pan-3836",
-        "agentId": "agent-pan-3836",
-        "pid": 3509316,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-17T00:35:28.857Z"
-      }
-    },
+    "sequence": 45,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3836",
@@ -875,12 +867,23 @@
         "outcome": "completed",
         "reason": "Dropped refreshRemote from the resolve route so the probe memo serves the keystroke path, added the read auth guard to the job poll, and moved genuine create failures from 409 to 500. Commit ed2464fa393.",
         "releasedAt": "2026-09-17T00:32:18.348Z"
+      },
+      {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 3509316,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T00:35:28.857Z",
+        "itemId": "repo-url-parser",
+        "outcome": "completed",
+        "reason": "WI-1.1: transport URLs preserved verbatim (no SSH->HTTPS rewrite, port kept out of the path, dotted names accepted); metadata derived separately incl. folder name for unknown hosts; file://, git://, ext::, control chars, option-like input and half-typed known-provider paths rejected. Table-driven test of the PRD matrix. Commit bc53b79a40f.",
+        "releasedAt": "2026-09-17T00:40:38.153Z"
       }
     ],
     "statusReasons": {
       "repo-url-parser": {
-        "reason": "WI-1.1 revised: transport URLs must be preserved verbatim (no SSH->HTTPS rewrite, no port-as-path, dotted names accepted). Old acceptance superseded by the revised PRD.",
-        "updatedAt": "2026-09-17T00:35:25.544Z"
+        "reason": "WI-1.1: transport URLs preserved verbatim (no SSH->HTTPS rewrite, port kept out of the path, dotted names accepted); metadata derived separately incl. folder name for unknown hosts; file://, git://, ext::, control chars, option-like input and half-typed known-provider paths rejected. Table-driven test of the PRD matrix. Commit bc53b79a40f.",
+        "updatedAt": "2026-09-17T00:40:38.153Z"
       },
       "registration-extras": {
         "reason": "Added RegisterProjectExtras type and optional extras parameter. Tests verify extras are saved and backward compatibility is maintained.",
@@ -937,12 +940,12 @@
     }
   },
   "statusOverrides": {
-    "repo-url-parser": "running",
-    "repo-url-parser.ac1": "pending",
-    "repo-url-parser.ac2": "pending",
-    "repo-url-parser.ac3": "pending",
-    "repo-url-parser.ac4": "pending",
-    "repo-url-parser.ac5": "pending",
+    "repo-url-parser": "completed",
+    "repo-url-parser.ac1": "completed",
+    "repo-url-parser.ac2": "completed",
+    "repo-url-parser.ac3": "completed",
+    "repo-url-parser.ac4": "completed",
+    "repo-url-parser.ac5": "completed",
     "registration-extras": "completed",
     "registration-extras.ac1": "completed",
     "registration-extras.ac2": "completed",
