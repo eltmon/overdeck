@@ -82,3 +82,4 @@
 1914 src/dashboard/server/routes/workspaces/merge-ops.ts # PAN-3847
 1042 src/lib/cloister/verification-runner.ts # PAN-3847
 1007 src/lib/github-app.ts # PAN-3847
+1001 src/dashboard/server/routes/workspaces/review-pipeline.ts # PAN-3847
