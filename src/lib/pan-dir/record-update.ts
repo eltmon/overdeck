@@ -439,11 +439,45 @@ async function recordReconcileFailureHealth(
  * re-applies the mutator only when the issue's own record conflicted, so a
  * mutation lost any other way must be re-applied here.
  *
- * Footprint rule: a top-level field the mutator changed (original → next) must
- * still hold the mutated value after the merge. Re-apply is guarded a second
- * time — if running the mutator on the current record changes nothing, the
- * mutation is already reflected and no churn commit is written.
+ * Footprint rule (PAN-3848 F6): compare only the leaf paths the mutator
+ * actually changed (original → next), never whole serialized top-level
+ * fields. A concurrent writer may add another entry under the same field
+ * while the caller's change remains present — a whole-field comparison
+ * misfires there and replays the mutator, which double-advances
+ * `record.tasks.sequence` on a forced block or duplicates `claimHistory`.
+ * Re-apply is guarded a second time — if running the mutator on the current
+ * record changes nothing, the mutation is already reflected and no churn
+ * commit is written.
  */
+type MutationJsonPath = Array<string | number>;
+
+function changedMutationLeafPaths(original: unknown, next: unknown, path: MutationJsonPath = []): MutationJsonPath[] {
+  if (Object.is(original, next)) return [];
+  if (typeof original !== 'object' || typeof next !== 'object' || original === null || next === null) {
+    return [path];
+  }
+  if (Array.isArray(original) !== Array.isArray(next)) return [path];
+  const paths: MutationJsonPath[] = [];
+  const keys = new Set([...Object.keys(original), ...Object.keys(next)]);
+  for (const key of keys) {
+    const segment = Array.isArray(original) ? Number(key) : key;
+    paths.push(...changedMutationLeafPaths(
+      (original as Record<string, unknown>)[key],
+      (next as Record<string, unknown>)[key],
+      [...path, segment],
+    ));
+  }
+  return paths;
+}
+
+function mutationValueAtPath(root: unknown, path: MutationJsonPath): unknown {
+  let node = root;
+  for (const segment of path) {
+    if (typeof node !== 'object' || node === null) return undefined;
+    node = (node as Record<string | number, unknown>)[segment];
+  }
+  return node;
+}
 async function ensureMutationSurvivedReconcile(
   project: ProjectConfig,
   issueId: string,
@@ -456,16 +490,11 @@ async function ensureMutationSurvivedReconcile(
   const current = readIssueRecordSync(project, issueId);
   if (!current) return;
 
-  const footprintKeys = new Set([
-    ...Object.keys(mutation.original),
-    ...Object.keys(mutation.next),
-  ] as Array<keyof PanIssueRecord>);
+  const changedPaths = changedMutationLeafPaths(mutation.original, mutation.next);
   let mutationLost = false;
-  for (const key of footprintKeys) {
-    const before = JSON.stringify(mutation.original[key]);
-    const after = JSON.stringify(mutation.next[key]);
-    if (before === after) continue;
-    if (JSON.stringify(current[key]) !== after) {
+  for (const path of changedPaths) {
+    const after = mutationValueAtPath(mutation.next, path);
+    if (JSON.stringify(mutationValueAtPath(current, path)) !== JSON.stringify(after)) {
       mutationLost = true;
       break;
     }
