@@ -136,7 +136,7 @@
     "recordedAt": "2026-09-17T01:00:05.968Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T01:00:55.034Z",
+  "updated": "2026-09-17T01:00:58.285Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "pending",
@@ -331,7 +331,7 @@
   ],
   "workModel": "claude-opus-5",
   "tasks": {
-    "sequence": 17,
+    "sequence": 18,
     "claims": {},
     "claimHistory": [
       {
@@ -438,8 +438,8 @@
         "updatedAt": "2026-09-16T20:13:54.637Z"
       },
       "retro-docs": {
-        "reason": "Added the '**Pipeline retrospective button:**' paragraph to docs/DASHBOARD-ARCHITECTURE.md directly after the Simple home conversation composer paragraph (endpoint path, per-request roles/retrospective.md template read, unscoped conversation under the No project bucket, read-only prompt contract pinned by the invariant test) and the '### Conversation kickoff templates (not roles)' subsection to docs/ROLES.md after the active-role-files table listing roles/retrospective.md alongside the three handoff templates with the Prompt-Change: trailer requirement. Both grep checks print one line each. Commit cadccbb20a3 pushed.",
-        "updatedAt": "2026-09-16T20:14:49.537Z"
+        "reason": "Independent review remains unresolved: retrospective must receive canonical record evidence through the existing resolver; direct JSON reads under a resolved directory are not compliant. Implement and test the data path, update prompt and docs.",
+        "updatedAt": "2026-09-17T01:00:58.285Z"
       }
     }
   },
@@ -474,8 +474,8 @@
     "retro-mount.ac2": "completed",
     "retro-mount.ac3": "completed",
     "retro-mount.ac4": "completed",
-    "retro-docs": "completed",
-    "retro-docs.ac1": "completed",
-    "retro-docs.ac2": "completed"
+    "retro-docs": "pending",
+    "retro-docs.ac1": "pending",
+    "retro-docs.ac2": "pending"
   }
 }
