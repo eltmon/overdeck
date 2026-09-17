@@ -153,10 +153,10 @@
       "tests/unit/lib/overdeck/no-loss-matrix.ts",
       "tests/unit/prompts/retrospective-template.test.ts"
     ],
-    "recordedAt": "2026-09-17T01:00:05.968Z"
+    "recordedAt": "2026-09-17T01:23:42.409Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T01:23:38.524Z",
+  "updated": "2026-09-17T01:23:42.410Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "passed",
