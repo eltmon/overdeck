@@ -53,6 +53,7 @@ export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
     { table: 'review_status', column: 'strike_next_attempt_at' },
     { table: 'review_status', column: 'strike_landing_attempts' },
     { table: 'review_status', column: 'conflicts_since' },
+    { table: 'review_status', column: 'review_stale_since' },
     { table: 'agents', column: 'yielded_by_scheduler' },
     { table: 'agents', column: 'review_context_manifest_path' },
     { table: 'agents', column: 'yielded_at' },
@@ -175,6 +176,8 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `review_cycle_history` text');
   // PAN-3154: main-head SHA/paths that first made this branch conflict.
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `conflicts_since` text');
+  // PAN-3847: a passed review whose anchor no longer matches HEAD is stale, not reset.
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `review_stale_since` text');
   ensureReleaseSetTablesSync(db);
   ensureUatGenerationRepoTablesSync(db);
   // PAN-1491: existing overdeck.db files created before substrate-bug weights need

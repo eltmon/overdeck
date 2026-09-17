@@ -11,8 +11,8 @@
  *      SQLite so the field survives a dashboard restart.
  *
  *   2. Deacon detection — checkPostReviewCommits() reads reviewedAtCommit, compares
- *      it to the current workspace HEAD, and resets the review pipeline when HEAD
- *      has moved (i.e. new commits pushed after review passed).
+ *      it to the current workspace HEAD, and (PAN-3847) marks the review stale when
+ *      HEAD has moved (i.e. new commits pushed after review passed).
  *
  * The specialists.ts route handler is an Effect HTTP handler requiring a full
  * server stack, so the snapshot logic is covered by testing the two components
@@ -319,12 +319,12 @@ describe('reviewedAtCommit DB persistence (specialists/done snapshot layer)', ()
     expect(row?.reviewedAtCommit).toBe(sha);
   });
 
-  it('writes the HTTP blocked anchor only after feedback delivery', async () => {
+  it('writes the HTTP blocked anchor with the verdict in one write (PAN-3847)', async () => {
     mockExecHeadSha = 'blocked-http-head';
     mockDeliverReviewVerdictFeedback.mockImplementation(() => {
       const duringDelivery = getReviewStatusFromDbSync('PAN-RAC-HTTP');
       expect(duringDelivery?.reviewStatus).toBe('blocked');
-      expect(duringDelivery?.reviewedAtCommit).toBeUndefined();
+      expect(duringDelivery?.reviewedAtCommit).toBe('blocked-http-head');
       return Effect.succeed({ prCommentPosted: false, agentMessageSent: true });
     });
 
@@ -345,9 +345,10 @@ describe('reviewedAtCommit DB persistence (specialists/done snapshot layer)', ()
       'PAN-RAC-HTTP',
       '/fake/project/workspaces/feature-pan-rac-http',
     );
+    // The anchor is snapshotted before the verdict write, which precedes feedback.
     expect(
-      mockDeliverReviewVerdictFeedback.mock.invocationCallOrder[0],
-    ).toBeLessThan(mockSnapshotWorkspaceHeads.mock.invocationCallOrder[0]!);
+      mockSnapshotWorkspaceHeads.mock.invocationCallOrder[0],
+    ).toBeLessThan(mockDeliverReviewVerdictFeedback.mock.invocationCallOrder[0]!);
     expect(getReviewStatusFromDbSync('PAN-RAC-HTTP')).toMatchObject({
       reviewStatus: 'blocked',
       reviewedAtCommit: 'blocked-http-head',
@@ -380,7 +381,7 @@ describe('reviewedAtCommit DB persistence (specialists/done snapshot layer)', ()
 // ─── 2. Deacon post-review commit detection ───────────────────────────────────
 
 describe('checkPostReviewCommits — deacon detects new commits via reviewedAtCommit', () => {
-  it('resets review pipeline when HEAD has moved since review passed', async () => {
+  it('marks the review stale when HEAD has moved since review passed (PAN-3847)', async () => {
     setReviewStatusSync('PAN-900', {
       reviewStatus: 'passed',
       testStatus: 'passed',
@@ -396,11 +397,14 @@ describe('checkPostReviewCommits — deacon detects new commits via reviewedAtCo
 
     expect(actions.some((a) => a.includes('PAN-900'))).toBe(true);
 
+    // A passed review is never reset by a patrol: the verdict and anchor survive,
+    // the row is marked stale, and it no longer counts as ready for merge.
     const after = getReviewStatusSync('PAN-900');
-    expect(after?.reviewStatus).toBe('pending');
-    expect(after?.testStatus).toBe('pending');
+    expect(after?.reviewStatus).toBe('passed');
+    expect(after?.testStatus).toBe('passed');
     expect(after?.readyForMerge).toBe(false);
-    expect(after?.reviewedAtCommit).toBeUndefined();
+    expect(after?.reviewedAtCommit).toBe('oldsha1');
+    expect(after?.reviewStaleSince).toBeTruthy();
   });
 
   it('preserves review when HEAD changed but the tree did not', async () => {

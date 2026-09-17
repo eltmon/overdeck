@@ -21,6 +21,7 @@ import {
   verificationArtifactPath,
   writeVerificationArtifact,
 } from './verification-artifact.js';
+import { runTestSkipGate } from './test-skip-gate.js';
 import { buildFinalFailureInstructions } from './verification-feedback.js';
 import {
   isVerificationWorkerActive,
@@ -35,7 +36,7 @@ import type {
 import { readReviewStatusMap } from './review-status-source.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
-import { messageAgent, setAgentPaused, stopAgent } from '../agents.js';
+import { getAgentStateSync, messageAgent, setAgentPaused, stopAgent } from '../agents.js';
 import { findProjectByPathSync, resolveProjectFromIssueSync } from '../projects.js';
 import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
 import { getXBriefACStatusSync } from '../xbrief/acceptance-criteria.js';
@@ -44,7 +45,7 @@ import { isXBriefFilename } from '../xbrief/lifecycle.js';
 import { checkIncompletePlanItemsPromise } from '../work/done-preflight.js';
 import { capturePipelineStageForIssue } from '../telemetry/pipeline.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
-import type { HeadAnchor } from '../git-utils.js';
+import { parseCompositeSnapshot, type HeadAnchor } from '../git-utils.js';
 
 const execAsync = promisify(exec);
 
@@ -323,7 +324,7 @@ function buildSyncFailureFeedback(
   return { summary, feedbackBody };
 }
 
-function getSyncTargetBranch(
+export function getSyncTargetBranch(
   workspacePath: string,
   projectConfig: ReturnType<typeof findProjectByPathSync>,
   repoName?: string,
@@ -419,6 +420,9 @@ async function runVerificationForIssuePromise(
   }
 
   setReviewStatusSync(issueId, { verificationStatus: 'running' });
+  // PAN-3847 (FR-11): the run timestamp is captured once here and names the
+  // immutable per-run artifact written when the run terminates.
+  const runStartedAt = new Date().toISOString();
   console.log(`[${logPrefix}] Running verification gate for ${issueId} (attempt ${currentCycles + 1}/${VERIFICATION_MAX_CYCLES})`);
 
   try {
@@ -591,7 +595,17 @@ async function runVerificationForIssuePromise(
     };
     writeLiveArtifact();
 
-    const gateResults = await Effect.runPromise(runQualityGates(gates, workspacePath, 'pre_push', {
+    // PAN-3847 (FR-12): the test-skip gate runs before the quality gates — a diff
+    // that adds skipped/only tests or removes test cases fails verification as a
+    // required `test-skip` gate without burning a full suite run.
+    const testSkipStart = Date.now();
+    const testSkip = await runTestSkipGate(workspacePath, changedBase);
+    if (testSkip.diffUnavailable) {
+      console.warn(`[${logPrefix}] test-skip gate abstained for ${issueId}: could not diff ${changedBase}...HEAD`);
+    }
+
+    const gateResults = testSkip.passed
+      ? await Effect.runPromise(runQualityGates(gates, workspacePath, 'pre_push', {
       issueId,
       isRemote: workspaceInfo.isRemote,
       vmName: workspaceInfo.vmName,
@@ -620,7 +634,15 @@ async function runVerificationForIssuePromise(
         liveGateTail = '';
         writeLiveArtifact();
       },
-    }));
+    }))
+      : [{
+        name: 'test-skip',
+        passed: false,
+        required: true,
+        output: testSkip.violations.map(v => `${v.file}: [${v.kind}] ${v.line}`).join('\n'),
+        durationMs: Date.now() - testSkipStart,
+        error: 'Diff adds skipped or only-tests or removes test cases',
+      }];
 
     const postGateMergedOutcome = skipMergedVerification(issueId, logPrefix);
     if (postGateMergedOutcome) return postGateMergedOutcome;
@@ -657,8 +679,20 @@ async function runVerificationForIssuePromise(
 
     // Durable terminal record of this gate run, surfaced by the issue tree's
     // Test/Lint node (replaces the incremental 'running' writes above).
+    // PAN-3847 (FR-11): also written to an immutable per-run file named by run
+    // time and head, so feedback references a path later runs cannot overwrite.
+    let head8: string | undefined;
     try {
-      writeVerificationArtifact(workspacePath, issueId, gateResults);
+      const { stdout } = await execAsync('git rev-parse --short=8 HEAD', { cwd: workspacePath, encoding: 'utf-8', timeout: 10_000 });
+      head8 = stdout.trim() || undefined;
+    } catch { /* non-fatal — fall back to the latest-only write */ }
+    let runArtifactPath: string | undefined;
+    try {
+      const finalArtifact = writeVerificationArtifact(workspacePath, issueId, gateResults, {
+        ranAt: runStartedAt,
+        ...(head8 ? { head8 } : {}),
+      });
+      runArtifactPath = finalArtifact.path;
     } catch (artifactErr: any) {
       console.warn(`[${logPrefix}] Could not write verification artifact for ${issueId}: ${artifactErr.message}`);
     }
@@ -666,7 +700,7 @@ async function runVerificationForIssuePromise(
     if (failedGate) {
       const newCycleCount = currentCycles + 1;
       const failedCheck = failedGate.name;
-      const fullOutputPath = verificationArtifactPath(workspacePath);
+      const fullOutputPath = runArtifactPath ?? verificationArtifactPath(workspacePath);
       const summary = `Verification FAILED at ${failedCheck} (${failedGate.durationMs}ms).\n\nFull gate output: ${fullOutputPath}`;
 
       setReviewStatusSync(issueId, {
@@ -912,11 +946,35 @@ async function runVerificationForIssuePromise(
       verificationNotes: undefined,
       ...(lastVerifiedCommit ? { lastVerifiedCommit } : {}),
     });
+    // PAN-3847 (FR-10): a verification pass clears a verification_stuck flag and
+    // lifts the pause that escalateVerificationStuck set — the gate that created
+    // the stuck state is the gate that clears it.
+    const stuckRow = getReviewStatusSync(issueId);
+    if (stuckRow?.stuck && stuckRow.stuckReason === 'verification_stuck') {
+      const { clearWorkspaceStuck } = await import('../overdeck/review-status-sync.js');
+      clearWorkspaceStuck(issueId);
+      console.log(`[${logPrefix}] Cleared verification_stuck for ${issueId}: verification passed`);
+    }
+    {
+      const stuckAgentId = `agent-${issueId.toLowerCase()}`;
+      const agentState = getAgentStateSync(stuckAgentId);
+      if (agentState?.pausedReason?.startsWith('needs-you: verification stuck')) {
+        try {
+          await Effect.runPromise(setAgentPaused(stuckAgentId, undefined, false));
+          console.log(`[${logPrefix}] Lifted verification-stuck pause for ${stuckAgentId}`);
+        } catch (err: any) {
+          console.warn(`[${logPrefix}] Failed to lift verification-stuck pause for ${stuckAgentId}: ${err?.message ?? err}`);
+        }
+      }
+    }
     void capturePipelineStageForIssue(issueId, 'verification_passed');
     console.log(`[${logPrefix}] Verification passed for ${issueId}${lastVerifiedCommit ? ` (HEAD=${lastVerifiedCommit.slice(0, 8)})` : ''} — proceeding to review-agent`);
 
-    // Post overdeck/tests=success so the GitHub CI test job can self-skip
-    // its redundant vitest run on this exact commit. Non-fatal on failure.
+    // Post overdeck/test=success for branch protection's required context
+    // (Decision 7). PAN-3847: the stamp binds to the anchor snapshotted at pass
+    // time (the primary repo's sha for a composite polyrepo anchor), and the
+    // description says changed-file scope so nobody reads it as a full-suite
+    // proof. Non-fatal on failure.
     void (async () => {
       try {
         const project = findProjectByPathSync(workspacePath);
@@ -924,7 +982,14 @@ async function runVerificationForIssuePromise(
         if (!repo || !repo.includes('/')) return;
         const [owner, name] = repo.split('/');
         const { postOverdeckTestsStatus } = await import('../github-app.js');
-        await postOverdeckTestsStatus(workspacePath, owner!, name!, 'success', 'Verification gate passed');
+        const stampSha = (() => {
+          if (!lastVerifiedCommit) return undefined;
+          const composite = parseCompositeSnapshot(lastVerifiedCommit);
+          if (composite.size === 0) return lastVerifiedCommit as string;
+          const primary = repoRoots[0]?.repoKey;
+          return (primary && composite.get(primary)) ?? [...composite.values()][0];
+        })();
+        await postOverdeckTestsStatus(workspacePath, owner!, name!, 'success', 'Verification gate passed (changed-file scope)', stampSha);
       } catch (err: any) {
         console.warn(`[${logPrefix}] Failed to post overdeck/tests status: ${err.message}`);
       }

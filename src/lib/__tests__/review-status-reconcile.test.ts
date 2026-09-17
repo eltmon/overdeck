@@ -329,7 +329,9 @@ describe('resetPipelineVerdictsForWorkStartSync', () => {
       verificationStatus: 'pending',
       readyForMerge: false,
       autoRequeueCount: 0,
-      verificationCycleCount: 0,
+      // PAN-3847 (FR-17): the verification cycle counter is per issue — a work
+      // start preserves it; only `pan review reset` clears it.
+      verificationCycleCount: 1,
       reviewRetryCount: 0,
       testRetryCount: 0,
       mergeRetryCount: 0,

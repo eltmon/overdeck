@@ -189,6 +189,8 @@ export interface PanIssuePipelineRecord extends StrikeLandingStatus {
   prNumber?: number;
   prHeadSha?: string;
   reviewedAtCommit?: string;
+  /** PAN-3847: durable mirror of the row's stale marker — a passed review whose anchor no longer matches HEAD. */
+  reviewStaleSince?: string;
   lastVerifiedCommit?: string;
   /** PAN-1988 auto-heal: durable "the work agent finished and wants review" intent (set by `pan done`). */
   reviewRequestedAt?: string;

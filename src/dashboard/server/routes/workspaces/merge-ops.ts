@@ -1084,7 +1084,9 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
         const sha = prState.headSha.trim();
         if (sha) {
           await reportCommitStatus(githubPrRef.owner, githubPrRef.repo, sha, 'success', 'overdeck/review', 'Review passed');
-          await reportCommitStatus(githubPrRef.owner, githubPrRef.repo, sha, 'success', 'overdeck/test', 'Tests passed');
+          // PAN-3847: the description states what backed the stamp — the merge
+          // path's own post-rebase gate, not the pre-review verification run.
+          await reportCommitStatus(githubPrRef.owner, githubPrRef.repo, sha, 'success', 'overdeck/test', 'Merge path: CI green');
           console.log(`[merge] Reported commit statuses on post-rebase HEAD for ${issueId} (${sha.slice(0, 8)})`);
         }
       }

@@ -131,6 +131,7 @@ export function projectPipeline(
     prNumber: status.prNumber,
     prHeadSha: status.prHeadSha,
     reviewedAtCommit: status.reviewedAtCommit,
+    reviewStaleSince: status.reviewStaleSince,
     lastVerifiedCommit: status.lastVerifiedCommit,
     reviewRequestedAt: status.reviewRequestedAt,
     reviewSpawnedAt: typeof status.reviewSpawnedAt === 'number'

@@ -2,10 +2,9 @@
  * PAN-3512 — the two unsignaled-recovery auto-completes route their terminal
  * verdict through the write door instead of writing the review row directly.
  *
- * Both pass no evidence head, so the door takes its no-evidence path and the
- * landing behavior is unchanged; what changes is that the write is now
- * attributable (writer 'unsignaled-recovery') and a refusal is reported instead
- * of being announced as a completed auto-complete.
+ * PAN-3847: the door refuses anchorless verdicts, so the auto-complete first
+ * snapshots the workspace head and skips (logs) when none is available; a
+ * refusal is reported instead of being announced as a completed auto-complete.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, mkdirSync, writeFileSync, utimesSync, rmSync } from 'fs';
@@ -24,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   isPaneDead: vi.fn(),
   getAgentStateSync: vi.fn(),
   messageAgent: vi.fn(),
+  snapshotWorkspaceHeadsPromise: vi.fn(),
 }));
 
 vi.mock('../review-verdict-writer.js', () => ({ recordReviewVerdict: mocks.recordReviewVerdict }));
@@ -47,6 +47,10 @@ vi.mock('../../agents.js', () => ({
   getAgentRuntimeStateSync: vi.fn(),
   listRunningAgents: vi.fn(() => Effect.succeed([])),
   messageAgent: mocks.messageAgent,
+}));
+vi.mock('../../git-utils.js', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  snapshotWorkspaceHeadsPromise: mocks.snapshotWorkspaceHeadsPromise,
 }));
 
 const { checkCompletedButUnsignaledReviews } = await import('../deacon-review-unsignaled.js');
@@ -77,6 +81,7 @@ beforeEach(() => {
   mocks.parseVerdictReport.mockReturnValue({ verdict: 'blocked', topBlocker: 'terminal verdicts are dropped' });
   mocks.isPaneDead.mockReturnValue(Effect.succeed(true));
   mocks.getAgentStateSync.mockReturnValue(null);
+  mocks.snapshotWorkspaceHeadsPromise.mockResolvedValue('unsignaled-head');
   mocks.recordReviewVerdict.mockResolvedValue({ landed: true, classification: 'no-evidence' });
 });
 
@@ -96,9 +101,21 @@ describe('unsignaled-recovery auto-complete — verdict write door (PAN-3512)', 
     expect(input.verdict).toBe('blocked');
     expect(input.writer).toBe('unsignaled-recovery');
     expect(input.notes).toBe('terminal verdicts are dropped');
-    // No evidence head — the door takes its no-evidence path, behavior unchanged.
-    expect(input.evidenceHead).toBeUndefined();
+    // PAN-3847: the auto-complete snapshots the workspace head so the door's
+    // anchor requirement is met.
+    expect(input.evidenceHead).toBe('unsignaled-head');
     expect(actions.some(a => a.includes('Auto-completed review'))).toBe(true);
+  });
+
+  it('skips the auto-complete when no workspace head snapshot is available (PAN-3847)', async () => {
+    mocks.sessionExistsSync.mockReturnValue(false);
+    mocks.snapshotWorkspaceHeadsPromise.mockResolvedValue(undefined);
+
+    const actions = await checkCompletedButUnsignaledReviews();
+
+    expect(mocks.recordReviewVerdict).not.toHaveBeenCalled();
+    expect(actions.some(a => a.includes('no workspace head snapshot available'))).toBe(true);
+    expect(actions.some(a => a.includes('Auto-completed review'))).toBe(false);
   });
 
   it('reports the rejection reason instead of announcing an auto-complete that did not land', async () => {

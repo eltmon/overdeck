@@ -94,6 +94,8 @@ export default defineConfig({
     // verification, so unbounded threads multiply into a machine-wide CPU
     // storm. Mirror the root vitest.config.ts cap.
     maxWorkers: process.env.CI ? 2 : 4,
+    // PAN-3847 (FR-12): vitest refuses .only in every gate run.
+    allowOnly: false,
     globalSetup: [path.resolve(__dirname, '../../../tests/vitest-cpu-admission.ts')],
     // canvas-setup.ts must load first — it stubs canvas before test-setup.ts
     // imports @xterm/xterm (which probes canvas on import). See PAN-1989.

@@ -136,8 +136,10 @@ require all of the following before it can ask the write door to converge state:
 - the current workspace head equals the artifact anchor.
 
 `recordReviewVerdict()` in
-`src/lib/cloister/review-verdict-writer.ts` is the sole terminal write door. It
-classifies differing evidence and row anchors with per-repository
+`src/lib/cloister/review-verdict-writer.ts` is the sole terminal write door. PAN-3847:
+a terminal verdict with **no evidence anchor is refused** (`no-evidence-head`) so the
+caller re-snapshots — verdict and anchor are one write, never two. Differing evidence
+and row anchors are classified with per-repository
 `git merge-base --is-ancestor` probes:
 
 - **equal anchors** land without re-gating an existing terminal test result;
@@ -241,6 +243,12 @@ reversal (the newest count rises) or a stall (two non-decreases) marks the issue
 `review-not-converging`. The issue remains blocked with its feedback and a
 needs-you escalation; automatic rework re-drive stops until an operator runs
 `pan unstick <issueId>` or decomposes the work.
+
+Post-review drift (PAN-3847): when a passed review's anchor stops matching the
+workspace head, the row is marked `reviewStaleSince` — never reset by a patrol —
+and stops deriving `readyForMerge`. Only `pan done` or `pan review request`
+clears the marker and starts the re-review. Blocked verdicts still re-dispatch
+on a rework commit (debounced one patrol), never with `force: true`.
 
 This cross-cycle safety gate is separate from a single review parent's judgment
 about which findings matter in one convoy.

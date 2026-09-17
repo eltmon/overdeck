@@ -38,6 +38,7 @@
 - `.claude/agents/` + `.claude/skills/` in worktrees are **sync targets** populated from `sync-sources/`; shipped subagent definitions carry no `model:` pin — they inherit the session model so Cloister routing applies (prefer built-in `Explore`/`general-purpose` for ad-hoc exploration).
 - Pipeline membership, decisions, and workspace tables each have a canonical resolver — never derive independently. [docs/PIPELINE-MEMBERSHIP.md](docs/PIPELINE-MEMBERSHIP.md), [docs/DECISIONS.md](docs/DECISIONS.md), [docs/WORKSPACES-AND-PROJECTS.md](docs/WORKSPACES-AND-PROJECTS.md)
 - Project CI state reaches Command Deck rows through the shared read-model event path (`ciByProjectKey` → `/ws/rpc`); webhook observations and server-side REST repair feed it, never frontend polling. [docs/EXTERNAL-EVENT-STREAM.md](docs/EXTERNAL-EVENT-STREAM.md)
+- A terminal review verdict always carries its anchor (the write door refuses anchorless verdicts); a passed review is never reset by a patrol — post-review drift marks it `reviewStaleSince`, blocking merge until re-review (PAN-3847). [docs/REVIEW-AGENT-ARCHITECTURE.md](docs/REVIEW-AGENT-ARCHITECTURE.md)
 
 ## Topic Index
 

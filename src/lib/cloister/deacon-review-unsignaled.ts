@@ -4,7 +4,7 @@ import { basename, join } from 'path';
 import { Effect } from 'effect';
 import { getAgentRuntimeStateSync, getAgentStateSync, listRunningAgents } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
-import type { HeadAnchor } from '../git-utils.js';
+import { snapshotWorkspaceHeadsPromise, type HeadAnchor } from '../git-utils.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { loadReviewStatuses, setReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { getAllProjectSpecialistStatuses, getTmuxSessionName } from './specialists.js';
@@ -423,7 +423,10 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
         // the agent is unresponsive — auto-complete so the pipeline isn't blocked.
         if (lastNudged) {
           const notes = topBlocker || `Review auto-completed by deacon: ${verdict} (agent alive but unresponsive after nudge, ${latestReport.filename} exists)`;
-          const outcome = await recordReviewVerdict(issueId, { verdict, notes, writer: 'unsignaled-recovery' });
+          // PAN-3847: the verdict door refuses anchorless verdicts — snapshot the workspace head.
+          const evidenceHead = await snapshotWorkspaceHeadsPromise(issueId, wsPath).catch(() => undefined);
+          if (!evidenceHead) { actions.push(`Auto-complete for ${issueId} skipped: no workspace head snapshot available`); continue; }
+          const outcome = await recordReviewVerdict(issueId, { verdict, notes, evidenceHead, writer: 'unsignaled-recovery' });
           if (!outcome.landed) { actions.push(`Auto-complete for ${issueId} not recorded (${outcome.reason})`); continue; }
           actions.push(`Auto-completed review for ${issueId}: ${verdict} (alive but unresponsive after nudge, ${latestReport.filename} written ${Math.round((now - latestMtime) / 60000)}min ago)`);
           console.log(`[deacon] Auto-completed review for ${issueId}: ${verdict} (alive but unresponsive after nudge)`);
@@ -450,7 +453,10 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
       } else {
         // Session is dead — auto-complete so the pipeline isn't blocked
         const notes = topBlocker || `Review auto-completed by deacon: ${verdict} (agent dead, ${latestReport.filename} exists)`;
-        const outcome = await recordReviewVerdict(issueId, { verdict, notes, writer: 'unsignaled-recovery' });
+        // PAN-3847: the verdict door refuses anchorless verdicts — snapshot the workspace head.
+        const evidenceHead = await snapshotWorkspaceHeadsPromise(issueId, wsPath).catch(() => undefined);
+        if (!evidenceHead) { actions.push(`Auto-complete for ${issueId} skipped: no workspace head snapshot available`); continue; }
+        const outcome = await recordReviewVerdict(issueId, { verdict, notes, evidenceHead, writer: 'unsignaled-recovery' });
         if (!outcome.landed) { actions.push(`Auto-complete for ${issueId} not recorded (${outcome.reason})`); continue; }
         actions.push(`Auto-completed review for ${issueId}: ${verdict} (dead agent, ${latestReport.filename} written ${Math.round((now - latestMtime) / 60000)}min ago)`);
         console.log(`[deacon] Auto-completed review for ${issueId}: ${verdict} (dead agent)`);

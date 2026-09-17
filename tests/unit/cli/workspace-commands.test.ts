@@ -83,9 +83,15 @@ describe('pan workspace new (PAN-1990)', () => {
     // the security/branch-collision behavior this call shape fixes.
     // `--` terminates option parsing so an operator-supplied parent branch
     // like `--no-checkout` cannot be read by git as a flag (PAN-3330 review).
+    // PAN-3847 (FR-15): the branch is cut from origin/<parent> after a fetch.
     expect(mockExecAsync).toHaveBeenCalledWith(
       'git',
-      ['worktree', 'add', '-b', 'scratch/isolated-notes', '--', expectedPath, 'main'],
+      ['fetch', 'origin', 'main'],
+      expect.objectContaining({ cwd: projectRoot }),
+    );
+    expect(mockExecAsync).toHaveBeenCalledWith(
+      'git',
+      ['worktree', 'add', '-b', 'scratch/isolated-notes', '--', expectedPath, 'origin/main'],
       expect.objectContaining({ cwd: projectRoot }),
     );
   });

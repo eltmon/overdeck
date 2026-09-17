@@ -6,6 +6,7 @@ import { Effect } from 'effect';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { listSessionNames } from '../tmux.js';
 import { listWorkspaces } from '../workspaces/resolver.js';
+import { pruneVerificationRunArtifacts } from './verification-artifact.js';
 
 const execAsync = promisify(exec);
 
@@ -185,6 +186,22 @@ export async function reconcileIdleWorkspaceStacks(
 
   const d = { ...defaultDeps(), ...deps };
   const actions: string[] = [];
+
+  // PAN-3847 (FR-11): prune immutable per-run verification artifacts older than
+  // 30 days. Runs before the docker tiers so retention does not depend on the
+  // docker daemon being reachable.
+  try {
+    let prunedRuns = 0;
+    for (const ws of listWorkspaces({})) {
+      prunedRuns += pruneVerificationRunArtifacts(ws.path, d.now());
+    }
+    if (prunedRuns > 0) {
+      actions.push(`Pruned ${prunedRuns} verification run artifact(s) older than 30 days`);
+      console.log(`[deacon] Pruned ${prunedRuns} stale verification run artifact(s)`);
+    }
+  } catch (err: any) {
+    console.warn(`[deacon] verification run artifact prune failed (non-fatal): ${err?.message ?? err}`);
+  }
 
   let containerNames: string[];
   try {
