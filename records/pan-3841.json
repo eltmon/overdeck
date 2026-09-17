@@ -156,7 +156,7 @@
     "recordedAt": "2026-09-17T01:00:05.968Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-17T01:10:41.060Z",
+  "updated": "2026-09-17T01:14:07.369Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "passed",
@@ -352,8 +352,16 @@
   ],
   "workModel": "claude-opus-5",
   "tasks": {
-    "sequence": 24,
-    "claims": {},
+    "sequence": 25,
+    "claims": {
+      "retro-docs": {
+        "writerId": "agent-pan-3841",
+        "agentId": "agent-pan-3841",
+        "pid": 4165258,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T01:14:07.369Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3841",
@@ -492,8 +500,8 @@
         "updatedAt": "2026-09-16T20:13:54.637Z"
       },
       "retro-docs": {
-        "reason": "Independent review remains unresolved: retrospective must receive canonical record evidence through the existing resolver; direct JSON reads under a resolved directory are not compliant. Implement and test the data path, update prompt and docs.",
-        "updatedAt": "2026-09-17T01:00:58.285Z"
+        "reason": "Document the evidence bridge",
+        "updatedAt": "2026-09-17T01:14:07.369Z"
       }
     }
   },
@@ -528,7 +536,7 @@
     "retro-mount.ac2": "completed",
     "retro-mount.ac3": "completed",
     "retro-mount.ac4": "completed",
-    "retro-docs": "pending",
+    "retro-docs": "running",
     "retro-docs.ac1": "pending",
     "retro-docs.ac2": "pending"
   }
