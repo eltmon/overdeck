@@ -6,7 +6,7 @@
  * test files (PAN-1586, PAN-3846) and mock the runtime-state / runtimes /
  * tmux modules the activity signals read.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   getAgentRuntimeStateSync: vi.fn(),
@@ -16,10 +16,6 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../../src/lib/agents/runtime-state.js', () => ({
   getAgentRuntimeStateSync: mocks.getAgentRuntimeStateSync,
-}));
-
-vi.mock('../../../../src/lib/runtimes/index.js', () => ({
-  getRuntimeForAgent: mocks.getRuntimeForAgent,
 }));
 
 vi.mock('../../../../src/lib/tmux.js', () => ({
@@ -32,7 +28,17 @@ import {
   isAlive,
   isAliveSync,
   isIdle,
+  registerLivenessHeartbeatLookup,
 } from '../../../../src/lib/agents/liveness.js';
+
+// The heartbeat reaches liveness through the registration seam (the barrel
+// registers at load; tests register their fixture instead).
+beforeEach(() => {
+  registerLivenessHeartbeatLookup((agentId) => mocks.getRuntimeForAgent(agentId)?.getHeartbeat?.(agentId) ?? null);
+});
+afterEach(() => {
+  registerLivenessHeartbeatLookup(null);
+});
 
 const NOW = new Date('2026-09-17T12:00:00Z').getTime();
 

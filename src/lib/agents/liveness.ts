@@ -29,7 +29,6 @@
 import { Effect } from 'effect';
 
 import { listPaneValues, listPaneValuesSync, sessionExists, sessionExistsSync } from '../tmux.js';
-import { getRuntimeForAgent } from '../runtimes/index.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getAgentStateSync } from './agent-state.js';
 import { getAgentRuntimeStateSync } from './runtime-state.js';
@@ -37,6 +36,36 @@ import {
   findAgentRuntimePidInSubtree,
   findAgentRuntimePidInSubtreeSync,
 } from './runtime-pid-probe.js';
+
+/**
+ * The transcript-heartbeat lookup behind the idle verdicts. liveness.ts lives
+ * under src/lib/agents/ and is imported by messaging.ts, so it must NOT
+ * import the runtimes barrel (agents.ts → messaging → liveness →
+ * runtimes/index closes a module cycle). runtimes/index.ts registers
+ * getRuntimeForAgent here at module load — the same registration pattern as
+ * registerPipelineTelemetryAgentReader in agent-state.ts. When no lookup is
+ * registered (a process that never loads the runtime registry), the idle
+ * signals degrade to the runtime mirror alone, the pre-PAN-3677 behavior.
+ */
+export type LivenessHeartbeatLookup = (agentId: string) => { timestamp: Date } | null;
+
+let heartbeatLookup: LivenessHeartbeatLookup | null = null;
+
+export function registerLivenessHeartbeatLookup(lookup: LivenessHeartbeatLookup | null): void {
+  heartbeatLookup = lookup;
+}
+
+function getTranscriptHeartbeatMs(agentId: string): number | null {
+  if (!heartbeatLookup) return null;
+  try {
+    const heartbeat = heartbeatLookup(agentId);
+    if (!heartbeat?.timestamp) return null;
+    const ms = heartbeat.timestamp.getTime();
+    return Number.isFinite(ms) ? ms : null;
+  } catch {
+    return null;
+  }
+}
 
 export type LivenessVerdict =
   | { alive: true; paneAlive: true; runtimePid?: number }
@@ -161,15 +190,8 @@ export function getAgentEffectiveLastActivityMs(agentId: string): number | null 
     // tmux activity is best-effort; fall through to transcript/runtime sources.
   }
 
-  try {
-    const heartbeat = getRuntimeForAgent(agentId)?.getHeartbeat(agentId);
-    if (heartbeat?.timestamp) {
-      const heartbeatMs = heartbeat.timestamp.getTime();
-      if (Number.isFinite(heartbeatMs)) candidates.push(heartbeatMs);
-    }
-  } catch {
-    // Runtime transcript lookup is best-effort.
-  }
+  const heartbeatMs = getTranscriptHeartbeatMs(agentId);
+  if (heartbeatMs !== null) candidates.push(heartbeatMs);
 
   return candidates.length > 0 ? Math.max(...candidates) : null;
 }
@@ -192,15 +214,8 @@ export function getAgentWorkActivityMs(agentId: string): number | null {
   const runtimeMs = runtimeState?.lastActivity ? new Date(runtimeState.lastActivity).getTime() : NaN;
   if (Number.isFinite(runtimeMs)) candidates.push(runtimeMs);
 
-  try {
-    const heartbeat = getRuntimeForAgent(agentId)?.getHeartbeat(agentId);
-    if (heartbeat?.timestamp) {
-      const heartbeatMs = heartbeat.timestamp.getTime();
-      if (Number.isFinite(heartbeatMs)) candidates.push(heartbeatMs);
-    }
-  } catch {
-    // Runtime transcript lookup is best-effort.
-  }
+  const heartbeatMs = getTranscriptHeartbeatMs(agentId);
+  if (heartbeatMs !== null) candidates.push(heartbeatMs);
 
   return candidates.length > 0 ? Math.max(...candidates) : null;
 }
