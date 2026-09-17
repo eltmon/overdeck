@@ -67,8 +67,11 @@ export function writeVerificationArtifact(
 ): VerificationArtifact {
   const failed = gateResults.find((r) => !r.passed && r.required !== false);
   // Progress writes carry no ranAt; terminal per-run writes always do (PAN-3847).
+  // PR #3872 finding 5: a terminal write MUST produce the immutable per-run file
+  // even when head8 is unavailable — otherwise a later run overwrites the only
+  // record of this one. 'unknown-head' keeps the name unique via ranAt.
   const running = options !== undefined && options.ranAt === undefined;
-  const isRunWrite = !running && Boolean(options?.ranAt && options?.head8);
+  const isRunWrite = !running && Boolean(options?.ranAt);
   const artifact: VerificationArtifact = {
     issueId,
     ranAt: options?.ranAt ?? new Date().toISOString(),
@@ -91,7 +94,7 @@ export function writeVerificationArtifact(
   if (isRunWrite) {
     // The per-run file is the immutable record; the latest file is a copy so the
     // dashboard reader stays unchanged.
-    const runPath = verificationRunArtifactPath(workspacePath, options!.ranAt!, options!.head8!);
+    const runPath = verificationRunArtifactPath(workspacePath, options!.ranAt!, options!.head8 ?? 'unknown-head');
     mkdirSync(join(workspacePath, RUNS_RELATIVE_DIR), { recursive: true });
     const json = JSON.stringify(artifact, null, 2);
     writeFileSync(runPath, json);
