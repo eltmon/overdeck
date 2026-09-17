@@ -45,7 +45,7 @@ import { isXBriefFilename } from '../xbrief/lifecycle.js';
 import { checkIncompletePlanItemsPromise } from '../work/done-preflight.js';
 import { capturePipelineStageForIssue } from '../telemetry/pipeline.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
-import type { HeadAnchor } from '../git-utils.js';
+import { parseCompositeSnapshot, type HeadAnchor } from '../git-utils.js';
 
 const execAsync = promisify(exec);
 
@@ -970,8 +970,11 @@ async function runVerificationForIssuePromise(
     void capturePipelineStageForIssue(issueId, 'verification_passed');
     console.log(`[${logPrefix}] Verification passed for ${issueId}${lastVerifiedCommit ? ` (HEAD=${lastVerifiedCommit.slice(0, 8)})` : ''} — proceeding to review-agent`);
 
-    // Post overdeck/tests=success so the GitHub CI test job can self-skip
-    // its redundant vitest run on this exact commit. Non-fatal on failure.
+    // Post overdeck/test=success for branch protection's required context
+    // (Decision 7). PAN-3847: the stamp binds to the anchor snapshotted at pass
+    // time (the primary repo's sha for a composite polyrepo anchor), and the
+    // description says changed-file scope so nobody reads it as a full-suite
+    // proof. Non-fatal on failure.
     void (async () => {
       try {
         const project = findProjectByPathSync(workspacePath);
@@ -979,7 +982,14 @@ async function runVerificationForIssuePromise(
         if (!repo || !repo.includes('/')) return;
         const [owner, name] = repo.split('/');
         const { postOverdeckTestsStatus } = await import('../github-app.js');
-        await postOverdeckTestsStatus(workspacePath, owner!, name!, 'success', 'Verification gate passed');
+        const stampSha = (() => {
+          if (!lastVerifiedCommit) return undefined;
+          const composite = parseCompositeSnapshot(lastVerifiedCommit);
+          if (composite.size === 0) return lastVerifiedCommit as string;
+          const primary = repoRoots[0]?.repoKey;
+          return (primary && composite.get(primary)) ?? [...composite.values()][0];
+        })();
+        await postOverdeckTestsStatus(workspacePath, owner!, name!, 'success', 'Verification gate passed (changed-file scope)', stampSha);
       } catch (err: any) {
         console.warn(`[${logPrefix}] Failed to post overdeck/tests status: ${err.message}`);
       }
