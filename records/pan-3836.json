@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T00:32:01.034Z",
+  "updated": "2026-09-17T00:32:18.348Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,16 +678,8 @@
     }
   ],
   "tasks": {
-    "sequence": 41,
-    "claims": {
-      "project-create-routes": {
-        "writerId": "agent-pan-3836",
-        "agentId": "agent-pan-3836",
-        "pid": 3029220,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-16T23:09:31.764Z"
-      }
-    },
+    "sequence": 42,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3836",
@@ -864,6 +856,17 @@
         "outcome": "completed",
         "reason": "Restored realpath canonicalization on the home-boundary guard and on intent.path; bounded and coalesced the remote probe; gated detection on clean findings and a complete repo path. Six tests added.",
         "releasedAt": "2026-09-16T23:09:25.892Z"
+      },
+      {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 3029220,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-16T23:09:31.764Z",
+        "itemId": "project-create-routes",
+        "outcome": "completed",
+        "reason": "Dropped refreshRemote from the resolve route so the probe memo serves the keystroke path, added the read auth guard to the job poll, and moved genuine create failures from 409 to 500. Commit ed2464fa393.",
+        "releasedAt": "2026-09-17T00:32:18.348Z"
       }
     ],
     "statusReasons": {
@@ -888,8 +891,8 @@
         "updatedAt": "2026-09-16T14:53:17.289Z"
       },
       "project-create-routes": {
-        "reason": "Cycle-10 review BLOCKING [performance]: POST /api/projects/resolve passes refreshRemote: true (src/dashboard/server/routes/projects.ts:950) so the 60s probe memo never serves and every settled keystroke spawns git ls-remote. Drop refreshRemote from the resolve route (keep it only for the final create if needed), skip the probe while url findings exist. Details: .pan/review/agent-pan-3836-review-437d88d5/synthesis.md",
-        "updatedAt": "2026-09-16T22:59:46.214Z"
+        "reason": "Dropped refreshRemote from the resolve route so the probe memo serves the keystroke path, added the read auth guard to the job poll, and moved genuine create failures from 409 to 500. Commit ed2464fa393.",
+        "updatedAt": "2026-09-17T00:32:18.348Z"
       },
       "cli-project-add-dry-run": {
         "reason": "Cycle-10 review BLOCKING [requirements FR-5/AC-3 + correctness]: (1) --dry-run must print the resolved intent as JSON (console.log(JSON.stringify(intent,null,2))) for both add and clone, not decorated prose; update CLI tests to parse it. (2) pan project add (src/cli/commands/project.ts:95) stubs regResult so the detected tracker/github_repo/issue_prefix/default_branch just written by performProjectCreate get wiped; return the real registration result instead of a stub. Details: .pan/review/agent-pan-3836-review-437d88d5/synthesis.md",
@@ -954,12 +957,12 @@
     "create-job-store.ac2": "completed",
     "create-job-store.ac3": "completed",
     "create-job-store.ac4": "completed",
-    "project-create-routes": "running",
-    "project-create-routes.ac1": "pending",
-    "project-create-routes.ac2": "pending",
-    "project-create-routes.ac3": "pending",
-    "project-create-routes.ac4": "pending",
-    "project-create-routes.ac5": "pending",
+    "project-create-routes": "completed",
+    "project-create-routes.ac1": "completed",
+    "project-create-routes.ac2": "completed",
+    "project-create-routes.ac3": "completed",
+    "project-create-routes.ac4": "completed",
+    "project-create-routes.ac5": "completed",
     "cli-project-add-dry-run": "pending",
     "cli-project-add-dry-run.ac1": "pending",
     "cli-project-add-dry-run.ac2": "pending",
