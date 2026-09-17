@@ -750,17 +750,18 @@ const PUSH_RETRY_DELAYS_MS = [500, 1500, 3000] as const;
 const PUSH_MAX_ATTEMPTS = PUSH_RETRY_DELAYS_MS.length + 1;
 
 /**
- * A rejected push is retried only when another writer plausibly landed a
- * commit on the same local branch concurrently — the rejection is transient
- * and a plain retry succeeds once the ref lock clears. Anything else
- * (auth, network, hooks) fails immediately as before. No fetch, no rebase,
+ * A rejected push is retried only on git's `cannot lock ref` rejection: another
+ * writer pushed the same local branch at the same instant, the rejection is
+ * transient, and a plain retry succeeds once the ref lock clears. Anything
+ * else (non-fast-forward, auth, network, hooks) fails immediately as before. No fetch, no rebase,
  * no force. Total added delay is at most 5s (D11: the record writer's state
  * git lock has a 30s durability budget).
  */
 function isRetryablePushRejection(message: string): boolean {
-  return message.includes('cannot lock ref')
-    || message.includes('failed to push some refs')
-    || message.includes('non-fast-forward');
+  // Only the ref-lock race is transient. A non-fast-forward rejection means
+  // origin really advanced; the PAN-3291 merge reconciliation owns that case
+  // and must not wait behind 5s of pointless retries.
+  return message.includes('cannot lock ref');
 }
 
 interface PushAttemptOutcome {

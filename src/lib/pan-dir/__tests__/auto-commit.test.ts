@@ -822,6 +822,18 @@ describe('pushWithRetry', () => {
     expect(calls).toBe(3);
   });
 
+  it('does not retry a non-fast-forward rejection (origin really advanced)', async () => {
+    let calls = 0;
+    const promise = __testInternals.pushWithRetry(async () => {
+      calls++;
+      return { ok: false, message: " ! [rejected]        overdeck-state -> overdeck-state (non-fast-forward)\nerror: failed to push some refs to 'origin'" };
+    });
+    const result = await promise;
+
+    expect(result.pushed).toBe(false);
+    expect(calls).toBe(1);
+  });
+
   it('does not retry a non-retryable failure', async () => {
     let calls = 0;
     const promise = __testInternals.pushWithRetry(async () => {
