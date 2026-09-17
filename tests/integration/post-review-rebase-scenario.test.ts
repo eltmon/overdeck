@@ -387,7 +387,9 @@ describe('PAN-1215 post-review-rebase scenario', () => {
 
   // ─── Gap C: Review override clears stale verificationStatus ─────────────────
 
-  it('clears stale verificationStatus when review override signals passed', async () => {
+  // ─── Gap C: Review verdict never writes verificationStatus (PAN-3847) ──────
+
+  it('leaves a failed verificationStatus untouched when review signals passed (PAN-3847)', async () => {
     // Pre-seed a status with failed verification (e.g. from a prior cycle)
     setReviewStatusSync('PAN-1215-C', {
       reviewStatus: 'pending',
@@ -398,12 +400,13 @@ describe('PAN-1215 post-review-rebase scenario', () => {
 
     await doneCommand('review', 'pan-1215-c', { status: 'passed' });
 
+    // FR-10: the review verdict command never writes verificationStatus — a human
+    // passing review no longer clears the verification gate.
     const after = getReviewStatusSync('PAN-1215-C');
     expect(after?.reviewStatus).toBe('passed');
-    expect(after?.verificationStatus).toBe('passed');
-    expect(after?.verificationNotes).toContain('PAN-1215');
-    expect(after?.verificationNotes).toContain('override');
-    expect(verificationSatisfied(after!)).toBe(true);
+    expect(after?.verificationStatus).toBe('failed');
+    expect(after?.verificationNotes ?? '').not.toContain('PAN-1215');
+    expect(verificationSatisfied(after!)).toBe(false);
   });
 
   // ─── Gap B.1: Checkpoint excludes workspace-only .pan/ artifacts ────────────

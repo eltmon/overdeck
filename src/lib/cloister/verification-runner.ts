@@ -35,7 +35,7 @@ import type {
 import { readReviewStatusMap } from './review-status-source.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
-import { messageAgent, setAgentPaused, stopAgent } from '../agents.js';
+import { getAgentStateSync, messageAgent, setAgentPaused, stopAgent } from '../agents.js';
 import { findProjectByPathSync, resolveProjectFromIssueSync } from '../projects.js';
 import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
 import { getXBriefACStatusSync } from '../xbrief/acceptance-criteria.js';
@@ -912,6 +912,27 @@ async function runVerificationForIssuePromise(
       verificationNotes: undefined,
       ...(lastVerifiedCommit ? { lastVerifiedCommit } : {}),
     });
+    // PAN-3847 (FR-10): a verification pass clears a verification_stuck flag and
+    // lifts the pause that escalateVerificationStuck set — the gate that created
+    // the stuck state is the gate that clears it.
+    const stuckRow = getReviewStatusSync(issueId);
+    if (stuckRow?.stuck && stuckRow.stuckReason === 'verification_stuck') {
+      const { clearWorkspaceStuck } = await import('../overdeck/review-status-sync.js');
+      clearWorkspaceStuck(issueId);
+      console.log(`[${logPrefix}] Cleared verification_stuck for ${issueId}: verification passed`);
+    }
+    {
+      const stuckAgentId = `agent-${issueId.toLowerCase()}`;
+      const agentState = getAgentStateSync(stuckAgentId);
+      if (agentState?.pausedReason?.startsWith('needs-you: verification stuck')) {
+        try {
+          await Effect.runPromise(setAgentPaused(stuckAgentId, undefined, false));
+          console.log(`[${logPrefix}] Lifted verification-stuck pause for ${stuckAgentId}`);
+        } catch (err: any) {
+          console.warn(`[${logPrefix}] Failed to lift verification-stuck pause for ${stuckAgentId}: ${err?.message ?? err}`);
+        }
+      }
+    }
     void capturePipelineStageForIssue(issueId, 'verification_passed');
     console.log(`[${logPrefix}] Verification passed for ${issueId}${lastVerifiedCommit ? ` (HEAD=${lastVerifiedCommit.slice(0, 8)})` : ''} — proceeding to review-agent`);
 

@@ -166,12 +166,8 @@ export async function doneCommand(
         }
         update.reviewedAtCommit = workspaceHead;
       }
-      if (options.status === 'passed') {
-        // Clear any stale verificationStatus='failed' so the override unblocks
-        // readyForMerge. A human passing review assumes responsibility for the gate.
-        update.verificationStatus = 'passed';
-        update.verificationNotes = 'Cleared by `pan specialists done review --status passed` override (PAN-1215)';
-      }
+      // PAN-3847 (FR-10): a review verdict never writes verificationStatus — the
+      // verification gate alone owns that field.
       break;
 
     case 'test':

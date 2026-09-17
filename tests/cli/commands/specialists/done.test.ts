@@ -228,8 +228,6 @@ describe('specialists done command', () => {
       reviewStatus: 'passed',
       reviewNotes: 'approved',
       reviewedAtCommit: 'passed-head',
-      verificationStatus: 'passed',
-      verificationNotes: 'Cleared by `pan specialists done review --status passed` override (PAN-1215)',
     });
     expect(mockDeliverReviewVerdictFeedback).not.toHaveBeenCalled();
   });
