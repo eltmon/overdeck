@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T02:09:47.613Z",
+  "updated": "2026-09-17T02:09:50.953Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,16 +678,8 @@
     }
   ],
   "tasks": {
-    "sequence": 65,
-    "claims": {
-      "new-project-page": {
-        "writerId": "agent-pan-3836",
-        "agentId": "agent-pan-3836",
-        "pid": 837743,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-17T02:09:47.613Z"
-      }
-    },
+    "sequence": 66,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3836",
@@ -963,6 +955,17 @@
         "outcome": "completed",
         "reason": "WI-4 hook: discriminated submission state, operation correlation with synchronous submit guard, 750ms poll with 1/2/4/8/8s backoff then Check again, 404->reconcile once, cancel, sessionStorage observation, overrides vs proposals. The HTTP 503 regression is a real-hook test. Commit c870fae1f4e.",
         "releasedAt": "2026-09-17T02:09:44.401Z"
+      },
+      {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 837743,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T02:09:47.613Z",
+        "itemId": "new-project-page",
+        "outcome": "completed",
+        "reason": "WI-4 page: intent-first entry actions, per-mode forms, real destination path, Options disclosure that self-opens on a finding, FolderPicker restored and type=button hardened, a11y labels/progressbar/live status, truthful lost-contact and needs-setup states. Commit c870fae1f4e.",
+        "releasedAt": "2026-09-17T02:09:50.952Z"
       }
     ],
     "statusReasons": {
@@ -1003,8 +1006,8 @@
         "updatedAt": "2026-09-17T02:09:44.401Z"
       },
       "new-project-page": {
-        "reason": "Cycle-10 review BLOCKING [requirements FR-7, WI-5 rows 3 and 5]: NewProjectPage.tsx replaced the modal's FolderPicker directory browsing with bare text inputs. Mount FolderPicker (as NewWorkspacePage does) for the existing-mode path and the clone/new parent directory, feeding setPath/setParentDir; add data-testid=new-project-name-input to the name input. Details: .pan/review/agent-pan-3836-review-437d88d5/synthesis.md",
-        "updatedAt": "2026-09-16T22:59:49.233Z"
+        "reason": "WI-4 page: intent-first entry actions, per-mode forms, real destination path, Options disclosure that self-opens on a finding, FolderPicker restored and type=button hardened, a11y labels/progressbar/live status, truthful lost-contact and needs-setup states. Commit c870fae1f4e.",
+        "updatedAt": "2026-09-17T02:09:50.952Z"
       },
       "wire-entry-points-no-loss": {
         "reason": "Cycle-10 review BLOCKING [requirements FR-7/AC-5]: (1) capture('project_created', { mode }) is no longer emitted anywhere; call it before onCreated in the hook's success paths (200 result and job done). (2) NewProjectPage.no-loss.test.tsx asserts only 3 of the 11 WI-5 no-loss rows and two rows are mislabeled; replace the affordances array with the 11 WI-5 rows verbatim, each asserting the real affordance (FolderPicker rows, telemetry row, strip path preview with a populated mocked intent, name testid). Details: .pan/review/agent-pan-3836-review-437d88d5/synthesis.md",
@@ -1075,12 +1078,12 @@
     "use-project-create-intent-hook.ac3": "completed",
     "use-project-create-intent-hook.ac4": "completed",
     "use-project-create-intent-hook.ac5": "completed",
-    "new-project-page": "running",
-    "new-project-page.ac1": "pending",
-    "new-project-page.ac2": "pending",
-    "new-project-page.ac3": "pending",
-    "new-project-page.ac4": "pending",
-    "new-project-page.ac5": "pending",
+    "new-project-page": "completed",
+    "new-project-page.ac1": "completed",
+    "new-project-page.ac2": "completed",
+    "new-project-page.ac3": "completed",
+    "new-project-page.ac4": "completed",
+    "new-project-page.ac5": "completed",
     "wire-entry-points-no-loss": "pending",
     "wire-entry-points-no-loss.ac1": "pending",
     "wire-entry-points-no-loss.ac2": "pending",
