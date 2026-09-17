@@ -59,4 +59,15 @@ describe('PAN-3859 dead-code no-loss audit', () => {
     expect(typeof mod.writeRouterConfigSync).toBe('function');
     expect(typeof mod.getRouterConfigPath).toBe('function');
   });
+
+  it('W5: settings.models.complexity is gone from defaults and validation', async () => {
+    // The complexity model map fed only the deleted generateRouterConfig.
+    // Types are erased at runtime, so assert on the resolved settings object:
+    // defaults carry no complexity key, and validation no longer demands one.
+    const { getDefaultSettingsSync, validateSettingsSync } = await import('../../../../src/lib/settings.js');
+    const defaults = getDefaultSettingsSync();
+    expect('complexity' in defaults.models).toBe(false);
+    expect(validateSettingsSync(defaults)).toBeNull();
+    expect(typeof validateSettingsSync).toBe('function');
+  });
 });
