@@ -435,7 +435,7 @@
     "recordedAt": "2026-09-16T19:04:24.778Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-17T02:10:21.032Z",
+  "updated": "2026-09-17T02:10:24.205Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
@@ -678,7 +678,7 @@
     }
   ],
   "tasks": {
-    "sequence": 72,
+    "sequence": 73,
     "claims": {
       "wire-entry-points-no-loss": {
         "writerId": "agent-pan-3836",
@@ -700,6 +700,13 @@
         "pid": 841701,
         "host": "eltmon-z790",
         "claimedAt": "2026-09-17T02:10:17.749Z"
+      },
+      "docs-projects-and-workspaces": {
+        "writerId": "agent-pan-3836",
+        "agentId": "agent-pan-3836",
+        "pid": 842449,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-17T02:10:24.205Z"
       }
     },
     "claimHistory": [
@@ -1116,7 +1123,7 @@
     "delete-new-project-modal.ac1": "pending",
     "delete-new-project-modal.ac2": "pending",
     "delete-new-project-modal.ac3": "pending",
-    "docs-projects-and-workspaces": "pending",
+    "docs-projects-and-workspaces": "running",
     "docs-projects-and-workspaces.ac1": "pending",
     "docs-projects-and-workspaces.ac2": "pending",
     "docs-projects-and-workspaces.ac3": "pending",
