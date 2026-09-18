@@ -30,7 +30,23 @@ dashboard server, a React frontend, and a fleet of tmux-hosted coding agents.
   per role), `providerHarnesses`, workhorses, normalization + defaults.
 - `settings-api.ts` — settings GET/PUT payload mapping between YAML and dashboard.
 - `cloister/` — the Deacon (lifecycle watchdog), model routing (`router.ts`),
-  legacy `model_selection.specialist_harnesses` (PAN-636).
+  legacy `model_selection.specialist_harnesses` (PAN-636). The Deacon runs
+  in-process: `service.ts` calls `startDeacon()` (`deacon.ts` ~3072), which
+  installs a 60 s `setInterval` around `runPatrol()` (~2506) plus a 15 s
+  resource-pressure timer. `runPatrol` is a hand-wired registry: every step is
+  `runBudgetedPatrol('<name>', fn)` (`patrol-budget.ts`, per-UTC-day action
+  budgets) except five directly wired alarms; the set is audited by
+  `tests/unit/lib/cloister/patrol-no-loss-audit.test.ts` against Appendix C of
+  `drafts/pipeline-reliability-review.md` on `overdeck-state`. Patrols slated
+  for deletion count would-fires via `patrol-would-fire.ts`
+  (`~/.overdeck/deacon/would-fire.jsonl`); `pan doctor` prints the tables.
+  Reactive handlers for domain events live in `service-reactive.ts`
+  (`handleCloisterDomainEvent`). PAN-3894 splits the loop: the 60 s tick keeps
+  14 stuck-detection/pipeline-progress steps, and 29 housekeeping chores move to
+  `housekeeping-scheduler.ts` on fast/hourly/daily cadences with durable
+  due-times. `patrol-registry.ts` is the one declarative list both read, and it
+  must never import `deacon.ts` (madge counts a dynamic import as an edge) —
+  the four deacon-resident chores arrive through `ChoreContext`.
 - `planning/spawn-planning-session.ts` — plan-role kickoff (own spawn path).
 - `launcher-generator.ts` — generates tmux launcher scripts (`--resume`, PTY
   supervisor wrapping, env exports).
@@ -76,4 +92,4 @@ Work agents can run on Fly.io VMs (`src/lib/remote/remote-agents.ts`,
 `routes/projects.ts` `collectSessionTreeNodes()` (PAN-1775). Remote agents have
 no local tmux session — never assume tmux discovery covers them.
 
-<!-- last-verified: 2026-07-05 -->
+<!-- last-verified: 2026-09-18 -->

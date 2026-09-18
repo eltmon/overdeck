@@ -1,6 +1,6 @@
 # Concerns / hazards
 
-Live landmines a change in this repo can step on. Verified 2026-07-26.
+Live landmines a change in this repo can step on. Verified 2026-09-18 (deacon/cloister rows); older rows verified 2026-07-26.
 
 - **ToS policy gate** — `canUseHarnessSync()` (`src/lib/harness-policy.ts:69`) blocks
   Pi + Anthropic + subscription auth. Every harness resolution path must end by
@@ -72,6 +72,25 @@ Live landmines a change in this repo can step on. Verified 2026-07-26.
   or none, rolled back with `checkout -B` to a captured head. Do NOT reintroduce
   rebuild-and-replay: it is O(repos x features²) heavyweight git and can hold the
   project's single-flight reconcile slot for hours.
+- **Ephemeral-VM heartbeat is a 5-minute dead-man switch** —
+  `src/lib/remote/remote-agents.ts:45` `EPHEMERAL_HEARTBEAT_STALE_THRESHOLD_SECONDS
+  = 5 * 60`: the VM-side watchdog stops the machine when the host heartbeat file
+  is older than that. `refreshHostHeartbeatForEphemeralVms` must therefore run
+  at least every minute (it stays on the 60 s deacon tick); never move it to a
+  slower cadence.
+- **`checkWorkspaceContainerHealth` shares `runPatrol`'s in-memory
+  `DeaconState`** — its restart-backoff map lives on the state object and
+  `runPatrol` writes the whole state file at the end of the pass (comment at
+  `deacon.ts:2419`), so calling it with its own `loadState()`/`saveState()`
+  from another timer silently loses the bookkeeping (PAN-3894 moves it to a
+  module map).
+- **`reconcileInFlightJournals` (patrol #4) fires on the F15 delta** — it
+  compares a raw `loadReviewStatuses()` row with the journal-reconciled AND
+  enriched `getReviewStatusSync()` read, so it reports an action on nearly
+  every in-flight issue every tick (145 in 5 h on 2026-09-18). PAN-3894 W7 fixes
+  it, but every row already in `would-fire.jsonl` is noise: 259 of the file's
+  287 rows are this patrol. It is on the pending-deletion list, so PAN-3895 must
+  restart its soak clock once the fix deploys rather than read the old count.
 - **Single Deacon invariant** — never mount `~/.overdeck` into workspace
   containers; `OVERDECK_DISABLE_DEACON=1` belt-and-suspenders.
 - **Dashboard runtime** — Node 22 + built `dist/` only (node-pty native addon
@@ -105,4 +124,4 @@ Live landmines a change in this repo can step on. Verified 2026-07-26.
   `/workspace`. Never run durable work without verifying the volume mount
   (PAN-1845).
 
-<!-- last-verified: 2026-07-28 -->
+<!-- last-verified: 2026-09-18 -->
