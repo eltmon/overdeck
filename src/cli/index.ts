@@ -100,7 +100,7 @@ import { createRegistryCommand } from './commands/registry.js'; import { createO
 import { createParkedCommand } from './commands/parked.js';
 import { createDocsCommand } from './commands/docs.js';
 import { planCommand } from './commands/plan.js';
-import { strikeCommand } from './commands/strike.js'; import { registerStrikeReadyCommand } from './commands/strike-ready.js';
+import { strikeCommand } from './commands/strike.js';
 import { configureKnowledgeCommand } from './commands/knowledge.js';
 import { planFinalizeCommand } from './commands/plan-finalize.js';
 import { planDoneCommand } from './commands/plan-done.js';
@@ -329,7 +329,7 @@ program
 
 registerReviewCommands(program);
 
-program.command('staffing <id>').description('Show or set per-issue work-model and swarm overrides').option('--model <model>', 'Set the work model, or default to clear the override').option('--swarm <mode>', 'Set swarm mode (off, auto, always), or default to clear the override').action(staffingCommand);
+program.command('staffing <id>').description('Show the work model and swarm policy in effect for an issue').action(staffingCommand);
 
 // pan backlog — sequence writer surface
 const backlog = program
@@ -338,7 +338,7 @@ const backlog = program
 
 backlog
   .command('write-sequence <file>')
-  .description('Validate a SequenceDoc JSON file and write it to .pan/backlog/sequence.md (triggers auto-commit)')
+  .description('Validate a SequenceDoc JSON file, write it to .pan/backlog/sequence.md, and commit it')
   .option('--project-root <path>', 'Project root (default: cwd)')
   .action(async (file: string, opts: { projectRoot?: string }) => {
     const { readFileSync } = await import('node:fs');
@@ -358,7 +358,18 @@ backlog
       return exitCli(1);
     }
     writeSequenceMd(projectRoot, result.doc);
+    // Whoever writes a .pan/ artifact commits it — there is no auto-commit daemon.
+    const { commitPlanArtifacts } = await import('../lib/overdeck/plan-artifact-commit.js');
+    const { resolvePlanHome } = await import('../lib/pan-dir/paths.js');
+    const commit = await commitPlanArtifacts({
+      cwd: resolvePlanHome(projectRoot),
+      paths: ['.pan/backlog'],
+      message: 'chore(workspace): backlog sequence',
+    });
     console.log(chalk.green(`✓ Wrote .pan/backlog/sequence.md (${result.doc.nodes.length} nodes, pass=${result.doc.pass})`));
+    if (!commit.committed && commit.reason !== 'nothing to commit') {
+      console.error(chalk.yellow(`  ⚠ Could not commit the sequence: ${commit.reason}`));
+    }
   });
 
 // pan plan finalize <id>
@@ -504,7 +515,7 @@ registerCloseCommand(program);
 program
   .command('start <id>')
   .description('Create workspace and spawn agent for an issue')
-  .option('--model <model>', 'Work model to use and persist for later respawns (defaults to Cloister config)').option('--swarm <mode>', 'Per-issue swarm policy: off | auto | always').option('--review-mode <mode>', 'Per-issue review mode: quick | full | none').option('--review-model <model>', 'Per-issue review model override')
+  .option('--model <model>', 'Work model for this session (defaults to Cloister config)')
   .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | opencode | muse (defaults to role/provider settings)')
   .option('--effort <level>', 'Claude Code effort: low | medium | high | xhigh | max (defaults to roles.work.effort)')
   .option('--tier <tier>', 'Remote workspace resiliency tier: ephemeral | durable (defaults to remote.resiliency_tier)')
@@ -528,7 +539,7 @@ program
   .option('--effort <level>', 'Strike effort: low | medium | high | xhigh | max (default high)')
   .option('--dry-run', 'Print what would happen without spawning')
   .action((ids: string[], options: { model?: string; harness?: RuntimeName; effort?: RoleEffort; dryRun?: boolean }) => strikeCommand(ids, options));
-registerStrikeReadyCommand(program); configureKnowledgeCommand(program);
+configureKnowledgeCommand(program);
 registerSwarmCommands(program); registerTaskCommands(program);
 registerWorkspaceCommands(program);
 registerTestCommands(program);
