@@ -206,3 +206,21 @@ describe('forge shape translation', () => {
     expect(toChecksState([{ status: 'IN_PROGRESS' }])).toBe('pending');
   });
 });
+
+describe('deriveIssueState — an open PR is always the pipeline\'s move', () => {
+  it('an open PR with no review decision and pending checks is in-review, not parked', () => {
+    const state = deriveIssueState(facts({
+      labels: ['parked'],
+      pr: { url: 'u', number: 12, reviewState: 'none', checks: 'pending', mergeable: null },
+    }));
+    expect(state.state).toBe('in-review');
+  });
+
+  it('an open PR with green checks and no approval is still in-review, not planned', () => {
+    const state = deriveIssueState(facts({
+      specExists: true,
+      pr: { url: 'u', number: 12, reviewState: 'commented', checks: 'green', mergeable: true },
+    }));
+    expect(state.state).toBe('in-review');
+  });
+});

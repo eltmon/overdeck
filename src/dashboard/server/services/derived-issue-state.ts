@@ -20,7 +20,7 @@
  * | parked            | tracker label `parked`, or listed in `.pan/parked.md`             |
  * | planned           | spec file exists                                                  |
  * | working           | a live pane whose `issue` token is this issue, or feature branch ahead of main with no PR |
- * | in-review         | PR open and review requested, or a reviewer pane live             |
+ * | in-review         | PR open (any review state but changes-requested), or a reviewer pane live |
  * | changes-requested | latest PR review state is `CHANGES_REQUESTED`                     |
  * | ready             | PR approved, checks green, `mergeable` true                       |
  * | merged            | PR merged                                                         |
@@ -60,11 +60,15 @@ import type {
   PrReviewState,
 } from '@overdeck/contracts';
 
+import { createSettledTtlPromiseCache } from '../../../lib/concurrency.js';
 import { getProjectPanPaths } from '../../../lib/pan-dir/paths.js';
-import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
+import { findProjectByPathSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { getBackendPanes } from './backend-inventory.js';
 
 const execFileAsync = promisify(execFile);
+
+/** How long a repo's PR listing is served before the forge is read again. */
+export const PR_CACHE_TTL_MS = 30_000;
 
 /** Idle for this long with unpushed commits is `stuck`. */
 export const DEFAULT_STUCK_AFTER_MS = 20 * 60_000;
@@ -124,14 +128,17 @@ function deriveState(facts: IssueStateFacts): IssueState {
   if (pr) {
     if (pr.reviewState === 'approved' && pr.checks === 'green' && pr.mergeable === true) return 'ready';
     if (pr.reviewState === 'changes-requested') return 'changes-requested';
-    if (pr.reviewState === 'review-requested') return 'in-review';
+    // Any other open PR is in review. GitHub reports no review decision when
+    // branch protection does not require one, or once a reviewer is removed —
+    // the issue is still the pipeline's move, never parked (the W1 note).
+    return 'in-review';
   }
   if (livePanes.some((pane) => pane.role === 'review' || pane.role === 'test' || pane.role === 'uat')) {
     return 'in-review';
   }
 
   if (livePanes.length > 0) return 'working';
-  if (!pr && facts.branch && facts.branch.aheadOfMain > 0) return 'working';
+  if (facts.branch && facts.branch.aheadOfMain > 0) return 'working';
 
   if (facts.labels.includes('parked') || facts.parkedListed) return 'parked';
   if (facts.specExists) return 'planned';
@@ -227,34 +234,125 @@ interface GhPrRow {
   reviewDecision?: string | null;
   reviewRequests?: unknown[];
   statusCheckRollup?: Array<{ status?: string; conclusion?: string | null }>;
+  title?: string;
+  headRefName?: string;
+  isDraft?: boolean;
 }
 
-async function readPrWithGh(_issueId: string, projectPath: string, branch: string): Promise<LoadedPr | null> {
-  let stdout = '';
-  try {
-    ({ stdout } = await execFileAsync('gh', [
-      'pr', 'list',
-      '--head', branch,
-      '--state', 'all',
-      '--limit', '1',
-      '--json', 'number,url,state,mergedAt,mergeable,reviewDecision,reviewRequests,statusCheckRollup',
-    ], { cwd: projectPath, encoding: 'utf-8', timeout: 15_000 }));
-  } catch {
-    return null;
-  }
-  let rows: GhPrRow[] = [];
-  try { rows = JSON.parse(stdout || '[]') as GhPrRow[]; } catch { return null; }
-  const row = rows[0];
-  if (!row || typeof row.number !== 'number') return null;
+const GH_PR_FIELDS = 'number,url,title,state,mergedAt,mergeable,headRefName,isDraft,reviewDecision,reviewRequests,statusCheckRollup';
 
+/** One `gh pr list` per repo, cached briefly — the batch door's forge read. */
+const cachedRepoPullRequests = createSettledTtlPromiseCache<string, readonly GhPrRow[]>(PR_CACHE_TTL_MS);
+
+export async function listRepoPullRequests(projectPath: string): Promise<readonly GhPrRow[]> {
+  return cachedRepoPullRequests(projectPath, async () => {
+    try {
+      const { stdout } = await execFileAsync('gh', [
+        'pr', 'list', '--state', 'all', '--limit', '200', '--json', GH_PR_FIELDS,
+      ], { cwd: projectPath, encoding: 'utf-8', timeout: 20_000 });
+      return JSON.parse(stdout || '[]') as GhPrRow[];
+    } catch {
+      return [];
+    }
+  });
+}
+
+/** A `gh` row → the PR facts, or null when the PR is closed without merging. */
+export function prFromGhRow(row: GhPrRow): LoadedPr | null {
+  if (typeof row.number !== 'number') return null;
+  const merged = Boolean(row.mergedAt);
+  // A closed-unmerged PR is not this issue's PR any more: reporting it would
+  // pin the issue at `in-review` forever.
+  if (!merged && (row.state ?? '').toUpperCase() !== 'OPEN') return null;
   return {
     url: row.url ?? '',
     number: row.number,
     reviewState: toReviewState(row.reviewDecision, (row.reviewRequests?.length ?? 0) > 0),
     checks: toChecksState(row.statusCheckRollup),
     mergeable: row.mergeable === 'MERGEABLE' ? true : row.mergeable === 'CONFLICTING' ? false : null,
-    merged: Boolean(row.mergedAt),
+    merged,
   };
+}
+
+async function readPrWithGh(_issueId: string, projectPath: string, branch: string): Promise<LoadedPr | null> {
+  const rows = await listRepoPullRequests(projectPath);
+  const row = rows.find((candidate) => candidate.headRefName === branch);
+  return row ? prFromGhRow(row) : null;
+}
+
+// ─── GitLab ──────────────────────────────────────────────────────────────────
+
+interface GlabMrRow {
+  iid?: number;
+  web_url?: string;
+  state?: string;
+  source_branch?: string;
+  draft?: boolean;
+  detailed_merge_status?: string;
+  merge_status?: string;
+  has_conflicts?: boolean;
+  head_pipeline?: { status?: string } | null;
+  approvals_required?: number;
+  approved?: boolean;
+}
+
+const cachedRepoMergeRequests = createSettledTtlPromiseCache<string, readonly GlabMrRow[]>(PR_CACHE_TTL_MS);
+
+/** GitLab pipeline status → the aggregate check state. */
+export function toChecksStateFromPipeline(status: string | undefined): PrChecksState {
+  switch ((status ?? '').toLowerCase()) {
+    case 'success': case 'manual': case 'skipped': return 'green';
+    case 'failed': case 'canceled': return 'red';
+    default: return 'pending';
+  }
+}
+
+export function mrFromGlabRow(row: GlabMrRow): LoadedPr | null {
+  if (typeof row.iid !== 'number') return null;
+  const state = (row.state ?? '').toLowerCase();
+  const merged = state === 'merged';
+  if (!merged && state !== 'opened') return null;
+  const mergeStatus = (row.detailed_merge_status ?? row.merge_status ?? '').toLowerCase();
+  return {
+    url: row.web_url ?? '',
+    number: row.iid,
+    reviewState: row.approved ? 'approved' : (row.approvals_required ?? 0) > 0 ? 'review-requested' : 'none',
+    checks: toChecksStateFromPipeline(row.head_pipeline?.status),
+    mergeable: row.has_conflicts === true ? false
+      : mergeStatus === 'mergeable' || mergeStatus === 'can_be_merged' ? true
+      : mergeStatus ? false : null,
+    merged,
+  };
+}
+
+async function listRepoMergeRequests(projectPath: string): Promise<readonly GlabMrRow[]> {
+  return cachedRepoMergeRequests(projectPath, async () => {
+    try {
+      const { stdout } = await execFileAsync('glab', [
+        'api', 'projects/:id/merge_requests?state=all&per_page=100',
+      ], { cwd: projectPath, encoding: 'utf-8', timeout: 20_000, maxBuffer: 16 * 1024 * 1024 });
+      return JSON.parse(stdout || '[]') as GlabMrRow[];
+    } catch {
+      return [];
+    }
+  });
+}
+
+async function readMrWithGlab(_issueId: string, projectPath: string, branch: string): Promise<LoadedPr | null> {
+  const rows = await listRepoMergeRequests(projectPath);
+  const row = rows.find((candidate) => candidate.source_branch === branch);
+  return row ? mrFromGlabRow(row) : null;
+}
+
+/** GitHub or GitLab, from the project's tracker configuration. */
+export function forgeForProject(projectPath: string): 'github' | 'gitlab' {
+  const project = findProjectByPathSync(projectPath);
+  const tracker = (project as { tracker?: string } | null)?.tracker ?? '';
+  return tracker.toLowerCase().includes('gitlab') ? 'gitlab' : 'github';
+}
+
+function forgeReader(projectPath: string) {
+  return forgeForProject(projectPath) === 'gitlab' ? readMrWithGlab : readPrWithGh;
 }
 
 async function readBranchWithGit(projectPath: string, branch: string): Promise<DerivedBranchState | null> {
@@ -317,7 +415,7 @@ export async function loadIssueStateFacts(
 
   const issue = deps.readIssue ? await deps.readIssue(issueId) : null;
   const branch = await (deps.readBranch ?? readBranchWithGit)(projectPath, branchName);
-  const pr = await (deps.readPr ?? readPrWithGh)(issueId, projectPath, branchName);
+  const pr = await (deps.readPr ?? forgeReader(projectPath))(issueId, projectPath, branchName);
 
   let apiError = false;
   if (deps.readPaneText) {
@@ -360,12 +458,6 @@ export interface ReadyIssue {
   readonly pr?: number;
 }
 
-interface GhOpenPrRow extends GhPrRow {
-  title?: string;
-  headRefName?: string;
-  isDraft?: boolean;
-}
-
 /** `feature/pan-3917` → `PAN-3917`. Anything else has no issue. */
 export function issueIdFromBranch(branch: string | undefined): string | null {
   const match = /^feature\/([a-z]+-\d+)$/i.exec(branch ?? '');
@@ -373,38 +465,84 @@ export function issueIdFromBranch(branch: string | undefined): string | null {
 }
 
 /**
- * The project's ready set, in one forge read. This replaces the review-status
- * record scan: readiness is approvals plus green checks plus forge
- * mergeability, and nothing else (FR-9, D3).
+ * The project's ready set, from the same cached repo listing the batch door
+ * uses. Readiness is approvals plus green checks plus forge mergeability, and
+ * nothing else (FR-9, D3).
  */
 export async function listReadyIssuesForProject(
   projectPath: string,
-  deps: { readonly listOpenPrs?: (projectPath: string) => Promise<readonly GhOpenPrRow[]> } = {},
+  deps: { readonly listPullRequests?: (projectPath: string) => Promise<readonly GhPrRow[]> } = {},
 ): Promise<ReadyIssue[]> {
-  const rows = await (deps.listOpenPrs ?? listOpenPrsWithGh)(projectPath);
+  const rows = await (deps.listPullRequests ?? listRepoPullRequests)(projectPath);
   const ready: ReadyIssue[] = [];
   for (const row of rows) {
     if (row.isDraft) continue;
     const issueId = issueIdFromBranch(row.headRefName);
-    if (!issueId || typeof row.number !== 'number') continue;
-    if (toReviewState(row.reviewDecision, false) !== 'approved') continue;
-    if (toChecksState(row.statusCheckRollup) !== 'green') continue;
-    if (row.mergeable !== 'MERGEABLE') continue;
-    ready.push({ issueId, title: row.title ?? issueId, pr: row.number });
+    if (!issueId) continue;
+    const pr = prFromGhRow(row);
+    if (!pr || pr.merged) continue;
+    if (pr.reviewState !== 'approved' || pr.checks !== 'green' || pr.mergeable !== true) continue;
+    ready.push({ issueId, title: row.title ?? issueId, pr: pr.number });
   }
   return ready;
 }
 
-async function listOpenPrsWithGh(projectPath: string): Promise<readonly GhOpenPrRow[]> {
-  try {
-    const { stdout } = await execFileAsync('gh', [
-      'pr', 'list',
-      '--state', 'open',
-      '--limit', '200',
-      '--json', 'number,title,url,headRefName,isDraft,mergeable,reviewDecision,statusCheckRollup',
-    ], { cwd: projectPath, encoding: 'utf-8', timeout: 20_000 });
-    return JSON.parse(stdout || '[]') as GhOpenPrRow[];
-  } catch {
-    return [];
+// ─── the batch door ──────────────────────────────────────────────────────────
+
+/**
+ * Derive many issues at once. One forge listing per repo (cached), one backend
+ * inventory read, a spec `existsSync` per issue, and a git read only for the
+ * issues that have no PR — that row is the only one needing `aheadOfMain`.
+ *
+ * Every board-shaped route uses this. Calling `getDerivedIssueState` in a loop
+ * would issue one `gh` and two `git` invocations per issue.
+ */
+export async function loadIssueStatesForProject(
+  projectPath: string,
+  issueIds: readonly string[],
+  deps: IssueStateLoaderDeps & {
+    readonly labelsByIssue?: Readonly<Record<string, readonly string[]>>;
+    readonly closedIssues?: ReadonlySet<string>;
+  } = {},
+): Promise<Map<string, DerivedIssueState>> {
+  const now = (deps.now ?? Date.now)();
+  const gitlab = forgeForProject(projectPath) === 'gitlab';
+  const rows = gitlab ? [] : await listRepoPullRequests(projectPath);
+  const prByIssue = new Map<string, LoadedPr>();
+  if (!gitlab) {
+    for (const row of rows) {
+      const issueId = issueIdFromBranch(row.headRefName);
+      const pr = issueId ? prFromGhRow(row) : null;
+      if (issueId && pr) prByIssue.set(issueId, pr);
+    }
   }
+
+  const panes = deps.panes ?? await getBackendPanes();
+  const out = new Map<string, DerivedIssueState>();
+
+  for (const raw of issueIds) {
+    const issueId = raw.toUpperCase();
+    const pr = prByIssue.get(issueId)
+      ?? (gitlab ? await (deps.readPr ?? forgeReader(projectPath))(issueId, projectPath, featureBranchFor(issueId)) : null);
+    const branch = pr
+      ? null
+      : await (deps.readBranch ?? readBranchWithGit)(projectPath, featureBranchFor(issueId));
+
+    const facts: IssueStateFacts = {
+      issueId,
+      issueOpen: !deps.closedIssues?.has(issueId),
+      labels: (deps.labelsByIssue?.[issueId] ?? []).map((label) => label.toLowerCase()),
+      parkedListed: parkedListedIn(issueId, projectPath),
+      specExists: specExistsFor(issueId, projectPath),
+      panes: panes.filter((pane) => pane.issue === issueId),
+      prMerged: pr?.merged ?? false,
+      apiError: false,
+      now,
+      ...(branch ? { branch } : {}),
+      ...(pr ? { pr: { url: pr.url, number: pr.number, reviewState: pr.reviewState, checks: pr.checks, mergeable: pr.mergeable } } : {}),
+      ...(deps.stuckAfterMs !== undefined ? { stuckAfterMs: deps.stuckAfterMs } : {}),
+    };
+    out.set(issueId, deriveIssueState(facts));
+  }
+  return out;
 }

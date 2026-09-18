@@ -101,7 +101,11 @@ export function parseAgentSessionName(session: string): ParsedSessionName | null
 
 // ─── mapping ─────────────────────────────────────────────────────────────────
 
-function snapshotToPane(snapshot: BackendAgentSnapshot, now: number): BackendPane {
+function snapshotToPane(
+  snapshot: BackendAgentSnapshot,
+  now: number,
+  previous?: BackendPane,
+): BackendPane {
   const tokens = snapshot.tokens;
   const pane: {
     -readonly [K in keyof BackendPane]: BackendPane[K];
@@ -111,7 +115,12 @@ function snapshotToPane(snapshot: BackendAgentSnapshot, now: number): BackendPan
     harness: tokens.harness ?? 'unknown',
     model: tokens.model ?? 'unknown',
     state: snapshot.state,
-    stateSince: now,
+    // A pane that has not changed state keeps the timestamp it entered it —
+    // otherwise every refresh would reset the clock and nothing could ever be
+    // reported `stuck`.
+    stateSince: previous && previous.state === snapshot.state && previous.stateSince !== undefined
+      ? previous.stateSince
+      : now,
     terminalId: snapshot.terminalId,
   };
   if (tokens.issue) pane.issue = tokens.issue;
@@ -198,7 +207,10 @@ async function resolveBackend(deps: BackendInventoryDeps): Promise<TerminalBacke
 }
 
 /** Every live agent pane, from the backend if it answers and from tmux otherwise. */
-export async function listBackendPanes(deps: BackendInventoryDeps = {}): Promise<readonly BackendPane[]> {
+export async function listBackendPanes(
+  deps: BackendInventoryDeps = {},
+  previous?: BackendPaneCache,
+): Promise<readonly BackendPane[]> {
   const now = (deps.now ?? Date.now)();
   const backend = await resolveBackend(deps);
 
@@ -207,7 +219,7 @@ export async function listBackendPanes(deps: BackendInventoryDeps = {}): Promise
       backend.list().pipe(Effect.catch(() => Effect.succeed(null))),
     );
     if (result !== null && !isUnsupported(result)) {
-      return result.map((snapshot) => snapshotToPane(snapshot, now));
+      return result.map((snapshot) => snapshotToPane(snapshot, now, previous?.get(snapshot.paneId)));
     }
   }
 
@@ -315,7 +327,7 @@ export async function getBackendPanes(deps: BackendInventoryDeps = {}): Promise<
 
   inFlight = (async () => {
     try {
-      const panes = await listBackendPanes(deps);
+      const panes = await listBackendPanes(deps, cache ?? undefined);
       cache = new BackendPaneCache(panes);
       refreshedAt = now;
       return panes;

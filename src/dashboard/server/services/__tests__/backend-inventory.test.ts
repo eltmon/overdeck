@@ -219,3 +219,29 @@ describe('getBackendPanes — the read door', () => {
     ]);
   });
 });
+
+describe('getBackendPanes — stateSince survives a refresh', () => {
+  it('keeps the timestamp a pane entered its state, so `stuck` can be reached', async () => {
+    let clock = NOW;
+    const deps = { backend: herdrBackend(), now: () => clock };
+    const [first] = await getBackendPanes(deps);
+    expect(first?.stateSince).toBe(NOW);
+
+    clock = NOW + 6_000; // past INVENTORY_TTL_MS, so the snapshot is re-read
+    const [second] = await getBackendPanes(deps);
+    expect(second?.stateSince).toBe(NOW);
+  });
+
+  it('stamps a new timestamp when the pane changed state', async () => {
+    let clock = NOW;
+    let snapshot = HERDR_SNAPSHOT;
+    const deps = { backend: { name: 'herdr', list: () => Effect.succeed(snapshot) } as unknown as TerminalBackend, now: () => clock };
+    await getBackendPanes(deps);
+
+    clock = NOW + 6_000;
+    snapshot = [{ ...HERDR_SNAPSHOT[0]!, state: 'idle' }, ...HERDR_SNAPSHOT.slice(1)];
+    const [second] = await getBackendPanes(deps);
+    expect(second?.state).toBe('idle');
+    expect(second?.stateSince).toBe(NOW + 6_000);
+  });
+});
