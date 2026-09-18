@@ -1,8 +1,7 @@
 import type { SessionNode } from '@overdeck/contracts';
 import type { WorkspaceInfo } from './workspace-types';
-import type { Agent, WorkAgentLifecycle } from '../types';
-import { isReviewPipelineStuck } from './pipeline-state';
-import { derivePipelineState, normalizeCanonicalState, type PipelineReviewStatus } from './issuePipelineState';
+import type { Agent, BackendPane, DerivedIssueState, WorkAgentLifecycle } from '../types';
+import { derivePipelineState, normalizeCanonicalState } from './issuePipelineState';
 
 export type PipelinePhase =
   | 'QUEUED_FOR_PLAN'
@@ -11,7 +10,6 @@ export type PipelinePhase =
   | 'WORK_RUNNING'
   | 'INPUT'
   | 'REVIEW_RUNNING'
-  | 'SHIP_RUNNING'
   | 'CHANGES_REQUESTED'
   | 'STUCK'
   | 'READY_TO_MERGE'
@@ -94,7 +92,10 @@ export const GROUP_ORDER: IssueActionGroup[] = [
 ];
 
 export interface IssueActionState {
-  reviewStatus?: PipelineReviewStatus | null;
+  /** PAN-3917 — the derived issue state (FR-6). Replaces the six status fields. */
+  derived?: DerivedIssueState | null;
+  /** Backend panes in this issue's workspace. */
+  panes?: readonly BackendPane[];
   agent?: Pick<Agent, 'status' | 'role' | 'agentPhase' | 'git' | 'paused' | 'troubled'> | null;
   lifecycle?: Pick<WorkAgentLifecycle, 'canResumeSession'> | null;
   workspace?: Pick<WorkspaceInfo, 'exists' | 'path' | 'mrUrl'> | null;
@@ -525,15 +526,15 @@ const isDoneOrCanceled = (state: IssueActionState) => {
   const canonical = canonicalState(state);
   return canonical === 'done' || canonical === 'canceled';
 };
-const isMerged = (state: IssueActionState) => state.isMerged === true || state.reviewStatus?.mergeStatus === 'merged';
+const isMerged = (state: IssueActionState) => state.isMerged === true || state.derived?.state === 'merged';
 const canPlan = (state: IssueActionState) => hasStoppedAgent(state) && !state.hasPlan && !isMerged(state) && !isDoneOrCanceled(state);
 const canFinalizePlanning = (state: IssueActionState) => state.hasPlan && state.agent?.role === 'plan' && hasStoppedAgent(state) && !isMerged(state);
 // Once review is running, approved, or merge-ready, the work agent's job is
 // done — "Start agent" must not reappear (C-ACTIONS: contradictory verbs are
 // never co-enabled). Review 'skipped' counts as approved here (PAN-1862).
 const reviewSettledOrRunning = (state: IssueActionState) => {
-  const rs = state.reviewStatus?.reviewStatus;
-  return state.reviewStatus?.readyForMerge === true || rs === 'reviewing' || rs === 'passed' || rs === 'skipped';
+  const derived = state.derived?.state;
+  return derived === 'in-review' || derived === 'changes-requested' || derived === 'ready' || derived === 'merged';
 };
 const canStartAgent = (state: IssueActionState) => hasStoppedAgent(state) && state.hasPlan && state.hasTasks && !isMerged(state) && !isDoneOrCanceled(state) && !reviewSettledOrRunning(state);
 // Rebuild & start: the recovery path for the `stack-unhealthy` spawn block.
@@ -546,7 +547,7 @@ const canStartWithoutPlanning = (state: IssueActionState) => hasStoppedAgent(sta
 // PAN-1517: `hasParallelizablePlan` removed alongside the `swarm` action entry —
 // parallelism is now an in-context concern owned by the work agent (see
 // roles/work.md "Parallel work via subagents"), not a separate spawn verb.
-const canRequestReview = (state: IssueActionState) => hasWorkspace(state) && hasStoppedAgent(state) && !state.reviewStatus && !isMerged(state) && !isDoneOrCanceled(state);
+const canRequestReview = (state: IssueActionState) => hasWorkspace(state) && hasStoppedAgent(state) && !state.derived?.pr && !isMerged(state) && !isDoneOrCanceled(state);
 // PAN-3675: 'pending' is included — a failed dispatch strands the row at
 // pending with no live reviewers (the PAN-3668 shape), and the server endpoint
 // coalesces a redundant trigger while a healthy dispatch is still in flight,
@@ -554,27 +555,21 @@ const canRequestReview = (state: IssueActionState) => hasWorkspace(state) && has
 // review. The dispatch resumes the review agent's saved session when possible
 // (PAN-1862); a fresh session only on harness/model change.
 const canRestartReview = (state: IssueActionState) => {
-  const review = state.reviewStatus;
-  return review?.reviewStatus === 'pending' || review?.reviewStatus === 'reviewing' || review?.reviewStatus === 'blocked' || review?.reviewStatus === 'failed' || review?.testStatus === 'testing' || review?.testStatus === 'failed' || review?.testStatus === 'dispatch_failed' || review?.mergeStatus === 'merging' || review?.mergeStatus === 'failed';
+  const derived = state.derived?.state;
+  return derived === 'in-review' || derived === 'changes-requested';
 };
 const hasReviewFailure = (state: IssueActionState) =>
-  isReviewPipelineStuck(state.reviewStatus ?? null) || state.reviewStatus?.reviewStatus === 'pending';
+  state.derived?.attention === 'stuck' || state.derived?.attention === 'api-error' || state.derived?.pr?.checks === 'red';
 // Complete review reset is available whenever review is in a restartable/stuck/failed
 // state — the "something's wrong with review, nuke all of it" gate. The stale-ghost case
 // (clean-looking review but leftover convoy sub-reviewers) is surfaced separately by the
 // Issues-view stale warning, which carries its own purge button.
 const canPurgeReview = (state: IssueActionState) => canRestartReview(state) || hasReviewFailure(state);
 const canRecoverAgent = (state: IssueActionState) => state.agent?.status === 'stopped' || state.agent?.status === 'stuck' || state.agent?.status === 'failed' || state.agent?.status === 'dead' || state.agent?.status === 'error';
-const hasPrTarget = (state: IssueActionState) => state.hasPr === true || !!state.prUrl || !!state.workspace?.mrUrl || state.reviewStatus?.readyForMerge === true;
-const canMerge = (state: IssueActionState) => state.reviewStatus?.readyForMerge === true && !isMerged(state);
-const canCloseOut = (state: IssueActionState) => {
-  const canonical = canonicalState(state);
-  return canonical === 'verifying_on_main' || canonical === 'verifying' || isMerged(state);
-};
-const canCancelIssue = (state: IssueActionState) => {
-  const canonical = canonicalState(state);
-  return canonical !== 'verifying_on_main' && canonical !== 'verifying' && !isMerged(state) && !isDoneOrCanceled(state);
-};
+const hasPrTarget = (state: IssueActionState) => state.hasPr === true || !!state.prUrl || !!state.workspace?.mrUrl || !!state.derived?.pr?.url;
+const canMerge = (state: IssueActionState) => state.derived?.state === 'ready' && !isMerged(state);
+const canCloseOut = (state: IssueActionState) => isMerged(state);
+const canCancelIssue = (state: IssueActionState) => !isMerged(state) && !isDoneOrCanceled(state);
 const canAddToOrderBook = (state: IssueActionState) =>
   state.orderBooksLoaded === true && !state.isInActiveOrderBook && !isMerged(state) && !isDoneOrCanceled(state);
 
@@ -587,7 +582,6 @@ const PHASE_PRIMARY_KEYS: Record<PipelinePhase, IssueActionKey[]> = {
   WORK_RUNNING: ['tell', 'doneWork'],
   INPUT: ['open', 'tell'],
   REVIEW_RUNNING: ['tell', 'recoverAgent'],
-  SHIP_RUNNING: ['tell', 'recoverAgent'],
   CHANGES_REQUESTED: ['open', 'requestReview'],
   STUCK: ['recoverAgent', 'tell'],
   READY_TO_MERGE: ['merge', 'viewPr'],
@@ -685,18 +679,12 @@ export function deriveIssueActionPhase(state: IssueActionState): PipelinePhase {
     case 'in_progress_work_idle':
       return 'PLANNED_IDLE';
     case 'in_review_reviewers_running':
-    case 'testing_running':
+    case 'in_review_approved':
       return 'REVIEW_RUNNING';
     case 'in_review_changes_requested':
       return 'CHANGES_REQUESTED';
-    case 'testing_failures':
-    case 'verification_failing':
-      return 'STUCK';
     case 'ready_to_merge':
       return 'READY_TO_MERGE';
-    case 'merging':
-      return 'SHIP_RUNNING';
-    case 'verifying':
     case 'merged':
     case 'done':
       return 'MERGED';

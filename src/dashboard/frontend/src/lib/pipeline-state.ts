@@ -1,32 +1,23 @@
-import type { Agent, Issue } from '../types';
+import type { Agent, DerivedIssueState, DerivedIssueStateName, Issue } from '../types';
 
-export type PipelineIssuePhase = 'ship' | 'review' | 'work' | 'plan' | 'ready' | 'todo' | 'verifying';
+/**
+ * Pipeline lanes. PAN-3917: every lane is now fed by one derived issue state —
+ * there is no 'verifying' lane, because nothing derives "verifying on main".
+ */
+export type PipelineIssuePhase = 'ship' | 'review' | 'work' | 'plan' | 'ready' | 'todo';
 
-type PipelineStateLike = {
-  reviewStatus?: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked' | 'skipped';
-  testStatus?: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
-  mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
-  inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed' | 'error';
-  uatStatus?: 'pending' | 'testing' | 'passed' | 'failed';
-  verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
-  updatedAt?: string;
-  reviewSpawnedAt?: string;
-  readyForMerge?: boolean;
-  queuePosition?: number | null;
-  activeSpecialist?: string | null;
-  // PAN-794: persistent stuck flag + reason set by the deacon/breaker or main-diverged flow.
-  stuck?: boolean;
-  stuckReason?: string;
-  reviewRetryCount?: number;
-  // Operator-set patrol opt-out (distinct from system-set `stuck`).
-  deaconIgnored?: boolean;
-  deaconIgnoredAt?: string;
-  deaconIgnoredReason?: string;
+/** The one place the nine derived states map onto lanes. Every surface imports this. */
+export const PHASE_BY_DERIVED_STATE: Record<DerivedIssueStateName, PipelineIssuePhase> = {
+  backlog: 'todo',
+  parked: 'todo',
+  planned: 'plan',
+  working: 'work',
+  'in-review': 'review',
+  'changes-requested': 'review',
+  ready: 'ship',
+  merged: 'ship',
+  closed: 'ship',
 };
-
-// Keep in sync with the review coordinator's longest specialist timeout.
-export const REVIEW_SPECIALIST_TIMEOUT_MS = 30 * 60 * 1000;
-export const PENDING_REVIEW_STRANDED_MS = REVIEW_SPECIALIST_TIMEOUT_MS * 2;
 
 export function hasActualPendingQuestion(agent?: Pick<Agent, 'hasPendingQuestion' | 'pendingQuestionCount' | 'pendingQuestionPrompt'> | null): boolean {
   return agent?.hasPendingQuestion === true && ((agent.pendingQuestionCount ?? 0) > 0 || !!agent.pendingQuestionPrompt?.trim());
@@ -49,32 +40,6 @@ export function getPendingQuestionTitle(agent?: Pick<Agent, 'pendingQuestionCoun
   return `Agent is waiting for user input (${count} question${count > 1 ? 's' : ''})`;
 }
 
-export function isReviewPipelineStuck(status?: PipelineStateLike | null): boolean {
-  if (!status) return false;
-
-  return (
-    status.mergeStatus === 'failed' ||
-    status.reviewStatus === 'failed' ||
-    status.reviewStatus === 'blocked' ||
-    status.testStatus === 'failed' ||
-    status.testStatus === 'dispatch_failed' ||
-    status.inspectStatus === 'failed' ||
-    status.inspectStatus === 'error' ||
-    status.uatStatus === 'failed' ||
-    status.verificationStatus === 'failed'
-  );
-}
-
-/**
- * PAN-794: the breaker tripped on this issue — it is parked in stuck state
- * waiting for a human to click "Retry review" (unstick). Distinct from
- * `isReviewPipelineStuck`, which reports transient failed statuses that the
- * pipeline can still recover from automatically.
- */
-export function isReviewInfraStuck(status?: PipelineStateLike | null): boolean {
-  return status?.stuck === true && status.stuckReason === 'review_infrastructure_failure';
-}
-
 export function isAgentRunningStatus(status?: Agent['status'] | null): boolean {
   return status === 'running' || status === 'starting' || status === 'healthy' || status === 'warning';
 }
@@ -83,117 +48,34 @@ export function isAgentProblemStatus(status?: Agent['status'] | null): boolean {
   return status === 'stuck' || status === 'stalled' || status === 'failed' || status === 'error' || status === 'unknown';
 }
 
-/**
- * PAN-1034: a pending review with no active queue/specialist for more than 2x
- * the longest specialist timeout is stranded. This is distinct from a fresh
- * pending state while dispatch/verification is still starting up.
- */
-export function isPendingReviewStranded(status?: PipelineStateLike | null, now = Date.now()): boolean {
-  if (!status) return false;
-  if (status.reviewStatus !== 'pending') return false;
-  if (status.stuck) return false;
-  if (status.readyForMerge) return false;
-  if (status.queuePosition != null || status.activeSpecialist) return false;
-
-  const reference = status.reviewSpawnedAt ?? status.updatedAt;
-  if (!reference) return false;
-
-  const referenceMs = Date.parse(reference);
-  if (!Number.isFinite(referenceMs)) return false;
-
-  return now - referenceMs >= PENDING_REVIEW_STRANDED_MS;
+/** The issue is not moving and the operator has to look (FR-6 attention states). */
+export function isIssueStuck(derived?: DerivedIssueState | null): boolean {
+  return derived?.attention === 'stuck' || derived?.attention === 'api-error';
 }
 
-/**
- * Operator has paused Deacon patrol for this issue via the kanban "Pause"
- * button. Separate signal from any stuck reason — an issue can be paused
- * while also healthy, stuck, or actively in a failed state.
- */
-export function isDeaconIgnored(status?: PipelineStateLike | null): boolean {
-  return status?.deaconIgnored === true;
+export function issueNeedsYou(derived?: DerivedIssueState | null): boolean {
+  return derived?.attention === 'needs-you';
 }
 
 /**
  * Definition of Ready (PAN-1966): an issue is deliberately "ready to work" when
  * it carries a GitHub/GitLab `ready` label OR sits in a Linear `Todo` column
  * (stateType 'unstarted'). A raw open/backlog issue is NOT ready — readiness is
- * an explicit human act. Keeps backlog out of the pipeline view; only DoR-met,
- * not-yet-started issues land in the Ready lane. See docs/PIPELINE-READY-AND-DONE.md.
+ * an explicit human act. See docs/PIPELINE-READY-AND-DONE.md.
  */
 export function isPipelineReady(issue: Pick<Issue, 'labels' | 'stateType'>): boolean {
   return (issue.labels?.includes('ready') ?? false) || issue.stateType === 'unstarted';
 }
 
+/**
+ * The issue's lane. The derived state decides it; the tracker's Definition of
+ * Ready only splits unplanned work between the Ready and Backlog lanes.
+ */
 export function getPipelineIssuePhase(
-  issue: Pick<Issue, 'state' | 'status' | 'stateType' | 'hasPlan' | 'planningComplete' | 'mergeStatus' | 'labels' | 'pipelineMembership'>,
-  reviewStatus?: PipelineStateLike | null,
-  agent?: Pick<Agent, 'role' | 'status' | 'hasPendingQuestion' | 'pendingQuestionCount' | 'pendingQuestionPrompt'> | null,
+  derived?: DerivedIssueState | null,
+  issue?: Pick<Issue, 'labels' | 'stateType'> | null,
 ): PipelineIssuePhase {
-  const state = issue.state ?? issue.status;
-  if (state === 'done' || state === 'closed' || state === 'completed') {
-    return 'ship';
-  }
-
-  // PAN-3341: the canonical post-merge verdict outranks a stale stored phase.
-  if (issue.pipelineMembership?.available === true && issue.pipelineMembership.bucket === 'post_merge_limbo') {
-    return 'ship';
-  }
-
-  if (state === 'verifying_on_main') {
-    return 'verifying';
-  }
-
-  if (
-    issue.mergeStatus === 'queued' ||
-    issue.mergeStatus === 'merging' ||
-    issue.mergeStatus === 'verifying' ||
-    issue.mergeStatus === 'failed' ||
-    issue.mergeStatus === 'merged' ||
-    reviewStatus?.readyForMerge === true ||
-    reviewStatus?.mergeStatus === 'queued' ||
-    reviewStatus?.mergeStatus === 'merging' ||
-    reviewStatus?.mergeStatus === 'verifying' ||
-    reviewStatus?.mergeStatus === 'failed' ||
-    reviewStatus?.mergeStatus === 'merged'
-  ) {
-    return 'ship';
-  }
-
-  if (
-    reviewStatus?.reviewStatus === 'reviewing' ||
-    reviewStatus?.reviewStatus === 'passed' ||
-    reviewStatus?.reviewStatus === 'skipped' || // PAN-1862: mode none — review phase complete
-
-    reviewStatus?.reviewStatus === 'failed' ||
-    reviewStatus?.reviewStatus === 'blocked' ||
-    reviewStatus?.testStatus === 'testing' ||
-    reviewStatus?.testStatus === 'passed' ||
-    reviewStatus?.testStatus === 'failed' ||
-    reviewStatus?.verificationStatus === 'running' ||
-    reviewStatus?.verificationStatus === 'passed' ||
-    reviewStatus?.verificationStatus === 'failed' ||
-    reviewStatus?.inspectStatus === 'inspecting' ||
-    reviewStatus?.inspectStatus === 'passed' ||
-    reviewStatus?.inspectStatus === 'failed' ||
-    reviewStatus?.inspectStatus === 'error'
-  ) {
-    return 'review';
-  }
-
-  if (agent?.role === 'plan' && isAgentRunningStatus(agent.status)) {
-    return 'plan';
-  }
-
-  if (agent?.role === 'work' && isAgentRunningStatus(agent.status)) {
-    return 'work';
-  }
-
-  const derivedState = issue.state ?? issue.status;
-  if (derivedState === 'in_review') return 'review';
-  if (derivedState === 'in_progress' || issue.stateType === 'started') return 'work';
-  if (issue.hasPlan === true || issue.planningComplete === true) return 'plan';
-  // Definition of Ready: a `ready` label or Linear Todo → the Ready lane.
-  // Everything else is raw backlog ('todo'), which the pipeline view hides.
-  if (isPipelineReady(issue)) return 'ready';
-  return 'todo';
+  if (!derived) return issue && isPipelineReady(issue) ? 'ready' : 'todo';
+  if (derived.state === 'backlog' && issue && isPipelineReady(issue)) return 'ready';
+  return PHASE_BY_DERIVED_STATE[derived.state];
 }

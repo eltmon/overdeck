@@ -1,13 +1,13 @@
 /**
  * PAN-2908 · C-SIMPLE — per-issue derivation for simple mode.
  *
- * Pure functions joining Issue × AgentSnapshot[] × ReviewStatusSnapshot into
+ * Pure functions joining Issue × AgentSnapshot[] × DerivedIssueState into
  * the five user-facing states. Pages compose these; tests cover them without
  * rendering anything. Advanced-mode derivations (drawer/cockpit) stay
  * untouched — this is the simple-mode projection only.
  */
-import type { AgentSnapshot, ReviewStatusSnapshot } from '@overdeck/contracts';
-import type { Issue } from '../../types';
+import type { AgentSnapshot } from '@overdeck/contracts';
+import type { BackendPane, DerivedIssueState, Issue } from '../../types';
 import { derivePipelineState, type PipelineState } from '../issuePipelineState';
 import { isAgentProblemStatus } from '../pipeline-state';
 import { phaseRailState, type PhaseRailState } from './phases';
@@ -24,7 +24,7 @@ export interface SimpleIssueDerivation {
   pendingInputAgent: AgentSnapshot | undefined;
   /** An agent is troubled or in a problem status — "Get it unstuck" recovers the agent. */
   agentStuck: boolean;
-  /** The review-status row carries the persistent stuck flag — "Get it unstuck" must call the unstick door (PAN-3073). */
+  /** The derived issue state raised an attention signal (stuck / api-error). */
   reviewStuck: boolean;
   agents: AgentSnapshot[];
   taskProgress: { completed: number; total: number } | null;
@@ -32,7 +32,7 @@ export interface SimpleIssueDerivation {
   prUrl: string | null;
   /** Plain-English expectation: elapsed + rough time-to-go from task progress. */
   expectation: string | null;
-  /** reviewStatus.updatedAt when merged — for the Finished section. */
+  /** Newest agent activity — for the Finished section. */
   activityAt: string | null;
 }
 
@@ -121,21 +121,19 @@ export function isPlanReadyToStart(issue: Issue, pendingInputAgent: AgentSnapsho
 export function deriveSimpleIssue(
   issue: Issue,
   agents: AgentSnapshot[],
-  reviewStatus?: ReviewStatusSnapshot | undefined,
+  derived?: DerivedIssueState | undefined,
+  panes: readonly BackendPane[] = [],
 ): SimpleIssueDerivation {
   const primaryAgent = pickPrimaryAgent(agents);
   const pendingInputAgent = agents.find(hasPendingInput);
-  const agentStuck = agents.some((a) => a.troubled || isAgentProblemStatus(a.status));
-  const reviewStuck = reviewStatus?.stuck === true;
+  const agentStuck = agents.some((a) => isAgentProblemStatus(a.status));
+  const reviewStuck = derived?.attention === 'stuck' || derived?.attention === 'api-error';
   const stuck = agentStuck || reviewStuck;
 
   const pipelineState = derivePipelineState({
-    reviewStatus: reviewStatus ?? null,
-    agent: primaryAgent ?? null,
-    hasPlan: issue.hasPlan === true,
-    hasTasks: issue.hasTasks === true,
+    derived: derived ?? null,
+    panes,
     issueCanonicalState: issue.state ?? issue.status ?? null,
-    isMerged: reviewStatus?.mergeStatus === 'merged',
   });
 
   const costs = agents.map((a) => a.costSoFar).filter((c): c is number => typeof c === 'number');
@@ -163,10 +161,8 @@ export function deriveSimpleIssue(
     taskProgress: issue.taskCounts ?? null,
     costSoFar: costs.length > 0 ? costs.reduce((a, b) => a + b, 0) : null,
     expectation: deriveExpectation(primaryAgent, issue.taskCounts ?? null),
-    prUrl: reviewStatus?.prUrl ?? null,
-    // Fall back to agent activity so done issues without a review snapshot
-    // still land in Finished within their window.
-    activityAt: reviewStatus?.updatedAt ?? lastAgentActivity ?? null,
+    prUrl: derived?.pr?.url ?? null,
+    activityAt: lastAgentActivity ?? null,
   };
 }
 

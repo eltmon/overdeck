@@ -6,6 +6,7 @@
  * Pure reducer functions are shared with the server read model via @overdeck/contracts.
  */
 
+import { useMemo } from 'react'
 import { create } from 'zustand'
 import type {
   AgentSnapshot,
@@ -359,6 +360,24 @@ export const selectDerivedIssueState =
   (issueId: string) =>
   (s: DashboardState): DerivedIssueState | undefined =>
     s.derivedIssueStateByIssueId[issueId]
+
+/** React hook form of `selectDerivedIssueState` — the issue read model. */
+export function useDerivedIssueState(issueId: string | null | undefined): DerivedIssueState | undefined {
+  return useDashboardStore((s) => (issueId ? s.derivedIssueStateByIssueId[issueId] : undefined))
+}
+
+/** React hook form of `selectBackendPanes` — the issue's rows in the issue tree. */
+export function useBackendPanes(issueId: string | null | undefined): BackendPane[] {
+  const byId = useDashboardStore((s) => s.backendPanesById)
+  return useMemo(
+    () => (issueId
+      ? Object.values(byId).filter((pane) => pane.issue?.toUpperCase() === issueId.toUpperCase())
+      : EMPTY_PANES),
+    [byId, issueId],
+  )
+}
+
+const EMPTY_PANES: BackendPane[] = []
 
 /** Every backend pane whose `issue` metadata token names this issue. */
 export const selectBackendPanes =
