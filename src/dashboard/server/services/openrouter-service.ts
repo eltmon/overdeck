@@ -14,12 +14,12 @@ export interface OpenRouterModel {
   readonly id: string;
   /** Human-readable name */
   readonly name: string;
-  /** Cost per 1M prompt tokens in USD (0 for free models) */
-  readonly promptCostPer1M: number;
-  /** Cost per 1M completion tokens in USD (0 for free models) */
-  readonly completionCostPer1M: number;
-  /** Maximum context window in tokens */
-  readonly contextLength: number;
+  /** Cost per 1M prompt tokens in USD (0 for free models, null when unknown) */
+  readonly promptCostPer1M: number | null;
+  /** Cost per 1M completion tokens in USD (0 for free models, null when unknown) */
+  readonly completionCostPer1M: number | null;
+  /** Maximum context window in tokens, or null when unknown */
+  readonly contextLength: number | null;
   /** Whether this model supports thinking/extended reasoning */
   readonly supportsThinking: boolean;
   /** Category hint for UI filtering */
@@ -38,6 +38,32 @@ export interface ApiKeyValidationResult {
 interface ModelCache {
   readonly models: OpenRouterModel[];
   readonly fetchedAt: number;
+}
+
+/**
+ * Preserve saved choices even when OpenRouter omits them from discovery.
+ * Missing pricing and context are unknown, not zero/free.
+ */
+export function includeOpenRouterFavorites(
+  models: OpenRouterModel[],
+  favorites: readonly string[],
+): OpenRouterModel[] {
+  const result = [...models];
+  const knownIds = new Set(models.map(model => model.id));
+  for (const id of favorites) {
+    if (knownIds.has(id)) continue;
+    knownIds.add(id);
+    result.push({
+      id,
+      name: id,
+      promptCostPer1M: null,
+      completionCostPer1M: null,
+      contextLength: null,
+      supportsThinking: false,
+      category: 'other',
+    });
+  }
+  return result;
 }
 
 // ─── Service interface ────────────────────────────────────────────────────────

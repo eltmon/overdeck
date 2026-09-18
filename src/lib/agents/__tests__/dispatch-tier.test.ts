@@ -17,10 +17,11 @@ vi.mock('../../config-yaml.js', async (importOriginal) => {
 });
 vi.mock('../../xbrief/io.js', () => ({
   readWorkspacePlanSync: vi.fn(),
+  readTierOverrides: vi.fn(() => ({})),
 }));
 
 import { loadConfigSync } from '../../config-yaml.js';
-import { readWorkspacePlanSync } from '../../xbrief/io.js';
+import { readTierOverrides, readWorkspacePlanSync } from '../../xbrief/io.js';
 import { applyTierAssignment, logTierFitnessAtSpawn, resolveSingleWorkTierSpawnParams, resolveSlotSpawnFitness, resolveSlotTierSpawnParams } from '../spawn-prep.js';
 
 const TIER_CONFIG: TierAssignmentConfig = {
@@ -162,6 +163,7 @@ describe('resolveSlotTierSpawnParams', () => {
   beforeEach(() => {
     vi.mocked(loadConfigSync).mockReset();
     vi.mocked(readWorkspacePlanSync).mockReset();
+    vi.mocked(readTierOverrides).mockReturnValue({});
   });
 
   it('carries the resolved tier model and harness into the spawn params when tiering is on', () => {
@@ -217,6 +219,29 @@ describe('resolveSlotTierSpawnParams', () => {
 
     expect(resolveSlotTierSpawnParams('/ws', 'task-x')).toEqual({});
   });
+
+  // PAN-3858: a recorded promotion must change the model the slot spawns on.
+  it('applies a recorded tier promotion to the slot item before resolving its tier', () => {
+    mockConfig(TIER_CONFIG);
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([planItem('task-x', { difficulty: 'simple' })]));
+    vi.mocked(readTierOverrides).mockReturnValue({
+      'task-x': {
+        effectiveDifficulty: 'expert',
+        promotions: 1,
+        history: [{ at: '2026-09-17T00:00:00.000Z', from: 'simple', to: 'expert', reason: 'test' }],
+      },
+    });
+
+    expect(resolveSlotTierSpawnParams('/ws', 'task-x')).toEqual({
+      model: 'claude-opus-4-8',
+      harness: 'claude-code',
+      tierName: 'frontier',
+      implicit: false,
+      // PAN-3842 + PAN-3858: fitness judges the model against the SAME
+      // (promoted) difficulty staffing routed on, not the authored 'simple'.
+      difficulty: 'expert',
+    });
+  });
 });
 
 describe('resolveSingleWorkTierSpawnParams', () => {
@@ -254,6 +279,7 @@ describe('resolveSingleWorkTierSpawnParams', () => {
   beforeEach(() => {
     vi.mocked(loadConfigSync).mockReset();
     vi.mocked(readWorkspacePlanSync).mockReset();
+    vi.mocked(readTierOverrides).mockReturnValue({});
   });
 
   it('routes tiered when global config is off but plan metadata opts in', () => {
@@ -264,9 +290,9 @@ describe('resolveSingleWorkTierSpawnParams', () => {
     ], { tiered_execution: 'on' }));
 
     expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({
-      model: 'claude-haiku-4-5',
+      model: 'claude-opus-4-8',
       harness: 'claude-code',
-      tierName: 'cheap',
+      tierName: 'frontier',
       implicit: false,
       planDifficulties: ['simple', 'expert'],
       planItems: [
@@ -296,20 +322,95 @@ describe('resolveSingleWorkTierSpawnParams', () => {
     expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({});
   });
 
-  it('uses the first dispatchable item and skips completed blockers', () => {
+  // PAN-3857 (D4): the single work agent executes the whole plan, so it is
+  // staffed for the plan's hardest remaining item — not the first dispatchable
+  // one (which misrouted plans whose hard items come later).
+  it("keys on the plan's max difficulty, not the first dispatchable item", () => {
     mockConfig(TIER_CONFIG);
     vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
-      planItem('done', { difficulty: 'simple' }, 'completed'),
-      planItem('frontier', { difficulty: 'expert' }),
+      planItem('first', { difficulty: 'simple' }),
+      planItem('later', { difficulty: 'complex' }),
     ]));
 
     expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({
-      model: 'claude-opus-4-8',
+      model: 'claude-sonnet-5',
       harness: 'claude-code',
-      tierName: 'frontier',
+      tierName: 'standard',
       implicit: false,
-      planDifficulties: ['expert'],
-      planItems: [{ id: 'frontier', difficulty: 'expert' }],
+      planDifficulties: ['simple', 'complex'],
+      planItems: [
+        { id: 'first', difficulty: 'simple' },
+        { id: 'later', difficulty: 'complex' },
+      ],
+    });
+  });
+
+  it('excludes completed, cancelled, running, and blocked items from the max', () => {
+    mockConfig(TIER_CONFIG);
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+      planItem('done', { difficulty: 'expert' }, 'completed'),
+      planItem('cancelled', { difficulty: 'expert' }, 'cancelled'),
+      planItem('running', { difficulty: 'expert' }, 'running'),
+      planItem('blocked', { difficulty: 'expert' }, 'blocked'),
+      planItem('next', { difficulty: 'simple' }),
+    ]));
+
+    expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({
+      model: 'claude-haiku-4-5',
+      harness: 'claude-code',
+      tierName: 'cheap',
+      implicit: false,
+      // PAN-3842: the fitness sweep is deliberately WIDER than the staffing
+      // candidate set — a running item is what this agent is working and a
+      // blocked one unblocks into the same agent, so both difficulties still
+      // belong in the warning. Only completed/cancelled work drops out.
+      planDifficulties: ['expert', 'simple'],
+      planItems: [
+        { id: 'running', difficulty: 'expert' },
+        { id: 'blocked', difficulty: 'expert' },
+        { id: 'next', difficulty: 'simple' },
+      ],
+    });
+  });
+
+  it("applies by_kind per item before taking the max, so a design item counts as its tier's difficulty", () => {
+    mockConfig({ ...TIER_CONFIG, byKind: { design: 'standard' } });
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+      planItem('code', { difficulty: 'simple' }),
+      planItem('ux', { kind: 'design' }),
+    ]));
+
+    expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({
+      model: 'claude-sonnet-5',
+      harness: 'claude-code',
+      tierName: 'standard',
+      implicit: false,
+      // 'ux' declares no difficulty of its own, so the fitness sweep has
+      // nothing to judge it against and lists only 'code'.
+      planDifficulties: ['simple'],
+      planItems: [{ id: 'code', difficulty: 'simple' }],
+    });
+  });
+
+  it("lets by_kind outrank an item's own difficulty, exactly as resolveTier applies it", () => {
+    mockConfig({ ...TIER_CONFIG, byKind: { design: 'standard' } });
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+      planItem('ux', { kind: 'design', difficulty: 'trivial' }),
+      planItem('code', { difficulty: 'simple' }),
+    ]));
+
+    expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({
+      model: 'claude-sonnet-5',
+      harness: 'claude-code',
+      tierName: 'standard',
+      implicit: false,
+      // by_kind raises the STAFFING difficulty only; the fitness sweep reports
+      // each item's own authored difficulty.
+      planDifficulties: ['trivial', 'simple'],
+      planItems: [
+        { id: 'ux', difficulty: 'trivial' },
+        { id: 'code', difficulty: 'simple' },
+      ],
     });
   });
 
@@ -326,6 +427,36 @@ describe('resolveSingleWorkTierSpawnParams', () => {
       explicitOverride: 'claude-sonnet-5',
       planDifficulties: ['expert'],
       planItems: [{ id: 'frontier', difficulty: 'expert' }],
+    });
+  });
+
+  // PAN-3858: a promotion raises an item's effective difficulty, which can
+  // change WHICH item is the plan's hardest remaining one.
+  it('ranks a promoted item by its effective difficulty when picking the staffing item', () => {
+    mockConfig(TIER_CONFIG);
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+      planItem('promoted', { difficulty: 'medium' }),
+      planItem('hard', { difficulty: 'complex' }),
+    ]));
+    vi.mocked(readTierOverrides).mockReturnValue({
+      promoted: {
+        effectiveDifficulty: 'expert',
+        promotions: 1,
+        history: [{ at: '2026-09-17T00:00:00.000Z', from: 'medium', to: 'expert', reason: 'test' }],
+      },
+    });
+
+    expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({
+      model: 'claude-opus-4-8',
+      harness: 'claude-code',
+      tierName: 'frontier',
+      implicit: false,
+      // PAN-3842 + PAN-3858: the promotion reaches the fitness sweep too.
+      planDifficulties: ['expert', 'complex'],
+      planItems: [
+        { id: 'promoted', difficulty: 'expert' },
+        { id: 'hard', difficulty: 'complex' },
+      ],
     });
   });
 });
@@ -353,8 +484,8 @@ describe('spawn-time tier fitness logging (PAN-3842)', () => {
     };
   }
 
-  function planItem(id: string, metadata: XBriefItem['metadata']): XBriefItem {
-    return { id, title: id, status: 'pending', metadata };
+  function planItem(id: string, metadata: XBriefItem['metadata'], status: XBriefItem['status'] = 'pending'): XBriefItem {
+    return { id, title: id, status, metadata };
   }
 
   function mockCatalogConfig(): void {
@@ -434,7 +565,12 @@ describe('spawn-time tier fitness logging (PAN-3842)', () => {
       } as unknown as ReturnType<typeof loadConfigSync>);
     }
 
-    it('returns every pending item difficulty as planDifficulties when the first item is simple', () => {
+    // PAN-3857 (D4) removed the original source of this unfitness: staffing no
+    // longer keys on the first dispatchable item, so a plan led by a simple
+    // item now staffs its hardest item instead of haiku. FR-6's remaining
+    // claim is narrower but still load-bearing — the fitness sweep reports
+    // EVERY pending item, not just the one item staffing keyed on.
+    it('reports every pending item difficulty even though staffing keys on the max', () => {
       mockPan3836Config();
       vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
         planItem('first', { difficulty: 'simple' }),
@@ -442,25 +578,35 @@ describe('spawn-time tier fitness logging (PAN-3842)', () => {
         planItem('hard', { difficulty: 'complex' }),
       ]));
       const params = resolveSingleWorkTierSpawnParams('/ws');
-      expect(params.model).toBe('claude-haiku-4-5');
+      // Staffed for 'hard' (complex), not for the leading simple item.
+      expect(params.model).toBe('claude-sonnet-5');
       expect(params.planDifficulties).toEqual(['simple', 'medium', 'complex']);
+      expect(params.planItems).toEqual([
+        { id: 'first', difficulty: 'simple' },
+        { id: 'mid', difficulty: 'medium' },
+        { id: 'hard', difficulty: 'complex' },
+      ]);
     });
 
-    it('logs one line naming medium, complex and only the medium/complex item ids for a haiku staffing', () => {
+    // The surviving non-override way a single-work agent lands on a model that
+    // is unfit for work it will actually do: main's staffing pick (PAN-3857)
+    // excludes blocked items, but the SAME agent works them once they unblock.
+    // The fitness sweep is deliberately wider, so the warning still fires.
+    it('warns about a blocked item the staffing pick excluded but this agent will still work', () => {
       mockPan3836Config();
       vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
-        planItem('first', { difficulty: 'simple' }),
-        planItem('mid', { difficulty: 'medium' }),
-        planItem('hard', { difficulty: 'complex' }),
+        planItem('next', { difficulty: 'simple' }),
+        planItem('later', { difficulty: 'complex' }, 'blocked'),
       ]));
       const params = resolveSingleWorkTierSpawnParams('/ws');
+      // Only 'next' is a staffing candidate, so the agent spawns on haiku.
+      expect(params.model).toBe('claude-haiku-4-5');
       const lines: string[] = [];
       logTierFitnessAtSpawn('agent-1', { tierName: params.tierName ?? 'default', model: params.model, harness: params.harness }, params.planDifficulties ?? [], params.planItems ?? [], (l) => lines.push(l));
       expect(lines).toHaveLength(1);
-      expect(lines[0]).toContain('medium, complex');
-      expect(lines[0]).toContain('mid');
-      expect(lines[0]).toContain('hard');
-      expect(lines[0]).not.toContain('first');
+      expect(lines[0]).toContain('complex');
+      expect(lines[0]).toContain('later');
+      expect(lines[0]).not.toContain('next');
     });
 
     it('logs nothing when the first item is complex and staffing resolves to claude-sonnet-5', () => {

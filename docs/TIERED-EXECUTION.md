@@ -39,7 +39,6 @@ tiered_execution:
     enabled: false
     retries_at_tier: 0
     max_promotions: 0
-    flounder_budget_minutes: {}
   compaction_reroute: off
   replay_threshold: 0.5
 ```
@@ -56,7 +55,6 @@ tiered_execution:
 - `feed.max_diff_bytes` is a positive integer cap or `null`; default `null` keeps raw `git show` output uncapped.
 - `escalation.enabled` defaults to `false`; when disabled, supervisor verdicts and verification failures do not promote tiers.
 - `escalation.retries_at_tier` and `escalation.max_promotions` are non-negative integers; both default to `0`.
-- `escalation.flounder_budget_minutes` maps difficulties to positive minute budgets; default `{}` leaves the floundering trigger inactive.
 - `compaction_reroute` must be `off` or `on`; default `off` keeps replay respawning the same registered slot with the same captured behavior.
 - `supervisor.owns_inspection` defaults to `true` when a supervisor is configured (PAN-2397 W4): a standing supervisor IS the inspection surface. Set it to `false` explicitly to keep routing `pan inspect` to the ephemeral inspect/inspect-deep subrole agents.
 - `by_kind` is optional and defaults to `{}`; kind routing is never hardcoded.
@@ -103,7 +101,9 @@ The same warnings surface in three places:
 
 1. **`pan doctor`** prints a `Tiered execution` row: `error` when the `tiered_execution` block is invalid (the PAN-2395 degraded-load reason), `warn` listing every fitness warning, `ok` otherwise. With tiered execution disabled, the row checks the implicit `roles.work` tier against every difficulty.
 2. **Settings > Tiered Execution** renders a `⚠` badge on each crew row and on the supervisor block, computed from the unsaved draft so the badge appears and disappears as you edit.
-3. **Spawn time** logs one `[spawn] tier fitness:` line per warning. Slot spawns check the slot item's difficulty; single-work spawns check the maximum difficulty across every pending plan item, naming the items that exceed the staffed class.
+3. **Spawn time** logs one `[spawn] tier fitness:` line per warning. Slot spawns check the slot item's difficulty; single-work spawns check every pending plan item, naming the items that exceed the staffed class.
+
+The single-work fitness sweep is deliberately **wider than the staffing candidate set**. Staffing picks one item — the plan's hardest item that is not completed, cancelled, running, or blocked (PAN-3857). Fitness drops only completed and cancelled items, because the same agent works the running item it already claimed and works a blocked item once it unblocks. So a plan whose only ready work is `simple` staffs a cheap model and still warns about the `complex` item waiting behind a blocker. Both surfaces read the **effective** difficulty: a recorded tier promotion (PAN-3858) raises the difficulty staffing routes on and the difficulty fitness judges against, so the warning never lags an escalation.
 
 Every surface checks the **final selected model** — the one the agent is launched with. On the slot path the tier's model replaces the parent default, so the check runs after that reassignment (`resolveSlotSpawnFitness` in `src/lib/agents/spawn-prep.ts` owns the ordering so a call site cannot get it wrong). An explicit `--model` override outranks tier routing for both selection and the warning: the operator's model is what spawns and what gets judged. `src/lib/__tests__/agents-spawn-tier-fitness.test.ts` drives the real `spawnAgent` and `spawnRun` entry points to hold this.
 
@@ -145,6 +145,12 @@ tiered_execution:
 
 This follows Devin Fusion's failure-mode lesson: when judgment is the deliverable, delegating it to a cheaper sidekick can backfire. It remains a recommendation because model choice must come from explicit operator configuration, never a hardcoded fallback.
 
+## Single-Agent Staffing
+
+With swarm mode off, one work agent executes the whole plan. That agent is staffed for the plan's hardest remaining item — the maximum difficulty over every item not completed, cancelled, running, or blocked, with `by_kind` applied per item before the maximum, exactly as the resolution chain applies it (a `design` item counts as the difficulty of the tier its kind names). Keying on the first dispatchable item instead misrouted every plan whose hard items came later (PAN-3857).
+
+The per-issue work-model override (`record.workModel`) is written only by an explicit operator choice — `pan start --model`, a model picked in the dashboard spawn or restart-fresh flows, or the Policies panel. A resolved role default is never persisted as an override; when no override exists, single-agent staffing resolves through the tier table above. A stored override still wins through the `issue-override` tier and suspends crew routing for the issue.
+
 ## Standing Warm Tiers
 
 The foreman owns `pan task next`, claiming, status updates, verification commands, commit messages, and task closure. Tier agents do implementation only. They receive the task brief, make the scoped change, and return control to the foreman for verification and commit.
@@ -183,7 +189,7 @@ Escalation is disabled by default. When `escalation.enabled: true`, deterministi
 
 `trivial -> simple -> medium -> complex -> expert`
 
-Triggers are supervisor `BLOCKED` verdicts for the task's commit, verification failures attributed to the task, and floundering when a configured per-difficulty time budget is exceeded. `retries_at_tier` controls how many attempts stay on the current tier before promotion, and `max_promotions` caps promotions per task. At `expert`, or after the promotion cap is reached, the result is block-and-surface for operator attention.
+Triggers are supervisor `BLOCKED` verdicts for the task's commit and verification failures (attributed to the plan's hardest item, since verification covers the whole submitted diff). `retries_at_tier` controls how many attempts stay on the current tier before promotion, and `max_promotions` caps promotions per task. At `expert`, or after the promotion cap is reached, the result is block-and-surface for operator attention.
 
 Example with `retries_at_tier: 1` and `max_promotions: 2`: a `simple` task gets one retry at `simple`; the next qualifying trigger promotes it to `medium`; another retry/promotion cycle can move it to `complex`; a further trigger blocks because the promotion cap is spent. Promotions are recorded as effective difficulty in workspace `.pan/continue.json` `tierOverrides`, not by mutating the xBRIEF spec.
 

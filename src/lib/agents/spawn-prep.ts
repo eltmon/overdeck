@@ -16,22 +16,22 @@ import { getWorkspaceStackHealth } from '../workspace/stack-health.js';
 import { resolveCanonicalReviewStatus } from '../cloister/review-status-source.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
-import type { ModelId, ComplexityLevel } from '../settings.js';
+import type { ModelId } from '../settings.js';
 import { requireModelOverrideSync } from '../model-validation.js';
 import type { MemoryIdentity } from '@overdeck/contracts';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
-import { readWorkspacePlanSync } from '../xbrief/io.js';
-import type { XBriefDifficulty } from '../xbrief/types.js';
-import { getDispatchableItems } from '../xbrief/dag.js';
+import { readTierOverrides, readWorkspacePlanSync, type TierOverridesMap } from '../xbrief/io.js';
+import type { XBriefDocument, XBriefDifficulty, XBriefItem, XBriefItemStatus } from '../xbrief/types.js';
 import { type Role } from './agent-state.js';
 import type { TierAssignment } from './dispatch-tier.js';
 import { normalizeFlywheelRunId } from './provenance.js';
 import { clearStaleClosedOutBeforeSpawn } from './reopen-guard.js';
 import { resolveStaffing } from './staffing.js';
+import { applyEffectiveDifficulty } from './tier-escalation.js';
 import { checkStaffingFitness } from './tier-fitness.js';
 import { buildTierFitnessContextSync } from './tier-fitness-context.js';
-import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue } from './tier-table.js';
+import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue, type ValidatedTieredExecutionConfig } from './tier-table.js';
 import {
   buildCavemanExports,
   determineModel,
@@ -92,7 +92,7 @@ export interface SpawnOptions {
    * Strike sessions are named `strike-<issue-id>` instead of `agent-<issue-id>`.
    */
   role?: 'work' | 'strike' | 'knowledge';
-  difficulty?: ComplexityLevel;
+  difficulty?: XBriefDifficulty;
   agentType?: 'review-agent' | 'test-agent' | 'merge-agent' | 'work-agent';
 
   // Work type system (PAN-118)
@@ -275,7 +275,10 @@ export function resolveSlotTierSpawnParams(
   if (explicitModel) {
     const item = doc.plan.items.find((candidate) => candidate.id === slotItemId);
     return {
-      difficulty: item?.metadata?.difficulty as XBriefDifficulty | undefined,
+      // PAN-3858: warn against the promoted difficulty, not the authored one.
+      difficulty: item
+        ? (applyEffectiveDifficulty(item, readTierOverrides(baseWorkspace)).metadata?.difficulty as XBriefDifficulty | undefined)
+        : undefined,
       explicitOverride: explicitModel,
     };
   }
@@ -309,13 +312,141 @@ export function resolveSlotTierSpawnParams(
   // PAN-2397 (Always Tiered): staffing ALWAYS resolves — explicit tier table
   // when enabled, else the implicit roles.work tier (same resolveModel +
   // spawnKey as determineModel, so distributions stay deterministic).
-  const staffing = resolveStaffing(item, { planMetadata, spawnKey, config, issueId: issueId ?? undefined });
+  // PAN-3858: recorded promotions must reach staffing.
+  const tierOverrides = readTierOverrides(baseWorkspace);
+  const staffing = resolveStaffing(item, { planMetadata, spawnKey, config, issueId: issueId ?? undefined, tierOverrides });
   return {
     model: staffing.model,
     harness: staffing.implicit ? undefined : staffing.harness,
     tierName: staffing.tierName,
     implicit: staffing.implicit,
-    difficulty: item.metadata?.difficulty as XBriefDifficulty | undefined,
+    // PAN-3858: staffing routed this item by its effective (promoted)
+    // difficulty, so the fitness warning must judge the model against the
+    // same difficulty.
+    difficulty: applyEffectiveDifficulty(item, tierOverrides).metadata?.difficulty as XBriefDifficulty | undefined,
+  };
+}
+
+/** Difficulty ordering for single-work staffing (PAN-3857 D4). */
+const DIFFICULTY_RANK: Readonly<Record<XBriefDifficulty, number>> = {
+  trivial: 0,
+  simple: 1,
+  medium: 2,
+  complex: 3,
+  expert: 4,
+};
+
+/** Statuses getDispatchableItems excludes. The single-work staffing candidate
+ * set is the same item set — but ALL of it, not the first dispatchable item. */
+const SINGLE_WORK_NON_CANDIDATE_STATUSES = new Set<XBriefItemStatus>(['completed', 'cancelled', 'running', 'blocked']);
+
+/**
+ * Effective dispatch difficulty of a plan item (PAN-3857 D4). by_kind routes
+ * first — exactly as resolveTier applies it — so a `design` item counts as
+ * the highest difficulty that maps to the tier its kind names; otherwise the
+ * item's own metadata.difficulty.
+ */
+function effectiveItemDifficulty(
+  item: Pick<XBriefItem, 'metadata'>,
+  tiered: Pick<ValidatedTieredExecutionConfig, 'difficultyToTier' | 'byKind'> | undefined,
+): XBriefDifficulty | undefined {
+  const kind = item.metadata?.kind;
+  const kindTierName = kind ? tiered?.byKind?.[kind] : undefined;
+  if (kindTierName && tiered) {
+    let best: XBriefDifficulty | undefined;
+    for (const [difficulty, tierName] of Object.entries(tiered.difficultyToTier)) {
+      if (tierName !== kindTierName) continue;
+      const candidate = difficulty as XBriefDifficulty;
+      if (best === undefined || DIFFICULTY_RANK[candidate] > DIFFICULTY_RANK[best]) best = candidate;
+    }
+    if (best !== undefined) return best;
+  }
+  return item.metadata?.difficulty;
+}
+
+/**
+ * The item the single work agent is staffed for (PAN-3857 D4): the hardest
+ * remaining item in the plan. The agent executes the whole plan, so keying on
+ * the first dispatchable item misrouted every plan whose hard items come
+ * later. Ties break to the earliest item in plan order; items with no
+ * resolvable difficulty sort below every ranked item. Recorded tier
+ * promotions (PAN-3858) raise an item's effective difficulty before ranking.
+ */
+export function selectStaffingItem(
+  doc: XBriefDocument,
+  tiered: Pick<ValidatedTieredExecutionConfig, 'difficultyToTier' | 'byKind'> | undefined,
+  tierOverrides?: TierOverridesMap,
+): XBriefItem | undefined {
+  return selectHardestItem(
+    doc.plan.items.filter((item) => !SINGLE_WORK_NON_CANDIDATE_STATUSES.has(item.status)),
+    tiered,
+    tierOverrides,
+  );
+}
+
+/**
+ * The plan's hardest item regardless of status (PAN-3858). Verification-failed
+ * escalation attributes to this item: verification runs against the whole
+ * submitted diff after items are already marked completed, so the
+ * status-filtered staffing pick would find nothing to promote.
+ */
+export function selectHardestPlanItem(
+  doc: XBriefDocument,
+  tiered: Pick<ValidatedTieredExecutionConfig, 'difficultyToTier' | 'byKind'> | undefined,
+  tierOverrides?: TierOverridesMap,
+): XBriefItem | undefined {
+  return selectHardestItem(doc.plan.items, tiered, tierOverrides);
+}
+
+function selectHardestItem(
+  items: readonly XBriefItem[],
+  tiered: Pick<ValidatedTieredExecutionConfig, 'difficultyToTier' | 'byKind'> | undefined,
+  tierOverrides?: TierOverridesMap,
+): XBriefItem | undefined {
+  let best: XBriefItem | undefined;
+  let bestRank = -1;
+  for (const item of items) {
+    const effectiveItem = tierOverrides ? applyEffectiveDifficulty(item, tierOverrides) : item;
+    const difficulty = effectiveItemDifficulty(effectiveItem, tiered);
+    const rank = difficulty === undefined ? -1 : DIFFICULTY_RANK[difficulty];
+    if (best === undefined || rank > bestRank) {
+      best = item;
+      bestRank = rank;
+    }
+  }
+  return best;
+}
+
+/**
+ * Statuses excluded from the single-work fitness sweep (PAN-3842). Deliberately
+ * NARROWER than SINGLE_WORK_NON_CANDIDATE_STATUSES: that set picks the one item
+ * staffing keys on, while this set answers "what will this agent actually
+ * touch". A blocked item unblocks and gets worked by the same agent, so its
+ * difficulty still belongs in the warning.
+ */
+const FITNESS_DONE_STATUSES: ReadonlySet<XBriefItemStatus> = new Set<XBriefItemStatus>(['completed', 'cancelled']);
+
+/**
+ * Pending-item difficulties for the single-work fitness warning (PAN-3842).
+ * Recorded tier promotions (PAN-3858) are applied first, so an item escalated
+ * to `expert` is warned about at `expert` — staffing already routes it that
+ * way, and reading the raw metadata here would silently under-warn on exactly
+ * the items the escalation path just raised.
+ */
+function collectPlanFitnessItems(
+  doc: XBriefDocument,
+  tierOverrides: TierOverridesMap,
+): { planDifficulties: XBriefDifficulty[]; planItems: Array<{ id: string; difficulty?: XBriefDifficulty }> } {
+  const planItems = doc.plan.items
+    .filter((candidate) => !FITNESS_DONE_STATUSES.has(candidate.status))
+    .map((candidate) => ({
+      id: candidate.id,
+      difficulty: applyEffectiveDifficulty(candidate, tierOverrides).metadata?.difficulty as XBriefDifficulty | undefined,
+    }))
+    .filter((candidate): candidate is { id: string; difficulty: XBriefDifficulty } => Boolean(candidate.difficulty));
+  return {
+    planDifficulties: [...new Set(planItems.map((candidate) => candidate.difficulty))],
+    planItems,
   };
 }
 
@@ -392,11 +523,11 @@ export function logTierFitnessAtSpawn(
 
 /**
  * Tiered-execution model resolution for the single work-agent path.
- * Auto-start and non-swarm issues still run one foreground work agent, but
- * the first dispatchable xBRIEF item is the same scheduling unit the agent is
- * about to execute. If tiered execution is enabled for the issue, route that
- * agent through the item's resolved tier; otherwise leave role-default model
- * resolution untouched.
+ * Auto-start and non-swarm issues still run one foreground work agent, and
+ * that agent executes the whole plan — so it is staffed for the plan's
+ * hardest remaining item (PAN-3857 D4). If tiered execution is enabled for
+ * the issue, route the agent through that item's resolved tier; otherwise
+ * leave role-default model resolution untouched.
  */
 export function resolveSingleWorkTierSpawnParams(
   workspace: string,
@@ -407,62 +538,53 @@ export function resolveSingleWorkTierSpawnParams(
   if (!doc) return {};
   const planMetadata = doc?.plan?.metadata;
 
-  // PAN-3842: an override skips tier selection, so it must also skip
-  // getDispatchableItems — that DAG walk only picks the tier-selecting item,
-  // and reaching doc.plan.edges here broke real spawns. Difficulty still comes
-  // off doc.plan.items so the caller warns against the FINAL model; model and
-  // harness stay unset so options.model wins.
+  // PAN-3842: an override skips tier selection entirely, so it must also skip
+  // staffing. Difficulty still comes off doc.plan.items so the caller warns
+  // against the FINAL model; model and harness stay unset so options.model wins.
   if (explicitModel) {
-    const pending = doc.plan.items.filter((candidate) => !['completed', 'cancelled'].includes(candidate.status));
-    const planDifficulties = [...new Set(pending.map((candidate) => candidate.metadata?.difficulty).filter((d): d is XBriefDifficulty => Boolean(d)))];
-    const planItems = pending
-      .filter((candidate) => candidate.metadata?.difficulty)
-      .map((candidate) => ({ id: candidate.id, difficulty: candidate.metadata?.difficulty as XBriefDifficulty | undefined }));
     return {
-      planDifficulties,
-      planItems,
+      ...collectPlanFitnessItems(doc, readTierOverrides(workspace)),
       explicitOverride: explicitModel,
     };
   }
-
-  const item = getDispatchableItems(doc, new Set())[0];
-  if (!item) return {};
 
   // Extract issueId from workspace path: feature-<issueId>
   const workspaceName = basename(workspace);
   const issueIdMatch = workspaceName.match(/^feature-(.+)$/i);
   const issueId = issueIdMatch ? issueIdMatch[1].toUpperCase() : null;
 
-  // PAN-2397 (Always Tiered): the single-work path staffs through the same
-  // resolver as slots — explicit table when enabled, implicit roles.work
-  // tier otherwise. Use issue-aware resolver to honor record override (PAN-2383).
   const config = loadYamlConfig().config;
   const tiered = config.tieredExecution;
   const effectiveTieredEnabled = issueId
     ? resolveTieredExecutionEnabledForIssue(tiered, issueId, planMetadata)
     : resolveTieredExecutionEnabled(tiered, planMetadata);
 
+  // PAN-3858: recorded promotions must reach staffing — they raise an item's
+  // effective difficulty both when picking the staffing item and when
+  // resolving its tier.
+  const tierOverrides = readTierOverrides(workspace);
+  const item = selectStaffingItem(doc, tiered, tierOverrides);
+  if (!item) return {};
+
+  // PAN-2397 (Always Tiered): the single-work path staffs through the same
+  // resolver as slots — explicit table when enabled, implicit roles.work
+  // tier otherwise. Use issue-aware resolver to honor record override (PAN-2383).
   const staffing = resolveStaffing(item, {
     planMetadata,
     spawnKey,
     issueId: issueId ?? undefined,
+    tierOverrides,
     config: { ...config, tieredExecution: { ...tiered, enabled: effectiveTieredEnabled } },
   });
   // PAN-3842: the single agent works the WHOLE plan, so its fitness check runs
-  // against the maximum difficulty across every pending item (FR-6), not just
-  // the first dispatchable item that selected the tier.
-  const pending = doc.plan.items.filter((candidate) => !['completed', 'cancelled'].includes(candidate.status));
-  const planDifficulties = [...new Set(pending.map((candidate) => candidate.metadata?.difficulty).filter((d): d is XBriefDifficulty => Boolean(d)))];
-  const planItems = pending
-    .filter((candidate) => candidate.metadata?.difficulty)
-    .map((candidate) => ({ id: candidate.id, difficulty: candidate.metadata?.difficulty as XBriefDifficulty | undefined }));
+  // against every pending item's difficulty (FR-6), not just the one item that
+  // selected the tier.
   return {
     model: staffing.model,
     harness: staffing.implicit ? undefined : staffing.harness,
     tierName: staffing.tierName,
     implicit: staffing.implicit,
-    planDifficulties,
-    planItems,
+    ...collectPlanFitnessItems(doc, tierOverrides),
   };
 }
 

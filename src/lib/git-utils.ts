@@ -15,7 +15,33 @@ import { Effect } from 'effect';
 import { GitError, FsError } from './errors.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 const DEFAULT_PROCESS_PROBE_TIMEOUT_MS = 30_000;
+
+/**
+ * The ONE branch-name validator for config- and operator-supplied branch values
+ * (PR #3872 round 2, CWE-78 residual). argv form stops shell injection but NOT
+ * refspec abuse: `git fetch origin -- <name>` still parses <name> as a refspec,
+ * so '+refs/heads/main:refs/heads/pwned' would update a local ref. Validate
+ * every such value with `git check-ref-format --branch` before it reaches a
+ * git command.
+ */
+export async function isValidBranchNamePromise(name: string): Promise<boolean> {
+  if (!name || name.length > 255) return false;
+  try {
+    await execFileAsync('git', ['check-ref-format', '--branch', name], { encoding: 'utf-8', timeout: 5_000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Throw when a branch value fails isValidBranchNamePromise — the rejection every fetch gate uses. */
+export async function assertValidBranchNamePromise(name: string, context: string): Promise<void> {
+  if (!(await isValidBranchNamePromise(name))) {
+    throw new Error(`Invalid branch name for ${context}: ${JSON.stringify(name)} — refusing to run git with it`);
+  }
+}
 
 export interface StaleLockCleanupOptions {
   signal?: AbortSignal;

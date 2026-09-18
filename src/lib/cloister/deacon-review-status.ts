@@ -13,6 +13,7 @@ import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync, type Revi
 import { observeActiveReviewArtifact } from './verdict-restore.js';
 import { recordOrphanRestoreVerdict } from './orphan-restore-verdict.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
+import { recordWouldFire, type PatrolShadowOptions } from './patrol-would-fire.js';
 import { recordDeaconNudge } from './deacon-nudge-log.js';
 import { REVIEW_SUB_ROLES } from './review-monitor.js';
 import { getAllProjectSpecialistStatuses, getTmuxSessionName } from './specialists.js';
@@ -217,6 +218,8 @@ interface ReviewStatusLike {
 
 interface OrphanRecoveryOptions {
   readWorkspaceHead?: (workspace: string) => Promise<string>;
+  /** PAN-3848 (W30): shadow mode — detect and count would-fires, never act. */
+  shadow?: boolean;
 }
 
 function latestHistoryEntry(
@@ -548,12 +551,15 @@ async function reconcileReviewStatusOrphan(
           ? await options.readWorkspaceHead(workspace)
           : await (await import('../git-utils.js')).snapshotWorkspaceHeadsPromise(issueId, workspace);
         if (currentHead === status.lastVerifiedCommit) {
-          setReviewStatusSync(issueId, {
-            reviewStatus: 'pending',
-            reviewNotes: undefined,
-          });
-          status.reviewStatus = 'pending';
-          status.reviewNotes = undefined;
+          recordWouldFire('checkOrphanedReviewStatuses', issueId);
+          if (!options.shadow) {
+            setReviewStatusSync(issueId, {
+              reviewStatus: 'pending',
+              reviewNotes: undefined,
+            });
+            status.reviewStatus = 'pending';
+            status.reviewNotes = undefined;
+          }
           actions.push(`Recovered review continuation for ${issueId} after verification completed during restart`);
         }
       } catch {
@@ -596,37 +602,47 @@ async function reconcileReviewStatusOrphan(
           reviewUpdate['mergeStatus'] = 'pending';
         }
       }
-      const restored = await recordOrphanRestoreVerdict(issueId, reviewUpdate);
-      actions.push(
-        (restored.landed ? `Restored orphaned review snapshot for ${issueId} to ${latestTerminalReview.status}` : `Orphaned review snapshot for ${issueId} not recorded (${restored.reason})`) +
-        (latestTerminalTest ? ` / test ${latestTerminalTest.status}` : ''),
-      );
+      recordWouldFire('checkOrphanedReviewStatuses', issueId);
+      if (!options.shadow) {
+        const restored = await recordOrphanRestoreVerdict(issueId, reviewUpdate);
+        actions.push(
+          (restored.landed ? `Restored orphaned review snapshot for ${issueId} to ${latestTerminalReview.status}` : `Orphaned review snapshot for ${issueId} not recorded (${restored.reason})`) +
+          (latestTerminalTest ? ` / test ${latestTerminalTest.status}` : ''),
+        );
+      } else {
+        actions.push(`Would restore orphaned review snapshot for ${issueId} to ${latestTerminalReview.status} (shadow)`);
+      }
       return actions;
     }
     if (!hasPassedReview) {
       // RACE GUARD (PAN-1577): preserve active-run evidence for diagnosis, but
       // a workspace-writable artifact cannot complete the review by itself.
       try {
-        const observation = await observeActiveReviewArtifactForRecovery(
-          issueId,
-          status,
-          'orphan-review-recovery',
-        );
-        if (observation.outcome !== 'no-artifact') {
-          actions.push(
-            `Preserved orphaned ${observation.artifact.verdict} evidence for ${issueId} from active run ${observation.artifact.runId}; continuing bounded recovery`,
+        if (!options.shadow) {
+          const observation = await observeActiveReviewArtifactForRecovery(
+            issueId,
+            status,
+            'orphan-review-recovery',
           );
+          if (observation.outcome !== 'no-artifact') {
+            actions.push(
+              `Preserved orphaned ${observation.artifact.verdict} evidence for ${issueId} from active run ${observation.artifact.runId}; continuing bounded recovery`,
+            );
+          }
         }
       } catch (err) {
         console.warn(`[deacon] Artifact observation failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
       }
       const nextRetry = (status.reviewRetryCount ?? 0) + 1;
       const recoveryStart = status.recoveryStartedAt ?? new Date().toISOString();
-      setReviewStatusSync(issueId, {
-        reviewStatus: 'pending',
-        reviewRetryCount: nextRetry,
-        recoveryStartedAt: recoveryStart,
-      });
+      recordWouldFire('checkOrphanedReviewStatuses', issueId);
+      if (!options.shadow) {
+        setReviewStatusSync(issueId, {
+          reviewStatus: 'pending',
+          reviewRetryCount: nextRetry,
+          recoveryStartedAt: recoveryStart,
+        });
+      }
       actions.push(
         `Reset orphaned review for ${issueId} (no review-agent active; retry ${nextRetry}/${REVIEW_INFRA_BREAKER_THRESHOLD})`,
       );
@@ -642,6 +658,13 @@ async function reconcileReviewStatusOrphan(
     status.prUrl
   ) {
     if ((status.reviewRetryCount ?? 0) >= REVIEW_INFRA_BREAKER_THRESHOLD) {
+      recordWouldFire('checkOrphanedReviewStatuses', issueId);
+      if (options.shadow) {
+        actions.push(
+          `Would trip review-infra breaker for ${issueId} after ${status.reviewRetryCount} retries (shadow)`,
+        );
+        return actions;
+      }
       try {
         await recordArtifactObservationAtBreaker(issueId, status, actions);
         markWorkspaceStuck(issueId, 'review_infrastructure_failure', {
@@ -667,9 +690,17 @@ async function reconcileReviewStatusOrphan(
     const issueLower = issueId.toLowerCase();
     const workspace = agentState?.workspace || (resolved ? findWorkspacePath(resolved.projectPath, issueLower) : null);
 
-    if (workspace && resolved && !tryReserveAdvancingSlot() && !(await tryYieldForAdvancingDispatch('review', issueId))) {
+    if (!workspace || !resolved) {
+      actions.push(!resolved
+        ? `Skipped pending review re-dispatch for ${issueId}: no project configured`
+        : `Skipped pending review re-dispatch for ${issueId}: workspace unavailable`);
+    } else if (options.shadow) {
+      // PAN-3848 (W30): count the would-fire; never reserve a slot or spawn in shadow mode.
+      recordWouldFire('checkOrphanedReviewStatuses', issueId);
+      actions.push(`Would re-dispatch pending review for ${issueId} (shadow)`);
+    } else if (!tryReserveAdvancingSlot() && !(await tryYieldForAdvancingDispatch('review', issueId))) {
       actions.push(`Deferred review re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
-    } else if (workspace && resolved) {
+    } else {
       try {
         const { spawnReviewRoleForIssue } = await import('./review-agent.js');
         const dispatchResult = await Effect.runPromise(
@@ -679,6 +710,7 @@ async function reconcileReviewStatusOrphan(
           releaseAdvancingSlot();
           actions.push(`Deferred review re-dispatch for ${issueId} — ${dispatchResult.message}`);
         } else if (dispatchResult.success) {
+          recordWouldFire('checkOrphanedReviewStatuses', issueId);
           actions.push(`Re-dispatched pending review for ${issueId} (deacon-orphan-recovery)`);
         } else {
           actions.push(`Failed to re-dispatch pending review for ${issueId}: ${dispatchResult.error || dispatchResult.message}`);
@@ -686,10 +718,6 @@ async function reconcileReviewStatusOrphan(
       } catch (err) {
         actions.push(`Failed to re-dispatch pending review for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
       }
-    } else if (!resolved) {
-      actions.push(`Skipped pending review re-dispatch for ${issueId}: no project configured`);
-    } else {
-      actions.push(`Skipped pending review re-dispatch for ${issueId}: workspace unavailable`);
     }
   }
 
@@ -712,13 +740,20 @@ async function reconcileReviewStatusOrphan(
       const { spawnRun } = await import('../agents.js');
       const { buildTestRolePrompt } = await import('./test-agent-queue.js');
 
+      if (options.shadow) {
+        // PAN-3848 (W30): shadow mode never rebuilds stacks, reserves slots, or
+        // spawns — it counts the would-fire and moves on.
+        recordWouldFire('checkOrphanedReviewStatuses', issueId);
+        actions.push(`Would re-dispatch orphaned test for ${issueId} (shadow)`);
+      } else {
       const stackRecovery = await recoverUnhealthyTestStack(issueId, workspace);
       if (stackRecovery === 'cooldown' || stackRecovery === 'exhausted') {
+        recordWouldFire('checkOrphanedReviewStatuses', issueId);
         setReviewStatusSync(issueId, { testStatus: 'dispatch_failed' });
         actions.push(
           stackRecovery === 'exhausted'
             ? `Orphaned test for ${issueId}: workspace docker stack unhealthy, rebuild cap reached — escalated to human`
-            : `Orphaned test for ${issueId}: workspace docker stack rebuilding — deferring re-dispatch`,
+            : `Orphaned test for ${issueId}: workspace docker stack unhealthy, rebuilding — deferring re-dispatch`,
         );
       } else if (!tryReserveAdvancingSlot() && !(await tryYieldForAdvancingDispatch('test', issueId))) {
         actions.push(`Deferred test re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
@@ -734,6 +769,7 @@ async function reconcileReviewStatusOrphan(
               startedBy: 'deacon:orphan-test-recovery',
             });
             testStackRebuildState.delete(issueId.toUpperCase());
+            recordWouldFire('checkOrphanedReviewStatuses', issueId);
             setReviewStatusSync(issueId, { testStatus: 'testing' });
             actions.push(`Re-dispatched orphaned test for ${issueId} via test role ${run.id} (deacon-orphan-recovery)`);
           } catch (err) {
@@ -748,8 +784,12 @@ async function reconcileReviewStatusOrphan(
           }
         }
       }
+      }
     } else {
-      setReviewStatusSync(issueId, { testStatus: 'pending' });
+      recordWouldFire('checkOrphanedReviewStatuses', issueId);
+      if (!options.shadow) {
+        setReviewStatusSync(issueId, { testStatus: 'pending' });
+      }
       actions.push(
         !resolved
           ? `Reset orphaned test for ${issueId}: no project configured`
@@ -783,8 +823,10 @@ export async function checkOrphanedReviewStatuses(options: OrphanRecoveryOptions
 
 export async function recoverStalledReviewConvoys(
   getCanonicalState: (issueId: string) => Promise<string | null> = getAutoCloseOutCanonicalState,
+  options: PatrolShadowOptions = {},
 ): Promise<string[]> {
   const actions: string[] = [];
+  const shadow = options.shadow === true;
 
   let statuses: Record<string, ReviewStatus>;
   try {
@@ -832,6 +874,15 @@ export async function recoverStalledReviewConvoys(
 
       if (record.attempts >= STALLED_REVIEW_CONVOY_RECOVERY_MAX_ATTEMPTS) {
         if (!record.escalated) {
+          // PAN-3848 (W30): count the would-fire; shadow mode suppresses the
+          // stuck write, the escalation bookkeeping, and the activity entry.
+          recordWouldFire('recoverStalledReviewConvoys', issueId);
+          if (shadow) {
+            actions.push(
+              `Stalled review convoy for ${issueId}: would mark stuck — recovery cap reached after ${record.attempts} attempts (shadow)`,
+            );
+            continue;
+          }
           record.escalated = true;
           stalledReviewConvoyRecoveryState.set(key, record);
           const stuckDetails = JSON.stringify({
@@ -874,6 +925,16 @@ export async function recoverStalledReviewConvoys(
         continue;
       }
 
+      // PAN-3848 (W30): shadow mode counts the would-fire without reserving a
+      // slot, mutating the recovery budget, or spawning.
+      if (shadow) {
+        recordWouldFire('recoverStalledReviewConvoys', issueId);
+        actions.push(
+          `Would re-dispatch stalled review convoy for ${issueId} (attempt ${record.attempts + 1}/${STALLED_REVIEW_CONVOY_RECOVERY_MAX_ATTEMPTS}, shadow)`,
+        );
+        continue;
+      }
+
       // PAN-1665: honor advancing-role concurrency budget before dispatch.
       if (!tryReserveAdvancingSlot() && !(await tryYieldForAdvancingDispatch('review', issueId))) {
         actions.push(
@@ -899,6 +960,7 @@ export async function recoverStalledReviewConvoys(
         }
         stalledReviewConvoyRecoveryState.delete(key);
         status.reviewStatus = 'reviewing';
+        recordWouldFire('recoverStalledReviewConvoys', issueId);
         actions.push(
           `Re-dispatched stalled review convoy for ${issueId} (attempt ${record.attempts}/${STALLED_REVIEW_CONVOY_RECOVERY_MAX_ATTEMPTS})`,
         );
@@ -928,8 +990,9 @@ export async function recoverStalledReviewConvoys(
  * HTTP trigger to the dashboard never arrived (dashboard down, network failure,
  * etc). Deacon scans the agent directories and auto-triggers review dispatch.
  */
-export async function checkMissingReviewStatuses(): Promise<string[]> {
+export async function checkMissingReviewStatuses(options: PatrolShadowOptions = {}): Promise<string[]> {
   const actions: string[] = [];
+  const shadow = options.shadow === true;
 
   try {
     // PAN-1908: primary missing-status creation is now reactive (work.completed
@@ -946,6 +1009,14 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
       const completedFile = join(AGENTS_DIR, agent.id, 'completed');
       const processedFile = join(AGENTS_DIR, agent.id, 'completed.processed');
       if (!existsSync(completedFile) && !existsSync(processedFile)) continue;
+
+      // PAN-3848 (W30): shadow mode detects the missing status and counts the
+      // would-fire without creating the row, reaping markers, or dispatching.
+      if (shadow) {
+        recordWouldFire('checkMissingReviewStatuses', issueId);
+        actions.push(`Would auto-trigger review for ${issueId} (missing status entry, shadow)`);
+        continue;
+      }
 
       const rowCreated = await handleWorkCompleted(issueId);
       actions.push(...rowCreated);
@@ -988,6 +1059,7 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
           action: 'auto-triggered review (missing status entry)',
           reason: 'work agent has a completion marker but no review was dispatched — the reactive work→review handoff (work.completed → in_review) never created/dispatched review',
         });
+        recordWouldFire('checkMissingReviewStatuses', issueId);
         actions.push(`Auto-triggered review for ${issueId} (missing status entry)`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

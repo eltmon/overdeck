@@ -4,7 +4,7 @@ import { basename, join } from 'path';
 import { Effect } from 'effect';
 import { getAgentRuntimeStateSync, getAgentStateSync, listRunningAgents } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
-import type { HeadAnchor } from '../git-utils.js';
+import { snapshotWorkspaceHeadsPromise, type HeadAnchor } from '../git-utils.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { loadReviewStatuses, setReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { getAllProjectSpecialistStatuses, getTmuxSessionName } from './specialists.js';
@@ -14,11 +14,31 @@ import { evaluateReviewConvoyLiveness, reviewTimestampMs } from './review-convoy
 import { convergeRowFromVerdictOfRecord } from './verdict-restore.js';
 import { recordReviewVerdict } from './review-verdict-writer.js';
 import { deliverReviewVerdictFeedback } from './review-verdict-feedback.js';
+import { readHeadEvidenceAsync } from './synthesis-verdict.js';
 import { findVerdictReport, findVerdictReportAsync, parseVerdictReport } from './review-verdict-report.js';
+import { recordWouldFire, type PatrolShadowOptions } from './patrol-would-fire.js';
 
 // ============================================================================
 // Stuck review detection (PAN-733)
 // ============================================================================
+
+/**
+ * PR #3872 finding 2: the auto-complete anchors the verdict to the review RUN's
+ * spawn-time head (its context.json), never to the recovery-time workspace head —
+ * the report only covers the run's anchor. Returns null when the auto-complete
+ * must be skipped: the run has no anchor, or the workspace head moved past it.
+ */
+async function reviewRunAnchorForAutoComplete(
+  issueId: string,
+  runDir: string,
+  wsPath: string,
+): Promise<HeadAnchor | null> {
+  const runAnchor = await readHeadEvidenceAsync(runDir).catch(() => undefined);
+  if (!runAnchor) return null;
+  const currentHead = await snapshotWorkspaceHeadsPromise(issueId, wsPath).catch(() => undefined);
+  if (!currentHead || currentHead !== runAnchor) return null;
+  return runAnchor as HeadAnchor;
+}
 
 /**
  * Detect issues stuck in `reviewing` status with no active review session.
@@ -34,7 +54,7 @@ import { findVerdictReport, findVerdictReportAsync, parseVerdictReport } from '.
  *   - Only resets if no active review session exists for the issue
  *   - 30-minute threshold avoids resetting legitimate long-running reviews
  */
-export async function checkStuckReviewing(): Promise<string[]> {
+export async function checkStuckReviewing(options: PatrolShadowOptions = {}): Promise<string[]> {
   const actions: string[] = [];
   const REVIEW_STUCK_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
 
@@ -80,10 +100,18 @@ export async function checkStuckReviewing(): Promise<string[]> {
       if (!Number.isFinite(spawnedAt)) continue;
       if (now - spawnedAt < REVIEW_STUCK_THRESHOLD_MS) continue;
 
+      if (options.shadow) {
+        // PAN-3848 (W30): count the would-fire without resetting the row.
+        recordWouldFire('checkStuckReviewing', issueId);
+        actions.push(`Would reset stuck reviewing status for ${issueId} (no active session for ${Math.round((now - spawnedAt) / 60000)}min, shadow)`);
+        continue;
+      }
+
       setReviewStatusSync(issueId, {
         reviewStatus: 'pending',
         reviewNotes: `Review reset by deacon: no active review session after ${Math.round((now - spawnedAt) / 60000)}min`,
       });
+      recordWouldFire('checkStuckReviewing', issueId);
       const msg = `Reset stuck reviewing status for ${issueId} (no active session for ${Math.round((now - spawnedAt) / 60000)}min)`;
       actions.push(msg);
       console.log(`[deacon] ${msg}`);
@@ -203,8 +231,9 @@ export function isSynthesisForActiveReviewRun(
  * verdict itself; a dead parent, or one still unsignaled after 30 minutes, is
  * reconciled directly through the review-status and feedback write doors.
  */
-export async function reconcileUnappliedReviewVerdicts(): Promise<string[]> {
+export async function reconcileUnappliedReviewVerdicts(options: PatrolShadowOptions = {}): Promise<string[]> {
   const actions: string[] = [];
+  const shadow = options.shadow === true;
   const VERDICT_SETTLE_MS = 5 * 60 * 1000;
   const NUDGE_GRACE_MS = 30 * 60 * 1000;
 
@@ -296,6 +325,11 @@ export async function reconcileUnappliedReviewVerdicts(): Promise<string[]> {
               basename(latestDir),
             );
             const nudge = `Your review verdict is already written on disk but review status is still pending. Your ONLY remaining task is to execute this Bash command immediately — do not analyze, do not summarize, do not ask questions, just run it:\n\n${cmd}\n\nRun this command NOW. Do not write any other response before executing it.`;
+            recordWouldFire('reconcileUnappliedReviewVerdicts', issueId);
+            if (shadow) {
+              actions.push(`Would nudge ${reviewSession} to apply pending ${parsed.verdict} verdict from ${latestReport.filename} (shadow)`);
+              continue;
+            }
             try {
               const { messageAgent } = await import('../agents.js');
               await messageAgent(reviewSession, nudge);
@@ -309,6 +343,14 @@ export async function reconcileUnappliedReviewVerdicts(): Promise<string[]> {
             continue;
           }
           if (now - lastNudged < NUDGE_GRACE_MS) continue;
+        }
+
+        // PAN-3848 (W30): count the verdict-application would-fire; shadow mode
+        // suppresses the convergence write, the feedback delivery, and the event.
+        recordWouldFire('reconcileUnappliedReviewVerdicts', issueId);
+        if (shadow) {
+          actions.push(`Would apply ${parsed.verdict} verdict for ${issueId} from ${latestReport.filename} (shadow)`);
+          continue;
         }
 
         const attribution = `applied by deacon sweep from on-disk ${latestReport.filename}`;
@@ -356,8 +398,9 @@ export async function reconcileUnappliedReviewVerdicts(): Promise<string[]> {
   return actions;
 }
 
-export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
+export async function checkCompletedButUnsignaledReviews(options: PatrolShadowOptions = {}): Promise<string[]> {
   const actions: string[] = [];
+  const shadow = options.shadow === true;
   const SYNTHESIS_SETTLE_MS = 5 * 60 * 1000; // 5 minutes
 
   try {
@@ -423,7 +466,16 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
         // the agent is unresponsive — auto-complete so the pipeline isn't blocked.
         if (lastNudged) {
           const notes = topBlocker || `Review auto-completed by deacon: ${verdict} (agent alive but unresponsive after nudge, ${latestReport.filename} exists)`;
-          const outcome = await recordReviewVerdict(issueId, { verdict, notes, writer: 'unsignaled-recovery' });
+          recordWouldFire('checkCompletedButUnsignaledReviews', issueId);
+          if (shadow) {
+            actions.push(`Would auto-complete review for ${issueId}: ${verdict} (alive but unresponsive after nudge, shadow)`);
+            continue;
+          }
+          // PR #3872 finding 2: anchor to the review RUN's head (context.json) —
+          // the report covers that head, not the recovery-time workspace head.
+          const evidenceHead = await reviewRunAnchorForAutoComplete(issueId, latestDir, wsPath);
+          if (!evidenceHead) { actions.push(`Auto-complete for ${issueId} skipped: workspace head no longer matches the review-run anchor (or the run has none)`); continue; }
+          const outcome = await recordReviewVerdict(issueId, { verdict, notes, evidenceHead, writer: 'unsignaled-recovery' });
           if (!outcome.landed) { actions.push(`Auto-complete for ${issueId} not recorded (${outcome.reason})`); continue; }
           actions.push(`Auto-completed review for ${issueId}: ${verdict} (alive but unresponsive after nudge, ${latestReport.filename} written ${Math.round((now - latestMtime) / 60000)}min ago)`);
           console.log(`[deacon] Auto-completed review for ${issueId}: ${verdict} (alive but unresponsive after nudge)`);
@@ -438,6 +490,11 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
           basename(latestDir),
         );
         const nudge = `Your review verdict in ${latestReport.filename} is already written and saved. Your ONLY remaining task is to execute this Bash command immediately — do not analyze, do not summarize, do not ask questions, just run it:\n\n${cmd}\n\nRun this command NOW. Do not write any other response before executing it.`;
+        recordWouldFire('checkCompletedButUnsignaledReviews', issueId);
+        if (shadow) {
+          actions.push(`Would nudge ${reviewSession} to signal ${verdict} (${latestReport.filename}, shadow)`);
+          continue;
+        }
         try {
           const { messageAgent } = await import('../agents.js');
           await messageAgent(reviewSession, nudge);
@@ -450,7 +507,16 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
       } else {
         // Session is dead — auto-complete so the pipeline isn't blocked
         const notes = topBlocker || `Review auto-completed by deacon: ${verdict} (agent dead, ${latestReport.filename} exists)`;
-        const outcome = await recordReviewVerdict(issueId, { verdict, notes, writer: 'unsignaled-recovery' });
+        recordWouldFire('checkCompletedButUnsignaledReviews', issueId);
+        if (shadow) {
+          actions.push(`Would auto-complete review for ${issueId}: ${verdict} (dead agent, shadow)`);
+          continue;
+        }
+        // PR #3872 finding 2: anchor to the review RUN's head (context.json) —
+        // the report covers that head, not the recovery-time workspace head.
+        const evidenceHead = await reviewRunAnchorForAutoComplete(issueId, latestDir, wsPath);
+        if (!evidenceHead) { actions.push(`Auto-complete for ${issueId} skipped: workspace head no longer matches the review-run anchor (or the run has none)`); continue; }
+        const outcome = await recordReviewVerdict(issueId, { verdict, notes, evidenceHead, writer: 'unsignaled-recovery' });
         if (!outcome.landed) { actions.push(`Auto-complete for ${issueId} not recorded (${outcome.reason})`); continue; }
         actions.push(`Auto-completed review for ${issueId}: ${verdict} (dead agent, ${latestReport.filename} written ${Math.round((now - latestMtime) / 60000)}min ago)`);
         console.log(`[deacon] Auto-completed review for ${issueId}: ${verdict} (dead agent)`);

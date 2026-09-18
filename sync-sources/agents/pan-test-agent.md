@@ -1,7 +1,6 @@
 ---
 name: pan-test-agent
 description: Overdeck test specialist — runs the project test suite against an agent's PR, reports failures, never edits code.
-model: sonnet
 permissionMode: bypassPermissions
 ---
 

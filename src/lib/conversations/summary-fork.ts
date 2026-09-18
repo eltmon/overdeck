@@ -182,8 +182,24 @@ async function waitForHandoffDoc(paths: HandoffPaths, timeoutMs: number, pollInt
   }
 }
 
-const DEFAULT_HANDOFF_AUTHOR_MODEL = 'claude-sonnet-4-6';
 const HANDOFF_AUTHOR_TIMEOUT_MS = 300_000;
+
+/**
+ * PAN-3860: thrown when no handoff authoring model is available — neither a
+ * per-call override (`--author-model`) nor `conversations.handoff_author_model`
+ * in config.yaml. There is deliberately no hardcoded fallback model (repo
+ * rule: never hardcode a model fallback). This is a distinct error type so
+ * callers can distinguish "operator hasn't configured this" from a
+ * transient authoring failure: the former must fail the whole pipeline
+ * loudly, never silently degrade to a plain summary fork.
+ */
+export class HandoffAuthorModelNotConfiguredError extends Error {
+  constructor() {
+    super('no handoff author model configured: set conversations.handoff_author_model in ~/.overdeck/config.yaml');
+    this.name = 'HandoffAuthorModelNotConfiguredError';
+  }
+}
+
 // When the raw transcript exceeds this many characters, pre-compact it via
 // generateSmartSummary (which chunks internally) before sending to the
 // handoff authoring model. Threshold chosen to keep the final prompt
@@ -223,7 +239,8 @@ export async function authorHandoffExternal(
   const timestamp = (options.now ?? new Date()).toISOString();
   const paths = createHandoffPaths(sourceConv.name, timestamp);
 
-  const effectiveModel = model ?? DEFAULT_HANDOFF_AUTHOR_MODEL;
+  const effectiveModel = model ?? loadConfigSync().config.conversations.handoffAuthorModel;
+  if (!effectiveModel) throw new HandoffAuthorModelNotConfiguredError();
   const effectiveHarness: RuntimeName = harness ?? 'claude-code';
 
   // The authoring harness decides the prompt template: Claude Code's `Write`
@@ -647,9 +664,13 @@ async function createSummaryForkPromise(
           options.handoffAuthorHarness,
         );
         summary = handoff.docText;
-        usedSummaryModel = options.handoffAuthorModel ?? DEFAULT_HANDOFF_AUTHOR_MODEL;
+        usedSummaryModel = options.handoffAuthorModel ?? loadConfigSync().config.conversations.handoffAuthorModel ?? null;
         handoffDocPath = handoff.docPath;
       } catch (error) {
+        // PAN-3860: a missing handoff-author-model config is an operator
+        // error, not a transient authoring failure — never silently degrade
+        // to a plain summary fork over it.
+        if (error instanceof HandoffAuthorModelNotConfiguredError) throw error;
         forkFallbackReason = handoffFailureReason(error);
         effectiveForkMode = 'summary';
         logHandoffFallback(conv, forkFallbackReason);

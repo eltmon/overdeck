@@ -67,7 +67,7 @@ export function settleMergedVerification<
 export function reviewGatesPassedSync(
   status: Pick<
     ReviewStatus,
-    'reviewStatus' | 'testStatus' | 'verificationStatus' | 'uatStatus' | 'mergeStatus'
+    'reviewStatus' | 'testStatus' | 'verificationStatus' | 'uatStatus' | 'mergeStatus' | 'reviewStaleSince'
   >,
 ): boolean {
   return (
@@ -75,6 +75,7 @@ export function reviewGatesPassedSync(
     (status.testStatus === 'passed' || status.testStatus === 'skipped') &&
     verificationSatisfied(status) &&
     (status.uatStatus === undefined || status.uatStatus === 'passed') &&
+    !status.reviewStaleSince &&
     (status.mergeStatus === 'pending' ||
       status.mergeStatus === 'queued' ||
       status.mergeStatus === undefined ||

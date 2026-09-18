@@ -51,7 +51,7 @@ function defaultTieredExecution(enabled: boolean): TieredExecutionConfig {
     tiers: {},
     by_kind: {},
     feed: { callouts: 'off', exclude: [], exclude_subjects: [], max_diff_bytes: null },
-    escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0, flounder_budget_minutes: {} },
+    escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0 },
     compaction_reroute: 'off',
     replay_threshold: 0.5,
   };
@@ -346,18 +346,10 @@ export function TieredExecutionSection({
           enabled: next.escalation?.enabled ?? false,
           retries_at_tier: next.escalation?.retries_at_tier ?? 0,
           max_promotions: next.escalation?.max_promotions ?? 0,
-          flounder_budget_minutes: next.escalation?.flounder_budget_minutes ?? {},
           ...patch,
         },
       },
     }, opts);
-  };
-
-  const handleFlounderBudgetChange = (difficulty: typeof DIFFICULTIES[number], value: string) => {
-    const nextBudget = { ...(config?.escalation?.flounder_budget_minutes ?? {}) };
-    if (value === '') delete nextBudget[difficulty];
-    else nextBudget[difficulty] = Number(value);
-    handleEscalationPatch({ flounder_budget_minutes: nextBudget }, { debounce: true });
   };
 
   const handleReplayThresholdChange = (value: string) => {
@@ -751,21 +743,6 @@ export function TieredExecutionSection({
                     className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
                   />
                 </label>
-              </div>
-              <div className="grid gap-2 grid-cols-2 @2xl:grid-cols-5">
-                {DIFFICULTIES.map((difficulty) => (
-                  <label key={difficulty} className="space-y-1.5">
-                    <span className="text-xs font-medium text-foreground">{difficulty}</span>
-                    <input
-                      aria-label={`Flounder budget ${difficulty}`}
-                      type="number"
-                      min="1"
-                      value={config?.escalation?.flounder_budget_minutes?.[difficulty] ?? ''}
-                      onChange={(event) => handleFlounderBudgetChange(difficulty, event.target.value)}
-                      className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-                    />
-                  </label>
-                ))}
               </div>
             </div>
             {escalationError && <p className="mt-3 text-xs text-destructive">{escalationError}</p>}

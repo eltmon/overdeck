@@ -5,8 +5,7 @@ import { TIERED_EXECUTION_DIFFICULTIES } from './tier-table.js';
 
 export type EscalationTrigger =
   | { kind: 'supervisor-blocked'; itemId: string; sha: string; attemptsAtCurrentTier?: number }
-  | { kind: 'verification-failed'; itemId: string; detail: string; attemptsAtCurrentTier?: number }
-  | { kind: 'floundering'; itemId: string; dispatchedAt: string; now: string; attemptsAtCurrentTier?: number };
+  | { kind: 'verification-failed'; itemId: string; detail: string; attemptsAtCurrentTier?: number };
 
 export type EscalationAction =
   | { action: 'retry'; attempt: number }
@@ -18,15 +17,6 @@ export interface VerificationFailureEscalationInput {
   config: ValidatedEscalationConfig;
   overrides: TierOverridesMap;
   detail: string;
-  attemptsAtCurrentTier?: number;
-}
-
-export interface FlounderingEscalationInput {
-  bead: Pick<XBriefItem, 'id' | 'metadata'>;
-  config: ValidatedEscalationConfig;
-  overrides: TierOverridesMap;
-  dispatchedAt: string;
-  now: string;
   attemptsAtCurrentTier?: number;
 }
 
@@ -100,21 +90,6 @@ export function decideEscalation(
   };
 }
 
-export function isFloundering(
-  dispatchedAtIso: string,
-  nowIso: string,
-  budgetMinutes?: number,
-): boolean {
-  if (budgetMinutes === undefined || budgetMinutes === null) return false;
-  if (!Number.isFinite(budgetMinutes) || budgetMinutes <= 0) return false;
-
-  const dispatchedAt = Date.parse(dispatchedAtIso);
-  const now = Date.parse(nowIso);
-  if (!Number.isFinite(dispatchedAt) || !Number.isFinite(now)) return false;
-
-  return (now - dispatchedAt) / 60_000 > budgetMinutes;
-}
-
 export function decideVerificationFailureEscalation(
   input: VerificationFailureEscalationInput,
 ): EscalationAction {
@@ -126,28 +101,11 @@ export function decideVerificationFailureEscalation(
   }, input.bead, input.config, input.overrides);
 }
 
-export function decideFlounderingEscalation(
-  input: FlounderingEscalationInput,
-): EscalationAction | null {
-  const effectiveDifficulty = input.overrides[input.bead.id]?.effectiveDifficulty ?? input.bead.metadata?.difficulty;
-  const budget = effectiveDifficulty ? input.config.flounder_budget_minutes[effectiveDifficulty] : undefined;
-  if (!isFloundering(input.dispatchedAt, input.now, budget)) return null;
-  return decideEscalation({
-    kind: 'floundering',
-    itemId: input.bead.id,
-    dispatchedAt: input.dispatchedAt,
-    now: input.now,
-    attemptsAtCurrentTier: input.attemptsAtCurrentTier,
-  }, input.bead, input.config, input.overrides);
-}
-
 function triggerReason(trigger: EscalationTrigger): string {
   switch (trigger.kind) {
     case 'supervisor-blocked':
       return `supervisor blocked commit ${trigger.sha}`;
     case 'verification-failed':
       return `verification failed: ${trigger.detail}`;
-    case 'floundering':
-      return `floundering since ${trigger.dispatchedAt}`;
   }
 }

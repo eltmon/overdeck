@@ -614,7 +614,7 @@ describe('TieredExecutionSection', () => {
             tiers: {},
             by_kind: {},
             feed: { callouts: 'off', exclude: [], exclude_subjects: [], max_diff_bytes: null },
-            escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0, flounder_budget_minutes: {} },
+            escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0 },
             replay_threshold: 0.5,
           },
         })}
@@ -720,7 +720,7 @@ describe('no-loss inventory', () => {
       supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged', owns_inspection: true },
       by_kind: {},
       feed: { callouts: 'off', max_diff_bytes: null, exclude: [], exclude_subjects: [] },
-      escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0, flounder_budget_minutes: {} },
+      escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0 },
       replay_threshold: 0.5, compaction_reroute: 'off',
     } })} onSettingsChange={onSettingsChange} />);
 
@@ -750,7 +750,6 @@ describe('no-loss inventory', () => {
       expect(screen.getByLabelText(label)).toBeTruthy();
     }
     expect(screen.getByRole('switch', { name: 'Enable tier escalation' })).toBeTruthy();
-    for (const difficulty of ['trivial', 'simple', 'medium', 'complex', 'expert']) expect(screen.getByLabelText(`Flounder budget ${difficulty}`)).toBeTruthy();
     expect(screen.getByText(/What this writes to config.yaml/)).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText('Call-outs'), { target: { value: 'notify' } });

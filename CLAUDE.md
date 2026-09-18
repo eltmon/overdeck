@@ -35,9 +35,13 @@
 - Every state domain has **one read door and one write door**; never touch stores directly. [docs/API-SURFACE.md](docs/API-SURFACE.md)
 - The resource governor holds dispatch during memory or CPU saturation, and every local Vitest run enters the shared CPU admission queue. [docs/RESOURCE-GOVERNOR.md](docs/RESOURCE-GOVERNOR.md)
 - The post-merge lifecycle runs **at most once per merge** — keep `tests/unit/lib/cloister/in-flight-guard.test.ts` green. [docs/MERGE-WORKFLOW.md](docs/MERGE-WORKFLOW.md)
-- `.claude/agents/` + `.claude/skills/` in worktrees are **sync targets** populated from `sync-sources/`; three shipped subagents hardcode `model: haiku` (breaks on CLIProxy-routed models — prefer built-in `Explore`/`general-purpose` for ad-hoc exploration).
+- `.claude/agents/` + `.claude/skills/` in worktrees are **sync targets** populated from `sync-sources/`; shipped subagent definitions carry no `model:` pin — they inherit the session model so Cloister routing applies (prefer built-in `Explore`/`general-purpose` for ad-hoc exploration).
 - Pipeline membership, decisions, and workspace tables each have a canonical resolver — never derive independently. [docs/PIPELINE-MEMBERSHIP.md](docs/PIPELINE-MEMBERSHIP.md), [docs/DECISIONS.md](docs/DECISIONS.md), [docs/WORKSPACES-AND-PROJECTS.md](docs/WORKSPACES-AND-PROJECTS.md)
 - Project CI state reaches Command Deck rows through the shared read-model event path (`ciByProjectKey` → `/ws/rpc`); webhook observations and server-side REST repair feed it, never frontend polling. [docs/EXTERNAL-EVENT-STREAM.md](docs/EXTERNAL-EVENT-STREAM.md)
+- A terminal review verdict always carries its anchor (the write door refuses anchorless verdicts); a passed review is never reset by a patrol — post-review drift marks it `reviewStaleSince`, blocking merge until re-review (PAN-3847). [docs/REVIEW-AGENT-ARCHITECTURE.md](docs/REVIEW-AGENT-ARCHITECTURE.md)
+- pan done writes its review request; no patrol re-creates it (PAN-3848): `prUrl` + `reviewRequestedAt` + `completedAt` land in one durable record write, retried on the lock ladder. Record writes hold the per-issue lock across the commit only — the push runs after release. [docs/MERGE-WORKFLOW.md](docs/MERGE-WORKFLOW.md)
+- Patrols are alarms with budgets; transitions write their own state (PAN-3850): every `runPatrol` step runs inside `runBudgetedPatrol()` with a per-UTC-day action budget (excess suspends the patrol until the next day with one needs-you), and the report-only invariant checker alarms when record, review-status row, and liveness disagree — repairs go through the owning doors, never the checker. [docs/PIPELINE-GATES.md](docs/PIPELINE-GATES.md)
+- One module answers agent liveness and idleness — `src/lib/agents/liveness.ts` (session + live pane + harness process in the pane subtree; idle = stale work activity, never the mirror label alone). Agent state is written only after the tmux session exists — there are no placeholder rows — and supervisor-launched agents write `stopped` from the supervisor's `exited` lifecycle event, not from patrol inference (PAN-3849). [docs/AGENT-STATE-PLANES.md](docs/AGENT-STATE-PLANES.md)
 
 ## Topic Index
 
@@ -46,7 +50,7 @@
 | Harnesses (claude-code, ohmypi, codex, acp, kimi-code), ToS gate | [configuration/harnesses.mdx](configuration/harnesses.mdx), [reference/harness-landscape.mdx](reference/harness-landscape.mdx) |
 | Roles, sub-roles, agent taxonomy, review architecture | [docs/ROLES.md](docs/ROLES.md), [docs/REVIEW-AGENT-ARCHITECTURE.md](docs/REVIEW-AGENT-ARCHITECTURE.md) |
 | Skills ↔ CLI convention (`sync-sources/skills/pan-<verb>/`) | [docs/SKILLS-CONVENTION.md](docs/SKILLS-CONVENTION.md) |
-| Agent message delivery (PTY supervisor, Channels fallback, blocking-menu guard) | [docs/AGENT-MESSAGE-DELIVERY.md](docs/AGENT-MESSAGE-DELIVERY.md) |
+| Agent message delivery (confirmed turn, PTY supervisor, Channels fallback, blocking-menu guard) | [docs/AGENT-MESSAGE-DELIVERY.md](docs/AGENT-MESSAGE-DELIVERY.md) |
 | Dashboard server architecture, WS endpoints, terminal protocol | [docs/DASHBOARD-ARCHITECTURE.md](docs/DASHBOARD-ARCHITECTURE.md) |
 | Verification gate, verdict feedback routing, review convergence, auto-resume gates | [docs/PIPELINE-GATES.md](docs/PIPELINE-GATES.md) |
 | Resource governor (memory gate, preemption) | [docs/RESOURCE-GOVERNOR.md](docs/RESOURCE-GOVERNOR.md) |

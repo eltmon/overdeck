@@ -187,6 +187,7 @@ function durableSubset(p: PanIssuePipelineRecord): DurableStatusFields {
     prNumber: p.prNumber,
     prHeadSha: p.prHeadSha,
     reviewedAtCommit: p.reviewedAtCommit,
+    reviewStaleSince: p.reviewStaleSince,
     lastVerifiedCommit: p.lastVerifiedCommit,
     reviewRequestedAt: p.reviewRequestedAt,
     reviewSpawnedAt: p.reviewSpawnedAt,

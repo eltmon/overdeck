@@ -193,12 +193,12 @@ The continue file is the machine-readable operational state for in-progress work
     "ws-reconnect": ["task-42"],
     "ws-reconnect.ac1": ["task-42"]
   },
-  "agentModel": "claude-opus-4-6",
+  "agentModel": "agent:example-model",
   "sessionHistory": [
-    { "timestamp": "2026-04-28T12:00:00Z", "reason": "planning", "agentModel": "claude-opus-4-7" },
-    { "timestamp": "2026-04-28T14:00:00Z", "reason": "start", "agentModel": "claude-opus-4-6" },
+    { "timestamp": "2026-04-28T12:00:00Z", "reason": "planning", "agentModel": "agent:example-model" },
+    { "timestamp": "2026-04-28T14:00:00Z", "reason": "start", "agentModel": "agent:example-model" },
     { "timestamp": "2026-04-28T18:00:00Z", "reason": "end" },
-    { "timestamp": "2026-04-29T10:00:00Z", "reason": "resume", "agentModel": "claude-opus-4-6" }
+    { "timestamp": "2026-04-29T10:00:00Z", "reason": "resume", "agentModel": "agent:example-model" }
   ]
 }
 ```
@@ -242,7 +242,7 @@ Every xBRIEF has exactly two top-level keys per the xBRIEF spec:
     "title": "Dashboard skeleton loading states",
     "status": "approved",
     "uid": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-    "author": "agent:claude-opus-4-6",
+    "author": "agent:example-model",
     "sequence": 3,
     "created": "2026-04-04T12:00:00Z",
     "updated": "2026-04-04T18:30:00Z",
@@ -322,7 +322,7 @@ Every xBRIEF has exactly two top-level keys per the xBRIEF spec:
 | `plan.items` | YES | Array of work items |
 | `plan.edges` | NO | Dependency edges between items |
 | `plan.uid` | NO | UUID v4, generated once at creation — stable identifier for the plan |
-| `plan.author` | NO | Who created the plan, e.g. `"agent:claude-opus-4-6"` |
+| `plan.author` | NO | Who created the plan, e.g. `"agent:<model-slug>"` |
 | `plan.sequence` | NO | Monotonically incrementing write counter (starts at 1, auto-incremented by io.ts) |
 | `plan.references` | NO | External links — see [References](#references) |
 | `plan.created` | NO | ISO 8601 timestamp — when the plan was first created |

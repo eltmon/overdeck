@@ -11,7 +11,7 @@ import { encodeClaudeProjectDir, getOverdeckHome } from '../paths.js';
 import { backfillAgentsFromStateJsonSync } from './agent-backfill.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 65;
+export const SCHEMA_VERSION = 66;
 
 function tryIdempotentDdl(db: SqliteDatabase, targetVersion: number, statement: string): void {
   try {
@@ -248,6 +248,8 @@ export function initSchema(db: SqliteDatabase): void {
       stuck_details         TEXT,
       -- PAN-653: commit SHA at which review passed (used by deacon to detect new pushes)
       reviewed_at_commit    TEXT,
+      -- PAN-3847: ISO timestamp when a passed review went stale (HEAD moved); blocks readyForMerge until re-review
+      review_stale_since    TEXT,
       -- PAN-699: timestamp when review agents were dispatched (deacon timeout detection)
       review_spawned_at     TEXT,
       -- PAN-1765: timestamp when conflict resolution was dispatched
@@ -1758,6 +1760,7 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
     tryIdempotentDdl(db, 64, 'ALTER TABLE review_status ADD COLUMN uat_notes TEXT');
   }
   if (currentVersion < 65) tryIdempotentDdl(db, 65, 'ALTER TABLE review_status ADD COLUMN retired_at TEXT');
+  if (currentVersion < 66) tryIdempotentDdl(db, 66, 'ALTER TABLE review_status ADD COLUMN review_stale_since TEXT');
   // After all migrations, set the version
   db.pragma(`user_version = ${SCHEMA_VERSION}`);
 }

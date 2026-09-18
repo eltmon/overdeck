@@ -28,12 +28,18 @@ canonical, migration-aware paths — one record, read through the per-domain
 resolver and written through the single record writer — so a slot's durable
 completion is never silently lost to a stale workspace-local copy.
 
-Record writes hold the per-issue fs lock across the state-worktree commit and
-push, bounded by `OVERDECK_RECORD_DURABILITY_BUDGET_MS` (default 30s,
+Record writes hold the per-issue fs lock — and the per-issue state git lock,
+keyed `gitRoot::ISSUE` since PAN-3848 — across the read-mutate-write-commit
+only; the push runs after both locks are released, so a slow network push
+never starves a peer issue's writer (F1). The commit wait stays bounded by
+`OVERDECK_RECORD_DURABILITY_BUDGET_MS` (default 30s,
 PAN-2989): on expiry the writer rejects with `RecordDurabilityTimeoutError`
 and releases the lock, keeps the mutation in the local record (no
 restore-on-timeout — the raced flush may still land), and never aborts the
-shared-gitRoot flush of peer writers. A verdict write that cannot take the
+shared-gitRoot flush of peer writers. A push-race reconcile (fetch, merge
+`origin/overdeck-state`, re-push) likewise runs after the locks; the reconcile
+verifies the caller's mutation survived the merge and re-applies it if a
+peer's batched record was resolved `--theirs` over it. A verdict write that cannot take the
 lock in time falls back to `<workspace>/.overdeck/pipeline-verdict.json`;
 `drainWorkspaceVerdictFallback()` folds that fallback into the canonical
 record (newer-wins on ISO `updatedAt`) and deletes it, triggered after every
@@ -237,6 +243,14 @@ The raw `status_history` table intentionally retains the full unbounded record f
 
 ### Agent spawn provenance
 
+Agent state is written only after the tmux session exists — there are no
+placeholder rows (PAN-3849, FR-24). The retired `pending-work-spawn` start
+row existed only to serialize concurrent dashboard spawn requests; that claim
+is now an in-process in-flight set in the spawn route, and a failed spawn
+leaves nothing to reconcile. `agent.started` is emitted when real state
+exists (the supervisor's `session-started` lifecycle event, or the enrichment
+poller's `agent.created` for non-supervisor launches), never earlier.
+
 Agent state records two complementary provenance fields:
 
 - `flywheelRunId` is the active `RUN-…` identity when a Flywheel run owns the spawn. Spawn options and the inherited Flywheel environment feed it into `state.json` and the agents-table `flywheel_run_id` column.
@@ -260,9 +274,16 @@ running/starting event projection; a live tmux session still wins.
 
 ### Stopped but session-alive (PAN-3338)
 
-`status` in the agents table is the durable record — written at finalize or
-stop, never inferred from process liveness. `hasLiveTmuxSession` is the
-liveness signal, sourced from the tmux oracle below. The read model must agree
+`status` in the agents table is the durable record. For supervisor-launched
+agents (Claude Code work/strike on non-Docker workspaces), the record is
+written from observed process truth: the PTY supervisor posts lifecycle events
+(`session-started`, `turn-started`, `turn-ended`, `exited`) to
+`POST /api/agents/:id/lifecycle`, and the projection applies them through
+`applyAgentLifecycleEvent` in `src/dashboard/server/services/agent-projection.ts`
+— `running` on session-started, `lastActivity` on turns, `stopped` on exited,
+each in one transaction (PAN-3849, FR-21). An agent's exit no longer needs a
+patrol inferring it from a missing tmux session; `hasLiveTmuxSession` is the
+liveness signal, sourced from the oracle below. The read model must agree
 with the durable record; the single resolver for whether a stopped-but-alive
 agent gets rewritten back to `running` is `shouldResurrectStoppedAgent()` in
 `src/dashboard/server/services/agent-enrichment-service.ts`.
@@ -278,12 +299,27 @@ rewrites these back to `running`; the shared predicate is
 unchanged: a stopped-but-tmux-alive agent there is a transitional state
 following a crash or restart, and the poller rewrites it to `running`.
 
-## Liveness oracle — tmux
+## Liveness oracle — `src/lib/agents/liveness.ts`
 
-A session on the `overdeck` tmux socket is the physical liveness authority.
-Lifecycle events project status, while the Deacon keeps a thin patrol as a
-dropped-event safety net. A global Deacon pause gates every patrol and recovery
-path.
+One module answers "is this agent alive" and "is this agent idle"; every
+caller uses it (PAN-3849, FR-23). `isAlive`/`isAliveSync` return a verdict —
+`alive` only when the tmux session exists AND at least one pane is not dead
+AND the expected harness process is in a live pane's process subtree
+(`no-session` / `pane-dead` / `runtime-missing` otherwise). The subtree walk
+resolves real pids from `#{pane_pid}` — never substring process matching — so
+a remain-on-exit zombie pane whose harness exited reads as dead, the F12
+feedback-routing bug class. `isIdle`/`idleAgeMs` implement FR-5: idle is work
+activity (the hook-driven runtime mirror timestamp plus the transcript
+heartbeat, never tmux pane repaints and never the mirror's `idle` label
+alone) older than a threshold.
+
+A session on the `overdeck` tmux socket remains the physical substrate, but
+no consumer reads `sessionExists`/`pane_dead` directly anymore —
+`scripts/lint-liveness.sh` fails the build if the migrated consumers
+(deacon-auto-resume, the parked sweeper, feedback-target, the lifecycle
+classifier, messageAgent) re-introduce a private predicate. The Deacon keeps
+a thin patrol as a dropped-event safety net. A global Deacon pause gates
+every patrol and recovery path.
 
 Codex app-server sessions keep the same liveness oracle. The tmux pane hosts
 Overdeck's Codex app-server host process, which owns the `codex app-server`

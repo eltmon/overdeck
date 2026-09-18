@@ -66,14 +66,12 @@ export interface TieredEscalationConfig {
   enabled?: boolean;
   retries_at_tier?: number;
   max_promotions?: number;
-  flounder_budget_minutes?: Partial<Record<XBriefDifficulty, number>>;
 }
 
 export interface ValidatedEscalationConfig {
   enabled: boolean;
   retries_at_tier: number;
   max_promotions: number;
-  flounder_budget_minutes: Partial<Record<XBriefDifficulty, number>>;
 }
 
 export interface TieredExecutionConfig {
@@ -122,7 +120,6 @@ export const DEFAULT_TIERED_EXECUTION_CONFIG: ValidatedTieredExecutionConfig = {
     enabled: false,
     retries_at_tier: 0,
     max_promotions: 0,
-    flounder_budget_minutes: {},
   },
   compaction_reroute: 'off',
   replay_threshold: 0.5,
@@ -334,22 +331,10 @@ function validateFeedConfig(config?: TieredExecutionFeedConfig): ValidatedTiered
 }
 
 function validateEscalationConfig(config?: TieredEscalationConfig): ValidatedEscalationConfig {
-  const flounderBudget: Partial<Record<XBriefDifficulty, number>> = {};
-  for (const [difficulty, budget] of Object.entries(config?.flounder_budget_minutes ?? {})) {
-    if (!isDifficulty(difficulty)) {
-      throw new TieredExecutionConfigError(`tiered_execution.escalation.flounder_budget_minutes contains unknown difficulty '${difficulty}'`);
-    }
-    if (!Number.isFinite(budget) || budget <= 0) {
-      throw new TieredExecutionConfigError(`tiered_execution.escalation.flounder_budget_minutes.${difficulty} must be positive`);
-    }
-    flounderBudget[difficulty] = budget;
-  }
-
   return {
     enabled: config?.enabled ?? false,
     retries_at_tier: validateNonNegativeInteger(config?.retries_at_tier, 'tiered_execution.escalation.retries_at_tier', 0),
     max_promotions: validateNonNegativeInteger(config?.max_promotions, 'tiered_execution.escalation.max_promotions', 0),
-    flounder_budget_minutes: flounderBudget,
   };
 }
 

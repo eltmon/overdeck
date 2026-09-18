@@ -69,6 +69,7 @@ function pipelineToDurableUpdate(pipeline: PanIssuePipelineRecord): ReviewStatus
     reviewedAtCommit: pipeline.reviewedAtCommit
       ? rehydrateHeadAnchor(pipeline.reviewedAtCommit)
       : undefined,
+    reviewStaleSince: pipeline.reviewStaleSince,
     // Durable records deserialize anchors as strings; re-brand only at the write door.
     lastVerifiedCommit: pipeline.lastVerifiedCommit
       ? rehydrateHeadAnchor(pipeline.lastVerifiedCommit)

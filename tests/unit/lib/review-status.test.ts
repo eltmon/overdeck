@@ -11,6 +11,7 @@ vi.mock('../../../src/lib/database/index.js', () => ({
 
 const mockUpdateIssueRecordForIssue = vi.hoisted(() => vi.fn());
 const capturePipelineStageForIssueMock = vi.hoisted(() => vi.fn());
+const notifyPipelineSyncMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../src/lib/pan-dir/records.js', () => ({
   updateIssueRecordForIssue: mockUpdateIssueRecordForIssue,
@@ -18,7 +19,7 @@ vi.mock('../../../src/lib/pan-dir/records.js', () => ({
 
 vi.mock('../../../src/lib/pipeline-notifier.js', () => ({
   notifyPipeline: vi.fn(),
-  notifyPipelineSync: vi.fn(),
+  notifyPipelineSync: notifyPipelineSyncMock,
 }));
 
 vi.mock('../../../src/lib/activity-logger.js', () => ({
@@ -120,7 +121,7 @@ describe('review status', () => {
     expect(reviewStatus.scopeDrift).toEqual(scopeDrift);
   });
 
-  it('finalizes verification when no-code-drift skips the post-review test role', () => {
+  it('PAN-3847: a passed review with reviewedAtCommit === lastVerifiedCommit still dispatches the test role', () => {
     // This fixture simulates an anchor read back from unbranded storage.
     const head = rehydrateHeadAnchor('abc123abc123abc123abc123abc123abc123abcd');
     setReviewStatusSync('PAN-2200', {
@@ -133,18 +134,21 @@ describe('review status', () => {
 
     setReviewStatusSync('PAN-2200', { reviewStatus: 'passed' });
 
+    // Equal anchors prove only that the tree did not move since a changed-file-scoped
+    // gate — they never prove the suite ran. The test role always runs.
     const status = getReviewStatusSync('PAN-2200');
     expect(status).toMatchObject({
       reviewStatus: 'passed',
-      testStatus: 'passed',
-      verificationStatus: 'passed',
-      readyForMerge: true,
+      testStatus: 'pending',
+      verificationStatus: 'running',
+      readyForMerge: false,
     });
-    expect(capturePipelineStageForIssueMock).toHaveBeenCalledTimes(1);
+    expect(notifyPipelineSyncMock).toHaveBeenCalledWith({ type: 'review.approved', issueId: 'PAN-2200' });
+    expect(notifyPipelineSyncMock).not.toHaveBeenCalledWith({ type: 'test.passed', issueId: 'PAN-2200' });
     expect(capturePipelineStageForIssueMock).toHaveBeenCalledWith('PAN-2200', 'review_passed');
   });
 
-  it('keeps a required UAT failure latched across a review retry and no-code test skip', () => {
+  it('keeps a required UAT failure latched across a review retry', () => {
     const head = rehydrateHeadAnchor('def456def456def456def456def456def456def4');
     setReviewStatusSync('PAN-93365', {
       reviewStatus: 'passed',
@@ -171,7 +175,8 @@ describe('review status', () => {
 
     expect(getReviewStatusSync('PAN-93365')).toMatchObject({
       reviewStatus: 'passed',
-      testStatus: 'passed',
+      // PAN-3847: the anchor-equality test skip is gone — the test role re-runs.
+      testStatus: 'pending',
       uatStatus: 'failed',
       verificationStatus: 'passed',
       readyForMerge: false,
@@ -223,6 +228,28 @@ describe('review status', () => {
       mergeStatus: 'pending',
       verificationStatus: 'pending',
     });
+  });
+
+  it('PAN-3847: a fully green row with reviewStaleSince derives readyForMerge false', () => {
+    setReviewStatusSync('PAN-3847', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      verificationStatus: 'passed',
+      mergeStatus: 'pending',
+      readyForMerge: true,
+    });
+    expect(getReviewStatusSync('PAN-3847')?.readyForMerge).toBe(true);
+
+    // Post-review drift marks the row stale — a later write without an explicit
+    // readyForMerge must derive false even though every gate verdict is green.
+    setReviewStatusSync('PAN-3847', { reviewStaleSince: new Date().toISOString() });
+    const stale = getReviewStatusSync('PAN-3847');
+    expect(stale?.reviewStaleSince).toBeTruthy();
+    expect(stale?.readyForMerge).toBe(false);
+
+    // Clearing the marker (pan done / pan review request) restores derivation.
+    setReviewStatusSync('PAN-3847', { reviewStaleSince: undefined });
+    expect(getReviewStatusSync('PAN-3847')?.readyForMerge).toBe(true);
   });
 
   it('consumes a serviced review request when review passes', () => {

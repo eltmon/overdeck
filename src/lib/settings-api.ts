@@ -154,6 +154,8 @@ export interface ApiSettingsConfig {
     manual_compact_mode?: 'claude-code' | 'overdeck-native';
     rich_compaction?: boolean;
     title_model?: ModelId;
+    /** Model used to author external handoff docs (`pan handoff`) when no per-call model is given (PAN-3869/3884). */
+    handoff_author_model?: ModelId;
     watch_dirs?: string[];
     scan_max_parallel?: number | null;
     embeddings?: boolean;
@@ -367,6 +369,29 @@ function pruneUndefined<T>(value: T): T {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Merge-preserving block write (PAN-3884).
+ *
+ * The settings API only models a whitelist of keys per block, so a wholesale
+ * `doc.setIn([block], payload)` silently drops any key it doesn't know about —
+ * `conversations.handoff_author_model` before it joined the model, or any
+ * hand-added future key. Write per-key instead: known fields still win,
+ * unknown keys (and their comments) survive untouched. Shallow on purpose —
+ * nested entries (e.g. a single provider's object) are replaced wholesale so
+ * a cleared override actually clears. Matches the existing per-key precedent
+ * for `tts` and `agents.rtk`/`agents.tldr` below.
+ */
+function setBlockMergePreserving(doc: ReturnType<typeof parseDocument>, path: string[], value: Record<string, unknown>): void {
+  const existing = doc.getIn(path);
+  if (existing !== undefined && !isRecord(existing)) {
+    doc.setIn(path, value);
+    return;
+  }
+  for (const [key, entry] of Object.entries(value)) {
+    doc.setIn([...path, key], entry);
+  }
 }
 
 function isWorkhorseRef(ref: string): boolean {
@@ -658,6 +683,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
     manual_compact_mode: config.conversations?.manualCompactMode,
     rich_compaction: config.conversations?.richCompaction,
     title_model: config.conversations?.titleModel,
+    handoff_author_model: config.conversations?.handoffAuthorModel,
     watch_dirs: config.conversations?.watchDirs,
     scan_max_parallel: config.conversations?.scanMaxParallel,
     embeddings: config.conversations?.embeddings,
@@ -796,10 +822,18 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     doc.contents = parseDocument('{}\n').contents;
   }
   const config = pruneUndefined(yamlConfig);
-  doc.setIn(['swarm'], config.swarm ?? { mode: 'off', maxSlots: 3, autoAdvance: true });
+  if (config.swarm !== undefined) {
+    setBlockMergePreserving(doc, ['swarm'], config.swarm as Record<string, unknown>);
+  } else {
+    setBlockMergePreserving(doc, ['swarm'], { mode: 'off', maxSlots: 3, autoAdvance: true });
+  }
   doc.setIn(['workhorses'], config.workhorses ?? {});
   doc.setIn(['roles'], config.roles ?? {});
-  doc.setIn(['models', 'providers'], config.models?.providers ?? {});
+  if (isRecord(config.models?.providers)) {
+    setBlockMergePreserving(doc, ['models', 'providers'], config.models.providers as Record<string, unknown>);
+  } else {
+    doc.setIn(['models', 'providers'], config.models?.providers ?? {});
+  }
   doc.deleteIn(['models', 'overrides']);
 
   if (config.models?.gemini_thinking_level !== undefined) {
@@ -834,6 +868,8 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
   for (const [key, value] of topLevelSections) {
     if (value === undefined) {
       doc.deleteIn([key]);
+    } else if (isRecord(value)) {
+      setBlockMergePreserving(doc, [key], value as Record<string, unknown>);
     } else {
       doc.setIn([key], value);
     }
@@ -854,7 +890,11 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
   }
 
   if (config.remote !== undefined) {
-    doc.setIn(['remote'], config.remote);
+    if (isRecord(config.remote)) {
+      setBlockMergePreserving(doc, ['remote'], config.remote as Record<string, unknown>);
+    } else {
+      doc.setIn(['remote'], config.remote);
+    }
   } else {
     doc.deleteIn(['remote']);
   }
