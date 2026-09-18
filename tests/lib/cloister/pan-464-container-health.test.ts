@@ -140,7 +140,9 @@ vi.mock('../../../src/lib/review-status.js', () => ({
 import {
   containerRestartBackoffMs,
   checkWorkspaceContainerHealth,
-  type DeaconState,
+  resetContainerRestartsForTests,
+  seedContainerRestartForTests,
+  getContainerRestartForTests,
 } from '../../../src/lib/cloister/deacon.js';
 import { sessionExists } from '../../../src/lib/tmux.js';
 
@@ -153,21 +155,6 @@ const STATE_FILE = join(TEST_OVERDECK_HOME, 'deacon', 'health-state.json');
 
 const CONTAINER = 'overdeck-feature-pan-464-frontend-1';
 const AGENT_ID = 'agent-pan-464';
-
-function writeState(state: Partial<DeaconState>): void {
-  mkdirSync(join(TEST_OVERDECK_HOME, 'deacon'), { recursive: true });
-  const full: DeaconState = {
-    specialists: {} as DeaconState['specialists'],
-    patrolCycle: 0,
-    recentDeaths: [],
-    ...state,
-  };
-  writeFileSync(STATE_FILE, JSON.stringify(full, null, 2), 'utf-8');
-}
-
-function readState(): DeaconState {
-  return JSON.parse(readFileSync(STATE_FILE, 'utf-8'));
-}
 
 /**
  * Configure mockExec to simulate exec callback behavior.
@@ -220,6 +207,9 @@ describe('checkWorkspaceContainerHealth', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // PAN-3894 (D6): the restart backoff map is process-local now, so each case
+    // starts from an empty map instead of a seeded state.json.
+    resetContainerRestartsForTests();
 
     // Back up existing deacon state
     if (existsSync(STATE_FILE)) {
@@ -263,22 +253,17 @@ describe('checkWorkspaceContainerHealth', () => {
   // -------------------------------------------------------------------------
 
   it('(b) restarts container and saves restart record on first crash', async () => {
-    writeState({ containerRestarts: {} });
-
     const actions = await checkWorkspaceContainerHealth();
 
     expect(actions).toHaveLength(1);
     expect(actions[0]).toMatch(/Auto-restarted.*pan-464-frontend.*attempt 1\/5/);
 
-    const state = readState();
-    expect(state.containerRestarts![CONTAINER]).toBeDefined();
-    expect(state.containerRestarts![CONTAINER].count).toBe(1);
-    expect(state.containerRestarts![CONTAINER].gaveUp).toBeUndefined();
+    expect(getContainerRestartForTests(CONTAINER)).toBeDefined();
+    expect(getContainerRestartForTests(CONTAINER)!.count).toBe(1);
+    expect(getContainerRestartForTests(CONTAINER)!.gaveUp).toBeUndefined();
   });
 
   it('(b) sends informational tmux message to agent on first restart', async () => {
-    writeState({ containerRestarts: {} });
-
     await checkWorkspaceContainerHealth();
 
     expect(mockSendKeysAsync).toHaveBeenCalledWith(
@@ -294,11 +279,7 @@ describe('checkWorkspaceContainerHealth', () => {
 
   it('(c) skips restart when within 60s backoff window', async () => {
     const recent = new Date(Date.now() - 30_000).toISOString(); // 30s ago, backoff=60s
-    writeState({
-      containerRestarts: {
-        [CONTAINER]: { count: 1, firstRestart: recent, lastRestart: recent },
-      },
-    });
+    seedContainerRestartForTests(CONTAINER, { count: 1, firstRestart: recent, lastRestart: recent });
 
     const actions = await checkWorkspaceContainerHealth();
 
@@ -310,11 +291,7 @@ describe('checkWorkspaceContainerHealth', () => {
 
   it('(c) allows restart after backoff expires (count=1, 90s elapsed)', async () => {
     const old = new Date(Date.now() - 90_000).toISOString(); // 90s ago, backoff=60s → ok
-    writeState({
-      containerRestarts: {
-        [CONTAINER]: { count: 1, firstRestart: old, lastRestart: old },
-      },
-    });
+    seedContainerRestartForTests(CONTAINER, { count: 1, firstRestart: old, lastRestart: old });
 
     const actions = await checkWorkspaceContainerHealth();
 
@@ -329,17 +306,12 @@ describe('checkWorkspaceContainerHealth', () => {
   it('(d) marks gaveUp and alerts agent after max restarts exceeded', async () => {
     const recent = new Date(Date.now() - 10 * 60_000).toISOString(); // within 30 min window
     const justNow = new Date(Date.now() - 1000).toISOString();
-    writeState({
-      containerRestarts: {
-        [CONTAINER]: { count: 5, firstRestart: recent, lastRestart: justNow },
-      },
-    });
+    seedContainerRestartForTests(CONTAINER, { count: 5, firstRestart: recent, lastRestart: justNow });
 
     const actions = await checkWorkspaceContainerHealth();
 
     expect(actions.some(a => a.includes('giving up'))).toBe(true);
-    const state = readState();
-    expect(state.containerRestarts![CONTAINER].gaveUp).toBe(true);
+    expect(getContainerRestartForTests(CONTAINER)!.gaveUp).toBe(true);
 
     expect(mockSendKeysAsync).toHaveBeenCalledWith(
       AGENT_ID,
@@ -350,11 +322,7 @@ describe('checkWorkspaceContainerHealth', () => {
 
   it('(d) silently skips on subsequent patrols after gaveUp=true', async () => {
     const recent = new Date(Date.now() - 5 * 60_000).toISOString();
-    writeState({
-      containerRestarts: {
-        [CONTAINER]: { count: 5, firstRestart: recent, lastRestart: recent, gaveUp: true },
-      },
-    });
+    seedContainerRestartForTests(CONTAINER, { count: 5, firstRestart: recent, lastRestart: recent, gaveUp: true });
 
     const actions = await checkWorkspaceContainerHealth();
 
@@ -368,20 +336,15 @@ describe('checkWorkspaceContainerHealth', () => {
 
   it('(e) resets burst counter when first restart was >30 min ago', async () => {
     const longAgo = new Date(Date.now() - 35 * 60_000).toISOString(); // > 30 min ago
-    writeState({
-      containerRestarts: {
-        [CONTAINER]: { count: 5, firstRestart: longAgo, lastRestart: longAgo, gaveUp: true },
-      },
-    });
+    seedContainerRestartForTests(CONTAINER, { count: 5, firstRestart: longAgo, lastRestart: longAgo, gaveUp: true });
 
     const actions = await checkWorkspaceContainerHealth();
 
     // Burst reset → fresh restart as attempt 1
     expect(actions).toHaveLength(1);
     expect(actions[0]).toMatch(/attempt 1\/5/);
-    const state = readState();
-    expect(state.containerRestarts![CONTAINER].count).toBe(1);
-    expect(state.containerRestarts![CONTAINER].gaveUp).toBeUndefined();
+    expect(getContainerRestartForTests(CONTAINER)!.count).toBe(1);
+    expect(getContainerRestartForTests(CONTAINER)!.gaveUp).toBeUndefined();
   });
 
   // -------------------------------------------------------------------------
@@ -389,8 +352,6 @@ describe('checkWorkspaceContainerHealth', () => {
   // -------------------------------------------------------------------------
 
   it('(f) skips restart when agent tmux session does not exist', async () => {
-    writeState({ containerRestarts: {} });
-
     setupExec({
       'docker ps -a': { stdout: `${CONTAINER}|Exited (1) 2 minutes ago\n` },
     });
@@ -407,8 +368,6 @@ describe('checkWorkspaceContainerHealth', () => {
   // -------------------------------------------------------------------------
 
   it('(h) ignores init containers entirely (one-shot, exit 0 is normal)', async () => {
-    writeState({ containerRestarts: {} });
-
     setupExec({
       'docker ps -a': { stdout: 'overdeck-feature-pan-596-init-1|Exited (0) 30 seconds ago\n' },
       'tmux has-session': { stdout: '' },
@@ -429,8 +388,6 @@ describe('checkWorkspaceContainerHealth', () => {
   // -------------------------------------------------------------------------
 
   it('(i) skips service containers that exited cleanly (exit 0)', async () => {
-    writeState({ containerRestarts: {} });
-
     setupExec({
       'docker ps -a': { stdout: `${CONTAINER}|Exited (0) 30 seconds ago\n` },
       'tmux has-session': { stdout: '' },
@@ -449,8 +406,6 @@ describe('checkWorkspaceContainerHealth', () => {
   // -------------------------------------------------------------------------
 
   it('(g) alerts agent when docker restart itself fails', async () => {
-    writeState({ containerRestarts: {} });
-
     setupExec({
       'docker ps -a': { stdout: `${CONTAINER}|Exited (1) 2 minutes ago\n` },
       'tmux has-session': { stdout: '' },
@@ -475,8 +430,6 @@ describe('checkWorkspaceContainerHealth', () => {
   // -------------------------------------------------------------------------
 
   it('(j) restarts a myn-feature- crashed container exactly like an overdeck-feature- one', async () => {
-    writeState({ containerRestarts: {} });
-
     setupExec({
       'docker ps -a': { stdout: 'myn-feature-pan-464-server-1|Exited (1) 2 minutes ago\n' },
       'tmux has-session': { stdout: '' },
@@ -488,13 +441,10 @@ describe('checkWorkspaceContainerHealth', () => {
 
     expect(actions).toHaveLength(1);
     expect(actions[0]).toMatch(/Auto-restarted.*pan-464-server.*attempt 1\/5/);
-    const state = readState();
-    expect(state.containerRestarts!['myn-feature-pan-464-server-1']).toBeDefined();
+    expect(getContainerRestartForTests('myn-feature-pan-464-server-1')).toBeDefined();
   });
 
   it('(j) skips a myn-feature- api container (service set unchanged) and overdeck-traefik (no feature token)', async () => {
-    writeState({ containerRestarts: {} });
-
     setupExec({
       'docker ps -a': {
         stdout: [
@@ -521,8 +471,6 @@ describe('checkWorkspaceContainerHealth', () => {
   // name with a strict word-digits issue token, matching the real crashed
   // container (PAN-464), not an earlier decoy segment (FOO-1).
   it('(k) attributes an ambiguous name to the final feature-<issue>-<service>-<index> segment, not an earlier decoy', async () => {
-    writeState({ containerRestarts: {} });
-
     setupExec({
       'docker ps -a': {
         stdout: 'tenant-feature-foo-1-server-feature-pan-464-server-1|Exited (1) 2 minutes ago\n',
@@ -536,8 +484,7 @@ describe('checkWorkspaceContainerHealth', () => {
 
     expect(actions).toHaveLength(1);
     expect(actions[0]).toMatch(/attempt 1\/5/);
-    const state = readState();
-    expect(state.containerRestarts!['tenant-feature-foo-1-server-feature-pan-464-server-1']).toBeDefined();
+    expect(getContainerRestartForTests('tenant-feature-foo-1-server-feature-pan-464-server-1')).toBeDefined();
     expect(mockSendKeysAsync).toHaveBeenCalledWith(
       'agent-pan-464',
       expect.anything(),
@@ -554,7 +501,6 @@ describe('checkWorkspaceContainerHealth', () => {
     { issue: 'f29698', service: 'server' },
     { issue: 'us12345', service: 'frontend' },
   ])('(l) restarts a crashed Rally $issue $service container and alerts its agent', async ({ issue, service }) => {
-    writeState({ containerRestarts: {} });
     const container = `rally-feature-${issue}-${service}-1`;
 
     setupExec({
@@ -568,7 +514,7 @@ describe('checkWorkspaceContainerHealth', () => {
 
     expect(actions).toHaveLength(1);
     expect(actions[0]).toContain(`Auto-restarted crashed container ${container}`);
-    expect(readState().containerRestarts![container]).toBeDefined();
+    expect(getContainerRestartForTests(container)).toBeDefined();
     expect(mockExec).toHaveBeenCalledWith(
       `docker restart ${container}`,
       expect.anything(),

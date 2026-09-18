@@ -259,6 +259,31 @@ export interface ContainerRestartRecord {
 }
 
 /**
+ * PAN-3894 (D6): process-local restart backoff. checkWorkspaceContainerHealth
+ * runs from the housekeeping scheduler, not runPatrol, so it can neither share
+ * runPatrol's in-memory DeaconState nor save its own copy without clobbering
+ * the tick's later saveState(). Losing the map across a dashboard restart just
+ * resets a container's attempt count: a restart loop gets at most
+ * CONTAINER_RESTART_MAX_COUNT more attempts per process lifetime.
+ */
+const containerRestarts = new Map<string, ContainerRestartRecord>();
+
+/** Test hook: clear the process-local restart backoff map. */
+export function resetContainerRestartsForTests(): void {
+  containerRestarts.clear();
+}
+
+/** Test hook: seed one container's restart record (replaces the old writeState seeding). */
+export function seedContainerRestartForTests(name: string, record: ContainerRestartRecord): void {
+  containerRestarts.set(name, record);
+}
+
+/** Test hook: read one container's restart record (replaces the old readState assertion). */
+export function getContainerRestartForTests(name: string): ContainerRestartRecord | undefined {
+  return containerRestarts.get(name);
+}
+
+/**
  * Complete health check state for all specialists
  */
 export interface DeaconState {
@@ -269,7 +294,6 @@ export interface DeaconState {
   recentDeaths: string[];        // ISO timestamps of recent deaths
   lastMassDeathAlert?: string;   // ISO 8601
   mergeStuckAttempts?: Record<string, number>;  // circuit-breaker attempt counts (PAN-344)
-  containerRestarts?: Record<string, ContainerRestartRecord>;  // PAN-464: restart backoff tracking
   mainDivergence?: ProjectMainDivergence[];
 }
 
@@ -2239,7 +2263,7 @@ async function killOrphanedWorkspaceProcesses(workspacePath: string): Promise<vo
  * Gives up after 5 restarts within 30 minutes to avoid restart loops.
  * Kills orphaned host processes before restarting to fix the inotify root cause.
  */
-export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): Promise<string[]> {
+export async function checkWorkspaceContainerHealth(): Promise<string[]> {
   const actions: string[] = [];
   try {
     // Find all workspace-related containers that are exited (crashed)
@@ -2249,10 +2273,6 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
     );
     const crashed = stdout.trim().split('\n').filter(Boolean);
     if (crashed.length === 0) return actions;
-
-    const state = sharedState ?? loadState();
-    if (!state.containerRestarts) state.containerRestarts = {};
-    let stateDirty = false;
 
     const now = Date.now();
 
@@ -2288,15 +2308,14 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
       }
 
       // PAN-464: Backoff / give-up logic
-      const record = state.containerRestarts[name];
+      const record = containerRestarts.get(name);
       if (record) {
         const windowStart = now - CONTAINER_RESTART_WINDOW_MS;
         const firstRestartMs = new Date(record.firstRestart).getTime();
 
         // Reset burst counter if the last restart was > 30 min ago (container ran stably for a while)
         if (firstRestartMs < windowStart) {
-          delete state.containerRestarts[name];
-          stateDirty = true;
+          containerRestarts.delete(name);
         } else {
           // Still within the burst window
           if (record.gaveUp) {
@@ -2306,7 +2325,6 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
           // Check max count BEFORE backoff — if we've hit the limit, give up regardless of timing
           if (record.count >= CONTAINER_RESTART_MAX_COUNT) {
             record.gaveUp = true;
-            stateDirty = true;
             const msg = `[deacon] Container ${name} exceeded max restarts (${CONTAINER_RESTART_MAX_COUNT}) — giving up`;
             console.warn(msg);
             actions.push(msg);
@@ -2347,14 +2365,14 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
       // Restart the container
       try {
         await execAsync(`docker restart ${name}`, { encoding: 'utf-8', timeout: 30000 });
-        const existing = state.containerRestarts[name];
-        state.containerRestarts[name] = {
+        const existing = containerRestarts.get(name);
+        const updated: ContainerRestartRecord = {
           count: (existing?.count ?? 0) + 1,
           firstRestart: existing?.firstRestart ?? new Date().toISOString(),
           lastRestart: new Date().toISOString(),
         };
-        stateDirty = true;
-        const count = state.containerRestarts[name].count;
+        containerRestarts.set(name, updated);
+        const count = updated.count;
         const msg = `[deacon] Auto-restarted crashed container ${name} (attempt ${count}/${CONTAINER_RESTART_MAX_COUNT})`;
         console.log(msg);
         actions.push(msg);
@@ -2382,10 +2400,6 @@ export async function checkWorkspaceContainerHealth(sharedState?: DeaconState): 
         }
       }
     }
-
-    // When called with sharedState, the caller is responsible for persisting.
-    // Saving here would race with runPatrol's later saveState() and clobber records.
-    if (stateDirty && !sharedState) saveState(state);
   } catch {
     // Docker not available or other error — skip silently
   }
@@ -2846,7 +2860,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   for (const a of reviewCleanupActions) addLog('action', a, state.patrolCycle);
 
   // PAN-464: Check workspace Docker container health and auto-restart crashed containers
-  const containerActions = await runBudgetedPatrol('checkWorkspaceContainerHealth', () => checkWorkspaceContainerHealth(state));
+  const containerActions = await runBudgetedPatrol('checkWorkspaceContainerHealth', () => checkWorkspaceContainerHealth());
   actions.push(...containerActions);
   for (const a of containerActions) addLog('action', a, state.patrolCycle);
 
