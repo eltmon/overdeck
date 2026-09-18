@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { request as httpRequest } from 'node:http';
 import { join, dirname } from 'path';
@@ -7,9 +8,11 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { markKimiContextDelivered, prepareKimiMessage, type PreparedKimiMessage } from '../runtimes/kimi-context-envelope.js';
 import type { AgentState } from '../agents.js';
+import type { PromptResult, PromptSender } from '../terminal-backends/types.js';
 import {
   normalizeAgentId,
   getAgentState,
+  getAgentStateSync,
   saveAgentState,
   getAgentDir,
   waitForPromptReady,
@@ -17,6 +20,9 @@ import {
 } from '../agents.js';
 import { getAgentRuntimeState } from './runtime-state.js';
 import { isPaneDead, sendKeys, sessionExists } from '../tmux.js';
+import { checkPrompt, senderFromEnv, tokensFromLaunchMetadata } from '../terminal-backends/prompt-guard.js';
+import { selectTerminalBackend } from '../terminal-backends/select.js';
+import { isPromptDropped, isPromptRefused, isUnsupported } from '../terminal-backends/types.js';
 import { completeKeyedSubmit, sendKeysDedup } from '../tmux-dedup.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync } from '../bridge-token.js';
 import { PTY_TOKEN_HEADER, readPtyToken } from '../pty-token.js';
@@ -30,9 +36,43 @@ import {
   type TranscriptUserRecordSnapshot,
 } from '../transcript-landing.js';
 
+/**
+ * `terminal.backend` from config.yaml, for the D10 selection. Read lazily: the
+ * delivery door must not pull the config loader into its module graph.
+ */
+async function loadTerminalBackendConfig(): Promise<{ terminal?: { backend?: 'herdr' | 'tmux' } }> {
+  try {
+    const { loadConfigSync } = await import('../config-yaml.js');
+    return loadConfigSync() as { terminal?: { backend?: 'herdr' | 'tmux' } };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Which backend this host delivers through. Resolved once per process: the
+ * answer is a property of the host (binary plus socket, or an explicit
+ * `terminal.backend`), not of the message, and a probe per delivery would put
+ * filesystem work on every message's hot path.
+ */
+let backendSelection: Promise<'herdr' | 'tmux'> | null = null;
+
+function deliveryBackendName(): Promise<'herdr' | 'tmux'> {
+  backendSelection ??= loadTerminalBackendConfig()
+    .then((config) => selectTerminalBackend(config))
+    .then((selection) => selection.backend)
+    .catch(() => 'tmux' as const);
+  return backendSelection;
+}
+
+/** Tests reset the memoized host selection. */
+export function resetDeliveryBackendSelection(): void {
+  backendSelection = null;
+}
+
 export type DeliveryResult = {
   ok: boolean;
-  path: 'app-server' | 'acp' | 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex';
+  path: 'app-server' | 'acp' | 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex' | 'herdr';
   failure?: string;
   /** True when the delivery was suppressed by the keyed dedup record — the
    * side effect already happened on an earlier call with the same key. */
@@ -61,6 +101,19 @@ export interface DeliverAgentMessageOptions {
    * caller's acknowledgment would otherwise replay the wake.
    */
   dedupKey?: string;
+  /**
+   * Idempotency key for the prompt guard (PAN-3917 FR-17). A repeat of the
+   * same id for the same target inside the guard's window is dropped and the
+   * reason is reported. Callers that do not pass one get a fresh id per call,
+   * so nothing is dropped by accident — a retry of a FAILED delivery must use
+   * a new id, because the guard records an id when it admits it.
+   */
+  messageId?: string;
+  /**
+   * Who is sending. Defaults to this process's `OVERDECK_AGENT_ID` (an
+   * operator shell with none is treated as an operator conversation).
+   */
+  sender?: PromptSender;
 }
 
 /**
@@ -291,6 +344,7 @@ export async function deliverAgentMessage(
   const normalizedId = normalizeAgentId(agentId);
   const dedupKey = opts.dedupKey;
 
+
   let channelsEnabled = false;
   let resolvedMethod = deliveryMethod;
   let state: AgentState | null = null;
@@ -310,6 +364,46 @@ export async function deliverAgentMessage(
     resolvedMethod ??= resilientDeliveryMethod(state?.deliveryMethod) ?? 'auto';
   } catch {
     resolvedMethod ??= 'auto';
+  }
+
+  // PAN-3917 FR-17: every prompt is role-checked and idempotent, on both
+  // backends. On Herdr the whole delivery is `backend.prompt`; on tmux only the
+  // guard is new — the PTY supervisor cascade below is unchanged. The target's
+  // tokens come from the agent state already read above, and the Herdr adapter
+  // is imported only on a Herdr host (it must not be a module-load dependency
+  // of the delivery door).
+  const messageId = opts.messageId ?? randomUUID();
+  const targetTokens = tokensFromLaunchMetadata(state);
+  // The SENDER's own tokens, looked up from ITS agent id — never the target's.
+  const sender = opts.sender
+    ?? senderFromEnv(process.env, (senderId) => tokensFromLaunchMetadata(getAgentStateSync(senderId)));
+  const herdrAgent = (await deliveryBackendName()) === 'herdr'
+    ? await (await import('../terminal-backends/herdr.js')).findHerdrAgent(normalizedId)
+    : null;
+  if (herdrAgent) {
+    const { herdrBackend } = await import('../terminal-backends/herdr.js');
+    // A backend failure is a delivery result, not a throw: callers branch on
+    // `.ok`, and throwing here would skip the mail-queue path every other
+    // failing tier gets.
+    const result = await Effect.runPromise(
+      herdrBackend.prompt({ paneId: herdrAgent.paneId }, message, { messageId, sender }),
+    ).catch((error: unknown): PromptResult => ({
+      unsupported: true,
+      reason: error instanceof Error ? error.message : String(error),
+    }));
+    if (isUnsupported(result)) return { ok: false, path: 'herdr', failure: result.reason };
+    if (isPromptRefused(result)) return { ok: false, path: 'herdr', failure: `refused: ${result.reason}` };
+    if (isPromptDropped(result)) {
+      return { ok: true, path: 'herdr', deduplicated: true, failure: `dropped: ${result.reason}` };
+    }
+    return { ok: true, path: 'herdr' };
+  }
+  // Not a Herdr agent (or a tmux host): the cascade below is unchanged, with
+  // the same guard in front of it.
+  const guard = checkPrompt({ targetId: normalizedId, targetTokens, sender, messageId });
+  if ('refused' in guard) return { ok: false, path: 'tmux', failure: `refused: ${guard.reason}` };
+  if ('dropped' in guard) {
+    return { ok: true, path: 'tmux', deduplicated: true, failure: `dropped: ${guard.reason}` };
   }
 
   const isAcpTarget = state?.harness === 'acp' || state?.harness === 'opencode';
@@ -744,9 +838,17 @@ export async function deliverInitialPromptWithRetry(
     }
   });
   const waitForReady = options.waitForReady ?? waitForPromptReady;
-  const sessionExistsForAgent = options.sessionExists ?? (async (id: string) => (
-    Effect.runPromise(sessionExists(normalizeAgentId(id)))
-  ));
+  // "Is the agent's terminal still there?" is a backend question: a live tmux
+  // session, or a live Herdr agent of that name. Without the Herdr half, a
+  // kickoff on a Herdr host reports SESSION_EXITED_BEFORE_KICKOFF and the
+  // spawn path kills a perfectly healthy pane (PAN-3917).
+  const sessionExistsForAgent = options.sessionExists ?? (async (id: string) => {
+    const normalized = normalizeAgentId(id);
+    if (await Effect.runPromise(sessionExists(normalized)).catch(() => false)) return true;
+    if ((await deliveryBackendName()) !== 'herdr') return false;
+    const { findHerdrAgent } = await import('../terminal-backends/herdr.js');
+    return (await findHerdrAgent(normalized)) !== null;
+  });
 
   function promptReadyTimeoutSeconds(): number {
     const raw = process.env.OVERDECK_PROMPT_READY_TIMEOUT_SECONDS;
