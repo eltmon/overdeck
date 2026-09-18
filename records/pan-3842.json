@@ -194,7 +194,7 @@
     "recordedAt": "2026-09-18T07:31:28.942Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-18T10:03:46.273Z",
+  "updated": "2026-09-18T10:04:09.365Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "passed",
@@ -204,9 +204,9 @@
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "mergeStep": "post-merge-cleanup",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T10:03:46.169Z",
+    "updatedAt": "2026-09-18T10:04:08.075Z",
     "reviewNotes": "Tier fitness lands on all three surfaces and never blocks; 30/30 files reviewed across four dimensions, no blockers, 2 advisory notes (by_kind difficulty, deprecated-id badge)",
     "testNotes": "At HEAD 097e315e (workspace feature/pan-3842): npm run typecheck passed (tsc + hooks/evals/dashboard/frontend/acp guards, 0 new errors). npm run lint passed (eslint + all 20 project guards: effect, permissions, state-writes/paths, overdeck-boundaries, pipeline-membership, liveness, workspace-doors, park-exits, agent-dir-removal, skills, slash-commands, prompts, prompt-trailer, file-size, source-introspection, no-coderabbit-merge-gate, circular, ratchet-audit, quarantine-audit, effect-diagnostics — no new findings). npm test passed: 1564 test files / 14671 tests passed, 51 skipped (root vitest suite), plus frontend suite 6 files / 112 tests passed (issueActions parity, fr7 conversation pending-input, TieredExecutionSection, tiered-crews) — exit code 0. Matches the pipeline's own verification-latest.json (ranAt 2026-09-18T08:03:44Z, outcome passed) run at the same commit.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3851",
@@ -349,7 +349,7 @@
       },
       "costAtCloseOut": {
         "usd": 25.241918,
-        "pricingAsOf": "2026-09-18T10:03:46.215Z"
+        "pricingAsOf": "2026-09-18T10:04:08.082Z"
       }
     },
     "merges": [
