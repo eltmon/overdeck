@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-09-18T06:43:33.655Z",
-  "updated": "2026-09-18T08:23:46.977Z",
+  "updated": "2026-09-18T08:23:54.038Z",
   "pipeline": {
     "issueId": "PAN-3894",
     "reviewStatus": "pending",
@@ -65,8 +65,16 @@
     }
   ],
   "tasks": {
-    "sequence": 17,
-    "claims": {},
+    "sequence": 18,
+    "claims": {
+      "w5-doctor-cadence-table": {
+        "writerId": "agent-pan-3894",
+        "agentId": "agent-pan-3894",
+        "pid": 1238537,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-18T08:23:54.038Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3894",
@@ -224,6 +232,7 @@
     "w4-wire-tick-and-scheduler.ac2": "completed",
     "w4-wire-tick-and-scheduler.ac3": "completed",
     "w4-wire-tick-and-scheduler.ac4": "completed",
-    "w4-wire-tick-and-scheduler.ac5": "completed"
+    "w4-wire-tick-and-scheduler.ac5": "completed",
+    "w5-doctor-cadence-table": "running"
   }
 }
