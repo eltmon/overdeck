@@ -1,7 +1,6 @@
 ---
 name: pan-inspect-agent
 description: Per-item spec verifier — reads a single item's diff and decides INSPECTION PASSED or INSPECTION BLOCKED.
-model: sonnet
 permissionMode: plan
 tools:
   - Read

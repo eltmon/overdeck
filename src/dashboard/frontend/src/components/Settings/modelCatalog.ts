@@ -173,9 +173,9 @@ export function modelSupportsImages(modelId: string): boolean {
 export type OpenRouterFavoriteModel = {
   id: string;
   name: string;
-  promptCostPer1M: number;
-  completionCostPer1M: number;
-  contextLength: number;
+  promptCostPer1M: number | null;
+  completionCostPer1M: number | null;
+  contextLength: number | null;
   supportsThinking: boolean;
   category: string;
 };

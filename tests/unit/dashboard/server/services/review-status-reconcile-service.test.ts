@@ -20,6 +20,9 @@ const {
 vi.mock('../../../../../src/lib/review-status.js', () => ({
   loadReviewStatuses: mockLoadReviewStatuses,
   getReviewStatusSync: mockGetReviewStatusSync,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../../../src/dashboard/server/event-store.js', () => ({

@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
+  pruneVerificationRunArtifacts,
   readVerificationArtifact,
   verificationArtifactPath,
   writeVerificationArtifact,
@@ -84,5 +85,95 @@ describe('verification artifact', () => {
     mkdirSync(join(workspace, '.overdeck'), { recursive: true });
     writeFileSync(verificationArtifactPath(workspace), 'not json');
     expect(readVerificationArtifact(workspace)).toBeNull();
+  });
+});
+
+describe('immutable per-run verification artifacts (PAN-3847)', () => {
+  let workspace: string;
+
+  beforeEach(() => {
+    workspace = mkdtempSync(join(tmpdir(), 'verif-run-artifact-'));
+  });
+
+  afterEach(() => {
+    rmSync(workspace, { recursive: true, force: true });
+  });
+
+  it('two terminal runs produce two per-run files; verification-latest.json equals the second', () => {
+    const first = writeVerificationArtifact(workspace, 'PAN-6', [gate({ name: 'test' })], {
+      ranAt: '2026-09-17T01:00:00.000Z',
+      head8: 'aaaa1111',
+    });
+    const second = writeVerificationArtifact(workspace, 'PAN-6', [
+      gate({ name: 'lint', passed: false, output: 'the full failure output', error: 'exit 1' }),
+    ], {
+      ranAt: '2026-09-17T02:00:00.000Z',
+      head8: 'bbbb2222',
+    });
+
+    const runsDir = join(workspace, '.overdeck', 'verification');
+    const files = readdirSync(runsDir);
+    expect(files).toHaveLength(2);
+    expect(files).toContain('2026-09-17T01-00-00-000Z-aaaa1111.json');
+    expect(files).toContain('2026-09-17T02-00-00-000Z-bbbb2222.json');
+
+    expect(first.path).toBe(join(runsDir, '2026-09-17T01-00-00-000Z-aaaa1111.json'));
+    expect(second.path).toBe(join(runsDir, '2026-09-17T02-00-00-000Z-bbbb2222.json'));
+
+    // The failed gate's full output is in the immutable per-run file…
+    const perRun = JSON.parse(readFileSync(second.path!, 'utf-8'));
+    expect(perRun.gates.find((g: { name: string }) => g.name === 'lint').output).toBe('the full failure output');
+
+    // …and verification-latest.json is a copy of the second run.
+    const latest = JSON.parse(readFileSync(verificationArtifactPath(workspace), 'utf-8'));
+    expect(latest.ranAt).toBe('2026-09-17T02:00:00.000Z');
+    expect(latest.outcome).toBe('failed');
+    expect(readVerificationArtifact(workspace)?.failedCheck).toBe('lint');
+  });
+
+  it('progress (running) writes never create per-run files', () => {
+    const artifact = writeVerificationArtifact(workspace, 'PAN-7', [gate({ name: 'test' })], {
+      currentGate: 'lint',
+    });
+
+    expect(artifact.path).toBeUndefined();
+    expect(existsSync(join(workspace, '.overdeck', 'verification'))).toBe(false);
+    expect(readVerificationArtifact(workspace)?.outcome).toBe('running');
+  });
+
+  it('pruneVerificationRunArtifacts removes files older than 30 days only', () => {
+    const runsDir = join(workspace, '.overdeck', 'verification');
+    mkdirSync(runsDir, { recursive: true });
+    const oldFile = join(runsDir, '2026-08-01T00-00-00-000Z-deadbeef.json');
+    const newFile = join(runsDir, '2026-09-16T00-00-00-000Z-cafe0000.json');
+    writeFileSync(oldFile, '{}');
+    writeFileSync(newFile, '{}');
+    const old = Date.parse('2026-08-01T00:00:00.000Z');
+    const now = Date.parse('2026-09-17T00:00:00.000Z');
+    utimesSync(oldFile, old / 1000, old / 1000);
+
+    expect(pruneVerificationRunArtifacts(workspace, now)).toBe(1);
+    expect(existsSync(oldFile)).toBe(false);
+    expect(existsSync(newFile)).toBe(true);
+    // Missing directory is a no-op.
+    expect(pruneVerificationRunArtifacts(join(workspace, 'nonexistent-ws'), now)).toBe(0);
+  });
+
+  it('a terminal write without head8 still gets an immutable per-run file (PR #3872 finding 5)', () => {
+    const artifact = writeVerificationArtifact(workspace, 'PAN-8', [
+      gate({ name: 'test', passed: false, output: 'failure evidence', error: 'exit 1' }),
+    ], { ranAt: '2026-09-17T03:00:00.000Z' });
+
+    expect(artifact.path).toBe(
+      join(workspace, '.overdeck', 'verification', '2026-09-17T03-00-00-000Z-unknown-head.json'),
+    );
+    expect(existsSync(artifact.path!)).toBe(true);
+    // The latest copy matches, and the failed gate's output survives in both.
+    const perRun = JSON.parse(readFileSync(artifact.path!, 'utf-8'));
+    const latest = JSON.parse(readFileSync(verificationArtifactPath(workspace), 'utf-8'));
+    for (const doc of [perRun, latest]) {
+      expect(doc.gates[0].output).toBe('failure evidence');
+      expect(doc.outcome).toBe('failed');
+    }
   });
 });

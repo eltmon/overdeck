@@ -24,7 +24,7 @@ function tieredConfig(overrides: Partial<ValidatedTieredExecutionConfig> = {}): 
     byKind: {},
     feed: { callouts: 'off', exclude: [], exclude_subjects: [], max_diff_bytes: null },
     supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'all' },
-    escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0, flounder_budget_minutes: {} },
+    escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0 },
     compaction_reroute: 'off',
     replay_threshold: 0.5,
     ...overrides,

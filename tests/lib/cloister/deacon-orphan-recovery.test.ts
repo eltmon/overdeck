@@ -19,8 +19,10 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Effect } from 'effect';
-import { existsSync, mkdirSync, writeFileSync, unlinkSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync, unlinkSync, rmSync } from 'fs';
+import { execSync } from 'child_process';
 import { join } from 'path';
+import { tmpdir } from 'os';
 import { getOverdeckHome } from '../../../src/lib/paths.js';
 
 // ---------------------------------------------------------------------------
@@ -37,6 +39,13 @@ vi.mock('../../../src/lib/review-status.js', async (importOriginal) => {
     ...actual,
     loadReviewStatuses: (...args: unknown[]) => mockLoadReviewStatuses(...args as []),
     getReviewStatusSync: (...args: unknown[]) => mockGetReviewStatus(...args),
+    // PAN-3903: the pipeline read door's bulk read. Spreading `actual` would
+    // leave the real SQLite/journal reader in place and resolve projects behind
+    // the fixtures; answer from the same mocked map the door's cache read uses.
+    getReviewStatusesSync: (issueIds: string[]) => {
+      const rows = mockLoadReviewStatuses() as Record<string, unknown>;
+      return Object.fromEntries(issueIds.map((id) => [id, rows?.[id]]).filter(([, v]) => Boolean(v)));
+    },
     setReviewStatus: (...args: unknown[]) => mockSetReviewStatus(...args),
   setReviewStatusSync: (...args: unknown[]) => mockSetReviewStatus(...args),
   };
@@ -120,6 +129,9 @@ vi.mock('../../../src/lib/projects.js', () => ({
   resolveProjectFromIssueSync: (...args: unknown[]) => mockResolveProjectFromIssue(...args),
   findProjectByPath: vi.fn().mockReturnValue(null),
   findProjectByPathSync: vi.fn().mockReturnValue(null),
+  // Single-root fallback for head snapshots — the real config is polyrepo and
+  // would degrade every fixture snapshot to undefined (PAN-3254 guard).
+  getProjectSync: vi.fn().mockReturnValue(null),
 }));
 
 // ---------------------------------------------------------------------------
@@ -620,16 +632,38 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
 
     mockGetAgentState.mockReturnValue(null);
 
-    const actions = await checkOrphanedReviewStatuses();
+    // PAN-3847: the verdict door refuses anchorless restores — the orphan
+    // recovery snapshots the workspace head, so the fixture needs a real one.
+    const projectPath = mkdtempSync(join(tmpdir(), 'pan-369-orphan-project-'));
+    const orphanWorkspace = join(projectPath, 'workspaces', `feature-${ISSUE_ID.toLowerCase()}`);
+    mkdirSync(orphanWorkspace, { recursive: true });
+    execSync('git init && git commit --allow-empty -m "head"', {
+      cwd: orphanWorkspace,
+      stdio: 'pipe',
+      env: {
+        ...process.env,
+        GIT_AUTHOR_NAME: 'test',
+        GIT_AUTHOR_EMAIL: 'test@test.com',
+        GIT_COMMITTER_NAME: 'test',
+        GIT_COMMITTER_EMAIL: 'test@test.com',
+      },
+    });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck', projectPath });
 
-    expect(actions).toHaveLength(1);
-    expect(actions[0]).toMatch(/Restored orphaned review snapshot/);
+    try {
+      const actions = await checkOrphanedReviewStatuses();
 
-    // DB-backed path: setReviewStatus must be called with the restored state
-    expect(mockSetReviewStatus).toHaveBeenCalledWith(
-      ISSUE_ID,
-      expect.objectContaining({ reviewStatus: 'passed', testStatus: 'passed' }),
-    );
+      expect(actions).toHaveLength(1);
+      expect(actions[0]).toMatch(/Restored orphaned review snapshot/);
+
+      // DB-backed path: setReviewStatus must be called with the restored state
+      expect(mockSetReviewStatus).toHaveBeenCalledWith(
+        ISSUE_ID,
+        expect.objectContaining({ reviewStatus: 'passed', testStatus: 'passed' }),
+      );
+    } finally {
+      rmSync(projectPath, { recursive: true, force: true });
+    }
   });
 
   // -------------------------------------------------------------------------

@@ -39,6 +39,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../review-status.js', () => ({
   loadReviewStatuses: mocks.loadReviewStatuses,
   getReviewStatusSync: mocks.getReviewStatusSync,
+  getReviewStatusesSync: (issueIds: string[]) => Object.fromEntries(
+    issueIds.map((id) => [id, mocks.getReviewStatusSync(id)]).filter(([, v]) => Boolean(v)),
+  ),
   setReviewStatusSync: mocks.setReviewStatusSync,
 }));
 
@@ -180,8 +183,8 @@ describe('PAN-2341 ceiling self-heal regression', () => {
     expect(countAdvancing()).toBe(1);
 
     const reconcileDeps: AdvancingSelfHealDeps = {
-      loadReviewStatuses: () => ({ ...reviewRows }),
-      getReviewStatusSync: vi.fn((issueId: string) => {
+      listPipelineStatuses: () => ({ ...reviewRows }),
+      getPipelineStatus: vi.fn((issueId: string) => {
         reviewRows[issueId] = status({
           issueId,
           reviewStatus: 'passed',

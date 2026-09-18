@@ -46,6 +46,8 @@ export interface ReviewStatus extends StrikeLandingStatus, InspectionStatusField
   history?: StatusHistoryEntry[];
   blockerReasons?: BlockerReason[];
   reviewedAtCommit?: string;
+  /** PAN-3847: ISO timestamp when a passed review's anchor stopped matching HEAD; blocks readyForMerge until re-review. */
+  reviewStaleSince?: string;
   lastVerifiedCommit?: string;
   mergeStep?: string;
   stuck?: boolean;

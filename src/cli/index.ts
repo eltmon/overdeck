@@ -511,6 +511,7 @@ program
   .description('Alias for workspace destroy: remove the issue workspace worktree and branch')
   .option('--force', 'Force removal even with uncommitted changes')
   .option('--project <path>', 'Explicit project path (overrides registry)')
+  .option('--shape <shape>', 'Limit to one shape: base|strike|slot|all (default: all)')
   .action(destroyWorkspaceCommand);
 
 registerCloseCommand(program);

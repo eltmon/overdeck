@@ -51,6 +51,9 @@ vi.mock('../../../src/lib/review-status.js', () => ({
   setReviewStatusSync: (...args: unknown[]) => mockSetReviewStatus(...args),
   getReviewStatus: vi.fn(),
   getReviewStatusSync: vi.fn(),
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../src/lib/cloister/merge-verification.js', () => ({

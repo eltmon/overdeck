@@ -50,8 +50,10 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
   sessionExistsSync: vi.fn(() => true),
 }));
 
-vi.mock('../../../../src/lib/cloister/agent-idle.js', () => ({
-  isAgentIdleForNudge: vi.fn(() => true),
+vi.mock('../../../../src/lib/agents/liveness.js', () => ({
+  isAlive: vi.fn(async () => ({ alive: true, paneAlive: true })),
+  isAliveSync: vi.fn(() => ({ alive: true, paneAlive: true })),
+  isIdle: vi.fn(() => true),
 }));
 
 vi.mock('../../../../src/lib/cloister/issue-closed.js', () => ({
@@ -60,6 +62,9 @@ vi.mock('../../../../src/lib/cloister/issue-closed.js', () => ({
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: mocks.getReviewStatusSync,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../../src/lib/xbrief/io.js', () => ({
@@ -100,7 +105,6 @@ vi.mock('../../../../src/lib/cloister/boot-reconciliation.js', () => ({
 vi.mock('../../../../src/lib/cloister/boot-reconciliation-predicates.js', () => ({ bootReconciliationSkipReason: vi.fn() }));
 vi.mock('../../../../src/lib/overdeck/control-settings.js', () => ({ getBootReconciliationState: vi.fn(() => ({})) }));
 vi.mock('../../../../src/lib/transcript-landing.js', () => ({ captureTranscriptUserRecordSnapshot: vi.fn() }));
-vi.mock('../../../../src/lib/agents/placeholder-reconciliation.js', () => ({ reconcileLiveWorkSpawnPlaceholder: vi.fn() }));
 vi.mock('../../../../src/lib/cloister/confirmed-session-query.js', () => ({
   consumeConfirmedSessionDetail: vi.fn(),
   queryConfirmedSession: vi.fn(),

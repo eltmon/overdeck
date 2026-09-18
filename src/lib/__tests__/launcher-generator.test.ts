@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -649,6 +649,7 @@ describe('generateLauncherScript', () => {
       baseCommand: 'claude --print --dangerously-skip-permissions --permission-mode bypassPermissions --model gpt-5.5',
       sessionId: 'sess-rev',
       reviewSignal: {
+        agentId: 'agent-pan-1-review-security',
         synthesisAgentId: 'agent-pan-1-review',
         subRole: 'security',
         outputPath: '/agents/agent-pan-1-review-security/review-security.md',
@@ -673,6 +674,17 @@ describe('generateLauncherScript', () => {
     expect(script).toContain('elif [ -s \'/agents/agent-pan-1-review-security/review-security.md\' ]; then');
     expect(script).toContain('pan tell \'agent-pan-1-review\' "REVIEWER_READY security /agents/agent-pan-1-review-security/review-security.md" || true');
     expect(script).toContain('pan tell \'agent-pan-1-review\' "REVIEWER_FAILED security reviewer exited (code $CLAUDE_EXIT) without writing report" || true');
+    // PAN-3848 (W26, FR-21): the launcher writes the reviewer's stopped state on
+    // exit — after the signal `fi`, before the signal-marker touch. PAN-3848
+    // (F5): the write is retried, never swallowed with `|| true`.
+    const fiIndex = script.indexOf('pan tell \'agent-pan-1-review\' "REVIEWER_FAILED');
+    const exitLineIndex = script.indexOf('pan admin agents exited \'agent-pan-1-review-security\' --code "$CLAUDE_EXIT"');
+    const touchIndex = script.indexOf("touch '/agents/agent-pan-1-review-security/reviewer-signaled'");
+    expect(exitLineIndex).toBeGreaterThan(-1);
+    expect(exitLineIndex).toBeGreaterThan(fiIndex);
+    expect(exitLineIndex).toBeLessThan(touchIndex);
+    expect(script).toContain('for PAN_EXIT_ATTEMPT in 1 2 3; do');
+    expect(script).not.toContain('pan admin agents exited \'agent-pan-1-review-security\' --code "$CLAUDE_EXIT" || true');
     expect(script).toContain("touch '/agents/agent-pan-1-review-security/reviewer-signaled'");
     expect(script).toContain("rm -f '/agents/agent-pan-1-review-security/reviewer-launcher.pid'");
   });
@@ -1122,6 +1134,7 @@ describe('generateLauncherScript', () => {
       useSupervisor: true,
       supervisorScriptPath: '/opt/pty-supervisor.js',
       reviewSignal: {
+        agentId: 'agent-pan-1-review-security',
         synthesisAgentId: 'agent-pan-1-review',
         subRole: 'security',
         outputPath: '/tmp/review.md',
@@ -1132,6 +1145,105 @@ describe('generateLauncherScript', () => {
     });
     expect(reviewScript).toContain('timeout 1800 claude --print');
     expect(reviewScript).not.toContain('pty-supervisor.js');
+  });
+
+  it('PAN-3848 (W26, FR-21): a reviewer exit makes the launcher report `pan admin agents exited` — no patrol needed', () => {
+    // Fixture: a stub `pan` on PATH records its argv, and the reviewer command
+    // exits 7. Running the generated launcher must emit the exit report —
+    // the transition writes its own state. The verb's state write itself is
+    // covered by tests/unit/cli/admin-agents-exited.test.ts.
+    const binDir = join(tempHome, 'bin');
+    mkdirSync(binDir, { recursive: true });
+    const panLog = join(tempHome, 'pan-calls.log');
+    writeFileSync(join(binDir, 'pan'), `#!/bin/sh\necho "$@" >> '${panLog}'\nexit 0\n`);
+    chmodSync(join(binDir, 'pan'), 0o755);
+    writeFileSync(join(binDir, 'fake-claude'), '#!/bin/sh\nexit 7\n');
+    chmodSync(join(binDir, 'fake-claude'), 0o755);
+
+    const launcherPath = join(tempHome, 'reviewer-launcher.sh');
+    const markerPath = join(tempHome, 'reviewer-signaled');
+    writeFileSync(launcherPath, generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'review',
+      workingDir: tempHome,
+      changeDir: false,
+      trapHup: true,
+      baseCommand: 'fake-claude',
+      reviewSignal: {
+        agentId: 'agent-pan-1-review-security',
+        synthesisAgentId: 'agent-pan-1-review',
+        subRole: 'security',
+        outputPath: join(tempHome, 'review-security.md'),
+        signalMarkerPath: markerPath,
+        launcherPidPath: join(tempHome, 'reviewer-launcher.pid'),
+        timeoutSeconds: 60,
+      },
+    }));
+
+    const result = spawnSync('bash', [launcherPath], {
+      encoding: 'utf-8',
+      env: { ...process.env, PATH: `${binDir}:${process.env.PATH ?? ''}` },
+    });
+
+    expect(result.status).toBe(0);
+    const calls = readFileSync(panLog, 'utf8');
+    // No report file → REVIEWER_FAILED branch, then the exit report with the
+    // reviewer's own agent id and the real exit code.
+    expect(calls).toContain('admin agents exited agent-pan-1-review-security --code 7');
+    expect(existsSync(markerPath)).toBe(true);
+  });
+
+  it('PAN-3848 (F5): the launcher retries a failed reviewer-exit write before giving up', () => {
+    // Fixture: the stub `pan` fails the first `admin agents exited` call
+    // (transient state-store failure), then succeeds. The launcher must
+    // retry the exit transition — not swallow the first failure — and still
+    // touch the signal marker.
+    const binDir = join(tempHome, 'bin-retry');
+    mkdirSync(binDir, { recursive: true });
+    const panLog = join(tempHome, 'pan-calls-retry.log');
+    const attemptCounter = join(tempHome, 'exited-attempts');
+    writeFileSync(join(binDir, 'pan'),
+      `#!/bin/sh\n`
+      + `echo "$@" >> '${panLog}'\n`
+      + `case "$*" in\n`
+      + `  *"admin agents exited"*) n=$(cat '${attemptCounter}' 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > '${attemptCounter}'; [ "$n" -lt 2 ] && exit 1;;\n`
+      + `esac\n`
+      + `exit 0\n`);
+    chmodSync(join(binDir, 'pan'), 0o755);
+    writeFileSync(join(binDir, 'fake-claude'), '#!/bin/sh\nexit 7\n');
+    chmodSync(join(binDir, 'fake-claude'), 0o755);
+
+    const launcherPath = join(tempHome, 'reviewer-launcher-retry.sh');
+    const markerPath = join(tempHome, 'reviewer-signaled-retry');
+    writeFileSync(launcherPath, generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'review',
+      workingDir: tempHome,
+      changeDir: false,
+      trapHup: true,
+      baseCommand: 'fake-claude',
+      reviewSignal: {
+        agentId: 'agent-pan-1-review-security',
+        synthesisAgentId: 'agent-pan-1-review',
+        subRole: 'security',
+        outputPath: join(tempHome, 'review-security.md'),
+        signalMarkerPath: markerPath,
+        launcherPidPath: join(tempHome, 'reviewer-launcher.pid'),
+        timeoutSeconds: 60,
+      },
+    }));
+
+    const result = spawnSync('bash', [launcherPath], {
+      encoding: 'utf-8',
+      env: { ...process.env, PATH: `${binDir}:${process.env.PATH ?? ''}` },
+    });
+
+    expect(result.status).toBe(0);
+    // Two attempts: the first failure retried, the second succeeded.
+    expect(readFileSync(attemptCounter, 'utf8').trim()).toBe('2');
+    expect(readFileSync(panLog, 'utf8').split('\n')
+      .filter((line) => line.includes('admin agents exited'))).toHaveLength(2);
+    expect(existsSync(markerPath)).toBe(true);
   });
 });
 

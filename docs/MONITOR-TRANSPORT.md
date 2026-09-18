@@ -1,12 +1,8 @@
 # Monitor Transport (PAN-3015)
 
-Pull-based message delivery for Claude Code sessions. Instead of typing a
-message into the agent's TUI composer (PTY supervisor paste or tmux
-`paste-buffer`), the sender writes a durable mail file and a `pan monitor`
-background task running *inside* the agent's session prints it to stdout.
-Claude Code surfaces background-command output to the model at the next turn
-boundary — and wakes an idle session — so the message reaches the model with
-no keystrokes at all.
+Manual, opt-in transport. `messageAgent` does not use it (PAN-3846).
+Operators may run `pan inbox <id>` to read mail an agent was sent while
+gated.
 
 The pattern is borrowed from Traycer's open-source `traycer monitor`
 (github.com/traycerai/traycer, `clients/traycer-cli/src/commands/monitor.ts`),
@@ -31,8 +27,6 @@ feedback stranded "in a queue nothing drains."
 | `pan monitor [id]` | `src/cli/commands/monitor.ts` | Long-running background task in the agent session. Drains mail to stdout blocks, maintains presence. stdout = messages only; diagnostics = stderr. |
 | `pan inbox [id] [--limit n]` | `src/cli/commands/inbox.ts` | Unary full-body re-read (monitor blocks truncate at 4000 chars). Moves nothing. |
 | Shared library | `src/lib/agents/monitor-transport.ts` | Presence protocol, mail-file format, drain/claim logic, block rendering. |
-| Monitor tier | `src/lib/agents/messaging.ts` (`messageAgent`) | For `claude-code` targets with a live monitor: write mail, done. Stale presence falls through to the normal cascade. |
-| Role instruction | `roles/work.md`, `roles/strike.md` | Tells Claude agents to start `pan monitor` in the background at session start. |
 
 ## Presence protocol
 
@@ -46,10 +40,11 @@ sender uses the keystroke cascade as before.
 
 ## Mail flow
 
-1. `messageAgent` (mid-session tells: `pan tell`, dashboard, Cloister feedback)
-   sees a live monitor and writes `mail/<ts>.md` with a provenance header:
-   `# Message` / `source: <caller>` / `date: <iso>` / body. Legacy headerless
-   files still parse.
+1. Mail files arrive only from manual, off-cascade paths (PAN-3846): the
+   gated branches of `messageAgent` (paused / suspended / stopped — those
+   return `delivered: false`), or an operator writing one by hand. Each file
+   carries a provenance header: `# Message` / `source: <caller>` /
+   `date: <iso>` / body. Legacy headerless files still parse.
 2. The monitor claims each plain `.md` file by renaming it into `mail/read/`
    (claim-by-rename makes concurrent drainers safe), then prints:
 
@@ -70,10 +65,9 @@ plain `.md`.
 
 ## Boundaries
 
-- **Mid-session only.** Kickoff and resume delivery keep the injection paths
+- **Mid-session only.** Kickoff and resume delivery use the injection paths
   (`deliverAgentMessage` / `deliverInitialPromptWithRetry`) — no monitor
-  exists before the session's first turn. The tier lives in `messageAgent`,
-  deliberately not in `deliverAgentMessage`.
+  exists before the session's first turn.
 - **Claude Code only.** Codex (app-server), ACP, and Pi (RPC FIFO) already
   have structured transports and are untouched.
 - **Fallback preserved.** Every keystroke transport remains in place for

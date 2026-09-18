@@ -76,7 +76,8 @@ export const FALLBACK_GROUPS: ModelGroup[] = [
   },
 ];
 
-export function formatCost(costPer1M: number, provider?: string): string {
+export function formatCost(costPer1M: number | null, provider?: string): string {
+  if (costPer1M === null) return 'Pricing unavailable';
   if (costPer1M === 0) return provider === 'dashscope' ? 'See pricing' : 'FREE';
   if (costPer1M < 1) return `$${costPer1M.toFixed(2)}/1M`;
   return `$${Math.round(costPer1M)}/1M`;
@@ -119,7 +120,7 @@ async function loadAvailableModelsState(): Promise<AvailableModelsState> {
           Record<string, Array<{ id: string; name: string; costPer1MTokens: number }>>
         >,
         fetch('/api/settings/openrouter/models').then((r) => r.json()) as Promise<{
-          models: Array<{ id: string; name: string; promptCostPer1M: number }>;
+          models: Array<{ id: string; name: string; promptCostPer1M: number | null }>;
           favorites: string[];
         }>,
         fetch('/api/settings').then((r) => r.json()) as Promise<{
@@ -173,7 +174,7 @@ async function loadAvailableModelsState(): Promise<AvailableModelsState> {
             label: m.name,
             provider: 'openrouter',
             costDisplay: formatCost(m.promptCostPer1M),
-            costPer1MTokens: m.promptCostPer1M,
+            costPer1MTokens: m.promptCostPer1M ?? undefined,
           })),
         });
       }

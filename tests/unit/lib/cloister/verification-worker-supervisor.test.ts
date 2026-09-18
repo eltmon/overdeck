@@ -187,6 +187,48 @@ describe('verification worker supervisor', () => {
     expect(readVerificationWorkerState('PAN-2597')!.pid).toBe(firstPid);
   });
 
+  it('coalesces simultaneous dispatch while the code HEAD is being captured', async () => {
+    useFixture(100);
+
+    const first = runSupervisedVerification('PAN-3814', process.cwd(), { isRemote: false }, 'test');
+    const second = runSupervisedVerification('PAN-3814', process.cwd(), { isRemote: false }, 'test');
+
+    expect(second).toBe(first);
+    await expect(first).resolves.toEqual({ outcome: 'passed' });
+  });
+
+  it('replaces a live merge worker whose recorded code HEAD is stale', async () => {
+    const home = useFixture(100);
+    const issueId = 'PAN-3814';
+    const dir = join(home, 'verification-workers', issueId.toLowerCase());
+    mkdirSync(dir, { recursive: true });
+    const stale = spawn('sleep', ['60'], { detached: true });
+    stale.unref();
+    const stalePid = stale.pid!;
+    writeFileSync(join(dir, 'state.json'), JSON.stringify({
+      runId: 'stale-head',
+      issueId,
+      workspacePath: process.cwd(),
+      pid: stalePid,
+      startedAt: new Date().toISOString(),
+      resultPath: join(dir, 'result-stale-head.json'),
+      phase: 'queued',
+      admittedAt: null,
+      headAnchor: '0'.repeat(40),
+    }));
+
+    await expect(runSupervisedVerification(
+      issueId,
+      process.cwd(),
+      { isRemote: false },
+      'test',
+      { syncTargetBranch: false },
+    )).resolves.toEqual({ outcome: 'passed' });
+
+    await vi.waitFor(() => expect(() => process.kill(stalePid, 0)).toThrow());
+    expect(readVerificationWorkerState(issueId)!.pid).not.toBe(stalePid);
+  });
+
   it('keeps verification alive after the process that dispatched it exits', async () => {
     useFixture(750);
     const parent = spawn(
@@ -256,6 +298,7 @@ describe('PAN-3674 follow-up: expired workers', () => {
     // The supervisor registers the worker before its first polling delay. Age
     // the active gate past its budget, then advance the polling and kill timers.
     const stateFile = join(home, 'verification-workers', 'pan-3675', 'state.json');
+    await vi.waitFor(() => expect(readVerificationWorkerState('PAN-3675')).not.toBeNull());
     const pid = readVerificationWorkerState('PAN-3675')!.pid;
     expect(pid).toBeGreaterThan(0);
     const seeded = JSON.parse(readFileSync(stateFile, 'utf8'));
@@ -268,6 +311,6 @@ describe('PAN-3674 follow-up: expired workers', () => {
     expect(outcome.outcome).toBe('error');
     expect(outcome.outcome === 'error' ? outcome.message : '').toContain('exceeded');
     // Recovery cannot start while the expired worker remains live.
-    expect(() => process.kill(pid, 0)).toThrow();
+    await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow());
   });
 });

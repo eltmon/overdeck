@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../../../src/lib/pan-dir/auto-commit.js', () => ({
   queueAutoCommit: vi.fn(),
   flushAutoCommits: vi.fn(() => Effect.succeed({ committed: false, reason: 'no pending' })),
+  commitAutoCommits: vi.fn(() => Effect.succeed({ committed: false, reason: 'no pending' })),
+  pushAutoCommits: vi.fn(() => Effect.succeed(null)),
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
@@ -35,6 +37,9 @@ vi.mock('../../../../src/lib/projects.js', () => ({
 vi.mock('../../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: mocks.getReviewStatusSync,
   setReviewStatusSync: mocks.setReviewStatusSync,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../../src/lib/cloister/review-agent.js', () => ({

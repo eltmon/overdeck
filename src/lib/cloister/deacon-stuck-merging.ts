@@ -4,17 +4,14 @@ import { Effect } from 'effect';
 import { getAgentStateSync } from '../agents.js';
 import { getMergeSetSync, type MergeSet } from '../merge-set.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import {
-  loadReviewStatuses,
-  reviewGatesPassedSync,
-  setReviewStatusSync,
-  type ReviewStatus,
-} from '../review-status.js';
+import { reviewGatesPassedSync, setReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import {
   observeForgeMergeState,
   type ForgeMergeObservationResult,
 } from './merge-completeness.js';
+import { recordWouldFire } from './patrol-would-fire.js';
+import { listPipelineStatuses } from '../overdeck/pipeline-view.js';
 
 const execFileAsync = promisify(execFile);
 export const STUCK_MERGING_MS = 30 * 60 * 1000;
@@ -87,11 +84,14 @@ export interface StuckMergingDeps {
   setReviewStatus: typeof setReviewStatusSync;
   enqueuePostMerge(issueId: string, projectPath: string, branch: string): Promise<string | null | undefined>;
   warn(message: string): void;
+  /** PAN-3848 (W30): shadow mode — detect and count would-fires, never write. */
+  shadow?: boolean;
 }
 
 export async function reconcileStuckMergingStatesWithDeps(deps: StuckMergingDeps): Promise<string[]> {
   const actions: string[] = [];
   const now = deps.now();
+  const shadow = deps.shadow === true;
 
   for (const [issueId, status] of Object.entries(deps.loadStatuses())) {
     if (!isStuckMergingState(status, now)) continue;
@@ -131,6 +131,11 @@ export async function reconcileStuckMergingStatesWithDeps(deps: StuckMergingDeps
 
     if (complete && positiveMergedEvidence) {
       if (deps.hasPlanningAgent(issueId) || specStatus === 'draft' || specStatus === 'proposed') continue;
+      recordWouldFire('reconcileStuckMergingStates', issueId);
+      if (shadow) {
+        actions.push(`Would reconcile stuck ${status.mergeStatus} state for ${issueId} — forge confirms the merge (shadow)`);
+        continue;
+      }
       deps.setReviewStatus(issueId, {
         mergeStatus: 'merged', mergeStep: 'post-merge-cleanup', readyForMerge: false,
       });
@@ -141,6 +146,11 @@ export async function reconcileStuckMergingStatesWithDeps(deps: StuckMergingDeps
     }
 
     const readyForMerge = deps.reviewGatesPassed({ ...status, mergeStatus: 'pending' });
+    recordWouldFire('reconcileStuckMergingStates', issueId);
+    if (shadow) {
+      actions.push(`Would reset stuck ${status.mergeStatus} state for ${issueId} to pending (shadow)`);
+      continue;
+    }
     deps.setReviewStatus(issueId, {
       mergeStatus: 'pending',
       mergeNotes: `Reset stuck ${status.mergeStatus} state after 30 minutes because the forge has no completed merge evidence`,
@@ -152,10 +162,10 @@ export async function reconcileStuckMergingStatesWithDeps(deps: StuckMergingDeps
   return actions;
 }
 
-export async function reconcileStuckMergingStates(): Promise<string[]> {
+export async function reconcileStuckMergingStates(options: { shadow?: boolean } = {}): Promise<string[]> {
   return reconcileStuckMergingStatesWithDeps({
     now: () => Date.now(),
-    loadStatuses: loadReviewStatuses,
+    loadStatuses: listPipelineStatuses,
     resolveProject: resolveProjectFromIssueSync,
     getMergeSet: getMergeSetSync,
     resolveGitHubIssue: resolveGitHubIssueSync,
@@ -170,5 +180,6 @@ export async function reconcileStuckMergingStates(): Promise<string[]> {
       return enqueuePostMergeLifecycle(issueId, projectPath, branch);
     },
     warn: (message) => console.warn(message),
+    shadow: options.shadow,
   });
 }

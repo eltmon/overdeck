@@ -78,7 +78,8 @@ async function reopenWorkspaceStatePromise(
     reviewNotes: `Reopened${options.reason ? `: ${options.reason}` : ''}`,
     testNotes: undefined,
     verificationNotes: undefined,
-    verificationCycleCount: 0,
+    // PAN-3847 (FR-17): the verification cycle counter survives reopen — it is
+    // per issue and resets only via `pan review reset`.
     mergeNotes: undefined,
     readyForMerge: false,
     prUrl: existing?.prUrl,
@@ -101,6 +102,7 @@ async function reopenWorkspaceStatePromise(
     // Start a new evidence cycle while retaining status history and prior
     // strike-landing attempts.
     reviewedAtCommit: undefined,
+    reviewStaleSince: undefined,
     lastVerifiedCommit: undefined,
     strikeReadyHead: undefined,
     strikeReadyAt: undefined,

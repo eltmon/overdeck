@@ -330,6 +330,77 @@ describe('ConversationLifecycleService — pollConversations', () => {
     expect(mockMarkConversationEnded).not.toHaveBeenCalled();
   });
 
+  describe('does NOT mark ended while a fork/handoff pipeline is in flight (PAN-3860)', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('skips a handoff whose external authoring is still running past the spawn grace period (session not yet spawned)', async () => {
+      const createdAt = new Date().toISOString();
+      const row = {
+        name: 'handoff-authoring', tmuxSession: 'conv-handoff-authoring', status: 'active',
+        cwd: '/tmp/work', claudeSessionId: null, createdAt, forkStatus: 'handoff',
+      };
+      mockListConversations.mockReturnValue([row]);
+      mockGetConversationByName.mockReturnValue(row);
+      // The tmux session doesn't exist yet — the handoff author hasn't finished,
+      // so runForkPipeline hasn't reached the spawn step.
+      mockListSessionNames.mockReturnValue(Effect.succeed([]));
+
+      // Advance well past SPAWN_GRACE_PERIOD_MS: a >1M-char transcript's
+      // pre-compaction + authoring routinely takes minutes (PAN-3860 incident).
+      await vi.advanceTimersByTimeAsync(31_000);
+
+      const { pollConversations } = await import('../conversation-lifecycle.js');
+      await pollConversations();
+
+      expect(mockMarkConversationEnded).not.toHaveBeenCalled();
+    });
+
+    it('skips a fork pipeline whose spawn step has started but the harness has not taken the foreground yet', async () => {
+      const createdAt = new Date().toISOString();
+      const row = {
+        name: 'handoff-spawning', tmuxSession: 'conv-handoff-spawning', status: 'active',
+        cwd: '/tmp/work', claudeSessionId: null, createdAt, forkStatus: 'spawning',
+      };
+      mockListConversations.mockReturnValue([row]);
+      mockGetConversationByName.mockReturnValue(row);
+      // tmux session exists (spawnConversationSession ran) but the harness
+      // process hasn't taken the foreground yet — looks like a keep-alive corpse.
+      mockListSessionNames.mockReturnValue(Effect.succeed(['conv-handoff-spawning']));
+      mockIsHarnessProcessAlive.mockResolvedValue(false);
+
+      await vi.advanceTimersByTimeAsync(31_000);
+
+      const { pollConversations } = await import('../conversation-lifecycle.js');
+      await pollConversations();
+
+      expect(mockMarkConversationEnded).not.toHaveBeenCalled();
+    });
+
+    it('still marks ended on the same age/session shape once forkStatus has cleared (control: proves the skip is gated on forkStatus, not age)', async () => {
+      const createdAt = new Date().toISOString();
+      const row = {
+        name: 'handoff-done', tmuxSession: 'conv-handoff-done', status: 'active',
+        cwd: '/tmp/work', claudeSessionId: null, createdAt, forkStatus: null,
+      };
+      mockListConversations.mockReturnValue([row]);
+      mockGetConversationByName.mockReturnValue(row);
+      mockListSessionNames.mockReturnValue(Effect.succeed([]));
+
+      await vi.advanceTimersByTimeAsync(31_000);
+
+      const { pollConversations } = await import('../conversation-lifecycle.js');
+      await pollConversations();
+
+      expect(mockMarkConversationEnded).toHaveBeenCalledWith('handoff-done');
+    });
+  });
+
   it('does NOT mark ended when a re-read shows a fresh spawn/attach signal (resume raced the poll)', async () => {
     // Poll-start snapshot: old conversation, harness looks dead (launcher shell
     // still foreground mid-respawn). By mark time, the resume has bumped

@@ -14,6 +14,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../review-status.js', () => ({
   getReviewStatusSync: mocks.getReviewStatusSync,
   setReviewStatusSync: mocks.setReviewStatusSync,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../event-store-provider.js', () => ({
@@ -73,11 +76,10 @@ describe('recordReviewVerdict', () => {
     mocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/project' });
   });
 
-  describe('no-evidence path', () => {
-    it('Given a VerdictInput with no evidenceHead, recordReviewVerdict calls setReviewStatusSync once with the verdict fields and returns { landed: true, classification: "no-evidence" }', async () => {
+  describe('no-evidence refusal', () => {
+    it('Given a VerdictInput with no evidenceHead, recordReviewVerdict refuses: { landed: false, reason: "no-evidence-head" }, zero row writes, one warn activity entry', async () => {
       const status = reviewStatus();
       mocks.getReviewStatusSync.mockReturnValue(status);
-      mocks.setReviewStatusSync.mockReturnValue(status);
 
       const input: VerdictInput = {
         verdict: 'passed',
@@ -87,25 +89,25 @@ describe('recordReviewVerdict', () => {
 
       const result = await recordReviewVerdict('PAN-3512', input);
 
-      expect(result).toEqual({ landed: true, classification: 'no-evidence' });
-      expect(mocks.setReviewStatusSync).toHaveBeenCalledOnce();
-      expect(mocks.setReviewStatusSync).toHaveBeenCalledWith(
-        'PAN-3512',
+      expect(result).toEqual({ landed: false, reason: 'no-evidence-head' });
+      expect(mocks.setReviewStatusSync).not.toHaveBeenCalled();
+      expect(mocks.emitActivityEntrySync).toHaveBeenCalledWith(
         expect.objectContaining({
-          reviewStatus: 'passed',
-          reviewNotes: 'looks good',
+          level: 'warn',
+          message: expect.stringContaining('no evidence head'),
         }),
-        status,
       );
     });
 
-    it('Given no existing row, the door creates it and lands the verdict', async () => {
+    it('Given no existing row and an evidenceHead, the door creates the row with the verdict and its anchor in one write', async () => {
+      const evidenceHead = 'b'.repeat(40);
       mocks.getReviewStatusSync.mockReturnValue(undefined);
       mocks.setReviewStatusSync.mockReturnValue(reviewStatus({ reviewStatus: 'blocked' }));
 
       const result = await recordReviewVerdict('PAN-3512', {
         verdict: 'blocked',
         notes: 'first verdict',
+        evidenceHead,
         writer: 'coordinator',
       });
 
@@ -113,10 +115,12 @@ describe('recordReviewVerdict', () => {
       expect(mocks.setReviewStatusSync).toHaveBeenCalledWith('PAN-3512', {
         reviewStatus: 'blocked',
         reviewNotes: 'first verdict',
+        reviewedAtCommit: evidenceHead,
       });
     });
 
-    it('Given no lastVerifiedCommit on the row, the door takes the no-evidence path and returns { landed: true, classification: "no-evidence" }', async () => {
+    it('Given no lastVerifiedCommit on the row, the door lands verdict and anchor together with classification "no-verification-anchor"', async () => {
+      const evidenceHead = 'b'.repeat(40);
       const status = reviewStatus({ lastVerifiedCommit: undefined });
       mocks.getReviewStatusSync.mockReturnValue(status);
       mocks.setReviewStatusSync.mockReturnValue(status);
@@ -124,13 +128,20 @@ describe('recordReviewVerdict', () => {
       const input: VerdictInput = {
         verdict: 'blocked',
         writer: 'fallback',
-        evidenceHead: 'b'.repeat(40),
+        evidenceHead,
       };
 
       const result = await recordReviewVerdict('PAN-3512', input);
 
-      expect(result).toEqual({ landed: true, classification: 'no-evidence' });
-      expect(mocks.setReviewStatusSync).toHaveBeenCalledOnce();
+      expect(result).toEqual({ landed: true, classification: 'no-verification-anchor' });
+      expect(mocks.setReviewStatusSync).toHaveBeenCalledWith(
+        'PAN-3512',
+        expect.objectContaining({
+          reviewStatus: 'blocked',
+          reviewedAtCommit: evidenceHead,
+        }),
+        status,
+      );
     });
 
     it('Given a fallback blocked verdict with evidence and no verified row head, the door preserves its reviewed anchor through extra fields', async () => {

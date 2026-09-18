@@ -176,7 +176,8 @@ export function saveStoredHarness(harness: Harness): void {
   try { localStorage.setItem(HARNESS_STORAGE_KEY, harness); } catch { /* ignore */ }
 }
 
-function formatCost(costPer1M: number, provider?: string): string {
+function formatCost(costPer1M: number | null, provider?: string): string {
+  if (costPer1M === null) return 'Pricing unavailable';
   if (costPer1M === 0) return provider === 'dashscope' ? 'See pricing' : 'FREE';
   if (costPer1M < 1) return `$${costPer1M.toFixed(2)}/1M`;
   return `$${Math.round(costPer1M)}/1M`;
@@ -250,7 +251,7 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
             }>>
           >,
           fetch('/api/settings/openrouter/models').then((r) => r.json()) as Promise<{
-            models: Array<{ id: string; name: string; promptCostPer1M: number; supportsThinking: boolean }>;
+            models: Array<{ id: string; name: string; promptCostPer1M: number | null; supportsThinking: boolean }>;
             favorites: string[];
           }>,
           fetch('/api/settings').then((r) => r.json()) as Promise<{
@@ -315,7 +316,7 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
               label: m.name,
               provider: 'openrouter',
               costDisplay: formatCost(m.promptCostPer1M),
-              costPer1MTokens: m.promptCostPer1M,
+              costPer1MTokens: m.promptCostPer1M ?? undefined,
               effortLevels: m.supportsThinking ? ['low', 'medium', 'high'] : [],
             })),
           });

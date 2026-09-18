@@ -39,7 +39,6 @@ tiered_execution:
     enabled: false
     retries_at_tier: 0
     max_promotions: 0
-    flounder_budget_minutes: {}
   compaction_reroute: off
   replay_threshold: 0.5
 ```
@@ -56,14 +55,13 @@ tiered_execution:
 - `feed.max_diff_bytes` is a positive integer cap or `null`; default `null` keeps raw `git show` output uncapped.
 - `escalation.enabled` defaults to `false`; when disabled, supervisor verdicts and verification failures do not promote tiers.
 - `escalation.retries_at_tier` and `escalation.max_promotions` are non-negative integers; both default to `0`.
-- `escalation.flounder_budget_minutes` maps difficulties to positive minute budgets; default `{}` leaves the floundering trigger inactive.
 - `compaction_reroute` must be `off` or `on`; default `off` keeps replay respawning the same registered slot with the same captured behavior.
 - `supervisor.owns_inspection` defaults to `true` when a supervisor is configured (PAN-2397 W4): a standing supervisor IS the inspection surface. Set it to `false` explicitly to keep routing `pan inspect` to the ephemeral inspect/inspect-deep subrole agents.
 - `by_kind` is optional and defaults to `{}`; kind routing is never hardcoded.
 
 ## Settings UI
 
-The dashboard Settings -> Tiered Execution panel presents the tier table as crews, so operators edit the routing decision rather than YAML tier names. Its five-column board maps every difficulty to exactly one crew, making missing and duplicate difficulty coverage impossible. The crew roster labels each crew by its staffing (for example, `Kimi K2.7 Code` or `4-model mix`), shows blended cost, and expands into single-model or weighted-distribution editors. Harness selectors default to the provider route and warn when an explicit override creates a known routing hazard.
+The dashboard Settings -> Tiered Execution panel presents the tier table as crews, so operators edit the routing decision rather than YAML tier names. Its five-column board maps every difficulty to exactly one crew, making missing and duplicate difficulty coverage impossible. The crew roster labels each crew by its staffing (for example, `Kimi K2.7 Code` or `4-model mix`), shows blended cost, and expands into single-model or weighted-distribution editors. Harness selectors default to the provider route and warn when an explicit override creates a known routing hazard, and each crew row and the supervisor block show a fitness badge when the staffed model's capability class does not match the difficulties it owns (see Tier fitness warnings).
 
 The roster's **+ Add crew** control opens an inline difficulty prompt, so creating a crew and assigning its first difficulty remain one gesture. From an empty roster, the first crew takes every difficulty immediately. Each collapsed row exposes **× remove**; when the crew owns difficulties, the hand-off prompt chooses another crew to inherit them and emits the reassignment and removal in one settings write. The board's **+ new crew…** shortcut remains available and uses the same create-and-assign path.
 
@@ -74,6 +72,46 @@ On load, tiers with identical staffing merge into one crew and own the union of 
 Every crew must retain at least one difficulty because runtime tiers reject an empty `difficulties` list. Removal performs the required reassignment through the hand-off prompt before deleting the crew. A crew with kind overrides remains blocked with `Move or remove these kind overrides before removing this crew.`; the last crew remains blocked with `This is the only crew, and every difficulty needs one. Add another crew first — or turn tiered execution off.` Moving the final difficulty of a kind-routed crew is also blocked until those overrides are explicitly moved or removed, so an unrelated routing edit cannot silently delete kind-routed work.
 
 The issue view's **Policies** panel exposes the per-issue override in its Work group as a **Standing crew** segmented control: `Default · <effective> (<source>)`, `On`, or `Off`. Explicit overrides appear in the collapsed strip as an overrides-only `crew · on|off` chip and write to the per-issue permanent record through `PATCH /api/workspaces/:issueId/tiered-execution`; the xBRIEF spec remains immutable under PAN-1124, so the override is stored outside the spec and resolved at runtime. When a per-issue work-model override is active, it suspends crew routing for the entire issue, and the panel and collapsed chip state that consequence.
+
+## Tier fitness warnings
+
+Every catalog model carries a **capability class** — `frontier`, `workhorse`, or `small` — assigned in `src/lib/model-capability-class.ts` (`MODEL_CAPABILITY_CLASSES`). That table is the only place model ids are classified.
+
+`capabilityClassOf` rates **the model that will actually run**. It reads the literal id first and follows `MODEL_DEPRECATIONS` only for an id with no row of its own. Most retired ids have no row and so inherit their replacement's class, but a retired id that is still launchable and genuinely weaker than its replacement carries its own row — `glm-4.7` (`workhorse`) and `glm-4.7-flash` (`small`) both do, and both retire to the `frontier` `glm-5.1`. An explicit `--model` override is launched verbatim, so hopping first would have rated a model that is not executing: before this was corrected, `--model glm-4.7-flash` passed an expert plan in silence (PAN-3842, PRD revision R1).
+
+The fitness checker (`src/lib/agents/tier-fitness.ts`) compares each tier's staffed class against the band its owned difficulties need:
+
+| Difficulty | Minimum class | Maximum class |
+| --- | --- | --- |
+| `trivial` | small | workhorse |
+| `simple` | small | workhorse |
+| `medium` | workhorse | frontier |
+| `complex` | workhorse | frontier |
+| `expert` | frontier | frontier |
+
+It emits five warning codes:
+
+- `underpowered` — the staffed class is below the band minimum for at least one owned difficulty. When the failing difficulties need different classes, the message states each requirement separately (`expert needs at least frontier-class; medium, complex need at least workhorse-class`) rather than naming the strongest for all of them (PAN-3842, PRD revision R2).
+- `overpowered` — the staffed class is above the band maximum for every owned difficulty (a cost warning).
+- `unknown-model` — the model id is not in the model catalog.
+- `provider-not-enabled` — the model's provider is disabled in Settings > Providers. Scoped to `CONFIGURABLE_PROVIDERS` (`src/lib/configurable-providers.ts`), the providers that have an enable control. Providers reachable only through environment variables — xAI, Groq, Cerebras, Mistral, QuantumLlama — have no `models.providers` key and no Settings card, so warning about them would name a remedy that does not exist. They still get their band check; only this one warning is suppressed.
+- `supervisor-underpowered` — the supervisor is a small-class model; it reviews every tier's commits and should be workhorse-class or better.
+
+The same warnings surface in three places:
+
+1. **`pan doctor`** prints a `Tiered execution` row: `error` when the `tiered_execution` block is invalid (the PAN-2395 degraded-load reason), `warn` listing every fitness warning, `ok` otherwise. With tiered execution disabled, the row checks the implicit `roles.work` tier against every difficulty.
+2. **Settings > Tiered Execution** renders a `⚠` badge on each crew row and on the supervisor block, computed from the unsaved draft so the badge appears and disappears as you edit.
+3. **Spawn time** logs one `[spawn] tier fitness:` line per warning. Slot spawns check the slot item's difficulty; single-work spawns check every pending plan item, naming the items that exceed the staffed class.
+
+The single-work fitness sweep is deliberately **wider than the staffing candidate set**. Staffing picks one item — the plan's hardest item that is not completed, cancelled, running, or blocked (PAN-3857). Fitness drops only completed and cancelled items, because the same agent works the running item it already claimed and works a blocked item once it unblocks. So a plan whose only ready work is `simple` staffs a cheap model and still warns about the `complex` item waiting behind a blocker. Both surfaces read the **effective** difficulty: a recorded tier promotion (PAN-3858) raises the difficulty staffing routes on and the difficulty fitness judges against, so the warning never lags an escalation.
+
+Every surface checks the **final selected model** — the one the agent is launched with. On the slot path the tier's model replaces the parent default, so the check runs after that reassignment (`resolveSlotSpawnFitness` in `src/lib/agents/spawn-prep.ts` owns the ordering so a call site cannot get it wrong). An explicit `--model` override outranks tier routing for both selection and the warning: the operator's model is what spawns and what gets judged. `src/lib/__tests__/agents-spawn-tier-fitness.test.ts` drives the real `spawnAgent` and `spawnRun` entry points to hold this.
+
+The single-work rule exists because of PAN-3836 (2026-09-16): a 14-item feature whose first xBRIEF item was rated `simple` staffed the whole run on a small-class model — the first item selects the tier, but the agent works every item. Six review cycles followed. The spawn log now calls that out before the issue pays for it.
+
+Fitness warnings never block a save or a spawn; a cheap model may be a deliberate choice. An underpowered explicit override warns and then spawns normally.
+
+The Settings badges and the server share one model catalog: the frontend's `MODELS_BY_PROVIDER` has no Groq, Cerebras or Mistral groups, so `tierFitnessWarnings` unions in the class-table keys and both surfaces agree on which ids exist. Without that, Settings called server-known models such as `mistral-large-latest` and `llama-3.3-70b-versatile` "not in the model catalog".
 
 ## Resolution Chain
 
@@ -106,6 +144,12 @@ tiered_execution:
 ```
 
 This follows Devin Fusion's failure-mode lesson: when judgment is the deliverable, delegating it to a cheaper sidekick can backfire. It remains a recommendation because model choice must come from explicit operator configuration, never a hardcoded fallback.
+
+## Single-Agent Staffing
+
+With swarm mode off, one work agent executes the whole plan. That agent is staffed for the plan's hardest remaining item — the maximum difficulty over every item not completed, cancelled, running, or blocked, with `by_kind` applied per item before the maximum, exactly as the resolution chain applies it (a `design` item counts as the difficulty of the tier its kind names). Keying on the first dispatchable item instead misrouted every plan whose hard items came later (PAN-3857).
+
+The per-issue work-model override (`record.workModel`) is written only by an explicit operator choice — `pan start --model`, a model picked in the dashboard spawn or restart-fresh flows, or the Policies panel. A resolved role default is never persisted as an override; when no override exists, single-agent staffing resolves through the tier table above. A stored override still wins through the `issue-override` tier and suspends crew routing for the issue.
 
 ## Standing Warm Tiers
 
@@ -145,7 +189,7 @@ Escalation is disabled by default. When `escalation.enabled: true`, deterministi
 
 `trivial -> simple -> medium -> complex -> expert`
 
-Triggers are supervisor `BLOCKED` verdicts for the task's commit, verification failures attributed to the task, and floundering when a configured per-difficulty time budget is exceeded. `retries_at_tier` controls how many attempts stay on the current tier before promotion, and `max_promotions` caps promotions per task. At `expert`, or after the promotion cap is reached, the result is block-and-surface for operator attention.
+Triggers are supervisor `BLOCKED` verdicts for the task's commit and verification failures (attributed to the plan's hardest item, since verification covers the whole submitted diff). `retries_at_tier` controls how many attempts stay on the current tier before promotion, and `max_promotions` caps promotions per task. At `expert`, or after the promotion cap is reached, the result is block-and-surface for operator attention.
 
 Example with `retries_at_tier: 1` and `max_promotions: 2`: a `simple` task gets one retry at `simple`; the next qualifying trigger promotes it to `medium`; another retry/promotion cycle can move it to `complex`; a further trigger blocks because the promotion cap is spent. Promotions are recorded as effective difficulty in workspace `.pan/continue.json` `tierOverrides`, not by mutating the xBRIEF spec.
 

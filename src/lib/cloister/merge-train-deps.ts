@@ -11,7 +11,7 @@
 import { join } from 'path';
 import { promisify } from 'util';
 import { exec } from 'child_process';
-import { getAllReviewStatusesFromDb } from '../overdeck/review-status-sync.js';
+import { listPipelineStatuses } from '../overdeck/pipeline-view.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { spawnRun } from '../agents.js';
 import type { ReconcileDeps, RebaseStatus } from './merge-train-reconciler.js';
@@ -28,7 +28,7 @@ export function buildRealReconcileDeps(): ReconcileDeps {
   return {
     getReadySiblings: (mergedIssueId) => {
       const merged = mergedIssueId.toUpperCase();
-      return Object.values(getAllReviewStatusesFromDb())
+      return Object.values(listPipelineStatuses())
         .filter(
           (rs) =>
             rs.readyForMerge === true &&

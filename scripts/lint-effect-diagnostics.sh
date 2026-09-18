@@ -22,7 +22,7 @@ elif [[ $# -gt 0 ]]; then
   exit 2
 fi
 
-BASELINE_FILE="scripts/effect-diagnostics-baseline.txt"
+BASELINE_FILE="${EFFECT_DIAG_BASELINE_FILE:-scripts/effect-diagnostics-baseline.txt}"
 # A finding must end with this marker. Do not classify diagnostics by severity or code.
 MARKER_REGEX='    effect\([A-Za-z]+\)$'
 TYPE_DIAGNOSTIC_REGEX='^[^(]+\([0-9]+,[0-9]+\): (error|warning|message) TS[0-9]+: '
@@ -62,31 +62,37 @@ done
 "$ELS_BIN" patch
 
 all_output=""
-for lane in "${LANES[@]}"; do
-  label=${lane%%:*}
-  tsconfig=${lane#*:}
-  if output=$("$TSC_BIN" --noEmit -p "$tsconfig" 2>&1); then
-    tsc_status=0
-  else
-    tsc_status=$?
-  fi
+if [[ -n "${EFFECT_DIAG_FIXTURE_OUTPUT:-}" ]]; then
+  # Test hook: skip the tsc lanes and read findings from a fixture file
+  # (tests/unit/scripts/lint-effect-diagnostics.test.ts).
+  all_output=$(cat "$EFFECT_DIAG_FIXTURE_OUTPUT")$'\n'
+else
+  for lane in "${LANES[@]}"; do
+    label=${lane%%:*}
+    tsconfig=${lane#*:}
+    if output=$("$TSC_BIN" --noEmit -p "$tsconfig" 2>&1); then
+      tsc_status=0
+    else
+      tsc_status=$?
+    fi
 
-  if (( tsc_status != 0 )) && ! grep -Eq "$TYPE_DIAGNOSTIC_REGEX" <<< "$output"; then
-    echo "✖ Effect diagnostics lane '$label' failed (exit $tsc_status) without TypeScript diagnostics." >&2
-    printf '%s\n' "$output" >&2
-    echo "  Reproduce: node_modules/.bin/tsc --noEmit -p $tsconfig" >&2
-    exit 1
-  fi
+    if (( tsc_status != 0 )) && ! grep -Eq "$TYPE_DIAGNOSTIC_REGEX" <<< "$output"; then
+      echo "✖ Effect diagnostics lane '$label' failed (exit $tsc_status) without TypeScript diagnostics." >&2
+      printf '%s\n' "$output" >&2
+      echo "  Reproduce: node_modules/.bin/tsc --noEmit -p $tsconfig" >&2
+      exit 1
+    fi
 
-  all_output+="$output"$'\n'
-done
+    all_output+="$output"$'\n'
+  done
+fi
 
 current=$(printf '%s\n' "$all_output" | grep -E "$MARKER_REGEX" | sort || true)
 count=$(printf '%s\n' "$current" | grep -cE "$MARKER_REGEX" || true)
 
-# Normalized comparison keys strip source positions, preventing a line shift from
-# turning a pre-existing finding into a NEW finding during annotation.
-norm() { grep -E "$MARKER_REGEX" | sed -E 's/^([^(:]+)\([0-9]+,[0-9]+\)/\1/' | sort -u; }
+# Per-file finding counts: "<count> <file>" for rows that carry a file(line,col)
+# prefix. PAN-3847 (FR-14): the ratchet names the files whose count rose.
+per_file() { grep -E "$MARKER_REGEX" | grep -E '^[^(:]+\([0-9]+,[0-9]+\)' | sed -E 's/^([^(:]+)\([0-9]+,[0-9]+\).*/\1/' | sort | uniq -c | awk '{print $2" "$1}'; }
 
 if [[ "$MODE" == "update" ]]; then
   if [[ "$initializing" != true ]] && (( count > baseline_count )); then
@@ -105,12 +111,11 @@ fi
 
 if (( count > baseline_count )); then
   echo "✖ Effect diagnostics regressed: $count findings (baseline $baseline_count)." >&2
-  echo "  Findings with no baseline match (yours to fix):" >&2
-  comm -23 <(printf '%s\n' "$current" | norm) <(grep -E "$MARKER_REGEX" "$BASELINE_FILE" | norm || true) | sed 's/^/  NEW: /' >&2
-  echo "  Baselined backlog (pre-existing — not yours):" >&2
-  comm -12 <(printf '%s\n' "$current" | norm) <(grep -E "$MARKER_REGEX" "$BASELINE_FILE" | norm || true) | sed 's/^/  known: /' >&2
-  echo "  Note: rewording a pre-existing finding can relabel it as NEW;" >&2
-  echo "  the count delta ($((count - baseline_count))) bounds how many are truly new." >&2
+  echo "  Files whose finding count rose against the baseline (yours to fix):" >&2
+  join -a1 -e0 -o '0,1.2,2.2' <(printf '%s\n' "$current" | per_file) <(grep -E "$MARKER_REGEX" "$BASELINE_FILE" | per_file || true) \
+    | awk '$2 > $3 { printf "  NEW: %s (%d, baseline %d)\n", $1, $2, $3 }' >&2
+  tailless=$(printf '%s\n' "$current" | grep -E "$MARKER_REGEX" | grep -cvE '^[^(:]+\([0-9]+,[0-9]+\)' || true)
+  echo "  Note: $tailless finding rows carry no file position and are counted but not attributed." >&2
   echo "  Reproduce each lane with: node_modules/.bin/tsc --noEmit -p <tsconfig.effect-diag.json>" >&2
   exit 1
 fi

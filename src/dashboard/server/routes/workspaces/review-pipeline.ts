@@ -143,6 +143,74 @@ async function getDirtyWorkspaceErrorForReviewRequest(
     return null;
   }
 }
+
+/**
+ * PAN-3847 (FR-16): a re-review request is refused when the working tree is
+ * dirty (reviewers only see committed HEAD) or when HEAD already equals the
+ * last approved anchor and the row is not stale.
+ */
+export async function reReviewGuardError(
+  issueId: string,
+  workspacePath: string,
+  workspaceInfo: WorkspaceInfo,
+  existingStatus: Pick<ReviewStatus, 'reviewStatus' | 'reviewedAtCommit' | 'reviewStaleSince'> | null | undefined,
+): Promise<{ error: string; hint: string } | null> {
+  const dirtyError = await getDirtyWorkspaceErrorForReviewRequest(workspacePath, workspaceInfo);
+  if (dirtyError) {
+    return {
+      error: 'working tree is dirty',
+      hint: 'Commit or discard changes, push, then request review again. Reviewers only see committed HEAD.',
+    };
+  }
+  try {
+    const { snapshotWorkspaceHeadsPromise } = await import('../../../../lib/git-utils.js');
+    const currentHead = await snapshotWorkspaceHeadsPromise(issueId, workspacePath);
+    if (
+      currentHead &&
+      existingStatus?.reviewedAtCommit === currentHead &&
+      existingStatus.reviewStatus === 'passed' &&
+      !existingStatus.reviewStaleSince
+    ) {
+      return {
+        error: 'HEAD already approved',
+        hint: `Review already passed at ${currentHead.slice(0, 8)} and nothing changed.`,
+      };
+    }
+  } catch { /* snapshot unavailable — the dispatch-side runId guard is the backstop */ }
+  return null;
+}
+/**
+ * Reset shapes for the trigger/rerun review paths. PAN-3847 (FR-17): neither
+ * carries verificationCycleCount — the counter is per issue and only
+ * `pan review reset` (review-control.ts) clears it. Exported for tests.
+ */
+export function buildReviewRequestReset(): Record<string, unknown> {
+  return {
+    reviewStatus: 'pending',
+    testStatus: 'pending',
+    autoRequeueCount: 0,
+    verificationStatus: 'pending',
+    verificationNotes: undefined,
+    reviewStaleSince: undefined,
+  };
+}
+
+export function buildReviewRerunReset(): Record<string, unknown> {
+  return {
+    reviewStatus: 'pending',
+    testStatus: 'pending',
+    mergeStatus: 'pending',
+    readyForMerge: false,
+    autoRequeueCount: 0,
+    verificationStatus: 'pending',
+    verificationNotes: undefined,
+    reviewNotes: undefined,
+    testNotes: undefined,
+    mergeNotes: undefined,
+    reviewStaleSince: undefined,
+  };
+}
+
 // ─── Route: POST /api/review/:issueId/trigger ─────────────────────────────
 const postWorkspaceReviewRoute = HttpRouter.add(
   'POST',
@@ -241,6 +309,15 @@ const postWorkspaceReviewRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace does not exist' }, { status: 400 });
     }
 
+    // PAN-3847 (FR-16): refuse a re-review on a dirty tree or an unchanged,
+    // already-approved HEAD — before any status reset or pending operation.
+    const reReviewGuard = yield* Effect.promise(() =>
+      reReviewGuardError(issueId, workspacePath, workspaceInfo, existingStatus));
+    if (reReviewGuard) {
+      console.log(`[review] Rejecting re-review for ${issueId}: ${reReviewGuard.error}`);
+      return jsonResponse({ success: false, error: reReviewGuard.error, hint: reReviewGuard.hint }, { status: 409 });
+    }
+
     const reviewModeProject = requestedReviewMode.mode === undefined
       ? null
       : yield* Effect.promise(async () => {
@@ -255,14 +332,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
     // reviewStatus is set to 'reviewing' only after the specialist is successfully dispatched
     // or queued, not before. This prevents stuck 'reviewing' state if Cloister crashes mid-dispatch.
     setPendingOperation(issueId, 'review');
-    const reviewReset: Record<string, unknown> = {
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      autoRequeueCount: 0,
-      verificationCycleCount: 0,
-      verificationStatus: 'pending',
-      verificationNotes: undefined,
-    };
+    const reviewReset: Record<string, unknown> = buildReviewRequestReset();
     if (forceReview) {
       reviewReset.readyForMerge = false;
       reviewReset.mergeStatus = 'pending';
@@ -365,6 +435,16 @@ const postWorkspaceReviewRoute = HttpRouter.add(
                 reviewStatus: 'failed',
                 reviewNotes: `Verification failed at ${verifyOutcome.failedCheck}`,
               });
+              try {
+                const { reportTieredVerificationFailureEscalation } = await import('../tiered-inspect-escalation.js');
+                await reportTieredVerificationFailureEscalation(
+                  issueId,
+                  workspacePath,
+                  `verification failed at ${verifyOutcome.failedCheck}`,
+                );
+              } catch (escalationErr: unknown) {
+                console.warn(`[review] Tier escalation handling failed for ${issueId}: ${errorMessage(escalationErr)}`);
+              }
               try {
                 (await Effect.runPromise(eventStore.append({
                   type: 'pipeline.verification-failed',
@@ -550,21 +630,18 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           return jsonResponse({ success: false, error: dirtyError }, { status: 400 });
         }
 
+        // PAN-3847 (FR-16): a forced re-review is still refused when HEAD already
+        // equals the approved anchor — nothing new to review.
+        const rerunGuard = yield* Effect.promise(() =>
+          reReviewGuardError(canonicalIssueId, workspacePathRerun, wsInfoRerun, existingStatus));
+        if (rerunGuard) {
+          console.log(`[request-review] Rejecting ${issueId}: ${rerunGuard.error} on rerun path`);
+          return jsonResponse({ success: false, error: rerunGuard.error, hint: rerunGuard.hint }, { status: 409 });
+        }
+
         console.log(`[request-review] ${issueId}: forcing full review/test rerun from passed state`);
         setPendingOperation(issueId, 'review');
-        setReviewStatus(issueId, {
-          reviewStatus: 'pending',
-          testStatus: 'pending',
-          mergeStatus: 'pending',
-          readyForMerge: false,
-          autoRequeueCount: 0,
-          verificationCycleCount: 0,
-          verificationStatus: 'pending',
-          verificationNotes: undefined,
-          reviewNotes: undefined,
-          testNotes: undefined,
-          mergeNotes: undefined,
-        });
+        setReviewStatus(issueId, buildReviewRerunReset());
 
         (async () => {
           try {

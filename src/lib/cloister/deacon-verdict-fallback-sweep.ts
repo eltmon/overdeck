@@ -14,7 +14,7 @@
  * every surface reported the reviewer healthy.
  */
 
-import { loadReviewStatuses } from '../review-status.js';
+import { listPipelineStatuses } from '../overdeck/pipeline-view.js';
 import {
   drainWorkspaceVerdictFallback,
   findWorkspaceVerdictConflicts,
@@ -26,6 +26,7 @@ import { readOwner, recordLockPath } from '../pan-dir/fs-lock.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { findRecoveryTrip, recordRecoveryFailure } from './recovery-trip.js';
 import { emitActivityEntryOnce, type ActivityEmitOutcome } from '../activity-logger.js';
+import { recordWouldFire, type PatrolShadowOptions } from './patrol-would-fire.js';
 
 /** How long a fallback may stay undrained before the operator hears about it. */
 export const VERDICT_CONTENTION_SURFACE_MS = 10 * 60 * 1000;
@@ -151,11 +152,13 @@ interface WarningCandidate {
 export async function sweepStrandedVerdictFallbacks(
   now = Date.now(),
   budgetMs = SWEEP_WARNING_BUDGET_MS,
+  options: PatrolShadowOptions = {},
 ): Promise<string[]> {
   const actions: string[] = [];
+  const shadow = options.shadow === true;
   let statuses: Record<string, { mergeStatus?: string; closedOut?: boolean; stuck?: boolean; deaconIgnored?: boolean }>;
   try {
-    statuses = loadReviewStatuses();
+    statuses = listPipelineStatuses();
   } catch {
     return actions;
   }
@@ -171,7 +174,16 @@ export async function sweepStrandedVerdictFallbacks(
       const fallback = await readWorkspaceVerdictFallback(issueId);
       if (!fallback) continue;
 
+      // PAN-3848 (W30): shadow mode (the soak) detects the stranded fallback and
+      // counts the would-fire without draining, warning, or tripping.
+      if (shadow) {
+        recordWouldFire('sweepStrandedVerdictFallbacks', issueId);
+        actions.push(`Would drain stranded verdict fallback for ${issueId} (shadow)`);
+        continue;
+      }
+
       if (await drainWorkspaceVerdictFallback(issueId)) {
+        recordWouldFire('sweepStrandedVerdictFallbacks', issueId);
         actions.push(`Drained stranded verdict fallback for ${issueId}`);
         continue;
       }

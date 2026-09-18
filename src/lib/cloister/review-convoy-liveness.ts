@@ -1,4 +1,4 @@
-import { getAgentEffectiveLastActivityMs } from './agent-idle.js';
+import { getAgentEffectiveLastActivityMs } from '../agents/liveness.js';
 
 export const REVIEW_AGENT_IDLE_THRESHOLD_MS = 15 * 60 * 1000;
 export const REVIEWING_WATCHDOG_THRESHOLD_MS = 45 * 60 * 1000;

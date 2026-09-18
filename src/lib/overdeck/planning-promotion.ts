@@ -30,6 +30,7 @@ import { killSession, sessionExists } from '../tmux.js';
 import { findPlan, findWorkspaceDraftPlan, readPlan } from '../xbrief/io.js';
 import { assertPlanQuality, PlanQualityLintError } from '../xbrief/quality-lint.js';
 import { flushAutoCommits } from '../pan-dir/auto-commit.js';
+import { isPreWorktreeMetadataOnlyDir } from '../workspace-manager/worktree-ops.js';
 import { resolveIssueProjectPathSync } from './issue-reads.js';
 
 const execFileAsync = promisify(execFile);
@@ -224,6 +225,57 @@ export function completePlanningWorkspaceGitAddCommands(gitRoot: string, migrate
     commands.push(['add', '.gitignore']);
   }
   return commands;
+}
+
+/**
+ * Git-init (when needed), stage, and commit the workspace planning artifacts,
+ * then push when a remote exists.
+ *
+ * Skipped entirely for pre-worktree metadata-only directories (only `.pan/`
+ * and/or `.overdeck/`): git-init'ing those leaves a staged `.git` that makes
+ * `pan workspace create` refuse with "Workspace already exists" — and the
+ * canonical spec was already committed on the state branch by the time this
+ * runs. The `git init` stays for every other shape: PAN-2386 polyrepo
+ * scaffolds are not git repos until this commit lands (see the comment on
+ * completePlanningWorkspaceGitAddCommands).
+ */
+export async function commitCompletePlanningWorkspaceGit(
+  gitRoot: string,
+  issueId: string,
+  migrated: boolean,
+  taskWarning: string | null,
+  execImpl: typeof execFileAsync = execFileAsync,
+): Promise<{ pushed: boolean; taskWarning: string | null }> {
+  if (isPreWorktreeMetadataOnlyDir(gitRoot)) {
+    console.log('[complete-planning] workspace ' + gitRoot + ' is a pre-worktree metadata dir; skipping workspace git init/commit');
+    return { pushed: true, taskWarning };
+  }
+
+  const isGitRepo = existsSync(join(gitRoot, '.git'));
+  if (!isGitRepo) {
+    await execImpl('git', ['init'], { cwd: gitRoot, encoding: 'utf-8' });
+  }
+
+  for (const args of completePlanningWorkspaceGitAddCommands(gitRoot, migrated)) {
+    await execImpl('git', args, { cwd: gitRoot, encoding: 'utf-8' });
+  }
+
+  try {
+    await execImpl('git', ['diff', '--cached', '--quiet'], { cwd: gitRoot, encoding: 'utf-8' });
+  } catch {
+    await execImpl('git', ['commit', '-m', `chore(plan): complete planning for ${issueId}`, '--no-verify'], { cwd: gitRoot, encoding: 'utf-8' });
+  }
+
+  try {
+    const { stdout: remotes } = await execImpl('git', ['remote'], { cwd: gitRoot, encoding: 'utf-8' });
+    if (remotes.trim()) {
+      const pushChild = spawn('git', ['push'], { cwd: gitRoot, detached: true, stdio: 'ignore' });
+      pushChild.unref();
+    }
+    return { pushed: true, taskWarning };
+  } catch {
+    return { pushed: false, taskWarning };
+  }
 }
 
 /**
@@ -688,31 +740,7 @@ export async function completePlanningForIssue(options: {
         }
       }
 
-      const isGitRepo = existsSync(join(gitRoot, '.git'));
-      if (!isGitRepo) {
-        await execFileAsync('git', ['init'], { cwd: gitRoot, encoding: 'utf-8' });
-      }
-
-      for (const args of completePlanningWorkspaceGitAddCommands(gitRoot, migrated)) {
-        await execFileAsync('git', args, { cwd: gitRoot, encoding: 'utf-8' });
-      }
-
-      try {
-        await execFileAsync('git', ['diff', '--cached', '--quiet'], { cwd: gitRoot, encoding: 'utf-8' });
-      } catch {
-        await execFileAsync('git', ['commit', '-m', `chore(plan): complete planning for ${id}`, '--no-verify'], { cwd: gitRoot, encoding: 'utf-8' });
-      }
-
-      try {
-        const { stdout: remotes } = await execFileAsync('git', ['remote'], { cwd: gitRoot, encoding: 'utf-8' });
-        if (remotes.trim()) {
-          const pushChild = spawn('git', ['push'], { cwd: gitRoot, detached: true, stdio: 'ignore' });
-          pushChild.unref();
-        }
-        return { pushed: true, taskWarning };
-      } catch {
-        return { pushed: false, taskWarning };
-      }
+      return commitCompletePlanningWorkspaceGit(gitRoot, id, migrated, taskWarning);
     })();
 
     // Update Linear/GitHub issue state

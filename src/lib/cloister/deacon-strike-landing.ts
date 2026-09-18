@@ -3,7 +3,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
-import { loadReviewStatuses, getReviewStatusSync, setReviewStatusSync, type ReviewStatus } from '../review-status.js';
+import { setReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { listProjectsAsync, resolveProjectFromIssueSync } from '../projects.js';
 import { getAgentState } from '../agents/agent-state.js';
 import { hasAgentRuntimeInSubtree } from '../agents/runtime-command.js';
@@ -14,6 +14,7 @@ import { writeFeedbackFile } from './feedback-writer.js';
 import { surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 import type { StrikeLandingAttempt } from '../strike-landing.js';
 import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
+import { deriveInFlightOwner, describeOwner, getPipelineStatus, listPipelineStatuses } from '../overdeck/pipeline-view.js';
 const execFileAsync = promisify(execFile);
 export interface StrikeMergeRequest {
   kind: 'strike'; markerHead: string; workspacePath: string; branchName: string; recoveryTarget: string;
@@ -125,8 +126,8 @@ async function defaultIsStrikeAgentAlive(agentId: string): Promise<boolean> {
 
 function defaultDeps(): StrikeLandingDeps {
   return {
-    loadStatuses: loadReviewStatuses,
-    getStatus: getReviewStatusSync,
+    loadStatuses: listPipelineStatuses,
+    getStatus: getPipelineStatus,
     setStatus: setReviewStatusSync,
     resolveProject: resolveProjectFromIssueSync,
     mergeIssue: requestStrikeMerge,
@@ -298,6 +299,15 @@ export async function salvageStrandedStrikeBranches(deps: StrikeLandingDeps): Pr
   for (const candidate of await findStrandedStrikeCandidates(deps)) {
     const current = deps.getStatus(candidate.issueId);
     if (current?.strikeReadyHead === candidate.head) continue;
+
+    // PAN-3903/PAN-3898: salvage INITIATES a landing. An issue already claimed
+    // by another actor — a landing in progress, a merge, an operator hold — is
+    // not salvage's to re-arm.
+    const owner = deriveInFlightOwner(current);
+    if (owner) {
+      console.log(`[strike-salvage] skipped ${describeOwner(candidate.issueId, owner)}`);
+      continue;
+    }
 
     // Recheck immediately before the push to narrow the liveness race with an
     // agent that may have resumed after the initial branch scan.

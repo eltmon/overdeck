@@ -1,7 +1,6 @@
 ---
 name: pan-uat-agent
 description: Browser-based requirement verifier — drives Playwright against the running app to check whether the issue's acceptance criteria are observable end-to-end.
-model: sonnet
 permissionMode: bypassPermissions
 mcpServers:
   - playwright:

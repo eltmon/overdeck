@@ -27,6 +27,13 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: mockGetReviewStatus,
   markWorkspaceStuck: mockMarkWorkspaceStuck,
   setReviewStatusSync: mockSetReviewStatus,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
+}));
+
+vi.mock('../../../../src/lib/cloister/test-skip-gate.js', () => ({
+  runTestSkipGate: vi.fn(async () => ({ passed: true, violations: [] })),
 }));
 
 vi.mock('../../../../src/lib/cloister/validation.js', () => ({
@@ -187,10 +194,14 @@ describe('runVerificationForIssueInProcess merged issue guard', () => {
     ));
 
     const fullOutputPath = `${workspacePath}/.overdeck/verification-latest.json`;
+    // PAN-3847: terminal writes carry the run timestamp (and head8 when the
+    // workspace HEAD resolves — it does not in this fixture, so the write falls
+    // back to latest-only and feedback keeps pointing at verification-latest.json).
     expect(mockWriteVerificationArtifact).toHaveBeenCalledWith(
       workspacePath,
       'PAN-2901',
       expect.arrayContaining([expect.objectContaining({ name: 'test', passed: false })]),
+      expect.objectContaining({ ranAt: expect.any(String) }),
     );
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-2901', expect.objectContaining({
       verificationNotes: expect.stringContaining(fullOutputPath),

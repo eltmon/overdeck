@@ -46,6 +46,7 @@ import {
   listOpenIssuesWithLabelsPromise,
   listPullRequestsForHead,
   listPullRequestsForHeadPromise,
+  postOverdeckTestsStatus,
   verifyAppCanMerge,
 } from '../../../src/lib/github-app.js';
 
@@ -472,4 +473,45 @@ describe('isIntegrationPermissionError', () => {
     expect(isIntegrationPermissionError('GitHub merge failed: 422 {"message":"Required status check"}')).toBe(false);
     expect(isIntegrationPermissionError('GitHub merge failed: 405 Method Not Allowed')).toBe(false);
   });
+});
+
+describe('postOverdeckTestsStatus sha binding (PAN-3847)', () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockReset();
+    execFileMock.mockClear();
+    fetchMock.mockImplementation((input: unknown) => {
+      const url = String(input);
+      if (url.includes('/access_tokens')) {
+        return Promise.resolve(new Response(JSON.stringify({ token: 'token', expires_at: '2026-09-18T00:00:00Z' }), { status: 201 }));
+      }
+      return Promise.resolve(new Response('{}', { status: 201 }));
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('posts to /statuses/<sha> with the caller-provided sha and never shells out to git', async () => {
+    const testedSha = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
+
+    await postOverdeckTestsStatus(
+      '/workspaces/feature-pan-3847',
+      'eltmon',
+      'overdeck',
+      'success',
+      'Verification gate passed (changed-file scope)',
+      testedSha,
+    );
+
+    const statusCall = fetchMock.mock.calls.find((call) => String(call[0]).includes('/statuses/'));
+    expect(statusCall).toBeDefined();
+    expect(String(statusCall![0])).toBe(`https://api.github.com/repos/eltmon/overdeck/statuses/${testedSha}`);
+    expect(execFileMock.mock.calls.some((call) => String(call[1]).includes('rev-parse'))).toBe(false);
+    expect(execFileMock.mock.calls.some((call) => String(call[0]).includes('rev-parse'))).toBe(false);
+  });
+
 });

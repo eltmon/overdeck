@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, basename } from 'node:path';
 
-import { Effect } from 'effect';
+import { Cause, Effect, Exit } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 import type { RuntimeName } from '../../../../lib/runtimes/types.js';
 import { resolveStaffing } from '../../../../lib/agents/staffing.js';
@@ -10,7 +10,7 @@ import {
   detectPendingOperatorDecision,
   type PendingOperatorDecision,
 } from '../../../../lib/agents/pending-decision-gate.js';
-import { findPlanSync, readWorkspacePlanSync } from '../../../../lib/xbrief/io.js';
+import { findPlanSync, readTierOverrides, readWorkspacePlanSync } from '../../../../lib/xbrief/io.js';
 import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue } from '../../../../lib/agents/tier-table.js';
 import { getDispatchableItems } from '../../../../lib/xbrief/dag.js';
 import { loadConfigSync } from '../../../../lib/config-yaml.js';
@@ -22,7 +22,6 @@ import {
   recoverAgent,
   resumeAgent,
   restartAgent,
-  saveAgentStateSync,
   getAgentDir,
   getProviderAuthMode,
   listRunningAgents,
@@ -45,6 +44,7 @@ import {
   readJsonBody,
   spawnPanCommandDetached,
 } from './shared.js';
+import { claimAgentStart, releaseAgentStart } from './spawn-helpers.js';
 
 function pendingDecisionError(
   agentId: string,
@@ -562,7 +562,7 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
 
     const args = buildPanStartArgs({
       issueId,
-      model: spawnModel,
+      model: newModel ?? null, // PAN-3857: forward only an explicit operator choice
       harness: effectiveHarness,
     });
 
@@ -572,43 +572,41 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
       harness: effectiveHarness,
     }));
 
-    // Spawn detached `pan start` — same pattern the existing POST /api/agents
-    // route uses, minus the HTTP hop. We deliberately write a placeholder
-    // state.json (matching the existing spawn flow) so the dashboard
-    // transitions the agent from "stopped" to "starting" within one refresh.
-    saveAgentStateSync({
-      id: agentSessionName,
-      issueId,
-      workspace: workspacePath,
-      harness: effectiveHarness ?? 'claude-code',
-      role: 'work',
-      model: 'pending-work-spawn',
-      status: 'starting',
-      startedAt: new Date().toISOString(),
-    });
+    // Spawn detached `pan start` — the POST /api/agents pattern minus the
+    // HTTP hop. PAN-3849 (W34): no placeholder row; the in-flight claim
+    // serializes concurrent spawns (see spawn-helpers.ts).
+    if (!claimAgentStart(agentSessionName)) {
+      return jsonResponse({
+        success: false,
+        error: `Agent ${agentSessionName} is already starting or running.`, code: 'AGENT_START_IN_FLIGHT',
+      }, { status: 409 });
+    }
 
-    try {
-      yield* Effect.promise(() => spawnPanCommandDetached({
-        agentSessionName,
+    // Effect failures are values, not JS exceptions: a JS try/catch/finally
+    // around `yield*` never sees the Effect.promise rejection (it becomes a
+    // defect), so capture the Exit — otherwise the friendly 500 never
+    // renders and the claim leaks, 409ing later spawns until a restart.
+    const spawnExit = yield* Effect.exit(Effect.promise(() => spawnPanCommandDetached({
+      agentSessionName,
+      issueId,
+      role: 'work',
+      workspacePath,
+      args,
+      cwd: workspacePath,
+    })));
+    releaseAgentStart(agentSessionName);
+    if (Exit.isFailure(spawnExit)) {
+      // Wipe removed the old state and the launch failed, so nothing owns a
+      // tmux session: write no agent state (W34 — a failed spawn leaves
+      // nothing to roll back). Visibility lives in the lifecycle log and the
+      // 500 below, never in a recreated row or the `exited` event path.
+      const raw: unknown = Cause.squash(spawnExit.cause);
+      const details = raw instanceof Error ? raw.message : typeof raw === 'string' ? raw : 'unknown spawn failure';
+      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.restart_fresh_spawn_failed', {
         issueId,
-        role: 'work',
-        workspacePath,
-        args,
-        cwd: workspacePath,
+        error: details,
+        wiped: wipeResult.removed,
       }));
-    } catch (err: any) {
-      saveAgentStateSync({
-        id: agentSessionName,
-        issueId,
-        workspace: workspacePath,
-        harness: effectiveHarness ?? agentState.harness ?? 'claude-code',
-        role: 'work',
-        model: spawnModel,
-        status: 'stopped',
-        startedAt: new Date().toISOString(),
-        stoppedAt: new Date().toISOString(),
-      });
-      const details = err?.message ?? String(err);
       return jsonResponse({
         success: false,
         error: 'The old agent state was cleared, but the fresh agent could not start. Resolve the startup blocker, then try again.',
@@ -918,6 +916,7 @@ async function resolveCurrentStaffing(agentId: string, agentState: any, issueId:
       planMetadata: plan.plan.metadata,
       spawnKey: `work:${issueId.toLowerCase()}`,
       issueId,
+      tierOverrides: readTierOverrides(workspacePath),
       config: { ...config, tieredExecution: { ...tiered, enabled: effectiveTieredEnabled } },
     });
 

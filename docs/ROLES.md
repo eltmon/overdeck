@@ -12,7 +12,7 @@ See [PAN-1048](./prds/planned/PAN-1048-role-primitive.md) for the migration's mo
 
 | Role | File | Purpose |
 |------|------|---------|
-| `plan` | `roles/plan.md` | Read issue, research codebase, write xBRIEF, create xBRIEF tasks |
+| `plan` | `roles/plan.md` | Read issue, research codebase, write xBRIEF, create xBRIEF tasks. Instruction source: `roles/plan.md` (system prompt) plus `src/lib/cloister/prompts/planning.md` (issue inputs and plan formats); no other file instructs the planner. |
 | `work` | `roles/work.md` | Claim xBRIEF tasks, write code, commit per bead, self-inspect (Jidoka) |
 | `strike` | `roles/strike.md` | Precision drop-in. Implements an isolated fix on `strike/<id>`, pushes the branch, and signals the spawner to review and land it. Bypasses the plan/work/review/test pipeline and server-side shipping. |
 | `review` | `roles/review.md` | Read manifest, gather convoy findings, approve or request changes |
@@ -45,6 +45,7 @@ Consequences:
 
 - **Dispatch resumes before it spawns.** Every dispatch path (review request, re-review, test run, rework handoff) first looks for a live warm session for that role + issue and messages/resumes it; cold-spawning is the fallback for the absent case.
 - **Review agents (and convoy sub-reviewers) stay warm after a verdict** so a re-review after a BLOCKED → fix cycle resumes reviewers that already hold context from the previous pass, cutting re-review latency (PAN-1862 is the convoy-warm-reuse design).
+- **Reviewer exit is reported by the supervisor, not inferred by a patrol (PAN-3849).** For supervisor-launched agents the PTY supervisor posts an `exited` lifecycle event to `POST /api/agents/:id/lifecycle`, and the projection writes `stopped` from that observed fact (FR-21) — see [AGENT-MESSAGE-DELIVERY.md](./AGENT-MESSAGE-DELIVERY.md#supervisor-lifecycle-events-pan-3849). The review convoy launcher's own exit signals (`REVIEWER_READY` / `REVIEWER_FAILED` via `pan tell`) remain in place as the belt-and-braces path during the Phase 4 soak; liveness questions everywhere else go through the single oracle in `src/lib/agents/liveness.ts` (FR-23).
 - **BLOCKED feedback goes agent-to-agent.** The review agent's `pan admin specialists done review --status blocked` delivers feedback directly to the live work agent (`deliverReviewVerdictFeedback` → `messageAgent`); the deacon is a recovery backstop, not the primary path.
 - **Idle-warm sessions are free capacity**, not load: they must not count against the advancing-role concurrency ceiling, and they are the first thing the governor sheds under memory pressure.
 

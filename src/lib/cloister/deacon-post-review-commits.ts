@@ -1,7 +1,7 @@
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { Effect } from 'effect';
-import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync, type ReviewStatus } from '../review-status.js';
+import { setReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { isIssueClosed } from './issue-closed.js';
 import {
@@ -11,6 +11,7 @@ import {
 } from './concurrency.js';
 import { ciRetryMap } from './deacon-merge.js';
 import { tryYieldForAdvancingDispatch } from './preemption.js';
+import { getPipelineStatus, listPipelineStatuses } from '../overdeck/pipeline-view.js';
 
 const BLOCKED_REVIEW_MISSING_ANCHOR_LOG_INTERVAL_MS = 60 * 60 * 1000;
 const blockedReviewMissingAnchorLogs = new Map<string, number>();
@@ -37,7 +38,7 @@ export async function checkPostReviewCommits(): Promise<string[]> {
   const actions: string[] = [];
 
   try {
-    const statuses = loadReviewStatuses();
+    const statuses = listPipelineStatuses();
     const { resolveProjectFromIssueSync } = await import('../projects.js');
 
     for (const [issueId, status] of Object.entries(statuses)) {
@@ -51,6 +52,11 @@ export async function checkPostReviewCommits(): Promise<string[]> {
         continue;
       }
       if (!isBlocked && status.reviewStatus !== 'passed' && !status.readyForMerge) continue;
+
+      // PAN-3847: a review already marked stale needs no further drift handling —
+      // only `pan done` / `pan review request` clears the marker, and leaving the
+      // row untouched here keeps the PAN-3254 reset-loop guard from misfiring on it.
+      if (status.reviewStaleSince) continue;
 
       const reviewedAnchor = status.reviewedAtCommit;
       if (!reviewedAnchor) {
@@ -136,7 +142,7 @@ export async function checkPostReviewCommits(): Promise<string[]> {
 
       console.log(
         `[deacon] Post-review commit detected for ${issueId}: ` +
-        `was ${formatAnchorShort(reviewedAnchor)}, now ${formatAnchorShort(currentHead)} — resetting review`,
+        `was ${formatAnchorShort(reviewedAnchor)}, now ${formatAnchorShort(currentHead)} — ${isBlocked ? 'resetting review' : 'marking review stale'}`,
       );
       lastResetAnchors.set(issueId, currentHead);
       resetLoopEscalated.delete(issueId);
@@ -149,34 +155,27 @@ export async function checkPostReviewCommits(): Promise<string[]> {
           recoveryStartedAt: undefined,
         });
       } else {
-        setReviewStatusSync(issueId, {
-          reviewStatus: 'pending',
-          testStatus: 'pending',
-          readyForMerge: false,
-          reviewedAtCommit: undefined,
-          reviewNotes: undefined,
-          testNotes: undefined,
-          // Reset merge retry counter so checkFailedMergeRetry can retry again after
-          // the work agent pushes a fix (e.g. to address a CI check failure).
-          mergeRetryCount: 0,
-          // PAN-794: new commits open a fresh recovery cycle — stale infra
-          // failures from the previous cycle must not poison the breaker budget.
-          reviewRetryCount: 0,
-          recoveryStartedAt: undefined,
-        });
+        // PAN-3847 (FR-8): a passed review is never reset by a patrol. Drift marks
+        // the row stale; only `pan done` or `pan review request` clears staleness.
+        if (!status.reviewStaleSince) {
+          setReviewStatusSync(issueId, {
+            reviewStaleSince: new Date().toISOString(),
+            readyForMerge: false,
+            mergeNotes: `Review stale: approved ${formatAnchorShort(reviewedAnchor)}, workspace HEAD is ${formatAnchorShort(currentHead)}. Run pan done or pan review request to re-review.`,
+          });
+          actions.push(`Marked review stale for ${issueId}: new commits after review passed (${formatAnchorShort(reviewedAnchor)} → ${formatAnchorShort(currentHead)}); no automatic re-dispatch`);
+        }
+        continue;
       }
       // Also clear the CI transient retry counter so the next merge attempt
       // starts fresh. Without this, ciRetryMap retains count=6 from the previous
       // CI failure cycle, permanently blocking transient retries for this issue.
       ciRetryMap.delete(issueId);
-      if (!isBlocked) {
-        actions.push(`Reset review for ${issueId}: new commits after review passed (${formatAnchorShort(reviewedAnchor)} → ${formatAnchorShort(currentHead)})`);
-      }
 
       // Redispatch a fresh review convoy. Re-read status to guard against races
       // with other dispatch paths (HTTP request-review, manual CLI) that may have
       // already picked up the work between the reset above and now.
-      const freshStatus = getReviewStatusSync(issueId);
+      const freshStatus = getPipelineStatus(issueId);
       // PAN-2507: also a blocked advancing (review) dispatch — try to yield an
       // idle work agent before deferring. (This 7th site was not in the PRD's
       // six-site enumeration but is the same `!tryReserveAdvancingSlot()` shape.)
@@ -192,7 +191,9 @@ export async function checkPostReviewCommits(): Promise<string[]> {
           issueId,
           workspace: workspacePath,
           branch,
-          force: true,
+          // PAN-3847 (FR-16): never force — the runId guard refuses a convoy for
+          // an unchanged head.
+          force: false,
         }));
         if (dispatchResult.gated) {
           releaseAdvancingSlot();

@@ -27,6 +27,9 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
     mocks.setReviewStatus(issueId, update),
   loadReviewStatuses: () => mocks.statuses,
   MAX_AUTO_REQUEUE: 25,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../../src/lib/cloister/review-agent.js', () => ({
@@ -183,7 +186,9 @@ describe('checkPostReviewCommits blocked review drift', () => {
       issueId: 'PAN-3148-A',
       workspace: '/project/workspaces/feature-pan-3148-a',
       branch: 'feature/pan-3148-a',
-      force: true,
+      // PAN-3847 (FR-16): no patrol dispatches a convoy with force: true — the
+      // runId guard refuses a convoy for an unchanged head.
+      force: false,
     });
     expect(actions).toEqual([
       'Re-dispatched review for PAN-3148-A: rework commit after BLOCKED verdict (old-head → new-head)',
@@ -249,28 +254,29 @@ describe('checkPostReviewCommits repeat-reset bound (PAN-3254)', () => {
     ({ checkPostReviewCommits } = await import('../../../../src/lib/cloister/deacon.js'));
   });
 
-  function passedStatus() {
+  function blockedStatus() {
     return {
       issueId: 'MIN-901',
-      reviewStatus: 'passed',
-      testStatus: 'passed',
+      reviewStatus: 'blocked',
+      testStatus: 'failed',
       reviewedAtCommit: 'fe@aaa api@bbb',
       readyForMerge: false,
     };
   }
 
   it('resets once for a static current anchor, then suppresses and escalates instead of looping', async () => {
-    mocks.statuses['MIN-901'] = passedStatus();
+    mocks.statuses['MIN-901'] = blockedStatus();
     // The producer keeps reporting the identical current anchor — the MIN-901
     // signature (425 resets, one distinct anchor over 19.5 hours).
     mocks.evaluateDrift.mockResolvedValue({ kind: 'drifted', currentAnchor: 'wrapper-head' });
 
+    await expect(checkPostReviewCommits()).resolves.toEqual([]); // blocked debounce tick
     const first = await checkPostReviewCommits();
-    expect(first.some((a) => a.includes('Reset review for MIN-901'))).toBe(true);
+    expect(first.some((a) => a.includes('Re-dispatched review for MIN-901'))).toBe(true);
     expect(mocks.spawnReview).toHaveBeenCalledTimes(1);
 
-    // Review re-passes at the same workspace state; the drift verdict repeats.
-    mocks.statuses['MIN-901'] = passedStatus();
+    // The row returns to blocked against the same anchors; the drift verdict repeats.
+    mocks.statuses['MIN-901'] = blockedStatus();
     const second = await checkPostReviewCommits();
     expect(second).toEqual([]);
     expect(mocks.spawnReview).toHaveBeenCalledTimes(1);
@@ -290,17 +296,19 @@ describe('checkPostReviewCommits repeat-reset bound (PAN-3254)', () => {
   });
 
   it('a genuinely new current anchor still resets and re-dispatches after suppression', async () => {
-    mocks.statuses['MIN-901'] = passedStatus();
+    mocks.statuses['MIN-901'] = blockedStatus();
     mocks.evaluateDrift.mockResolvedValue({ kind: 'drifted', currentAnchor: 'wrapper-head' });
-    await checkPostReviewCommits();
-    mocks.statuses['MIN-901'] = passedStatus();
+    await checkPostReviewCommits(); // debounce tick
+    await checkPostReviewCommits(); // reset + dispatch
+    mocks.statuses['MIN-901'] = blockedStatus();
     await checkPostReviewCommits(); // suppressed
 
     // A real push moves the current anchor — the bound must not mask it.
     mocks.evaluateDrift.mockResolvedValue({ kind: 'drifted', currentAnchor: 'fe@ccc api@ddd' });
+    await checkPostReviewCommits(); // debounce tick against the new anchor
     const actions = await checkPostReviewCommits();
 
-    expect(actions.some((a) => a.includes('Reset review for MIN-901'))).toBe(true);
+    expect(actions.some((a) => a.includes('Re-dispatched review for MIN-901'))).toBe(true);
     expect(mocks.spawnReview).toHaveBeenCalledTimes(2);
   });
 });

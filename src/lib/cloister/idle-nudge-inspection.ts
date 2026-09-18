@@ -1,4 +1,4 @@
-import { getReviewStatusSync } from '../review-status.js';
+import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 import type { XBriefDocument, XBriefItem } from '../xbrief/types.js';
 
 const BLOCKING_INSPECTION_STATUSES = new Set(['failed', 'blocked', 'error', 'inspecting']);
@@ -13,7 +13,7 @@ export function getBlockingMandatoryInspection(
   plan: XBriefDocument,
   issueId: string,
 ): BlockingMandatoryInspection | null {
-  const inspection = getReviewStatusSync(issueId);
+  const inspection = getPipelineStatus(issueId);
   const status = inspection?.inspectStatus as string | undefined;
   if (!status || !BLOCKING_INSPECTION_STATUSES.has(status) || !inspection?.inspectBeadId) return null;
 

@@ -25,6 +25,13 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
   loadReviewStatuses: () => mocks.statuses,
+  // PAN-3903: cloister now reads through the pipeline read door, which
+  // reconciles the durable journal per issue on top of this cache map. The
+  // door's single-issue and bulk reads must answer from the same fixture.
+  getReviewStatusSync: (issueId: string) => mocks.statuses?.[issueId] ?? null,
+  getReviewStatusesSync: (issueIds: string[]) => Object.fromEntries(
+    issueIds.map((id) => [id, mocks.statuses?.[id]]).filter(([, value]) => Boolean(value)),
+  ),
   setReviewStatusSync: (...args: unknown[]) => mocks.setReviewStatus(...args),
 }));
 

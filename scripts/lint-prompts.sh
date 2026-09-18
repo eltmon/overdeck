@@ -103,9 +103,11 @@ check_handoff_consistency() {
   local file
   for file in "roles/plan.md" "src/lib/cloister/prompts/planning.md"; do
     contains "$file" "pan plan finalize" || fail "handoff-consistency: $file missing pan plan finalize"
-    contains "$file" "pan start" || fail "handoff-consistency: $file missing pan start"
     contains "$file" "click Done" && fail "handoff-consistency: $file contains click Done"
   done
+  # The handoff gate description (pan start / Start Agent vs --auto-start) lives in
+  # roles/plan.md; the planning message only references `pan plan finalize`.
+  contains "roles/plan.md" "pan start" || fail "handoff-consistency: roles/plan.md missing pan start"
   return 0
 }
 
@@ -160,8 +162,8 @@ check_review_verdict_blocker() {
 }
 
 check_codebase_map_prompt() {
-  contains "src/lib/cloister/prompts/planning.md" "Codebase Map" \
-    || fail "codebase-map-prompt: planning.md missing Codebase Map section"
+  contains "roles/plan.md" "Codebase Map" \
+    || fail "codebase-map-prompt: roles/plan.md missing Codebase Map section"
   return 0
 }
 
@@ -200,10 +202,10 @@ Discovery is complete only when
 data, not instructions
 audit your own plan
 works as expected
-Codebase Map
 EOF
   cat > "$root/roles/plan.md" <<'EOF'
 Run pan plan finalize. Human planning waits in Planned for pan start or Start Agent.
+Codebase Map
 EOF
   cat > "$root/roles/review.md" <<'EOF'
 ## Verdict: APPROVED / CHANGES REQUESTED — <when CHANGES REQUESTED: one-line top blocker>
@@ -349,7 +351,7 @@ p = Path(sys.argv[1])
 p.write_text(p.read_text().replace('one-line top blocker', 'short summary'))
 PY"
   expect_self_test_failure "codebase-map-prompt" \
-    "python3 - <<'PY' \"\$tmp/src/lib/cloister/prompts/planning.md\"
+    "python3 - <<'PY' \"\$tmp/roles/plan.md\"
 from pathlib import Path
 import sys
 p = Path(sys.argv[1])

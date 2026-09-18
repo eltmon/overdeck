@@ -1,7 +1,8 @@
+import type { ConfigurableProvider } from '../../../../../lib/configurable-providers.js';
 // Settings data types matching the new config.yaml structure
 // Now uses smart (capability-based) model selection instead of static presets
 
-export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'minimax' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'meta' | 'opencode' | 'opencode-go';
+export type Provider = ConfigurableProvider;
 
 export type ModelId = string;
 export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse' | 'opencode';
@@ -190,7 +191,6 @@ export interface TieredExecutionConfig {
     enabled: boolean;
     retries_at_tier: number;
     max_promotions: number;
-    flounder_budget_minutes: Partial<Record<XBriefDifficulty, number>>;
   };
   compaction_reroute?: 'off' | 'on';
   replay_threshold: number;
@@ -241,6 +241,7 @@ export interface SettingsConfig {
     manual_compact_mode?: 'claude-code' | 'overdeck-native';
     rich_compaction?: boolean;
     title_model?: ModelId;
+    handoff_author_model?: ModelId;
     watch_dirs?: string[];
     scan_max_parallel?: number | null;
     embeddings?: boolean;

@@ -1,6 +1,6 @@
 import type { ProjectConfig } from '../workspace-config.js';
 
-export const PRE_WORKTREE_METADATA_DIRS = new Set(['.pan']);
+export const PRE_WORKTREE_METADATA_DIRS = new Set(['.pan', '.overdeck']);
 
 export interface PanMigrationResult {
   /** Subdirectories migrated from .overdeck/ to .pan/ */

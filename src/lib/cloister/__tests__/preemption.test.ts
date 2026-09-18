@@ -46,6 +46,9 @@ vi.mock('../../agents.js', () => ({
 
 vi.mock('../../review-status.js', () => ({
   getReviewStatusSync: mocks.getReviewStatusSync,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../tmux.js', () => ({
@@ -64,8 +67,8 @@ vi.mock('../config.js', () => ({
   loadCloisterConfigSync: mocks.loadCloisterConfigSync,
 }));
 
-vi.mock('../agent-idle.js', () => ({
-  isAgentIdleForNudge: mocks.isAgentIdleForNudge,
+vi.mock('../../agents/liveness.js', () => ({
+  isIdle: mocks.isAgentIdleForNudge,
 }));
 
 vi.mock('../memory-governor.js', () => ({

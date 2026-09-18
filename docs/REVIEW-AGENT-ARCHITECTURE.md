@@ -136,8 +136,10 @@ require all of the following before it can ask the write door to converge state:
 - the current workspace head equals the artifact anchor.
 
 `recordReviewVerdict()` in
-`src/lib/cloister/review-verdict-writer.ts` is the sole terminal write door. It
-classifies differing evidence and row anchors with per-repository
+`src/lib/cloister/review-verdict-writer.ts` is the sole terminal write door. PAN-3847:
+a terminal verdict with **no evidence anchor is refused** (`no-evidence-head`) so the
+caller re-snapshots — verdict and anchor are one write, never two. Differing evidence
+and row anchors are classified with per-repository
 `git merge-base --is-ancestor` probes:
 
 - **equal anchors** land without re-gating an existing terminal test result;
@@ -159,6 +161,16 @@ lane reports for the active run, writes a synthesis artifact, and calls the same
 write door. The unsignaled reconciler also converges pending or reviewing rows
 through that door after the settle window, current-head check, newer-request
 check, and freshness check. It preserves the normal blocked-feedback path.
+
+A reviewer's exit writes its own state (PAN-3848 W26): the review sub-role
+launcher runs `pan admin agents exited <agentId> --code <n>` when the reviewer
+process exits (retrying transient write failures, PAN-3848 F5), and the
+Stop-hook's convoy reaper calls the same verb before killing a signaled
+reviewer's session. No patrol is the designed exit path — but Deacon's orphan
+recovery (`handleAgentHeartbeatDeadEvent`) still marks a reviewer stopped when
+its session is gone past the startup grace, so a persistently failed exit
+write converges on the next sweep: without the exit code, and counted as an
+orphan rather than a reported exit.
 
 The stall sweeper is observation-only. It may recommend that an operator inspect
 fresh evidence, but it never writes a verdict, clears a stuck flag, starts a
@@ -241,6 +253,12 @@ reversal (the newest count rises) or a stall (two non-decreases) marks the issue
 `review-not-converging`. The issue remains blocked with its feedback and a
 needs-you escalation; automatic rework re-drive stops until an operator runs
 `pan unstick <issueId>` or decomposes the work.
+
+Post-review drift (PAN-3847): when a passed review's anchor stops matching the
+workspace head, the row is marked `reviewStaleSince` — never reset by a patrol —
+and stops deriving `readyForMerge`. Only `pan done` or `pan review request`
+clears the marker and starts the re-review. Blocked verdicts still re-dispatch
+on a rework commit (debounced one patrol), never with `force: true`.
 
 This cross-cycle safety gate is separate from a single review parent's judgment
 about which findings matter in one convoy.

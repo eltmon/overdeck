@@ -32,6 +32,9 @@ vi.mock('../../review-status.js', () => ({
   loadReviewStatuses: mocks.loadReviewStatuses,
   getReviewStatusSync: mocks.getReviewStatusSync,
   setReviewStatusSync: mocks.setReviewStatusSync,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../agents.js', () => ({
@@ -39,6 +42,12 @@ vi.mock('../../agents.js', () => ({
   getAgentRuntimeStateSync: mocks.getAgentRuntimeStateSync,
   listRunningAgents: mocks.listRunningAgents,
   spawnRun: mocks.spawnRun,
+}));
+
+// PAN-3849: the activity signals moved into agents/liveness.ts, which reads
+// the mirror from agents/runtime-state.js (not the barrel) — mirror the mock.
+vi.mock('../../agents/runtime-state.js', () => ({
+  getAgentRuntimeStateSync: mocks.getAgentRuntimeStateSync,
 }));
 
 vi.mock('../../overdeck/agents.js', () => ({

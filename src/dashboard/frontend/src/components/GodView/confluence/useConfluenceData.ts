@@ -233,6 +233,26 @@ const ACTIVE_MERGE_STATUSES = new Set<string>(['pending', 'queued', 'merging', '
  * so a large stale population never becomes an unreadable label wall. */
 const STALE_ORB_LIMIT = 14;
 
+/**
+ * The agents whose paused / yielded flags describe the issue RIGHT NOW.
+ *
+ * A stopped agent keeps whatever `paused` it held when it stopped — nothing
+ * clears the flag on a dead row, and nothing should. But the orb asked
+ * `issueAgents.some((agent) => agent.paused === true)` across every agent the
+ * issue ever had, so one long-dead paused row shelved an issue whose live
+ * agent was working: PAN-3841 carried eight stopped-and-paused review
+ * specialists from an operator pause plus one running work agent, and rendered
+ * "yielded ⏸" in the Doldrums shelf while that agent produced output.
+ *
+ * So the live agents speak when there are any. When there are none, the whole
+ * set speaks again — that is the genuinely operator-parked issue (every agent
+ * stopped, several paused), and the shelf is exactly where it belongs.
+ */
+function pauseVoters(agents: readonly AgentSnapshot[]): readonly AgentSnapshot[] {
+  const live = agents.filter((agent) => activeStatus(agent.status));
+  return live.length > 0 ? live : agents;
+}
+
 function closedIssueState(issue: IssueRecord | undefined): boolean {
   if (!issue) return false;
   const state = String(issue.state ?? issue.status ?? '').toLowerCase();
@@ -642,7 +662,8 @@ export function useConfluenceOrbs(
       const lastActivity = latestActivity(issueAgents, agentRuntimeById);
       const lastActivityMs = lastActivity ? Date.parse(lastActivity) : Number.NaN;
       const idleMin = Number.isFinite(lastActivityMs) ? Math.max(0, (now - lastActivityMs) / 60_000) : 0;
-      const yieldedByScheduler = issueAgents.some((agent) =>
+      const voters = pauseVoters(issueAgents);
+      const yieldedByScheduler = voters.some((agent) =>
         (agent as AgentSnapshot & { yieldedByScheduler?: boolean }).yieldedByScheduler === true ||
         agent.pausedReason?.toLowerCase().includes('yield') === true,
       );
@@ -661,13 +682,13 @@ export function useConfluenceOrbs(
         heat: Math.min(1, 0.25 + issueAgents.filter((agent) => activeStatus(agent.status)).length * 0.15),
         staleMin: idleMin,
         state: classifyOrb({
-          paused: issueAgents.some((agent) => agent.paused === true),
+          paused: voters.some((agent) => agent.paused === true),
           yieldedByScheduler,
           mergeStatus,
           lastActivity,
         }, now),
         convoy: convoyMembers(issueAgents),
-        yieldReason: issueAgents.find((agent) => agent.pausedReason)?.pausedReason ?? null,
+        yieldReason: voters.find((agent) => agent.pausedReason)?.pausedReason ?? null,
         yieldedByScheduler,
         warn: primary.status === 'error' || primary.troubled ? (primary.lastFailureReason ?? primary.status) : null,
         broken,

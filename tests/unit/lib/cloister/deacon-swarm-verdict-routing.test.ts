@@ -43,6 +43,9 @@ vi.mock('../../../../src/lib/projects.js', () => ({
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: mockGetReviewStatus,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
@@ -104,6 +107,12 @@ async function writePlan(doc: XBriefDocument): Promise<string> {
 describe('swarm verdict feedback routing', () => {
   beforeEach(() => {
     mockMessageAgent.mockReset();
+    // PAN-3846 W7: review-verdict-feedback now counts a message as sent only
+    // when the delivery outcome reports delivered:true (a confirmed turn). An
+    // undefined mock return is delivered:false, which escalates instead. These
+    // tests assert ROUTING — which target receives the message — so the default
+    // outcome is a successful delivery, matching review-verdict-feedback.test.ts.
+    mockMessageAgent.mockResolvedValue({ delivered: true, queuedToMail: false });
     mockGetReviewStatus.mockReset();
     mockWriteFeedbackFile.mockReset();
     mockListSlotOwnership.mockReset();
@@ -143,6 +152,7 @@ describe('swarm verdict feedback routing', () => {
       'internal',
       {
         owesRework: true,
+        feedbackRedelivery: true,
         dedupKey: expect.stringMatching(/^review-feedback:pan-2203:[a-f0-9]{16}$/),
       },
     );
@@ -156,6 +166,7 @@ describe('swarm verdict feedback routing', () => {
     mockResolveIssueFeedbackTarget.mockResolvedValue({ agentId: 'agent-pan-2203-slot-2' });
     mockMessageAgent.mockImplementation(async (agentId: string) => {
       if (agentId === 'agent-pan-2203') throw new Error('parent agent missing');
+      return { delivered: true, queuedToMail: false };
     });
 
     const { deliverReviewVerdictFeedback } = await import('../../../../src/lib/cloister/review-verdict-feedback.js');
@@ -176,6 +187,7 @@ describe('swarm verdict feedback routing', () => {
       'internal',
       {
         owesRework: true,
+        feedbackRedelivery: true,
         dedupKey: expect.stringMatching(/^review-feedback:pan-2203:[a-f0-9]{16}$/),
       },
     );
@@ -211,6 +223,7 @@ describe('swarm verdict feedback routing', () => {
       'internal',
       {
         owesRework: true,
+        feedbackRedelivery: true,
         dedupKey: expect.stringMatching(/^review-feedback:pan-2203:[a-f0-9]{16}$/),
       },
     );

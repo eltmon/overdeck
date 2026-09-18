@@ -17,7 +17,8 @@ import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { getCloisterEventStore } from './event-store-provider.js';
-import { getReviewStatusSync, setReviewStatusSync, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
+import { setReviewStatusSync, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
+import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -36,7 +37,7 @@ export interface VerdictInput {
   writer: VerdictWriter;
 }
 
-export type VerdictOutcome = { landed: true; classification: 'no-evidence' | 'anchor-match' | 'dispatched' } | { landed: false; reason: string };
+export type VerdictOutcome = { landed: true; classification: 'no-evidence' | 'no-verification-anchor' | 'anchor-match' | 'dispatched' } | { landed: false; reason: string };
 
 // ─── Private: Head Classification ─────────────────────────────────────────────
 
@@ -127,11 +128,25 @@ async function classifyEvidenceAgainstAnchor(
  * {landed: false; reason} if the verdict was rejected (stale evidence only).
  */
 export async function recordReviewVerdict(issueId: string, input: VerdictInput): Promise<VerdictOutcome> {
-  const status = getReviewStatusSync(issueId);
+  const status = getPipelineStatus(issueId);
+
+  // A terminal verdict without an evidence anchor cannot be compared with anything later;
+  // refuse it so the caller re-snapshots instead of landing a verdict that carries a stale anchor.
+  if (!input.evidenceHead) {
+    emitActivityEntrySync({
+      source: 'cloister',
+      level: 'warn',
+      issueId,
+      message: `[review-verdict-writer] Refused ${input.verdict} verdict from ${input.writer}: no evidence head`,
+    });
+    return { landed: false, reason: 'no-evidence-head' };
+  }
+
   if (!status) {
     setReviewStatusSync(issueId, {
       reviewStatus: input.verdict,
       reviewNotes: input.notes,
+      reviewedAtCommit: input.evidenceHead,
       ...(input.extra ? { ...input.extra } : {}),
     });
     return { landed: true, classification: 'no-evidence' };
@@ -143,15 +158,16 @@ export async function recordReviewVerdict(issueId: string, input: VerdictInput):
     return resolved ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`) : null;
   })();
 
-  // No evidence head or row head absent: take the no-evidence path
-  if (!input.evidenceHead || !status.lastVerifiedCommit) {
+  // Row has no verification anchor yet (verification skipped by policy): land verdict + anchor together.
+  if (!status.lastVerifiedCommit) {
     const update: ReviewStatusUpdate = {
       reviewStatus: input.verdict,
       reviewNotes: input.notes,
+      reviewedAtCommit: input.evidenceHead,
       ...(input.extra ? { ...input.extra } : {}),
     };
     setReviewStatusSync(issueId, update, status);
-    return { landed: true, classification: 'no-evidence' };
+    return { landed: true, classification: 'no-verification-anchor' };
   }
 
   // Evidence heads equal: land the verdict without re-gating the same test result.

@@ -1,3 +1,4 @@
+import type { ConfigurableProvider } from '../configurable-providers.js';
 import type { ModelId } from '../settings.js';
 import type { ModelProvider } from '../model-fallback.js';
 import type { EffortLevel } from '../model-capabilities.js';
@@ -171,6 +172,8 @@ export interface ConversationsConfig {
   rich_compaction?: boolean;
   /** Model used for AI-generated conversation titles (default: claude-haiku-4-5) */
   title_model?: ModelId;
+  /** Model used to author external handoff docs (`pan handoff`) when no per-call model is given. Required for `pan handoff` to work — there is no default (PAN-3860); unset fails the handoff loudly. */
+  handoff_author_model?: ModelId;
   watch_dirs?: string[];
   scan_max_parallel?: number | null;
   embeddings?: boolean;
@@ -480,10 +483,7 @@ export interface YamlConfig {
   /** Model configuration */
   models?: {
     /** Provider enable/disable and API keys */
-    providers?: Partial<Record<
-      'anthropic' | 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' |
-      'openrouter' | 'nous' | 'dashscope' | 'meta' | 'opencode' | 'opencode-go', ProviderConfig | boolean
-    >>;
+    providers?: Partial<Record<ConfigurableProvider, ProviderConfig | boolean>>;
 
     /** Per-work-type overrides (explicit model for specific tasks) */
     overrides?: Partial<Record<string, ModelId>>;
@@ -851,6 +851,10 @@ export interface NormalizedConfig {
     manualCompactMode: ManualCompactMode;
     richCompaction: boolean;
     titleModel: ModelId;
+    /** PAN-3860: deliberately no default — unset means the handoff pipeline
+     * must fail loudly (HandoffAuthorModelNotConfiguredError) rather than
+     * hardcode a fallback model. */
+    handoffAuthorModel?: ModelId;
     watchDirs: string[];
     scanMaxParallel: number | null;
     embeddings: boolean;

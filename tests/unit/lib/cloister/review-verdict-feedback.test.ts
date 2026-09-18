@@ -49,6 +49,9 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
   getReviewStatus: mockGetReviewStatus,
   getReviewStatusSync: mockGetReviewStatus,
   clearFeedbackDeliveryStuck: mockClearFeedbackDeliveryStuck,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
@@ -125,6 +128,7 @@ describe('deliverReviewVerdictFeedback', () => {
       'internal',
       {
         owesRework: true,
+        feedbackRedelivery: true,
         dedupKey: expect.stringMatching(/^review-feedback:pan-1059:[a-f0-9]{16}$/),
       },
     );
@@ -222,7 +226,7 @@ describe('deliverReviewVerdictFeedback', () => {
       'agent-pan-1059',
       expect.any(String),
       'internal',
-      { owesRework: true },
+      { owesRework: true, feedbackRedelivery: true },
     );
   });
 
@@ -306,9 +310,10 @@ describe('deliverReviewVerdictFeedback', () => {
     expect(mockMessageAgent).toHaveBeenCalledTimes(2);
     expect(mockMessageAgent.mock.calls[0]![3]).toEqual({
       owesRework: true,
+      feedbackRedelivery: true,
       dedupKey: expect.stringMatching(/^review-feedback:pan-1059:[a-f0-9]{16}$/),
     });
-    expect(mockMessageAgent.mock.calls[1]![3]).toEqual({ owesRework: true });
+    expect(mockMessageAgent.mock.calls[1]![3]).toEqual({ owesRework: true, feedbackRedelivery: true });
   });
 });
 

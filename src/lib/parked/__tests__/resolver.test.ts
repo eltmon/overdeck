@@ -22,6 +22,20 @@ vi.mock('../../agents/queries.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../agents/queries.js')>();
   return { ...actual, listAgentStates: () => gather.agents, listRunningAgentsSync: () => gather.liveAgents };
 });
+// PAN-3849 (W32): the sweeper's "live" filter is the liveness oracle now. Map
+// each fixture's tmuxActive flag to the verdict it stood for, so every case
+// keeps its original intent.
+vi.mock('../../agents/liveness.js', () => ({
+  isAliveSync: (agentId: string) => (
+    (gather.liveAgents as { id: string; tmuxActive?: boolean }[])
+      .some((a) => a.id === agentId && a.tmuxActive === true)
+      ? { alive: true, paneAlive: true }
+      : { alive: false, reason: 'no-session' }
+  ),
+  // Mirrors the real isConfirmedDead: only a confirmed absence is death.
+  isConfirmedDead: (verdict: { alive: boolean; reason?: string }) =>
+    !verdict.alive && verdict.reason !== 'runtime-indeterminate',
+}));
 
 const projects = vi.hoisted(() => ({
   registry: new Map<string, { projectKey: string; projectPath: string }>(),
@@ -89,6 +103,7 @@ function signals(overrides: Partial<ParkedSignals>): ParkedSignals {
     liveAgents: [],
     openRecoveryTrips: [],
     issueClosed: null,
+    invariantMismatches: [],
     now: NOW,
     ...overrides,
   };
@@ -213,6 +228,34 @@ describe('classifyParked — one orbit at a time', () => {
     expect(rows[0].parkReason).toContain('25/25');
   });
 
+  it('invariant-mismatch: pipeline drift names the resync door (PAN-3850)', () => {
+    const rows = classifyParked(signals({
+      invariantMismatches: [{ entity: 'PAN-1', kind: 'pipeline', fields: [{ field: 'reviewStatus', recordValue: 'passed', rowValue: 'pending' }] }],
+    }));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].orbit).toBe('invariant-mismatch');
+    expect(rows[0].parkReason).toContain('reviewStatus');
+    expect(rows[0].unparkCondition).toContain('pan review resync PAN-1');
+  });
+
+  it('invariant-mismatch: liveness drift names the agents-exited door (PAN-3850)', () => {
+    const rows = classifyParked(signals({
+      invariantMismatches: [{ entity: 'agent-pan-1', kind: 'liveness', fields: [], detail: 'agents row says running but no tmux session exists', issueId: 'PAN-1' }],
+    }));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].orbit).toBe('invariant-mismatch');
+    expect(rows[0].unparkCondition).toContain('pan admin agents exited agent-pan-1');
+  });
+
+  it('invariant-mismatch never suppresses idle-running, the orbit of last resort', () => {
+    const rows = classifyParked(signals({
+      reviewStatus: baseStatus({}),
+      liveAgents: [{ ...baseAgent({ lastActivity: new Date(NOW - IDLE_RUNNING_THRESHOLD_MS - 60_000).toISOString() }), tmuxActive: true }],
+      invariantMismatches: [{ entity: 'PAN-1', kind: 'pipeline', fields: [{ field: 'stuck', recordValue: null, rowValue: true }] }],
+    }));
+    expect(rows.map((r) => r.orbit).sort()).toEqual(['idle-running', 'invariant-mismatch']);
+  });
+
   it('multiple orbits stack on one issue (stuck + operator gate)', () => {
     const rows = classifyParked(signals({
       reviewStatus: baseStatus({ stuck: true, stuckReason: 'review_infrastructure_failure' }),
@@ -251,6 +294,9 @@ describe('guard-exit inventory (PAN-3488)', () => {
       'zombie-session': signals({ reviewStatus: baseStatus({ mergeStatus: 'merged' }), liveAgents: [{ ...baseAgent({}), tmuxActive: true }] }),
       'idle-running': signals({ reviewStatus: baseStatus({}), liveAgents: [{ ...baseAgent({ lastActivity: new Date(NOW - IDLE_RUNNING_THRESHOLD_MS - 60_000).toISOString() }), tmuxActive: true }] }),
       'circuit-breaker': signals({ reviewStatus: baseStatus({ autoRequeueCount: 30 }) }),
+      'invariant-mismatch': signals({
+        invariantMismatches: [{ entity: 'PAN-1', kind: 'pipeline', fields: [{ field: 'reviewStatus', recordValue: 'passed', rowValue: 'pending' }] }],
+      }),
     };
     expect(Object.keys(fixtures).sort()).toEqual([...PARKED_ORBITS].sort());
     for (const orbit of PARKED_ORBITS) {
@@ -344,6 +390,28 @@ describe('resolveParkedPopulation record-first terminality (PAN-3727)', () => {
     // Not record-terminal and tracker says open — the issue classifies normally
     // (no zombie-session row for a live agent on an open issue).
     expect(rows.some((row) => row.issueId === 'PAN-502' && row.orbit === 'zombie-session')).toBe(false);
+  });
+
+  it('status gate survives the oracle migration: a stopped agent with a live session is not live', async () => {
+    // The W32 oracle migration dropped the pre-migration status gate
+    // (tmuxActive && (running || starting)); a stopped agent whose session is
+    // still alive then entered liveAgents, minting zombie-session rows for an
+    // agent that is resumable residue, not a running agent.
+    const stopped = baseAgent({ id: 'agent-pan-503', issueId: 'PAN-503', status: 'stopped', stoppedAt: new Date(NOW - HOUR).toISOString(), lastActivity: new Date(NOW - HOUR).toISOString() });
+    gather.statuses = { 'PAN-503': baseStatus({ issueId: 'PAN-503', mergeStatus: 'merged' }) };
+    gather.agents = [stopped];
+    // Oracle verdict is alive (the session outlived the harness) — the status
+    // gate alone must keep this agent out of liveAgents.
+    gather.liveAgents = [{ ...stopped, tmuxActive: true }];
+    const isClosedSpy = vi.fn(async () => false);
+
+    const rows = await resolveParkedPopulation({
+      now: NOW,
+      readRecordTerminal: async () => false,
+      isClosed: isClosedSpy,
+    });
+
+    expect(rows.filter((row) => row.issueId === 'PAN-503')).toHaveLength(0);
   });
 });
 

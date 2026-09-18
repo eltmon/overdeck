@@ -28,6 +28,44 @@ and ACP sockets — precede these but are no-ops for Claude Code agents):
 2. legacy Claude Code Channels MCP socket for already-wired sessions
 3. tmux paste-buffer fallback
 
+## Supervisor lifecycle events (PAN-3849)
+
+The supervisor is also the lifecycle reporter for its agent (W33, FR-21/FR-24).
+Because it spawns the harness child and reaps its exit, it posts the events
+only it can know to `POST /api/agents/:id/lifecycle` (authenticated with the
+same `pty-token` as the delivery socket):
+
+- `session-started` — right after the harness process spawns; the projection
+  writes `running` and emits `agent.started` here, never from a pre-spawn
+  placeholder row.
+- `turn-started` — after each accepted injection; touches `lastActivity`.
+- `turn-ended` — reserved in the route's event union.
+- `exited` — after the child exits; the projection writes `stopped` through
+  `applyAgentLifecycleEvent` (`src/dashboard/server/services/agent-projection.ts`)
+  in one transaction with the agents-row upsert.
+
+Posts retry three times with backoff and are logged on failure; an
+unreachable dashboard never blocks the child, and `exited` is awaited (the
+child is already dead) before the supervisor exits. The event is additive
+with the delivery contract above: a confirmed turn is still reported by
+`messageAgent` through transcript probing (PAN-3846), while these events
+drive the agents-table status and activity columns.
+
+
+## Delivery contract (PAN-3846)
+
+`messageAgent` returns `delivered: true` for a running Claude Code agent only
+when the agent's transcript shows the message as a new turn — the delivery is
+probed against the session JSONL for up to 30 seconds across two attempts
+(`deliverMessageWithTranscriptConfirmation` in `src/lib/agents/delivery.ts`,
+the generalized resume primitive). When no turn appears, the outcome is
+`delivered: false` with a `reason` (and `confirmed: false`); callers that need
+escalation branch on `delivered` and surface a needs-you instead of reporting
+success. Keyed deliveries keep the dedup door as their receipt and non-Claude
+harnesses keep their composer-level contract; both report `confirmed: false`.
+A confirmed delivery also clears the issue's `feedback_delivery_needs_you`
+stuck flag through the review-status door.
+
 The tmux fallback presses Enter after an unverified paste so text never sits
 orphaned in the composer — except when the pane is blocked on a numbered choice
 menu (session-resume gate, permission prompt, plan approval). That menu is why

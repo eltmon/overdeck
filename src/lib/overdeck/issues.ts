@@ -22,6 +22,20 @@ export const overdeckIssues = sqliteTable('issues', {
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 });
 
+/**
+ * PAN-3903: the pipeline read door is `./pipeline-view.js`, deliberately NOT a
+ * method on this resolver and deliberately NOT re-exported here.
+ *
+ * The door has to answer a cloister patrol, which is plain sync code that
+ * cannot take an Effect dependency. Importing it from this module pulls
+ * `review-status.js` — and the `cloister/feedback-target.js` subgraph behind it
+ * — into every importer of `IssuesResolver`, and `overdeck/control-settings.js`
+ * already imports this file. That closes a cycle the circular-dependency guard
+ * rejects and that Node's strict ESM refuses at boot (Bun tolerates it, so a
+ * green typecheck proves nothing). Keeping the door a leaf module is what makes
+ * one implementation reachable from both the patrols and the dashboard.
+ */
+
 export const IssueId = Schema.String.pipe(Schema.brand('IssueId'));
 export type IssueId = typeof IssueId.Type;
 

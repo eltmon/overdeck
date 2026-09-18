@@ -859,7 +859,7 @@ describe('PAN-1919: buildIssueRecord backfill migration', () => {
     rmSync(project.path, { recursive: true, force: true });
   });
 
-  it('ignores a mid-spawn placeholder row and falls back to the existing record', async () => {
+  it('PAN-3849: a starting row carries the child-resolved harness/model — there is no placeholder to ignore', async () => {
     const project = makeProject();
     writeIssueRecordSync(project, 'PAN-1919', {
       issueId: 'PAN-1919',
@@ -870,12 +870,12 @@ describe('PAN-1919: buildIssueRecord backfill migration', () => {
       closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
     });
     mockListOverdeckAgentStatesSync.mockReturnValue([
-      { id: 'agent-pan-1919', issueId: 'PAN-1919', role: 'work', harness: 'claude-code', model: 'pending-work-spawn', status: 'starting', startedAt: '2026-06-22T00:00:00.000Z' },
+      { id: 'agent-pan-1919', issueId: 'PAN-1919', role: 'work', harness: 'claude-code', model: 'gpt-5.6-sol', status: 'starting', startedAt: '2026-06-22T00:00:00.000Z' },
     ]);
 
     const record = await buildIssueRecord(project, 'PAN-1919');
-    expect(record.harness).toBe('codex');
-    expect(record.model).toBe('gpt-5.5');
+    expect(record.harness).toBe('claude-code');
+    expect(record.model).toBe('gpt-5.6-sol');
     rmSync(project.path, { recursive: true, force: true });
   });
 });

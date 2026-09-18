@@ -16,7 +16,7 @@ describe('buildPlanningPrompt', () => {
   };
 
   it('renders a planning prompt without child stories', async () => {
-    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace');
+    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', 'test-model');
     expect(prompt).toContain('PAN-123');
     expect(prompt).toContain('Test Issue');
     expect(prompt).toContain('A test description');
@@ -24,7 +24,7 @@ describe('buildPlanningPrompt', () => {
   });
 
   it('defines readiness as static parallel safety instead of the initial DAG frontier', async () => {
-    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace');
+    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', 'test-model');
 
     expect(prompt).toContain('never derive it from zero in-degree or the initial frontier');
     expect(prompt).toContain('incoming `blocks` edges should still be `ready`');
@@ -42,7 +42,7 @@ describe('buildPlanningPrompt', () => {
       ],
     };
 
-    const prompt = await buildPlanningPrompt(featureIssue, '/tmp/workspace');
+    const prompt = await buildPlanningPrompt(featureIssue, '/tmp/workspace', 'test-model');
     expect(prompt).toContain('Child Stories');
     expect(prompt).toContain('US100');
     expect(prompt).toContain('Story A');
@@ -60,7 +60,7 @@ describe('buildPlanningPrompt', () => {
       ],
     };
 
-    const prompt = await buildPlanningPrompt(featureIssue, '/tmp/workspace');
+    const prompt = await buildPlanningPrompt(featureIssue, '/tmp/workspace', 'test-model');
     expect(prompt).toContain('Cross-story dependencies');
     expect(prompt).toContain('blocks');
     expect(prompt).toContain('informs');
@@ -73,12 +73,12 @@ describe('buildPlanningPrompt', () => {
       artifactType: 'HierarchicalRequirement',
     };
 
-    const prompt = await buildPlanningPrompt(storyIssue, '/tmp/workspace');
+    const prompt = await buildPlanningPrompt(storyIssue, '/tmp/workspace', 'test-model');
     expect(prompt).not.toContain('Child Stories');
   });
 
   it('renders non-interactive auto-planning instructions', async () => {
-    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', undefined, undefined, true);
+    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', 'test-model', undefined, true);
 
     expect(prompt).toContain('Auto Planning Mode');
     expect(prompt).toContain('Do not use AskUserQuestion');
@@ -87,7 +87,7 @@ describe('buildPlanningPrompt', () => {
   });
 
   it('renders probe pass instructions when --probe is set', async () => {
-    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', undefined, undefined, false, true);
+    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', 'test-model', undefined, false, true);
 
     expect(prompt).toContain('Probe Pass (required before finalize)');
     expect(prompt).toContain('attack your own plan');
@@ -95,17 +95,36 @@ describe('buildPlanningPrompt', () => {
   });
 
   it('renders probe pass instructions for high effort planning', async () => {
-    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', undefined, 'high');
+    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', 'test-model', 'high');
 
     expect(prompt).toContain('Probe Pass (required before finalize)');
     expect(prompt).toContain('Which edge is missing');
   });
 
   it('does not render probe pass instructions by default', async () => {
-    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace');
+    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', 'test-model');
 
     expect(prompt).not.toContain('Probe Pass (required before finalize)');
     expect(prompt).not.toContain('PROBE: no findings');
+  });
+
+  it('throws when planningModel is missing instead of falling back to a hardcoded model', async () => {
+    await expect(
+      buildPlanningPrompt(baseIssue, '/tmp/workspace', undefined as unknown as string),
+    ).rejects.toThrow('planningModel is required');
+  });
+
+  it('does not inline role instructions for claude-code', async () => {
+    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', 'test-model', undefined, false, false, '', 'claude-code');
+
+    expect(prompt).not.toContain('Role instructions (inlined');
+  });
+
+  it('inlines the plan role body for harnesses without an agent-definition channel', async () => {
+    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace', 'test-model', undefined, false, false, '', 'ohmypi');
+
+    expect(prompt).toContain('Role instructions (inlined');
+    expect(prompt).toContain('## Boundaries');
   });
 });
 

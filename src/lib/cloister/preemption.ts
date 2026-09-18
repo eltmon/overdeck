@@ -34,12 +34,12 @@ import {
   stopAgent,
   type AgentState,
 } from '../agents.js';
-import { getReviewStatusSync } from '../review-status.js';
+import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 import { listSessions } from '../tmux.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { loadCloisterConfigSync } from './config.js';
-import { isAgentIdleForNudge } from './agent-idle.js';
+import { isIdle } from '../agents/liveness.js';
 import { assessMemoryPressure } from './memory-governor.js';
 import { tryReserveAdvancingSlot } from './concurrency.js';
 
@@ -61,7 +61,7 @@ export interface YieldOutcome {
 export interface YieldCandidate {
   id: string;
   issueId: string;
-  /** `isAgentIdleForNudge` — only idle agents may be yielded (never preempt active work). */
+  /** `isIdle` — only idle agents may be yielded (never preempt active work). */
   idle: boolean;
   /** An operator is attached to the tmux session — never yield out from under a human. */
   attached: boolean;
@@ -111,7 +111,7 @@ export function selectYieldVictim(
 }
 
 function reviewBlockedFor(issueId: string): boolean {
-  const status = getReviewStatusSync(issueId)?.reviewStatus;
+  const status = getPipelineStatus(issueId)?.reviewStatus;
   // PAN-2507 (FR-2a): the enum has no `in_progress`; the faithful "waiting on
   // its own review" states are `pending` (queued) and `reviewing` (running).
   return status === 'pending' || status === 'reviewing';
@@ -132,7 +132,7 @@ async function buildCandidates(): Promise<YieldCandidate[]> {
     .map((s) => ({
       id: s.id,
       issueId: s.issueId,
-      idle: isAgentIdleForNudge(s.id),
+      idle: isIdle(s.id),
       attached: attached.has(s.id),
       paused: s.paused === true,
       reviewBlocked: reviewBlockedFor(s.issueId),

@@ -17,6 +17,14 @@ import { writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
+// PAN-3846 W5: the test-signal failsafe asks isAgentIdleForNudge(session,
+// TEST_SETTLE_MS = 5min). Idle is now a fact about work activity, not the
+// mirror's 'idle' label — the Stop hook flips that label between every two
+// turns. These fixtures mean "alive and genuinely idle", so their work
+// activity must be older than the settle window; activity of `now` is a
+// working agent and correctly gets no nudge.
+const STALE_ACTIVITY = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+
 // ── Module-level mocks ──────────────────────────────────────────────────────
 
 const mockSetReviewStatus = vi.fn();
@@ -45,6 +53,9 @@ vi.mock('../../../src/lib/review-status.js', () => ({
   setReviewStatusSync: (...args: unknown[]) => mockSetReviewStatus(...args),
   loadReviewStatuses: (...args: unknown[]) => mockLoadReviewStatuses(...args),
   MAX_AUTO_REQUEUE: 25,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {
@@ -91,6 +102,13 @@ vi.mock('../../../src/lib/agents.js', () => ({
   messageAgent: (...args: unknown[]) => mockMessageAgent(...args),
   spawnRun: (...args: unknown[]) => mockSpawnRun(...args),
 }));
+// PAN-3849: the liveness oracle reads the runtime mirror from
+// agents/runtime-state.js directly, not through the agents.js barrel — mirror
+// the same mock there or isIdle reads the real filesystem.
+vi.mock('../../../src/lib/agents/runtime-state.js', () => ({
+  getAgentRuntimeStateSync: (...args: unknown[]) => mockGetAgentRuntimeState(...args),
+}));
+
 
 vi.mock('../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: (...args: unknown[]) => mockResolveProjectFromIssue(...args),
@@ -185,7 +203,7 @@ describe('checkCompletedButUnsignaledTests (PAN-1681 test-signal failsafe)', () 
     mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck', projectPath: projectPath });
     mockSessionExists.mockReturnValue(true); // live test session
     mockIsPaneDead.mockResolvedValue(false);
-    mockGetAgentRuntimeState.mockReturnValue({ state: 'idle', lastActivity: new Date().toISOString() });
+    mockGetAgentRuntimeState.mockReturnValue({ state: 'idle', lastActivity: STALE_ACTIVITY });
     writeStatusFile({ 'PAN-1242': { issueId: 'PAN-1242', reviewStatus: 'passed', testStatus: 'pending' } });
 
     // First pass: nudge, do NOT mutate status.
@@ -207,7 +225,7 @@ describe('checkCompletedButUnsignaledTests (PAN-1681 test-signal failsafe)', () 
     mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck', projectPath: projectPath });
     mockSessionExists.mockReturnValue(true);
     mockIsPaneDead.mockResolvedValue(false);
-    mockGetAgentRuntimeState.mockReturnValue({ state: 'idle', lastActivity: new Date().toISOString() });
+    mockGetAgentRuntimeState.mockReturnValue({ state: 'idle', lastActivity: STALE_ACTIVITY });
     writeStatusFile({ 'PAN-1243': { issueId: 'PAN-1243', reviewStatus: 'passed', testStatus: 'pending' } });
 
     await checkCompletedButUnsignaledTests();
@@ -228,7 +246,7 @@ describe('checkCompletedButUnsignaledTests (PAN-1681 test-signal failsafe)', () 
     mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck', projectPath });
     mockSessionExists.mockReturnValue(true);
     mockIsPaneDead.mockResolvedValue(false);
-    mockGetAgentRuntimeState.mockReturnValue({ state: 'idle', lastActivity: new Date().toISOString() });
+    mockGetAgentRuntimeState.mockReturnValue({ state: 'idle', lastActivity: STALE_ACTIVITY });
     writeStatusFile({
       'PAN-3092': {
         issueId: 'PAN-3092',

@@ -24,6 +24,7 @@ const routeMocks = vi.hoisted(() => ({
   pushDashboardReviewBranch: vi.fn(),
   resolveProjectForIssue: vi.fn(),
   updateIssueRecord: vi.fn(),
+  reportTieredVerificationFailureEscalation: vi.fn(),
 }));
 
 vi.mock('../../workspaces.js', async (importOriginal) => {
@@ -44,6 +45,9 @@ vi.mock('../../../../../lib/review-status.js', () => ({
   getReviewStatusSync: routeMocks.getReviewStatusSync,
   clearFeedbackDeliveryStuck: routeMocks.clearFeedbackDeliveryStuck,
   registerReviewVerdictFeedbackDelivery: routeMocks.registerReviewVerdictFeedbackDelivery,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../../../lib/cloister/conflict-gate.js', () => ({
@@ -74,6 +78,14 @@ vi.mock('../../../../../lib/pan-dir/record.js', () => ({
 
 vi.mock('../../../../../lib/pan-dir/record-update.js', () => ({
   updateIssueRecord: routeMocks.updateIssueRecord,
+}));
+
+vi.mock('../../tiered-inspect-escalation.js', () => ({
+  reportTieredVerificationFailureEscalation: routeMocks.reportTieredVerificationFailureEscalation,
+}));
+
+vi.mock('../../../../../lib/review-artifacts.js', () => ({
+  createReviewArtifactsForIssue: vi.fn(() => Effect.succeed({ mergeSet: { repos: [] } })),
 }));
 
 import { EventStoreService } from '../../../services/domain-services.js';
@@ -189,5 +201,51 @@ describe('POST /api/review/:issueId/trigger reviewMode', () => {
     expect(result.status).toBe(500);
     expect(result.body).toMatchObject({ error: expect.stringContaining('state push failed') });
     expect(routeMocks.pushLocalReviewBranches).not.toHaveBeenCalled();
+  });
+
+  // PAN-3858: the verification gate is the caller of the verification-failed
+  // escalation trigger.
+  it('fires the verification-failed tier escalation when verification fails', async () => {
+    routeMocks.pushLocalReviewBranches.mockResolvedValue(undefined);
+    routeMocks.runVerificationForIssue.mockReturnValue(Effect.succeed({ outcome: 'failed', failedCheck: 'typecheck' }));
+    routeMocks.reportTieredVerificationFailureEscalation.mockResolvedValue(undefined);
+
+    const result = await requestReviewTrigger({
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        [INTERNAL_TOKEN_HEADER]: 'test-internal-token',
+      },
+      body: JSON.stringify({ reviewMode: 'full' }),
+    });
+
+    expect(result.status).toBe(200);
+    await vi.waitFor(() => {
+      expect(routeMocks.reportTieredVerificationFailureEscalation).toHaveBeenCalledWith(
+        'PAN-3340',
+        '/repo/workspaces/feature-3340',
+        'verification failed at typecheck',
+      );
+    });
+  });
+
+  it('does not fire the tier escalation when verification passes', async () => {
+    routeMocks.pushLocalReviewBranches.mockImplementation(() => new Promise<void>(() => {}));
+
+    const result = await requestReviewTrigger({
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        [INTERNAL_TOKEN_HEADER]: 'test-internal-token',
+      },
+      body: JSON.stringify({ reviewMode: 'full' }),
+    });
+
+    expect(result.status).toBe(200);
+    // The background pipeline is parked at the branch push, well before
+    // verification runs; give microtasks a turn, then assert no escalation.
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(routeMocks.reportTieredVerificationFailureEscalation).not.toHaveBeenCalled();
+    expect(routeMocks.runVerificationForIssue).not.toHaveBeenCalled();
   });
 });

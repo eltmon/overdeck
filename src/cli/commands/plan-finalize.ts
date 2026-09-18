@@ -188,7 +188,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   const workspacePath = findWorkspaceRoot(startDir);
 
   if (!workspacePath) {
-    const msg = 'No workspace spec found in current directory or any parent. Run this from a workspace where the planning agent wrote .pan/spec.vbrief.json.';
+    const msg = 'No workspace spec found in current directory or any parent. Run this from a workspace where the planning agent wrote .overdeck/spec.vbrief.json (or legacy .pan/spec.vbrief.json).';
     if (options.json) console.log(JSON.stringify({ success: false, error: msg }));
     else console.error(chalk.red('✗ ' + msg));
     return exitCli(1);
@@ -196,7 +196,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
 
   const planPath = findWorkspaceDraftPlanSync(workspacePath, 'authored-first') ?? findPlanSync(workspacePath);
   if (!planPath) {
-    const msg = `xBRIEF plan not readable at ${workspacePath}/.pan/spec.vbrief.json`;
+    const msg = `xBRIEF plan not readable at ${workspacePath}/.overdeck/spec.vbrief.json (or legacy .pan/spec.vbrief.json)`;
     if (options.json) console.log(JSON.stringify({ success: false, error: msg }));
     else console.error(chalk.red('✗ ' + msg));
     return exitCli(1);

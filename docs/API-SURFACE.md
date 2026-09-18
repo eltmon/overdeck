@@ -120,6 +120,33 @@ issue* — are each smeared across 2–5 modules, and the **reads have no shared
 from DB / `.pan/` / GitHub inconsistently. This is the API-layer twin of the in-DB and filesystem-vs-DB
 duplication.
 
+### The pipeline read door (PAN-3903) — enforced for cloister
+
+The first domain to get its read door enforced is the issue pipeline.
+`src/lib/overdeck/pipeline-view.ts` is now the only module under
+`src/lib/cloister/` allowed to read `review_status`, and
+`scripts/lint-pipeline-read-door.sh` (in `npm run lint`) fails the build on any
+new direct read there.
+
+Two readers existed and they did not agree: `getReviewStatusSync` reconciles the
+durable journal on read, `loadReviewStatuses` returns the raw SQLite cache. The
+door routes bulk reads through `getReviewStatusesSync` so a bulk answer cannot
+differ from a single-issue one.
+
+It also answers a second question the old readers could not: **who owns the
+current transition**. See [PIPELINE-GATES.md](PIPELINE-GATES.md#the-in-flight-owner-pan-3903).
+
+The door is deliberately a **leaf module**, not a method on `IssuesResolver`.
+Cloister patrols are plain sync code that cannot take an Effect dependency, and
+importing the door from `overdeck/issues.ts` pulls `review-status.js` — and the
+`cloister/feedback-target.js` subgraph behind it — into every importer of the
+resolver, closing a cycle Node's strict ESM refuses at boot. A green typecheck
+does not catch that; Bun tolerates the cycle and Node does not.
+
+**Scope today:** all 37 cloister readers are migrated. 56 non-cloister readers
+(dashboard routes, CLI, flywheel) remain — PAN-3903 part 2. Until they land, the
+issue's acceptance grep still returns those files.
+
 ## The write side — even worse than reads
 
 Reads are scattered; writes are **uncontrolled**. Approximate write-path call-site counts (`git grep`):

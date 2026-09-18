@@ -6,11 +6,13 @@ import { MODELS_BY_PROVIDER } from '../modelCatalog';
 import {
   blendedCost,
   crewLabel,
+  deriveTierName,
   DIFFICULTIES,
   importCrews,
   providerDefaultHarness,
   renderYamlPreview,
   serializeCrews,
+  tierFitnessWarnings,
   type Crew,
   type CrewAssignments,
   type CrewRest,
@@ -49,7 +51,7 @@ function defaultTieredExecution(enabled: boolean): TieredExecutionConfig {
     tiers: {},
     by_kind: {},
     feed: { callouts: 'off', exclude: [], exclude_subjects: [], max_diff_bytes: null },
-    escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0, flounder_budget_minutes: {} },
+    escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0 },
     compaction_reroute: 'off',
     replay_threshold: 0.5,
   };
@@ -148,6 +150,9 @@ export function TieredExecutionSection({
   } catch {
     // Keep invalid hand-authored config inspectable; guarded UI actions cannot save this state.
   }
+  // PAN-3842: fitness warnings are computed from the unsaved draft so the
+  // badge appears and disappears as the operator edits, before any save.
+  const fitness = outgoingConfig.tiers ? tierFitnessWarnings(outgoingConfig, formData) : [];
   const [openCrewId, setOpenCrewId] = useState<string | null>(null);
   const [addCrewPromptOpen, setAddCrewPromptOpen] = useState(false);
   const [removePromptCrewId, setRemovePromptCrewId] = useState<string | null>(null);
@@ -341,18 +346,10 @@ export function TieredExecutionSection({
           enabled: next.escalation?.enabled ?? false,
           retries_at_tier: next.escalation?.retries_at_tier ?? 0,
           max_promotions: next.escalation?.max_promotions ?? 0,
-          flounder_budget_minutes: next.escalation?.flounder_budget_minutes ?? {},
           ...patch,
         },
       },
     }, opts);
-  };
-
-  const handleFlounderBudgetChange = (difficulty: typeof DIFFICULTIES[number], value: string) => {
-    const nextBudget = { ...(config?.escalation?.flounder_budget_minutes ?? {}) };
-    if (value === '') delete nextBudget[difficulty];
-    else nextBudget[difficulty] = Number(value);
-    handleEscalationPatch({ flounder_budget_minutes: nextBudget }, { debounce: true });
   };
 
   const handleReplayThresholdChange = (value: string) => {
@@ -528,6 +525,7 @@ export function TieredExecutionSection({
                 open={openCrewId === crew.id}
                 onToggle={() => setOpenCrewId(openCrewId === crew.id ? null : crew.id)}
                 onChange={(nextCrew) => writeCrews(crews.map((entry) => entry.id === crew.id ? nextCrew : entry), assign)}
+                warnings={fitness.filter((w) => w.tierName === deriveTierName(ownedDifficulties))}
                 onRequestRemove={() => handleRequestRemove(crew.id)}
               />
               {removeError?.crewId === crew.id && (
@@ -582,6 +580,7 @@ export function TieredExecutionSection({
           <button type="button" aria-expanded={supervisorOpen} onClick={() => setSupervisorOpen(!supervisorOpen)} className="flex w-full items-center gap-2 px-4 py-3 text-left focus-visible:ring-2 focus-visible:ring-primary">
             <span>{supervisorOpen ? '▾' : '▸'}</span><span className="text-sm font-medium text-foreground">Standing reviewer</span>
             <span className="text-xs text-muted-foreground">— {supervisor?.subscribe === 'all' ? 'reviews every commit' : supervisor?.subscribe === 'sampled' ? 'reviews a sample' : 'wakes on flagged commits'} · {supervisorModelName} · {supervisor?.owns_inspection ?? true ? 'owns inspection' : 'inspection stays separate'}</span>
+            {fitness.filter((w) => w.tierName === 'supervisor').map((w, index) => <span key={`${w.code}:${w.model}:${index}`} data-testid="tier-fitness-warning" title={w.message} className="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">⚠ {w.message.replace(/^tiered_execution\.supervisor: /, '')}</span>)}
           </button>
           {supervisorOpen && <div className="grid gap-3 border-t border-border/70 px-4 py-3 @xl:grid-cols-2">
             <p className="col-span-full text-xs text-muted-foreground">Wakes on every commit a crew makes and reviews the diff against the task's acceptance criteria. Required whenever crews are configured.</p>
@@ -744,21 +743,6 @@ export function TieredExecutionSection({
                     className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
                   />
                 </label>
-              </div>
-              <div className="grid gap-2 grid-cols-2 @2xl:grid-cols-5">
-                {DIFFICULTIES.map((difficulty) => (
-                  <label key={difficulty} className="space-y-1.5">
-                    <span className="text-xs font-medium text-foreground">{difficulty}</span>
-                    <input
-                      aria-label={`Flounder budget ${difficulty}`}
-                      type="number"
-                      min="1"
-                      value={config?.escalation?.flounder_budget_minutes?.[difficulty] ?? ''}
-                      onChange={(event) => handleFlounderBudgetChange(difficulty, event.target.value)}
-                      className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-                    />
-                  </label>
-                ))}
               </div>
             </div>
             {escalationError && <p className="mt-3 text-xs text-destructive">{escalationError}</p>}

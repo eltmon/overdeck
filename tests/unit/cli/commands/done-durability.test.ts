@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   getAgentStateSync: vi.fn(),
   getReviewStatusSync: vi.fn(),
   postDoneDashboardJson: vi.fn(),
+  recordDeadEndNeedsYou: vi.fn(),
   saveAgentRuntimeState: vi.fn(),
   saveAgentStateSync: vi.fn(),
   setReviewStatusSync: vi.fn(),
@@ -92,11 +93,18 @@ vi.mock('../../../../src/lib/review-artifacts.js', () => ({
 vi.mock('../../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: mocks.getReviewStatusSync,
   setReviewStatusSync: mocks.setReviewStatusSync,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../../src/cli/commands/done-dashboard-client.js', () => ({
   postDoneDashboardJson: mocks.postDoneDashboardJson,
   waitForDoneReviewHandoff: mocks.waitForDoneReviewHandoff,
+}));
+
+vi.mock('../../../../src/lib/cloister/dead-end-trip.js', () => ({
+  recordDeadEndNeedsYou: mocks.recordDeadEndNeedsYou,
 }));
 
 import { doneCommand } from '../../../../src/cli/commands/done.js';
@@ -123,9 +131,11 @@ describe('pan done canonical durability boundary', () => {
       lastActivity: '2026-07-18T00:00:00.000Z',
     } : null);
     mocks.getReviewStatusSync.mockReturnValue(null);
+    // PAN-3848 (W25): the intent write retries three times on the lock ladder
+    // before failing — the mock must reject every attempt, not just one.
     mocks.updateIssueRecord
       .mockResolvedValueOnce({})
-      .mockRejectedValueOnce(new Error('Failed to push PAN-2840 state after 3 reconciliation attempts'));
+      .mockRejectedValue(new Error('Failed to push PAN-2840 state after 3 reconciliation attempts'));
 
     exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
       throw new Error('process.exit:1');
@@ -142,17 +152,29 @@ describe('pan done canonical durability boundary', () => {
   it('does not advance tracker, runtime, cache, markers, or HTTP after the canonical write fails', async () => {
     await expect(doneCommand(ISSUE_ID, { force: true })).rejects.toThrow('process.exit:1');
 
-    expect(mocks.updateIssueRecord).toHaveBeenCalledTimes(2);
+    // 1 tombstone clear + 4 review-request write attempts (initial + 3 retries,
+    // PAN-3848 W25).
+    expect(mocks.updateIssueRecord).toHaveBeenCalledTimes(5);
     expect(mocks.shouldSkipTrackerUpdate).not.toHaveBeenCalled();
     expect(mocks.updateShadowState).not.toHaveBeenCalled();
     expect(mocks.setReviewStatusSync).not.toHaveBeenCalled();
     expect(mocks.saveAgentStateSync).not.toHaveBeenCalled();
     expect(mocks.saveAgentRuntimeState).not.toHaveBeenCalled();
-    expect(mocks.writeFileSync).not.toHaveBeenCalled();
     expect(mocks.appendSessionEntrySync).not.toHaveBeenCalled();
     expect(mocks.emitActivityEntrySync).not.toHaveBeenCalled();
     expect(mocks.emitActivityTtsSync).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
+    // W25's loud failure path: the completion marker IS written (the branch is
+    // pushed and the PR exists, so the work is real) and the needs-you names
+    // the missing review request.
+    expect(mocks.writeFileSync).toHaveBeenCalledTimes(1);
+    expect(String(mocks.writeFileSync.mock.calls[0]?.[0])).toMatch(/completed$/);
+    expect(mocks.recordDeadEndNeedsYou).toHaveBeenCalledWith(
+      ISSUE_ID,
+      'review-request-unrecorded',
+      'https://example.test/pr/1',
+      expect.stringContaining('reviewRequestedAt'),
+    );
   });
 
   it('fails with a recovery command when no review handoff owner appears', async () => {

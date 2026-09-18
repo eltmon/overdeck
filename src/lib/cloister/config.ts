@@ -336,6 +336,22 @@ export interface DeployConfig {
 }
 
 /**
+ * PAN-3850 (W39, FR-26): per-patrol firing budgets. Each patrol registered
+ * through `runBudgetedPatrol` may take at most `default` actions per UTC day
+ * (per-patrol `overrides` win); exceeding the budget suspends the patrol
+ * until the next UTC day and emits a needs-you. `exempt` patrols (the alarms:
+ * Appendix C #3, #64, #70, #71, #77) tally but never suspend.
+ */
+export interface PatrolBudgetsConfig {
+  /** Default action budget per patrol per UTC day. */
+  default: number;
+  /** Patrol names that are never suspended. */
+  exempt: string[];
+  /** Per-patrol budget overrides. */
+  overrides: Record<string, number>;
+}
+
+/**
  * Complete Cloister configuration
  */
 export interface CloisterConfig {
@@ -358,6 +374,7 @@ export interface CloisterConfig {
   close_out?: CloseOutConfig;
   orphanProposedReconciler?: OrphanProposedReconcilerConfig;
   deploy: DeployConfig;
+  patrolBudgets?: PatrolBudgetsConfig;
 }
 
 /**
@@ -398,6 +415,19 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
     auto_deploy: true,
     debounce_minutes: 5,
     queue_deadline_minutes: 30,
+  },
+  patrolBudgets: {
+    default: 50,
+    // Alarms (Appendix C #3, #64, #70, #71, #77): tally for `pan doctor`
+    // visibility, but a firing alarm must never go silent for the day.
+    exempt: [
+      'runStallSweeperPatrol',
+      'checkApiErrorAgents',
+      'recreatedStateWarnings',
+      'recordMainDivergenceHealth',
+      'checkMassDeath',
+    ],
+    overrides: {},
   },
   concurrency: {
     max_work_agents: 6,

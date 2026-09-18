@@ -34,4 +34,23 @@ describe('agent start route pan start args', () => {
       offBook: true,
     })).toEqual(['start', 'PAN-1787', '--local', '--model', 'gpt-5.5', '--off-book']);
   });
+
+  // PAN-3857: without an explicit operator-chosen model no --model is emitted,
+  // so `pan start` runs tier/role resolution instead of treating a forwarded
+  // default as an explicit override (and stamping it as record.workModel).
+  it('omits --model when the request did not name one', () => {
+    expect(buildPanStartArgs({
+      issueId: 'PAN-3857',
+      harness: null,
+    })).toEqual(['start', 'PAN-3857', '--local']);
+  });
+
+  it('omits --model for an explicit null model while keeping other flags', () => {
+    expect(buildPanStartArgs({
+      issueId: 'PAN-3857',
+      model: null,
+      harness: 'pi',
+      allowHost: true,
+    })).toEqual(['start', 'PAN-3857', '--local', '--harness', 'pi', '--host', '--yes']);
+  });
 });

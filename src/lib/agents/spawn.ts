@@ -64,6 +64,8 @@ import {
   resolveAgentStartedBy,
   resolveRegisteredSlotSpawn,
   resolveSlotTierSpawnParams,
+  resolveSlotSpawnFitness,
+  logTierFitnessAtSpawn,
   resolveSingleWorkTierSpawnParams,
   resolveFlywheelSpawnEnv,
   runAgentId,
@@ -141,6 +143,9 @@ async function spawnRunWithoutConsentClaim(
         // historical harness handling in that case.
         slotHarness = tierParams.harness ?? options.harness;
       }
+      // PAN-3842: build fitness payload through the production helper (FINAL selected model).
+      const fitness = resolveSlotSpawnFitness(role, modelSpawnKey, tierParams, options.model, slotHarness, slot.slotItemId);
+      logTierFitnessAtSpawn(slot.agentId, fitness.staffing, fitness.difficulties, fitness.items);
       await ensureRegisteredSlotWorktree(issueId, workspace, slot);
     }
     const prompt = slot
@@ -631,6 +636,8 @@ async function spawnAgentWithoutConsentClaim(
     : {};
   const selectedModel = determineModel({ model: singleTierParams.model ?? options.model, role, spawnKey: modelSpawnKey });
   console.log(`[DEBUG] Selected model: ${selectedModel}`);
+  // PAN-3842: plan-max fitness; log against the FINAL selected model so explicit overrides still warn.
+  logTierFitnessAtSpawn(agentId, { tierName: singleTierParams.tierName ?? 'default', model: selectedModel, harness: singleTierParams.harness }, singleTierParams.planDifficulties ?? [], singleTierParams.planItems ?? []);
 
   // When routing a GPT agent through ChatGPT subscription auth, the local
   // CLIProxyAPI sidecar MUST already be running. We only check — never

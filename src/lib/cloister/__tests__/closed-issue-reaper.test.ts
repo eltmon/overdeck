@@ -69,6 +69,7 @@ vi.mock('../reap-issue-residue.js', () => ({
 vi.mock('../../review-status.js', () => ({
   getReviewStatusesSync: mocks.getReviewStatusesSync,
   loadReviewStatuses: mocks.loadReviewStatuses,
+  getReviewStatusSync: (issueId: string) => mocks.loadReviewStatuses()?.[issueId] ?? null,
   setReviewStatusSync: mocks.setReviewStatusSync,
 }));
 

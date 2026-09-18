@@ -7,7 +7,8 @@ import { getReadableWorkspacePanPaths } from '../pan-dir/continue.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { readIssueRecordSync, type PanIssueRecord } from '../pan-dir/record.js';
 import { updateIssueRecord } from '../pan-dir/record-update.js';
-import { listSessionNames, sessionExists } from '../tmux.js';
+import { listSessionNames } from '../tmux.js';
+import { isAlive, isConfirmedDead } from '../agents/liveness.js';
 
 export type IssueFeedbackTarget =
   | { agentId: string }
@@ -19,8 +20,14 @@ export interface ResolveIssueFeedbackTargetOptions {
   revivePipelinePausedAgent?: (agentId: string, issueId: string) => Promise<boolean>;
 }
 
+// PAN-3849 (W32): liveness is the single oracle, not a bare has-session. A
+// remain-on-exit pane whose harness process exited still "exists" as a tmux
+// session, and feedback pasted into that dead shell was previously reported
+// as delivered (pipeline-reliability-review F12, last bullet).
 async function isLiveSession(agentId: string): Promise<boolean> {
-  return Effect.runPromise(sessionExists(agentId));
+  // An indeterminate probe is not death: deliver to the session and let the
+  // transport fail naturally rather than resurrecting a possibly-live agent.
+  return !isConfirmedDead(await isAlive(agentId));
 }
 
 function isWorkFeedbackTarget(role: string): boolean {

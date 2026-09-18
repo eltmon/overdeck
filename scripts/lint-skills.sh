@@ -22,7 +22,7 @@ SKILLS = ROOT / "sync-sources" / "skills"
 LOCAL_PAN = ["node", str(ROOT / "dist" / "cli" / "index.js")]
 RUN_PAN_CACHE: dict[tuple[str, ...], str] = {}
 RUN_PAN_CACHE_LOCK = Lock()
-LEGACY_REDIRECTS = {"all-up": "pan-flywheel"}
+LEGACY_REDIRECTS = {"all-up": "pan-flywheel", "plan": "pan-plan", "write-spec": "pan-plan"}
 
 
 def run_pan(*args: str) -> str:
