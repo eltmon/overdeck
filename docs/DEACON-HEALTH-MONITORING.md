@@ -1,6 +1,13 @@
 # Deacon Health Monitoring & Stuck Detection
 
-The Deacon is Overdeck's health monitor, running as part of the dashboard server. It patrols every 60 seconds, checking agent and specialist health, detecting stuck states, and taking recovery actions.
+The Deacon is Overdeck's health monitor, running as part of the dashboard server.
+
+Since PAN-3894 it runs two timers. The 60-second **tick** (`runPatrol()`) carries
+14 steps and nothing else: stuck detection, pipeline progress, and the three
+time-critical checks that cannot be slowed down. Everything that is housekeeping
+— cleanup, retention, resource hygiene, projection, retry policy — runs from the
+**housekeeping scheduler** (`src/lib/cloister/housekeeping-scheduler.ts`) on a
+`fast` / `hourly` / `daily` cadence. See [Patrol cadences](#patrol-cadences-pan-3894).
 
 ## Detection Summary
 
@@ -21,6 +28,84 @@ The Deacon is Overdeck's health monitor, running as part of the dashboard server
 | **Deleted Workspaces** | readyForMerge=true but workspace directory gone | Immediate | Clear readyForMerge | N/A |
 | **Pending Post-Merge** | pending-post-merge.json not consumed on startup | Immediate | Process lifecycle in-process | N/A |
 | **Pending Planning Promotion** | `complete-planning` did not produce the canonical spec | 120s marker grace; 5min markerless fallback | Re-run `complete-planning`; trip needs-you after 5 failures | Retries continue once per patrol |
+
+## Patrol cadences (PAN-3894)
+
+`src/lib/cloister/patrol-registry.ts` is the single declarative list: 14
+`TICK_PATROLS` and 29 `HOUSEKEEPING_CHORES`. `runPatrol()`, the scheduler,
+`pan doctor`, and the no-loss audit all read it, so none of them can disagree
+about what runs.
+
+### What stays on the 60-second tick
+
+The five alarms (`runStallSweeperPatrol`, `checkApiErrorAgents`,
+`recreatedStateWarnings`, `recordMainDivergenceHealth`, `checkMassDeath`) are
+wired directly, never budgeted. `runInvariantChecker` runs every 10 ticks. The
+remaining eight are pipeline progress or stuck recovery:
+`monitorReviewConvoySignals`, `checkPostReviewCommits`, `patrolStrikeLandings`,
+`swarmJanitorPass`, `nudgeIdleWorkAgentsWithOpenBeads`,
+`checkThinkingSignatureCorruption`, `checkDeadEndAgents`, and
+`refreshHostHeartbeatForEphemeralVms`.
+
+Three of those are on the tick because they cannot be slower:
+`refreshHostHeartbeatForEphemeralVms` feeds a VM-side watchdog that stops a
+machine after a 5-minute heartbeat gap; `checkPostReviewCommits` debounces on the
+same new HEAD appearing on two consecutive ticks; `checkMassDeath` uses a
+one-minute window.
+
+### The three cadence classes
+
+| Cadence | Interval | Chores |
+| --- | --- | --- |
+| `fast` | 5 min | `patrolStaleTaskClaims`, `processPendingLifecycleForPatrol`, `runScheduledDeployPatrol`, `reconcilePendingPromotions`, `checkAndSuspendIdleAgents`, `checkMergedWorkSessions`, `checkMergedAdvancingSessions`, `refreshClaudeCredentialsForActiveRemoteAgents`, `reapCompletedRemoteAgents`, `checkInspectAgentTimeouts`, `checkWorkspaceContainerHealth`, `checkFailedMergeRetry`, `autoCloseOut`, `reconcileAutoMergeRows`, `reconcileTraefikNetworks`, `reconcileIdleWorkspaceStacks`, `patrolDockerBridgePool`, `reapOrphanedDashboardServers`, `reapLeftoverPlaywrightBrowsers`, `perProjectSpecialistPatrol` |
+| `hourly` | 60 min | `reconcileOrphanProposedSpecs`, `reconcileClosedIssueAgents`, `reapMergedStrikeWorkspaces`, `reconcilePipelineLabelsPatrol`, `reconcileProjectStatePlanes`, `reconcileTerminalIssueResidue`, `cleanupStaleAgentState` |
+| `daily` | 24 h | `sweepTranscriptRetention`, then `pruneTerminalStoppedAgents` |
+
+Every internal grace or cooldown in the `fast` set is at least two minutes, so a
+5-minute cadence adds at most five minutes of latency. The visible changes:
+inspect sessions are bounded at 12 + ≤5 min instead of 12 + ≤1; a crashed UAT
+container restarts within ≤5 min instead of ≤1; a failed `complete-planning`
+promotion retries every 5 min after its 120-second grace.
+
+The daily pair is ordered, not incidental: transcript retention must see the
+canonical registry row to prove terminal state before agent GC removes that
+evidence.
+
+`reconcileIdleWorkspaceStacks`, `reconcileClosedIssueAgents`, and
+`reconcileOrphanProposedSpecs` carry a `trigger` in the registry naming the
+reactive event (`agent.stopped` / `agent.started`, `issue.statusChanged`) that is
+their primary path — the polled run is a backstop for dropped events.
+
+### Durable due-times
+
+The scheduler ticks every 60 seconds and runs a chore when
+`now - lastRunAt >= cadenceMs`, persisting `lastRunAt` to
+`~/.overdeck/deacon/housekeeping.json` after each run. A bare hourly or daily
+`setInterval` would reset on every restart, so a daily chore would almost never
+fire on a machine that reloads several times a day. A chore with no recorded
+`lastRunAt` is due on the first scheduler tick after boot. A missing or torn file
+reads as "nothing has ever run".
+
+### Single-flight, pausing, and error isolation
+
+A scheduler tick never overlaps itself (the shared `createInFlightGuard`). While
+`isDeaconGloballyPaused()` is true no chore runs and the skip is logged once per
+pause span. A chore that throws is logged at `warn` and the tick continues to the
+next chore; the thrower still gets its `lastRunAt` stamped, so a broken chore
+retries at its cadence rather than every minute. Every chore runs through
+`runBudgetedPatrol`, so the per-UTC-day firing budget applies to chores exactly
+as it does to tick patrols.
+
+Chore actions reach the deacon log through `appendDeaconLog` and appear in
+`GET /api/deacon/logs`; they are not part of `PatrolResult.actions`, which stays
+the tick's own record.
+
+### Seeing it
+
+`pan doctor` prints a **Patrol cadences** table: every tick patrol with `every
+tick` / `every 10 ticks` / `(alarm)`, then every chore with its cadence, last run,
+and next due time (`last never` / `next now` for one that has not run yet), and
+`(also on <event>)` where a reactive trigger exists.
 
 ## Detection Details
 
@@ -56,7 +141,7 @@ The Deacon is Overdeck's health monitor, running as part of the dashboard server
 
 - **Files:** `src/lib/cloister/pending-promotion-reconciler.ts`, called from `runPatrol()` in `src/lib/cloister/deacon.ts`
 - **Marker:** `<workspace>/.overdeck/pending-promotion.json`, written atomically when `pan plan finalize` exhausts its five promotion attempts. The version-1 payload records `issueId`, `canonicalFilename`, `noPrd`, `autoSpawnRequested`, `finalizedAt`, `lastError`, `lastAttemptAt`, and `patrolAttempts`.
-- **Runs:** Every 60-second patrol cycle. Marker candidates receive a 120-second grace period so the patrol does not race the CLI retry loop. A defensive scan also finds markerless workspace specs that have remained `proposed` for at least five minutes and have no canonical counterpart through `findSpecByIssue()`. `pan plan finalize --no-promote` stamps `plan.metadata.promotionIntent: "manual"`, so this fallback cannot override the operator's deliberate approval gate.
+- **Runs:** Every 5 minutes (the `fast` housekeeping cadence, PAN-3894). Marker candidates receive a 120-second grace period so the patrol does not race the CLI retry loop. A defensive scan also finds markerless workspace specs that have remained `proposed` for at least five minutes and have no canonical counterpart through `findSpecByIssue()`. `pan plan finalize --no-promote` stamps `plan.metadata.promotionIntent: "manual"`, so this fallback cannot override the operator's deliberate approval gate.
 - **Action:** POST the dashboard's own `complete-planning` endpoint through the internal-token door. HTTP 200 removes the marker; HTTP 202, an in-flight response, or a pending-AskUserQuestion skip preserves it for the next cycle. Successful `completePlanningForIssue()` also removes any stale marker.
 - **Escalation:** Each real failure increments `patrolAttempts`. At five failures, the reconciler records one generation-deduplicated needs-you trip while continuing to retry once per patrol. The manual fallback is `pan plan done <issue-id>`.
 - **Rationale:** PAN-3212 remained finalized but unpromoted for 9.5 hours because its 15-second CLI retry budget expired during a deploy and no server-side owner revisited it. PAN-3229 makes that intermediate state durable and gives it a recovery owner.

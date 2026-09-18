@@ -103,15 +103,21 @@ These gates are orthogonal to the global Deacon freeze in SQLite
 ## Patrol budgets (PAN-3850)
 
 Every deacon patrol is an alarm with a budget, not an actor with unlimited
-ammunition. Each patrol registered in `runPatrol` runs inside
-`runBudgetedPatrol()` (`src/lib/cloister/patrol-budget.ts`), which tallies the
-actions the patrol reports against a per-UTC-day budget in
+ammunition. Both the tick patrols registered in `runPatrol` and the housekeeping
+chores the scheduler runs go through `runBudgetedPatrol()`
+(`src/lib/cloister/patrol-budget.ts`), which tallies the actions the patrol
+reports against a per-UTC-day budget in
 `~/.overdeck/deacon/patrol-budget.json` (default 50 actions/day). When a
 patrol's tally crosses its budget it is suspended until the next UTC day and
 the operator gets exactly one needs-you (idempotency key
 `patrol-budget-exceeded:<name>:<day>`) — a runaway patrol degrades to a single
 actionable signal instead of an action storm. The tally resets at UTC midnight;
 a suspended patrol runs again the next day.
+
+PAN-3894 split those patrols in two: which ones run on the 60-second tick and
+which run from the housekeeping scheduler (and how often) is documented in
+[Patrol cadences](DEACON-HEALTH-MONITORING.md#patrol-cadences-pan-3894). A
+chore's budget is the same per-UTC-day budget regardless of its cadence.
 
 Five patrols are exempt alarms — `runStallSweeperPatrol`, `checkApiErrorAgents`,
 `recreatedStateWarnings`, `recordMainDivergenceHealth`, `checkMassDeath` —
