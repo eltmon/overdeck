@@ -1,5 +1,3 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { Schema } from 'effect';
@@ -26,7 +24,6 @@ import {
   deriveRestartGateStatus,
   emptyRestartGateState,
   pruneRestartGateState,
-  resolveRestartGateBoot,
   satisfyRestartGateForDirectRestart,
   startRestartGateSweep,
   toRestartGateSnapshot,
@@ -69,18 +66,12 @@ describe('restart gate state machine', () => {
 
     expect(claimRestartGate(state, 'reload:22', T0).result).toEqual({ granted: false, status: 'claimed' });
 
-    // The restart happens; the next boot satisfies BOTH members of the epoch.
-    const booted = resolveRestartGateBoot(state, T0 + 5_000);
-    expect(booted.satisfiedIds.sort()).toEqual(['deploy:PAN-1:11', 'reload:22']);
-    expect(booted.state.pending).toEqual([]);
-    expect(booted.state.epoch).toBeNull();
-
+    // The claimant restarts the server. PAN-3917 D2: the gate is in memory, so
+    // the fresh process starts empty and every requester simply re-registers.
     for (const requesterId of ['deploy:PAN-1:11', 'reload:22']) {
-      const poll = upsertRestartRequest(booted.state, deployRequest(requesterId, 'x'), T0 + 5_000);
-      expect(poll.result.status).toBe('satisfied');
+      const poll = upsertRestartRequest(emptyRestartGateState(), deployRequest(requesterId, 'x'), T0 + 5_000);
+      expect(poll.result.status).toBe('pending');
       expect(poll.result.mayClaim).toBe(false);
-      // A satisfied requester must not be re-queued — it exits instead.
-      expect(poll.state.pending).toEqual([]);
     }
   });
 
@@ -206,7 +197,7 @@ describe('restart gate state machine', () => {
     let claimed = upsertRestartRequest(emptyRestartGateState(), deployRequest('a', 'a'), T0).state;
     claimed = approveRestartGate(claimed, T0).state;
     claimed = claimRestartGate(claimed, 'a', T0).state;
-    expect(resolveRestartGateBoot(claimed, T0 + 3_000).state.lastOutcome).toBeUndefined();
+    expect(pruneRestartGateState(claimed, T0 + 3_000).lastOutcome).toBeUndefined();
   });
 
   it('keeps a live claim alive even when the claimant stops polling', () => {
@@ -231,28 +222,7 @@ describe('restart gate state machine', () => {
     expect(claimRestartGate(late.state, 'late', T0 + 1_000).result.granted).toBe(false);
   });
 
-  it('leaves an approved-but-unclaimed epoch alone at boot', () => {
-    let state = upsertRestartRequest(emptyRestartGateState(), deployRequest('a', 'a'), T0).state;
-    state = approveRestartGate(state, T0).state;
 
-    const booted = resolveRestartGateBoot(state, T0 + 1_000);
-    expect(booted.satisfiedIds).toEqual([]);
-    expect(booted.state.epoch).not.toBeNull();
-  });
-
-  it('prunes satisfied ids 10 minutes after boot', () => {
-    let state = upsertRestartRequest(emptyRestartGateState(), deployRequest('a', 'a'), T0).state;
-    state = approveRestartGate(state, T0).state;
-    state = claimRestartGate(state, 'a', T0).state;
-    const booted = resolveRestartGateBoot(state, T0).state;
-
-    expect(upsertRestartRequest(booted, deployRequest('a', 'a'), T0 + SATISFIED_TTL_MS - 1).result.status)
-      .toBe('satisfied');
-    // Past the window the id is forgotten, so a NEW invocation reusing it
-    // starts a fresh request instead of exiting immediately.
-    expect(upsertRestartRequest(booted, deployRequest('a', 'a'), T0 + SATISFIED_TTL_MS).result.status)
-      .toBe('pending');
-  });
 
   it('folds every waiting request into a claimed epoch for the dashboard restart button', () => {
     let state = upsertRestartRequest(emptyRestartGateState(), deployRequest('a', 'a'), T0).state;
@@ -261,60 +231,29 @@ describe('restart gate state machine', () => {
     const direct = satisfyRestartGateForDirectRestart(state, T0, 'dashboard-ui:99');
     expect(direct.epoch?.claimedBy).toBe('dashboard-ui:99');
     expect(direct.epoch?.requesterIds.sort()).toEqual(['a', 'b']);
-
-    const booted = resolveRestartGateBoot(direct, T0 + 1_000);
-    expect(booted.satisfiedIds.sort()).toEqual(['a', 'b']);
+    // The restart happens next; the in-memory gate dies with the process and
+    // every member re-registers against the fresh server (PAN-3917 D2).
+    expect(deriveRestartGateStatus(direct, T0)).toBe('claimed');
   });
 });
 
 describe('restart gate service', () => {
-  let dir: string;
-  let filePath: string;
   let clock: number;
   let emitted: RestartGateSnapshot[];
 
-  beforeEach(async () => {
-    dir = await mkdtemp(join(tmpdir(), 'restart-gate-'));
-    filePath = join(dir, 'restart-gate.json');
+  beforeEach(() => {
     clock = T0;
     emitted = [];
   });
 
-  afterEach(async () => {
-    await rm(dir, { recursive: true, force: true });
-  });
-
   function makeGate() {
     return createRestartGate({
-      filePath,
       now: () => clock,
       emit: (snapshot) => emitted.push(snapshot),
     });
   }
 
-  it('persists the gate and satisfies a claimed epoch on the next boot (AC-3)', async () => {
-    const gate = makeGate();
-    await gate.request(deployRequest('deploy:PAN-1:11', 'post-merge deploy PAN-1'));
-    await gate.request(deployRequest('reload:22', 'pan reload'));
-    await gate.approve();
-    expect((await gate.claim('deploy:PAN-1:11')).granted).toBe(true);
 
-    const persisted = JSON.parse(await readFile(filePath, 'utf-8')) as RestartGateState;
-    expect(persisted.epoch?.claimedBy).toBe('deploy:PAN-1:11');
-
-    // A NEW process reading the same file — the boot IS the restart completing.
-    clock = T0 + 3_000;
-    const rebooted = makeGate();
-    expect(await rebooted.read()).toEqual({ status: 'idle', pending: [] });
-    expect((await rebooted.request(deployRequest('reload:22', 'pan reload'))).status).toBe('satisfied');
-  });
-
-  it('starts from an empty gate when the file is missing or corrupt', async () => {
-    await writeFile(filePath, 'not json at all', 'utf-8');
-    const gate = makeGate();
-    expect(await gate.read()).toEqual({ status: 'idle', pending: [] });
-    expect((await gate.request(deployRequest('a', 'a'))).status).toBe('pending');
-  });
 
   it('serializes concurrent claims so exactly one is granted', async () => {
     const gate = makeGate();
