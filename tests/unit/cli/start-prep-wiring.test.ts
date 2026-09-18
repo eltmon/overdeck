@@ -1,12 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockRequireAutomaticStateMigration = vi.hoisted(() => vi.fn());
 const mockGetProjectSync = vi.hoisted(() => vi.fn());
 
-vi.mock('../../../src/lib/state-auto-migrate.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../src/lib/state-auto-migrate.js')>()),
-  requireAutomaticStateMigration: mockRequireAutomaticStateMigration,
-}));
 vi.mock('../../../src/lib/projects.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../src/lib/projects.js')>()),
   getProjectSync: mockGetProjectSync,
@@ -23,7 +18,12 @@ import {
 } from '../../../src/cli/commands/start-prep-progress.js';
 import { UnsafeSyncMainStateError } from '../../../src/lib/cloister/sync-main-git.js';
 
-const { runStartPrepStep, reconcileStartState } = __testInternals;
+// PAN-3917: reconcileStartState (the pre-spawn state-worktree migration) is
+// gone with the state layer — start.ts no longer runs it, so __testInternals
+// no longer exposes it. The 'state-reconcile' prep-step budget/timeout tests
+// below still exercise the generic runStateReconcile/runStartPrepStep
+// machinery with ad-hoc callbacks, unrelated to that deleted function.
+const { runStartPrepStep } = __testInternals;
 type PrepProgress = Parameters<typeof runStartPrepStep>[0];
 type PrepStepName = keyof typeof START_PREP_STEP_POLICIES;
 
