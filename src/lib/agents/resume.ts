@@ -155,18 +155,6 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
     logAgentLifecycleSync(normalizedId, `resumeAgent: bypassing troubled gate for explicit compact recovery (${gateBlock?.reason})`);
   }
   const hasWorkspace = !!agentState?.workspace && existsSync(agentState.workspace);
-  // A `pending-` model (e.g. 'pending-work-spawn') is a mid-spawn placeholder
-  // written before real model resolution; such an agent never produced a
-  // resumable session, so it is a placeholder in ANY status — not only
-  // 'starting'. Detecting it by status alone (the old gate) let a placeholder
-  // that had transitioned to 'stopped' slip through to model resolution below,
-  // where requireModelOverrideSync('pending-work-spawn') throws "Unknown model"
-  // — which the deacon records as a resume failure and, after 3, trips the
-  // troubled gate, stranding the agent forever (PAN-2377/PAN-2829). Reject on
-  // the model prefix regardless of status so it hits the graceful "start a
-  // fresh agent" path instead of crashing. A non-placeholder agent (real model)
-  // is unaffected.
-  const isPlaceholder = !!agentState && typeof agentState.model === 'string' && agentState.model.startsWith('pending-');
   const allowedRuntimeStates = ['suspended', 'idle'];
   const allowedAgentStatuses = ['stopped', 'completed'];
 
@@ -245,8 +233,8 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
     logAgentLifecycleSync(normalizedId, `resume pointer reconstructed from durable metadata: sessionId=${sessionId}`);
   }
 
-  if (!agentState || !hasWorkspace || isPlaceholder) {
-    const reason = 'Saved Claude session is orphaned because the backing workspace/agent state is missing or placeholder-only. Start a fresh agent instead.';
+  if (!agentState || !hasWorkspace) {
+    const reason = 'Saved Claude session is orphaned because the backing workspace/agent state is missing. Start a fresh agent instead.';
     logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
     return {
       success: false,
@@ -330,7 +318,15 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
     // Clear ready signal before resuming (clean slate for PAN-87 fix)
     clearReadySignal(normalizedId);
 
-    const model = requestedModel || requireModelOverrideSync(agentState.model || 'claude-sonnet-4-6');
+    // PAN-3859: no hardcoded model fallback — a state file with no model and
+    // no explicit override fails loudly here, naming the agent, instead of
+    // silently resuming on a model nobody chose.
+    if (!requestedModel && !agentState.model) {
+      throw new Error(
+        `Cannot resume ${normalizedId}: agent state has no model and no model override was requested (PAN-3859: no hardcoded fallback)`,
+      );
+    }
+    const model = requestedModel || requireModelOverrideSync(agentState.model);
     if (requestedModel && requestedModel !== agentState.model) {
       agentState.model = requestedModel;
       saveAgentStateSync(agentState);

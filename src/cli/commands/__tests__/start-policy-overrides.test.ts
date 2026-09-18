@@ -8,9 +8,14 @@ const { updateIssueRecord } = vi.hoisted(() => ({
   }),
 }));
 
-vi.mock('../../../lib/pan-dir/record-update.js', () => ({ updateIssueRecord }));
+const { getProjectSync } = vi.hoisted(() => ({
+  getProjectSync: vi.fn((_key: string) => ({})),
+}));
 
-import { hasStartPolicyOverrides, parseStartPolicyOverrides, persistStartPolicyOverrides } from '../start-policy-overrides.js';
+vi.mock('../../../lib/pan-dir/record-update.js', () => ({ updateIssueRecord }));
+vi.mock('../../../lib/projects.js', () => ({ getProjectSync }));
+
+import { hasStartPolicyOverrides, parseStartPolicyOverrides, persistStartPolicyOverrides, persistStartPoliciesThenCheckKickoff } from '../start-policy-overrides.js';
 
 describe('pan start policy overrides', () => {
   beforeEach(() => {
@@ -76,5 +81,86 @@ describe('pan start policy overrides', () => {
       workModel: 'gpt-5.6-sol', reviewMode: 'full', reviewModel: 'gpt-5.5',
       swarm: { policy: { inspection: 'required', mode: 'off' } },
     });
+  });
+
+  // PAN-3857 (D2): a start without --model must not rewrite an existing
+  // record.workModel — not with a prior agent's model, not with a default.
+  it('leaves a previously stamped record.workModel untouched when no --model was passed', async () => {
+    updateIssueRecord.mockImplementationOnce(async (_project, _issueId, mutator) => {
+      const record: Record<string, unknown> = { workModel: 'claude-opus-5' };
+      await mutator(record);
+      return record;
+    });
+
+    await persistStartPolicyOverrides({} as never, 'PAN-3857', { swarmMode: 'off' });
+
+    await expect(updateIssueRecord.mock.results[0].value).resolves.toEqual({
+      workModel: 'claude-opus-5',
+      swarm: { policy: { mode: 'off' } },
+    });
+  });
+});
+
+describe('persistStartPoliciesThenCheckKickoff (PAN-3848 F4)', () => {
+  beforeEach(() => {
+    updateIssueRecord.mockClear();
+    getProjectSync.mockClear();
+  });
+
+  // The F4 regression: the old flow returned on a failed kickoff BEFORE the
+  // override write, leaving the live session and the record disagreeing.
+  it('persists overrides before reporting a failed kickoff', async () => {
+    const failed = await persistStartPoliciesThenCheckKickoff(
+      { projectKey: 'overdeck' } as never,
+      { role: 'work', kickoffDelivered: false },
+      'PAN-2704',
+      { reviewMode: 'full' },
+      false,
+      () => {},
+    );
+
+    expect(failed).toBe(true);
+    expect(updateIssueRecord).toHaveBeenCalledWith({}, 'PAN-2704', expect.any(Function));
+  });
+
+  it('persists overrides and reports success when kickoff landed', async () => {
+    const failed = await persistStartPoliciesThenCheckKickoff(
+      { projectKey: 'overdeck' } as never,
+      { role: 'work', kickoffDelivered: true },
+      'PAN-2704',
+      { reviewMode: 'full' },
+      false,
+      () => {},
+    );
+
+    expect(failed).toBe(false);
+    expect(updateIssueRecord).toHaveBeenCalledWith({}, 'PAN-2704', expect.any(Function));
+  });
+
+  it('skips the write but still reports the failed kickoff when no overrides were passed', async () => {
+    const failed = await persistStartPoliciesThenCheckKickoff(
+      { projectKey: 'overdeck' } as never,
+      { role: 'work', kickoffDelivered: false },
+      'PAN-2704',
+      {},
+      false,
+      () => {},
+    );
+
+    expect(failed).toBe(true);
+    expect(updateIssueRecord).not.toHaveBeenCalled();
+  });
+
+  it('never reports a failed kickoff for non-work roles', async () => {
+    const failed = await persistStartPoliciesThenCheckKickoff(
+      { projectKey: 'overdeck' } as never,
+      { role: 'review', kickoffDelivered: false },
+      'PAN-2704',
+      {},
+      false,
+      () => {},
+    );
+
+    expect(failed).toBe(false);
   });
 });

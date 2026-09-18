@@ -10,7 +10,7 @@ this table and that module from drifting silently.
 
 | # | Gate ID | Step | Mechanical owner | Visible at |
 | --- | --- | --- | --- | --- |
-| 1 | `review` | Review passed (mode per issue policy); strike-landed work skips because no reviewer runs, and tracker-closed landed work skips when no negative review verdict exists | review role → `pan admin specialists done review` → review-status write door; terminal settlement in `evaluateDodGate()` | `reviewStatus: passed`, or `skip` preserving the original verdict and naming the strike/terminal reason |
+| 1 | `review` | Review passed (mode per issue policy); strike-landed work skips because no reviewer runs, and tracker-closed landed work skips when no negative review verdict exists | review role → `pan admin specialists done review` → review-status write door; terminal settlement in `evaluateDodGate()`; the review request itself is one durable record write from `pan done` (PAN-3848) — a write that fails every retry exits 1 with a `review-request-unrecorded` needs-you | `reviewStatus: passed`, or `skip` preserving the original verdict and naming the strike/terminal reason |
 | 2 | `tests` | Tests passed (incl. browser UAT when required); strike-landed work skips because no test specialist runs, and tracker-closed landed work may settle under the rule below | test role → `pan admin specialists done test`; terminal settlement in `evaluateDodGate()` | `testStatus: passed`, or `skip` preserving the original verdict and naming the strike/terminal reason |
 | 3 | `verification` | Verification green on the branch (typecheck, lint, suite, build); tracker-closed landed work may settle under the rule below | supervised verification worker (`verification-runner.ts` / `verification-worker.ts`); UAT promotion (PAN-3114); terminal settlement in `evaluateDodGate()` | `verificationStatus: passed` (or policy `skipped`), or terminal `skip` preserving the original verdict |
 | 4 | `merged` | Merged to main: forge/durable merge evidence resolved per required repository through either convention head (`feature/<id>` or `strike/<id>`). Polyrepo probes run inside each resolved repository; forge squash-merge detection covers GitHub PRs and GitLab MRs, with GitLab artifacts matched to the branch head SHA. The last resort is a non-PR landing where the shared L2-work lens finds at least one convention-branch ref contained in its repository's default branch with the tip off the first-parent line and zero unmerged refs across all configured repositories. | merge door: `triggerMerge` → merge specialist (`merge-agent.ts`); verification: `verifyBranchMergedImpl()` + `getForgeAdapter().findMergedArtifact()`; fallback: `gatherIssueBranchContainment()` | PR/MR id and URL, `mergeStatus: merged`, durable merge record, or branch-containment evidence |
@@ -23,6 +23,8 @@ this table and that module from drifting silently.
 ## Verdict durability
 
 Rows 1–3 read live status first and fall back to the per-issue record's `pipeline` block on `overdeck-state` when live status is absent. The durable journal preserves the full verdict triple (review/tests/verification) plus `lastVerifiedCommit` through close-out and across database rebuilds, so rows continue to read and pass after live status is cleared or the SQLite database is re-derived. Re-running `pan close <id>` on a fully closed-out issue is an idempotent no-op that returns success without re-evaluating the gate or re-running any ceremony step; it names the original `closedOutAt` timestamp to prove completion on the original run.
+
+The agreement between those two planes now has a mechanical owner (PAN-3850): the report-only invariant checker (`src/lib/cloister/invariant-checker.ts`, every 10 patrol passes) compares the record `pipeline` block against the review-status row field by field and alarms on drift — one activity entry per mismatching entity per day, a persisted report at `~/.overdeck/deacon/invariant-report.json`, and an `invariant-mismatch` row in the parked population. It never repairs; verdict drift is resynced through `pan review resync <id>` and liveness drift through `pan admin agents exited <id>`. The same phase budgets every patrol's actions per UTC day (`src/lib/cloister/patrol-budget.ts`): a patrol whose tally crosses its budget suspends until the next UTC day with exactly one needs-you, so a malfunctioning gate-side patrol degrades to a signal instead of an action storm.
 
 ## Rules of the table
 
@@ -54,10 +56,13 @@ Rows 1–3 read live status first and fall back to the per-issue record's `pipel
   feature branch remain in the observed string instead of causing a miss.
 - **Residue disposition handles tracker-closed pre-record-era issues** (PAN-3396). When `pan close --residue` is used, the DoD gate is skipped and every row reports skip with the verified disposition evidence. The command closes stale convention PRs/MRs with an honest "no merge claim" comment, verifies the tracker issue is closed (tracker-agnostic via `isTrackerIssueClosed`), and marks the issue terminal without asserting `mergeStatus` (which is unknowable for recordless work). Residue is operator-conversation-only and mutually exclusive with `--abandon` and `--accept-*` flags.
 - **The verification verdict is the row; `lastVerifiedCommit` is not required** (PAN-3067). The
-  runner writes that anchor best-effort — it snapshots HEAD inside a `try/catch` for the
-  test-skip drift check, and a policy `skipped` verdict never has one — so its absence proves
+  runner writes that anchor best-effort — it snapshots HEAD inside a `try/catch` for
+  post-review drift detection and the `overdeck/test` commit-status stamp, and a policy
+  `skipped` verdict never has one — so its absence proves
   nothing about whether verification ran, while requiring it made merged, green, deployed
-  issues permanently un-closable. UAT batch promotion records a `passed` verdict for each
+  issues permanently un-closable. PAN-3847 removed the anchor-equality test skip: a review
+  whose anchor matches `lastVerifiedCommit` no longer auto-passes the test role — the suite
+  always runs. UAT batch promotion records a `passed` verdict for each
   non-terminal member at promote time, and close-out heals members of batches promoted before
   that write path existed (PAN-3114). The row still reports the anchor's presence or absence,
   so a reader never has to guess which condition a miss came from.

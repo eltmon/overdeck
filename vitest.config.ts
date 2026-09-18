@@ -41,6 +41,9 @@ export default defineConfig({
     // retry:0 so flakes remain visible during development. A retried-then-passed
     // test is still surfaced by vitest's default reporter.
     retry: retryEnabled ? 1 : 0,
+    // PAN-3847 (FR-12): vitest refuses .only in every gate run — a focused test
+    // must never shrink the suite silently.
+    allowOnly: false,
     experimental: {
       // Persist transformed module cache across runs in node_modules/.experimental-vitest-cache.
       // Vitest v4 introduced this; meaningful on a ~200-file suite where re-running a

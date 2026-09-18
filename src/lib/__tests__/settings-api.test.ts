@@ -820,6 +820,73 @@ describe('saveSettingsApi', () => {
     expect(state.ui.theme).toBe('ledger');
     expect(mockWriteFile).toHaveBeenCalledTimes(2);
   });
+
+  it('preserves conversations.handoff_author_model across a provider-toggle save (PAN-3884)', async () => {
+    mockLoadConfig.mockReturnValue(baseConfig({
+      conversations: {
+        compactionModel: 'claude-haiku-4-5',
+        manualCompactMode: 'claude-code',
+        richCompaction: true,
+        titleModel: 'claude-haiku-4-5',
+        handoffAuthorModel: 'claude-sonnet-4-6',
+      },
+    }));
+    mockReadFile.mockResolvedValue(
+      'conversations:\n  title_model: claude-haiku-4-5\n  handoff_author_model: claude-sonnet-4-6\nmodels:\n  providers:\n    anthropic: true\n',
+    );
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    expect(settings.conversations?.handoff_author_model).toBe('claude-sonnet-4-6');
+
+    await Effect.runPromise(saveSettingsApi({
+      ...settings,
+      models: {
+        ...settings.models,
+        providers: { ...settings.models.providers, openai: true },
+      },
+    }));
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('handoff_author_model: claude-sonnet-4-6');
+    expect(written).toContain('openai:');
+  });
+
+  it('preserves unknown keys under conversations, models.providers, and swarm across GET then save (PAN-3884)', async () => {
+    mockReadFile.mockResolvedValue(
+      [
+        'swarm:',
+        '  mode: auto',
+        '  maxSlots: 3',
+        '  autoAdvance: true',
+        '  future_swarm_key: keep-me',
+        'conversations:',
+        '  title_model: claude-haiku-4-5',
+        '  future_conv_key: keep-me',
+        'models:',
+        '  providers:',
+        '    anthropic: true',
+        '    future_provider: true',
+        '',
+      ].join('\n'),
+    );
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await Effect.runPromise(saveSettingsApi({
+      ...settings,
+      models: {
+        ...settings.models,
+        providers: { ...settings.models.providers, openai: true },
+      },
+    }));
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('future_swarm_key: keep-me');
+    expect(written).toContain('future_conv_key: keep-me');
+    expect(written).toContain('future_provider: true');
+    expect(written).toContain('openai:');
+  });
 });
 
 describe('validateSettingsApi', () => {

@@ -1,3 +1,4 @@
+import { useComposerEchoes } from './useComposerEchoes';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { toastResumeOutcome } from '../../lib/resumeOutcome';
 import { useDashboardStore } from '../../lib/store';
@@ -22,10 +23,8 @@ import { getDefaultConversationModel } from './defaultConversationModel';
 import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, SubagentSummary, TurnDiffSummary, WorkLogEntry } from './chat-types';
 import {
   useComposerStore,
-  useConversationOptimistic,
-  useConversationOptimisticBaseCount,
 } from '../../lib/composerStore';
-import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, isConversationWorking, TURN_STALL_MS, type WorkingPhase } from '../../lib/workingPhase';
+import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, isConversationWorking, type WorkingPhase } from '../../lib/workingPhase';
 import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
 import type { ReviewerRoundMetadata } from '@overdeck/contracts';
 import { DiffPanel } from '../DiffPanel';
@@ -1199,12 +1198,8 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   // Keep optimistic messages and failed-send retries in the conversation-keyed
   // composer store so switching panes cannot discard them (PAN-1591).
-  const optimisticMessages = useConversationOptimistic(conversation.name);
-  const optimisticBaseCount = useConversationOptimisticBaseCount(conversation.name);
   const addOptimistic = useComposerStore((s) => s.addOptimistic);
   const acknowledgeOptimistic = useComposerStore((s) => s.acknowledgeOptimistic);
-  const clearOptimistic = useComposerStore((s) => s.clearOptimistic);
-  const failSend = useComposerStore((s) => s.failSend);
   const queryClient = useQueryClient();
 
   // When forkStatus transitions from non-null to null (fork completed),
@@ -1240,6 +1235,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
     conversation,
     agentId,
     serverBaseCount: serverMessages.length,
+    serverMessageIds: serverMessages.map((message) => message.id),
     onSendFailed: onSendFailedProp,
   });
   // PAN-1523: ContextWindowMeter lives in the composer toolbar (matches
@@ -1250,61 +1246,18 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
     data?.contextUsage ?? conversation.contextUsage ?? null,
   );
 
-  // Reconcile optimistic messages against what the server has actually echoed.
-  // Count only USER turns added since the send baseline — an optimistic bubble is
-  // "absorbed" when its real user message comes back, NOT merely when the total
-  // message count grows. Counting all messages let a concurrent assistant turn
-  // prematurely clear the "Sending…" bubble before the user's own message echoed,
-  // so it sometimes disappeared entirely until the next poll (PAN-1591).
-  const echoedUserCount = serverMessages
-    .slice(optimisticBaseCount)
-    .filter((m) => m.role === 'user').length;
-  const absorbedCount = Math.min(optimisticMessages.length, echoedUserCount);
-  const visibleOptimistic = optimisticMessages.slice(absorbedCount);
-  const serverCaughtUp = optimisticMessages.length > 0 && visibleOptimistic.length === 0;
+  const visibleOptimistic = useComposerEchoes(conversation.name, serverMessages);
   const messages = [...serverMessages, ...visibleOptimistic, ...commandResults];
 
-  const handleMessageSent = useCallback((text: string) => {
-    addOptimistic(conversation.name, text, serverMessages.length);
-  }, [addOptimistic, conversation.name, serverMessages.length]);
-
-  const handleMessageAcknowledged = useCallback((text: string) => {
-    if (conversation.harness !== 'ohmypi' && conversation.harness !== 'pi') return;
-    acknowledgeOptimistic(conversation.name, text);
-  }, [acknowledgeOptimistic, conversation.harness, conversation.name]);
-
-  // Failed messages are NOT cleared on conversation switch — they persist in the
-  // store keyed per-conversation so the retry outbox survives navigating away
-  // and back (the whole point of moving them out of component-local state).
-
-  // Clean up optimistic messages once the server catches up.
-  useEffect(() => {
-    if (serverCaughtUp) clearOptimistic(conversation.name);
-  }, [serverCaughtUp, clearOptimistic, conversation.name]);
-
-  // PAN-1635: a sent message can be silently eaten when Claude Code compacts on
-  // submit (the paste+Enter races the compaction state-transition) — the prompt
-  // is dropped and never echoes, leaving the optimistic bubble "Sending…" forever.
-  // Detect it: a compact boundary that appeared at/after the send means the prompt
-  // was eaten (surface fast); otherwise fall back to a plain stall timeout. Either
-  // way, move it to the retry outbox so the user can re-send instead of waiting on
-  // a response that will never come.
-  useEffect(() => {
-    if (visibleOptimistic.length === 0) return;
-    const oldest = visibleOptimistic[0];
-    const sentTs = Date.parse(oldest.createdAt || '');
-    if (Number.isNaN(sentTs)) return;
-    const eatenByCompaction = (data?.compactBoundaries ?? []).some((b) => {
-      const bt = Date.parse(b.timestamp);
-      return !Number.isNaN(bt) && bt >= sentTs;
+  const handleMessageSent = useCallback((text: string, clientMessageId?: string) => {
+    addOptimistic(conversation.name, text, serverMessages.length, {
+      clientMessageId, echoBaselineIds: serverMessages.map((message) => message.id),
     });
-    const deadline = sentTs + (eatenByCompaction ? 20_000 : TURN_STALL_MS);
-    const timer = setTimeout(
-      () => failSend(conversation.name, oldest.text),
-      Math.max(0, deadline - Date.now()),
-    );
-    return () => clearTimeout(timer);
-  }, [visibleOptimistic, data?.compactBoundaries, failSend, conversation.name]);
+  }, [addOptimistic, conversation.name, serverMessages]);
+
+  const handleMessageAcknowledged = useCallback((text: string, clientMessageId?: string) => {
+    acknowledgeOptimistic(conversation.name, text, clientMessageId);
+  }, [acknowledgeOptimistic, conversation.name]);
 
   const isForkInProgress = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
   const isForkFailed = conversation.forkStatus === 'failed';

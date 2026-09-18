@@ -89,6 +89,58 @@ describe('handoffCommand', () => {
     expect(forkMocks.forkConversationViaServer).toHaveBeenCalled();
   });
 
+  it('reports failure and exits non-zero when the fork pipeline failed instead of printing a conv id as if it launched (PAN-3860)', async () => {
+    conversationMocks.getConversationById.mockReturnValue({
+      id: 123,
+      name: 'source-conv',
+      title: 'Source conversation',
+      cwd: '/workspace',
+      claudeSessionId: 'session-id',
+    });
+    forkMocks.forkConversationViaServer.mockResolvedValue({
+      id: 2743,
+      name: 'conv-20260917-351b',
+      tmuxSession: 'conv-20260917-351b',
+      forkStatus: 'failed',
+      forkError: 'Timed out waiting for tmux session conv-20260917-351b',
+    });
+    const { handoffCommand } = await import('../handoff.js');
+
+    await expect(handoffCommand('123', ['ship', 'it'], {})).rejects.toThrow('process.exit');
+
+    const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+    expect(output).toContain('Handoff failed: Timed out waiting for tmux session conv-20260917-351b');
+    expect(output).not.toContain('Handoff forked conversation');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('reports still-in-progress and exits non-zero when the fork pipeline times out before spawning (PAN-3860)', async () => {
+    conversationMocks.getConversationById.mockReturnValue({
+      id: 123,
+      name: 'source-conv',
+      title: 'Source conversation',
+      cwd: '/workspace',
+      claudeSessionId: 'session-id',
+    });
+    forkMocks.forkConversationViaServer.mockResolvedValue({
+      id: 2742,
+      name: 'conv-20260917-ed92',
+      tmuxSession: 'conv-20260917-ed92',
+      forkStatus: 'handoff',
+      timedOut: true,
+      sessionAlive: false,
+    });
+    forkMocks.isForkResultInProgress.mockReturnValueOnce(true);
+    const { handoffCommand } = await import('../handoff.js');
+
+    await expect(handoffCommand('123', ['ship', 'it'], {})).rejects.toThrow('process.exit');
+
+    const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+    expect(output).toContain('Handoff is still in progress');
+    expect(output).not.toContain('Handoff forked conversation');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
   it('prints an ignored notice for --harness and does not forward it to the fork server', async () => {
     conversationMocks.getConversationById.mockReturnValue({
       id: 123,

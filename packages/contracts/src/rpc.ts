@@ -212,6 +212,11 @@ export const ConversationEvent = Schema.Union([
     workLog: Schema.Array(WorkLogEntry),
     streaming: Schema.Boolean,
     snapshot: Schema.optional(Schema.Boolean),
+    /** Confirmed transcript replacement/truncation; replace even a shorter cached history. */
+    reset: Schema.optional(Schema.Boolean),
+    /** Metadata represents the whole parsed state, including absent plans/boundaries. */
+    metadataSnapshot: Schema.optional(Schema.Boolean),
+    totalCost: Schema.optional(Schema.Number),
     proposedPlan: Schema.optional(ProposedPlan),
     compactBoundaries: Schema.optional(Schema.Array(CompactBoundary)),
     contextUsage: Schema.optional(Schema.NullOr(ContextUsage)),

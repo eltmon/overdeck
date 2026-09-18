@@ -218,6 +218,51 @@ describe('fork pipeline recovery and re-entry', () => {
     expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
   });
 
+  it('ends the row (not just fails forkStatus) when a retry-capped fork has no live successor to salvage (PAN-3860)', async () => {
+    const { getConversationByName, incrementForkRetryCount } = await import('../../../../lib/overdeck/conversations.js');
+    const { recoverStuckForks } = await import('../../../../lib/overdeck/conversation-forks.js');
+    await createForkPair({ forkStatus: 'spawning', forkMode: 'handoff' });
+    incrementForkRetryCount('fork-conv');
+    incrementForkRetryCount('fork-conv');
+    // Neither the tmux session nor a harness process survived the restart —
+    // there is nothing to salvage, and no in-memory pipeline can resume.
+    sessionAlive.set('conv-fork-conv', false);
+    harnessAlive.set('conv-fork-conv', false);
+
+    await expect(recoverStuckForks()).resolves.toBe(0);
+
+    const recovered = getConversationByName('fork-conv');
+    expect(recovered?.forkStatus).toBe('failed');
+    expect(recovered?.forkError).toMatch(/retry limit/i);
+    // The conversation-lifecycle sweeper's PAN-3860 skip only protects a
+    // non-'failed' forkStatus — a row left status='active' here would never
+    // be revisited by anything and would show as phantom-active forever.
+    expect(recovered?.status).toBe('ended');
+  });
+
+  it('ends the row when a dashboard restart lost the fork request before it was ever persisted (PAN-3860)', async () => {
+    const { createConversation, getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
+    const { recoverStuckForks } = await import('../../../../lib/overdeck/conversation-forks.js');
+    createConversation({
+      name: 'orphan-fork-conv',
+      tmuxSession: 'conv-orphan-fork-conv',
+      cwd: TEST_HOME,
+      claudeSessionId: 'orphan-fork-session',
+      title: 'Orphaned fork',
+      harness: 'claude-code',
+      forkStatus: 'handoff',
+      // No setForkRequest() call — the row was created but the crash landed
+      // before the fork-request metadata was persisted.
+    });
+
+    await expect(recoverStuckForks()).resolves.toBe(0);
+
+    const recovered = getConversationByName('orphan-fork-conv');
+    expect(recovered?.forkStatus).toBe('failed');
+    expect(recovered?.forkError).toMatch(/restarted during fork/i);
+    expect(recovered?.status).toBe('ended');
+  });
+
   it('re-enters a stale runtime-active tmux corpse instead of clearing fork status', async () => {
     const { getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
     const { recoverStuckForks } = await import('../../../../lib/overdeck/conversation-forks.js');

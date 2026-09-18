@@ -2,8 +2,8 @@
 name: write-xbrief
 description: >
   Write an xBRIEF spec and continue.json directly — without launching the interactive
-  planning agent. The workspace working copy deliberately remains .pan/spec.vbrief.json
-  for legacy compatibility. Use when the work is well-understood
+  planning agent. The workspace copy lives in the runtime dir `.overdeck/`; finalize
+  reads it and promotes the canonical spec to `specs/` on `overdeck-state`. Use when the work is well-understood
   and the agent can author the plan from the issue body and codebase alone.
   Also use when you ARE the work agent and need to self-plan before implementing.
   Covers the full xBRIEF v0.8 schema, continue.json format, task sizing rules,
@@ -50,9 +50,9 @@ Minimum exploration:
 
 ---
 
-## Step 2 — Write `.pan/spec.vbrief.json`
+## Step 2 — Write `.overdeck/spec.vbrief.json`
 
-The file goes at `.pan/spec.vbrief.json` in the workspace root and MUST conform to xBRIEF v0.8. This workspace-only filename is a deliberate legacy-compatibility path; finalized canonical specs use the `.xbrief.json` extension.
+The file goes at `.overdeck/spec.vbrief.json` in the workspace root and MUST conform to xBRIEF v0.8. The workspace copy lives in the runtime dir `.overdeck/`; finalize reads it and promotes the canonical spec to `specs/` on `overdeck-state` with the `.xbrief.json` extension.
 
 ### Full schema
 
@@ -143,7 +143,7 @@ The file goes at `.pan/spec.vbrief.json` in the workspace root and MUST conform 
 
 ---
 
-## Step 3 — Write `.pan/continue.json`
+## Step 3 — Write `.overdeck/continue.json`
 
 The continue file records decisions and hazards so the work agent (and review/test agents) have context that isn't in the xBRIEF narrative.
 
@@ -191,7 +191,7 @@ pan plan finalize
 ```
 
 This atomically:
-1. Reads the legacy-compatible workspace path `.pan/spec.vbrief.json`
+1. Reads the workspace spec at `.overdeck/spec.vbrief.json`
 2. Creates xBRIEF tasks through the canonical writer (one per `items[]` entry, edges respected)
 3. Sets `plan.status` to `"proposed"`
 4. Promotes the canonical spec to `${OVERDECK_HOME}/state/<project>/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.xbrief.json`
@@ -260,13 +260,13 @@ Most plans have 0–2 inspection xBRIEF tasks. More than 3 suggests the xBRIEF t
 
 ## Difficulty rubric
 
-| Level | When | Typical model |
-|-------|------|---------------|
-| `trivial` | Typo, comment, formatting only | haiku |
-| `simple` | Bug fix, single file, obvious change | haiku |
-| `medium` | New feature, 3–5 files, standard patterns | sonnet |
-| `complex` | Refactor, migration, 6+ files, some risk | sonnet |
-| `expert` | Architecture, security, performance, high risk | opus |
+| Level | When |
+|-------|------|
+| `trivial` | Typo, comment, formatting only |
+| `simple` | Bug fix, single file, obvious change |
+| `medium` | New feature, 3–5 files, standard patterns |
+| `complex` | Refactor, migration, 6+ files, some risk |
+| `expert` | Architecture, security, performance, high risk |
 
 ---
 
@@ -274,7 +274,7 @@ Most plans have 0–2 inspection xBRIEF tasks. More than 3 suggests the xBRIEF t
 
 Before running `pan plan finalize`:
 
-- [ ] `.pan/spec.vbrief.json` has exactly two top-level keys: `xBRIEFInfo` and `plan`
+- [ ] `.overdeck/spec.vbrief.json` has exactly two top-level keys: `xBRIEFInfo` and `plan`
 - [ ] `plan.id` is lowercase issue ID
 - [ ] `plan.uid` is a fresh UUID v4
 - [ ] `plan.status` is `"approved"`
@@ -284,7 +284,7 @@ Before running `pan plan finalize`:
 - [ ] Every item has at least one nested `items` AC entry
 - [ ] `foundationFor` populated on every `requiresInspection: true` item
 - [ ] No spurious edges
-- [ ] `.pan/continue.json` written with at least one `decisions[]` entry
+- [ ] `.overdeck/continue.json` written with at least one `decisions[]` entry
 
 ---
 

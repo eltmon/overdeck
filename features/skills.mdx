@@ -245,24 +245,107 @@ This spawns all three reviewers in parallel, then synthesizes their findings int
 
 ### Planning & Exploration Subagents
 
-| Subagent | Model | Focus | Permission Mode |
-|----------|-------|-------|-----------------|
-| `planning-agent` | sonnet | Codebase research, execution planning | `plan` (read-only) |
-| `codebase-explorer` | haiku | Fast architecture discovery, pattern finding | `plan` (read-only) |
-| `triage-agent` | haiku | Issue categorization, complexity estimation | default |
-| `health-monitor` | haiku | Agent stuck detection, log analysis | default |
+Overdeck ships no custom planning or exploration subagent files. Planning runs as the `plan` role (`roles/plan.md`), and any role that needs parallel read-only exploration uses Claude Code's built-in `Explore` and `general-purpose` subagent types, which inherit the parent session's model and provider routing. Custom `.claude/agents/` files with a pinned `model:` broke under CLIProxy-routed sessions; see the "Why no ambient subagents" section in `docs/ROLES.md`.
 
-**Usage Examples:**
-```bash
-# Explore codebase architecture
-Task(subagent_type='codebase-explorer', prompt='Map out the authentication system')
+## Best Practices
 
-# Triage an issue
-Task(subagent_type='triage-agent', prompt='Categorize and estimate ISSUE-123')
+- Tip 1
+- Tip 2
+EOF
 
-# Check agent health
-Task(subagent_type='health-monitor', prompt='Check status of all running agents')
+# Sync to all AI tools
+pan sync
 ```
+
+**Skill anatomy:**
+
+```markdown
+# Skill Title
+
+One-line description.
+
+## When to Use
+
+When to invoke this skill (triggers).
+
+## Steps
+
+1. Detailed step-by-step instructions
+2. With specific commands or patterns
+3. And expected outcomes
+
+## Checklist
+
+- [ ] Item 1
+- [ ] Item 2
+- [ ] Item 3
+
+## Examples
+
+\`\`\`bash
+# Example command
+\`\`\`
+
+## Related Skills
+
+- /other-skill - When to use instead
+- /complementary-skill - Use together with this
+```
+
+See the [Claude skill creator](/cli/core-commands) or use `/pan-skill-creator` for guided creation.
+
+## Skill Distribution
+
+Skills can be distributed via:
+
+1. **Project-specific** - Store in `.overdeck/skills/` in your repo
+2. **User-specific** - Store in `~/.overdeck/skills/` (synced to AI tools)
+3. **Team-shared** - Commit to version control and share via git
+4. **Public packages** - Distribute via npm or GitHub
+
+### Syncing Skills
+
+```bash
+# Sync all skills to AI tools (Claude Code, Cursor, etc.)
+pan sync
+
+# Only sync skills (skip agents, hooks)
+pan sync --skills-only
+
+# Verify sync status
+pan sync --dry-run
+```
+
+The `pan sync` command:
+- Copies skills from `~/.overdeck/skills/` to each AI tool's config directory
+- Updates existing skills if versions differ
+- Removes manifest-managed skills from harness directories after their bundled source is removed
+- Preserves user-owned and user-modified files, reporting modified stale files instead of deleting them
+- Ignores empty bundled skill directories so they do not reappear in caches or harness targets
+
+## Subagents
+
+Overdeck includes specialized subagent templates for common development tasks. Subagents are invoked via the Task tool or convoy orchestration for parallel execution.
+
+### Code Review Subagents
+
+| Subagent | Model | Focus | Output |
+|----------|-------|-------|--------|
+| `code-review-correctness` | haiku | Logic errors, edge cases, type safety | `.claude/reviews/<timestamp>-correctness.md` |
+| `code-review-security` | sonnet | OWASP Top 10, vulnerabilities | `.claude/reviews/<timestamp>-security.md` |
+| `code-review-performance` | haiku | Algorithms, N+1 queries, memory | `.claude/reviews/<timestamp>-performance.md` |
+| `code-review-synthesis` | sonnet | Combines all findings into unified report | `.claude/reviews/<timestamp>-synthesis.md` |
+
+**Usage Example:**
+```bash
+/pan-code-review --files "src/auth/*.ts"
+```
+
+This spawns all three reviewers in parallel, then synthesizes their findings into a prioritized report.
+
+### Planning & Exploration Subagents
+
+Overdeck ships no custom planning or exploration subagent files. Planning runs as the `plan` role (`roles/plan.md`), and any role that needs parallel read-only exploration uses Claude Code's built-in `Explore` and `general-purpose` subagent types, which inherit the parent session's model and provider routing. Custom `.claude/agents/` files with a pinned `model:` broke under CLIProxy-routed sessions; see the "Why no ambient subagents" section in `docs/ROLES.md`.
 
 ## Best Practices
 

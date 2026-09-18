@@ -40,6 +40,20 @@ beforeEach(() => {
 });
 
 describe('spawnSequencerAgent', () => {
+  it('honors the persistent pause before collecting or spawning background work', async () => {
+    vi.mocked(getAgentStateSync).mockReturnValueOnce({ paused: true } as never);
+    const { collectOpenBacklog } = await import('../backlog-input.js');
+    await expect(spawnSequencerAgent('incremental', { issues: [] })).rejects.toThrow('Sequencer is paused');
+    expect(collectOpenBacklog).not.toHaveBeenCalled();
+    expect(spawnRun).not.toHaveBeenCalled();
+  });
+
+  it('honors a pause applied while preparing a pass', async () => {
+    vi.mocked(getAgentStateSync).mockReturnValueOnce(null).mockReturnValueOnce({ paused: true } as never);
+    await expect(spawnSequencerAgent('review', { projectRoot: '/tmp/proj', issues: [] })).rejects.toThrow('Sequencer is paused');
+    expect(spawnRun).not.toHaveBeenCalled();
+  });
+
   it('resolves to creation pass when no sequence.md exists', async () => {
     (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
     await spawnSequencerAgent('auto', { projectRoot: '/tmp/proj', projectKey: 'overdeck' });

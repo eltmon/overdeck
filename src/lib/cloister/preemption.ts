@@ -39,7 +39,7 @@ import { listSessions } from '../tmux.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { loadCloisterConfigSync } from './config.js';
-import { isAgentIdleForNudge } from './agent-idle.js';
+import { isIdle } from '../agents/liveness.js';
 import { assessMemoryPressure } from './memory-governor.js';
 import { tryReserveAdvancingSlot } from './concurrency.js';
 
@@ -61,7 +61,7 @@ export interface YieldOutcome {
 export interface YieldCandidate {
   id: string;
   issueId: string;
-  /** `isAgentIdleForNudge` — only idle agents may be yielded (never preempt active work). */
+  /** `isIdle` — only idle agents may be yielded (never preempt active work). */
   idle: boolean;
   /** An operator is attached to the tmux session — never yield out from under a human. */
   attached: boolean;
@@ -132,7 +132,7 @@ async function buildCandidates(): Promise<YieldCandidate[]> {
     .map((s) => ({
       id: s.id,
       issueId: s.issueId,
-      idle: isAgentIdleForNudge(s.id),
+      idle: isIdle(s.id),
       attached: attached.has(s.id),
       paused: s.paused === true,
       reviewBlocked: reviewBlockedFor(s.issueId),

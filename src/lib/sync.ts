@@ -270,13 +270,15 @@ export function refreshCacheSync(): RefreshCacheResult {
 
   // Copy agent definitions from repo to cache.
   //
-  // PAN-982: This pass deploys both Claude Code subagent definitions
-  // (codebase-explorer, planning-agent, triage-agent, health-monitor — used by
-  // the in-session Agent tool) and the Overdeck pipeline agents
-  // (pan-work-agent, pan-planning-agent, pan-review-agent, pan-test-agent,
+  // PAN-982: This pass deploys the Overdeck pipeline agent definitions
+  // (no ad-hoc Claude Code subagents ship here any more — roles use the
+  // built-in `Explore` / `general-purpose` types, see docs/ROLES.md)
+  // (pan-work-agent, pan-review-agent, pan-test-agent,
   // pan-inspect-agent, pan-uat-agent, pan-merge-agent — used by `claude --agent
   // pan-<type>-agent` when Cloister spawns the work/review/test/inspect/uat/
-  // merge processes).
+  // merge processes). Planning is not among them: Cloister launches the
+  // planner with the role file `roles/plan.md` (see runtime-command.ts), not
+  // an agent definition.
   //
   // Both kinds live side by side in the repo's `agents/` directory and both get
   // mirrored into ~/.overdeck/agent-definitions/ here, then on to
@@ -301,7 +303,6 @@ export function refreshCacheSync(): RefreshCacheResult {
     // discovering it when a work/review/test/inspect/uat/merge spawn fails.
     const REQUIRED_PIPELINE_AGENTS = [
       'pan-work-agent.md',
-      'pan-planning-agent.md',
       'pan-review-agent.md',
       'pan-test-agent.md',
       'pan-inspect-agent.md',

@@ -792,10 +792,11 @@ export async function reportCommitStatus(
  * Post the `overdeck/tests` commit status for the HEAD of a workspace.
  *
  * Used by verification-runner (pre-review gate) and the test specialist
- * (post-review gate) to signal that Overdeck has run the test suite
- * against this exact commit. The `test` job in .github/workflows/ci.yml
- * reads this status and skips its own vitest run when it's `success`,
- * eliminating duplicate test execution for pipeline-managed PRs.
+ * (post-review gate) to record that Overdeck's changed-file-scoped
+ * verification gate passed against this exact commit. PAN-3847 (FR-13): CI
+ * no longer reads this status — the `test` job in .github/workflows/ci.yml
+ * runs vitest on every push. The context keeps its name because branch
+ * protection requires it (Decision 7).
  *
  * Non-pipeline pushes (no workspace, no `overdeck/tests` status) cause
  * CI to fall through and run vitest as normal — defense in depth.
@@ -809,27 +810,33 @@ export async function postOverdeckTestsStatus(
   repo: string,
   status: 'success' | 'failure',
   description: string,
+  /** PAN-3847 (FR-13): the stamp binds to the tested sha when the caller provides it. */
+  sha?: string,
 ): Promise<void> {
   if (!isGitHubAppConfigured()) return;
   try {
-    const { stdout } = await execAsync('git rev-parse HEAD', {
-      cwd: workspacePath,
-      encoding: 'utf-8',
-      timeout: 5000,
-    });
-    const sha = stdout.trim();
-    if (!sha) return;
+    const resolvedSha = sha ?? await (async () => {
+      const { stdout } = await execAsync('git rev-parse HEAD', {
+        cwd: workspacePath,
+        encoding: 'utf-8',
+        timeout: 5000,
+      });
+      return stdout.trim();
+    })();
+    if (!resolvedSha) return;
     // Context name MUST match branch protection's required_status_checks.contexts
     // for main, which is the singular "overdeck/test". Don't change to plural
     // without coordinating the branch protection rule update.
-    await reportCommitStatus(owner, repo, sha, status, 'overdeck/test', description);
+    await reportCommitStatus(owner, repo, resolvedSha, status, 'overdeck/test', description);
     console.log(
-      `[github-app] Posted overdeck/test=${status} for ${sha.slice(0, 8)} in ${owner}/${repo}`,
+      `[github-app] Posted overdeck/test=${status} for ${resolvedSha.slice(0, 8)} in ${owner}/${repo}`,
     );
   } catch (err: any) {
     console.warn(`[github-app] Failed to post overdeck/test status: ${err.message}`);
   }
-}async function refreshWorkspaceTokenPromise(
+}
+
+async function refreshWorkspaceTokenPromise(
   workspacePath: string,
 ): Promise<void> {
   const config = loadGitHubAppConfig();

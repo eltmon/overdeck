@@ -46,6 +46,9 @@ vi.mock('../../runtimes/behavior.js', () => ({
     transcriptKind: 'claude-jsonl',
   })),
 }));
+vi.mock('../../runtimes/kimi-context-envelope.js', () => ({
+  waitForManagedKimiSessionId: vi.fn(async () => 'session-matrix'),
+}));
 vi.mock('../../transcript-landing.js', () => ({
   captureTranscriptUserRecordSnapshot: vi.fn(),
 }));
@@ -204,7 +207,7 @@ describe('composer command harness interception matrix (all KNOWN_HARNESSES)', (
           message,
           'conversation-message',
           'auto',
-          ...(harness === 'kimi-code' ? [{ kimiContext: { workspace: `/tmp/matrix-${harness}` } }] : []),
+          ...(harness === 'kimi-code' ? [{ kimiContext: { workspace: `/tmp/matrix-${harness}`, sessionId: 'session-matrix' } }] : []),
         );
         expect(mocks.deliverControl).not.toHaveBeenCalled();
       }

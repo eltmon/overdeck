@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { constants } from 'node:fs';
+import { constants, readFileSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
@@ -10,6 +10,55 @@ import type { RuntimeName } from './runtimes/types.js';
 
 const execFileAsync = promisify(execFile);
 const SAFE_BINARY_NAME = /^[A-Za-z0-9._+-]+$/;
+
+/**
+ * Windows drive mounts visible from inside WSL (`/mnt/c`, …), read once from
+ * /proc/mounts. WSL appends the Windows PATH to the Linux PATH (interop), so
+ * on a distro with no Linux harness installed `claude` resolves to
+ * `/mnt/c/Users/<user>/AppData/Roaming/npm/claude` — the *Windows* Claude
+ * Code. That binary runs on the Windows side: its `~` is the Windows profile,
+ * so it writes `~/.claude/projects/…/<session>.jsonl` where the WSL-side
+ * server can never find it, and its cwd is a `\\wsl.localhost\…` UNC path.
+ * The tmux pane looks healthy while the dashboard renders the empty welcome
+ * state forever (PAN-3827). Such candidates are not harness binaries for
+ * Overdeck: the resolver skips them and names them so the operator is told to
+ * install the harness inside the distro instead of chasing a phantom session.
+ *
+ * WSL2 mounts drives as 9p with source `C:\` (octal-escaped as `C:\134`) and
+ * `aname=drvfs` in the options; WSL1 uses the `drvfs` filesystem type.
+ */
+function detectWindowsMountRoots(): readonly string[] {
+  if (process.platform !== 'linux') return [];
+  let mounts: string;
+  try {
+    mounts = readFileSync('/proc/mounts', 'utf8');
+  } catch {
+    return [];
+  }
+  const roots: string[] = [];
+  for (const line of mounts.split('\n')) {
+    const [source, mountPoint, fsType, mountOptions = ''] = line.split(' ');
+    if (!source || !mountPoint || !fsType) continue;
+    const isDriveMount = (fsType === '9p' || fsType === 'drvfs')
+      && (/^[A-Za-z]:/.test(source) || /(?:^|[,;])aname=drvfs(?:$|[,;])/.test(mountOptions));
+    if (!isDriveMount) continue;
+    // /proc/mounts octal-escapes spaces, tabs, newlines and backslashes.
+    roots.push(mountPoint.replace(/\\([0-7]{3})/g, (_, octal: string) => String.fromCharCode(parseInt(octal, 8))));
+  }
+  return roots;
+}
+
+let cachedWindowsMountRoots: readonly string[] | undefined;
+
+function windowsMountRoots(): readonly string[] {
+  cachedWindowsMountRoots ??= detectWindowsMountRoots();
+  return cachedWindowsMountRoots;
+}
+
+/** True when `path` lives on a Windows drive mounted into WSL. */
+export function isWindowsInteropPath(path: string, roots: readonly string[] = windowsMountRoots()): boolean {
+  return roots.some((root) => path === root || path.startsWith(root.endsWith('/') ? root : `${root}/`));
+}
 
 export const HARNESS_BINARY_BY_RUNTIME: Record<RuntimeName, string> = {
   'claude-code': 'claude',
@@ -33,6 +82,19 @@ export interface ExecutableResolutionOptions {
   allowLoginShell?: boolean;
   accessExecutable?: (path: string) => Promise<void>;
   runCommand?: ExecutableCommandRunner;
+  /** Windows drive mounts to treat as interop (test seam; defaults to /proc/mounts on WSL). */
+  windowsMountRoots?: readonly string[];
+}
+
+export interface ExecutableResolution {
+  /** Absolute executable path, or null when nothing usable was found. */
+  path: string | null;
+  /**
+   * Executable candidates that were skipped because they live on a Windows
+   * drive mounted into WSL. Non-empty with a null `path` means the harness is
+   * installed on Windows but not inside the distro.
+   */
+  windowsInterop: string[];
 }
 
 const defaultRunCommand: ExecutableCommandRunner = async (command, args) => {
@@ -69,6 +131,19 @@ export async function resolveExecutable(
   binary: string,
   options: ExecutableResolutionOptions = {},
 ): Promise<string | null> {
+  return (await resolveExecutableDetailed(binary, options)).path;
+}
+
+/**
+ * {@link resolveExecutable}, plus the Windows-interop candidates it refused.
+ * Every candidate — PATH entry, well-known install dir, npm/bun prefix, login
+ * shell answer, even an explicitly configured path — passes through the same
+ * gate, so a Windows binary can never leak into a launcher by any route.
+ */
+export async function resolveExecutableDetailed(
+  binary: string,
+  options: ExecutableResolutionOptions = {},
+): Promise<ExecutableResolution> {
   if (!SAFE_BINARY_NAME.test(binary)) {
     throw new Error(`Invalid executable name: ${binary}`);
   }
@@ -76,8 +151,17 @@ export async function resolveExecutable(
   const cwd = options.cwd ?? process.cwd();
   const home = resolve(cwd, options.home ?? homedir());
   const pathValue = options.pathValue ?? process.env['PATH'] ?? '';
-  const accessExecutable = options.accessExecutable ?? ((path: string) => access(path, constants.X_OK));
   const runCommand = options.runCommand ?? defaultRunCommand;
+  const mountRoots = options.windowsMountRoots ?? windowsMountRoots();
+  const windowsInterop: string[] = [];
+  const accessNative = options.accessExecutable ?? ((path: string) => access(path, constants.X_OK));
+  const accessExecutable = async (path: string): Promise<void> => {
+    await accessNative(path);
+    if (isWindowsInteropPath(path, mountRoots)) {
+      if (!windowsInterop.includes(path)) windowsInterop.push(path);
+      throw new Error(`Windows interop executable is not usable from WSL: ${path}`);
+    }
+  };
 
   if (options.executablePath !== undefined) {
     if (!isAbsolute(options.executablePath)) {
@@ -85,9 +169,9 @@ export async function resolveExecutable(
     }
     try {
       await accessExecutable(options.executablePath);
-      return options.executablePath;
+      return { path: options.executablePath, windowsInterop };
     } catch {
-      return null;
+      return { path: null, windowsInterop };
     }
   }
 
@@ -96,7 +180,7 @@ export async function resolveExecutable(
     .filter(Boolean)
     .map((directory) => isAbsolute(directory) ? directory : resolve(cwd, directory));
   const pathMatch = await firstExecutable(pathDirectories, binary, accessExecutable);
-  if (pathMatch) return pathMatch;
+  if (pathMatch) return { path: pathMatch, windowsInterop };
 
   // Well-known per-harness install directories. Each of these installers drops
   // its binary somewhere the server's inherited PATH does not reach: Claude
@@ -111,20 +195,20 @@ export async function resolveExecutable(
     join(home, '.npm-global', 'bin'),
   ];
   const fixedMatch = await firstExecutable(fixedCandidates, binary, accessExecutable);
-  if (fixedMatch) return fixedMatch;
+  if (fixedMatch) return { path: fixedMatch, windowsInterop };
 
   try {
     const npmPrefix = (await runCommand('npm', ['prefix', '-g'])).trim().split('\n')[0]?.trim();
     if (npmPrefix) {
       const npmMatch = await firstExecutable([join(resolve(cwd, npmPrefix), 'bin')], binary, accessExecutable);
-      if (npmMatch) return npmMatch;
+      if (npmMatch) return { path: npmMatch, windowsInterop };
     }
   } catch {
     // npm is optional; continue to the remaining resolution sources.
   }
 
   const bunMatch = await firstExecutable([join(home, '.bun', 'bin')], binary, accessExecutable);
-  if (bunMatch) return bunMatch;
+  if (bunMatch) return { path: bunMatch, windowsInterop };
 
   if (options.allowLoginShell !== false) {
     const shell = options.shell ?? process.env['SHELL'];
@@ -136,7 +220,7 @@ export async function resolveExecutable(
           ?.trim();
         if (shellResult && isAbsolute(shellResult)) {
           await accessExecutable(shellResult);
-          return shellResult;
+          return { path: shellResult, windowsInterop };
         }
       } catch {
         // A login shell is the final optional fallback.
@@ -144,7 +228,7 @@ export async function resolveExecutable(
     }
   }
 
-  return null;
+  return { path: null, windowsInterop };
 }
 
 export function harnessBinaryName(harness: RuntimeName): string {
@@ -170,7 +254,14 @@ export async function resolveHarnessBinary(
   harness: RuntimeName,
   options?: ExecutableResolutionOptions,
 ): Promise<string | null> {
-  return resolveExecutable(harnessBinaryName(harness), withConfiguredExecutable(harness, options));
+  return (await resolveHarnessBinaryDetailed(harness, options)).path;
+}
+
+export async function resolveHarnessBinaryDetailed(
+  harness: RuntimeName,
+  options?: ExecutableResolutionOptions,
+): Promise<ExecutableResolution> {
+  return resolveExecutableDetailed(harnessBinaryName(harness), withConfiguredExecutable(harness, options));
 }
 
 export async function requireHarnessBinary(
@@ -179,7 +270,7 @@ export async function requireHarnessBinary(
 ): Promise<string> {
   const binary = harnessBinaryName(harness);
   const effectiveOptions = withConfiguredExecutable(harness, options);
-  const resolved = await resolveExecutable(binary, effectiveOptions);
+  const { path: resolved, windowsInterop } = await resolveExecutableDetailed(binary, effectiveOptions);
   if (resolved) return resolved;
 
   const harnessName = harness === 'claude-code'
@@ -191,6 +282,17 @@ export async function requireHarnessBinary(
         : harness === 'kimi-code'
           ? 'Kimi Code CLI'
           : 'Kimi Code CLI'; // acp drives the native Kimi Code CLI binary too
+  if (windowsInterop.length > 0) {
+    // The only usable-looking candidate is the Windows install reached through
+    // WSL interop. Launching it "works" — the pane shows a live TUI — but its
+    // transcript lands in the Windows profile where this server can't read it,
+    // so the dashboard would show an empty conversation forever (PAN-3827).
+    throw new Error(
+      `${harnessName} executable "${binary}" only resolves to a Windows install through WSL interop (${windowsInterop[0]}). ` +
+        `Windows binaries run outside this distro and write their transcripts to the Windows user profile, where Overdeck cannot read them. ` +
+        `Install ${harnessName} inside WSL${harness === 'claude-code' ? ' (curl -fsSL https://claude.ai/install.sh | bash)' : ''}, then restart Overdeck. No terminal session was created.`,
+    );
+  }
   if (effectiveOptions.executablePath) {
     throw new Error(
       `${harnessName} configured executable "${effectiveOptions.executablePath}" was not found or is not executable. Fix its configured path, then restart Overdeck. No terminal session was created.`,

@@ -297,7 +297,17 @@ export async function deliverAgentMessage(
   try {
     state = await Effect.runPromise(getAgentState(normalizedId));
     channelsEnabled = Boolean(state?.channelsEnabled);
-    resolvedMethod ??= state?.deliveryMethod ?? 'auto';
+    // A persisted deliveryMethod is a launch-time hint, not a per-call
+    // transport opt-in: state can project 'supervisor' for an agent with no
+    // live PTY supervisor (codex app-server launches stamped
+    // supervisorEnabled=true while the launcher never wrapped; a crash-resume
+    // can lose the socket, PAN-3257). Route a state-derived 'supervisor'
+    // through the resilient cascade so delivery falls through to the
+    // app-server/channels/tmux tiers instead of throwing socket-missing with
+    // no fallback — the failure mode that stalled the PAN-3743 review loop
+    // when the inspect verdict could not reach the work agent. Only an
+    // explicit caller argument keeps the strict PAN-1769 supervisor contract.
+    resolvedMethod ??= resilientDeliveryMethod(state?.deliveryMethod) ?? 'auto';
   } catch {
     resolvedMethod ??= 'auto';
   }
@@ -662,7 +672,7 @@ async function waitForTranscriptMessageLanding(
   return result.matchedUserRecord || (result.realAssistantTurnCount ?? 0) > 0;
 }
 
-export async function deliverResumeMessageWithTranscriptConfirmation(args: {
+export async function deliverMessageWithTranscriptConfirmation(args: {
   agentId: string;
   workspace: string;
   sessionId: string;
@@ -695,12 +705,15 @@ export async function deliverResumeMessageWithTranscriptConfirmation(args: {
       return { delivered: true, attempts: attempt, lastDelivery };
     }
     if (attempt < 2) {
-      console.warn(`[resumeAgent] Auto-continue prompt did not land in ${args.sessionId}; redelivering once.`);
+      console.warn(`[${args.caller}] message did not land in ${args.sessionId}; redelivering once.`);
     }
   }
 
   return { delivered: false, attempts: 2, ...(lastDelivery ? { lastDelivery } : {}) };
 }
+
+/** Alias kept for one release; use `deliverMessageWithTranscriptConfirmation`. */
+export { deliverMessageWithTranscriptConfirmation as deliverResumeMessageWithTranscriptConfirmation };
 
 export async function deliverInitialPromptWithRetry(
   agentId: string,

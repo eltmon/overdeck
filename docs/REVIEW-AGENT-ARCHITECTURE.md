@@ -43,6 +43,46 @@ point, so manual requests, automatic dispatch, and recovery use the same mode.
 | `full` | The review parent plus the four-lane convoy run in parallel; the parent writes `synthesis.md`. |
 | `none` | AI review is skipped, but the verification quality floor still applies. |
 
+The shared `roles/review.md` is mode-neutral: it supplies evidence, severity,
+coverage, verification, and reporting standards. `buildSelfReviewPrompt` supplies
+only the combined-review workflow. `buildReviewRolePrompt` supplies the full-mode
+wait/signals/synthesis workflow. Quick review never receives instructions to
+wait for a convoy and then an override telling it to ignore them.
+
+Combined review applies explicit correctness, security, performance, and
+requirements/UX checklists. Reviewers finish assigned coverage and a second pass
+before signaling, distinguish implementation from specification defects, and
+trace real callers before reporting a helper-probe failure as a product bug.
+The report records changed-file coverage and acceptance-criterion evidence,
+including whether tests exercise real entry points and run in normal gates.
+There are no per-commit finding caps. New evidence of a real blocker remains
+reportable on later cycles, with an explanation of why it was missed earlier.
+The mechanical non-convergence escalation below is unchanged.
+
+Reviewers reuse successful verification for the exact reviewed HEAD or run
+focused checks. Overdeck TypeScript/Effect/compiler changes require the Effect
+diagnostic ratchet; documentation/style-only changes can mark it not applicable.
+This does not disable any CI or pipeline verification gate. Probe fixtures must
+be isolated from live operator state.
+
+### Prompt refactor no-loss audit
+
+| Previous obligation | Current home |
+| --- | --- |
+| Mode and output file selection | Mode-specific dispatch in `review-agent.ts` |
+| Full-mode wait, four terminal signals, failure handling, early-read exception | `buildReviewRolePrompt` only |
+| Stale-signal guard and exact run ID | Full dispatch; preserved |
+| PR scope, prior review evidence, deduplication, severity | Shared `roles/review.md` |
+| Report head/base, findings, convoy status, AC coverage | Shared report contract plus full dispatch |
+| One completion signal, contention fallback, Pi sentinel | Shared role plus exact dispatch commands |
+| No merge, no delegation, no host lifecycle changes, no test dispatch | Shared role boundaries |
+| Notify orchestration before a silent stall | Shared role; preserved |
+| Arbitrary blocker-count cap and hiding previously missed blockers | Deliberately removed; evidence determines severity |
+| Four specialist scope/checklists and completion contracts | Existing specialist templates, with evidence and coverage additions |
+
+Focused tests in `review-agent.test.ts`, `role-definitions.test.ts`, and
+`code-review-agent-definitions.test.ts` guard mode separation and these contracts.
+
 A full review never substitutes a prior report for a fresh convoy lane. If rework
 changes code, the next full review runs every lane again.
 
@@ -96,8 +136,10 @@ require all of the following before it can ask the write door to converge state:
 - the current workspace head equals the artifact anchor.
 
 `recordReviewVerdict()` in
-`src/lib/cloister/review-verdict-writer.ts` is the sole terminal write door. It
-classifies differing evidence and row anchors with per-repository
+`src/lib/cloister/review-verdict-writer.ts` is the sole terminal write door. PAN-3847:
+a terminal verdict with **no evidence anchor is refused** (`no-evidence-head`) so the
+caller re-snapshots — verdict and anchor are one write, never two. Differing evidence
+and row anchors are classified with per-repository
 `git merge-base --is-ancestor` probes:
 
 - **equal anchors** land without re-gating an existing terminal test result;
@@ -119,6 +161,16 @@ lane reports for the active run, writes a synthesis artifact, and calls the same
 write door. The unsignaled reconciler also converges pending or reviewing rows
 through that door after the settle window, current-head check, newer-request
 check, and freshness check. It preserves the normal blocked-feedback path.
+
+A reviewer's exit writes its own state (PAN-3848 W26): the review sub-role
+launcher runs `pan admin agents exited <agentId> --code <n>` when the reviewer
+process exits (retrying transient write failures, PAN-3848 F5), and the
+Stop-hook's convoy reaper calls the same verb before killing a signaled
+reviewer's session. No patrol is the designed exit path — but Deacon's orphan
+recovery (`handleAgentHeartbeatDeadEvent`) still marks a reviewer stopped when
+its session is gone past the startup grace, so a persistently failed exit
+write converges on the next sweep: without the exit code, and counted as an
+orphan rather than a reported exit.
 
 The stall sweeper is observation-only. It may recommend that an operator inspect
 fresh evidence, but it never writes a verdict, clears a stuck flag, starts a
@@ -201,6 +253,12 @@ reversal (the newest count rises) or a stall (two non-decreases) marks the issue
 `review-not-converging`. The issue remains blocked with its feedback and a
 needs-you escalation; automatic rework re-drive stops until an operator runs
 `pan unstick <issueId>` or decomposes the work.
+
+Post-review drift (PAN-3847): when a passed review's anchor stops matching the
+workspace head, the row is marked `reviewStaleSince` — never reset by a patrol —
+and stops deriving `readyForMerge`. Only `pan done` or `pan review request`
+clears the marker and starts the re-review. Blocked verdicts still re-dispatch
+on a rework commit (debounced one patrol), never with `force: true`.
 
 This cross-cycle safety gate is separate from a single review parent's judgment
 about which findings matter in one convoy.

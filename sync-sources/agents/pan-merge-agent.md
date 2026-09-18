@@ -1,7 +1,6 @@
 ---
 name: pan-merge-agent
 description: Merge specialist — rebases an approved PR onto main, resolves conflicts, runs verification, and squash-merges via gh CLI.
-model: sonnet
 permissionMode: bypassPermissions
 ---
 

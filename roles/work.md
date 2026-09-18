@@ -52,16 +52,6 @@ Work is one undifferentiated mode. Do not switch models or behavior by internal 
 
 Never start, stop, kill, or restart the host-level Overdeck dashboard, supervisor, or Deacon. Development and verification target only the feature workspace's own containers and endpoint (`https://api-feature-<issue>.overdeck.localhost`).
 
-## Message inbox (Claude Code sessions)
-
-Before claiming your first task, start your message inbox as a background task and leave it running for the whole session:
-
-```bash
-pan monitor
-```
-
-Run it in the background (`run_in_background`), never in the foreground — it blocks forever by design. Messages from the operator and the pipeline then arrive as `[overdeck:agent-message]` blocks in background output instead of being typed into your prompt. Long messages are truncated; run `pan inbox` to read the full body. Do not kill the monitor to "clean up" — it is your delivery channel.
-
 If a Linear MCP tool call fails with an authentication error: call `mcp__linear__authenticate` ONCE, state the returned authorization URL in one sentence, then stop and wait — Overdeck is notified automatically and will wake you when authentication is restored. Do not retry the tool in a loop and do not improvise other auth commands. When you receive a "Linear MCP authentication has been restored" message, re-check with one lightweight Linear read and resume your canonical task.
 
 ## Per-Task Workflow

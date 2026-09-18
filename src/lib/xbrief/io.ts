@@ -36,9 +36,9 @@ import type { ProjectConfig } from '../projects.js';
 import { parseXBriefFilename } from './lifecycle.js';
 import { FsError } from '../errors.js';
 import { subItemsOf, type XBriefDifficulty, type XBriefDocument, type XBriefInfo, type XBriefItemStatus } from './types.js';
-import type { TierOverridesMap } from './continue-state.js';
+import type { TierOverridesMap, TierRetriesMap } from './continue-state.js';
 
-export type { TierOverride, TierOverridesMap, TierPromotionHistoryEntry } from './continue-state.js';
+export type { TierOverride, TierOverridesMap, TierPromotionHistoryEntry, TierRetriesMap, TierRetryEntry } from './continue-state.js';
 
 /**
  * Synchronous spec lookup that mirrors what `findSpecByIssue` did pre-PAN-1249.
@@ -347,8 +347,59 @@ export function recordTierPromotion(
     },
   };
 
+  // A promotion moves the item to a new tier, so its retry count at the old
+  // tier is discarded (PAN-3858).
+  const currentRetries = (state.tierRetries && typeof state.tierRetries === 'object')
+    ? { ...(state.tierRetries as TierRetriesMap) }
+    : {};
+  delete currentRetries[itemId];
+
   mkdirSync(getWorkspacePanPaths(workspacePath).panDir, { recursive: true });
-  writeFileSync(path, JSON.stringify({ ...state, tierOverrides: nextOverrides }, null, 2), 'utf-8');
+  writeFileSync(path, JSON.stringify({ ...state, tierOverrides: nextOverrides, tierRetries: currentRetries }, null, 2), 'utf-8');
+}
+
+/** Recorded retry attempts per item (PAN-3858), keyed by xBRIEF item id. */
+export function readTierRetries(workspacePath: string): TierRetriesMap {
+  const path = readableWorkspaceContinuePath(workspacePath);
+  try {
+    const raw = readFileSync(path, 'utf-8');
+    const parsed = JSON.parse(raw) as { tierRetries?: TierRetriesMap };
+    return parsed.tierRetries ?? {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Persist a retry attempt at the item's current effective difficulty
+ * (PAN-3858). `attempts` is the attempt number decideEscalation returned;
+ * a later promotion clears the entry via recordTierPromotion.
+ */
+export function recordTierRetry(
+  workspacePath: string,
+  itemId: string,
+  difficulty: XBriefDifficulty,
+  attempts: number,
+): void {
+  const path = workspaceContinuePath(workspacePath);
+  const readablePath = readableWorkspaceContinuePath(workspacePath);
+  let state: Record<string, unknown> = {};
+  try {
+    state = JSON.parse(readFileSync(readablePath, 'utf-8')) as Record<string, unknown>;
+  } catch {
+    state = {};
+  }
+
+  const current = (state.tierRetries && typeof state.tierRetries === 'object')
+    ? state.tierRetries as TierRetriesMap
+    : {};
+  const nextRetries: TierRetriesMap = {
+    ...current,
+    [itemId]: { difficulty, attempts },
+  };
+
+  mkdirSync(getWorkspacePanPaths(workspacePath).panDir, { recursive: true });
+  writeFileSync(path, JSON.stringify({ ...state, tierRetries: nextRetries }, null, 2), 'utf-8');
 }
 
 /**

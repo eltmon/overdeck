@@ -86,6 +86,39 @@ describe('resolveStaffing (PAN-2397 W1 — Always Tiered)', () => {
   it('fails loudly when the implicit tier is needed but roles.work is unresolvable', () => {
     expect(() => resolveImplicitStaffing({} as never)).toThrow();
   });
+
+  // PAN-3858: a recorded promotion changes the model resolveStaffing returns.
+  it('applies recorded tier promotions before resolving the tier', () => {
+    const config = { roles: WORK_ROLES, tieredExecution: explicitTiered() } as never;
+    const promoted = resolveStaffing(item('task', { difficulty: 'simple' }), {
+      config,
+      tierOverrides: {
+        task: {
+          effectiveDifficulty: 'complex',
+          promotions: 1,
+          history: [{ at: '2026-09-17T00:00:00.000Z', from: 'simple', to: 'complex', reason: 'test' }],
+        },
+      },
+    });
+    expect(promoted).toMatchObject({ tierName: 'standard', model: 'gpt-5.5', implicit: false });
+
+    const unpromoted = resolveStaffing(item('task', { difficulty: 'simple' }), { config });
+    expect(unpromoted).toMatchObject({ tierName: 'cheap', model: 'claude-haiku-4-5', implicit: false });
+  });
+
+  it('ignores promotions recorded for other items', () => {
+    const staffing = resolveStaffing(item('task', { difficulty: 'simple' }), {
+      config: { roles: WORK_ROLES, tieredExecution: explicitTiered() } as never,
+      tierOverrides: {
+        'other-task': {
+          effectiveDifficulty: 'expert',
+          promotions: 1,
+          history: [{ at: '2026-09-17T00:00:00.000Z', from: 'simple', to: 'expert', reason: 'test' }],
+        },
+      },
+    });
+    expect(staffing).toMatchObject({ tierName: 'cheap', model: 'claude-haiku-4-5', implicit: false });
+  });
 });
 
 describe('distribution tiers (PAN-2391 / PAN-2397 W2)', () => {

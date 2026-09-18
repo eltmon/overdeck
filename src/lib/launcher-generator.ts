@@ -150,6 +150,9 @@ export interface LauncherConfig {
    * launcher's own bash process — it only fails to signal if SIGKILLed.
    */
   reviewSignal?: {
+    /** The reviewer's own agent id (agent-<issue>-review-<role>) — the launcher
+     * reports process exit for it via `pan admin agents exited` (PAN-3848 W26). */
+    agentId: string;
     synthesisAgentId: string;
     subRole: string;
     outputPath: string;
@@ -601,6 +604,22 @@ function buildReviewSubRoleCommand(config: LauncherConfig): string[] {
     `else`,
     `  pan tell ${synth} "REVIEWER_FAILED ${role} reviewer exited (code $CLAUDE_EXIT) without writing report" || true`,
     `fi`,
+    // PAN-3848 (W26, FR-21): the transition writes its own state — the launcher
+    // records the reviewer's exit instead of a patrol inferring it from a
+    // missing tmux session. PAN-3848 (F5): a failed exit write is retried, not
+    // swallowed — a transient state-store failure must not silently downgrade
+    // the exit to an orphan-misclassification. If the write still fails,
+    // cleanup proceeds and Deacon's orphan recovery reconciles the stopped
+    // row from session liveness on its next sweep.
+    `PAN_EXIT_RECORDED=false`,
+    `for PAN_EXIT_ATTEMPT in 1 2 3; do`,
+    `  if pan admin agents exited ${shellQuote(sig.agentId)} --code "$CLAUDE_EXIT"; then`,
+    `    PAN_EXIT_RECORDED=true`,
+    `    break`,
+    `  fi`,
+    `  sleep 2`,
+    `done`,
+    `if [ "$PAN_EXIT_RECORDED" != "true" ]; then echo "[launcher] WARNING: failed to record reviewer exit for ${shellQuote(sig.agentId)} after 3 attempts (code $CLAUDE_EXIT) — orphan recovery will reconcile from session liveness" >&2; fi`,
     `touch ${shellQuote(sig.signalMarkerPath)}`,
     `rm -f ${pidFile}`,
   ];

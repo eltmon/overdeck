@@ -70,6 +70,7 @@ interface DbRow {
   stuck_at: number | null;
   stuck_details: string | null;
   reviewed_at_commit: string | null;
+  review_stale_since: string | null;
   review_spawned_at: number | null;
   conflict_resolution_dispatched_at: number | null;
   test_retry_count: number | null;
@@ -128,6 +129,7 @@ function rowToReviewStatus(row: DbRow, history: StatusHistoryEntry[]): ReviewSta
     stuckAt: msToIso(row.stuck_at),
     stuckDetails: row.stuck_details ?? undefined,
     reviewedAtCommit: row.reviewed_at_commit ?? undefined,
+    reviewStaleSince: row.review_stale_since ?? undefined,
     reviewSpawnedAt: msToIso(row.review_spawned_at),
     conflictResolutionDispatchedAt: msToIso(row.conflict_resolution_dispatched_at),
     testRetryCount: row.test_retry_count ?? undefined,
@@ -215,9 +217,9 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         strike_ready_head, strike_ready_at, strike_landing_state,
         strike_recovery_count, strike_transport_retry_count,
         strike_next_attempt_at, strike_landing_attempts,
-        review_cycle_history, retired_at
+        review_cycle_history, retired_at, review_stale_since
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status = excluded.review_status,
@@ -271,7 +273,8 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         strike_next_attempt_at = excluded.strike_next_attempt_at,
         strike_landing_attempts = excluded.strike_landing_attempts,
         review_cycle_history = excluded.review_cycle_history,
-        retired_at = excluded.retired_at
+        retired_at = excluded.retired_at,
+        review_stale_since = excluded.review_stale_since
     `).run(
       s.issueId,
       s.reviewStatus,
@@ -326,6 +329,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       s.strikeLandingAttempts ? JSON.stringify(s.strikeLandingAttempts) : null,
       s.reviewCycleHistory ? JSON.stringify(s.reviewCycleHistory) : null,
       isoToMs(s.retiredAt),
+      s.reviewStaleSince ?? null,
     );
 
     if (s.history && s.history.length > 0) {

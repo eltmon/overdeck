@@ -638,7 +638,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
             </div>
             <div className={styles.failedMessageActions}>
               <span className={styles.failedMessageLabel}>
-                {fm.kind === 'command' ? 'Command request failed' : 'Failed to send'}
+                {fm.deliveryUnknown ? 'Delivery not confirmed' : fm.kind === 'command' ? 'Command request failed' : 'Failed to send'}
               </span>
               {fm.error && (
                 <span className={styles.failedMessageReason} title={fm.error}>

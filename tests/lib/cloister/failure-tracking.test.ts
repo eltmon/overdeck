@@ -12,6 +12,7 @@ describe('agent failure tracking and auto-resume backoff', () => {
   let originalNoResume: string | undefined;
   let resumeAgentMock: ReturnType<typeof vi.fn>;
   let sessionExistsMock: ReturnType<typeof vi.fn>;
+  let isAliveMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -26,6 +27,7 @@ describe('agent failure tracking and auto-resume backoff', () => {
     delete process.env.OVERDECK_NO_RESUME;
     resumeAgentMock = vi.fn();
     sessionExistsMock = vi.fn(() => Effect.succeed(false));
+    isAliveMock = vi.fn(async () => ({ alive: false, reason: 'no-session' }));
   });
 
   afterEach(() => {
@@ -197,6 +199,12 @@ describe('agent failure tracking and auto-resume backoff', () => {
       sendKeysAsync: vi.fn().mockResolvedValue(undefined),
     }));
 
+    vi.doMock('../../../src/lib/agents/liveness.js', () => ({
+      isAlive: (...args: unknown[]) => isAliveMock(...args),
+      isAliveSync: vi.fn(() => ({ alive: false, reason: 'no-session' })),
+      isIdle: vi.fn(() => false),
+    }));
+
     const agents = await import('../../../src/lib/agents.js');
     const deacon = await import('../../../src/lib/cloister/deacon.js');
     return { agents, deacon, autoResumeStoppedWorkAgents: deacon.autoResumeStoppedWorkAgents };
@@ -231,7 +239,7 @@ describe('agent failure tracking and auto-resume backoff', () => {
 
   it('reconciles a stopped agent with a live tmux session to running', async () => {
     const agentId = 'agent-pan-1141-live-tmux';
-    sessionExistsMock.mockReturnValue(Effect.succeed(true));
+    isAliveMock.mockResolvedValue({ alive: true, paneAlive: true });
     const { agents, deacon, autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock();
     const notifications: Array<{ status: string; previousStatus?: string; hasLiveTmuxSession?: boolean }> = [];
     deacon.setAgentStatusChangedNotifier((state, previousStatus, hasLiveTmuxSession) => {

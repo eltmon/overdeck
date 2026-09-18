@@ -7,7 +7,31 @@
 After a work agent signals completion, Cloister runs quality gates from `projects.yaml`
 before advancing to the review role. If typecheck/lint/test fail, feedback is sent to the
 agent's tmux session and the issue does not advance, so the agent can fix and retry.
-After 3 consecutive failures, verification is bypassed to prevent permanent blocking.
+After 3 failed cycles the issue is marked `verification_stuck`, the work agent is paused,
+and a needs-you escalation fires; the counter is per issue and is reset only by
+`pan review reset` (PAN-3847). A verification pass clears the `verification_stuck` flag
+and lifts that pause.
+
+## Immutable run artifacts (PAN-3847)
+
+Each verification run writes an immutable artifact named by run time and workspace head:
+`<workspace>/.overdeck/verification/<ranAt>-<head8>.json`. The runner also copies it to
+`.overdeck/verification-latest.json`, which remains the dashboard's read path. Failure
+feedback references the per-run file, so the evidence a later run cannot overwrite is
+what the agent reads. Per-run files older than 30 days are pruned by the idle-stack
+patrol.
+
+## Test-skip gate (PAN-3847)
+
+Before the quality gates run, the verification runner diffs the workspace against
+`origin/<target>` and fails a required `test-skip` gate when the diff adds `.skip`,
+`.only`, `xit`, `xdescribe`, or `xtest` in test files, or removes more `it(`/`test(`
+calls than it adds. `allowOnly: false` in both vitest configs makes `.only` fail every
+gate run outright. Related: the anchor-equality test skip is gone — a review whose
+`reviewedAtCommit` equals `lastVerifiedCommit` no longer auto-passes the test role;
+`review.approved` always dispatches it. CI runs vitest on every push and never reads
+the `overdeck/test` commit status; that stamp now records only that the changed-file-
+scoped verification gate passed, bound to the tested sha.
 
 ## Verdict feedback routing
 
@@ -15,11 +39,13 @@ Review `blocked`/`failed`, test `failed`, and UAT `failed` verdicts all return w
 the work agent through the same feedback doors: `writeFeedbackFile()` persists the
 feedback, `resolveIssueFeedbackTarget()` finds or resurrects the work target, and
 `surfaceIssueFeedbackNeedsYou()` creates a durable escalation when no target resolves.
-The UAT relay is `src/lib/cloister/uat-failure-feedback.ts`.
+The UAT relay is `src/lib/cloister/uat-failure-feedback.ts`. Delivery is confirmed
+against the agent's transcript; an unconfirmed delivery surfaces a needs-you
+escalation instead of reporting success (PAN-3846).
 
 ## Review Convergence Gate (PAN-3151)
 
-When a change enters the `blocked` review state, the blocking-finding count is recorded into a `reviewCycleHistory` series. When ≥3 cycles are recorded and the series shows a reversal (latest count > previous) or stall (two consecutive non-decreases), the issue is marked `stuck` with `stuckReason: 'review-not-converging'`. Automatic rework re-drive is suppressed; feedback file is written and PR comment posted, but the work agent is not messaged. A needs-you escalation surfaces with the cycle count series and guidance to decompose the change into sibling issues or run `pan unstick <issueId>` to clear the gate and attempt rework. Distinguish from the prompt-level convergence gate (`roles/review.md` — "Convergence gate (cycle ≥ 3)", currently around line 148), which governs single-reviewer filtering within one cycle.
+When a change enters the `blocked` review state, the blocking-finding count is recorded into a `reviewCycleHistory` series. When ≥3 cycles are recorded and the series shows a reversal (latest count > previous) or stall (two consecutive non-decreases), the issue is marked `stuck` with `stuckReason: 'review-not-converging'`. Automatic rework re-drive is suppressed; feedback file is written and PR comment posted, but the work agent is not messaged. A needs-you escalation surfaces with the cycle count series and guidance to decompose the change into sibling issues or run `pan unstick <issueId>` to clear the gate and attempt rework. This mechanical gate is separate from reviewer judgment: `roles/review.md` requires checking prior fixes first and explaining newly discovered blockers. It never suppresses a confirmed blocker solely because a previous review missed it.
 
 ## Agent Auto-Resume Gates
 
@@ -73,3 +99,35 @@ unpause` on a yielded agent clears the yield attribution too. See
 These gates are orthogonal to the global Deacon freeze in SQLite
 (`deacon.globally_paused`) and the per-issue Deacon ignore flag in review status.
 
+
+## Patrol budgets (PAN-3850)
+
+Every deacon patrol is an alarm with a budget, not an actor with unlimited
+ammunition. Each patrol registered in `runPatrol` runs inside
+`runBudgetedPatrol()` (`src/lib/cloister/patrol-budget.ts`), which tallies the
+actions the patrol reports against a per-UTC-day budget in
+`~/.overdeck/deacon/patrol-budget.json` (default 50 actions/day). When a
+patrol's tally crosses its budget it is suspended until the next UTC day and
+the operator gets exactly one needs-you (idempotency key
+`patrol-budget-exceeded:<name>:<day>`) — a runaway patrol degrades to a single
+actionable signal instead of an action storm. The tally resets at UTC midnight;
+a suspended patrol runs again the next day.
+
+Five patrols are exempt alarms — `runStallSweeperPatrol`, `checkApiErrorAgents`,
+`recreatedStateWarnings`, `recordMainDivergenceHealth`, `checkMassDeath` —
+wired directly in `runPatrol`, never budgeted: they exist precisely to fire
+when everything else is wrong. Budgets are configuration
+(`cloister.patrolBudgets` in `~/.overdeck/config.yaml`: `default`, `exempt`,
+per-patrol `overrides`); `pan doctor` prints today's tally per patrol with
+suspended patrols named in red.
+
+The same phase adds the report-only **invariant checker**
+(`src/lib/cloister/invariant-checker.ts`, every 10 passes, budgeted like every
+other patrol): for each non-merged issue it compares the record `pipeline`
+block against the review-status row field by field, and each agent row's
+status against tmux liveness. It emits one activity entry per mismatching
+entity per day plus a per-run summary count, persists
+`~/.overdeck/deacon/invariant-report.json` for `pan doctor` and the parked
+resolver's `invariant-mismatch` orbit — and writes no store it reads. Repairs
+go through the owning doors: `pan review resync <id>` for verdict drift,
+`pan admin agents exited <id>` for liveness drift.

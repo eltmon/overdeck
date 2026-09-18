@@ -1,8 +1,8 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   KIMI_CONTEXT_END,
@@ -11,6 +11,7 @@ import {
   KIMI_TASK_START,
   markKimiContextDelivered,
   prepareKimiMessage,
+  waitForManagedKimiSessionId,
 } from '../kimi-context-envelope.js';
 
 describe('native Kimi managed-context envelope', () => {
@@ -73,5 +74,33 @@ describe('native Kimi managed-context envelope', () => {
     await expect(prepareKimiMessage('agent-no-session', '/workspace/project', 'Task', {
       contextFiles: [contextFile],
     })).rejects.toThrow(/captured kimi-session-id is missing/);
+  });
+
+  describe('waitForManagedKimiSessionId', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('resolves once the spawn path writes the pointer file', async () => {
+      const agentId = 'conv-kimi-wait';
+      const pending = waitForManagedKimiSessionId(agentId, { timeoutMs: 5_000, pollMs: 250, overdeckHome });
+
+      await vi.advanceTimersByTimeAsync(600);
+      mkdirSync(join(overdeckHome, 'agents', agentId), { recursive: true });
+      writeFileSync(join(overdeckHome, 'agents', agentId, 'kimi-session-id'), 'session-late\n');
+      await vi.advanceTimersByTimeAsync(300);
+
+      await expect(pending).resolves.toBe('session-late');
+    });
+
+    it('returns null at the deadline when the id never appears', async () => {
+      const pending = waitForManagedKimiSessionId('conv-kimi-never', { timeoutMs: 1_000, pollMs: 250, overdeckHome });
+      await vi.advanceTimersByTimeAsync(1_100);
+      await expect(pending).resolves.toBeNull();
+    });
   });
 });

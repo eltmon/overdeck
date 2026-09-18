@@ -190,7 +190,6 @@ describe('tiered execution tier table', () => {
       enabled: false,
       retries_at_tier: 0,
       max_promotions: 0,
-      flounder_budget_minutes: {},
     });
     expect(config.tieredExecution.compaction_reroute).toBe('off');
   });
@@ -256,7 +255,6 @@ describe('tiered execution tier table', () => {
         enabled: true,
         retries_at_tier: 2,
         max_promotions: 3,
-        flounder_budget_minutes: { simple: 30, complex: 90 },
       },
     }));
 
@@ -270,7 +268,6 @@ describe('tiered execution tier table', () => {
       enabled: true,
       retries_at_tier: 2,
       max_promotions: 3,
-      flounder_budget_minutes: { simple: 30, complex: 90 },
     });
   });
 
@@ -284,16 +281,30 @@ describe('tiered execution tier table', () => {
     }))).toThrow('tiered_execution.feed.max_diff_bytes');
 
     expect(() => validateTieredExecutionConfig(validConfig({
-      escalation: { flounder_budget_minutes: { unknown: 10 } as never },
-    }))).toThrow("tiered_execution.escalation.flounder_budget_minutes contains unknown difficulty 'unknown'");
-
-    expect(() => validateTieredExecutionConfig(validConfig({
       escalation: { retries_at_tier: -1 },
     }))).toThrow('tiered_execution.escalation.retries_at_tier');
 
     expect(() => validateTieredExecutionConfig(validConfig({
       compaction_reroute: 'sometimes' as never,
     }))).toThrow('tiered_execution.compaction_reroute');
+  });
+
+  // PAN-3858 no-loss audit: the floundering trigger was deleted because no
+  // patrol could supply per-item dispatch times without new infrastructure.
+  // These two tests prove the state it guarded is unreachable: no config key
+  // can feed a flounder budget, and no decider exists to consume one.
+  it('drops the deleted flounder_budget_minutes key from the validated escalation config', () => {
+    const result = validateTieredExecutionConfig(validConfig({
+      escalation: { enabled: true, flounder_budget_minutes: { simple: 30 } } as never,
+    }));
+    expect(result.escalation).toEqual({ enabled: true, retries_at_tier: 0, max_promotions: 0 });
+    expect('flounder_budget_minutes' in result.escalation).toBe(false);
+  });
+
+  it('exports no floundering escalation decider or budget check', async () => {
+    const escalation = await import('../tier-escalation.js');
+    expect('decideFlounderingEscalation' in escalation).toBe(false);
+    expect('isFloundering' in escalation).toBe(false);
   });
 });
 
