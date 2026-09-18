@@ -18,7 +18,9 @@ import {
   type XBriefTransitionResult,
 } from '../../lib/xbrief/lifecycle-io.js';
 import { findPlanSync, readPlanSync } from '../../lib/xbrief/io.js';
-import { getProjectConfigFromWorkspacePath, readRecordContinueViewSync, resolveProjectForIssue } from '../../lib/pan-dir/record.js';
+import { getIssueWorkspacePath } from '../../lib/overdeck/issue-projects.js';
+import { resolvePlanHome } from '../../lib/pan-dir/paths.js';
+import { readContinueState } from '../../lib/xbrief/continue-state.js';
 import { listXBriefs, readXBriefDocument } from '../../lib/xbrief/xbrief-index.js';
 import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync, listProjectsSync } from '../../lib/projects.js';
 import type { XBriefDocument } from '../../lib/xbrief/types.js';
@@ -352,31 +354,22 @@ async function showCommand(issueId: string, options: { project?: string }): Prom
     }
   }
 
-  // Continue-state summary (last session, decisions count, hazards count)
-  let cs;
-  try {
-    const resolved = resolveProjectFromIssueSync(upperId);
-    const recordProject = resolved
-      ? { name: resolved.projectKey, path: resolved.projectPath }
-      : getProjectConfigFromWorkspacePath(projectPath);
-    cs = readRecordContinueViewSync(recordProject, upperId);
-  } catch (err: any) {
-    console.log();
-    console.log(chalk.bold('Continue State:'));
-    console.log(chalk.red(`  Failed to read record: ${err.message}`));
-    return;
-  }
+  // Continue-state summary, read from `.pan/continues/` — the workspace's copy
+  // on the feature branch first, then the main checkout's.
+  const workspacePath = getIssueWorkspacePath(upperId);
+  const cs = (workspacePath ? readContinueState(resolvePlanHome(workspacePath), upperId) : null)
+    ?? readContinueState(resolvePlanHome(projectPath), upperId);
 
   console.log();
   console.log(chalk.bold('Continue State:'));
   if (!cs) {
-    console.log(chalk.dim('  (no record found)'));
+    console.log(chalk.dim('  (no continue file found)'));
     return;
   }
   console.log(`  Decisions: ${cs.decisions.length}`);
   console.log(`  Hazards:   ${cs.hazards.length}`);
   console.log(`  Sessions:  ${cs.sessionHistory.length}`);
-  const gitState = (cs as any).gitState;
+  const gitState = cs.gitState;
   if (gitState && (gitState.branch || gitState.sha)) {
     const branch = gitState.branch ? chalk.cyan(gitState.branch) : chalk.dim('(none)');
     const sha = gitState.sha ? chalk.dim(gitState.sha) : chalk.dim('(none)');

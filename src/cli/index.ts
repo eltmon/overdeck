@@ -113,6 +113,7 @@ import { getManagedTmuxSocketName } from '../lib/tmux.js';
 import { registerResourceCommands } from './commands/resources.js';
 import { devCommand } from './commands/dev.js';
 import { registerScopeCommands } from './commands/scope.js';
+import { registerSpawnCommand } from './commands/spawn.js';
 import { openCommand } from './commands/open.js';
 import { registerFlywheelCommands } from './commands/flywheel.js';
 import { registerMergeCommands } from './commands/merge.js';
@@ -560,6 +561,7 @@ registerInstallCommand(program);
 // Register caveman commands (pan caveman-compress)
 registerCavemanCommands(program);
 registerScopeCommands(program);
+registerSpawnCommand(program);
 registerFlywheelCommands(program);
 registerMergeCommands(program);
 registerArtifactCommands(program);
