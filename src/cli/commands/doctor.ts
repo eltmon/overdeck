@@ -36,6 +36,7 @@ import {
 import { checkDeployedHooksDrift } from './doctor-hooks-drift.js';
 import { checkCliGenerationLink } from './doctor-cli-generation.js';
 import { checkInotify } from './doctor-inotify.js';
+import { checkTierFitnessConfig } from './doctor-tier-fitness.js';
 import { checkStateDivergence } from './doctor-state-divergence.js';
 import { checkStateWorktrees } from './doctor-state-worktree.js';
 import { checkDuplicateComposeStacks } from './doctor-duplicate-stacks.js';
@@ -968,6 +969,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
     dashboardAgents: await getDashboardAgentRowsForDoctor(),
   }));
   checks.push(checkOrphanProposedSpecs());
+  checks.push(checkTierFitnessConfig()); // PAN-3842
   checks.push(...await checkMainDivergence());
   checks.push(...await checkStateWorktrees());
   checks.push(...await checkStateDivergence());

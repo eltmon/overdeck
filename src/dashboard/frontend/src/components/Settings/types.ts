@@ -1,7 +1,8 @@
+import type { ConfigurableProvider } from '../../../../../lib/configurable-providers.js';
 // Settings data types matching the new config.yaml structure
 // Now uses smart (capability-based) model selection instead of static presets
 
-export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'minimax' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'meta' | 'opencode' | 'opencode-go';
+export type Provider = ConfigurableProvider;
 
 export type ModelId = string;
 export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse' | 'opencode';

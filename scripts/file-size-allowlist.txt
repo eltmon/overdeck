@@ -104,3 +104,6 @@
 1071 src/lib/pan-dir/auto-commit.ts # PAN-3848
 1106 src/cli/commands/doctor.ts # PAN-3850
 1139 src/cli/commands/doctor.ts # PAN-3850
+1141 src/cli/commands/doctor.ts # PAN-3842
+1091 src/lib/agents/spawn.ts # PAN-3842
+1138 src/lib/agents/spawn-prep.ts # PAN-3842

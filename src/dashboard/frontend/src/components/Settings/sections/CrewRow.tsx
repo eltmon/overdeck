@@ -1,4 +1,5 @@
 import { MODELS_BY_PROVIDER } from '../modelCatalog';
+import type { TierFitnessWarning } from '../../../../../../lib/agents/tier-fitness.js';
 import type { Harness, SettingsConfig } from '../types';
 import {
   blendedCost,
@@ -25,7 +26,7 @@ function HarnessSelect({ model, value, settings, onChange, label = 'Harness' }: 
   </select></label>;
 }
 
-export function CrewRow({ crew, owned, ownedKinds, settings, open, onToggle, onChange, onRequestRemove }: {
+export function CrewRow({ crew, owned, ownedKinds, settings, open, onToggle, onChange, onRequestRemove, warnings = [] }: {
   crew: Crew;
   owned: string[];
   ownedKinds: string[];
@@ -34,6 +35,7 @@ export function CrewRow({ crew, owned, ownedKinds, settings, open, onToggle, onC
   onToggle: () => void;
   onChange: (crew: Crew) => void;
   onRequestRemove: () => void;
+  warnings?: TierFitnessWarning[];
 }) {
   const entries = crew.distribution;
   const total = entries?.reduce((sum, entry) => sum + entry.weight, 0) ?? 100;
@@ -52,6 +54,7 @@ export function CrewRow({ crew, owned, ownedKinds, settings, open, onToggle, onC
       <span className="text-[10px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 group-focus-within:opacity-100">edit</span>
       <span className="font-medium text-foreground">{crewLabel(crew)}</span>
       {warning && <span className="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">⚠ harness overrides provider default — PAN-1865</span>}
+      {warnings.map((fitnessWarning, fitnessIndex) => <span key={`${fitnessWarning.code}:${fitnessWarning.model}:${fitnessIndex}`} data-testid="tier-fitness-warning" title={fitnessWarning.message} className="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">⚠ {fitnessWarning.message.replace(/^tiered_execution\.tiers\.[^:]+: /, '')}</span>)}
       <span className="ml-auto text-[11px] text-muted-foreground">{owned.length || ownedKinds.length ? `handles ${[...owned, ...ownedKinds.map((kind) => `${kind} override`)].join(' · ')}` : 'handles nothing — assign it on the board or remove it'}</span>
       <span className="text-[11px] font-medium text-cyan-600 dark:text-cyan-400">{cost == null ? '—' : `≈ $${cost.toFixed(1)}/1M`}</span>
       {!open && <button

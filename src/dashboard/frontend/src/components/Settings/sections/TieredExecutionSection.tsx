@@ -6,11 +6,13 @@ import { MODELS_BY_PROVIDER } from '../modelCatalog';
 import {
   blendedCost,
   crewLabel,
+  deriveTierName,
   DIFFICULTIES,
   importCrews,
   providerDefaultHarness,
   renderYamlPreview,
   serializeCrews,
+  tierFitnessWarnings,
   type Crew,
   type CrewAssignments,
   type CrewRest,
@@ -148,6 +150,9 @@ export function TieredExecutionSection({
   } catch {
     // Keep invalid hand-authored config inspectable; guarded UI actions cannot save this state.
   }
+  // PAN-3842: fitness warnings are computed from the unsaved draft so the
+  // badge appears and disappears as the operator edits, before any save.
+  const fitness = outgoingConfig.tiers ? tierFitnessWarnings(outgoingConfig, formData) : [];
   const [openCrewId, setOpenCrewId] = useState<string | null>(null);
   const [addCrewPromptOpen, setAddCrewPromptOpen] = useState(false);
   const [removePromptCrewId, setRemovePromptCrewId] = useState<string | null>(null);
@@ -520,6 +525,7 @@ export function TieredExecutionSection({
                 open={openCrewId === crew.id}
                 onToggle={() => setOpenCrewId(openCrewId === crew.id ? null : crew.id)}
                 onChange={(nextCrew) => writeCrews(crews.map((entry) => entry.id === crew.id ? nextCrew : entry), assign)}
+                warnings={fitness.filter((w) => w.tierName === deriveTierName(ownedDifficulties))}
                 onRequestRemove={() => handleRequestRemove(crew.id)}
               />
               {removeError?.crewId === crew.id && (
@@ -574,6 +580,7 @@ export function TieredExecutionSection({
           <button type="button" aria-expanded={supervisorOpen} onClick={() => setSupervisorOpen(!supervisorOpen)} className="flex w-full items-center gap-2 px-4 py-3 text-left focus-visible:ring-2 focus-visible:ring-primary">
             <span>{supervisorOpen ? '▾' : '▸'}</span><span className="text-sm font-medium text-foreground">Standing reviewer</span>
             <span className="text-xs text-muted-foreground">— {supervisor?.subscribe === 'all' ? 'reviews every commit' : supervisor?.subscribe === 'sampled' ? 'reviews a sample' : 'wakes on flagged commits'} · {supervisorModelName} · {supervisor?.owns_inspection ?? true ? 'owns inspection' : 'inspection stays separate'}</span>
+            {fitness.filter((w) => w.tierName === 'supervisor').map((w, index) => <span key={`${w.code}:${w.model}:${index}`} data-testid="tier-fitness-warning" title={w.message} className="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">⚠ {w.message.replace(/^tiered_execution\.supervisor: /, '')}</span>)}
           </button>
           {supervisorOpen && <div className="grid gap-3 border-t border-border/70 px-4 py-3 @xl:grid-cols-2">
             <p className="col-span-full text-xs text-muted-foreground">Wakes on every commit a crew makes and reviews the diff against the task's acceptance criteria. Required whenever crews are configured.</p>
