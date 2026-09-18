@@ -21,7 +21,7 @@ import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 import { resolve } from 'node:path';
 import { httpHandler } from './http-handler.js';
 import { jsonResponse } from '../http-helpers.js';
-import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
+import { hasDashboardInternalToken, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { getProjectSync, listProjectsSync, resolveProjectFromIssueSync, type ProjectConfig, type ResolvedProject } from '../../../lib/projects.js';
 import type { MergeQueueItem } from '../../../lib/flywheel-merge-order.js';
 import { gatherMergeEligibility, isMergeEligible } from '../../../lib/cloister/merge-eligibility.js';
@@ -165,8 +165,9 @@ export interface MergeTrainMergeNextDeps {
 }
 
 async function defaultOrderedIssueIdsForProject(projectPath: string): Promise<string[]> {
-  const candidates = await listEligibleCandidatesByProject(projectPath);
+  const candidates = await listReadyIssuesForProject(projectPath);
   if (candidates.length === 0) return [];
+  const { computeMergeQueueFromCandidates } = await import('../../../lib/flywheel-merge-order.js');
   const queue = await Effect.runPromise(
     computeMergeQueueFromCandidates(candidates, projectPath).pipe(Effect.provide(nodeServicesLayer)),
   );
@@ -422,8 +423,9 @@ const postMergeTrainMergeNextRoute = HttpRouter.add(
 // derived issue state instead of a run id or a review-status record.
 
 function requireTrustedOrigin(request: HttpServerRequest.HttpServerRequest) {
-  const originError = validateOrigin(request);
-  if (originError) return originError;
+  if (hasDashboardInternalToken(request)) return null;
+  const originCheck = validateOrigin(request);
+  if (!originCheck.ok) return jsonResponse({ error: originCheck.error }, { status: 403 });
   return rejectUnsafeDashboardMutationRequest(request);
 }
 

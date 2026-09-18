@@ -334,7 +334,7 @@ const postHealthAgentPingRoute = HttpRouter.add(
         return jsonResponse({
           success: true,
           status: 'healthy',
-          hasOutput: !!health.lastOutput,
+          hasOutput: 'lastOutput' in health && Boolean(health.lastOutput),
         });
       }    catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);

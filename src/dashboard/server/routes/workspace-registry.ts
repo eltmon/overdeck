@@ -39,7 +39,7 @@ import * as NodePath from '@effect/platform-node/NodePath';
 import type { WorkspaceGitState, WorkspaceRow } from '../../../lib/workspaces/types.js';
 import { getWorkspaceGitState, pullWorkspaceFastForward } from '../../../lib/workspaces/git-state.js';
 import type { DerivedIssueState } from '@overdeck/contracts';
-import { getDerivedIssueState, loadIssueStatesForProject } from '../../services/derived-issue-state.js';
+import { getDerivedIssueState, loadIssueStatesForProject } from '../services/derived-issue-state.js';
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { readCurrentStatus, readRecentObservations } from '../../../lib/memory/rollup.js';
 

@@ -621,6 +621,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
             try {
               const testRun = yield* Effect.promise(() => spawnRun(issueId, 'test', {
                 workspace: workspacePath,
+                startedBy: 'dashboard:review-pipeline',
               }));
               console.log(
                 `[request-review] Test role spawned for ${issueId} as ${testRun.id}`
