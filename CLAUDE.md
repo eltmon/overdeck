@@ -40,6 +40,7 @@
 - Project CI state reaches Command Deck rows through the shared read-model event path (`ciByProjectKey` → `/ws/rpc`); webhook observations and server-side REST repair feed it, never frontend polling. [docs/EXTERNAL-EVENT-STREAM.md](docs/EXTERNAL-EVENT-STREAM.md)
 - A terminal review verdict always carries its anchor (the write door refuses anchorless verdicts); a passed review is never reset by a patrol — post-review drift marks it `reviewStaleSince`, blocking merge until re-review (PAN-3847). [docs/REVIEW-AGENT-ARCHITECTURE.md](docs/REVIEW-AGENT-ARCHITECTURE.md)
 - pan done writes its review request; no patrol re-creates it (PAN-3848): `prUrl` + `reviewRequestedAt` + `completedAt` land in one durable record write, retried on the lock ladder. Record writes hold the per-issue lock across the commit only — the push runs after release. [docs/MERGE-WORKFLOW.md](docs/MERGE-WORKFLOW.md)
+- Patrols are alarms with budgets; transitions write their own state (PAN-3850): every `runPatrol` step runs inside `runBudgetedPatrol()` with a per-UTC-day action budget (excess suspends the patrol until the next day with one needs-you), and the report-only invariant checker alarms when record, review-status row, and liveness disagree — repairs go through the owning doors, never the checker. [docs/PIPELINE-GATES.md](docs/PIPELINE-GATES.md)
 
 ## Topic Index
 

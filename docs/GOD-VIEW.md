@@ -56,6 +56,7 @@ and status grounded in dashboard state.
 | Shelf | Paused or scheduler-yielded work that still belongs to the pipeline |
 | Frost / Doldrums | Increasing idle age and work that crossed the stale threshold |
 | Orbit-tinted frost | A parked issue — the frost color names its orbit (amber stuck, orange UAT, pink merge-failed, purple conflicts, ash zombie, ice idle) |
+| Mismatched frost | The `invariant-mismatch` orbit (PAN-3850): the report-only invariant checker saw the record, the review-status row, and liveness disagree — observation only, the tag names the repair door |
 | Sweeper beam | A real parked-population scan (sweep.scan) crossing the Doldrums |
 | Thaw | A stale orb whose refreshed state confirms it is active again, returning to the river |
 | Signal flare | A parked orb only a human can release (sweep.escalated) |
