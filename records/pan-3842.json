@@ -112,6 +112,11 @@
       "reason": "resume",
       "agentModel": "claude-opus-5",
       "timestamp": "2026-09-17T01:57:59.220Z"
+    },
+    {
+      "timestamp": "2026-09-18T07:31:41.962Z",
+      "reason": "end",
+      "note": "Merge conflict with origin/main resolved in ad879ac74fa (merge commit). Main's PAN-3857/3858 rewrote the same two functions this branch extends, so both intents were reconciled rather than one side taken: main's hardest-remaining-item staffing and tier-promotion threading kept whole, PAN-3842's fitness fields layered on top, and the fitness sweep now judges EFFECTIVE (promotion-applied) difficulty so it cannot under-warn on items escalation just raised. Fitness status filter is deliberately wider than main's staffing candidate set. Also repaired a silent bad auto-merge that spliced assertion lines onto main's by_kind test. Branch clean, pushed, PR #3851 MERGEABLE. Gates: typecheck, lint, build, file-size guard, full local suite 14670 passed with one quarantined PAN-2421 flake (excluded in CI and verification gates)."
     }
   ],
   "feedback": [],
@@ -184,21 +189,20 @@
     "recordedAt": "2026-09-18T07:31:28.942Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-18T07:31:33.872Z",
+  "updated": "2026-09-18T07:31:42.050Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T07:31:33.832Z",
+    "updatedAt": "2026-09-18T07:31:41.951Z",
     "mergeNotes": "Review stale: approved ff31b427, workspace HEAD is ad879ac7. Run pan done or pan review request to re-review.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3851",
     "reviewedAtCommit": "ff31b42704cd1c4aad54547e796b30f6f2daac4f",
-    "reviewStaleSince": "2026-09-18T07:30:12.005Z",
     "lastVerifiedCommit": "ff31b42704cd1c4aad54547e796b30f6f2daac4f",
     "reviewRequestedAt": "2026-09-18T07:31:30.445Z",
     "reviewSpawnedAt": "2026-09-17T01:57:58.365Z",
@@ -338,7 +342,7 @@
       },
       "costAtCloseOut": {
         "usd": 19.952098,
-        "pricingAsOf": "2026-09-18T07:31:33.855Z"
+        "pricingAsOf": "2026-09-18T07:31:41.990Z"
       }
     },
     "merges": [
