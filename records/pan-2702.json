@@ -288,7 +288,7 @@
     "recordedAt": "2026-07-16T13:04:38.427Z"
   },
   "created": "2026-07-15T12:52:17.786Z",
-  "updated": "2026-07-16T16:59:09.154Z",
+  "updated": "2026-09-18T09:04:25.871Z",
   "pipeline": {
     "issueId": "PAN-2702",
     "reviewStatus": "passed",
@@ -438,7 +438,6 @@
   },
   "harness": "codex",
   "model": "gpt-5.6-sol",
-  "workModel": "gpt-5.6-sol",
   "swarm": {
     "policy": {
       "mode": "off"
