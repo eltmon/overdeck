@@ -7,7 +7,6 @@ import { TasksTab } from '../../CommandDeck/ZoneCOverviewTabs/TasksTab'
 import { PrDiffTab } from '../../CommandDeck/ZoneCOverviewTabs/PrDiffTab'
 import { usePlanningQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
-import { StatusHistoryTab } from './StatusHistoryTab'
 
 export type DigTab =
   | 'activity'
@@ -19,7 +18,6 @@ export type DigTab =
   | 'tasks'
   | 'diff'
   | 'artifacts'
-  | 'history'
 
 const TABS: { id: DigTab; label: string }[] = [
   { id: 'activity', label: 'Activity' },
@@ -31,7 +29,6 @@ const TABS: { id: DigTab; label: string }[] = [
   { id: 'state', label: 'STATE' },
   { id: 'costs', label: 'Costs' },
   { id: 'artifacts', label: 'Artifacts' },
-  { id: 'history', label: 'History' },
 ]
 
 function MarkdownDigTab({ issueId, field }: { issueId: string; field: 'prd' | 'state' }) {
@@ -94,7 +91,6 @@ export function IssueDigTabs({
           {active === 'tasks' && <TasksTab issueId={issueId} />}
           {active === 'diff' && <PrDiffTab issueId={issueId} />}
           {active === 'artifacts' && <DrawerArtifactsPanel issueId={issueId} />}
-          {active === 'history' && <StatusHistoryTab issueId={issueId} />}
         </div>
       )}
     </div>

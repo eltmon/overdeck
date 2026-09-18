@@ -1,12 +1,12 @@
 /**
  * Start-block recovery — one tiny store so any action surface (registry
  * actions, simple mode) can turn the server's 409 start blocks (resumable
- * session, troubled gate, paused gate) into a proper dialog with working
+ * session, paused gate) into a proper dialog with working
  * choices instead of a raw CLI-text alert.
  */
 import { create } from 'zustand';
 
-export type RecoveryKind = 'resumable' | 'troubled' | 'paused' | 'live-session';
+export type RecoveryKind = 'resumable' | 'paused' | 'live-session';
 
 export interface RecoveryRequest {
   kind: RecoveryKind;
@@ -43,7 +43,7 @@ export class StartBlockHandoff extends Error {}
 
 /**
  * If a failed POST /api/agents (or agent resume) response is a start-block
- * 409 (resumable session, troubled gate, paused gate), open the recovery
+ * 409 (resumable session, paused gate), open the recovery
  * dialog and return true. Returns false for everything else so callers keep
  * their plain error path. Use this in every surface that starts an agent so
  * the CLI-instruction text never reaches a toast or inline alert.
@@ -59,7 +59,6 @@ export function openRecoveryForStartBlock(status: number, body: unknown, issueId
 /**
  * Inspect a failed action response's parsed body for a recoverable 409:
  * - resumable session (lifecycle.canResumeSession) → Resume / Start fresh
- * - troubled gate (troubled: true) → Clear gate & start
  * - paused gate (paused: true) → Unpause & start
  * Returns null for everything else (plain errors stay plain alerts).
  */
@@ -77,12 +76,8 @@ export function recoveryFromBody(body: unknown): RecoveryRequest | null {
     return { kind: 'resumable', agentId: lifecycle.agentId };
   }
 
-  const gate = body as { troubled?: boolean; paused?: boolean; agentId?: string; error?: string; hint?: string };
+  const gate = body as { paused?: boolean; agentId?: string; error?: string; hint?: string };
   if (typeof gate.agentId !== 'string') return null;
-  if (gate.troubled === true) {
-    const match = /\((\d+ failures?)\)/.exec(gate.error ?? '');
-    return { kind: 'troubled', agentId: gate.agentId, detail: match?.[1] };
-  }
   if (gate.paused === true) {
     const match = /is paused \(([^)]+)\)/.exec(gate.error ?? '');
     return { kind: 'paused', agentId: gate.agentId, detail: match?.[1] };

@@ -38,13 +38,13 @@ export function StackCard({
     hasState: false,
     isShadow: false,
   };
-  const reviewStatus: BucketedFeature['reviewStatus'] = stack.phase === 'merged'
-    ? { issueId: stack.issueId ?? stack.id, mergeStatus: 'merged' }
+  const derived: BucketedFeature['derived'] = stack.phase === 'merged'
+    ? { issueId: stack.issueId ?? stack.id, state: 'merged' }
     : undefined;
   const chip = pipelineChipFor({
     phase: stack.phase === 'merged' ? 'ship' : stack.phase,
     feature,
-    reviewStatus,
+    derived,
   });
   const idleHint = shouldShowIdleHint(stack);
   const atLimit = stack.services.some((service) => (service.memPercentOfLimit ?? 0) >= 95);

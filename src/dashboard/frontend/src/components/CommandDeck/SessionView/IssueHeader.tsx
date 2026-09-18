@@ -1,20 +1,18 @@
 import { useMemo } from 'react';
 import {
-  ExternalLink, AlertTriangle, ShieldCheck, Package,
+  ExternalLink, AlertTriangle, Package,
   CheckCircle2, Loader2, AlertCircle, CircleDot,
 } from 'lucide-react';
-import { isReviewPipelineStuck } from '../../../lib/pipeline-state';
-import { reviewCycleSeries } from '../../issue-view/derivations';
+import { isIssueStuck } from '../../../lib/pipeline-state';
 import { ActivitySparkline, type SparklineEvent } from '../ActivitySparkline';
 import {
   useActivityQuery,
   usePlanningSummaryWithOverridesQuery,
-  useReviewStatusQuery,
   type PlanningSummaryResponse,
-  type ReviewStatusData,
 } from '../ZoneCOverviewTabs/queries';
 import styles from '../styles/command-deck.module.css';
-import { useDashboardStore } from '../../../lib/store';
+import { useDerivedIssueState } from '../../../lib/store';
+import type { DerivedIssueState } from '../../../types';
 import { AutoMergeToggle } from '../../AutoMergeToggle';
 import { IssuePolicyStrip } from '../../IssuePolicyStrip';
 
@@ -89,73 +87,61 @@ function StagePill({ label, stage, isLast }: StagePillProps) {
   );
 }
 
-/** Derive the six stage statuses from review status + planning state (PAN-830 high-2). */
+/**
+ * The five stages the derived issue state can actually answer (PAN-3917 FR-6).
+ * There is no Verify or Test stage: verification is a workspace artifact plus a
+ * check run (FR-8), and the forge's check rollup is the Checks stage.
+ */
 function deriveStageStatuses(
-  reviewStatus: ReviewStatusData | undefined,
+  derived: DerivedIssueState | undefined,
   planning: PlanningStageData | undefined,
 ): Array<{ label: string; stage: StageStatus }> {
-  const merged = reviewStatus?.mergeStatus === 'merged';
+  const state = derived?.state;
+  const merged = state === 'merged';
   const hasPlan = planning?.hasPrd === true || planning?.hasState === true;
+  const reviewing = state === 'in-review' || state === 'changes-requested';
+  const pastReview = merged || state === 'ready';
 
-  // Planning: done if plan exists, pending otherwise
-  const planningStage: StageStatus = merged ? 'done' : hasPlan ? 'done' : 'pending';
-
-  // Work: done if merged or review passed, current if no plan yet (still planning), pending otherwise
-  let workStage: StageStatus = merged ? 'done' : hasPlan ? 'current' : 'pending';
-  if (reviewStatus?.reviewStatus === 'passed' || reviewStatus?.reviewStatus === 'failed') {
-    workStage = 'done';
-  }
-
-  // Verify: from verificationStatus
-  const verifyStage: StageStatus = merged
+  const planStage: StageStatus = merged || hasPlan || state === 'planned' || state === 'working' || reviewing || pastReview
     ? 'done'
-    : reviewStatus?.verificationStatus === 'passed'
-      ? 'done'
-      : reviewStatus?.verificationStatus === 'failed'
-        ? 'failed'
-        : reviewStatus?.verificationStatus === 'running'
-          ? 'running'
-          : 'pending';
+    : 'pending';
 
-  // Review: from reviewStatus
-  const reviewStage: StageStatus = merged
+  const workStage: StageStatus = reviewing || pastReview
     ? 'done'
-    : reviewStatus?.reviewStatus === 'passed'
-      ? 'done'
-      : reviewStatus?.reviewStatus === 'failed' || reviewStatus?.reviewStatus === 'blocked'
-        ? 'failed'
-        : reviewStatus?.reviewStatus === 'reviewing'
-          ? 'running'
-          : 'pending';
+    : state === 'working'
+      ? 'running'
+      : hasPlan ? 'current' : 'pending';
 
-  // Test: from testStatus
-  const testStage: StageStatus = merged
+  const reviewStage: StageStatus = pastReview
     ? 'done'
-    : reviewStatus?.testStatus === 'passed'
-      ? 'done'
-      : reviewStatus?.testStatus === 'failed' || reviewStatus?.testStatus === 'dispatch_failed'
-        ? 'failed'
-        : reviewStatus?.testStatus === 'testing'
-          ? 'running'
-          : 'pending';
+    : state === 'changes-requested'
+      ? 'failed'
+      : state === 'in-review'
+        ? 'running'
+        : 'pending';
 
-  // Merge: from mergeStatus
+  const checks = derived?.pr?.checks;
+  const checksStage: StageStatus = checks === 'green'
+    ? 'done'
+    : checks === 'red'
+      ? 'failed'
+      : checks === 'pending'
+        ? 'running'
+        : 'pending';
+
   const mergeStage: StageStatus = merged
     ? 'done'
-    : reviewStatus?.mergeStatus === 'failed'
-      ? 'failed'
-      : reviewStatus?.mergeStatus === 'merging' || reviewStatus?.mergeStatus === 'verifying'
-        ? 'running'
-        : reviewStatus?.mergeStatus === 'queued'
-          ? 'current'
-          : 'pending';
+    : state === 'ready'
+      ? 'current'
+      : derived?.pr?.mergeable === false
+        ? 'failed'
+        : 'pending';
 
   return [
-    { label: 'Plan', stage: planningStage },
+    { label: 'Plan', stage: planStage },
     { label: 'Work', stage: workStage },
-    { label: 'Verify', stage: verifyStage },
     { label: 'Review', stage: reviewStage },
-    { label: 'Test', stage: testStage },
+    { label: 'Checks', stage: checksStage },
     { label: 'Merge', stage: mergeStage },
   ];
 }
@@ -170,25 +156,18 @@ export function IssueHeader({ issueId, title, url }: IssueHeaderProps) {
   const planningSummary = usePlanningSummaryWithOverridesQuery(issueId, {
     staleTime: 30_000,
   });
-  const reviewStatusQuery = useReviewStatusQuery(issueId);
   const activityQuery = useActivityQuery(issueId);
 
-  const reviewStatus = reviewStatusQuery.data;
+  const derived = useDerivedIssueState(issueId);
   const activity = activityQuery.data;
-
-  // PAN-1691: per-issue auto-merge routing key, read from the store snapshot
-  // (already carries autoMerge) so we avoid threading a new query type.
-  const autoMergeSnap = useDashboardStore(
-    (s) => s.reviewStatusByIssueId[issueId.toUpperCase()] ?? s.reviewStatusByIssueId[issueId],
-  );
 
   const planningForStageStatus = planningSummary.data;
 
   const stageStatuses = useMemo(
-    () => deriveStageStatuses(reviewStatus, planningForStageStatus),
-    [reviewStatus, planningForStageStatus],
+    () => deriveStageStatuses(derived, planningForStageStatus),
+    [derived, planningForStageStatus],
   );
-  const stuck = isReviewPipelineStuck(reviewStatus ?? undefined);
+  const stuck = isIssueStuck(derived);
 
   // Activity sparkline events from session sections (PAN-847)
   const sparklineEvents = useMemo<SparklineEvent[]>(() => {
@@ -215,17 +194,6 @@ export function IssueHeader({ issueId, title, url }: IssueHeaderProps) {
   const stashCount = planningSummary.data?.stashCount ?? 0;
   const resolvedTotalCost = activity?.resolvedTotalCost ?? null;
 
-  // Quality-gate indicator from verification status (PAN-847)
-  const qgStatus = reviewStatus?.verificationStatus;
-  const qgColor =
-    qgStatus === 'passed'
-      ? 'var(--success)'
-      : qgStatus === 'failed'
-        ? 'var(--destructive)'
-        : qgStatus === 'running'
-          ? 'var(--warning)'
-          : undefined;
-
   return (
     <div className={styles.issueHeader} data-testid="issue-header" data-issue={issueId}>
       {/* Row 1: ID + title + metadata */}
@@ -247,30 +215,6 @@ export function IssueHeader({ issueId, title, url }: IssueHeaderProps) {
           <span className={styles.issueHeaderTitle}>{title}</span>
         </div>
         <div className={styles.issueHeaderRight}>
-          {/* Quality-gate mini-badge (PAN-847) */}
-          {qgColor && (
-            <span
-              data-testid="zone-a-qg-badge"
-              title={`Quality gates: ${qgStatus}`}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 3,
-                fontSize: 10,
-                fontWeight: 600,
-                color: qgColor,
-                padding: '1px 5px',
-                borderRadius: 4,
-                border: `1px solid ${qgColor}40`,
-                background: `${qgColor}12`,
-                textTransform: 'uppercase',
-                letterSpacing: '0.03em',
-              }}
-            >
-              <ShieldCheck size={10} />
-              QG
-            </span>
-          )}
           {/* Acceptance progress (PAN-847) */}
           {ac && ac.total > 0 && (
             <span
@@ -323,7 +267,7 @@ export function IssueHeader({ issueId, title, url }: IssueHeaderProps) {
             <span className={styles.issueHeaderCost} data-testid="zone-a-cost">{formatCost(resolvedTotalCost)}</span>
           )}
           <IssuePolicyStrip issueId={issueId} />
-          <AutoMergeToggle issueId={issueId} autoMerge={autoMergeSnap?.autoMerge} compact />
+          <AutoMergeToggle issueId={issueId} compact />
         </div>
       </div>
 
@@ -358,36 +302,9 @@ export function IssueHeader({ issueId, title, url }: IssueHeaderProps) {
           }}
         >
           <AlertTriangle size={12} />
-          Pipeline stuck — review, test, or merge failed. Use Recover to retry.
-        </div>
-      )}
-
-      {/* PAN-3151: Review convergence warning */}
-      {reviewStatus?.stuckReason === 'review-not-converging' && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '6px 12px',
-            fontSize: 11,
-            color: 'var(--warning)',
-            background: 'color-mix(in srgb, var(--warning) 8%, transparent)',
-            borderBottom: '1px dashed var(--border)',
-          }}
-        >
-          <AlertTriangle size={12} />
-          <span>
-            Review cycles:
-            {' '}
-            <strong>{reviewCycleSeries(reviewStatus) ?? 'unknown'}</strong>
-            {' '}
-            — not converging. Consider decomposing into sibling issues, or
-            {' '}
-            <em>unstick</em>
-            {' '}
-            to continue rework.
-          </span>
+          {derived?.attention === 'api-error'
+            ? 'Provider errors — the agent cannot make a call.'
+            : 'Stuck — nothing is moving this issue forward.'}
         </div>
       )}
 

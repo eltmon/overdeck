@@ -22,7 +22,7 @@ export interface SimpleIssueDerivation {
   primaryAgent: AgentSnapshot | undefined;
   /** First agent with an outstanding question/plan approval. */
   pendingInputAgent: AgentSnapshot | undefined;
-  /** An agent is troubled or in a problem status — "Get it unstuck" recovers the agent. */
+  /** An agent is in a problem status — "Get it unstuck" recovers the agent. */
   agentStuck: boolean;
   /** The derived issue state raised an attention signal (stuck / api-error). */
   reviewStuck: boolean;

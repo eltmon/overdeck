@@ -55,7 +55,6 @@ interface RestartConfigChangeItem {
   newHarness: string;
   changed: boolean;
   paused: boolean;
-  troubled: boolean;
   status: string;
 }
 
@@ -474,7 +473,7 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
                           }
                           setSelectedForRestart(newSelected);
                         }}
-                        disabled={item.paused || item.troubled}
+                        disabled={item.paused}
                         className="accent-primary mt-0.5"
                       />
                       <div className="flex-1">
@@ -489,10 +488,8 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
                           {!item.changed && (
                             <div className="text-muted-foreground">No change needed</div>
                           )}
-                          {(item.paused || item.troubled) && (
-                            <div className="text-destructive">
-                              {item.paused ? 'Paused' : 'Troubled'} — cannot restart
-                            </div>
+                          {item.paused && (
+                            <div className="text-destructive">Paused — cannot restart</div>
                           )}
                         </div>
                       </div>

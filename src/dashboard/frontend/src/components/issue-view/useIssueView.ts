@@ -1,20 +1,16 @@
 import { useMemo } from 'react';
 import type { AgentSnapshot, SessionNode } from '@overdeck/contracts';
-import { selectIssues, useDashboardStore } from '../../lib/store';
+import { selectIssues, useBackendPanes, useDashboardStore, useDerivedIssueState } from '../../lib/store';
 import {
   useActivityQuery,
   useIssueCostsQuery,
-  useReviewStatusQuery,
-  useShipLogQuery,
   useWorkspaceQuery,
   type ActivityResponse,
   type ActivitySection,
   type IssueCostData,
-  type ReviewStatusData,
-  type ShipLogData,
   type WorkspaceData,
 } from '../CommandDeck/ZoneCOverviewTabs/queries';
-import { deriveShip, isAgentRunning, readyForMerge, sortOperatorNeeds } from './derivations';
+import { deriveShip, isAgentRunning, readyForMerge, sortOperatorNeeds, stuckReason } from './derivations';
 import type {
   AgentRowModel,
   IssueActivityModel,
@@ -28,7 +24,7 @@ import type {
   OperatorNeedsYou,
   VerificationGateModel,
 } from './types';
-import type { Issue } from '../../types';
+import type { BackendPane, DerivedIssueState, Issue } from '../../types';
 
 const MODEL_PLACEHOLDERS = new Set(['', 'unknown', 'specialist', 'planning', 'idle', 'none']);
 
@@ -194,12 +190,31 @@ function findCostForSession(session: SessionNode, costs?: IssueCostData): string
   return hit ? formatCost(hit.cost, hit.tokenCount) : undefined;
 }
 
+const PANE_ROLE_BY_SESSION_TYPE: Partial<Record<SessionNode['type'], BackendPane['role']>> = {
+  planning: 'plan',
+  legacy: 'plan',
+  work: 'work',
+  strike: 'strike',
+  review: 'review',
+  reviewer: 'review',
+  test: 'test',
+};
+
+/** The backend owns harness and model — match this session's row to its pane. */
+function findPaneForSession(session: SessionNode, panes: readonly BackendPane[]): BackendPane | undefined {
+  const role = PANE_ROLE_BY_SESSION_TYPE[session.type];
+  return panes.find((pane) => pane.id === session.sessionId || pane.terminalId === session.tmuxSession)
+    ?? (role ? panes.find((pane) => pane.role === role) : undefined);
+}
+
 function buildAgentRow(
   session: SessionNode,
   agentsById: Record<string, AgentSnapshot>,
   costs?: IssueCostData,
+  panes: readonly BackendPane[] = [],
 ): AgentRowModel {
   const agent = findAgentForSession(session, agentsById);
+  const pane = findPaneForSession(session, panes);
   return {
     sessionId: session.sessionId,
     type: session.type,
@@ -208,8 +223,8 @@ function buildAgentRow(
     role: session.role,
     status: deriveAgentStatus(session, agent),
     active: isAgentRunning(session, agent),
-    model: shortModel(session.model),
-    harness: session.harness ?? agent?.runtime,
+    model: shortModel(session.model || pane?.model),
+    harness: session.harness ?? pane?.harness ?? agent?.runtime,
     startedAt: session.startedAt,
     cost: findCostForSession(session, costs),
     duration: session.duration ?? null,
@@ -218,57 +233,44 @@ function buildAgentRow(
   };
 }
 
-function derivePhase(reviewStatus: ReviewStatusData | undefined, sessions: SessionNode[]): string {
-  if (reviewStatus?.mergeStatus === 'merged') return 'merged';
-  if (reviewStatus?.mergeStatus === 'verifying') return 'verifying';
-  if (readyForMerge(reviewStatus)) return 'ready';
-  if (reviewStatus?.mergeStatus === 'queued' || reviewStatus?.mergeStatus === 'merging') return 'ship';
-  if (reviewStatus?.testStatus === 'testing') return 'test';
-  // The verification gate is its own phase — calling it 'test' made the view
-  // claim a test specialist was involved while only the Lint node was running.
-  if (reviewStatus?.verificationStatus === 'running') return 'verify';
-  if (
-    reviewStatus?.reviewStatus === 'reviewing' ||
-    reviewStatus?.reviewStatus === 'passed' ||
-    reviewStatus?.reviewStatus === 'failed' ||
-    reviewStatus?.reviewStatus === 'blocked'
-  ) {
-    return 'review';
-  }
+/** The issue's derived state is the phase; sessions only answer for an unplanned issue. */
+function derivePhase(derived: DerivedIssueState | undefined, sessions: SessionNode[]): string {
+  if (derived) return derived.state;
 
   const runningType = sessions.find((s) => isAgentRunning(s, undefined))?.type;
-  if (runningType === 'planning' || runningType === 'legacy') return 'plan';
-  if (runningType) return 'work';
-
-  return 'todo';
+  if (runningType === 'planning' || runningType === 'legacy') return 'planned';
+  if (runningType) return 'working';
+  return 'backlog';
 }
 
-function deriveNowText(reviewStatus: ReviewStatusData | undefined, activeAgent?: AgentRowModel): string {
-  if (reviewStatus?.mergeStatus === 'merged') return 'Merged — ready to close out';
-  if (readyForMerge(reviewStatus)) return 'Review & tests passed — ready to merge';
-  if (reviewStatus?.reviewStatus === 'blocked' || reviewStatus?.reviewStatus === 'failed') {
-    return activeAgent?.type === 'work'
-      ? 'Review blocked — work agent is fixing it'
-      : 'Review blocked — awaiting the work agent';
+function deriveNowText(derived: DerivedIssueState | undefined, activeAgent?: AgentRowModel): string {
+  switch (derived?.state) {
+    case 'merged': return 'Merged — ready to close out';
+    case 'closed': return 'Closed';
+    case 'ready': return 'Approved and green — ready to merge';
+    case 'changes-requested':
+      return activeAgent?.type === 'work'
+        ? 'Changes requested — work agent is fixing it'
+        : 'Changes requested — awaiting the work agent';
+    case 'in-review': return 'In review';
+    case 'parked': return 'Parked';
+    default:
+      if (activeAgent) return `${activeAgent.label} agent is working`;
+      return 'Idle — awaiting the pipeline';
   }
-  if (reviewStatus?.testStatus === 'testing') return 'Tests running';
-  if (reviewStatus?.verificationStatus === 'running') return 'Verification running';
-  if (activeAgent) return `${activeAgent.label} agent is working`;
-  return 'Idle — awaiting the pipeline';
 }
 
-function deriveNextAction(reviewStatus: ReviewStatusData | undefined): string {
-  if (!reviewStatus) return 'start work';
-  if (reviewStatus.mergeStatus === 'merged') return 'merged — close out';
-  if (readyForMerge(reviewStatus)) return 'merge to main';
-  if (reviewStatus.reviewStatus === 'blocked' || reviewStatus.reviewStatus === 'failed') return 'work agent fixes → re-review';
-  if (reviewStatus.reviewStatus === 'reviewing') return 'review in progress';
-  if (reviewStatus.testStatus === 'testing') return 'test in progress';
-  if (reviewStatus.testStatus === 'failed' || reviewStatus.testStatus === 'dispatch_failed') return 'fix tests → re-run';
-  if (reviewStatus.reviewStatus === 'passed' && reviewStatus.testStatus !== 'passed' && reviewStatus.testStatus !== 'skipped') {
-    return 'dispatch test';
+function deriveNextAction(derived: DerivedIssueState | undefined): string {
+  switch (derived?.state) {
+    case 'merged': return 'merged — close out';
+    case 'closed': return 'closed';
+    case 'ready': return 'merge to main';
+    case 'changes-requested': return 'work agent fixes → re-review';
+    case 'in-review': return derived.pr?.checks === 'red' ? 'fix the red checks' : 'review in progress';
+    case 'working': return 'work in progress';
+    case 'planned': return 'start work';
+    default: return 'start work';
   }
-  return 'awaiting pipeline';
 }
 
 function deriveHeader(
@@ -276,7 +278,7 @@ function deriveHeader(
   title: string | undefined,
   branch: string | undefined,
   projectName: string | undefined,
-  reviewStatus: ReviewStatusData | undefined,
+  derived: DerivedIssueState | undefined,
   costs: IssueCostData | undefined,
   sessions: SessionNode[],
 ): IssueHeaderModel {
@@ -284,28 +286,26 @@ function deriveHeader(
   return {
     issueId,
     title,
-    branch,
+    branch: branch ?? derived?.branch?.name,
     projectName,
-    phase: derivePhase(reviewStatus, sessions),
+    phase: derivePhase(derived, sessions),
     cost: cost > 0 ? `$${cost.toFixed(2)}` : undefined,
+    prNumber: derived?.pr?.number,
+    prUrl: derived?.pr?.url,
   };
 }
 
 function deriveNarrative(
-  reviewStatus: ReviewStatusData | undefined,
+  derived: DerivedIssueState | undefined,
   agents: AgentRowModel[],
 ): IssueNarrativeModel {
   const activeAgent = agents.find((a) => a.active);
-  const recentEvents = (reviewStatus?.history ?? [])
-    .slice()
-    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-    .slice(0, 3)
-    .map((h) => ({ type: h.type, status: h.status, timestamp: h.timestamp }));
-
+  // PAN-3917: there is no stored status history to replay. The activity feed
+  // (transcripts) is the record of what happened.
   return {
-    now: deriveNowText(reviewStatus, activeAgent),
-    nextAction: deriveNextAction(reviewStatus),
-    recentEvents,
+    now: deriveNowText(derived, activeAgent),
+    nextAction: deriveNextAction(derived),
+    recentEvents: [],
   };
 }
 
@@ -317,107 +317,49 @@ function stepState(
   return { status: s, active, done: s === 'passed' || s === 'skipped' || s === 'merged' || s === 'completed' };
 }
 
+const REVIEWED_STATES = new Set(['in-review', 'changes-requested', 'ready', 'merged', 'closed']);
+
 function derivePipeline(
-  reviewStatus: ReviewStatusData | undefined,
+  derived: DerivedIssueState | undefined,
   sessions: SessionNode[],
 ): IssuePipelineModel {
-  const merged = reviewStatus?.mergeStatus === 'merged';
+  const merged = derived?.state === 'merged';
   const hasPlanSession = sessions.some((s) => s.type === 'planning' || s.type === 'legacy');
   const hasWorkSession = sessions.some((s) => s.type === 'work' || s.type === 'strike');
   const planActive = hasPlanSession && sessions.some((s) => (s.type === 'planning' || s.type === 'legacy') && isAgentRunning(s, undefined));
   const workActive = sessions.some((s) => (s.type === 'work' || s.type === 'strike') && isAgentRunning(s, undefined));
   const reviewSessionActive = sessions.some((s) => (s.type === 'review' || s.type === 'reviewer') && isAgentRunning(s, undefined));
-  const testSessionActive = sessions.some((s) => s.type === 'test' && isAgentRunning(s, undefined));
-  const reviewActive = reviewStatus?.reviewStatus === 'reviewing' ||
-    ((reviewStatus?.reviewStatus === undefined || reviewStatus.reviewStatus === 'pending') && reviewSessionActive);
-  const testActive = reviewStatus?.testStatus === 'testing' ||
-    ((reviewStatus?.testStatus === undefined || reviewStatus.testStatus === 'pending') && testSessionActive);
-  const shipActive = reviewStatus?.mergeStatus === 'queued' || reviewStatus?.mergeStatus === 'merging' || reviewStatus?.mergeStatus === 'verifying';
+  const reviewed = derived ? REVIEWED_STATES.has(derived.state) : false;
+  const checks = derived?.pr?.checks;
 
   return {
-    plan: stepState(hasPlanSession ? 'passed' : 'pending', planActive),
+    plan: stepState(hasPlanSession || (derived && derived.state !== 'backlog') ? 'passed' : 'pending', planActive),
     work: stepState(hasWorkSession ? 'passed' : 'pending', workActive),
     review: stepState(
-      merged ? 'passed' : reviewStatus?.reviewStatus,
-      reviewActive,
+      merged ? 'passed' : derived?.state === 'changes-requested' ? 'failed' : reviewed ? 'passed' : 'pending',
+      reviewSessionActive,
     ),
+    // The PR's check runs are the test gate — nothing stores a test status.
     test: stepState(
-      merged ? 'passed' : reviewStatus?.testStatus,
-      testActive,
+      checks === 'green' ? 'passed' : checks === 'red' ? 'failed' : 'pending',
+      checks === 'pending',
     ),
-    ship: stepState(merged ? 'merged' : readyForMerge(reviewStatus) ? 'ready' : reviewStatus?.mergeStatus ?? 'pending', shipActive),
+    ship: stepState(merged ? 'merged' : readyForMerge(derived) ? 'ready' : 'pending', false),
   };
 }
 
-function gateStatus(
-  status: string | undefined,
-): VerificationGateModel['status'] {
-  if (
-    status === 'passed' ||
-    status === 'failed' ||
-    status === 'pending' ||
-    status === 'running' ||
-    status === 'skipped' ||
-    status === 'infra-unavailable'
-  ) {
-    return status;
-  }
-  if (status === 'testing') return 'running';
-  return 'pending';
-}
-
-function qualityGateStatus(
-  gate: string,
-  reviewStatus: ReviewStatusData | undefined,
-): VerificationGateModel['status'] {
-  const notes = reviewStatus?.verificationNotes ?? '';
-  const failedMatch = notes.match(/Verification FAILED at (typecheck|lint|test)\b/i);
-  const failedIdx = failedMatch ? ['typecheck', 'lint', 'test'].indexOf(failedMatch[1]!.toLowerCase()) : -1;
-  const gateIdx = ['typecheck', 'lint', 'test'].indexOf(gate);
-
-  if (reviewStatus?.verificationStatus === 'passed') return 'passed';
-  if (reviewStatus?.verificationStatus === 'failed') {
-    if (failedIdx < 0) return 'failed';
-    if (gateIdx < failedIdx) return 'passed';
-    if (gateIdx === failedIdx) return 'failed';
-    return 'pending';
-  }
-  if (reviewStatus?.verificationStatus === 'running') return gateIdx === 0 ? 'running' : 'pending';
-  if (reviewStatus?.verificationStatus === 'skipped') return 'skipped';
-  return 'pending';
-}
-
-function deriveVerification(
-  reviewStatus: ReviewStatusData | undefined,
-  workspace: WorkspaceData | undefined,
-): IssueVerificationModel {
-  const cycle = reviewStatus?.verificationCycleCount
-    ? `cycle ${reviewStatus.verificationCycleCount}${reviewStatus.verificationMaxCycles ? `/${reviewStatus.verificationMaxCycles}` : ''}`
-    : undefined;
-
-  const uatStatus = !workspace?.exists || workspace?.hasDocker === false ? 'infra-unavailable' : gateStatus(reviewStatus?.uatStatus);
-
-  const gates: VerificationGateModel[] = [
-    { id: 'typecheck', label: 'typecheck', status: qualityGateStatus('typecheck', reviewStatus) },
-    { id: 'lint', label: 'lint', status: qualityGateStatus('lint', reviewStatus) },
-    { id: 'test', label: 'test', status: qualityGateStatus('test', reviewStatus) },
-    { id: 'uat', label: 'UAT', status: uatStatus },
-  ];
+/**
+ * PAN-3917 (FR-8): verification is the PR's check runs. There is one gate and
+ * the forge owns it — no stored verificationStatus, no cycle counter.
+ */
+function deriveVerification(derived: DerivedIssueState | undefined): IssueVerificationModel {
+  const checks = derived?.pr?.checks;
+  const status: VerificationGateModel['status'] =
+    checks === 'green' ? 'passed' : checks === 'red' ? 'failed' : checks === 'pending' ? 'running' : 'pending';
 
   return {
-    status: reviewStatus?.verificationStatus ?? 'pending',
-    cycle,
-    gates,
-  };
-}
-
-function toShipLogModel(data: ShipLogData | undefined): import('./types').ShipLogModel | null {
-  if (!data?.log) return null;
-  return {
-    startedAt: data.log.startedAt,
-    updatedAt: data.log.updatedAt,
-    step: data.log.step,
-    lines: data.log.lines,
+    status: status === 'passed' ? 'passed' : status === 'failed' ? 'failed' : 'pending',
+    gates: [{ id: 'checks', label: 'checks', status }],
   };
 }
 
@@ -439,7 +381,7 @@ function deriveResources(workspace: WorkspaceData | undefined): IssueResourcesMo
 function deriveOperator(
   sessions: SessionNode[],
   agentsById: Record<string, AgentSnapshot>,
-  reviewStatus: ReviewStatusData | undefined,
+  derived: DerivedIssueState | undefined,
   issue?: Issue,
 ): IssueOperatorModel {
   const items: OperatorNeedsYou[] = [];
@@ -454,14 +396,6 @@ function deriveOperator(
         reason: session.awaitingInputReason ?? agent?.pendingQuestionReason,
       });
     }
-    if (session.troubled || agent?.troubled) {
-      const agentTroubledReason = (agent as (AgentSnapshot & { troubledReason?: string }) | undefined)?.troubledReason;
-      items.push({
-        kind: 'troubled',
-        sessionId: session.sessionId,
-        reason: session.troubledReason ?? agentTroubledReason ?? agent?.lastFailureReason,
-      });
-    }
     if (session.paused || agent?.paused) {
       items.push({
         kind: 'paused',
@@ -471,27 +405,11 @@ function deriveOperator(
     }
   }
 
-  if (reviewStatus?.stuck) {
-    items.push({ kind: 'stuck', reason: reviewStatus.stuckReason ?? reviewStatus.stuckDetails });
+  if (derived?.attention === 'stuck' || derived?.attention === 'api-error') {
+    items.push({ kind: 'stuck', reason: stuckReason(derived) });
   }
-  const hasActiveReview = sessions.some(
-    (session) => (session.type === 'review' || session.type === 'reviewer') && session.presence === 'active',
-  );
-  const hasEndedReviewer = sessions.some(
-    (session) => session.type === 'reviewer' && session.presence === 'ended',
-  );
-  if (
-    hasEndedReviewer &&
-    !hasActiveReview &&
-    (reviewStatus?.reviewStatus === 'pending' || reviewStatus?.reviewStatus === 'failed')
-  ) {
-    items.push({ kind: 'stale_review', reason: 'Leftover review specialist sessions must be cleared before a clean review can run.' });
-  }
-  if (reviewStatus?.blockerReasons?.[0]) {
-    items.push({
-      kind: 'blocker',
-      reason: reviewStatus.blockerReasons[0].details ?? reviewStatus.blockerReasons[0].summary,
-    });
+  if (derived?.pr && (derived.pr.checks === 'red' || derived.pr.mergeable === false)) {
+    items.push({ kind: 'blocker', reason: stuckReason(derived) });
   }
 
   const labels = new Set((issue?.labels ?? []).map((label) => label.toLowerCase()));
@@ -501,7 +419,7 @@ function deriveOperator(
     items.push({ kind: 'pickup_gate', reason: 'The plan is ready, but work cannot be picked up until an operator releases it.' });
   }
 
-  if (readyForMerge(reviewStatus)) {
+  if (readyForMerge(derived)) {
     items.push({ kind: 'ready_for_merge' });
   }
 
@@ -509,7 +427,7 @@ function deriveOperator(
   if (
     work &&
     !isAgentRunning(work, findAgentForSession(work, agentsById)) &&
-    reviewStatus?.mergeStatus !== 'merged'
+    derived?.state !== 'merged'
   ) {
     items.push({ kind: 'stopped', sessionId: work.sessionId });
   }
@@ -523,27 +441,27 @@ export function buildIssueViewModel(
   title: string | undefined,
   branch: string | undefined,
   projectName: string | undefined,
-  reviewStatus: ReviewStatusData | undefined,
+  derived: DerivedIssueState | undefined,
   costs: IssueCostData | undefined,
   workspace: WorkspaceData | undefined,
   activity: ActivityResponse | undefined,
   agentsById: Record<string, AgentSnapshot>,
-  shipLog?: ShipLogData | undefined,
   issue?: Issue,
+  panes: readonly BackendPane[] = [],
 ): IssueViewModel {
   const sessions = (activity?.sections ?? []).map(toSessionNode);
-  const agents = sessions.map((session) => buildAgentRow(session, agentsById, costs));
+  const agents = sessions.map((session) => buildAgentRow(session, agentsById, costs, panes));
 
   return {
-    header: deriveHeader(issueId, title, branch, projectName, reviewStatus, costs, sessions),
-    narrative: deriveNarrative(reviewStatus, agents),
-    pipeline: derivePipeline(reviewStatus, sessions),
+    header: deriveHeader(issueId, title, branch, projectName, derived, costs, sessions),
+    narrative: deriveNarrative(derived, agents),
+    pipeline: derivePipeline(derived, sessions),
     agents,
-    verification: deriveVerification(reviewStatus, workspace),
-    ship: deriveShip(reviewStatus, toShipLogModel(shipLog)),
+    verification: deriveVerification(derived),
+    ship: deriveShip(derived),
     activity: deriveActivity(activity),
     resources: deriveResources(workspace),
-    operator: deriveOperator(sessions, agentsById, reviewStatus, issue),
+    operator: deriveOperator(sessions, agentsById, derived, issue),
   };
 }
 
@@ -555,11 +473,11 @@ export function useIssueView(
     projectName?: string;
   },
 ): IssueViewModel {
-  const review = useReviewStatusQuery(issueId);
+  const derived = useDerivedIssueState(issueId);
+  const panes = useBackendPanes(issueId);
   const costs = useIssueCostsQuery(issueId);
   const workspace = useWorkspaceQuery(issueId);
   const activity = useActivityQuery(issueId);
-  const shipLog = useShipLogQuery(issueId);
   const agentsById = useDashboardStore((s) => s.agentsById);
   const issues = (useDashboardStore(selectIssues) as Issue[] | undefined) ?? [];
   const issue = useMemo(
@@ -574,26 +492,26 @@ export function useIssueView(
         options?.title,
         options?.branch,
         options?.projectName,
-        review.data,
+        derived,
         costs.data,
         workspace.data,
         activity.data,
         agentsById,
-        shipLog.data,
         issue,
+        panes,
       ),
     [
       issueId,
       options?.title,
       options?.branch,
       options?.projectName,
-      review.data,
+      derived,
       costs.data,
       workspace.data,
       activity.data,
       agentsById,
-      shipLog.data,
       issue,
+      panes,
     ],
   );
 }

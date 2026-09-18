@@ -1,4 +1,5 @@
-import type { ReviewStatusSnapshot, SessionNode } from '@overdeck/contracts';
+import type { SessionNode } from '@overdeck/contracts';
+import type { DerivedIssueState } from '../../types';
 import type { PipelineIssuePhase } from '../../lib/pipeline-state';
 import { compactModelName } from '../../lib/model-names';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
@@ -7,7 +8,8 @@ export type PipelineBucketPhase = PipelineIssuePhase | 'needs-you' | 'stalled';
 
 export interface BucketedFeature {
   feature: ProjectFeature;
-  reviewStatus: ReviewStatusSnapshot | undefined;
+  /** PAN-3917 — the issue's derived state (FR-6). Replaces the review-status row. */
+  derived: DerivedIssueState | undefined;
   phase: PipelineBucketPhase;
 }
 
@@ -35,10 +37,6 @@ export interface IssueCostBreakdown {
 }
 
 const ACTIVE_AGENT_STATUSES = new Set(['active', 'running', 'starting']);
-const REVIEW_BLOCKED_STATUSES = new Set(['failed', 'blocked']);
-const TEST_BLOCKED_STATUSES = new Set(['failed', 'dispatch_failed']);
-const MERGE_BLOCKED_STATUSES = new Set(['failed']);
-const VERIFICATION_BLOCKED_STATUSES = new Set(['failed']);
 
 export function hasActiveWorkSession(feature: ProjectFeature): boolean {
   return feature.sessions?.some(session => session.type === 'work' && session.presence === 'active') ?? false;
@@ -67,44 +65,40 @@ function hasAdmittedArtifactSignal(feature: ProjectFeature): boolean {
   return false;
 }
 
-function featureLastActivity(feature: ProjectFeature, reviewStatus: ReviewStatusSnapshot | undefined): number {
+function featureLastActivity(feature: ProjectFeature): number {
   const sessionTimes = (feature.sessions ?? [])
     .flatMap(session => [session.startedAt, session.endedAt].filter(Boolean))
     .map(iso => new Date(iso!).getTime())
     .filter(t => !Number.isNaN(t));
-  const reviewTime = reviewStatus?.updatedAt ? new Date(reviewStatus.updatedAt).getTime() : NaN;
   const taskUpdated = feature.taskTotals?.lastUpdated
     ? new Date(feature.taskTotals.lastUpdated).getTime()
     : NaN;
   const times = [
     ...sessionTimes,
-    ...(Number.isNaN(reviewTime) ? [] : [reviewTime]),
     ...(Number.isNaN(taskUpdated) ? [] : [taskUpdated]),
   ];
   return times.length > 0 ? Math.max(...times) : 0;
 }
 
-function isStaleActivity(feature: ProjectFeature, reviewStatus: ReviewStatusSnapshot | undefined): boolean {
-  const last = featureLastActivity(feature, reviewStatus);
+function isStaleActivity(feature: ProjectFeature): boolean {
+  const last = featureLastActivity(feature);
   if (last === 0) return true;
   return Date.now() - last >= STALLED_INACTIVITY_MS;
 }
 
-export function isStalledFeature(feature: ProjectFeature, reviewStatus: ReviewStatusSnapshot | undefined): boolean {
+export function isStalledFeature(feature: ProjectFeature): boolean {
   if (!hasAdmittedArtifactSignal(feature)) return false;
   if (hasActiveAgentSignal(feature)) return false;
-  return isStaleActivity(feature, reviewStatus);
+  return isStaleActivity(feature);
 }
 
-export function isBlockedFeature(feature: ProjectFeature, reviewStatus: ReviewStatusSnapshot | undefined): boolean {
+export function isBlockedFeature(feature: ProjectFeature, derived: DerivedIssueState | undefined): boolean {
   return Boolean(
     feature.agentStatus === 'failed' ||
-      reviewStatus?.stuck ||
-      (reviewStatus?.blockerReasons?.length ?? 0) > 0 ||
-      REVIEW_BLOCKED_STATUSES.has(reviewStatus?.reviewStatus ?? '') ||
-      TEST_BLOCKED_STATUSES.has(reviewStatus?.testStatus ?? '') ||
-      MERGE_BLOCKED_STATUSES.has(reviewStatus?.mergeStatus ?? '') ||
-      VERIFICATION_BLOCKED_STATUSES.has(reviewStatus?.verificationStatus ?? ''),
+      derived?.attention === 'stuck' ||
+      derived?.attention === 'api-error' ||
+      derived?.pr?.checks === 'red' ||
+      derived?.pr?.mergeable === false,
   );
 }
 
@@ -115,8 +109,9 @@ function isPlanApprovalPending(feature: ProjectFeature): boolean {
     && !feature.sessions?.some(session => session.type === 'planning');
 }
 
-export function isNeedsYouFeature(feature: ProjectFeature, reviewStatus: ReviewStatusSnapshot | undefined): boolean {
-  if (reviewStatus?.readyForMerge || feature.readyForMerge) return true;
+export function isNeedsYouFeature(feature: ProjectFeature, derived: DerivedIssueState | undefined): boolean {
+  if (derived?.attention === 'needs-you') return true;
+  if (derived?.state === 'ready') return true;
   if (feature.sessions?.some(session => session.paused)) return true;
   if (feature.sessions?.some(session => session.type === 'planning' && session.awaitingInput)) return true;
   // The membership resolver distinguishes a real planned backlog from terminal
@@ -124,29 +119,38 @@ export function isNeedsYouFeature(feature: ProjectFeature, reviewStatus: ReviewS
   return isPlanApprovalPending(feature);
 }
 
-export function stuckReason(reviewStatus: ReviewStatusSnapshot | undefined): string {
-  if (reviewStatus?.stuckReason) return reviewStatus.stuckReason;
-  if (reviewStatus?.blockerReasons?.[0]) return reviewStatus.blockerReasons[0].summary;
-  if (reviewStatus?.reviewStatus === 'blocked') return 'Review blocked';
-  if (reviewStatus?.reviewStatus === 'failed') return 'Review failed';
-  if (reviewStatus?.testStatus === 'dispatch_failed') return 'Test dispatch failed';
-  if (reviewStatus?.testStatus === 'failed') return 'Tests failed';
-  if (reviewStatus?.mergeStatus === 'failed') return 'Merge failed';
-  if (reviewStatus?.verificationStatus === 'failed') return 'Verification failed';
+export function stuckReason(derived: DerivedIssueState | undefined): string {
+  if (derived?.attention === 'api-error') return 'Provider errors — the agent cannot make a call';
+  if (derived?.pr?.checks === 'red') return 'Checks failing on the pull request';
+  if (derived?.pr?.mergeable === false) return 'Pull request conflicts with main';
   return 'Needs attention';
 }
 
 export function pipelineChipFor(entry: BucketedFeature): PipelineChipSpec {
-  const { feature, reviewStatus, phase } = entry;
+  const { feature, derived, phase } = entry;
 
-  if (isNeedsYouFeature(feature, reviewStatus)) {
+  // Amber = a human must act; blue = a machine is working; purple = specialist
+  // verb; red = broken. One colored signal per row (style guide §restraint).
+  if (isNeedsYouFeature(feature, derived)) {
     return {
       key: 'waiting',
       label: 'waiting on you',
-      textClass: 'text-amber-600',
-      bgClass: 'bg-amber-500/14',
-      dotClass: 'bg-amber-500',
-      ringClass: 'border-amber-500',
+      textClass: 'text-warning-foreground',
+      bgClass: 'bg-warning/[0.08]',
+      dotClass: 'bg-warning',
+      ringClass: 'border-warning/[0.32]',
+      animate: false,
+    };
+  }
+
+  if (isBlockedFeature(feature, derived)) {
+    return {
+      key: 'blocked',
+      label: 'blocked',
+      textClass: 'text-destructive',
+      bgClass: 'bg-destructive/[0.08]',
+      dotClass: 'bg-destructive',
+      ringClass: 'border-destructive/[0.32]',
       animate: false,
     };
   }
@@ -155,10 +159,10 @@ export function pipelineChipFor(entry: BucketedFeature): PipelineChipSpec {
     return {
       key: 'stalled',
       label: 'stalled — has work, no live agent',
-      textClass: 'text-amber-600',
-      bgClass: 'bg-amber-500/14',
-      dotClass: 'bg-amber-500',
-      ringClass: 'border-amber-500',
+      textClass: 'text-warning-foreground',
+      bgClass: 'bg-warning/[0.08]',
+      dotClass: 'bg-warning',
+      ringClass: 'border-warning/[0.32]',
       animate: false,
     };
   }
@@ -166,48 +170,24 @@ export function pipelineChipFor(entry: BucketedFeature): PipelineChipSpec {
   if (phase === 'ship') {
     return {
       key: 'ship',
-      label: 'lining up to ship',
-      textClass: 'text-violet-600',
-      bgClass: 'bg-violet-500/12',
-      dotClass: 'bg-violet-500',
-      ringClass: 'border-violet-500',
+      label: derived?.state === 'merged' ? 'merged' : 'lining up to ship',
+      textClass: 'text-signal-review',
+      bgClass: 'bg-signal-review/[0.08]',
+      dotClass: 'bg-signal-review',
+      ringClass: 'border-signal-review/[0.32]',
       animate: false,
     };
   }
 
   if (phase === 'review') {
-    if (reviewStatus?.testStatus === 'testing') {
-      return {
-        key: 'testing',
-        label: 'testing',
-        textClass: 'text-teal-600',
-        bgClass: 'bg-teal-500/12',
-        dotClass: 'bg-teal-500',
-        ringClass: 'border-teal-500',
-        animate: true,
-      };
-    }
-    // The verification gate (quality checks) is not the test specialist —
-    // labelling it "testing" made rows claim a test agent that never spawned.
-    if (reviewStatus?.verificationStatus === 'running') {
-      return {
-        key: 'verification',
-        label: 'running checks',
-        textClass: 'text-teal-600',
-        bgClass: 'bg-teal-500/12',
-        dotClass: 'bg-teal-500',
-        ringClass: 'border-teal-500',
-        animate: true,
-      };
-    }
     return {
       key: 'review',
-      label: 'in review',
-      textClass: 'text-violet-600',
-      bgClass: 'bg-violet-500/12',
-      dotClass: 'bg-violet-500',
-      ringClass: 'border-violet-500',
-      animate: reviewStatus?.reviewStatus === 'reviewing',
+      label: derived?.state === 'changes-requested' ? 'changes requested' : 'in review',
+      textClass: 'text-signal-review',
+      bgClass: 'bg-signal-review/[0.08]',
+      dotClass: 'bg-signal-review',
+      ringClass: 'border-signal-review/[0.32]',
+      animate: derived?.state === 'in-review',
     };
   }
 
@@ -215,10 +195,10 @@ export function pipelineChipFor(entry: BucketedFeature): PipelineChipSpec {
     return {
       key: 'building',
       label: 'building',
-      textClass: 'text-blue-600',
-      bgClass: 'bg-blue-500/12',
-      dotClass: 'bg-blue-500',
-      ringClass: 'border-blue-500',
+      textClass: 'text-info',
+      bgClass: 'bg-info/[0.08]',
+      dotClass: 'bg-info',
+      ringClass: 'border-info/[0.32]',
       animate: hasActiveAgentSignal(feature),
     };
   }
@@ -227,10 +207,10 @@ export function pipelineChipFor(entry: BucketedFeature): PipelineChipSpec {
     return {
       key: 'planning',
       label: 'planning',
-      textClass: 'text-teal-600',
-      bgClass: 'bg-teal-500/12',
-      dotClass: 'bg-teal-500',
-      ringClass: 'border-teal-500',
+      textClass: 'text-info',
+      bgClass: 'bg-info/[0.08]',
+      dotClass: 'bg-info',
+      ringClass: 'border-info/[0.32]',
       animate: hasActiveAgentSignal(feature),
     };
   }
@@ -247,13 +227,13 @@ export function pipelineChipFor(entry: BucketedFeature): PipelineChipSpec {
 }
 
 export function sublineFor(entry: BucketedFeature): string {
-  const { feature, reviewStatus, phase } = entry;
+  const { feature, derived, phase } = entry;
   const progress = feature.childCount && feature.childCount > 0
     ? `${feature.completedCount ?? 0} of ${feature.childCount} tasks done`
     : null;
 
-  if (isNeedsYouFeature(feature, reviewStatus)) {
-    if (reviewStatus?.readyForMerge || feature.readyForMerge) return 'merge train assembled — held for your review';
+  if (isNeedsYouFeature(feature, derived)) {
+    if (derived?.state === 'ready') return 'approved and green — held for your merge';
     if (feature.sessions?.some(session => session.paused || (session.type === 'planning' && session.awaitingInput))) {
       return 'waiting on your answer';
     }
@@ -261,20 +241,19 @@ export function sublineFor(entry: BucketedFeature): string {
     return progress ?? 'waiting on your decision';
   }
 
-  if (isBlockedFeature(feature, reviewStatus)) {
-    return stuckReason(reviewStatus);
+  if (isBlockedFeature(feature, derived)) {
+    return stuckReason(derived);
   }
 
   if (phase === 'stalled') {
     return 'work artifacts present but no live agent';
   }
 
-  if (reviewStatus?.testStatus === 'testing') return 'tests running now';
-  if (reviewStatus?.reviewStatus === 'reviewing') return 'reviewer checking the finished work';
-  if (reviewStatus?.reviewStatus === 'passed') {
-    return reviewStatus?.testStatus === 'pending' ? 'review passed · tests next' : (progress ?? 'review passed');
+  if (derived?.state === 'changes-requested') return 'reviewer asked for changes';
+  if (derived?.state === 'in-review') {
+    return derived.pr?.checks === 'pending' ? 'in review · checks running' : 'reviewer checking the finished work';
   }
-  if (reviewStatus?.verificationStatus === 'running') return 'build check running';
+  if (derived?.state === 'merged') return 'merged';
   if (phase === 'work') return progress ?? 'writing code';
   if (phase === 'plan') return 'planning what to build';
   if (phase === 'ship') return 'lining up to ship';
@@ -353,7 +332,7 @@ export function formatPipelineCost(cost: number | undefined): string {
 }
 
 export function lastActivityAt(entry: BucketedFeature): number {
-  return featureLastActivity(entry.feature, entry.reviewStatus);
+  return featureLastActivity(entry.feature);
 }
 
 export function sortByLastActivity(entries: readonly BucketedFeature[]): BucketedFeature[] {
@@ -368,7 +347,6 @@ export function stageDisplayName(phase: PipelineBucketPhase): { title: string; s
     case 'plan': return { title: 'Planning', subtitle: 'writing the plan' };
     case 'ready': return { title: 'Ready', subtitle: 'queued for pickup' };
     case 'todo': return { title: 'Todo', subtitle: 'not started' };
-    case 'verifying': return { title: 'Verifying', subtitle: 'on main' };
     case 'stalled': return { title: 'Stalled / fell off the pipeline', subtitle: 'started work with nobody on it' };
     case 'needs-you': return { title: 'Needs you', subtitle: 'waiting on a human decision' };
     default: return { title: phase, subtitle: '' };
@@ -376,7 +354,7 @@ export function stageDisplayName(phase: PipelineBucketPhase): { title: string; s
 }
 
 export function groupPipelineEntries(entries: readonly BucketedFeature[]): PipelineGroup[] {
-  const needsYou = sortByLastActivity(entries.filter(e => isNeedsYouFeature(e.feature, e.reviewStatus)));
+  const needsYou = sortByLastActivity(entries.filter(e => isNeedsYouFeature(e.feature, e.derived)));
   const groups: PipelineGroup[] = [];
 
   if (needsYou.length > 0) {
@@ -391,8 +369,8 @@ export function groupPipelineEntries(entries: readonly BucketedFeature[]): Pipel
 
   const stalledEntries = sortByLastActivity(
     entries.filter(e =>
-      isStalledFeature(e.feature, e.reviewStatus) &&
-      !isNeedsYouFeature(e.feature, e.reviewStatus),
+      isStalledFeature(e.feature) &&
+      !isNeedsYouFeature(e.feature, e.derived),
     ),
   );
   if (stalledEntries.length > 0) {
@@ -405,13 +383,13 @@ export function groupPipelineEntries(entries: readonly BucketedFeature[]): Pipel
     });
   }
 
-  const phaseOrder: PipelineBucketPhase[] = ['ship', 'review', 'work', 'plan', 'ready', 'todo', 'verifying'];
+  const phaseOrder: PipelineBucketPhase[] = ['ship', 'review', 'work', 'plan', 'ready', 'todo'];
   for (const phase of phaseOrder) {
     const phaseEntries = sortByLastActivity(
       entries.filter(e =>
         e.phase === phase &&
-        !isNeedsYouFeature(e.feature, e.reviewStatus) &&
-        !isStalledFeature(e.feature, e.reviewStatus),
+        !isNeedsYouFeature(e.feature, e.derived) &&
+        !isStalledFeature(e.feature),
       ),
     );
     if (phaseEntries.length === 0) continue;

@@ -36,6 +36,7 @@ export type IssueActionKey =
   | 'merge'
   | 'reopen'
   | 'closeOut'
+  | 'resetIssue'
   | 'wipe'
   | 'destroyWorkspace'
   | 'open'
@@ -609,6 +610,7 @@ const ISSUE_ACTION_DEFINITIONS: Omit<IssueActionEntry, 'scope'>[] = [
   { key: 'merge', label: 'Merge to main', description: 'Merge this issue\'s approved branch into main. Human-only: nothing merges automatically.', panVerb: null, endpoint: '/api/issues/:id/merge', enabledWhen: canMerge, phasePrimary: phasePrimary('merge'), kind: 'safe', group: 'lifecycle' },
   { key: 'reopen', label: 'Reopen', description: 'Bring a closed or canceled issue back into the pipeline.', panVerb: 'reopen', endpoint: '/api/issues/:id/reopen', enabledWhen: isDoneOrCanceled, phasePrimary: [], kind: 'safe', group: 'lifecycle' },
   { key: 'closeOut', label: 'Close out', description: 'The final ceremony: archive artifacts, tidy the workspace, close the tracker issue.', panVerb: 'close', endpoint: '/api/issues/:id/close-out', enabledWhen: canCloseOut, phasePrimary: phasePrimary('closeOut'), kind: 'destructive', group: 'danger' },
+  { key: 'resetIssue', label: 'Reset issue', description: 'Back to square one: stop agents, delete workspace and branch, return the issue to Todo.', panVerb: null, endpoint: '/api/issues/:id/reset', enabledWhen: always, phasePrimary: [], kind: 'destructive', group: 'danger' },
   { key: 'wipe', label: 'Wipe', description: 'Erase this issue\'s agent state and workspace. Cannot be undone.', panVerb: 'wipe', endpoint: '/api/issues/:id/deep-wipe', enabledWhen: always, phasePrimary: [], kind: 'destructive', group: 'danger' },
   { key: 'destroyWorkspace', label: 'Destroy workspace', description: 'Delete the workspace folder and containers. The issue itself survives.', panVerb: 'destroy', endpoint: '/api/issues/:id/cleanup-workspace', enabledWhen: hasWorkspace, phasePrimary: [], kind: 'destructive', group: 'danger' },
   { key: 'open', label: 'Open', description: 'Open this issue\'s workspace in your editor.', panVerb: 'open', endpoint: null, enabledWhen: hasWorkspace, phasePrimary: phasePrimary('open'), kind: 'safe', group: 'navigation' },

@@ -23,7 +23,7 @@ interface GateRecord {
 
 interface VerificationResponse {
   issueId: string;
-  verificationStatus: string | null;
+  /** PAN-3917 (FR-8): the workspace artifact is the only source — no status row. */
   artifact: {
     ranAt: string;
     outcome: 'running' | 'passed' | 'failed';
@@ -35,7 +35,7 @@ interface VerificationResponse {
 }
 
 function isLive(data: VerificationResponse | undefined): boolean {
-  return data?.verificationStatus === 'running' || data?.artifact?.outcome === 'running';
+  return data?.artifact?.outcome === 'running';
 }
 
 /** Live tail of the running gate's output, pinned to the bottom. */

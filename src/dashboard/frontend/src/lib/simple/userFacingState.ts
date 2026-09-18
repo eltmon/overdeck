@@ -23,7 +23,7 @@ export interface UserFacingInput {
    * pipeline state says. See `isPlanReadyToStart` in ./derive.ts.
    */
   planReadyToStart?: boolean;
-  /** An agent is past the stuck threshold or gated troubled. */
+  /** An agent is past the stuck threshold, or the issue's attention is stuck. */
   stuck?: boolean;
 }
 

@@ -6,19 +6,15 @@ import type { IssueVerificationModel, VerificationGateModel } from './types';
 const GATE_TONE_CLASSES: Record<VerificationGateModel['status'], string> = {
   passed: 'border-success/40 bg-success/10 text-success-foreground',
   failed: 'border-destructive/40 bg-destructive/10 text-destructive-foreground',
-  running: 'border-info/40 bg-info/10 text-info-foreground',
-  skipped: 'border-muted text-muted-foreground',
+  running: 'border-border text-muted-foreground',
   pending: 'border-muted text-muted-foreground',
-  'infra-unavailable': 'border-muted text-muted-foreground',
 };
 
 const GATE_STATUS_LABEL: Record<VerificationGateModel['status'], string> = {
   passed: 'pass',
   failed: 'fail',
   running: 'running',
-  skipped: 'skipped',
   pending: 'pending',
-  'infra-unavailable': 'unavailable',
 };
 
 interface VerificationGatesProps {
@@ -34,9 +30,8 @@ function VerificationGatesGrid({ verification }: VerificationGatesProps) {
     >
       <div className="mb-[10px] text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
         Verification Gates
-        {verification.cycle ? <span className="ml-2 normal-case">{verification.cycle}</span> : null}
       </div>
-      <div className="grid grid-cols-4 gap-[8px]">
+      <div className="grid grid-cols-2 gap-[8px] sm:grid-cols-4">
         {verification.gates.map((gate) => (
           <div
             key={gate.id}

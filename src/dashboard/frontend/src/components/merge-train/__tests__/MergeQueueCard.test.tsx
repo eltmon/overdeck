@@ -6,7 +6,7 @@
  * components/merge-train/__tests__/MergeTrainView.test.tsx, so what remains to
  * prove here is the wrapper contract — the card reads the aggregate endpoints
  * (never the legacy per-repo pair), renders the shared view, labels itself from
- * the same data, and populates with NO flywheel run active.
+ * the same data, and populates regardless of the `active` polling flag.
  */
 import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -74,7 +74,7 @@ const POPULATED: FetchResponses = {
   '/api/merge-train/generations': [
     { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [READY_GEN] },
   ],
-  '/api/flywheel/merge-backend': { available: true, mode: 'gh-cli', detail: 'ok' },
+  '/api/merge-train/merge-backend': { available: true, mode: 'gh-cli', detail: 'ok' },
 };
 
 function renderCard(props: { active?: boolean } = {}) {
@@ -115,11 +115,10 @@ describe('MergeQueueCard as a merge-train viewer (PAN-1696)', () => {
     const urls = fetchMock.mock.calls.map((c) => String(c[0]));
     expect(urls.some((u) => u.includes('/api/merge-train/queues'))).toBe(true);
     expect(urls.some((u) => u.includes('/api/merge-train/generations'))).toBe(true);
-    expect(urls.some((u) => u.includes('/api/flywheel/uat-generations'))).toBe(false);
-    expect(urls.some((u) => u.includes('/api/flywheel/merge-queue'))).toBe(false);
+    expect(urls.filter((u) => u.includes('/api/flywheel/'))).toEqual([]);
   });
 
-  it('populates with no flywheel run active — even with active=false (ac2)', async () => {
+  it('populates even with active=false (ac2)', async () => {
     // active=false only stops polling; the reads still happen, which is exactly
     // what the old run-gated card could not do.
     mockFetch(POPULATED);
@@ -154,7 +153,7 @@ describe('MergeQueueCard as a merge-train viewer (PAN-1696)', () => {
   });
 
   it('surfaces the merge-backend warning through the shared view', async () => {
-    mockFetch({ ...POPULATED, '/api/flywheel/merge-backend': { available: false, mode: 'none', detail: 'no auth' } });
+    mockFetch({ ...POPULATED, '/api/merge-train/merge-backend': { available: false, mode: 'none', detail: 'no auth' } });
     renderCard();
     expect(await screen.findByText('Merge backend unavailable')).toBeTruthy();
   });

@@ -23,7 +23,7 @@ export function StartAgentCta({ issueId, density, surface = 'issue-view' }: { is
   useEffect(() => { if (defaultModel) setModel(defaultModel); }, [defaultModel]);
   const start = actions.all.find((view) => view.action.key === 'startAgent');
   const resume = actions.all.find((view) => view.action.key === 'resumeSession');
-  const gate = actions.agent?.troubled ? 'troubled' : actions.agent?.paused ? 'paused' : null;
+  const gate = actions.agent?.paused ? 'paused' as const : null;
   const clearAndStart = Boolean(gate && start?.enabled);
   const mode = clearAndStart ? 'start' : resume?.enabled ? 'resume' : start?.enabled ? 'start' : null;
   const mutation = useMutation({
@@ -79,9 +79,8 @@ export function StartAgentCta({ issueId, density, surface = 'issue-view' }: { is
     : 'rounded-[var(--radius-sm)] bg-primary px-2.5 py-1.5 text-[12px] font-medium text-primary-foreground disabled:opacity-50';
   const handleClick = () => {
     const agentId = actions.agent?.id;
-    // A gated agent (paused / troubled) gets the recovery dialog — the same
-    // Unpause & start / Clear gate & start surface every other entry point
-    // uses — instead of a cramped inline confirm.
+    // A paused agent gets the recovery dialog — the same Unpause & start
+    // surface every other entry point uses — instead of an inline confirm.
     if (gate && start?.enabled && agentId) {
       openRecovery({ kind: gate, agentId, issueId });
       return;

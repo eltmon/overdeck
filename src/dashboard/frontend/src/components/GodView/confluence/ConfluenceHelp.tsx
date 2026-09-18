@@ -51,7 +51,7 @@ export function ConfluenceHelp({ eventsPerMin, onClose }: ConfluenceHelpProps) {
         <div className="h-grid">
           <div className="h-card">
             <h4 style={{ color: 'var(--gv-blue)' }}>The River</h4>
-            <p>The pipeline is a luminous canal flowing <b>left → right</b> through stage columns: PLAN · WORK · REVIEW · TEST · VERIFY · MERGE. Scrolling chevrons show flow direction; the number under each stage is its live orb count (MERGE shows its queue depth). A stage-gradient <b>waveform ribbon</b> rides the river — its amplitude is total system event energy. Stage transitions flash a blue <b>gate ring</b> at the column boundary.</p>
+            <p>The pipeline is a luminous canal flowing <b>left → right</b> through stage columns: PLAN · WORK · REVIEW · TEST · MERGE. Scrolling chevrons show flow direction; the number under each stage is its live orb count (MERGE shows its queue depth). A stage-gradient <b>waveform ribbon</b> rides the river — its amplitude is total system event energy. Stage transitions flash a blue <b>gate ring</b> at the column boundary.</p>
           </div>
           <div className="h-card">
             <h4 style={{ color: 'var(--gv-blue)' }}>Issue Orbs &amp; Model Glyphs</h4>

@@ -7,7 +7,8 @@
  */
 
 import { useQuery } from '@tanstack/react-query'
-import { useActivityQuery, useReviewStatusQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries'
+import { useActivityQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries'
+import { useDerivedIssueState } from '../../../lib/store'
 
 interface FeedLine {
   at: string
@@ -40,7 +41,7 @@ const ROLE_VERB: Record<string, { doing: string; done: string }> = {
 
 export function HappenedFeed({ issueId }: { issueId: string }) {
   const activity = useActivityQuery(issueId)
-  const review = useReviewStatusQuery(issueId)
+  const issue = useDerivedIssueState(issueId)
   const plan = useQuery<{ plan?: { items?: Array<{ status: string }> } }>({
     queryKey: ['plan', issueId],
     queryFn: async () => {
@@ -96,11 +97,11 @@ export function HappenedFeed({ issueId }: { issueId: string }) {
       })
     }
   }
-  const rs = review.data
-  if (rs?.reviewStatus === 'passed') lines.push({ at: '', atMs: Number.MAX_SAFE_INTEGER - 2, text: 'The reviewer approved the work ✓', tone: 'ok' })
-  if (rs?.reviewStatus === 'blocked' || rs?.reviewStatus === 'failed') lines.push({ at: '', atMs: Number.MAX_SAFE_INTEGER - 2, text: 'The reviewer found problems — the crew is on it', tone: 'bad' })
-  if (rs?.testStatus === 'passed') lines.push({ at: '', atMs: Number.MAX_SAFE_INTEGER - 1, text: 'All tests passed ✓', tone: 'ok' })
-  if (rs?.mergeStatus === 'merged') lines.push({ at: '', atMs: Number.MAX_SAFE_INTEGER, text: 'Shipped — the change is on main ✓', tone: 'ok' })
+  if (issue?.pr?.reviewState === 'APPROVED') lines.push({ at: '', atMs: Number.MAX_SAFE_INTEGER - 2, text: 'The reviewer approved the work ✓', tone: 'ok' })
+  if (issue?.state === 'changes-requested') lines.push({ at: '', atMs: Number.MAX_SAFE_INTEGER - 2, text: 'The reviewer asked for changes — the crew is on it', tone: 'bad' })
+  if (issue?.pr?.checks === 'green') lines.push({ at: '', atMs: Number.MAX_SAFE_INTEGER - 1, text: 'All checks passed ✓', tone: 'ok' })
+  if (issue?.pr?.checks === 'red') lines.push({ at: '', atMs: Number.MAX_SAFE_INTEGER - 1, text: 'Checks are failing on the PR', tone: 'bad' })
+  if (issue?.state === 'merged') lines.push({ at: '', atMs: Number.MAX_SAFE_INTEGER, text: 'Shipped — the change is on main ✓', tone: 'ok' })
 
   const recent = lines
     .filter((line) => Number.isFinite(line.atMs))

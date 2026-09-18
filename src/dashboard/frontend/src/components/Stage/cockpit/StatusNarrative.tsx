@@ -7,10 +7,10 @@
 import { useQuery } from '@tanstack/react-query'
 import {
   useIssueCheckRunsQuery,
-  useReviewStatusQuery,
   type IssueCheckRunsResponse,
-  type ReviewStatusData,
 } from '../../CommandDeck/ZoneCOverviewTabs/queries'
+import { useDerivedIssueState } from '../../../lib/store'
+import type { DerivedIssueState } from '../../../types'
 
 interface PlanCounts { done: number; total: number }
 
@@ -23,12 +23,12 @@ export interface NarrativeModel {
 /** Pure narrative derivation — exported for tests. */
 export function deriveNarrative(args: {
   hasPlan: boolean
-  rs: ReviewStatusData | undefined
+  issue: DerivedIssueState | undefined
   ci: IssueCheckRunsResponse | undefined
   plan: PlanCounts | undefined
   workRunning: boolean
 }): NarrativeModel {
-  const { hasPlan, rs, ci, plan, workRunning } = args
+  const { hasPlan, issue, ci, plan, workRunning } = args
   const summary = ci?.summary
   const ciFailing = Boolean(summary && (summary.failed || summary.cancelled))
   const progress = plan && plan.total > 0 ? `${plan.done} of ${plan.total} tasks done` : undefined
@@ -37,28 +37,22 @@ export function deriveNarrative(args: {
   let next: string
   let needsYou = false
 
-  if (rs?.mergeStatus === 'merged') {
+  if (issue?.state === 'merged') {
     headline = 'Shipped — this change is on main'
     next = 'Wrapping up: closing the issue out.'
-  } else if (rs?.readyForMerge) {
+  } else if (issue?.state === 'ready') {
     headline = 'Ready to ship — everything passed'
     next = 'Waiting on you: press Merge when you want it on main.'
     needsYou = true
-  } else if (rs?.reviewStatus === 'blocked' || rs?.reviewStatus === 'failed') {
-    headline = 'The reviewer found problems'
-    next = 'The crew is fixing them, then review runs again.'
-  } else if (rs?.testStatus === 'failed' || rs?.testStatus === 'dispatch_failed') {
-    headline = 'Tests failed'
-    next = 'The crew is fixing the failures, then tests run again.'
+  } else if (issue?.state === 'changes-requested') {
+    headline = 'The reviewer asked for changes'
+    next = 'The crew is addressing them, then review runs again.'
   } else if (ciFailing) {
     headline = `Automated checks are failing (${summary!.passed}/${summary!.total} passing)`
     next = 'The crew fixes the checks before anything ships.'
-  } else if (rs?.reviewStatus === 'reviewing') {
+  } else if (issue?.state === 'in-review') {
     headline = 'The reviewer is checking the finished work'
-    next = 'If it passes, testing is next.'
-  } else if (rs?.testStatus === 'testing') {
-    headline = 'Testing whether it all works'
-    next = 'If tests pass, it lines up to ship.'
+    next = 'If it passes, it lines up to ship.'
   } else if (workRunning || (plan && plan.total > 0 && plan.done < plan.total)) {
     headline = progress ? `The crew is writing code — ${progress}` : 'The crew is writing code'
     next = 'Up next: the reviewer checks the finished work.'
@@ -79,7 +73,7 @@ export function StatusNarrative({ issueId, workRunning, hasPlan }: {
   workRunning: boolean
   hasPlan: boolean
 }) {
-  const review = useReviewStatusQuery(issueId)
+  const issue = useDerivedIssueState(issueId)
   const ci = useIssueCheckRunsQuery(issueId)
   const plan = useQuery<{ plan?: { items?: Array<{ status: string }> } }>({
     queryKey: ['plan', issueId],
@@ -95,7 +89,7 @@ export function StatusNarrative({ issueId, workRunning, hasPlan }: {
     ? { done: items.filter((item) => item.status === 'completed').length, total: items.length }
     : undefined
 
-  const model = deriveNarrative({ hasPlan, rs: review.data, ci: ci.data, plan: counts, workRunning })
+  const model = deriveNarrative({ hasPlan, issue, ci: ci.data, plan: counts, workRunning })
 
   return (
     <span

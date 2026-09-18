@@ -71,7 +71,6 @@ export interface ProjectFeature {
   completedCount?: number;
   inProgressCount?: number;
   rawTrackerState?: string;
-  readyForMerge?: boolean;
   pipelineBucket?: PipelineBucket;
   specOnlyPlanned?: boolean;
   sessions?: readonly SessionNode[];

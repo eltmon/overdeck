@@ -2,11 +2,9 @@
  * Multi-project merge-train view (PAN-1696 fe-merge-train-view).
  *
  * This is the shared body of the merge-train surface. It replaces the
- * single-project card that read `/api/flywheel/uat-generations` and
- * `/api/flywheel/merge-queue`: those answered for the dashboard's own repo
- * only, and only while a flywheel run was active. This view reads the
- * aggregate `/api/merge-train/*` namespace instead, so a ready feature in ANY
- * tracked project shows up whether or not a flywheel run exists.
+ * single-project card that answered for the dashboard's own repo only. This
+ * view reads the aggregate `/api/merge-train/*` namespace instead, so a ready
+ * feature in ANY tracked project shows up.
  *
  * Layout per project section — unchanged in substance from the old card:
  * plain-language intro · batches newest-first (ready / assembling /
@@ -207,11 +205,10 @@ function writeStoredFilter(keys: string[] | null): void {
 }
 
 /**
- * The view's data reads, shared so a host can label itself (e.g. the Flywheel
- * rail card's count) from the same payloads the sections render. React Query
- * dedupes by key, so calling this alongside <MergeTrainView> costs no extra
- * requests. `active` only controls polling — the reads happen either way, which
- * is what lets the Flywheel rail render with no run in progress.
+ * The view's data reads, shared so a host can label itself (e.g. a rail card's
+ * count) from the same payloads the sections render. React Query dedupes by
+ * key, so calling this alongside <MergeTrainView> costs no extra requests.
+ * `active` only controls polling — the reads happen either way.
  */
 export function useMergeTrainData(active: boolean) {
   const queuesQuery = useQuery({
@@ -233,15 +230,15 @@ export function useMergeTrainData(active: boolean) {
 }
 
 /**
- * Capability probe, not flywheel run state: whether a GitHub App or gh CLI can
- * merge at all. Deliberately NOT part of useMergeTrainData — only the full view
- * renders the warning, so a host that just wants counts (the Flywheel rail card,
- * the cockpit summary) should not pay for this request.
+ * Capability probe: whether a GitHub App or gh CLI can merge at all.
+ * Deliberately NOT part of useMergeTrainData — only the full view renders the
+ * warning, so a host that just wants counts (the rail card, the cockpit
+ * summary) should not pay for this request.
  */
 export function useMergeBackendStatus(active: boolean): { unavailable: boolean } {
   const query = useQuery({
     queryKey: ['merge-train-merge-backend'],
-    queryFn: () => fetchJson<MergeBackendStatus>('/api/flywheel/merge-backend'),
+    queryFn: () => fetchJson<MergeBackendStatus>('/api/merge-train/merge-backend'),
     refetchInterval: active ? 15000 : false,
   });
   return { unavailable: query.data?.available === false };

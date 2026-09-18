@@ -1,10 +1,8 @@
 /**
- * RailCard — the collapsible card primitive for the Flywheel control rail (PAN-1694 v3).
+ * RailCard — the collapsible card primitive for a control rail (PAN-1694 v3).
  *
- * Every rail section (Merge queue, Merge policy, Pending auto-merges, Run status)
- * is one of these: an uppercase header with icon + count + chevron, and a body
- * that collapses. Matches `.card`/`.chead`/`.cbody` in the approved v3 mockup
- * (docs/design/flywheel-redesign-mockup-v3.html).
+ * A rail section is one of these: an uppercase header with icon + count +
+ * chevron, and a body that collapses.
  */
 import { useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';

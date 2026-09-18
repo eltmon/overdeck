@@ -4,23 +4,12 @@ import type { NeedsYouResolvedAction } from '../../issue-view/NeedsYouSlot';
 import type { OperatorNeedsYou } from '../../issue-view/types';
 
 export function useCockpitNeedsYouActions(
-  issueId: string,
   treeSessions: readonly SessionNode[],
   onSelectSession: (session: SessionNode) => void,
 ) {
   const actions = useSimpleActions();
 
   return (item: OperatorNeedsYou): NeedsYouResolvedAction | undefined => {
-    if (item.kind === 'stuck') {
-      return {
-        label: 'Clear stuck gate',
-        description: 'Clear the review-convergence gate so pipeline recovery can continue.',
-        enabled: true,
-        isPending: actions.unstick.isPending,
-        invoke: () => actions.unstick.mutate({ issueId }),
-      };
-    }
-
     const sessionId = item.sessionId;
     if (!sessionId) return undefined;
 
@@ -44,19 +33,10 @@ export function useCockpitNeedsYouActions(
         invoke: () => actions.unpause.mutate({ agentId: sessionId }),
       };
     }
-    if (item.kind === 'troubled') {
-      return {
-        label: 'Clear troubled gate',
-        description: 'Clear this agent’s troubled gate after fixing the underlying failure.',
-        enabled: true,
-        isPending: actions.untroubled.isPending,
-        invoke: () => actions.untroubled.mutate({ agentId: sessionId }),
-      };
-    }
-    if (item.kind === 'stopped') {
+    if (item.kind === 'stopped' || item.kind === 'stuck') {
       return {
         label: 'Recover agent',
-        description: 'Recover this stopped agent session.',
+        description: 'Recover this agent session.',
         enabled: true,
         isPending: actions.recover.isPending,
         invoke: () => actions.recover.mutate({ agentId: sessionId }),

@@ -20,11 +20,6 @@ let linkedFrontendNodeModules = false;
 const linkedFrontendPackages: string[] = [];
 const projectRoot = process.cwd();
 const frontendRoot = join(projectRoot, 'src/dashboard/frontend');
-const bootReconciliationSourceFiles = [
-  join(frontendRoot, 'src/components/BootReconciliationModal.tsx'),
-  join(frontendRoot, 'src/components/GraceCountdown.tsx'),
-];
-const forbiddenBootReconciliationColorClass = /\b(?:bg|text|border)-(?:neutral|orange|emerald|gray|zinc|sky|red)-|\btext-(?:white|black)\b/g;
 const packageResolutionRoots = [
   frontendRoot,
   projectRoot,
@@ -152,15 +147,11 @@ const feature = {
   hasState: true,
   isShadow: false,
   cost: 1.25,
-  readyForMerge: false,
   sessions: [{
     sessionId: 'agent-pan-1148',
     type: 'work',
     role: 'work',
     presence: 'active',
-    troubled: true,
-    troubledReason: 'Review handoff failed',
-    troubledAt: now,
     consecutiveFailures: 0,
     queuedMailCount: 2,
   }],
@@ -183,7 +174,8 @@ const snapshot = {
   agents: [agent],
   specialists: [],
   agentRuntimeById: {},
-  reviewStatuses: [],
+  derivedIssueStates: [{ issueId: 'PAN-1148', state: 'working' }],
+  backendPanes: [],
   resources: null,
   issues: [issue],
   channelPermissionRequests: [],
@@ -211,7 +203,6 @@ async function newContext(): Promise<BrowserContext> {
       if (path === '/api/version') return json({ version: 'test', supervisorUrl: null });
       if (path === '/api/tracker-status') return json({ primary: 'github', configured: [] });
       if (path === '/api/confirmations') return json([]);
-      if (path === '/api/boot-reconciliation') return json({ decision: null, perAgent: {}, decidedAt: null, bootId: null, graceDeadline: null, set: [] });
       if (path === '/api/cloister/status') return json({
         running: true,
         lastCheck: new Date().toISOString(),
@@ -283,12 +274,6 @@ async function newContext(): Promise<BrowserContext> {
         topSpenders: { agents: [{ agentId: 'agent-pan-1148', cost: 1.25 }], issues: [{ issueId: 'PAN-1148', cost: 1.25 }] },
       });
       if (path === '/api/issues/resource-allocated') return json([featureFixture]);
-      if (path === '/api/agents/agent-pan-1148/untroubled') {
-        const win = window as typeof window & { __troubledClearRequests?: Array<{ path: string; method: string }> };
-        win.__troubledClearRequests = win.__troubledClearRequests ?? [];
-        win.__troubledClearRequests.push({ path, method });
-        return json({ ok: true });
-      }
       if (path === '/api/backlog/issue-state') return json({
         issueId: new URL(url, window.location.origin).searchParams.get('issueId') ?? 'PAN-1148',
         state: {
@@ -313,8 +298,6 @@ async function newContext(): Promise<BrowserContext> {
       if (path === '/api/conversations/pending-input') return json([]);
       if (path === '/api/git-activity') return json([]);
       if (path === '/api/conversations/cost' || path === '/api/conversations/cost/by-workspace') return json({ totalCost: 0, entries: [] });
-      if (path === '/api/flywheel/current') return json(null);
-      if (path === '/api/flywheel/runs') return json([]);
       return json(search ? { search } : {});
     };
   }, { snapshotFixture: snapshot, featureFixture: feature });
@@ -416,17 +399,6 @@ afterAll(async () => {
 });
 
 describe('styleguide rendered surface conformance', () => {
-  it('keeps boot reconciliation countdown surfaces on semantic color tokens', async () => {
-    const violations: string[] = [];
-    for (const file of bootReconciliationSourceFiles) {
-      const source = await readFile(file, 'utf8');
-      const matches = source.match(forbiddenBootReconciliationColorClass) ?? [];
-      violations.push(...matches.map((match) => `${file}: ${match}`));
-    }
-
-    expect(violations).toEqual([]);
-  });
-
   it('renders shared primitives on Pipeline, Board, Command Deck, and Agents routes', async () => {
     const pipeline = await openRoute('/pipeline');
     await expect.poll(() => pipeline.page.locator('[data-component="top-bar"]').count(), renderPoll).toBeGreaterThan(0);
@@ -506,51 +478,6 @@ describe('styleguide rendered surface conformance', () => {
       return rect.top >= parentRect.top && rect.bottom <= parentRect.bottom;
     });
     expect(isInViewport).toBe(true);
-
-    await context.close();
-  }, 45_000);
-
-  it('renders and clears a troubled Command Deck badge for the exact session', async () => {
-    const { context, page } = await openRoute('/command-deck');
-    await page.getByText('Overdeck', { exact: true }).nth(1).click();
-
-    const featureRow = page.locator('[data-component="feature-item"][data-issue-id="PAN-1148"]');
-    await expect.poll(() => featureRow.count(), renderPoll).toBe(1);
-    const badge = featureRow.locator('[data-testid="feature-troubled"]');
-    await expect.poll(() => badge.count(), renderPoll).toBe(1);
-    await expect.poll(() => badge.innerText(), renderPoll).toContain('Troubled · 2 queued');
-
-    const title = await badge.getAttribute('title');
-    expect(title).toContain('Session: agent-pan-1148.');
-    expect(title).toContain('Reason: Review handoff failed.');
-    expect(title).toContain('Failures: 0.');
-    expect(title).toContain('Likely spurious: troubled with 0 failures.');
-
-    const overlapFree = await badge.evaluate((node) => {
-      const badgeRect = node.getBoundingClientRect();
-      const row = node.closest('[data-component="feature-item"]');
-      const rowRect = row?.getBoundingClientRect();
-      if (!rowRect) return false;
-      return (
-        badgeRect.width > 0 &&
-        badgeRect.height > 0 &&
-        badgeRect.left >= rowRect.left &&
-        badgeRect.right <= rowRect.right &&
-        badgeRect.top >= rowRect.top &&
-        badgeRect.bottom <= rowRect.bottom
-      );
-    });
-    expect(overlapFree).toBe(true);
-
-    if (process.env.PAN_2257_CAPTURE_TROUBLED_BADGE === '1') {
-      await featureRow.screenshot({ path: '/tmp/pan-2257-troubled-badge.png' });
-    }
-
-    await badge.click();
-    await expect.poll(() => page.evaluate(() => {
-      const win = window as typeof window & { __troubledClearRequests?: Array<{ path: string; method: string }> };
-      return win.__troubledClearRequests ?? [];
-    }), renderPoll).toEqual([{ path: '/api/agents/agent-pan-1148/untroubled', method: 'POST' }]);
 
     await context.close();
   }, 45_000);
