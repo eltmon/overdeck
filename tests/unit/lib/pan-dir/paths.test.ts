@@ -55,6 +55,37 @@ describe('resolvePlanHome (PAN-3917)', () => {
   });
 });
 
+describe('resolvePlanHome is idempotent over depth', () => {
+  const polyrepo = () => ({
+    name: 'Mind Your Now',
+    path: '/repos/myn',
+    pan_records: { repo: 'infra' },
+    workspace: { repos: [{ name: 'infra', path: 'infra' }] },
+  } as ProjectConfig);
+
+  it('does not nest the plan-home sub-repo when handed the plan home itself', () => {
+    findProject = polyrepo;
+    expect(resolvePlanHome('/repos/myn/infra')).toBe('/repos/myn/infra');
+    expect(resolvePlanHome('/repos/myn/infra/src/api')).toBe('/repos/myn/infra');
+  });
+
+  it('resolves a nested worktree path to that worktree, not deeper', () => {
+    findProject = polyrepo;
+    expect(resolvePlanHome('/repos/myn/workspaces/feature-min-1/infra/src')).toBe(
+      '/repos/myn/workspaces/feature-min-1/infra',
+    );
+  });
+
+  it('resolves a subdirectory of a monorepo checkout to the checkout root', () => {
+    findProject = () => ({ name: 'Overdeck', path: '/repos/overdeck' });
+    // `pan task done` run from a slot cwd must write the same .pan the root does.
+    expect(resolvePlanHome('/repos/overdeck/src/lib')).toBe('/repos/overdeck');
+    expect(resolvePlanHome('/repos/overdeck/workspaces/feature-pan-1/src')).toBe(
+      '/repos/overdeck/workspaces/feature-pan-1',
+    );
+  });
+});
+
 describe('getProjectPanPaths (PAN-3917)', () => {
   it('returns <projectRoot>/.pan unconditionally', () => {
     const paths = getProjectPanPaths('/repos/overdeck');

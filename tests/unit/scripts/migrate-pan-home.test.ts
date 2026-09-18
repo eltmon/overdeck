@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   MIGRATION_COMMIT_SUBJECT,
+  destinationName,
   issueIdForArtifact,
   migratePanHome,
   readOpenIssuesFile,
@@ -40,8 +41,9 @@ beforeEach(() => {
   write(stateRoot, 'drafts/pan-200.md', '# closed draft\n');
   write(stateRoot, 'specs/2026-01-01-PAN-100-open.xbrief.json', '{"open":true}\n');
   write(stateRoot, 'specs/2026-01-01-PAN-200-closed.xbrief.json', '{"open":false}\n');
-  write(stateRoot, 'continues/PAN-100.xbrief.json', '{"issueId":"PAN-100"}\n');
-  write(stateRoot, 'continues/PAN-200.xbrief.json', '{"issueId":"PAN-200"}\n');
+  // State-worktree continues carry the legacy lowercase `.vbrief.json` name.
+  write(stateRoot, 'continues/pan-100.vbrief.json', '{"issueId":"PAN-100"}\n');
+  write(stateRoot, 'continues/pan-200.vbrief.json', '{"issueId":"PAN-200"}\n');
   write(stateRoot, 'orders/index.json', '[]\n');
   write(stateRoot, 'orders/2026-01-01-wave.json', '{"id":"2026-01-01-wave"}\n');
   write(stateRoot, 'notes/retro.md', 'notes\n');
@@ -60,7 +62,13 @@ describe('issueIdForArtifact', () => {
     expect(issueIdForArtifact('drafts', 'pan-100.md')).toBe('PAN-100');
     expect(issueIdForArtifact('specs', '2026-01-01-PAN-100-open.xbrief.json')).toBe('PAN-100');
     expect(issueIdForArtifact('continues', 'PAN-100.xbrief.json')).toBe('PAN-100');
+    expect(issueIdForArtifact('continues', 'pan-100.vbrief.json')).toBe('PAN-100');
     expect(issueIdForArtifact('drafts', 'README.md')).toBeNull();
+  });
+
+  it('renames a legacy continue file to the name the continue door reads', () => {
+    expect(destinationName('continues', 'pan-100.vbrief.json', 'PAN-100')).toBe('PAN-100.xbrief.json');
+    expect(destinationName('drafts', 'pan-100.md', 'PAN-100')).toBe('pan-100.md');
   });
 });
 
@@ -71,11 +79,14 @@ describe('migratePanHome', () => {
     const panDir = join(planHome, '.pan');
     expect(existsSync(join(panDir, 'drafts/pan-100.md'))).toBe(true);
     expect(existsSync(join(panDir, 'specs/2026-01-01-PAN-100-open.xbrief.json'))).toBe(true);
+    // Renamed to the shape continueStatePath reads.
     expect(existsSync(join(panDir, 'continues/PAN-100.xbrief.json'))).toBe(true);
+    expect(existsSync(join(panDir, 'continues/pan-100.vbrief.json'))).toBe(false);
 
     expect(existsSync(join(panDir, 'drafts/pan-200.md'))).toBe(false);
     expect(existsSync(join(panDir, 'specs/2026-01-01-PAN-200-closed.xbrief.json'))).toBe(false);
     expect(existsSync(join(panDir, 'continues/PAN-200.xbrief.json'))).toBe(false);
+    expect(existsSync(join(panDir, 'continues/pan-200.vbrief.json'))).toBe(false);
 
     expect(result.skippedClosed).toBe(3);
     expect(result.remaining).toBe(0);

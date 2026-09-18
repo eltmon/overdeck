@@ -29,6 +29,7 @@ import { dirname, join, relative } from 'node:path';
 import { promisify } from 'node:util';
 import { resolvePlanHome } from '../src/lib/pan-dir/paths.js';
 import { getProjectSync } from '../src/lib/projects.js';
+import { CONTINUE_FILENAME_SUFFIX } from '../src/lib/xbrief/continue-state.js';
 import { parseXBriefFilename } from '../src/lib/xbrief/lifecycle.js';
 
 const execFileAsync = promisify(execFile);
@@ -77,6 +78,17 @@ export function issueIdForArtifact(dir: string, filename: string): string | null
     return match ? match[1].toUpperCase() : null;
   }
   return null;
+}
+
+/**
+ * The name an artifact takes in `.pan/`. State-worktree continues are named
+ * `pan-1014.vbrief.json`; `continueStatePath` reads `PAN-1014.xbrief.json`, so
+ * they are renamed on copy or the migrated file is invisible. Drafts and specs
+ * keep their names (their resolvers already accept both cases and suffixes).
+ */
+export function destinationName(dir: string, rel: string, issueId: string): string {
+  if (dir !== 'continues') return rel;
+  return `${issueId.toUpperCase()}${CONTINUE_FILENAME_SUFFIX}`;
 }
 
 function listFilesRecursive(root: string): string[] {
@@ -134,7 +146,7 @@ export async function migratePanHome(options: MigratePanHomeOptions): Promise<Mi
         skippedClosed += 1;
         continue;
       }
-      consider(join(stateRoot, dir, rel), join(dir, rel));
+      consider(join(stateRoot, dir, rel), join(dir, destinationName(dir, rel, issueId)));
     }
   }
 
