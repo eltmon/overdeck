@@ -26,7 +26,6 @@ const mocks = vi.hoisted(() => ({
   fsSymlink: vi.fn(),
   readDevSupervisorMarker: vi.fn(),
   devSupervisorRefusalLines: vi.fn(),
-  agentRestartBlockReason: vi.fn(),
   readActiveDashboardBundle: vi.fn(),
   writeActiveDashboardBundle: vi.fn(),
   fsMkdir: vi.fn(),
@@ -49,10 +48,6 @@ vi.mock('../../../lib/dev-supervisor.js', () => ({
 vi.mock('../../../lib/restart-lock.js', () => ({
   acquireRestartLock: mocks.acquireRestartLock,
   readRestartLockHolder: mocks.readRestartLockHolder,
-}));
-
-vi.mock('../../../lib/deploy/agent-restart-gate.js', () => ({
-  agentRestartBlockReason: mocks.agentRestartBlockReason,
 }));
 
 vi.mock('../../../lib/channels/pty-supervisor-locate.js', () => ({
@@ -226,7 +221,6 @@ describe('reloadCommand', () => {
     mocks.resolvePrimaryDashboardIdentity.mockReturnValue({ repoRoot: '/repo', mode: 'primary' });
     mocks.readDevSupervisorMarker.mockReturnValue(null);
     mocks.devSupervisorRefusalLines.mockReturnValue([]);
-    mocks.agentRestartBlockReason.mockResolvedValue(null);
     mocks.readActiveDashboardBundle.mockReturnValue(null);
     mocks.writeActiveDashboardBundle.mockResolvedValue(undefined);
     mocks.supervisorDeploymentFailure.mockReturnValue(null);
@@ -323,40 +317,11 @@ describe('reloadCommand', () => {
     expect(process.exitCode).toBe(2);
   });
 
-  it('refuses a blocked agent reload before acquiring the restart lock or building', async () => {
-    process.env.OVERDECK_AGENT_ID = 'agent-pan-2772';
-    mocks.agentRestartBlockReason.mockResolvedValue('Restart refused by active deployment gate.');
-
-    await reloadCommand({});
-
-    expect(mocks.agentRestartBlockReason).toHaveBeenCalledWith({
-      initiator: 'agent-pan-2772',
-      force: false,
-    });
-    expect(console.error).toHaveBeenCalledWith('Restart refused by active deployment gate.');
-    expect(process.exitCode).toBe(1);
-    expect(mocks.acquireRestartLock).not.toHaveBeenCalled();
-    expect(mocks.spawn).not.toHaveBeenCalled();
-    expect(mocks.restartDashboard).not.toHaveBeenCalled();
-  });
-
-  it('allows --force to proceed through the agent reload gate', async () => {
+  it('reloads for an agent initiator without consulting a deploy gate', async () => {
     process.env.OVERDECK_AGENT_ID = 'agent-pan-2772';
 
-    await reloadCommand({ force: true, skipBuild: true });
-
-    expect(mocks.agentRestartBlockReason).toHaveBeenCalledWith({
-      initiator: 'agent-pan-2772',
-      force: true,
-    });
-    expect(mocks.acquireRestartLock).toHaveBeenCalledWith('pan reload');
-    expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
-  });
-
-  it('skips the agent reload gate when no initiator is present', async () => {
     await reloadCommand({ skipBuild: true });
 
-    expect(mocks.agentRestartBlockReason).not.toHaveBeenCalled();
     expect(mocks.acquireRestartLock).toHaveBeenCalledWith('pan reload');
     expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
   });

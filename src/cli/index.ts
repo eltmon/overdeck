@@ -528,7 +528,7 @@ program
   .option('--force', 'Clear paused and pending-operator-decision gates and start anyway')
   .option('--fresh', 'Drop the saved Claude session (non-destructive) and start a new one — replaces a live session too, so it recovers an inert agent without a separate pan kill')
   .option('--host', 'Bypass workspace docker stack-health gate and spawn on the host')
-  .option('--yes', 'Confirm --host in non-interactive contexts').option('--off-book', 'Allow one work-agent dispatch outside the active order book and log the override')
+  .option('--yes', 'Confirm --host in non-interactive contexts')
   .action(startCommand);
 
 program

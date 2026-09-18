@@ -165,6 +165,9 @@ export async function swarmMergeCommand(
   const doc = Object.keys(itemStatuses).length > 0
     ? applyItemStatuses(loaded.doc, itemStatuses)
     : loaded.doc;
+  // NOTE (PAN-3917 W9): `statusOverrides` is slot-reconcile.ts's own option name; that
+  // module is on the delete list (src/lib/agents/slot-reconcile.ts) and the key goes
+  // with it. The values here come from .pan/continues/, not from a record.
   const reconciled = await deps.reconcileSlotState(issue, workspacePath, doc, { statusOverrides: itemStatuses });
   const slot = reconciled.inFlight.find(candidate => candidate.slotIndex === slotIndex);
   if (!slot) {
