@@ -33,7 +33,7 @@ import { getProjectConfigFromWorkspacePath, resolveProjectForIssue } from '../pa
 import { applyStatusOverrides } from '../xbrief/io.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../xbrief/swarm-readiness.js';
 import type { XBriefDocument, XBriefItem } from '../xbrief/types.js';
-import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
+import { type ReviewStatus } from '../review-status.js';
 import { isDeaconGloballyPausedSync } from '../overdeck/control-settings.js';
 import { resolveAutomaticSwarmPolicy, resolveSwarmMaxSlots } from '../swarm-policy.js';
 import type { SwarmInferCompletionMode } from './config.js';
@@ -66,6 +66,7 @@ import { applySupersededSlotHighWater, archiveFailedSwarmSlot, requeueFailedSwar
 import { archiveBlockedSwarmSlot, defaultIsSlotBranchPushed, prepareReleasedSwarmSlot, releaseBlockedSlots } from './swarm-blocked-slot.js';
 import { ensureSwarmForeman } from './swarm-foreman.js';
 import { maintainSwarmForeman, resetForemanRespawnFailuresForTests, type SwarmForemanLivenessDeps } from './swarm-foreman-liveness.js';
+import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 
 export { gcOrphanedSlots } from './deacon-swarm-orphan-gc.js';
 export { gcMergedSlots } from './deacon-swarm-gc.js';
@@ -168,7 +169,7 @@ function defaultGetMaxSlotIndex(): number {
 
 function defaultGetIssueHold(issueId: string): Pick<ReviewStatus, 'stuck' | 'deaconIgnored' | 'stuckReason'> | null {
   try {
-    return getReviewStatusSync(issueId);
+    return getPipelineStatus(issueId);
   } catch {
     return null;
   }

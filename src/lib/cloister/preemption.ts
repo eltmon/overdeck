@@ -34,7 +34,7 @@ import {
   stopAgent,
   type AgentState,
 } from '../agents.js';
-import { getReviewStatusSync } from '../review-status.js';
+import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 import { listSessions } from '../tmux.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
@@ -111,7 +111,7 @@ export function selectYieldVictim(
 }
 
 function reviewBlockedFor(issueId: string): boolean {
-  const status = getReviewStatusSync(issueId)?.reviewStatus;
+  const status = getPipelineStatus(issueId)?.reviewStatus;
   // PAN-2507 (FR-2a): the enum has no `in_progress`; the faithful "waiting on
   // its own review" states are `pending` (queued) and `reviewing` (running).
   return status === 'pending' || status === 'reviewing';

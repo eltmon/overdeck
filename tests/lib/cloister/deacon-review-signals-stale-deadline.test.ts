@@ -78,6 +78,9 @@ vi.mock('../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: vi.fn(() => null),
   setReviewStatusSync: vi.fn(),
   markWorkspaceStuck: (...args: Parameters<typeof mockMarkWorkspaceStuck>) => mockMarkWorkspaceStuck(...args),
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../src/lib/cloister/review-verdict-feedback.js', () => ({

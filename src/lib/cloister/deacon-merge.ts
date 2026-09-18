@@ -9,7 +9,7 @@ import { AGENTS_DIR } from '../paths.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { getAgentRuntimeStateSync, getAgentStateSync, listRunningAgentsSync, type AgentState } from '../agents.js';
 import { withConcurrencyLimit } from '../concurrency.js';
-import { loadReviewStatuses, setReviewStatusSync, reviewGatesPassedSync } from '../review-status.js';
+import { setReviewStatusSync, reviewGatesPassedSync } from '../review-status.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { getMergeSetSync } from '../merge-set.js';
@@ -18,6 +18,7 @@ import { isIdle } from '../agents/liveness.js';
 import { loadCloisterConfig } from './config.js';
 import { getAutoCloseOutCanonicalState, sweepAutoCloseOutCache } from './deacon-canonical-state.js';
 import { isStuckMergingState, observeGitHubBranchMerge } from './deacon-stuck-merging.js';
+import { listPipelineStatuses } from '../overdeck/pipeline-view.js';
 
 export { reconcileStuckMergingStates } from './deacon-stuck-merging.js';
 export { reconcileAutoMergeRows } from './deacon-auto-merge-reconcile.js';
@@ -80,7 +81,7 @@ export async function checkReadyForMergeStuck<State extends MergeReminderState>(
   const shadow = options.shadow === true;
 
   try {
-    const statuses = loadReviewStatuses();
+    const statuses = listPipelineStatuses();
 
     const now = Date.now();
     const state = deps.loadState();
@@ -160,7 +161,7 @@ export async function reconcileStaleMergeStatus(options: PatrolShadowOptions = {
   const actions: string[] = [];
   const shadow = options.shadow === true;
   try {
-    const statuses = loadReviewStatuses();
+    const statuses = listPipelineStatuses();
 
     for (const [issueId, status] of Object.entries(statuses)) {
       const postMergeIncomplete = status.mergeStatus === 'merged' && status.mergeStep === 'post-merge-cleanup';
@@ -307,7 +308,7 @@ export async function reconcileFalseMerged(options: PatrolShadowOptions = {}): P
     const { getPullRequestState, isGitHubAppConfigured } = await import('../github-app.js');
     if (!isGitHubAppConfigured()) return actions;
 
-    const statuses = loadReviewStatuses();
+    const statuses = listPipelineStatuses();
 
     for (const [issueId, status] of Object.entries(statuses)) {
       if (status.retiredAt || status.mergeStatus !== 'merged') continue;
@@ -383,7 +384,7 @@ export async function reconcileClosedPrReadyForMerge(options: PatrolShadowOption
     const { getPullRequestState, isGitHubAppConfigured } = await import('../github-app.js');
     if (!isGitHubAppConfigured()) return actions;
 
-    const statuses = loadReviewStatuses();
+    const statuses = listPipelineStatuses();
     const now = Date.now();
 
     for (const [issueId, status] of Object.entries(statuses)) {
@@ -482,7 +483,7 @@ export async function reconcileStaleMergeBlockers(
   const shadow = options.shadow === true;
   try {
     const { resolveConflictGate, buildRealConflictGateDeps } = await import('./conflict-gate.js');
-    const statuses = loadReviewStatuses();
+    const statuses = listPipelineStatuses();
     const now = Date.now();
     const deps = buildRealConflictGateDeps();
     const candidates = Object.entries(statuses).filter(([, status]) =>
@@ -548,7 +549,7 @@ export async function reconcileStuckReadyForMerge(
   const actions: string[] = [];
   const shadow = options.shadow === true;
   try {
-    const candidates = Object.entries(loadReviewStatuses()).filter(([, status]) =>
+    const candidates = Object.entries(listPipelineStatuses()).filter(([, status]) =>
       !status.retiredAt
       && status.readyForMerge === false
       && (status.blockerReasons?.length ?? 0) === 0
@@ -582,7 +583,7 @@ export async function reconcileMergedButReviewing(options: PatrolShadowOptions =
   const actions: string[] = [];
   const shadow = options.shadow === true;
   try {
-    const statuses = loadReviewStatuses();
+    const statuses = listPipelineStatuses();
     const nonTerminal = new Set(['reviewing', 'pending', undefined, null]);
 
     for (const [issueId, status] of Object.entries(statuses)) {
@@ -657,7 +658,7 @@ export async function checkFailedMergeRetry(): Promise<string[]> {
   const actions: string[] = [];
 
   try {
-    const statuses = loadReviewStatuses();
+    const statuses = listPipelineStatuses();
 
     const now = Date.now();
 
@@ -847,7 +848,7 @@ export async function autoCloseOut(now = new Date()): Promise<string[]> {
   const delayMinutes = Math.max(0, closeOutConfig.auto_delay_minutes ?? 60);
   const cutoff = now.getTime() - delayMinutes * 60 * 1000;
   const actions: string[] = [];
-  const statuses = loadReviewStatuses();
+  const statuses = listPipelineStatuses();
 
   const candidates: Array<{ issueId: string }> = [];
   for (const [key, status] of Object.entries(statuses)) {
@@ -974,7 +975,7 @@ export async function checkFirstCompletionAgents(options: PatrolShadowOptions = 
       const issueId = agent.issueId || agent.id.replace('agent-', '').toUpperCase();
       const issueKey = issueId.toLowerCase();
       try {
-        const statuses = loadReviewStatuses();
+        const statuses = listPipelineStatuses();
         // Keys are stored in original case (e.g., "MIN-727") — check all case variants
         const hasStatus = statuses[issueKey] || statuses[issueId] || statuses[issueId.toUpperCase()];
         if (hasStatus) {

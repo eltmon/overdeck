@@ -62,6 +62,9 @@ vi.mock('../../../../src/lib/cloister/issue-closed.js', () => ({
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: mocks.getReviewStatusSync,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../../src/lib/xbrief/io.js', () => ({

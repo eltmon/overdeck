@@ -36,6 +36,9 @@ const mockLoadReviewStatuses = vi.fn();
 vi.mock('../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: vi.fn().mockReturnValue(null),
   loadReviewStatuses: (...args: unknown[]) => mockLoadReviewStatuses(...args),
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 // Stub remaining deps so the module loads cleanly

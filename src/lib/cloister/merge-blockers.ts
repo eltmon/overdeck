@@ -1,4 +1,4 @@
-import { getAllReviewStatusesFromDb } from '../overdeck/review-status-sync.js';
+import { listPipelineStatuses } from '../overdeck/pipeline-view.js';
 
 /**
  * PRs that passed review but cannot merge for a native gate reason (PAN-1620):
@@ -25,7 +25,7 @@ export interface MergeBlocker {
 }
 
 export function getMergeBlockersPayload(): MergeBlocker[] {
-  const statuses = getAllReviewStatusesFromDb();
+  const statuses = listPipelineStatuses();
   const out: MergeBlocker[] = [];
   for (const [issueId, status] of Object.entries(statuses)) {
     if (status.reviewStatus !== 'passed') continue;

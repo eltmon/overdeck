@@ -6,7 +6,7 @@ import { getAgentRuntimeStateSync, getAgentStateSync, listRunningAgents } from '
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { snapshotWorkspaceHeadsPromise, type HeadAnchor } from '../git-utils.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import { loadReviewStatuses, setReviewStatusSync, type ReviewStatus } from '../review-status.js';
+import { setReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { getAllProjectSpecialistStatuses, getTmuxSessionName } from './specialists.js';
 import { isPaneDead, sessionExistsSync } from '../tmux.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
@@ -17,6 +17,7 @@ import { deliverReviewVerdictFeedback } from './review-verdict-feedback.js';
 import { readHeadEvidenceAsync } from './synthesis-verdict.js';
 import { findVerdictReport, findVerdictReportAsync, parseVerdictReport } from './review-verdict-report.js';
 import { recordWouldFire, type PatrolShadowOptions } from './patrol-would-fire.js';
+import { listPipelineStatuses } from '../overdeck/pipeline-view.js';
 
 // ============================================================================
 // Stuck review detection (PAN-733)
@@ -59,8 +60,9 @@ export async function checkStuckReviewing(options: PatrolShadowOptions = {}): Pr
   const REVIEW_STUCK_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
 
   try {
-    const { loadReviewStatuses, setReviewStatusSync } = await import('../review-status.js');
-    const statuses = loadReviewStatuses();
+    const { setReviewStatusSync } = await import('../review-status.js');
+    const { listPipelineStatuses } = await import('../overdeck/pipeline-view.js');
+    const statuses = listPipelineStatuses();
     const now = Date.now();
 
     // Build set of issues with active review sessions
@@ -238,7 +240,7 @@ export async function reconcileUnappliedReviewVerdicts(options: PatrolShadowOpti
   const NUDGE_GRACE_MS = 30 * 60 * 1000;
 
   try {
-    const statuses = loadReviewStatuses();
+    const statuses = listPipelineStatuses();
     const now = Date.now();
 
     for (const [issueId, status] of Object.entries(statuses)) {
@@ -404,7 +406,7 @@ export async function checkCompletedButUnsignaledReviews(options: PatrolShadowOp
   const SYNTHESIS_SETTLE_MS = 5 * 60 * 1000; // 5 minutes
 
   try {
-    const statuses = loadReviewStatuses();
+    const statuses = listPipelineStatuses();
     const now = Date.now();
 
     for (const [issueId, status] of Object.entries(statuses)) {

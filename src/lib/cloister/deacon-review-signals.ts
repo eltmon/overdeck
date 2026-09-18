@@ -6,7 +6,7 @@ import { getAgentRuntimeStateSync, getAgentState, getAgentStateSync, saveAgentSt
 import { deliverReviewVerdictFeedback } from './review-verdict-feedback.js';
 import { findVerdictReport } from './review-verdict-report.js';
 import { AGENTS_DIR } from '../paths.js';
-import { getReviewStatusSync } from '../review-status.js';
+import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 import type { HeadAnchor } from '../git-utils.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { recordWouldFire, type PatrolShadowOptions } from './patrol-would-fire.js';
@@ -153,7 +153,7 @@ export async function nudgeSynthesisForCompleteReviewerReports(states: readonly 
   );
 
   for (const state of synthesisStates) {
-    const status = getReviewStatusSync(state.issueId);
+    const status = getPipelineStatus(state.issueId);
     if (!status || status.reviewStatus !== 'reviewing') continue;
 
     const reviewDir = join(state.workspace, '.pan', 'review', state.reviewRunId!);
@@ -655,7 +655,7 @@ export async function checkStalledReviewParents(options: PatrolShadowOptions = {
       // cannot lose a verdict; the runtime row can (and did, 2026-08-05). A
       // terminal verdict in EITHER plane means warm-idle by design — skip.
       if (hasTerminalVerdictOfRecord(state)) continue;
-      const reviewStatus = getReviewStatusSync(state.issueId)?.reviewStatus;
+      const reviewStatus = getPipelineStatus(state.issueId)?.reviewStatus;
       if (reviewStatus === 'passed' || reviewStatus === 'blocked' || reviewStatus === 'failed') continue;
 
       // Escalate once per deadline epoch — patrols repeat, the operator does

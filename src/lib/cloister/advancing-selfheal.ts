@@ -2,14 +2,11 @@ import { Effect } from 'effect';
 import * as agents from '../agents.js';
 import type { AgentState } from '../agents.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
-import {
-  getReviewStatusSync,
-  loadReviewStatuses,
-  type ReviewStatus,
-} from '../review-status.js';
+import { type ReviewStatus } from '../review-status.js';
 import { killSession, listSessionNames } from '../tmux.js';
 import { selectMergedAdvancingSessions } from './reap-terminal-sessions.js';
 import { recordWouldFire } from './patrol-would-fire.js';
+import { getPipelineStatus, listPipelineStatuses } from '../overdeck/pipeline-view.js';
 
 const JOURNAL_RECONCILE_STATES = new Set([
   'pending',
@@ -23,8 +20,8 @@ const JOURNAL_RECONCILE_STATES = new Set([
 ]);
 
 export interface AdvancingSelfHealDeps {
-  loadReviewStatuses(): Record<string, ReviewStatus>;
-  getReviewStatusSync(issueId: string): ReviewStatus | null;
+  listPipelineStatuses(): Record<string, ReviewStatus>;
+  getPipelineStatus(issueId: string): ReviewStatus | null;
   listSessionNames(): Promise<readonly string[]>;
   getAgentStateSync(session: string): AgentState | null;
   saveAgentStateSync(state: AgentState): void;
@@ -33,8 +30,8 @@ export interface AdvancingSelfHealDeps {
 }
 
 const defaultDeps: AdvancingSelfHealDeps = {
-  loadReviewStatuses,
-  getReviewStatusSync,
+  listPipelineStatuses,
+  getPipelineStatus,
   listSessionNames: () => Effect.runPromise(listSessionNames()),
   getAgentStateSync: (session) => agents.getAgentStateSync(session),
   saveAgentStateSync: (state) => agents.saveAgentStateSync(state),
@@ -63,7 +60,7 @@ function hasFailingChecks(status: ReviewStatus | null | undefined): boolean {
 
 /**
  * Host-side sweep for journaled review/test verdicts whose HTTP status POST
- * failed. getReviewStatusSync owns the journal -> DB reconcile; this patrol
+ * failed. The pipeline read door owns the journal -> DB reconcile; this patrol
  * step makes sure in-flight and tmux-alive advancing issues are read by the
  * host even when the agent has gone idle.
  */
@@ -71,7 +68,7 @@ export async function reconcileInFlightJournals(
   deps: AdvancingSelfHealDeps = defaultDeps,
 ): Promise<string[]> {
   const actions: string[] = [];
-  const statuses = deps.loadReviewStatuses();
+  const statuses = deps.listPipelineStatuses();
   const issueIds = new Set<string>();
 
   for (const [issueId, status] of Object.entries(statuses)) {
@@ -97,7 +94,7 @@ export async function reconcileInFlightJournals(
   for (const issueId of issueIds) {
     const before = statuses[issueId] ?? null;
     try {
-      const after = deps.getReviewStatusSync(issueId);
+      const after = deps.getPipelineStatus(issueId);
       if (!statusChanged(before, after)) continue;
       // A required-check failure is actionable blocker state, not advancing
       // pipeline progress. Keep reconciling the journal through the read door,
@@ -105,7 +102,7 @@ export async function reconcileInFlightJournals(
       if (hasFailingChecks(after)) continue;
       // PAN-3848 (W30): count the would-fire. This patrol's action IS the
       // reconciling read through the read door, so shadow mode has nothing
-      // further to suppress — every getReviewStatusSync read reconciles.
+      // further to suppress — every getPipelineStatus read reconciles.
       recordWouldFire('reconcileInFlightJournals', issueId);
       actions.push(`Reconciled journaled advancing verdict for ${issueId}`);
     } catch (error) {
@@ -139,7 +136,7 @@ export function markAdvancingSessionStopped(
 export async function checkMergedAdvancingSessions(): Promise<string[]> {
   const actions: string[] = [];
   try {
-    const statuses = loadReviewStatuses();
+    const statuses = listPipelineStatuses();
     const aliveSessions = await Effect.runPromise(listSessionNames());
     const toKill = selectMergedAdvancingSessions(statuses, [...aliveSessions]);
 

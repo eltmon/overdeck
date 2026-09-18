@@ -20,11 +20,12 @@ import { Effect } from 'effect';
 import { messageAgent } from '../agents/messaging.js';
 import { getAgentStateSync } from '../agents/agent-state.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import { clearFeedbackDeliveryStuck, getReviewStatusSync } from '../review-status.js';
+import { clearFeedbackDeliveryStuck } from '../review-status.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 import { findVerdictReport } from './review-verdict-report.js';
+import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -130,7 +131,7 @@ async function deliverReviewVerdictFeedbackPromise(
   const resolved = resolveProjectFromIssueSync(issueId);
   const workspacePath = opts.workspacePath
     ?? (resolved ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`) : undefined);
-  const existingStatus = getReviewStatusSync(issueId);
+  const existingStatus = getPipelineStatus(issueId);
 
   // PAN-3151: check if review loop is stuck in non-converging state
   const isReviewNotConverging = existingStatus?.stuckReason === 'review-not-converging';

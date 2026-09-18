@@ -93,6 +93,9 @@ vi.mock('../../../lib/agents/liveness.js', () => ({
 vi.mock('../../../lib/review-status.js', () => ({
   getReviewStatusSync: (...args: unknown[]) => mockGetReviewStatusSync(...args),
   loadReviewStatuses: () => ({}),
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../lib/cloister/concurrency.js', () => ({

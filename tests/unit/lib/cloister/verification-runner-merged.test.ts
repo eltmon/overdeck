@@ -27,6 +27,9 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: mockGetReviewStatus,
   markWorkspaceStuck: mockMarkWorkspaceStuck,
   setReviewStatusSync: mockSetReviewStatus,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../../src/lib/cloister/test-skip-gate.js', () => ({

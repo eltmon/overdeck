@@ -10,11 +10,12 @@ import { AGENTS_DIR } from '../paths.js';
 import { listProjectsSync } from '../projects.js';
 import { readJournalStatus } from '../overdeck/review-status-record-sync.js';
 import { resolveProjectForIssue } from '../pan-dir/record.js';
-import { loadReviewStatuses, setReviewStatusSync } from '../review-status.js';
+import { setReviewStatusSync } from '../review-status.js';
 import type { ReviewStatus } from '../review-status-reconcile.js';
 import { listSessionNames } from '../tmux.js';
 import { isIssueClosed, isTrackerIssueClosed } from './issue-closed.js';
 import { reapIssueResidue } from './reap-issue-residue.js';
+import { listPipelineStatuses } from '../overdeck/pipeline-view.js';
 
 // Sessions reaped by NAME as a backstop: inspect sessions never have agent
 // state, and strike sessions can outlive their state entry (e.g. state already
@@ -92,7 +93,7 @@ export async function reapClosedIssueReviewRequests(
   trackerClosedChecks: Map<string, Promise<boolean>>,
 ): Promise<string[]> {
   const actions: string[] = [];
-  const pendingStatuses = Object.entries(loadReviewStatuses())
+  const pendingStatuses = Object.entries(listPipelineStatuses())
     .filter(([, status]) => status.reviewStatus === 'pending');
 
   for (let offset = 0; offset < pendingStatuses.length; offset += REVIEW_REQUEST_CLOSURE_CHECK_CONCURRENCY) {
@@ -310,8 +311,8 @@ export async function reconcileClosedIssueAgents(): Promise<string[]> {
   let mergedIssueIds: string[] | null = devnetIssueIds ? [] : null;
   if (openDevnetIssueIds.length > 0) {
     try {
-      const { getReviewStatusesSync } = await import('../review-status.js');
-      const statuses = getReviewStatusesSync(openDevnetIssueIds);
+      const { listPipelineStatusesForIssues } = await import('../overdeck/pipeline-view.js');
+      const statuses = listPipelineStatusesForIssues(openDevnetIssueIds);
       mergedIssueIds = openDevnetIssueIds.filter(
         (issueId) => statuses[issueId]?.mergeStatus === 'merged',
       );

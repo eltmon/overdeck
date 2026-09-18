@@ -151,7 +151,7 @@ import { OVERDECK_HOME, AGENTS_DIR, sessionFilePath } from '../paths.js';
 import { loadCloisterConfigSync, loadCloisterConfig } from './config.js';
 import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents, resetPatrolDispatchBudget, tryReserveAdvancingSlot, describeRunningAgents } from './concurrency.js';
 import { tryYieldForAdvancingDispatch } from './preemption.js';
-import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync } from '../review-status.js';
+import { setReviewStatusSync } from '../review-status.js';
 import { needsReviewDispatch } from '../review-dispatch-decision.js';
 import { readIssueRecordSync } from '../pan-dir/record.js';
 import { updateIssueRecord } from '../pan-dir/record-update.js';
@@ -1001,9 +1001,9 @@ async function handleOrphanReviewerSession(
   if (sessions.includes(agentSession)) return null;
 
   // Gate 2: review in flight for this issue?
-  const { getReviewStatusSync } = await import('../review-status.js');
+  const { getPipelineStatus } = await import('../overdeck/pipeline-view.js');
   try {
-    const status = getReviewStatusSync(issueId);
+    const status = getPipelineStatus(issueId);
     if (status?.reviewStatus === 'reviewing') return null;
   } catch {
     // No status entry → safe to clean
@@ -1092,6 +1092,7 @@ export {
   isSynthesisForActiveReviewRun,
   stalledReviewConvoyRecoveryState,
 } from './deacon-review.js';
+import { describeOwner, getPipelineStatus, listPipelineStatuses, listPipelineViews } from '../overdeck/pipeline-view.js';
 export type { ReviewConvoyLiveness } from './deacon-review.js';
 
 // ============================================================================
@@ -1110,13 +1111,26 @@ export async function checkOrphanedCompletions(options: PatrolShadowOptions = {}
   const shadow = options.shadow === true;
 
   try {
-    const statuses = loadReviewStatuses();
+    const views = listPipelineViews();
 
-    for (const [issueId, status] of Object.entries(statuses)) {
+    for (const [issueId, view] of Object.entries(views)) {
+      const status = view.status;
       try {
         if (status.reviewStatus !== 'pending') continue;
         if (status.mergeStatus === 'merged') continue;
         if (needsReviewDispatch(status)) continue;
+
+        // PAN-3903: this patrol INITIATES a review dispatch, so an issue whose
+        // transition another actor already owns is not its to start. PAN-3842:
+        // reviewStaleSince was set at 07:30 with "no automatic re-dispatch" by
+        // design and this patrol "recovered" the issue nine times in
+        // forty-five minutes, stacking a convoy on the work agent's re-review.
+        // Recovery patrols (checkStuckReviewing, auto-resume, stuck-merging)
+        // deliberately do NOT skip here — they exist to revive a dead owner.
+        if (view.inFlightOwner) {
+          console.log(`[deacon] checkOrphanedCompletions: skipped ${describeOwner(issueId, view.inFlightOwner)}`);
+          continue;
+        }
 
         const resolved = resolveProjectFromIssueSync(issueId);
         if (!resolved) continue;
@@ -1184,8 +1198,9 @@ export async function checkPendingTestDispatch(options: PatrolShadowOptions = {}
   const shadow = options.shadow === true;
 
   try {
-    const { loadReviewStatuses, setReviewStatusSync } = await import('../review-status.js');
-    const statuses = loadReviewStatuses();
+    const { setReviewStatusSync } = await import('../review-status.js');
+    const { listPipelineStatuses } = await import('../overdeck/pipeline-view.js');
+    const statuses = listPipelineStatuses();
     const now = Date.now();
 
     for (const [issueId, status] of Object.entries(statuses)) {
@@ -1362,7 +1377,7 @@ export async function checkCompletedButUnsignaledTests(options: PatrolShadowOpti
   const NUDGE_DEDUP_MS = 30 * 60 * 1000;
 
   try {
-    const statuses = loadReviewStatuses();
+    const statuses = listPipelineStatuses();
     const now = Date.now();
 
     for (const [issueId, status] of Object.entries(statuses)) {
@@ -1659,7 +1674,7 @@ const DEAD_END_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
  * For CI-blocked merges: clear the stale merge failure and feedback files.
  */
 export interface CheckDeadEndAgentsDeps {
-  loadReviewStatuses?: typeof loadReviewStatuses;
+  listPipelineStatuses?: typeof listPipelineStatuses;
   sessionExistsSync?: typeof sessionExistsSync;
   getAgentStateSync?: typeof getAgentStateSync;
   getAgentDir?: typeof getAgentDir;
@@ -1674,7 +1689,7 @@ export interface CheckDeadEndAgentsDeps {
 
 export async function checkDeadEndAgents(deps: CheckDeadEndAgentsDeps = {}): Promise<string[]> {
   const actions: string[] = [];
-  const readReviewStatuses = deps.loadReviewStatuses ?? loadReviewStatuses;
+  const readReviewStatuses = deps.listPipelineStatuses ?? listPipelineStatuses;
   const hasSession = deps.sessionExistsSync ?? sessionExistsSync;
   const readAgentState = deps.getAgentStateSync ?? getAgentStateSync;
   const resolveAgentDir = deps.getAgentDir ?? getAgentDir;
@@ -1919,7 +1934,7 @@ async function reconcileAndCheckIfMerged(
     return result;
   };
 
-  const reviewStatus = getReviewStatusSync(issueId);
+  const reviewStatus = getPipelineStatus(issueId);
   if (reviewStatus?.mergeStatus === 'merged') {
     return remember(true);
   }
@@ -2071,7 +2086,7 @@ export async function patrolWorkAgentResolutions(): Promise<string[]> {
 
       // PAN-653: Skip workspaces marked stuck — Deacon must not poke/respawn them.
       // Keyed by issueId (not agentId) so respawned agents with new IDs still match.
-      const resolutionReviewStatus = getReviewStatusSync(issueId);
+      const resolutionReviewStatus = getPipelineStatus(issueId);
       if (resolutionReviewStatus?.stuck) {
         console.log(`[deacon] Skipping stuck workspace ${issueId} in patrolWorkAgentResolutions`);
         continue;
@@ -2441,7 +2456,7 @@ export async function checkMergedWorkSessions(): Promise<string[]> {
   try {
     const { selectMergedWorkSessions } = await import('./reap-terminal-sessions.js');
     const { setAgentPaused } = await import('../agents.js');
-    const statuses = loadReviewStatuses();
+    const statuses = listPipelineStatuses();
     const aliveSessions = await Effect.runPromise(listSessionNames());
     const toKill = selectMergedWorkSessions(statuses, [...aliveSessions]);
     for (const session of toKill) {
@@ -2491,7 +2506,7 @@ export async function checkAwaitingTestWorkSessions(options: PatrolShadowOptions
   const shadow = options.shadow === true;
   try {
     const { selectAwaitingTestWorkSessions } = await import('./reap-terminal-sessions.js');
-    const statuses = loadReviewStatuses();
+    const statuses = listPipelineStatuses();
     const aliveSessions = await Effect.runPromise(listSessionNames());
     const candidates = selectAwaitingTestWorkSessions(statuses, [...aliveSessions]);
     const now = Date.now();
@@ -2669,7 +2684,7 @@ export async function runPatrol(): Promise<PatrolResult> {
     const cleared: string[] = [];
     try {
       const { resolveProjectFromIssueSync } = await import('../projects.js');
-      const allStatuses = loadReviewStatuses();
+      const allStatuses = listPipelineStatuses();
       for (const [issueId, status] of Object.entries(allStatuses)) {
         if (!status.readyForMerge || status.mergeStatus === 'merged') continue;
         const project = resolveProjectFromIssueSync(issueId);
@@ -3079,7 +3094,7 @@ export async function runPatrol(): Promise<PatrolResult> {
           if (projSpec.specialistType === 'merge-agent' && runtimeState.currentIssue) {
             const issueId = runtimeState.currentIssue;
             try {
-              const currentStatus = getReviewStatusSync(issueId);
+              const currentStatus = getPipelineStatus(issueId);
               if (currentStatus?.mergeStatus === 'merging') {
                 const { resolveProjectFromIssueSync } = await import('../projects.js');
                 const resolved = resolveProjectFromIssueSync(issueId);

@@ -14,7 +14,7 @@
  * every surface reported the reviewer healthy.
  */
 
-import { loadReviewStatuses } from '../review-status.js';
+import { listPipelineStatuses } from '../overdeck/pipeline-view.js';
 import {
   drainWorkspaceVerdictFallback,
   findWorkspaceVerdictConflicts,
@@ -158,7 +158,7 @@ export async function sweepStrandedVerdictFallbacks(
   const shadow = options.shadow === true;
   let statuses: Record<string, { mergeStatus?: string; closedOut?: boolean; stuck?: boolean; deaconIgnored?: boolean }>;
   try {
-    statuses = loadReviewStatuses();
+    statuses = listPipelineStatuses();
   } catch {
     return actions;
   }

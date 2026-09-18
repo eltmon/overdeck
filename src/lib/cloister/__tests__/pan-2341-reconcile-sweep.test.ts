@@ -21,8 +21,8 @@ function status(fields: Partial<ReviewStatus> = {}): ReviewStatus {
 
 function deps(overrides: Partial<AdvancingSelfHealDeps> = {}): AdvancingSelfHealDeps {
   return {
-    loadReviewStatuses: vi.fn(() => ({})),
-    getReviewStatusSync: vi.fn(() => null),
+    listPipelineStatuses: vi.fn(() => ({})),
+    getPipelineStatus: vi.fn(() => null),
     listSessionNames: vi.fn(async () => []),
     getAgentStateSync: vi.fn(() => null),
     saveAgentStateSync: vi.fn(),
@@ -55,28 +55,28 @@ describe('reconcileInFlightJournals', () => {
       updatedAt: '2026-07-07T00:01:00.000Z',
     });
     const d = deps({
-      loadReviewStatuses: vi.fn(() => ({ 'PAN-2524': before })),
-      getReviewStatusSync: vi.fn(() => after),
+      listPipelineStatuses: vi.fn(() => ({ 'PAN-2524': before })),
+      getPipelineStatus: vi.fn(() => after),
     });
 
     await expect(reconcileInFlightJournals(d)).resolves.toEqual([
       'Reconciled journaled advancing verdict for PAN-2524',
     ]);
-    expect(d.getReviewStatusSync).toHaveBeenCalledWith('PAN-2524');
+    expect(d.getPipelineStatus).toHaveBeenCalledWith('PAN-2524');
   });
 
-  it('calls getReviewStatusSync for in-flight rows and reports rows advanced from the journal', async () => {
+  it('calls getPipelineStatus for in-flight rows and reports rows advanced from the journal', async () => {
     const before = status({ reviewStatus: 'reviewing', updatedAt: '2026-07-07T00:00:00.000Z' });
     const after = status({ reviewStatus: 'passed', updatedAt: '2026-07-07T00:01:00.000Z' });
     const d = deps({
-      loadReviewStatuses: vi.fn(() => ({ 'PAN-2341': before })),
-      getReviewStatusSync: vi.fn(() => after),
+      listPipelineStatuses: vi.fn(() => ({ 'PAN-2341': before })),
+      getPipelineStatus: vi.fn(() => after),
     });
 
     await expect(reconcileInFlightJournals(d)).resolves.toEqual([
       'Reconciled journaled advancing verdict for PAN-2341',
     ]);
-    expect(d.getReviewStatusSync).toHaveBeenCalledWith('PAN-2341');
+    expect(d.getPipelineStatus).toHaveBeenCalledWith('PAN-2341');
   });
 
   it('reconciles in-flight review rows when tests are skipped', async () => {
@@ -91,14 +91,14 @@ describe('reconcileInFlightJournals', () => {
       updatedAt: '2026-07-07T00:01:00.000Z',
     });
     const d = deps({
-      loadReviewStatuses: vi.fn(() => ({ 'PAN-2341': before })),
-      getReviewStatusSync: vi.fn(() => after),
+      listPipelineStatuses: vi.fn(() => ({ 'PAN-2341': before })),
+      getPipelineStatus: vi.fn(() => after),
     });
 
     await expect(reconcileInFlightJournals(d)).resolves.toEqual([
       'Reconciled journaled advancing verdict for PAN-2341',
     ]);
-    expect(d.getReviewStatusSync).toHaveBeenCalledWith('PAN-2341');
+    expect(d.getPipelineStatus).toHaveBeenCalledWith('PAN-2341');
   });
 
   it('PAN-3764: keeps failing required checks as blocker state without reporting false advancement', async () => {
@@ -120,17 +120,17 @@ describe('reconcileInFlightJournals', () => {
       updatedAt: '2026-08-22T00:01:00.000Z',
     });
     const d = deps({
-      loadReviewStatuses: vi.fn(() => ({ 'PAN-3668': before })),
-      getReviewStatusSync: vi.fn(() => after),
+      listPipelineStatuses: vi.fn(() => ({ 'PAN-3668': before })),
+      getPipelineStatus: vi.fn(() => after),
     });
 
     await expect(reconcileInFlightJournals(d)).resolves.toEqual([]);
-    expect(d.getReviewStatusSync).toHaveBeenCalledWith('PAN-3668');
+    expect(d.getPipelineStatus).toHaveBeenCalledWith('PAN-3668');
   });
 
   it('enumerates tmux-alive advancing sessions with no DB row and skips merged issues', async () => {
     const d = deps({
-      loadReviewStatuses: vi.fn(() => ({
+      listPipelineStatuses: vi.fn(() => ({
         'PAN-3002': status({ issueId: 'PAN-3002', mergeStatus: 'merged' }),
       })),
       listSessionNames: vi.fn(async () => [
@@ -138,7 +138,7 @@ describe('reconcileInFlightJournals', () => {
         'agent-pan-3002-test',
         'agent-pan-3003',
       ]),
-      getReviewStatusSync: vi.fn((issueId) => issueId === 'PAN-3001'
+      getPipelineStatus: vi.fn((issueId) => issueId === 'PAN-3001'
         ? status({ issueId, reviewStatus: 'passed', updatedAt: '2026-07-07T00:02:00.000Z' })
         : null),
     });
@@ -146,8 +146,8 @@ describe('reconcileInFlightJournals', () => {
     await expect(reconcileInFlightJournals(d)).resolves.toEqual([
       'Reconciled journaled advancing verdict for PAN-3001',
     ]);
-    expect(d.getReviewStatusSync).toHaveBeenCalledTimes(1);
-    expect(d.getReviewStatusSync).toHaveBeenCalledWith('PAN-3001');
+    expect(d.getPipelineStatus).toHaveBeenCalledTimes(1);
+    expect(d.getPipelineStatus).toHaveBeenCalledWith('PAN-3001');
   });
 
   it('parses only advancing-role session names', () => {

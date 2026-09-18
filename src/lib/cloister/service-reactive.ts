@@ -230,8 +230,8 @@ async function resolveWorkspaceForIssue(issueId: string): Promise<string | null>
   // state (e.g. `verifying-on-main`) would otherwise re-trigger a ship dispatch
   // for a branch that merged weeks ago. Mirror the isIssueClosed gate above:
   // mergeStatus='merged' is the same terminal signal closed-state is.
-  const { getReviewStatusSync } = await import('../review-status.js');
-  if (getReviewStatusSync(normalizedIssueId)?.mergeStatus === 'merged') {
+  const { getPipelineStatus } = await import('../overdeck/pipeline-view.js');
+  if (getPipelineStatus(normalizedIssueId)?.mergeStatus === 'merged') {
     const message = `${normalizedIssueId}: skipping ${role} dispatch — merge already landed (merge_status='merged' is terminal)`;
     console.log(`[cloister] ${message}`);
     emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });

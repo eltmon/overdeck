@@ -43,6 +43,9 @@ vi.mock('../../../../src/lib/agents/agent-state-source.js', () => ({
 vi.mock('../../../../src/lib/review-status.js', () => ({
   markWorkspaceStuck: mockMarkWorkspaceStuck,
   FEEDBACK_DELIVERY_STUCK_REASON: 'feedback_delivery_needs_you',
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../../src/lib/tmux.js', () => ({

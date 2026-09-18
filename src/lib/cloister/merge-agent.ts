@@ -162,10 +162,11 @@ import { runQualityGates } from './validation.js';
 import { loadProjectsConfigSync } from '../projects.js';
 import { cleanupStaleLocks } from '../git-utils.js';
 import { gitPush, MainDivergedError } from '../git/operations.js';
-import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
+import { markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
 import { appendGitOperationSync, type GitOperationType } from '../git-activity.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 import { verifyMergedBeforeLifecycle, type PostMergeLifecycleOptions } from './merge-verification.js';
+import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 
 const SPECIALISTS_DIR = join(OVERDECK_HOME, 'specialists');
 const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
@@ -302,7 +303,7 @@ export async function postMergeLifecycle(
 ): Promise<void> {
   // PAN-1517: postMergeLifecycle fires only when the issue's main feature branch merges to `main`.
   // Guard 1: skip if already completed (defense-in-depth against infinite loops)
-  if (_completedPostMerge.has(issueId) || getReviewStatusSync(issueId)?.mergeStep === 'merged') {
+  if (_completedPostMerge.has(issueId) || getPipelineStatus(issueId)?.mergeStep === 'merged') {
     _completedPostMerge.add(issueId);
     console.log(`[merge-agent] postMergeLifecycle already completed for ${issueId}, skipping`);
     return;
@@ -315,7 +316,7 @@ export async function postMergeLifecycle(
   }
 
   const run = withPostMergeLifecycleLock(issueId, async () => {
-    if (_completedPostMerge.has(issueId) || getReviewStatusSync(issueId)?.mergeStep === 'merged') {
+    if (_completedPostMerge.has(issueId) || getPipelineStatus(issueId)?.mergeStep === 'merged') {
       _completedPostMerge.add(issueId); console.log(`[merge-agent] postMergeLifecycle completed while waiting for ${issueId}, skipping`);
       return;
     }
@@ -565,7 +566,7 @@ export async function postMergeLifecycle(
 }
 
 export async function triggerPostMergeReleaseIfConfigured(issueId: string, projectPath: string): Promise<void> {
-  const currentStatus = getReviewStatusSync(issueId)?.releaseStatus;
+  const currentStatus = getPipelineStatus(issueId)?.releaseStatus;
   if (currentStatus && currentStatus !== 'pending') {
     console.log(`[merge-agent] Release already started or completed for ${issueId} (${currentStatus}), skipping`);
     return;

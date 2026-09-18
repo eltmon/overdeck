@@ -3,7 +3,8 @@ import { promisify } from 'node:util';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { messageAgent } from '../agents/messaging.js';
 import { spawnRun } from '../agents/spawn.js';
-import { getReviewStatusSync, setReviewStatusSync, type BlockerReason, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
+import { setReviewStatusSync, type BlockerReason, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
+import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 
 const execAsync = promisify(exec);
 const GIT_TIMEOUT_MS = 30_000;
@@ -58,7 +59,7 @@ export interface ResolveConflictGateDeps {
 interface RealConflictGateDepsOverrides {
   spawnRun?: typeof spawnRun;
   messageAgent?: typeof messageAgent;
-  getReviewStatus?: typeof getReviewStatusSync;
+  getReviewStatus?: typeof getPipelineStatus;
   setReviewStatus?: typeof setReviewStatusSync;
   emitActivityEntry?: typeof emitActivityEntrySync;
   now?: () => Date;
@@ -149,7 +150,7 @@ export function parseMergeTreeNameOnly(stdout: string): string[] {
 export function buildRealConflictGateDeps(overrides: RealConflictGateDepsOverrides = {}): ResolveConflictGateDeps {
   const runSpawn = overrides.spawnRun ?? spawnRun;
   const deliverMessage = overrides.messageAgent ?? messageAgent;
-  const readStatus = overrides.getReviewStatus ?? getReviewStatusSync;
+  const readStatus = overrides.getReviewStatus ?? getPipelineStatus;
   const writeStatus = overrides.setReviewStatus ?? setReviewStatusSync;
   const emitActivity = overrides.emitActivityEntry ?? emitActivityEntrySync;
   const now = overrides.now ?? (() => new Date());
