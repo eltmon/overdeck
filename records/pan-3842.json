@@ -194,17 +194,17 @@
     "recordedAt": "2026-09-18T07:31:28.942Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-18T08:03:38.253Z",
+  "updated": "2026-09-18T08:03:44.670Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T08:03:32.631Z",
+    "updatedAt": "2026-09-18T08:03:44.643Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "verificationNotes": "Verification FAILED at test (773461ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3842/.overdeck/verification/2026-09-18T07-31-33-842Z-ad879ac7.json",
     "mergeNotes": "Review stale: approved ff31b427, workspace HEAD is ad879ac7. Run pan done or pan review request to re-review.",
@@ -349,7 +349,7 @@
       },
       "costAtCloseOut": {
         "usd": 19.952098,
-        "pricingAsOf": "2026-09-18T08:03:38.246Z"
+        "pricingAsOf": "2026-09-18T08:03:44.659Z"
       }
     },
     "merges": [
