@@ -89,7 +89,8 @@ beforeEach(() => {
   useDashboardStore.setState({
     issuesRaw: [],
     agentsById: {},
-    reviewStatusByIssueId: {},
+    derivedIssueStateByIssueId: {},
+    backendPanesById: {},
   } as Parameters<typeof useDashboardStore.setState>[0]);
 });
 
@@ -124,7 +125,8 @@ describe('Sidebar Workspaces pipeline badge (ac2)', () => {
     useDashboardStore.setState({
       issuesRaw: [issue({ identifier: 'PAN-9001', status: 'In Progress', state: 'in_progress' })],
       agentsById: {},
-      reviewStatusByIssueId: {},
+      derivedIssueStateByIssueId: {},
+    backendPanesById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
     // Favorited so the row stays in the default rail: PAN-3286 FR-13 collapses
     // non-favorited pipeline worktrees behind a count row. The badge logic under

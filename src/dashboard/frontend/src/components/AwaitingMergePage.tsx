@@ -309,7 +309,7 @@ export function AwaitingMergeRow({
               onClick={() => rebuildMutation.mutate()}
               disabled={rebuildMutation.isPending}
               title={stackReason ? `Workspace stack is down: ${stackReason}` : 'Workspace stack is down — rebuild it to UAT'}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border border-warning/[0.32] text-warning-foreground hover:bg-warning/[0.08] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {rebuildMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCw className="w-3.5 h-3.5" />}
               {rebuildMutation.isPending ? 'Rebuilding…' : 'Rebuild to UAT'}
@@ -602,9 +602,9 @@ function PipelineOverrideSection({
       >
         <header className="mb-4">
           <div className="flex items-center gap-3 mb-1">
-            <TriangleAlert className="w-5 h-5 text-amber-500" />
+            <TriangleAlert className="w-5 h-5 text-warning-foreground" />
             <h2 className="text-lg font-semibold text-foreground">Pipeline Override</h2>
-            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400">
+            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-warning/[0.08] text-warning-foreground">
               {openMergeRequests.length}
             </span>
             <span className="ml-auto text-muted-foreground">
@@ -620,7 +620,7 @@ function PipelineOverrideSection({
       </button>
       {expanded && (
         <>
-          <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 mb-4 text-[12px] text-amber-700 dark:text-amber-300">
+          <div className="rounded-md border border-warning/[0.32] bg-warning/[0.08] p-3 mb-4 text-[12px] text-warning-foreground">
             These issues have open PRs that are not approved-and-green yet.
             Merging here bypasses Overdeck's rebase, verification, and cleanup steps.
           </div>
@@ -700,7 +700,7 @@ function OpenMergeRequestRow({
   };
 
   return (
-    <li className="border border-amber-500/20 rounded-lg bg-card p-4 flex items-start gap-4">
+    <li className="border border-warning/[0.32] rounded-lg bg-card p-4 flex items-start gap-4">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           {trackerUrl ? (
@@ -743,7 +743,7 @@ function OpenMergeRequestRow({
         <button
           onClick={handleApprove}
           disabled={approveMutation.isPending}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm border border-warning/[0.32] text-warning-foreground hover:bg-warning/[0.08] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {approveMutation.isPending ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -755,7 +755,7 @@ function OpenMergeRequestRow({
         <button
           onClick={handleMerge}
           disabled={mergeMutation.isPending}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm bg-amber-600 text-white hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm bg-warning text-warning-foreground hover:bg-warning/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {mergeMutation.isPending ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />

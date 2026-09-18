@@ -1,7 +1,7 @@
 /**
  * Start-block recovery dialog. The start route's 409s (resumable session,
- * troubled gate, paused gate) used to surface as raw alerts telling the
- * operator to run `pan resume` / `pan untroubled` / `pan unpause` — this
+ * paused gate) used to surface as raw alerts telling the
+ * operator to run `pan resume` / `pan unpause` — this
  * dialog IS those choices, as working buttons.
  */
 import { useState } from 'react';
@@ -38,11 +38,6 @@ const CONTENT: Record<RecoveryRequest['kind'], { title: (r: RecoveryRequest) => 
     title: (r) => `${r.agentId} has a saved session`,
     body: 'Resume it to continue with its memory intact, or start fresh (for example to switch model).',
     primary: 'Resume session',
-  },
-  troubled: {
-    title: (r) => `${r.agentId} is troubled${r.detail ? ` (${r.detail})` : ''}`,
-    body: 'The deacon quarantined this agent after repeated failures — starting it is blocked until the gate is cleared. Clear the gate and start again?',
-    primary: 'Clear gate & start',
   },
   paused: {
     title: (r) => `${r.agentId} is paused${r.detail ? ` (${r.detail})` : ''}`,
@@ -123,10 +118,6 @@ export function ResumableSessionDialog() {
       } else if (kind === 'resumable') {
         await postJson(`/api/agents/${encodeURIComponent(agentId)}/resume`);
         toastResumeOutcome(agentId);
-      } else if (kind === 'troubled') {
-        await postJson(`/api/agents/${encodeURIComponent(agentId)}/untroubled`);
-        if (await startIssue()) return;
-        toast.success(issueId ? `${agentId} gate cleared — starting` : `${agentId} gate cleared`);
       } else {
         const unpauseResult = await postJson(`/api/agents/${encodeURIComponent(agentId)}/unpause`);
         if (unpauseResult?.resumeTriggered === true) {

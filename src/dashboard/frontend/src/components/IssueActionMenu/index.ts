@@ -17,4 +17,4 @@ export {
   type IssueActionPinnedComponent,
 } from './IssueActionMenu';
 export { IssueOpenInDialog } from './IssueOpenInDialog';
-export { clearTroubledGateForAgent, useIssueActions, type IssueActionLayout, type IssueActionView, type UseIssueActionsResult } from './useIssueActions';
+export { useIssueActions, type IssueActionLayout, type IssueActionView, type UseIssueActionsResult } from './useIssueActions';

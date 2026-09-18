@@ -14,7 +14,6 @@ vi.mock('../IssuePolicyStrip', () => ({
 }));
 
 vi.mock('../CommandDeck/ZoneCOverviewTabs/queries', () => ({
-  useReviewStatusQuery: () => ({ data: undefined }),
 }));
 
 vi.mock('./StartAgentCta', () => ({

@@ -53,19 +53,16 @@ const LEGACY_WHEN_TO_PHASE: Record<string, Phase> = {
 export default function IssuePhaseRail({ issueId, onSelectPhase, activePhase }: { issueId?: string; onSelectPhase?: (phase: Phase) => void; activePhase?: Phase | null }) {
   const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
   const data = useIssueData(issueId ?? drawerIssueId);
-  const { issue, agents, reviewStatus, phaseTimeline } = data ?? { issue: null, agents: [], reviewStatus: undefined, phaseTimeline: [] };
+  const { issue, agents, derived, panes, phaseTimeline } = data ?? { issue: null, agents: [], derived: undefined, panes: [], phaseTimeline: [] };
 
   const rail = useMemo(() => {
     const pipelineState = derivePipelineState({
-      reviewStatus: reviewStatus ?? null,
-      agent: agents.find((a) => !['stopped', 'failed', 'dead'].includes(a.status)) ?? agents[0] ?? null,
-      hasPlan: issue?.hasPlan === true,
-      hasTasks: issue?.hasTasks === true,
+      derived: derived ?? null,
+      panes,
       issueCanonicalState: issue?.state ?? issue?.status ?? null,
-      isMerged: reviewStatus?.mergeStatus === 'merged',
     });
     return phaseRailState(pipelineState);
-  }, [issue, agents, reviewStatus]);
+  }, [issue, derived, panes]);
 
   const meta = useMemo(() => {
     const out: Partial<Record<Phase, string>> = { test: '—' };

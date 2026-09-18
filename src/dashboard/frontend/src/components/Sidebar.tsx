@@ -14,10 +14,10 @@ import { useConversationMutations } from './CommandDeck/useConversationMutations
 import { FreshnessIndicator } from './FreshnessIndicator';
 import { useTheme } from '../hooks/useTheme';
 import { usePlannedBacklogVisibility } from '../hooks/usePlannedBacklogVisibility';
-import { useDashboardStore, selectIssues, selectAgents } from '../lib/store';
+import { useDashboardStore, selectIssues } from '../lib/store';
 import { getPipelineIssuePhase } from '../lib/pipeline-state';
 import { fetchExperimentalFeaturesEnabled, isExperimentalTab } from '../lib/experimentalFeatures';
-import type { Issue, Agent } from '../types';
+import type { Issue } from '../types';
 import type { Tab } from './Header';
 
 type PipelineIssuePhase = 'ship' | 'review' | 'work' | 'plan' | 'todo';
@@ -332,8 +332,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
   }, [visibleWorkspaces, projectNameByKey]);
 
   const issues = useDashboardStore(selectIssues) as Issue[];
-  const agents = useDashboardStore(selectAgents) as unknown as Agent[];
-  const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
+  const derivedByIssueId = useDashboardStore((state) => state.derivedIssueStateByIssueId);
 
   // PAN-1990 ac2: issue-kind workspace rows get a pipeline-phase badge derived
   // from getPipelineIssuePhase, the same helper the "Filter phase" group below
@@ -341,20 +340,14 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
   const workspacePhaseByIssueId = useMemo(() => {
     const map = new Map<string, PipelineIssuePhase>();
     if (issues.length === 0) return map;
-    const agentByIssueId = new Map<string, Agent>();
-    for (const agent of agents) {
-      const key = agent.issueId?.toLowerCase();
-      if (key && !agentByIssueId.has(key)) agentByIssueId.set(key, agent);
-    }
     for (const issue of issues) {
       const key = issue.identifier.toLowerCase();
-      const agent = agentByIssueId.get(key) ?? null;
-      const reviewStatus = reviewStatusByIssueId[issue.identifier] ?? reviewStatusByIssueId[issue.identifier.toUpperCase()];
-      const rawPhase = getPipelineIssuePhase(issue, reviewStatus, agent);
-      map.set(key, rawPhase === 'ready' || rawPhase === 'verifying' ? 'work' : rawPhase);
+      const derived = derivedByIssueId[issue.identifier] ?? derivedByIssueId[issue.identifier.toUpperCase()];
+      const rawPhase = getPipelineIssuePhase(derived, issue);
+      map.set(key, rawPhase === 'ready' ? 'work' : rawPhase);
     }
     return map;
-  }, [issues, agents, reviewStatusByIssueId]);
+  }, [issues, derivedByIssueId]);
 
   const [pipelineFilter, setPipelineFilter] = useState(readPipelineFilterState);
 
@@ -367,20 +360,13 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
   const pipelineData = useMemo(() => {
     if (activeTab !== 'pipeline') return { phaseCounts: {} as Record<string, number>, projects: [] as Array<{ id: string; name: string; color: string; prefix: string }> };
 
-    const agentByIssueId = new Map<string, Agent>();
-    for (const agent of agents) {
-      const key = agent.issueId?.toLowerCase();
-      if (key && !agentByIssueId.has(key)) agentByIssueId.set(key, agent);
-    }
-
     const phaseCounts: Record<string, number> = { ship: 0, review: 0, work: 0, plan: 0, todo: 0 };
     const projectMap = new Map<string, { name: string; color: string; prefix: string }>();
 
     for (const issue of issues) {
       if (isClosedIssue(issue)) continue;
-      const agent = agentByIssueId.get(issue.identifier.toLowerCase()) ?? null;
-      const reviewStatus = reviewStatusByIssueId[issue.identifier] ?? reviewStatusByIssueId[issue.identifier.toUpperCase()];
-      const phase = getPipelineIssuePhase(issue, reviewStatus, agent);
+      const derived = derivedByIssueId[issue.identifier] ?? derivedByIssueId[issue.identifier.toUpperCase()];
+      const phase = getPipelineIssuePhase(derived, issue);
       phaseCounts[phase] = (phaseCounts[phase] ?? 0) + 1;
       if (issue.project) {
         const id = issue.project.id || issue.project.name;
@@ -396,7 +382,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
       .sort((a, b) => a.name.localeCompare(b.name));
 
     return { phaseCounts, projects };
-  }, [activeTab, issues, agents, reviewStatusByIssueId]);
+  }, [activeTab, issues, derivedByIssueId]);
   const { data: versionData } = useQuery({
     queryKey: ['version'],
     queryFn: async () => {

@@ -154,20 +154,17 @@ async function fetchCockpitProjectFeature(projectName: string | undefined, issue
       title: treeFeature?.title ?? issueId,
       projectName: effectiveProject,
       branch: '',
-      status: treeFeature?.sessions.some((session) => session.presence === 'active') ? 'running' : 'has_state',
+      status: 'has_state',
       stateLabel: 'In Progress',
-      agentStatus: treeFeature?.sessions.some((session) => session.presence === 'active') ? 'running' : null,
-      hasPlanning: treeFeature?.sessions.some((session) => session.type === 'planning' || session.type === 'legacy') ?? false,
+      agentStatus: null,
+      hasPlanning: false,
       hasPrd: false,
       hasState: false,
       isShadow: false,
-      sessions: treeFeature?.sessions ?? [],
+      sessions: [],
     }
   }
-  return {
-    ...feature,
-    sessions: treeFeature?.sessions ?? feature.sessions,
-  }
+  return feature
 }
 
 export function IssueTreeLane({
@@ -259,8 +256,15 @@ export function IssueTreeLane({
     },
   }), [actions.state.hasTasks, actions.state.hasPlan, issue, issueId, projectName, sessions, title])
 
-  const feature = projectFeature.data ?? fallbackFeature
-  const renderedSessions = useMemo(() => feature.sessions ?? [], [feature.sessions])
+  // The pane inventory is the tree (FR-5). The project-feature read only
+  // supplies the surrounding metadata (title, branch, resource details) — it
+  // must never replace the rows, or a Herdr-spawned reviewer would vanish
+  // behind whatever the session-tree endpoint happened to remember.
+  const feature: ProjectFeature = useMemo(
+    () => (projectFeature.data ? { ...projectFeature.data, sessions } : fallbackFeature),
+    [fallbackFeature, projectFeature.data, sessions],
+  )
+  const renderedSessions = sessions
 
   useEffect(() => {
     onSessionsChange(renderedSessions)

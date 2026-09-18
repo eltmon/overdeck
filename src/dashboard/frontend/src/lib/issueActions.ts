@@ -650,6 +650,7 @@ export function getPhasePrimaryActions(_state: IssueActionState, phase: Pipeline
 
 export function deriveIssueActionPhase(state: IssueActionState): PipelinePhase {
   if (state.hasPendingInput) return 'INPUT';
+  if (state.derived?.attention === 'stuck' || state.derived?.attention === 'api-error') return 'STUCK';
   if (state.agent?.status === 'stuck' || state.agent?.status === 'failed' || state.agent?.status === 'error') return 'STUCK';
 
   switch (derivePipelineState(state)) {

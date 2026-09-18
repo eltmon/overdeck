@@ -967,7 +967,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
   const workSessionId = workSession?.sessionId ?? bestSessionId ?? null;
 
   // PAN-3917: "ready to merge" is derived from the forge (approved, green,
-  // mergeable), never a stored readyForMerge flag.
+  // mergeable), never a stored isReadyToMerge flag.
   const isReady = useDerivedIssueState(feature.issueId)?.state === 'ready';
 
   // PAN-1779: surface the pause gate at the issue level — paused agents are

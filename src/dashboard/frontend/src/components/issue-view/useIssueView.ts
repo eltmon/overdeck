@@ -10,7 +10,7 @@ import {
   type IssueCostData,
   type WorkspaceData,
 } from '../CommandDeck/ZoneCOverviewTabs/queries';
-import { deriveShip, isAgentRunning, readyForMerge, sortOperatorNeeds, stuckReason } from './derivations';
+import { deriveShip, isAgentRunning, isReadyToMerge, sortOperatorNeeds, stuckReason } from './derivations';
 import type {
   AgentRowModel,
   IssueActivityModel,
@@ -344,7 +344,7 @@ function derivePipeline(
       checks === 'green' ? 'passed' : checks === 'red' ? 'failed' : 'pending',
       checks === 'pending',
     ),
-    ship: stepState(merged ? 'merged' : readyForMerge(derived) ? 'ready' : 'pending', false),
+    ship: stepState(merged ? 'merged' : isReadyToMerge(derived) ? 'ready' : 'pending', false),
   };
 }
 
@@ -419,7 +419,7 @@ function deriveOperator(
     items.push({ kind: 'pickup_gate', reason: 'The plan is ready, but work cannot be picked up until an operator releases it.' });
   }
 
-  if (readyForMerge(derived)) {
+  if (isReadyToMerge(derived)) {
     items.push({ kind: 'ready_for_merge' });
   }
 

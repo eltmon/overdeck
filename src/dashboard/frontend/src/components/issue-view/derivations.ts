@@ -20,7 +20,7 @@ export function isAgentRunning(session: SessionNode, agent?: AgentSnapshot): boo
 }
 
 /** The forge says this PR can merge now. */
-export function readyForMerge(derived: DerivedIssueState | undefined): boolean {
+export function isReadyToMerge(derived: DerivedIssueState | undefined): boolean {
   return derived?.state === 'ready';
 }
 

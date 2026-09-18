@@ -14,7 +14,6 @@ export interface IssueOverviewTabProps {
   hasPlan: boolean;
   workRunning: boolean;
   mergedCommit?: string;
-  reviewSummary?: string;
 }
 
 function ShipSurface({ model }: { model: IssueViewModel }) {
@@ -33,7 +32,6 @@ export function IssueOverviewTab({
   hasPlan,
   workRunning,
   mergedCommit,
-  reviewSummary,
 }: IssueOverviewTabProps) {
   if (state === 'pre-work') {
     return (
@@ -61,9 +59,6 @@ export function IssueOverviewTab({
           <div className="mt-3 text-[11px] text-muted-foreground">
             Merged commit <span className="font-mono text-foreground">{mergedCommit ?? 'unavailable'}</span>
           </div>
-          <p className="mt-3 text-[12.5px] leading-5 text-foreground">
-            {reviewSummary ?? 'Review and verification completed successfully.'}
-          </p>
         </section>
         <ShipSurface model={model} />
       </div>

@@ -34,7 +34,7 @@ describe('Confluence model', () => {
         spectrumH: 54,
         doldrumsH: 64,
         shelfH: 34,
-        colW: 1628 / 6,
+        colW: 1628 / 5,
         shelfY: 804,
         doldrumsY: 855,
         portalX: 1646,
@@ -92,15 +92,17 @@ describe('Confluence model', () => {
     it('classifies with shelf > failed > stale > active precedence', () => {
       expect(classifyOrb({
         paused: true,
-        mergeStatus: 'failed',
+        attention: 'stuck',
         lastActivity: staleActivity,
       }, now)).toBe('shelf');
       expect(classifyOrb({
         yieldedByScheduler: true,
-        mergeStatus: 'failed',
+        attention: 'stuck',
         lastActivity: staleActivity,
       }, now)).toBe('shelf');
-      expect(classifyOrb({ mergeStatus: 'failed', lastActivity: staleActivity }, now)).toBe('failed');
+      expect(classifyOrb({ attention: 'stuck', lastActivity: staleActivity }, now)).toBe('failed');
+      expect(classifyOrb({ attention: 'api-error', lastActivity: staleActivity }, now)).toBe('failed');
+      expect(classifyOrb({ attention: 'needs-you', lastActivity: staleActivity }, now)).toBe('stale');
       expect(classifyOrb({ lastActivity: staleActivity }, now)).toBe('stale');
       expect(classifyOrb({ lastActivity: '2026-08-01T11:30:00.001Z' }, now)).toBe('active');
       expect(classifyOrb({}, now)).toBe('active');

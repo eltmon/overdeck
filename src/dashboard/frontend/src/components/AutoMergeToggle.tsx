@@ -119,9 +119,9 @@ export function AutoMergeToggle({
     const next = !isAuto; // undefined/false → set auto; true → set hold
     const label = isAuto ? 'auto' : autoMerge === false ? 'hold' : 'default';
     const tone = isAuto
-      ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/40'
+      ? 'text-primary bg-primary/[0.08] border-primary/[0.32]'
       : autoMerge === false
-        ? 'text-amber-400 bg-amber-500/10 border-amber-500/40'
+        ? 'text-warning-foreground bg-warning/[0.08] border-warning/[0.32]'
         : 'text-muted-foreground bg-transparent border-border';
     return (
       <button
@@ -158,7 +158,7 @@ export function AutoMergeToggle({
         disabled={busy}
         aria-pressed={autoMerge === true}
         onClick={(e) => { e.stopPropagation(); void set(true); }}
-        className={seg(autoMerge === true, 'text-emerald-400 bg-emerald-500/10')}
+        className={seg(autoMerge === true, 'text-primary bg-primary/[0.08]')}
         title="Auto-merge — ride the train, ship when green"
       >
         <Zap className={iconSize} /> Auto
@@ -168,7 +168,7 @@ export function AutoMergeToggle({
         disabled={busy}
         aria-pressed={autoMerge === false}
         onClick={(e) => { e.stopPropagation(); void set(false); }}
-        className={`border-l border-border ${seg(autoMerge === false, 'text-amber-400 bg-amber-500/10')}`}
+        className={`border-l border-border ${seg(autoMerge === false, 'text-warning-foreground bg-warning/[0.08]')}`}
         title="Hold for UAT — wait for human batch review"
       >
         <Lock className={iconSize} /> Hold

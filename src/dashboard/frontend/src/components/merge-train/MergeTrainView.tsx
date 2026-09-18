@@ -508,7 +508,7 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
               ? `Could not probe the stack: ${gen.stack.probeError ?? 'unknown error'} — the stack record is preserved`
               : detail || `Not serving: ${down.join(', ') || 'a declared service'} — restart the stack`
           }
-          className="inline-flex items-center gap-1 rounded border border-amber-500/50 px-2 py-0.5 text-[10.5px] font-semibold text-amber-400 hover:bg-amber-500/10 disabled:opacity-60"
+          className="inline-flex items-center gap-1 rounded border border-warning/[0.32] px-2 py-0.5 text-[10.5px] font-medium text-warning-foreground hover:bg-warning/[0.08] disabled:opacity-60"
         >
           {starting
             ? (<><Loader2 className="h-3 w-3 animate-spin" /> Restarting…</>)
@@ -524,7 +524,7 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
           href={gen.stack.frontendUrl}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1 rounded border border-emerald-500/40 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-400 hover:bg-emerald-500/10"
+          className="inline-flex items-center gap-1 rounded border border-success/[0.32] px-2 py-0.5 text-[10.5px] font-medium text-success hover:bg-success/[0.08]"
         >
           ▶ {compact ? 'Open' : 'Open UAT frontend'}
         </a>
@@ -536,7 +536,7 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
         disabled={starting}
         onClick={() => void onStack(gen)}
         title="Starts a live dashboard stack serving this exact batch (~1 min), then opens it"
-        className="inline-flex items-center gap-1 rounded border border-emerald-500/40 px-2 py-0.5 text-[10.5px] font-semibold text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-60"
+        className="inline-flex items-center gap-1 rounded border border-success/[0.32] px-2 py-0.5 text-[10.5px] font-medium text-success hover:bg-success/[0.08] disabled:opacity-60"
       >
         {starting ? (<><Loader2 className="h-3 w-3 animate-spin" /> Starting… ~1 min</>) : (<>▶ {compact ? 'Start & open' : 'Start & open UAT frontend'}</>)}
       </button>
@@ -713,7 +713,7 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                                     type="button"
                                     disabled={shipMutation.isPending}
                                     onClick={() => setVersionAction({ generationName: gen.name, mode: 'ship', version: '' })}
-                                    className="rounded border border-amber-500/50 px-2 py-0.5 text-[10.5px] font-semibold text-amber-400 hover:bg-amber-500/10 disabled:opacity-50"
+                                    className="rounded border border-warning/[0.32] px-2 py-0.5 text-[10.5px] font-medium text-warning-foreground hover:bg-warning/[0.08] disabled:opacity-50"
                                   >
                                     {shipMutation.isPending && shipMutation.variables?.name === gen.name ? 'Shipping…' : 'Ship version'}
                                   </button>

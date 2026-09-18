@@ -37,22 +37,18 @@ const prdActionKeys: readonly IssueActionKey[] = [
   'doneWork',
   'requestReview',
   'restartReview',
-  'recoverReview',
   'stopAgent',
   'pause',
   'unpause',
-  'untroubled',
   'recoverAgent',
   'resumeSession',
   'syncMain',
-  'inspectTask',
   'reopen',
   'closeOut',
   'wipe',
   'destroyWorkspace',
   'open',
   'resetIssue',
-  'resetToPlanned',
   'viewPr',
 ];
 
@@ -64,7 +60,6 @@ const preservedActionKeys: readonly IssueActionKey[] = [
   'transcripts',
   'upload',
   'syncDiscussions',
-  'statusReview',
   'createWorkspace',
   'copySettings',
   'resetSession',
@@ -75,7 +70,7 @@ const preservedActionKeys: readonly IssueActionKey[] = [
 ];
 
 const baseState: IssueActionState = {
-  reviewStatus: null,
+  derived: null,
   agent: null,
   lifecycle: null,
   workspace: { exists: true, path: '/tmp/workspace' },
@@ -95,17 +90,18 @@ function action(key: IssueActionKey) {
   return entry;
 }
 
-function reviewStatus(overrides: Partial<NonNullable<IssueActionState['reviewStatus']>> = {}): NonNullable<IssueActionState['reviewStatus']> {
-  return {
-    issueId: 'PAN-1331',
-    reviewStatus: 'pending',
-    testStatus: 'pending',
-    mergeStatus: 'pending',
-    readyForMerge: false,
-    updatedAt: '2026-05-23T00:00:00.000Z',
-    ...overrides,
-  };
+function derivedState(
+  state: NonNullable<IssueActionState['derived']>['state'],
+  overrides: Partial<NonNullable<IssueActionState['derived']>> = {},
+): NonNullable<IssueActionState['derived']> {
+  return { issueId: 'PAN-1331', state, ...overrides };
 }
+
+const OPEN_PR = { url: 'https://example.test/pr/1', number: 1, reviewState: 'REVIEW_REQUIRED', checks: 'pending' as const, mergeable: true };
+
+const LIVE_PLAN_PANE = [{
+  id: 'pane-plan', issue: 'PAN-1331', role: 'plan' as const, harness: 'claude-code', model: 'claude-opus-5', state: 'working' as const,
+}];
 
 function reviewIssue(): Issue {
   return {
@@ -284,14 +280,10 @@ describe('ISSUE_ACTIONS', () => {
   it('declares real CLI verbs only for issue-scoped pan commands', () => {
     expect(action('doneWork').label).toBe('Done — mark work complete & start review');
     expect(action('restartReview').label).toBe('Re-run review on latest commit');
-    expect(action('recoverReview').label).toBe('Reset stalled review state');
-    expect(action('purgeReview').label).toBe('Remove review sessions & reset');
     expect(action('requestReview').panVerb).toBe('review request');
     expect(action('restartReview').panVerb).toBe('review restart');
-    expect(action('recoverReview').panVerb).toBe('review reset');
     expect(action('stopAgent').panVerb).toBe('kill');
     expect(action('resetIssue').panVerb).toBeNull();
-    expect(action('resetToPlanned').panVerb).toBe('reset-to-planned');
     expect(action('restartFromPlan').panVerb).toBeNull();
     expect(action('restartAgent').panVerb).toBeNull();
     expect(action('completeWorkReset').panVerb).toBeNull();
@@ -306,7 +298,6 @@ describe('ISSUE_ACTIONS', () => {
     expect(action('doneWork').kind).toBe('safe');
     expect(action('requestReview').kind).toBe('safe');
     expect(action('restartReview').kind).toBe('safe');
-    expect(action('recoverReview').kind).toBe('safe');
     expect(action('stopAgent').kind).toBe('safe');
     expect(action('recoverAgent').kind).toBe('safe');
     expect(action('reopen').kind).toBe('safe');
@@ -314,7 +305,6 @@ describe('ISSUE_ACTIONS', () => {
     expect(action('closeOut').kind).toBe('destructive');
     expect(action('wipe').kind).toBe('destructive');
     expect(action('resetIssue').kind).toBe('destructive');
-    expect(action('resetToPlanned').kind).toBe('destructive');
     expect(action('cancel').kind).toBe('destructive');
   });
 
@@ -341,12 +331,11 @@ describe('ISSUE_ACTIONS', () => {
   });
 
   it('gates planning and review actions to their lifecycle states', () => {
-    const planningActive: IssueActionState = { ...baseState, agent: { status: 'running', role: 'plan' }, issueCanonicalState: 'in_progress' };
-    const planAgentIdle: IssueActionState = { ...baseState, hasPlan: true, agent: { status: 'stopped', role: 'plan' } };
-    const workRunning: IssueActionState = { ...baseState, hasPlan: true, agent: { status: 'running', role: 'work' }, issueCanonicalState: 'in_progress' };
+    const planningActive: IssueActionState = { ...baseState, agent: { status: 'running', role: 'plan' }, derived: derivedState('planned'), panes: LIVE_PLAN_PANE, issueCanonicalState: 'in_progress' };
+    const planAgentIdle: IssueActionState = { ...baseState, hasPlan: true, agent: { status: 'stopped', role: 'plan' }, derived: derivedState('planned') };
+    const workRunning: IssueActionState = { ...baseState, hasPlan: true, agent: { status: 'running', role: 'work' }, derived: derivedState('working'), panes: [{ ...LIVE_PLAN_PANE[0], id: 'pane-work', role: 'work' as const }], issueCanonicalState: 'in_progress' };
     const readyForReview: IssueActionState = { ...baseState, hasPlan: true, workspace: { exists: true }, agent: { status: 'stopped', role: 'work' } };
-    const reviewRunning: IssueActionState = { ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'reviewing' }) };
-    const reviewFailed: IssueActionState = { ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'failed' }) };
+    const reviewRunning: IssueActionState = { ...baseState, derived: derivedState('in-review', { pr: OPEN_PR }) };
 
     expect(action('watchPlanning').enabledWhen(planningActive)).toBe(true);
     expect(action('watchPlanning').enabledWhen(baseState)).toBe(false);
@@ -357,23 +346,16 @@ describe('ISSUE_ACTIONS', () => {
     expect(action('requestReview').enabledWhen(readyForReview)).toBe(true);
     expect(action('requestReview').enabledWhen(workRunning)).toBe(false);
     expect(action('restartReview').enabledWhen(reviewRunning)).toBe(true);
-    expect(action('recoverReview').enabledWhen(reviewFailed)).toBe(true);
     expect(action('recoverAgent').enabledWhen(reviewRunning)).toBe(false);
   });
 
-  it('PAN-3675: enables review recovery on a stranded pending review (the PAN-3668 shape)', () => {
-    // A failed dispatch strands the row at pending with no live reviewers —
-    // every review action was disabled in exactly that state.
-    const strandedPending: IssueActionState = { ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'pending' }) };
-    expect(action('restartReview').enabledWhen(strandedPending)).toBe(true);
-    expect(action('recoverReview').enabledWhen(strandedPending)).toBe(true);
-    expect(action('purgeReview').enabledWhen(strandedPending)).toBe(true);
+  it('re-running review is offered while the PR is open and never after it lands', () => {
+    expect(action('restartReview').enabledWhen({ ...baseState, derived: derivedState('in-review', { pr: OPEN_PR }) })).toBe(true);
+    expect(action('restartReview').enabledWhen({ ...baseState, derived: derivedState('changes-requested', { pr: OPEN_PR }) })).toBe(true);
 
     // Terminal states stay protected.
-    const passed: IssueActionState = { ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'passed', testStatus: 'passed' }) };
-    expect(action('restartReview').enabledWhen(passed)).toBe(false);
-    const merged: IssueActionState = { ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'merged' }), isMerged: true };
-    expect(action('restartReview').enabledWhen(merged)).toBe(false);
+    expect(action('restartReview').enabledWhen({ ...baseState, derived: derivedState('ready', { pr: OPEN_PR }) })).toBe(false);
+    expect(action('restartReview').enabledWhen({ ...baseState, derived: derivedState('merged'), isMerged: true })).toBe(false);
   });
 
   it('enables rebuildAndStart wherever a normal start is viable and a workspace exists', () => {
@@ -415,7 +397,8 @@ describe('requestReview mode submenu', () => {
     useDashboardStore.setState({
       issuesRaw: [reviewIssue()],
       agentsById: { 'agent-pan-3340': stoppedWorkAgent() },
-      reviewStatusByIssueId: {},
+      derivedIssueStateByIssueId: {},
+      backendPanesById: {},
       drawer: { issueId: null, tab: 'overview' },
     } as Parameters<typeof useDashboardStore.setState>[0]);
   });
@@ -499,12 +482,11 @@ describe('getPhasePrimaryActions', () => {
     ['PLANNED_IDLE', { ...baseState, hasPlan: true, issueCanonicalState: 'todo' }, ['startAgent']],
     ['WORK_RUNNING', { ...baseState, agent: { status: 'running', role: 'work' }, issueCanonicalState: 'in_progress' }, ['tell', 'doneWork']],
     ['INPUT', { ...baseState, agent: { status: 'running', role: 'work' }, hasPendingInput: true }, ['open', 'tell']],
-    ['REVIEW_RUNNING', { ...baseState, agent: { status: 'running', role: 'review' }, reviewStatus: reviewStatus({ reviewStatus: 'reviewing' }) }, ['tell', 'recoverAgent']],
-    ['SHIP_RUNNING', { ...baseState, agent: { status: 'running', role: 'ship' }, reviewStatus: reviewStatus({ mergeStatus: 'merging' }) }, ['tell', 'recoverAgent']],
-    ['CHANGES_REQUESTED', { ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'blocked' }) }, ['open', 'requestReview']],
-    ['STUCK', { ...baseState, agent: { status: 'failed', role: 'work' }, reviewStatus: reviewStatus({ testStatus: 'failed' }) }, ['recoverAgent', 'tell']],
-    ['READY_TO_MERGE', { ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'passed', testStatus: 'passed', readyForMerge: true }), hasPr: true }, ['merge', 'viewPr']],
-    ['MERGED', { ...baseState, isMerged: true, reviewStatus: reviewStatus({ mergeStatus: 'merged' }) }, ['closeOut']],
+    ['REVIEW_RUNNING', { ...baseState, agent: { status: 'running', role: 'review' }, derived: derivedState('in-review', { pr: OPEN_PR }) }, ['tell', 'recoverAgent']],
+    ['CHANGES_REQUESTED', { ...baseState, derived: derivedState('changes-requested', { pr: OPEN_PR }) }, ['open', 'requestReview']],
+    ['STUCK', { ...baseState, agent: { status: 'failed', role: 'work' }, derived: derivedState('working', { attention: 'stuck' }) }, ['recoverAgent', 'tell']],
+    ['READY_TO_MERGE', { ...baseState, derived: derivedState('ready', { pr: OPEN_PR }), hasPr: true }, ['merge', 'viewPr']],
+    ['MERGED', { ...baseState, isMerged: true, derived: derivedState('merged') }, ['closeOut']],
   ];
 
   it.each(cases)('returns the ordered %s primary action set', (phase, state, expected) => {
@@ -513,11 +495,11 @@ describe('getPhasePrimaryActions', () => {
 
   it('derives the selector phase from the shared pipeline classifier', () => {
     expect(deriveIssueActionPhase({ ...baseState, hasPlan: false, issueCanonicalState: 'todo' })).toBe('QUEUED_FOR_PLAN');
-    expect(deriveIssueActionPhase({ ...baseState, agent: { status: 'running', role: 'plan' }, issueCanonicalState: 'in_progress' })).toBe('PLANNING');
-    expect(deriveIssueActionPhase({ ...baseState, agent: { status: 'running', role: 'work' }, issueCanonicalState: 'in_progress' })).toBe('WORK_RUNNING');
-    expect(deriveIssueActionPhase({ ...baseState, reviewStatus: reviewStatus({ reviewStatus: 'blocked' }) })).toBe('CHANGES_REQUESTED');
-    expect(deriveIssueActionPhase({ ...baseState, reviewStatus: reviewStatus({ testStatus: 'failed' }) })).toBe('STUCK');
-    expect(deriveIssueActionPhase({ ...baseState, reviewStatus: reviewStatus({ readyForMerge: true }) })).toBe('READY_TO_MERGE');
-    expect(deriveIssueActionPhase({ ...baseState, isMerged: true })).toBe('MERGED');
+    expect(deriveIssueActionPhase({ ...baseState, derived: derivedState('planned'), panes: LIVE_PLAN_PANE })).toBe('PLANNING');
+    expect(deriveIssueActionPhase({ ...baseState, derived: derivedState('working'), panes: [{ ...LIVE_PLAN_PANE[0], id: 'pane-work', role: 'work' as const }] })).toBe('WORK_RUNNING');
+    expect(deriveIssueActionPhase({ ...baseState, derived: derivedState('changes-requested') })).toBe('CHANGES_REQUESTED');
+    expect(deriveIssueActionPhase({ ...baseState, agent: { status: 'failed', role: 'work' }, derived: derivedState('working', { attention: 'stuck' }) })).toBe('STUCK');
+    expect(deriveIssueActionPhase({ ...baseState, derived: derivedState('ready') })).toBe('READY_TO_MERGE');
+    expect(deriveIssueActionPhase({ ...baseState, derived: derivedState('merged'), isMerged: true })).toBe('MERGED');
   });
 });

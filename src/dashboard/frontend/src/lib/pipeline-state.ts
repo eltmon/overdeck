@@ -19,6 +19,21 @@ export const PHASE_BY_DERIVED_STATE: Record<DerivedIssueStateName, PipelineIssue
   closed: 'ship',
 };
 
+/**
+ * An issue occupies a pipeline slot: past planning, not yet landed. The one
+ * definition — order books, the merge-policy roster and capacity reads share it.
+ */
+export const IN_FLIGHT_STATES: ReadonlySet<DerivedIssueStateName> = new Set([
+  'working',
+  'in-review',
+  'changes-requested',
+  'ready',
+]);
+
+export function isIssueInFlight(derived?: DerivedIssueState | null): boolean {
+  return !!derived && IN_FLIGHT_STATES.has(derived.state);
+}
+
 export function hasActualPendingQuestion(agent?: Pick<Agent, 'hasPendingQuestion' | 'pendingQuestionCount' | 'pendingQuestionPrompt'> | null): boolean {
   return agent?.hasPendingQuestion === true && ((agent.pendingQuestionCount ?? 0) > 0 || !!agent.pendingQuestionPrompt?.trim());
 }
@@ -73,8 +88,14 @@ export function isPipelineReady(issue: Pick<Issue, 'labels' | 'stateType'>): boo
  */
 export function getPipelineIssuePhase(
   derived?: DerivedIssueState | null,
-  issue?: Pick<Issue, 'labels' | 'stateType'> | null,
+  issue?: Pick<Issue, 'labels' | 'stateType' | 'pipelineMembership'> | null,
 ): PipelineIssuePhase {
+  // The canonical membership resolver still owns post-merge limbo — an issue
+  // whose branch landed but whose tracker has not caught up (PAN-3341). It is
+  // derived, not stored, so it outranks the tracker's lagging state.
+  if (issue?.pipelineMembership?.available === true && issue.pipelineMembership.bucket === 'post_merge_limbo') {
+    return 'ship';
+  }
   if (!derived) return issue && isPipelineReady(issue) ? 'ready' : 'todo';
   if (derived.state === 'backlog' && issue && isPipelineReady(issue)) return 'ready';
   return PHASE_BY_DERIVED_STATE[derived.state];

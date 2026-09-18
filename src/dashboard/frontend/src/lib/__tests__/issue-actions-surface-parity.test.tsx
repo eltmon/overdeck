@@ -35,10 +35,8 @@ const cockpitQueryMocks = vi.hoisted(() => ({
   checks: { isLoading: false, data: { summary: { total: 0, passed: 0 }, checkRuns: [] } },
   planning: { data: { prd: '', state: '' }, isLoading: false },
   pr: { data: {} },
-  review: { data: undefined },
   costs: { data: { totalCost: 0, totalTokens: 0, byModel: {}, sessions: [] } },
   workspace: { data: null, isLoading: false },
-  shipLog: { data: null, isLoading: false },
 }));
 
 vi.mock('../../components/IssueActionMenu/useIssueActions', async (importOriginal) => {
@@ -59,10 +57,8 @@ vi.mock('../../components/CommandDeck/ZoneCOverviewTabs/queries', () => ({
   useIssueCheckRunsQuery: () => cockpitQueryMocks.checks,
   usePlanningQuery: () => cockpitQueryMocks.planning,
   usePrQuery: () => cockpitQueryMocks.pr,
-  useReviewStatusQuery: () => cockpitQueryMocks.review,
   useIssueCostsQuery: () => cockpitQueryMocks.costs,
   useWorkspaceQuery: () => cockpitQueryMocks.workspace,
-  useShipLogQuery: () => cockpitQueryMocks.shipLog,
 }));
 
 vi.mock('../../components/MergeButton', () => ({
@@ -132,8 +128,12 @@ const REGISTRY: ActionRegistry = {
 };
 
 const noop = () => undefined;
+const WORK_PANE = { id: 'pane-work', issue: 'PAN-1610', role: 'work' as const, harness: 'claude-code', model: 'claude-opus-4-8', state: 'working' as const };
+const OPEN_PR = { url: 'https://example.test/pr/1610', number: 1610, reviewState: 'APPROVED', checks: 'green' as const, mergeable: true };
+
 const BASE_STATE: IssueActionState = {
-  reviewStatus: null,
+  derived: null,
+  panes: [],
   agent: null,
   lifecycle: null,
   workspace: { exists: false, path: undefined, mrUrl: null },
@@ -158,6 +158,7 @@ const STATE_FIXTURES: readonly StateFixture[] = [
     sessionPresence: 'active',
     state: {
       ...BASE_STATE,
+      derived: { issueId: 'PAN-1610', state: 'planned' },
       workspace: { exists: true, path: '/tmp/feature-pan-1610', mrUrl: null },
       hasPlan: true,
       hasTasks: true,
@@ -170,7 +171,9 @@ const STATE_FIXTURES: readonly StateFixture[] = [
     sessionPresence: 'active',
     state: {
       ...BASE_STATE,
-      agent: { status: 'running', role: 'work', paused: false, troubled: false },
+      agent: { status: 'running', role: 'work', paused: false },
+      derived: { issueId: 'PAN-1610', state: 'working' },
+      panes: [WORK_PANE],
       workspace: { exists: true, path: '/tmp/feature-pan-1610', mrUrl: null },
       hasPlan: true,
       hasTasks: true,
@@ -183,7 +186,9 @@ const STATE_FIXTURES: readonly StateFixture[] = [
     sessionPresence: 'suspended',
     state: {
       ...BASE_STATE,
-      agent: { status: 'running', role: 'work', paused: true, troubled: false },
+      agent: { status: 'running', role: 'work', paused: true },
+      derived: { issueId: 'PAN-1610', state: 'working' },
+      panes: [WORK_PANE],
       lifecycle: { canResumeSession: true },
       workspace: { exists: true, path: '/tmp/feature-pan-1610', mrUrl: null },
       hasPlan: true,
@@ -197,8 +202,8 @@ const STATE_FIXTURES: readonly StateFixture[] = [
     sessionPresence: 'active',
     state: {
       ...BASE_STATE,
-      reviewStatus: { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'pending', readyForMerge: true },
-      agent: { status: 'stopped', role: 'work', paused: false, troubled: false },
+      derived: { issueId: 'PAN-1610', state: 'ready', pr: OPEN_PR },
+      agent: { status: 'stopped', role: 'work', paused: false },
       workspace: { exists: true, path: '/tmp/feature-pan-1610', mrUrl: 'https://example.test/pr/1610' },
       hasPlan: true,
       hasTasks: true,
@@ -213,8 +218,8 @@ const STATE_FIXTURES: readonly StateFixture[] = [
     sessionPresence: 'active',
     state: {
       ...BASE_STATE,
-      reviewStatus: { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'merged', readyForMerge: true },
-      agent: { status: 'stopped', role: 'work', paused: false, troubled: false },
+      derived: { issueId: 'PAN-1610', state: 'merged', pr: OPEN_PR },
+      agent: { status: 'stopped', role: 'work', paused: false },
       lifecycle: { canResumeSession: true },
       workspace: { exists: true, path: '/tmp/feature-pan-1610', mrUrl: 'https://example.test/pr/1610' },
       hasPlan: true,
@@ -222,7 +227,7 @@ const STATE_FIXTURES: readonly StateFixture[] = [
       hasPr: true,
       prUrl: 'https://example.test/pr/1610',
       isMerged: true,
-      issueCanonicalState: 'verifying_on_main',
+      issueCanonicalState: 'done',
     },
   },
 ];
@@ -404,7 +409,6 @@ function agentFixture(fixture: StateFixture): Agent | undefined {
     consecutiveFailures: 0,
     killCount: 0,
     paused: fixture.state.agent.paused,
-    troubled: fixture.state.agent.troubled,
   };
 }
 
@@ -432,15 +436,8 @@ function prepareStore(fixture: StateFixture) {
     drawer: { issueId: null, tab: 'overview' },
     issuesRaw: [issue],
     agentsById: agent ? { [agent.id]: agent } : {},
-    reviewStatusByIssueId: fixture.state.reviewStatus
-      ? {
-          'PAN-1610': {
-            issueId: 'PAN-1610',
-            updatedAt: '2026-07-17T00:00:00.000Z',
-            ...fixture.state.reviewStatus,
-          },
-        }
-      : {},
+    derivedIssueStateByIssueId: fixture.state.derived ? { 'PAN-1610': fixture.state.derived } : {},
+    backendPanesById: Object.fromEntries((fixture.state.panes ?? []).map((pane) => [pane.id, pane])),
   } as Parameters<typeof useDashboardStore.setState>[0]);
   return { issue, agent };
 }
@@ -518,7 +515,8 @@ function renderSurface(surface: Surface, fixture: StateFixture, context: Surface
     drawerDataState.current = {
       issue,
       agents: agent ? [agent] : [],
-      reviewStatus: fixture.state.reviewStatus,
+      derived: fixture.state.derived ?? undefined,
+      panes: [...(fixture.state.panes ?? [])],
       tasks: [],
       reviewSpecialists: [],
       verificationGates: [],

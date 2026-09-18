@@ -25,7 +25,7 @@ describe('deriveSpecialistChips', () => {
         reviewer('correctness', { presence: 'active' }),
         reviewer('security', { presence: 'ended', status: 'stopped', roundMetadata: { roundCount: 1, latestRound: 1, latestReviewResult: 'APPROVED', history: [] } }),
       ],
-      { reviewSubStatuses: { performance: 'done' } },
+      null,
     );
     expect(chips.map((c) => c.id)).toEqual([...REVIEW_SPECIALIST_ROLES]);
     const [security, correctness, performance, requirements] = chips;
@@ -33,7 +33,7 @@ describe('deriveSpecialistChips', () => {
     expect(security.lastLine).toContain('approved');
     expect(correctness.status).toBe('running');
     expect(correctness.hasConversation).toBe(true);
-    expect(performance.status).toBe('done'); // from reviewSubStatuses
+    expect(performance.status).toBe('queued');
     expect(performance.hasConversation).toBe(false);
     expect(requirements.status).toBe('queued');
   });
@@ -46,12 +46,13 @@ describe('deriveSpecialistChips', () => {
     expect(chips[0].verdict).toBe('CHANGES_REQUESTED');
   });
 
-  it('a completed convoy with no per-role data shows done/verdict, never phantom queued', () => {
-    const passed = deriveSpecialistChips([], { reviewStatus: 'passed' });
+  it("a completed convoy with no per-role node falls back to the PR's own review state", () => {
+    const pr = { url: 'https://example.test/pr/1', number: 1, checks: 'green' as const, mergeable: true };
+    const passed = deriveSpecialistChips([], { issueId: 'PAN-1', state: 'ready', pr: { ...pr, reviewState: 'APPROVED' } });
     expect(passed.every((c) => c.status === 'done' && c.verdict === 'APPROVED')).toBe(true);
-    const blocked = deriveSpecialistChips([], { reviewStatus: 'blocked' });
+    const blocked = deriveSpecialistChips([], { issueId: 'PAN-1', state: 'changes-requested', pr: { ...pr, reviewState: 'CHANGES_REQUESTED' } });
     expect(blocked.every((c) => c.status === 'failed' && c.verdict === 'CHANGES_REQUESTED')).toBe(true);
-    const reviewing = deriveSpecialistChips([], { reviewStatus: 'reviewing' });
+    const reviewing = deriveSpecialistChips([], { issueId: 'PAN-1', state: 'in-review', pr: { ...pr, reviewState: 'REVIEW_REQUIRED' } });
     expect(reviewing.every((c) => c.status === 'queued')).toBe(true);
   });
 });

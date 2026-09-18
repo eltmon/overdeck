@@ -30,7 +30,8 @@ function orb(id: string, state: ConfluenceOrb['state'], stage: ConfluenceOrb['st
     thinkUntil: 0,
     compactT: 0,
     spend: 0,
-    mergeStatus: null,
+    issueState: null,
+    attention: null,
   };
 }
 

@@ -115,7 +115,7 @@ describe('IssueActionContextMenu', () => {
     const menu = renderMenu({
       phase: 'WORK_RUNNING',
       primaryKeys: ['tell', 'doneWork'],
-      enabledKeys: ['tell', 'doneWork', 'purgeReview', 'wipe'],
+      enabledKeys: ['tell', 'doneWork', 'recoverAgent', 'wipe'],
       nonIssueActions: [sessionArtifactInvocation(sessionExtra)],
     });
 
@@ -293,16 +293,15 @@ describe('IssueActionContextMenu', () => {
     expect(screen.getByTestId('issue-action-verb-plan')).toHaveTextContent('pan plan');
   });
 
-  it('toggles Danger with pointer, Enter, and Space and keeps destructive styling in both locations', () => {
+  it('toggles Danger with pointer, Enter, and Space and keeps destructive styling inside it', () => {
     renderMenu({
       phase: 'WORK_RUNNING',
       primaryKeys: ['tell', 'doneWork'],
-      enabledKeys: ['tell', 'doneWork', 'purgeReview', 'wipe'],
+      enabledKeys: ['tell', 'doneWork', 'recoverAgent', 'wipe'],
     });
 
     const disclosure = screen.getByRole('menuitem', { name: 'Danger (1 available)' });
-    const purgeReview = screen.getByTestId('issue-action-purgeReview');
-    expect(purgeReview).toHaveClass('text-destructive');
+    expect(screen.queryByTestId('issue-action-wipe')).not.toBeInTheDocument();
 
     fireEvent.click(disclosure);
     expect(disclosure).toHaveAttribute('aria-expanded', 'true');

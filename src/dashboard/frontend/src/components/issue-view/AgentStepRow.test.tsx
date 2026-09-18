@@ -64,7 +64,6 @@ vi.mock('../shared/ModelPicker/ModelPicker', () => ({
 
 vi.mock('../CommandDeck/ZoneCOverviewTabs/queries', () => ({
   useIssueCostsQuery: () => ({ data: { sessions: costSessions } }),
-  useReviewStatusQuery: () => ({ data: null }),
   useWorkspaceQuery: () => ({ data: null }),
 }));
 

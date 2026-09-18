@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render as rtlRender, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { ReviewStatusSnapshot } from '@overdeck/contracts';
 import { bucketFeaturePhase, ProjectOverview } from '../ProjectOverview';
 import type { PipelineIssuePhase } from '../../../lib/pipeline-state';
 import { useDashboardStore } from '../../../lib/store';
 import type { ProjectFeature } from '../ProjectTree/ProjectNode';
+import type { DerivedIssueState } from '../../../types';
 import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
 
 let fetchControl: ReturnType<typeof installStrictFetchMock>;
@@ -41,23 +41,17 @@ function makeFeature(overrides: Partial<ProjectFeature> = {}): ProjectFeature {
   };
 }
 
-function reviewStatus(overrides: Partial<ReviewStatusSnapshot>): ReviewStatusSnapshot {
-  return {
-    issueId: 'PAN-1044',
-    ...overrides,
-  } as ReviewStatusSnapshot;
+function derived(overrides: Partial<DerivedIssueState> & Pick<DerivedIssueState, 'state'>): DerivedIssueState {
+  return { issueId: 'PAN-1044', ...overrides };
 }
 
 function expectPhase(
   expected: PipelineIssuePhase,
   featureOverrides: Partial<ProjectFeature>,
-  status?: Partial<ReviewStatusSnapshot>,
+  state?: Partial<DerivedIssueState> & Pick<DerivedIssueState, 'state'>,
 ) {
   expect(
-    bucketFeaturePhase(
-      makeFeature(featureOverrides),
-      status ? reviewStatus(status) : undefined,
-    ),
+    bucketFeaturePhase(makeFeature(featureOverrides), state ? derived(state) : undefined),
   ).toBe(expected);
 }
 
@@ -71,98 +65,36 @@ function rowFor(issueId: string): HTMLElement {
 
 describe('bucketFeaturePhase', () => {
   beforeEach(() => {
-    useDashboardStore.setState({ reviewStatusByIssueId: {} });
+    useDashboardStore.setState({ derivedIssueStateByIssueId: {} });
   });
 
-  it('buckets stuck issues by the stuck flag', () => {
-    expectPhase('todo', {}, { stuck: true });
+  it('maps every derived state onto its lane', () => {
+    expectPhase('todo', {}, { state: 'backlog' });
+    expectPhase('todo', {}, { state: 'parked' });
+    expectPhase('plan', {}, { state: 'planned' });
+    expectPhase('work', {}, { state: 'working' });
+    expectPhase('review', {}, { state: 'in-review' });
+    expectPhase('review', {}, { state: 'changes-requested' });
+    expectPhase('ship', {}, { state: 'ready' });
+    expectPhase('ship', {}, { state: 'merged' });
+    expectPhase('ship', {}, { state: 'closed' });
   });
 
-  it('buckets non-progress pipeline failures and blockers as stuck', () => {
-    expectPhase('review', {}, { reviewStatus: 'failed' });
-    expectPhase('review', {}, { reviewStatus: 'blocked' });
-    expectPhase('review', {}, { testStatus: 'failed' });
-    expectPhase('todo', {}, { testStatus: 'dispatch_failed' });
-    expectPhase('ship', {}, { mergeStatus: 'failed' });
-    expectPhase('review', {}, { verificationStatus: 'failed' });
+  it('ignores the tracker label once the issue has a derived state', () => {
+    expectPhase('work', { stateLabel: 'Done' }, { state: 'working' });
   });
 
-  it('buckets blocker reasons as stuck', () => {
-    expectPhase('todo', {}, {
-      blockerReasons: [
-        {
-          type: 'merge_conflict',
-          summary: 'Merge conflict',
-          detectedAt: '2026-05-09T00:00:00Z',
-        },
-      ],
-    });
-  });
-
-  it('buckets active merge statuses as merging', () => {
-    expectPhase('ship', {}, { mergeStatus: 'queued' });
-    expectPhase('ship', {}, { mergeStatus: 'merging' });
-    expectPhase('ship', {}, { mergeStatus: 'verifying' });
-  });
-
-  it('buckets ready-for-merge issues as awaitingMerge', () => {
-    expectPhase('ship', {}, { readyForMerge: true });
-  });
-
-  it('buckets verifying issues as awaiting close-out instead of awaiting merge', () => {
-    expectPhase('verifying', { stateLabel: 'Verifying' }, { readyForMerge: true });
-    expectPhase('verifying', { stateLabel: 'Verifying On Main' }, { mergeStatus: 'merged' });
-  });
-
-  it('buckets merged work that needs close-out in the ship lane', () => {
-    expectPhase('ship', { stateLabel: 'Merged — Needs Close-Out' });
-  });
-
-  it('buckets testing issues as tests', () => {
-    expectPhase('review', {}, { testStatus: 'testing' });
-  });
-
-  it('buckets active reviews as review', () => {
-    expectPhase('review', {}, { reviewStatus: 'reviewing' });
-  });
-
-  it('buckets running verification as buildGate', () => {
-    expectPhase('review', {}, { verificationStatus: 'running' });
-  });
-
-  it('buckets active work-agent issues without review status as working', () => {
-    expectPhase('work', { agentStatus: 'running' }, undefined);
-    expectPhase('work', { agentStatus: 'active' }, undefined);
+  it('falls back to the tracker state when nothing is derived yet', () => {
+    expectPhase('work', { agentStatus: 'running' });
     expectPhase('work', {
       agentStatus: 'stopped',
       sessions: [{ type: 'work', presence: 'active' }] as ProjectFeature['sessions'],
-    }, undefined);
-  });
-
-  it('does not bucket stopped or suspended agents as working', () => {
-    expectPhase('todo', { agentStatus: 'stopped' }, undefined);
-    expectPhase('todo', { agentStatus: 'suspended' }, undefined);
-  });
-
-  it('buckets planned issues without work sessions as planning using SessionNode.type', () => {
-    expectPhase('plan', {
-      hasPlanning: true,
-      sessions: [
-        { type: 'planning' },
-        { type: 'reviewer', role: 'work' },
-      ] as ProjectFeature['sessions'],
     });
-  });
-
-  it('does not bucket planned issues with a work session as planning', () => {
-    expectPhase('plan', {
-      hasPlanning: true,
-      sessions: [{ type: 'work' }] as ProjectFeature['sessions'],
-    });
-  });
-
-  it('buckets issues with no active signals as idle', () => {
-    expectPhase('todo', {}, undefined);
+    expectPhase('ship', { stateLabel: 'Merged — Needs Close-Out' });
+    expectPhase('review', { stateLabel: 'In Review' });
+    expectPhase('plan', { hasPlanning: true });
+    expectPhase('todo', { agentStatus: 'stopped' });
+    expectPhase('todo', {});
   });
 });
 
@@ -191,7 +123,7 @@ describe('ProjectOverview', () => {
       }
       return undefined;
     });
-    useDashboardStore.setState({ reviewStatusByIssueId: {} });
+    useDashboardStore.setState({ derivedIssueStateByIssueId: {} });
   });
 
   afterEach(async () => {
@@ -327,9 +259,9 @@ describe('ProjectOverview', () => {
 
   it('pins needs-you issues first and labels them waiting on you', () => {
     useDashboardStore.setState({
-      reviewStatusByIssueId: {
-        'PAN-1': reviewStatus({ issueId: 'PAN-1', reviewStatus: 'reviewing' }),
-        'PAN-2': reviewStatus({ issueId: 'PAN-2', readyForMerge: true }),
+      derivedIssueStateByIssueId: {
+        'PAN-1': derived({ issueId: 'PAN-1', state: 'in-review' }),
+        'PAN-2': derived({ issueId: 'PAN-2', state: 'ready' }),
       },
     });
 
@@ -338,7 +270,7 @@ describe('ProjectOverview', () => {
         projectName="overdeck"
         features={[
           makeFeature({ issueId: 'PAN-1', title: 'Reviewing' }),
-          makeFeature({ issueId: 'PAN-2', title: 'Ready', readyForMerge: true }),
+          makeFeature({ issueId: 'PAN-2', title: 'Ready' }),
         ]}
         issueCosts={{}}
         onSelectFeature={() => {}}
@@ -407,9 +339,13 @@ describe('ProjectOverview', () => {
 
   it('shows stuck reasons as the row subline for blocked issues', () => {
     useDashboardStore.setState({
-      reviewStatusByIssueId: {
-        'PAN-1': reviewStatus({ issueId: 'PAN-1', reviewStatus: 'blocked' }),
-        'PAN-2': reviewStatus({ issueId: 'PAN-2', testStatus: 'dispatch_failed' }),
+      derivedIssueStateByIssueId: {
+        'PAN-1': derived({
+          issueId: 'PAN-1',
+          state: 'in-review',
+          pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'APPROVED', checks: 'red', mergeable: true },
+        }),
+        'PAN-2': derived({ issueId: 'PAN-2', state: 'working', attention: 'api-error' }),
       },
     });
 
@@ -425,16 +361,24 @@ describe('ProjectOverview', () => {
       />,
     );
 
-    expect(rowFor('PAN-1')).toHaveTextContent('Review blocked');
-    expect(rowFor('PAN-2')).toHaveTextContent('Test dispatch failed');
+    expect(rowFor('PAN-1')).toHaveTextContent('Checks failing on the pull request');
+    expect(rowFor('PAN-2')).toHaveTextContent('Provider errors — the agent cannot make a call');
   });
 
-  it('summarizes current CI health from project review state', () => {
+  it('summarizes current CI health from the forge', () => {
     useDashboardStore.setState({
-      reviewStatusByIssueId: {
-        'PAN-1': reviewStatus({ issueId: 'PAN-1', blockerReasons: [{ type: 'failing_checks', summary: 'Checks failing', details: 'test job failed on main', detectedAt: '2026-06-14T00:00:00Z' }] }),
-        'PAN-2': reviewStatus({ issueId: 'PAN-2', blockerReasons: [{ type: 'merge_conflict', summary: 'Merge conflict', details: 'src/app.ts conflicts', detectedAt: '2026-06-14T00:00:00Z' }] }),
-        'PAN-3': reviewStatus({ issueId: 'PAN-3', readyForMerge: true }),
+      derivedIssueStateByIssueId: {
+        'PAN-1': derived({
+          issueId: 'PAN-1',
+          state: 'in-review',
+          pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'APPROVED', checks: 'red', mergeable: true },
+        }),
+        'PAN-2': derived({
+          issueId: 'PAN-2',
+          state: 'in-review',
+          pr: { url: 'https://example.com/pr/2', number: 2, reviewState: 'APPROVED', checks: 'green', mergeable: false },
+        }),
+        'PAN-3': derived({ issueId: 'PAN-3', state: 'ready' }),
       },
     });
 
@@ -444,7 +388,7 @@ describe('ProjectOverview', () => {
         features={[
           makeFeature({ issueId: 'PAN-1', title: 'CI red' }),
           makeFeature({ issueId: 'PAN-2', title: 'Conflict' }),
-          makeFeature({ issueId: 'PAN-3', title: 'Ready', readyForMerge: true }),
+          makeFeature({ issueId: 'PAN-3', title: 'Ready' }),
           makeFeature({ issueId: 'PAN-4', title: 'Work', agentStatus: 'running' }),
         ]}
         issueCosts={{}}
@@ -460,11 +404,9 @@ describe('ProjectOverview', () => {
     expect(within(ciHealth).getByText('Work agents').parentElement).toHaveTextContent('1 running');
     expect(ciHealth).toHaveTextContent('Blocking details');
     expect(ciHealth).toHaveTextContent('PAN-1');
-    expect(ciHealth).toHaveTextContent('Checks failing');
-    expect(ciHealth).toHaveTextContent('test job failed on main');
+    expect(ciHealth).toHaveTextContent('Checks failing on PR #1');
     expect(ciHealth).toHaveTextContent('PAN-2');
-    expect(ciHealth).toHaveTextContent('Merge conflict');
-    expect(ciHealth).toHaveTextContent('src/app.ts conflicts');
+    expect(ciHealth).toHaveTextContent('The pull request conflicts with main');
   });
 
   it('wires hero stat cards to their optional callbacks', () => {

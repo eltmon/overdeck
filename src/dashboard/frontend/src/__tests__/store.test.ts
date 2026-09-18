@@ -10,7 +10,7 @@ import {
   selectAgents,
   selectAgentById,
   selectAgentsByRole,
-  selectReviewStatus,
+  selectDerivedIssueState,
   selectAgentOutput,
   selectChannelPermissionRequests,
   selectIsBootstrapped,
@@ -57,6 +57,8 @@ const reviewAgent: AgentSnapshot = {
 
 const emptyState: DashboardState = {
   ...INITIAL_READ_MODEL_STATE,
+  derivedIssueStateByIssueId: {},
+  backendPanesById: {},
   drawer: { issueId: null, tab: 'overview' },
   bootstrapComplete: false,
   snapshotTimestamp: null,
@@ -303,23 +305,6 @@ describe('applyEventReducer — runtime events', () => {
   })
 })
 
-// ─── Pipeline / review reducers ───────────────────────────────────────────────
-
-describe('applyEventReducer — review/pipeline events', () => {
-  it('pipeline.status_changed updates review status', () => {
-    const status = {
-      issueId: 'PAN-1',
-      reviewStatus: 'passed' as const,
-      testStatus: 'pending' as const,
-      readyForMerge: false,
-      updatedAt: '2026-01-01T00:00:00Z',
-    }
-    const event = makeEvent('pipeline.status_changed', 8, { issueId: 'PAN-1', status })
-    const next = applyEventReducer(emptyState, event)
-    expect(next.reviewStatusByIssueId['PAN-1']).toEqual(status)
-  })
-})
-
 // ─── Resource / activity reducers ─────────────────────────────────────────────
 
 describe('applyEventReducer — resources and activity', () => {
@@ -479,8 +464,8 @@ describe('selectors', () => {
     expect(selectAgentsByRole('test')(state)).toEqual([])
   })
 
-  it('selectReviewStatus returns undefined when not present', () => {
-    expect(selectReviewStatus('PAN-1')(state)).toBeUndefined()
+  it('selectDerivedIssueState returns undefined when not present', () => {
+    expect(selectDerivedIssueState('PAN-1')(state)).toBeUndefined()
   })
 
   it('selectAgentOutput returns lines for known agent', () => {

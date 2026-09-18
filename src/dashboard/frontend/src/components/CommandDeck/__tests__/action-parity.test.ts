@@ -11,7 +11,7 @@ const issueActionKeys = new Set(ISSUE_ACTIONS.map((action) => action.key));
 
 const legacyIssueActionMap: Record<string, IssueActionKey | null> = {
   'Review & Test': 'requestReview',
-  Recover: 'recoverReview',
+  Recover: 'recoverAgent',
   'Stop agent': 'stopAgent',
   'Start agent': 'startAgent',
   'Create workspace': 'createWorkspace',
@@ -24,7 +24,6 @@ const legacyIssueActionMap: Record<string, IssueActionKey | null> = {
   'Complete work reset': 'completeWorkReset',
   'Restart agent': 'restartAgent',
   'Restart from plan': 'restartFromPlan',
-  'Reset issue': 'resetIssue',
   Tasks: 'tasks',
   Transcripts: 'transcripts',
   Discussions: 'discussions',
@@ -32,11 +31,8 @@ const legacyIssueActionMap: Record<string, IssueActionKey | null> = {
   Inference: 'inference',
   'Sync discussions': 'syncDiscussions',
   'Sync main': 'syncMain',
-  'Status review': 'statusReview',
   'Copy settings': 'copySettings',
   Open: 'open',
-  'Inspect task': 'inspectTask',
-  Untroubled: 'untroubled',
 };
 
 const zoneBSessionActionKeys = [

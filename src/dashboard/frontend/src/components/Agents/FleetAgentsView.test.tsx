@@ -245,8 +245,8 @@ describe('FleetAgentsView', () => {
     expect(within(menu).getByTestId('issue-action-stopAgent')).toHaveTextContent('Stop agent');
     expect(within(menu).getByTestId('issue-action-pause')).toHaveTextContent('Pause agent');
     expect(within(menu).getByTestId('issue-action-unpause')).toHaveTextContent('Unpause agent');
-    expect(within(menu).getByTestId('issue-action-untroubled')).toHaveTextContent('Clear troubled gate');
-    expect(within(menu).getByTestId('issue-action-recoverAgent')).toHaveTextContent('Recover agent');
+    expect(within(menu).queryByTestId('issue-action-untroubled')).not.toBeInTheDocument();
+    expect(within(menu).getAllByTestId('issue-action-recoverAgent')[0]).toHaveTextContent('Recover agent');
     expect(within(menu).getByTestId('issue-action-resumeSession')).toHaveTextContent('Resume session');
     expect(within(menu).queryByTestId('issue-action-switchModel')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-plan')).not.toBeInTheDocument();
@@ -311,7 +311,11 @@ describe('FleetAgentsView', () => {
       </QueryClientProvider>,
     );
 
-    fireEvent.click(screen.getAllByText('Open issue')[0]);
+    // Address the card by its agent rather than by grid position: card order
+    // follows the fleet's phase sort, which is not what this test is about.
+    const runningCard = document.querySelector('[data-component="agent-card"][data-agent-id="agent-running"]');
+    expect(runningCard).toBeTruthy();
+    fireEvent.click(within(runningCard as HTMLElement).getByText('Open issue'));
 
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'overview' });
     expect(window.location.search).toBe('?issue=PAN-1&tab=overview');

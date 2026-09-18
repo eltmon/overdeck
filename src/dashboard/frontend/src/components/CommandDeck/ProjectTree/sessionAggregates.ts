@@ -2,7 +2,7 @@
  * sessionAggregates — pure predicates that fold a feature's descendant sessions
  * into one signal for its row. Extracted from FeatureItem (a baselined god file)
  * so aggregation logic has a home that can be tested directly, matching the
- * sibling-helper precedent set by troubledBadge.ts.
+ * sibling-helper precedent for this directory.
  */
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import { type StatusDotStatus } from '../StatusDot';
