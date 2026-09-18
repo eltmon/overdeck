@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-09-18T06:43:33.655Z",
-  "updated": "2026-09-18T07:40:14.539Z",
+  "updated": "2026-09-18T07:40:25.129Z",
   "pipeline": {
     "issueId": "PAN-3894",
     "reviewStatus": "pending",
@@ -63,8 +63,16 @@
     }
   ],
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "w3a-extract-specialist-patrol": {
+        "writerId": "agent-pan-3894",
+        "agentId": "agent-pan-3894",
+        "pid": 668965,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-18T07:40:25.129Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3894",
@@ -106,6 +114,7 @@
     "w8-delete-stuck-stub.ac1": "completed",
     "w8-delete-stuck-stub.ac2": "completed",
     "w8-delete-stuck-stub.ac3": "completed",
-    "w8-delete-stuck-stub.ac4": "completed"
+    "w8-delete-stuck-stub.ac4": "completed",
+    "w3a-extract-specialist-patrol": "running"
   }
 }
