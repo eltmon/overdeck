@@ -125,6 +125,8 @@ vi.mock('../styles/command-deck.module.css', () => ({
     sessionList: 'sessionList',
     sessionNode: 'sessionNode',
     sessionNodeSelected: 'sessionNodeSelected',
+    sessionToggleSlot: 'sessionToggleSlot',
+    sessionDotSlot: 'sessionDotSlot',
     sessionIconSlot: 'sessionIconSlot',
     sessionLabel: 'sessionLabel',
     sessionModel: 'sessionModel',
@@ -1483,11 +1485,16 @@ describe('FeatureItem', () => {
     const activeLink = screen.getByTestId('conversation-42');
     expect(activeLink).toHaveAttribute('href', '/conv/42');
     expect(activeLink).toHaveTextContent('My conv');
-    expect(activeLink.children).toHaveLength(4);
-    expect(activeLink.children[0]).toHaveClass('sessionIconSlot');
-    expect(activeLink.children[1]).toHaveClass('sessionLabel');
-    expect(activeLink.children[2]).toHaveClass('sessionStatus');
-    expect(activeLink.children[3]).toHaveClass('sessionModel');
+    // The row shares .sessionNode's grid with agent session rows, so it must
+    // emit the same leading caret and dot slots or the label lands in the 12px
+    // dot column and the status chip paints over the id.
+    expect(activeLink.children).toHaveLength(6);
+    expect(activeLink.children[0]).toHaveClass('sessionToggleSlot');
+    expect(activeLink.children[1]).toHaveClass('sessionDotSlot');
+    expect(activeLink.children[2]).toHaveClass('sessionIconSlot');
+    expect(activeLink.children[3]).toHaveClass('sessionLabel');
+    expect(activeLink.children[4]).toHaveClass('sessionStatus');
+    expect(activeLink.children[5]).toHaveClass('sessionModel');
 
     const endedLink = screen.getByTestId('conversation-43');
     expect(endedLink).toHaveAttribute('href', '/conv/43');
