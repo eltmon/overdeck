@@ -613,18 +613,18 @@
     "recordedAt": "2026-09-18T09:36:36.969Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-09-18T09:39:00.409Z",
+  "updated": "2026-09-18T09:39:03.713Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "pending",
+    "verificationStatus": "skipped",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T09:39:00.315Z",
+    "updatedAt": "2026-09-18T09:39:03.686Z",
     "reviewNotes": "killAgent skips terminate when the abort RPC fails and has no grace period; runtime-adapter.ac3 + message-delivery.ac3 unmet, only test exercises an unreachable registry",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3670",
     "reviewRequestedAt": "2026-09-18T09:36:38.415Z",
@@ -969,7 +969,7 @@
       },
       "costAtCloseOut": {
         "usd": 182.1714763,
-        "pricingAsOf": "2026-09-18T09:39:00.388Z"
+        "pricingAsOf": "2026-09-18T09:39:03.701Z"
       }
     },
     "merges": [
