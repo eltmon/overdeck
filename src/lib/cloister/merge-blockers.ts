@@ -9,9 +9,7 @@
  * The in-flight candidate set comes from the durable pipeline lenses (tracker +
  * git + PR), never from a record.
  */
-import { resolvePipelineMembership } from '../pipeline-membership.js';
-import type { ProjectConfig } from '../projects.js';
-import type { gatherProjectLensSignalsForProjects } from '../pipeline-membership-gather.js';
+import { listInFlightIssuesWithPr, type MergeCandidateDeps } from './merge-ready-set.js';
 import { getPrFacts, type PrFacts } from './pr-facts.js';
 
 export type MergeBlockerType = 'merge_conflict' | 'failing_checks' | 'not_mergeable';
@@ -22,11 +20,7 @@ export interface MergeBlocker {
   reasons: Array<{ type: MergeBlockerType; summary: string }>;
 }
 
-export interface MergeBlockersDeps {
-  listProjects?: () => Promise<Array<{ key: string; config: ProjectConfig }>>;
-  gather?: typeof gatherProjectLensSignalsForProjects;
-  getFacts?: typeof getPrFacts;
-}
+export type MergeBlockersDeps = MergeCandidateDeps;
 
 /**
  * Classify one PR's forge state into blocker reasons. Pure: the caller supplies
@@ -49,42 +43,17 @@ export function blockerReasonsFor(facts: PrFacts): MergeBlocker['reasons'] {
 }
 
 /**
- * The in-flight issues with an open PR, from the durable pipeline lenses.
- *
- * The lens gather is loaded lazily so a caller that injects its own candidate
- * source (tests, the CLI) never pulls the whole tracker/git gather graph in.
- */
-async function collectCandidates(deps: MergeBlockersDeps): Promise<string[]> {
-  const listProjects = deps.listProjects
-    ?? (await import('../projects.js')).listProjectsAsync;
-  const gather = deps.gather
-    ?? (await import('../pipeline-membership-gather.js')).gatherProjectLensSignalsForProjects;
-  const projects = await listProjects();
-  const gathered = await gather(projects.map(({ config }) => config));
-
-  const candidates: string[] = [];
-  for (const { signals } of gathered) {
-    for (const signal of signals ?? []) {
-      if (!signal.hasOpenPr) continue;
-      if (resolvePipelineMembership(signal).bucket !== 'in_flight') continue;
-      candidates.push(signal.issueId.toUpperCase());
-    }
-  }
-  return candidates;
-}
-
-/**
  * Every in-flight issue whose PR is approved but blocked by the forge.
  *
  * Async because the forge is the source: callers that used to read SQLite
  * synchronously (the dashboard route and `pan flywheel merge-blockers`) await it.
  */
 export async function getMergeBlockersPayload(deps: MergeBlockersDeps = {}): Promise<MergeBlocker[]> {
-  const candidates = await collectCandidates(deps);
+  const candidates = await listInFlightIssuesWithPr(deps);
 
   const getFacts = deps.getFacts ?? getPrFacts;
   const out: MergeBlocker[] = [];
-  for (const issueId of [...new Set(candidates)]) {
+  for (const issueId of candidates) {
     const facts = await getFacts(issueId);
     if (!facts.approved) continue;
     const reasons = blockerReasonsFor(facts);
