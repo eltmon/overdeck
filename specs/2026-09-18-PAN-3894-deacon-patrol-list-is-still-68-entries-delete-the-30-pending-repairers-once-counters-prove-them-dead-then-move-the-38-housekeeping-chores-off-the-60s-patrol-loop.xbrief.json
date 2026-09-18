@@ -1,0 +1,904 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-18T06:56:20Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3894: Deacon patrol list is still 68 entries: delete the 30 pending repairers once counters prove them dead, then move the 38 housekeeping chores off the 60s patrol loop",
+    "updated": "2026-09-18T07:13:17.973Z"
+  },
+  "plan": {
+    "id": "pan-3894",
+    "title": "Deacon patrol list is still 68 entries: delete the 30 pending repairers once counters prove them dead, then move the 38 housekeeping chores off the 60s patrol loop",
+    "status": "proposed",
+    "uid": "516e8d67-7635-4138-b0b1-759cdb6c0757",
+    "author": "agent:claude-fable-5-1",
+    "sequence": 2,
+    "created": "2026-09-18T06:56:20Z",
+    "updated": "2026-09-18T07:13:17.973Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3894",
+        "label": "PAN-3894",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3895",
+        "label": "PAN-3895 (Part A deletions, time-gated sibling)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3845",
+        "label": "PAN-3845 (substrate epic)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3850",
+        "label": "PAN-3850 (Phase 5)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "deacon",
+      "cloister",
+      "patrols",
+      "housekeeping-scheduler",
+      "pan-doctor",
+      "no-loss-audit"
+    ],
+    "narratives": {
+      "Problem": "After the substrate epic, runPatrol() still runs 68 budgeted patrols (plus 5 alarms) every 60 seconds: 30 state-repair patrols awaiting soak-gated deletion and 38 Keep/Rewire chores that ride the tick only because it was there. The tick should be stuck detection and pipeline progress; housekeeping belongs on slower, durable cadences. The deletions are gated on 7 clean days of would-fire counters, and on 2026-09-18 that evidence is one day old for 22 patrols, absent for 7 (no counter sites), and invalid for reconcileInFlightJournals (its counter records the F15 enriched-vs-raw delta: 145 firings in 5 hours).",
+      "Proposal": "Part B now: a declarative patrol registry (src/lib/cloister/patrol-registry.ts: 14 TICK_PATROLS and 29 HOUSEKEEPING_CHORES with fast=5min/hourly/daily cadences), a housekeeping scheduler (src/lib/cloister/housekeeping-scheduler.ts) that ticks every 60s and runs a chore when now - lastRunAt >= cadence with lastRunAt persisted to ~/.overdeck/deacon/housekeeping.json (durable across pan reload, single-flight, pause-aware, budgeted through runBudgetedPatrol), runPatrol reduced to the 14 tick steps plus the 30 pending-soak steps, pan doctor printing a Patrol cadences table, and the no-loss audit holding TICK ∪ CHORES against Appendix C. Part A prerequisites now: would-fire counters and shadow gates for the six counter-less Phase 4 patrols, an honest reconcileInFlightJournals counter (real journal folds only), and deletion of the checkStuckWorkAgents no-op stub. Part A deletions (30 patrols, one commit each, family audit fixtures) are filed as PAN-3895 with the decision rule and per-patrol map, executable once each patrol has 7 clean days (earliest 2026-09-25).",
+      "NonGoals": "- Deleting any of the 29 remaining PENDING_SOAK_DELETION patrols in this issue (PAN-3895 owns them; their evidence windows are not open)\n- Writing the family no-loss audit fixtures for those deletions (PAN-3895)\n- A Docker events subscriber or any new reactive handler; existing reactive primaries in service-reactive.ts are unchanged and the polled runs become slower backstops\n- Making cadences configurable via cloister config; the three classes are constants in the registry\n- Changing the five exempt alarm patrols, the patrol budget mechanism, the invariant checker, the stall sweeper, or the 15s resource-pressure timer\n- Changing shadow-mode semantics (OVERDECK_PATROL_SHADOW) or the would-fire file format\n- Any dashboard UI for cadences (pan doctor is the only surface)\n- Moving refreshHostHeartbeatForEphemeralVms off the tick (the VM watchdog kills machines after a 5-minute heartbeat gap)\n- Touching model routing, effort, or spawn flags\n- Manual triggering of housekeeping chores: POST /api/deacon/patrol runs the 60s tick only\n- Chore actions in PatrolResult.actionsToken / GET /api/deacon/status (they reach GET /api/deacon/logs and the deacon log file through appendDeaconLog)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Split the 30 deletions into sibling PAN-3895; PAN-3894 delivers Part B plus the non-time-gated Part A prerequisites.",
+        "rationale": "Deletion evidence needs 7 clean days per patrol; on 2026-09-18 it is 1 day old for 22 patrols, absent for 7 (no recordWouldFire sites), and invalid for reconcileInFlightJournals (F15 noise). A single issue would hold an open deacon.ts PR for a week after Part B lands."
+      },
+      {
+        "summary": "Tick set is 14 steps: 5 alarms, the invariant checker, swarm janitor, checkPostReviewCommits, patrolStrikeLandings, monitorReviewConvoySignals, checkDeadEndAgents, nudgeIdleWorkAgentsWithOpenBeads, checkThinkingSignatureCorruption, refreshHostHeartbeatForEphemeralVms.",
+        "rationale": "These are stuck recovery, tick-debounced (checkPostReviewCommits needs two consecutive ticks), 1-minute-windowed (checkMassDeath), or time-critical (EPHEMERAL_HEARTBEAT_STALE_THRESHOLD_SECONDS = 300 in remote-agents.ts would let the VM watchdog kill machines on a slower heartbeat)."
+      },
+      {
+        "summary": "Three cadence classes (fast 5 min, hourly, daily) with durable per-chore lastRunAt in ~/.overdeck/deacon/housekeeping.json, checked by a 60s scheduler tick.",
+        "rationale": "patrolCycle is persisted so today's % 60 gates survive pan reload; bare hourly/daily setIntervals would reset on every restart and daily chores would rarely fire on a machine that reloads several times a day. A staleness sweep of every moved chore found no internal grace or cooldown under 2 minutes, so 5-minute latency is safe."
+      },
+      {
+        "summary": "No new event-driven infrastructure; existing reactive handlers stay primary and their polled runs move to hourly.",
+        "rationale": "reconcileClosedIssueAgents, reconcileOrphanProposedSpecs and reconcileIdleWorkspaceStacks already have reactive handlers in service-reactive.ts. Strike-workspace reaping cannot key on the merge event because the strike session is still alive when the merge lands. A Docker events stream is new surface with no proven need; container health polls at 5 minutes with its existing 60s backoff floor."
+      },
+      {
+        "summary": "Container-restart backoff bookkeeping becomes process-local in-memory state instead of DeaconState.",
+        "rationale": "Off-tick, checkWorkspaceContainerHealth cannot share runPatrol's in-memory state and a separate saveState clobbers it (deacon.ts:2419 comment). Losing the map across a dashboard restart only grants a crash-looping container up to five more attempts per process."
+      },
+      {
+        "summary": "Fix the reconcileInFlightJournals counter to fire only on a genuine journal fold instead of treating its nonzero count as a transition gap.",
+        "rationale": "Appendix C row #4 and epic W27 both document that the patrol compares an enriched read against the raw row and fires forever (F15). Its 145 firings in 5 hours are that noise; left alone it would also cross its 50/day budget daily and page the operator."
+      },
+      {
+        "summary": "Delete checkStuckWorkAgents in this issue without a soak.",
+        "rationale": "The function body is `return []` (deacon.ts:814-816, \"Retained as a no-op stub\"); it repairs nothing, so a counter would be zero by construction and the audit evidence is the source itself."
+      },
+      {
+        "summary": "Cadences are constants, not configuration.",
+        "rationale": "Karpathy rule 2: no configurability that was not requested; the issue asks for a decision per chore, not a knob."
+      },
+      {
+        "summary": "Deacon-resident chore functions are injected into the registry through a ChoreContext; the registry never references deacon.js; deacon.ts imports the scheduler statically.",
+        "rationale": "scripts/lint-circular-deps.sh runs madge, which counts dynamic imports as edges (verified with a two-file fixture on 2026-09-18). Reachability over the madge graph shows no chore module or scheduler dependency reaches deacon.ts or service.ts, so injection removes the only possible new cycle."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "The issue was already decomposed: the time-gated 30 deletions are PAN-3895. What remains has one shared mutation point (src/lib/cloister/deacon.ts, edited by five items in a serial chain) and one shared audit file; the file count (29) is dominated by two-line test and doc touches, and the subsystems are src/lib, src/cli, tests/unit, tests/lib, scripts, docs, CLAUDE.md. Splitting further would put the registry, the scheduler, and the runPatrol rewiring in separate PRs that each conflict on deacon.ts.",
+      "canonicalFilename": "2026-09-18-PAN-3894-deacon-patrol-list-is-still-68-entries-delete-the-30-pending-repairers-once-counters-prove-them-dead-then-move-the-38-housekeeping-chores-off-the-60s-patrol-loop.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "w1-patrol-registry",
+        "title": "Patrol registry: TICK_PATROLS, CADENCE_MS, and the 29 HOUSEKEEPING_CHORES with dynamic-import run closures",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-18T06:56:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3894",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/patrol-registry.ts",
+            "tests/unit/lib/cloister/patrol-registry.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/patrol-registry.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "patrol-registry.test.ts passes with 5 cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "foundationFor": [
+            "w2-housekeeping-scheduler",
+            "w4-wire-tick-and-scheduler",
+            "w5-doctor-cadence-table"
+          ],
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/patrol-registry.ts exactly as PRD §5.1: PatrolCadence, CADENCE_MS {fast: 300000, hourly: 3600000, daily: 86400000}, TICK_PATROLS (the 14 names in PRD D2 order), DeaconChoreFns + ChoreContext (the four deacon-resident functions checkAndSuspendIdleAgents, checkMergedWorkSessions, checkWorkspaceContainerHealth, cleanupStaleAgentState are INJECTED by startDeacon; the registry never references deacon.js, statically or dynamically, because scripts/lint-circular-deps.sh counts dynamic imports as edges — PRD D7), HousekeepingChore with run(ctx), and HOUSEKEEPING_CHORES (29 entries in PRD D5 order: 20 fast, 7 hourly, 2 daily) whose run closures use `await import(...)` of their own module or ctx.deacon.<fn>() and apply the return-shape adapters listed in §5.1 (pending-post-merge path, deploy void, remote reap filter, state-plane/residue message mapping, agents-gc ids, transcript_days guard). Set trigger strings on reconcileIdleWorkspaceStacks, reconcileClosedIssueAgents, reconcileOrphanProposedSpecs."
+        },
+        "items": [
+          {
+            "id": "w1-patrol-registry.ac1",
+            "title": "Given the registry module, when tests read it, then TICK_PATROLS has 14 names and HOUSEKEEPING_CHORES has 29 entries with no name in both lists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-patrol-registry.ac2",
+            "title": "Given HOUSEKEEPING_CHORES, when iterated, then every cadence is a key of CADENCE_MS and sweepTranscriptRetention precedes pruneTerminalStoppedAgents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-patrol-registry.ac3",
+            "title": "Given the source file text, when scanned, then it contains no reference to deacon.js at all (neither static nor dynamic import)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-patrol-registry.ac4",
+            "title": "Given each chore run closure, when invoked with a stub ChoreContext and its module mocked, then it returns string[] (adapters convert void, objects, and result rows to action strings; the four deacon-resident chores call ctx.deacon)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2-housekeeping-scheduler",
+        "title": "Housekeeping scheduler with durable per-chore due-times, single-flight, pause skip, and budgeted runs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-18T06:56:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3894",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/housekeeping-scheduler.ts",
+            "tests/unit/lib/cloister/housekeeping-scheduler.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/housekeeping-scheduler.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "housekeeping-scheduler.test.ts passes with the eight PRD W2 cases (a)-(h)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement PRD §5.2 in src/lib/cloister/housekeeping-scheduler.ts: HOUSEKEEPING_SCHEDULER_TICK_MS = 60000, housekeepingStatePath() under getOverdeckHome()/deacon/housekeeping.json, tolerant readHousekeepingState, isChoreDue (no lastRunAt => due; else now - lastRunAt >= CADENCE_MS[cadence]), runHousekeepingTick(deps) (deps.context carries the ChoreContext; deps.isPaused defaults to a LAZY `(await import(\"../overdeck/control-settings.js\")).isDeaconGloballyPaused()` so pan doctor's static import graph stays free of SQLite app-settings; static imports limited to ./patrol-registry.js, ./in-flight-guard.js, ./patrol-budget.js, ../paths.js, node:fs, node:path) iterating chores in registry order and calling chore.run(deps.context), running each due chore through runBudgetedPatrol inside try/catch (warn on throw, continue), logging each returned action at level action via deps.log, stamping lastRunAt after every run (including a throwing one) with an atomic tmp+rename write; startHousekeepingScheduler (idempotent, unref, createInFlightGuard key housekeeping) and stopHousekeepingScheduler; listHousekeepingRows for pan doctor. Skip the whole tick while `await isPaused()` is true with one info log per pause span. The manual POST /api/deacon/patrol trigger runs the 60s tick only; chores are not manually triggerable (decided, PRD §5.2). Fake timers only (vi.useFakeTimers + advanceTimersByTimeAsync)."
+        },
+        "items": [
+          {
+            "id": "w2-housekeeping-scheduler.ac1",
+            "title": "Given a chore with no lastRunAt, when the first tick runs, then the chore runs and housekeeping.json records its lastRunAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-housekeeping-scheduler.ac2",
+            "title": "Given a fast chore that ran at t0 and an hourly chore pre-seeded at t0-30min in the file, when the scheduler advances 4 minutes, then neither runs; when it advances to t0+5min, then only the fast chore runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-housekeeping-scheduler.ac3",
+            "title": "Given a chore whose run throws, when the tick runs, then a warn log is emitted, later chores in the same tick still run, and the thrower's lastRunAt is stamped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-housekeeping-scheduler.ac4",
+            "title": "Given isPaused returns true, when a tick fires, then no chore runs and exactly one info log is emitted for the pause span",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-housekeeping-scheduler.ac5",
+            "title": "Given a tick still in flight, when the interval fires again, then the second tick is skipped (createInFlightGuard run returns false) and no chore runs twice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w8-delete-stuck-stub",
+        "title": "Delete the checkStuckWorkAgents no-op stub, its registration, its test cases, its audit row, and its doc section",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-18T06:56:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-3894",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon.ts",
+            "src/lib/cloister/__tests__/deacon-stuck-skip.test.ts",
+            "tests/unit/lib/cloister/patrol-no-loss-audit.test.ts",
+            "docs/DEACON-HEALTH-MONITORING.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/patrol-no-loss-audit.test.ts src/lib/cloister/__tests__/deacon-stuck-skip.test.ts",
+            "grep -rn \"checkStuckWorkAgents\" src tests docs/DEACON-HEALTH-MONITORING.md"
+          ],
+          "expected_outputs": [
+            "audit test passes with checkStuckWorkAgents in DELETED_PATROLS",
+            "grep returns only the DELETED_PATROLS row in the audit test"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W8: remove the checkStuckWorkAgents function (deacon.ts ~800-816, including its comment block) and its runBudgetedPatrol registration (~2984-2986, plus the actions.push/addLog lines that follow it). Remove the checkStuckWorkAgents cases from src/lib/cloister/__tests__/deacon-stuck-skip.test.ts (delete the file if nothing else remains). In the audit test move the name from PENDING_SOAK_DELETION to DELETED_PATROLS mapped to { file: \"unit/lib/cloister/stuck-remediation-oracle.test.ts\", namedIndividually: false } with a comment naming PAN-800 and checkStuckAgentRemediation. In docs/DEACON-HEALTH-MONITORING.md delete the \"Extended Thinking\" summary row, the \"### Extended Thinking (`checkStuckWorkAgents`)\" section, AND the bullet \"`checkStuckWorkAgents` — skip extended-thinking recovery\" under \"Per-Issue Deacon Ignore → Where the skip fires\" (line ~311). Leave historical PRDs under docs/prds/ untouched. One commit whose message names the audit test and states the function body returned [] (no soak needed)."
+        },
+        "items": [
+          {
+            "id": "w8-delete-stuck-stub.ac1",
+            "title": "Given the tree after the commit, when grep -rn \"checkStuckWorkAgents\" src tests docs/DEACON-HEALTH-MONITORING.md runs, then the only match is the DELETED_PATROLS row in patrol-no-loss-audit.test.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-delete-stuck-stub.ac2",
+            "title": "Given the audit test, when it runs, then it passes with PENDING_SOAK_DELETION at 29 names and DELETED_PATROLS at 7 rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-delete-stuck-stub.ac3",
+            "title": "Given docs/DEACON-HEALTH-MONITORING.md, when searched for \"checkStuckWorkAgents\" or \"Extended Thinking\", then no match remains",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-delete-stuck-stub.ac4",
+            "title": "Given git log -1, when the commit message is read, then it names patrol-no-loss-audit.test.ts and states the stub body returned []",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w3a-extract-specialist-patrol",
+        "title": "Extract the inline per-project specialist patrol from runPatrol into specialist-patrol.ts returning action strings",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-18T06:56:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-3894",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon.ts",
+            "src/lib/cloister/specialist-patrol.ts",
+            "tests/unit/lib/cloister/specialist-patrol.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/specialist-patrol.test.ts tests/unit/lib/cloister/patrol-no-loss-audit.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "specialist-patrol.test.ts passes with the four PRD W3a cases",
+            "audit test still passes (perProjectSpecialistPatrol still registered on the tick in this item)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W3a: move the closure body of runBudgetedPatrol(\"perProjectSpecialistPatrol\", …) (deacon.ts ~3059-3160) into `export async function perProjectSpecialistPatrol(deps = defaultDeps): Promise<string[]>` in a new src/lib/cloister/specialist-patrol.ts with an injectable deps object (getAllProjectSpecialistStatuses, getAgentRuntimeStateSync, saveAgentRuntimeState, getReviewStatusSync, setReviewStatusSync, killSession, execAsync, resolveProjectFromIssueSync, postMergeLifecycle). Replace each addLog(level, msg, state.patrolCycle) with collected.push(msg) (the warn line gets a \"[warn] \" prefix). In runPatrol the registration becomes runBudgetedPatrol(\"perProjectSpecialistPatrol\", () => perProjectSpecialistPatrol()) with the existing actions.push. Use execAsync and the Effect killSession only (no sync tmux)."
+        },
+        "items": [
+          {
+            "id": "w3a-extract-specialist-patrol.ac1",
+            "title": "Given a dead specialist session whose runtime state is active, when perProjectSpecialistPatrol runs with stubbed deps, then saveAgentRuntimeState is called with state idle and one action string is returned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3a-extract-specialist-patrol.ac2",
+            "title": "Given a dead merge specialist with mergeStatus merging and a git log line matching the feature branch, when the patrol runs, then setReviewStatusSync receives { mergeStatus: \"merged\", readyForMerge: false } and postMergeLifecycle is called once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3a-extract-specialist-patrol.ac3",
+            "title": "Given a specialist active for more than 15 minutes, when the patrol runs, then killSession is called for its session and the returned action names it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3a-extract-specialist-patrol.ac4",
+            "title": "Given deacon.ts after the change, when the audit test runs, then perProjectSpecialistPatrol is still a registered budgeted name and runPatrol no longer contains the inline closure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w3b-container-restarts-map",
+        "title": "Move container-restart backoff bookkeeping out of DeaconState so checkWorkspaceContainerHealth can run off-tick",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-18T06:56:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-3894",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon.ts",
+            "tests/lib/cloister/pan-464-container-health.test.ts",
+            "tests/lib/cloister/deacon-queue.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/lib/cloister/pan-464-container-health.test.ts tests/lib/cloister/deacon-queue.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both container tests pass using resetContainerRestartsForTests()",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W3b and D6: in deacon.ts replace the DeaconState.containerRestarts field (line ~272) with a module-level `const containerRestarts = new Map<string, ContainerRestartRecord>()` plus `export function resetContainerRestartsForTests()`; change checkWorkspaceContainerHealth to take no sharedState argument, replace every state.containerRestarts[name] read/write/delete with the map, and delete the stateDirty flag and the trailing conditional saveState. Update the runPatrol call site to checkWorkspaceContainerHealth() (still on the tick in this item). Update tests/lib/cloister/pan-464-container-health.test.ts (and deacon-queue.test.ts if it seeds containerRestarts) to reset the map in beforeEach instead of seeding state."
+        },
+        "items": [
+          {
+            "id": "w3b-container-restarts-map.ac1",
+            "title": "Given a container that crashed twice, when checkWorkspaceContainerHealth runs a third time within the backoff window, then it defers the restart based on the in-memory map without reading or writing deacon state.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3b-container-restarts-map.ac2",
+            "title": "Given the DeaconState interface after the change, when typecheck runs, then no reference to containerRestarts on DeaconState remains and typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3b-container-restarts-map.ac3",
+            "title": "Given resetContainerRestartsForTests() called in beforeEach, when the pan-464 container tests run, then they pass without seeding state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w4-wire-tick-and-scheduler",
+        "title": "Wire runPatrol to the 14-step tick set, start the housekeeping scheduler from startDeacon, retire modulo cadence gates, update the no-loss audit",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-18T06:56:20Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3894",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon.ts",
+            "src/lib/cloister/patrol-cadence.ts",
+            "tests/unit/lib/cloister/deterministic-patrol-cadence.test.ts",
+            "src/lib/cloister/state-plane-patrol.ts",
+            "src/lib/cloister/__tests__/state-plane-patrol.test.ts",
+            "tests/unit/lib/cloister/patrol-no-loss-audit.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/patrol-no-loss-audit.test.ts src/lib/cloister/__tests__/state-plane-patrol.test.ts tests/unit/dashboard/deacon-supervisor.test.ts tests/unit/lib/cloister/service-swarm-fastpath.test.ts",
+            "npm run typecheck",
+            "bash scripts/lint-file-size.sh",
+            "bash scripts/lint-circular-deps.sh"
+          ],
+          "expected_outputs": [
+            "audit test passes with TICK ∪ CHORES == KEEP_REWIRE ∪ PHASE_5_ADDITIONS",
+            "deacon supervisor and swarm fastpath tests pass",
+            "typecheck completes without errors",
+            "lint-file-size passes with deacon.ts at or below its origin/main line count",
+            "lint-circular-deps reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W4 and §5.3: delete from runPatrol the invocation blocks of the 29 D5 chores (call, actions.push, addLog loop, and any try/catch owned by the block), the serverReaperEveryCycles const, the % 5 deploy gate, the shouldRunRecoveryJanitor and statePlaneReconcileEveryCycles imports; keep listProjectsSync() for recreatedStateWarnings and recordMainDivergenceHealth. Leave the 14 tick steps and all 29 pending-soak blocks in their current order. Export appendDeaconLog(level, message) wrapping the private addLog. Add a STATIC `import { startHousekeepingScheduler, stopHousekeepingScheduler } from \"./housekeeping-scheduler.js\"` to deacon.ts (safe: madge reachability on 2026-09-18 shows nothing under the scheduler or any chore module reaches deacon.ts or service.ts). In startDeacon, after deaconInterval is set, call startHousekeepingScheduler({ log: appendDeaconLog, context: { deacon: { checkAndSuspendIdleAgents, checkMergedWorkSessions, checkWorkspaceContainerHealth, cleanupStaleAgentState } } }); in stopDeacon call stopHousekeepingScheduler(). Run bash scripts/lint-circular-deps.sh; it must report no new cycle. Delete src/lib/cloister/patrol-cadence.ts and tests/unit/lib/cloister/deterministic-patrol-cadence.test.ts; remove statePlaneReconcileEveryCycles from state-plane-patrol.ts and its test cases. Update the audit test per PRD W4 step 4: import TICK_PATROLS and HOUSEKEEPING_CHORES; assert registeredBudgetedNames() == (TICK_PATROLS minus alarms) ∪ PENDING_SOAK_DELETION; assert TICK ∪ CHORES == KEEP_REWIRE ∪ PHASE_5_ADDITIONS with no overlap; assert the runPatrol body contains exactly one \"patrolCycle %\" occurrence."
+        },
+        "items": [
+          {
+            "id": "w4-wire-tick-and-scheduler.ac1",
+            "title": "Given deacon.ts, when the audit test parses runPatrol, then the budgeted names equal the 9 budgeted tick names plus PENDING_SOAK_DELETION and nothing else",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-wire-tick-and-scheduler.ac2",
+            "title": "Given the registry and the audit constants, when the audit runs, then TICK_PATROLS ∪ chore names equals KEEP_REWIRE ∪ PHASE_5_ADDITIONS exactly (43 names) with no name in both",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-wire-tick-and-scheduler.ac3",
+            "title": "Given the runPatrol source body, when scanned, then exactly one \"patrolCycle %\" gate remains (the invariant checker's % 10)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-wire-tick-and-scheduler.ac4",
+            "title": "Given startDeacon() in a test with the scheduler module mocked, when it runs, then startHousekeepingScheduler is called once with a log function that appends to the deacon log and a context carrying the four deacon-resident chore functions; stopDeacon() calls stopHousekeepingScheduler",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-wire-tick-and-scheduler.ac5",
+            "title": "Given the tree, when grep -rn \"shouldRunRecoveryJanitor|statePlaneReconcileEveryCycles|serverReaperEveryCycles\" src tests runs, then it returns nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w6-phase4-counters",
+        "title": "Would-fire counters and shadow gates for the six counter-less Phase 4 patrols",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-18T06:56:20Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3894",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/stuck-remediation.ts",
+            "src/lib/cloister/deacon-auto-resume.ts",
+            "src/lib/cloister/inspect-session-reaper.ts",
+            "src/lib/cloister/deacon-review-signals.ts",
+            "src/lib/cloister/deacon.ts",
+            "tests/unit/lib/cloister/patrol-would-fire.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/patrol-would-fire.test.ts tests/unit/lib/cloister/stuck-remediation-oracle.test.ts src/lib/cloister/__tests__/inspect-session-reaper.test.ts src/lib/cloister/__tests__/pan-1908-reactive-liveness.test.ts",
+            "for n in checkStuckAgentRemediation reconcileAgentLiveness cleanupOrphanedInspectSessions cleanupOrphanedPlanningSessions cleanupOrphanedReviewSessions cleanupOrphanReviewerSessions; do grep -q \"recordWouldFire('$n'\" -r src || echo MISSING $n; done"
+          ],
+          "expected_outputs": [
+            "all listed tests pass including the new shadow/non-shadow cases per patrol",
+            "the grep loop prints no MISSING line"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W6: for checkStuckAgentRemediation (stuck-remediation.ts), reconcileAgentLiveness and cleanupOrphanedPlanningSessions (deacon-auto-resume.ts), cleanupOrphanedInspectSessions (inspect-session-reaper.ts), cleanupOrphanedReviewSessions (deacon-review-signals.ts), and cleanupOrphanReviewerSessions / handleOrphanReviewerSession (deacon.ts): add a trailing `options: PatrolShadowOptions = {}` parameter, call recordWouldFire(\"<name>\", issueId) immediately before each state-changing call (killSession, killSessionSync, saveAgentStateSync, sendEscapeKeyAsync, handleAgentHeartbeatDeadEvent, resumeAgent, troubled marking; for stuck remediation, at each ladder transition logged by logAction), gate the call and its actions.push behind `if (!options.shadow)`, and push the same message suffixed \" (shadow)\" in shadow mode. In runPatrol wrap each of the six registrations as runBudgetedPatrol(name, () => runShadowablePatrol(name, (shadow) => fn({ shadow }))). Do not touch the boot-time reconcileAgentLiveness() call in startDeacon."
+        },
+        "items": [
+          {
+            "id": "w6-phase4-counters.ac1",
+            "title": "Given shadow true, when each of the six patrols runs against a fixture that would act, then the state-changing dep is not called and getInMemoryWouldFireCounts() shows 1 for that patrol name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-phase4-counters.ac2",
+            "title": "Given shadow false, when the same fixture runs, then the state-changing dep is called once and the count is still 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-phase4-counters.ac3",
+            "title": "Given deacon.ts, when the six registrations are read, then each is wrapped in runShadowablePatrol with its own name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-phase4-counters.ac4",
+            "title": "Given src, when grep -rn \"recordWouldFire('<name>'\" runs for each of the six names, then every grep returns at least one match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w7-inflight-journal-counter",
+        "title": "reconcileInFlightJournals records a would-fire and an action only on a genuine journal fold (F15 fix)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-18T06:56:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3894",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/advancing-selfheal.ts",
+            "src/lib/cloister/__tests__/pan-2341-reconcile-sweep.test.ts",
+            "tests/unit/lib/cloister/reconcile-in-flight-journals-no-loss.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/pan-2341-reconcile-sweep.test.ts tests/unit/lib/cloister/reconcile-in-flight-journals-no-loss.test.ts src/lib/cloister/__tests__/pan-2341-ceiling-selfheal.test.ts src/lib/cloister/__tests__/pan-2341-boot-selfheal.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the four PRD W7 cases pass (no journal, older journal, newer journal, no row) alongside the existing sweep/boot/ceiling tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W7 and D9: add readJournalStatusSync(issueId) to AdvancingSelfHealDeps (default from ../overdeck/review-status-record-sync.js). In reconcileInFlightJournals compute `folded = journal !== null && (!before || (before.updatedAt ?? \"\") < journal.updatedAt)` before the getReviewStatusSync read; keep the read unconditional; `continue` when not folded; then apply the existing hasFailingChecks guard, recordWouldFire, and the action push. Delete statusChanged if it becomes unused. Add the four cases to pan-2341-reconcile-sweep.test.ts and one real-read-door case to the no-loss test."
+        },
+        "items": [
+          {
+            "id": "w7-inflight-journal-counter.ac1",
+            "title": "Given a cached row and no journal for the issue, when reconcileInFlightJournals runs, then it returns no action and records no would-fire",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-inflight-journal-counter.ac2",
+            "title": "Given a journal whose updatedAt is older than the row, when it runs, then it returns no action and records no would-fire",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-inflight-journal-counter.ac3",
+            "title": "Given a journal newer than the row, when it runs, then it returns exactly one \"Reconciled journaled advancing verdict\" action and one would-fire for that issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-inflight-journal-counter.ac4",
+            "title": "Given no cached row and a journal present, when it runs, then it returns one action and one would-fire",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w5-doctor-cadence-table",
+        "title": "pan doctor prints the Patrol cadences table from the registry and the scheduler state",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-18T06:56:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3894",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor.ts",
+            "scripts/file-size-allowlist.txt",
+            "tests/unit/cli/doctor-patrol-cadence.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/doctor-patrol-cadence.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "doctor-patrol-cadence.test.ts passes (14 tick rows, 29 chore rows, seeded last/next, never-run shows next now)",
+            "lint-file-size passes with the new PAN-3894 allowlist row for doctor.ts",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W5 and §5.4: add printPatrolCadenceTable() to src/cli/commands/doctor.ts next to printPatrolWouldFireTable and call it immediately after printPatrolWouldFireTable() in the main doctor flow. Tick rows come from TICK_PATROLS (label \"every 10 ticks\" for runInvariantChecker, \"(alarm)\" for the five alarms, \"every tick\" otherwise); chore rows come from listHousekeepingRows() with cadence, last run (or \"never\"), next due (or \"now\"), and \"(also on <event>)\" when trigger is set. Import only patrol-registry.js and housekeeping-scheduler.js. Add the audited allowlist row `<lines> src/cli/commands/doctor.ts # PAN-3894` in the same commit."
+        },
+        "items": [
+          {
+            "id": "w5-doctor-cadence-table.ac1",
+            "title": "Given OVERDECK_HOME at a temp dir with a seeded housekeeping.json, when printPatrolCadenceTable runs, then it prints a \"Patrol cadences\" header, 14 tick rows, and 29 chore rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-doctor-cadence-table.ac2",
+            "title": "Given a seeded lastRunAt for one chore, when the table prints, then that row shows the seeded last time and next = last + cadence, and a never-run chore prints \"next now\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-doctor-cadence-table.ac3",
+            "title": "Given doctor.ts imports, when scanned, then it imports patrol-registry.js and housekeeping-scheduler.js, does not import deacon.js, and the scheduler's lazy isPaused keeps control-settings.js out of the doctor's static graph",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-doctor-cadence-table.ac4",
+            "title": "Given scripts/lint-file-size.sh, when it runs, then it exits 0 with the doctor.ts growth covered by a # PAN-3894 allowlist row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w9-docs",
+        "title": "Document the tick set, cadence classes, durable due-times, and the pan doctor cadence table",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-18T06:56:20Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3894",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DEACON-HEALTH-MONITORING.md",
+            "docs/PIPELINE-GATES.md",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c \"PAN-3894\" docs/DEACON-HEALTH-MONITORING.md docs/PIPELINE-GATES.md CLAUDE.md",
+            "grep -E \"housekeeping.json|Patrol cadences\" docs/DEACON-HEALTH-MONITORING.md"
+          ],
+          "expected_outputs": [
+            "each of the three files reports at least one PAN-3894 match",
+            "DEACON-HEALTH-MONITORING.md contains housekeeping.json and a Patrol cadences section"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W9: rewrite the DEACON-HEALTH-MONITORING.md intro sentence so it says the 60 s tick runs the 14 stuck-detection and pipeline-progress steps and housekeeping chores run from the housekeeping scheduler; add a \"## Patrol cadences (PAN-3894)\" section with the D5 table (fast 5 min / hourly / daily, chores listed per class in order), the ~/.overdeck/deacon/housekeeping.json due-times file, single-flight and pause behavior, and the pan doctor \"Patrol cadences\" table; change the Pending-Promotion Reconciler \"Runs:\" line to every 5 minutes. In docs/PIPELINE-GATES.md \"Patrol budgets (PAN-3850)\" make the budget sentence cover tick patrols and housekeeping chores and point at the cadence section. In CLAUDE.md line 43 append the PAN-3894 clause from PRD W9."
+        },
+        "items": [
+          {
+            "id": "w9-docs.ac1",
+            "title": "Given docs/DEACON-HEALTH-MONITORING.md, when read, then its intro states the 60 s tick runs 14 stuck-detection and pipeline-progress steps and a \"Patrol cadences (PAN-3894)\" section lists every chore under fast, hourly, or daily with the housekeeping.json path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-docs.ac2",
+            "title": "Given docs/PIPELINE-GATES.md, when the Patrol budgets section is read, then it states that both tick patrols and housekeeping chores run through runBudgetedPatrol and links the cadence section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-docs.ac3",
+            "title": "Given CLAUDE.md Key Invariants, when line 43 is read, then it names housekeeping-scheduler.ts, the three cadences, and PAN-3894",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w1-patrol-registry",
+        "to": "w2-housekeeping-scheduler",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-patrol-registry",
+        "to": "w4-wire-tick-and-scheduler",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-housekeeping-scheduler",
+        "to": "w4-wire-tick-and-scheduler",
+        "type": "blocks"
+      },
+      {
+        "from": "w8-delete-stuck-stub",
+        "to": "w3a-extract-specialist-patrol",
+        "type": "blocks"
+      },
+      {
+        "from": "w3a-extract-specialist-patrol",
+        "to": "w3b-container-restarts-map",
+        "type": "blocks"
+      },
+      {
+        "from": "w3b-container-restarts-map",
+        "to": "w4-wire-tick-and-scheduler",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-wire-tick-and-scheduler",
+        "to": "w6-phase4-counters",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-wire-tick-and-scheduler",
+        "to": "w5-doctor-cadence-table",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-wire-tick-and-scheduler",
+        "to": "w9-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "w5-doctor-cadence-table",
+        "to": "w9-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "w8-delete-stuck-stub",
+        "to": "w9-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "w8-delete-stuck-stub",
+        "to": "w3b-container-restarts-map",
+        "type": "blocks"
+      },
+      {
+        "from": "w8-delete-stuck-stub",
+        "to": "w4-wire-tick-and-scheduler",
+        "type": "blocks"
+      },
+      {
+        "from": "w8-delete-stuck-stub",
+        "to": "w6-phase4-counters",
+        "type": "blocks"
+      },
+      {
+        "from": "w3a-extract-specialist-patrol",
+        "to": "w4-wire-tick-and-scheduler",
+        "type": "blocks"
+      },
+      {
+        "from": "w3a-extract-specialist-patrol",
+        "to": "w6-phase4-counters",
+        "type": "blocks"
+      },
+      {
+        "from": "w3b-container-restarts-map",
+        "to": "w6-phase4-counters",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
