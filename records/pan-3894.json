@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-09-18T06:43:33.655Z",
-  "updated": "2026-09-18T08:05:52.277Z",
+  "updated": "2026-09-18T08:08:58.615Z",
   "pipeline": {
     "issueId": "PAN-3894",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T08:05:52.247Z",
-    "inspectNotes": "Inspecting item w1-patrol-registry"
+    "updatedAt": "2026-09-18T08:08:58.285Z",
+    "inspectNotes": "All 4 ACs verified independently: TICK_PATROLS=14 / HOUSEKEEPING_CHORES=29 (20 fast, 7 hourly, 2 daily), no name in both; every cadence is a CADENCE_MS key and sweepTranscriptRetention precedes pruneTerminalStoppedAgents; zero 'deacon.js' occurrences and no static deacon import (D7 holds via ChoreContext.deacon for the 4 deacon-resident chores); all 12 tests pass locally and each run closure resolves to string[] against real signatures (checked every target function's return type — adapters correct for the void deploy patrol, single lifecycle action, remote-reap filter, {level,message} rows, and GC id list). FR-5 alignment checked: tick ∪ chores == the audit's 42 KEEP_REWIRE names plus runInvariantChecker, disjoint, all five alarms in TICK_PATROLS."
   },
   "closeOut": {
     "usage": {
@@ -46,7 +46,7 @@
       },
       "costAtCloseOut": {
         "usd": 24.120823,
-        "pricingAsOf": "2026-09-18T08:05:52.261Z"
+        "pricingAsOf": "2026-09-18T08:08:58.355Z"
       }
     },
     "merges": [],
