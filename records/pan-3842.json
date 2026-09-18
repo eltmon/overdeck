@@ -184,27 +184,24 @@
     "recordedAt": "2026-09-18T07:31:28.942Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-18T07:31:30.447Z",
+  "updated": "2026-09-18T07:31:33.872Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T07:31:30.445Z",
+    "updatedAt": "2026-09-18T07:31:33.832Z",
     "mergeNotes": "Review stale: approved ff31b427, workspace HEAD is ad879ac7. Run pan done or pan review request to re-review.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3851",
     "reviewedAtCommit": "ff31b42704cd1c4aad54547e796b30f6f2daac4f",
+    "reviewStaleSince": "2026-09-18T07:30:12.005Z",
     "lastVerifiedCommit": "ff31b42704cd1c4aad54547e796b30f6f2daac4f",
-    "reviewSpawnedAt": "2026-09-17T01:57:58.365Z",
-    "deaconIgnored": true,
-    "deaconIgnoredAt": "2026-09-16T22:55:47.495Z",
-    "deaconIgnoredReason": "Operator requested all agents stopped for independent code review and PRD redesign. Hold issue scheduling until explicit authorization.",
     "reviewRequestedAt": "2026-09-18T07:31:30.445Z",
-    "completedAt": "2026-09-18T07:31:30.445Z",
+    "reviewSpawnedAt": "2026-09-17T01:57:58.365Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".overdeck/context/codebase/architecture.md",
@@ -272,7 +269,10 @@
         "src/lib/model-capability-class.ts"
       ],
       "recordedAt": "2026-09-18T07:31:28.942Z"
-    }
+    },
+    "deaconIgnored": true,
+    "deaconIgnoredAt": "2026-09-16T22:55:47.495Z",
+    "deaconIgnoredReason": "Operator requested all agents stopped for independent code review and PRD redesign. Hold issue scheduling until explicit authorization."
   },
   "closeOut": {
     "usage": {
@@ -338,7 +338,7 @@
       },
       "costAtCloseOut": {
         "usd": 19.952098,
-        "pricingAsOf": "2026-09-18T07:30:12.010Z"
+        "pricingAsOf": "2026-09-18T07:31:33.855Z"
       }
     },
     "merges": [
