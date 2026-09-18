@@ -1,3 +1,4 @@
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
 import { readdir, writeFile as writeFileAsync, mkdir as mkdirAsync } from 'fs/promises';
 import { join } from 'path';
 import { Effect } from 'effect';
@@ -5,16 +6,16 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { AGENTS_DIR, getOverdeckHome } from '../paths.js';
 import { FsError } from '../errors.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
-import { resolveAutoResumeConfigForIssue } from '../cloister/auto-resume-config.js';
-import { getRollbackAgentStatePath, readRollbackAgentStateSync, writeRollbackAgentStateSync } from '../overdeck/agent-rollback-state.js';
-import { getOverdeckAgentStateSync, saveOverdeckAgentStateSync, listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
-import { readAgentHarnessModelRecordSync, writeAgentHarnessModelRecordSync } from '../overdeck/agent-record-sync.js';
+import { resolveAutoResumeConfigForIssue } from './auto-resume-config.js';
 import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
-import { appendAgentPlaneLifecycle } from '../pan-dir/agents.js';
 import { normalizeAgentId } from './identity.js';
 import { removeAgentStateDir } from './state-dir-removal.js';
 import { registerPipelineTelemetryAgentReader } from '../telemetry/pipeline-agent-reader.js';
+import {
+  registerActiveReviewArtifactContextReader,
+  registerFeedbackAgentStateReader,
+} from './agent-state-source.js';
 import { isRole } from './role.js';
 import type { Role } from './role.js';
 
@@ -45,9 +46,9 @@ export interface AgentState {
   workspace: string;
   /**
    * The projects/workspaces registry row this agent belongs to (PAN-1990
-   * AC-1/FR-4). Resolved from `issueId` at persistence time
-   * (agent-state-sync.ts) when not set explicitly — undefined only when no
-   * workspace row exists for the issue yet.
+   * AC-1/FR-4). Resolved from `issueId` at spawn time when not set
+   * explicitly — undefined only when no workspace row exists for the issue
+   * yet.
    */
   workspaceId?: string;
   /** Coding-agent harness this agent runs under (PAN-636). */
@@ -186,7 +187,7 @@ export function getAgentDir(agentId: string): string {
 }
 
 export function getAgentStateFilePath(agentId: string): string {
-  return getRollbackAgentStatePath(agentId);
+  return join(getOverdeckHome(), 'agents', agentId, 'state.json');
 }
 
 /**
@@ -311,25 +312,42 @@ function parseAgentState(content: string, normalizedId: string): AgentState | nu
 
 export function getAgentStateSync(agentId: string): AgentState | null {
   const normalizedId = normalizeAgentId(agentId);
+  const stateFile = getAgentStateFilePath(normalizedId);
+  if (!existsSync(stateFile)) return null;
+  return parseAgentState(readFileSync(stateFile, 'utf8'), normalizedId);
+}
 
-  const overdeckState = getOverdeckAgentStateSync(normalizedId);
-  if (overdeckState) return cleanAgentState(overdeckState);
-
-  const state = readRollbackAgentStateSync(normalizedId, parseAgentState);
-  if (!state) return null;
-
-  // PAN-1919: harness/model are no longer sourced from state.json. Merge from
-  // the per-issue git-tracked record so cross-machine pickup works.
-  if (state.issueId) {
-    const record = readAgentHarnessModelRecordSync(state.issueId);
-    if (record?.harness) state.harness = record.harness;
-    if (record?.model) state.model = record.model;
+/**
+ * Every agent's state, scanned directly from each `~/.overdeck/agents/<id>/state.json`
+ * (PAN-3917: the SQLite mirror is gone — the per-agent JSON file is the only
+ * copy). Roleless/unparsable entries are skipped, matching getAgentStateSync.
+ */
+export function listAgentStatesSync(): AgentState[] {
+  let entries: string[];
+  try {
+    entries = readdirSync(AGENTS_DIR);
+  } catch {
+    return [];
   }
-
-  return state;
+  const states: AgentState[] = [];
+  for (const name of entries) {
+    const state = getAgentStateSync(name);
+    if (state) states.push(state);
+  }
+  return states;
 }
 
 registerPipelineTelemetryAgentReader(getAgentStateSync);
+registerFeedbackAgentStateReader(listAgentStatesSync);
+registerActiveReviewArtifactContextReader((issueId) => {
+  const state = getAgentStateSync(`agent-${issueId.toLowerCase()}-review`);
+  if (!state?.reviewRunId) return null;
+  return {
+    runId: state.reviewRunId,
+    ...(state.roleRunHead ? { roleRunHead: state.roleRunHead } : {}),
+    ...(state.workspace ? { workspacePath: state.workspace } : {}),
+  };
+});
 
 export const getAgentState = (agentId: string): Effect.Effect<AgentState | null, FsError> => {
   return Effect.try({
@@ -347,26 +365,10 @@ function prepareAgentStateForSave(state: AgentState): AgentState {
   return state;
 }
 
-async function recordDurableStoppedTransition(
-  state: AgentState,
-  oldStatus: AgentState['status'] | undefined,
-): Promise<void> {
-  if (state.status !== 'stopped' || oldStatus === 'stopped') return;
-  try {
-    await appendAgentPlaneLifecycle(state, {
-      at: state.stoppedAt ?? new Date().toISOString(),
-      event: 'stopped',
-    });
-  } catch (error) {
-    console.warn(
-      `[agents] Could not append durable stopped lifecycle for ${state.id}: `
-      + `${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-}
-
 export function writeAgentStateJsonSync(state: AgentState): void {
-  writeRollbackAgentStateSync(state, (clean) => JSON.stringify(cleanAgentState(clean), null, 2));
+  const stateFile = getAgentStateFilePath(state.id);
+  mkdirSync(join(getOverdeckHome(), 'agents', state.id), { recursive: true });
+  writeFileSync(stateFile, JSON.stringify(cleanAgentState(state), null, 2));
 }
 
 export function saveAgentStateSync(state: AgentState): void {
@@ -376,21 +378,8 @@ export function saveAgentStateSync(state: AgentState): void {
 
   prepareAgentStateForSave(state);
 
-  saveOverdeckAgentStateSync(state);
   writeAgentStateJsonSync(state);
 
-  // PAN-1919: mirror harness/model into the per-issue git-tracked record so
-  // they travel with the branch. Done synchronously at save time; auto-commit
-  // is suppressed here because spawn paths explicitly queue the commit.
-  if (state.issueId && state.harness && state.model) {
-    try {
-      writeAgentHarnessModelRecordSync(state.issueId, state.harness, state.model);
-    } catch (err) {
-      console.warn(`[agents] Failed to mirror harness/model to record for ${state.issueId}: ${(err as Error).message}`);
-    }
-  }
-
-  void recordDurableStoppedTransition(state, oldStatus);
   if (oldStatus && oldStatus !== state.status) {
     logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentState)`);
   }
@@ -411,22 +400,13 @@ export function recordAgentActivitySync(
   if (activity.costSoFar !== undefined && Number.isFinite(activity.costSoFar)) {
     state.costSoFar = activity.costSoFar;
   }
-  // An activity write is telemetry — it must never take down the caller. On
-  // 2026-08-13 an unhandled SQLITE_BUSY here crashed the PAN-3668 review
-  // orchestrator's app-server host mid-synthesis. The JSON mirror still runs
-  // when the DB write fails.
-  try {
-    saveOverdeckAgentStateSync(state);
-  } catch (err) {
-    console.warn(`[agents] activity DB write failed for ${agentId} (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
-  }
   writeAgentStateJsonSync(state);
   return true;
 }
 
 export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> => {
   const dir = getAgentDir(state.id);
-  const stateFile = getRollbackAgentStatePath(state.id);
+  const stateFile = getAgentStateFilePath(state.id);
 
   return Effect.gen(function* () {
     yield* Effect.tryPromise({
@@ -443,26 +423,12 @@ export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> 
       state.stoppedAt = new Date().toISOString();
     }
 
-    yield* Effect.try({
-      try: () => saveOverdeckAgentStateSync(state),
-      catch: (cause) => toAgentFsError('write', `agents-db:${state.id}`, cause),
-    });
-
     yield* Effect.tryPromise({
       try: () => writeFileAsync(stateFile, JSON.stringify(cleanAgentState(state), null, 2)),
       catch: (cause) => toAgentFsError('write', stateFile, cause),
     });
     recordFeatureRegistryAgentState(state);
 
-    // PAN-1919: mirror harness/model into the per-issue git-tracked record.
-    if (state.harness && state.model) {
-      yield* Effect.try({
-        try: () => writeAgentHarnessModelRecordSync(state.issueId, state.harness!, state.model!),
-        catch: (cause) => toAgentFsError('write', `record:${state.issueId}`, cause),
-      });
-    }
-
-    yield* Effect.promise(() => recordDurableStoppedTransition(state, oldStatus));
     if (oldStatus && oldStatus !== state.status) {
       logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentStateProgram)`);
     }
@@ -677,7 +643,7 @@ export const clearAgentTroubled = (agentId: string): Effect.Effect<AgentState | 
  * scheduling decision, not operator residue, and a live agent's gates are not
  * this issue's to clear.
  *
- * Batched (one `listOverdeckAgentStatesSync()` scan for every issueId in the
+ * Batched (one `listAgentStatesSync()` scan for every issueId in the
  * set) so the recurring residue patrol does not perform one full agent-table
  * scan per terminal issue (review finding, PAN-3727) — cost scales with the
  * agent table once per patrol run, not with the number of terminal issues.
@@ -686,7 +652,7 @@ export function clearAgentOperatorGatesForIssuesSync(issueIds: ReadonlySet<strin
   const mutated = new Map<string, string[]>();
   if (issueIds.size === 0) return mutated;
 
-  for (const state of listOverdeckAgentStatesSync()) {
+  for (const state of listAgentStatesSync()) {
     if (state.status !== 'stopped') continue;
     const normalized = state.issueId?.toUpperCase();
     if (!normalized || !issueIds.has(normalized)) continue;
