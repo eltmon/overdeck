@@ -29,6 +29,7 @@ import { describe, expect, it } from 'vitest';
 
 const DEACON_PATH = resolve(__dirname, '../../../../src/lib/cloister/deacon.ts');
 const TESTS_ROOT = resolve(__dirname, '../../..');
+const DELIVERY_AUDIT_PATH = resolve(TESTS_ROOT, 'unit/lib/agents/delivery-no-loss-audit.test.ts');
 
 /** Appendix C Keep + Rewire rows (37 + 5 = 42), in registered spelling. */
 const KEEP_REWIRE = new Set([
@@ -182,7 +183,7 @@ describe('Phase 5 patrol no-loss audit (PAN-3850 W42)', () => {
       }
     }
     // The W6 group fixture must still describe itself as covering all four.
-    const delivery = readFileSync(resolve(TESTS_ROOT, 'unit/lib/agents/delivery-no-loss-audit.test.ts'), 'utf8');
+    const delivery = readFileSync(DELIVERY_AUDIT_PATH, 'utf8');
     expect(delivery).toContain('four delivery-recovery patrols (W6)');
   });
 
