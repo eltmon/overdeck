@@ -119,22 +119,10 @@ the review runs; a merged, pushed wave is not at risk from a review in flight.
 
 ### 5. Keep the durable bits, drop the machinery
 
-Keep:
-
-- **Per-item commits and pushes.** The invariant that every completed item exists on
-  origin before it is recorded done is not ceremony; it is what makes a crash recoverable.
-- **The issue record.** One `pan task done` per item so the record stays truthful. No
-  inspection step, no waiting on a verdict.
-- **The merge gate.** `pan done` at the end opens the PR and runs the real review
-  pipeline. Wave reviews catch things while they are cheap to fix; they do not replace the
-  gate.
-
-Drop:
-
-- `pan swarm` slot registration, dispatch, wait, freeze/resume, recover, intervention
-  counters.
-- `pan inspect` per item and the `INSPECTION PASSED/BLOCKED` round trip.
-- The foreman protocol as a separate mode. There is one mode: orchestrate.
+This section shipped as PAN-3917, "The Overdeck Cut." For the actual keep/drop
+decisions and the full no-loss accounting, see the PRD (`.pan/drafts/pan-3917.md`
+on the archived `overdeck-state` branch, now migrated to `.pan/drafts/pan-3917.md`
+in this repo) and [`docs/THE-CUT.md`](docs/THE-CUT.md).
 
 ### 6. What this costs, honestly
 

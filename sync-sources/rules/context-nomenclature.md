@@ -26,8 +26,3 @@ user-owned and Overdeck never writes them.
 Translate vague or ad-hoc terms ("global context template", "the CLAUDE.md
 template") into one of the four scopes above, and confirm the routing when the
 universal-vs-project choice is ambiguous.
-
-Context is code-owned and does not live on the state branch. Permanent project
-state for migrated projects lives on `overdeck-state` (on disk at
-`${OVERDECK_HOME}/state/<project>/`); unmigrated projects alone retain the
-legacy `<projectRoot>/.pan/` state surface until cutover.

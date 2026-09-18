@@ -1,12 +1,10 @@
 import { existsSync, readdirSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { Effect } from 'effect';
-import type { ContinueFeedbackEntry } from '../xbrief/continue-state.js';
 import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByTeamSync } from '../projects.js';
 import { isTldrEnabledSync } from '../config-yaml.js';
-import { getReadableWorkspacePanPaths, readWorkspaceContext, readFeedback, writeWorkspaceContext } from '../pan-dir/index.js';
-import { getProjectConfigFromWorkspacePath, readRecordContinueViewSync, resolveProjectForIssue } from '../pan-dir/record.js';
+import { getReadableWorkspacePanPaths, readWorkspaceContext, readFeedback, writeWorkspaceContext, readIssueDraft } from '../pan-dir/index.js';
 import { findPlanSync, readWorkspacePlanSync, readPlanSync, readWorkspacePlan } from '../xbrief/io.js';
 import { createActiveSlice, getDispatchableItems } from '../xbrief/dag.js';
 import { loadConfigSync } from '../config.js';
@@ -37,10 +35,9 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
   let featureContextStr = '';
   let polyrepoContextStr = '';
   let pendingFeedbackStr = '';
-  let recordContextStr = '';
 
   if (!ctx.skipDynamicContext && ctx.projectRoot) {
-    const planningContent = await readPlanningContext(ctx.workspacePath);
+    const planningContent = await readPlanningContext(ctx.workspacePath, ctx.projectRoot);
     const featureContext = await readFeatureContext(ctx.workspacePath, issueId);
 
     const stitchDesigns = extractStitchDesigns(planningContent);
@@ -57,22 +54,6 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
 
     polyrepoContextStr = buildPolyrepoContext(issueId, ctx.workspacePath);
     pendingFeedbackStr = await readPendingFeedback(ctx.workspacePath);
-
-    try {
-      const project = { name: 'inferred', path: ctx.projectRoot };
-      const record = readRecordContinueViewSync(project, issueIdLower);
-      if (record) {
-        recordContextStr = JSON.stringify({
-          decisions: record.decisions,
-          hazards: record.hazards,
-          resumePoint: record.resumePoint,
-          sessionHistory: record.sessionHistory,
-          scopeDrift: record.scopeDrift,
-        }, null, 2);
-      }
-    } catch {
-      // Record may not exist yet for a fresh issue — silently skip
-    }
   }
 
   return await Effect.runPromise(renderPrompt({
@@ -94,7 +75,6 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       // the workspace actually has a TLDR .venv (PAN: tldr configurable toggle).
       TLDR_AVAILABLE: isTldrEnabledSync() && existsSync(join(ctx.workspacePath, '.venv')),
       MEMORY_CONTEXT: ctx.memoryContext || '',
-      RECORD_CONTEXT: recordContextStr,
     },
   }));
 }
@@ -134,101 +114,27 @@ async function buildActiveSliceContext(workspacePath: string, issueId: string): 
 }
 
 /**
- * Read pending specialist feedback.
- * Primary source: workspace `.pan/continue.json` feedback[] plus `.pan/feedback/`.
+ * Read pending specialist feedback from workspace `.pan/feedback/`.
  */
 async function readPendingFeedback(workspacePath: string): Promise<string> {
-  const issueId = inferIssueIdFromWorkspace(workspacePath);
-  const continueEntries: ContinueFeedbackEntry[] = [];
-  if (issueId) {
-    try {
-      const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
-      const recordView = readRecordContinueViewSync(project, issueId);
-      if (recordView?.feedback?.length) {
-        continueEntries.push(...recordView.feedback);
-      }
-    } catch { /* ignore */ }
-  }
-
-  // --- Backward compat: filesystem files not already in continue file ---
-  const seqsInContinue = new Set(continueEntries.map(e => e.seq));
-  const legacyFilePaths: string[] = [];
+  let feedbackFilePaths: string[] = [];
   try {
     const feedbackFiles = await Effect.runPromise(readFeedback(workspacePath));
-    for (const file of feedbackFiles) {
-      const match = file.filename.match(/^(\d{3})-/);
-      const seq = match ? parseInt(match[1], 10) : -1;
-      if (!seqsInContinue.has(seq)) {
-        legacyFilePaths.push(file.path);
-      }
-    }
+    feedbackFilePaths = feedbackFiles.map((file) => file.path);
   } catch { /* ignore */ }
 
-  if (continueEntries.length === 0 && legacyFilePaths.length === 0) return '';
+  if (feedbackFilePaths.length === 0) return '';
 
   const lines: string[] = [];
-  const total = continueEntries.length + legacyFilePaths.length;
-
-  // Format continue file entries inline (agent reads them directly from prompt).
-  // Keep this bounded below the supervisor input limit even when a patrol has
-  // repeatedly recorded the same undelivered feedback.
-  if (continueEntries.length > 0) {
-    const groupedEntries = new Map<string, { entry: ContinueFeedbackEntry; count: number }>();
-    for (const entry of continueEntries) {
-      const group = groupedEntries.get(entry.markdownBody);
-      if (group) {
-        group.count += 1;
-      } else {
-        groupedEntries.set(entry.markdownBody, { entry, count: 1 });
-      }
-    }
-
-    const feedbackContextLimit = 24_000;
-    const truncation = '\n_[Additional feedback omitted to keep the kickoff prompt within its delivery limit.]_';
-    lines.push(`**${total} feedback item(s) from specialist pipeline:**`);
-    lines.push('');
-    let renderedLength = lines.join('\n').length;
-    for (const { entry, count } of groupedEntries.values()) {
-      const seqStr = String(entry.seq).padStart(3, '0');
-      const repeated = count > 1 ? ` — repeated ${count} times` : '';
-      const block = [
-        `### ${seqStr} — ${entry.specialist}: ${entry.outcome.toUpperCase()} (${entry.timestamp})${repeated}`,
-        '',
-        entry.markdownBody,
-        '',
-        '---',
-        '',
-      ].join('\n');
-      const remaining = feedbackContextLimit - renderedLength;
-      if (block.length > remaining) {
-        const truncatedBlock = block.slice(0, Math.max(0, remaining - truncation.length));
-        lines.push(remaining >= truncation.length ? `${truncatedBlock}${truncation}` : truncation.slice(0, remaining));
-        break;
-      }
-      lines.push(block);
-      renderedLength += block.length + 1;
-    }
+  lines.push(`**${feedbackFilePaths.length} feedback file(s):**`);
+  lines.push('');
+  const latest = feedbackFilePaths[feedbackFilePaths.length - 1];
+  for (const filePath of feedbackFilePaths) {
+    const marker = filePath === latest ? ' ← **latest, read this first**' : '';
+    lines.push(`- \`${filePath}\`${marker}`);
   }
-
-  // Format legacy filesystem entries as file paths (agent must Read them)
-  if (legacyFilePaths.length > 0) {
-    if (continueEntries.length === 0) {
-      lines.push(`**${total} feedback file(s):**`);
-      lines.push('');
-    } else {
-      lines.push(`**${legacyFilePaths.length} legacy feedback file(s) (pre-migration, read these too):**`);
-      lines.push('');
-    }
-    const latestLegacy = legacyFilePaths[legacyFilePaths.length - 1];
-    for (const filePath of legacyFilePaths) {
-      const marker = filePath === latestLegacy && continueEntries.length === 0 ? ' ← **latest, read this first**' : '';
-      lines.push(`- \`${filePath}\`${marker}`);
-    }
-    if (continueEntries.length === 0) {
-      lines.push('');
-      lines.push(`Use your Read tool to open \`${latestLegacy}\`, read every line, then address any issues before continuing other work.`);
-    }
-  }
+  lines.push('');
+  lines.push(`Use your Read tool to open \`${latest}\`, read every line, then address any issues before continuing other work.`);
 
   return lines.join('\n');
 }
@@ -382,18 +288,15 @@ export async function getTrackerContext(
 }
 
 /**
- * Read planning artifacts for an issue from workspace `.pan/continue.json`.
+ * Read the issue's PRD draft (`.pan/drafts/<issue>.md`), the source for
+ * Stitch design sections referenced in the kickoff prompt.
  */
-export async function readPlanningContext(workspacePath: string): Promise<string | null> {
+export async function readPlanningContext(workspacePath: string, projectRoot?: string): Promise<string | null> {
   const issueId = inferIssueIdFromWorkspace(workspacePath);
-  if (!issueId) return null;
+  if (!issueId || !projectRoot) return null;
 
   try {
-    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
-    const recordView = readRecordContinueViewSync(project, issueId);
-    if (recordView) {
-      return JSON.stringify(recordView, null, 2);
-    }
+    return await Effect.runPromise(readIssueDraft(projectRoot, issueId));
   } catch { /* ignore */ }
 
   return null;

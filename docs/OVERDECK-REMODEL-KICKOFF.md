@@ -30,16 +30,17 @@ foreign keys, god-tables, unbounded caches, duplicated entities).
   rollback.
 - **Inspect the live DB read-only** (`~/.overdeck/panopticon.db`) or on a copy — never mutate it.
 - **Tenet (locked):** one canonical resolver per domain; no direct store access; **"state" is NOT a
-  domain.** (`sync-sources/rules/single-source-of-truth.md`)
+  domain.** (this tenet shipped as PAN-3917's "Overdeck stores no status it can derive" — see `CLAUDE.md`)
 - Recoverable actions only (no force-push / history rewrite / deletes of JSONL or branches).
 
 ## Read these — form your own view
 
 - **Master epic:** PAN-1938 (umbrella: problem, end-state, workstreams).
-- **API surface map + end-state diagram + write audit:** `docs/API-SURFACE.md`.
 - **ERD of the current 34-table schema:** `docs/overdeck-db-erd.excalidraw` (open in Excalidraw — a
   live canvas with it loaded is at http://localhost:3000, or open the file directly).
-- **Tenet:** `sync-sources/rules/single-source-of-truth.md`.
+- **Superseded by:** PAN-3917 ("The Overdeck Cut") — see [`docs/THE-CUT.md`](THE-CUT.md). The API surface
+  map, write audit, and single-source-of-truth tenet this kickoff pointed to were about the record plane
+  that PAN-3917 deletes; `CLAUDE.md`'s "Overdeck stores no status it can derive" is the tenet now.
 - **State model:** `reference/state-model.mdx`.  ·  **Export design:** PAN-1937.
 - **Live DB:** `~/.overdeck/panopticon.db` (SQLite; read-only). Schema = 34 tables; inspect with
   `python3 -m sqlite3`.

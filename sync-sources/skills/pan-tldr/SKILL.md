@@ -75,4 +75,3 @@ wait for or request those tools.
 
 - `pan admin tldr status` — operator view of running daemons. Use the
   `pan-admin-tldr` skill for daemon lifecycle.
-- `docs/TLDR.md` in overdeck — full TLDR design.

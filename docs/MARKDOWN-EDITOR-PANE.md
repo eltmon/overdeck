@@ -1,7 +1,7 @@
 # Internal Markdown Editor Pane (PAN-3260)
 
-Markdown file chips in chat (e.g. the Flywheel brief chip on
-`docs/flywheel-brief.md`) open in an internal, editable Stage tab by
+Markdown file chips in chat (e.g. a PRD chip on
+`.pan/drafts/<issue>.md`) open in an internal, editable Stage tab by
 default instead of always launching an external editor. Right-click still
 offers the external editors, plus the internal option, and the choice
 persists. This doc covers the four pieces that implement it.

@@ -1,6 +1,6 @@
 # Dashboard Server Architecture (Effect + Raw WebSocket)
 
-> Moved from CLAUDE.md (2026-08-07). See also docs/DASHBOARD-PERFORMANCE.md and docs/OVERDECK_DEV_SOP.md.
+> Moved from CLAUDE.md (2026-08-07).
 
 
 The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus a

@@ -17,9 +17,7 @@ route, or script may touch them directly —
 `scripts/guard-workspace-doors.sh` (wired into `npm run lint`) greps `src/**`
 and `scripts/**` for a `FROM|INTO|UPDATE|DELETE FROM` immediately followed by
 one of the four table names outside those two files (or their own tests) and
-fails the build on a match. This is the same two-doors tenet
-`docs/PIPELINE-MEMBERSHIP.md` and the project's single-source-of-truth rule
-apply to every other domain: one canonical resolver, one canonical writer, no
+fails the build on a match: one canonical resolver, one canonical writer, no
 parallel path.
 
 Representative exports:
@@ -301,19 +299,16 @@ create/archive — this is **not** canonical state (the `workspaces` row is),
 only a rebuild aid; see `rebuildMainAndScratchWorkspaces()` below.
 
 Durable memory artifacts (daily summaries, pin descriptors — never rolling
-observations, `pending/`, or `status.json`) additionally mirror onto the
-project's `overdeck-state` branch under a `memory/` domain
-(`STATE_BRANCH_PATHS` in `src/lib/state-plane.ts`), through
-`src/lib/memory/state-mirror.ts`'s `writeMemoryStateMirror`/
-`removeMemoryStateMirror`, which reject any path under `observations/` or
-`pending/`.
+observations, `pending/`, or `status.json`) are the workspace's own on-disk
+archive under its memory home; nothing mirrors onto `overdeck-state` — that
+branch is archived and no longer read or written.
 
 ## Rebuild
 
 `pan admin db rebuild-workspaces` (`src/cli/commands/db.ts`, handler
-`rebuildWorkspacesCommand`) reconstructs the four tables from git truth, the
-same "disposable cache, rebuilt from sources of truth" pattern
-`docs/AGENT-STATE-PLANES.md` documents for `rebuild-agents`. In order:
+`rebuildWorkspacesCommand`) reconstructs the four tables from git truth — the
+same "disposable cache, rebuilt from sources of truth" pattern the agent-state
+rebuild follows. In order:
 
 1. `seedProjectsFromYaml()` — upserts every `projects.yaml` entry as a
    `projects` row.
@@ -541,19 +536,16 @@ For a `workspace.type: polyrepo` project (PAN-2948), the workspace *root* is a
 one-commit wrapper repo whose `.gitignore` excludes the real code sub-repos
 (e.g. `fe/`, `api/`) — no review-path git operation may run at that root
 (`docs/REVIEW-AGENT-ARCHITECTURE.md`, "Polyrepo workspaces (PAN-2948)"). The
-wrapper's HEAD never moves, so anything that snapshots it as a verdict anchor
-reports "no drift" forever — this is exactly the MIN-901 incident (PAN-3254):
-a deacon patrol compared a polyrepo composite `reviewedAtCommit` against a
-bare wrapper-HEAD snapshot and cycled review→test 426 times in 19.5 hours
-before the anchor-shape mismatch was caught (`git-utils.ts`'s
-`snapshotWorkspaceHeadsPromise` doc comment; `project-repos.ts`'s
-`degradedPolyrepo` field). The invariant this domain's `workspaces.path`
-column must respect: **the wrapper repo's HEAD is workspace metadata (where
-the worktree lives on disk), never a verdict anchor** — drift/reviewedAtCommit
-comparisons belong to the composite sub-repo snapshot, not to the wrapper.
-`WorkspaceRow.isGitRepository`/`branchName`/`parentBranch` describe the
-workspace root as Overdeck sees it on disk; they are not, and must never be
-promoted to, a review-verdict signal for a polyrepo project.
+wrapper's HEAD never moves, so anything that snapshots it as a review anchor
+reports "no drift" forever (`git-utils.ts`'s `snapshotWorkspaceHeadsPromise`
+doc comment; `project-repos.ts`'s `degradedPolyrepo` field). The invariant
+this domain's `workspaces.path` column must respect: **the wrapper repo's
+HEAD is workspace metadata (where the worktree lives on disk), never a
+review anchor** — anchor/drift comparisons belong to the composite sub-repo
+snapshot, not to the wrapper. `WorkspaceRow.isGitRepository`/`branchName`/
+`parentBranch` describe the workspace root as Overdeck sees it on disk; they
+are not, and must never be promoted to, a review signal for a polyrepo
+project.
 
 ## No-loss discipline
 
