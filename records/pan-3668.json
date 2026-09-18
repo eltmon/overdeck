@@ -327,6 +327,11 @@
       "reason": "resume",
       "agentModel": "claude-opus-5",
       "timestamp": "2026-09-18T09:14:45.364Z"
+    },
+    {
+      "timestamp": "2026-09-18T09:36:43.124Z",
+      "reason": "end",
+      "note": "Two host-dependent gate failures, then the review blocker.\n\nANOMALY 1 - the verification failures were not PAN-3668 code. This branch widened the `--changed origin/main` set, which pulled in two tests that fail from host state: the liveness no-loss audit reds whenever OVERDECK_NO_RESUME=1 is in the environment (the live dashboard has been in no-resume mode since 07:15 and verification workers inherit it), and makeDbLive opened overdeck.db without running the init migration, leaving a table-less database in the shared per-worker home so the next read-only open failed its schema audit inside unrelated code. Both fixed at root (325bb2333b7), not worked around.\n\nANOMALY 2 - the makeDbLive fix touches the dashboard boot path (DbLive is built at server start). On an existing database it is one sqlite_master lookup; it goes through the normal pipeline, never a hot-patch.\n\nBLOCKER - killAgent awaited abort before terminate, so any abort rejection skipped the terminate. With a wedged Prime child the host answers 500, the tmux session and child survive, and Cloister emits killed_agent anyway - an agent recorded as killed while still burning tokens. Now abort (best-effort) -> bounded grace -> unconditional terminate, and postPrimeAgentHost has a request timeout. The reviewer's open question (does abort return success:false when idle?) is moot by construction: terminate runs regardless.\n\nThe in-process session registry holding the only correct abort/grace/terminate sequence was never populated in production, so the test proving that AC exercised a path the adapter never takes. Registry deleted; tests now drive PrimeAgentRuntimeSync.killAgent and a real host socket.\n\nAll eleven non-blocking findings addressed: framer recovers per record and acceptStdout never throws; keyed delivery to Prime refuses like ACP (the keyed cascade's PTY and tmux tiers cannot reach a Prime host, so moving the branch below it would have been broken, not fixed); both launch paths default to api-key and share one credential gate naming the variable or auth file; stderr version fallback is opt-in per prerequisite; own badge glyph; projection no longer scans transcript dirs for metrics-less harnesses; audit gained opencode; docs narrowed to the resume check that exists; allowlist deduplicated.\n\nPARTIAL - N10 keeps sessionFile-first precedence for the session id (untangling needs a live Prime binary); service.ts:623's unawaited killAgent is a pre-existing all-runtimes pattern, untouched. Also found: src/lib/prime-agent/provider-map.test.ts sat outside vitest's include globs and had never run - moved into __tests__/.\n\nGates at 93cd6317d34: typecheck 0, lint 0, test 9788 root + 2120 frontend passed, 0 failed."
     }
   ],
   "feedback": [],
@@ -608,10 +613,10 @@
     "recordedAt": "2026-09-18T09:36:36.969Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-09-18T09:36:40.311Z",
+  "updated": "2026-09-18T09:36:43.124Z",
   "pipeline": {
     "issueId": "PAN-3668",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "uatStatus": "passed",
     "verificationStatus": "skipped",
@@ -619,12 +624,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T09:36:40.281Z",
+    "updatedAt": "2026-09-18T09:36:42.577Z",
     "reviewNotes": "killAgent skips terminate when the abort RPC fails and has no grace period; runtime-adapter.ac3 + message-delivery.ac3 unmet, only test exercises an unreachable registry",
     "verificationNotes": "Verification FAILED at test (808662ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3668/.overdeck/verification/2026-09-18T08-06-31-225Z-37430f70.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3670",
     "reviewRequestedAt": "2026-09-18T09:36:38.415Z",
-    "reviewSpawnedAt": "2026-09-18T09:14:44.094Z",
+    "reviewSpawnedAt": "2026-09-18T09:36:42.576Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".gitignore",
@@ -965,7 +970,7 @@
       },
       "costAtCloseOut": {
         "usd": 182.1714763,
-        "pricingAsOf": "2026-09-18T09:36:40.298Z"
+        "pricingAsOf": "2026-09-18T09:36:42.832Z"
       }
     },
     "merges": [
