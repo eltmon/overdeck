@@ -128,7 +128,6 @@ export interface UatPromoteDeps {
    * it on main.
    */
   memberEligibility(issueId: string): { eligible: boolean; reason?: string };
-  recordVerification?: (generation: UatGeneration, mergeSha: string) => void;
   runShip?: (
     generation: UatGeneration,
     shipVersion: string | undefined,
@@ -654,11 +653,9 @@ async function finishPromote(
   // Persist the exact landed refs before any ship work. Deferred ship must root
   // its worktrees at these commits rather than the ambient primary checkout.
   deps.store.update(gen.name, { status: 'promoted', repos: promotedRepos });
-  try {
-    deps.recordVerification?.(promotedGeneration, mergeSha);
-  } catch (err) {
-    log(`[uat-promote] ${gen.name}: verification verdict recording failed after merge: ${err instanceof Error ? err.message : String(err)}`);
-  }
+  // PAN-3917: no verification verdict is stamped for the batch. The operator's
+  // UAT happened against the batch branch; what merged is what GitHub now shows
+  // merged, and the batch's own check runs are the evidence.
   try {
     await deps.runShip?.(promotedGeneration, shipVersion, promotedRepos);
   } catch (err) {
