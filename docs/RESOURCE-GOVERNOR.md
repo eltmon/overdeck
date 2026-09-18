@@ -74,10 +74,15 @@ governor mode:
 | `soft` | `holding` | Stop admitting new resumes and new advancing dispatches. Nothing is killed. |
 | `hard` | `shedding` | Admission is blocked. Automatic eviction is not wired; the kernel may start killing processes if memory stays exhausted. |
 
-The governor never re-admits the moment it clears SOFT. It holds until `MemAvailable` exceeds
-RECOVERY — a threshold strictly above SOFT. Without that gap, a system oscillating around SOFT would
-flip between admitting and holding on every patrol, resuming and re-stopping agents in a loop. The
-transition rule (`nextGovernorMode` in `memory-governor.ts`) is:
+The normal recovery path holds until `MemAvailable` exceeds RECOVERY and one-minute CPU load falls
+below `governor_cpu_recovery_load_per_core`. A second path prevents a transient memory dip from
+holding a healthy host indefinitely: when PSI
+`full avg10` stays below `governor_psi_calm_readmit_avg10` continuously for
+`governor_psi_calm_window_ms`, the governor can re-admit at SOFT. The calm window re-arms after every
+early re-admission, so another dip must earn a fresh full window before it can re-admit again. CPU
+load must also be below its recovery threshold; calm memory pressure never overrides CPU saturation.
+Without these conditions, a system oscillating around SOFT could resume and re-stop agents on every
+patrol. The base transition rule (`nextGovernorMode` in `memory-governor.ts`) is:
 
 ```
 available >= RECOVERY  -> admitting
@@ -89,7 +94,7 @@ otherwise                                                -> hold the current mod
 ```
  available RAM
       ^
- RECOVERY ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─  <- only line that re-admits
+ RECOVERY ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─  <- normal re-admission
       │            ┌─────────────┐
    SOFT ─ ─ ─ ─ ─ ─ │   holding   │ ─ ─ ─ ─ ─ ─ ─
       │  admitting  │  (no admit) │
@@ -98,8 +103,8 @@ otherwise                                                -> hold the current mod
       └──────────────────────────────────────> time
 ```
 
-The governor's mode is module-level state, persisted across calls within the process — it is not
-recomputed from scratch each time, which is what makes the hold behavior possible.
+The governor's mode, trigger, and calm-window start are module-level state persisted across calls
+within the process. The verdict carries the trigger kind, trigger-time reading, threshold, and time.
 
 ## Activity-Feed Signals (PAN-3550)
 
@@ -108,16 +113,20 @@ The memory governor's level transitions and kernel OOM kills appear in the dashb
 Four feed levels:
 - **`ok`** — MemAvailable above the watch reserve; Overdeck is admitting work normally.
 - **`watch`** — MemAvailable below the watch reserve but still admitting (band is `ok`). Warning that the soft reserve may soon be crossed.
-- **`holding`** (band `soft`) — Overdeck has stopped admitting new agents and dispatches. Work queues until memory recovers above the recovery reserve.
+- **`holding`** (band `soft`) — Overdeck has stopped admitting new agents and dispatches. Work queues until normal recovery or PSI-calm early re-admission.
 - **`shedding`** (band `hard`) — MemAvailable is below the hard reserve. Overdeck admits nothing; the kernel may OOM-kill. Automatic eviction is not wired.
 
 Top RSS consumers are attributed to Overdeck tmux sessions via `getRuntimeCensus()` (the in-repo runtime census, not the machine-local `.overdeck/logs/memory-census.log`).
+
+Each non-admitting message separates the stored cause from the current reading. For example:
+
+> Overdeck stopped admitting work at 14:22 UTC when available memory dipped to 8.9 GiB, under the 9.4 GiB soft reserve. 12.5 GiB is available now. Admissions resume at the 15.7 GiB recovery reserve, or at the 9.4 GiB soft reserve once memory pressure stalls (PSI full avg10) stay below 0.05 for 10 minutes. Nothing has been stopped or killed.
 
 **OOM Canary** watches the kernel journal for `oom-kill:` lines, parses the victim's pid, command, RSS, and cgroup, and emits one activity entry per kill. The cursor-file pattern ensures no duplicate reporting across patrol ticks or dashboard restarts. On permission error (user not in `adm` group), the canary disables itself gracefully and logs once, never blocking the rest of the patrol.
 
 ### Swap runway and PSI
 
-The governor composes three host signals into that single mode:
+The governor composes four host signals into that single mode:
 
 - `MemAvailable` measures how much memory the kernel can allocate now.
 - `SwapFree` measures the remaining runway for an allocation burst. When free swap falls below
@@ -125,13 +134,19 @@ The governor composes three host signals into that single mode:
 - Memory Pressure Stall Information (PSI) `full avg10` measures how much time all runnable work spent
   stalled on memory during the last ten seconds. Low swap upgrades from `holding` to `shedding` only
   when `full avg10` reaches `governor_psi_full_shed_avg10`.
+- One-minute load per core measures CPU demand. Load at or above
+  `governor_cpu_soft_load_per_core` moves an admitting governor to `holding`. Once held, load must
+  fall below `governor_cpu_recovery_load_per_core` before admission resumes. CPU saturation never
+  triggers `shedding`; running work finishes and releases CPU without losing completed work.
 
 Swap uses the same hysteresis latch as RAM. After the governor stops admitting, free swap must reach
-`governor_swap_recovery_free_percent` before the swap signal clears. Re-admission requires both
-`MemAvailable >= RECOVERY` and `SwapFree` at or above that recovery percentage, so a machine with
-healthy RAM but exhausted swap does not admit another workspace stack.
+`governor_swap_recovery_free_percent` before the swap signal clears on the normal recovery path.
+That path requires both `MemAvailable >= RECOVERY` and `SwapFree` at or above the recovery
+percentage. PSI-calm early re-admission is the exception: after a fresh full calm window begins in
+the non-admitting state, the governor can re-admit at SOFT even while swap remains below its recovery
+percentage, because idle swap residency without live stalls is not current pressure.
 
-A machine with `SwapTotal = 0` keeps the RAM-only behavior. If PSI is unavailable, low swap still
+A machine with `SwapTotal = 0` still evaluates RAM and CPU. If PSI is unavailable, low swap still
 holds admissions, but it cannot trigger shedding by itself; only the RAM HARD threshold can do that.
 
 ## Footprint budget
@@ -226,7 +241,16 @@ state. Warm-idle sessions also do not count against the advancing ceiling
 
 Quality-gate admission is separate from agent admission and memory shedding. `src/lib/cloister/quality-gate-admission.ts` places local and container command gates in a cross-process FIFO, then admits the oldest live waiter only when sampled CPU utilization is below 75% and one-minute load is below 1.0 per core. It rechecks after a 1.5-second settle period, serializes active local gates through one owner lease, and reclaims dead or over-age queue state.
 
-Every retry obtains a fresh lease and releases it in `finally`. Remote commands and HTTP health checks bypass the local CPU slot. This scheduler never stops an agent, pauses a workspace, changes memory-governor mode, or enforces cost policy; it prevents simultaneous builds and test suites from starving the dashboard while the memory governor continues to own RAM admission and shedding.
+Every retry obtains a fresh lease and releases it in `finally`. The gate subprocess receives
+`OVERDECK_GATE_ADMITTED=1`, so a Vitest child recognizes the parent's lease and avoids a deadlock.
+Remote commands and HTTP health checks bypass the local CPU slot.
+
+Root and frontend Vitest configs also acquire this lease through
+`tests/vitest-cpu-admission.ts`. This covers `npm test` and `vitest run` commands launched directly
+from agent shells. The client skips admission when `OVERDECK_GATE_ADMITTED=1`,
+`OVERDECK_GATE_ADMISSION=0`, or `CI` is set. It fails open with one warning after 30 minutes or when
+the admission protocol errors, so damaged queue state cannot prevent all local tests from running.
+This scheduler never stops an agent, pauses a workspace, or triggers CPU shedding.
 
 Detached verification workers persist `phase: queued | running` plus `admittedAt`. Their 65-minute execution timeout starts when the first gate is admitted, rather than when the worker entered the CPU queue.
 
@@ -374,6 +398,10 @@ the normalized in-process config uses the camelCase names shown in parentheses.
 | `governor_swap_soft_free_percent` | `governorSwapSoftFreePercent` | `25` | Below this percentage of free swap, stop admitting. |
 | `governor_swap_recovery_free_percent` | `governorSwapRecoveryFreePercent` | `50` | Free-swap percentage required before re-admission. Always normalized above the swap SOFT percentage, up to 100. |
 | `governor_psi_full_shed_avg10` | `governorPsiFullShedAvg10` | `1` | With low swap, PSI `full avg10` at or above this value upgrades the mode to shedding. |
+| `governor_psi_calm_readmit_avg10` | `governorPsiCalmReadmitAvg10` | `0.05` | PSI `full avg10` must stay below this value for early re-admission at SOFT. |
+| `governor_psi_calm_window_ms` | `governorPsiCalmWindowMs` | `600000` | Continuous calm-PSI time required for early re-admission. The window re-arms after each early re-admission. |
+| `governor_cpu_soft_load_per_core` | `governorCpuSoftLoadPerCore` | `1.5` | At or above this one-minute load per core, stop admitting. |
+| `governor_cpu_recovery_load_per_core` | `governorCpuRecoveryLoadPerCore` | `1.0` | Re-admit only below this load per core. This value must be lower than the CPU soft threshold because lower load is healthier. |
 | `governor_footprint_default_work_gb` | `governorFootprintDefaultWorkGb` | `2` | Cold-start footprint estimate for a work agent. |
 | `governor_footprint_default_review_gb` | `governorFootprintDefaultReviewGb` | `1` | Cold-start footprint estimate for a review agent. |
 | `governor_footprint_default_test_gb` | `governorFootprintDefaultTestGb` | `1` | Cold-start footprint estimate for a test agent. |

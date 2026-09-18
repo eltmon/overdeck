@@ -202,9 +202,11 @@ const postSpecialistsDoneRoute = HttpRouter.add(
 
     switch (specialist) {
       case 'review':
-        // Passed verdicts need the current workspace head for the write-door check.
-        // Blocked verdicts stay durable-first and take their anchor after feedback.
-        if (status === 'passed') {
+        // Terminal verdicts need the current workspace head for the write-door check.
+        // PAN-3847: the door refuses anchorless verdicts, so the anchor is snapshotted
+        // for passed, blocked and failed (HTTP review prompt reports changes-requested
+        // as failed) and travels in the same write as the verdict.
+        if (status === 'passed' || status === 'blocked' || status === 'failed') {
           yield* Effect.promise(async () => {
             try {
               const project = resolveProjectFromIssueSync(normalizedIssueId);
@@ -220,7 +222,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
                 }
               }
             } catch {
-              // Non-fatal; recordReviewVerdict will proceed without evidenceHead
+              // Non-fatal; recordReviewVerdict refuses the verdict without an evidence head
             }
           });
         }
@@ -359,32 +361,9 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       }
     });
 
-    // When review passes, snapshot the current HEAD commit so we can detect
-    // if the agent makes new commits before merge (which invalidates the review).
-    if (specialist === 'review' && status === 'passed') {
-      yield* Effect.promise(async () => {
-        try {
-          const project = resolveProjectFromIssueSync(normalizedIssueId);
-          if (project) {
-            const workspacePath = join(
-              project.projectPath,
-              'workspaces',
-              `feature-${normalizedIssueId.toLowerCase()}`,
-            );
-            if (existsSync(workspacePath)) {
-              const { formatAnchorShort, snapshotWorkspaceHeadsPromise } = await import('../../../../lib/git-utils.js');
-              const headAnchor = await snapshotWorkspaceHeadsPromise(normalizedIssueId, workspacePath);
-              if (headAnchor) {
-                setReviewStatusBase(normalizedIssueId, { reviewedAtCommit: headAnchor });
-                console.log(`[specialists/done] Snapshotted reviewedAtCommit=${formatAnchorShort(headAnchor)} for ${normalizedIssueId}`);
-              }
-            }
-          }
-        } catch (err) {
-          console.error(`[specialists/done] Failed to snapshot reviewedAtCommit for ${normalizedIssueId}:`, err);
-        }
-      });
-    }
+    // PAN-3847: the reviewedAtCommit anchor now travels inside the verdict write door
+    // call above — verdict and anchor are one write; the old post-door snapshot write
+    // was a redundant second writer.
 
     // When inspect specialist reports success, save checkpoint
     if (specialist === 'inspect' && status === 'passed') {
@@ -558,35 +537,6 @@ const postSpecialistsDoneRoute = HttpRouter.add(
           );
         } catch (err: any) {
           console.warn(`[specialists/done] Failed to deliver review verdict feedback: ${err.message}`);
-        }
-      });
-    }
-
-    // PAN-3148: the HTTP review prompt reports changes requested as status=failed,
-    // which the durable write above maps to reviewStatus=blocked. Snapshot the
-    // reviewed HEAD only after feedback delivery so the verdict remains durable
-    // even when the git probe stalls or fails (PAN-2524 ordering).
-    if (specialist === 'review' && status === 'failed') {
-      yield* Effect.promise(async () => {
-        try {
-          const project = resolveProjectFromIssueSync(normalizedIssueId);
-          if (project) {
-            const workspacePath = join(
-              project.projectPath,
-              'workspaces',
-              `feature-${normalizedIssueId.toLowerCase()}`,
-            );
-            if (existsSync(workspacePath)) {
-              const { formatAnchorShort, snapshotWorkspaceHeadsPromise } = await import('../../../../lib/git-utils.js');
-              const reviewedAtCommit = await snapshotWorkspaceHeadsPromise(normalizedIssueId, workspacePath);
-              if (reviewedAtCommit) {
-                setReviewStatusBase(normalizedIssueId, { reviewedAtCommit });
-                console.log(`[specialists/done] Snapshotted blocked reviewedAtCommit=${formatAnchorShort(reviewedAtCommit)} for ${normalizedIssueId}`);
-              }
-            }
-          }
-        } catch (err) {
-          console.error(`[specialists/done] Failed to snapshot blocked reviewedAtCommit for ${normalizedIssueId}:`, err);
         }
       });
     }

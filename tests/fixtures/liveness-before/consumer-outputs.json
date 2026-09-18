@@ -1,0 +1,371 @@
+{
+  "lifecycle": {
+    "agent-pan-9001": {
+      "agentId": "agent-pan-9001",
+      "hasAgentState": true,
+      "hasLiveTmuxSession": true,
+      "hasSavedSession": true,
+      "hasResumableTranscript": true,
+      "hasWorkspace": true,
+      "isOrphaned": false,
+      "isRunning": true,
+      "isRunningButStuck": false,
+      "isStopped": false,
+      "isCompleted": false,
+      "isCrashed": false,
+      "handedOff": false,
+      "owesRework": false,
+      "runtimeState": "uninitialized",
+      "agentStatus": "running",
+      "canStartFresh": false,
+      "canResumeSession": false,
+      "canRestartWithContext": true,
+      "canResetSession": true,
+      "requiresSessionResetBeforeFreshStart": false,
+      "recommendedAction": "none",
+      "reason": "Agent agent-pan-9001 is already running. Use 'pan tell' to message it."
+    },
+    "agent-pan-9002": {
+      "agentId": "agent-pan-9002",
+      "hasAgentState": true,
+      "hasLiveTmuxSession": false,
+      "hasSavedSession": true,
+      "hasResumableTranscript": true,
+      "hasWorkspace": true,
+      "isOrphaned": false,
+      "isRunning": false,
+      "isRunningButStuck": false,
+      "isStopped": true,
+      "isCompleted": false,
+      "isCrashed": false,
+      "handedOff": false,
+      "owesRework": false,
+      "runtimeState": "uninitialized",
+      "agentStatus": "stopped",
+      "canStartFresh": false,
+      "canResumeSession": true,
+      "canRestartWithContext": true,
+      "canResetSession": true,
+      "requiresSessionResetBeforeFreshStart": true,
+      "recommendedAction": "resume",
+      "reason": "Agent agent-pan-9002 has a resumable Claude session. Use 'pan resume agent-pan-9002' to continue it, or run 'pan reset-session agent-pan-9002' before starting a new session."
+    },
+    "agent-pan-9003": {
+      "agentId": "agent-pan-9003",
+      "hasAgentState": true,
+      "hasLiveTmuxSession": false,
+      "hasSavedSession": false,
+      "hasResumableTranscript": true,
+      "hasWorkspace": true,
+      "isOrphaned": false,
+      "isRunning": false,
+      "isRunningButStuck": false,
+      "isStopped": false,
+      "isCompleted": false,
+      "isCrashed": false,
+      "handedOff": false,
+      "owesRework": false,
+      "runtimeState": "uninitialized",
+      "agentStatus": "starting",
+      "canStartFresh": true,
+      "canResumeSession": false,
+      "canRestartWithContext": true,
+      "canResetSession": false,
+      "requiresSessionResetBeforeFreshStart": false,
+      "recommendedAction": "start"
+    },
+    "agent-pan-9004": {
+      "agentId": "agent-pan-9004",
+      "hasAgentState": true,
+      "hasLiveTmuxSession": false,
+      "hasSavedSession": false,
+      "hasResumableTranscript": true,
+      "hasWorkspace": false,
+      "isOrphaned": true,
+      "isRunning": false,
+      "isRunningButStuck": false,
+      "isStopped": true,
+      "isCompleted": false,
+      "isCrashed": false,
+      "handedOff": false,
+      "owesRework": false,
+      "runtimeState": "uninitialized",
+      "agentStatus": "stopped",
+      "canStartFresh": true,
+      "canResumeSession": false,
+      "canRestartWithContext": false,
+      "canResetSession": false,
+      "requiresSessionResetBeforeFreshStart": false,
+      "recommendedAction": "start",
+      "reason": "Agent agent-pan-9004 is an orphaned placeholder/stale record. Start Agent should create a fresh session."
+    },
+    "agent-pan-9005": {
+      "agentId": "agent-pan-9005",
+      "hasAgentState": true,
+      "hasLiveTmuxSession": true,
+      "hasSavedSession": false,
+      "hasResumableTranscript": true,
+      "hasWorkspace": true,
+      "isOrphaned": false,
+      "isRunning": true,
+      "isRunningButStuck": false,
+      "isStopped": false,
+      "isCompleted": false,
+      "isCrashed": false,
+      "handedOff": false,
+      "owesRework": false,
+      "runtimeState": "uninitialized",
+      "agentStatus": "running",
+      "canStartFresh": false,
+      "canResumeSession": false,
+      "canRestartWithContext": true,
+      "canResetSession": false,
+      "requiresSessionResetBeforeFreshStart": false,
+      "recommendedAction": "none",
+      "reason": "Agent agent-pan-9005 is already running. Use 'pan tell' to message it."
+    }
+  },
+  "parked": [
+    {
+      "issueId": "PAN-9005",
+      "orbit": "zombie-session",
+      "parkedAt": "2026-09-17T11:50:00.000Z",
+      "parkReason": "agent-pan-9005 is still running but the issue is merged — it holds a session and a concurrency slot for nothing",
+      "unparkCondition": "reap the session through the established merged-zombie teardown door",
+      "details": {
+        "agentId": "agent-pan-9005",
+        "mergeStatus": "merged"
+      }
+    },
+    {
+      "issueId": "PAN-9004",
+      "orbit": "uat-failed",
+      "parkedAt": "2026-09-17T12:00:00.000Z",
+      "parkReason": "UAT failed and no work agent is live to rework it — the merge gate will not take the issue and the UAT-failure relay found no delivery target",
+      "unparkCondition": "pan start <id> to put a work agent on the UAT feedback; the relay redelivers on the next failed verdict",
+      "details": {
+        "uatNotes": null
+      }
+    }
+  ],
+  "status": [
+    {
+      "id": "agent-pan-9001",
+      "issueId": "PAN-9001",
+      "workspace": "<AUDIT_HOME>/workspaces/feature-pan-9001",
+      "role": "work",
+      "model": "claude-sonnet-4-6",
+      "status": "running",
+      "startedAt": "2026-09-17T08:00:00.000Z",
+      "harness": "claude-code",
+      "lastActivity": "2026-09-17T11:55:00.000Z",
+      "tmuxActive": true,
+      "shadowMode": false,
+      "stackHealth": null
+    },
+    {
+      "id": "agent-pan-9002",
+      "issueId": "PAN-9002",
+      "workspace": "<AUDIT_HOME>/workspaces/feature-pan-9002",
+      "role": "work",
+      "model": "claude-sonnet-4-6",
+      "status": "stopped",
+      "startedAt": "2026-09-17T08:00:00.000Z",
+      "harness": "claude-code",
+      "stoppedAt": "2026-09-17T09:05:00.000Z",
+      "lastActivity": "2026-09-17T09:00:00.000Z",
+      "tmuxActive": false,
+      "shadowMode": false,
+      "stackHealth": null
+    },
+    {
+      "id": "agent-pan-9003",
+      "issueId": "PAN-9003",
+      "workspace": "<AUDIT_HOME>/workspaces/feature-pan-9003",
+      "role": "work",
+      "model": "claude-sonnet-4-6",
+      "status": "starting",
+      "startedAt": "2026-09-17T08:00:00.000Z",
+      "harness": "claude-code",
+      "lastActivity": "2026-09-17T11:59:00.000Z",
+      "tmuxActive": false,
+      "shadowMode": false,
+      "stackHealth": null
+    },
+    {
+      "id": "agent-pan-9004",
+      "issueId": "PAN-9004",
+      "workspace": "<AUDIT_HOME>/workspaces/feature-pan-9004",
+      "role": "work",
+      "model": "claude-sonnet-4-6",
+      "status": "stopped",
+      "startedAt": "2026-09-17T08:00:00.000Z",
+      "harness": "claude-code",
+      "stoppedAt": "2026-09-17T09:30:00.000Z",
+      "lastActivity": "2026-09-17T09:30:00.000Z",
+      "tmuxActive": false,
+      "shadowMode": false,
+      "stackHealth": null
+    },
+    {
+      "id": "agent-pan-9005",
+      "issueId": "PAN-9005",
+      "workspace": "<AUDIT_HOME>/workspaces/feature-pan-9005",
+      "role": "work",
+      "model": "claude-sonnet-4-6",
+      "status": "running",
+      "startedAt": "2026-09-17T08:00:00.000Z",
+      "harness": "claude-code",
+      "lastActivity": "2026-09-17T11:50:00.000Z",
+      "tmuxActive": true,
+      "shadowMode": false,
+      "stackHealth": null
+    }
+  ],
+  "dodGate": {
+    "PAN-9001": {
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review",
+          "expected": "review_status row (fixture-seeded)",
+          "observed": "reviewStatus=blocked",
+          "status": "miss"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests",
+          "expected": "review_status row (fixture-seeded)",
+          "observed": "testStatus=pending",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification",
+          "expected": "review_status row (fixture-seeded)",
+          "observed": "verificationStatus=pending",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged",
+          "expected": "stubbed external row (audit fixture)",
+          "observed": "stubbed by the no-loss audit",
+          "status": "pass"
+        },
+        {
+          "id": "postMerge",
+          "num": 5,
+          "title": "Post-merge lifecycle",
+          "expected": "stubbed external row (audit fixture)",
+          "observed": "stubbed by the no-loss audit",
+          "status": "pass"
+        },
+        {
+          "id": "mainVerify",
+          "num": 6,
+          "title": "Verify on main",
+          "expected": "stubbed external row (audit fixture)",
+          "observed": "stubbed by the no-loss audit",
+          "status": "pass"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Ship",
+          "expected": "stubbed external row (audit fixture)",
+          "observed": "stubbed by the no-loss audit",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deploy",
+          "expected": "stubbed external row (audit fixture)",
+          "observed": "stubbed by the no-loss audit",
+          "status": "pass"
+        }
+      ],
+      "misses": [
+        "review"
+      ],
+      "accepted": [],
+      "passed": false
+    },
+    "PAN-9002": {
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review",
+          "expected": "review_status row (fixture-seeded)",
+          "observed": "reviewStatus=passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests",
+          "expected": "review_status row (fixture-seeded)",
+          "observed": "testStatus=passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification",
+          "expected": "review_status row (fixture-seeded)",
+          "observed": "verificationStatus=pending",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged",
+          "expected": "stubbed external row (audit fixture)",
+          "observed": "stubbed by the no-loss audit",
+          "status": "pass"
+        },
+        {
+          "id": "postMerge",
+          "num": 5,
+          "title": "Post-merge lifecycle",
+          "expected": "stubbed external row (audit fixture)",
+          "observed": "stubbed by the no-loss audit",
+          "status": "pass"
+        },
+        {
+          "id": "mainVerify",
+          "num": 6,
+          "title": "Verify on main",
+          "expected": "stubbed external row (audit fixture)",
+          "observed": "stubbed by the no-loss audit",
+          "status": "pass"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Ship",
+          "expected": "stubbed external row (audit fixture)",
+          "observed": "stubbed by the no-loss audit",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deploy",
+          "expected": "stubbed external row (audit fixture)",
+          "observed": "stubbed by the no-loss audit",
+          "status": "pass"
+        }
+      ],
+      "misses": [],
+      "accepted": [],
+      "passed": true
+    }
+  }
+}

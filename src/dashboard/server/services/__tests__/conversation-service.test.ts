@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -79,7 +79,7 @@ describe('computeContextUsage', () => {
     expect(result).toMatchObject({
       activeBytes: buffer.length,
       estimatedTokens: 33_041,
-      contextWindow: 200_000,
+      contextWindow: 1_000_000,
       lastInputTokens: 4_200,
       lastCacheReadTokens: 26_000,
       lastCacheCreationTokens: 2_841,
@@ -87,7 +87,7 @@ describe('computeContextUsage', () => {
       lastModel: 'claude-opus-4-7',
       lastTurnAt: '2026-05-26T14:30:00Z',
     });
-    expect(result?.percentUsed).toBeCloseTo((33_041 / 200_000) * 100, 5);
+    expect(result?.percentUsed).toBeCloseTo((33_041 / 1_000_000) * 100, 5);
   });
 
   it('returns context usage for a known GPT model', async () => {
@@ -110,7 +110,7 @@ describe('computeContextUsage', () => {
       // gpt-5.5 routes through CLIProxy, whose effective ceiling is the
       // conservative CLIPROXY_CODEX_CONTEXT_WINDOW (150k), not the 200k
       // marketing window — see model-capabilities.ts (PAN-1672).
-      contextWindow: 150_000,
+      contextWindow: 272_000,
     });
   });
 
@@ -124,7 +124,7 @@ describe('computeContextUsage', () => {
     const { computeContextUsage } = await import('../conversation-service.js');
     const result = await computeContextUsage('/fake/context-deprecated.jsonl', 'claude-opus-4-5');
 
-    expect(result?.contextWindow).toBe(200_000);
+    expect(result?.contextWindow).toBe(1_000_000);
   });
 
   it('auto-promotes the effective context window to 1M when observed input exceeds the default', async () => {
@@ -211,7 +211,7 @@ describe('computeContextUsage', () => {
     const { computeContextUsage } = await import('../conversation-service.js');
     const result = await computeContextUsage('/fake/context-empty-file.jsonl', 'claude-opus-4-7');
 
-    expect(result).toEqual({ activeBytes: 0, estimatedTokens: 0, contextWindow: 200000, percentUsed: 0 });
+    expect(result).toEqual({ activeBytes: 0, estimatedTokens: 0, contextWindow: 1000000, percentUsed: 0 });
   });
 
   it('returns zero usage when the file has lines but no assistant turn with usage data', async () => {
@@ -1215,6 +1215,89 @@ describe('watchConversation', () => {
 
     releaseFirstCallback();
     await vi.waitFor(() => expect(callback).toHaveBeenCalledTimes(2));
+    handle.stop();
+  });
+});
+
+describe('watchConversation safety nets (missed fs.watch events)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    mockStat.mockImplementation(async () => {
+      const buf = await mockReadFile();
+      return { mtimeMs: Date.now() - 1_000, birthtimeMs: Date.now() - 1_000, size: buf.length };
+    });
+    mockOpen.mockImplementation(async () => {
+      const buffer = await mockReadFile();
+      return {
+        read: (buf: Buffer, offset: number, length: number, position: number) => {
+          const toCopy = Math.min(length, Math.max(0, buffer.length - position));
+          if (toCopy > 0) {
+            buffer.copy(buf, offset, position, position + toCopy);
+          }
+          return Promise.resolve({ bytesRead: toCopy, buffer: buf });
+        },
+        close: () => Promise.resolve(),
+      };
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const userLine = (uuid: string, text: string) => makeJsonlLine({
+    type: 'user',
+    uuid,
+    timestamp: '2024-01-01T00:00:00.000Z',
+    message: { content: [{ type: 'text', text }] },
+  });
+
+  it('re-parses an append that fs.watch never reported via the periodic size reconcile', async () => {
+    const firstLine = userLine('u-1', 'First');
+    let buffer = Buffer.from(`${firstLine}\n`);
+    mockReadFile.mockImplementation(async () => buffer);
+    // fs.watch stays open but never yields an event.
+    mockWatch.mockImplementationOnce(() => ({ [Symbol.asyncIterator]: () => ({ next: () => new Promise(() => {}) }) }));
+
+    const callback = vi.fn(async () => {});
+    const { watchConversation, RECONCILE_INTERVAL_MS } = await import('../conversation-service.js');
+    const handle = watchConversation('/fake/session.jsonl', callback, {
+      byteOffset: buffer.length,
+      priorState: { pendingToolUse: new Map(), unresolvedResults: new Map(), lastSequence: 0 },
+    });
+
+    await vi.advanceTimersByTimeAsync(RECONCILE_INTERVAL_MS + 10);
+    expect(callback).not.toHaveBeenCalled();
+
+    buffer = Buffer.from(`${firstLine}\n${userLine('u-2', 'Second')}\n`);
+    await vi.advanceTimersByTimeAsync(RECONCILE_INTERVAL_MS + 10);
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback.mock.calls[0]![0].messages.map((m: { id: string }) => m.id)).toEqual(['u-2']);
+
+    handle.stop();
+  });
+
+  it('falls back to polling when the fs.watch iterator ends without throwing', async () => {
+    const firstLine = userLine('u-1', 'First');
+    let buffer = Buffer.from(`${firstLine}\n`);
+    mockReadFile.mockImplementation(async () => buffer);
+    mockWatch.mockImplementationOnce(() => ({
+      [Symbol.asyncIterator]: async function* () { /* closes immediately */ },
+    }));
+
+    const callback = vi.fn(async () => {});
+    const { watchConversation } = await import('../conversation-service.js');
+    const handle = watchConversation('/fake/session.jsonl', callback, {
+      byteOffset: buffer.length,
+      priorState: { pendingToolUse: new Map(), unresolvedResults: new Map(), lastSequence: 0 },
+    });
+
+    buffer = Buffer.from(`${firstLine}\n${userLine('u-2', 'Second')}\n`);
+    await vi.advanceTimersByTimeAsync(600);
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback.mock.calls[0]![0].messages.map((m: { id: string }) => m.id)).toEqual(['u-2']);
+
     handle.stop();
   });
 });

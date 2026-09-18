@@ -12,6 +12,7 @@ interface ComposerDeliveryStateOptions {
   conversation: Conversation;
   agentId?: string;
   serverBaseCount: number;
+  serverMessageIds?: string[];
   onSendFailed?: () => void;
 }
 
@@ -33,6 +34,7 @@ export function useComposerDeliveryState({
   conversation,
   agentId,
   serverBaseCount,
+  serverMessageIds,
   onSendFailed,
 }: ComposerDeliveryStateOptions) {
   const failedMessages = useConversationFailed(conversation.name);
@@ -55,12 +57,13 @@ export function useComposerDeliveryState({
       text,
       serverBaseCount,
       agentId,
+      serverMessageIds,
     ).then((result) => {
       if (result?.kind === 'ui') {
         openCommandUi(conversation, result.action, result.args.focus || undefined);
       }
     });
-  }, [agentId, conversation, retryFailed, serverBaseCount]);
+  }, [agentId, conversation, retryFailed, serverBaseCount, serverMessageIds]);
 
   const handleConfirmCommand = useCallback(async (messageId: string, typedText?: string) => {
     const message = commandResults.find(candidate => candidate.id === messageId);
@@ -74,6 +77,7 @@ export function useComposerDeliveryState({
       agentId,
       undefined,
       { nonce: result.nonce, typedText },
+      { clientMessageId: crypto.randomUUID() },
     );
     if (!nextResult) {
       throw new Error('The command did not return a structured result.');

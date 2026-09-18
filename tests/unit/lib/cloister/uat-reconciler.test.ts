@@ -13,6 +13,9 @@ import {
 import type { ReadyFeature } from '../../../../src/lib/cloister/uat-generation-engine.js';
 import { needsReviewDispatch } from '../../../../src/lib/review-dispatch-decision.js';
 import type { UatGeneration, UatGenerationStatus } from '../../../../src/lib/database/uat-generations-db.js';
+import { makeUniqueUatCandidateName } from '../../../../src/lib/cloister/uat-candidate-name.js';
+import { generationFolderName } from '../../../../src/lib/cloister/uat-generation-engine.js';
+import { safeBranchName, safeGenerationWorktreePath } from '../../../../src/lib/cloister/uat-generation-deps.js';
 
 const MAIN = 'main-sha-1';
 const T0 = Date.parse('2026-06-10T12:00:00.000Z');
@@ -50,23 +53,27 @@ function makeDeps(projectRoot: string, options: {
   rows?: UatGeneration[];
   headShas?: Record<string, string>;
   assembleStatus?: UatGenerationStatus;
+  containedNames?: string[];
 } = {}): UatReconcilerDeps & {
   rows: Map<string, UatGeneration>;
   assembled: ReadyFeature[][];
   teardowns: string[];
   cleanups: number[];
+  logs: string[];
 } {
   const rows = new Map((options.rows ?? []).map((g) => [g.name, g]));
   const assembled: ReadyFeature[][] = [];
   const teardowns: string[] = [];
   const cleanups: number[] = [];
+  const logs: string[] = [];
   let assembleSeq = 0;
   return {
-    rows, assembled, teardowns, cleanups,
+    rows, assembled, teardowns, cleanups, logs,
     isEnabled: () => options.enabled ?? true,
     getReadySet: async () => options.readySet === undefined ? READY : options.readySet,
     getMainHeadSha: async () => MAIN,
     getBranchHeadSha: async (branch) => options.headShas?.[branch] ?? (branch === 'feature/pan-1' ? 'h1' : 'h2'),
+    isGenerationContainedInMain: async (generation) => options.containedNames?.includes(generation.name) ?? false,
     store: {
       insert: (g) => { rows.set(g.name, { ...g, createdAt: '', updatedAt: '' }); },
       update: (name, patch) => {
@@ -91,9 +98,39 @@ function makeDeps(projectRoot: string, options: {
     teardownStack: async (g) => { teardowns.push(g.name); },
     cleanup: async () => { cleanups.push(1); },
     now: () => T0,
-    log: () => {},
+    log: (message) => { logs.push(message); },
   };
 }
+
+describe('terminal promoted generations', () => {
+  it('stamps contained live branches promoted before stale invalidation', async () => {
+    const proj = freshProject();
+    const name = 'uat/pan-sable-0816';
+    const promoted = gen(proj, name, 'ready');
+    const deps = makeDeps(proj, { rows: [promoted], readySet: [], containedNames: [name] });
+
+    await reconcileUatGenerations(proj, deps);
+    expect(deps.rows.get(name)).toMatchObject({ status: 'promoted', members: promoted.members });
+    expect(deps.teardowns).toEqual([]);
+    expect(deps.logs).toContain(`[uat-reconciler] stamping ${name} promoted — branch is contained in main`);
+
+    await reconcileUatGenerations(proj, deps);
+    expect(deps.rows.get(name)?.status).toBe('promoted');
+  });
+
+  it('mints a same-day suffix without replacing the promoted name', () => {
+    const promoted = 'uat/pan-sable-0816';
+    const next = makeUniqueUatCandidateName({
+      label: 'pan', dateIso: '2026-08-16T12:00:00Z', codenames: ['sable'], pick: () => 0,
+    }, [promoted]);
+
+    expect(next).toBe('uat/pan-sable-0816-2');
+    expect(safeBranchName(next, 'uat')).toBe(next);
+    const folder = generationFolderName(next);
+    expect(safeGenerationWorktreePath('/project', `/project/workspaces/${folder}`)).toBe(`/project/workspaces/${folder}`);
+    expect(folder).toBe('uat-pan-sable-0816-2');
+  });
+});
 
 describe('gates', () => {
   it('no-ops when the merge train is disabled', async () => {

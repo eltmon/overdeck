@@ -51,8 +51,8 @@ function normalizeProviderConfig(
 }
 
 function validateProviderHarness(provider: ModelProvider, harness: RuntimeName | undefined): void {
-  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code') {
-    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, acp, or kimi-code`);
+  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse') {
+    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, or muse`);
   }
 }
 
@@ -103,6 +103,24 @@ function degradeInvalidTieredExecution(
   }
   result.tieredExecutionInvalid = { reason: err.message };
   result.tieredExecution = { ...DEFAULT_TIERED_EXECUTION_CONFIG, enabled: false };
+}
+
+// An unrecognized `claude.permissionMode` used to be dropped without a word, so
+// a typo (`bypassPermissions`, `yolo`, `auto-review`) silently kept whatever the
+// default was — for permissions that is a security-relevant surprise in either
+// direction. Config load must not throw (see the tiered_execution note above), so
+// we degrade to the current value and say so, once per distinct bad value.
+const warnedInvalidClaudePermissionModes = new Set<string>();
+function warnInvalidClaudePermissionMode(raw: unknown, effective: string): void {
+  const shown = typeof raw === 'string' ? raw : JSON.stringify(raw);
+  if (warnedInvalidClaudePermissionModes.has(String(shown))) return;
+  warnedInvalidClaudePermissionModes.add(String(shown));
+  console.error(
+    `[config] claude.permissionMode "${shown}" is not a valid value — valid values are ` +
+    `'auto' (Claude Code runs with --permission-mode default; needs the auto-approve hooks) ` +
+    `and 'bypass' (--permission-mode bypassPermissions; no prompts). ` +
+    `Ignoring it and using "${effective}".`,
+  );
 }
 
 export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedConfig; explicitlyDisabled: Set<ModelProvider> } {
@@ -193,6 +211,10 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       governorSwapSoftFreePercent: DEFAULT_CONFIG.resources.governorSwapSoftFreePercent,
       governorSwapRecoveryFreePercent: DEFAULT_CONFIG.resources.governorSwapRecoveryFreePercent,
       governorPsiFullShedAvg10: DEFAULT_CONFIG.resources.governorPsiFullShedAvg10,
+      governorPsiCalmReadmitAvg10: DEFAULT_CONFIG.resources.governorPsiCalmReadmitAvg10,
+      governorPsiCalmWindowMs: DEFAULT_CONFIG.resources.governorPsiCalmWindowMs,
+      governorCpuSoftLoadPerCore: DEFAULT_CONFIG.resources.governorCpuSoftLoadPerCore,
+      governorCpuRecoveryLoadPerCore: DEFAULT_CONFIG.resources.governorCpuRecoveryLoadPerCore,
     },
     issues: {
       closedWindowDays: DEFAULT_CONFIG.issues.closedWindowDays,
@@ -266,6 +288,15 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
         if (openai.plan) result.providerPlan.openai = openai.plan;
       } else if (providers.openai !== undefined) {
         explicitlyDisabled.add('openai');
+      }
+
+      // Muse Code owns credentials; enabling Meta only exposes its model choices.
+      const meta = normalizeProviderConfig(providers.meta, undefined);
+      applyProviderHarness(result, 'meta', meta.harness);
+      if (meta.enabled) result.enabledProviders.add('meta');
+      else if (providers.meta !== undefined) {
+        explicitlyDisabled.add('meta');
+        result.enabledProviders.delete('meta');
       }
 
       // Google
@@ -367,6 +398,15 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       }
     }
 
+    for (const provider of ['opencode', 'opencode-go'] as const) {
+      const raw = config.models?.providers?.[provider];
+      if (raw === undefined) continue;
+      const normalized = normalizeProviderConfig(raw);
+      applyProviderHarness(result, provider, normalized.harness);
+      if (normalized.enabled) result.enabledProviders.add(provider);
+      else explicitlyDisabled.add(provider);
+    }
+
     // Merge tmux configuration
     if (config.tmux?.config_mode) {
       result.tmux.configMode = config.tmux.config_mode;
@@ -384,6 +424,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     }
     if (config.conversations?.title_model) {
       result.conversations.titleModel = resolveModelIdSync(config.conversations.title_model);
+    }
+    if (config.conversations?.handoff_author_model) {
+      result.conversations.handoffAuthorModel = resolveModelIdSync(config.conversations.handoff_author_model);
     }
     if (config.conversations?.watch_dirs) {
       result.conversations.watchDirs = config.conversations.watch_dirs;
@@ -686,6 +729,34 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       if (typeof config.resources.governor_psi_full_shed_avg10 === 'number') {
         result.resources.governorPsiFullShedAvg10 = config.resources.governor_psi_full_shed_avg10;
       }
+      if (
+        typeof config.resources.governor_psi_calm_readmit_avg10 === 'number'
+        && Number.isFinite(config.resources.governor_psi_calm_readmit_avg10)
+        && config.resources.governor_psi_calm_readmit_avg10 >= 0
+      ) {
+        result.resources.governorPsiCalmReadmitAvg10 = config.resources.governor_psi_calm_readmit_avg10;
+      }
+      if (
+        typeof config.resources.governor_psi_calm_window_ms === 'number'
+        && Number.isFinite(config.resources.governor_psi_calm_window_ms)
+        && config.resources.governor_psi_calm_window_ms > 0
+      ) {
+        result.resources.governorPsiCalmWindowMs = config.resources.governor_psi_calm_window_ms;
+      }
+      if (
+        typeof config.resources.governor_cpu_soft_load_per_core === 'number'
+        && Number.isFinite(config.resources.governor_cpu_soft_load_per_core)
+        && config.resources.governor_cpu_soft_load_per_core > 0
+      ) {
+        result.resources.governorCpuSoftLoadPerCore = config.resources.governor_cpu_soft_load_per_core;
+      }
+      if (
+        typeof config.resources.governor_cpu_recovery_load_per_core === 'number'
+        && Number.isFinite(config.resources.governor_cpu_recovery_load_per_core)
+        && config.resources.governor_cpu_recovery_load_per_core >= 0
+      ) {
+        result.resources.governorCpuRecoveryLoadPerCore = config.resources.governor_cpu_recovery_load_per_core;
+      }
       // PAN-2500: RECOVERY must exceed SOFT or hysteresis can never re-admit.
       // Normalize rather than throw — a misconfigured reserve shouldn't crash config load.
       if (result.resources.governorRecoveryReserveGb <= result.resources.governorSoftReserveGb) {
@@ -699,6 +770,12 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
         result.resources.governorSwapRecoveryFreePercent = Math.min(
           result.resources.governorSwapSoftFreePercent + 10,
           100,
+        );
+      }
+      if (result.resources.governorCpuRecoveryLoadPerCore >= result.resources.governorCpuSoftLoadPerCore) {
+        throw new Error(
+          'config.yaml: resources.governor_cpu_recovery_load_per_core must be lower than '
+          + 'resources.governor_cpu_soft_load_per_core — lower CPU load is healthier',
         );
       }
     }
@@ -749,8 +826,12 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       }
     }
 
-    if (config.claude && (config.claude.permissionMode === 'auto' || config.claude.permissionMode === 'bypass')) {
-      result.claude.permissionMode = config.claude.permissionMode;
+    if (config.claude?.permissionMode !== undefined) {
+      if (config.claude.permissionMode === 'auto' || config.claude.permissionMode === 'bypass') {
+        result.claude.permissionMode = config.claude.permissionMode;
+      } else {
+        warnInvalidClaudePermissionMode(config.claude.permissionMode, result.claude.permissionMode);
+      }
     }
 
     if (config.codex && (config.codex.permissionMode === 'read-only' || config.codex.permissionMode === 'workspace' || config.codex.permissionMode === 'auto-review' || config.codex.permissionMode === 'full-access')) {

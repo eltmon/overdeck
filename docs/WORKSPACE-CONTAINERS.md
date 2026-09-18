@@ -12,6 +12,8 @@ A workspace stack is rendered from `workspace.docker.compose_template` into the 
 
 A non-zero `init` exit is a broken stack, not a successful host fallback. If `init` fails, dependent services staying in `Created` is the correct Docker behavior and should be surfaced loudly.
 
+Every bind-mounted workspace repository must exist before Compose starts. Docker creates a missing bind source as root, which leaves non-root init services unable to install dependencies. The rebuild path restores referenced polyrepo worktrees before startup and repairs ownership-corrupt `node_modules` or `.pnpm-store` caches. It refuses to replace an unregistered directory that contains anything else.
+
 The `init` service must install development dependencies and must not try to install host git hooks inside the container:
 
 - `NODE_ENV=development` keeps devDependencies available for scripts such as `husky` and `tsdown`.
@@ -112,7 +114,8 @@ Use `pan workspace rebuild <issue-id>` to reset one workspace stack:
 
 1. tear down that stack with Docker Compose;
 2. re-render the workspace `.devcontainer` from the template;
-3. restart the stack with `docker compose up -d --build`.
+3. restore missing bind-mounted repo worktrees and heal ownership-corrupt dependency caches;
+4. restart the stack with `docker compose up -d --build`.
 
 Use `pan workspace reap` for bulk cleanup of orphaned broken stacks. It is dry-run by default and lists candidate workspace stacks without modifying Docker state. `pan workspace reap --apply` performs teardown for candidates, and active-agent stacks are skipped so in-progress work is not destroyed accidentally.
 

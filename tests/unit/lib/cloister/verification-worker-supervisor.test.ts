@@ -63,7 +63,9 @@ describe('verification worker supervisor', () => {
       .toBe(Date.parse(admittedAt) + 65 * 60 * 1000);
   });
 
-  it('persists queued and running admission phases without resetting first admission', () => {
+  it('excludes every admission queue from the deadline across multiple gates', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-19T00:00:00.000Z'));
     const home = useFixture();
     const dir = join(home, 'verification-workers', 'pan-1');
     mkdirSync(dir, { recursive: true });
@@ -79,18 +81,37 @@ describe('verification worker supervisor', () => {
     }));
 
     markVerificationWorkerAdmissionPhase('PAN-1', {
-      phase: 'running', gateName: 'typecheck', attempt: 1, admittedAt: '2026-07-19T01:00:00.000Z',
+      phase: 'running', gateName: 'typecheck', attempt: 1, admittedAt: new Date().toISOString(),
     });
+    vi.advanceTimersByTime(60 * 60_000);
     markVerificationWorkerAdmissionPhase('PAN-1', {
       phase: 'queued', gateName: 'lint', attempt: 1,
     });
 
-    expect(readVerificationWorkerState('PAN-1')).toMatchObject({
+    let state = readVerificationWorkerState('PAN-1')!;
+    expect(state).toMatchObject({
       phase: 'queued',
-      admittedAt: '2026-07-19T01:00:00.000Z',
+      admittedAt: null,
       currentGate: 'lint',
       currentAttempt: 1,
     });
+    expect(verificationWorkerDeadline(state)).toBeNull();
+
+    vi.advanceTimersByTime(2 * 60 * 60_000);
+    markVerificationWorkerAdmissionPhase('PAN-1', {
+      phase: 'running', gateName: 'lint', attempt: 1, admittedAt: new Date().toISOString(),
+    });
+    state = readVerificationWorkerState('PAN-1')!;
+    expect(verificationWorkerDeadline(state)).toBe(Date.now() + 65 * 60_000);
+
+    vi.advanceTimersByTime(60 * 60_000);
+    markVerificationWorkerAdmissionPhase('PAN-1', {
+      phase: 'queued', gateName: 'test', attempt: 1,
+    });
+    vi.advanceTimersByTime(2 * 60 * 60_000);
+    state = readVerificationWorkerState('PAN-1')!;
+    expect(state).toMatchObject({ phase: 'queued', admittedAt: null, currentGate: 'test' });
+    expect(verificationWorkerDeadline(state)).toBeNull();
   });
 
   it('runs verification in a detached worker and returns its durable result', async () => {
@@ -228,32 +249,25 @@ describe('PAN-3674 follow-up: expired workers', () => {
   });
 
   it('kills the worker when the execution deadline fires mid-run', async () => {
-    const home = useFixture(5_000); // slow fixture: outlives the deadline trip
+    vi.useFakeTimers();
+    const home = useFixture(60_000); // slow fixture: outlives the deadline trip
     const pending = runSupervisedVerification('PAN-3675', '/tmp/workspace', { isRemote: false }, 'test');
 
-    // Wait for the worker to register, then age its admission past the budget.
+    // The supervisor registers the worker before its first polling delay. Age
+    // the active gate past its budget, then advance the polling and kill timers.
     const stateFile = join(home, 'verification-workers', 'pan-3675', 'state.json');
-    let pid = -1;
-    for (let i = 0; i < 100; i++) {
-      const s = readVerificationWorkerState('PAN-3675');
-      if (s) { pid = s.pid; break; }
-      await new Promise((r) => setTimeout(r, 25));
-    }
+    const pid = readVerificationWorkerState('PAN-3675')!.pid;
     expect(pid).toBeGreaterThan(0);
     const seeded = JSON.parse(readFileSync(stateFile, 'utf8'));
+    seeded.phase = 'running';
     seeded.admittedAt = new Date(Date.now() - 66 * 60_000).toISOString();
     writeFileSync(stateFile, JSON.stringify(seeded));
 
+    await vi.advanceTimersByTimeAsync(3_000);
     const outcome = await pending;
     expect(outcome.outcome).toBe('error');
     expect(outcome.outcome === 'error' ? outcome.message : '').toContain('exceeded');
-    // The kill ladder (TERM → 1s → KILL) is fire-and-forget behind the verdict —
-    // poll for death instead of racing it.
-    let dead = false;
-    for (let i = 0; i < 120 && !dead; i++) {
-      try { process.kill(pid, 0); } catch { dead = true; }
-      if (!dead) await new Promise((r) => setTimeout(r, 25));
-    }
-    expect(dead).toBe(true);
+    // Recovery cannot start while the expired worker remains live.
+    expect(() => process.kill(pid, 0)).toThrow();
   });
 });

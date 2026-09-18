@@ -71,6 +71,10 @@ A **handoff fork** asks the live source agent to write the seed text itself, the
 - `pan handoff <conversation> --focus "..."` and the dashboard Focus field tell the source agent what the successor most needs to know.
 - If no focus is provided, the prompt tells the agent to write a general continuation handoff.
 
+**Title:**
+- Without an explicit title, the new conversation is titled from the first ~70 characters of the focus (`Handoff: ...`), or `Handoff: <source title>` with no focus.
+- Pass `--title "<title>"` (CLI) or use the dashboard Title field to name the successor explicitly (PAN-3768). A blank title falls back to the focus-derived default.
+
 **Timeout and fallback:**
 - The default handshake timeout is 5 minutes (`300_000ms`).
 - Timeout, validation failure, source-ended state, or source-in-workspace-devcontainer detection automatically falls back to a summary fork.
@@ -91,6 +95,7 @@ When forking from the dashboard, you can configure:
 | **Plain fork** | Off | Copy raw history instead of generating a summary |
 | **Handoff fork** | Off | Ask the live source agent to author the seed document |
 | **Focus** | Empty | Optional guidance for what the source agent should emphasize in a handoff |
+| **Title** | Derived from focus | Explicit name for the new conversation; defaults to `Handoff: <first ~70 chars of focus>` |
 | **Fast summary (no LLM)** | Off | Use a heuristic fallback instead of calling an LLM to summarize. Faster and free, but less nuanced |
 | **Include thinking in summary** | Off | When generating a summary, include thinking block content as labeled text. Increases summary size but preserves reasoning details |
 | **Summary model** | Configured compaction model | Which model generates the summary. Only applies when Fast summary is off |

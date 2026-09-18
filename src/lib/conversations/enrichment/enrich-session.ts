@@ -31,6 +31,7 @@ import type { TokenUsage } from '../../cost.js';
 import type { EnrichmentTier, EnrichmentTierConfig, ModelProvider } from '../../model-fallback.js';
 import type { ModelId } from '../../settings.js';
 import type { DiscoveredSession } from '../../overdeck/discovered-sessions.js';
+import { readCodexRolloutMessage } from '../../codex-rollout-message.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -290,10 +291,11 @@ function buildCodexExcerpt(lines: string[], options: ExcerptOptions = {}): strin
       const payload = entry.payload;
       if (!payload || typeof payload !== 'object') continue;
 
-      if (entry.type === 'event_msg' && (payload.type === 'user_message' || payload.type === 'agent_message')) {
-        const rawText = typeof payload.message === 'string' ? payload.message : '';
-        const text = truncateText(redactSensitiveText(rawText.trim()), options);
-        if (text) parts.push(`[${payload.type === 'user_message' ? 'user' : 'assistant'}]: ${text}`);
+      // Both rollout message shapes (PAN-3781) — see codex-rollout-message.ts.
+      const rolloutMessage = entry.type === 'event_msg' ? readCodexRolloutMessage(entry) : undefined;
+      if (rolloutMessage) {
+        const text = truncateText(redactSensitiveText(rolloutMessage.text), options);
+        if (text) parts.push(`[${rolloutMessage.role}]: ${text}`);
         continue;
       }
 

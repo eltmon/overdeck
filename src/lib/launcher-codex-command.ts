@@ -15,11 +15,14 @@ import { shellQuote } from './shell-quote.js';
 /** The LauncherConfig subset the Codex command shapes read. */
 export interface CodexCommandConfig {
   codexMode?: 'exec' | 'tui' | 'work-tui' | 'app-server';
+  codexEffort?: string;
   codexSandboxMode?: string;
   resumeSessionId?: string;
   model?: string;
   promptFile?: string;
   promptInline?: string;
+  appendSystemPromptFile?: string;
+  appendSystemPromptFiles?: string[];
   overdeckEnv?: { agentId?: string };
 }
 
@@ -51,17 +54,28 @@ function computeCodexCommandTokens(
   wrap: SupervisorWrap,
 ): string[] {
   const codexMode = config.codexMode ?? 'exec';
+  const developerInstructionFiles = [
+    ...(config.appendSystemPromptFile ? [config.appendSystemPromptFile] : []),
+    ...(config.appendSystemPromptFiles ?? []),
+  ];
+  const addDeveloperInstructions = (tokens: string[]): void => {
+    if (developerInstructionFiles.length === 0) return;
+    const sources = developerInstructionFiles.map(shellQuote).join(' ');
+    // Codex accepts developer_instructions as a supported config override. The
+    // command substitution is evaluated by the generated launcher, keeping the
+    // rendered content out of native AGENTS.md files and argv source code.
+    tokens.push('-c', `"developer_instructions=$(cat ${sources} 2>/dev/null)"`);
+  };
 
   // TUI / conversation mode: interactive terminal, optionally under the PTY
-  // supervisor for conversation delivery. Keep CODEX_HOME/AGENTS.md, but do
-  // not let repo AGENTS.md turn a normal dashboard conversation into a work
-  // agent with project-level task-tracker rules.
+  // supervisor. User-owned repository AGENTS.md remains under Codex's native
+  // discovery; Overdeck context is a separate launch-only developer layer.
   if (codexMode === 'tui') {
     const tokens: string[] = ['codex'];
     if (config.resumeSessionId) {
       tokens.push('resume');
     }
-    tokens.push('-c', 'project_doc_max_bytes=0');
+    addDeveloperInstructions(tokens);
     if (config.resumeSessionId) {
       tokens.push(shellQuote(config.resumeSessionId));
     }
@@ -88,6 +102,7 @@ function computeCodexCommandTokens(
     if (config.model) {
       tokens.push('-m', shellQuoteModelIdSync(config.model));
     }
+    addDeveloperInstructions(tokens);
     if (config.resumeSessionId) {
       tokens.push(shellQuote(config.resumeSessionId));
     }
@@ -97,12 +112,15 @@ function computeCodexCommandTokens(
 
   if (codexMode === 'app-server') {
     const hostPath = join(packageRoot, 'dist', 'codex-app-server-host.js');
-    const tokens: string[] = ['node', shellQuote(hostPath)];
+    const tokens: string[] = ['node', shellQuote(hostPath), '--effort', shellQuote(config.codexEffort ?? 'high')];
     if (config.model) {
       tokens.push('--model', shellQuoteModelIdSync(config.model));
     }
     if (config.resumeSessionId) {
       tokens.push('--resume', shellQuote(config.resumeSessionId));
+    }
+    for (const file of developerInstructionFiles) {
+      tokens.push('--developer-instructions-file', shellQuote(file));
     }
     const cmd = tokens.join(' ');
     return [useExec ? `exec ${cmd}` : cmd];
@@ -122,6 +140,8 @@ function computeCodexCommandTokens(
   if (config.model) {
     tokens.push('-m', shellQuoteModelIdSync(config.model));
   }
+
+  addDeveloperInstructions(tokens);
 
   // Disable approval prompts (codex exec rejects --ask-for-approval; use -c instead)
   tokens.push('-c', 'approval_policy=never');

@@ -49,7 +49,7 @@ async function resetDb() {
   closeOverdeckDatabaseSync();
 }
 
-async function createForkPair(options: { forkStatus?: string; forkMode?: 'summary' | 'handoff' | 'plain' } = {}) {
+async function createForkPair(options: { forkStatus?: string; forkMode?: 'summary' | 'handoff' | 'plain'; title?: string } = {}) {
   const { createConversation, setForkRequest } = await import('../../../../lib/overdeck/conversations.js');
   const { buildForkRequest } = await import('../../../../lib/overdeck/conversation-forks.js');
 
@@ -77,6 +77,7 @@ async function createForkPair(options: { forkStatus?: string; forkMode?: 'summar
     localSummaryOnly: false,
     includeThinkingInSummary: false,
     handoffAuthor: 'external',
+    ...(options.title !== undefined ? { title: options.title } : {}),
   })));
   return { parent, fork };
 }
@@ -217,6 +218,51 @@ describe('fork pipeline recovery and re-entry', () => {
     expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
   });
 
+  it('ends the row (not just fails forkStatus) when a retry-capped fork has no live successor to salvage (PAN-3860)', async () => {
+    const { getConversationByName, incrementForkRetryCount } = await import('../../../../lib/overdeck/conversations.js');
+    const { recoverStuckForks } = await import('../../../../lib/overdeck/conversation-forks.js');
+    await createForkPair({ forkStatus: 'spawning', forkMode: 'handoff' });
+    incrementForkRetryCount('fork-conv');
+    incrementForkRetryCount('fork-conv');
+    // Neither the tmux session nor a harness process survived the restart —
+    // there is nothing to salvage, and no in-memory pipeline can resume.
+    sessionAlive.set('conv-fork-conv', false);
+    harnessAlive.set('conv-fork-conv', false);
+
+    await expect(recoverStuckForks()).resolves.toBe(0);
+
+    const recovered = getConversationByName('fork-conv');
+    expect(recovered?.forkStatus).toBe('failed');
+    expect(recovered?.forkError).toMatch(/retry limit/i);
+    // The conversation-lifecycle sweeper's PAN-3860 skip only protects a
+    // non-'failed' forkStatus — a row left status='active' here would never
+    // be revisited by anything and would show as phantom-active forever.
+    expect(recovered?.status).toBe('ended');
+  });
+
+  it('ends the row when a dashboard restart lost the fork request before it was ever persisted (PAN-3860)', async () => {
+    const { createConversation, getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
+    const { recoverStuckForks } = await import('../../../../lib/overdeck/conversation-forks.js');
+    createConversation({
+      name: 'orphan-fork-conv',
+      tmuxSession: 'conv-orphan-fork-conv',
+      cwd: TEST_HOME,
+      claudeSessionId: 'orphan-fork-session',
+      title: 'Orphaned fork',
+      harness: 'claude-code',
+      forkStatus: 'handoff',
+      // No setForkRequest() call — the row was created but the crash landed
+      // before the fork-request metadata was persisted.
+    });
+
+    await expect(recoverStuckForks()).resolves.toBe(0);
+
+    const recovered = getConversationByName('orphan-fork-conv');
+    expect(recovered?.forkStatus).toBe('failed');
+    expect(recovered?.forkError).toMatch(/restarted during fork/i);
+    expect(recovered?.status).toBe('ended');
+  });
+
   it('re-enters a stale runtime-active tmux corpse instead of clearing fork status', async () => {
     const { getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
     const { recoverStuckForks } = await import('../../../../lib/overdeck/conversation-forks.js');
@@ -296,5 +342,56 @@ describe('fork pipeline recovery and re-entry', () => {
     expect(mocks.deliverAgentMessage).toHaveBeenCalledWith('conv-fork-conv', docText, 'handoff', 'auto');
     expect(recovered?.forkStatus).toBeNull();
     expect(recovered?.forkRetryCount).toBe(1);
+  });
+});
+
+describe('fork pipeline custom title (PAN-3774)', () => {
+  function mockHandoffAuthoring(fileName: string, docText: string) {
+    const docPath = join(TEST_HOME, fileName);
+    mocks.authorHandoffExternal.mockImplementation(async () => {
+      writeFileSync(docPath, docText);
+      return { docText, docPath };
+    });
+  }
+
+  it('keeps an operator-provided --title through handoff authoring instead of the focus-derived fallback', async () => {
+    const { getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
+    const { runForkPipeline } = await import('../../../../lib/overdeck/conversation-forks.js');
+    const { parent } = await createForkPair({ forkMode: 'handoff' });
+    mockHandoffAuthoring('titled-handoff.md', '## Handoff\n\nContinue the work.');
+
+    await runForkPipeline(
+      'fork-conv', parent, 'fork-session', undefined, 'handoff', false, false, undefined,
+      'Read /home/eltmon/Projects/lexerra-c2/.pan/handoff-brief.md FIRST and follow it exactly. Begin now.',
+      'external', undefined, undefined,
+      'C2 Mountains iter11 (crown anisotropy)',
+    );
+
+    expect(getConversationByName('fork-conv')?.title).toBe('C2 Mountains iter11 (crown anisotropy)');
+  });
+
+  it('keeps the custom title when a stuck fork is recovered from its persisted request', async () => {
+    const { getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
+    const { recoverStuckForks } = await import('../../../../lib/overdeck/conversation-forks.js');
+    await createForkPair({ forkStatus: 'handoff', forkMode: 'handoff', title: 'Recovered custom title' });
+    mockHandoffAuthoring('recovered-handoff.md', '## Handoff\n\nRecovered.');
+
+    await expect(recoverStuckForks()).resolves.toBe(1);
+
+    expect(getConversationByName('fork-conv')?.title).toBe('Recovered custom title');
+  });
+
+  it('still derives the focus fallback when no custom title was given', async () => {
+    const { getConversationByName } = await import('../../../../lib/overdeck/conversations.js');
+    const { runForkPipeline } = await import('../../../../lib/overdeck/conversation-forks.js');
+    const { parent } = await createForkPair({ forkMode: 'handoff' });
+    mockHandoffAuthoring('untitled-handoff.md', '## Handoff\n\nNo custom title.');
+
+    await runForkPipeline(
+      'fork-conv', parent, 'fork-session', undefined, 'handoff', false, false, undefined,
+      'Short focus text', 'external',
+    );
+
+    expect(getConversationByName('fork-conv')?.title).toBe('Handoff: Short focus text');
   });
 });

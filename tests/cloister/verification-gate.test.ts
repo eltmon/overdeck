@@ -262,6 +262,15 @@ describe('runQualityGates — CPU admission lifecycle', () => {
       .toEqual(['queued', 'running', 'queued', 'running']);
   });
 
+  it('gate env carries OVERDECK_GATE_ADMITTED while lease held', async () => {
+    await Effect.runPromise(runQualityGates({
+      test: { command: 'npm test' },
+    }, workspacePath));
+
+    expect(execMock.mock.calls[0]?.[1]?.env?.OVERDECK_GATE_ADMITTED).toBe('1');
+    expect(admissionMocks.release).toHaveBeenCalledOnce();
+  });
+
   it('releases admission after a terminal gate failure', async () => {
     execMock.mockRejectedValueOnce(Object.assign(new Error('failed'), { stdout: '', stderr: '' }));
 

@@ -50,6 +50,7 @@ function makePrState(overrides: Partial<GitHubPullRequestState> = {}): GitHubPul
     mergeableState: 'clean',
     draft: false,
     headSha: 'abc1234',
+    headRef: 'feature/pan-1486',
     baseBranch: 'main',
     checksPending: false,
     checksFailed: false,
@@ -157,6 +158,7 @@ describe('auto-merge eligibility', () => {
         mergeable: 'MERGEABLE',
         mergeStateStatus: 'CLEAN',
         isDraft: false,
+        headRefName: 'feature/pan-1486',
         headRefOid: 'abc1234',
         baseRefName: 'main',
         url: 'https://github.com/eltmon/overdeck/pull/1486',
@@ -180,7 +182,7 @@ describe('auto-merge eligibility', () => {
       '--repo',
       'eltmon/overdeck',
       '--json',
-      'state,mergeable,mergeStateStatus,isDraft,headRefOid,baseRefName,url,statusCheckRollup',
+      'state,mergeable,mergeStateStatus,isDraft,headRefName,headRefOid,baseRefName,url,statusCheckRollup',
     ], { encoding: 'utf-8' });
     expect(githubAppMocks.getPullRequestState).not.toHaveBeenCalled();
   });

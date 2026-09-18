@@ -1,3 +1,4 @@
+import { getAvailableModelsWithOpenCodeApi } from '../../../lib/settings-model-catalog.js';
 import { jsonResponse } from "../http-helpers.js";
 /**
  * Settings route module — Effect HttpRouter.Layer (PAN-428 B15)
@@ -23,7 +24,6 @@ import {
   saveSettingsApi,
   saveDesignLanguage,
   validateSettingsApi,
-  getAvailableModelsApi,
   getOptimalDefaultsApi,
   getMiniMaxDefaultsApi,
   saveOpenRouterFavorites,
@@ -35,7 +35,7 @@ import { setUiTheme } from '../../../lib/ui-theme.js';
 import { getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
 import { PROVIDERS, getKimiAnthropicBaseUrl } from '../../../lib/providers.js';
 import { getDashScopeUpstreamBaseUrl } from '../../../lib/openai-compatible-proxy.js';
-import { OpenRouterService } from '../services/openrouter-service.js';
+import { OpenRouterService, includeOpenRouterFavorites } from '../services/openrouter-service.js';
 import { httpHandler } from './http-handler.js';
 import { getProviderAuthMode, getProviderEnvForModel } from '../../../lib/agents.js';
 import { buildHarnessPolicyDecisions, parseHarnessPolicyModels } from '../../../lib/harness-policy-decisions.js';
@@ -48,8 +48,8 @@ import { stopConversationSearchWatcher, syncConversationSearchWatcher } from '..
 import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { validateOrigin } from './origin-validation.js';
 import { getConversationSearchConfigSync } from '../../../lib/config-yaml.js';
-import { dimensionsForModel, openEmbeddingsDb } from '../../../lib/overdeck/conversations-search.js';
-import { createConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
+import { getConversationSearchStatus } from '../services/conversation-search-status.js';
+import { recordConversationSearchFailure, recordConversationSearchSuccess } from '../../../lib/conversation-search/health.js';
 import { estimateFullReindexConversationSearchCost, fullReindexConversationSearch } from '../../../lib/conversation-search/indexer.js';
 import { getLegacyHome } from '../../../lib/paths.js';
 import { previewLegacyConversations, importLegacyConversations } from '../../../lib/overdeck/legacy-import.js';
@@ -177,8 +177,8 @@ const getSettingsRoute = HttpRouter.add(
 const getAvailableModelsRoute = HttpRouter.add(
   'GET',
   '/api/settings/available-models',
-  httpHandler(Effect.try({
-    try: () => jsonResponse(getAvailableModelsApi()),
+  httpHandler(Effect.tryPromise({
+    try: async () => jsonResponse(await getAvailableModelsWithOpenCodeApi()),
     catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
   })),
 );
@@ -744,47 +744,9 @@ const getConversationSearchStatusRoute = HttpRouter.add(
   'GET',
   '/api/settings/conversation-search/status',
   httpHandler(Effect.gen(function* () {
-    return yield* Effect.try({
-      try: () => {
-        const config = getConversationSearchConfigSync();
-        if (!config.enabled) {
-          return jsonResponse({
-            enabled: false,
-            available: false,
-            unavailableReason: 'conversationSearch is disabled',
-            dbPath: config.dbPath,
-            chunkCount: 0,
-            indexedFileCount: 0,
-            lastIndexedAt: null,
-          });
-        }
-
-        const provider = createConversationEmbeddingProvider({ config });
-        if (!provider.enabled) {
-          return jsonResponse({
-            enabled: config.enabled,
-            available: false,
-            unavailableReason: provider.unavailableReason ?? 'embedding provider unavailable',
-            dbPath: config.dbPath,
-            chunkCount: 0,
-            indexedFileCount: 0,
-            lastIndexedAt: null,
-          });
-        }
-
-        const db = openEmbeddingsDb(config.dbPath, dimensionsForModel(config.model));
-        try {
-          const stats = db.getStats();
-          return jsonResponse({
-            enabled: config.enabled,
-            available: db.available && provider.enabled,
-            unavailableReason: db.unavailableReason,
-            dbPath: config.dbPath,
-            ...stats,
-          });
-        } finally {
-          db.close();
-        }
+    return yield* Effect.tryPromise({
+      try: async () => {
+        return jsonResponse(await getConversationSearchStatus());
       },
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
@@ -853,7 +815,17 @@ const postConversationSearchReindexRoute = HttpRouter.add(
               conversationReindexProgress = { active: true, startedAt: conversationReindexProgress.startedAt, ...p };
             },
           });
+          // PAN-3771: feed reindex outcomes into the banner health state.
+          const firstError = result.errors[0];
+          if (firstError) {
+            recordConversationSearchFailure(firstError.message);
+          } else if (!result.disabled) {
+            recordConversationSearchSuccess();
+          }
           return jsonResponse(result);
+        } catch (error) {
+          recordConversationSearchFailure(error);
+          throw error;
         } finally {
           conversationReindexProgress = { ...conversationReindexProgress, active: false };
           await syncConversationSearchWatcher();
@@ -969,7 +941,7 @@ const getOpenRouterModelsRoute = HttpRouter.add(
     const orService = yield* OpenRouterService;
     const models = yield* orService.fetchModels();
     const favorites = getOpenRouterFavorites();
-    return jsonResponse({ models, favorites });
+    return jsonResponse({ models: includeOpenRouterFavorites(models, favorites), favorites });
   })),
 );
 

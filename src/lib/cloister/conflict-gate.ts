@@ -355,7 +355,7 @@ function buildConflictResolverPrompt(input: DispatchResolverInput): string {
     '',
     'Resolve the conflict WITHOUT degrading either side of the change:',
     `1. Read what origin/${input.targetBranch} changed and what ${input.issueId} intended before editing.`,
-    `2. Rebase this branch onto origin/${input.targetBranch} and resolve every conflict so BOTH intents are preserved.`,
+    `2. Run pan sync-main ${input.issueId} to merge origin/${input.targetBranch} through the repository-approved sync path, then resolve every conflict so BOTH intents are preserved.`,
     '3. Build, run the relevant tests, and commit the resolved state.',
     '4. Re-request review when the branch is clean (use pan done or pan review request as appropriate for this workspace).',
     '',

@@ -178,7 +178,8 @@ describe('CostWriter.reconcile — codex extra roots', () => {
         imported: 0,
         sessionsScanned: 1,
         eventsImported: 0,
-        duplicatesSkipped: 1,
+        duplicatesSkipped: 0,
+        cacheSkipped: 1,
       });
       expect(insertedValues).toHaveLength(1);
       expect(insertedValues[0]).toMatchObject({

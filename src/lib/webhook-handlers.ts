@@ -240,22 +240,33 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
     const [owner, repoName] = repo.split('/');
     if (!owner || !repoName) return;
 
+    const { isGitHubAppConfigured, getPullRequestState } = await import('./github-app.js');
+    const githubAppConfigured = isGitHubAppConfigured();
+    if (!githubAppConfigured && isInGraphQLCooldown()) return;
+
+    const status = await Effect.runPromise(getReviewStatus(issueId));
+    if (!status || status.retiredAt) return;
+
     let mergeable: string;
     let mergeState: string;
     let isDraft: boolean;
     let checksFailed: boolean;
+    let headSha: string;
+    let headRef: string;
+    let prUrl: string | undefined;
 
-    const { isGitHubAppConfigured, getPullRequestState } = await import('./github-app.js');
-    if (isGitHubAppConfigured()) {
+    if (githubAppConfigured) {
       // App REST path — installation token, separate rate-limit budget, no GraphQL.
       const prState = await Effect.runPromise(getPullRequestState(owner, repoName, prNumber));
       mergeable = prState.mergeable === null ? 'UNKNOWN' : prState.mergeable ? 'MERGEABLE' : 'CONFLICTING';
       mergeState = (prState.mergeableState ?? '').toUpperCase();
       isDraft = prState.draft;
       checksFailed = prState.checksFailed;
+      headSha = prState.headSha;
+      headRef = prState.headRef;
+      prUrl = prState.url ?? status.prUrl;
     } else {
       // gh CLI fallback (GraphQL) — only when the App is not configured.
-      if (isInGraphQLCooldown()) return;
       const { execFile } = await import('child_process');
       const { promisify } = await import('util');
       const execFileAsync = promisify(execFile);
@@ -267,7 +278,7 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
       try {
         ({ stdout } = await execFileAsync(
           'gh',
-          ['pr', 'view', String(prNumber), '--repo', repo, '--json', 'mergeable,mergeStateStatus,isDraft,statusCheckRollup'],
+          ['pr', 'view', String(prNumber), '--repo', repo, '--json', 'mergeable,mergeStateStatus,isDraft,statusCheckRollup,headRefName,headRefOid,url'],
           { encoding: 'utf-8', timeout: 15000 },
         ));
       } catch (err) {
@@ -279,6 +290,9 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
         mergeable?: string | null;
         mergeStateStatus?: string | null;
         isDraft?: boolean;
+        headRefName?: string | null;
+        headRefOid?: string | null;
+        url?: string | null;
         statusCheckRollup?: Array<{
           name?: string | null;
           context?: string | null;
@@ -289,14 +303,14 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
       mergeable = (pr.mergeable ?? '').toUpperCase();
       mergeState = (pr.mergeStateStatus ?? '').toUpperCase();
       isDraft = pr.isDraft === true;
+      headSha = pr.headRefOid ?? '';
+      headRef = pr.headRefName ?? '';
+      prUrl = pr.url ?? status.prUrl;
       checksFailed = (pr.statusCheckRollup ?? []).some((check) =>
         !isAdvisoryCheckName(check.name ?? check.context)
         && FAILING_CHECK_CONCLUSIONS.has((check.conclusion || check.state || '').toUpperCase()),
       );
     }
-
-    const status = await Effect.runPromise(getReviewStatus(issueId));
-    if (!status) return;
 
     const isConflicting = mergeable === 'CONFLICTING' || mergeState === 'DIRTY';
 
@@ -319,6 +333,17 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
     const changed = prevTypes.size !== nextTypes.size || [...nextTypes].some((t) => !prevTypes.has(t));
     if (changed) {
       await Effect.runPromise(setReviewStatus(issueId, { blockerReasons: blockers.length > 0 ? blockers : undefined }, status));
+      if (checksFailed && !prevTypes.has('failing_checks') && headSha && headRef) {
+        await Effect.runPromise(relayCiFailureFeedback({
+          issueId,
+          repo,
+          prNumber,
+          headSha,
+          headRef,
+          prUrl,
+          source: 'polling_reconciliation',
+        }));
+      }
     }
   } catch (err) {
     console.warn(`[webhook] Merge state reconciliation failed for ${issueId}:`, err);
@@ -503,12 +528,17 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
 
   // For synchronize/opened/reopened the head SHA may have changed — skip SHA
   // validation so the handler can refresh prHeadSha and recompute blockers.
-  const headMayHaveMoved = ['synchronize', 'opened', 'reopened'].includes(payload.action ?? '');
+  const headMayHaveMoved = ['synchronize', 'opened', 'reopened', 'closed'].includes(payload.action ?? '');
   const status = await loadAndValidateStatus(issueId, repo, pr.number, headMayHaveMoved ? undefined : pr.head.sha);
   if (!status) return;
 
   const update: ReviewStatusUpdate = {};
   let blockers = [...(status.blockerReasons ?? [])];
+
+  if (payload.action === 'closed' && pr.merged === false) {
+    update.readyForMerge = false;
+    update.retiredAt = new Date().toISOString();
+  }
 
   // Populate missing PR identity and keep head SHA in sync on synchronize
   if (!status.prUrl) update.prUrl = pr.html_url ?? `https://github.com/${repo}/pull/${pr.number}`;

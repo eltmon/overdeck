@@ -79,7 +79,9 @@ export async function buildHarnessPolicyDecisions(
       ohmypi: canUseHarnessSync('ohmypi', model, authMode),
       codex: canUseHarnessSync('codex', model, authMode),
       acp: canUseHarnessSync('acp', model, authMode),
+      opencode: canUseHarnessSync('opencode', model, authMode),
       'kimi-code': canUseHarnessSync('kimi-code', model, authMode),
+      muse: canUseHarnessSync('muse', model, authMode),
     };
   }
   return decisions;

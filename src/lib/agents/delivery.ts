@@ -5,6 +5,7 @@ import { homedir } from 'os';
 import { Effect } from 'effect';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
+import { markKimiContextDelivered, prepareKimiMessage, type PreparedKimiMessage } from '../runtimes/kimi-context-envelope.js';
 import type { AgentState } from '../agents.js';
 import {
   normalizeAgentId,
@@ -39,6 +40,10 @@ export type DeliveryResult = {
 };
 
 export interface DeliverAgentMessageOptions {
+  /** Conversation sessions have no AgentState; identify their Kimi context explicitly. */
+  kimiContext?: { workspace: string; sessionId?: string };
+  /** Runtime-owned precomposition seam; prevents the shared Kimi guard from nesting envelopes. */
+  preparedKimiContext?: PreparedKimiMessage;
   /**
    * Idempotency key (PAN-2997). Keyed deliveries are deduplicated by the
    * crash-independent delivery component, not by dashboard-side state: the
@@ -307,24 +312,44 @@ export async function deliverAgentMessage(
     resolvedMethod ??= 'auto';
   }
 
-  const isAcpTarget = state?.harness === 'acp';
+  const isAcpTarget = state?.harness === 'acp' || state?.harness === 'opencode';
   if (isAcpTarget && resolvedMethod !== 'auto') {
     throw new Error(
       `MessageDeliveryFailed: ACP delivery failed for ${normalizedId} (${caller}): ACP requires authenticated host RPC delivery`,
     );
   }
 
+  let preparedKimiMessage = opts.preparedKimiContext;
+  if (preparedKimiMessage && preparedKimiMessage.message !== message) {
+    throw new Error(`Managed Kimi message blocked for ${normalizedId}: prepared envelope does not match the delivered message.`);
+  }
+  const kimiContext = state?.harness === 'kimi-code' && state.workspace
+    ? { workspace: state.workspace }
+    : opts.kimiContext;
+  if (kimiContext && !preparedKimiMessage) {
+    preparedKimiMessage = await prepareKimiMessage(normalizedId, kimiContext.workspace, message, {
+      sessionId: kimiContext.sessionId,
+    });
+    message = preparedKimiMessage.message;
+  }
+  const completeDelivery = (result: DeliveryResult): DeliveryResult => {
+    if (result.ok && !result.deduplicated && preparedKimiMessage) {
+      markKimiContextDelivered(normalizedId, preparedKimiMessage);
+    }
+    return result;
+  };
+
   // Keyed deliveries take a dedicated, narrower cascade: only the tiers whose
   // crash-independent component enforces the key across the complete side
   // effect. Everything below this branch is the unkeyed cascade.
   if (dedupKey !== undefined) {
-    return deliverKeyedAgentMessage(normalizedId, message, caller, resolvedMethod ?? 'auto', isAcpTarget, dedupKey);
+    return completeDelivery(await deliverKeyedAgentMessage(normalizedId, message, caller, resolvedMethod ?? 'auto', isAcpTarget, dedupKey));
   }
 
   if (resolvedMethod === 'tmux') {
     await assertTmuxTargetCanReceive(normalizedId, caller);
     await Effect.runPromise(sendKeys(normalizedId, message));
-    return { ok: true, path: 'tmux' };
+    return completeDelivery({ ok: true, path: 'tmux' });
   }
 
   let appServerFailure: string | undefined;
@@ -345,7 +370,7 @@ export async function deliverAgentMessage(
             appServerToken,
           );
           await appendChannelDeliveryLog(normalizedId, { path: 'app-server', caller });
-          return { ok: true, path: 'app-server' };
+          return completeDelivery({ ok: true, path: 'app-server' });
         } catch (err) {
           const reason = err instanceof Error ? err.message : String(err);
           appServerFailure = `socket-post-failed: ${reason}`;
@@ -376,7 +401,7 @@ export async function deliverAgentMessage(
             acpToken,
           );
           await appendChannelDeliveryLog(normalizedId, { path: 'acp', caller });
-          return { ok: true, path: 'acp' };
+          return completeDelivery({ ok: true, path: 'acp' });
         } catch (err) {
           const reason = err instanceof Error ? err.message : String(err);
           acpFailure = `socket-post-failed: ${reason}`;
@@ -419,7 +444,7 @@ export async function deliverAgentMessage(
           PTY_TOKEN_HEADER,
         );
         await appendChannelDeliveryLog(normalizedId, { path: 'supervisor', caller });
-        return { ok: true, path: 'supervisor' };
+        return completeDelivery({ ok: true, path: 'supervisor' });
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         supervisorFailure = `socket-post-failed: ${reason}`;
@@ -455,7 +480,7 @@ export async function deliverAgentMessage(
             caller,
             ...(supervisorFailure ? { 'pty-supervisor': supervisorFailure } : {}),
           });
-          return { ok: true, path: 'channels' };
+          return completeDelivery({ ok: true, path: 'channels' });
         } catch (err) {
           const reason = err instanceof Error ? err.message : String(err);
           channelFailure = `socket-post-failed: ${reason}`;
@@ -478,12 +503,12 @@ export async function deliverAgentMessage(
     });
     await assertTmuxTargetCanReceive(normalizedId, caller);
     await Effect.runPromise(sendKeys(normalizedId, message));
-    return { ok: true, path: 'tmux', failure: channelFailure ?? supervisorFailure };
+    return completeDelivery({ ok: true, path: 'tmux', failure: channelFailure ?? supervisorFailure });
   }
 
   await assertTmuxTargetCanReceive(normalizedId, caller);
   await Effect.runPromise(sendKeys(normalizedId, message));
-  return { ok: true, path: 'tmux' };
+  return completeDelivery({ ok: true, path: 'tmux' });
 }
 
 /**
@@ -647,7 +672,7 @@ async function waitForTranscriptMessageLanding(
   return result.matchedUserRecord || (result.realAssistantTurnCount ?? 0) > 0;
 }
 
-export async function deliverResumeMessageWithTranscriptConfirmation(args: {
+export async function deliverMessageWithTranscriptConfirmation(args: {
   agentId: string;
   workspace: string;
   sessionId: string;
@@ -680,12 +705,15 @@ export async function deliverResumeMessageWithTranscriptConfirmation(args: {
       return { delivered: true, attempts: attempt, lastDelivery };
     }
     if (attempt < 2) {
-      console.warn(`[resumeAgent] Auto-continue prompt did not land in ${args.sessionId}; redelivering once.`);
+      console.warn(`[${args.caller}] message did not land in ${args.sessionId}; redelivering once.`);
     }
   }
 
   return { delivered: false, attempts: 2, ...(lastDelivery ? { lastDelivery } : {}) };
 }
+
+/** Alias kept for one release; use `deliverMessageWithTranscriptConfirmation`. */
+export { deliverMessageWithTranscriptConfirmation as deliverResumeMessageWithTranscriptConfirmation };
 
 export async function deliverInitialPromptWithRetry(
   agentId: string,

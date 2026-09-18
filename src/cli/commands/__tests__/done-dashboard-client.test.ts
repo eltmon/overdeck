@@ -4,7 +4,11 @@ import {
   INTERNAL_TOKEN_HEADER,
   _resetInternalTokenCacheForTests,
 } from '../../../lib/internal-token.js';
-import { postDoneDashboardJson } from '../done-dashboard-client.js';
+import {
+  observeDoneReviewHandoff,
+  postDoneDashboardJson,
+  waitForDoneReviewHandoff,
+} from '../done-dashboard-client.js';
 
 describe('postDoneDashboardJson', () => {
   beforeEach(() => {
@@ -38,5 +42,37 @@ describe('postDoneDashboardJson', () => {
         }),
       }),
     );
+  });
+
+  it('does not accept a pending review when no handler advances the durable status', async () => {
+    const fetchImpl = vi.fn(async () => Response.json({
+      reviewStatus: 'pending',
+      verificationStatus: 'pending',
+      reviewRequestedAt: '2026-09-09T05:14:00.000Z',
+      reviewSpawnedAt: null,
+    }));
+
+    const observation = waitForDoneReviewHandoff(
+      'http://localhost:3011',
+      'MIN-889',
+      '2026-09-09T05:14:00.000Z',
+      { fetchImpl: fetchImpl as typeof fetch, attempts: 3, intervalMs: 1000 },
+    );
+    await vi.runAllTimersAsync();
+
+    await expect(observation).resolves.toBeNull();
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it('accepts durable verification ownership or a current review spawn', () => {
+    expect(observeDoneReviewHandoff(
+      { verificationStatus: 'running' },
+      '2026-09-09T05:14:00.000Z',
+    )?.kind).toBe('verification');
+
+    expect(observeDoneReviewHandoff(
+      { reviewSpawnedAt: '2026-09-09T05:14:01.000Z' },
+      '2026-09-09T05:14:00.000Z',
+    )?.kind).toBe('review');
   });
 });

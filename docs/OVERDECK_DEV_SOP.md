@@ -22,6 +22,8 @@ pan dev
 
 `pan dev` is a development loop. It is not the post-reboot recovery path and does not replace the bundled Node 22 path.
 
+While Deacon is active, its resource-pressure patrol checks free disk space every 15 seconds. If less than 10 GiB remains, it runs `docker builder prune --all --force` to remove only unused BuildKit cache, records the before-and-after space in the activity feed, and retries failures after five minutes. Docker images, volumes, and workspaces remain behind their existing explicit lifecycle gates.
+
 ## Mode switching
 
 Use `pan up` when you need the dashboard that agents and local workflows depend on. This mode runs the built server and matches the runtime used by restart and reload commands.

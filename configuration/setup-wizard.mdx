@@ -136,7 +136,7 @@ templates/project-types/
 │   ├── template.yaml          # Template metadata + defaults
 │   └── agent-template/        # .claude/ skeleton
 │       └── .claude/
-│           ├── CLAUDE.md
+│           ├── .overdeck/context/project.md
 │           └── skills/
 ├── monorepo/
 ├── polyrepo/
@@ -188,7 +188,7 @@ The Setup Agent is an AI agent that explores your codebase to detect conventions
 
 1. **Explores the codebase** — Reads READMEs, package.json files, CI configs, Terraform files
 2. **Detects conventions** — Branch naming patterns, PR conventions, code style, test frameworks
-3. **Generates CLAUDE.md** — Writes project-specific AI instructions for only non-obvious conventions
+3. **Generates project context** — Writes project-specific AI instructions for only non-obvious conventions
 4. **Generates repo-map.md** — Documents each repo's purpose, dependencies, and relationships
 5. **Generates repo-groups.yaml** — Suggests logical groupings based on naming patterns
 6. **Generates onboarding checklist** — Lists prerequisites, API keys, access requirements
@@ -199,7 +199,7 @@ The Setup Agent is an AI agent that explores your codebase to detect conventions
 team-meta/
 ├── .agent-template/              # Copied into every workspace
 │   └── .claude/
-│       ├── CLAUDE.md             # Project conventions for agents
+│       ├── .overdeck/context/project.md # Managed project conventions
 │       └── skills/
 ├── overdeck/                   # Overdeck-specific config
 │   └── repo-groups.yaml          # Repo group definitions
@@ -221,7 +221,7 @@ The Setup Agent runs in a tmux session, similar to planning agents:
 # Setup Agent prompt includes:
 - Project context (name, path, type, repo count, tracker)
 - Detected repositories table
-- Tasks: Generate CLAUDE.md, repo-map.md, repo-groups.yaml, onboarding checklist
+- Tasks: Generate .overdeck/context/project.md, repo-map.md, repo-groups.yaml, onboarding checklist
 - Output location: {{META_REPO_PATH}}/
 ```
 

@@ -43,6 +43,7 @@ export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
     { table: 'review_status', column: 'release_notes' },
     { table: 'review_status', column: 'uat_status' },
     { table: 'review_status', column: 'uat_notes' },
+    { table: 'review_status', column: 'retired_at' },
     { table: 'review_status', column: 'inspect_owner_session' },
     { table: 'review_status', column: 'strike_ready_head' },
     { table: 'review_status', column: 'strike_ready_at' },
@@ -52,6 +53,7 @@ export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
     { table: 'review_status', column: 'strike_next_attempt_at' },
     { table: 'review_status', column: 'strike_landing_attempts' },
     { table: 'review_status', column: 'conflicts_since' },
+    { table: 'review_status', column: 'review_stale_since' },
     { table: 'agents', column: 'yielded_by_scheduler' },
     { table: 'agents', column: 'review_context_manifest_path' },
     { table: 'agents', column: 'yielded_at' },
@@ -162,6 +164,7 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `release_notes` text');
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `uat_status` text');
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `uat_notes` text');
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `retired_at` integer');
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `inspect_owner_session` text');
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_ready_head` text');
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_ready_at` integer');
@@ -173,6 +176,8 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `review_cycle_history` text');
   // PAN-3154: main-head SHA/paths that first made this branch conflict.
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `conflicts_since` text');
+  // PAN-3847: a passed review whose anchor no longer matches HEAD is stale, not reset.
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `review_stale_since` text');
   ensureReleaseSetTablesSync(db);
   ensureUatGenerationRepoTablesSync(db);
   // PAN-1491: existing overdeck.db files created before substrate-bug weights need
@@ -185,6 +190,7 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_cost_agent_id` ON `cost_events` (`agent_id`, `ts`)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_cost_issue_upper` ON `cost_events` (UPPER(`issue_id`))');
+  runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `cost_reconcile_file_state` (`path` text PRIMARY KEY NOT NULL, `mtime_ms` integer NOT NULL, `size` integer NOT NULL, `verdict` text NOT NULL)');
   // PAN-2507: preemptive-scheduler yield attribution on agents. The init
   // migration only runs on a fresh DB, so existing overdeck.db files need these
   // columns added idempotently here.

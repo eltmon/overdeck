@@ -18,9 +18,10 @@ scope word alone determines the destination:
 
 After writing any of them, run `pan sync`. Changes reach **new** sessions only.
 
-The rendered outputs — the managed region of `~/.claude/CLAUDE.md`, project
-`CLAUDE.md`/`AGENTS.md`, and `pi-global.md`/`codex-global.md` — are **harness
-context files**; never edit them directly.
+The rendered outputs — `claude-global.md`, `pi-global.md`, and
+`codex-global.md` under `~/.overdeck/context/` — are **managed-session launch
+artifacts**; never edit them directly. Native harness instruction files are
+user-owned and Overdeck never writes them.
 
 Translate vague or ad-hoc terms ("global context template", "the CLAUDE.md
 template") into one of the four scopes above, and confirm the routing when the

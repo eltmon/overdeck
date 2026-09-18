@@ -54,7 +54,14 @@ type StartAgentPhase = 'stackHealthGate' | 'guardrails' | 'spawn';
 
 export function buildPanStartArgs(input: {
   issueId: string;
-  model: string;
+  /**
+   * Explicit operator-chosen model only. When omitted, no `--model` is emitted
+   * and `pan start` resolves staffing itself (tier table / issue override /
+   * role default). Forwarding a resolved default here made `pan start` treat
+   * it as an explicit override — skipping tier resolution and stamping it as
+   * the durable per-issue `record.workModel` (PAN-3857).
+   */
+  model?: string | null;
   harness?: RuntimeName | null;
   allowHost?: boolean;
   offBook?: boolean;
@@ -63,8 +70,7 @@ export function buildPanStartArgs(input: {
     'start',
     input.issueId,
     '--local',
-    '--model',
-    input.model,
+    ...(input.model ? ['--model', input.model] : []),
     ...(input.harness ? ['--harness', input.harness] : []),
     ...(input.allowHost ? ['--host', '--yes'] : []),
     ...(input.offBook ? ['--off-book'] : []),
@@ -292,12 +298,11 @@ function buildStoppedAgentLifecycle(
   const agentStatus = state.status || 'unknown';
   const runtime = runtimeData.state || 'uninitialized';
   const isCompleted = runtimeData.resolution === 'completed';
-  const isPlaceholder = agentStatus === 'starting' && typeof state.model === 'string' && state.model.startsWith('pending-');
   const isStopped = agentStatus === 'stopped' || agentStatus === 'error' || isCompleted || runtime === 'stopped' || runtime === 'idle' || runtime === 'suspended';
   const isRunning = false;
-  const isCrashed = (agentStatus === 'running' || isPlaceholder) && !hasLiveTmuxSession;
+  const isCrashed = agentStatus === 'running' && !hasLiveTmuxSession;
   const isRunningButStuck = false;
-  const hasResumableBackingState = hasAgentState && hasWorkspace && !isPlaceholder;
+  const hasResumableBackingState = hasAgentState && hasWorkspace;
   const handedOff = typeof state.id === 'string' && state.id.length > 0
     ? hasCompletionMarkerForAgent(state as AgentState)
     : false;
@@ -306,7 +311,7 @@ function buildStoppedAgentLifecycle(
   const canWarmResumeAfterHandoff = owesRework && hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed);
   const isOrphaned = !hasLiveTmuxSession && (
     (hasSavedSession && !hasResumableBackingState)
-    || (hasAgentState && (!hasWorkspace || isPlaceholder))
+    || (hasAgentState && !hasWorkspace)
   );
   const requiresSessionResetBeforeFreshStart = hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed);
 
@@ -344,7 +349,6 @@ function buildStoppedAgentLifecycle(
     hasSavedSession,
     hasResumableTranscript,
     hasWorkspace,
-    isPlaceholder,
     isOrphaned,
     isRunning,
     isRunningButStuck,

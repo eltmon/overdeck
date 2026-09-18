@@ -157,6 +157,27 @@ cloister:
     interval: 60    # seconds between patrol cycles
 ```
 
+Per-patrol firing budgets (PAN-3850) cap how many actions each patrol may take
+per UTC day before it suspends until the next day with one needs-you:
+
+```yaml
+cloister:
+  patrolBudgets:
+    default: 50                                   # actions per patrol per UTC day
+    exempt:                                       # alarm patrols — never suspended
+      - runStallSweeperPatrol
+      - checkApiErrorAgents
+      - recreatedStateWarnings
+      - recordMainDivergenceHealth
+      - checkMassDeath
+    overrides:
+      checkDeadEndAgents: 100                     # per-patrol budget override
+```
+
+`pan doctor` prints today's tally per patrol, with suspended patrols in red,
+and the invariant checker's last mismatch report. See "Patrol budgets" in
+[`docs/PIPELINE-GATES.md`](PIPELINE-GATES.md).
+
 Work-agent auto-resume backoff can be overridden per project in `projects.yaml`:
 
 ```yaml

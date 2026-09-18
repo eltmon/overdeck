@@ -9,7 +9,7 @@ import {
 } from '../agent-runtime.js';
 import { getRuntimeSnapshot, isAgentStateServiceInProcess } from '../agent-runtime-mirror.js';
 import { normalizeHarness } from '../overdeck/conversations.js';
-import { getAgentDir } from '../agents.js';
+import { getOverdeckHome } from '../paths.js';
 
 export type AgentResolution = 'working' | 'done' | 'needs_input' | 'stuck' | 'completed' | 'unclear' | 'abandoned';
 
@@ -103,7 +103,7 @@ export const getAgentRuntimeState = (agentId: string): Effect.Effect<AgentRuntim
   });
 
 async function patchRuntimeJson(agentId: string, patch: Partial<AgentRuntimeState>): Promise<void> {
-  const agentDir = getAgentDir(agentId);
+  const agentDir = join(getOverdeckHome(), 'agents', agentId);
   const runtimeFile = join(agentDir, 'runtime.json');
   let runtime: Record<string, unknown> = {};
 

@@ -34,6 +34,7 @@ import {
   requireComposeProjectNameForWorkspace,
 } from './stack-health.js';
 import { reconcileTraefikNetworks } from './traefik-connect.js';
+import { repairWorkspaceBindMounts } from './rebuild-bind-mounts.js';
 
 // Canonical home is stack-health.ts (health checks need it too); re-export so
 // existing consumers of this module keep working.
@@ -235,6 +236,15 @@ export const rebuildWorkspaceStack = (
         workspacePath,
       } satisfies RebuildWorkspaceStackResult;
     }
+
+    progress('Repairing workspace bind mounts...');
+    yield* Effect.promise(() => repairWorkspaceBindMounts({
+      workspacePath,
+      issueId: normalizedIssueId,
+      projectConfig,
+      composeFile,
+      onProgress: progress,
+    }));
 
     // Strict: a freshly rendered workspace must declare a resolvable name.
     // Silently falling back here is exactly the loud failure PAN-3049 needs —

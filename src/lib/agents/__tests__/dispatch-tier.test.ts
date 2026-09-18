@@ -17,10 +17,11 @@ vi.mock('../../config-yaml.js', async (importOriginal) => {
 });
 vi.mock('../../xbrief/io.js', () => ({
   readWorkspacePlanSync: vi.fn(),
+  readTierOverrides: vi.fn(() => ({})),
 }));
 
 import { loadConfigSync } from '../../config-yaml.js';
-import { readWorkspacePlanSync } from '../../xbrief/io.js';
+import { readTierOverrides, readWorkspacePlanSync } from '../../xbrief/io.js';
 import { applyTierAssignment, resolveSingleWorkTierSpawnParams, resolveSlotTierSpawnParams } from '../spawn-prep.js';
 
 const TIER_CONFIG: TierAssignmentConfig = {
@@ -161,6 +162,7 @@ describe('resolveSlotTierSpawnParams', () => {
   beforeEach(() => {
     vi.mocked(loadConfigSync).mockReset();
     vi.mocked(readWorkspacePlanSync).mockReset();
+    vi.mocked(readTierOverrides).mockReturnValue({});
   });
 
   it('carries the resolved tier model and harness into the spawn params when tiering is on', () => {
@@ -209,6 +211,26 @@ describe('resolveSlotTierSpawnParams', () => {
 
     expect(resolveSlotTierSpawnParams('/ws', 'task-x')).toEqual({});
   });
+
+  // PAN-3858: a recorded promotion must change the model the slot spawns on.
+  it('applies a recorded tier promotion to the slot item before resolving its tier', () => {
+    mockConfig(TIER_CONFIG);
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([planItem('task-x', { difficulty: 'simple' })]));
+    vi.mocked(readTierOverrides).mockReturnValue({
+      'task-x': {
+        effectiveDifficulty: 'expert',
+        promotions: 1,
+        history: [{ at: '2026-09-17T00:00:00.000Z', from: 'simple', to: 'expert', reason: 'test' }],
+      },
+    });
+
+    expect(resolveSlotTierSpawnParams('/ws', 'task-x')).toEqual({
+      model: 'claude-opus-4-8',
+      harness: 'claude-code',
+      tierName: 'frontier',
+      implicit: false,
+    });
+  });
 });
 
 describe('resolveSingleWorkTierSpawnParams', () => {
@@ -246,6 +268,7 @@ describe('resolveSingleWorkTierSpawnParams', () => {
   beforeEach(() => {
     vi.mocked(loadConfigSync).mockReset();
     vi.mocked(readWorkspacePlanSync).mockReset();
+    vi.mocked(readTierOverrides).mockReturnValue({});
   });
 
   it('routes tiered when global config is off but plan metadata opts in', () => {
@@ -256,9 +279,9 @@ describe('resolveSingleWorkTierSpawnParams', () => {
     ], { tiered_execution: 'on' }));
 
     expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({
-      model: 'claude-haiku-4-5',
+      model: 'claude-opus-4-8',
       harness: 'claude-code',
-      tierName: 'cheap',
+      tierName: 'frontier',
       implicit: false,
     });
   });
@@ -279,17 +302,68 @@ describe('resolveSingleWorkTierSpawnParams', () => {
     expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({});
   });
 
-  it('uses the first dispatchable item and skips completed blockers', () => {
+  // PAN-3857 (D4): the single work agent executes the whole plan, so it is
+  // staffed for the plan's hardest remaining item — not the first dispatchable
+  // one (which misrouted plans whose hard items come later).
+  it("keys on the plan's max difficulty, not the first dispatchable item", () => {
     mockConfig(TIER_CONFIG);
     vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
-      planItem('done', { difficulty: 'simple' }, 'completed'),
-      planItem('frontier', { difficulty: 'expert' }),
+      planItem('first', { difficulty: 'simple' }),
+      planItem('later', { difficulty: 'complex' }),
     ]));
 
     expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({
-      model: 'claude-opus-4-8',
+      model: 'claude-sonnet-5',
       harness: 'claude-code',
-      tierName: 'frontier',
+      tierName: 'standard',
+      implicit: false,
+    });
+  });
+
+  it('excludes completed, cancelled, running, and blocked items from the max', () => {
+    mockConfig(TIER_CONFIG);
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+      planItem('done', { difficulty: 'expert' }, 'completed'),
+      planItem('cancelled', { difficulty: 'expert' }, 'cancelled'),
+      planItem('running', { difficulty: 'expert' }, 'running'),
+      planItem('blocked', { difficulty: 'expert' }, 'blocked'),
+      planItem('next', { difficulty: 'simple' }),
+    ]));
+
+    expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({
+      model: 'claude-haiku-4-5',
+      harness: 'claude-code',
+      tierName: 'cheap',
+      implicit: false,
+    });
+  });
+
+  it("applies by_kind per item before taking the max, so a design item counts as its tier's difficulty", () => {
+    mockConfig({ ...TIER_CONFIG, byKind: { design: 'standard' } });
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+      planItem('code', { difficulty: 'simple' }),
+      planItem('ux', { kind: 'design' }),
+    ]));
+
+    expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({
+      model: 'claude-sonnet-5',
+      harness: 'claude-code',
+      tierName: 'standard',
+      implicit: false,
+    });
+  });
+
+  it("lets by_kind outrank an item's own difficulty, exactly as resolveTier applies it", () => {
+    mockConfig({ ...TIER_CONFIG, byKind: { design: 'standard' } });
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+      planItem('ux', { kind: 'design', difficulty: 'trivial' }),
+      planItem('code', { difficulty: 'simple' }),
+    ]));
+
+    expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({
+      model: 'claude-sonnet-5',
+      harness: 'claude-code',
+      tierName: 'standard',
       implicit: false,
     });
   });
@@ -301,6 +375,30 @@ describe('resolveSingleWorkTierSpawnParams', () => {
     ]));
 
     expect(resolveSingleWorkTierSpawnParams('/ws', 'claude-sonnet-5')).toEqual({});
+  });
+
+  // PAN-3858: a promotion raises an item's effective difficulty, which can
+  // change WHICH item is the plan's hardest remaining one.
+  it('ranks a promoted item by its effective difficulty when picking the staffing item', () => {
+    mockConfig(TIER_CONFIG);
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([
+      planItem('promoted', { difficulty: 'medium' }),
+      planItem('hard', { difficulty: 'complex' }),
+    ]));
+    vi.mocked(readTierOverrides).mockReturnValue({
+      promoted: {
+        effectiveDifficulty: 'expert',
+        promotions: 1,
+        history: [{ at: '2026-09-17T00:00:00.000Z', from: 'medium', to: 'expert', reason: 'test' }],
+      },
+    });
+
+    expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual({
+      model: 'claude-opus-4-8',
+      harness: 'claude-code',
+      tierName: 'frontier',
+      implicit: false,
+    });
   });
 });
 

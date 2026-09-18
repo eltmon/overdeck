@@ -59,6 +59,7 @@ interface DbRow {
   release_notes: string | null;
   updated_at: number;
   ready_for_merge: number;
+  retired_at: number | null;
   auto_requeue_count: number | null;
   merge_retry_count: number | null;
   pr_url: string | null;
@@ -69,6 +70,7 @@ interface DbRow {
   stuck_at: number | null;
   stuck_details: string | null;
   reviewed_at_commit: string | null;
+  review_stale_since: string | null;
   review_spawned_at: number | null;
   conflict_resolution_dispatched_at: number | null;
   test_retry_count: number | null;
@@ -116,6 +118,7 @@ function rowToReviewStatus(row: DbRow, history: StatusHistoryEntry[]): ReviewSta
     releaseNotes: row.release_notes ?? undefined,
     updatedAt: msToIso(row.updated_at) ?? new Date(0).toISOString(),
     readyForMerge: row.ready_for_merge === 1,
+    retiredAt: msToIso(row.retired_at),
     autoRequeueCount: row.auto_requeue_count ?? undefined,
     mergeRetryCount: row.merge_retry_count ?? undefined,
     prUrl: row.pr_url ?? undefined,
@@ -126,6 +129,7 @@ function rowToReviewStatus(row: DbRow, history: StatusHistoryEntry[]): ReviewSta
     stuckAt: msToIso(row.stuck_at),
     stuckDetails: row.stuck_details ?? undefined,
     reviewedAtCommit: row.reviewed_at_commit ?? undefined,
+    reviewStaleSince: row.review_stale_since ?? undefined,
     reviewSpawnedAt: msToIso(row.review_spawned_at),
     conflictResolutionDispatchedAt: msToIso(row.conflict_resolution_dispatched_at),
     testRetryCount: row.test_retry_count ?? undefined,
@@ -213,9 +217,9 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         strike_ready_head, strike_ready_at, strike_landing_state,
         strike_recovery_count, strike_transport_retry_count,
         strike_next_attempt_at, strike_landing_attempts,
-        review_cycle_history
+        review_cycle_history, retired_at, review_stale_since
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status = excluded.review_status,
@@ -268,7 +272,9 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         strike_transport_retry_count = excluded.strike_transport_retry_count,
         strike_next_attempt_at = excluded.strike_next_attempt_at,
         strike_landing_attempts = excluded.strike_landing_attempts,
-        review_cycle_history = excluded.review_cycle_history
+        review_cycle_history = excluded.review_cycle_history,
+        retired_at = excluded.retired_at,
+        review_stale_since = excluded.review_stale_since
     `).run(
       s.issueId,
       s.reviewStatus,
@@ -322,6 +328,8 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       isoToMs(s.strikeNextAttemptAt),
       s.strikeLandingAttempts ? JSON.stringify(s.strikeLandingAttempts) : null,
       s.reviewCycleHistory ? JSON.stringify(s.reviewCycleHistory) : null,
+      isoToMs(s.retiredAt),
+      s.reviewStaleSince ?? null,
     );
 
     if (s.history && s.history.length > 0) {
@@ -550,10 +558,11 @@ export function getMergeBlockerReconcileCandidatesSync(): MergeBlockerReconcileC
   const rows = db.prepare(`
     SELECT issue_id, pr_url, blocker_reasons, ready_for_merge
     FROM review_status
-    WHERE ready_for_merge = 1
+    WHERE retired_at IS NULL AND (
+      ready_for_merge = 1
       OR blocker_reasons LIKE '%merge_conflict%'
       OR blocker_reasons LIKE '%not_mergeable%'
-      OR blocker_reasons LIKE '%failing_checks%'
+      OR blocker_reasons LIKE '%failing_checks%')
   `).all() as Array<{
     issue_id: string;
     pr_url: string | null;

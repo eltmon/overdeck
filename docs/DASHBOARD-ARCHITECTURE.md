@@ -43,6 +43,71 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 - `wsTransport.ts` — Effect-based RPC client with auto-reconnection
 - Store: Zustand with shared reducers from `@overdeck/contracts`
 
+**Simple home conversation composer:** `components/simple/TalkItThrough.tsx`
+starts a discuss-first conversation through `POST /api/conversations` and opens
+`/conv/:name`. The description uses a full row, with the project selector, model
+picker, and action wrapping below it. The model picker follows the configured
+provider harness unless explicit harness permutations are enabled. Click and
+Enter share a pending-launch guard. Launch errors appear below the controls;
+the draft stays available for retry. Browser coverage lives in
+`src/dashboard/frontend/tests/talk-it-through.spec.ts`.
+
+**DB job worker lanes:**
+- The `read` lane handles interactive lookups, the `long` lane handles bulk scans and
+  reconciliation, and the `semantic` lane isolates embedding and semantic-search work.
+  The `parse` lane runs `parseTranscriptSnapshot`. Transcript parsing is CPU-bound and
+  can take seconds, so its own lane cannot block interactive reads or wait behind bulk
+  sweeps.
+- Worker implementations live in `src/dashboard/server/services/dashboard-db-worker.ts`.
+  Add each new operation to both `dashboard-db-task.ts` and the worker dispatch table so
+  the main thread and worker remain type-safe.
+- Jobs that wait or run for more than one second emit
+  `[db-jobs] slow: op=<operation> lane=<lane> waitMs=<n> runMs=<n> depth=<n>`.
+  The line identifies whether queue delay or worker execution caused the slowdown.
+- `costReconcileSweep` walks and parses transcript files in the `long` lane. The main
+  thread records bounded 250-event progress batches through the canonical write doors and
+  acknowledges each batch before the worker continues its single-pass scan. This limits
+  transfer memory without repeated parsing while preserving EventBus publication and
+  durable skip-cache updates.
+- Cost polling, conversation-list ledger totals, and search counters use shared worker
+  snapshots. Concurrent refreshes coalesce. Cost snapshots refresh after 15 seconds;
+  search counters refresh after 60 seconds. Successful values remain usable for at most
+  five minutes during refresh failures, with a five-second retry backoff. Search
+  configuration, provider availability, and runtime health are still read per request.
+- Agent resource costs use one grouped worker query and a 15-second shared snapshot,
+  invalidated when agent membership changes. Hourly burn remains twice the sum in the
+  last 30 minutes, with the inclusive cutoff and rounding to cents preserved. SQLite's
+  more accurate summation can correct a cent at a half-cent floating-point boundary.
+  Resource polling no longer materializes each agent's full ledger history.
+- `subscribeConversationMessages` resolves transcript paths on the main thread and
+  shares worker parse results across subscribers. Codex consumes appended records;
+  other full-parser harnesses still parse changed files in the worker. Clients receive
+  complete initial history, then changed message/tool rows and metadata. Explicit resets
+  replace history after truncation/replacement, and metadata snapshots clear removed
+  plans or compact boundaries. Full tool results remain accessible.
+- Global issue updates use `issues.delta`: complete changed rows at their original
+  array positions plus the resulting length. Initial/reconnect snapshots retain all
+  rows and descriptions. Shared reducers preserve order, removal, and arbitrary tracker
+  fields without repeatedly transmitting unchanged descriptions. These projections use
+  in-memory publication and never enter the durable event log.
+
+**Conversation loading and delivery:**
+- A `/conv/<id>` deep link loads that conversation directly, independently of the
+  sidebar list. Favorites, pending-input state, and normal list navigation remain intact.
+- HTTP acceptance and transcript confirmation are distinct. A late echo does not prove
+  delivery failure. Unknown delivery preserves the operator's text; confirmed rejection
+  retains the existing recovery actions. The client bounds the request and body read to
+  120 seconds, and reconciles late echoes using message identity or text/time matching.
+- Conversation sends carry `clientMessageId`; retries preserve it and set `retry: true`.
+  The server coalesces matching concurrent requests and retains their result, including
+  ambiguous failures. Changed text or command confirmation requires a new ID. Receipts
+  are bounded to 2,000 entries and 24 hours. A retry whose receipt was lost to restart or
+  expiry is refused with an unknown outcome, never injected as a new message. This is
+  safe retry handling, not an exactly-once guarantee from the underlying harness.
+- `pan pause sequencer-runner` prevents both explicit and automatic sequencer starts.
+  The launcher checks the pause before preparation and immediately before spawning.
+  Resume permission requires `pan unpause sequencer-runner`.
+
 **Issue views:** Rail, cockpit, and console issue surfaces share the kit documented in
 `docs/ISSUE-VIEW.md`. Route new issue sections through `IssueViewModel`, the shared
 components, and `DENSITY_SECTIONS`; update the inventory and real `data-section`
@@ -56,4 +121,3 @@ marker so the no-loss gate proves that no existing surface disappeared.
 - The planning launcher script MUST export TERM/COLORTERM/LANG for Claude Code rendering.
 - Planning sessions use `remain-on-exit on` + `destroy-unattached off` so the session
   survives after the agent exits, until the user clicks Done.
-

@@ -52,6 +52,13 @@ All consumers use one of these representations of the same verdict:
 - Dashboard API: `GET /api/pipeline/membership?project=<project-key>`, backed by the cached membership service. `POST /api/pipeline/membership/refresh?project=<project-key>` is the operator-initiated retry: it forces a re-gather via `refreshMembershipSnapshotsForProjects()` (PAN-2972) and returns the fresh snapshot, because re-reading a cold snapshot can never heal it.
 - Issue DTO: total `pipelineMembership` with `available`, `inPipeline`, `bucket`, and `labelDrift`, used by the dashboard frontend. `available: false` means durable membership could not be resolved; a successful lookup with no candidate is explicitly `clean_terminal`.
 
+The merge-eligibility consumers use this same read door. The Deacon's
+`readyForMerge` blocker, stuck-ready patrol, and startup sweep require `in_flight`
+membership before acting. `listEligibleCandidatesByProject()` applies the same gate to
+the merge-train projection, and the merge-next endpoint gathers membership again before
+shipping the selected head. A row in any other bucket remains visible for disposition
+but cannot enter a merge action.
+
 Dashboard GET requests are snapshot-only; they never gather tracker or git evidence inside the request. A successful GET or POST refresh returns HTTP `200` with the bare `PipelineMembership[]` array. A completed gather that could not determine membership also returns HTTP `200`, but with `{ status: 'unavailable', reason, message, projectKey }`. The typed reason is one of `missing_issue_prefix`, `repo_unavailable`, `default_branch_unresolved`, `forge_unavailable`, `tracker_unconfigured`, or `gather_failed`, so callers can distinguish an empty pipeline from a blind spot. When multiple reasons apply to the same project, the checks run in precedence order: tracker type is resolved first (a project with no tracker reports `tracker_unconfigured`), then the issue prefix is checked (a project with a tracker but no prefix reports `missing_issue_prefix`). HTTP `503` is reserved for the transient cold-boot state while the first background refresh is still loading.
 
 The frontend Retry button POSTs to the refresh route rather than refetching the GET. Loading and determined failures leave the issue tree and its actions mounted, with a status message or explicit Retry alongside them. Lifecycle events invalidate the affected query, so there is no interval membership poll.

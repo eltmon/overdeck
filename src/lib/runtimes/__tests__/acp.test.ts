@@ -120,6 +120,8 @@ describe('AcpRuntimeSync', () => {
       agentId: 'agent-spawn',
       workspace: '/tmp/work space',
       runtime: 'acp',
+      model: 'kimi-code/k3',
+      effort: 'low',
       env: { EXTRA: 'value' },
     })
 
@@ -136,7 +138,8 @@ describe('AcpRuntimeSync', () => {
     expect(command).toContain("--workspace '/tmp/work space'")
     expect(command).toContain("--binary-path '/opt/kimi code/bin/kimi'")
     expect(command).toContain(`--context-file '${join(home, 'agents', 'agent-spawn', 'acp-context.md')}'`)
-    expect(command).not.toContain('--model')
+    expect(command).toContain("--model 'kimi-code/k3'")
+    expect(command).toContain("--effort 'low'")
     expect(agent).toMatchObject({
       id: 'agent-spawn',
       sessionId: 'session-2858',

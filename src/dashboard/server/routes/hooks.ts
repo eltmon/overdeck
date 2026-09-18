@@ -24,7 +24,7 @@ import { sessionFilePath } from '../../../lib/paths.js';
 import { assertMemorySafeSegment } from '../../../lib/memory/paths.js';
 import { hasDashboardInternalToken } from './dashboard-auth.js';
 import { ReadModelService } from '../read-model.js';
-import { getConversationByClaudeSessionId, updateConversationTitle, type LegacyConversation } from '../../../lib/overdeck/conversations.js';
+import { clearConversationFailureState, getConversationByClaudeSessionId, markConversationActive, updateConversationTitle, type LegacyConversation } from '../../../lib/overdeck/conversations.js';
 import { getWorkspaceById } from '../../../lib/workspaces/resolver.js';
 import { derivePromptTitle } from '../../../lib/conversations/transcript-summary.js';
 import { generateAiTitle, resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js';
@@ -56,6 +56,22 @@ const CLEAR_ON = new Set([
   'StopFailure',
   'PermissionDenied',
 ])
+
+/**
+ * A hook arriving from a conversation's own Claude session is affirmative
+ * evidence the harness is alive and executing turns. If the fork/handoff
+ * pipeline previously marked this conversation failed (the submit-confirmation
+ * check can false-negative: pane echo of the submitted summary keeps the
+ * composer match positive after a successful Enter), heal the verdict. The
+ * dashboard treats forkStatus='failed' as terminal — gray dot, no composer —
+ * so a stale verdict leaves an alive, working session uninteractable.
+ */
+function healFailedForkVerdictOnLiveActivity(conv: LegacyConversation): void {
+  if (conv.forkStatus !== 'failed') return;
+  console.log(`[hooks] clearing fork failure for ${conv.name} — hook activity proves the session is alive (was: ${conv.forkError ?? 'failed'})`);
+  clearConversationFailureState(conv.name);
+  markConversationActive(conv.name);
+}
 
 const MemoryTurnHookPayload = Schema.Struct({
   session_id: Schema.String,
@@ -522,6 +538,8 @@ const postPermissionEventRoute = HttpRouter.add(
       return jsonResponse({ ok: true });
     }
 
+    healFailedForkVerdictOnLiveActivity(conv);
+
     const waiting = hookEvent === 'PermissionRequest';
     const clearing = CLEAR_ON.has(hookEvent);
 
@@ -560,6 +578,8 @@ export async function handleUserPromptSubmitBody(
   if (!conv) {
     return { ok: true };
   }
+
+  healFailedForkVerdictOnLiveActivity(conv);
 
   if (conv.titleSource === 'default') {
     const derivedTitle = derivePromptTitle(prompt);

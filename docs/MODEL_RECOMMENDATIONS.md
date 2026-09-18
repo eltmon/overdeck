@@ -30,7 +30,7 @@ Mark the following as wrong or outdated:
 - **Speed rankings** (Gemini 2.0 Flash, GLM-4 Flash) — outdated. Use Gemini 3 Flash Preview, GLM-4.7 Flash, or MiniMax M2.7 Highspeed as the new fast-tier references; no current published latency benchmark covers the 2026 fleet uniformly, so we don't rank them numerically here.
 - **Monthly cost estimates** — kept as a rough order-of-magnitude only. Actual cost moved with new tokenizers, prompt caching defaults, and the broader provider mix.
 - **Sources list** — the 2025-era articles linked at the bottom are largely superseded; updated source URLs are inline per row in the per-model tables below.
-- **OpenAI catalog (2026-05-23 addendum, PAN-1122; 2026-07-09 addendum adds GPT-5.6):** trimmed to match the Codex CLI published list. Kept: `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.3-codex`, `gpt-5.3-codex-spark`, `gpt-5.2`. Dropped: `gpt-5.5-pro`, `gpt-5.4-pro`, `gpt-5.5-mini`, `gpt-5.5-nano`, `gpt-5.4-nano`, `o3`, `o4-mini`, `gpt-4o`, `gpt-4o-mini`. Saved configs referencing dropped IDs are migrated by `MODEL_DEPRECATIONS` in `src/lib/model-capabilities.ts` and warned at settings-load. `gpt-5.5-pro` is OUT of consideration for any role going forward.
+- **OpenAI catalog (2026-05-23 addendum, PAN-1122; 2026-07-09 addendum adds GPT-5.6; 2026-09-07 addendum adds GPT-6 Astra):** trimmed to match the Codex CLI published list. Kept: `gpt-6-astra`, `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`, `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.3-codex`, `gpt-5.3-codex-spark`, `gpt-5.2`. Dropped: `gpt-5.5-pro`, `gpt-5.4-pro`, `gpt-5.5-mini`, `gpt-5.5-nano`, `gpt-5.4-nano`, `o3`, `o4-mini`, `gpt-4o`, `gpt-4o-mini`. Saved configs referencing dropped IDs are migrated by `MODEL_DEPRECATIONS` in `src/lib/model-capabilities.ts` and warned at settings-load. `gpt-5.5-pro` is OUT of consideration for any role going forward.
 - **Sonnet 4.6 + Opus 4.7 capability notes already current.** No further Claude family changes in this revision.
 
 ## Performance benchmarks — what's verified
@@ -138,6 +138,7 @@ No vendor publishes effective-context retrieval scores for the 2026 fleet. Third
 | claude-sonnet-4-6 | $3.00 | $15.00 | 50% batch; 90% cache reads |
 | claude-haiku-4-5 | $1.00 | $5.00 | 50% batch; 90% cache reads |
 | gpt-5.5 | $5.00 | $30.00 | 50% batch/flex; cached input $0.50; Priority 2.5x; >272k input 2x in / 1.5x out |
+| gpt-6-astra | $10.00 | $50.00 | Cached input $1.00; >272k input 2x in / 1.5x out for the full request |
 | gpt-5.6-sol | $5.00 | $30.00 | 50% batch/flex; cached input $0.50 |
 | gpt-5.6-terra | $2.50 | $15.00 | 50% batch/flex; cached input $0.25 |
 | gpt-5.6-luna | $1.00 | $6.00 | 50% batch/flex; cached input $0.10 |
@@ -164,6 +165,7 @@ No vendor publishes effective-context retrieval scores for the 2026 fleet. Third
 | claude-sonnet-4-6 | 1,000,000 (1M beta) | — |
 | claude-haiku-4-5 | 200,000 | — |
 | gpt-5.5 | 1,050,000 | 128,000 |
+| gpt-6-astra | 1,050,000 | 128,000 |
 | gpt-5.6-sol | 1,000,000 | — |
 | gpt-5.6-terra | 1,000,000 | — |
 | gpt-5.6-luna | 1,000,000 | — |
@@ -195,7 +197,8 @@ No vendor publishes effective-context retrieval scores for the 2026 fleet. Third
 **claude-sonnet-4-6.** 79.6% SWE-Bench Verified single-run; near-Opus on practical enterprise tasks at 1/5 the cost. Default model for the implementation pipeline. The 1M ctx beta lets it carry the whole spec + relevant code without trimming.
 
 **Alternatives:**
-- `gpt-5.6-sol` ($5.00/$30.00, 1M ctx) — current OpenAI flagship and default for Codex/ChatGPT subscription auth. No official SWE-Bench Verified score published at launch.
+- `gpt-6-astra` ($10.00/$50.00, 1.05M ctx) — current OpenAI flagship, first of the GPT-6 generation. Overdeck pins its session window to 272K like the GPT-5.6 family, so it has no `[372k]` opt-in variant yet. Not the OpenAI tier default: `gpt-5.6-sol` still fills the `opus` slot, because astra costs 2x per token. No official SWE-Bench Verified score published at launch.
+- `gpt-5.6-sol` ($5.00/$30.00, 1M ctx) — previous OpenAI flagship and the default for Codex/ChatGPT subscription auth. No official SWE-Bench Verified score published at launch.
 - `gpt-5.3-codex` ($1.75/$14.00, 400k ctx, 85.0% SWE-Bench Verified) — previous coding-optimized OpenAI flagship. Viable when the operator wants ChatGPT subscription auth via Codex CLI / CLIProxy and the task fits a 400k context. Higher per-token output cost than Sonnet 4.6 but the cached-input rate ($0.175/1M, 90% off) makes long-running implementation loops competitive.
 - `minimax-m2.7` ($0.28/$1.20, 78% SWE-Bench Verified, 87.4% GPQA, auto-cache $0.06/1M) — cheapest verified high-quality coder. Best for high-volume work where cache reuse dominates cost. Tradeoff: smaller (205k) context; OpenAI-compatible JSON mode but no third-party reliability eval.
 - `kimi-k2.6` ($0.60/$2.50, 80.2% SWE-Bench Verified, 256k ctx) — strong middle ground. Open-weight with native INT4; agent-swarm primitive built in.

@@ -175,16 +175,8 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     );
     console.log('');
 
-    // Context layers → CLAUDE.md managed regions
-    console.log(chalk.cyan('context layers → CLAUDE.md:'));
-    console.log(`  ${chalk.blue('↻')} global → ~/.claude/CLAUDE.md ${chalk.dim('(managed region)')}`);
-    for (const { config } of listProjectsSync()) {
-      if (existsSync(resolveProjectContextFile(config.path))) {
-        console.log(
-          `  ${chalk.blue('↻')} ${config.name} → ${join(config.path, 'CLAUDE.md')} ${chalk.dim('(managed region)')}`,
-        );
-      }
-    }
+    console.log(chalk.cyan('context layers → Overdeck launch artifacts:'));
+    console.log(`  ${chalk.blue('↻')} global → ~/.overdeck/context/{claude,pi,codex}-global.md`);
 
     // Show .pan/skills/ source files for each registered project
     const dryRunProjects = listProjectsSync();
@@ -371,18 +363,14 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     for (const name of keptModifiedPaths) console.log(chalk.dim(`  - ${name}`));
   }
 
-  // Render the layered context into harness CLAUDE.md files (PAN-1201).
+  // Render layered context into Overdeck-owned launch artifacts.
   const ctxSpinner = ora('Rendering context layers...').start();
   const ctx = time('context-layers', () => syncContextLayersSync());
   const ctxParts: string[] = [];
   if (ctx.globalStubCreated) ctxParts.push('seeded global.md');
-  if (ctx.globalWritten) ctxParts.push('~/.claude/CLAUDE.md');
-  if (ctx.projectsWritten.length > 0) {
-    ctxParts.push(`${ctx.projectsWritten.length} project file(s)`);
-  }
-  if (ctx.legacyBeadsCleanups.length > 0) {
-    ctxParts.push(`${ctx.legacyBeadsCleanups.length} legacy Beads reference file(s) cleaned`);
-  }
+  if (ctx.claudeGlobalWritten) ctxParts.push('claude-global.md');
+  if (ctx.piGlobalWritten) ctxParts.push('pi-global.md');
+  if (ctx.codexGlobalWritten) ctxParts.push('codex-global.md');
   if (ctx.errors.length > 0) {
     ctxSpinner.warn(`Context layers rendered with ${ctx.errors.length} error(s)`);
     for (const e of ctx.errors) console.log(chalk.red(`  ✗ ${e}`));
@@ -390,33 +378,6 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     ctxSpinner.succeed(`Context layers rendered: ${ctxParts.join(', ')}`);
   } else {
     ctxSpinner.info('Context layers already up to date');
-  }
-
-  for (const cleanup of ctx.legacyBeadsCleanups) {
-    console.log(chalk.green(`  ✓ Removed legacy generated Beads references: ${cleanup.file}`));
-    console.log(chalk.dim(`    Backup: ${cleanup.backupPath}`));
-  }
-
-  // One-time notice: a managed region was added to a file that already had
-  // hand-authored content. Reassure the user their content is preserved and
-  // point at the backup taken before the first injection.
-  if (ctx.firstInjections.length > 0) {
-    console.log(
-      chalk.cyan('\n  ℹ Overdeck added a managed region to existing context file(s):'),
-    );
-    for (const fi of ctx.firstInjections) {
-      console.log(`    • ${fi.file}`);
-      console.log(
-        chalk.dim(
-          `      Your content outside the markers is untouched. Backup: ${fi.backupPath}`,
-        ),
-      );
-    }
-    console.log(
-      chalk.dim(
-        '    Edit the layer source (pan context edit), never the region between the markers.',
-      ),
-    );
   }
 
   // Sync hooks (bin scripts)

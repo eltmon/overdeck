@@ -11,13 +11,13 @@ import { isHarnessProcessAlive, listSessionNames } from '../tmux.js';
 import { resolveConversationGitInfo } from '../../dashboard/server/services/git-info.js';
 import { isCompacting } from '../../dashboard/server/services/conversation-compaction.js';
 import { summarizeConversationActivity } from '../../dashboard/server/services/conversation-service.js';
+import { getConversationLedgerCostsSnapshot } from '../../dashboard/server/services/dashboard-poll-snapshots.js';
 import {
   conversationNeedsRunningRepair,
   conversationSessionAliveFromState,
 } from './conversation-runtime.js';
 import { codexConversationPendingInput } from './conversation-delivery.js';
 import {
-  getConversationLedgerCosts,
   listConversations,
   listFavoritedIds,
   markConversationRunning,
@@ -98,8 +98,11 @@ export function getEnrichedConversationList(limit: number, offset: number): Prom
 async function enrichConversationList(limit: number, offset: number): Promise<readonly unknown[]> {
   const conversations = listConversations({ limit, offset });
   const favoritedNames = getCachedFavoritedIds();
-  const ledgerCosts = getConversationLedgerCosts();
-  const liveSessionNames = new Set(await Effect.runPromise(listSessionNames()));
+  const [ledgerEntries, sessionNames] = await Promise.all([
+    getConversationLedgerCostsSnapshot(), Effect.runPromise(listSessionNames()),
+  ]);
+  const ledgerCosts = new Map(ledgerEntries);
+  const liveSessionNames = new Set(sessionNames);
   return Effect.runPromise(withConcurrencyLimit(
     conversations.map((conv) => Effect.promise(async () => {
       let row = conv;

@@ -355,7 +355,9 @@ CREATE TABLE `review_status` (
 	`strike_next_attempt_at` integer,
 	`strike_landing_attempts` text,
 	`review_cycle_history` text,
-	`conflicts_since` text
+	`retired_at` integer,
+	`conflicts_since` text,
+	`review_stale_since` text
 );
 --> statement-breakpoint
 CREATE INDEX `review_status_updated_idx` ON `review_status` (`updated_at`);--> statement-breakpoint

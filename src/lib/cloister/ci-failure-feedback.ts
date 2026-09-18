@@ -228,8 +228,13 @@ async function relayCiFailureFeedbackPromise(
   const failures = await collectFailures(owner, repo, opts.headRef, opts.headSha, mainFailingNames);
 
   // If we cannot find any failing workflow run for this SHA, still write a short
-  // feedback file for explicit status events so the agent is not left in the dark.
-  if (failures.length === 0 && !opts.source.startsWith('status:')) {
+  // feedback file for explicit status events and authoritative polling so the
+  // agent is not left in the dark.
+  if (
+    failures.length === 0
+    && !opts.source.startsWith('status:')
+    && opts.source !== 'polling_reconciliation'
+  ) {
     console.log(
       `[ci-failure-feedback] No failing runs found for ${issueId} @ ${opts.headSha.slice(0, 8)}; skipping feedback`,
     );

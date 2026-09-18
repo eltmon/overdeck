@@ -81,7 +81,7 @@ describe('role model configuration', () => {
       },
     });
 
-    expect(resolveModel('plan', undefined, config)).toBe('gpt-5.5');
+    expect(resolveModel('plan', undefined, config)).toBe('gpt-5.6-sol');
   });
 
   it('uses sub-role overrides before role-level model refs', () => {
@@ -251,10 +251,14 @@ describe('role model configuration', () => {
   it('rejects an effort level the role model does not support (model-aware)', () => {
     expect(() => mergeConfigs({
       roles: {
-        // claude-sonnet-4-6 supports low/medium/high only — xhigh is Opus-4.7-only.
+        // claude-sonnet-4-6 supports low/medium/high/max — xhigh requires newer models.
         test: { model: 'claude-sonnet-4-6', effort: 'xhigh' },
       },
-    })).toThrow("config.yaml: roles.test.effort 'xhigh' is not supported by claude-sonnet-4-6 (supported: low, medium, high)");
+    })).toThrow("config.yaml: roles.test.effort 'xhigh' is not supported by claude-sonnet-4-6 (supported: low, medium, high, max)");
+  });
+
+  it('allows a generic High role default on fixed-effort Kimi Code', () => {
+    expect(() => mergeConfigs({ roles: { work: { model: 'kimi-code/kimi-for-coding', effort: 'high' } } })).not.toThrow();
   });
 
   it('rejects an effort value outside the enum', () => {
@@ -280,7 +284,7 @@ describe('role model configuration', () => {
       ...DEFAULT_WORKHORSES,
       mid: 'gpt-5.4-mini',
     });
-    expect(resolveModel('work', undefined, config)).toBe('gpt-5.4-mini');
+    expect(resolveModel('work', undefined, config)).toBe('gpt-5.6-luna');
   });
 });
 
@@ -362,7 +366,7 @@ describe('percent model pick derivation (PAN-2053)', () => {
     expect(origin!.resolved).toBe(resolveModel('work', undefined, weighted, spawnKey));
     // workhorse:mid is dereffed to the real model id for display
     expect(origin!.distribution[0].model).toBe(derefWorkhorse('workhorse:mid', weighted));
-    expect(origin!.distribution[1].model).toBe('gpt-5.5');
+    expect(origin!.distribution[1].model).toBe('gpt-5.6-sol');
     // exactly one entry chosen, and it names the resolved model
     const chosen = origin!.distribution.filter((d) => d.chosen);
     expect(chosen).toHaveLength(1);

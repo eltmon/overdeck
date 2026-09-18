@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stream } from 'effect';
 import { getHarnessBehavior, WS_METHODS } from '@overdeck/contracts';
@@ -100,7 +100,7 @@ export function applyConversationMessagesEvent(
   // already have; merge instead, preserving history while still adopting any
   // new records the snapshot carries.
   const snapshotShrinks =
-    isSnapshot && event.messages.length < (previous?.messages.length ?? 0);
+    isSnapshot && !event.reset && event.messages.length < (previous?.messages.length ?? 0);
   const replaceFromSnapshot = isSnapshot && !snapshotShrinks;
   return {
     ...previous,
@@ -111,8 +111,9 @@ export function applyConversationMessagesEvent(
       ? event.workLog
       : mergeById(previous?.workLog ?? [], event.workLog),
     streaming: event.streaming,
-    proposedPlan: event.proposedPlan ?? previous?.proposedPlan,
-    compactBoundaries: replaceFromSnapshot
+    totalCost: event.totalCost ?? previous?.totalCost,
+    proposedPlan: event.metadataSnapshot ? event.proposedPlan : event.proposedPlan ?? previous?.proposedPlan,
+    compactBoundaries: event.metadataSnapshot || replaceFromSnapshot
       ? event.compactBoundaries
       : mergeById(previous?.compactBoundaries ?? [], event.compactBoundaries ?? []),
     contextUsage: 'contextUsage' in event ? event.contextUsage : previous?.contextUsage,
@@ -130,7 +131,7 @@ export function shouldStreamConversationMessages(conversation: Pick<Conversation
   // transcript appears, then emits the full snapshot), so subscribing early is safe
   // and self-heals the view the instant the runtime writes — no reload. Ended
   // conversations stay on the one-shot HTTP path (historical view; no live tail).
-  // Claude Code uses the incremental JSONL stream; pi/codex use full snapshot
+  // Claude Code uses the incremental JSONL stream; pi/codex use snapshot + delta
   // streams — polling those every 2s is visibly stale during fast turns.
   if (conversation.id !== undefined && conversation.id >= 0) {
     if (conversation.endedAt) return false;
@@ -150,9 +151,16 @@ export function shouldStreamConversationMessages(conversation: Pick<Conversation
   return isAgentSession && streamable;
 }
 
-export function useConversationMessagesStream(conversation: Pick<Conversation, 'name' | 'harness' | 'sessionAlive'> & { id?: number; endedAt?: string | null }): boolean {
+export function useConversationMessagesStream(conversation: Pick<Conversation, 'name' | 'harness' | 'sessionAlive'> & { id?: number; endedAt?: string | null }): { enabled: boolean; receivedFirstPayload: boolean } {
   const queryClient = useQueryClient();
   const enabled = shouldStreamConversationMessages(conversation);
+  const streamIdentity = `${enabled ? 'enabled' : 'disabled'}:${conversation.name}`;
+  const [firstPayloadIdentity, setFirstPayloadIdentity] = useState<string | null>(null);
+  const receivedFirstPayload = firstPayloadIdentity === streamIdentity;
+
+  useLayoutEffect(() => {
+    setFirstPayloadIdentity(null);
+  }, [streamIdentity]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -163,6 +171,7 @@ export function useConversationMessagesStream(conversation: Pick<Conversation, '
       (client) =>
         (client as PanRpcProtocolClient)[WS_METHODS.subscribeConversationMessages]({ conversationName: conversation.name }) as Stream.Stream<ConversationEvent, Error>,
       (event) => {
+        setFirstPayloadIdentity(streamIdentity);
         queryClient.setQueryData<ConversationMessagesCache>(queryKey, (previous) =>
           applyConversationMessagesEvent(previous, event));
       },
@@ -171,9 +180,9 @@ export function useConversationMessagesStream(conversation: Pick<Conversation, '
     return () => {
       unsubscribe();
     };
-  }, [conversation.name, enabled, queryClient]);
+  }, [conversation.name, enabled, queryClient, streamIdentity]);
 
-  return enabled;
+  return { enabled, receivedFirstPayload };
 }
 
 export function useSubagentTranscript(

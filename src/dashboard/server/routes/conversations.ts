@@ -10,6 +10,7 @@ import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
 import { validateOrigin, validateOriginHeaders, getHeaderFromMap, type HeaderMap } from './origin-validation.js';
 import * as self from './conversations.js';
+import { withConversationMessageReceipt } from '../services/conversation-message-receipts.js';
 import {
   backfillConversationModels,
   conversationRuntimeRootPids,
@@ -68,6 +69,7 @@ import {
   handleConversationCompact,
   handleConversationCodexApproval,
   handleConversationControlAck,  handleConversationDeliveryMethod,
+  handleConversationPiAskAnswer,
   handleConversationPlanAction,
   handleConversationThinkingLevel,
   isPiControlChannelHarness,
@@ -593,21 +595,20 @@ const postConversationMessageRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     return yield* Effect.promise(async () => {
       try {
-        return await handleConversationMessage(name, body, conversationMessageDependencies);
+        return await withConversationMessageReceipt(name, body, () =>
+          handleConversationMessage(name, body, conversationMessageDependencies));
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
-        // Log the full stack (falls back to message) so a 500's cause is
-        // diagnosable after the fact, not just the bare message (PAN-1552).
+        // Include the stack so failures are diagnosable after the fact (PAN-1552).
         console.error('[conversations] send message failed:', error instanceof Error ? (error.stack ?? msg) : msg);
-        // MessageDeliveryFailed includes a pane snapshot for debugging
         if (error instanceof Error && error.name === 'MessageDeliveryFailed') {
           return jsonResponse({
-            error: 'Message delivery failed — text did not reach the terminal',
-            deliveryFailed: true,
+            error: 'Delivery could not be confirmed. Check the conversation before sending again.',
+            deliveryUnknown: true,
             details: msg,
           }, { status: 504 });
         }
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+        return jsonResponse({ error: 'Delivery could not be confirmed', deliveryUnknown: true }, { status: 500 });
       }
     });
   }),
@@ -651,6 +652,29 @@ const postConversationPaneChoiceRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     return yield* Effect.promise(async () => {
       const result = await handleConversationPaneChoiceAnswer(rawId, body);
+      return jsonResponse(result.body, { status: result.status });
+    });
+  }),
+);
+//
+// PAN-3766 — answer an ohmypi conversation's `ask` modal from the dashboard.
+// The message route cannot: pi queues the steer behind the modal and the agent
+// never sees it. This route drives the modal with keystrokes after verifying
+// the live pane still shows the same question (see pi-ask-modal.ts).
+const postConversationPiAskAnswerRoute = HttpRouter.add(
+  'POST',
+  '/api/conversations/:id/pi-ask-answer',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const rawId = params['id'] ?? '';
+    const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      const result = await handleConversationPiAskAnswer(rawId, body);
       return jsonResponse(result.body, { status: result.status });
     });
   }),
@@ -1030,6 +1054,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   postConversationMessageRoute,
   postConversationCodexApprovalRoute,
   postConversationPaneChoiceRoute,
+  postConversationPiAskAnswerRoute,
   postConversationDeliveryMethodRoute,
   postConversationControlAckRoute,
   postConversationFavoriteRoute,

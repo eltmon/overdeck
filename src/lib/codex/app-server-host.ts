@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { appendFile, chmod, mkdir, rm, writeFile } from 'node:fs/promises';
+import { appendFile, chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer, type Server, type ServerResponse } from 'node:http';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
@@ -46,6 +46,7 @@ export interface CodexAppServerHostOptions {
   model?: string;
   effort?: string;
   resumeThreadId?: string;
+  developerInstructions?: string;
   overdeckHome?: string;
   codexHome?: string;
   manager?: AppServerHostManager;
@@ -67,6 +68,7 @@ export class CodexAppServerHost {
   private input: Interface | undefined;
   private token: string | undefined;
   private threadModel: string | undefined;
+  private effort: string;
   private state: 'starting' | 'ready' | 'closed' = 'starting';
   private lastActivityPersistedAt = 0;
 
@@ -77,6 +79,7 @@ export class CodexAppServerHost {
       codexHome: options.codexHome ?? codexHome(),
     });
     this.threadModel = options.model;
+    this.effort = options.effort ?? 'high';
     this.attachManagerEvents();
   }
 
@@ -139,6 +142,13 @@ export class CodexAppServerHost {
     const name = typeof body.op === 'string' ? body.op : '';
     try {
       if (name === 'status') return { status: 200, body: this.status() };
+      if (name === 'set-effort') {
+        if (typeof body.effort !== 'string' || !['low', 'medium', 'high', 'xhigh', 'max'].includes(body.effort)) {
+          return { status: 400, body: { error: 'Invalid reasoning effort' } };
+        }
+        this.effort = body.effort;
+        return { status: 200, body: { ok: true, effort: this.effort } };
+      }
       if (name === 'message') return await this.handleMessageOp(body);
       if (name === 'interrupt') return await this.handleInterruptOp();
       if (name === 'approval') return this.handleApprovalOp(body);
@@ -156,7 +166,7 @@ export class CodexAppServerHost {
     const content = typeof op.content === 'string' ? op.content : '';
     if (!content) return { status: 400, body: { error: 'message content is required' } };
     const requestedModel = typeof op.model === 'string' ? op.model : undefined;
-    const requestedEffort = typeof op.effort === 'string' ? op.effort : this.options.effort;
+    const requestedEffort = typeof op.effort === 'string' ? op.effort : this.effort;
     const model = requestedModel ?? this.threadModel;
     if (!model) {
       return {
@@ -167,7 +177,14 @@ export class CodexAppServerHost {
 
     const state = this.manager.getState();
     if (!state.threadId) {
-      const threadOptions: ThreadOptions = { model, cwd: this.options.cwd, runtimeMode: 'default' };
+      const threadOptions: ThreadOptions = {
+        model,
+        cwd: this.options.cwd,
+        runtimeMode: 'default',
+        ...(this.options.developerInstructions
+          ? { developerInstructions: this.options.developerInstructions }
+          : {}),
+      };
       if (this.options.resumeThreadId) await this.manager.resumeThread(this.options.resumeThreadId, threadOptions);
       else await this.manager.startThread(threadOptions);
       this.threadModel = model;
@@ -463,12 +480,19 @@ function extractThreadId(message: AppServerMessage): string | undefined {
   return typeof thread.id === 'string' ? thread.id : typeof params.threadId === 'string' ? params.threadId : undefined;
 }
 
-function parseArgs(argv: string[]): { resumeThreadId?: string; model?: string } {
-  const parsed: { resumeThreadId?: string; model?: string } = {};
+function parseArgs(argv: string[]): { resumeThreadId?: string; model?: string; effort?: string; developerInstructionFiles: string[] } {
+  const parsed: { resumeThreadId?: string; model?: string; effort?: string; developerInstructionFiles: string[] } = {
+    developerInstructionFiles: [],
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--resume') parsed.resumeThreadId = argv[++index];
     else if (arg === '--model') parsed.model = argv[++index];
+    else if (arg === '--developer-instructions-file') {
+      const file = argv[++index];
+      if (file) parsed.developerInstructionFiles.push(file);
+    }
+    else if (arg === '--effort') parsed.effort = argv[++index];
   }
   return parsed;
 }
@@ -477,11 +501,16 @@ async function main(): Promise<void> {
   const agentId = process.env.OVERDECK_AGENT_ID;
   if (!agentId) throw new Error('OVERDECK_AGENT_ID is required for codex app-server host.');
   const args = parseArgs(process.argv.slice(2));
+  const developerInstructions = (
+    await Promise.all(args.developerInstructionFiles.map((file) => readFile(file, 'utf-8')))
+  ).filter((content) => content.trim()).join('\n\n---\n\n');
   const host = new CodexAppServerHost({
     agentId,
     cwd: process.cwd(),
     model: args.model,
+    effort: args.effort,
     resumeThreadId: args.resumeThreadId,
+    developerInstructions: developerInstructions || undefined,
     codexHome: process.env.CODEX_HOME,
     stdin: process.stdin,
     stdout: process.stdout,

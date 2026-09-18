@@ -49,6 +49,7 @@ import {
   copySessionFromCompactBoundary,
   generateFallbackSummary,
   generateSummaryForFork,
+  HandoffAuthorModelNotConfiguredError,
   handoffFailureReason,
   handoffPreconditionFallbackReason,
   logHandoffFallback,
@@ -204,6 +205,7 @@ export function buildForkRequest(params: ForkRequest): ForkRequest {
     handoffAuthor: params.handoffAuthor,
     ...(params.handoffAuthorModel !== undefined ? { handoffAuthorModel: params.handoffAuthorModel } : {}),
     ...(params.handoffAuthorHarness !== undefined ? { handoffAuthorHarness: params.handoffAuthorHarness } : {}),
+    ...(params.title !== undefined ? { title: params.title } : {}),
   };
 }
 
@@ -420,6 +422,7 @@ export async function runForkPipeline(
   handoffAuthor: HandoffAuthor = 'external',
   handoffAuthorModel?: string,
   handoffAuthorHarness?: RuntimeName,
+  customTitle?: string,
 ): Promise<void> {
   const conv = getConversationByName(convName);
   if (!conv) throw new Error(`Fork conversation ${convName} not found`);
@@ -500,6 +503,11 @@ export async function runForkPipeline(
         summary = handoff.docText;
         handoffDocPath = handoff.docPath;
       } catch (error) {
+        // PAN-3860: a missing handoff-author-model config is an operator
+        // error, not a transient authoring failure — never silently degrade
+        // to a plain summary fork over it; let it fail the whole pipeline
+        // (handleForkPipelineFailure marks forkStatus='failed' + ends the row).
+        if (error instanceof HandoffAuthorModelNotConfiguredError) throw error;
         forkFallbackReason = handoffFailureReason(error);
         effectiveForkMode = 'summary';
         logHandoffFallback(parentConv, forkFallbackReason);
@@ -529,11 +537,14 @@ export async function runForkPipeline(
     summary = await buildSummary();
   }
   updateConversationForkFallbackReason(convName, forkFallbackReason);
+  // An operator-provided title (--title / fork modal) is authoritative in every
+  // mode and every fallback — re-deriving from the focus here silently
+  // overwrote it once the session came up (PAN-3774).
   updateConversationTitle(
     convName,
-    effectiveForkMode === 'handoff'
+    customTitle ?? (effectiveForkMode === 'handoff'
       ? handoffTitleFromFocus(handoffFocus, parentConv.title || parentConv.name)
-      : `Summary Fork: ${parentConv.title || parentConv.name}`,
+      : `Summary Fork: ${parentConv.title || parentConv.name}`),
     'manual',
   );
   if (handoffDocPath) {
@@ -605,12 +616,20 @@ export async function recoverStuckForks(): Promise<number> {
   for (const fork of forks) {
     try {
       if (!fork.forkRequest) {
+        // PAN-3860: an in-memory fork pipeline cannot survive a dashboard
+        // restart. Every give-up branch below must end the row alongside
+        // marking forkStatus='failed' — otherwise the conversation-lifecycle
+        // sweeper's forkStatus-based skip (added for PAN-3860) treats it as
+        // still in flight and the row never gets its normal tmux-liveness
+        // pass, leaving status='active' with no live session indefinitely.
         updateForkStatus(fork.name, 'failed', 'Dashboard restarted during fork before recovery metadata was persisted');
+        markConversationEnded(fork.name);
         continue;
       }
       const request = parsePersistedForkRequest(fork.forkRequest);
       if (!request) {
         updateForkStatus(fork.name, 'failed', 'Persisted fork request is invalid');
+        markConversationEnded(fork.name);
         continue;
       }
       const tmuxAlive = await forkSessionExists(fork.tmuxSession);
@@ -624,12 +643,14 @@ export async function recoverStuckForks(): Promise<number> {
       }
       if (fork.forkRetryCount >= 2) {
         updateForkStatus(fork.name, 'failed', 'Fork recovery retry limit reached');
+        markConversationEnded(fork.name);
         continue;
       }
       incrementForkRetryCount(fork.name);
       const parentConv = getConversationByName(request.parentConversationName);
       if (!parentConv) {
         updateForkStatus(fork.name, 'failed', `Parent conversation ${request.parentConversationName} not found`);
+        markConversationEnded(fork.name);
         continue;
       }
       await registerInFlightForkPipeline(runForkPipeline(
@@ -645,12 +666,14 @@ export async function recoverStuckForks(): Promise<number> {
         request.handoffAuthor,
         request.handoffAuthorModel,
         request.handoffAuthorHarness,
+        request.title,
       ));
       recovered += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error(`[fork-recovery] Failed to recover ${fork.name}:`, error);
       updateForkStatus(fork.name, 'failed', message);
+      markConversationEnded(fork.name);
     }
   }
   return recovered;
@@ -841,11 +864,12 @@ export async function handleConversationSummaryFork(
       handoffAuthor,
       ...(handoffAuthorModel !== undefined ? { handoffAuthorModel } : {}),
       ...(handoffAuthorHarness !== undefined ? { handoffAuthorHarness } : {}),
+      ...(customTitle !== undefined ? { title: customTitle } : {}),
     });
     setForkRequest(newConv.name, JSON.stringify(forkRequest));
     markConversationActive(newConv.name);
     registerInFlightForkPipeline(
-      runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness),
+      runForkPipeline(newConv.name, conv, sessionId, summaryModel, forkMode, localSummaryOnly, includeThinkingInSummary, summaryHarness, handoffFocus, handoffAuthor, handoffAuthorModel, handoffAuthorHarness, customTitle),
     ).catch((err) => {
       handleForkPipelineFailure(newConv.name, err);
     });

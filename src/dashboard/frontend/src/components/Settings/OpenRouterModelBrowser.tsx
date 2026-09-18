@@ -5,9 +5,9 @@ import { cn } from '../../lib/utils';
 export interface OpenRouterModel {
   id: string;
   name: string;
-  promptCostPer1M: number;
-  completionCostPer1M: number;
-  contextLength: number;
+  promptCostPer1M: number | null;
+  completionCostPer1M: number | null;
+  contextLength: number | null;
   supportsThinking: boolean;
   category: 'free' | 'chat' | 'code' | 'other';
   topProvider?: string;
@@ -45,7 +45,8 @@ function ModelCard({
   onToggleFavorite: (id: string) => void;
 }) {
   const isFree = model.category === 'free' || (model.promptCostPer1M === 0 && model.completionCostPer1M === 0);
-  const avgCost = (model.promptCostPer1M + model.completionCostPer1M) / 2;
+  const avgCost = model.promptCostPer1M === null || model.completionCostPer1M === null
+    ? null : (model.promptCostPer1M + model.completionCostPer1M) / 2;
 
   return (
     <div
@@ -82,7 +83,9 @@ function ModelCard({
 
         {/* Metrics row */}
         <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-          {isFree ? (
+          {avgCost === null ? (
+            <span className="text-xs text-muted-foreground">Pricing unavailable</span>
+          ) : isFree ? (
             <span className="text-xs font-bold text-success-foreground badge-bg-success px-1.5 py-0.5 rounded border badge-border-success">
               FREE
             </span>
@@ -92,7 +95,7 @@ function ModelCard({
             </span>
           )}
           <span className="text-xs text-muted-foreground">
-            <span className="text-muted-foreground">{formatContextLength(model.contextLength)}</span> ctx
+            <span className="text-muted-foreground">{model.contextLength === null ? 'Unknown' : formatContextLength(model.contextLength)}</span> ctx
           </span>
           {model.topProvider && (
             <span className="text-xs text-muted-foreground">{model.topProvider}</span>

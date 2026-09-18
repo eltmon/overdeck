@@ -138,7 +138,7 @@ Use your Read tool to open this file, read every line, then fix every failed UAT
   }
 
   try {
-    const outcome = await messageAgent(target.agentId, message, 'internal', { owesRework: true });
+    const outcome = await messageAgent(target.agentId, message, 'internal', { owesRework: true, feedbackRedelivery: true });
     if (outcome.delivered) {
       result.agentMessageSent = true;
       return result;

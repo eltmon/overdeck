@@ -153,3 +153,36 @@ describe('shouldUseSupervisorForConversation', () => {
     expect(shouldUseSupervisorForConversation('claude-code')).toBe(true);
   });
 });
+
+
+describe('waitForPromptReady — Muse Code', () => {
+  afterEach(() => {
+    tmuxMocks.sessionExists.mockReset();
+    tmuxMocks.capturePane.mockReset();
+  });
+
+  it('waits for the native prompt after startup', async () => {
+    vi.useFakeTimers();
+    tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
+    tmuxMocks.capturePane
+      .mockReturnValueOnce(Effect.succeed('Muse Code is starting'))
+      .mockReturnValue(Effect.succeed('Muse Code\n⟩ \n muse-spark-1.3'));
+    const pending = waitForPromptReady('agent-muse-ready', 'muse', 5);
+    await vi.advanceTimersByTimeAsync(250);
+    await expect(pending).resolves.toBe(true);
+  });
+
+  it('times out when the native prompt never appears', async () => {
+    vi.useFakeTimers();
+    tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
+    tmuxMocks.capturePane.mockReturnValue(Effect.succeed('Muse Code is starting'));
+    const pending = waitForPromptReady('agent-muse-timeout', 'muse', 1);
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(pending).resolves.toBe(false);
+  });
+
+  it('stops waiting when Muse exits', async () => {
+    tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(false));
+    await expect(waitForPromptReady('agent-muse-exited', 'muse', 1)).resolves.toBe(false);
+  });
+});

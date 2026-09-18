@@ -16,6 +16,7 @@ interface HandoffOptions {
   author?: string;
   authorModel?: string;
   authorHarness?: string;
+  title?: string;
 }
 
 function resolveConversation(convRef: string) {
@@ -101,6 +102,10 @@ export async function handoffCommand(
   if (focus) {
     console.log(chalk.gray(`  Focus: ${focus}`));
   }
+  const customTitle = options.title?.trim() || undefined;
+  if (customTitle) {
+    console.log(chalk.gray(`  Title: ${customTitle} (--title)`));
+  }
   console.log(chalk.gray('  Authoring the handoff and spawning the session — this can take a minute…'));
 
   // PAN-1568: route through the dashboard server, which authors the doc AND
@@ -115,6 +120,7 @@ export async function handoffCommand(
       issueId,
       forkMode: 'handoff',
       focus,
+      title: customTitle,
       handoffAuthor: author,
       handoffAuthorModel: options.authorModel,
     });

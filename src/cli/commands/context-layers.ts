@@ -26,6 +26,7 @@ import {
   renderForHarness,
   validateTemplate,
   migrateDevroot,
+  detachManagedContextSync,
 } from '../../lib/context-layers/index.js';
 import { syncContextLayersSync } from '../../lib/sync.js';
 import { isDevMode } from '../../lib/paths.js';
@@ -39,6 +40,8 @@ interface ContextOptions {
   harness?: string;
   json?: boolean;
   yes?: boolean;
+  apply?: boolean;
+  dryRun?: boolean;
 }
 
 function contextDiffHarnesses(rawHarness: string | undefined): Harness[] {
@@ -52,6 +55,7 @@ function contextDiffHarnesses(rawHarness: string | undefined): Harness[] {
     case 'codex':
     case 'acp':
     case 'kimi-code':
+    case 'opencode':
       break;
     default:
       return allHarnesses;
@@ -149,7 +153,7 @@ export async function contextEditCommand(options: ContextOptions = {}): Promise<
     process.exitCode = 1;
     return;
   }
-  console.log(chalk.dim('Run `pan context sync` to render the change into harness outputs.'));
+  console.log(chalk.dim('Run `pan context sync` to refresh managed-session launch artifacts.'));
 }
 
 // ─── pan context sync ─────────────────────────────────────────────────────
@@ -159,17 +163,10 @@ export async function contextSyncCommand(): Promise<void> {
   if (result.globalStubCreated) {
     console.log(chalk.cyan('Seeded ~/.overdeck/context/global.md with a starter template.'));
   }
-  if (result.globalWritten) {
-    console.log(chalk.green('✓ Rendered global layer → ~/.claude/CLAUDE.md'));
+  if (result.claudeGlobalWritten || result.piGlobalWritten || result.codexGlobalWritten) {
+    console.log(chalk.green('✓ Refreshed ~/.overdeck/context/*-global.md launch artifacts'));
   } else {
     console.log(chalk.dim('  global layer already up to date'));
-  }
-  for (const name of result.projectsWritten) {
-    console.log(chalk.green(`✓ Rendered project layer → ${name}/CLAUDE.md`));
-  }
-  for (const cleanup of result.legacyBeadsCleanups) {
-    console.log(chalk.green(`✓ Removed legacy generated Beads references → ${cleanup.file}`));
-    console.log(chalk.dim(`  Backup: ${cleanup.backupPath}`));
   }
   for (const err of result.errors) {
     console.log(chalk.red(`  ✗ ${err}`));
@@ -280,7 +277,35 @@ export async function contextMigrateCommand(options: ContextOptions = {}): Promi
     );
     console.log(chalk.dim('Set sync.devroot to null in config to silence the deprecation warning.'));
   }
-  console.log(chalk.dim('\nRun `pan context sync` to render the migrated content.'));
+  console.log(chalk.dim('\nRun `pan context sync` to refresh managed-session launch artifacts.'));
+}
+
+// ─── pan context detach ──────────────────────────────────────────────────
+
+export async function contextDetachCommand(options: ContextOptions = {}): Promise<void> {
+  if (options.apply && options.dryRun) {
+    console.error(chalk.red('Choose either --dry-run or --apply, not both.'));
+    process.exitCode = 1;
+    return;
+  }
+  if (!options.apply && !options.dryRun) {
+    console.error(chalk.red('Explicit authorization required: use --dry-run first, then --apply.'));
+    process.exitCode = 1;
+    return;
+  }
+
+  const results = detachManagedContextSync(options.apply === true);
+  const actionable = results.filter((item) => item.status !== 'manual-only');
+  if (actionable.length === 0) console.log(chalk.dim('No recognized managed regions found.'));
+  for (const item of results) {
+    const icon = item.status === 'removed' ? chalk.green('✓')
+      : item.status === 'removable' ? chalk.cyan('•')
+      : chalk.yellow('!');
+    console.log(`${icon} ${item.file} — ${item.status}`);
+    if (item.reason) console.log(chalk.dim(`  ${item.reason}`));
+    if (item.managedBlock && !options.apply) console.log(item.managedBlock);
+    if (item.backupPath) console.log(chalk.dim(`  Backup: ${item.backupPath}`));
+  }
 }
 
 // ─── dispatcher (used by `pan context` with no subcommand) ─────────────────
@@ -290,10 +315,11 @@ export async function contextLayersHelp(): Promise<void> {
   console.log(chalk.bold('pan context — layered context distribution\n'));
   console.log('  pan context list      Show all three layers and their files');
   console.log('  pan context edit      Open a layer in $EDITOR (--layer global|project|workspace)');
-  console.log('  pan context sync      Render the layers into harness CLAUDE.md files');
+  console.log('  pan context sync      Refresh managed-session launch artifacts');
   console.log('  pan context diff      Show what each harness would receive (--harness claude|pi)');
   console.log('  pan context validate  Lint layer templates for malformed harness blocks');
   console.log('  pan context migrate   One-shot migration from the deprecated sync.devroot');
+  console.log('  pan context detach    Explicitly remove historical managed regions (--dry-run|--apply)');
 }
 
 /** A renderer used in tests / programmatic callers. */

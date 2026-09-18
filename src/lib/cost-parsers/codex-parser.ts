@@ -21,6 +21,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import type { SessionUsage } from './jsonl-parser.js';
 import { getPricingSync } from '../cost.js';
+import { readCodexRolloutMessage } from '../codex-rollout-message.js';
 
 interface CodexTokenUsageFields {
   // Flat (legacy) rollout field names.
@@ -58,6 +59,13 @@ export function parseCodexSessionSync(sessionFile: string): SessionUsage | null 
     return null;
   }
 
+  const parser = createCodexSessionParser(sessionFile);
+  for (const line of raw.split('\n')) parser.push(line);
+  return parser.result();
+}
+
+/** Stateful canonical usage reducer shared by full reads and the live transcript tail. */
+export function createCodexSessionParser(sessionFile: string) {
   let model = '';
   let threadId = '';
   let startTime = '';
@@ -69,15 +77,17 @@ export function parseCodexSessionSync(sessionFile: string): SessionUsage | null 
   let messageCount = 0;
   let hasUsage = false;
 
-  for (const line of raw.split('\n')) {
+  const push = (line: string): void => {
     const trimmed = line.trim();
-    if (!trimmed) continue;
+    if (!trimmed) return;
     let entry: Record<string, unknown>;
     try {
       entry = JSON.parse(trimmed) as Record<string, unknown>;
     } catch {
-      continue;
+      return;
     }
+
+    if (!entry || typeof entry !== 'object') return;
 
     // Normalize the two rollout schemas. cli >= 0.137.0 nests the record kind
     // under `payload.type` inside event_msg/turn_context/session_meta wrappers;
@@ -102,9 +112,20 @@ export function parseCodexSessionSync(sessionFile: string): SessionUsage | null 
       if (typeof data['model'] === 'string' && data['model']) model = data['model'];
       if (typeof data['thread_id'] === 'string') threadId = data['thread_id'];
       if (!startTime && ts) startTime = ts;
-    } else if (type === 'agent_message') {
-      messageCount++;
-      if (ts) endTime = ts;
+    } else if (type === 'agent_message' || type === 'item_completed') {
+      // Flat pre-0.137 rollouts put `agent_message` at the top level with no
+      // event_msg wrapper, which the shared reader deliberately rejects — count
+      // those directly. Wrapped records go through the reader, which knows both
+      // the legacy `agent_message` payload and the cli >= 0.153.4
+      // `item_completed` shape that replaced it (PAN-3781); asking it also
+      // keeps tool and reasoning items from counting as assistant turns.
+      const isAssistantTurn = payload
+        ? readCodexRolloutMessage(entry)?.role === 'assistant'
+        : type === 'agent_message';
+      if (isAssistantTurn) {
+        messageCount++;
+        if (ts) endTime = ts;
+      }
     } else if (type === 'token_count') {
       const info = data['info'] as { total_token_usage?: CodexTokenUsageFields } | undefined;
       const usage = info?.total_token_usage;
@@ -116,44 +137,47 @@ export function parseCodexSessionSync(sessionFile: string): SessionUsage | null 
         if (ts) endTime = ts;
       }
     }
-  }
+  };
+  const result = (): SessionUsage | null => {
 
-  if (!hasUsage && messageCount === 0) return null;
-  if (!model) model = 'unknown';
+    if (!hasUsage && messageCount === 0) return null;
+    if (!model) model = 'unknown';
 
-  const pricing = getPricingSync('openai', model);
-  // total_token_usage.input_tokens includes the cached portion, so charge only
-  // the non-cached remainder at the full input rate.
-  const nonCachedInput = Math.max(0, totalInput - totalCachedInput);
-  const inputCost = (nonCachedInput / 1000) * (pricing?.inputPer1k ?? 0);
-  const cachedCost = (totalCachedInput / 1000) * (pricing?.cacheReadPer1k ?? 0);
-  const outputCost = (totalOutput / 1000) * (pricing?.outputPer1k ?? 0);
-  const totalCost = inputCost + cachedCost + outputCost;
+    const pricing = getPricingSync('openai', model);
+    // total_token_usage.input_tokens includes the cached portion, so charge only
+    // the non-cached remainder at the full input rate.
+    const nonCachedInput = Math.max(0, totalInput - totalCachedInput);
+    const inputCost = (nonCachedInput / 1000) * (pricing?.inputPer1k ?? 0);
+    const cachedCost = (totalCachedInput / 1000) * (pricing?.cacheReadPer1k ?? 0);
+    const outputCost = (totalOutput / 1000) * (pricing?.outputPer1k ?? 0);
+    const totalCost = inputCost + cachedCost + outputCost;
 
-  return {
-    sessionId: threadId || sessionFile,
-    sessionFile,
-    startTime: startTime || new Date().toISOString(),
-    endTime: endTime || startTime || new Date().toISOString(),
-    model,
-    usage: {
-      inputTokens: totalInput,
-      outputTokens: totalOutput,
-      cacheReadTokens: totalCachedInput,
-    },
-    cost: totalCost,
-    cost_v2: totalCost,
-    cwd,
-    messageCount,
-    modelBreakdown: {
-      [model]: {
-        cost: totalCost,
+    return {
+      sessionId: threadId || sessionFile,
+      sessionFile,
+      startTime: startTime || new Date().toISOString(),
+      endTime: endTime || startTime || new Date().toISOString(),
+      model,
+      usage: {
         inputTokens: totalInput,
         outputTokens: totalOutput,
-        messageCount,
+        cacheReadTokens: totalCachedInput,
       },
-    },
+      cost: totalCost,
+      cost_v2: totalCost,
+      cwd,
+      messageCount,
+      modelBreakdown: {
+        [model]: {
+          cost: totalCost,
+          inputTokens: totalInput,
+          outputTokens: totalOutput,
+          messageCount,
+        },
+      },
+    };
   };
+  return { push, result };
 }
 
 /** Per-turn cost event for Codex rollouts. Mirrors OhmypiCostEventUsage. */

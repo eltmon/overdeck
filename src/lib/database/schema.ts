@@ -11,7 +11,7 @@ import { encodeClaudeProjectDir, getOverdeckHome } from '../paths.js';
 import { backfillAgentsFromStateJsonSync } from './agent-backfill.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 64;
+export const SCHEMA_VERSION = 66;
 
 function tryIdempotentDdl(db: SqliteDatabase, targetVersion: number, statement: string): void {
   try {
@@ -234,6 +234,7 @@ export function initSchema(db: SqliteDatabase): void {
       release_notes         TEXT,
       updated_at            TEXT NOT NULL,
       ready_for_merge       INTEGER NOT NULL DEFAULT 0,
+      retired_at            TEXT,
       auto_requeue_count    INTEGER DEFAULT 0,
       merge_retry_count     INTEGER DEFAULT 0,
       pr_url                TEXT,
@@ -247,6 +248,8 @@ export function initSchema(db: SqliteDatabase): void {
       stuck_details         TEXT,
       -- PAN-653: commit SHA at which review passed (used by deacon to detect new pushes)
       reviewed_at_commit    TEXT,
+      -- PAN-3847: ISO timestamp when a passed review went stale (HEAD moved); blocks readyForMerge until re-review
+      review_stale_since    TEXT,
       -- PAN-699: timestamp when review agents were dispatched (deacon timeout detection)
       review_spawned_at     TEXT,
       -- PAN-1765: timestamp when conflict resolution was dispatched
@@ -1752,12 +1755,12 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
     tryIdempotentDdl(db, 63, 'ALTER TABLE review_status ADD COLUMN conflicts_since TEXT');
   }
 
-  // v63 -> v64: persist browser UAT independently from automated test gates (PAN-3365).
   if (currentVersion < 64) {
     tryIdempotentDdl(db, 64, 'ALTER TABLE review_status ADD COLUMN uat_status TEXT');
     tryIdempotentDdl(db, 64, 'ALTER TABLE review_status ADD COLUMN uat_notes TEXT');
   }
-
+  if (currentVersion < 65) tryIdempotentDdl(db, 65, 'ALTER TABLE review_status ADD COLUMN retired_at TEXT');
+  if (currentVersion < 66) tryIdempotentDdl(db, 66, 'ALTER TABLE review_status ADD COLUMN review_stale_since TEXT');
   // After all migrations, set the version
   db.pragma(`user_version = ${SCHEMA_VERSION}`);
 }

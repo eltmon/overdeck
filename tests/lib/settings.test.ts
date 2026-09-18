@@ -43,18 +43,6 @@ describe('settings', () => {
       expect(defaults.api_keys).toEqual({});
     });
 
-    it('should include all complexity levels', async () => {
-      const { getDefaultSettingsSync } = await import('../../src/lib/settings.js');
-      const defaults = getDefaultSettingsSync();
-
-      // Complexity levels per DEFAULT_SETTINGS
-      expect(defaults.models.complexity.trivial).toBe('claude-haiku-4-5');
-      expect(defaults.models.complexity.simple).toBe('claude-haiku-4-5');
-      expect(defaults.models.complexity.medium).toBe('kimi-k2.5');
-      expect(defaults.models.complexity.complex).toBe('kimi-k2.5');
-      expect(defaults.models.complexity.expert).toBe('claude-opus-4-6');
-    });
-
     it('should return a deep copy (not same reference)', async () => {
       const { getDefaultSettingsSync } = await import('../../src/lib/settings.js');
       const defaults1 = getDefaultSettingsSync();
@@ -125,7 +113,6 @@ describe('settings', () => {
 
       // Other values should be defaults per DEFAULT_SETTINGS
       expect(loaded.models.specialists.review_agent).toBe('claude-opus-4-6');
-      expect(loaded.models.complexity.trivial).toBe('claude-haiku-4-5');
     });
 
     it('should handle invalid JSON gracefully', async () => {
@@ -211,8 +198,8 @@ describe('settings', () => {
       const settingsPath = join(tempDir, 'settings.json');
       const userSettings = {
         models: {
-          complexity: {
-            expert: 'gpt-5.3-codex', // Override just one complexity level
+          specialists: {
+            review_agent: 'gpt-5.3-codex', // Override just one specialist
           },
         },
       };
@@ -221,16 +208,14 @@ describe('settings', () => {
       const loaded = loadSettingsSync();
 
       // User override should apply
-      expect(loaded.models.complexity.expert).toBe('gpt-5.3-codex');
+      expect(loaded.models.specialists.review_agent).toBe('gpt-5.3-codex');
 
-      // Other complexity levels should be defaults per DEFAULT_SETTINGS
-      expect(loaded.models.complexity.trivial).toBe('claude-haiku-4-5');
-      expect(loaded.models.complexity.simple).toBe('claude-haiku-4-5');
-      expect(loaded.models.complexity.medium).toBe('kimi-k2.5');
-      expect(loaded.models.complexity.complex).toBe('kimi-k2.5');
+      // Other specialists should be defaults per DEFAULT_SETTINGS
+      expect(loaded.models.specialists.test_agent).toBe('claude-sonnet-5');
+      expect(loaded.models.specialists.merge_agent).toBe('claude-sonnet-5');
 
       // Other sections should be defaults per DEFAULT_SETTINGS
-      expect(loaded.models.specialists.review_agent).toBe('claude-opus-4-6');
+      expect(loaded.models.status_review).toBe('claude-opus-4-6');
     });
   });
 
@@ -329,62 +314,12 @@ describe('settings', () => {
             review_agent: 'claude-sonnet-4-5',
             // Missing test_agent and merge_agent
           },
-          complexity: {
-            trivial: 'claude-haiku-4-5',
-            simple: 'claude-haiku-4-5',
-            medium: 'claude-sonnet-4-5',
-            complex: 'claude-sonnet-4-5',
-            expert: 'claude-opus-4-6',
-          },
         },
         api_keys: {},
       };
 
       const error = validateSettingsSync(invalidSettings);
       expect(error).toBe('Missing specialist agent model configuration');
-    });
-
-    it('should detect missing complexity configuration', async () => {
-      const { validateSettingsSync } = await import('../../src/lib/settings.js');
-
-      const invalidSettings: any = {
-        models: {
-          specialists: {
-            review_agent: 'claude-sonnet-4-5',
-            test_agent: 'claude-haiku-4-5',
-            merge_agent: 'claude-sonnet-4-5',
-          },
-          // Missing complexity
-        },
-        api_keys: {},
-      };
-
-      const error = validateSettingsSync(invalidSettings);
-      expect(error).toBe('Missing complexity configuration');
-    });
-
-    it('should detect missing complexity levels', async () => {
-      const { validateSettingsSync } = await import('../../src/lib/settings.js');
-
-      const invalidSettings: any = {
-        models: {
-          specialists: {
-            review_agent: 'claude-sonnet-4-5',
-            test_agent: 'claude-haiku-4-5',
-            merge_agent: 'claude-sonnet-4-5',
-          },
-          complexity: {
-            trivial: 'claude-haiku-4-5',
-            simple: 'claude-haiku-4-5',
-            medium: 'claude-sonnet-4-5',
-            // Missing complex and expert
-          },
-        },
-        api_keys: {},
-      };
-
-      const error = validateSettingsSync(invalidSettings);
-      expect(error).toContain('Missing complexity level:');
     });
 
     it('should detect missing api_keys configuration', async () => {
@@ -396,13 +331,6 @@ describe('settings', () => {
             review_agent: 'claude-sonnet-4-5',
             test_agent: 'claude-haiku-4-5',
             merge_agent: 'claude-sonnet-4-5',
-          },
-          complexity: {
-            trivial: 'claude-haiku-4-5',
-            simple: 'claude-haiku-4-5',
-            medium: 'claude-sonnet-4-5',
-            complex: 'claude-sonnet-4-5',
-            expert: 'claude-opus-4-6',
           },
         },
         // Missing api_keys
@@ -421,6 +349,7 @@ describe('settings', () => {
       const available = getAvailableModelsSync(settings);
 
       expect(available.anthropic).toEqual([
+        'claude-fable-5-1',
         'claude-fable-5',
         'claude-opus-5',
         'claude-opus-4-8',
@@ -453,18 +382,13 @@ describe('settings', () => {
       const available = getAvailableModelsSync(settings);
 
       expect(available.openai).toEqual([
+        'gpt-6-astra',
         'gpt-5.6-sol',
         'gpt-5.6-terra',
         'gpt-5.6-luna',
         'gpt-5.6-sol[372k]',
         'gpt-5.6-terra[372k]',
         'gpt-5.6-luna[372k]',
-        'gpt-5.5',
-        'gpt-5.4',
-        'gpt-5.4-mini',
-        'gpt-5.3-codex',
-        'gpt-5.3-codex-spark',
-        'gpt-5.2',
       ]);
     });
 
@@ -477,6 +401,8 @@ describe('settings', () => {
       const available = getAvailableModelsSync(settings);
 
       expect(available.google).toEqual([
+        'gemini-3.8-flash',
+        'gemini-3.5-flash-lite',
         'gemini-3.1-pro-preview',
         'gemini-3-flash-preview',
         'gemini-3.1-flash-lite-preview',
@@ -491,7 +417,7 @@ describe('settings', () => {
 
       const available = getAvailableModelsSync(settings);
 
-      expect(available.minimax).toEqual(['minimax-m2.7', 'minimax-m2.7-highspeed']);
+      expect(available.minimax).toEqual(['MiniMax-M3', 'minimax-m2.7', 'minimax-m2.7-highspeed']);
     });
 
     it('should return Kimi models when API key is configured', async () => {

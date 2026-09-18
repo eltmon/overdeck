@@ -35,6 +35,8 @@ export interface ReviewStatus extends StrikeLandingStatus, InspectionStatusField
   releaseNotes?: string;
   updatedAt: string;
   readyForMerge: boolean;
+  /** Terminal marker for a closed/stale PR record; cleared only by fresh work or a new PR. */
+  retiredAt?: string;
   autoMerge?: boolean;
   autoRequeueCount?: number;
   mergeRetryCount?: number;
@@ -44,6 +46,8 @@ export interface ReviewStatus extends StrikeLandingStatus, InspectionStatusField
   history?: StatusHistoryEntry[];
   blockerReasons?: BlockerReason[];
   reviewedAtCommit?: string;
+  /** PAN-3847: ISO timestamp when a passed review's anchor stopped matching HEAD; blocks readyForMerge until re-review. */
+  reviewStaleSince?: string;
   lastVerifiedCommit?: string;
   mergeStep?: string;
   stuck?: boolean;

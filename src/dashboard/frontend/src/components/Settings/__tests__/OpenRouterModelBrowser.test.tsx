@@ -134,3 +134,17 @@ describe('OpenRouterModelBrowser', () => {
     expect(container.querySelector('svg')).toBeDefined();
   });
 });
+
+
+it('keeps an unlisted favorite removable without claiming it is free', () => {
+  const onToggleFavorite = vi.fn();
+  render(<OpenRouterModelBrowser models={[{
+    id: 'stealth/union-alpha', name: 'stealth/union-alpha',
+    promptCostPer1M: null, completionCostPer1M: null, contextLength: null,
+    supportsThinking: false, category: 'other',
+  }]} favorites={['stealth/union-alpha']} onToggleFavorite={onToggleFavorite} />);
+  expect(screen.getByText('Pricing unavailable')).toBeInTheDocument();
+  expect(screen.queryByText('FREE')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByTitle('Remove from favorites'));
+  expect(onToggleFavorite).toHaveBeenCalledWith('stealth/union-alpha');
+});

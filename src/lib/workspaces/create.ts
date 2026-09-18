@@ -373,9 +373,21 @@ export async function performWorkspaceCreate(intent: ResolvedWorkspaceIntent): P
     // `--` terminates option parsing: an operator-supplied parent branch like
     // `--no-checkout` would otherwise be read by git as a flag and quietly
     // change how the worktree is made (PAN-3330 review).
-    const worktreeArgs = intent.parentBranch
-      ? ['worktree', 'add', '-b', intent.branchName, '--', intent.path, intent.parentBranch]
-      : ['worktree', 'add', '-b', intent.branchName, '--', intent.path];
+    // PAN-3847 (FR-15): the branch is cut from origin/<parent> after a fetch —
+    // a local main can be stale or ahead and silently mis-root the workspace.
+    // CWE-78 residual: validate the branch before it reaches any refspec position.
+    const parent = intent.parentBranch ?? 'main';
+    const { assertValidBranchNamePromise } = await import('../git-utils.js');
+    await assertValidBranchNamePromise(parent.replace(/^origin\//, ''), 'workspace parent branch');
+    let baseRef = parent.startsWith('origin/') ? parent : `origin/${parent}`;
+    try {
+      await execFileAsync('git', ['fetch', 'origin', parent.replace(/^origin\//, '')], { cwd: project.config.path });
+    } catch (fetchErr: unknown) {
+      const message = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+      baseRef = parent.replace(/^origin\//, '');
+      console.warn(`[workspace-create] git fetch origin ${baseRef} failed (${message}); cutting ${intent.branchName} from the LOCAL ${baseRef} ref — it may be stale or ahead of origin.`);
+    }
+    const worktreeArgs = ['worktree', 'add', '-b', intent.branchName, '--', intent.path, baseRef];
     await execFileAsync('git', worktreeArgs, { cwd: project.config.path });
   }
 

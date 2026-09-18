@@ -23,9 +23,9 @@
  * reactive scheduler review branch, and the dashboard kanban "Review again"
  * button — flows through
  * spawnReviewRoleForIssue → spawnRun(issueId, 'review'). The review role
- * launches four isolated review sub-role sessions via `pan review spawn-reviewer`,
- * then writes the report and signals the verdict via Overdeck's CLI inside
- * the role itself (see roles/review.md).
+ * runs a combined quick review or receives four server-launched specialist
+ * reports in full mode. Dispatch owns mode-specific workflow; roles/review.md
+ * supplies shared evidence, coverage, and verdict standards.
  *
  * Surface area kept:
  *   - spawnReviewRoleForIssue       — the only review entry point
@@ -69,6 +69,7 @@ import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { AGENTS_DIR, packageRoot, sessionFilePath } from '../paths.js';
 import { getAgentStateSync } from '../agents/agent-state.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import { withReviewLifecycleGuard } from '../review-lifecycle-guard.js';
 
 const execAsync = promisify(exec);
 // PAN-1531: review-temp stash helpers removed.
@@ -140,6 +141,10 @@ export function buildReviewRolePrompt(opts: {
     'poll anything. Just wait — the reviewers notify you when they finish, and',
     'Deacon is the failsafe if one never starts or never completes. Acting early',
     'wastes tokens reviewing nothing.',
+    'Operator-requested early reads may summarize one completed report, but do not',
+    'lift the all-signals gate. Failed or timed-out lanes, or missing/empty/unreadable',
+    'reports after READY, block approval. Keep waiting for the other terminal signals.',
+    'Record each lane, signal, report path, and blocker count in the synthesis.',
     '',
     'STALE-SIGNAL GUARD (PAN-3549): terminal signals from a dead prior attempt of',
     'this same branch can replay into your session when you resume — every signal',
@@ -198,12 +203,7 @@ export function buildReviewRolePrompt(opts: {
   return prompt;
 }
 
-// PAN-1981 (quick path to production): the review role agent reviews the diff
-// ITSELF — no convoy, no synthesis. `buildReviewRolePrompt` above (the synthesis
-// "stand by, wait for the convoy" prompt) is kept for when we restore the convoy
-// as an opt-in (#1982 fast-follow); for now the review agent gets this self-review
-// prompt instead. We will decide convoy-vs-self-review (and better per-harness
-// message transmission) in the fast-follow.
+// Quick review receives no convoy workflow; the shared role supplies all four checklists.
 function buildSelfReviewPrompt(opts: {
   issueId: string;
   workspace: string;
@@ -243,14 +243,15 @@ function buildSelfReviewPrompt(opts: {
         ].join('\n')
       : opts.contextManifestPath
         ? `Context manifest: ${opts.contextManifestPath}`
-        : 'Context manifest: (missing — inspect the diff directly: git diff origin/main...HEAD)',
+        : 'Context manifest: (missing — report the missing scope/requirements and block review)',
     '',
     'How to review:',
-    '1. Read the diff — use the manifest risk ranking, `git diff` the high-risk files,',
-    '   and read the surrounding code as needed.',
+    '1. Review every changed file, starting with the manifest risk ranking; trace',
+    '   actual callers, validators, defaults, and overrides as needed.',
     '2. Evaluate correctness, security, requirements/AC, and performance. Use the',
-    '   severity + verdict vocabulary in roles/review.md.',
-    `3. Write your findings to ${reviewReportPath}.`,
+    '   complete checklists, evidence classification, and verdict rules in roles/review.md.',
+    '   Finish all dimensions even after finding blockers; do a second coverage pass.',
+    `3. Write your findings, changed-file ledger, AC evidence, and check results to ${reviewReportPath}.`,
     '',
     'Then signal the verdict with the Overdeck CLI (exactly one):',
     `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>" --run-id "${opts.runId}"`,
@@ -319,8 +320,26 @@ async function spawnReviewRoleForIssuePromise(
   //
   // Force mode (human override from dashboard) kills the old session and
   // respawns so the review runs against current HEAD, not stale state.
+  if (opts.force) {
+    const stopped = await Effect.runPromise(
+      killAllReviewerSessions(undefined, opts.issueId).pipe(
+        Effect.catch(() => Effect.succeed({
+          killed: [],
+          failed: [reviewSessionName],
+        })),
+      ),
+    );
+    if (stopped.failed.length > 0) {
+      return {
+        success: false,
+        message: `Review replacement aborted — could not stop ${stopped.failed.join(', ')}`,
+        error: `Review sessions still live: ${stopped.failed.join(', ')}`,
+      };
+    }
+  }
+
   try {
-    const sessions = await Effect.runPromise(listSessionNames());
+    const sessions = opts.force ? [] : await Effect.runPromise(listSessionNames());
     if (sessions.includes(reviewSessionName)) {
       const paneDead = await Effect.runPromise(isPaneDead(reviewSessionName));
 
@@ -438,11 +457,21 @@ async function spawnReviewRoleForIssuePromise(
         : staleRunId ? 'stale runId'
         : 'finished-idle (warm reuse for new cycle)';
       console.log(`[review-agent] ${reviewSessionName} ${reason} — respawning convoy`);
-      await Effect.runPromise(
+      const stopped = await Effect.runPromise(
         killAllReviewerSessions(undefined, opts.issueId).pipe(
-          Effect.catch(() => Effect.succeed({ killed: [], failed: [] })),
+          Effect.catch(() => Effect.succeed({
+            killed: [],
+            failed: [reviewSessionName],
+          })),
         ),
       );
+      if (stopped.failed.length > 0) {
+        return {
+          success: false,
+          message: `Review replacement aborted — could not stop ${stopped.failed.join(', ')}`,
+          error: `Review sessions still live: ${stopped.failed.join(', ')}`,
+        };
+      }
     }
   } catch (err) {
     console.warn(`[review-agent] Idempotency check failed for ${opts.issueId}, proceeding:`, err);
@@ -742,7 +771,10 @@ async function killAllReviewerSessionsPromise(
     allSessions = await Effect.runPromise(listSessionNames());
   } catch (err) {
     console.warn('[review-agent] Failed to list tmux sessions during reviewer cleanup:', err instanceof Error ? err.message : String(err));
-    return { killed, failed };
+    return {
+      killed,
+      failed: [`agent-${issueId.toLowerCase()}-review`],
+    };
   }
 
   const sessionsToKill = allSessions.filter(s => isReviewSessionForIssue(s, projectKey, issueId));
@@ -824,7 +856,10 @@ export const spawnReviewRoleForIssue = (
     if (reviewDispatchCoalescer.isInFlight(key)) {
       console.log(`[review-agent] Review dispatch already in flight for ${key} — coalescing concurrent dispatch (PAN-2695)`);
     }
-    return reviewDispatchCoalescer.run(key, () => spawnReviewRoleForIssuePromise(opts));
+    return reviewDispatchCoalescer.run(
+      key,
+      () => withReviewLifecycleGuard(key, () => spawnReviewRoleForIssuePromise(opts)),
+    );
   });
 
 /**

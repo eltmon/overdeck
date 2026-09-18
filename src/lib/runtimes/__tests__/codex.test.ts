@@ -104,11 +104,37 @@ describe('initCodexHome', () => {
   beforeEach(() => { ctx = withFakeCodexHome() })
   afterEach(() => ctx.cleanup())
 
+  it.each([
+    ['gpt-6-astra', undefined, 272000, 'high'],
+    ['gpt-5.6-sol', 'low', 272000, 'low'],
+    ['gpt-5.6-terra[372k]', 'high', 372000, 'high'],
+    ['gpt-5.6-luna', 'medium', 272000, 'medium'],
+  ])('pins %s context and effort in the managed Codex home', (model, effort, window, expectedEffort) => {
+    const codexDir = join(ctx.codexHome, 'explicit-policy')
+    initCodexHome(codexDir, { model, effort })
+    const config = readFileSync(join(codexDir, 'config.toml'), 'utf8')
+    expect(config).toContain(`model_context_window = ${window}`)
+    expect(config).toContain(`model_reasoning_effort = "${expectedEffort}"`)
+  })
+
   it('creates sessions/ subdirectory', () => {
     const codexDir = join(ctx.codexHome, 'agent-init-01')
     initCodexHome(codexDir)
     const { existsSync: existsNode } = require('node:fs')
     expect(existsNode(join(codexDir, 'sessions'))).toBe(true)
+  })
+
+  it('preserves historical native instructions while opening a clean config home with the same transcripts', () => {
+    const agent = join(ctx.codexHome, 'agent-context');
+    const oldHome = join(agent, 'codex-home');
+    const newHome = join(agent, 'codex-home-v2');
+    mkdirSync(join(oldHome, 'sessions'), { recursive: true });
+    writeFileSync(join(oldHome, 'AGENTS.md'), 'Historical user or generated content');
+    writeFileSync(join(oldHome, 'sessions', 'retained.jsonl'), 'retained');
+    initCodexHome(newHome);
+    expect(existsSync(join(newHome, 'AGENTS.md'))).toBe(false);
+    expect(readFileSync(join(oldHome, 'AGENTS.md'), 'utf8')).toBe('Historical user or generated content');
+    expect(readFileSync(join(newHome, 'sessions', 'retained.jsonl'), 'utf8')).toBe('retained');
   })
 
   it('writes config.toml with flat top-level Codex keys', () => {

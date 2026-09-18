@@ -66,6 +66,10 @@ vi.mock('../../harness-binary.js', () => ({
   prepareHarnessLaunch: mocks.prepareHarnessLaunch,
 }));
 
+vi.mock('../../agents/runtime-command.js', () => ({
+  claudeSystemPromptFiles: vi.fn(async () => ['/managed/context.md']),
+}));
+
 vi.mock('../../launcher-generator.js', () => ({
   generateLauncherScriptSync: mocks.generateLauncherScriptSync,
 }));
@@ -389,7 +393,6 @@ function tieredExecutionConfig() {
       enabled: false,
       retries_at_tier: 0,
       max_promotions: 0,
-      flounder_budget_minutes: {},
     },
     replay_threshold: 0.5,
     difficultyToTier: {},

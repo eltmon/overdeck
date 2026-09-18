@@ -1,3 +1,4 @@
+import { useComposerEchoes } from './useComposerEchoes';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { toastResumeOutcome } from '../../lib/resumeOutcome';
 import { useDashboardStore } from '../../lib/store';
@@ -22,10 +23,8 @@ import { getDefaultConversationModel } from './defaultConversationModel';
 import type { ChatMessage, CompactBoundary, ContextUsage, ProposedPlan, SubagentSummary, TurnDiffSummary, WorkLogEntry } from './chat-types';
 import {
   useComposerStore,
-  useConversationOptimistic,
-  useConversationOptimisticBaseCount,
 } from '../../lib/composerStore';
-import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, type WorkingPhase } from '../../lib/workingPhase';
+import { getWorkingPhase, getPhaseLabel, getPendingToolEntry, isSpinnerPhase, isConversationWorking, type WorkingPhase } from '../../lib/workingPhase';
 import { deriveRoundMarkers } from '../../lib/deriveRoundMarkers';
 import type { ReviewerRoundMetadata } from '@overdeck/contracts';
 import { DiffPanel } from '../DiffPanel';
@@ -40,6 +39,7 @@ import { conversationMessagesQueryKey, useConversationMessagesStream } from './u
 import { SubagentRail, updateSelectedSubagent, useSubagentSelection } from './SubagentRail';
 import { SubagentTranscript } from './SubagentTranscript';
 import { ForkProgressView } from './ForkProgressView';
+import { TranscriptLoadingSkeleton } from './TranscriptLoadingSkeleton';
 import { useComposerDeliveryState } from './useComposerDeliveryState';
 import { ViewToggle } from '../shared/ViewToggle';
 import styles from '../CommandDeck/styles/command-deck.module.css';
@@ -48,8 +48,7 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
 // stalled, not working. Covers a slow compaction + response (a Claude-native
 // /compact here ran ~128s before any follow-up); finite so a prompt that was
 // eaten by submit-time compaction can't strand the spinner forever.
-const TURN_STALL_MS = 4 * 60_000;
-
+// Now lives in lib/workingPhase.ts alongside isConversationWorking (PAN-3770).
 /**
  * How long a conversation row may show "Starting…" without a live session.
  * Genuine spawns are seconds-to-a-couple-minutes; anything older with no
@@ -64,17 +63,6 @@ function isWithinSpawnWindow(createdAt: string | null | undefined, nowMs = Date.
   if (!createdAt) return false;
   const createdMs = Date.parse(createdAt);
   return Number.isFinite(createdMs) && nowMs - createdMs < SPAWN_PLACEHOLDER_MAX_AGE_MS;
-}
-
-/**
- * Whether the conversation's latest transcript entry is recent enough that the
- * agent could still be mid-turn. Empty/loading history counts as recent (startup).
- */
-function lastActivityRecent(lastMsg: ChatMessage | undefined): boolean {
-  if (!lastMsg) return true;
-  const ts = Date.parse(lastMsg.completedAt || lastMsg.createdAt || '');
-  if (Number.isNaN(ts)) return true;
-  return Date.now() - ts < TURN_STALL_MS;
 }
 
 // ─── Phase icon map ───────────────────────────────────────────────────────────
@@ -166,7 +154,12 @@ export function ConversationPanel({
   hideComposer = false,
   onSendFailed,
 }: ConversationPanelProps) {
-  const [resumed, setResumed] = useState(false);
+  // Resume-click latch: bridges the gap between a successful resume POST and
+  // the conversations poll reporting the session alive (up to one poll tick).
+  // Spent as soon as the server confirms the session — alive, or endedAt
+  // stamped because the resumed session died again — so a twice-stopped
+  // conversation gets its resume bar back instead of a read-only composer.
+  const [resumedAwaitingConfirm, setResumedAwaitingConfirm] = useState(false);
   const [sendResumeContract, setSendResumeContract] = useState(true);
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -185,7 +178,7 @@ export function ConversationPanel({
   const committingRef = useRef(false);
   const queryClient = useQueryClient();
   const messagesQueryKey = useMemo(() => conversationMessagesQueryKey(conversation.name), [conversation.name]);
-  const streamMessagesEnabled = useConversationMessagesStream(conversation);
+  const { enabled: streamMessagesEnabled, receivedFirstPayload } = useConversationMessagesStream(conversation);
   // Ref mirrors the latest streaming state so the HTTP queryFn can discard
   // responses that were already in flight when streaming became active.
   const streamActiveRef = useRef(streamMessagesEnabled);
@@ -228,6 +221,25 @@ export function ConversationPanel({
     }
   }, [messagesQueryKey, queryClient, streamMessagesEnabled]);
 
+  // The resume latch is spent once the poll confirms the resumed session came
+  // alive. Clearing on endedAt instead would let a stale pre-resume row
+  // (still carrying the previous death's endedAt) kill the bridge during the
+  // click→poll window. Without this effect, a session that stopped a second
+  // time left `showTerminal` — and with it the composer-vs-resume-bar choice
+  // — pinned until a full browser refresh.
+  useEffect(() => {
+    if (resumedAwaitingConfirm && conversation.sessionAlive) {
+      setResumedAwaitingConfirm(false);
+    }
+  }, [resumedAwaitingConfirm, conversation.sessionAlive]);
+
+  // A ConversationPanel instance can be reused for a different conversation
+  // (drawer / flywheel embeds switch the row in place) — never carry a resume
+  // latch across conversations.
+  useEffect(() => {
+    setResumedAwaitingConfirm(false);
+  }, [conversation.name]);
+
   // Query messages at this level so we can drive the header working-spinner.
   // Live claude-code conversations are pushed through useConversationMessagesStream;
   // keep the existing polling path for non-claude harnesses and historical views.
@@ -256,23 +268,19 @@ export function ConversationPanel({
   const { selectedAgentId: selectedSubagentId, selectedSubagent, clearSelection: clearSubagent } = useSubagentSelection(subagents);
   const headerMessages = messagesData?.messages ?? [];
   const headerWorkLog = messagesData?.workLog ?? [];
-  const headerLastMsg = headerMessages[headerMessages.length - 1];
   const canSwitchConversationModel =
     !agentId &&
     !conversation.sessionAlive &&
     !conversation.claudeSessionId &&
     headerMessages.length === 0;
-  // Spin unless truly idle: idle = last message is a completed assistant turn (completedAt set).
-  // Empty history, last-user, and in-progress assistant (no completedAt) all mean still working.
-  // PAN-1635: a trailing user/incomplete-assistant entry only implies "working" while it's
-  // recent — otherwise a prompt eaten by submit-time compaction spins the header forever.
-  const isWorking = conversation.sessionAlive && (
-    messagesData == null ||
-    headerMessages.length === 0 ||
-    (lastActivityRecent(headerLastMsg) && (
-      headerLastMsg?.role === 'user' ||
-      (headerLastMsg?.role === 'assistant' && !headerLastMsg.completedAt)
-    ))
+  // Spin unless truly idle. Message shape (trailing user / incomplete
+  // assistant) plus, for harnesses that append complete messages mid-turn
+  // (Codex narrates before tool runs), recent work-log activity newer than
+  // the last message. PAN-3770; recency guards per PAN-1635.
+  const isWorking = isConversationWorking(
+    conversation.sessionAlive,
+    messagesData == null ? [] : headerMessages,
+    headerWorkLog,
   );
   const workingPhase = isWorking ? getWorkingPhase(headerMessages, headerWorkLog) : 'thinking';
   const pendingEntry = isWorking ? getPendingToolEntry(headerWorkLog) : undefined;
@@ -394,9 +402,11 @@ export function ConversationPanel({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey(conversation.name) });
-      // PAN-2975: the resume bar reports the actual outcome too.
+      // PAN-2975: the resume bar reports the actual outcome too. The latch is
+      // only a bridge until the poll confirms the session — see the
+      // resumedAwaitingConfirm clear effect below.
       toastResumeOutcome(conversation.name);
-      setResumed(true);
+      setResumedAwaitingConfirm(true);
     },
   });
 
@@ -407,13 +417,22 @@ export function ConversationPanel({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model, harness }),
-      }).then(r => { if (!r.ok) throw new Error('Failed to switch model'); return r.json(); });
+      }).then(async r => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => null) as { error?: string } | null;
+          throw new Error(body?.error || `Failed to switch model (${r.status})`);
+        }
+        return r.json();
+      });
     },
     onSuccess: (_, { model, harness }) => {
       saveStoredModel(model);
       saveStoredHarness(harness);
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       queryClient.invalidateQueries({ queryKey: conversationMessagesQueryKey(conversation.name) });
+    },
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 6000 });
     },
   });
 
@@ -617,7 +636,7 @@ export function ConversationPanel({
     }
   }, [conversation.handoffTargetConvId]);
 
-  const showTerminal = conversation.sessionAlive || resumed;
+  const showTerminal = conversation.sessionAlive || resumedAwaitingConfirm;
   // Diff deep-links are transcript-oriented. If this pane was previously left in
   // terminal mode, do not mount xterm beside the diff; that opens/reopens the PTY
   // and looks like a reconnect loop when the user only asked to inspect a diff.
@@ -1034,6 +1053,7 @@ export function ConversationPanel({
               workingPhase={isWorking ? workingPhase : undefined}
               agentBusy={isWorking}
               streamMessagesEnabled={streamMessagesEnabled}
+              receivedFirstPayload={receivedFirstPayload}
               messagesData={messagesData}
               messagesLoading={messagesLoading}
               onOpenTerminal={showTerminal ? () => handleViewMode('terminal') : undefined}
@@ -1160,6 +1180,8 @@ interface ConversationViewProps {
   agentBusy?: boolean;
   /** True when the shared conversation-messages cache is fed by the WS stream. */
   streamMessagesEnabled?: boolean;
+  /** True after the current conversation's WS subscription emits its first event. */
+  receivedFirstPayload?: boolean;
   messagesData?: MessagesResponse;
   /** PAN-3113 — switch the panel to terminal mode (pane choice card). */
   onOpenTerminal?: () => void;
@@ -1172,16 +1194,12 @@ interface ConversationViewProps {
 
 export type { FailedMessage } from './chat-types';
 
-function ConversationView({ conversation, onResume, onArchive, resumePending, resumeLabel, sendResumeContract, onSendResumeContractChange, hideComposer = false, onSendFailed: onSendFailedProp, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, agentBusy = false, streamMessagesEnabled, messagesData, messagesLoading, onOpenTerminal, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
+function ConversationView({ conversation, onResume, onArchive, resumePending, resumeLabel, sendResumeContract, onSendResumeContractChange, hideComposer = false, onSendFailed: onSendFailedProp, modelPicker, roundMarkers, roundMetadata, turnDiffSummaryByAssistantMessageId, onOpenTurnDiff, resolvedTheme, agentId, hideToolCalls, workingPhase, agentBusy = false, streamMessagesEnabled = false, receivedFirstPayload = false, messagesData, messagesLoading, onOpenTerminal, targetMessageId, targetMessageIndex, targetMessageNonce, onTargetMessageHandled }: ConversationViewProps) {
   const isCompacting = useDashboardStore((s) => s.conversationsCompactingByName?.[conversation.name] ?? false);
   // Keep optimistic messages and failed-send retries in the conversation-keyed
   // composer store so switching panes cannot discard them (PAN-1591).
-  const optimisticMessages = useConversationOptimistic(conversation.name);
-  const optimisticBaseCount = useConversationOptimisticBaseCount(conversation.name);
   const addOptimistic = useComposerStore((s) => s.addOptimistic);
   const acknowledgeOptimistic = useComposerStore((s) => s.acknowledgeOptimistic);
-  const clearOptimistic = useComposerStore((s) => s.clearOptimistic);
-  const failSend = useComposerStore((s) => s.failSend);
   const queryClient = useQueryClient();
 
   // When forkStatus transitions from non-null to null (fork completed),
@@ -1217,6 +1235,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
     conversation,
     agentId,
     serverBaseCount: serverMessages.length,
+    serverMessageIds: serverMessages.map((message) => message.id),
     onSendFailed: onSendFailedProp,
   });
   // PAN-1523: ContextWindowMeter lives in the composer toolbar (matches
@@ -1227,66 +1246,27 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
     data?.contextUsage ?? conversation.contextUsage ?? null,
   );
 
-  // Reconcile optimistic messages against what the server has actually echoed.
-  // Count only USER turns added since the send baseline — an optimistic bubble is
-  // "absorbed" when its real user message comes back, NOT merely when the total
-  // message count grows. Counting all messages let a concurrent assistant turn
-  // prematurely clear the "Sending…" bubble before the user's own message echoed,
-  // so it sometimes disappeared entirely until the next poll (PAN-1591).
-  const echoedUserCount = serverMessages
-    .slice(optimisticBaseCount)
-    .filter((m) => m.role === 'user').length;
-  const absorbedCount = Math.min(optimisticMessages.length, echoedUserCount);
-  const visibleOptimistic = optimisticMessages.slice(absorbedCount);
-  const serverCaughtUp = optimisticMessages.length > 0 && visibleOptimistic.length === 0;
+  const visibleOptimistic = useComposerEchoes(conversation.name, serverMessages);
   const messages = [...serverMessages, ...visibleOptimistic, ...commandResults];
 
-  const handleMessageSent = useCallback((text: string) => {
-    addOptimistic(conversation.name, text, serverMessages.length);
-  }, [addOptimistic, conversation.name, serverMessages.length]);
-
-  const handleMessageAcknowledged = useCallback((text: string) => {
-    if (conversation.harness !== 'ohmypi' && conversation.harness !== 'pi') return;
-    acknowledgeOptimistic(conversation.name, text);
-  }, [acknowledgeOptimistic, conversation.harness, conversation.name]);
-
-  // Failed messages are NOT cleared on conversation switch — they persist in the
-  // store keyed per-conversation so the retry outbox survives navigating away
-  // and back (the whole point of moving them out of component-local state).
-
-  // Clean up optimistic messages once the server catches up.
-  useEffect(() => {
-    if (serverCaughtUp) clearOptimistic(conversation.name);
-  }, [serverCaughtUp, clearOptimistic, conversation.name]);
-
-  // PAN-1635: a sent message can be silently eaten when Claude Code compacts on
-  // submit (the paste+Enter races the compaction state-transition) — the prompt
-  // is dropped and never echoes, leaving the optimistic bubble "Sending…" forever.
-  // Detect it: a compact boundary that appeared at/after the send means the prompt
-  // was eaten (surface fast); otherwise fall back to a plain stall timeout. Either
-  // way, move it to the retry outbox so the user can re-send instead of waiting on
-  // a response that will never come.
-  useEffect(() => {
-    if (visibleOptimistic.length === 0) return;
-    const oldest = visibleOptimistic[0];
-    const sentTs = Date.parse(oldest.createdAt || '');
-    if (Number.isNaN(sentTs)) return;
-    const eatenByCompaction = (data?.compactBoundaries ?? []).some((b) => {
-      const bt = Date.parse(b.timestamp);
-      return !Number.isNaN(bt) && bt >= sentTs;
+  const handleMessageSent = useCallback((text: string, clientMessageId?: string) => {
+    addOptimistic(conversation.name, text, serverMessages.length, {
+      clientMessageId, echoBaselineIds: serverMessages.map((message) => message.id),
     });
-    const deadline = sentTs + (eatenByCompaction ? 20_000 : TURN_STALL_MS);
-    const timer = setTimeout(
-      () => failSend(conversation.name, oldest.text),
-      Math.max(0, deadline - Date.now()),
-    );
-    return () => clearTimeout(timer);
-  }, [visibleOptimistic, data?.compactBoundaries, failSend, conversation.name]);
+  }, [addOptimistic, conversation.name, serverMessages]);
+
+  const handleMessageAcknowledged = useCallback((text: string, clientMessageId?: string) => {
+    acknowledgeOptimistic(conversation.name, text, clientMessageId);
+  }, [acknowledgeOptimistic, conversation.name]);
 
   const isForkInProgress = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
   const isForkFailed = conversation.forkStatus === 'failed';
   const isForking = isForkInProgress || isForkFailed;
   const isSpawnFailed = !!conversation.spawnError;
+  // PAN-3744: before this subscription emits, the transcript is loading rather
+  // than empty. Keep this signal hook-local because query-cache entries survive
+  // conversation switches and could flash a stale empty state.
+  const awaitingFirstPayload = streamMessagesEnabled && !receivedFirstPayload && messages.length === 0;
   const isDiscovering = streamMessagesEnabled && data?.discovering === true && messages.length === 0;
   // Zero chat messages ≠ zero activity for agent sessions (PAN-3544). Since
   // the CLIProxy 7.2 upgrade (2026-08-03) GPT-harness sessions emit only
@@ -1305,31 +1285,27 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   // content parsed, the row is interrupted, not starting.
   const isSpawning = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed && !isForking
     && isWithinSpawnWindow(conversation.createdAt) && !hasTimelineActivity;
-  const isFirstMessage = !isLoading && !isDiscovering && !hasTimelineActivity && conversation.sessionAlive;
+  const isFirstMessage = !isLoading && !isDiscovering && !awaitingFirstPayload && !hasTimelineActivity && conversation.sessionAlive;
   // A failed /messages fetch leaves `data` undefined — that is NOT the same as a
   // successful empty response. Rendering it as "no saved history" (the old
   // behavior) falsely tells the user their history is gone, e.g. during a
   // server-restart window (2026-07-05 incident). Ended conversations have no
   // refetchInterval, so without a retry surface the error state would persist.
   const messagesFetchFailed =
-    !isLoading && !isDiscovering && !streamMessagesEnabled && data == null &&
+    !isLoading && !isDiscovering && !awaitingFirstPayload && !streamMessagesEnabled && data == null &&
     !isSpawning && !isSpawnFailed && !isForking;
-  const isOrphaned = !isLoading && !isDiscovering && data != null && !hasTimelineActivity && !conversation.sessionAlive && !isSpawnFailed && !isSpawning;
+  const isOrphaned = !isLoading && !isDiscovering && !awaitingFirstPayload && data != null && !hasTimelineActivity && !conversation.sessionAlive && !isSpawnFailed && !isSpawning;
 
   // Spin unless truly idle: idle = last message is a completed assistant turn (completedAt set).
   // Note: `completedAt` is reliably set server-side for all terminal stop reasons via
   // `entry.timestamp || new Date().toISOString()`, so `!lastMsg.completedAt` is safe.
-  const lastMsg = messages[messages.length - 1];
-  // PAN-1635: an in-progress compaction keeps us working; otherwise a trailing
-  // user/incomplete-assistant entry only implies "working" while it's recent, so a
-  // prompt eaten by Claude's submit-time compaction can't spin the panel forever.
-  const isWorking = conversation.sessionAlive && (
-    isCompacting ||
-    messages.length === 0 ||
-    (lastActivityRecent(lastMsg) && (
-      lastMsg?.role === 'user' ||
-      (lastMsg?.role === 'assistant' && !lastMsg.completedAt)
-    ))
+  // PAN-1635: an in-progress compaction keeps us working; otherwise the shared
+  // helper applies message shape plus the Codex-style work-log gap signal
+  // (recent tool activity newer than the last completed message, PAN-3770).
+  const isWorking = isCompacting || isConversationWorking(
+    conversation.sessionAlive,
+    messages,
+    workLog,
   );
 
   const parentTitle = conversation.title?.replace(/^Summary Fork:\s*/, '') || undefined;
@@ -1342,10 +1318,8 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
 
   return (
     <div className={styles.conversationView}>
-      {isLoading || isDiscovering ? (
-        <div className={styles.conversationConnecting}>
-          <span>{isDiscovering ? 'Discovering conversation…' : 'Loading…'}</span>
-        </div>
+      {isLoading || isDiscovering || awaitingFirstPayload ? (
+        <TranscriptLoadingSkeleton discovering={isDiscovering} />
       ) : data?.error ? (
         <div className={styles.conversationEmptyState}>
           <p className={styles.conversationEmptyStateTitle} style={{ color: 'var(--warning)' }}>

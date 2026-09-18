@@ -8,7 +8,7 @@ import { getOpenAIAuthStatus } from '../openai-auth.js';
 import { ensureOpenAICompatibleProxyRunning } from '../openai-compatible-proxy.js';
 import { validateProviderHealth } from '../provider-health.js';
 import { getProviderEnvSync, getProviderForModelSync } from '../providers.js';
-import { CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, GPT56_LONG_CONTEXT_VARIANTS, hasModelCapabilitySync, getModelCapabilitySync, resolveModelIdSync } from '../model-capabilities.js';
+import { CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, GPT56_LONG_CONTEXT_VARIANTS, OPENROUTER_MODEL_CONTEXT_WINDOWS, hasModelCapabilitySync, getModelCapabilitySync, resolveModelIdSync } from '../model-capabilities.js';
 import type { Role } from './agent-state.js';
 import type { RuntimeName } from '../runtimes/types.js';
 
@@ -27,6 +27,8 @@ export const CLI_PROXY_MODEL_ALIASES: Record<string, string> = {
 export async function getProviderEnvForModel(model: string, harness?: RuntimeName): Promise<Record<string, string>> {
   const provider = getProviderForModelSync(model);
   if (provider.name === 'anthropic') return {};
+  // Muse owns login/API credentials; keep them out of Claude's environment.
+  if (provider.name === 'meta' && harness === 'muse') return {};
 
   // PAN-1837 review fix: native kimi-code auth is host-owned via `kimi login`
   // (~/.kimi-code/config.toml) — it does not need config.apiKeys.kimi at all.
@@ -128,9 +130,11 @@ const PROVIDER_ENV_KEYS = [
 // window 2.5x smaller than the one the harness was actually given.
 // PAN-3388: bare ids pin to the 272K billing tier; [372k] variants opt into
 // the long window at 2x-input/1.5x-output quota burn past 272K.
-const GPT_56_MODELS = new Set(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']);
+// gpt-6-astra shares the 272K billing tier and the 872K raw ceiling with the
+// GPT-5.6 family (Codex catalog, 2026-09-07), so it takes the same pin. The
+// set name is kept for continuity with PAN-3057/PAN-3388.
+const GPT_56_MODELS = new Set(['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']);
 const GPT_56_LONG_MODELS = new Set(Object.keys(GPT56_LONG_CONTEXT_VARIANTS));
-const KIMI_K3_MODELS = new Set(['k3', 'k3[1m]']);
 
 interface ClaudeCodeContextPolicy {
   autoCompactWindow?: number;
@@ -139,9 +143,28 @@ interface ClaudeCodeContextPolicy {
 
 export function getClaudeCodeContextPolicyForModel(model: string): ClaudeCodeContextPolicy {
   const provider = getProviderForModelSync(model);
-  if (provider.name === 'anthropic') return {};
+  if (provider.name === 'anthropic') {
+    return hasModelCapabilitySync(model)
+      ? { autoCompactWindow: getModelCapabilitySync(resolveModelIdSync(model)).contextWindow }
+      : {};
+  }
+
 
   const resolvedModel = resolveModelIdSync(model);
+  // OpenRouter models are unknown to Claude Code, which assumes a 200K window
+  // for unrecognized ids. Pin both vars (K3 precedent — only
+  // CLAUDE_CODE_MAX_CONTEXT_TOKENS is verified to lift the 200K assumption;
+  // CLAUDE_CODE_AUTO_COMPACT_WINDOW keeps the PAN-2441 compaction pin aligned).
+  if (provider.name === 'openrouter') {
+    const openrouterWindow = OPENROUTER_MODEL_CONTEXT_WINDOWS[resolvedModel];
+    if (openrouterWindow !== undefined) {
+      return {
+        autoCompactWindow: openrouterWindow,
+        maxContextTokens: openrouterWindow,
+      };
+    }
+    return {};
+  }
   if (GPT_56_LONG_MODELS.has(resolvedModel)) {
     return {
       autoCompactWindow: CLIPROXY_GPT56_LONG_CONTEXT_WINDOW,
@@ -157,13 +180,9 @@ export function getClaudeCodeContextPolicyForModel(model: string): ClaudeCodeCon
   if (!hasModelCapabilitySync(resolvedModel)) return {};
 
   const contextWindow = getModelCapabilitySync(resolvedModel).contextWindow;
-  if (KIMI_K3_MODELS.has(resolvedModel)) {
-    return {
-      autoCompactWindow: contextWindow,
-      maxContextTokens: contextWindow,
-    };
-  }
-  return { autoCompactWindow: contextWindow };
+  // Unknown-to-Claude model IDs otherwise keep its smaller native budget.
+  // Both ceilings must describe the same context shown in Overdeck's picker.
+  return { autoCompactWindow: contextWindow, maxContextTokens: contextWindow };
 }
 
 export async function getProviderExportsForModel(model: string, harness?: RuntimeName): Promise<string> {

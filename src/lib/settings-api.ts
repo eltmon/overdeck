@@ -4,6 +4,7 @@
  * Provides API-compatible interface for settings management.
  * Converts between YAML config format and frontend API format.
  */
+export { getAvailableModelsApi } from './settings-model-catalog.js';
 import { readFile, writeFile } from 'fs/promises';
 import { parseDocument } from 'yaml';
 import { Data, Effect } from 'effect';
@@ -136,6 +137,9 @@ export interface ApiSettingsConfig {
       openrouter: boolean;
       nous: boolean;
       dashscope: boolean;
+      opencode?: boolean;
+      "opencode-go"?: boolean;
+      meta?: boolean;
     };
     /** Legacy model-route overrides are no longer surfaced by GET /api/settings. */
     overrides?: Partial<Record<string, ModelId>>;
@@ -150,6 +154,8 @@ export interface ApiSettingsConfig {
     manual_compact_mode?: 'claude-code' | 'overdeck-native';
     rich_compaction?: boolean;
     title_model?: ModelId;
+    /** Model used to author external handoff docs (`pan handoff`) when no per-call model is given (PAN-3869/3884). */
+    handoff_author_model?: ModelId;
     watch_dirs?: string[];
     scan_max_parallel?: number | null;
     embeddings?: boolean;
@@ -293,26 +299,9 @@ export function getDefaultConversationModelApi(): ModelId | undefined {
 }
 
 const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer', 'knowledge'];
-type AvailableModel = {
-  id: ModelId;
-  name: string;
-  costPer1MTokens: number;
-  /**
-   * Kimi-only: which harness family this id launches under. `claude-code` ids
-   * are the Anthropic-compatible route; `kimi-code/*` ids belong to the native
-   * CLI's catalog (also used by the ACP transport). Conversation pickers use
-   * this to render harness-labeled rows and to send the row's harness at
-   * spawn; config panels can ignore it.
-   */
-  harness?: RuntimeName;
-  /** Effort levels the row's harness actually offers (Kimi rows only today). */
-  effortLevels?: readonly string[];
-  /** Display name without any harness suffix — pickers compose row labels from it. */
-  baseName?: string;
-};
-type AvailableModelsApi = Record<'anthropic' | 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous' | 'dashscope', AvailableModel[]>;
+
 const WORKHORSE_SLOTS: readonly WorkhorseSlot[] = ['expensive', 'mid', 'cheap'];
-const MODEL_PROVIDERS = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kimi', 'mimo', 'openrouter', 'nous', 'dashscope'] as const;
+const MODEL_PROVIDERS = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kimi', 'mimo', 'openrouter', 'nous', 'dashscope', 'meta', 'opencode', 'opencode-go'] as const;
 type ApiModelProvider = typeof MODEL_PROVIDERS[number];
 type ProviderHarnessesConfig = Partial<Record<ApiModelProvider, RuntimeName | ''>>;
 type BuiltInProviderHarnessesConfig = Record<ApiModelProvider, RuntimeName>;
@@ -380,6 +369,29 @@ function pruneUndefined<T>(value: T): T {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Merge-preserving block write (PAN-3884).
+ *
+ * The settings API only models a whitelist of keys per block, so a wholesale
+ * `doc.setIn([block], payload)` silently drops any key it doesn't know about —
+ * `conversations.handoff_author_model` before it joined the model, or any
+ * hand-added future key. Write per-key instead: known fields still win,
+ * unknown keys (and their comments) survive untouched. Shallow on purpose —
+ * nested entries (e.g. a single provider's object) are replaced wholesale so
+ * a cleared override actually clears. Matches the existing per-key precedent
+ * for `tts` and `agents.rtk`/`agents.tldr` below.
+ */
+function setBlockMergePreserving(doc: ReturnType<typeof parseDocument>, path: string[], value: Record<string, unknown>): void {
+  const existing = doc.getIn(path);
+  if (existing !== undefined && !isRecord(existing)) {
+    doc.setIn(path, value);
+    return;
+  }
+  for (const [key, entry] of Object.entries(value)) {
+    doc.setIn([...path, key], entry);
+  }
 }
 
 function isWorkhorseRef(ref: string): boolean {
@@ -501,15 +513,15 @@ function validateModelRef(
   }
 
   const resolved = resolveModelIdSync(ref);
-  if (!hasModelCapabilitySync(resolved)) {
+  if (!/^opencode(?:-go)?\/[^\s/]+$/.test(resolved) && !hasModelCapabilitySync(resolved)) {
     errors.push(`Invalid model reference "${ref}" at ${fieldPath}`);
   }
 }
 
 function validateRoleFields(fieldPath: string, roleConfig: Record<string, unknown>, errors: string[]): void {
   const harness = roleConfig.harness;
-  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code') {
-    errors.push(`${fieldPath}.harness must be claude-code, ohmypi, codex, acp, kimi-code, null, or empty string`);
+  if (harness !== undefined && harness !== null && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse') {
+    errors.push(`${fieldPath}.harness must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, null, or empty string`);
   }
 
   const effort = roleConfig.effort;
@@ -591,7 +603,7 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
               const resolvedModel = resolveModelRefToId(entry.model, effectiveWorkhorses);
               if (resolvedModel) {
                 const supported = getModelEffortLevelsSync(resolvedModel);
-                if (supported !== undefined && !supported.includes(effort as RoleEffort)) {
+                if (supported !== undefined && supported.length > 0 && !supported.includes(effort as RoleEffort)) {
                   errors.push(
                     `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
                   );
@@ -602,7 +614,7 @@ function validateWorkhorsesAndRoles(settings: ApiSettingsConfig, errors: string[
             const resolvedModel = resolveModelRefToId(modelRef, effectiveWorkhorses);
             if (resolvedModel) {
               const supported = getModelEffortLevelsSync(resolvedModel);
-              if (supported !== undefined && !supported.includes(effort as RoleEffort)) {
+              if (supported !== undefined && supported.length > 0 && !supported.includes(effort as RoleEffort)) {
                 errors.push(
                   `roles.${role}.effort '${effort}' is not supported by ${resolvedModel} (supported: ${supported.join(', ')})`,
                 );
@@ -671,6 +683,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
     manual_compact_mode: config.conversations?.manualCompactMode,
     rich_compaction: config.conversations?.richCompaction,
     title_model: config.conversations?.titleModel,
+    handoff_author_model: config.conversations?.handoffAuthorModel,
     watch_dirs: config.conversations?.watchDirs,
     scan_max_parallel: config.conversations?.scanMaxParallel,
     embeddings: config.conversations?.embeddings,
@@ -709,6 +722,9 @@ export function loadSettingsApi(): ApiSettingsConfig {
         openrouter: config.enabledProviders.has('openrouter'),
         nous: config.enabledProviders.has('nous'),
         dashscope: config.enabledProviders.has('dashscope'),
+        opencode: config.enabledProviders.has('opencode'),
+        'opencode-go': config.enabledProviders.has('opencode-go'),
+        meta: config.enabledProviders.has('meta'),
       },
       provider_harnesses: config.providerHarnesses,
       provider_default_harnesses: builtInProviderHarnesses(),
@@ -806,10 +822,18 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     doc.contents = parseDocument('{}\n').contents;
   }
   const config = pruneUndefined(yamlConfig);
-  doc.setIn(['swarm'], config.swarm ?? { mode: 'off', maxSlots: 3, autoAdvance: true });
+  if (config.swarm !== undefined) {
+    setBlockMergePreserving(doc, ['swarm'], config.swarm as Record<string, unknown>);
+  } else {
+    setBlockMergePreserving(doc, ['swarm'], { mode: 'off', maxSlots: 3, autoAdvance: true });
+  }
   doc.setIn(['workhorses'], config.workhorses ?? {});
   doc.setIn(['roles'], config.roles ?? {});
-  doc.setIn(['models', 'providers'], config.models?.providers ?? {});
+  if (isRecord(config.models?.providers)) {
+    setBlockMergePreserving(doc, ['models', 'providers'], config.models.providers as Record<string, unknown>);
+  } else {
+    doc.setIn(['models', 'providers'], config.models?.providers ?? {});
+  }
   doc.deleteIn(['models', 'overrides']);
 
   if (config.models?.gemini_thinking_level !== undefined) {
@@ -844,6 +868,8 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
   for (const [key, value] of topLevelSections) {
     if (value === undefined) {
       doc.deleteIn([key]);
+    } else if (isRecord(value)) {
+      setBlockMergePreserving(doc, [key], value as Record<string, unknown>);
     } else {
       doc.setIn([key], value);
     }
@@ -864,7 +890,11 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
   }
 
   if (config.remote !== undefined) {
-    doc.setIn(['remote'], config.remote);
+    if (isRecord(config.remote)) {
+      setBlockMergePreserving(doc, ['remote'], config.remote as Record<string, unknown>);
+    } else {
+      doc.setIn(['remote'], config.remote);
+    }
   } else {
     doc.deleteIn(['remote']);
   }
@@ -949,6 +979,9 @@ async function saveSettingsApiPromiseUnlocked(
         openrouter: providerConfigForSave('openrouter', settings.models.providers.openrouter, settings, currentConfig),
         nous: providerConfigForSave('nous', settings.models.providers.nous, settings, currentConfig),
         dashscope: providerConfigForSave('dashscope', settings.models.providers.dashscope, settings, currentConfig),
+        opencode: providerConfigForSave('opencode', settings.models.providers.opencode ?? false, settings, currentConfig),
+        'opencode-go': providerConfigForSave('opencode-go', settings.models.providers['opencode-go'] ?? false, settings, currentConfig),
+        meta: providerConfigForSave('meta', settings.models.providers.meta ?? false, settings, currentConfig),
       },
       gemini_thinking_level: settings.models.gemini_thinking_level as 1 | 2 | 3 | 4,
       default_conversation_model: settings.models.default_conversation_model,
@@ -1217,8 +1250,8 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
           errors.push(`Unknown provider harness entry "${provider}"`);
           continue;
         }
-        if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code') {
-          errors.push(`models.provider_harnesses.${provider} must be claude-code, ohmypi, codex, acp, kimi-code, or empty string`);
+        if (harness !== undefined && harness !== '' && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse') {
+          errors.push(`models.provider_harnesses.${provider} must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, or empty string`);
         }
       }
     }
@@ -1376,113 +1409,6 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
 }
 
 /**
- * Get available models by provider (for model selection UI)
- */
-/**
- * Annotate Kimi entries with the harness their id space belongs to and the
- * effort levels that route actually offers (ground truth:
- * MODEL_CAPABILITIES.effortLevels — the native `kimi` binary's /effort offers
- * low/high/max for kimi-code/* ids; claude-code's /effort offers all five for
- * the bare Anthropic-route ids). `kimi-code/*` ids only launch via the native
- * CLI (kimi-code harness or ACP transport), so the picker-facing `name`
- * carries the "— Kimi Code CLI" marker wherever the row is shown without
- * harness context; bare ids are the claude-code route. Keeps flat config
- * panels honest (two "Kimi K3 (1M)" rows with different validity would be a
- * trap) while conversation pickers compose their own per-row labels from
- * baseName.
- */
-function annotateKimiAvailableModel(modelId: string, entry: AvailableModel, effortLevels: readonly string[] | undefined): AvailableModel {
-  if (modelId.startsWith('kimi-code/')) {
-    return {
-      ...entry,
-      name: `${entry.name} — Kimi Code CLI`,
-      baseName: entry.name,
-      harness: 'kimi-code',
-      effortLevels,
-    };
-  }
-  return {
-    ...entry,
-    baseName: entry.name,
-    harness: 'claude-code',
-    effortLevels,
-  };
-}
-
-export function getAvailableModelsApi(): AvailableModelsApi {
-  const result: AvailableModelsApi = {
-    anthropic: [],
-    openai: [],
-    google: [],
-    minimax: [],
-    zai: [],
-    kimi: [],
-    mimo: [],
-    openrouter: [],
-    nous: [],
-    dashscope: [],
-  };
-
-  for (const [modelId, capability] of Object.entries(MODEL_CAPABILITIES)) {
-    // Skip deprecated models — they should not appear in user-facing pickers.
-    // MODEL_DEPRECATIONS is the single source of truth for "this model has
-    // been retired and remapped to a current one"; capability entries are kept
-    // for back-compat (cost/capability lookups for old configs and historical
-    // conversations), but they must not surface in dropdowns.
-    if (capability.displayName.includes('(deprecated)')) continue;
-    if (modelId in MODEL_DEPRECATIONS) continue;
-    const entry = { id: modelId as ModelId, name: capability.displayName, costPer1MTokens: capability.costPer1MTokens };
-    const annotated = capability.provider === 'kimi' ? annotateKimiAvailableModel(modelId, entry, capability.effortLevels) : entry;
-    switch (capability.provider) {
-      case 'anthropic':
-        result.anthropic.push(annotated);
-        break;
-      case 'openai':
-        result.openai.push(annotated);
-        break;
-      case 'google':
-        result.google.push(annotated);
-        break;
-      case 'kimi':
-        result.kimi.push(annotated);
-        break;
-      case 'minimax':
-        result.minimax.push(annotated);
-        break;
-      case 'zai':
-        result.zai.push(annotated);
-        break;
-      case 'mimo':
-        result.mimo.push(annotated);
-        break;
-      case 'openrouter':
-        result.openrouter.push(annotated);
-        break;
-      case 'nous':
-        result.nous.push(annotated);
-        break;
-      case 'dashscope':
-        result.dashscope.push(annotated);
-        break;
-    }
-  }
-
-  // Order OpenAI models with latest family first: 5.6-sol (current default) → 5.6-terra → 5.6-luna → 5.5 → 5.4 → 5.3-codex → 5.2 → o-series → gpt-4o legacy.
-  const openaiOrder: Record<string, number> = {
-    'gpt-5.6-sol': 0, 'gpt-5.6-terra': 1, 'gpt-5.6-luna': 2,
-    'gpt-5.5': 10, 'gpt-5.5-pro': 11,
-    'gpt-5.4': 20, 'gpt-5.4-pro': 21, 'gpt-5.4-mini': 22,
-    'gpt-5.3-codex': 30,
-    'gpt-5.2': 40,
-    'o3': 50, 'o4-mini': 51,
-    'gpt-4o': 60, 'gpt-4o-mini': 61,
-  };
-  result.openai.sort((a, b) => (openaiOrder[a.id] ?? 99) - (openaiOrder[b.id] ?? 99));
-
-  return result;
-}
-
-/**
  * Get optimal default settings (for "Restore optimal defaults" feature)
  */
 export function getOptimalDefaultsApi(): ApiSettingsConfig {
@@ -1501,6 +1427,7 @@ export function getOptimalDefaultsApi(): ApiSettingsConfig {
         openrouter: false,
         nous: false,
         dashscope: false,
+        meta: false,
       },
       gemini_thinking_level: 3,
     },
@@ -1532,6 +1459,7 @@ export function getMiniMaxDefaultsApi(): ApiSettingsConfig {
         openrouter: false,
         nous: false,
         dashscope: false,
+        meta: false,
       },
       gemini_thinking_level: 3,
     },

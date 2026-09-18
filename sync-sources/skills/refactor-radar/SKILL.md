@@ -91,10 +91,10 @@ fi
 
 ### Step 0.5: Check User Preferences for Category Exclusions
 
-Check `~/.claude/CLAUDE.md` for excluded categories:
+Check `~/.overdeck/context/global.md` for excluded categories:
 
 ```bash
-grep -A 20 "## AI Suggestion Preferences" ~/.claude/CLAUDE.md 2>/dev/null
+grep -A 20 "## AI Suggestion Preferences" ~/.overdeck/context/global.md 2>/dev/null
 ```
 
 Look for sections like:
@@ -165,7 +165,7 @@ I've noticed a systemic issue that's causing confusion:
 | **Yes, create issue** | I'll draft a detailed refactoring proposal as a GitHub/Linear issue |
 | **Yes, but just notes** | I'll add notes to project documentation instead |
 | **Not now** | Skip this time (I'll ask less often) |
-| **Skip this category** | Never suggest {CATEGORY} refactors (updates your ~/.claude/CLAUDE.md) |
+| **Skip this category** | Never suggest {CATEGORY} refactors (updates your ~/.overdeck/context/global.md) |
 | **Not important** | Don't track this issue (I may notice similar issues later) |
 | **Too frequent** | Switch to minimal mode |
 | **Stop asking** | Silent mode - log but don't prompt |
@@ -206,8 +206,8 @@ Create issue with template:
 ```
 
 **"Skip this category":**
-1. Update `~/.claude/CLAUDE.md` to add category to skip list
-2. Acknowledge: "Got it - I won't suggest {CATEGORY} refactors anymore. You can edit ~/.claude/CLAUDE.md to change this."
+1. Update `~/.overdeck/context/global.md` to add category to skip list
+2. Acknowledge: "Got it - I won't suggest {CATEGORY} refactors anymore. You can edit ~/.overdeck/context/global.md to change this."
 
 **"Shut up forever":**
 Create override skill to permanently disable:
@@ -241,9 +241,9 @@ cat > .overdeck/refactor-radar.json << 'EOF'
 EOF
 ```
 
-## User Preferences in ~/.claude/CLAUDE.md
+## User Preferences in ~/.overdeck/context/global.md
 
-Users can exclude specific categories globally by adding to their personal `~/.claude/CLAUDE.md`:
+Users can exclude specific categories globally by adding to their personal `~/.overdeck/context/global.md`:
 
 ```markdown
 ## AI Suggestion Preferences
@@ -297,7 +297,7 @@ welcome: naming, code-organization, testing
 To add a category exclusion:
 ```bash
 # AI will add this section if it doesn't exist, or append to existing
-cat >> ~/.claude/CLAUDE.md << 'EOF'
+cat >> ~/.overdeck/context/global.md << 'EOF'
 
 ## AI Suggestion Preferences
 
@@ -310,13 +310,13 @@ EOF
 To modify:
 ```bash
 # Edit directly
-nano ~/.claude/CLAUDE.md
+nano ~/.overdeck/context/global.md
 ```
 
 To remove all exclusions:
 ```bash
 # Remove the AI Suggestion Preferences section
-sed -i '/## AI Suggestion Preferences/,/^## /d' ~/.claude/CLAUDE.md
+sed -i '/## AI Suggestion Preferences/,/^## /d' ~/.overdeck/context/global.md
 ```
 
 ## User Commands (Escalating Silence)
@@ -449,14 +449,14 @@ Relationships exist in application code but lack DB constraints:
 
 | File | Purpose |
 |------|---------|
-| `~/.claude/CLAUDE.md` | User preferences (category exclusions/welcomes) |
+| `~/.overdeck/context/global.md` | User preferences (category exclusions/welcomes) |
 | `.overdeck/refactor-radar.json` | Per-project configuration |
 | `.claude/skills/refactor-radar/SKILL.md` | Override to permanently disable |
 
 ## Integration
 
 Works with:
-- **knowledge-capture**: If same issue triggers both, prefer refactor-radar (systemic fix > workaround). Both skills share the same category exclusion system in ~/.claude/CLAUDE.md
+- **knowledge-capture**: If same issue triggers both, prefer refactor-radar (systemic fix > workaround). Both skills share the same category exclusion system in ~/.overdeck/context/global.md
 - **pan-skill-creator**: Can convert proposals into project-specific guidance
 - Issue trackers: Creates issues in configured tracker (Linear, GitHub, GitLab)
 

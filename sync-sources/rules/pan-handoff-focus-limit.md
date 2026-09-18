@@ -7,7 +7,9 @@ The `pan handoff` **focus** (the trailing text after `self`/`<conv>`) is a steer
 statement, not the brief. Since PAN-3737 the hard cap is **10,000 characters**
 (multi-line focus is allowed), so accidental rejection is effectively gone — but a
 short focus still works better: it becomes the conversation title and steers the
-handoff author, while detail belongs in the transcript or a brief file.
+handoff author, while detail belongs in the transcript or a brief file. Pass
+`--title "<title>"` to name the successor explicitly instead (PAN-3768) — useful
+when the focus is a file pointer.
 
 For a full brief, write it to a file in the target cwd and point the focus at it:
 

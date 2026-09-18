@@ -4,9 +4,10 @@ import ora from 'ora';
 import { saveAgentRuntimeState } from '../../lib/agents.js';
 import type { AgentState } from '../../lib/agents.js';
 import { existsSync, writeFileSync, readFileSync, mkdirSync, unlinkSync } from 'fs';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 import { join } from 'path';
 import { homedir } from 'os';
 import { AGENTS_DIR } from '../../lib/paths.js';
@@ -42,8 +43,9 @@ import { compileGlob } from '../../lib/xbrief/dag.js';
 import type { ScopeDriftRecord } from '../../lib/xbrief/continue-state.js';
 import type { XBriefDocument } from '../../lib/xbrief/types.js';
 import { hasOnlyPipelineStateChangesSinceCommit } from '../../lib/pipeline-state-paths.js';
-import { postDoneDashboardJson } from './done-dashboard-client.js';
+import { postDoneDashboardJson, waitForDoneReviewHandoff } from './done-dashboard-client.js';
 import { persistDoneReviewIntent } from './done-review-intent.js';
+import { recordDeadEndNeedsYou } from '../../lib/cloister/dead-end-trip.js';
 import { recordStrikeBypassVerdicts, verifyStrikeBranchMergedIntoMain } from './strike-merge-verification.js';
 const childProcessLayer = NodeChildProcessSpawner.layer.pipe(
   Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
@@ -281,15 +283,35 @@ export function computeScopeDrift(
   };
 }
 
-async function recordScopeDriftForDone(
+/** Exported for tests (PAN-3847 done-scope-drift). */
+export async function recordScopeDriftForDone(
   issueId: string,
   workspacePath: string,
 ): Promise<ScopeDriftRecord | undefined> {
   try {
     const plan = readWorkspacePlanSync(workspacePath);
     if (!plan) return undefined;
+    // PAN-3847 (FR-15): scope drift diffs against a freshly fetched
+    // origin/<target>, never a remembered local ref. The fetch is best-effort.
+    const projectConfig = (() => { try { return resolveProjectForIssue(issueId); } catch { return null; } })();
+    const { getSyncTargetBranch } = await import('../../lib/cloister/verification-runner.js');
+    const targetBranch = getSyncTargetBranch(workspacePath, projectConfig, undefined);
+    // CWE-78 residual: validate the config-supplied target branch before it
+    // reaches any git refspec position (PR #3872 round 2).
+    const { assertValidBranchNamePromise } = await import('../../lib/git-utils.js');
+    try {
+      await assertValidBranchNamePromise(targetBranch, 'scope-drift target branch');
+    } catch (invalid) {
+      console.warn(`[pan done] ${invalid instanceof Error ? invalid.message : invalid} — skipping scope-drift record`);
+      return undefined;
+    }
+    try {
+      await execFileAsync('git', ['fetch', 'origin', '--', targetBranch], { cwd: workspacePath, encoding: 'utf-8', timeout: 30_000 });
+    } catch (fetchErr: any) {
+      console.warn(`[pan done] git fetch origin ${targetBranch} failed; scope drift diffs against the cached ref: ${fetchErr?.message ?? fetchErr}`);
+    }
     const actualChangedFiles = await Effect.runPromise(
-      changedFilesVsMain('HEAD', workspacePath, 'origin/main').pipe(Effect.provide(childProcessLayer)),
+      changedFilesVsMain('HEAD', workspacePath, `origin/${targetBranch}`).pipe(Effect.provide(childProcessLayer)),
     );
     const drift = computeScopeDrift(plan, actualChangedFiles, new Date().toISOString());
     if (!drift) return undefined;
@@ -315,14 +337,19 @@ async function isMergeSetMergedIntoTargets(
 
     if (!existsSync(join(repoPath, '.git'))) return false;
 
-    await execAsync(`git fetch origin ${repo.targetBranch}`, {
+    // CWE-78 residual: validate before the fetch AND the merge-base refspec.
+    const { assertValidBranchNamePromise } = await import('../../lib/git-utils.js');
+    await assertValidBranchNamePromise(repo.targetBranch, `merge-set target branch for ${repo.repoKey}`);
+
+    await execFileAsync('git', ['fetch', 'origin', '--', repo.targetBranch], {
       cwd: repoPath,
       encoding: 'utf-8',
       timeout: 60000,
     });
 
     try {
-      await execAsync(`git merge-base --is-ancestor HEAD origin/${repo.targetBranch}`, {
+      // CWE-78: the ref travels as one argv element, never through a shell.
+      await execFileAsync('git', ['merge-base', '--is-ancestor', 'HEAD', `origin/${repo.targetBranch}`], {
         cwd: repoPath,
         encoding: 'utf-8',
         timeout: 10000,
@@ -466,6 +493,57 @@ export async function completeSlotWork(issueId: string, slot: SlotCompletionCont
   console.log(chalk.dim('  Swarm coordination will verify and merge this slot before issue-level review.'));
 }
 
+/**
+ * The durable completion marker file for a work agent. Extracted so the
+ * PAN-3848 (W25) review-request failure path can write it even when the record
+ * write failed — the branch is pushed and the PR exists, so the work is real.
+ */
+export function writeDoneCompletionMarker(agentId: string, comment: string | undefined, trackerUpdated: boolean): void {
+  mkdirSync(join(AGENTS_DIR, agentId), { recursive: true });
+  const completedFile = join(AGENTS_DIR, agentId, 'completed');
+  const processedMarker = join(AGENTS_DIR, agentId, 'completed.processed');
+  if (existsSync(processedMarker)) {
+    try { unlinkSync(processedMarker); } catch {}
+  }
+  writeFileSync(completedFile, JSON.stringify({
+    timestamp: new Date().toISOString(),
+    trackerUpdated,
+    comment,
+  }));
+}
+
+/**
+ * PAN-3848 (W25): the loud failure path for a review-request record write that
+ * failed every retry. Writes the completion marker anyway (the branch is
+ * pushed and the PR exists, so the work is real) and records a
+ * `review-request-unrecorded` needs-you naming the missing reviewRequestedAt.
+ */
+export async function handleUnrecordedReviewRequest(
+  issueId: string,
+  agentId: string,
+  prUrl: string | undefined,
+  comment: string | undefined,
+  error: unknown,
+): Promise<void> {
+  writeDoneCompletionMarker(agentId, comment, false);
+  const reason = error instanceof Error ? error.message : String(error);
+  await recordDeadEndNeedsYou(
+    issueId,
+    'review-request-unrecorded',
+    prUrl ?? '',
+    `${reason} — pipeline.reviewRequestedAt was not recorded for the pushed PR`,
+  );
+}
+
+/** PR #3872 finding 1: a stale review (reviewStaleSince set) must never take the no-op path — exported for tests. */
+export function shouldSkipReReviewAsNoop(
+  currentStatus: { reviewStatus?: string; reviewedAtCommit?: string; reviewStaleSince?: string } | null | undefined,
+): currentStatus is { reviewStatus?: string; reviewedAtCommit: string; reviewStaleSince?: string } {
+  return currentStatus?.reviewStatus === 'passed'
+    && Boolean(currentStatus?.reviewedAtCommit)
+    && !currentStatus?.reviewStaleSince;
+}
+
 export async function doneCommand(id: string, options: DoneOptions = {}): Promise<void> {
   // Support both "pan done MIN-123" and "pan done agent-min-123"
   const slotInput = parseSlotAgentId(id);
@@ -576,6 +654,9 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
   }
 
   // PAN-2207: clear stale deacon recovery tombstone before pre-flight.
+  // PR #3872 finding 1: reviewStaleSince must survive preflight — it is cleared
+  // only as part of the successful durable write in persistDoneReviewIntent, so
+  // a preflight abort can never strand the issue as passed-but-stale.
   try {
     const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(process.cwd());
     await updateIssueRecord(project, issueId, (record) => {
@@ -782,7 +863,9 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     // Step 2b: Guard against no-op re-submission. If review already passed and
     // HEAD hasn't changed since the review snapshot, skip re-review entirely.
     // This prevents agents from accidentally cycling the pipeline after approval.
-    if (currentStatus?.reviewStatus === 'passed' && currentStatus?.reviewedAtCommit) {
+    // PR #3872 finding 1: a stale review (reviewStaleSince set) must NEVER take
+    // the no-op path — the marker exists to force exactly this re-review.
+    if (currentStatus && shouldSkipReReviewAsNoop(currentStatus)) {
       const { getWorkspaceGitInfo } = await import('../../lib/git-utils.js');
       try {
         const { HEAD } = await Effect.runPromise(getWorkspaceGitInfo(workspacePath));
@@ -809,11 +892,24 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     // branch push loses a remote-ref race, updateIssueRecord reconciles it; if
     // durability still fails, the command exits before all later pipeline progression.
     const reviewRequestedAt = new Date().toISOString();
-    await persistDoneReviewIntent(issueId, workspacePath, {
-      reviewRequestedAt,
-      scopeDrift,
-      prUrl: reviewArtifactUrl,
-    });
+    try {
+      await persistDoneReviewIntent(issueId, workspacePath, {
+        reviewRequestedAt,
+        scopeDrift,
+        prUrl: reviewArtifactUrl,
+      });
+    } catch (intentError: any) {
+      // PAN-3848 (W25, FR-20): the review-request record write failed after all
+      // retries. The branch is pushed and the PR exists, so the work is real —
+      // write the completion marker anyway, then fail loudly with a needs-you
+      // naming the missing reviewRequestedAt. A pushed PR with no recorded
+      // review request is never silent.
+      await handleUnrecordedReviewRequest(issueId, agentId, reviewArtifactUrl, options.comment, intentError);
+      const intentReason = intentError instanceof Error ? intentError.message : String(intentError);
+      spinner.fail(`Work completed but the review request was not recorded for ${issueId}: ${intentReason}`);
+      console.error(chalk.dim(`  The completion marker was written and the PR exists. Recover with: pan review request ${issueId}`));
+      return exitCli(1);
+    }
 
     // Step 4: Update status (either tracker or shadow) only after the canonical
     // request is durable.
@@ -856,7 +952,11 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       mergeStatus: 'pending',
       readyForMerge: false,
       verificationStatus: 'pending',
-      verificationCycleCount: 0,
+      // PAN-3847 (FR-17): the verification cycle counter is per issue — pan done
+      // must NOT reset it; only `pan review reset` does.
+      // FR-8: the durable intent above succeeded, so the row's stale marker
+      // clears as part of the new review cycle.
+      reviewStaleSince: undefined,
       autoRequeueCount: 0,
       reviewRequestedAt,
       scopeDrift,
@@ -876,16 +976,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     });
 
     mkdirSync(join(AGENTS_DIR, agentId), { recursive: true });
-    const completedFile = join(AGENTS_DIR, agentId, 'completed');
-    const processedMarker = join(AGENTS_DIR, agentId, 'completed.processed');
-    if (existsSync(processedMarker)) {
-      try { unlinkSync(processedMarker); } catch {}
-    }
-    writeFileSync(completedFile, JSON.stringify({
-      timestamp: new Date().toISOString(),
-      trackerUpdated,
-      comment: options.comment,
-    }));
+    writeDoneCompletionMarker(agentId, options.comment, trackerUpdated);
 
     try {
       const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
@@ -897,38 +988,6 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     } catch (continueErr: any) {
       console.warn(`[pan done] Failed to append end entry to record (non-fatal): ${continueErr?.message ?? continueErr}`);
     }
-
-    spinner.succeed(`Work complete: ${issueId}`);
-    emitActivityEntrySync({
-      source: 'work-agent',
-      level: 'info',
-      message: `${issueId} work complete — entering review pipeline`,
-      issueId,
-    });
-    emitActivityTtsSync({
-      utterance: `Work agent finished ${issueId}, entering review`,
-      priority: 2,
-      issueId,
-      source: 'work-agent',
-      eventType: 'workAgent.finished',
-    });
-    console.log('');
-
-    // Summary
-    console.log(chalk.bold('Summary:'));
-    console.log(`  Issue:   ${chalk.cyan(issueId)}`);
-    if (shadowModeActive) {
-      console.log(`  Status:  ${chalk.cyan('👻 Shadow mode - pending sync to tracker')}`);
-    } else {
-      console.log(`  Tracker: ${trackerUpdated ? chalk.green('Updated to In Review') : chalk.dim('Not updated')}`);
-    }
-    if (options.comment) {
-      console.log(`  Comment: ${chalk.dim(options.comment.slice(0, 50))}${options.comment.length > 50 ? '...' : ''}`);
-    }
-    console.log('');
-
-    console.log(chalk.dim('Ready for review. When review passes, click MERGE in the dashboard.'));
-    console.log('');
 
     // Auto-trigger review & test (respecting circuit breaker)
     try {
@@ -955,7 +1014,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       // recorded above means even total failure here is recovered by the host's reconcile-on-read;
       // this retry just makes the fast path resilient to a transient restart.
       const MAX_ATTEMPTS = 10;
-      let triggered = false;
+      let handoffObserved = false;
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         if (await checkDashboard()) {
           console.log(chalk.dim(`Auto-triggering review & test${attempt > 1 ? ` (attempt ${attempt}/${MAX_ATTEMPTS})` : ''}...`));
@@ -975,11 +1034,13 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
             }
           }
 
-          // The dashboard responded (success OR a real verdict like alreadyReviewed) — this is not a
-          // transient outage, so stop retrying regardless of the verdict.
-          triggered = true;
           if (result.success) {
-            console.log(chalk.green(`  ✓ Review & test ${result.queued ? 'queued' : 'started'} automatically`));
+            const observation = await waitForDoneReviewHandoff(dashboardUrl, issueId, reviewRequestedAt);
+            if (observation) {
+              handoffObserved = true;
+              const owner = observation.kind === 'verification' ? 'verification is running' : 'a review specialist was spawned';
+              console.log(chalk.green(`  ✓ Review & test handoff confirmed — ${owner}`));
+            }
           } else if (!result.alreadyMerged) {
             console.log(chalk.yellow(`  ⚠ Auto-review not triggered: ${result.error || result.message || 'Unknown error'}`));
             if (result.alreadyReviewed) {
@@ -997,16 +1058,45 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         }
       }
 
-      if (!triggered) {
-        console.log(chalk.yellow(`  ⚠ Dashboard unreachable after ${MAX_ATTEMPTS} attempts.`));
-        console.log(chalk.dim(`    Review intent is recorded durably — it will auto-dispatch when the dashboard next reads ${issueId}'s status. No action needed.`));
+      if (!handoffObserved) {
+        throw new Error(`Review handoff was not observed for ${issueId}. Recover with: pan review request ${issueId}`);
       }
     } catch (error: any) {
-      // Don't fail the done command if auto-review fails
-      console.log(chalk.dim(`  Could not auto-trigger review: ${error.message}`));
+      const detail = error instanceof Error ? error.message : String(error);
+      if (detail.includes('Recover with:')) throw error;
+      throw new Error(`Review handoff failed for ${issueId}: ${detail}. Recover with: pan review request ${issueId}`);
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    spinner.succeed(`Work complete: ${issueId}`);
+    emitActivityEntrySync({
+      source: 'work-agent',
+      level: 'info',
+      message: `${issueId} work complete — entering review pipeline`,
+      issueId,
+    });
+    emitActivityTtsSync({
+      utterance: `Work agent finished ${issueId}, entering review`,
+      priority: 2,
+      issueId,
+      source: 'work-agent',
+      eventType: 'workAgent.finished',
+    });
+    console.log('');
+
+    console.log(chalk.bold('Summary:'));
+    console.log(`  Issue:   ${chalk.cyan(issueId)}`);
+    if (shadowModeActive) {
+      console.log(`  Status:  ${chalk.cyan('👻 Shadow mode - pending sync to tracker')}`);
+    } else {
+      console.log(`  Tracker: ${trackerUpdated ? chalk.green('Updated to In Review') : chalk.dim('Not updated')}`);
+    }
+    if (options.comment) {
+      console.log(`  Comment: ${chalk.dim(options.comment.slice(0, 50))}${options.comment.length > 50 ? '...' : ''}`);
+    }
+    console.log('');
+
+    console.log(chalk.dim('Ready for review. When review passes, click MERGE in the dashboard.'));
+    console.log('');
 
   } catch (error: any) {
     spinner.fail(error.message);

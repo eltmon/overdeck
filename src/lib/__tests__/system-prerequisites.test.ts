@@ -101,6 +101,23 @@ describe('collectSetupDiagnostics', () => {
     );
   });
 
+  it('explains a Claude miss caused by a Windows-only install reachable through WSL interop', async () => {
+    const report = await collectSetupDiagnostics(
+      '9.8.7',
+      async (cmd) => `${cmd} 1.0.0`,
+      async (command) => command === 'claude'
+        ? { path: null, windowsInterop: ['/mnt/c/Users/test/AppData/Roaming/npm/claude'] }
+        : `/usr/bin/${command}`,
+    );
+
+    expect(report.markdown).toContain(
+      '✗ claude: only the Windows install is reachable through WSL interop (/mnt/c/Users/test/AppData/Roaming/npm/claude)',
+    );
+    expect(report.markdown).toContain('Shared resolver: not found');
+    expect(report.markdown).toContain('Likely cause: Claude is installed on Windows');
+    expect(report.markdown).toContain('Install Claude Code inside WSL');
+  });
+
   it('produces a bounded support report without dumping environment secrets', async () => {
     const previousSecret = process.env['OVERDECK_DIAGNOSTIC_TEST_SECRET'];
     process.env['OVERDECK_DIAGNOSTIC_TEST_SECRET'] = 'must-not-appear';

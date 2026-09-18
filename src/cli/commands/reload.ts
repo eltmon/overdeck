@@ -2,6 +2,7 @@ import { Effect } from 'effect';
 import chalk from 'chalk';
 import { statSync } from 'fs';
 import { resolve } from 'path';
+import { reportComposerReloadProgress } from '../../lib/composer-commands/reload.js';
 import {
   activateDashboardDeployment,
   buildDashboardFromOriginMain,
@@ -122,6 +123,27 @@ async function recordReloadStatus(
 }
 
 export async function reloadCommand(options: ReloadOptions): Promise<void> {
+  const activityId = process.env.OVERDECK_COMPOSER_RELOAD_ACTIVITY;
+  const logPath = process.env.OVERDECK_COMPOSER_RELOAD_LOG;
+  // Do not pass this command's activity identity into the replacement server.
+  delete process.env.OVERDECK_COMPOSER_RELOAD_ACTIVITY;
+  delete process.env.OVERDECK_COMPOSER_RELOAD_LOG;
+  const progress = (phase: Parameters<typeof reportComposerReloadProgress>[0]) =>
+    reportComposerReloadProgress(phase, activityId, logPath);
+  await progress('building');
+  try {
+    await runReload(options, progress);
+    await progress(process.exitCode ? 'failed' : 'completed');
+  } catch (error) {
+    await progress('failed');
+    throw error;
+  }
+}
+
+async function runReload(
+  options: ReloadOptions,
+  progress: (phase: Parameters<typeof reportComposerReloadProgress>[0]) => Promise<void>,
+): Promise<void> {
   let startedAt = Date.now();
   let healthTimeoutMs: number;
   try {
@@ -242,7 +264,11 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
         // deployment that dies on ERR_MODULE_NOT_FOUND at boot (PAN-3264).
         const serverBootFailure = dashboardServerBootFailure(deployment.serverPath);
         if (serverBootFailure) throw new Error(serverBootFailure);
-        await writeActiveDashboardBundle({ repoRoot, ...deployment });
+        await writeActiveDashboardBundle({
+          repoRoot,
+          deployRoot: deployment.deployRoot,
+          serverPath: deployment.serverPath,
+        });
         try {
           activation = await activateDashboardDeployment(repoRoot, deployment);
         } catch (error) {
@@ -267,10 +293,18 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     // Everything above is ungated: a build changes nothing the operator can see.
     // The restart below is voluntary, so it waits for the operator's approval
     // first (PAN-3729) and may find that an approved restart already happened.
+    await progress('awaiting-approval');
+    const postMergeIssue = process.env.OVERDECK_RESTART_INITIATOR === 'merge-step0'
+      ? process.env.OVERDECK_ISSUE_ID
+      : undefined;
+    const gateKind = postMergeIssue ? 'deploy' : 'reload';
     const gate = await waitForRestartApproval({
-      requesterId: restartGateRequesterId('reload'),
-      kind: 'reload',
-      reason: 'pan reload — put the freshly built dashboard live',
+      requesterId: restartGateRequesterId(gateKind, postMergeIssue),
+      kind: gateKind,
+      reason: postMergeIssue
+        ? `post-merge deploy for ${postMergeIssue}`
+        : 'pan reload — put the freshly built dashboard live',
+      ...(deployment?.builtSha ? { builtSha: deployment.builtSha } : {}),
     });
     if (!gate.proceed) {
       // Same disposition as a restart that left the old dashboard running: the
@@ -294,6 +328,7 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     }
     // The approval wait is unbounded, so the pre-wait clock would report a
     // reload that "took" as long as the operator was away from the dashboard.
+    await progress('restarting');
     startedAt = Date.now();
 
     let restartResult: DashboardRestartResult;

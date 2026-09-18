@@ -17,7 +17,7 @@ import { ROLE_EFFORTS, resolveModel as resolveRoleModel, loadConfigSync as loadY
 import { getModelEffortLevelsSync } from '../../lib/model-capabilities.js';
 import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
 import { resolveWorkspaceRepoRootsSync } from '../../lib/project-repos.js';
-import { resolveProjectFromIssueSync, hasProjectsSync } from '../../lib/projects.js';
+import { resolveProjectFromIssueSync, hasProjectsSync, type ResolvedProject } from '../../lib/projects.js';
 import { hasPRDDraft, getPRDDraftPathSync } from '../../lib/prd-draft.js';
 import { isGitHubIssueSync, resolveGitHubIssueSync } from '../../lib/tracker-utils.js';
 import { Effect } from 'effect';
@@ -28,7 +28,6 @@ import type { RuntimeName } from '../../lib/runtimes/types.js';
 import { findPlanSync, readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
 import { writeAutoStartXBrief, type AutoSynthesizeIssueInput } from '../../lib/xbrief/auto-synthesize.js';
-import { resolveIssueWorkModel } from '../../lib/agents/staffing.js';
 import { transitionStartedXBrief, updateWorkspaceDraftPlanStatus } from './start-status.js';
 import {
   buildStartPlanningBody,
@@ -96,7 +95,7 @@ import { requireAutomaticStateMigration } from '../../lib/state-auto-migrate.js'
 import { checkActiveOrderDispatch } from '../../lib/orders/dispatch-gate.js';
 import { withActiveOrderDispatchReservation } from '../../lib/orders/dispatch-reservation.js';
 import type { IssueOptions } from './start-options.js';
-import { applyStartPolicyOptions } from './start-policy-overrides.js';
+import { applyStartPolicyOptionsAfterSpawn, persistStartPoliciesThenCheckKickoff } from './start-policy-overrides.js';
 import { prepareFreshWorkAgentSession } from './start-fresh-session.js';
 
 /**
@@ -156,8 +155,8 @@ async function resolveExplicitHarnessFlag(
     return undefined;
   }
 
-  if (harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code') {
-    process.stderr.write(`Invalid --harness value: ${harness}. Expected 'claude-code', 'ohmypi', 'codex', 'acp', or 'kimi-code'.\n`);
+  if (harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode' && harness !== 'muse') {
+    process.stderr.write(`Invalid --harness value: ${harness}. Expected 'claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', or 'muse'.\n`);
     return exitCli(1);
   }
 
@@ -301,6 +300,11 @@ async function fetchIssueForAutoStart(issueId: string): Promise<AutoSynthesizeIs
   return { issueId, title: issueId, body: '' };
 }
 
+/** PAN-3848 (W24): pre-spawn reconcile is the migration only; policy-override record writes moved post-spawn. */
+async function reconcileStartState(resolved: ResolvedProject, signal: AbortSignal): Promise<void> {
+  await requireAutomaticStateMigration(resolved, signal);
+}
+
 /**
  * Handle remote workspace agent spawning
  */
@@ -308,7 +312,8 @@ async function handleRemoteWorkspace(
   issueId: string,
   options: IssueOptions,
   spinner: Ora,
-  clearPauseBeforeSpawn: boolean
+  clearPauseBeforeSpawn: boolean,
+  resolved?: ResolvedProject,
 ): Promise<void> {
   const config = loadConfigSync();
 
@@ -435,6 +440,10 @@ async function handleRemoteWorkspace(
       tier: fly.getResiliencyTier(),
     });
     spinner.succeed(`Remote agent spawned: ${remoteAgent.id}`);
+
+    if (resolved) {
+      await applyStartPolicyOptionsAfterSpawn(resolved, issueId, options, false, (message) => spinner.warn(message));
+    }
 
     // Handle shadow mode
     const skipTrackerUpdate = await Effect.runPromise(shouldSkipTrackerUpdate(issueId, options.shadow));
@@ -696,23 +705,7 @@ async function repairMainBranchWorkspace(workspace: string, normalizedId: string
   }
 }
 
-/** PAN-2410: --fresh means fresh STAFFING, not just a fresh session. Never
- * inherit the dead agent's recorded model — with no explicit --model the
- * tier/role resolvers run against current config. A plain restart (no
- * --fresh) keeps the recorded staffing, by design.
- * A `pending-`-prefixed recorded model is a mid-spawn placeholder written
- * before real model resolution (spawn-helpers/lifecycle-restart); a spawn that
- * died mid-flight leaves it behind, and inheriting it crashes resolution with
- * "Unknown model" (same guard resume.ts applies). Treat it as no recorded
- * model so staffing re-runs. */
-export function resolveSpawnModel(
-  explicitModel: string | undefined,
-  fresh: boolean | undefined,
-  recordedModel: string | undefined,
-): string | undefined {
-  const recorded = recordedModel?.startsWith('pending-') ? undefined : recordedModel;
-  return explicitModel || (fresh ? undefined : recorded);
-}
+import { resolveStartSpawnModel } from './start-spawn-model.js';
 
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
   process.env['OVERDECK_AGENT_STARTED_BY'] = resolveCliStartedBy('operator:cli:pan-start');
@@ -733,7 +726,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   const normalizedId = id.toLowerCase();
   const agentId = `agent-${normalizedId}`;
   const existingAgentState = getAgentStateSync(agentId);
-  const spawnModel = resolveSpawnModel(options.model ?? resolveIssueWorkModel(id.toUpperCase()), options.fresh, existingAgentState?.model);
+  const spawnModel = resolveStartSpawnModel(options.model, options.fresh, existingAgentState?.model);
   // PAN-636 — validate only an explicit --harness flag up front. Flagless
   // spawns intentionally forward undefined so spawnAgent's resolveHarness()
   // applies role/provider defaults after model resolution.
@@ -866,10 +859,12 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
     const effectiveRemote = isRemote || overflowToRemote || (locationPreference === 'remote' && !workspacePath);
     if (resolved) {
+      // PAN-3848 (W24, FR-19): only the state migration runs here — the
+      // policy-override record write moved post-spawn so spawning never takes
+      // the record lock.
       const reconcileState = async (signal: AbortSignal) => {
         spinner.text = `Reconciling permanent state for ${resolved.projectName}...`;
-        await requireAutomaticStateMigration(resolved, signal);
-        await applyStartPolicyOptions(resolved, id, options, options.dryRun === true, signal);
+        await reconcileStartState(resolved, signal);
       };
       await runStateReconcile(prep, spinner, effectiveRemote, reconcileState);
     }
@@ -970,7 +965,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     // Handle remote workspace
     if (effectiveRemote) {
-      await handleRemoteWorkspace(id, options, spinner, shouldClearPauseBeforeSpawn);
+      await handleRemoteWorkspace(id, options, spinner, shouldClearPauseBeforeSpawn, resolved ?? undefined);
       return;
     }
 
@@ -1212,7 +1207,17 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       throw new Error(admitted.check.decision.message ?? `Order-book dispatch blocked for ${id}`);
     }
     const agent = admitted.result;
-    if (agent.role === 'work' && agent.kickoffDelivered === false) {
+    // PAN-3848 (F4): policy overrides persist BEFORE the kickoff-failure
+    // return — the live session already carries them through state.json.
+    const kickoffFailed = await persistStartPoliciesThenCheckKickoff(
+      resolved,
+      agent,
+      id,
+      options,
+      false,
+      (message) => spinner.warn(message),
+    );
+    if (kickoffFailed) {
       spinner.fail(`Agent spawned but kickoff delivery was not confirmed: ${agent.id}`);
       for (const line of ['', chalk.red(`Kickoff delivery did not land for ${agent.id}.`), chalk.dim('The live session is preserved and the agent may be idle until the kickoff lands.'), chalk.dim('Deacon will retry delivery after the stuck threshold, or you can send a manual message now:'), `  pan tell ${id} "continue from your kickoff brief"`]) console.log(line);
       process.exitCode = 1; return;
@@ -1271,4 +1276,4 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   }
 }
 
-export const __testInternals = { failPostCreateValidation, repairMainBranchWorkspace, resolveExplicitHarnessFlag, runStartPrepStep };
+export const __testInternals = { failPostCreateValidation, repairMainBranchWorkspace, resolveExplicitHarnessFlag, runStartPrepStep, reconcileStartState };

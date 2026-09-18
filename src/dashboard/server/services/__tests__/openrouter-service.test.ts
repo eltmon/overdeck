@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Effect, Layer } from 'effect';
-import { OpenRouterService, OpenRouterServiceLive } from '../openrouter-service.js';
+import { OpenRouterService, OpenRouterServiceLive, includeOpenRouterFavorites } from '../openrouter-service.js';
 
 // ─── Mock global fetch ────────────────────────────────────────────────────────
 
@@ -191,5 +191,36 @@ describe('openrouter-service', () => {
 
       expect(caps).toBeNull();
     });
+  });
+});
+
+
+describe('includeOpenRouterFavorites', () => {
+  it('retains every catalog model and adds missing favorites without inventing metadata', () => {
+    const catalog = [{
+      id: 'known/model', name: 'Known model', promptCostPer1M: 2,
+      completionCostPer1M: 4, contextLength: 32768,
+      supportsThinking: true, category: 'chat' as const,
+    }];
+    const models = includeOpenRouterFavorites(catalog, [
+      'known/model', 'stealth/union-alpha', 'stealth/union-alpha',
+    ]);
+    expect(models).toHaveLength(2);
+    expect(models[0]).toBe(catalog[0]);
+    expect(models[1]).toEqual({
+      id: 'stealth/union-alpha', name: 'stealth/union-alpha',
+      promptCostPer1M: null, completionCostPer1M: null, contextLength: null,
+      supportsThinking: false, category: 'other',
+    });
+    expect(catalog).toHaveLength(1);
+  });
+
+  it('keeps favorites when discovery returns no models', () => {
+    expect(includeOpenRouterFavorites([], ['stealth/union-alpha']).map(m => m.id))
+      .toEqual(['stealth/union-alpha']);
+  });
+
+  it('does not retain a missing model after it is unfavorited', () => {
+    expect(includeOpenRouterFavorites([], [])).toEqual([]);
   });
 });

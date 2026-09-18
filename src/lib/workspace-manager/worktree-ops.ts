@@ -1,12 +1,14 @@
+import { isHarnessNativeTarget } from '../context-layers/native-instructions.js';
 import { chmodSync, existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, copyFileSync, symlinkSync, statSync, renameSync, rmSync } from 'fs';
 import { join, dirname, extname, relative, resolve } from 'path';
 import { homedir } from 'os';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { TemplatePlaceholders, replacePlaceholdersSync } from '../workspace-config.js';
 import { PRE_WORKTREE_METADATA_DIRS } from './types.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /**
  * Validate feature name (alphanumeric and hyphens only)
@@ -147,8 +149,27 @@ export async function createWorktree(
   defaultBranch: string = 'main'
 ): Promise<{ success: boolean; message: string }> {
   try {
-    // Fetch latest from origin
-    await execAsync('git fetch origin', { cwd: repoPath });
+    // PAN-3847 (FR-15): fetch the target so the new branch is cut from
+    // origin/<default>, not a possibly-stale local ref. Offline falls back to
+    // the local ref with a warning naming the risk.
+    // CWE-78 residual: validate the config-supplied branch BEFORE any git call —
+    // a refspec payload ('+refs/heads/a:refs/heads/b') passes argv safely but
+    // would still make git update a local ref.
+    const { assertValidBranchNamePromise } = await import('../git-utils.js');
+    try {
+      await assertValidBranchNamePromise(defaultBranch, 'createWorktree defaultBranch');
+    } catch (invalid) {
+      return { success: false, message: invalid instanceof Error ? invalid.message : String(invalid) };
+    }
+    let baseRef = `origin/${defaultBranch}`;
+    try {
+      // CWE-78: defaultBranch comes from per-repo/workspace config — pass it as
+      // an argv element, never interpolated into a shell string.
+      await execFileAsync('git', ['fetch', 'origin', '--', defaultBranch], { cwd: repoPath });
+    } catch (fetchErr) {
+      console.warn(`[worktree] git fetch origin ${defaultBranch} failed; cutting ${branchName} from LOCAL ${defaultBranch} — it may be stale or ahead of origin: ${fetchErr instanceof Error ? fetchErr.message : fetchErr}`);
+      baseRef = defaultBranch;
+    }
 
     // Prune stale worktree entries (e.g., from deleted workspaces)
     await execAsync('git worktree prune', { cwd: repoPath });
@@ -163,11 +184,13 @@ export async function createWorktree(
       localList.includes(branchName) ||
       remoteList.includes(`origin/${branchName}`);
 
+    // CWE-78: path, branch, and base ref all travel as argv elements — a config-
+    // or operator-supplied value must never reach a shell.
     if (branchExists) {
-      await execAsync(`git worktree add "${targetPath}" "${branchName}"`, { cwd: repoPath });
+      await execFileAsync('git', ['worktree', 'add', targetPath, branchName], { cwd: repoPath });
     } else {
-      // Create new branch from the configured default branch
-      await execAsync(`git worktree add -b "${branchName}" "${targetPath}" "${defaultBranch}"`, { cwd: repoPath });
+      // Create new branch from the fetched origin ref of the default branch
+      await execFileAsync('git', ['worktree', 'add', '-b', branchName, targetPath, baseRef], { cwd: repoPath });
     }
 
     await installPreRebaseHook(targetPath);
@@ -192,11 +215,12 @@ export async function removeWorktree(
   branchName: string
 ): Promise<{ success: boolean; message: string }> {
   try {
-    // Remove worktree
-    await execAsync(`git worktree remove "${targetPath}" --force`, { cwd: repoPath }).catch(() => {});
+    // CWE-78: path and branch travel as argv elements — double quotes stop a
+    // semicolon but never a $(...) substitution or a quote break-out.
+    await execFileAsync('git', ['worktree', 'remove', targetPath, '--force'], { cwd: repoPath }).catch(() => {});
 
     // Optionally delete the branch
-    await execAsync(`git branch -D "${branchName}"`, { cwd: repoPath }).catch(() => {});
+    await execFileAsync('git', ['branch', '-D', branchName], { cwd: repoPath }).catch(() => {});
 
     return { success: true, message: `Removed worktree at ${targetPath}` };
   } catch (error) {
@@ -343,7 +367,7 @@ export function copyProjectTemplateDirs(
     const sourcePath = join(sourceDir, dir);
     const targetPath = join(targetDir, dir);
 
-    if (!existsSync(sourcePath)) continue;
+    if (!existsSync(sourcePath) || isHarnessNativeTarget(dir)) continue;
 
     // Recursively copy all files, applying placeholder substitution to text files
     function copyDir(src: string, dest: string): number {
@@ -353,6 +377,7 @@ export function copyProjectTemplateDirs(
       for (const entry of entries) {
         const srcEntry = join(src, entry.name);
         const destEntry = join(dest, entry.name);
+        if (isHarnessNativeTarget(relative(targetDir, destEntry))) continue;
         if (entry.isDirectory()) {
           count += copyDir(srcEntry, destEntry);
         } else if (entry.isFile()) {

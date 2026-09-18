@@ -1,3 +1,4 @@
+import { resolveMuseSessionPath } from '../../lib/runtimes/muse-session.js';
 /**
  * WebSocket RPC handlers — implements PanRpcGroup using Effect (PAN-428 B5)
  *
@@ -15,15 +16,10 @@ import { EventStoreService } from './services/domain-services.js';
 import { ReadModelService, type ReadModelServiceShape } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
 import { shouldBroadcastDashboardEvent, streamAgentOutput } from './services/agent-output-stream.js';
-import { getConversationByName } from '../../lib/overdeck/conversations.js';
-import { contextUsageFromParseResult, gateSnapshotEmission, parseConversationMessages, parseEntireConversation, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
-import { isPiSessionFile, parsePiConversationMessages } from './services/pi-conversation-parser.js';
-import { isOhmypiSessionFile, parseOhmypiConversationMessages } from './services/ohmypi-conversation-parser.js';
-import { parseCodexConversationMessages } from './services/codex-conversation-parser.js';
-import { parseAcpConversationMessages } from './services/acp-conversation-parser.js';
-import { parseKimiConversationMessages } from './services/kimi-conversation-parser.js';
+import type { LegacyConversation } from '../../lib/overdeck/conversations.js';
+import { contextUsageFromParseResult, gateSnapshotEmission, parseConversationMessages, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
+import { isPiSessionFile } from './services/pi-conversation-parser.js';
 import { resolveAgentHarness, resolvePiSessionPath, resolveCodexRolloutPath, resolveAcpTranscriptPath, resolveKimiWirePath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
-import { watch as fsWatch } from 'node:fs';
 import { sessionFilePath } from '../../lib/paths.js';
 import { getRuntimeCensus } from '../../lib/runtime-census.js';
 import { listProjectsSync } from '../../lib/projects.js';
@@ -45,7 +41,12 @@ import { readFileAtPathEffect, writeFileAtPathEffect } from './services/file-at-
 import { resolveFilePathExistsEffect } from './services/resolve-file-path-exists.js';
 import { getHarnessBehavior } from '../../lib/runtimes/behavior.js';
 import { normalizeSessionsFeedFilter, toDiscoveredSessionSnapshot, toSessionsFeedRowSnapshot } from './services/sessions-feed-rpc.js';
+import { listCodexSubagents, resolveCodexSubagentTranscript } from './services/conversation/codex-subagents.js';
 import { startSubagentListPolling, subagentTranscriptPath } from './services/conversation/subagents.js';
+
+import { sharedTranscriptParser } from './services/shared-transcript-parser.js';
+import { streamResolvedFullParseSnapshots } from './services/full-parse-stream.js';
+export { streamResolvedFullParseSnapshots } from './services/full-parse-stream.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -99,249 +100,7 @@ export function conversationDiscoveringStream(): Stream.Stream<ConversationEvent
   );
 }
 
-/**
- * Live message stream for transcripts that only support a FULL parse (pi, codex)
- * — PAN-1908. Unlike the Claude incremental watcher, pi/codex parsers re-read the
- * whole file, so we emit a full `snapshot: true` event on first subscribe and on
- * every file change (debounced). The client reducer adopts snapshots
- * idempotently and never shrinks a populated view, so re-emitting the full
- * transcript on each append is safe and dedupes by message id.
- *
- * Used for synthetic agent sessions (work/planning/specialist panels) whose pi
- * or codex transcript the operator watches live. fs.watch fires on each append
- * pi/codex makes; a 300ms debounce coalesces bursts during active generation.
- */
-function streamFullParseSnapshots(
-  sessionFile: string,
-  parse: (file: string) => Promise<ParseResult>,
-  model: string | null,
-): Stream.Stream<ConversationEvent, PanRpcError> {
-  return Stream.callback<ConversationEvent, PanRpcError>((queue) =>
-    Effect.acquireRelease(
-      Effect.promise(async () => {
-        let parsing = false;
-        let pendingReparse = false;
-        const emit = async (): Promise<void> => {
-          if (parsing) { pendingReparse = true; return; }
-          parsing = true;
-          try {
-            const result = await parse(sessionFile);
-            try {
-              Queue.offerUnsafe(queue, {
-                kind: 'messages' as const,
-                messages: result.messages,
-                workLog: result.workLog,
-                streaming: result.streaming,
-                snapshot: true,
-                proposedPlan: result.proposedPlan,
-                compactBoundaries:
-                  result.compactBoundaries && result.compactBoundaries.length > 0
-                    ? result.compactBoundaries
-                    : undefined,
-                contextUsage: contextUsageFromParseResult(result, model),
-              });
-            } catch {
-              // Queue shut down (client disconnected) — ignore.
-            }
-          } catch {
-            // Transient parse failure (read during a write) — the next change
-            // event re-parses cleanly.
-          } finally {
-            parsing = false;
-            if (pendingReparse) { pendingReparse = false; void emit(); }
-          }
-        };
-
-        await emit(); // authoritative initial snapshot
-
-        let debounce: ReturnType<typeof setTimeout> | null = null;
-        let watcher: ReturnType<typeof fsWatch> | null = null;
-        try {
-          watcher = fsWatch(sessionFile, () => {
-            if (debounce) return;
-            debounce = setTimeout(() => { debounce = null; void emit(); }, 300);
-          });
-        } catch {
-          // If the watcher can't attach, the initial snapshot still rendered;
-          // the client's HTTP path is its own fallback on reconnect.
-        }
-        return {
-          stop: () => {
-            if (debounce) { clearTimeout(debounce); debounce = null; }
-            if (watcher) { try { watcher.close(); } catch { /* ignore */ } }
-          },
-        };
-      }),
-      (handle) => Effect.sync(() => handle.stop()),
-    ),
-  );
-}
-
-export function streamResolvedFullParseSnapshots(
-  resolve: () => Promise<string | null>,
-  parse: (file: string) => Promise<ParseResult>,
-  model: string | null,
-  // When true, "no transcript file resolved yet" is treated as an EMPTY (ready)
-  // conversation rather than a still-discovering one. Interactive pi/codex
-  // conversations write no transcript until their first turn, so a brand-new
-  // one that is alive and simply waiting for the user's first message would
-  // otherwise sit on "Discovering conversation…" forever. resolve() returns
-  // null ONLY when no transcript exists on disk (a resumed conversation already
-  // has its file), so emitting an empty snapshot here never blanks real history.
-  unresolvedMeansEmpty = false,
-): Stream.Stream<ConversationEvent, PanRpcError> {
-  return Stream.callback<ConversationEvent, PanRpcError>((queue) =>
-    Effect.acquireRelease(
-      Effect.promise(async () => {
-        let stopped = false;
-        let resolving = false;
-        let discoveryTimer: ReturnType<typeof setInterval> | null = null;
-        let debounce: ReturnType<typeof setTimeout> | null = null;
-        let watcher: ReturnType<typeof fsWatch> | null = null;
-        let parsing = false;
-        let pendingReparse = false;
-        let sessionFile: string | null = null;
-        // Whether we've already emitted the empty/ready snapshot for an
-        // unresolved interactive conversation, so the 2s discovery poll doesn't
-        // re-offer it on every tick.
-        let announcedEmpty = false;
-        // Lock onto a transcript only once we've actually parsed content from it.
-        // A brand-new pi/codex conversation can briefly resolve to an empty
-        // placeholder transcript while the real session is written under a
-        // different (session-id) filename. The old code stopped discovery at the
-        // FIRST resolved file and tailed that empty file forever — so the panel
-        // showed the empty "How can I help you?" state until a manual refresh
-        // re-subscribed. We keep re-resolving (and switch to the newest file)
-        // until content appears, which also covers a watcher that misses appends.
-        let hasContent = false;
-
-        const stopDiscovery = () => {
-          if (discoveryTimer) { clearInterval(discoveryTimer); discoveryTimer = null; }
-        };
-
-        const offer = (event: ConversationEvent) => {
-          try {
-            Queue.offerUnsafe(queue, event);
-          } catch {
-            // Queue shut down (client disconnected) — ignore.
-          }
-        };
-
-        const emit = async (): Promise<void> => {
-          if (!sessionFile || stopped) return;
-          if (parsing) { pendingReparse = true; return; }
-          parsing = true;
-          try {
-            const result = await parse(sessionFile);
-            if (result.messages.length > 0 && !hasContent) {
-              // Real content arrived — lock onto this file and stop polling.
-              hasContent = true;
-              stopDiscovery();
-            }
-            offer({
-              kind: 'messages' as const,
-              messages: result.messages,
-              workLog: result.workLog,
-              streaming: result.streaming,
-              snapshot: true,
-              proposedPlan: result.proposedPlan,
-              compactBoundaries:
-                result.compactBoundaries && result.compactBoundaries.length > 0
-                  ? result.compactBoundaries
-                  : undefined,
-              contextUsage: contextUsageFromParseResult(result, model),
-            });
-          } catch {
-            // Transient parse failure (read during a write) — the next change
-            // event re-parses cleanly.
-          } finally {
-            parsing = false;
-            if (pendingReparse) { pendingReparse = false; void emit(); }
-          }
-        };
-
-        const watchFile = (file: string) => {
-          try {
-            watcher = fsWatch(file, () => {
-              if (debounce) return;
-              debounce = setTimeout(() => { debounce = null; void emit(); }, 300);
-            });
-          } catch {
-            // If the watcher can't attach, the discovery poll still re-parses.
-          }
-        };
-
-        const tryResolve = async (): Promise<void> => {
-          if (stopped || resolving || hasContent) return;
-          resolving = true;
-          try {
-            const resolved = await resolve();
-            if (!resolved) {
-              // No transcript on disk yet. For an interactive conversation that
-              // means it is brand-new and waiting for its first turn — show the
-              // ready (empty) state like claude-code, not an endless
-              // "Discovering…" spinner. Emit once; keep polling so the first
-              // turn's transcript switches us to showing real content.
-              if (unresolvedMeansEmpty) {
-                if (!sessionFile && !announcedEmpty) {
-                  announcedEmpty = true;
-                  offer({ kind: 'messages', messages: [], workLog: [], streaming: false, snapshot: true });
-                }
-                return;
-              }
-              // Only announce "discovering" before we've ever resolved a file, so
-              // we don't blank an already-shown (empty) snapshot.
-              if (!sessionFile) offer({ kind: 'discovering' });
-              return;
-            }
-            if (resolved !== sessionFile) {
-              // First resolution, or a newer transcript appeared — point the
-              // watcher at it and re-parse.
-              if (watcher) { try { watcher.close(); } catch { /* ignore */ } watcher = null; }
-              sessionFile = resolved;
-              await emit();
-              if (!stopped) watchFile(resolved);
-            } else {
-              // Same (still-empty) file resolved — re-parse in case it grew
-              // without firing a watch event (some FS/watch combos miss appends).
-              await emit();
-            }
-          } finally {
-            resolving = false;
-          }
-        };
-
-        await tryResolve();
-        if (!hasContent) {
-          // Keep polling until the transcript has real content. Cheap readdir+stat
-          // every 2s; self-stops via stopDiscovery() the moment content is parsed.
-          discoveryTimer = setInterval(() => { void tryResolve(); }, 2000);
-        }
-
-        return {
-          stop: () => {
-            stopped = true;
-            if (discoveryTimer) { clearInterval(discoveryTimer); discoveryTimer = null; }
-            if (debounce) { clearTimeout(debounce); debounce = null; }
-            if (watcher) { try { watcher.close(); } catch { /* ignore */ } }
-          },
-        };
-      }),
-      (handle) => Effect.sync(() => handle.stop()),
-    ),
-  );
-}
-
 type FullParseSnapshotStream = Stream.Stream<ConversationEvent, PanRpcError>;
-
-function ohmypiSnapshotParser(harness: unknown): (file: string) => Promise<ParseResult> {
-  switch (harness) {
-    case 'pi':
-      return parsePiConversationMessages;
-    default:
-      return parseOhmypiConversationMessages;
-  }
-}
 
 export function streamHarnessFullParseSnapshots(
   sessionName: string,
@@ -349,6 +108,7 @@ export function streamHarnessFullParseSnapshots(
   model: string | null,
   unresolvedMeansEmpty = false,
   workspace: string | null = null,
+  agentId?: string,
 ): FullParseSnapshotStream | null {
   const behavior = getHarnessBehavior(harness as Parameters<typeof getHarnessBehavior>[0]);
   const streamResolved = (
@@ -358,10 +118,30 @@ export function streamHarnessFullParseSnapshots(
 
   // A missing kind gets the caller's discovering stream (the kimi-code hang); `workspace` is the conversation cwd, which the kimi resolver needs because conversations have no AgentState row to derive it from.
   switch (behavior.transcriptKind) {
-    case 'ohmypi-jsonl': return streamResolved(() => resolvePiSessionPath(sessionName), ohmypiSnapshotParser(harness));
-    case 'codex-rollout-jsonl': return streamResolved(() => resolveCodexRolloutPath(sessionName), parseCodexConversationMessages);
-    case 'acp-jsonl': return streamResolved(() => resolveAcpTranscriptPath(sessionName), parseAcpConversationMessages);
-    case 'kimi-wire-jsonl': return streamResolved(() => resolveKimiWirePath(sessionName, workspace ? { workspaceOverride: workspace } : {}), parseKimiConversationMessages);
+    case 'ohmypi-jsonl': return streamResolved(
+      () => resolvePiSessionPath(sessionName),
+      sharedTranscriptParser(harness === 'pi' ? 'pi' : 'ohmypi'),
+    );
+    case 'codex-rollout-jsonl': return streamResolvedFullParseSnapshots(
+      async () => {
+        const parent = await resolveCodexRolloutPath(sessionName);
+        return parent && agentId !== undefined ? resolveCodexSubagentTranscript(parent, agentId) : parent;
+      },
+      sharedTranscriptParser('codex'),
+      model, unresolvedMeansEmpty, agentId === undefined,
+    );
+    case 'acp-jsonl': return streamResolved(
+      () => resolveAcpTranscriptPath(sessionName),
+      sharedTranscriptParser('acp'),
+    );
+    case 'muse-jsonl': return streamResolved(
+      () => resolveMuseSessionPath(sessionName),
+      sharedTranscriptParser('muse'),
+    );
+    case 'kimi-wire-jsonl': return streamResolved(
+      () => resolveKimiWirePath(sessionName, workspace ? { workspaceOverride: workspace } : {}),
+      sharedTranscriptParser('kimi'),
+    );
     default: return null;
   }
 }
@@ -424,7 +204,7 @@ export function filterDomainEventForIssue(event: DomainEvent, issueId: string, a
   // global store's full dataset, causing every issue-dependent component to
   // re-render with incomplete data. The full bulk updates arrive via
   // subscribeDomainEvents instead.
-  if (event.type === 'issues.snapshot' || event.type === 'activity.updated') {
+  if (event.type === 'issues.snapshot' || event.type === 'issues.delta' || event.type === 'activity.updated') {
     return null;
   }
 
@@ -887,7 +667,9 @@ const PanRpcLayer = PanRpcGroup.toLayer(
       [WS_METHODS.subscribeConversationMessages]: (input) =>
         Stream.unwrap(
           Effect.gen(function* () {
-            const conv = getConversationByName(input.conversationName);
+            const conv = yield* Effect.promise(() =>
+              runDashboardDbJob<LegacyConversation | null>('getConversationByName', input.conversationName),
+            );
 
             // PAN-1908: synthetic agent sessions (work/planning/specialist panels)
             // have no conversations-table row. Stream pi/codex work agents by
@@ -896,7 +678,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             // streaming for pi/codex here.
             if (!conv && /^(agent-|planning-|specialist-|strike-|inspect-)|^(flywheel-orchestrator|conv-flywheel-orchestrator)$/.test(input.conversationName)) {
               const harness = yield* Effect.promise(() => resolveAgentHarness(input.conversationName));
-              const stream = streamHarnessFullParseSnapshots(input.conversationName, harness, null);
+              const stream = streamHarnessFullParseSnapshots(input.conversationName, harness, null, false, null, input.agentId);
               if (stream) return stream;
               return conversationDiscoveringStream();
             }
@@ -905,7 +687,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
               return conversationDiscoveringStream();
             }
 
-            const stream = streamHarnessFullParseSnapshots(conv.tmuxSession, conv.harness, conv.model ?? null, true, conv.cwd ?? null);
+            const stream = streamHarnessFullParseSnapshots(conv.tmuxSession, conv.harness, conv.model ?? null, true, conv.cwd ?? null, input.agentId);
             if (stream) return stream;
 
             if (getHarnessBehavior(conv.harness).transcriptKind !== 'claude-jsonl') {
@@ -950,7 +732,10 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                   // Parse the complete existing transcript before subscribing to
                   // appends. Keep pending tool_use entries in parser state for the
                   // watcher instead of flushing them into the display-only work log.
-                  const initial = await parseEntireConversation(sessionFile, { flushPendingToolUse: false });
+                  const initial = await runDashboardDbJob<ParseResult>('parseTranscriptSnapshot', {
+                    sessionFile,
+                    parser: 'claude-initial',
+                  });
                   let currentByteOffset = initial.byteOffset;
                   let currentContextUsage = contextUsageFromParseResult(initial, model);
                   // Per-subscription high-water mark of the largest full transcript

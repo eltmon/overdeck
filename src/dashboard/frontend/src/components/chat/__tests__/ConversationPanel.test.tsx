@@ -9,6 +9,34 @@ import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
 import { ConversationPanel } from '../ConversationPanel';
 import { DialogProvider } from '../../DialogProvider';
 
+const streamTransportMock = vi.hoisted(() => ({
+  listeners: new Map<string, (event: unknown) => void>(),
+  initialEvents: new Map<string, unknown>(),
+}));
+
+vi.mock('../../../lib/wsTransport', () => ({
+  getTransport: () => ({
+    request: () => new Promise(() => {}),
+    subscribe: (createStream: (client: unknown) => unknown, listener: (event: unknown) => void) => {
+      let conversationName = '';
+      const client = new Proxy({}, {
+        get: () => (args: { conversationName: string }) => {
+          conversationName = args.conversationName;
+          return {};
+        },
+      });
+      createStream(client);
+      streamTransportMock.listeners.set(conversationName, listener);
+      const initialEvent = streamTransportMock.initialEvents.get(conversationName)
+        ?? (conversationName === 'next-conv'
+          ? { kind: 'messages', snapshot: true, messages: [], workLog: [], streaming: false }
+          : undefined);
+      if (initialEvent) listener(initialEvent);
+      return vi.fn();
+    },
+  }),
+}));
+
 // Mock DialogProvider hooks so ConversationPanel can mount without the full provider tree
 vi.mock('../../DialogProvider', () => ({
   DialogProvider: ({ children }: { children: React.ReactNode }) => children,
@@ -102,7 +130,7 @@ function defaultConversationResponse(method: string, url: string): Response | un
   if (method === 'POST' && url === 'http://localhost:3000/api/dashboard/session') {
     return Response.json({ csrfToken: 'test-csrf-token' });
   }
-  if (method === 'GET' && /^\/api\/conversations\/(test-conv|next-conv)\/diffs$/.test(url)) {
+  if (method === 'GET' && /^\/api\/conversations\/(test-conv|next-conv|agent-test-stream-[ab])\/diffs$/.test(url)) {
     return Response.json({ summaries: [] });
   }
   // PAN-3113 — the panel polls the shared pending-input feed for pane choice
@@ -118,6 +146,11 @@ function makeClient(messagesData = {
   workLog: [],
   streaming: false,
 }) {
+  streamTransportMock.initialEvents.set('test-conv', {
+    kind: 'messages',
+    snapshot: true,
+    ...messagesData,
+  });
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false, staleTime: Infinity },
@@ -546,6 +579,20 @@ describe('ConversationPanel rename flow', () => {
 });
 
 describe('ConversationPanel resume message control', () => {
+  // A transcript with timeline activity keeps the pane off the isOrphaned
+  // "no saved history" empty state, so the tests exercise the real
+  // resume-bar-vs-composer footer choice. Served both as the seeded query
+  // data and as the /messages refetch a successful resume triggers.
+  const resumeWorkLog = [{
+    id: 'call_1',
+    createdAt: '2024-01-01T00:30:00Z',
+    label: 'Bash',
+    tone: 'tool' as const,
+    toolTitle: 'Bash',
+    detail: 'git status',
+  }];
+  const resumeMessagesData = { messages: [], workLog: resumeWorkLog, streaming: false };
+
   beforeEach(() => {
     queryClients = [];
     fetchControl = installStrictFetchMock(({ method, url }) => {
@@ -553,6 +600,10 @@ describe('ConversationPanel resume message control', () => {
       if (defaultResponse) return defaultResponse;
       if (method === 'POST' && url === '/api/conversations/test-conv/resume') {
         return Response.json({ ...mockConversation, status: 'active', sessionAlive: true });
+      }
+      // A successful resume invalidates the messages query; serve the refetch.
+      if (method === 'GET' && url === '/api/conversations/test-conv/messages') {
+        return Response.json(resumeMessagesData);
       }
       return undefined;
     });
@@ -587,6 +638,39 @@ describe('ConversationPanel resume message control', () => {
       expect(resumeCall).toBeDefined();
       expect(JSON.parse(String((resumeCall?.[1] as RequestInit).body))).toMatchObject({ sendResumeContract: false });
     });
+  });
+
+  // The old `resumed` latch was one-way: a successful resume POST pinned
+  // showTerminal forever, so when the resumed session stopped again the pane
+  // showed a read-only composer with no resume bar short of a browser refresh.
+  it('brings the resume bar back when a resumed session stops again', async () => {
+    const dead = { ...mockConversation, status: 'ended' as const, sessionAlive: false, endedAt: '2024-01-01T01:00:01Z' };
+    const alive = { ...mockConversation, status: 'active' as const, sessionAlive: true, endedAt: null };
+    const { client, rerender } = renderPanel(dead, {}, resumeMessagesData);
+    expect(screen.getByRole('button', { name: 'Resume Session' })).toBeInTheDocument();
+
+    // Operator resumes; until the poll confirms the session, the latch (not
+    // the composer) owns the footer.
+    fireEvent.click(screen.getByRole('button', { name: 'Resume Session' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Resume Session' })).toBeNull());
+    expect(screen.getByTestId('composer-footer')).toBeInTheDocument();
+
+    // Poll confirms the session came alive — the latch is spent, harmlessly,
+    // because sessionAlive now carries showTerminal on its own.
+    const tree = (conv: typeof dead) => (
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationPanel conversation={conv} viewMode="conversation" onArchived={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>
+    );
+    rerender(tree(alive));
+    expect(screen.getByTestId('composer-footer')).toBeInTheDocument();
+
+    // The session stops again — the resume bar must come back.
+    rerender(tree(dead));
+    expect(screen.getByRole('button', { name: 'Resume Session' })).toBeInTheDocument();
+    expect(screen.queryByTestId('composer-footer')).toBeNull();
   });
 });
 
@@ -654,6 +738,93 @@ describe('ConversationPanel empty-state gating (workLog-only agent sessions)', (
   });
 });
 
+describe('ConversationPanel first stream payload', () => {
+  const streamConversation = {
+    ...mockConversation,
+    id: -1,
+    name: 'agent-test-stream-a',
+    tmuxSession: 'agent-test-stream-a',
+    status: 'active' as const,
+    sessionAlive: true,
+    endedAt: null,
+    harness: 'ohmypi' as const,
+  };
+
+  beforeEach(() => {
+    queryClients = [];
+    streamTransportMock.listeners.clear();
+    fetchControl = installStrictFetchMock(({ method, url }) => defaultConversationResponse(method, url));
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  afterEach(async () => {
+    cleanup();
+    await Promise.all(queryClients.map((client) => client.cancelQueries()));
+    queryClients.forEach((client) => client.clear());
+    await fetchControl.assertNoUnexpectedRequests();
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  it('shows the loading skeleton instead of the greeting before the first payload', () => {
+    renderPanel(streamConversation);
+
+    expect(screen.getByRole('status', { name: 'Loading conversation' })).toBeInTheDocument();
+    expect(screen.queryByText('How can I help you?')).toBeNull();
+  });
+
+  it('shows the greeting after the first payload confirms an empty transcript', () => {
+    renderPanel(streamConversation);
+
+    act(() => {
+      streamTransportMock.listeners.get(streamConversation.name)?.({
+        kind: 'messages',
+        snapshot: true,
+        messages: [],
+        workLog: [],
+        streaming: false,
+      });
+    });
+
+    expect(screen.getByText('How can I help you?')).toBeInTheDocument();
+  });
+
+  it('returns to the loading skeleton when switching conversations', () => {
+    const view = renderPanel(streamConversation);
+
+    act(() => {
+      streamTransportMock.listeners.get(streamConversation.name)?.({
+        kind: 'messages',
+        snapshot: true,
+        messages: [],
+        workLog: [],
+        streaming: false,
+      });
+    });
+    expect(screen.getByText('How can I help you?')).toBeInTheDocument();
+
+    view.rerender(
+      <DialogProvider>
+        <QueryClientProvider client={view.client}>
+          <ConversationPanel
+            conversation={{
+              ...streamConversation,
+              name: 'agent-test-stream-b',
+              tmuxSession: 'agent-test-stream-b',
+            }}
+            viewMode="conversation"
+            onArchived={() => {}}
+          />
+        </QueryClientProvider>
+      </DialogProvider>,
+    );
+
+    expect(screen.getByRole('status', { name: 'Loading conversation' })).toBeInTheDocument();
+    expect(screen.queryByText('How can I help you?')).toBeNull();
+  });
+});
+
 describe('ConversationPanel spawn-placeholder window (post-reboot interrupted rows)', () => {
   beforeEach(() => {
     queryClients = [];
@@ -698,4 +869,3 @@ describe('ConversationPanel spawn-placeholder window (post-reboot interrupted ro
     expect(screen.getByText('Starting…')).toBeInTheDocument();
   });
 });
-

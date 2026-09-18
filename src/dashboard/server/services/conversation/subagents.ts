@@ -99,6 +99,7 @@ export async function startSubagentListPolling(
   sessionFile: string,
   pendingToolUseIds: () => ReadonlySet<string>,
   emit: (event: ConversationEvent) => void,
+  list?: () => Promise<SubagentSummary[]>,
 ): Promise<SubagentListPoller> {
   let stopped = false;
   let lastSerialized: string | null = null;
@@ -108,10 +109,11 @@ export async function startSubagentListPolling(
     refreshChain = refreshChain.then(async () => {
       if (stopped) return;
       const pending = pendingToolUseIds();
-      const subagents: SubagentSummary[] = (await listSubagentMetas(sessionFile)).map((meta) => ({
+      const subagents: SubagentSummary[] = list ? await list() : (await listSubagentMetas(sessionFile)).map((meta) => ({
         ...meta,
         status: pending.has(meta.toolUseId) ? 'running' : 'done',
       }));
+      if (stopped) return;
       const serialized = JSON.stringify(subagents);
       if (serialized === lastSerialized) return;
       lastSerialized = serialized;

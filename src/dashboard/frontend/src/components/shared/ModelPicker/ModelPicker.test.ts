@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  formatCost,
   PI_TOS_BLOCK_REASON,
   canUsePickerHarness,
   getProviderForPickerModel,
@@ -59,4 +60,10 @@ describe('ModelPicker harness policy', () => {
       allowed: true,
     });
   });
+});
+
+
+it('distinguishes unavailable pricing from a free model', () => {
+  expect(formatCost(null)).toBe('Pricing unavailable');
+  expect(formatCost(0)).toBe('FREE');
 });

@@ -83,10 +83,10 @@ If override exists, **do not prompt** - the user has explicitly disabled this sk
 
 ### Step 0.5: Check User Preferences for Category Exclusions
 
-Check `~/.claude/CLAUDE.md` for excluded categories:
+Check `~/.overdeck/context/global.md` for excluded categories:
 
 ```bash
-grep -A 20 "## AI Suggestion Preferences" ~/.claude/CLAUDE.md 2>/dev/null
+grep -A 20 "## AI Suggestion Preferences" ~/.overdeck/context/global.md 2>/dev/null
 ```
 
 Look for sections like:
@@ -156,7 +156,7 @@ This seems like project-specific knowledge that would help me (and other AI assi
 | **Yes, create skill** | I'll draft a project-specific skill with this knowledge |
 | **Yes, add to CLAUDE.md** | I'll add a note to the project's CLAUDE.md file |
 | **Not now** | Skip this time (I'll ask less frequently) |
-| **Skip this category** | Never prompt about {CATEGORY} issues (updates your ~/.claude/CLAUDE.md) |
+| **Skip this category** | Never prompt about {CATEGORY} issues (updates your ~/.overdeck/context/global.md) |
 | **Too frequent** | Reduce how often I ask (switch to minimal mode) |
 | **Stop asking** | Turn off prompts for this project (silent mode) |
 | **Shut up forever** | Permanently disable for this project (creates override) |
@@ -181,8 +181,8 @@ This seems like project-specific knowledge that would help me (and other AI assi
 2. Continue working
 
 **If "Skip this category":**
-1. Update `~/.claude/CLAUDE.md` to add category to skip list
-2. Acknowledge: "Got it - I won't prompt about {CATEGORY} issues anymore. You can edit ~/.claude/CLAUDE.md to change this."
+1. Update `~/.overdeck/context/global.md` to add category to skip list
+2. Acknowledge: "Got it - I won't prompt about {CATEGORY} issues anymore. You can edit ~/.overdeck/context/global.md to change this."
 
 **If "Too frequent":**
 1. Update config: `mode = "minimal"`, `promptCooldownMinutes = 120`
@@ -228,9 +228,9 @@ cat > .overdeck/knowledge-capture.json << 'EOF'
 EOF
 ```
 
-## User Preferences in ~/.claude/CLAUDE.md
+## User Preferences in ~/.overdeck/context/global.md
 
-Users can exclude specific categories globally by adding to their personal `~/.claude/CLAUDE.md`:
+Users can exclude specific categories globally by adding to their personal `~/.overdeck/context/global.md`:
 
 ```markdown
 ## AI Suggestion Preferences
@@ -273,7 +273,7 @@ welcome: naming, code-organization, testing
 To add a category exclusion:
 ```bash
 # AI will add this section if it doesn't exist
-cat >> ~/.claude/CLAUDE.md << 'EOF'
+cat >> ~/.overdeck/context/global.md << 'EOF'
 
 ## AI Suggestion Preferences
 
@@ -285,13 +285,13 @@ EOF
 To modify:
 ```bash
 # Edit directly
-nano ~/.claude/CLAUDE.md
+nano ~/.overdeck/context/global.md
 ```
 
 To remove all exclusions:
 ```bash
 # Remove the AI Suggestion Preferences section
-sed -i '/## AI Suggestion Preferences/,/^## /d' ~/.claude/CLAUDE.md
+sed -i '/## AI Suggestion Preferences/,/^## /d' ~/.overdeck/context/global.md
 ```
 
 ## User Commands (Escalating Silence)
@@ -409,7 +409,7 @@ Prompt the user early:
 
 | File | Purpose |
 |------|---------|
-| `~/.claude/CLAUDE.md` | User preferences (category exclusions) |
+| `~/.overdeck/context/global.md` | User preferences (category exclusions) |
 | `.overdeck/knowledge-capture.json` | Per-project configuration |
 | `.claude/skills/project-knowledge/SKILL.md` | Captured knowledge as skill |
 | `.claude/skills/knowledge-capture/SKILL.md` | Override to permanently disable |
@@ -434,7 +434,7 @@ rm -rf .claude/skills/knowledge-capture/
 
 To clear all category exclusions:
 ```bash
-# Edit ~/.claude/CLAUDE.md and remove the "AI Suggestion Preferences" section
+# Edit ~/.overdeck/context/global.md and remove the "AI Suggestion Preferences" section
 ```
 
 ## Integration with Other Skills
@@ -443,7 +443,7 @@ To clear all category exclusions:
 - knowledge-capture: "Here's how to work around this confusion"
 - refactor-radar: "Here's how to fix the codebase so this confusion doesn't happen"
 - Prefer refactor-radar for systemic issues, knowledge-capture for workarounds
-- Both skills share the same category exclusion system in ~/.claude/CLAUDE.md
+- Both skills share the same category exclusion system in ~/.overdeck/context/global.md
 
 **With pan-skill-creator:** When invoked, suggest consolidating:
 > "You have 7 captured knowledge items in project-knowledge. Would you like me to organize these into a proper project skill?"

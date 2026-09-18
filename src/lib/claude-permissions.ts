@@ -97,6 +97,25 @@ export function getClaudePermissionFlagsStringSync(mode?: ClaudePermissionMode):
 }
 
 /**
+ * Append the resolved `--permission-mode` flag to an already-built `claude`
+ * command, but only when the command does not carry one already.
+ *
+ * Spawn sites that compose a base command elsewhere (conversation launches, for
+ * example) used to hand-roll this with a `mode === 'auto' ? 'auto' : …` ternary,
+ * which emitted the literal value `auto`. `auto` is Overdeck's internal mode name,
+ * never a Claude Code flag value — newer Claude Code builds strict-validate
+ * `--permission-mode` and abort the launch. Route every such append through this
+ * helper so the mode→flag mapping stays in one place.
+ */
+export function ensureClaudePermissionFlagSync(
+  command: string,
+  mode?: ClaudePermissionMode,
+): string {
+  if (command.includes('--permission-mode')) return command;
+  return `${command} ${getClaudePermissionFlagsStringSync(mode)}`;
+}
+
+/**
  * Bypass prefix injected ahead of `--agent`. The bypass CLI flag was removed,
  * so there is no longer a flag to inject — `--agent` agents rely on their
  * roles/<role>.md frontmatter permissionMode. Always returns `''`; kept as a

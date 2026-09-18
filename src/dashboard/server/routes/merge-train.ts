@@ -25,6 +25,8 @@ import {
   listEligibleCandidatesByProject,
   type MergeQueueItem,
 } from '../../../lib/flywheel-merge-order.js';
+import { gatherMergeEligibility, isMergeEligible } from '../../../lib/cloister/merge-eligibility.js';
+import type { PipelineMembership } from '../../../lib/pipeline-membership.js';
 
 const readUnknownJsonBody = Effect.gen(function* () {
   const request = yield* HttpServerRequest.HttpServerRequest;
@@ -72,7 +74,7 @@ async function queueEntryForProject(
   if (!enabled) return { ...base, queue: [] };
 
   const projectPath = resolve(config.path);
-  const candidates = listEligibleCandidatesByProject(projectPath);
+  const candidates = await listEligibleCandidatesByProject(projectPath);
   if (candidates.length === 0) return { ...base, queue: [] };
 
   const queue = await Effect.runPromise(
@@ -128,10 +130,11 @@ export async function getMergeTrainGenerationsPayload(): Promise<MergeTrainGener
 export interface MergeTrainMergeNextDeps {
   getOrderedIssueIds?: (projectPath: string) => Promise<string[]>;
   merge?: (issueId: string) => Promise<{ ok: true } | { ok: false; reason: string }>;
+  gatherEligibility?: (issueIds: string[]) => Promise<Map<string, PipelineMembership>>;
 }
 
 async function defaultOrderedIssueIdsForProject(projectPath: string): Promise<string[]> {
-  const candidates = listEligibleCandidatesByProject(projectPath);
+  const candidates = await listEligibleCandidatesByProject(projectPath);
   if (candidates.length === 0) return [];
   const queue = await Effect.runPromise(
     computeMergeQueueFromCandidates(candidates, projectPath).pipe(Effect.provide(nodeServicesLayer)),
@@ -170,6 +173,14 @@ export async function postMergeTrainMergeNextPayload(
 
   const ordered = await (deps.getOrderedIssueIds ?? defaultOrderedIssueIdsForProject)(resolve(config.path));
   const issueIds = ordered.slice(0, n);
+  const memberships = await (deps.gatherEligibility ?? gatherMergeEligibility)(issueIds);
+  for (const issueId of issueIds) {
+    const membership = memberships.get(issueId.toUpperCase());
+    if (!membership || !isMergeEligible(membership)) {
+      const reason = membership?.reasons.join('; ') || 'pipeline membership unavailable';
+      return { status: 409, body: { error: `${issueId} is not merge-eligible: ${reason}` } };
+    }
+  }
   const { shipMergeBatch } = await import('../../../lib/cloister/merge-batch.js');
   const outcomes = await shipMergeBatch(issueIds, { merge: deps.merge ?? defaultMergeOne });
   return { status: 200, body: { projectKey, outcomes } };

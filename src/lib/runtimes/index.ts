@@ -1,3 +1,5 @@
+import { createMuseRuntimeSync } from './muse.js';
+export { MuseRuntimeSync, createMuseRuntimeSync } from './muse.js';
 /**
  * Cloister Runtime Abstraction
  *
@@ -108,9 +110,11 @@ export class RuntimeRegistry implements RuntimeRegistryInterface {
     if (harness === 'codex') {
       return this.get('codex') ?? null;
     }
+    if (harness === 'opencode') return this.get('opencode') ?? null;
     if (harness === 'acp') {
       return this.get('acp') ?? null;
     }
+    if (harness === 'muse') return this.get('muse') ?? null;
     if (harness === 'kimi-code') {
       return this.get('kimi-code') ?? null;
     }
@@ -141,7 +145,9 @@ export function getGlobalRegistry(): RuntimeRegistry {
     globalRegistry.register(createOhmypiRuntimeSync());
     globalRegistry.register(createCodexRuntimeSync());
     globalRegistry.register(createAcpRuntimeSync());
+    globalRegistry.register(createAcpRuntimeSync({ name: 'opencode', provider: 'opencode' }));
     globalRegistry.register(createKimiCodeRuntimeSync());
+    globalRegistry.register(createMuseRuntimeSync());
   }
   return globalRegistry;
 }
@@ -168,3 +174,9 @@ export function getRuntime(name: RuntimeName): AgentRuntimeSync | undefined {
 export function getRuntimeForAgent(agentId: string): AgentRuntimeSync | null {
   return getGlobalRegistry().getRuntimeForAgent(agentId);
 }
+
+// PAN-3849: register the transcript-heartbeat lookup with the liveness oracle
+// (agents/liveness.ts cannot import this barrel — that would close a module
+// cycle through agents.ts → messaging.ts → liveness.ts).
+import { registerLivenessHeartbeatLookup } from '../agents/liveness.js';
+registerLivenessHeartbeatLookup((agentId) => getRuntimeForAgent(agentId)?.getHeartbeat(agentId) ?? null);

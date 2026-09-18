@@ -71,7 +71,6 @@ export interface WorkAgentLifecycle {
   hasLiveTmuxSession: boolean;
   hasSavedSession: boolean;
   hasWorkspace: boolean;
-  isPlaceholder: boolean;
   isOrphaned: boolean;
   isRunning: boolean;
   isStopped: boolean;
@@ -93,7 +92,7 @@ export interface Agent {
   id: string;
   issueId?: string;
   runtime: string;
-  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | null;
+  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | null;
   model: string;
   status: 'healthy' | 'warning' | 'stuck' | 'stalled' | 'dead' | 'stopped' | 'starting' | 'running' | 'failed' | 'error' | 'unknown';
   error?: string;

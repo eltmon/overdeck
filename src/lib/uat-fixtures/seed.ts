@@ -24,7 +24,6 @@ import { serializeXBriefDocument } from '../xbrief/io.js';
 import {
   FIXTURE_ISSUE_ID,
   FIXTURE_PROJECT_KEY,
-  FIXTURE_WORKSPACE_CLAUDE_MD,
   fixtureActivityEntries,
   fixtureAgentStates,
   fixtureContinueJson,
@@ -159,12 +158,7 @@ export async function seedUatFixturesLocal(options: SeedUatFixturesOptions = {})
   // PAN-3362 UAT cycle 1).
   const workspaceRoot = fixtureWorkspacePath();
 
-  // Marker file so the workspace-structure check in getWorkspaceRoute
-  // (src/dashboard/server/routes/workspaces/workspace-data.ts) does not
-  // report the seeded directory as corrupted — see FIXTURE_WORKSPACE_CLAUDE_MD.
   await mkdir(workspaceRoot, { recursive: true });
-  await writeFile(join(workspaceRoot, 'CLAUDE.md'), FIXTURE_WORKSPACE_CLAUDE_MD);
-
   const workspaceOverdeckDir = join(workspaceRoot, '.overdeck');
   await mkdir(workspaceOverdeckDir, { recursive: true });
   const planPath = join(workspaceOverdeckDir, 'spec.vbrief.json');

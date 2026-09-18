@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -12,6 +13,7 @@ const registry = vi.hoisted(() => ({
   resolved: {} as Record<string, ResolvedProject>,
   configs: {} as Record<string, ProjectConfig>,
   queueAutoCommit: vi.fn(),
+  useActualAutoCommit: false,
 }));
 
 vi.mock('../../projects.js', async (importActual) => {
@@ -26,7 +28,13 @@ vi.mock('../../projects.js', async (importActual) => {
 
 vi.mock('../auto-commit.js', async (importActual) => {
   const actual = await importActual<typeof import('../auto-commit.js')>();
-  return { ...actual, queueAutoCommit: registry.queueAutoCommit };
+  return {
+    ...actual,
+    queueAutoCommit: (options: Parameters<typeof actual.queueAutoCommit>[0]) => {
+      registry.queueAutoCommit(options);
+      if (registry.useActualAutoCommit) actual.queueAutoCommit(options);
+    },
+  };
 });
 
 import {
@@ -34,6 +42,7 @@ import {
   appendAgentPlaneLifecycle,
   appendAgentPlaneSession,
   backfillAgentPlaneRecord,
+  flushAgentPlaneWrites,
   readAgentPlaneRecordSync,
   recordAgentPlaneSpawn,
 } from '../agents.js';
@@ -94,6 +103,7 @@ describe('durable agents plane', () => {
     };
     registry.configs = { [PROJECT_KEY]: config };
     registry.queueAutoCommit.mockClear();
+    registry.useActualAutoCommit = false;
     writeFileSync(join(stateRoot, 'migration-complete.json'), markerJson());
   });
 
@@ -223,5 +233,61 @@ describe('durable agents plane', () => {
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('has not migrated to overdeck-state'));
     expect(existsSync(join(stateRoot, 'agents'))).toBe(false);
     expect(registry.queueAutoCommit).not.toHaveBeenCalled();
+  });
+
+  it('reconciles a tombstone after another writer advances overdeck-state', async () => {
+    const remote = join(root, 'origin.git');
+    const seed = join(root, 'seed');
+    const other = join(root, 'other');
+    execFileSync('git', ['init', '--bare', remote]);
+    execFileSync('git', ['init', seed]);
+    for (const repo of [seed]) {
+      execFileSync('git', ['config', 'user.email', 'test@overdeck.local'], { cwd: repo });
+      execFileSync('git', ['config', 'user.name', 'Overdeck Test'], { cwd: repo });
+      execFileSync('git', ['config', 'commit.gpgsign', 'false'], { cwd: repo });
+    }
+    writeFileSync(join(seed, 'migration-complete.json'), markerJson());
+    mkdirSync(join(seed, 'agents'), { recursive: true });
+    execFileSync('git', ['add', '.'], { cwd: seed });
+    execFileSync('git', ['commit', '-m', 'seed state'], { cwd: seed });
+    execFileSync('git', ['branch', '-M', 'overdeck-state'], { cwd: seed });
+    execFileSync('git', ['remote', 'add', 'origin', remote], { cwd: seed });
+    execFileSync('git', ['push', '-u', 'origin', 'overdeck-state'], { cwd: seed });
+    rmSync(stateRoot, { recursive: true, force: true });
+    execFileSync('git', ['clone', '--branch', 'overdeck-state', remote, stateRoot]);
+    execFileSync('git', ['config', 'user.email', 'test@overdeck.local'], { cwd: stateRoot });
+    execFileSync('git', ['config', 'user.name', 'Overdeck Test'], { cwd: stateRoot });
+    execFileSync('git', ['config', 'commit.gpgsign', 'false'], { cwd: stateRoot });
+    registry.useActualAutoCommit = true;
+
+    const state = agentState(join(projectPath, 'workspaces', 'feature-pan-3513'));
+    await recordAgentPlaneSpawn(state, 'session-one');
+    await expect(flushAgentPlaneWrites(ISSUE_ID, AGENT_ID)).resolves.toMatchObject({ pushed: true });
+    execFileSync('git', ['clone', '--branch', 'overdeck-state', remote, other]);
+    execFileSync('git', ['config', 'user.email', 'test@overdeck.local'], { cwd: other });
+    execFileSync('git', ['config', 'user.name', 'Overdeck Test'], { cwd: other });
+    execFileSync('git', ['config', 'commit.gpgsign', 'false'], { cwd: other });
+    await appendAgentPlaneLifecycle(state, {
+      at: '2026-08-02T12:00:00.000Z',
+      event: 'tombstoned',
+    }, { deferCommit: true });
+
+    writeFileSync(join(other, 'concurrent.json'), '{"writer":"other"}\n');
+    execFileSync('git', ['add', 'concurrent.json'], { cwd: other });
+    execFileSync('git', ['commit', '-m', 'concurrent state write'], { cwd: other });
+    execFileSync('git', ['push', 'origin', 'overdeck-state'], { cwd: other });
+
+    await expect(flushAgentPlaneWrites(ISSUE_ID, AGENT_ID)).resolves.toEqual({
+      committed: true,
+      pushed: true,
+    });
+    const remoteRecord = JSON.parse(execFileSync(
+      'git',
+      ['--git-dir', remote, 'show', `overdeck-state:agents/${AGENT_ID}.json`],
+      { encoding: 'utf8' },
+    ));
+    expect(remoteRecord.lifecycle).toContainEqual(expect.objectContaining({ event: 'tombstoned' }));
+    expect(execFileSync('git', ['--git-dir', remote, 'show', 'overdeck-state:concurrent.json'], { encoding: 'utf8' }))
+      .toContain('other');
   });
 });

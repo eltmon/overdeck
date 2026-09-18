@@ -194,7 +194,10 @@ async function persistAgentGcTombstone(
   if (!state) {
     throw new Error(`local agent state is unavailable for durable tombstone ${agent.id}`);
   }
-  const written = await appendAgentPlaneLifecycle(state, entry);
+  // The GC owns the durability boundary below. Keep this concrete mutation in
+  // the queue until its explicit flush can reconcile a concurrent remote
+  // advance while the desired tombstone is still available.
+  const written = await appendAgentPlaneLifecycle(state, entry, { deferCommit: true });
   if (!written) {
     throw new Error(`durable agent plane is unavailable for tombstone ${agent.id}`);
   }

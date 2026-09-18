@@ -131,13 +131,12 @@ export async function doneCommand(
       if (options.notes) update.reviewNotes = options.notes;
       // Snapshot the workspace HEAD — the same way the /api/specialists/done HTTP
       // route does. The synthesis agent signals via this CLI path, so without this
-      // the snapshot never happens: canSkipTests can't fire and the deacon's
-      // post-review-commit drift detection goes blind, jamming the issue at
-      // passed-but-no-anchor. This pre-delivery probe runs for passed verdicts;
-      // a blocked verdict stays synchronous ahead of feedback delivery, and its
-      // reviewedAtCommit anchor is recorded by a second best-effort write after
-      // feedback delivery below (PAN-2524, PAN-3148).
-      if (options.status === 'passed') {
+      // the snapshot never happens: the deacon's post-review-commit drift detection
+      // goes blind, jamming the issue at passed-but-no-anchor. PAN-3847: the verdict
+      // write door refuses anchorless terminal verdicts, so the head is snapshotted
+      // for passed, blocked and failed verdicts and travels in the same write — the
+      // verdict and its anchor are one write (PAN-2524, PAN-3148).
+      if (options.status === 'passed' || options.status === 'blocked' || options.status === 'failed') {
         let workspaceHead: HeadAnchor | undefined;
         try {
           const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
@@ -161,14 +160,14 @@ export async function doneCommand(
           const message = err instanceof Error ? err.message : String(err);
           console.warn(chalk.yellow(`  ⚠ Could not snapshot workspace HEAD: ${message}`));
         }
-        if (workspaceHead && options.status === 'passed') update.reviewedAtCommit = workspaceHead;
+        if (!workspaceHead) {
+          console.error(chalk.red('Cannot record a review verdict without the workspace head; check the workspace and retry'));
+          return exitCli(1);
+        }
+        update.reviewedAtCommit = workspaceHead;
       }
-      if (options.status === 'passed') {
-        // Clear any stale verificationStatus='failed' so the override unblocks
-        // readyForMerge. A human passing review assumes responsibility for the gate.
-        update.verificationStatus = 'passed';
-        update.verificationNotes = 'Cleared by `pan specialists done review --status passed` override (PAN-1215)';
-      }
+      // PAN-3847 (FR-10): a review verdict never writes verificationStatus — the
+      // verification gate alone owns that field.
       break;
 
     case 'test':
@@ -327,34 +326,6 @@ export async function doneCommand(
         );
       }
       console.warn(chalk.yellow(`Could not deliver review feedback: ${message}`));
-    }
-  }
-
-  // PAN-3148: a blocked verdict needs the reviewed HEAD as the baseline for
-  // detecting the rework commit that should trigger a fresh review. Keep this as
-  // a second, best-effort write after the durable verdict and feedback delivery;
-  // folding the git probe into the first write would reopen PAN-2524's stall.
-  if (specialist === 'review' && options.status === 'blocked') {
-    try {
-      const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
-      const { existsSync } = await import('node:fs');
-      const { join } = await import('node:path');
-      const project = resolveProjectFromIssueSync(normalizedIssueId);
-      if (project) {
-        const workspacePath = join(
-          project.projectPath,
-          'workspaces',
-          `feature-${normalizedIssueId.toLowerCase()}`,
-        );
-        if (existsSync(workspacePath)) {
-          const { snapshotWorkspaceHeadsPromise } = await import('../../../lib/git-utils.js');
-          const reviewedAtCommit = await snapshotWorkspaceHeadsPromise(normalizedIssueId, workspacePath);
-          if (reviewedAtCommit) setReviewStatusSync(normalizedIssueId, { reviewedAtCommit });
-        }
-      }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      console.warn(chalk.yellow(`  ⚠ Could not snapshot blocked review HEAD: ${message}`));
     }
   }
 

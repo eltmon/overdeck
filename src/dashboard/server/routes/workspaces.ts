@@ -1458,9 +1458,9 @@ export const postWorkspaceReviewStatusRoute = HttpRouter.add(
       readyForMerge?: boolean;
     };
 
-    // Snapshot reviewedAtCommit BEFORE the first setReviewStatus call so canSkipTests
-    // fires correctly in that same call — setting it afterward is too late (the
-    // async test-agent dispatch is already scheduled).
+    // Snapshot reviewedAtCommit BEFORE the first setReviewStatus call so the
+    // verdict carries its anchor in the same write (PAN-3847) — setting it
+    // afterward is too late (the async test-agent dispatch is already scheduled).
     const update: ReviewStatusUpdate = {};
     if (reviewStatus === 'passed') {
       const workspaceInfo = getWorkspaceInfoForIssue(issueId);

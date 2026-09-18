@@ -225,6 +225,7 @@ import { setReviewStatusSync, getReviewStatusSync, verificationSatisfied } from 
 import { checkPostReviewCommits } from '../../src/lib/cloister/deacon.js';
 import { doneCommand } from '../../src/cli/commands/specialists/done.js';
 import { captureCheckpoint, hasCheckpoint } from '../../src/lib/checkpoint/checkpoint-manager.js';
+import { withReviewLifecycleGuard, withReviewLifecycleGuardForAgent } from '../../src/lib/review-lifecycle-guard.js';
 
 describe('PAN-1215 post-review-rebase scenario', () => {
   let testRepoDir: string;
@@ -272,9 +273,9 @@ describe('PAN-1215 post-review-rebase scenario', () => {
     }
   });
 
-  // ─── Gap A: Deacon redispatches review convoy after post-review reset ───────
+  // ─── Gap A: Deacon marks a passed review stale after a tree-changing rebase ──
 
-  it('resets review and redispatches convoy after tree-changing rebase', async () => {
+  it('marks review stale without re-dispatching after a tree-changing rebase (PAN-3847)', async () => {
     setReviewStatusSync('PAN-1215-A', {
       reviewStatus: 'passed',
       testStatus: 'passed',
@@ -284,30 +285,23 @@ describe('PAN-1215 post-review-rebase scenario', () => {
 
     const actions = await checkPostReviewCommits();
 
-    // AC1 + AC4: actions include both reset and re-dispatch lines
+    // PAN-3847: a passed review is never reset by a patrol — drift marks it stale.
     expect(
-      actions.some((a) => a.includes('PAN-1215-A') && a.includes('Reset review')),
+      actions.some((a) => a.includes('PAN-1215-A') && a.includes('Marked review stale')),
     ).toBe(true);
-    expect(
-      actions.some((a) => a.includes('PAN-1215-A') && a.includes('Re-dispatched review')),
-    ).toBe(true);
+    expect(actions.some((a) => a.includes('Reset review'))).toBe(false);
 
-    // AC2: review status reset to pending, readyForMerge cleared
+    // The verdict, the test result, and the anchor survive; the row is no longer
+    // ready for merge.
     const after = getReviewStatusSync('PAN-1215-A');
-    expect(after?.reviewStatus).toBe('pending');
-    expect(after?.testStatus).toBe('pending');
+    expect(after?.reviewStatus).toBe('passed');
+    expect(after?.testStatus).toBe('passed');
     expect(after?.readyForMerge).toBe(false);
-    expect(after?.reviewedAtCommit).toBeUndefined();
+    expect(after?.reviewedAtCommit).toBe('oldsha1');
+    expect(after?.reviewStaleSince).toBeTruthy();
 
-    // AC5 + AC6: spawn called exactly once with correct args including force:true
-    expect(mockSpawnReviewRoleForIssue).toHaveBeenCalledTimes(1);
-    expect(mockSpawnReviewRoleForIssue).toHaveBeenCalledWith(
-      expect.objectContaining({
-        issueId: 'PAN-1215-A',
-        branch: 'feature/pan-1215-a',
-        force: true,
-      }),
-    );
+    // No convoy is dispatched for a stale passed review.
+    expect(mockSpawnReviewRoleForIssue).not.toHaveBeenCalled();
   });
 
   it('does NOT redispatch on tree-identical rebases (PAN-1213 short-circuit)', async () => {
@@ -332,9 +326,70 @@ describe('PAN-1215 post-review-rebase scenario', () => {
     expect(after?.reviewedAtCommit).toBe('newsha99');
   });
 
+  it('serializes polyrepo anchor-drift re-review with active boot recovery', async () => {
+    const issueId = 'PAN-3794';
+    const reviewedAnchor = `api@${'a'.repeat(40)} fe@${'b'.repeat(40)}`;
+    const currentAnchor = `api@${'c'.repeat(40)} splash@${'d'.repeat(40)}`;
+    mockExecHeadSha = currentAnchor;
+    // PAN-3847: passed reviews are stale-marked, never re-dispatched — the
+    // re-review dispatch path now runs only for blocked reviews.
+    setReviewStatusSync(issueId, {
+      reviewStatus: 'blocked',
+      testStatus: 'failed',
+      readyForMerge: false,
+      reviewedAtCommit: reviewedAnchor,
+    });
+
+    // Blocked drift debounces one patrol before resetting and re-dispatching.
+    await checkPostReviewCommits();
+
+    let releaseRecovery!: () => void;
+    let recoveryStarted!: () => void;
+    const recoveryIsActive = new Promise<void>((resolve) => {
+      recoveryStarted = resolve;
+    });
+    const recoveryPause = new Promise<void>((resolve) => {
+      releaseRecovery = resolve;
+    });
+    const lifecycleOrder: string[] = [];
+    const bootRecovery = withReviewLifecycleGuardForAgent(`agent-${issueId.toLowerCase()}-review`, async () => {
+      lifecycleOrder.push('boot-recovery:provisioned');
+      recoveryStarted();
+      await recoveryPause;
+      lifecycleOrder.push('boot-recovery:started');
+    });
+    await recoveryIsActive;
+
+    mockSpawnReviewRoleForIssue.mockImplementationOnce((opts: { issueId: string }) =>
+      withReviewLifecycleGuard(opts.issueId, async () => {
+        lifecycleOrder.push('redispatch:entered');
+        return { success: true, message: 'spawned' };
+      }));
+    const patrol = checkPostReviewCommits();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(lifecycleOrder).toEqual(['boot-recovery:provisioned']);
+    releaseRecovery();
+    const [, actions] = await Promise.all([bootRecovery, patrol]);
+
+    expect(lifecycleOrder).toEqual([
+      'boot-recovery:provisioned',
+      'boot-recovery:started',
+      'redispatch:entered',
+    ]);
+    expect(mockSpawnReviewRoleForIssue).toHaveBeenCalledWith(expect.objectContaining({
+      issueId,
+      force: false,
+    }));
+    expect(actions.some((a) => a.includes(`Re-dispatched review for ${issueId}`))).toBe(true);
+  });
+
   // ─── Gap C: Review override clears stale verificationStatus ─────────────────
 
-  it('clears stale verificationStatus when review override signals passed', async () => {
+  // ─── Gap C: Review verdict never writes verificationStatus (PAN-3847) ──────
+
+  it('leaves a failed verificationStatus untouched when review signals passed (PAN-3847)', async () => {
     // Pre-seed a status with failed verification (e.g. from a prior cycle)
     setReviewStatusSync('PAN-1215-C', {
       reviewStatus: 'pending',
@@ -345,12 +400,13 @@ describe('PAN-1215 post-review-rebase scenario', () => {
 
     await doneCommand('review', 'pan-1215-c', { status: 'passed' });
 
+    // FR-10: the review verdict command never writes verificationStatus — a human
+    // passing review no longer clears the verification gate.
     const after = getReviewStatusSync('PAN-1215-C');
     expect(after?.reviewStatus).toBe('passed');
-    expect(after?.verificationStatus).toBe('passed');
-    expect(after?.verificationNotes).toContain('PAN-1215');
-    expect(after?.verificationNotes).toContain('override');
-    expect(verificationSatisfied(after!)).toBe(true);
+    expect(after?.verificationStatus).toBe('failed');
+    expect(after?.verificationNotes ?? '').not.toContain('PAN-1215');
+    expect(verificationSatisfied(after!)).toBe(false);
   });
 
   // ─── Gap B.1: Checkpoint excludes workspace-only .pan/ artifacts ────────────

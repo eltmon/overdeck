@@ -1,6 +1,10 @@
 import type { SystemHealthSnapshot as AcceptedSystemHealthSnapshot } from '@overdeck/contracts';
 import { Effect } from 'effect';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../../../src/dashboard/server/services/dashboard-poll-snapshots.js', () => ({
+  getAgentCostStatsSnapshot: async () => [],
+}));
 
 import {
   getResourcesEffect,

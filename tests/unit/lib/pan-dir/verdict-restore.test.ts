@@ -386,6 +386,7 @@ describe('restoreReviewStatusFromRecords', () => {
       'pr_number',
       'reviewed_at_commit',
       'last_verified_commit',
+      'review_stale_since',
       'auto_merge',
       'deacon_ignored',
       'deacon_ignored_at',
@@ -423,6 +424,7 @@ describe('restoreReviewStatusFromRecords', () => {
       'recovery_started_at',
       'inspect_started_at',
       'inspect_bead_id',
+      'retired_at',
     ]);
 
     const accountedFor = new Set([...primaryKey, ...durable, ...compatibilityOnly, ...derived, ...ephemeralDefaults]);

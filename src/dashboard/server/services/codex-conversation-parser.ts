@@ -16,6 +16,15 @@
  *       - `user_message`  — the user's prompt (clean text in `payload.message`)
  *       - `agent_message` — the assistant's visible reply (`payload.message`)
  *       - `token_count`   — cumulative usage in `payload.info.total_token_usage`
+ *
+ * Codex cli ≥ 0.153.4 renamed both message events into a single
+ * `item_completed` record. Reading either shape is delegated to
+ * `readCodexRolloutMessage` in `src/lib/codex-rollout-message.ts`, which is the
+ * one place that knows the layouts; see that module for the details and for why
+ * `item_completed` tool items are not read here (the `response_item` branch
+ * below already builds the work log, so reading both would duplicate rows).
+ * Both shapes stay supported — rollouts written before the CLI upgrade use the
+ * old event names, and old conversations must keep rendering (PAN-3781).
  *   - `type: 'response_item'` with `payload.type`:
  *       - `function_call` / `custom_tool_call`        — tool invocation
  *       - `function_call_output` / `custom_tool_call_output` — tool result
@@ -24,10 +33,11 @@
  *       - `reasoning` — chain-of-thought; Codex encrypts it, so it is skipped.
  */
 
-import { readFile, stat } from 'node:fs/promises';
 import type { ChatMessage, CompactBoundary, WorkLogEntry } from '@overdeck/contracts';
 import type { ParseResult } from './conversation-service.js';
-import { parseCodexSessionSync } from '../../../lib/cost-parsers/codex-parser.js';
+import { createCodexSessionParser } from '../../../lib/cost-parsers/codex-parser.js';
+import { readCodexRolloutMessage } from '../../../lib/codex-rollout-message.js';
+import { createIncrementalTranscriptReader } from './incremental-transcript-reader.js';
 
 interface CodexTokenUsage {
   input_tokens?: number;
@@ -54,6 +64,14 @@ interface CodexEntry {
   timestamp?: string;
   payload?: CodexPayload;
   [k: string]: unknown;
+}
+
+function parseToolInput(args: string): Record<string, unknown> | undefined {
+  try {
+    const value: unknown = JSON.parse(args);
+    return value !== null && typeof value === 'object' && !Array.isArray(value)
+      ? value as Record<string, unknown> : undefined;
+  } catch { return undefined; }
 }
 
 /** Flatten a Codex tool output (usually a string) into display text. */
@@ -89,16 +107,9 @@ function extractCommand(name: string, args: string): string | undefined {
   return undefined;
 }
 
-/**
- * Parse a Codex rollout JSONL into the ParseResult shape the chat panel
- * consumes. Always a full read (rollouts are small enough); incremental-parse
- * state fields are returned as empty stubs, matching the Pi adapter.
- */
-export async function parseCodexConversationMessages(sessionFile: string): Promise<ParseResult> {
-  const fileStats = await stat(sessionFile);
-  const raw = await readFile(sessionFile, 'utf-8');
-
-  const lines = raw.split('\n').filter((line) => line.trim().length > 0);
+/** Incremental rollout accumulator; each JSONL record is consumed once per cached file. */
+export function createCodexConversationAccumulator(sessionFile: string) {
+  const costs = createCodexSessionParser(sessionFile);
   const messages: ChatMessage[] = [];
   const workLog: WorkLogEntry[] = [];
   const compactBoundaries: CompactBoundary[] = [];
@@ -106,29 +117,39 @@ export async function parseCodexConversationMessages(sessionFile: string): Promi
   const toolCallsByCallId = new Map<string, WorkLogEntry>();
   let totalTokens = 0;
   let sequence = 0;
+  // The trailing agent_message, if the file ends on one. Codex narrates
+  // mid-turn ("Checking the branch first.") before running tools, so a
+  // completed-looking assistant message does NOT mean the turn ended — only a
+  // message with no tool activity after it does (PAN-3770 spinner fix).
+  let trailingAgentMessageAt: string | undefined;
 
-  for (const line of lines) {
+  const push = (line: string): void => {
+    costs.push(line);
     let entry: CodexEntry;
     try {
       entry = JSON.parse(line) as CodexEntry;
     } catch {
-      continue;
+      return;
     }
-    if (!entry || typeof entry !== 'object') continue;
+    if (!entry || typeof entry !== 'object') return;
     const payload = entry.payload;
-    if (!payload || typeof payload !== 'object') continue;
+    if (!payload || typeof payload !== 'object') return;
     const createdAt = entry.timestamp ?? new Date().toISOString();
     const ptype = payload.type;
 
     if (entry.type === 'event_msg') {
-      if (ptype === 'user_message' || ptype === 'agent_message') {
-        const text = typeof payload.message === 'string' ? payload.message.trim() : '';
-        if (!text) continue;
+      const rolloutMessage = readCodexRolloutMessage(entry);
+      if (rolloutMessage) {
+        const isUser = rolloutMessage.role === 'user';
         sequence += 1;
+        // PAN-3770: a completed-looking assistant message does NOT mean the
+        // turn ended — Codex narrates mid-turn, so only a message with no tool
+        // activity after it does. The tool branches below clear this.
+        trailingAgentMessageAt = isUser ? undefined : createdAt;
         messages.push({
-          id: `codex-${ptype === 'user_message' ? 'user' : 'agent'}-${sequence}`,
-          role: ptype === 'user_message' ? 'user' : 'assistant',
-          text,
+          id: `codex-${isUser ? 'user' : 'agent'}-${sequence}`,
+          role: rolloutMessage.role,
+          text: rolloutMessage.text,
           createdAt,
           completedAt: createdAt,
           streaming: false,
@@ -143,11 +164,13 @@ export async function parseCodexConversationMessages(sessionFile: string): Promi
             : (usage.input_tokens ?? 0) + (usage.output_tokens ?? 0);
         }
       }
-      continue;
+      return;
     }
 
     if (entry.type === 'response_item') {
       if (ptype === 'function_call' || ptype === 'custom_tool_call') {
+        // Tool activity after a narration message means the turn continues.
+        trailingAgentMessageAt = undefined;
         const callId = typeof payload.call_id === 'string' ? payload.call_id : '';
         const name = typeof payload.name === 'string' ? payload.name : 'tool';
         const args = typeof payload.arguments === 'string'
@@ -160,6 +183,7 @@ export async function parseCodexConversationMessages(sessionFile: string): Promi
           createdAt,
           label: command ? 'Shell' : name,
           tone: 'tool',
+          ...(name === 'spawn_agent' ? { toolInput: parseToolInput(args) } : {}),
           sequence,
           ...(command ? { command } : args ? { detail: args } : {}),
         };
@@ -170,7 +194,10 @@ export async function parseCodexConversationMessages(sessionFile: string): Promi
         const output = extractToolOutput(payload.output);
         const wl = callId ? toolCallsByCallId.get(callId) : undefined;
         if (wl) {
-          if (output) (wl as { result?: string }).result = output;
+          if (output) {
+            const index = workLog.indexOf(wl);
+            workLog[index] = { ...wl, result: output };
+          }
           if (callId) toolCallsByCallId.delete(callId);
         } else if (output) {
           // Output with no matching call (truncated/rotated) — stand-alone entry.
@@ -187,37 +214,43 @@ export async function parseCodexConversationMessages(sessionFile: string): Promi
       }
       // response_item 'message' (injected context) and 'reasoning' (encrypted)
       // carry nothing user-visible — intentionally skipped.
-      continue;
+      return;
     }
-  }
-
-  // Codex turns are written as complete agent_message events (not streamed
-  // token-by-token into the rollout), so there is no partial-turn state to
-  // surface — the chat panel never shows a stuck typing indicator.
-  const streaming = false;
-
-  // Cost is derived by the canonical Codex cost parser (single source of truth
-  // for rollout pricing) so the conversation list shows real spend rather than
-  // $0. token_count already gave us the cumulative throughput above.
-  const usage = parseCodexSessionSync(sessionFile);
-  const totalCost = usage?.cost_v2 ?? usage?.cost ?? 0;
-
-  return {
-    messages,
-    workLog,
-    byteOffset: fileStats.size,
-    streaming,
-    totalCost,
-    totalTokens,
-    latestAssistantUsage: null,
-    contextBoundaryOffset: 0,
-    contextActiveBytes: fileStats.size,
-    pendingToolUse: new Map(),
-    unresolvedResults: new Map(),
-    lastSequence: sequence,
-    mtimeMs: fileStats.mtimeMs,
-    planToolUseIds: new Set(),
-    compactBoundaries,
-    fileEditsByAssistantId: new Map(),
   };
+
+  const result = (size: number, mtimeMs: number): ParseResult => {
+    // Codex turns are written as complete agent_message events (not streamed
+    // token-by-token into the rollout), so there is no partial-turn state to
+    // surface — the chat panel never shows a stuck typing indicator.
+    const streaming = false;
+
+    // Cost is derived by the canonical Codex cost parser (single source of truth
+    // for rollout pricing) so the conversation list shows real spend rather than
+    // $0. token_count already gave us the cumulative throughput above.
+    const usage = costs.result();
+    const totalCost = usage?.cost_v2 ?? usage?.cost ?? 0;
+
+    return {
+      messages: [...messages],
+      workLog: [...workLog],
+      byteOffset: size,
+      lastTurnCompletedAt: trailingAgentMessageAt,
+      streaming,
+      totalCost,
+      totalTokens,
+      latestAssistantUsage: null,
+      contextBoundaryOffset: 0,
+      contextActiveBytes: size,
+      pendingToolUse: new Map(),
+      unresolvedResults: new Map(),
+      lastSequence: sequence,
+      mtimeMs,
+      planToolUseIds: new Set(),
+      compactBoundaries,
+      fileEditsByAssistantId: new Map(),
+    };
+  };
+  return { push, result };
 }
+
+export const parseCodexConversationMessages = createIncrementalTranscriptReader(createCodexConversationAccumulator);

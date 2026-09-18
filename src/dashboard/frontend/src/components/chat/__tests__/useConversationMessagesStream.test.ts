@@ -1,5 +1,92 @@
-import { describe, expect, it } from 'vitest';
-import { applyConversationMessagesEvent, shouldStreamConversationMessages } from '../useConversationMessagesStream';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, renderHook } from '@testing-library/react';
+import { createElement, type ReactNode } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ConversationEvent } from '../chat-types';
+
+const transportMock = vi.hoisted(() => ({
+  listeners: [] as Array<(event: ConversationEvent) => void>,
+}));
+
+vi.mock('../../../lib/wsTransport', () => ({
+  getTransport: () => ({
+    subscribe: (_createStream: unknown, listener: (event: ConversationEvent) => void) => {
+      transportMock.listeners.push(listener);
+      return vi.fn();
+    },
+  }),
+}));
+
+import {
+  applyConversationMessagesEvent,
+  shouldStreamConversationMessages,
+  useConversationMessagesStream,
+} from '../useConversationMessagesStream';
+
+function createWrapper() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return ({ children }: { children: ReactNode }) =>
+    createElement(QueryClientProvider, { client: queryClient }, children);
+}
+
+beforeEach(() => {
+  transportMock.listeners.length = 0;
+});
+
+describe('useConversationMessagesStream', () => {
+  const conversation = {
+    id: 1,
+    name: 'conv-one',
+    sessionAlive: true,
+    harness: 'claude-code' as const,
+  };
+
+  it('reports no first payload before the stream emits an event', () => {
+    const { result } = renderHook(
+      () => useConversationMessagesStream(conversation),
+      { wrapper: createWrapper() },
+    );
+
+    expect(result.current).toEqual({ enabled: true, receivedFirstPayload: false });
+  });
+
+  it('reports the first payload after the stream emits an event', () => {
+    const { result } = renderHook(
+      () => useConversationMessagesStream(conversation),
+      { wrapper: createWrapper() },
+    );
+
+    act(() => {
+      transportMock.listeners[0]!({ kind: 'discovering' });
+    });
+
+    expect(result.current.receivedFirstPayload).toBe(true);
+  });
+
+  it('does not expose the prior first-payload signal when the conversation changes', () => {
+    const { result, rerender } = renderHook(
+      ({ name }) => useConversationMessagesStream({ ...conversation, name }),
+      { initialProps: { name: 'conv-one' }, wrapper: createWrapper() },
+    );
+
+    act(() => {
+      transportMock.listeners[0]!({ kind: 'discovering' });
+    });
+    expect(result.current.receivedFirstPayload).toBe(true);
+
+    rerender({ name: 'conv-two' });
+
+    expect(result.current.receivedFirstPayload).toBe(false);
+
+    act(() => {
+      transportMock.listeners[0]!({ kind: 'discovering' });
+    });
+
+    expect(result.current.receivedFirstPayload).toBe(false);
+  });
+});
 
 describe('applyConversationMessagesEvent', () => {
   it('replaces cache contents for full snapshots', () => {
@@ -112,5 +199,35 @@ describe('shouldStreamConversationMessages', () => {
   it('still gates synthetic agent sessions (id < 0) on a live session', () => {
     expect(shouldStreamConversationMessages({ id: -1, name: 'agent-pan-1', sessionAlive: false, harness: 'ohmypi' })).toBe(false);
     expect(shouldStreamConversationMessages({ id: -1, name: 'agent-pan-1', sessionAlive: true, harness: 'ohmypi' })).toBe(true);
+  });
+});
+
+describe('full parser delta no-loss audit', () => {
+  it('retains all history and tool fields while applying metadata-only updates and plan removal', () => {
+    const initial = applyConversationMessagesEvent(undefined, {
+      kind: 'messages', snapshot: true, metadataSnapshot: true, streaming: true, totalCost: 1,
+      messages: [{ id: 'user', role: 'user', text: 'Original prompt', createdAt: '2026-09-09' }],
+      workLog: [{ id: 'tool', label: 'Shell', tone: 'error', createdAt: '2026-09-09', command: 'pwd', result: 'Full error output' }],
+      proposedPlan: { id: 'plan', plan: 'Do the work', status: 'pending', createdAt: '2026-09-09' },
+      compactBoundaries: [{ id: 'compact', timestamp: '2026-09-09', trigger: 'auto' }],
+      contextUsage: { activeBytes: 100, estimatedTokens: 25, contextWindow: 1000, percentUsed: 2.5 },
+    });
+    const updated = applyConversationMessagesEvent(initial, {
+      kind: 'messages', snapshot: false, metadataSnapshot: true, streaming: false, totalCost: 2,
+      messages: [], workLog: [], compactBoundaries: [], contextUsage: null,
+    });
+    expect(updated.messages).toEqual(initial.messages);
+    expect(updated.workLog).toEqual(initial.workLog);
+    expect(updated).toMatchObject({ totalCost: 2, streaming: false, contextUsage: null, compactBoundaries: [] });
+    expect(updated.proposedPlan).toBeUndefined();
+  });
+
+  it('replaces history only when a smaller snapshot carries a confirmed reset', () => {
+    const initial = { messages: [{ id: 'old', role: 'user' as const, text: 'Old', createdAt: '2026-09-09' }],
+      workLog: [{ id: 'tool', label: 'Shell', tone: 'tool' as const, createdAt: '2026-09-09' }], streaming: false };
+    const snapshot = { kind: 'messages' as const, snapshot: true, streaming: false, messages: [], workLog: [] };
+    expect(applyConversationMessagesEvent(initial, snapshot).messages).toEqual(initial.messages);
+    expect(applyConversationMessagesEvent(initial, { ...snapshot, reset: true }))
+      .toMatchObject({ messages: [], workLog: [] });
   });
 });

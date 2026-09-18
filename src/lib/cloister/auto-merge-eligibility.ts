@@ -28,6 +28,7 @@ interface GhPullRequestView {
   mergeable?: string | null;
   mergeStateStatus?: string | null;
   isDraft?: boolean | null;
+  headRefName?: string | null;
   headRefOid?: string | null;
   baseRefName?: string | null;
   url?: string | null;
@@ -104,7 +105,7 @@ export async function getPullRequestStateViaGh(
     '--repo',
     `${owner}/${repo}`,
     '--json',
-    'state,mergeable,mergeStateStatus,isDraft,headRefOid,baseRefName,url,statusCheckRollup',
+    'state,mergeable,mergeStateStatus,isDraft,headRefName,headRefOid,baseRefName,url,statusCheckRollup',
   ], { encoding: 'utf-8' });
 
   const pr = JSON.parse(stdout) as GhPullRequestView;
@@ -123,6 +124,7 @@ export async function getPullRequestStateViaGh(
     mergeableState: pr.mergeStateStatus?.toLowerCase() ?? null,
     draft: pr.isDraft === true,
     headSha: pr.headRefOid ?? '',
+    headRef: pr.headRefName ?? '',
     baseBranch: pr.baseRefName ?? 'main',
     checksPending: checkState.pending,
     checksFailed: checkState.failed,

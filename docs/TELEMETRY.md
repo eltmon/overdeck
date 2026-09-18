@@ -79,7 +79,7 @@ the public contract and lists every allowed value.
 | `duration_bucket` | `under_100ms`, `100ms-999ms`, `1s-9s`, `10s+` |
 | `forge` | `github`, `gitlab` |
 | `fork_kind` | `summary`, `handoff`, `plain` |
-| `harness` | `claude-code`, `ohmypi`, `codex`, `acp`, `kimi-code` |
+| `harness` | `claude-code`, `ohmypi`, `codex`, `acp`, `kimi-code`, `opencode`, `muse` |
 | `merge_kind` | `pipeline` |
 | `model_family` | `claude`, `gpt`, `gemini`, `kimi`, `minimax`, `glm`, `mimo`, `other` |
 | `pipeline_stage` | `work_done`, `review_passed`, `verification_passed`, `merged`, `closed_out` |
@@ -88,6 +88,14 @@ the public contract and lists every allowed value.
 Raw counts and timings are never sent. Pipeline attribution is emitted only
 after the canonical pipeline-membership resolver confirms that the issue is in
 the pipeline, so stale agent rows cannot supply harness or model metadata.
+
+## Local DB job diagnostics
+
+The dashboard logs slow worker jobs locally as
+`[db-jobs] slow: op=<operation> lane=<lane> waitMs=<n> runMs=<n> depth=<n>` when
+queue wait or execution exceeds one second. Use the lane, wait time, run time,
+and queue depth to distinguish worker congestion from a slow operation. These
+raw timings stay in local logs and are not sent as anonymous telemetry.
 
 Node events also receive the anonymous install ID and the centrally stamped
 `$process_person_profile: false`, platform, architecture, Overdeck version, and

@@ -9,6 +9,7 @@ import {
 } from '../review-status.js';
 import { killSession, listSessionNames } from '../tmux.js';
 import { selectMergedAdvancingSessions } from './reap-terminal-sessions.js';
+import { recordWouldFire } from './patrol-would-fire.js';
 
 const JOURNAL_RECONCILE_STATES = new Set([
   'pending',
@@ -56,6 +57,10 @@ function statusChanged(before: ReviewStatus | null | undefined, after: ReviewSta
   return JSON.stringify(before ?? null) !== JSON.stringify(after ?? null);
 }
 
+function hasFailingChecks(status: ReviewStatus | null | undefined): boolean {
+  return status?.blockerReasons?.some((blocker) => blocker.type === 'failing_checks') ?? false;
+}
+
 /**
  * Host-side sweep for journaled review/test verdicts whose HTTP status POST
  * failed. getReviewStatusSync owns the journal -> DB reconcile; this patrol
@@ -94,6 +99,14 @@ export async function reconcileInFlightJournals(
     try {
       const after = deps.getReviewStatusSync(issueId);
       if (!statusChanged(before, after)) continue;
+      // A required-check failure is actionable blocker state, not advancing
+      // pipeline progress. Keep reconciling the journal through the read door,
+      // but do not emit a repeated no-op advancement action while CI is red.
+      if (hasFailingChecks(after)) continue;
+      // PAN-3848 (W30): count the would-fire. This patrol's action IS the
+      // reconciling read through the read door, so shadow mode has nothing
+      // further to suppress — every getReviewStatusSync read reconciles.
+      recordWouldFire('reconcileInFlightJournals', issueId);
       actions.push(`Reconciled journaled advancing verdict for ${issueId}`);
     } catch (error) {
       deps.warn(`[deacon] reconcileInFlightJournals: failed to reconcile ${issueId}: ${error instanceof Error ? error.message : String(error)}`);

@@ -15,6 +15,21 @@ describe('CodexAppServerManager', () => {
     manager.stop();
   });
 
+  it.each(['start', 'resume'] as const)('supplies developer instructions on thread %s', async (operation) => {
+    const fake = createFakeAppServer((message, server) => {
+      if (message.method === 'initialize') server.send({ id: message.id, result: {} });
+      if (message.method === `thread/${operation}`) server.send({ id: message.id, result: { thread: { id: 'thread-context' } } });
+    });
+    const manager = new CodexAppServerManager({ cwd: '/tmp', readVersion: async () => '0.144.1', spawnProcess: () => fake.child });
+    await manager.start();
+    const options = { model: 'caller-model', developerInstructions: 'GLOBAL\nPROJECT\nWORKSPACE' };
+    if (operation === 'start') await manager.startThread(options);
+    else await manager.resumeThread('thread-context', options);
+    const request = fake.messages.find(message => message.method === `thread/${operation}`);
+    expect(request?.params).toMatchObject({ developerInstructions: options.developerInstructions });
+    manager.stop();
+  });
+
   it('times out unanswered requests with fake timers', async () => {
     vi.useFakeTimers();
     const fake = createFakeAppServer();

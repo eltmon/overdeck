@@ -10,6 +10,7 @@ const EXPECTED_POLICIES: ReadonlyArray<{
   path: string[];
   policy: ComposerCommandPolicy;
 }> = [
+  { path: ['reload'], policy: { mode: 'detached', safety: 'safe' } },
   { path: ['start'], policy: { mode: 'detached', safety: 'safe' } },
   { path: ['plan'], policy: { mode: 'detached', safety: 'safe' } },
   { path: ['show'], policy: { mode: 'captured', safety: 'safe' } },

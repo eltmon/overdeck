@@ -23,6 +23,7 @@ import {
 import { setReviewStatusSync } from '../review-status.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
+import { claudeSystemPromptFiles } from '../agents/runtime-command.js';
 import {
   createSession,
   killSession,
@@ -264,6 +265,7 @@ async function spawnInspectAgentPromise(
         baseCommand: 'claude',
         sessionId,
         model,
+        appendSystemPromptFiles: await claudeSystemPromptFiles(context.workspace, 'claude-code'),
         extraArgs: `--effort ${effort}`,
         permissionFlags: getClaudePermissionFlagsSync(),
       }),

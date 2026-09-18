@@ -32,6 +32,26 @@ describe('code review convoy sub-role prompt templates', () => {
     });
   }
 
+  it('preserves all four dimensions and evidence obligations in combined review', () => {
+    const combined = readRepoFile('roles/review.md');
+    for (const dimension of ['Correctness', 'Security', 'Performance', 'Requirements and UX']) {
+      expect(combined).toContain(`### ${dimension}`);
+    }
+    for (const obligation of ['explicit overrides', 'specification defect', 'actual spawn/route/UI',
+      'normal project test command', 'lint:effect-diagnostics', 'HEAD reviewed:',
+      'Signal once', 'workspace fallback', 'Review never merges']) {
+      expect(combined).toContain(obligation);
+    }
+    expect(combined).not.toContain('keep at most the top 3');
+    expect(combined).not.toContain('Ignore every');
+    for (const role of REVIEW_SUB_ROLES) {
+      const specialist = readRepoFile(`roles/review-${role}.md`);
+      expect(specialist).toContain('second coverage pass');
+      expect(specialist).toContain('specification defects');
+      expect(specialist).toContain('input rejected upstream');
+    }
+  });
+
   it('does not keep legacy .claude/agents/code-review-* subagent files', () => {
     for (const subRole of REVIEW_SUB_ROLES) {
       expect(existsSync(join(process.cwd(), `.claude/agents/code-review-${subRole}.md`))).toBe(false);

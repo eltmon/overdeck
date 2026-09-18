@@ -97,7 +97,10 @@ Pipeline verdicts belong to reviewed code, not to an agent session. Starting a
 fresh or resumed work agent preserves earned verdicts while the current HEAD
 matches `reviewedAtCommit`, including a proven-benign commit-anchor move. A
 real code change, an unreadable anchor, or a missing passed-review anchor resets
-the verdicts before new work starts.
+the verdicts before new work starts. PAN-3847: when the drift appears *after* a
+review passed, the row is marked `reviewStaleSince` instead of being reset by a
+patrol, and a stale review blocks merge until `pan done` or `pan review request`
+produces a re-review.
 
 ## States
 
@@ -106,6 +109,14 @@ the verdicts before new work starts.
 The work agent has called `pan done`. The work-agent role prompt refuses
 `pan done` from a dirty worktree, so this state guarantees the workspace
 branch contains only committed work.
+
+PAN-3848 (W25): `pan done` writes the review request in one durable record
+write — `pipeline.prUrl`, `pipeline.reviewRequestedAt`, and
+`pipeline.completedAt` land in a single mutator, retried on the state lock's
+backoff ladder. If every attempt fails, the completion marker is still written
+(the branch is pushed and the PR exists, so the work is real), a
+`review-request-unrecorded` needs-you names the missing `reviewRequestedAt`,
+and the command exits 1: a pushed PR with no review request is never silent.
 
 If the worktree is dirty at `pan done` time, the CLI returns non-zero with
 three options surfaced to the agent or operator:
@@ -140,6 +151,23 @@ The human has clicked the dashboard Merge button. The dashboard asks each
 repository's forge adapter to merge its PR or MR, waits for positive forge
 evidence, then runs `postMergeLifecycle()` to clean up labels, Docker networks,
 and agent sessions.
+
+## Review-status retirement and terminal generations
+
+Review status keeps its historical verdicts after the row stops being actionable. The
+`retiredAt` timestamp is set when a closed pull request is observed during refresh, when
+the pull-request webhook reports closure, or when lazy review-status loading discovers
+the closed artifact. Consumers exclude retired rows from patrols, merge projections, and
+status stamping instead of deleting their history.
+
+A fresh pull request clears `retiredAt`. Starting fresh work also clears it, so a new
+review cycle can use the same issue record without inheriting the retired state.
+
+UAT generation history is terminal. Backfill marks a generation promoted only when each
+member branch is contained in `main` by the shared positive ancestor check; it does not
+reopen or rebuild that generation. Generation names use the date and codename, followed
+by `-2`, `-3`, and later suffixes when more than one generation is created on the same
+day.
 
 ## After another feature merges
 
@@ -325,8 +353,18 @@ volumes, project-owned containers, and the leaked devnet while preserving worksp
 branches, agents, sessions, state, and xBRIEF. The single `rebuildWorkspaceStack`
 chokepoint no-ops for closed and merged issues, so patrols never recreate a terminal stack.
 
+### Frozen Deacon freezes workspace reclamation (PAN-3887)
+
+The residue patrols above only run while the Deacon is live. A frozen Deacon
+freezes workspace reclamation with it: merged strike workspaces
+(`workspaces/feature-<id>-strike/`, each carrying its own `node_modules`) and
+slot worktrees sit on disk indefinitely — 29 of them reached ~72 GB before
+anyone noticed. When the Deacon has been frozen, check the pileup with
+`pan workspace list --stale [--all]` (merged branches still on disk, with
+sizes) and reclaim with `pan workspace destroy <id>` (removes base, strike,
+and slot shapes by default; `--shape base|strike|slot` narrows it).
+
 The destructive/non-reversible completion steps are owned by close-out, not merge:
 `pan close <id>` / dashboard Close Out completes the xBRIEF, archives planning artifacts,
 optionally tears down the workspace or deletes feature branches according to `close_out`
 config, closes the tracker issue, and clears review status.
-

@@ -215,6 +215,11 @@ project's effective merge-train flag is on; the ready set comes from that
 project's review-status records, so **no flywheel run is required**
 ([PAN-1696](https://github.com/eltmon/overdeck/issues/1696)).
 
+The merge train is actionable only for merge-eligible issues: its rows render only when
+canonical pipeline membership is `in_flight`. The merge-next endpoint revalidates the
+selected head server-side immediately before shipping. If membership changed or needs
+disposition, it returns HTTP `409` with the disposition reason and merges nothing.
+
 ### Orchestrator scope vs merge-train independence
 
 Two things are easy to conflate, so state them separately:

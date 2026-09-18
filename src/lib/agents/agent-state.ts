@@ -833,6 +833,8 @@ export type ResumeIntent = 'autonomous' | 'operator-start' | 'message-delivery' 
  *  a stopped-by-user agent that has a completed handoff. */
 export interface MessageAgentRedriveOptions {
   owesRework?: boolean;
+  /** PR #3870 review (PAN-3846): a confirmed delivery clears feedback_delivery_needs_you only with this intent. */
+  feedbackRedelivery?: boolean;
   /**
    * Idempotency key threaded to the delivery door (PAN-2997). Keyed live
    * deliveries are deduplicated by the crash-independent delivery component
