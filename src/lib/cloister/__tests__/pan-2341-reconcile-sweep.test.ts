@@ -23,6 +23,7 @@ function deps(overrides: Partial<AdvancingSelfHealDeps> = {}): AdvancingSelfHeal
   return {
     loadReviewStatuses: vi.fn(() => ({})),
     getReviewStatusSync: vi.fn(() => null),
+    readJournalStatusSync: vi.fn(() => null),
     listSessionNames: vi.fn(async () => []),
     getAgentStateSync: vi.fn(() => null),
     saveAgentStateSync: vi.fn(),
@@ -57,6 +58,7 @@ describe('reconcileInFlightJournals', () => {
     const d = deps({
       loadReviewStatuses: vi.fn(() => ({ 'PAN-2524': before })),
       getReviewStatusSync: vi.fn(() => after),
+      readJournalStatusSync: vi.fn(() => ({ updatedAt: '2026-07-07T00:01:00.000Z' })),
     });
 
     await expect(reconcileInFlightJournals(d)).resolves.toEqual([
@@ -71,6 +73,7 @@ describe('reconcileInFlightJournals', () => {
     const d = deps({
       loadReviewStatuses: vi.fn(() => ({ 'PAN-2341': before })),
       getReviewStatusSync: vi.fn(() => after),
+      readJournalStatusSync: vi.fn(() => ({ updatedAt: '2026-07-07T00:01:00.000Z' })),
     });
 
     await expect(reconcileInFlightJournals(d)).resolves.toEqual([
@@ -93,6 +96,7 @@ describe('reconcileInFlightJournals', () => {
     const d = deps({
       loadReviewStatuses: vi.fn(() => ({ 'PAN-2341': before })),
       getReviewStatusSync: vi.fn(() => after),
+      readJournalStatusSync: vi.fn(() => ({ updatedAt: '2026-07-07T00:01:00.000Z' })),
     });
 
     await expect(reconcileInFlightJournals(d)).resolves.toEqual([
@@ -122,6 +126,7 @@ describe('reconcileInFlightJournals', () => {
     const d = deps({
       loadReviewStatuses: vi.fn(() => ({ 'PAN-3668': before })),
       getReviewStatusSync: vi.fn(() => after),
+      readJournalStatusSync: vi.fn(() => ({ updatedAt: '2026-08-22T00:01:00.000Z' })),
     });
 
     await expect(reconcileInFlightJournals(d)).resolves.toEqual([]);
@@ -141,6 +146,9 @@ describe('reconcileInFlightJournals', () => {
       getReviewStatusSync: vi.fn((issueId) => issueId === 'PAN-3001'
         ? status({ issueId, reviewStatus: 'passed', updatedAt: '2026-07-07T00:02:00.000Z' })
         : null),
+      readJournalStatusSync: vi.fn((issueId) => issueId === 'PAN-3001'
+        ? { updatedAt: '2026-07-07T00:02:00.000Z' }
+        : null),
     });
 
     await expect(reconcileInFlightJournals(d)).resolves.toEqual([
@@ -148,6 +156,60 @@ describe('reconcileInFlightJournals', () => {
     ]);
     expect(d.getReviewStatusSync).toHaveBeenCalledTimes(1);
     expect(d.getReviewStatusSync).toHaveBeenCalledWith('PAN-3001');
+  });
+
+  // PAN-3894 (W7/D9): the would-fire counter and the action must track a real
+  // journal fold, not the enrichment delta between the raw row and the enriched
+  // read. Before this change the patrol fired on every in-flight row forever
+  // (finding F15: 145 firings in 5 hours, crossing its 50/day budget daily).
+  it('PAN-3894: reports nothing when a row exists and no journal is present', async () => {
+    const before = status({ issueId: 'PAN-3894', reviewStatus: 'reviewing' });
+    const d = deps({
+      loadReviewStatuses: vi.fn(() => ({ 'PAN-3894': before })),
+      getReviewStatusSync: vi.fn(() => status({ issueId: 'PAN-3894', reviewStatus: 'reviewing', notes: 'enriched' } as Partial<ReviewStatus>)),
+      readJournalStatusSync: vi.fn(() => null),
+    });
+
+    await expect(reconcileInFlightJournals(d)).resolves.toEqual([]);
+    // The reconciling read still happens — it IS the repair.
+    expect(d.getReviewStatusSync).toHaveBeenCalledWith('PAN-3894');
+  });
+
+  it('PAN-3894: reports nothing when the journal is older than the cached row', async () => {
+    const before = status({ issueId: 'PAN-3894', updatedAt: '2026-09-18T10:00:00.000Z' });
+    const d = deps({
+      loadReviewStatuses: vi.fn(() => ({ 'PAN-3894': before })),
+      getReviewStatusSync: vi.fn(() => status({ issueId: 'PAN-3894', updatedAt: '2026-09-18T10:00:00.000Z' })),
+      readJournalStatusSync: vi.fn(() => ({ updatedAt: '2026-09-18T09:00:00.000Z' })),
+    });
+
+    await expect(reconcileInFlightJournals(d)).resolves.toEqual([]);
+  });
+
+  it('PAN-3894: reports one action when the journal is newer than the cached row', async () => {
+    const before = status({ issueId: 'PAN-3894', updatedAt: '2026-09-18T10:00:00.000Z' });
+    const d = deps({
+      loadReviewStatuses: vi.fn(() => ({ 'PAN-3894': before })),
+      getReviewStatusSync: vi.fn(() => status({ issueId: 'PAN-3894', reviewStatus: 'passed', updatedAt: '2026-09-18T11:00:00.000Z' })),
+      readJournalStatusSync: vi.fn(() => ({ updatedAt: '2026-09-18T11:00:00.000Z' })),
+    });
+
+    await expect(reconcileInFlightJournals(d)).resolves.toEqual([
+      'Reconciled journaled advancing verdict for PAN-3894',
+    ]);
+  });
+
+  it('PAN-3894: reports one action when there is no cached row but a journal exists', async () => {
+    const d = deps({
+      loadReviewStatuses: vi.fn(() => ({})),
+      listSessionNames: vi.fn(async () => ['agent-pan-3894-review']),
+      getReviewStatusSync: vi.fn(() => status({ issueId: 'PAN-3894', reviewStatus: 'passed', updatedAt: '2026-09-18T11:00:00.000Z' })),
+      readJournalStatusSync: vi.fn(() => ({ updatedAt: '2026-09-18T11:00:00.000Z' })),
+    });
+
+    await expect(reconcileInFlightJournals(d)).resolves.toEqual([
+      'Reconciled journaled advancing verdict for PAN-3894',
+    ]);
   });
 
   it('parses only advancing-role session names', () => {

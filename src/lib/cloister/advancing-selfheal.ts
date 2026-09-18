@@ -8,6 +8,7 @@ import {
   type ReviewStatus,
 } from '../review-status.js';
 import { killSession, listSessionNames } from '../tmux.js';
+import { readJournalStatusSync } from '../overdeck/review-status-record-sync.js';
 import { selectMergedAdvancingSessions } from './reap-terminal-sessions.js';
 import { recordWouldFire } from './patrol-would-fire.js';
 
@@ -25,6 +26,8 @@ const JOURNAL_RECONCILE_STATES = new Set([
 export interface AdvancingSelfHealDeps {
   loadReviewStatuses(): Record<string, ReviewStatus>;
   getReviewStatusSync(issueId: string): ReviewStatus | null;
+  /** PAN-3894 (D9): the raw journal, so the patrol can tell a real fold from an enriched read. */
+  readJournalStatusSync(issueId: string): { updatedAt: string } | null;
   listSessionNames(): Promise<readonly string[]>;
   getAgentStateSync(session: string): AgentState | null;
   saveAgentStateSync(state: AgentState): void;
@@ -35,6 +38,7 @@ export interface AdvancingSelfHealDeps {
 const defaultDeps: AdvancingSelfHealDeps = {
   loadReviewStatuses,
   getReviewStatusSync,
+  readJournalStatusSync,
   listSessionNames: () => Effect.runPromise(listSessionNames()),
   getAgentStateSync: (session) => agents.getAgentStateSync(session),
   saveAgentStateSync: (state) => agents.saveAgentStateSync(state),
@@ -51,10 +55,6 @@ function isReconciliableStatus(status: ReviewStatus): boolean {
 export function parseAdvancingIssueId(sessionName: string): string | null {
   const match = sessionName.match(/^agent-([a-z0-9]+-\d+)-(?:review|test|ship)(?:-.+)?$/i);
   return match ? match[1].toUpperCase() : null;
-}
-
-function statusChanged(before: ReviewStatus | null | undefined, after: ReviewStatus | null): boolean {
-  return JSON.stringify(before ?? null) !== JSON.stringify(after ?? null);
 }
 
 function hasFailingChecks(status: ReviewStatus | null | undefined): boolean {
@@ -97,8 +97,16 @@ export async function reconcileInFlightJournals(
   for (const issueId of issueIds) {
     const before = statuses[issueId] ?? null;
     try {
+      // PAN-3894 (D9): only a journal newer than the cached row is a fold the
+      // read door actually performs. getReviewStatusSync returns an enriched
+      // read (enrichReviewNotesFromRecordSync), so it always differs from the
+      // raw loadReviewStatuses row — the old before/after comparison counted
+      // that enrichment delta, not real work (finding F15: 145 firings in 5h).
+      const journal = deps.readJournalStatusSync(issueId);
+      const folded = journal !== null && (before?.updatedAt ?? '') < journal.updatedAt;
+      // The reconciling read stays unconditional: it IS the repair.
       const after = deps.getReviewStatusSync(issueId);
-      if (!statusChanged(before, after)) continue;
+      if (!folded) continue;
       // A required-check failure is actionable blocker state, not advancing
       // pipeline progress. Keep reconciling the journal through the read door,
       // but do not emit a repeated no-op advancement action while CI is red.
