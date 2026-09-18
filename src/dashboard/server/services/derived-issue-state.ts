@@ -63,6 +63,7 @@ import type {
 import { createSettledTtlPromiseCache } from '../../../lib/concurrency.js';
 import { getProjectPanPaths } from '../../../lib/pan-dir/paths.js';
 import { findProjectByPathSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
+import { inferProjectForgeSync } from '../../../lib/project-repos.js';
 import { getBackendPanes } from './backend-inventory.js';
 
 const execFileAsync = promisify(execFile);
@@ -350,11 +351,16 @@ async function readMrWithGlab(_issueId: string, projectPath: string, branch: str
   return row ? mrFromGlabRow(row) : null;
 }
 
-/** GitHub or GitLab, from the project's tracker configuration. */
+/**
+ * GitHub or GitLab, from the project's REPO configuration — never its tracker.
+ * MYN's tracker is Linear while its forge is GitLab, so reading `tracker` here
+ * would send every MIN issue down the `gh` path and derive it as `working`
+ * forever. `inferProjectForgeSync` is the canonical resolver.
+ */
 export function forgeForProject(projectPath: string): 'github' | 'gitlab' {
   const project = findProjectByPathSync(projectPath);
-  const tracker = (project as { tracker?: string } | null)?.tracker ?? '';
-  return tracker.toLowerCase().includes('gitlab') ? 'gitlab' : 'github';
+  if (!project) return 'github';
+  return inferProjectForgeSync(project) ?? 'github';
 }
 
 function forgeReader(projectPath: string) {
@@ -405,6 +411,24 @@ function paneLooksLikeApiError(text: string): boolean {
 }
 
 /**
+ * The tail of a pane's output, for the `api-error` attention state.
+ *
+ * Only the tmux fallback can answer today: a tmux pane id IS its session name,
+ * so `capture-pane` reads it directly. A Herdr pane needs the adapter's
+ * `observe` stream, which W8 owns — until then a Herdr pane reports no text and
+ * `api-error` simply does not fire for it.
+ */
+async function readTmuxPaneText(pane: BackendPane): Promise<string> {
+  if (!/^(agent|strike|planning|conv)-/.test(pane.id)) return '';
+  try {
+    const { capturePaneText } = await import('../../../lib/tmux.js');
+    return await capturePaneText(pane.id, 40);
+  } catch {
+    return '';
+  }
+}
+
+/**
  * The single async loader: one pass over the owners, producing the snapshot
  * `deriveIssueState` reads. Every IO is injectable so tests stay offline.
  */
@@ -423,11 +447,11 @@ export async function loadIssueStateFacts(
   const branch = await (deps.readBranch ?? readBranchWithGit)(projectPath, branchName);
   const pr = await (deps.readPr ?? forgeReader(projectPath))(issueId, projectPath, branchName);
 
+  const readPaneText = deps.readPaneText ?? readTmuxPaneText;
   let apiError = false;
-  if (deps.readPaneText) {
-    for (const pane of panes) {
-      if (paneLooksLikeApiError(await deps.readPaneText(pane))) { apiError = true; break; }
-    }
+  for (const pane of panes) {
+    if (pane.state === 'exited') continue;
+    if (paneLooksLikeApiError(await readPaneText(pane))) { apiError = true; break; }
   }
 
   const facts: IssueStateFacts = {

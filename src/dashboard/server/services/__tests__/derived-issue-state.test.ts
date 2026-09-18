@@ -4,7 +4,10 @@ import type { BackendPane } from '@overdeck/contracts';
 import {
   DEFAULT_STUCK_AFTER_MS,
   deriveIssueState,
+  issueIdFromBranch,
+  mrFromGlabRow,
   toChecksState,
+  toChecksStateFromPipeline,
   toReviewState,
   type IssueStateFacts,
 } from '../derived-issue-state.js';
@@ -222,5 +225,38 @@ describe('deriveIssueState — an open PR is always the pipeline\'s move', () =>
       pr: { url: 'u', number: 12, reviewState: 'commented', checks: 'green', mergeable: true },
     }));
     expect(state.state).toBe('in-review');
+  });
+});
+
+describe('forge shape translation — GitLab', () => {
+  it('maps a pipeline status to the aggregate check state', () => {
+    expect(toChecksStateFromPipeline('success')).toBe('green');
+    expect(toChecksStateFromPipeline('skipped')).toBe('green');
+    expect(toChecksStateFromPipeline('failed')).toBe('red');
+    expect(toChecksStateFromPipeline('running')).toBe('pending');
+    expect(toChecksStateFromPipeline(undefined)).toBe('pending');
+  });
+
+  it('maps an open merge request, conflicts and all', () => {
+    expect(mrFromGlabRow({
+      iid: 7, web_url: 'https://gitlab.com/g/r/-/merge_requests/7', state: 'opened',
+      detailed_merge_status: 'mergeable', approved: true, head_pipeline: { status: 'success' },
+    })).toEqual({
+      url: 'https://gitlab.com/g/r/-/merge_requests/7', number: 7,
+      reviewState: 'approved', checks: 'green', mergeable: true, merged: false,
+    });
+    expect(mrFromGlabRow({ iid: 7, state: 'opened', has_conflicts: true })?.mergeable).toBe(false);
+    expect(mrFromGlabRow({ iid: 7, state: 'merged' })?.merged).toBe(true);
+    // A closed-unmerged MR is not this issue's MR any more.
+    expect(mrFromGlabRow({ iid: 7, state: 'closed' })).toBeNull();
+  });
+});
+
+describe('issueIdFromBranch', () => {
+  it('reads the issue out of a feature branch and nothing else', () => {
+    expect(issueIdFromBranch('feature/pan-3917')).toBe('PAN-3917');
+    expect(issueIdFromBranch('feature/min-1039')).toBe('MIN-1039');
+    expect(issueIdFromBranch('main')).toBeNull();
+    expect(issueIdFromBranch(undefined)).toBeNull();
   });
 });
