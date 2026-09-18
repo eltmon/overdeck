@@ -419,7 +419,11 @@ function paneLooksLikeApiError(text: string): boolean {
  * `api-error` simply does not fire for it.
  */
 async function readTmuxPaneText(pane: BackendPane): Promise<string> {
-  if (!/^(agent|strike|planning|conv)-/.test(pane.id)) return '';
+  // Only the tmux fallback writes the session name into BOTH `id` and
+  // `terminalId`; a Herdr pane's terminalId is its own handle. Matching on the
+  // id's shape would shell out to `capture-pane` for a Herdr pane whose
+  // adapter happened to reuse a session-like name.
+  if (pane.terminalId !== pane.id) return '';
   try {
     const { capturePaneText } = await import('../../../lib/tmux.js');
     return await capturePaneText(pane.id, 40);

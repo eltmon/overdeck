@@ -5,6 +5,7 @@ import {
   DEFAULT_STUCK_AFTER_MS,
   deriveIssueState,
   issueIdFromBranch,
+  loadIssueStateFacts,
   mrFromGlabRow,
   toChecksState,
   toChecksStateFromPipeline,
@@ -258,5 +259,53 @@ describe('issueIdFromBranch', () => {
     expect(issueIdFromBranch('feature/min-1039')).toBe('MIN-1039');
     expect(issueIdFromBranch('main')).toBeNull();
     expect(issueIdFromBranch(undefined)).toBeNull();
+  });
+});
+
+describe('api-error pane capture', () => {
+  it('skips a Herdr pane rather than shelling out to tmux for a session that is not there', async () => {
+    // No readPaneText dep, so the production default runs. A Herdr pane's
+    // terminalId differs from its id, which is the gate.
+    const facts = await loadIssueStateFacts('PAN-3917', {
+      now: () => NOW,
+      panes: [{
+        id: 'w1:p1', issue: 'PAN-3917', role: 'work', harness: 'h', model: 'm',
+        state: 'working', terminalId: 'term-w1p1',
+      }],
+      readIssue: async () => ({ open: true, labels: [] }),
+      readPr: async () => null,
+      readBranch: async () => null,
+    });
+    expect(facts.apiError).toBe(false);
+  });
+
+  it('flags provider-failure text and stops at the first pane that shows it', async () => {
+    const reads: string[] = [];
+    const facts = await loadIssueStateFacts('PAN-3917', {
+      now: () => NOW,
+      panes: [
+        { id: 'agent-pan-3917', issue: 'PAN-3917', role: 'work', harness: 'h', model: 'm', state: 'working', terminalId: 'agent-pan-3917' },
+        { id: 'agent-pan-3917-review', issue: 'PAN-3917', role: 'review', harness: 'h', model: 'm', state: 'working', terminalId: 'agent-pan-3917-review' },
+      ],
+      readIssue: async () => ({ open: true, labels: [] }),
+      readPr: async () => null,
+      readBranch: async () => null,
+      readPaneText: async (pane) => { reads.push(pane.id); return 'API Error: 429 rate limit'; },
+    });
+    expect(facts.apiError).toBe(true);
+    expect(reads).toEqual(['agent-pan-3917']);
+  });
+
+  it('never reads an exited pane', async () => {
+    const reads: string[] = [];
+    await loadIssueStateFacts('PAN-3917', {
+      now: () => NOW,
+      panes: [{ id: 'agent-pan-3917', issue: 'PAN-3917', role: 'work', harness: 'h', model: 'm', state: 'exited', terminalId: 'agent-pan-3917' }],
+      readIssue: async () => ({ open: true, labels: [] }),
+      readPr: async () => null,
+      readBranch: async () => null,
+      readPaneText: async (pane) => { reads.push(pane.id); return '429'; },
+    });
+    expect(reads).toEqual([]);
   });
 });
