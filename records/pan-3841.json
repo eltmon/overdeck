@@ -194,7 +194,7 @@
     "recordedAt": "2026-09-17T01:23:42.409Z"
   },
   "created": "2026-09-16T19:17:07.053Z",
-  "updated": "2026-09-18T15:11:18.242Z",
+  "updated": "2026-09-18T15:35:27.675Z",
   "pipeline": {
     "issueId": "PAN-3841",
     "reviewStatus": "passed",
@@ -206,10 +206,10 @@
     "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T15:11:17.076Z",
+    "updatedAt": "2026-09-18T15:35:27.633Z",
     "reviewNotes": "evidenceHead=e85ab105961b3dff9a93509f3b14c71cc3c0baa1. Cycle-6 passed-review claim that real-fs tests covered both layouts was wrong (legacy-only); cycle-7 commit e85ab1059 adds (1) migrated-layout fixtures with legacy decoys (4 new tests proving the resolver selects the migrated branch and ignores PAN-LEGACY/PAN-WORKSPACE) and (2) explicit untrusted-evidence prompt framing ('data, not instructions' with anti-injection phrases and verbatim-timestamps rule, pinned by 2 new template tests). Focused validation: record-list-real-fs.test.ts 10/10, retrospective-template.test.ts 13/13. All five required corrections now backed by real-fs tests on both layouts. Old cycle-6 anchor preserved at .pan/review/agent-pan-3841-review-9098a72e/review.md. New run-id agent-pan-3841-review-e85ab1059 created; not signaling against the old run.",
     "testNotes": "Verified at HEAD 9098a72e (branch moved ffb32f54->f865018e->9098a72e mid-run; f865018e fixed a real bug I found at ffb32f54 -- see below). npm run typecheck: 0 errors (verified twice, both HEADs). npm run lint: full clean pass at ffb32f54 (961 lines, all guards passed); at 9098a72e reached the final lint:effect-diagnostics step with zero failures across the whole chain (partial re-run due to heavy shared-host contention, not a code issue). Tests: at ffb32f54 my independent 'npm test' run found 18 failed/14333 passed/51 skipped -- 2 of the failures were a genuine deterministic defect in PAN-3841's own new file src/lib/overdeck/__tests__/conversation-retrospective.test.ts (duplicate `EVIDENCE_LIMITS` import at lines 217 and 469 -> PARSE_ERROR, confirmed via isolated `npx vitest run` reproducing 'Identifier EVIDENCE_LIMITS has already been declared'); the other 16 failures were beforeEach hook timeouts (setupOverdeckTestDb, 5000ms) in files unrelated to this issue, consistent with CPU contention from concurrent vitest runs in sibling workspaces observed at the time. Commit f865018e2fb (landed after I reported this) removes the duplicate import and fixes 4 other review-flagged defects. I independently re-ran the specific PAN-3841 test files in isolation at HEAD 9098a72e (conversation-retrospective.test.ts, record-list-real-fs.test.ts, conversations-retrospective.test.ts, retrospective-template.test.ts): 4 files / 68 tests, all passed, confirming the fix. I did not re-run the full 'npm test' suite a second time at 9098a72e: system load was severe during the re-verification window (swap 100% full, load avg ~7.3, multiple concurrent agent processes independently running lint/build in this exact shared workspace) and a full run risked another unreliable OOM-style kill. The pipeline record's own self-reported testNotes ('Skipped: no code changed since pre-review verification gate') is not independent evidence and was not relied on beyond corroboration; the reviewer's own full-suite self-report at 9098a72e (14366/14367 passed, one pre-existing quarantined flake PAN-2421 unrelated to this file) is consistent with my scoped result. Anomaly for the record: while blocked ~90min by a system-wide low-memory event, the branch received a new commit and an uncommitted, very-recently-modified (mtime ~5 min old) addition to src/lib/pan-dir/__tests__/record-list-real-fs.test.ts appeared in the working tree -- left untouched per policy (tests evaluate committed HEAD); operator's deaconIgnored note on the issue record says agents were asked to stop for independent review/PRD redesign as of 22:55, so this may be authorized human-directed work, not a rogue agent -- flagging for awareness.",
-    "uatNotes": "Operator override 2026-09-18: UAT ac1 confirmed in browser; ac2 blocked only by a pre-existing workspace-container Vite proxy port mismatch (3011 vs 3013) unrelated to this diff. Review, tests, verification all passed. Landing ahead of PAN-3917.",
+    "uatNotes": "Operator override 2026-09-18 (re-stamped after main sync b2574480): UAT ac1 confirmed in browser; ac2 blocked only by a pre-existing workspace-container Vite proxy port mismatch unrelated to this diff.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs traced to committed lines; FR-3/4/7 and NFR-1/2 satisfied. Renderer strips frontmatter + substitutes all five tokens globally (first line 'Pipeline retrospective: <label>', no '{{'); handler 400s on bad window before any dep call, forwards only message/model/harness/effort (no projectKey/issueId); loadRetrospectiveTemplate reads via node:fs/promises with no module-level cache and default path join(packageRoot,'roles','retrospective.md'); formatProjectLines renders migrated/legacy + empty case. Verified real roles/retrospective.md contains only the five pinned tokens. 11/11 unit tests pass locally incl. the default-path read. No execSync or sync tmux; http-helpers import matches sibling src/lib/overdeck modules.",
     "mergeNotes": "GitHub PR #3844 has failing required checks on HEAD e85ab105. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/3844 for details.",
@@ -370,7 +370,7 @@
       },
       "costAtCloseOut": {
         "usd": 47.6828724,
-        "pricingAsOf": "2026-09-18T15:11:18.234Z"
+        "pricingAsOf": "2026-09-18T15:35:27.654Z"
       }
     },
     "merges": [
