@@ -301,7 +301,9 @@ export async function collectSetupDiagnostics(
         : `✗ ${id}: command not found`;
     }
     try {
-      const output = await probe(resolvedPath, versionArgs, { allowStderrVersion: versionFromStderr === true });
+      const output = versionFromStderr
+        ? await probe(resolvedPath, versionArgs, { allowStderrVersion: true })
+        : await probe(resolvedPath, versionArgs);
       return `✓ ${id}: ${firstLine(output) ?? 'version unavailable'} — ${redactHome(resolvedPath)}`;
     } catch (error) {
       return `✗ ${id}: ${failureKind(error)} — ${redactHome(resolvedPath)}`;
@@ -355,7 +357,9 @@ export async function checkSystemPrerequisite(
   try {
     const { path: executable } = await resolvePrerequisiteExecutable(id, resolver);
     if (!executable) return { ...checkDefinition, found: false, version: null };
-    const output = await probe(executable, versionArgs, { allowStderrVersion: versionFromStderr === true });
+    const output = versionFromStderr
+      ? await probe(executable, versionArgs, { allowStderrVersion: true })
+      : await probe(executable, versionArgs);
     return { ...checkDefinition, found: true, version: firstLine(output) };
   } catch {
     return { ...checkDefinition, found: false, version: null };
