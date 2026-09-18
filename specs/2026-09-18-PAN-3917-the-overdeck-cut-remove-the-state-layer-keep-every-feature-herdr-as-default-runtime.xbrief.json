@@ -2,7 +2,7 @@
   "xBRIEFInfo": {
     "version": "0.8",
     "created": "2026-09-18T13:10:00.000Z",
-    "updated": "2026-09-18T13:14:06.695Z",
+    "updated": "2026-09-18T19:55:42.420Z",
     "author": "conv:20260918-7437",
     "description": "Plan for PAN-3917: remove Overdeck's state layer while keeping every feature; Herdr becomes the default terminal backend with tmux supported."
   },
@@ -14,7 +14,7 @@
     "author": "conv:20260918-7437",
     "sequence": 2,
     "created": "2026-09-18T13:10:00.000Z",
-    "updated": "2026-09-18T13:14:06.695Z",
+    "updated": "2026-09-18T19:55:42.420Z",
     "references": [
       "https://github.com/eltmon/overdeck/issues/3917",
       "drafts/pan-3917.md",
@@ -813,18 +813,21 @@
           "files_scope_confidence": "high",
           "verify_commands": [
             "npm run typecheck",
-            "npx vitest run tests/unit/lib/terminal-backends"
+            "npx vitest run tests/unit/lib/terminal-backends",
+            "npx vitest run tests/unit/lib/terminal-backends/prompt-guard.test.ts"
           ],
           "expected_outputs": [
             "herdr-api.test.ts passes for split frames, unknown optional fields, reconnect snapshot, and no duplicate mutation retry; herdr-stream.test.ts passes for two observers, one controller, and EOF without a close record.",
-            "The live verification record in docs/TERMINAL-BACKENDS.md shows start, prompt-and-wait to idle, blocked on a permission prompt, resume after server restart, and observe streaming; pan tell sends a message on both backends."
+            "The live verification record in docs/TERMINAL-BACKENDS.md shows start, prompt-and-wait to idle, blocked on a permission prompt, resume after server restart, and observe streaming; pan tell sends a message on both backends.",
+            "prompt-guard.test.ts passes on both adapters: the same message id sent twice to one target is delivered once and the second returns dropped; a reviewer pane prompting a worker pane returns refused with a reason; the issue work pane and an operator conversation are delivered."
           ],
           "readiness": "ready",
           "traces": [
             "FR-4",
             "FR-5",
             "NFR-5",
-            "NFR-3"
+            "NFR-3",
+            "FR-17"
           ],
           "parallelSafeReason": "Owns the adapter files and the launcher call sites; W6 explicitly excludes ws-terminal.ts and terminal-service.ts. Live verification uses the throwaway overdeck Herdr session from W0."
         },
@@ -843,6 +846,14 @@
           {
             "id": "w8-adapters.ac2",
             "title": "Given the overdeck Herdr session, pan spawn creates a pane whose agent.list entry contains issue, role, harness, and model tokens, and pan tell sends a prompt that the pane receives on both backends.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-adapters.ac3",
+            "title": "Given the same message id sent twice to one target pane, the second prompt returns dropped and the pane receives the text once; given a reviewer pane prompting a worker pane of the same issue, the prompt returns refused with a reason string and the pane receives nothing; given the issue work pane or an operator conversation prompting that worker, the pane receives the text — on both the Herdr and tmux adapters.",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"
@@ -1289,6 +1300,11 @@
       {
         "from": "w8-adapters",
         "to": "w10-context-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "w0-prepare",
+        "to": "w4-cloister-cut",
         "type": "blocks"
       }
     ]
