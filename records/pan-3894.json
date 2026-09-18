@@ -135,7 +135,7 @@
     "recordedAt": "2026-09-18T09:33:12.923Z"
   },
   "created": "2026-09-18T06:43:33.655Z",
-  "updated": "2026-09-18T09:34:32.353Z",
+  "updated": "2026-09-18T09:35:21.428Z",
   "pipeline": {
     "issueId": "PAN-3894",
     "reviewStatus": "pending",
@@ -145,7 +145,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T09:34:31.097Z",
+    "updatedAt": "2026-09-18T09:35:21.374Z",
     "reviewNotes": "Verification failed at test-skip — fix and resubmit",
     "verificationNotes": "Verification FAILED at test-skip (25ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3894/.overdeck/verification/2026-09-18T09-34-21-679Z-7b84a07a.json",
     "inspectNotes": "All 4 ACs verified independently: TICK_PATROLS=14 / HOUSEKEEPING_CHORES=29 (20 fast, 7 hourly, 2 daily), no name in both; every cadence is a CADENCE_MS key and sweepTranscriptRetention precedes pruneTerminalStoppedAgents; zero 'deacon.js' occurrences and no static deacon import (D7 holds via ChoreContext.deacon for the 4 deacon-resident chores); all 12 tests pass locally and each run closure resolves to string[] against real signatures (checked every target function's return type — adapters correct for the void deploy patrol, single lifecycle action, remote-reap filter, {level,message} rows, and GC id list). FR-5 alignment checked: tick ∪ chores == the audit's 42 KEEP_REWIRE names plus runInvariantChecker, disjoint, all five alarms in TICK_PATROLS.",
@@ -253,7 +253,7 @@
       },
       "costAtCloseOut": {
         "usd": 24.120823,
-        "pricingAsOf": "2026-09-18T09:34:31.125Z"
+        "pricingAsOf": "2026-09-18T09:35:21.411Z"
       }
     },
     "merges": [
