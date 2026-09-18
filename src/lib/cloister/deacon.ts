@@ -31,20 +31,17 @@ import { isStartingWithinGrace } from './agent-grace.js';
 import { isPatrolShadowMode, recordWouldFire, runShadowablePatrol, type PatrolShadowOptions } from './patrol-would-fire.js';
 import { runBudgetedPatrol } from './patrol-budget.js';
 import { recordDeaconNudge } from './deacon-nudge-log.js';
-import { checkInspectAgentTimeouts } from './deacon-inspect.js';
 import { checkApiErrorAgents } from './deacon-api-recovery.js';
 import { checkPostReviewCommits } from './deacon-post-review-commits.js';
 import { patrolStrikeLandings } from './deacon-strike-landing.js';
 import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingReviewStatuses, checkStuckReviewing, checkCompletedButUnsignaledReviews, reconcileUnappliedReviewVerdicts, monitorReviewConvoySignals, cleanupOrphanedReviewSessions, checkStalledReviewParents } from './deacon-review.js';
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
-import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileStuckMergingStates, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileAutoMergeRows, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
-import { reconcileTraefikNetworks } from '../workspace/traefik-connect.js';
+import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileStuckMergingStates, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
 import { swarmJanitorPass } from './deacon-swarm.js';
 import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHeartbeatDeadEvent as handleAgentHeartbeatDeadEventWithDeps, handleAgentStoppedEvent as handleAgentStoppedEventWithDeps, autoResumeStoppedWorkAgents as autoResumeStoppedWorkAgentsWithDeps, reconcileAgentLiveness as reconcileAgentLivenessWithDeps, nudgeIdleWorkAgentsWithOpenBeads, cleanupOrphanedPlanningSessions as cleanupOrphanedPlanningSessionsWithDeps } from './deacon-auto-resume.js';
 import { applyBootReconciliationDecision as applyBootReconciliationDecisionWithDeps, type BootReconciliationApplyOptions, type BootReconciliationApplyResult } from './boot-reconciliation-apply.js';
 import { isConversationDirectory } from '../agent-directory-cleanup.js';
 import { removeAgentStateDir } from '../agents/state-dir-removal.js';
-import { sweepTranscriptRetention } from './transcript-retention.js';
 import { createInFlightGuard } from './in-flight-guard.js';
 import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { isContextOverflowTail } from '../context-overflow.js';
@@ -160,8 +157,7 @@ import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
 import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync } from '../projects.js';
-import { recreatedStateWarnings, reconcileProjectStatePlanes, statePlaneReconcileEveryCycles } from './state-recreation-patrol.js';
-import { reconcileTerminalIssueResidue } from './parked-residue.js';
+import { recreatedStateWarnings } from './state-recreation-patrol.js';
 import { withIssueRecordLock } from '../pan-dir/record-lock.js';
 import { recordMainDivergenceHealth, type ProjectMainDivergence } from './deacon-main-divergence.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
@@ -179,7 +175,7 @@ import {
   isRunning,
   parseReviewerSessionName,
 } from './specialists.js';
-import { perProjectSpecialistPatrol } from './specialist-patrol.js';
+import { startHousekeepingScheduler, stopHousekeepingScheduler } from './housekeeping-scheduler.js';
 import { getAgentRuntimeStateSync, saveAgentRuntimeState, saveSessionId, listRunningAgentsSync, listRunningAgents, listAgentStates, getAgentDir, getAgentStateSync, getAgentState, saveAgentStateSync, saveAgentState, resumeAgent, recordAgentFailure, resetAgentFailureCount, markAgentRunningState, buildDefaultResumeContinueMessage, clearAgentTroubledSync, type AgentState } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePane, createSession, getManagedTmuxSocketName, isPaneDead, killSessionSync, killSession, listPaneValuesSync, listPaneValues, listSessionNames, sessionExistsSync, sessionExists, sendKeys } from '../tmux.js';
@@ -189,17 +185,9 @@ import { idleAgeMs, isIdle } from '../agents/liveness.js';
 import { checkStuckAgentRemediation } from './stuck-remediation.js';
 import { decideAgentAutonomousRedrive } from './redrive-gate.js';
 import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
-import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
-import { reconcilePipelineLabelsPatrol } from './label-reconciler.js';
-import { pruneTerminalStoppedAgents } from './agent-gc.js';
 import { shouldRunRecoveryJanitor } from './patrol-cadence.js';
 import { recordDeadEndNeedsYou } from './dead-end-trip.js';
-import { reconcileOrphanProposedSpecs, spawnWorkAgentThroughAgentsEndpoint, triggerRebuildAndStart } from './orphan-proposed-reconciler.js';
-import { reconcilePendingPromotions } from './pending-promotion-reconciler.js';
-import { reapOrphanedDashboardServers } from './orphan-dashboard-server-reaper.js';
-import { reconcileIdleWorkspaceStacks } from './idle-stack-reaper.js';
-import { reapLeftoverPlaywrightBrowsers } from './playwright-mcp-reaper.js';
-import { reapMergedStrikeWorkspaces } from './strike-workspace-reaper.js';
+import { spawnWorkAgentThroughAgentsEndpoint, triggerRebuildAndStart } from './orphan-proposed-reconciler.js';
 import { cleanupOrphanedInspectSessions } from './inspect-session-reaper.js';
 import { isIssueClosed } from './issue-closed.js';
 import { decideUnsignaledTestAction, readTestVerdictArtifact, recordUnsignaledTestEscalation } from './test-verdict.js';
@@ -2550,7 +2538,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   addLog('info', `Patrol cycle ${state.patrolCycle} — checking per-project specialists`, state.patrolCycle);
   console.log(`[deacon] Patrol cycle ${state.patrolCycle} - checking per-project specialists`);
 
-  for (const a of await runBudgetedPatrol('patrolStaleTaskClaims', async () => (await import('./stale-task-claims.js')).patrolStaleTaskClaims())) { actions.push(a); addLog('action', a, state.patrolCycle); }
   const stuckRemediationActions = await runBudgetedPatrol('checkStuckAgentRemediation', () => checkStuckAgentRemediation());
   actions.push(...stuckRemediationActions);
   for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);
@@ -2570,20 +2557,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   const reconciledJournalActions = await runBudgetedPatrol('reconcileInFlightJournals', () => runShadowablePatrol('reconcileInFlightJournals', () => reconcileInFlightJournals()));
   actions.push(...reconciledJournalActions);
   for (const a of reconciledJournalActions) addLog('action', a, state.patrolCycle);
-  // Process any pending post-merge lifecycle that wasn't consumed on startup (PAN-626).
-  // In dev mode, the deploy script may fail to restart cleanly, leaving the pending file.
-  try {
-    const pendingFile = join(OVERDECK_HOME, 'pending-post-merge.json');
-    const { processPendingLifecycleForPatrol } = await import('./deacon-pending-lifecycle.js');
-    const lifecycleActions = await runBudgetedPatrol('processPendingLifecycleForPatrol', async () => {
-      const action = await processPendingLifecycleForPatrol(pendingFile);
-      return action ? [action] : [];
-    });
-    actions.push(...lifecycleActions);
-  } catch (err: any) {
-    console.warn(`[deacon] Failed to process pending lifecycle: ${err.message}`);
-  }
-  if (state.patrolCycle % 5 === 0) await runBudgetedPatrol('runScheduledDeployPatrol', async () => { await (await import('./deploy-patrol.js')).runScheduledDeployPatrol(); return []; });
   /* PAN-378: Global specialist patrol removed. All specialist work now goes through
    * per-project ephemeral specialists via spawnEphemeralSpecialist(). The global
    * merge-agent, review-agent, and test-agent singletons are no longer used.
@@ -2600,29 +2573,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...livenessActions);
   for (const a of livenessActions) addLog('action', a, state.patrolCycle);
 
-  for (const a of await runBudgetedPatrol('reconcileOrphanProposedSpecs', () => reconcileOrphanProposedSpecs())) { actions.push(a); addLog('action', a, state.patrolCycle); }
-  for (const a of await runBudgetedPatrol('reconcilePendingPromotions', () => reconcilePendingPromotions())) { actions.push(a); addLog('action', a, state.patrolCycle); }
-
-  const closedIssueAgentActions = await runBudgetedPatrol('reconcileClosedIssueAgents', () => reconcileClosedIssueAgents());
-  actions.push(...closedIssueAgentActions);
-  for (const a of closedIssueAgentActions) addLog('action', a, state.patrolCycle);
-
-  // PAN-1882: strikes bypass close-out, so their merged `strike/<id>` worktrees
-  // + branches pile up forever. Reap any whose branch is fully merged into
-  // origin/main with no live strike session (never touches feature/* or unmerged work).
-  const strikeWorkspaceActions = await runBudgetedPatrol('reapMergedStrikeWorkspaces', () => reapMergedStrikeWorkspaces());
-  actions.push(...strikeWorkspaceActions);
-  for (const a of strikeWorkspaceActions) addLog('action', a, state.patrolCycle);
-
-  // PAN-1817: stop the server+frontend UI containers of workspaces whose agent
-  // has been idle (no agent, no tmux) past the grace window. Light-touch and
-  // reversible — never touches the agent (host tmux), worktree, or branch.
-  const idleStackActions = await runBudgetedPatrol('reconcileIdleWorkspaceStacks', () => reconcileIdleWorkspaceStacks());
-  actions.push(...idleStackActions);
-  for (const a of idleStackActions) addLog('action', a, state.patrolCycle);
-
-  // PAN-3053: read-only Docker bridge-pool pressure signal; emits on transitions only.
-  for (const a of await runBudgetedPatrol('patrolDockerBridgePool', async () => (await import('./bridge-pool-patrol.js')).patrolDockerBridgePool())) { actions.push(a); addLog('action', a, state.patrolCycle); }
 
   // Nudge work agents that are alive-but-idle with open beads remaining.
   // Catches the gap autoResume misses: tmux alive, status='running', Stop
@@ -2638,11 +2588,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   const signatureCorruptionActions = await runBudgetedPatrol('checkThinkingSignatureCorruption', () => checkThinkingSignatureCorruption());
   actions.push(...signatureCorruptionActions);
   for (const a of signatureCorruptionActions) addLog('action', a, state.patrolCycle);
-
-  // Check and auto-suspend idle agents (PAN-80, fixed in PAN-154)
-  const suspendActions = await runBudgetedPatrol('checkAndSuspendIdleAgents', () => checkAndSuspendIdleAgents());
-  actions.push(...suspendActions);
-  for (const a of suspendActions) addLog('action', a, state.patrolCycle);
 
   // Clear readyForMerge for issues whose workspace no longer exists.
   // Prevents MERGE button showing for issues that can't actually merge.
@@ -2683,31 +2628,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   // HARD pressure. Only sessions of MERGED issues (past close-out) are reaped.
   const { checkMergedAdvancingSessions } = await import('./advancing-selfheal.js');
 
-  // PAN-1726: Reap the work session of an already-merged issue. An idle merged
-  // work agent holds a PAN-1665 work slot; re-pause + kill it so the slot frees
-  // for live work. (Merged = past close-out, so the warm policy does not apply.)
-  const reapedWorkActions = await runBudgetedPatrol('checkMergedWorkSessions', () => checkMergedWorkSessions());
-  actions.push(...reapedWorkActions);
-  for (const a of reapedWorkActions) addLog('action', a, state.patrolCycle);
-
-  const reapedMergedAdvancingActions = await runBudgetedPatrol('checkMergedAdvancingSessions', () => checkMergedAdvancingSessions());
-  actions.push(...reapedMergedAdvancingActions);
-  for (const a of reapedMergedAdvancingActions) addLog('action', a, state.patrolCycle);
-
-  // PAN-1778: proactively refresh Claude credentials on active remote agents
-  // when the host credentials file changes, with a 15 min fallback cadence.
-  // Runs before the reactive 401 heal/reap path so long remote runs get fresh
-  // OAuth tokens before they stall. Zero active remote agents is a local state
-  // scan only — no Fly provider construction and no Fly API calls.
-  try {
-    const { refreshClaudeCredentialsForActiveRemoteAgents } = await import('../remote/remote-completion.js');
-    const remoteCredentialActions = await runBudgetedPatrol('refreshClaudeCredentialsForActiveRemoteAgents', () => refreshClaudeCredentialsForActiveRemoteAgents());
-    actions.push(...remoteCredentialActions);
-    for (const a of remoteCredentialActions) addLog(a.includes('failed') ? 'warn' : 'action', a, state.patrolCycle);
-  } catch (err: any) {
-    addLog('warn', `Remote credential refresh patrol failed: ${err.message}`, state.patrolCycle);
-  }
-
   // PAN-1845: keep ephemeral-tier remote VMs from running forever when the host
   // (or deacon) goes away. The patrol writes a freshness file; a VM-side
   // watchdog self-stops the machine when the heartbeat goes stale.
@@ -2718,27 +2638,6 @@ export async function runPatrol(): Promise<PatrolResult> {
     for (const a of heartbeatActions) addLog(a.includes('failed') ? 'warn' : 'action', a, state.patrolCycle);
   } catch (err: any) {
     addLog('warn', `Remote heartbeat refresh patrol failed: ${err.message}`, state.patrolCycle);
-  }
-
-  // PAN-1676: hand completed remote (fly.io) agents to the review pipeline.
-  // Cheap no-op when no remote-state.json is active (local file scan only —
-  // no fly API calls); otherwise checks each VM for the REMOTE_DONE sentinel,
-  // materializes the local worktree, creates review artifacts + the completed
-  // marker, and destroys the machine.
-  try {
-    const { reapCompletedRemoteAgents } = await import('../remote/remote-completion.js');
-    // Budget counts only real actions (hand-offs and errors), not per-VM no-op scans.
-    const remoteReap = await runBudgetedPatrol('reapCompletedRemoteAgents', async () =>
-      (await reapCompletedRemoteAgents()).filter((r) => r.status === 'handed-off' || r.status === 'error'));
-    for (const r of remoteReap) {
-      if (r.status === 'handed-off' || r.status === 'error') {
-        const msg = `Remote reap ${r.issueId}: ${r.status} (${r.details.join('; ')})`;
-        actions.push(msg);
-        addLog(r.status === 'error' ? 'warn' : 'action', msg, state.patrolCycle);
-      }
-    }
-  } catch (err: any) {
-    addLog('warn', `Remote reap patrol failed: ${err.message}`, state.patrolCycle);
   }
 
   // PAN-1730: Reap the work session of an issue idle awaiting its test verdict
@@ -2756,11 +2655,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   const orphanActions = await runBudgetedPatrol('checkOrphanedReviewStatuses', () => runShadowablePatrol('checkOrphanedReviewStatuses', (shadow) => checkOrphanedReviewStatuses({ shadow })));
   actions.push(...orphanActions);
   for (const a of orphanActions) addLog('action', a, state.patrolCycle);
-
-  // Bound per-bead inspect sessions so work agents never wait forever for a verdict.
-  const inspectTimeoutActions = await runBudgetedPatrol('checkInspectAgentTimeouts', () => checkInspectAgentTimeouts());
-  actions.push(...inspectTimeoutActions);
-  for (const a of inspectTimeoutActions) addLog('action', a, state.patrolCycle);
 
   // PAN-1559: reap untracked inspect tmux sessions. Inspect agents now write
   // state.json at spawn, but this safety net kills older leaked sessions and
@@ -2859,11 +2753,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...reviewCleanupActions);
   for (const a of reviewCleanupActions) addLog('action', a, state.patrolCycle);
 
-  // PAN-464: Check workspace Docker container health and auto-restart crashed containers
-  const containerActions = await runBudgetedPatrol('checkWorkspaceContainerHealth', () => checkWorkspaceContainerHealth());
-  actions.push(...containerActions);
-  for (const a of containerActions) addLog('action', a, state.patrolCycle);
-
   // Dead-end and first-completion nudges DISABLED — too flaky, risk of
   // draining AI token credits by sending unnecessary prompts to agents.
   // If an agent is stuck, the human operator can nudge it manually via the
@@ -2874,10 +2763,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...mergeStuckActions);
   for (const a of mergeStuckActions) addLog('action', a, state.patrolCycle);
 
-  // Auto-retry merges that failed due to transient post-rebase verification failures
-  const failedMergeRetryActions = await runBudgetedPatrol('checkFailedMergeRetry', () => checkFailedMergeRetry());
-  actions.push(...failedMergeRetryActions);
-  for (const a of failedMergeRetryActions) addLog('action', a, state.patrolCycle);
   for (const a of await runBudgetedPatrol('patrolStrikeLandings', () => patrolStrikeLandings())) { actions.push(a); addLog('action', a, state.patrolCycle); }
   // PAN-2203: deterministic swarm coordination. This pass derives active
   // swarms from workspaces + xBRIEF readiness; later beads fill in merge,
@@ -2905,16 +2790,12 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...mergedReviewingActions);
   for (const a of mergedReviewingActions) addLog('action', a, state.patrolCycle);
 
-  const autoCloseOutActions = await runBudgetedPatrol('autoCloseOut', () => autoCloseOut());
-  actions.push(...autoCloseOutActions);
-  for (const a of autoCloseOutActions) addLog('action', a, state.patrolCycle);
-
   // Closed-PR readyForMerge reconciler: stops the "Awaiting Merge" view from
   // listing issues whose PR was closed without merging (PAN-1111-style stale
   // state). Best-effort against the forge; 10-min per-issue cooldown.
   const closedPrReadyActions = await runBudgetedPatrol('reconcileClosedPrReadyForMerge', () => runShadowablePatrol('reconcileClosedPrReadyForMerge', (shadow) => reconcileClosedPrReadyForMerge({ shadow })));
   actions.push(...closedPrReadyActions);
-  for (const a of closedPrReadyActions) addLog('action', a, state.patrolCycle); for (const a of await runBudgetedPatrol('reconcileAutoMergeRows', () => reconcileAutoMergeRows())) { actions.push(a); addLog('action', a, state.patrolCycle); }
+  for (const a of closedPrReadyActions) addLog('action', a, state.patrolCycle);
 
   // PAN-2143: re-evaluate stale merge-blockers. resolveConflictGate clears a
   // stale merge_conflict/not_mergeable blocker once the branch is mergeable
@@ -2947,14 +2828,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...firstCompletionActions);
   for (const a of firstCompletionActions) addLog('action', a, state.patrolCycle);
 
-  // PAN-2428: workspace stacks can come up outside Overdeck (e.g. a project's own
-  // dev script), leaving traefik disconnected from their network — every route to
-  // that stack 504s until someone runs `docker network connect` by hand. Reconcile
-  // idempotently on the patrol tick.
-  const traefikActions = await runBudgetedPatrol('reconcileTraefikNetworks', () => reconcileTraefikNetworks());
-  actions.push(...traefikActions);
-  for (const a of traefikActions) addLog('action', a, state.patrolCycle);
-
   // Resolution patrol DISABLED — auto-completing and poking agents consumes
   // API credits and is unreliable. Human operator can take action via dashboard.
 
@@ -2964,7 +2837,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   const apiErrorActions = await checkApiErrorAgents();
   actions.push(...apiErrorActions);
   for (const a of apiErrorActions) addLog('action', a, state.patrolCycle);
-  if (state.patrolCycle % 10 === 0) for (const action of await runBudgetedPatrol('reconcilePipelineLabelsPatrol', () => reconcilePipelineLabelsPatrol())) { actions.push(action); addLog('action', action, state.patrolCycle); }
   // PAN-3850 (W40, FR-27): report-only invariant checker — do the record, the
   // review-status row, and liveness agree? Reports mismatches as activity
   // entries and a report file; never writes any store it reads.
@@ -2973,47 +2845,10 @@ export async function runPatrol(): Promise<PatrolResult> {
     actions.push(...invariantActions);
     for (const a of invariantActions) addLog('warn', a, state.patrolCycle);
   }
-  // PAN-1625: reap orphaned dashboard-server processes. Low cadence (~10 min).
-  // Never touches the live server, port owner, or workspace-container server.
-  const serverReaperEveryCycles = Math.max(1, Math.round((10 * 60 * 1000) / config.patrolIntervalMs));
-  if (state.patrolCycle % serverReaperEveryCycles === 0) {
-    const reaperActions = await runBudgetedPatrol('reapOrphanedDashboardServers', () => reapOrphanedDashboardServers());
-    actions.push(...reaperActions);
-    for (const a of reaperActions) addLog('action', a, state.patrolCycle);
-  }
-
-  // PAN-1706: reap leftover playwright-mcp trees / stale headless browsers.
-  // Each ghost browser keeps a full dashboard page polling at full rate,
-  // multiplying server load. Same ~10 min cadence as the server reaper.
-  if (state.patrolCycle % serverReaperEveryCycles === 0) {
-    const playwrightActions = await runBudgetedPatrol('reapLeftoverPlaywrightBrowsers', () => reapLeftoverPlaywrightBrowsers());
-    actions.push(...playwrightActions);
-    for (const a of playwrightActions) addLog('action', a, state.patrolCycle);
-  }
   const projectConfigs = listProjectsSync();
-  if (state.patrolCycle % statePlaneReconcileEveryCycles(config.patrolIntervalMs) === 0) for (const result of await runBudgetedPatrol('reconcileProjectStatePlanes', () => reconcileProjectStatePlanes(projectConfigs))) { actions.push(result.message); addLog(result.level, result.message, state.patrolCycle); }
-  // PAN-3727: sweep terminal-issue records for parked-population residue (open
-  // recovery trips, operator-gate flags) left over from before close-out
-  // started acknowledging it. Same cadence as the state-plane patrol above.
-  if (state.patrolCycle % statePlaneReconcileEveryCycles(config.patrolIntervalMs) === 0) for (const result of await runBudgetedPatrol('reconcileTerminalIssueResidue', () => reconcileTerminalIssueResidue(projectConfigs))) { actions.push(result.message); addLog(result.level, result.message, state.patrolCycle); }
   for (const warning of await recreatedStateWarnings(projectConfigs)) addLog(warning.level, warning.message, state.patrolCycle);
   const divergenceWarnings = await recordMainDivergenceHealth(state, projectConfigs);
   for (const warning of divergenceWarnings) addLog('warn', warning, state.patrolCycle);
-  if (shouldRunRecoveryJanitor('agent-state', state.patrolCycle)) {
-    const cleanupActions = await runBudgetedPatrol('cleanupStaleAgentState', () => cleanupStaleAgentState());
-    actions.push(...cleanupActions);
-    for (const a of cleanupActions) addLog('action', a, state.patrolCycle);
-
-    const transcriptDays = loadCloisterConfigSync().retention?.transcript_days;
-    if (typeof transcriptDays === 'number' && Number.isFinite(transcriptDays) && transcriptDays > 0) {
-      const transcriptActions = await runBudgetedPatrol('sweepTranscriptRetention', () => sweepTranscriptRetention({ transcriptDays }));
-      actions.push(...transcriptActions);
-      for (const a of transcriptActions) addLog('action', a, state.patrolCycle);
-    }
-  }
-  // Retention needs the canonical registry row to prove terminal state before
-  // agent GC removes that evidence. Both run on the same 60-cycle cadence.
-  if (state.patrolCycle % 60 === 0) for (const id of await runBudgetedPatrol('pruneTerminalStoppedAgents', async () => (await pruneTerminalStoppedAgents()).removed)) actions.push(`[agents-gc] pruned ${id}`);
 
   // PAN-1908: primary orphan reviewer-session cleanup is reactive
   // (agent.stopped for the owning work agent). This is a thin safety-net
@@ -3031,15 +2866,6 @@ export async function runPatrol(): Promise<PatrolResult> {
     actions.push(massDeathCheck.message);
     addLog('error', massDeathCheck.message, state.patrolCycle);
   }
-
-  // Patrol per-project ephemeral specialists (PAN-300)
-  // Ephemeral specialists are spawned on-demand and are not auto-restarted by the deacon.
-  // Patrol detects stuck sessions, dead sessions, and auto-completes successful merges (PAN-375).
-  const specialistPatrolActions = await runBudgetedPatrol('perProjectSpecialistPatrol', () => perProjectSpecialistPatrol());
-  actions.push(...specialistPatrolActions);
-  // PAN-3894 (W3a): the extracted patrol returns action strings instead of calling
-  // addLog itself; a '[warn] ' prefix marks the lines the inline closure logged at warn.
-  for (const a of specialistPatrolActions) addLog(a.startsWith('[warn] ') ? 'warn' : 'action', a.replace(/^\[warn\] /, ''), state.patrolCycle);
 
   refreshPatrolHeartbeat(state);
 
@@ -3097,6 +2923,15 @@ export interface DeaconLogEntry {
 
 const MAX_LOG_ENTRIES = 200;
 const deaconLogs: DeaconLogEntry[] = [];
+
+/**
+ * PAN-3894 (W4): the housekeeping scheduler's log door. Chore actions must reach
+ * the same deacon log the dashboard reads (`GET /api/deacon/logs`); they are not
+ * part of PatrolResult.actions, which stays the tick's own record.
+ */
+export function appendDeaconLog(level: DeaconLogEntry['level'], message: string): void {
+  addLog(level, message);
+}
 
 function addLog(level: DeaconLogEntry['level'], message: string, cycle?: number): void {
   const entry = {
@@ -3234,7 +3069,7 @@ export function startDeacon(): void {
   }
 
   config = loadConfig();
-  console.log(`[deacon] Starting health monitor (patrol every ${config.patrolIntervalMs / 1000}s)`);
+  console.log(`[deacon] Starting health monitor (patrol every ${config.patrolIntervalMs / 1000}s; housekeeping chores on fast/hourly/daily cadences)`);
   logDeaconEventSync(`startDeacon: health monitor starting (patrol every ${config.patrolIntervalMs / 1000}s)`);
 
   // Recover agents whose tmux sessions were killed by a system crash before the
@@ -3254,6 +3089,21 @@ export function startDeacon(): void {
   deaconInterval = setInterval(() => {
     runScheduledPatrol('interval');
   }, config.patrolIntervalMs);
+
+  // PAN-3894 (W4): housekeeping chores run on their own fast/hourly/daily
+  // cadences with durable due-times, not on the 60 s tick. The four chores whose
+  // functions live here are injected so the registry never imports this module.
+  startHousekeepingScheduler({
+    log: appendDeaconLog,
+    context: {
+      deacon: {
+        checkAndSuspendIdleAgents,
+        checkMergedWorkSessions,
+        checkWorkspaceContainerHealth,
+        cleanupStaleAgentState,
+      },
+    },
+  });
 
   // Resource-pressure patrol on dedicated 15s timer.
   memoryPatrolInterval = setInterval(() => {
@@ -3284,6 +3134,7 @@ export function stopDeacon(): void {
     clearInterval(memoryPatrolInterval);
     memoryPatrolInterval = null;
   }
+  stopHousekeepingScheduler();
 }
 
 /**

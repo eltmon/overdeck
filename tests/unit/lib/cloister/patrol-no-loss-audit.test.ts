@@ -9,6 +9,12 @@
  * 1. Every registered name is either a Keep/Rewire row, a Delete row still
  *    awaiting its soak-gated removal (W41, deferred), or the Phase 5 addition
  *    `runInvariantChecker`. No fourth kind of patrol can slip in unaudited.
+ *
+ * PAN-3894 (W4) split the surviving patrols in two: `runPatrol` keeps the 14
+ * `TICK_PATROLS` and the housekeeping scheduler runs the 29
+ * `HOUSEKEEPING_CHORES`, both declared in `src/lib/cloister/patrol-registry.ts`.
+ * "Registered" therefore means tick-registered OR chore-registered, and the
+ * audit now holds the union against Appendix C.
  * 2. The registered set equals the audited snapshot exactly — a patrol silently
  *    dropped from runPatrol (a deletion without an audit) fails here.
  * 3. The five exempt alarm patrols (Appendix C #3, #64, #70, #71, #77) are
@@ -26,6 +32,11 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+
+import {
+  TICK_PATROLS,
+  HOUSEKEEPING_CHORES,
+} from '../../../../src/lib/cloister/patrol-registry.js';
 
 const DEACON_PATH = resolve(__dirname, '../../../../src/lib/cloister/deacon.ts');
 const TESTS_ROOT = resolve(__dirname, '../../..');
@@ -152,21 +163,48 @@ function registeredBudgetedNames(): string[] {
   return [...new Set(names)].sort();
 }
 
+const CHORE_NAMES = HOUSEKEEPING_CHORES.map((c) => c.name);
+
+/** The body of `runPatrol` alone, so cadence gates elsewhere in deacon.ts do not count. */
+function runPatrolBody(): string {
+  const source = readFileSync(DEACON_PATH, 'utf8');
+  const start = source.indexOf('export async function runPatrol');
+  const end = source.indexOf('\nexport ', start + 10);
+  return source.slice(start, end === -1 ? undefined : end);
+}
+
 describe('Phase 5 patrol no-loss audit (PAN-3850 W42)', () => {
   it('every registered patrol is a Keep/Rewire row, a pending-soak Delete row, or a Phase 5 addition', () => {
     const allowed = new Set([...KEEP_REWIRE, ...PENDING_SOAK_DELETION, ...PHASE_5_ADDITIONS]);
-    const unaccounted = registeredBudgetedNames().filter((name) => !allowed.has(name));
+    const unaccounted = [...registeredBudgetedNames(), ...CHORE_NAMES].filter((name) => !allowed.has(name));
     expect(unaccounted).toEqual([]);
   });
 
-  it('the registered set matches the audited snapshot exactly — no silent additions or removals', () => {
+  it('runPatrol registers exactly the budgeted tick patrols plus the pending-soak rows', () => {
     const expected = new Set([
-      // Every Keep/Rewire row except the five alarms (wired directly).
-      ...[...KEEP_REWIRE].filter((name) => !ALARM_PATROLS.includes(name)),
+      // Every tick patrol except the five alarms (wired directly, never budgeted).
+      ...TICK_PATROLS.filter((name) => !ALARM_PATROLS.includes(name)),
       ...PENDING_SOAK_DELETION,
-      ...PHASE_5_ADDITIONS,
     ]);
     expect(registeredBudgetedNames()).toEqual([...expected].sort());
+  });
+
+  it('PAN-3894: the tick set and the housekeeping chores partition Keep/Rewire plus the Phase 5 addition', () => {
+    const union = [...TICK_PATROLS, ...CHORE_NAMES].sort();
+    const audited = [...new Set([...KEEP_REWIRE, ...PHASE_5_ADDITIONS])].sort();
+    expect(union).toEqual(audited);
+    expect(TICK_PATROLS).toHaveLength(14);
+    expect(CHORE_NAMES).toHaveLength(29);
+  });
+
+  it('PAN-3894: no patrol is both a tick patrol and a housekeeping chore', () => {
+    expect(CHORE_NAMES.filter((name) => (TICK_PATROLS as readonly string[]).includes(name))).toEqual([]);
+  });
+
+  it('PAN-3894: runPatrol keeps exactly one modulo cadence gate — the invariant checker', () => {
+    const body = runPatrolBody();
+    expect(body.match(/patrolCycle %/g) ?? []).toHaveLength(1);
+    expect(body).toContain("runBudgetedPatrol('runInvariantChecker'");
   });
 
   it('the five exempt alarm patrols are still wired directly in runPatrol', () => {

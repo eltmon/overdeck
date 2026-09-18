@@ -50,4 +50,4 @@ export function createRecreatedStateWarningReporter(
 }
 
 export const recreatedStateWarnings = createRecreatedStateWarningReporter();
-export { reconcileProjectStatePlanes, statePlaneReconcileEveryCycles } from './state-plane-patrol.js';
+export { reconcileProjectStatePlanes } from './state-plane-patrol.js';
