@@ -37,13 +37,17 @@ export async function findAgentRuntimePidInSubtree(rootPid: string, harness: Run
     if (seen.has(pid) || !/^\d+$/.test(pid)) continue;
     seen.add(pid);
 
+    // A failed identity lookup must not prune the subtree below this pid: a
+    // transient `ps` failure at the pane root would otherwise read a healthy
+    // harness further down as absent. Fall through to the child lookup.
+    let name: string | null = null;
     try {
       const { stdout: comm } = await execAsync(`ps -p ${pid} -o comm=`);
-      const name = comm.trim();
-      if (matchesHarnessProcess(name, expectedProcessNames, harness)) return Number.parseInt(pid, 10);
+      name = comm.trim();
     } catch {
-      continue;
+      // Identity unknown — the child lookup below still runs.
     }
+    if (name !== null && matchesHarnessProcess(name, expectedProcessNames, harness)) return Number.parseInt(pid, 10);
 
     try {
       const { stdout: kids } = await execAsync(`pgrep -P ${pid}`);
@@ -71,12 +75,15 @@ export function findAgentRuntimePidInSubtreeSync(rootPid: string, harness: Runti
     if (seen.has(pid) || !/^\d+$/.test(pid)) continue;
     seen.add(pid);
 
+    // Same fall-through contract as the async variant: a failed identity
+    // lookup never prunes the subtree below the pid.
+    let name: string | null = null;
     try {
-      const name = execFileSync('ps', ['-p', pid, '-o', 'comm='], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-      if (matchesHarnessProcess(name, expectedProcessNames, harness)) return Number.parseInt(pid, 10);
+      name = execFileSync('ps', ['-p', pid, '-o', 'comm='], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     } catch {
-      continue;
+      // Identity unknown — the child lookup below still runs.
     }
+    if (name !== null && matchesHarnessProcess(name, expectedProcessNames, harness)) return Number.parseInt(pid, 10);
 
     try {
       const kids = execFileSync('pgrep', ['-P', pid], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
