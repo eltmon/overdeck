@@ -101,7 +101,7 @@
     "recordedAt": "2026-08-14T09:01:11.684Z"
   },
   "created": "2026-08-14T06:01:28.966Z",
-  "updated": "2026-08-21T09:03:30.850Z",
+  "updated": "2026-09-18T09:07:42.671Z",
   "pipeline": {
     "issueId": "PAN-3703",
     "reviewStatus": "passed",
@@ -222,7 +222,6 @@
       "needsYouEmittedAt": "2026-08-14T06:24:03.820Z"
     }
   ],
-  "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 2,
     "claims": {},
