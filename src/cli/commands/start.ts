@@ -92,8 +92,6 @@ import { assertCanStartFreshSync, getWorkAgentLifecycleStateSync } from '../../l
 import { normalizeModelOverrideSync } from '../../lib/model-validation.js';
 import { resolvePlanningMode, type PlanningMode } from './planning-mode.js';
 import { requireAutomaticStateMigration } from '../../lib/state-auto-migrate.js';
-import { checkActiveOrderDispatch } from '../../lib/orders/dispatch-gate.js';
-import { withActiveOrderDispatchReservation } from '../../lib/orders/dispatch-reservation.js';
 import type { IssueOptions } from './start-options.js';
 import { prepareFreshWorkAgentSession } from './start-fresh-session.js';
 
@@ -1162,11 +1160,6 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       });
     }
 
-    const orderDispatch = await checkActiveOrderDispatch(projectRoot, id, { offBook: options.offBook });
-    if (!orderDispatch.decision.eligible) {
-      throw new Error(orderDispatch.decision.message ?? `Order-book dispatch blocked for ${id}`);
-    }
-
     prep.update('Building agent prompt with planning context...');
     const trackerContext = await runStartPrepStep(prep, spinner, 'tracker-context', (signal) => getTrackerContext(id, workspace, signal), '');
     const prompt = await buildWorkAgentPrompt({ issueId: id, env: 'LOCAL', workspacePath: workspace, projectRoot, trackerContext });
@@ -1178,28 +1171,19 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     if (shouldClearPauseBeforeSpawn) {
       clearAgentPausedSync(agentId);
     }
-    const admitted = await withActiveOrderDispatchReservation(
-      projectRoot,
-      id,
-      { offBook: options.offBook, recordOverride: !options.dryRun },
-      () => runStartPrepStep(prep, spinner, 'spawn', () => spawnAgent({
-        issueId: id,
-        workspace,
-        harness: requestedHarness,
-        model: spawnModel,
-        role: 'work',
-        prompt,
-        allowHost: options.host,
-        startedBy: process.env['OVERDECK_AGENT_STARTED_BY']!,
-        autoSpawnConsentRequired: process.env['OVERDECK_AUTO_SPAWN_CONSENT_REQUIRED'] === '1',
-        effort: resolvedEffort,
-        foreman: resolveSwarmPolicy(id).mode === 'always' || undefined,
-      })),
-    );
-    if (!admitted.check.decision.eligible || !admitted.result) {
-      throw new Error(admitted.check.decision.message ?? `Order-book dispatch blocked for ${id}`);
-    }
-    const agent = admitted.result;
+    const agent = await runStartPrepStep(prep, spinner, 'spawn', () => spawnAgent({
+      issueId: id,
+      workspace,
+      harness: requestedHarness,
+      model: spawnModel,
+      role: 'work',
+      prompt,
+      allowHost: options.host,
+      startedBy: process.env['OVERDECK_AGENT_STARTED_BY']!,
+      autoSpawnConsentRequired: process.env['OVERDECK_AUTO_SPAWN_CONSENT_REQUIRED'] === '1',
+      effort: resolvedEffort,
+      foreman: resolveSwarmPolicy(id).mode === 'always' || undefined,
+    }));
     const kickoffFailed = agent.role === 'work' && agent.kickoffDelivered === false;
     if (kickoffFailed) {
       spinner.fail(`Agent spawned but kickoff delivery was not confirmed: ${agent.id}`);
