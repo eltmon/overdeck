@@ -18,6 +18,7 @@ import { loadConfigSync } from '../../lib/config-yaml/load.js';
 import { resolveModel } from '../../lib/config-yaml/roles.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
 import { resolveHarness } from '../../lib/harness-resolve.js';
+import { createConversation } from '../../lib/overdeck/conversations.js';
 import {
   spawnConversationSession,
   waitForConversationRuntimeReady,
@@ -55,10 +56,26 @@ export async function flywheelStartCommand(options: FlywheelStartOptions = {}): 
   const model = options.model ?? resolveModel('flywheel', undefined, config);
   const harness = await resolveHarness({ explicit: options.harness as RuntimeName | undefined, role: 'flywheel', model });
 
+  // Register the conversation before the session exists, so the dashboard's
+  // conversation list and the issue tree see it the moment it comes up. An
+  // operator conversation carries no `issue` token (FR-5).
+  const claudeSessionId = randomUUID();
+  createConversation({
+    name: FLYWHEEL_CONVERSATION_SESSION,
+    tmuxSession: FLYWHEEL_CONVERSATION_SESSION,
+    cwd,
+    claudeSessionId,
+    title: 'Flywheel',
+    titleSource: 'manual',
+    model,
+    effort: 'high',
+    harness,
+  });
+
   await spawnConversationSession(
     FLYWHEEL_CONVERSATION_SESSION,
     cwd,
-    randomUUID(),
+    claudeSessionId,
     model,
     'high',
     undefined,

@@ -3,13 +3,12 @@
  *
  * PAN-3917: a specialist verdict is posted where the forge owns it — an
  * approval or a review comment on the pull/merge request — and nowhere else.
- * There is no review-status row, no `reviewStatus`/`testStatus`/`uatStatus`
- * field, and no computed `readyForMerge`: the ready set is derived from
- * approvals, checks and forge mergeability (FR-7, FR-9).
+ * There is no review-status row and no stored verdict field: the ready set is
+ * derived from approvals, checks and forge mergeability (FR-7, FR-9).
  *
  * Roles: `review`, `test`, `uat`. The `inspect` role went with the per-item
- * inspection gate (FR-14); `merge` and `ship` went with `readyForMerge` and
- * `mergeStatus` — a merged PR is the fact those two used to record.
+ * inspection gate (FR-14); `merge` and `ship` went with the stored merge
+ * verdict — a merged PR is the fact those two used to record.
  */
 
 import { exitCli } from '../../exit.js';

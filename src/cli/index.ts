@@ -358,7 +358,7 @@ backlog
       return exitCli(1);
     }
     writeSequenceMd(projectRoot, result.doc);
-    // Whoever writes a .pan/ artifact commits it — there is no auto-commit daemon.
+    // Whoever writes a .pan/ artifact commits it — no daemon does it for you.
     const { commitPlanArtifacts } = await import('../lib/overdeck/plan-artifact-commit.js');
     const { resolvePlanHome } = await import('../lib/pan-dir/paths.js');
     const commit = await commitPlanArtifacts({

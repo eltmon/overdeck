@@ -1,7 +1,8 @@
 /**
  * Committing `.pan/` artifacts (PAN-3917 W9).
  *
- * There is no auto-commit daemon and no state branch. Whoever writes a planning
+ * No daemon commits .pan/ behind your back, and there is no state branch.
+ * Whoever writes a planning
  * artifact commits it, on the branch it belongs to: per-issue artifacts (spec
  * promotion, drafts, continue files) on the issue's feature branch inside the
  * issue workspace; project-level artifacts (order books, notes, the parked

@@ -283,7 +283,7 @@ export async function commitCompletePlanningWorkspaceGit(
  * Commit the issue's `.pan/` plan artifacts on the feature branch before the
  * work agent is auto-started (PAN-3917).
  *
- * Nothing auto-commits any more: whoever writes a planning artifact commits it.
+ * No daemon commits .pan/ any more: whoever writes a planning artifact commits it.
  * Promotion has just written the spec (and possibly the continue file) into the
  * workspace's own `.pan/`, so the tree handed to auto-start would otherwise be
  * dirty and the start-agent guard would refuse to spawn.

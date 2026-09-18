@@ -63,7 +63,7 @@ function panDirFor(deps: OrdersCommandDeps = {}): string {
 
 /**
  * Order books live in `<planHome>/.pan/orders/` on `main`, and the verb that
- * writes one commits it (PAN-3917: there is no auto-commit daemon).
+ * writes one commits it (PAN-3917: no daemon commits .pan/ behind your back).
  */
 async function commitOrders(panDir: string, subject: string): Promise<void> {
   await commitPlanArtifacts({ cwd: dirname(panDir), paths: [join(panDir, 'orders')], message: subject });
