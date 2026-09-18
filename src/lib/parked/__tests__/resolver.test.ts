@@ -89,6 +89,7 @@ function signals(overrides: Partial<ParkedSignals>): ParkedSignals {
     liveAgents: [],
     openRecoveryTrips: [],
     issueClosed: null,
+    invariantMismatches: [],
     now: NOW,
     ...overrides,
   };
@@ -213,6 +214,34 @@ describe('classifyParked — one orbit at a time', () => {
     expect(rows[0].parkReason).toContain('25/25');
   });
 
+  it('invariant-mismatch: pipeline drift names the resync door (PAN-3850)', () => {
+    const rows = classifyParked(signals({
+      invariantMismatches: [{ entity: 'PAN-1', kind: 'pipeline', fields: [{ field: 'reviewStatus', recordValue: 'passed', rowValue: 'pending' }] }],
+    }));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].orbit).toBe('invariant-mismatch');
+    expect(rows[0].parkReason).toContain('reviewStatus');
+    expect(rows[0].unparkCondition).toContain('pan review resync PAN-1');
+  });
+
+  it('invariant-mismatch: liveness drift names the agents-exited door (PAN-3850)', () => {
+    const rows = classifyParked(signals({
+      invariantMismatches: [{ entity: 'agent-pan-1', kind: 'liveness', fields: [], detail: 'agents row says running but no tmux session exists', issueId: 'PAN-1' }],
+    }));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].orbit).toBe('invariant-mismatch');
+    expect(rows[0].unparkCondition).toContain('pan admin agents exited agent-pan-1');
+  });
+
+  it('invariant-mismatch never suppresses idle-running, the orbit of last resort', () => {
+    const rows = classifyParked(signals({
+      reviewStatus: baseStatus({}),
+      liveAgents: [{ ...baseAgent({ lastActivity: new Date(NOW - IDLE_RUNNING_THRESHOLD_MS - 60_000).toISOString() }), tmuxActive: true }],
+      invariantMismatches: [{ entity: 'PAN-1', kind: 'pipeline', fields: [{ field: 'stuck', recordValue: null, rowValue: true }] }],
+    }));
+    expect(rows.map((r) => r.orbit).sort()).toEqual(['idle-running', 'invariant-mismatch']);
+  });
+
   it('multiple orbits stack on one issue (stuck + operator gate)', () => {
     const rows = classifyParked(signals({
       reviewStatus: baseStatus({ stuck: true, stuckReason: 'review_infrastructure_failure' }),
@@ -251,6 +280,9 @@ describe('guard-exit inventory (PAN-3488)', () => {
       'zombie-session': signals({ reviewStatus: baseStatus({ mergeStatus: 'merged' }), liveAgents: [{ ...baseAgent({}), tmuxActive: true }] }),
       'idle-running': signals({ reviewStatus: baseStatus({}), liveAgents: [{ ...baseAgent({ lastActivity: new Date(NOW - IDLE_RUNNING_THRESHOLD_MS - 60_000).toISOString() }), tmuxActive: true }] }),
       'circuit-breaker': signals({ reviewStatus: baseStatus({ autoRequeueCount: 30 }) }),
+      'invariant-mismatch': signals({
+        invariantMismatches: [{ entity: 'PAN-1', kind: 'pipeline', fields: [{ field: 'reviewStatus', recordValue: 'passed', rowValue: 'pending' }] }],
+      }),
     };
     expect(Object.keys(fixtures).sort()).toEqual([...PARKED_ORBITS].sort());
     for (const orbit of PARKED_ORBITS) {

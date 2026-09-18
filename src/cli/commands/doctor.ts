@@ -8,6 +8,7 @@ import { promisify } from 'util';
 import { getAgentSessionsSync, listSessionNamesSync } from '../../lib/tmux.js';
 import { listProjectsSync, type ProjectConfig } from '../../lib/projects.js';
 import { findMixedWouldFireModes, readWouldFireCounts, readWouldFireRecorderHealth, wouldFireRecorderHealthPath } from '../../lib/cloister/patrol-would-fire.js';
+import { readInvariantReport } from '../../lib/cloister/invariant-checker.js';
 import { listPatrolBudgetRows } from '../../lib/cloister/patrol-budget.js';
 import { homedir } from 'os';
 import { isAbsolute, join, resolve } from 'path';
@@ -418,6 +419,34 @@ export function printPatrolBudgetTable(): void {
     const budgetText = row.budget === 'exempt' ? '(exempt)' : `of ${row.budget}`;
     const line = `  ${row.patrol}: ${row.actions} ${budgetText}${row.suspended ? ` — SUSPENDED (${row.suspendedReason ?? 'budget exceeded'})` : ''}`;
     console.log(row.suspended ? chalk.red(line) : line);
+  }
+}
+
+/**
+ * PAN-3850 (W40, FR-27): print the invariant checker's last report — every
+ * entity whose record, review-status row, or liveness disagree. The checker
+ * is report-only; each line names the repair door for its kind of drift.
+ */
+export function printInvariantMismatchTable(): void {
+  console.log(chalk.bold('Invariant mismatches (record vs row vs liveness):'));
+  const report = readInvariantReport();
+  if (!report.generatedAt) {
+    console.log(chalk.dim('  (no invariant report yet — the checker runs every 10 patrol passes)'));
+    return;
+  }
+  console.log(chalk.dim(`  last checked ${report.generatedAt}`));
+  if (report.mismatches.length === 0) {
+    console.log('  all planes agree');
+    return;
+  }
+  for (const mismatch of report.mismatches) {
+    const what = mismatch.kind === 'liveness'
+      ? (mismatch.detail ?? 'liveness drift')
+      : `record/row drift on ${mismatch.fields.map((f) => `${f.field} (record=${JSON.stringify(f.recordValue)} row=${JSON.stringify(f.rowValue)})`).join(', ')}`;
+    const fix = mismatch.kind === 'liveness'
+      ? `pan admin agents exited ${mismatch.entity}`
+      : `pan review resync ${mismatch.entity}`;
+    console.log(chalk.yellow(`  ${mismatch.entity}: ${what} — fix: ${fix}`));
   }
 }
 
@@ -1084,6 +1113,10 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   // PAN-3850 (W39): the per-patrol firing-budget table — today's action tally
   // against each patrol's budget, with suspended patrols named in red.
   printPatrolBudgetTable();
+
+  // PAN-3850 (W40): the invariant checker's last report — record vs row vs
+  // liveness drift, with the repair door named on each line.
+  printInvariantMismatchTable();
 
   console.log('');
 

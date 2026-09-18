@@ -2989,6 +2989,14 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...apiErrorActions);
   for (const a of apiErrorActions) addLog('action', a, state.patrolCycle);
   if (state.patrolCycle % 10 === 0) for (const action of await runBudgetedPatrol('reconcilePipelineLabelsPatrol', () => reconcilePipelineLabelsPatrol())) { actions.push(action); addLog('action', action, state.patrolCycle); }
+  // PAN-3850 (W40, FR-27): report-only invariant checker — do the record, the
+  // review-status row, and liveness agree? Reports mismatches as activity
+  // entries and a report file; never writes any store it reads.
+  if (state.patrolCycle % 10 === 0) {
+    const invariantActions = await runBudgetedPatrol('runInvariantChecker', async () => (await import('./invariant-checker.js')).runInvariantCheckerPatrol());
+    actions.push(...invariantActions);
+    for (const a of invariantActions) addLog('warn', a, state.patrolCycle);
+  }
   // PAN-1625: reap orphaned dashboard-server processes. Low cadence (~10 min).
   // Never touches the live server, port owner, or workspace-container server.
   const serverReaperEveryCycles = Math.max(1, Math.round((10 * 60 * 1000) / config.patrolIntervalMs));

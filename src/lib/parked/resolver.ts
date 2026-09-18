@@ -7,8 +7,10 @@
  * stuck flags, needs-you trips, deacon-ignore, resume gates, UAT gates, merge
  * retry caps, and circuit breakers — and every one of them converts autonomous
  * motion into operator work. Nine of those valves exist today, in six subsystems,
- * and no surface could answer "what is stalled, why, and what would release it."
- * This resolver is that answer: ONE read door that unions all nine orbits into
+ * plus a tenth observation-only orbit (invariant-mismatch, PAN-3850) fed by the
+ * invariant checker's report, and no surface could answer "what is stalled, why,
+ * and what would release it."
+ * This resolver is that answer: ONE read door that unions all ten orbits into
  * typed rows, so the CLI, the API, the dashboard, and the stall sweeper all agree
  * by construction.
  *
@@ -29,6 +31,9 @@
  *   7. zombie-session    live agent whose issue is merged/closed
  *   8. idle-running      live agent, no pipeline owner, idle beyond threshold
  *   9. circuit-breaker   autoRequeueCount >= 25 (dead-end recovery exhausted)
+ *  10. invariant-mismatch record, review-status row and liveness disagree
+ *                          (PAN-3850; observation-only, fed by the invariant
+ *                          checker's last report — never re-derived here)
  */
 
 import { loadReviewStatuses, type ReviewStatus } from '../review-status.js';
@@ -40,6 +45,7 @@ import { isIssueClosed } from '../cloister/issue-closed.js';
 import { readIssueRecord } from '../pan-dir/record.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { isRecordPipelineTerminal } from '../cloister/parked-residue.js';
+import { readInvariantReport, type InvariantMismatch } from '../cloister/invariant-checker.js';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { getOverdeckHome } from '../paths.js';
@@ -54,6 +60,7 @@ export const PARKED_ORBITS = [
   'zombie-session',
   'idle-running',
   'circuit-breaker',
+  'invariant-mismatch',
 ] as const;
 
 export type ParkedOrbit = (typeof PARKED_ORBITS)[number];
@@ -74,6 +81,9 @@ export const PARKED_ORBIT_SEVERITY: readonly ParkedOrbit[] = [
   'needs-you',
   'deacon-ignored',
   'operator-gate',
+  // Observation-only drift report (PAN-3850): least severe — it describes
+  // state-plane disagreement, it is never the reason motion stopped.
+  'invariant-mismatch',
 ];
 
 export interface ParkedRow {
@@ -173,6 +183,12 @@ export interface ParkedSignals {
   openRecoveryTrips: { recoveryPath: string; needsYouEmittedAt?: string }[];
   /** Tracker-closed (only resolved for live-agent candidates; null = unknown/not checked). */
   issueClosed: boolean | null;
+  /**
+   * Invariant mismatches for this issue from the checker's last report
+   * (PAN-3850): pipeline drift keyed by issue id, liveness drift attributed
+   * through the agent's issueId. Empty when the report shows no drift.
+   */
+  invariantMismatches: InvariantMismatch[];
   now: number;
 }
 
@@ -386,6 +402,30 @@ export function classifyParked(s: ParkedSignals): ParkedRow[] {
     }
   }
 
+  // 10. invariant-mismatch (PAN-3850, FR-27) — observation-only: the
+  //     invariant checker's last report found the record, the review-status
+  //     row, or liveness disagreeing for this issue. Repaired through the
+  //     named doors, never by this resolver. Evaluated LAST so it can never
+  //     suppress idle-running (the orbit of last resort reads rows.length
+  //     before this block pushes).
+  if (!closed && s.invariantMismatches.length > 0) {
+    const pipelineFields = s.invariantMismatches.flatMap((m) => m.fields.map((f) => f.field));
+    const livenessAgents = s.invariantMismatches.filter((m) => m.kind === 'liveness').map((m) => m.entity);
+    const what: string[] = [];
+    if (pipelineFields.length > 0) what.push(`record/row drift on ${pipelineFields.join(', ')}`);
+    if (livenessAgents.length > 0) what.push(`liveness drift on ${livenessAgents.join(', ')}`);
+    const fixes: string[] = [];
+    if (pipelineFields.length > 0) fixes.push(`run pan review resync ${issueId}`);
+    if (livenessAgents.length > 0) fixes.push(`run pan admin agents exited ${livenessAgents.join(' ')}`);
+    push(
+      'invariant-mismatch',
+      isoOr(undefined, s.now),
+      `the state planes disagree for this issue — ${what.join('; ')}`,
+      fixes.join('; '),
+      { fields: pipelineFields, livenessAgents },
+    );
+  }
+
   return rows;
 }
 
@@ -403,6 +443,20 @@ export interface ResolveParkedOptions {
    * resurrect a record-terminal issue into the parked population (PAN-3727).
    */
   readRecordTerminal?: (issueId: string) => Promise<boolean>;
+  /**
+   * The invariant checker's latest mismatches (PAN-3850), defaults to reading
+   * the report file the checker persists. Grouped per issue by the gather.
+   */
+  readInvariantMismatches?: () => InvariantMismatch[];
+}
+
+/** The checker's persisted report is the only source — never re-derived here. */
+function defaultReadInvariantMismatches(): InvariantMismatch[] {
+  try {
+    return readInvariantReport().mismatches;
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -455,10 +509,22 @@ export async function resolveParkedPopulation(options: ResolveParkedOptions = {}
   const readTrips = options.readOpenTrips ?? defaultReadOpenTrips;
   const isClosed = options.isClosed ?? isIssueClosed;
   const readRecordTerminal = options.readRecordTerminal ?? defaultReadRecordTerminal;
+  const readInvariantMismatches = options.readInvariantMismatches ?? defaultReadInvariantMismatches;
 
   const statuses = loadReviewStatuses();
   const allAgents = listAgentStates();
   const liveAgents = listRunningAgentsSync().filter((a) => a.tmuxActive && (a.status === 'running' || a.status === 'starting'));
+
+  // Group the checker's mismatches by issue: pipeline rows key by issue id,
+  // liveness rows attribute through the agent's issueId (dropped when unknown).
+  const mismatchesByIssue = new Map<string, InvariantMismatch[]>();
+  for (const mismatch of readInvariantMismatches()) {
+    const key = normalizeParkedIssueId(mismatch.kind === 'pipeline' ? mismatch.entity : (mismatch.issueId ?? ''));
+    if (!key) continue;
+    const list = mismatchesByIssue.get(key) ?? [];
+    list.push(mismatch);
+    mismatchesByIssue.set(key, list);
+  }
 
   const agentsByIssue = new Map<string, AgentState[]>();
   for (const agent of allAgents) {
@@ -510,6 +576,7 @@ export async function resolveParkedPopulation(options: ResolveParkedOptions = {}
       liveAgents: live,
       openRecoveryTrips: trips,
       issueClosed,
+      invariantMismatches: mismatchesByIssue.get(issueId) ?? [],
       now,
     });
   };
