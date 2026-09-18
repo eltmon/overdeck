@@ -46,6 +46,9 @@ vi.mock('../../../../src/lib/agents/liveness.js', () => ({
   getAgentEffectiveLastActivityMs: () => null,
   getAgentWorkActivityMs: () => null,
   isAliveSync: (...args: unknown[]) => mockIsAliveSync(...args),
+  // Mirrors the real isConfirmedDead: only a confirmed absence is death.
+  isConfirmedDead: (verdict: { alive: boolean; reason?: string }) =>
+    !verdict.alive && verdict.reason !== 'runtime-indeterminate',
   isIdle: () => false,
 }));
 vi.mock('../../../../src/lib/cloister/agent-death.js', () => ({
@@ -120,6 +123,26 @@ describe('flywheel orchestrator liveness goes through the oracle', () => {
   it('leaves a truly alive orchestrator alone', async () => {
     mockIsAliveSync.mockReturnValue({ alive: true, paneAlive: true });
     mockListRunningAgentsSync.mockReturnValue([flywheelAgent()]);
+
+    const actions = await checkStuckAgentRemediation({ now: Date.now() });
+
+    expect(actions).toHaveLength(0);
+    expect(mockResumeFlywheel).not.toHaveBeenCalled();
+  });
+
+  it('does not remediate on an indeterminate probe (a broken ps/pgrep is not death)', async () => {
+    mockIsAliveSync.mockReturnValue({ alive: false, reason: 'runtime-indeterminate' });
+    mockListRunningAgentsSync.mockReturnValue([flywheelAgent()]);
+
+    const actions = await checkStuckAgentRemediation({ now: Date.now() });
+
+    expect(actions).toHaveLength(0);
+    expect(mockResumeFlywheel).not.toHaveBeenCalled();
+  });
+
+  it('does not remediate an active run without an agent row on an indeterminate probe', async () => {
+    mockIsAliveSync.mockReturnValue({ alive: false, reason: 'runtime-indeterminate' });
+    mockListRunningAgentsSync.mockReturnValue([]);
 
     const actions = await checkStuckAgentRemediation({ now: Date.now() });
 

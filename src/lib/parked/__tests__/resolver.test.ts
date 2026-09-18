@@ -32,6 +32,9 @@ vi.mock('../../agents/liveness.js', () => ({
       ? { alive: true, paneAlive: true }
       : { alive: false, reason: 'no-session' }
   ),
+  // Mirrors the real isConfirmedDead: only a confirmed absence is death.
+  isConfirmedDead: (verdict: { alive: boolean; reason?: string }) =>
+    !verdict.alive && verdict.reason !== 'runtime-indeterminate',
 }));
 
 const projects = vi.hoisted(() => ({

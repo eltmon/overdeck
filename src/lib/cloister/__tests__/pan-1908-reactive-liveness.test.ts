@@ -615,5 +615,19 @@ describe('PAN-1908 reactive liveness handlers', () => {
       expect(await handleAgentHeartbeatDeadEvent('agent-pan-1908', 'patrol')).toEqual([]);
       expect(mockSaveAgentState).not.toHaveBeenCalled();
     });
+
+    it('does not kill on an indeterminate probe (a broken ps/pgrep is not death)', async () => {
+      mockGetAgentStateSync.mockReturnValue(makeState({ status: 'running', kickoffDelivered: true }));
+      mockSessionExistsSync.mockReturnValue(true);
+      mockQuerySessionSync.mockReturnValue({ status: 'exists' });
+      mockIsAlive.mockResolvedValue({ alive: false, reason: 'runtime-indeterminate' });
+
+      const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
+
+      expect(actions).toEqual([]);
+      expect(mockKillSession).not.toHaveBeenCalled();
+      expect(mockSaveAgentState).not.toHaveBeenCalled();
+      expect(mockRecordAgentFailure).not.toHaveBeenCalled();
+    });
   });
 });

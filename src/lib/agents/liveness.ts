@@ -13,7 +13,9 @@
  *   1. the tmux session exists (`no-session` otherwise),
  *   2. at least one pane is not dead (`pane-dead` otherwise), and
  *   3. the expected harness process is in a live pane's process subtree
- *      (`runtime-missing` otherwise).
+ *      (`runtime-missing` when the tree is cleanly observed without it,
+ *      `runtime-indeterminate` when the ps/pgrep probe itself failed — not
+ *      death; see `isConfirmedDead`).
  *
  * Idle (FR-5) means: work activity — the hook-driven runtime mirror timestamp
  * plus the transcript heartbeat, never tmux pane repaints and never the
@@ -35,6 +37,7 @@ import { getAgentRuntimeStateSync } from './runtime-state.js';
 import {
   findAgentRuntimePidInSubtree,
   findAgentRuntimePidInSubtreeSync,
+  type RuntimePidProbeResult,
 } from './runtime-pid-probe.js';
 
 /**
@@ -69,7 +72,17 @@ function getTranscriptHeartbeatMs(agentId: string): number | null {
 
 export type LivenessVerdict =
   | { alive: true; paneAlive: true; runtimePid?: number }
-  | { alive: false; reason: 'no-session' | 'pane-dead' | 'runtime-missing' };
+  | { alive: false; reason: 'no-session' | 'pane-dead' | 'runtime-missing' | 'runtime-indeterminate' };
+
+/**
+ * Remediation gate: true only when the oracle CONFIRMED the runtime is
+ * gone. `runtime-indeterminate` (the ps/pgrep probe itself failed) is NOT
+ * death — a broken probe must never trigger a kill, relaunch, or resume.
+ * Default to "not dead".
+ */
+export function isConfirmedDead(verdict: LivenessVerdict): boolean {
+  return !verdict.alive && verdict.reason !== 'runtime-indeterminate';
+}
 
 interface PaneRow {
   pid: string;
@@ -90,7 +103,7 @@ function parsePaneRows(values: readonly string[]): PaneRow[] {
 export interface LivenessAsyncDeps {
   sessionExists?: (agentId: string) => Promise<boolean>;
   listPaneRows?: (agentId: string) => Promise<PaneRow[]>;
-  findRuntimePid?: (rootPid: string, harness: RuntimeName) => Promise<number | null>;
+  findRuntimePid?: (rootPid: string, harness: RuntimeName) => Promise<RuntimePidProbeResult>;
   readHarness?: (agentId: string) => RuntimeName;
 }
 
@@ -98,7 +111,7 @@ export interface LivenessAsyncDeps {
 export interface LivenessSyncDeps {
   sessionExistsSync?: (agentId: string) => boolean;
   listPaneRowsSync?: (agentId: string) => PaneRow[];
-  findRuntimePidSync?: (rootPid: string, harness: RuntimeName) => number | null;
+  findRuntimePidSync?: (rootPid: string, harness: RuntimeName) => RuntimePidProbeResult;
   readHarness?: (agentId: string) => RuntimeName;
 }
 
@@ -136,10 +149,15 @@ export async function isAlive(agentId: string, deps: LivenessAsyncDeps = {}): Pr
   const livePanes = panes.filter((pane) => !pane.dead);
   if (livePanes.length === 0) return { alive: false, reason: 'pane-dead' };
   const harness = readHarness(agentId);
+  let probeIndeterminate = false;
   for (const pane of livePanes) {
     const pid = await findRuntimePid(pane.pid, harness);
-    if (pid !== null) return { alive: true, paneAlive: true, runtimePid: pid };
+    if (typeof pid === 'number') return { alive: true, paneAlive: true, runtimePid: pid };
+    if (pid === 'indeterminate') probeIndeterminate = true;
   }
+  // A failed probe is not a confirmed death — remediators consult
+  // isConfirmedDead, which treats this as "not dead".
+  if (probeIndeterminate) return { alive: false, reason: 'runtime-indeterminate' };
   return { alive: false, reason: 'runtime-missing' };
 }
 
@@ -160,10 +178,15 @@ export function isAliveSync(agentId: string, deps: LivenessSyncDeps = {}): Liven
   const livePanes = panes.filter((pane) => !pane.dead);
   if (livePanes.length === 0) return { alive: false, reason: 'pane-dead' };
   const harness = readHarness(agentId);
+  let probeIndeterminate = false;
   for (const pane of livePanes) {
     const pid = findRuntimePid(pane.pid, harness);
-    if (pid !== null) return { alive: true, paneAlive: true, runtimePid: pid };
+    if (typeof pid === 'number') return { alive: true, paneAlive: true, runtimePid: pid };
+    if (pid === 'indeterminate') probeIndeterminate = true;
   }
+  // A failed probe is not a confirmed death — remediators consult
+  // isConfirmedDead, which treats this as "not dead".
+  if (probeIndeterminate) return { alive: false, reason: 'runtime-indeterminate' };
   return { alive: false, reason: 'runtime-missing' };
 }
 

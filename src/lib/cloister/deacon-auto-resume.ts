@@ -152,6 +152,9 @@ export async function handleAgentHeartbeatDeadEvent(
       if (verdict.reason === 'no-session') {
         return []; // probe raced the confirmed query — assume alive, recheck next pass
       }
+      if (verdict.reason === 'runtime-indeterminate') {
+        return []; // probe failed — assume alive, recheck next pass
+      }
       try { await Effect.runPromise(killSession(agentId)); } catch { /* ignore */ }
       logDeaconEventSync(`handleAgentHeartbeatDeadEvent: killed dead reviewer pane ${agentId} (${verdict.reason})`);
     } else {
@@ -172,6 +175,9 @@ export async function handleAgentHeartbeatDeadEvent(
       if (verdict.reason === 'no-session') {
         return []; // probe raced the confirmed query — assume alive, recheck next pass
       }
+      if (verdict.reason === 'runtime-indeterminate') {
+        return []; // probe failed — assume alive, recheck next pass
+      }
       // Pane is dead or the runtime is gone — kill the zombie tmux session
       // and fall through to recovery.
       try { await Effect.runPromise(killSession(agentId)); } catch { /* ignore */ }
@@ -186,6 +192,9 @@ export async function handleAgentHeartbeatDeadEvent(
       if (verdict.alive) return []; // truly still running
       if (verdict.reason === 'no-session') {
         return []; // probe raced the confirmed query — assume alive, recheck next pass
+      }
+      if (verdict.reason === 'runtime-indeterminate') {
+        return []; // probe failed — a broken ps/pgrep is not death; recheck next pass
       }
       try { await Effect.runPromise(killSession(agentId)); } catch { /* ignore */ }
       logDeaconEventSync(`handleAgentHeartbeatDeadEvent: killed dead work pane ${agentId} (${verdict.reason})`);
@@ -563,9 +572,11 @@ export async function handleAgentStoppedEvent(
   if (isTerminalSwarmSlotAgent(state)) {
     // Reap semantics, not liveness: stop the agent whenever anything remains
     // in tmux — a zombie pane (pane-dead / runtime-missing) needs reaping
-    // just as much as a live one. Only 'no-session' means nothing to reap.
+    // just as much as a live one. Only 'no-session' means nothing to reap,
+    // and 'runtime-indeterminate' reaps nothing this pass — killing on an
+    // unobserved tree risks a healthy session (re-probed next cycle).
     const liveness = await isAlive(agentId);
-    if (liveness.alive || liveness.reason !== 'no-session') {
+    if (liveness.alive || (liveness.reason !== 'no-session' && liveness.reason !== 'runtime-indeterminate')) {
       try {
         await Effect.runPromise(stopAgent(agentId));
         logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} reaped — assigned swarm item is terminal`);

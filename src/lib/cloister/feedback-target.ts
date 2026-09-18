@@ -8,7 +8,7 @@ import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { readIssueRecordSync, type PanIssueRecord } from '../pan-dir/record.js';
 import { updateIssueRecord } from '../pan-dir/record-update.js';
 import { listSessionNames } from '../tmux.js';
-import { isAlive } from '../agents/liveness.js';
+import { isAlive, isConfirmedDead } from '../agents/liveness.js';
 
 export type IssueFeedbackTarget =
   | { agentId: string }
@@ -25,7 +25,9 @@ export interface ResolveIssueFeedbackTargetOptions {
 // session, and feedback pasted into that dead shell was previously reported
 // as delivered (pipeline-reliability-review F12, last bullet).
 async function isLiveSession(agentId: string): Promise<boolean> {
-  return (await isAlive(agentId)).alive;
+  // An indeterminate probe is not death: deliver to the session and let the
+  // transport fail naturally rather than resurrecting a possibly-live agent.
+  return !isConfirmedDead(await isAlive(agentId));
 }
 
 function isWorkFeedbackTarget(role: string): boolean {

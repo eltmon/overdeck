@@ -12,7 +12,7 @@ import { logDeaconEventSync } from '../persistent-logger.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { capturePaneSync, detectTerminalApiErrorSync, sessionExistsSync, killSession, killSessionSync, listPaneValuesSync, sendEscapeKeyAsync } from '../tmux.js';
 import { loadCloisterConfigSync, DEFAULT_CLOISTER_CONFIG, type StuckRemediationConfig } from './config.js';
-import { getAgentEffectiveLastActivityMs, getAgentWorkActivityMs, isAliveSync, isIdle } from '../agents/liveness.js';
+import { getAgentEffectiveLastActivityMs, getAgentWorkActivityMs, isAliveSync, isConfirmedDead, isIdle } from '../agents/liveness.js';
 import { describeAgentDeath } from './agent-death.js';
 import { getFlywheelActiveRunId, isFlywheelGloballyPaused } from '../overdeck/control-settings.js';
 import {
@@ -632,8 +632,10 @@ export function decideFlywheelRemediation(opts: {
 function isFlywheelOrchestratorDead(agentId: string): boolean {
   // The flywheel role is not exempt from the liveness contract: a live
   // session with an exited harness (runtime-missing) is dead even though the
-  // old sessionExists + pane_dead checks said otherwise.
-  return !isAliveSync(agentId).alive;
+  // old sessionExists + pane_dead checks said otherwise. A failed probe
+  // (runtime-indeterminate) is NOT death — a broken ps/pgrep must never
+  // trigger a kill-and-relaunch of a healthy orchestrator.
+  return isConfirmedDead(isAliveSync(agentId));
 }
 
 /**
@@ -768,7 +770,9 @@ async function evaluateFlywheelOrchestrator(
 async function reconcileActiveFlywheelWithoutRunningAgent(now: number, actions: string[]): Promise<void> {
   if (!getFlywheelActiveRunId()) return;
   if (isFlywheelGloballyPaused()) return;
-  if (isAliveSync(FLYWHEEL_ORCHESTRATOR_AGENT_ID).alive) return;
+  // Remediate only on confirmed absence — an indeterminate probe leaves the
+  // orchestrator alone for this pass (re-probed next cycle).
+  if (!isConfirmedDead(isAliveSync(FLYWHEEL_ORCHESTRATOR_AGENT_ID))) return;
 
   await remediateFlywheelOrchestrator(
     FLYWHEEL_ORCHESTRATOR_AGENT_ID,

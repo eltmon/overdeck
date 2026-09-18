@@ -54,6 +54,9 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
 // cases keep their meaning; zombie cases override mockIsAlive directly.
 vi.mock('../../../../src/lib/agents/liveness.js', () => ({
   isAlive: (agentId: string) => Promise.resolve(mockIsAlive(agentId)),
+  // Mirrors the real isConfirmedDead: only a confirmed absence is death.
+  isConfirmedDead: (verdict: { alive: boolean; reason?: string }) =>
+    !verdict.alive && verdict.reason !== 'runtime-indeterminate',
 }));
 
 import {

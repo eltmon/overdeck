@@ -27,6 +27,7 @@ import {
   idleAgeMs,
   isAlive,
   isAliveSync,
+  isConfirmedDead,
   isIdle,
   registerLivenessHeartbeatLookup,
 } from '../../../../src/lib/agents/liveness.js';
@@ -85,6 +86,29 @@ describe('isAlive: the single liveness oracle (PAN-3849)', () => {
     expect(verdict.alive).toBe(true);
     expect(findRuntimePid).toHaveBeenCalledWith('200', 'claude-code');
   });
+
+  it('returns runtime-indeterminate when the probe itself fails (not confirmed death)', async () => {
+    const deps = aliveDeps({ findRuntimePid: vi.fn(async () => 'indeterminate' as const) });
+    await expect(isAlive('agent-x', deps)).resolves.toEqual({ alive: false, reason: 'runtime-indeterminate' });
+  });
+
+  it('prefers a found runtime over an indeterminate sibling pane', async () => {
+    const findRuntimePid = vi.fn(async (pid: string) => (pid === '200' ? 200 : 'indeterminate' as const));
+    const deps = aliveDeps({
+      listPaneRows: vi.fn(async () => [{ pid: '100', dead: false }, { pid: '200', dead: false }]),
+      findRuntimePid,
+    });
+    await expect(isAlive('agent-x', deps)).resolves.toEqual({ alive: true, paneAlive: true, runtimePid: 200 });
+  });
+
+  it('returns runtime-indeterminate when one pane is indeterminate and none holds the runtime', async () => {
+    const findRuntimePid = vi.fn(async (pid: string) => (pid === '100' ? 'indeterminate' as const : null));
+    const deps = aliveDeps({
+      listPaneRows: vi.fn(async () => [{ pid: '100', dead: false }, { pid: '200', dead: false }]),
+      findRuntimePid,
+    });
+    await expect(isAlive('agent-x', deps)).resolves.toEqual({ alive: false, reason: 'runtime-indeterminate' });
+  });
 });
 
 // ─── isAliveSync (lifecycle-classifier variant) ─────────────────────────────
@@ -118,6 +142,27 @@ describe('isAliveSync: the lifecycle-classifier variant', () => {
 
   it('returns alive when session, pane, and harness process are all present', () => {
     expect(isAliveSync('agent-x', aliveSyncDeps())).toEqual({ alive: true, paneAlive: true, runtimePid: 100 });
+  });
+
+  it('returns runtime-indeterminate when the probe itself fails (not confirmed death)', () => {
+    const deps = aliveSyncDeps({ findRuntimePidSync: vi.fn(() => 'indeterminate' as const) });
+    expect(isAliveSync('agent-x', deps)).toEqual({ alive: false, reason: 'runtime-indeterminate' });
+  });
+});
+
+describe('isConfirmedDead: remediation gate (a broken probe is never death)', () => {
+  it('is false for alive verdicts', () => {
+    expect(isConfirmedDead({ alive: true, paneAlive: true, runtimePid: 100 })).toBe(false);
+  });
+
+  it('is false for runtime-indeterminate', () => {
+    expect(isConfirmedDead({ alive: false, reason: 'runtime-indeterminate' })).toBe(false);
+  });
+
+  it('is true for confirmed absence and tmux-level death', () => {
+    expect(isConfirmedDead({ alive: false, reason: 'runtime-missing' })).toBe(true);
+    expect(isConfirmedDead({ alive: false, reason: 'no-session' })).toBe(true);
+    expect(isConfirmedDead({ alive: false, reason: 'pane-dead' })).toBe(true);
   });
 });
 

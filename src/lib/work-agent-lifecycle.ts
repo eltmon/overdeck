@@ -5,7 +5,7 @@ import { getAgentStateSync, getAgentState, getAgentRuntimeStateSync, getAgentRun
 import { hasCompletionMarkerForAgent } from './agents/supervisor-channels.js';
 import { claudeSessionTranscriptExists } from './paths.js';
 import { getReviewStatusSync } from './review-status.js';
-import { isAlive, isAliveSync } from './agents/liveness.js';
+import { isAlive, isAliveSync, isConfirmedDead } from './agents/liveness.js';
 
 export type WorkAgentOperation = 'start' | 'resume' | 'restart_with_context' | 'reset_session';
 export type WorkAgentRecommendedAction = 'start' | 'resume' | 'restart_with_context' | 'reset_session' | 'none';
@@ -102,8 +102,10 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
   const hasSavedSession = !!sessionId;
   // PAN-3849 (W32): liveness comes from the single oracle — a remain-on-exit
   // zombie pane (session alive, harness process gone) reads as NOT live here,
-  // so a dead shell classifies as crashed/orphaned instead of running.
-  const hasLiveTmuxSession = isAliveSync(agentId).alive;
+  // so a dead shell classifies as crashed/orphaned instead of running. A
+  // failed probe (runtime-indeterminate) is NOT death: assume live so the
+  // classifier never offers a fresh start over a healthy agent.
+  const hasLiveTmuxSession = !isConfirmedDead(isAliveSync(agentId));
   const hasWorkspace = !!agentState?.workspace && existsSync(agentState.workspace);
   const hasResumableTranscript = !sessionId
     || (!!agentState?.harness && agentState.harness !== 'claude-code')
@@ -211,7 +213,9 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
   const hasAgentState = !!agentState;
   const sessionId = await Effect.runPromise(getLatestSessionId(agentId)) ?? null;
   const hasSavedSession = !!sessionId;
-  const hasLiveTmuxSession = (await isAlive(agentId)).alive;
+  // Same not-dead default as the sync variant above: an indeterminate probe
+  // reads as live.
+  const hasLiveTmuxSession = !isConfirmedDead(await isAlive(agentId));
   const hasWorkspace = !!agentState?.workspace && await pathExists(agentState.workspace);
   const hasResumableTranscript = !sessionId
     || (!!agentState?.harness && agentState.harness !== 'claude-code')

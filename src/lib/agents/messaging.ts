@@ -13,7 +13,7 @@ import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { ALLOW_SESSION_ROTATION_ON_RESUME } from '../session-rotation.js';
 import type { ModelId } from '../settings.js';
 import { createSession, killSession } from '../tmux.js';
-import { isAlive } from './liveness.js';
+import { isAlive, isConfirmedDead } from './liveness.js';
 import {
   clearReadySignal,
   normalizeAgentId,
@@ -562,12 +562,15 @@ export async function messageAgent(
   // Guard: if the tmux session exists but the harness process is gone (a
   // remain-on-exit dead shell), resume instead of typing the message into a
   // bare bash shell. Liveness is the single oracle (PAN-3849): session +
-  // live pane + harness process in the pane's process subtree.
+  // live pane + harness process in the pane's process subtree. Only a
+  // CONFIRMED death takes the resume path — an indeterminate probe delivers
+  // normally and lets the transport fail on its own rather than resuming a
+  // possibly-healthy agent.
   const liveness = await isAlive(normalizedId);
   if (!liveness.alive && liveness.reason === 'no-session') {
     throw new Error(`Agent ${normalizedId} not running`);
   }
-  if (!liveness.alive) {
+  if (!liveness.alive && isConfirmedDead(liveness)) {
     console.warn(`[agents] ${normalizedId} tmux session is a zombie (${liveness.reason}: no ${expectedHarness} runtime in a live pane) — attempting resume`);
     if (opts.dedupKey !== undefined) {
       return resumeThenDeliverKeyed(normalizedId, message, caller, agentState, opts.dedupKey);
