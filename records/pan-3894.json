@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-09-18T06:43:33.655Z",
-  "updated": "2026-09-18T07:57:40.616Z",
+  "updated": "2026-09-18T07:57:44.535Z",
   "pipeline": {
     "issueId": "PAN-3894",
     "reviewStatus": "pending",
@@ -63,7 +63,7 @@
     }
   ],
   "tasks": {
-    "sequence": 10,
+    "sequence": 11,
     "claims": {},
     "claimHistory": [
       {
@@ -124,8 +124,8 @@
     ],
     "statusReasons": {
       "w1-patrol-registry": {
-        "reason": "Blocked until W3a creates src/lib/cloister/specialist-patrol.ts: the registry's perProjectSpecialistPatrol chore dynamically imports it, and TS2307 + vi.mock resolution both fail on a missing module. Working W8 -> W3a first (DAG-legal: neither is blocked by W1).",
-        "updatedAt": "2026-09-18T07:28:50.542Z"
+        "reason": "W3a landed src/lib/cloister/specialist-patrol.ts, so the registry's dynamic import of it now resolves.",
+        "updatedAt": "2026-09-18T07:57:44.534Z"
       },
       "w8-delete-stuck-stub": {
         "reason": "Deleted the checkStuckWorkAgents no-op stub (body was 'return []'), its runPatrol registration, the stale header reference in deacon-stuck-skip.test.ts, and the three DEACON-HEALTH-MONITORING.md mentions. Audit test moved the name to DELETED_PATROLS covered by stuck-remediation-oracle.test.ts. 68 -> 67 registrations. Tests green (3 files, 27 tests).",
@@ -146,7 +146,7 @@
     }
   },
   "statusOverrides": {
-    "w1-patrol-registry": "blocked",
+    "w1-patrol-registry": "pending",
     "w8-delete-stuck-stub": "completed",
     "w8-delete-stuck-stub.ac1": "completed",
     "w8-delete-stuck-stub.ac2": "completed",
