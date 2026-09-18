@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-09-18T06:43:33.655Z",
-  "updated": "2026-09-18T08:32:29.179Z",
+  "updated": "2026-09-18T08:44:21.938Z",
   "pipeline": {
     "issueId": "PAN-3894",
     "reviewStatus": "pending",
@@ -65,16 +65,8 @@
     }
   ],
   "tasks": {
-    "sequence": 20,
-    "claims": {
-      "w6-phase4-counters": {
-        "writerId": "agent-pan-3894",
-        "agentId": "agent-pan-3894",
-        "pid": 1343643,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-18T08:32:29.178Z"
-      }
-    },
+    "sequence": 21,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3894",
@@ -174,6 +166,17 @@
         "outcome": "completed",
         "reason": "pan doctor prints a Patrol cadences block: 14 tick rows (alarms and the 10-tick invariant checker labeled) then 29 chore rows grouped fast/hourly/daily with cadence, last run, next due, and the (also on <event>) trigger suffix. Sourced from the registry + the scheduler's persisted file; imports never touch deacon.js. doctor.ts 1139->1188 with the allowlist row in the same commit. 4 tests green.",
         "releasedAt": "2026-09-18T08:32:21.475Z"
+      },
+      {
+        "writerId": "agent-pan-3894",
+        "agentId": "agent-pan-3894",
+        "pid": 1343643,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-18T08:32:29.178Z",
+        "itemId": "w6-phase4-counters",
+        "outcome": "completed",
+        "reason": "All six counter-less Phase 4 patrols now recordWouldFire at their action sites, accept PatrolShadowOptions, and register through runShadowablePatrol. DEVIATION on AC-1: two of the six (reconcileAgentLiveness, checkStuckAgentRemediation) decline shadow mode and return [] rather than count a firing the real patrol would not make — their detection is inseparable from their repair, and a separate shadow predicate would be the F15 bug again. Both fully support normal mode, which is where PAN-3895's evidence comes from. 17 tests green.",
+        "releasedAt": "2026-09-18T08:44:21.937Z"
       }
     ],
     "statusReasons": {
@@ -208,6 +211,10 @@
       "w5-doctor-cadence-table": {
         "reason": "pan doctor prints a Patrol cadences block: 14 tick rows (alarms and the 10-tick invariant checker labeled) then 29 chore rows grouped fast/hourly/daily with cadence, last run, next due, and the (also on <event>) trigger suffix. Sourced from the registry + the scheduler's persisted file; imports never touch deacon.js. doctor.ts 1139->1188 with the allowlist row in the same commit. 4 tests green.",
         "updatedAt": "2026-09-18T08:32:21.475Z"
+      },
+      "w6-phase4-counters": {
+        "reason": "All six counter-less Phase 4 patrols now recordWouldFire at their action sites, accept PatrolShadowOptions, and register through runShadowablePatrol. DEVIATION on AC-1: two of the six (reconcileAgentLiveness, checkStuckAgentRemediation) decline shadow mode and return [] rather than count a firing the real patrol would not make — their detection is inseparable from their repair, and a separate shadow predicate would be the F15 bug again. Both fully support normal mode, which is where PAN-3895's evidence comes from. 17 tests green.",
+        "updatedAt": "2026-09-18T08:44:21.937Z"
       }
     }
   },
@@ -253,6 +260,10 @@
     "w5-doctor-cadence-table.ac2": "completed",
     "w5-doctor-cadence-table.ac3": "completed",
     "w5-doctor-cadence-table.ac4": "completed",
-    "w6-phase4-counters": "running"
+    "w6-phase4-counters": "completed",
+    "w6-phase4-counters.ac1": "completed",
+    "w6-phase4-counters.ac2": "completed",
+    "w6-phase4-counters.ac3": "completed",
+    "w6-phase4-counters.ac4": "completed"
   }
 }
