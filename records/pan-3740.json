@@ -3,19 +3,19 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-15T13:56:03.035Z",
-  "updated": "2026-09-18T06:59:07.213Z",
+  "updated": "2026-09-18T06:59:23.373Z",
   "pipeline": {
     "issueId": "PAN-3740",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "mergeStatus": "merging",
-    "mergeStep": "rebasing",
+    "mergeStep": "preparing-work-agent",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T06:59:07.011Z",
+    "updatedAt": "2026-09-18T06:59:08.689Z",
     "verificationNotes": "Branch has no implementation — only pipeline artifacts (.pan/xBRIEF task state) changed across workspace repos vs panopticon-cli:origin/main. The work agent produced no code (likely a kickoff-delivery zombie — PAN-2179).",
-    "mergeNotes": "Post-rebase verification failed at empty-changeset",
+    "mergeNotes": "Preparing work agent strike-pan-3740 to rebase strike/pan-3740…",
     "strikeReadyHead": "a8ab83ab4e430ee169781a787b9f94db85fe4f80",
     "strikeReadyAt": "2026-08-16T10:01:22.951Z",
     "strikeLandingState": "landing",
@@ -80,7 +80,7 @@
       },
       "costAtCloseOut": {
         "usd": 21.788638,
-        "pricingAsOf": "2026-09-18T06:59:07.179Z"
+        "pricingAsOf": "2026-09-18T06:59:23.365Z"
       }
     },
     "merges": [],
