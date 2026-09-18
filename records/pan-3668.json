@@ -297,9 +297,22 @@
       "reason": "resume",
       "agentModel": "claude-opus-5",
       "timestamp": "2026-09-18T08:00:41.630Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-09-18T08:01Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-09-18T08:01:12.759Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-09-18T08:01:12Z",
+      "markdownBody": "VERIFICATION STUCK for PAN-3668 (attempt 2/3):\n\nFailed check: test-skip\n\nVerification FAILED at test-skip (28ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3668/.overdeck/verification/2026-09-18T08-01-05-057Z-27e8d7d1.json\n\n## NEEDS-YOU: Verification stuck\n\nAutomatic verification paused after repeated failures so it does not keep spending cycles on the same failing gate.\n\nFix every reported failure, commit and push the corrections, then run `pan done PAN-3668 -c \"<summary>\"`. That command resets verification and returns the latest commit to the normal review, test, and merge pipeline. If you cannot complete the fixes, report the concrete blocker for operator help."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/TELEMETRY.md",
@@ -566,7 +579,7 @@
     "recordedAt": "2026-09-18T08:00:26.249Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-09-18T08:01:11.856Z",
+  "updated": "2026-09-18T08:01:12.760Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
