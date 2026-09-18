@@ -99,3 +99,35 @@ unpause` on a yielded agent clears the yield attribution too. See
 These gates are orthogonal to the global Deacon freeze in SQLite
 (`deacon.globally_paused`) and the per-issue Deacon ignore flag in review status.
 
+
+## Patrol budgets (PAN-3850)
+
+Every deacon patrol is an alarm with a budget, not an actor with unlimited
+ammunition. Each patrol registered in `runPatrol` runs inside
+`runBudgetedPatrol()` (`src/lib/cloister/patrol-budget.ts`), which tallies the
+actions the patrol reports against a per-UTC-day budget in
+`~/.overdeck/deacon/patrol-budget.json` (default 50 actions/day). When a
+patrol's tally crosses its budget it is suspended until the next UTC day and
+the operator gets exactly one needs-you (idempotency key
+`patrol-budget-exceeded:<name>:<day>`) — a runaway patrol degrades to a single
+actionable signal instead of an action storm. The tally resets at UTC midnight;
+a suspended patrol runs again the next day.
+
+Five patrols are exempt alarms — `runStallSweeperPatrol`, `checkApiErrorAgents`,
+`recreatedStateWarnings`, `recordMainDivergenceHealth`, `checkMassDeath` —
+wired directly in `runPatrol`, never budgeted: they exist precisely to fire
+when everything else is wrong. Budgets are configuration
+(`cloister.patrolBudgets` in `~/.overdeck/config.yaml`: `default`, `exempt`,
+per-patrol `overrides`); `pan doctor` prints today's tally per patrol with
+suspended patrols named in red.
+
+The same phase adds the report-only **invariant checker**
+(`src/lib/cloister/invariant-checker.ts`, every 10 passes, budgeted like every
+other patrol): for each non-merged issue it compares the record `pipeline`
+block against the review-status row field by field, and each agent row's
+status against tmux liveness. It emits one activity entry per mismatching
+entity per day plus a per-run summary count, persists
+`~/.overdeck/deacon/invariant-report.json` for `pan doctor` and the parked
+resolver's `invariant-mismatch` orbit — and writes no store it reads. Repairs
+go through the owning doors: `pan review resync <id>` for verdict drift,
+`pan admin agents exited <id>` for liveness drift.

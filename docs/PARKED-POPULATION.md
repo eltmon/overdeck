@@ -36,7 +36,7 @@ recommended release without acting on it.
   operator-gate flags on the issue's stopped agent rows, so a terminal
   issue's rows stop escalating even before the tracker check would settle it.
 
-## The nine orbits
+## The ten orbits
 
 | # | Orbit | Detection (read doors only) | Recommended release |
 | --- | --- | --- | --- |
@@ -49,6 +49,7 @@ recommended release without acting on it.
 | 7 | `zombie-session` | live agent + merged/closed issue | recommendation: close-out owns teardown (`pan close`); the reaper is the backstop |
 | 8 | `idle-running` | live agent, no pipeline owner, idle ≥ 6h | recommendation: `pan tell` nudge, then `pan kill` / resume if nothing moves |
 | 9 | `circuit-breaker` | `autoRequeueCount >= 25` | operator decision; re-surfaced on TTL |
+| 10 | `invariant-mismatch` | the report-only invariant checker's last report (`~/.overdeck/deacon/invariant-report.json`, PAN-3850): record/row drift or liveness drift | observation only — verdict drift: `pan review resync <id>`; liveness drift: `pan admin agents exited <id>` |
 
 A failed UAT verdict reaches the work agent through the `setReviewStatus()`
 write door and `src/lib/cloister/uat-failure-feedback.ts`. The relay writes the
@@ -68,6 +69,11 @@ A **scheduler yield** (`yieldedByScheduler`) is NOT a park — it is
 self-clearing. **Warm-idle on a pipeline-owned issue** (PAN-2579) is NOT a
 park — review/test/merge owns the next move and the agent is supposed to wait.
 `idle-running` only fires when no other orbit explains the stall.
+
+`invariant-mismatch` (PAN-3850) is observation-only: the checker never writes
+the record, the review-status store, or agent state — it reports the
+disagreement and names the repair door. The orbit is evaluated last, so it can
+never suppress `idle-running`, the orbit of last resort.
 
 ## The read door
 
@@ -160,6 +166,6 @@ per-stage tooltip; the sidebar shows FLOW/HOUR with per-stage counts.
 `scripts/guard-park-exits.sh` (wired into `npm run lint` as `lint:park-exits`)
 fails the build when a stuck flavor is parked without operator copy in
 `STUCK_REASON_COPY`. The fixture meta-test in
-`src/lib/parked/__tests__/resolver.test.ts` proves all nine orbits classify
+`src/lib/parked/__tests__/resolver.test.ts` proves all ten orbits classify
 with non-empty `parkReason` + `unparkCondition`. Adding an orbit or a stuck
 flavor without its exit documentation is unmergeable.

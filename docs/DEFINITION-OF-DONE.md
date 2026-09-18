@@ -24,6 +24,8 @@ this table and that module from drifting silently.
 
 Rows 1–3 read live status first and fall back to the per-issue record's `pipeline` block on `overdeck-state` when live status is absent. The durable journal preserves the full verdict triple (review/tests/verification) plus `lastVerifiedCommit` through close-out and across database rebuilds, so rows continue to read and pass after live status is cleared or the SQLite database is re-derived. Re-running `pan close <id>` on a fully closed-out issue is an idempotent no-op that returns success without re-evaluating the gate or re-running any ceremony step; it names the original `closedOutAt` timestamp to prove completion on the original run.
 
+The agreement between those two planes now has a mechanical owner (PAN-3850): the report-only invariant checker (`src/lib/cloister/invariant-checker.ts`, every 10 patrol passes) compares the record `pipeline` block against the review-status row field by field and alarms on drift — one activity entry per mismatching entity per day, a persisted report at `~/.overdeck/deacon/invariant-report.json`, and an `invariant-mismatch` row in the parked population. It never repairs; verdict drift is resynced through `pan review resync <id>` and liveness drift through `pan admin agents exited <id>`. The same phase budgets every patrol's actions per UTC day (`src/lib/cloister/patrol-budget.ts`): a patrol whose tally crosses its budget suspends until the next UTC day with exactly one needs-you, so a malfunctioning gate-side patrol degrades to a signal instead of an action storm.
+
 ## Rules of the table
 
 - **Merged ≠ done.** Steps 5–9 are where "shipped" actually happens; step 8 is where the fix

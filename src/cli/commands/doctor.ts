@@ -8,6 +8,8 @@ import { promisify } from 'util';
 import { getAgentSessionsSync, listSessionNamesSync } from '../../lib/tmux.js';
 import { listProjectsSync, type ProjectConfig } from '../../lib/projects.js';
 import { findMixedWouldFireModes, readWouldFireCounts, readWouldFireRecorderHealth, wouldFireRecorderHealthPath } from '../../lib/cloister/patrol-would-fire.js';
+import { readInvariantReport } from '../../lib/cloister/invariant-checker.js';
+import { listPatrolBudgetRows } from '../../lib/cloister/patrol-budget.js';
 import { homedir } from 'os';
 import { isAbsolute, join, resolve } from 'path';
 import {
@@ -398,6 +400,53 @@ export function printPatrolWouldFireTable(): void {
     const mixed = shadow > 0 && normal > 0;
     const line = `  ${patrol}: shadow=${shadow} live=${normal}${mixed ? ' (MIXED — soak evidence invalid)' : ''}`;
     console.log(mixed ? chalk.red(line) : line);
+  }
+}
+
+/**
+ * PAN-3850 (W39, FR-26): print each patrol's action tally for the current UTC
+ * day against its budget. A suspended patrol is a needs-you the operator
+ * already got; this table is where they see the whole picture.
+ */
+export function printPatrolBudgetTable(): void {
+  console.log(chalk.bold('Patrol firing budgets (current UTC day):'));
+  const rows = listPatrolBudgetRows();
+  if (rows.length === 0) {
+    console.log(chalk.dim('  (no patrol actions recorded today)'));
+    return;
+  }
+  for (const row of rows) {
+    const budgetText = row.budget === 'exempt' ? '(exempt)' : `of ${row.budget}`;
+    const line = `  ${row.patrol}: ${row.actions} ${budgetText}${row.suspended ? ` — SUSPENDED (${row.suspendedReason ?? 'budget exceeded'})` : ''}`;
+    console.log(row.suspended ? chalk.red(line) : line);
+  }
+}
+
+/**
+ * PAN-3850 (W40, FR-27): print the invariant checker's last report — every
+ * entity whose record, review-status row, or liveness disagree. The checker
+ * is report-only; each line names the repair door for its kind of drift.
+ */
+export function printInvariantMismatchTable(): void {
+  console.log(chalk.bold('Invariant mismatches (record vs row vs liveness):'));
+  const report = readInvariantReport();
+  if (!report.generatedAt) {
+    console.log(chalk.dim('  (no invariant report yet — the checker runs every 10 patrol passes)'));
+    return;
+  }
+  console.log(chalk.dim(`  last checked ${report.generatedAt}`));
+  if (report.mismatches.length === 0) {
+    console.log('  all planes agree');
+    return;
+  }
+  for (const mismatch of report.mismatches) {
+    const what = mismatch.kind === 'liveness'
+      ? (mismatch.detail ?? 'liveness drift')
+      : `record/row drift on ${mismatch.fields.map((f) => `${f.field} (record=${JSON.stringify(f.recordValue)} row=${JSON.stringify(f.rowValue)})`).join(', ')}`;
+    const fix = mismatch.kind === 'liveness'
+      ? `pan admin agents exited ${mismatch.entity}`
+      : `pan review resync ${mismatch.entity}`;
+    console.log(chalk.yellow(`  ${mismatch.entity}: ${what} — fix: ${fix}`));
   }
 }
 
@@ -1060,6 +1109,14 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   // for the last 7 days. Zeroes across the board while OVERDECK_PATROL_SHADOW=1
   // prove the deleted-patrol candidates' repaired states are unreachable.
   printPatrolWouldFireTable();
+
+  // PAN-3850 (W39): the per-patrol firing-budget table — today's action tally
+  // against each patrol's budget, with suspended patrols named in red.
+  printPatrolBudgetTable();
+
+  // PAN-3850 (W40): the invariant checker's last report — record vs row vs
+  // liveness drift, with the repair door named on each line.
+  printInvariantMismatchTable();
 
   console.log('');
 
