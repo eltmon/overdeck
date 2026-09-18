@@ -23,7 +23,7 @@
     }
   ],
   "created": "2026-08-15T13:56:03.035Z",
-  "updated": "2026-09-18T08:51:30.247Z",
+  "updated": "2026-09-18T09:01:37.518Z",
   "pipeline": {
     "issueId": "PAN-3740",
     "reviewStatus": "pending",
@@ -33,7 +33,7 @@
     "mergeStep": "preparing-work-agent",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T08:51:30.226Z",
+    "updatedAt": "2026-09-18T09:01:37.494Z",
     "verificationNotes": "Branch has no implementation — only pipeline artifacts (.pan/xBRIEF task state) changed across workspace repos vs panopticon-cli:origin/main. The work agent produced no code (likely a kickoff-delivery zombie — PAN-2179).",
     "mergeNotes": "Rebase conflicts in: packages/contracts/src/composer-commands.generated.ts; Work agent strike-pan-3740 could not be prepared for the rebase: agent is paused (needs-you: idle-alive — no observable progress across 40 pokes (idle-alive escalation)); run pan unpause before merging; recovery not delivered: agent is paused (needs-you: idle-alive — no observable progress across 40 pokes (idle-alive escalation))",
     "strikeReadyHead": "a8ab83ab4e430ee169781a787b9f94db85fe4f80",
@@ -107,7 +107,7 @@
       },
       "costAtCloseOut": {
         "usd": 21.788638,
-        "pricingAsOf": "2026-09-18T08:51:30.230Z"
+        "pricingAsOf": "2026-09-18T09:01:37.499Z"
       }
     },
     "merges": [],
