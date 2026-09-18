@@ -189,7 +189,7 @@
     "recordedAt": "2026-09-18T07:31:28.942Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-18T07:35:01.526Z",
+  "updated": "2026-09-18T07:36:03.375Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "pending",
@@ -204,7 +204,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3851",
     "reviewedAtCommit": "ff31b42704cd1c4aad54547e796b30f6f2daac4f",
     "lastVerifiedCommit": "ff31b42704cd1c4aad54547e796b30f6f2daac4f",
-    "reviewRequestedAt": "2026-09-18T07:31:30.445Z",
+    "reviewRequestedAt": "2026-09-18T07:36:02.649Z",
     "reviewSpawnedAt": "2026-09-17T01:57:58.365Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -276,7 +276,8 @@
     },
     "deaconIgnored": true,
     "deaconIgnoredAt": "2026-09-16T22:55:47.495Z",
-    "deaconIgnoredReason": "Operator requested all agents stopped for independent code review and PRD redesign. Hold issue scheduling until explicit authorization."
+    "deaconIgnoredReason": "Operator requested all agents stopped for independent code review and PRD redesign. Hold issue scheduling until explicit authorization.",
+    "panDoneRecoveredAt": "2026-09-18T07:36:02.649Z"
   },
   "closeOut": {
     "usage": {
