@@ -515,7 +515,7 @@
     "recordedAt": "2026-09-17T04:24:56.466Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-18T16:25:57.955Z",
+  "updated": "2026-09-18T16:26:00.541Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "passed",
@@ -526,7 +526,7 @@
     "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T16:25:46.044Z",
+    "updatedAt": "2026-09-18T16:25:46.436Z",
     "reviewNotes": "Operator 2026-09-18: restored the passed review after the test-skip gate false-fail (PAN-3906 landed at b15c68544b6); branch content unchanged since review.",
     "testNotes": "npm run typecheck: clean (all lanes incl. dashboard/frontend/acp). npm run lint: clean (all guards passed, including circular/ratchet/quarantine/effect-diagnostics). npm test: 14365/14429 passed, 6 failed, 51 skipped. All 6 failures are in tests/... src/cli/commands/__tests__/agent-targeting.test.ts (overdeck.db schema-mismatch under shared-state pollution from concurrent workers) and src/lib/codex/__tests__/app-server-host.test.ts (codex effort-default assertions) -- confirmed pre-existing and unrelated: `git diff --name-only origin/main...HEAD` for both paths is empty, and both files pass 27/27 with 0 failures when run in isolation (`npx vitest run` on just those two files). Neither file is in PAN-3836's declared file scope.",
     "uatNotes": "Browser UAT by the shepherding conversation against the workspace stack at https://feature-pan-3836.overdeck.localhost (server rebuilt to branch head; Vite proxy pinned to this stack's server, see PAN-3854 root cause). Verified live: /projects/new renders in all three modes; clone of https://github.com/eltmon/okf resolved 'Will clone to /home/node/Projects/okf', Options showed derived name/prefix, clone completed and registered with tracker/github_repo/issue_prefix/default_branch detected, repo on main, workspaces/ excluded, landed on /command-deck/okf; new-mode create resolved target path and 10-char derived prefix; prefix conflict opened Options, flagged the field, disabled Create; unique prefix cleared it; workspace-page chips carry mode+returnTo; after the dc7a572 fix the return path lands on /workspaces/new?project=<key> with the chip and target dir preselected (before the fix it clobbered to /command-deck: real defect, fixed + journey added). Observation (follow-up filed): keystrokes typed within the first seconds after the page loads were discarded 3 of 5 times under load; retyping after defaults settle works.",
@@ -762,7 +762,7 @@
       },
       "costAtCloseOut": {
         "usd": 318.26303,
-        "pricingAsOf": "2026-09-18T16:25:57.944Z"
+        "pricingAsOf": "2026-09-18T16:26:00.530Z"
       }
     },
     "merges": [
