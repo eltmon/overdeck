@@ -4,17 +4,17 @@
     "created": "2026-09-18T06:56:20Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3894: Deacon patrol list is still 68 entries: delete the 30 pending repairers once counters prove them dead, then move the 38 housekeeping chores off the 60s patrol loop",
-    "updated": "2026-09-18T07:13:17.973Z"
+    "updated": "2026-09-18T07:25:37.572Z"
   },
   "plan": {
     "id": "pan-3894",
     "title": "Deacon patrol list is still 68 entries: delete the 30 pending repairers once counters prove them dead, then move the 38 housekeeping chores off the 60s patrol loop",
-    "status": "proposed",
+    "status": "running",
     "uid": "516e8d67-7635-4138-b0b1-759cdb6c0757",
     "author": "agent:claude-fable-5-1",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-18T06:56:20Z",
-    "updated": "2026-09-18T07:13:17.973Z",
+    "updated": "2026-09-18T07:25:37.572Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3894",
@@ -900,5 +900,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
