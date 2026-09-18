@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-09-18T06:43:33.655Z",
-  "updated": "2026-09-18T08:11:30.462Z",
+  "updated": "2026-09-18T08:23:46.977Z",
   "pipeline": {
     "issueId": "PAN-3894",
     "reviewStatus": "pending",
@@ -65,16 +65,8 @@
     }
   ],
   "tasks": {
-    "sequence": 16,
-    "claims": {
-      "w4-wire-tick-and-scheduler": {
-        "writerId": "agent-pan-3894",
-        "agentId": "agent-pan-3894",
-        "pid": 1080272,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-18T08:11:30.462Z"
-      }
-    },
+    "sequence": 17,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3894",
@@ -152,6 +144,17 @@
         "outcome": "completed",
         "reason": "Landed src/lib/cloister/housekeeping-scheduler.ts: 60s tick, durable lastRunAt in ~/.overdeck/deacon/housekeeping.json, runBudgetedPatrol per chore, per-chore error isolation with lastRunAt still stamped, pause skip logged once per span, lazy control-settings import, single-flight via createInFlightGuard, idempotent start, and listHousekeepingRows for pan doctor. Added [warn]-prefix routing beyond the PRD so W4 does not demote the specialist patrol's warnings. 12 fake-timer cases; 20 tests green incl. untouched in-flight-guard.",
         "releasedAt": "2026-09-18T08:11:21.561Z"
+      },
+      {
+        "writerId": "agent-pan-3894",
+        "agentId": "agent-pan-3894",
+        "pid": 1080272,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-18T08:11:30.462Z",
+        "itemId": "w4-wire-tick-and-scheduler",
+        "outcome": "completed",
+        "reason": "runPatrol down to 38 budgeted registrations (9 tick + 29 pending-soak) from 67; one patrolCycle % left (invariant checker). deacon.ts 3476 -> 3207 lines. Scheduler started/stopped from startDeacon/stopDeacon with the 4 deacon-resident chores injected; appendDeaconLog exported. statePlaneReconcileEveryCycles deleted. Audit test holds TICK (14) union CHORES (29) == KEEP_REWIRE (42) + runInvariantChecker. DEVIATION: kept patrol-cadence.ts — its orphan-reviewer gate still wraps cleanupOrphanReviewerSessions, a pending-soak patrol; removing it would 60x its firing rate and corrupt PAN-3895's evidence. 20 tests green.",
+        "releasedAt": "2026-09-18T08:23:46.976Z"
       }
     ],
     "statusReasons": {
@@ -178,6 +181,10 @@
       "w2-housekeeping-scheduler": {
         "reason": "Landed src/lib/cloister/housekeeping-scheduler.ts: 60s tick, durable lastRunAt in ~/.overdeck/deacon/housekeeping.json, runBudgetedPatrol per chore, per-chore error isolation with lastRunAt still stamped, pause skip logged once per span, lazy control-settings import, single-flight via createInFlightGuard, idempotent start, and listHousekeepingRows for pan doctor. Added [warn]-prefix routing beyond the PRD so W4 does not demote the specialist patrol's warnings. 12 fake-timer cases; 20 tests green incl. untouched in-flight-guard.",
         "updatedAt": "2026-09-18T08:11:21.561Z"
+      },
+      "w4-wire-tick-and-scheduler": {
+        "reason": "runPatrol down to 38 budgeted registrations (9 tick + 29 pending-soak) from 67; one patrolCycle % left (invariant checker). deacon.ts 3476 -> 3207 lines. Scheduler started/stopped from startDeacon/stopDeacon with the 4 deacon-resident chores injected; appendDeaconLog exported. statePlaneReconcileEveryCycles deleted. Audit test holds TICK (14) union CHORES (29) == KEEP_REWIRE (42) + runInvariantChecker. DEVIATION: kept patrol-cadence.ts — its orphan-reviewer gate still wraps cleanupOrphanReviewerSessions, a pending-soak patrol; removing it would 60x its firing rate and corrupt PAN-3895's evidence. 20 tests green.",
+        "updatedAt": "2026-09-18T08:23:46.976Z"
       }
     }
   },
@@ -212,6 +219,11 @@
     "w2-housekeeping-scheduler.ac3": "completed",
     "w2-housekeeping-scheduler.ac4": "completed",
     "w2-housekeeping-scheduler.ac5": "completed",
-    "w4-wire-tick-and-scheduler": "running"
+    "w4-wire-tick-and-scheduler": "completed",
+    "w4-wire-tick-and-scheduler.ac1": "completed",
+    "w4-wire-tick-and-scheduler.ac2": "completed",
+    "w4-wire-tick-and-scheduler.ac3": "completed",
+    "w4-wire-tick-and-scheduler.ac4": "completed",
+    "w4-wire-tick-and-scheduler.ac5": "completed"
   }
 }
