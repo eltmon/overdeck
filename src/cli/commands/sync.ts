@@ -36,7 +36,6 @@ import { ensurePlaywrightIsolationSync, ensureExcalidrawMcpSync } from '../../li
 import { resolveProjectContextFile } from '../../lib/context-layers/layers.js';
 import { provisionClaudeHooks } from '../../lib/claude-hooks-provision.js';
 import { provisionClaudePlugins } from '../../lib/claude-plugins-provision.js';
-import { ensureAutomaticStateMigration, formatAutomaticStateMigrationBlock } from '../../lib/state-auto-migrate.js';
 
 // Bundled git hooks distributed to registered projects (PAN-1201: sync-sources/).
 const BUNDLED_GIT_HOOKS_DIR = SYNC_SOURCES.gitHooks;
@@ -437,16 +436,6 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   }
 
   const projects = listProjectsSync();
-  for (const { key, config } of projects) {
-    if (!existsSync(config.path)) continue;
-    const migrationSpinner = ora(`Reconciling permanent state for ${config.name}...`).start();
-    const migration = await ensureAutomaticStateMigration(key, config);
-    if (migration.status === 'ready') {
-      migrationSpinner.succeed(`Permanent state ready for ${config.name}`);
-    } else {
-      migrationSpinner.warn(formatAutomaticStateMigrationBlock(migration));
-    }
-  }
 
   // Check jq availability (required by statusline and specialists)
   if (!checkCommand('jq')) {
