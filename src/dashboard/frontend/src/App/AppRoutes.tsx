@@ -28,6 +28,7 @@ import { OrderBookPage } from '../pages/OrderBookPage';
 import { BacklogSequencerPage } from '../pages/BacklogSequencerPage';
 import { HomePage } from '../pages/HomePage';
 import { NewWorkspacePage } from '../pages/NewWorkspacePage';
+import { NewProjectPage } from '../pages/NewProjectPage';
 import { WorkspaceView } from '../components/workspace/WorkspaceView';
 import type { Tab } from '../components/Header';
 import type { Issue } from '../types';
@@ -58,6 +59,7 @@ interface AppRoutesProps {
   workspaceRouteId: string | null;
   onWorkspaceViewBack: () => void;
   onWorkspaceCreated: (workspaceId: string) => void;
+  onProjectCreated: (project: { key: string; name: string; path: string }) => void;
   initialSessionKey: string | null;
   onOpenWorkspaceHome: (issueId: string) => void;
   onNewProject: () => void;
@@ -91,6 +93,7 @@ export function AppRoutes({
   workspaceRouteId,
   onWorkspaceViewBack,
   onWorkspaceCreated,
+  onProjectCreated,
   initialSessionKey,
   onOpenWorkspaceHome,
   onNewProject,
@@ -139,6 +142,14 @@ export function AppRoutes({
       {activeTab === 'workspace-new' && (
         <div className="w-full h-full overflow-hidden">
           <NewWorkspacePage onCancel={() => onTabChange('home')} onCreated={onWorkspaceCreated} />
+        </div>
+      )}
+      {activeTab === 'project-new' && (
+        <div className="w-full h-full overflow-hidden">
+          <NewProjectPage
+            onCancel={() => onTabChange('home')}
+            onCreated={onProjectCreated}
+          />
         </div>
       )}
       {activeTab === 'workspace' && workspaceRouteId && (

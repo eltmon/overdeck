@@ -7,14 +7,6 @@ import { fireEvent, render as testingRender, screen, waitFor } from '@testing-li
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../components/CommandDeck/NewProjectModal.js', () => ({
-  NewProjectModal: ({ isOpen, onCreated }: { isOpen: boolean; onCreated: (project: { key: string; name: string; path: string }) => void }) => (
-    <div data-testid="new-project-modal-mount" data-open={String(isOpen)}>
-      {isOpen && <button onClick={() => onCreated({ key: 'new-project', name: 'New Project', path: '/new' })}>Create mocked project</button>}
-    </div>
-  ),
-}));
-
 vi.mock('../../components/CommandDeck/FolderPicker.js', () => ({
   FolderPicker: ({ onSelect }: { onSelect: (path: string) => void }) => (
     <button data-testid="folder-picker" onClick={() => onSelect('/picked/from/browser')}>Pick folder</button>
@@ -153,7 +145,6 @@ describe('NewWorkspacePage shell', () => {
       'hairline-bottom',
       'idea-grid',
     ]);
-    expect(screen.getByTestId('new-project-modal-mount')).toHaveAttribute('data-open', 'false');
   });
 
   it('stays stable while the project queries cold-load', async () => {
@@ -367,21 +358,6 @@ describe('NewWorkspacePage shell', () => {
     fireEvent.click(screen.getByRole('button', { name: /more projects/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Project 6' }));
     expect(currentIntent.setProjectKey).toHaveBeenCalledWith('project-6');
-  });
-
-  it('opens NewProjectModal and selects the project returned by onCreated', async () => {
-    currentIntent.setProjectKey = vi.fn((key) => { currentIntent.projectKey = key; });
-    intentInitialized = true;
-    const { queryClient } = render(<NewWorkspacePage />);
-
-    fireEvent.click(screen.getByRole('button', { name: /new project/i }));
-    fireEvent.click(screen.getByRole('button', { name: 'Create mocked project' }));
-
-    expect(currentIntent.setProjectKey).toHaveBeenCalledWith('new-project');
-    expect(queryClient.getQueryData(['registered-projects'])).toEqual([
-      { key: 'new-project', name: 'New Project', path: '/new' },
-    ]);
-    expect(await screen.findByRole('button', { name: 'New Project' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('renders all six static idea cards with uppercase mono categories', () => {

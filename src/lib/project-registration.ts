@@ -24,9 +24,15 @@ export class DuplicateProjectError extends Error {
   }
 }
 
+export type RegisterProjectExtras = Pick<
+  ProjectConfig,
+  'issue_prefix' | 'github_repo' | 'gitlab_repo' | 'tracker' | 'workspace'
+>;
+
 export interface RegisterProjectOptions {
   path: string;
   name?: string;
+  extras?: RegisterProjectExtras;
 }
 
 export interface RegisterProjectResult {
@@ -61,7 +67,7 @@ export async function registerProjectFromPath(
     throw new DuplicateProjectError(key, existing.path);
   }
 
-  const projectConfig: ProjectConfig = { name, path: fullPath };
+  const projectConfig: ProjectConfig = { name, path: fullPath, ...(opts.extras ?? {}) };
   registerProjectSync(key, projectConfig);
 
   const seededContextLayer = ensureProjectLayer(fullPath);

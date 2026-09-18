@@ -6,17 +6,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../components/CommandDeck/NewProjectModal.js', () => ({
-  NewProjectModal: ({ isOpen, onCreated }: {
-    isOpen: boolean;
-    onCreated: (project: { key: string; name: string; path: string }) => void;
-  }) => isOpen ? (
-    <button onClick={() => onCreated({ key: 'new-project', name: 'New Project', path: '/new' })}>
-      Create audited project
-    </button>
-  ) : null,
-}));
-
 vi.mock('../../components/CommandDeck/FolderPicker.js', () => ({
   FolderPicker: ({ onSelect }: { onSelect: (path: string) => void }) => (
     <button onClick={() => onSelect('/picked')}>Choose audited folder</button>

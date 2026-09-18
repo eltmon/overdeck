@@ -1,0 +1,194 @@
+/**
+ * Pure repository URL parser (PAN-3836 WI-1.1).
+ *
+ * The one rule this module exists to enforce: an explicit source the operator
+ * typed is a **transport URL**, and `git` must receive it byte-for-byte. Its
+ * protocol, username, port and path all decide how authentication happens, so
+ * rewriting `git@github.com:acme/private.git` to an HTTPS URL — as the first
+ * implementation did — silently swaps a working SSH key for a credential prompt
+ * the dashboard has deliberately disabled. Likewise `ssh://git@host:2222/t/r.git`
+ * must keep its port instead of parsing `2222` as the first path segment.
+ *
+ * So parsing splits cleanly in two:
+ *
+ *   - **Transport** (`cloneUrl`) — the operator's own string, whitespace trimmed
+ *     and nothing else, for every explicit source. Only bare `owner/repo`
+ *     shorthand synthesizes a URL, because there is no transport to preserve.
+ *   - **Metadata** (`provider`, `slug`, `folderName`) — derived from the parsed
+ *     hostname and path, used for tracker config and the default folder name.
+ *     Metadata is best-effort: an unknown host yields a null provider and slug
+ *     but still a usable folder name, because "we don't recognize this forge"
+ *     is not the same as "this URL has no repository in it".
+ *
+ * Scheme URLs go through `new URL`; SCP syntax (`user@host:path`) is anchored
+ * separately because it is not a URL at all. No network, no filesystem.
+ */
+
+export interface ParsedRepoUrl {
+  /** 'github' | 'gitlab', or null for a host we have no tracker config for. */
+  provider: 'github' | 'gitlab' | null;
+  /** Provider identity, e.g. 'o/r' or GitLab 'g/sub/r'. Null for unknown hosts. */
+  slug: string | null;
+  /** Default local folder name, e.g. 'r'. Derived for every host, known or not. */
+  folderName: string | null;
+  /**
+   * The exact source handed to `git clone`. Preserved verbatim for explicit
+   * sources; synthesized only for `owner/repo` shorthand.
+   */
+  cloneUrl: string;
+}
+
+/** Schemes we are willing to hand to `git clone` from a dashboard request. */
+const SUPPORTED_SCHEMES = new Set(['https:', 'http:', 'ssh:']);
+
+/** Control characters and NUL, which have no business in a URL we spawn with. */
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS = /[\u0000-\u001f\u007f]/;
+
+/**
+ * `user@host:path/repo.git` — SCP syntax, not a URL.
+ *
+ * The host group excludes `:` and `/` so a scheme URL can never reach here, and
+ * the path must be non-empty. Any user is accepted, not just `git`: deploy keys
+ * routinely use another account.
+ */
+const SCP_SOURCE = /^([^\s@/:]+)@([^\s@/:]+):(.+)$/;
+
+/** Bare `owner/repo`, the only form we are allowed to invent a URL for. */
+const GITHUB_SHORTHAND = /^([A-Za-z0-9._-]+)\/([A-Za-z0-9._-]+)$/;
+
+interface SourceParts {
+  hostname: string;
+  /** Path with no leading slash, no trailing slash, and no `.git` suffix. */
+  repoPath: string;
+}
+
+/** Detect provider by host name. */
+function providerForHostname(hostname: string): 'github' | 'gitlab' | null {
+  const host = hostname.toLowerCase();
+  if (host === 'github.com' || host === 'www.github.com') return 'github';
+  if (host === 'gitlab.com' || host === 'www.gitlab.com') return 'gitlab';
+  return null;
+}
+
+/**
+ * Strip the decoration that is metadata-only: surrounding slashes and one
+ * trailing `.git`. Exactly one, so `repo.git.git` keeps its odd-but-real name.
+ */
+function normalizeRepoPath(rawPath: string): string {
+  return rawPath.replace(/^\/+/, '').replace(/\/+$/, '').replace(/\.git$/, '');
+}
+
+/**
+ * The last path segment, decoded, or null when it cannot safely name a folder.
+ *
+ * Decoding matters because `%2F` and `%2E%2E` survive the segment split and
+ * would otherwise become a path separator or a traversal in a directory name.
+ */
+function folderNameFor(repoPath: string): string | null {
+  const segments = repoPath.split('/').filter(Boolean);
+  const last = segments[segments.length - 1];
+  if (!last) return null;
+
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(last);
+  } catch {
+    return null; // malformed percent-encoding
+  }
+
+  if (!decoded || decoded === '.' || decoded === '..') return null;
+  if (decoded.includes('/') || decoded.includes('\\')) return null;
+  if (CONTROL_CHARS.test(decoded)) return null;
+  return decoded;
+}
+
+/** A repo path is usable when it names at least one non-empty, non-dot segment. */
+function isUsableRepoPath(repoPath: string): boolean {
+  const segments = repoPath.split('/').filter(Boolean);
+  if (segments.length === 0) return false;
+  const last = segments[segments.length - 1];
+  return last !== '.' && last !== '..';
+}
+
+/** Parse an explicit scheme URL (`https://…`, `ssh://…`). */
+function parseSchemeSource(source: string): SourceParts | null {
+  let url: URL;
+  try {
+    url = new URL(source);
+  } catch {
+    return null;
+  }
+
+  if (!SUPPORTED_SCHEMES.has(url.protocol)) return null;
+  if (!url.hostname) return null;
+
+  const repoPath = normalizeRepoPath(url.pathname);
+  if (!isUsableRepoPath(repoPath)) return null;
+
+  return { hostname: url.hostname, repoPath };
+}
+
+/** Parse SCP syntax (`git@github.com:acme/private.git`). */
+function parseScpSource(source: string): SourceParts | null {
+  const match = SCP_SOURCE.exec(source);
+  if (!match) return null;
+
+  const hostname = match[2];
+  const repoPath = normalizeRepoPath(match[3]);
+  if (!isUsableRepoPath(repoPath)) return null;
+
+  return { hostname, repoPath };
+}
+
+/**
+ * Parse a repository source into a transport URL plus best-effort metadata.
+ *
+ * Returns null when the input cannot become a clone source at all, which the
+ * caller renders as a `url-invalid` finding against the field.
+ */
+export function parseRepoUrl(raw: string): ParsedRepoUrl | null {
+  const source = raw.trim();
+
+  if (!source) return null;
+  if (CONTROL_CHARS.test(source)) return null;
+  // An argument-vector spawn stops `-upload-pack=…` from becoming a flag, but a
+  // source that looks like an option is a typo either way — say so.
+  if (source.startsWith('-')) return null;
+
+  // Shorthand first, and only when nothing else could claim it: `acme/widget`
+  // has no scheme, no `@`, and no `:`, so it cannot be an explicit source.
+  const shorthand = GITHUB_SHORTHAND.exec(source);
+  if (shorthand) {
+    const owner = shorthand[1];
+    const repo = normalizeRepoPath(shorthand[2]);
+    if (!repo || repo === '.' || repo === '..') return null;
+    return {
+      provider: 'github',
+      slug: `${owner}/${repo}`,
+      folderName: repo,
+      // The only synthesized transport in this module: there was none to keep.
+      cloneUrl: `https://github.com/${owner}/${repo}.git`,
+    };
+  }
+
+  const parts = parseSchemeSource(source) ?? parseScpSource(source);
+  if (!parts) return null;
+
+  const provider = providerForHostname(parts.hostname);
+
+  // GitHub and GitLab always address a repository as owner/repo (or deeper, for
+  // GitLab subgroups). A single segment there is a half-typed URL, so say so
+  // instead of probing `https://github.com/acme.git`. An unknown host gets no
+  // such rule: `https://git.internal/repo.git` is a perfectly ordinary source.
+  if (provider && parts.repoPath.split('/').filter(Boolean).length < 2) return null;
+  return {
+    provider,
+    // A slug is provider identity. Without a known provider there is nothing to
+    // identify it against, so it stays null even though the path parsed fine.
+    slug: provider ? parts.repoPath : null,
+    folderName: folderNameFor(parts.repoPath),
+    // Verbatim. Protocol, user, port and path all carry authentication meaning.
+    cloneUrl: source,
+  };
+}

@@ -179,6 +179,113 @@ waiting out the rail's 10s poll.
 workspaces stay pipeline-owned. Deleting a workspace and purging memory remain
 CLI-only, behind their typed confirmations.
 
+## Creating a project (PAN-3836)
+
+**One core, split along the write boundary.** Both halves live under
+`src/lib/projects/`, and the CLI and the dashboard go through the same code, so
+the preview can never disagree with what confirming actually does.
+
+| Module | Owns |
+| --- | --- |
+| `create.ts` | `resolveProjectCreateIntent` — reads, validates, previews. Writes nothing and spawns no mutating git command, so it is safe to call on every settled keystroke. |
+| `create-perform.ts` | `performProjectCreate` (clone or init → register → finish setup) and `finishProjectSetup` (the idempotent tail, on its own so repair and the happy path are the same code). |
+| `create-errors.ts` | `ProjectCreateFailure`, its classifier, and the single sanitizer every diagnostic passes through. |
+| `create-recovery.ts` | `resolveProjectCreateRecovery` — read-only reconciliation of an operation whose outcome is unknown. |
+
+**Transport URLs are preserved byte-for-byte.** An explicit source the operator
+typed (`git@github.com:acme/private.git`, `ssh://git@host:2222/t/r.git`) is
+handed to git unchanged: its protocol, username, port and path all decide how
+authentication happens. Only bare `owner/repo` shorthand synthesizes a URL.
+Provider, slug and folder name are derived separately as best-effort metadata,
+so an unknown host still clones and still yields a usable folder name.
+
+**Detected configuration.** Registration writes `tracker`,
+`github_repo`/`gitlab_repo`, `workspace.default_branch`, and a proposed
+`issue_prefix`, then creates the main workspace row. A detached or unborn HEAD
+yields *no* default branch rather than a guessed `main`.
+
+**Safe public DTOs.** The core holds the raw transport URL; routes and the CLI
+serialize `toPublicProjectIntent`, which redacts URL userinfo. Diagnostics are
+sanitized once (ANSI stripped, credentials and auth headers removed) and bounded
+to a 4 KiB tail before they reach a response, a log, or a job record.
+
+### Routes
+
+| Route | Auth | Behavior |
+| --- | --- | --- |
+| `POST /api/projects/resolve` | mutation guard (auth + origin + CSRF) despite read-only semantics | 200 with the safe intent and its `findings`. Forces `homeBoundary: true` and does **not** refresh the remote probe — it runs once per settled keystroke and must read the 60 s memo. |
+| `POST /api/projects` | mutation guard | 422 on findings; 202 `{jobId, operationId}` for clone; 200 `{key, name, path, operationId}` for existing/new; 409 for a real conflict — `conflict` when the body's `operationId` was already used for different input, `target-busy` when another operation owns the destination; 500 for an unexpected failure. Reserves the operation and its destination **after** resolving, because the fingerprint and target path are only known once the intent is resolved; every exit past the reservation settles it, so a failure releases the destination instead of pinning it. Refreshes the probe, because this one is about to write. |
+| `GET /api/projects/create-jobs/:jobId` | read guard | Safe job status. **404 means unknown to this runtime, not confirmed failure.** |
+| `POST /api/projects/create-jobs/:jobId/cancel` | mutation guard | 202 `cancelling` while the child is stopping; 409 `cannot-cancel-setup` once registration began; the terminal result if it already finished; 404 for an unknown job. Idempotent. |
+| `POST /api/projects/create-jobs/reconcile` | mutation guard | Read-only. Returns `job` when this runtime still owns the clone — found by the client's `jobId`, or by its `operationId` when the POST response that carried the job id was lost — and otherwise `completed`, `needs-setup`, `conflict`, or `unknown`. Never registers, clones, or repairs. |
+| `POST /api/projects/:projectKey/finish-setup` | mutation guard | Idempotent repair through the shared helper. 409 on identity mismatch, 500 on an unexpected failure. Never clones. |
+
+### Operations, jobs, and their limits
+
+`src/dashboard/server/routes/project-create-jobs.ts` is the only owner of this
+runtime state; routes never keep their own maps.
+
+- **Operations.** The client generates one `operationId` per submission and
+  sends it on `POST /api/projects`; a request without one still gets target
+  exclusion under a server-generated id, it simply has nothing to correlate a
+  retry with. The same id with the same input *joins* the first attempt, which
+  is what makes a retry after a lost POST response safe. The same id with
+  different input is a 409. Two different ids aimed at the same directory cannot
+  run together.
+- **Cancellation.** The job owns the `AbortController`. "Cancel requested" and
+  "cancelled" stay distinct: the job is cancelled only once the child has closed
+  and cleanup has settled, so the UI never offers a retry into a directory
+  something is still writing to. Abort escalates SIGTERM → SIGKILL after 5 s.
+- **Timeout vs. retention.** A clone has a 30-minute deadline, *cleared* when
+  the job enters `registering` — a deadline firing during a write would label a
+  still-writing registration cancelled and retry-safe, and it is neither. A
+  settled job's result is readable for 10 minutes, then pruned. A running job is
+  never pruned; eviction is not a substitute for cancellation.
+- **Restart limitation.** Jobs live in memory. After a dashboard restart nothing
+  can prove whether an in-flight clone died or finished. Reconciliation answers
+  from canonical state instead, and `unknown` is a legitimate answer: the UI
+  keeps Create disabled, shows the target, and offers *Check again* rather than
+  retrying automatically.
+
+### What counts as success
+
+A matching project key is **not** proof. Reconciliation reports `completed` only
+when the registered path matches canonically, the directory is on disk, a
+clone's `origin` points at the repository that was actually requested, and the
+main workspace exists at that path. Anything short of that is `conflict` or
+`unknown`.
+
+If creation stops after registration, the project is registered and the
+repository is on disk. The repair is `pan project finish-setup <key>` or
+`POST /api/projects/:key/finish-setup` — never a second clone, which would
+either duplicate the repository or hit the duplicate guard forever.
+
+### Cleanup ownership
+
+A clone target is claimed with a non-recursive `mkdir`, and its identity is
+recorded as dev + inode + birthtime. On failure the target is removed **only**
+if this operation created it and that identity still matches — inode numbers get
+reused, so inode alone would let a recreated directory be mistaken for ours.
+A pre-existing directory is never removed, and neither is a successful clone
+that failed later during setup.
+
+### Entry points
+
+The sidebar `+`, the workspace-page chips ("clone repo", "add existing", "new
+project"), and the HomePage `New project` button all reach `/projects/new`; the
+`?mode=` query param preselects a tab and `returnTo` brings a workspace-origin
+creation back to `/workspaces/new?project=<key>`.
+
+### Maintainers' tests
+
+`tests/unit/lib/projects/{repo-url,create-intent,create-perform,create-recovery,create-errors}.test.ts`,
+`tests/unit/dashboard/routes/{project-create-jobs,project-create-routes}.test.ts`,
+`tests/unit/cli/project-commands.test.ts`, and the frontend page/hook suites.
+
+**Project vs. workspace.** A project is a repository. A workspace is a checkout
+of that repository on a specific branch. Register a project once, then create
+workspaces from it.
+
 ## Memory homes
 
 Memory storage is keyed by **workspace UUID**, not issue id:

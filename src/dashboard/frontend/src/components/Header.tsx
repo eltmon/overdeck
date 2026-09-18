@@ -25,4 +25,5 @@ export type Tab =
   | 'sessions'
   | 'awaiting-merge'
   | 'workspace-new'
-  | 'workspace';
+  | 'workspace'
+  | 'project-new';

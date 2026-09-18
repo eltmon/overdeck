@@ -51,9 +51,10 @@ describe('no-loss audit (PAN-1990 ac1, ac2)', () => {
   });
 
   it('PAN-1990 and PAN-3411 add workspace routes without removing any tab', () => {
-    expect(Object.keys(TAB_PATHS).length).toBe(Object.keys(PRE_PAN_1990_TAB_PATHS).length + 2);
+    expect(Object.keys(TAB_PATHS).length).toBe(Object.keys(PRE_PAN_1990_TAB_PATHS).length + 3);
     expect(TAB_PATHS.workspace).toBe('/workspace');
     expect(TAB_PATHS['workspace-new']).toBe('/workspaces/new');
+    expect(TAB_PATHS['project-new']).toBe('/projects/new'); // PAN-3836
   });
 
   it('Sidebar nav item affordance resolves (component + workspace-registry rail)', async () => {

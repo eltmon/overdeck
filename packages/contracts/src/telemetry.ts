@@ -116,6 +116,7 @@ export const TELEMETRY_PROPERTY_DOMAINS = {
     "sessions",
     "awaiting-merge",
     "workspace-new",
+    "project-new",
     "workspace",
   ],
   decision_subject: ["agent", "conversation"],
@@ -126,7 +127,9 @@ export const TELEMETRY_PROPERTY_DOMAINS = {
   merge_kind: ["pipeline"],
   model_family: ["claude", "gpt", "gemini", "kimi", "minimax", "glm", "mimo", "other"],
   pipeline_stage: ["work_done", "review_passed", "verification_passed", "merged", "closed_out"],
-  project_mode: ["existing", "new"],
+  // "clone" ships with PAN-3836; without it the dimension cannot show whether
+  // cloning is actually used, which is the reason the event carries a mode.
+  project_mode: ["clone", "existing", "new"],
 } as const
 
 export type TelemetryPropertyDomainName = keyof typeof TELEMETRY_PROPERTY_DOMAINS

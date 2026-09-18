@@ -77,6 +77,25 @@ Conversations pin harness at creation in `handleConversationCreate`
 request time live in `roles/` (`handoff.md`, `retrospective.md`); `src/lib/cloister/prompts/*.md`
 are build-copied to `dist/dashboard/prompts/` and cached by `renderPrompt`.
 
+## Projects and workspaces domain (PAN-1990, PAN-3330)
+
+- `projects.yaml` (`~/.overdeck/projects.yaml`) is the project registry. Read it
+  through `getProjectSync`/`listProjectsSync`/`listProjectsAsync` (`src/lib/projects.ts`,
+  mtime-cached); write it through `registerProjectSync`/`updateProjectsConfigSync`,
+  which invalidate the cache. `src/lib/project-registration.ts` is the
+  `registerProjectFromPath` entry every project-creation front door ends in.
+- The `projects`/`workspaces`/`project_targets`/`pinned_docs` tables in overdeck.db
+  have one read door (`src/lib/workspaces/resolver.ts`, e.g. `getMainWorkspace`)
+  and one write door (`src/lib/workspaces/writer.ts`);
+  `scripts/guard-workspace-doors.sh` fails lint on SQL elsewhere.
+- Creation follows resolve-before-create: `src/lib/workspaces/create.ts` exports
+  `resolveWorkspaceCreateIntent` (zero writes, returns `findings`) and
+  `performWorkspaceCreate`. The CLI (`pan workspace new|main`) and the dashboard
+  route `POST /api/workspace-registry/resolve` call the same functions, and the
+  `/workspaces/new` page polls resolve per settled keystroke
+  (`components/workspace/new/useWorkspaceCreateIntent.ts`). PAN-3836 adds the
+  same shape for projects in `src/lib/projects/create.ts` and `/projects/new`.
+
 ## Remote (Fly.io) work agents
 
 Work agents can run on Fly.io VMs (`src/lib/remote/remote-agents.ts`,

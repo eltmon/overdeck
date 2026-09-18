@@ -1,0 +1,210 @@
+/**
+ * Table-driven tests for the repository source parser (PAN-3836 WI-1.1).
+ *
+ * The table is the PRD's required-cases matrix verbatim. Its whole point is the
+ * `transport` column: the string in it is what `git clone` receives, so an
+ * assertion that passes while the parser "helpfully" rewrote SSH to HTTPS would
+ * be asserting the bug the first implementation shipped.
+ */
+
+import { describe, it, expect } from 'vitest';
+import { parseRepoUrl } from '../../../../src/lib/projects/repo-url';
+
+interface Case {
+  input: string;
+  transport: string;
+  provider: 'github' | 'gitlab' | null;
+  slug: string | null;
+  folderName: string | null;
+  why: string;
+}
+
+const ACCEPTED: Case[] = [
+  {
+    input: 'acme/widget',
+    transport: 'https://github.com/acme/widget.git',
+    provider: 'github',
+    slug: 'acme/widget',
+    folderName: 'widget',
+    why: 'shorthand is the only form we synthesize a URL for',
+  },
+  {
+    input: 'acme/repo.with.dots',
+    transport: 'https://github.com/acme/repo.with.dots.git',
+    provider: 'github',
+    slug: 'acme/repo.with.dots',
+    folderName: 'repo.with.dots',
+    why: 'dotted repository names are legal and were previously rejected',
+  },
+  {
+    input: 'acme/widget.git',
+    transport: 'https://github.com/acme/widget.git',
+    provider: 'github',
+    slug: 'acme/widget',
+    folderName: 'widget',
+    why: 'exactly one .git suffix is stripped, never producing .git.git',
+  },
+  {
+    input: 'https://github.com/acme/widget',
+    transport: 'https://github.com/acme/widget',
+    provider: 'github',
+    slug: 'acme/widget',
+    folderName: 'widget',
+    why: 'an explicit HTTPS source is preserved, not given a .git suffix',
+  },
+  {
+    input: 'git@github.com:acme/private.git',
+    transport: 'git@github.com:acme/private.git',
+    provider: 'github',
+    slug: 'acme/private',
+    folderName: 'private',
+    why: 'SCP syntax must survive: rewriting it to HTTPS breaks key auth',
+  },
+  {
+    input: 'ssh://git@example.com:2222/team/repo.git',
+    transport: 'ssh://git@example.com:2222/team/repo.git',
+    provider: null,
+    slug: null,
+    folderName: 'repo',
+    why: 'the port is part of the transport, not the first path segment',
+  },
+  {
+    input: 'ssh://deploy@example.com/team/repo.git',
+    transport: 'ssh://deploy@example.com/team/repo.git',
+    provider: null,
+    slug: null,
+    folderName: 'repo',
+    why: 'a non-git username is preserved; deploy accounts are normal',
+  },
+  {
+    input: 'git@gitlab.com:group/subgroup/repo.git',
+    transport: 'git@gitlab.com:group/subgroup/repo.git',
+    provider: 'gitlab',
+    slug: 'group/subgroup/repo',
+    folderName: 'repo',
+    why: 'GitLab subgroups are part of the slug',
+  },
+  {
+    input: 'https://example.com/team/repo.git',
+    transport: 'https://example.com/team/repo.git',
+    provider: null,
+    slug: null,
+    folderName: 'repo',
+    why: 'an unknown host still yields a usable folder name, not "no remote"',
+  },
+  {
+    input: 'https://github.com/acme/widget/',
+    transport: 'https://github.com/acme/widget/',
+    provider: 'github',
+    slug: 'acme/widget',
+    folderName: 'widget',
+    why: 'a trailing slash is trimmed for metadata only',
+  },
+  {
+    input: 'https://github.com/acme/widget.git/',
+    transport: 'https://github.com/acme/widget.git/',
+    provider: 'github',
+    slug: 'acme/widget',
+    folderName: 'widget',
+    why: 'trailing slash plus .git is trimmed for metadata only',
+  },
+];
+
+const REJECTED: Array<{ input: string; why: string }> = [
+  { input: 'word', why: 'a bare word names no repository' },
+  { input: '', why: 'empty input' },
+  { input: '   ', why: 'whitespace-only input' },
+  { input: '-upload-pack=/tmp/x', why: 'option-like input is a typo, not a source' },
+  { input: 'file:///tmp/repo', why: 'local-file sources are not clonable from the dashboard' },
+  { input: 'ext::sh -c whoami', why: 'the remote-helper RCE class must not parse' },
+  { input: 'git://github.com/acme/widget.git', why: 'unauthenticated git:// is not a supported scheme' },
+  { input: 'https://github.com/', why: 'no repository path' },
+  { input: 'https://github.com/acme/..', why: 'a dot-dot final segment resolves away the repo' },
+  { input: 'git@github.com:', why: 'SCP syntax with an empty path' },
+  { input: 'https://github.com/acme', why: 'a known provider needs owner/repo, so this is half-typed' },
+  { input: 'https://github.com/acme.git', why: 'a known provider needs owner/repo' },
+];
+
+describe('parseRepoUrl', () => {
+  describe('accepted sources', () => {
+    for (const testCase of ACCEPTED) {
+      it(`accepts ${testCase.input || '<empty>'} — ${testCase.why}`, () => {
+        const result = parseRepoUrl(testCase.input);
+        expect(result).not.toBeNull();
+        expect(result!.cloneUrl).toBe(testCase.transport);
+        expect(result!.provider).toBe(testCase.provider);
+        expect(result!.slug).toBe(testCase.slug);
+        expect(result!.folderName).toBe(testCase.folderName);
+      });
+    }
+
+    it('trims surrounding whitespace and nothing else', () => {
+      const result = parseRepoUrl('  git@github.com:acme/private.git  ');
+      expect(result!.cloneUrl).toBe('git@github.com:acme/private.git');
+    });
+  });
+
+  describe('rejected sources', () => {
+    for (const { input, why } of REJECTED) {
+      it(`rejects ${JSON.stringify(input)} — ${why}`, () => {
+        expect(parseRepoUrl(input)).toBeNull();
+      });
+    }
+
+    it('rejects a source containing a control character', () => {
+      expect(parseRepoUrl('https://github.com/acme/wid\u0000get')).toBeNull();
+    });
+  });
+
+  describe('folder-name safety', () => {
+    it('rejects a folder name that decodes to a path separator', () => {
+      // %2F would survive the segment split and become a directory separator.
+      const result = parseRepoUrl('https://example.com/team/a%2Fb');
+      expect(result!.folderName).toBeNull();
+    });
+
+    it('rejects a source whose final segment decodes to a traversal', () => {
+      // URL normalization resolves the encoded `..` away, leaving no repository
+      // path at all — so the whole source is rejected, not just the folder name.
+      expect(parseRepoUrl('https://example.com/team/%2E%2E')).toBeNull();
+    });
+
+    it('accepts an unqualified intranet host with a single-segment path', () => {
+      const result = parseRepoUrl('https://gitserver/repo.git');
+      expect(result!.cloneUrl).toBe('https://gitserver/repo.git');
+      expect(result!.provider).toBeNull();
+      expect(result!.folderName).toBe('repo');
+    });
+
+    it('decodes an ordinary percent-encoded segment', () => {
+      const result = parseRepoUrl('https://example.com/team/my%20repo');
+      expect(result!.folderName).toBe('my repo');
+      // The transport itself keeps its encoding; only metadata is decoded.
+      expect(result!.cloneUrl).toBe('https://example.com/team/my%20repo');
+    });
+  });
+
+  describe('transport preservation (the regression this item exists for)', () => {
+    it('never rewrites an SSH source to HTTPS', () => {
+      for (const source of [
+        'git@github.com:acme/private.git',
+        'git@gitlab.com:group/subgroup/repo.git',
+        'ssh://git@github.com/acme/private.git',
+      ]) {
+        expect(parseRepoUrl(source)!.cloneUrl).toBe(source);
+      }
+    });
+
+    it('never appends .git to an explicit source', () => {
+      const result = parseRepoUrl('https://github.com/acme/widget');
+      expect(result!.cloneUrl).not.toMatch(/\.git$/);
+    });
+
+    it('keeps a non-standard SSH port out of the slug', () => {
+      const result = parseRepoUrl('ssh://git@github.com:2222/acme/widget.git');
+      expect(result!.cloneUrl).toBe('ssh://git@github.com:2222/acme/widget.git');
+      expect(result!.slug).toBe('acme/widget');
+      expect(result!.folderName).toBe('widget');
+    });
+  });
+});

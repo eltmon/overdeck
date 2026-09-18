@@ -113,4 +113,49 @@ describe('registerProjectFromPath', () => {
     expect((err as DuplicateProjectError).key).toBe('err-proj');
     expect((err as DuplicateProjectError).existingPath).toBe(dir);
   });
+
+  it('includes extras (github_repo, tracker, issue_prefix, workspace) when provided', async () => {
+    const dir = makeProjectDir('with-extras');
+    const extras = {
+      github_repo: 'o/r',
+      tracker: 'github' as const,
+      issue_prefix: 'OR',
+      workspace: { default_branch: 'main' },
+    };
+    const result = await registerProjectFromPath({ path: dir, extras });
+
+    expect(result.config).toMatchObject({
+      name: expect.any(String),
+      path: dir,
+      github_repo: 'o/r',
+      tracker: 'github',
+      issue_prefix: 'OR',
+      workspace: { default_branch: 'main' },
+    });
+
+    const stored = getProjectSync(result.key);
+    expect(stored).not.toBeNull();
+    expect(stored).toMatchObject({
+      github_repo: 'o/r',
+      tracker: 'github',
+      issue_prefix: 'OR',
+      workspace: { default_branch: 'main' },
+    });
+  });
+
+  it('maintains backward compatibility: no extras means exactly { name, path }', async () => {
+    const dir = makeProjectDir('no-extras');
+    const result = await registerProjectFromPath({ path: dir });
+
+    expect(result.config).toEqual({
+      name: result.config.name,
+      path: dir,
+    });
+
+    const stored = getProjectSync(result.key);
+    expect(stored).toEqual({
+      name: stored!.name,
+      path: dir,
+    });
+  });
 });

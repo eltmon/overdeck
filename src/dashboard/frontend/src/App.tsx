@@ -17,7 +17,7 @@ import { IssueDrawer } from './components/drawer/IssueDrawer';
 import { ConversationDock } from './components/dock/ConversationDock';
 import { ResumableSessionDialog } from './components/ResumableSessionDialog';
 import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar';
-import { NewProjectModal, type CreatedProject } from './components/CommandDeck/NewProjectModal';
+import type { CreatedProject } from './components/project/new/useProjectCreateIntent';
 import { Tab } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { UpdateDialog } from './components/UpdateDialog';
@@ -46,6 +46,7 @@ import {
   getCockpitRouteFromPath,
   getCommandDeckProjectRouteFromPath,
   getConversationRouteState,
+  getProjectCreatedNavigation,
   getIssueIdFromPath,
   getLastTab,
   getSessionKeyFromSearch,
@@ -199,7 +200,7 @@ export default function App() {
         ? `/command-deck/${encodeURIComponent(initialProjectRoute)}`
         : '/command-deck',
   );
-  const setConversationRoute = useCallback((id: string | null, viewMode: ConversationViewMode = 'conversation') => {
+  const setConversationRoute = useCallback((id: string | null, viewMode: ConversationViewMode = 'conversation', syncUrl = true) => {
     setSelectedConvIdState(id);
     setConversationViewModeState(id ? viewMode : 'conversation');
     setConversationViewModes((current) => {
@@ -209,7 +210,7 @@ export default function App() {
       } else if (id) {
         delete next[id];
       }
-      window.history.replaceState(null, '', id ? buildConversationUrl(id, viewMode, current) : commandDeckPathRef.current);
+      if (syncUrl) window.history.replaceState(null, '', id ? buildConversationUrl(id, viewMode, current) : commandDeckPathRef.current);
       return next;
     });
   }, []);
@@ -225,22 +226,24 @@ export default function App() {
   const queryClient = useQueryClient();
   const recentActivity = useDashboardStore((state) => (state.recentActivity ?? []) as Array<Record<string, unknown>>);
 
-  // PAN-1970: New Project modal
-  const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
-  const handleNewProject = useCallback(() => setIsNewProjectModalOpen(true), []);
+  const handleNewProject = useCallback(() => {
+    setActiveTabState('project-new');
+    window.history.pushState({ tab: 'project-new' }, '', '/projects/new');
+  }, []);
+
   const handleProjectCreated = useCallback((project: CreatedProject) => {
     void queryClient.invalidateQueries({ queryKey: ['command-deck-projects'] });
     void queryClient.invalidateQueries({ queryKey: ['registered-projects'] });
     setSelectedProjectKey(project.key);
-    setActiveTabState('command-deck');
-    const path = `/command-deck/${encodeURIComponent(project.key)}`;
-    commandDeckPathRef.current = path;
-    if (window.location.pathname !== path) {
-      window.history.pushState({ tab: 'command-deck', project: project.key }, '', path);
-    }
+    const target = getProjectCreatedNavigation(project.key); // PAN-3836: honors returnTo=/workspaces/new from the chips
+    setActiveTabState(target.tab);
+    if (target.tab === 'command-deck') commandDeckPathRef.current = target.path;
+    if (window.location.pathname !== target.path) window.history.pushState(target.state, '', target.path);
     // Same reason as handleSelectProject: the new project is newer intent than a
     // lingering conversation route, which would flip the deck away on remount.
-    setConversationRoute(null);
+    // syncUrl only for the deck target: the route clear replaces the URL with the
+    // deck path, which would clobber the /workspaces/new?project= return path.
+    setConversationRoute(null, 'conversation', target.tab === 'command-deck');
     usePanesStore.getState().ensureHome(project.key);
   }, [queryClient, setConversationRoute]);
   const seenWorkspaceActivityIds = useRef(new Set<string>());
@@ -841,13 +844,6 @@ export default function App() {
       {/* Event-sourced state: connects WsTransport → DashboardStore (PAN-428 B4) */}
       <EventRouter />
 
-      {/* PAN-1970: New Project modal */}
-      <NewProjectModal
-        isOpen={isNewProjectModalOpen}
-        onClose={() => setIsNewProjectModalOpen(false)}
-        onCreated={handleProjectCreated}
-      />
-
       {/* Mounts @keyframes for the pulsing extreme-tier cost warning badge */}
       <CostWarningStyles />
 
@@ -903,6 +899,7 @@ export default function App() {
             cockpitRoute={cockpitRoute}
             workspaceRouteId={workspaceRouteId}
             onWorkspaceViewBack={onWorkspaceViewBack} onWorkspaceCreated={onWorkspaceCreated}
+            onProjectCreated={handleProjectCreated}
             initialSessionKey={initialSessionKey}
             onOpenWorkspaceHome={handleOpenWorkspaceHome}
             onNewProject={handleNewProject}

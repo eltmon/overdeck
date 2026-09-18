@@ -34,15 +34,135 @@ While `projects.yaml` is the source of truth, much of this configuration is also
 
 ## Registering Projects
 
-```bash
-# Register a project
-pan project add /path/to/your/project --name myproject --linear-team PRJ
+### Clone a repository
 
+Clone a repository directly into Overdeck:
+
+```bash
+pan project clone https://github.com/owner/repo
+pan project clone owner/repo
+pan project clone git@github.com:owner/private.git
+pan project clone ssh://git@git.example.com:2222/team/repo.git
+```
+
+The URL you type is the URL git receives — protocol, username, port and path
+unchanged — because all four decide how authentication happens. Only the bare
+`owner/repo` shorthand is expanded, into a GitHub HTTPS URL.
+
+Optional flags: `--parent <dir>` (default `~/Projects`), `--name <name>`,
+`--issue-prefix <PREFIX>`, and `--dry-run`.
+
+```bash
+pan project clone owner/repo --dry-run | jq '{key, path, repoSlug, defaultBranch}'
+```
+
+`--dry-run` prints the resolved intent as a single JSON document and writes
+nothing — no directory, no registration, no context layer, no hooks. Credentials
+embedded in a URL are redacted from that output.
+
+**Credentials live on the server.** Clones run non-interactively
+(`GIT_TERMINAL_PROMPT=0`, `ssh -o BatchMode=yes`), so nothing can hang waiting on
+a prompt nobody can see. A private repository therefore needs credentials
+already available on the machine running Overdeck — an SSH key loaded into that
+machine's agent, or a configured credential helper. When they are missing you
+get a typed message naming the problem, and it never suggests `ssh-add` for an
+HTTPS failure.
+
+**Cancelling.** Press Ctrl-C (or use Cancel in the dashboard) and the clone
+child is stopped for real: SIGTERM first, SIGKILL if it has not exited five
+seconds later. The command exits 130 once cleanup has settled. A directory the
+clone created is removed; a directory that already existed is never touched.
+
+**Unknown hosts** clone fine. You get a usable folder name and no guessed
+tracker configuration, since there is no provider to infer one from.
+
+### Add existing
+
+Register a repository that already exists on your machine:
+
+```bash
+pan project add /path/to/your/project [--name <name>] [--dry-run]
+```
+
+Registration detects:
+- `github_repo` / `gitlab_repo` — the remote slug
+- `tracker` — GitHub or GitLab, from the remote host
+- `workspace.default_branch` — the repository's default branch, or nothing at
+  all when the repository is detached or has no commits yet (a guessed `main`
+  would point every later workspace at a branch that may not exist)
+- `issue_prefix` — proposed from the project key, up to ten characters
+- The main workspace row
+
+Adding a **subdirectory** of a repository is refused with the real repository
+root offered instead, so you cannot end up with two projects fighting over one
+checkout. A linked worktree is recognized as a repository. A plain folder that
+is not a repository at all is fine — it registers as a project without one.
+
+`workspaces/` is excluded through `<project>/.git/info/exclude`, which is local
+and untracked. Overdeck never edits your tracked `.gitignore`, so a freshly
+cloned repository does not come back dirty. If you want the exclusion shared
+with your team, add it to `.gitignore` yourself.
+
+Tests and quality gates are **not** detected. Configure those yourself — see
+[Project Configuration](#project-configuration).
+
+### Finish an interrupted setup
+
+If creation stops after the project was registered — say the main workspace
+could not be created — the repository is on disk and the project exists. Repair
+it instead of cloning again:
+
+```bash
+pan project finish-setup <key> [--path <expected-path>]
+```
+
+It is idempotent: it never clones and never registers a second project, so
+running it on an already-complete project simply reports the result. `--path` is
+a consistency check, not a relocation — a mismatch refuses rather than repairing
+the wrong project.
+
+### Dashboard
+
+Register projects through the dashboard at `/projects/new`, reachable from the
+sidebar `+`, the workspace-page chips, and the HomePage button:
+
+- **Open existing folder** — use a folder already on the server. Browse with the
+  folder picker or type an absolute path.
+- **Clone repository** — download a git repository.
+- **Create new project** — start an empty git repository.
+
+Defaults are real server-resolved values, not placeholders: the parent folder
+comes from the server's home directory, and the exact destination is shown
+before you commit to it. `~` and `~/sub` expand against the **server's** home,
+since the browser has no idea what they mean on the machine holding the files.
+Name and issue prefix live under Options, already filled in; anything you type
+there survives a change to the URL or folder.
+
+While a clone runs, the form is frozen and shows git's own phases. Cancel stops
+the real process. If the connection drops, the page says so and keeps the
+operation rather than pretending it finished — it never re-enables Create on a
+result it has not seen. After a server restart an in-flight clone genuinely
+cannot be resolved from memory, so you are offered *Check again* rather than an
+automatic retry that might clone a second copy.
+
+### Project or workspace?
+
+**A project is a repository with its own issues and pipeline.** Use projects to register separate codebases. If you already have a project registered and want another checkout of it (e.g., for a feature branch, a long-lived testing branch, or a release branch), **create a workspace** instead. Workspaces share the same project registry entry and codebase but isolate development state per branch.
+
+### Rename and list
+
+```bash
 # List registered projects
 pan project list
 
 # Remove a project
 pan project remove myproject
+
+# Rename a project
+pan project rename <key> <newName>
+
+# Example: keep the stable `myn` key and change its display name
+pan project rename myn "Mind Your Now"
 ```
 
 ### Rename a project
@@ -88,7 +208,7 @@ projects:
 |-------|----------|-------------|
 | `name` | Yes | Human-readable project name |
 | `path` | Yes | Absolute path to project root |
-| `issue_prefix` | Yes* | Issue prefix for standard format IDs (e.g., "MIN", "PAN") |
+| `issue_prefix` | Yes* | Issue prefix for standard format IDs (e.g., "MIN", "PAN"). Automatically proposed during registration based on the repository name. |
 | `tracker` | No | Issue tracker type: `linear`, `github`, `gitlab`, `rally`. Set it explicitly when the code host and issue tracker differ. |
 | `issue_prefixes` | No | Array of prefixes for multi-prefix trackers (e.g., `[F, US, DE, TA]`) |
 | `issue_pattern` | No | Custom regex for issue ID parsing: `^(PREFIX)-(\\d+)$` |

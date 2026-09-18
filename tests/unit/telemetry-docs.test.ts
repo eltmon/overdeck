@@ -97,9 +97,12 @@ describe('telemetry documentation', () => {
 
   it('detects allowed-value drift while properties and events remain unchanged', () => {
     const changedDomain = markdown.replace(
-      '| `project_mode` | `existing`, `new` |',
-      '| `project_mode` | `existing`, `new`, `imported` |',
+      '| `project_mode` | `clone`, `existing`, `new` |',
+      '| `project_mode` | `clone`, `existing`, `new`, `imported` |',
     );
+    // The mutation must actually apply, or this test passes vacuously when the
+    // real row is edited (PAN-3836 added `clone` and silently broke it).
+    expect(changedDomain).not.toEqual(markdown);
 
     expect(documentedCatalog(changedDomain)).toEqual(runtimeCatalog());
     expect(documentedDomains(changedDomain)).not.toEqual(runtimeDomains());
