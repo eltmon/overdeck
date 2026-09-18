@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { PanIssueRecord } from '../../pan-dir/record.js';
 import type { ProjectConfig } from '../../projects.js';
+import { CADENCE_MS, HOUSEKEEPING_CHORES } from '../patrol-registry.js';
 import {
   reconcileProjectStatePlanes,
   type StatePlanePatrolDeps,
@@ -36,6 +37,21 @@ function deps(overrides: Partial<StatePlanePatrolDeps> = {}): StatePlanePatrolDe
     ...overrides,
   };
 }
+
+describe('state-plane reconciliation cadence', () => {
+  // PAN-3894 moved this patrol off the 60 s deacon tick onto the housekeeping
+  // scheduler, so the old statePlaneReconcileEveryCycles() helper is gone. The
+  // invariant it guarded is not: this reconciliation walks every project's
+  // records and must never run more often than hourly. It is now expressed as
+  // the chore's declared cadence, so assert it there.
+  it('is registered as an hourly housekeeping chore, never on the tick', () => {
+    const chore = HOUSEKEEPING_CHORES.find((c) => c.name === 'reconcileProjectStatePlanes');
+
+    expect(chore).toBeDefined();
+    expect(chore?.cadence).toBe('hourly');
+    expect(CADENCE_MS[chore!.cadence]).toBe(60 * 60_000);
+  });
+});
 
 describe('PAN-3513 reopened issue reconciliation', () => {
   it('clears a poisoned closedOut record when the live tracker is active', async () => {
