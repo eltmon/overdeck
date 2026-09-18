@@ -21,7 +21,8 @@ import { CacheService, DEFAULT_TTLS, parseIntegerHeader } from './cache-service.
 import { resolveMissingIssue } from './issue-title-fallback.js';
 import type { Issue as TrackerIssue } from '../../../lib/tracker/interface.js';
 import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig } from './tracker-config.js';
-import { loadReviewStatusesForIssues, type ReviewStatus } from '../../../lib/review-status.js';
+import type { DerivedIssueState } from '@overdeck/contracts';
+import { loadIssueStatesForProject } from './derived-issue-state.js';
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { findPlan, readWorkspacePlan } from '../../../lib/xbrief/io.js';
 import type { XBriefDocument } from '../../../lib/xbrief/types.js';
@@ -293,14 +294,19 @@ export class IssueDataService {
   /** In-memory snapshot of shadow states, refreshed asynchronously. The hot
    * path (`getIssues`) reads from this map — no disk I/O on every request. */
   private shadowStatesCache: Map<string, any> = new Map();
-  private reviewStatusesCache: Record<string, ReviewStatus> = {};
+  /**
+   * PAN-3917 FR-6/FR-12: the derived pipeline state per issue, refreshed
+   * asynchronously off the tracker poll. This is a read-through cache of a
+   * computed value, never a stored status — nothing here is written back.
+   */
+  private derivedStatesCache: Record<string, DerivedIssueState> = {};
   private _onIssuesChanged: ((issues: unknown[]) => void) | null = null;
   private planningSnapshotQueued = false;
   private planningRefreshQueue: string[] = [];
   private planningRefreshQueued = new Set<string>();
   private planningRefreshActive = 0;
-  private reviewStatusRefreshQueued = false;
-  private reviewStatusRefreshIssueIds = new Set<string>();
+  private derivedRefreshQueued = false;
+  private derivedRefreshIssueIds = new Set<string>();
   private getIssuesCache = new Map<string, GetIssuesCacheEntry>();
   /** Issues resolved on demand after aging out of the tracker sync window
    * (PAN-3659). Keyed by uppercase identifier; merged into computeIssues and
@@ -527,25 +533,29 @@ export class IssueDataService {
     }
     // cycle === 'all': no additional filtering, show everything
 
-    // Augment with mergeStatus from the asynchronous review-status cache.
+    // Augment with the derived pipeline state (PAN-3917 FR-6). `pipelineState`
+    // replaces the six status fields; `attention`, `pr`, and `branch` come
+    // along so a row can render without a second request.
     allIssues = allIssues.map(issue => {
       const canonical = getCanonicalStatus(issue.state ?? issue.canonicalStatus ?? issue.status, issue.stateType);
       const key = issue.identifier?.toUpperCase();
-      const rs = key ? this.reviewStatusesCache[key] : null;
-      if (rs?.mergeStatus) {
-        const issueWithMerge = { ...issue, mergeStatus: rs.mergeStatus };
-        if (canonical === 'done' && issueWithMerge.mergeStatus !== 'merged') {
-          return { ...issueWithMerge, mergeStatus: 'merged' };
-        }
-        if (rs.mergeStatus === 'merged' && canonical !== 'done' && canonical !== 'canceled') {
-          return { ...issueWithMerge, status: 'Verifying', canonicalStatus: 'verifying_on_main', state: 'verifying_on_main' };
-        }
-        return issueWithMerge;
+      const derived = key ? this.derivedStatesCache[key] : null;
+      if (!derived) return issue;
+
+      const enriched = {
+        ...issue,
+        pipelineState: derived.state,
+        ...(derived.attention ? { attention: derived.attention } : {}),
+        ...(derived.pr ? { pr: derived.pr } : {}),
+        ...(derived.branch ? { branch: derived.branch } : {}),
+      };
+      // A merged PR on an issue the tracker has not closed yet is
+      // "verifying on main" — the same projection the merge-status cache used
+      // to make, now sourced from the forge.
+      if (derived.state === 'merged' && canonical !== 'done' && canonical !== 'canceled') {
+        return { ...enriched, status: 'Verifying', canonicalStatus: 'verifying_on_main', state: 'verifying_on_main' };
       }
-      if (canonical === 'done' && issue.mergeStatus && issue.mergeStatus !== 'merged') {
-        return { ...issue, mergeStatus: 'merged' };
-      }
-      return issue;
+      return enriched;
     });
 
     // Enrich with cached planning-state only. Refresh work is scheduled by tracker updates.
@@ -785,7 +795,7 @@ export class IssueDataService {
     }
     const cachedIssues = this.getCachedTrackerIssues();
     this.schedulePlanningRefreshForIssues(cachedIssues);
-    this.scheduleReviewStatusRefreshForIssues(cachedIssues);
+    this.scheduleDerivedStateRefreshForIssues(cachedIssues);
   }
 
   private pushSnapshot(): void {
@@ -798,7 +808,7 @@ export class IssueDataService {
     this.pruneBackfilledIssues();
     const cachedIssues = this.getCachedTrackerIssues();
     this.schedulePlanningRefreshForIssues(cachedIssues);
-    this.scheduleReviewStatusRefreshForIssues(cachedIssues);
+    this.scheduleDerivedStateRefreshForIssues(cachedIssues);
     this._onIssuesChanged?.(this.getIssues());
   }
 
@@ -956,27 +966,77 @@ export class IssueDataService {
     }, 50);
   }
 
-  private scheduleReviewStatusRefreshForIssues(issues: any[]): void {
+  /**
+   * Refresh the derived pipeline state for the issues a tracker poll touched.
+   * Grouped by project so each repo costs one cached forge listing and one
+   * backend-inventory read, never one `gh` invocation per issue.
+   */
+  private scheduleDerivedStateRefreshForIssues(issues: any[]): void {
     for (const issue of issues) {
       const identifier = typeof issue?.identifier === 'string' ? issue.identifier : '';
-      if (identifier) this.reviewStatusRefreshIssueIds.add(identifier);
+      if (identifier) this.derivedRefreshIssueIds.add(identifier);
     }
-    if (this.reviewStatusRefreshQueued || this.reviewStatusRefreshIssueIds.size === 0) return;
-    this.reviewStatusRefreshQueued = true;
+    if (this.derivedRefreshQueued || this.derivedRefreshIssueIds.size === 0) return;
+    this.derivedRefreshQueued = true;
     setImmediate(() => {
-      this.reviewStatusRefreshQueued = false;
-      const issueIds = [...this.reviewStatusRefreshIssueIds];
-      this.reviewStatusRefreshIssueIds.clear();
-      try {
-        this.reviewStatusesCache = {
-          ...this.reviewStatusesCache,
-          ...loadReviewStatusesForIssues(issueIds),
-        };
-        if (this.started) this.pushSnapshot();
-      } catch {
-        // review-status store may not exist yet
-      }
+      this.derivedRefreshQueued = false;
+      const issueIds = [...this.derivedRefreshIssueIds];
+      this.derivedRefreshIssueIds.clear();
+      void this.refreshDerivedStates(issueIds);
     });
+  }
+
+  private async refreshDerivedStates(issueIds: readonly string[]): Promise<void> {
+    const byProject = new Map<string, string[]>();
+    const labelsByIssue: Record<string, readonly string[]> = {};
+    const closedIssues = new Set<string>();
+
+    for (const raw of issueIds) {
+      const issueId = raw.toUpperCase();
+      const project = resolveProjectFromIssueSync(issueId);
+      if (!project) continue;
+      const list = byProject.get(project.projectPath);
+      if (list) list.push(issueId); else byProject.set(project.projectPath, [issueId]);
+
+      const issue = this.findIssueByIdentifier(issueId);
+      const labels = Array.isArray(issue?.labels)
+        ? issue.labels.map((label: any) => (typeof label === 'string' ? label : label?.name)).filter(Boolean)
+        : [];
+      labelsByIssue[issueId] = labels;
+      const canonical = getCanonicalStatus(issue?.state ?? issue?.canonicalStatus ?? issue?.status, issue?.stateType);
+      if (canonical === 'done' || canonical === 'canceled') closedIssues.add(issueId);
+    }
+
+    let changed = false;
+    for (const [projectPath, ids] of byProject) {
+      try {
+        const states = await loadIssueStatesForProject(projectPath, ids, { labelsByIssue, closedIssues });
+        for (const [issueId, state] of states) {
+          this.derivedStatesCache[issueId] = state;
+          changed = true;
+        }
+      } catch {
+        // A forge or git read failed for this project — keep the previous
+        // answer rather than blanking every row.
+      }
+    }
+    if (changed && this.started) this.pushSnapshot();
+  }
+
+  /** The cached tracker row for an identifier, across every tracker. */
+  private findIssueByIdentifier(uppercaseIdentifier: string): any | null {
+    for (const state of Object.values(this.trackers)) {
+      const found = state.lastFetchedIssues.find(
+        (issue: any) => (issue?.identifier ?? '').toUpperCase() === uppercaseIdentifier,
+      );
+      if (found) return found;
+    }
+    return this.backfilledIssues.get(uppercaseIdentifier) ?? null;
+  }
+
+  /** The derived pipeline state for one issue, or null before the first refresh. */
+  getDerivedState(identifier: string): DerivedIssueState | null {
+    return this.derivedStatesCache[identifier.toUpperCase()] ?? null;
   }
 
   private pushMeta(): void {

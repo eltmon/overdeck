@@ -13,13 +13,13 @@ import { loadConfigSync, resolveModel } from '../../../../lib/config-yaml.js';
 import { encodeClaudeProjectDir } from '../../../../lib/paths.js';
 import { resolvePrimaryWorkspaceRepoDirSync, resolveWorkspaceRepoRootsSync } from '../../../../lib/project-repos.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
-import { getReviewStatusSync } from '../../../../lib/review-status.js';
 import { getAgentCommandSync } from '../../../../lib/settings.js';
 import { killSession } from '../../../../lib/tmux.js';
 import { getAgentStateSync, saveAgentRuntimeState } from '../../../../lib/agents.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from '../../../../lib/cloister/review-monitor.js';
 import { resolveReviewParentRunState } from '../../../../lib/cloister/review-run-recovery.js';
 import { jsonResponse } from '../../http-helpers.js';
+import { getDerivedIssueState } from '../../services/derived-issue-state.js';
 import { httpHandler } from '../http-handler.js';
 import { execAsync, readJsonBody, validateSpecialistAgentName } from './shared.js';
 
@@ -607,7 +607,8 @@ const postProjectReviewRestartRoute = HttpRouter.add(
     const { spawnReviewRoleForIssue } = yield* Effect.promise(
       () => import('../../../../lib/cloister/review-agent.js'),
     );
-    const prUrl = getReviewStatusSync(issueId)?.prUrl;
+    // PAN-3917: the PR is the forge's, read through the derived issue state.
+    const prUrl = (yield* Effect.promise(() => getDerivedIssueState(issueId))).pr?.url;
     const result = yield* spawnReviewRoleForIssue({
       issueId,
       workspace: workspacePath,

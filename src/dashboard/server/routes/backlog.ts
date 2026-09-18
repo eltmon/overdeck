@@ -22,7 +22,7 @@ import {
 } from '../../../lib/backlog/pickup.js';
 import { buildClassifyLookups } from '../../../lib/backlog/lookups.js';
 import { getProjectPanPaths } from '../../../lib/pan-dir/paths.js';
-import { getReviewStatusSync } from '../../../lib/review-status.js';
+import { loadIssueStatesForProject } from '../services/derived-issue-state.js';
 import { getBacklogSequenceForRoot, clearBacklogSequence } from '../../../lib/overdeck/backlog.js';
 import { isFlywheelAutoPickupBacklog } from '../../../lib/overdeck/control-settings.js';
 import { SEQUENCER_AGENT_ID } from '../../../lib/backlog/sequencer-agent.js';
@@ -102,11 +102,19 @@ const getBacklogSequenceRoute = HttpRouter.add(
         // event loop with per-workspace process calls.
         const lookups = buildClassifyLookups(projectRoot);
 
+        // PAN-3917 FR-6: "the pipeline owns this issue" is derived — one batched
+        // forge + inventory read for the whole sequence, never a stored status.
+        const derivedStates = await loadIssueStatesForProject(
+          projectRoot,
+          cachedNodes.map((r) => r.issueId),
+        );
+        const PIPELINE_OWNED = new Set(['working', 'in-review', 'changes-requested', 'ready', 'merged']);
+
         const nodes = cachedNodes.map((r) => {
           const issueUpper = r.issueId.toUpperCase();
-          const reviewStatus = getReviewStatusSync(issueUpper);
+          const derived = derivedStates.get(issueUpper);
           const inPipeline =
-            (reviewStatus !== null && reviewStatus.reviewStatus !== 'pending') ||
+            (derived !== undefined && PIPELINE_OWNED.has(derived.state)) ||
             existsSync(join(workspacesDir, `feature-${r.issueId.toLowerCase()}`));
           const hasPrd = prdFiles.has(issueUpper);
           const ready = specIssues.has(issueUpper);
@@ -128,6 +136,7 @@ const getBacklogSequenceRoute = HttpRouter.add(
             hasPrd,
             ready,
             state,
+            pipelineState: derived?.state ?? null,
           };
         });
 

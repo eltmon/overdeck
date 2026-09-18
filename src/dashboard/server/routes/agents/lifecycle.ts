@@ -3,11 +3,11 @@
  *
  * The PTY supervisor observes the harness process directly (it owns the PTY
  * master) and posts lifecycle events here: session-started, turn-started,
- * turn-ended, exited. The projection writes state.json and the agents row in
- * one transaction (applyAgentLifecycleEvent), so an agent's exit writes
- * `stopped` without any patrol inferring it from a missing tmux session
- * (FR-21) and agent.started is emitted when the process actually exists
- * (FR-24).
+ * turn-ended, exited. Each one appends an event (applyAgentLifecycleEvent):
+ * an agent's exit emits `agent.stopped` without any patrol inferring it from a
+ * missing tmux session, and `agent.started` is emitted when the process
+ * actually exists. Nothing is mirrored — liveness is read from the terminal
+ * backend (PAN-3917 FR-12).
  *
  * Auth: the per-agent pty-token (x-overdeck-pty-token), the same credential
  * the delivery socket uses. Only the supervisor process holding the token
@@ -69,12 +69,17 @@ export const postAgentLifecycleRoute = HttpRouter.add(
       : new Date().toISOString();
     const exitCode = typeof body['exitCode'] === 'number' ? body['exitCode'] : undefined;
 
-    const result = yield* Effect.sync(() => applyAgentLifecycleEvent(id, {
+    const result = yield* Effect.promise(() => applyAgentLifecycleEvent(id, {
       event: event as AgentLifecycleEventName,
       at,
       ...(exitCode !== undefined ? { exitCode } : {}),
     }));
     if (!result.applied) {
+      // A retried POST carrying an already-applied event is a success for the
+      // supervisor: the event it wanted recorded is recorded.
+      if (result.reason === 'duplicate') {
+        return jsonResponse({ success: true, applied: false, reason: 'duplicate' });
+      }
       const status = result.reason === 'no-state' ? 404 : 409;
       return jsonResponse({ success: false, error: `lifecycle event not applied: ${result.reason}` }, { status });
     }

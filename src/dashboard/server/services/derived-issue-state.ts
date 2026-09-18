@@ -185,6 +185,12 @@ export function deriveIssueState(facts: IssueStateFacts): DerivedIssueState {
 export interface IssueStateLoaderDeps {
   readonly now?: () => number;
   readonly panes?: readonly BackendPane[];
+  /**
+   * The tracker row, when the caller already holds it. Without it (and without
+   * `readIssue`) the loader cannot see `closed` or the `parked` label, so a
+   * caller that has the row MUST pass it.
+   */
+  readonly issue?: { readonly open: boolean; readonly labels: readonly string[] };
   readonly readIssue?: (issueId: string) => Promise<{ open: boolean; labels: readonly string[] } | null>;
   readonly readPr?: (issueId: string, projectPath: string, branch: string) => Promise<LoadedPr | null>;
   readonly readBranch?: (projectPath: string, branch: string) => Promise<DerivedBranchState | null>;
@@ -413,7 +419,7 @@ export async function loadIssueStateFacts(
 
   const panes = deps.panes ?? (await getBackendPanes()).filter((pane) => pane.issue === issueId.toUpperCase());
 
-  const issue = deps.readIssue ? await deps.readIssue(issueId) : null;
+  const issue = deps.issue ?? (deps.readIssue ? await deps.readIssue(issueId) : null);
   const branch = await (deps.readBranch ?? readBranchWithGit)(projectPath, branchName);
   const pr = await (deps.readPr ?? forgeReader(projectPath))(issueId, projectPath, branchName);
 

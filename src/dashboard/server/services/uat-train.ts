@@ -6,10 +6,10 @@
  * The reconciler interval is the heartbeat of "always one batch ready": every
  * 60s it walks every tracked project whose effective merge-train flag is on,
  * comparing that project's ready set against its generation chain and
- * assembling/invalidating as needed. PAN-1696 removed the active-flywheel-run
- * requirement — the ready set comes from review-status records, so batches
- * assemble with no run at all. Assemblies run minutes; the reconciler is
- * single-flight per project, so ticks never pile up.
+ * assembling/invalidating as needed. PAN-3917: the ready set is the forge's —
+ * approvals, green checks, and mergeability (FR-9) — so batches assemble with
+ * no flywheel run and no review-status record at all. Assemblies run minutes;
+ * the reconciler is single-flight per project, so ticks never pile up.
  */
 import { stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -45,7 +45,6 @@ import {
   type PromoteResult,
   type UatPromoteDeps,
 } from '../../../lib/cloister/uat-promote.js';
-import { notifyFlywheelOfUatPromote } from '../../../lib/cloister/uat-promote-notify.js';
 import {
   getUatGenerationSync,
   hasUncleanedTerminalUatGenerationSync,
@@ -55,22 +54,10 @@ import {
   type UatGeneration,
   type UatGenerationRepo,
 } from '../../../lib/overdeck/merge-sync.js';
-import { listEligibleCandidatesByProject } from '../../../lib/flywheel-merge-order.js';
+import { getDerivedIssueState, listReadyIssuesForProject } from './derived-issue-state.js';
 import { extractACFromDocument } from '../../../lib/xbrief/acceptance-criteria.js';
 import { findXBriefByIssue, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
 import { findProjectByPathSync, listProjectsSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
-import type { PanIssueShipRecord } from '../../../lib/pan-dir/record.js';
-import {
-  executeVersionShipForGeneration,
-  persistPendingShipRecords,
-  persistShipRecords,
-  withGenerationShipLock,
-} from '../../../lib/cloister/ship-record.js';
-import {
-  aggregateGenerationShipStatus,
-  loadShipRecords,
-  publicShipStatus,
-} from '../../../lib/cloister/ship-status.js';
 import {
   resolveConfiguredReposSync,
   resolveProjectReposFromResolvedIssueSync,
@@ -247,9 +234,9 @@ async function runUatTrainReconcileForProject(
  * Get ready set for a specific project path.
  */
 async function getReadySetForProject(projectPath: string): Promise<ReadyFeature[] | null> {
-  const { computeMergeQueueFromCandidates, listEligibleCandidatesByProject, resolveMergeQueuePrUrl } = await import('../../../lib/flywheel-merge-order.js');
+  const { computeMergeQueueFromCandidates, resolveMergeQueuePrUrl } = await import('../../../lib/flywheel-merge-order.js');
 
-  const candidates = await listEligibleCandidatesByProject(projectPath);
+  const candidates = await listReadyIssuesForProject(projectPath);
   if (candidates.length === 0) return [];
 
   const queue = await Effect.runPromise(
@@ -288,7 +275,7 @@ function resolveReposForIssue(issueId: string): ResolvedProjectRepo[] {
  * from each feature's own contributions rather than these.
  */
 async function resolveProjectRepos(projectPath: string, preferredIssueId?: string): Promise<ResolvedProjectRepo[]> {
-  const issueId = preferredIssueId ?? (await listEligibleCandidatesByProject(projectPath))[0]?.issueId;
+  const issueId = preferredIssueId ?? (await listReadyIssuesForProject(projectPath))[0]?.issueId;
   if (issueId) return resolveReposForIssue(issueId);
 
   // No candidate to resolve through — the exact state cleanup runs in after the
@@ -304,10 +291,10 @@ async function resolveProjectRepos(projectPath: string, preferredIssueId?: strin
 
 /** Polyrepo ready set: per-candidate contributions across member repos. */
 async function getPolyrepoReadySetForProject(projectPath: string): Promise<ReadyFeature[] | null> {
-  const { computePolyrepoMergeQueueFromCandidates, listEligibleCandidatesByProject, resolveMergeQueuePrUrl } =
+  const { computePolyrepoMergeQueueFromCandidates, resolveMergeQueuePrUrl } =
     await import('../../../lib/flywheel-merge-order.js');
 
-  const candidates = await listEligibleCandidatesByProject(projectPath);
+  const candidates = await listReadyIssuesForProject(projectPath);
   if (candidates.length === 0) return [];
 
   const reposByIssue = new Map(candidates.map((c) => [c.issueId, resolveReposForIssue(c.issueId)]));
@@ -550,7 +537,12 @@ export interface UatGenerationPayload {
   resolutions: UatGeneration['resolutions'];
   versionSyncConfigured: boolean;
   /** Public aggregate omits operational error/reason detail. */
-  shipStatus: Omit<PanIssueShipRecord, 'error' | 'reason'> | null;
+  /**
+   * PAN-3917 D6: ship records are gone. A batch's ship state is its git tag
+   * and GitHub release, which `pan release` owns — the payload reports only
+   * whether version sync is configured for the project.
+   */
+  shipStatus: null;
   /**
    * Per-repo generation detail, additive (PAN-3093). Always present and
    * non-empty: a monorepo generation projects the single synthesized entry, so
@@ -655,10 +647,7 @@ export async function getUatGenerationsPayload(projectRootOverride?: string): Pr
   if (chain.length === 0) return [];
   const memberIssueIds = new Set(chain.flatMap((gen) => gen.members.map((member) => member.issueId.toUpperCase())));
   // Resolve each member's xBRIEF in ITS OWN project, not the dashboard's repo.
-  const [acCache, shipRecords] = await Promise.all([
-    loadAcceptanceCriteriaCache(memberIssueIds, root),
-    project && versionSyncConfigured ? loadShipRecords(project, chain) : Promise.resolve(new Map()),
-  ]);
+  const acCache = await loadAcceptanceCriteriaCache(memberIssueIds, root);
   const payload: UatGenerationPayload[] = [];
   for (const gen of chain) {
     const probe = await probeUatStack(gen);
@@ -686,9 +675,7 @@ export async function getUatGenerationsPayload(projectRootOverride?: string): Pr
       heldOut: gen.heldOut,
       resolutions: gen.resolutions,
       versionSyncConfigured,
-      shipStatus: publicShipStatus(
-        versionSyncConfigured ? aggregateGenerationShipStatus(gen, shipRecords) : null,
-      ),
+      shipStatus: null,
       repos: (gen.repos ?? []).map((r) => ({
         repoKey: r.repoKey,
         branch: r.branch,
@@ -756,13 +743,26 @@ export async function postUatGenerationPromotePayload(
   // project_root, so a MIN generation must not be merged against the Overdeck repo.
   // For a generation belonging to this repo this resolves to the same path as before.
   const root = resolve(getUatGenerationSync(name)?.projectRoot ?? projectRoot());
-  const [
-    { reviewRecordEligibility },
-    { recordUatPromotionVerdicts },
-  ] = await Promise.all([
-    import('../../../lib/flywheel-merge-order.js'),
-    import('../../../lib/cloister/uat-promote-verification.js'),
-  ]);
+  const { recordUatPromotionVerdicts } = await import('../../../lib/cloister/uat-promote-verification.js');
+
+  // PAN-3917 FR-9: a member may land only if its own PR is still ready —
+  // approved, green, mergeable. `uat-promote`'s gate is synchronous, so the
+  // states are derived up front and the closure reads the loaded answers.
+  const memberStates = new Map<string, { eligible: boolean; reason?: string }>();
+  await Promise.all((getUatGenerationSync(name)?.members ?? []).map(async (member) => {
+    const issueId = member.issueId.toUpperCase();
+    try {
+      const derived = await getDerivedIssueState(issueId);
+      memberStates.set(issueId, derived.state === 'ready'
+        ? { eligible: true }
+        : { eligible: false, reason: `is ${derived.state}, not ready to merge` });
+    } catch (error) {
+      memberStates.set(issueId, {
+        eligible: false,
+        reason: `state could not be read (${error instanceof Error ? error.message : String(error)})`,
+      });
+    }
+  }));
   // A polyrepo generation merges into each member repo's own target branch, so
   // it needs per-repo promote git. Supplying it is what selects the two-phase
   // (trial-merge everything, then publish) path.
@@ -787,8 +787,7 @@ export async function postUatGenerationPromotePayload(
         `${name} includes repo(s) that are no longer writable in project config: ${detail}. ` +
         `Nothing was published. Restore write access or let the reconciler rebuild the batch without them.`,
     };
-    await notifyFlywheelOfUatPromote(result).catch(() => {});
-    return result;
+      return result;
   }
   const generationRepos = storedRepos;
 
@@ -807,34 +806,13 @@ export async function postUatGenerationPromotePayload(
     store: { ...buildUatGenerationStore(), get: (n) => getUatGenerationSync(n) },
     teardownStack: (gen) => teardownUatStack(gen),
     firePostMerge,
-    memberEligibility: reviewRecordEligibility,
+    memberEligibility: (issueId: string) =>
+      memberStates.get(issueId.toUpperCase()) ?? { eligible: false, reason: 'state could not be read' },
     recordVerification: (generation, mergeSha) => recordUatPromotionVerdicts(generation, mergeSha),
-    ...(projectConfig?.version_sync
-      ? {
-          runShip: (generation: UatGeneration, requestedVersion: string | undefined) => withGenerationShipLock(
-            generation.name,
-            async () => {
-              // Establish durable batch membership before any command, worktree, or
-              // Git operation can fail. Deferred recovery and the DoD gate then
-              // remain blocking even when propagation never starts.
-              await persistPendingShipRecords(
-                generation,
-                requestedVersion ? 'version ship in progress' : 'no version supplied at promote time',
-              );
-              if (!requestedVersion) return;
-
-              const report = await executeVersionShipForGeneration({
-                generation,
-                project: projectConfig,
-                version: requestedVersion,
-              });
-              await persistShipRecords(generation, report);
-            },
-          ),
-        }
-      : {}),
+    // PAN-3917 D6: version ship no longer writes ship records. Tags and GitHub
+    // releases are the record, and `pan release` owns writing them — promote
+    // publishes the batch and stops there.
     log: (msg) => console.log(msg),
   }, { shipVersion });
-  await notifyFlywheelOfUatPromote(result).catch(() => {});
   return result;
 }

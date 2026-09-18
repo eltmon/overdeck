@@ -56,7 +56,6 @@ import {
 import { generateTasksForIssue } from '../../../lib/overdeck/task-generation.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataStatic } from '../../../lib/remote/workspace-metadata.js';
 import { resolveGitHubIssueSync as resolveGitHubIssueShared, resolveTrackerTypeSync } from '../../../lib/tracker-utils.js';
-import { clearReviewStatus, getReviewStatusSync } from '../review-status.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { validateOrigin } from './origin-validation.js';
 import { reopenWorkspaceState } from '../../../lib/reopen.js';
@@ -81,7 +80,6 @@ import { GitHubClient, type GitHubClientError, type GitHubClientShape, type GitH
 import { RallyClient } from '../services/rally-client.js';
 import { TrackerApiError } from '../services/typed-errors.js';
 import { killSession, listSessionNames, sessionExists } from '../../../lib/tmux.js';
-import { getAgentState, getAgentStateSync, saveAgentStateSync, getProviderAuthMode, normalizeAgentId } from '../../../lib/agents.js';
 import { loadRemoteAgentState } from '../../../lib/remote/remote-agents.js';
 import { saveAgentStateAndEmitEvent, saveAgentStateAndEmitEventProgram } from '../services/agent-projection.js';
 import { countPendingAskUserQuestionsForAgent } from '../../../lib/agent-enrichment.js';
@@ -277,13 +275,16 @@ const getIssueShipLogRoute = HttpRouter.add(
     }
     return yield* Effect.promise(async () => {
       const { getShipLog } = await import('../../../lib/cloister/ship-log.js');
-      const { getReviewStatusSync } = await import('../../../lib/review-status.js');
+      const { getDerivedIssueState } = await import('../services/derived-issue-state.js');
       const log = getShipLog(id);
-      const rs = getReviewStatusSync(id);
+      // PAN-3917 FR-6: the merge position is derived from the forge, not a
+      // stored mergeStatus. `mergeStep` had no owner and is gone; the door
+      // steps the panel renders come from the ship log itself.
+      const derived = await getDerivedIssueState(id);
       return jsonResponse({
         issueId: id.toUpperCase(),
-        mergeStatus: rs?.mergeStatus ?? null,
-        mergeStep: rs?.mergeStep ?? null,
+        state: derived.state,
+        ...(derived.pr ? { pr: derived.pr } : {}),
         log,
       });
     });
@@ -292,8 +293,8 @@ const getIssueShipLogRoute = HttpRouter.add(
 
 // ─── Route: GET /api/issues/:id/verification ─────────────────────────────────
 // PAN-2665: the Test/Lint tree node's live view — the per-workspace
-// verification artifact (written incrementally while gates run) plus the
-// review-status verificationStatus, polled by the panel while running.
+// verification artifact (written incrementally while gates run), polled by the
+// panel while running. FR-8: the artifact is the result.
 const getIssueVerificationRoute = HttpRouter.add(
   'GET',
   '/api/issues/:id/verification',
@@ -305,17 +306,16 @@ const getIssueVerificationRoute = HttpRouter.add(
     }
     return yield* Effect.promise(async () => {
       const { readVerificationArtifact } = await import('../../../lib/cloister/verification-artifact.js');
-      const { getReviewStatusSync } = await import('../../../lib/review-status.js');
       const { join } = await import('node:path');
       const resolved = resolveProjectFromIssueSync(id);
       const workspacePath = resolved
         ? join(resolved.projectPath, 'workspaces', `feature-${id.toLowerCase()}`)
         : null;
+      // PAN-3917 FR-8: the workspace artifact IS the verification result.
+      // Nothing writes a verificationStatus, so there is no second source.
       const artifact = workspacePath ? readVerificationArtifact(workspacePath) : null;
-      const rs = getReviewStatusSync(id.toUpperCase());
       return jsonResponse({
         issueId: id.toUpperCase(),
-        verificationStatus: rs?.verificationStatus ?? null,
         artifact,
       });
     });

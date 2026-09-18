@@ -1,51 +1,23 @@
 /**
- * Tests for agent lifecycle transactional projection (PAN-1908, PAN-1938).
+ * Agent lifecycle projection (PAN-3917 W6).
  *
- * Verifies that saveAgentStateAndEmitEvent commits the agents-row upsert and
- * the event append inside one SQLite transaction, preserves absent columns on
- * replay, and is idempotent.
- *
- * PAN-1938: ported from panopticon.db to overdeck.db via setupOverdeckTestDb().
+ * The projection used to commit an agents-row upsert and an event append in
+ * one SQLite transaction, so the mirror and the event could not drift. There is
+ * no mirror any more: the module appends the event and nothing else, and
+ * liveness is read from the terminal backend. These tests cover what is left —
+ * the append, and the supervisor-retry dedupe that used to be answered by
+ * comparing `stoppedAt` on the mirror.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { openDatabase } from '../../../../../src/lib/database/driver.js';
-import type { StoredEvent } from '../../../../../src/dashboard/server/event-store.js';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { AgentState } from '../../../../../src/lib/agents.js';
-import {
-  setupOverdeckTestDb,
-  teardownOverdeckTestDb,
-  getOverdeckAgentStateSync,
-  type OverdeckTestDb,
-} from '../../../../helpers/overdeck-test-db.js';
 
-// Mock writeAgentStateJsonSync so tests don't touch the filesystem.
-vi.mock('../../../../../src/lib/agents.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../../src/lib/agents.js')>();
-  return {
-    ...actual,
-    writeAgentStateJsonSync: vi.fn(),
-  };
-});
-
-// Mock logAgentLifecycleSync — fire-and-forget logging.
 vi.mock('../../../../../src/lib/persistent-logger.js', () => ({
   logAgentLifecycleSync: vi.fn(),
 }));
 
-let odb: OverdeckTestDb;
-
-beforeEach(() => {
-  odb = setupOverdeckTestDb();
-}, 20_000);
-
-afterEach(() => {
-  teardownOverdeckTestDb(odb);
-  vi.clearAllMocks();
-});
-
-// Imports after mocks are registered.
 import {
+  _resetAgentLifecycleDedupeForTests,
   applyAgentLifecycleEventWithDeps,
   saveAgentStateAndEmitEventWithDeps,
 } from '../../../../../src/dashboard/server/services/agent-projection.js';
@@ -56,6 +28,7 @@ function makeAgentState(overrides: Partial<AgentState> = {}): AgentState {
     issueId: 'PAN-1908',
     workspace: '/tmp/ws',
     role: 'work',
+    harness: 'claude-code',
     model: 'claude-sonnet-4-6',
     status: 'running',
     startedAt: '2026-06-15T10:00:00.000Z',
@@ -63,273 +36,128 @@ function makeAgentState(overrides: Partial<AgentState> = {}): AgentState {
   } as AgentState;
 }
 
-function makeStartedEvent(): Record<string, unknown> {
+function makeEventStore() {
+  let next = 1;
+  const appended: Array<Record<string, unknown>> = [];
   return {
-    type: 'agent.started',
-    timestamp: '2026-06-15T10:00:00.000Z',
-    payload: {
-      agentId: 'agent-pan-1908',
-      issueId: 'PAN-1908',
-      agent: {
-        id: 'agent-pan-1908',
-        issueId: 'PAN-1908',
-        status: 'running',
-      },
-    },
+    appended,
+    append: vi.fn((event: Record<string, unknown>) => {
+      appended.push(event);
+      return next++;
+    }),
   };
 }
 
-function makeStatusChangedEvent(payload: Record<string, unknown>): Record<string, unknown> {
-  return {
-    type: 'agent.status_changed',
-    timestamp: '2026-06-15T10:01:00.000Z',
-    payload,
-  };
-}
-
-function countEvents(): number {
-  return (odb.raw().prepare('SELECT COUNT(*) AS n FROM events').get() as { n: number }).n;
-}
-
-function readEvents(): Array<{ sequence: number; type: string; payload: string }> {
-  return odb.raw().prepare('SELECT sequence, type, payload FROM events ORDER BY sequence ASC').all() as Array<{
-    sequence: number;
-    type: string;
-    payload: string;
-  }>;
-}
+beforeEach(() => {
+  _resetAgentLifecycleDedupeForTests();
+  vi.clearAllMocks();
+});
 
 describe('saveAgentStateAndEmitEventWithDeps', () => {
-  it('upserts the agents row and appends the event inside one transaction', () => {
-    const eventStore = {
-      emitStored: vi.fn(),
-    };
-    const state = makeAgentState({ status: 'running', costSoFar: 1.23 });
-
-    const result = saveAgentStateAndEmitEventWithDeps(
-      odb.raw(),
-      eventStore,
-      state,
-      makeStartedEvent(),
-    );
-
-    expect(result.sequence).toBeGreaterThan(0);
-    expect(eventStore.emitStored).toHaveBeenCalledTimes(1);
-
-    const row = getOverdeckAgentStateSync('agent-pan-1908');
-    expect(row).not.toBeNull();
-    expect(row?.status).toBe('running');
-    expect(row?.costSoFar).toBe(1.23);
-    expect(row?.issueId).toBe('PAN-1908');
-
-    expect(countEvents()).toBe(1);
-    const events = readEvents();
-    expect(events[0].type).toBe('agent.started');
-    expect(JSON.parse(events[0].payload).agentId).toBe('agent-pan-1908');
-  });
-
-  it('returns the same sequence and row when replayed (idempotent)', () => {
-    const eventStore = { emitStored: vi.fn() };
-    const state = makeAgentState();
-    const event = makeStartedEvent();
-
-    const first = saveAgentStateAndEmitEventWithDeps(odb.raw(), eventStore, state, event);
-    const second = saveAgentStateAndEmitEventWithDeps(odb.raw(), eventStore, state, event);
-
-    expect(second.sequence).toBe(first.sequence + 1);
-    expect(countEvents()).toBe(2);
-
-    const row = getOverdeckAgentStateSync('agent-pan-1908');
-    expect(row?.status).toBe('running');
-  });
-
-  it('persists the full current state even when the event payload is partial', () => {
-    const eventStore = { emitStored: vi.fn() };
-
-    // Seed a full agent row.
-    saveAgentStateAndEmitEventWithDeps(
-      odb.raw(),
-      eventStore,
-      makeAgentState({
-        status: 'running',
-        model: 'claude-opus-4-7',
-        costSoFar: 5,
-      }),
-      makeStartedEvent(),
-    );
-
-    // Apply a status change whose event payload only carries status and
-    // hasLiveTmuxSession. The persisted state still includes the full agent
-    // record, so columns absent from the event are not nulled.
-    saveAgentStateAndEmitEventWithDeps(
-      odb.raw(),
-      eventStore,
-      makeAgentState({
-        status: 'running',
-        model: 'claude-opus-4-7',
-        costSoFar: 5,
-      }),
-      makeStatusChangedEvent({
-        agentId: 'agent-pan-1908',
-        status: 'running',
-        hasLiveTmuxSession: true,
-      }),
-    );
-
-    const row = getOverdeckAgentStateSync('agent-pan-1908');
-    expect(row?.status).toBe('running');
-    expect(row?.model).toBe('claude-opus-4-7');
-    expect(row?.costSoFar).toBe(5);
-
-    // The emitted event is partial; downstream reducers merge it rather than
-    // replacing the whole snapshot.
-    const emittedPayload = eventStore.emitStored.mock.calls.at(-1)?.[0].payload as Record<string, unknown>;
-    expect(emittedPayload['hasLiveTmuxSession']).toBe(true);
-    expect(emittedPayload['model']).toBeUndefined();
-  });
-
-  it('does not leave row and event log disagreeing when the upsert fails', () => {
-    const eventStore = { emitStored: vi.fn() };
-
-    // Create an in-memory db whose agents table rejects any insert so the
-    // upsert fails, but the events table exists so we can prove nothing leaked.
-    const brokenDb = openDatabase(':memory:');
-    brokenDb.exec(`
-      CREATE TABLE issues (id TEXT PRIMARY KEY, stage TEXT, updated_at INTEGER);
-      CREATE TABLE agents (
-        id TEXT PRIMARY KEY,
-        status TEXT NOT NULL CHECK (status = 'invalid')
-      );
-      CREATE TABLE events (
-        sequence INTEGER PRIMARY KEY AUTOINCREMENT,
-        type TEXT NOT NULL,
-        timestamp INTEGER NOT NULL,
-        payload TEXT
-      );
-    `);
-
-    expect(() =>
-      saveAgentStateAndEmitEventWithDeps(
-        brokenDb,
-        eventStore,
-        makeAgentState(),
-        makeStartedEvent(),
-      ),
-    ).toThrow();
-
-    // No event should be persisted and emitStored must not have been called.
-    const events = brokenDb.prepare('SELECT COUNT(*) AS n FROM events').get() as { n: number };
-    expect(events.n).toBe(0);
-    expect(eventStore.emitStored).not.toHaveBeenCalled();
-
-    brokenDb.close();
-  });
-
-  it('stamps stoppedAt when transitioning to stopped', () => {
-    const eventStore = { emitStored: vi.fn() };
-
-    saveAgentStateAndEmitEventWithDeps(
-      odb.raw(),
-      eventStore,
-      makeAgentState({ status: 'running' }),
-      makeStartedEvent(),
-    );
-
-    saveAgentStateAndEmitEventWithDeps(
-      odb.raw(),
-      eventStore,
-      makeAgentState({ status: 'stopped' }),
-      makeStatusChangedEvent({ agentId: 'agent-pan-1908', status: 'stopped' }),
-    );
-
-    const row = getOverdeckAgentStateSync('agent-pan-1908');
-    expect(row?.status).toBe('stopped');
-    expect(row?.stoppedAt).toEqual(expect.any(String));
-  });
-
-  it('clears stoppedAt when transitioning back to running', () => {
-    const eventStore = { emitStored: vi.fn() };
-
-    saveAgentStateAndEmitEventWithDeps(
-      odb.raw(),
-      eventStore,
-      makeAgentState({ status: 'stopped', stoppedAt: '2026-06-15T10:05:00.000Z' }),
-      makeStatusChangedEvent({ agentId: 'agent-pan-1908', status: 'stopped' }),
-    );
-
-    saveAgentStateAndEmitEventWithDeps(
-      odb.raw(),
-      eventStore,
-      makeAgentState({ status: 'running' }),
-      makeStatusChangedEvent({ agentId: 'agent-pan-1908', status: 'running' }),
-    );
-
-    const row = getOverdeckAgentStateSync('agent-pan-1908');
-    expect(row?.status).toBe('running');
-    // overdeck returns undefined (not null) for absent optional fields
-    expect(row?.stoppedAt).toBeUndefined();
-  });
-
-  it('emits the stored event with the real sequence after commit', () => {
-    const emitted: StoredEvent[] = [];
-    const eventStore = {
-      emitStored: (event: StoredEvent) => emitted.push(event),
+  it('appends the event and returns its sequence', () => {
+    const eventStore = makeEventStore();
+    const event = {
+      type: 'agent.started',
+      timestamp: '2026-06-15T10:00:00.000Z',
+      payload: { agentId: 'agent-pan-1908', issueId: 'PAN-1908' },
     };
 
-    const result = saveAgentStateAndEmitEventWithDeps(
-      odb.raw(),
-      eventStore,
-      makeAgentState(),
-      makeStartedEvent(),
-    );
+    const result = saveAgentStateAndEmitEventWithDeps(eventStore, makeAgentState(), event as never);
 
-    expect(emitted).toHaveLength(1);
-    expect(emitted[0].sequence).toBe(result.sequence);
-    expect(emitted[0].type).toBe('agent.started');
-    expect(emitted[0].timestamp).toBe('2026-06-15T10:00:00.000Z');
+    expect(result.sequence).toBe(1);
+    expect(eventStore.append).toHaveBeenCalledTimes(1);
+    expect(eventStore.appended[0]).toBe(event);
+  });
+
+  it('writes nothing but the event — no state is persisted anywhere', () => {
+    const eventStore = makeEventStore();
+    saveAgentStateAndEmitEventWithDeps(eventStore, makeAgentState({ status: 'stopped' }), {
+      type: 'agent.stopped',
+      timestamp: '2026-06-15T10:01:00.000Z',
+      payload: { agentId: 'agent-pan-1908' },
+    } as never);
+
+    expect(eventStore.append).toHaveBeenCalledTimes(1);
   });
 });
 
-describe('applyAgentLifecycleEventWithDeps exited idempotency (PAN-3849)', () => {
-  const stoppedEvents = () => readEvents().filter((e) => e.type === 'agent.stopped');
+describe('applyAgentLifecycleEventWithDeps', () => {
+  const at = '2026-06-15T10:05:00.000Z';
+  const deps = {
+    readAgentState: () => makeAgentState(),
+    hasExited: async () => false,
+  };
 
-  it('acks a retried exited with the same timestamp without duplicating agent.stopped', () => {
-    const eventStore = { emitStored: vi.fn() };
-    saveAgentStateAndEmitEventWithDeps(
-      odb.raw(),
-      eventStore,
-      makeAgentState({ status: 'running' }),
-      makeStartedEvent(),
-    );
+  it('emits agent.started for session-started', async () => {
+    const eventStore = makeEventStore();
+    const result = await applyAgentLifecycleEventWithDeps(eventStore, 'agent-pan-1908', { event: 'session-started', at }, deps);
 
-    // The supervisor builds one body and retries it, so both POSTs carry the
-    // same `at`.
-    const at = '2026-06-15T11:00:00.000Z';
-    const first = applyAgentLifecycleEventWithDeps(odb.raw(), eventStore, 'agent-pan-1908', { event: 'exited', at });
-    expect(first).toEqual({ applied: true, status: 'stopped' });
-    expect(stoppedEvents()).toHaveLength(1);
-
-    const retry = applyAgentLifecycleEventWithDeps(odb.raw(), eventStore, 'agent-pan-1908', { event: 'exited', at });
-    expect(retry).toEqual({ applied: true, status: 'stopped' });
-    expect(stoppedEvents()).toHaveLength(1);
+    expect(result).toEqual({ applied: true, status: 'running' });
+    expect(eventStore.appended[0]?.['type']).toBe('agent.started');
   });
 
-  it('still records exited when the row was stopped by another path with a different timestamp', () => {
-    const eventStore = { emitStored: vi.fn() };
-    // A patrol marked the row stopped directly (no lifecycle event emitted).
-    saveAgentStateAndEmitEventWithDeps(
-      odb.raw(),
-      eventStore,
-      makeAgentState({ status: 'stopped', stoppedAt: '2026-06-15T10:30:00.000Z' }),
-      makeStatusChangedEvent({ agentId: 'agent-pan-1908', status: 'stopped' }),
-    );
-    expect(stoppedEvents()).toHaveLength(0);
+  it('emits agent.stopped for exited', async () => {
+    const eventStore = makeEventStore();
+    const result = await applyAgentLifecycleEventWithDeps(eventStore, 'agent-pan-1908', { event: 'exited', at }, deps);
 
-    const result = applyAgentLifecycleEventWithDeps(odb.raw(), eventStore, 'agent-pan-1908', {
-      event: 'exited',
-      at: '2026-06-15T11:00:00.000Z',
-    });
     expect(result).toEqual({ applied: true, status: 'stopped' });
-    expect(stoppedEvents()).toHaveLength(1);
+    expect(eventStore.appended[0]?.['type']).toBe('agent.stopped');
+  });
+
+  it('emits agent.activity_changed for turn boundaries', async () => {
+    const eventStore = makeEventStore();
+    await applyAgentLifecycleEventWithDeps(eventStore, 'agent-pan-1908', { event: 'turn-started', at }, deps);
+    await applyAgentLifecycleEventWithDeps(eventStore, 'agent-pan-1908', { event: 'turn-ended', at }, deps);
+
+    expect(eventStore.appended.map((e) => (e['payload'] as { activity: string }).activity)).toEqual(['working', 'idle']);
+  });
+
+  it('drops a supervisor retry carrying the same event and timestamp', async () => {
+    const eventStore = makeEventStore();
+    const first = await applyAgentLifecycleEventWithDeps(eventStore, 'agent-pan-1908', { event: 'exited', at }, deps);
+    const retry = await applyAgentLifecycleEventWithDeps(eventStore, 'agent-pan-1908', { event: 'exited', at }, deps);
+
+    expect(first).toEqual({ applied: true, status: 'stopped' });
+    expect(retry).toEqual({ applied: false, reason: 'duplicate' });
+    expect(eventStore.append).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies a second exit that carries a different timestamp', async () => {
+    const eventStore = makeEventStore();
+    await applyAgentLifecycleEventWithDeps(eventStore, 'agent-pan-1908', { event: 'exited', at }, deps);
+    const second = await applyAgentLifecycleEventWithDeps(
+      eventStore,
+      'agent-pan-1908',
+      { event: 'exited', at: '2026-06-15T10:06:00.000Z' },
+      deps,
+    );
+
+    expect(second).toEqual({ applied: true, status: 'stopped' });
+    expect(eventStore.append).toHaveBeenCalledTimes(2);
+  });
+
+  it('refuses to resurrect an agent whose pane the backend reports exited', async () => {
+    const eventStore = makeEventStore();
+    const result = await applyAgentLifecycleEventWithDeps(
+      eventStore,
+      'agent-pan-1908',
+      { event: 'session-started', at },
+      { ...deps, hasExited: async () => true },
+    );
+
+    expect(result).toEqual({ applied: false, reason: 'already-stopped' });
+    expect(eventStore.append).not.toHaveBeenCalled();
+  });
+
+  it('reports no-state when the agent has no permanent record', async () => {
+    const eventStore = makeEventStore();
+    const result = await applyAgentLifecycleEventWithDeps(
+      eventStore,
+      'agent-missing',
+      { event: 'exited', at },
+      { ...deps, readAgentState: () => null },
+    );
+
+    expect(result).toEqual({ applied: false, reason: 'no-state' });
   });
 });

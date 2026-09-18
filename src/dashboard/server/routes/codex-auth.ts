@@ -7,7 +7,6 @@ import { join } from 'node:path';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
-import { listAgentStates } from '../../../lib/agents/queries.js';
 import { bridgeCodexAuthToCliproxy, getCliproxyAuthDir } from '../../../lib/cliproxy.js';
 import { createSession, sessionExists, listSessionNames } from '../../../lib/tmux.js';
 import { getDashboardApiUrlSync } from '../../../lib/config.js';
@@ -109,7 +108,10 @@ const getCodexAuthRoute = HttpRouter.add(
   '/api/settings/codex-auth',
   httpHandler(
     Effect.gen(function* () {
-      const status = yield* checkCodexAuthStatus({ agentStates: listAgentStates() });
+      // PAN-3917: the burned-agent cross-check read a `troubled` flag off the
+      // agent mirror, which is gone. Auth status now rests on the native
+      // ~/.codex/auth.json mtime check alone.
+      const status = yield* checkCodexAuthStatus({});
       return jsonResponse(status);
     }),
   ),
@@ -196,7 +198,6 @@ const postCodexReauthStatusRoute = HttpRouter.add(
       );
       const authStatus = yield* checkCodexAuthStatus({
         ...(refreshedCredential ? { ignoreBurnBefore: session.createdAt } : {}),
-        agentStates: listAgentStates(),
       });
       if (!refreshedCredential || authStatus.status !== 'valid') {
         return jsonResponse({

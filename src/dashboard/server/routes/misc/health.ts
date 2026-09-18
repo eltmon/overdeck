@@ -18,11 +18,6 @@ import {
   type AgentHealthObservations,
   type AgentHealthRuntimeState,
 } from '../../../../lib/agents/health.js';
-import {
-  classifyAdvancingSessionLifecycle,
-  type AdvancingRole,
-  type WarmIdleStatusShape,
-} from '../../../../lib/cloister/review-status-source.js';
 import { getOverdeckHome } from '../../../../lib/paths.js';
 import { getRuntimeCensusSnapshot } from '../../../../lib/runtime-census.js';
 import { checkAgentHealth } from '../../../lib/health-filtering.js';
@@ -123,7 +118,6 @@ const getDeployStalenessRoute = HttpRouter.add(
 type HealthAgentsRouteSnapshot = {
   agents: readonly unknown[];
   agentRuntimeById?: unknown;
-  reviewStatuses?: readonly unknown[];
 };
 
 interface HealthAgentsRouteDependencies {
@@ -197,31 +191,11 @@ function runtimeHealthState(
   }
 }
 
-function decodeReviewStatuses(value: readonly unknown[] | undefined): Map<string, WarmIdleStatusShape> {
-  const statuses = new Map<string, WarmIdleStatusShape>();
-  for (const candidate of value ?? []) {
-    const decoded = Schema.decodeUnknownResult(ReviewStatusSnapshot)(candidate);
-    if (decoded._tag === 'Success') {
-      statuses.set(decoded.success.issueId.toUpperCase(), decoded.success);
-    }
-  }
-  return statuses;
-}
-
-function reviewLifecycle(
-  agent: typeof AgentSnapshot.Type,
-  statuses: ReadonlyMap<string, WarmIdleStatusShape>,
-  tmuxActive: boolean,
-): SpecialistLifecycle {
-  if (agent.role !== 'review' && agent.role !== 'test' && agent.role !== 'ship') {
-    return 'unknown';
-  }
-  return classifyAdvancingSessionLifecycle(
-    agent.role as AdvancingRole,
-    statuses.get(agent.issueId.toUpperCase()),
-    tmuxActive,
-  );
-}
+// PAN-3917: the warm-vs-orphaned specialist classification read a verdict off
+// the review-status row to decide whether an idle reviewer session was
+// legitimately parked or abandoned. With the row gone there is no such
+// distinction to draw: the terminal backend reports whether the pane is live,
+// and that is the whole answer (FR-11).
 
 function snapshotSource(value: unknown): HealthAgentsRouteSnapshot {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -234,9 +208,6 @@ function snapshotSource(value: unknown): HealthAgentsRouteSnapshot {
   return {
     agents: candidate['agents'],
     agentRuntimeById: candidate['agentRuntimeById'],
-    reviewStatuses: Array.isArray(candidate['reviewStatuses'])
-      ? candidate['reviewStatuses']
-      : undefined,
   };
 }
 
@@ -255,8 +226,6 @@ async function projectAgentHealth(
   const snapshot = snapshotSource(snapshotValue);
   const liveSessions = new Set(sessionNames);
   const runtimes = runtimeRecord(snapshot.agentRuntimeById);
-  const reviewStatuses = decodeReviewStatuses(snapshot.reviewStatuses);
-
   return Promise.all(snapshot.agents.map(async (candidate, index) => {
     const decoded = Schema.decodeUnknownResult(AgentSnapshot)(candidate);
     if (decoded._tag === 'Failure') {
@@ -271,7 +240,6 @@ async function projectAgentHealth(
         },
         runtime: null,
         liveSessions,
-        reviewLifecycle: 'unknown',
         nowMs,
       });
     }
@@ -298,11 +266,6 @@ async function projectAgentHealth(
       },
       runtime: runtimeHealthState(runtime),
       liveSessions,
-      reviewLifecycle: reviewLifecycle(
-        agent,
-        reviewStatuses,
-        liveSessions.has(agent.id),
-      ),
       observations,
       nowMs,
     });

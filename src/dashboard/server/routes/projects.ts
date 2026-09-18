@@ -22,19 +22,11 @@ import {
 } from '../../../lib/projects.js';
 import { resolveSwarmPolicy } from '../../../lib/swarm-policy.js';
 import type { SwarmPolicyLayer } from '../../../lib/swarm-policy.js';
-import { readIssueRecordSync, type PanIssueShipRecord } from '../../../lib/pan-dir/record.js';
 import { setProjectVersionSync } from '../../../lib/projects-writer.js';
-import {
-  aggregateGenerationShipStatus,
-  loadShipRecords,
-  publicShipStatus,
-} from '../../../lib/cloister/ship-status.js';
 import { listUatGenerationsSync, type UatGeneration } from '../../../lib/overdeck/merge-sync.js';
-import { updateIssueRecord } from '../../../lib/pan-dir/record-update.js';
 import { loadConfigSync } from '../../../lib/config-yaml.js';
 import { resolveImplicitStaffing } from '../../../lib/agents/staffing.js';
 import { resolveTieredExecutionBlock } from '../../../lib/agents/tier-table.js';
-import { normalizeModelOverrideSync } from '../../../lib/model-validation.js';
 import { registerProjectFromPath, DuplicateProjectError } from '../../../lib/project-registration.js';
 import {
   resolveProjectCreateIntent,
@@ -57,12 +49,14 @@ import { ReadModelService } from '../read-model.js';
 import { compareIssueIds, type AgentSnapshot, type SessionNode, type SessionNodeType } from '@overdeck/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import { buildLintSessionNode } from './command-deck-lint-node.js';
+import { getBackendPanesForIssue } from '../services/backend-inventory.js';
+import { getDerivedIssueState } from '../services/derived-issue-state.js';
+import { getShipLog } from '../../../lib/cloister/ship-log.js';
 import { deriveSessionPresence } from '../services/session-presence.js';
 import { getAgentRuntimeState, getAgentStateSync } from '../../../lib/agents.js';
 import { enrichSessionsWithModelOrigin } from '../services/model-origin-enrich.js';
 import { detectAwaitingInputForAgent } from '../../../lib/agent-input-detection.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
-import { getReviewStatusSync } from '../review-status.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import type { ReviewerRoundMetadata } from './reviewer-tree.js';
 import {
@@ -364,7 +358,14 @@ async function collectSessionTreeNodes(
     }
   }
 
-  const centralStatus = getReviewStatusSync(issueId.toUpperCase());
+  // PAN-3917 FR-6: there is no central review-status record. Specialist rows
+  // are the issue's own panes plus the PR's review state; the ship row comes
+  // from the in-memory ship log the merge writes as it runs.
+  const shipLog = getShipLog(issueId.toUpperCase());
+  const [treeDerived, treePanes] = await Promise.all([
+    getDerivedIssueState(issueId),
+    getBackendPanesForIssue(issueId),
+  ]);
 
   // Lint node (PAN-2665): the verification quality-gate run, shown between
   // Work and Review (TYPE_PRIORITY orders it client-side). Unlike agent nodes
@@ -374,7 +375,6 @@ async function collectSessionTreeNodes(
     workspacePath,
     issueLower,
     includeTranscripts: true,
-    centralStatus: centralStatus ?? null,
   });
   if (lintSection) {
     sections.push({
@@ -383,7 +383,6 @@ async function collectSessionTreeNodes(
     });
   }
 
-  const statusHistory = centralStatus?.history ?? [];
   sections.push(...await buildSpecialistSessionNodes({
     issueId,
     fallbackProjectKey: issuePrefix.toLowerCase(),
@@ -391,38 +390,35 @@ async function collectSessionTreeNodes(
     projectPath,
     tmuxSessionNames: context.tmuxSessionNames,
     agentSnapshotsById: context.agentSnapshotsById,
-    centralStatus,
+    derived: treeDerived,
+    panes: treePanes,
   }));
 
-  if (statusHistory.length > 0) {
-    const mergeEntries = statusHistory.filter((entry) => entry.type === 'merge');
-    const latestMerge = mergeEntries[mergeEntries.length - 1];
-    if (latestMerge) {
-      const shipSessionName = `agent-${issueLower}-ship`;
-      const shipIsLive = context.tmuxSessionNames.has(shipSessionName);
-      const shipState = getAgentStateSync(shipSessionName);
-      const shipJsonlPath = shipIsLive || shipState ? await resolveJsonlPath(shipSessionName, workspacePath) : null;
-      if (shipIsLive || shipJsonlPath) {
-        const shipAwaitingInput = awaitingInputFromProjection(shipSessionName, context.agentSnapshotsById);
-        const shipSnapshot = context.agentSnapshotsById?.get(shipSessionName);
-        sections.push({
-          type: 'ship',
-          sessionId: shipSessionName,
-          model: 'specialist',
-          startedAt: latestMerge.timestamp,
-          endedAt: undefined,
-          duration: 0,
-          status: normalizeAgentStatus(latestMerge.status === 'merging' ? 'running' : latestMerge.status),
-          presence: shipIsLive ? (latestMerge.status === 'merging' ? 'active' : 'idle') : 'ended',
-          awaitingInput: shipAwaitingInput !== undefined ? (shipAwaitingInput !== null) : false,
-          awaitingInputPrompt: shipAwaitingInput?.prompt,
-          awaitingInputReason: shipAwaitingInput?.reason,
-          pendingInputKinds: shipSnapshot?.pendingInputKinds ? [...shipSnapshot.pendingInputKinds] : undefined,
-          hasJsonl: !!shipJsonlPath,
-          tmuxSession: shipIsLive ? shipSessionName : undefined,
-          ...await readSessionGateFields(shipSessionName),
-        });
-      }
+  if (shipLog) {
+    const shipSessionName = `agent-${issueLower}-ship`;
+    const shipIsLive = context.tmuxSessionNames.has(shipSessionName);
+    const shipJsonlPath = shipIsLive ? await resolveJsonlPath(shipSessionName, workspacePath) : null;
+    const shipRunning = shipIsLive && shipLog.step !== undefined && shipLog.step !== 'merged';
+    if (shipIsLive || shipJsonlPath) {
+      const shipAwaitingInput = awaitingInputFromProjection(shipSessionName, context.agentSnapshotsById);
+      const shipSnapshot = context.agentSnapshotsById?.get(shipSessionName);
+      sections.push({
+        type: 'ship',
+        sessionId: shipSessionName,
+        model: 'specialist',
+        startedAt: shipLog.startedAt,
+        endedAt: undefined,
+        duration: 0,
+        status: normalizeAgentStatus(shipRunning ? 'running' : 'completed'),
+        presence: shipIsLive ? (shipRunning ? 'active' : 'idle') : 'ended',
+        awaitingInput: shipAwaitingInput !== undefined ? (shipAwaitingInput !== null) : false,
+        awaitingInputPrompt: shipAwaitingInput?.prompt,
+        awaitingInputReason: shipAwaitingInput?.reason,
+        pendingInputKinds: shipSnapshot?.pendingInputKinds ? [...shipSnapshot.pendingInputKinds] : undefined,
+        hasJsonl: !!shipJsonlPath,
+        tmuxSession: shipIsLive ? shipSessionName : undefined,
+        ...await readSessionGateFields(shipSessionName),
+      });
     }
   }
   // PAN-2053: attach read-only model-origin so the right-click MODEL inspector works
@@ -691,7 +687,6 @@ interface ProjectVersionSyncRouteDeps {
   getProject: (key: string) => ProjectConfig | null;
   listProjectKeys: () => string[];
   listPromotedGenerations: (projectRoot: string) => UatGeneration[];
-  readOutcome: (project: ProjectConfig, generation: UatGeneration) => Promise<PanIssueShipRecord | null>;
   writeVersionSync: typeof setProjectVersionSync;
 }
 
@@ -703,10 +698,6 @@ const defaultProjectVersionSyncRouteDeps: ProjectVersionSyncRouteDeps = {
     statuses: ['promoted'],
     limit: 1,
   }),
-  readOutcome: async (project, generation) => aggregateGenerationShipStatus(
-    generation,
-    await loadShipRecords(project, [generation]),
-  ),
   writeVersionSync: setProjectVersionSync,
 };
 
@@ -717,11 +708,11 @@ export async function getProjectVersionSyncPayload(
   const project = deps.getProject(projectKey);
   if (!project) return { status: 404, body: { error: `Unknown project key: ${projectKey}` } };
 
+  // PAN-3917 D6: ship records are gone — a shipped version is a git tag plus a
+  // GitHub release. `lastOutcome` stays in the shape (W7 renders it) but is
+  // null until the release engine exposes a tag-derived read.
   const generation = deps.listPromotedGenerations(project.path)[0];
-  const lastOutcome = generation
-    ? publicShipStatus(await deps.readOutcome(project, generation))
-    : null;
-  return { status: 200, body: { config: project.version_sync ?? null, lastOutcome } };
+  return { status: 200, body: { config: project.version_sync ?? null, lastOutcome: null, generation: generation?.name ?? null } };
 }
 
 export async function putProjectVersionSyncPayload(
@@ -832,42 +823,36 @@ const getIssueSwarmPolicyRoute = HttpRouter.add('GET', '/api/issues/:issueId/swa
   const issueId = ((yield* HttpRouter.params)['issueId'] ?? '').toUpperCase();
   const resolved = resolveProjectFromIssueSync(issueId); const project = resolved ? getProjectSync(resolved.projectKey) : undefined;
   if (!project) return jsonResponse({ error: 'Issue project not found' }, { status: 404 });
-  return jsonResponse({ configured: readIssueRecordSync(project, issueId)?.swarm?.policy ?? null, resolved: resolveSwarmPolicy(issueId) });
-})));
-const postIssueSwarmPolicyRoute = HttpRouter.add('POST', '/api/issues/:issueId/swarm-policy', httpHandler(Effect.gen(function* () {
-  const issueId = ((yield* HttpRouter.params)['issueId'] ?? '').toUpperCase(); const body = (yield* readProjectJsonBody) as { value?: SwarmPolicyLayer | null };
-  const resolved = resolveProjectFromIssueSync(issueId); const project = resolved ? getProjectSync(resolved.projectKey) : undefined;
-  if (!project) return jsonResponse({ error: 'Issue project not found' }, { status: 404 });
-  const record = readIssueRecordSync(project, issueId); if (!record) return jsonResponse({ error: 'Issue record not found' }, { status: 404 });
-  yield* Effect.promise(() => updateIssueRecord(project, issueId, (current) => ({ ...current, swarm: { ...current.swarm, policy: body.value ?? undefined } })));
-  return jsonResponse({ configured: body.value ?? null, resolved: resolveSwarmPolicy(issueId) });
+  // PAN-3917: the per-issue swarm policy layer lived on the issue record and
+  // had no other owner, so it is gone. The resolved policy is the project's,
+  // then the global default. POST /api/issues/:issueId/swarm-policy is deleted;
+  // set the layer on the project instead.
+  return jsonResponse({ configured: null, resolved: resolveSwarmPolicy(issueId) });
 })));
 
-function getIssueStaffingPayload(
-  project: NonNullable<ReturnType<typeof getProjectSync>>,
+async function getIssueStaffingPayload(
   issueId: string,
   planMetadata: { [key: string]: unknown } | undefined,
 ) {
-  const record = readIssueRecordSync(project, issueId);
   const config = loadConfigSync().config;
-  const block = resolveTieredExecutionBlock(
-    config.tieredExecution,
-    planMetadata,
-    record?.tieredExecutionOverride ?? null,
-  );
+  // PAN-3917: `tieredExecutionOverride` and `workModel` lived on the issue
+  // record. Neither is derivable and neither had another home, so the per-issue
+  // override is gone: staffing resolves from the plan's own metadata and the
+  // configured defaults. `recordedModel` is now the live pane's `model` token
+  // (FR-5), which is the truth the record was always trying to mirror.
+  const block = resolveTieredExecutionBlock(config.tieredExecution, planMetadata, null);
   const implicit = resolveImplicitStaffing(config, `work:${issueId.toLowerCase()}`);
-  // PAN-2686: recordedModel reflects the most recent work-agent run, so prefer
-  // the live agent state over the permanent record (which can lag a
-  // restart-fresh respawn). The mid-spawn placeholder is not authoritative.
-  const liveModel = getAgentStateSync(`agent-${issueId.toLowerCase()}`)?.model;
+  const panes = await getBackendPanesForIssue(issueId);
+  const workPane = panes.find((pane) => pane.role === 'work') ?? panes[0];
+  const liveModel = workPane && workPane.model !== 'unknown' ? workPane.model : null;
   return {
-    override: { workModel: record?.workModel ?? null },
+    override: { workModel: null },
     tieredExecution: block,
     resolved: {
-      model: record?.workModel ?? implicit.model,
+      model: implicit.model,
       tiered: block.effective,
-      source: record?.workModel ? 'issue' : 'default',
-      recordedModel: liveModel ?? record?.model ?? null,
+      source: 'default',
+      recordedModel: liveModel,
     },
   };
 }
@@ -880,27 +865,7 @@ const getIssueStaffingRoute = HttpRouter.add('GET', '/api/issues/:issueId/staffi
   const spec = yield* findSpecByIssue(project.path, issueId).pipe(
     Effect.catch(() => Effect.succeed(null)),
   );
-  return jsonResponse(getIssueStaffingPayload(project, issueId, spec?.document.plan.metadata));
-})));
-
-const postIssueStaffingRoute = HttpRouter.add('POST', '/api/issues/:issueId/staffing', httpHandler(Effect.gen(function* () {
-  const issueId = ((yield* HttpRouter.params)['issueId'] ?? '').toUpperCase();
-  const body = (yield* readProjectJsonBody) as { workModel?: unknown };
-  const resolved = resolveProjectFromIssueSync(issueId);
-  const project = resolved ? getProjectSync(resolved.projectKey) : undefined;
-  if (!project) return jsonResponse({ error: 'Issue project not found' }, { status: 404 });
-  if (!readIssueRecordSync(project, issueId)) return jsonResponse({ error: 'Issue record not found' }, { status: 404 });
-  let workModel: string | undefined;
-  try {
-    workModel = normalizeModelOverrideSync(body.workModel);
-  } catch (error) {
-    return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
-  }
-  yield* Effect.promise(() => updateIssueRecord(project, issueId, (record) => { record.workModel = workModel; }));
-  const spec = yield* findSpecByIssue(project.path, issueId).pipe(
-    Effect.catch(() => Effect.succeed(null)),
-  );
-  return jsonResponse(getIssueStaffingPayload(project, issueId, spec?.document.plan.metadata));
+  return jsonResponse(yield* Effect.promise(() => getIssueStaffingPayload(issueId, spec?.document.plan.metadata)));
 })));
 
 // ─── Route: POST /api/projects/resolve ──────────────────────────────────────
@@ -968,9 +933,7 @@ export const projectsRouteLayer = Layer.mergeAll(
   getProjectSwarmPolicyRoute,
   postProjectSwarmPolicyRoute,
   getIssueSwarmPolicyRoute,
-  postIssueSwarmPolicyRoute,
   getIssueStaffingRoute,
-  postIssueStaffingRoute,
   postProjectsResolveRoute,
   // The create-job routes live in project-create-routes.ts (file-size ratchet);
   // they are merged first so their literal path segments win over

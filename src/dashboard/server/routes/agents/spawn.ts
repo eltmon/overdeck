@@ -26,7 +26,6 @@ import { checkActiveOrderDispatch } from '../../../../lib/orders/dispatch-gate.j
 import { OrderDispatchReservationError, withActiveOrderDispatchReservation } from '../../../../lib/orders/dispatch-reservation.js';
 import type { OrderDispatchEligibility } from '../../../../lib/orders/eligibility.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../../../../lib/projects.js';
-import { clearWorkspaceStuck, getReviewStatusSync } from '../../../../lib/review-status.js';
 import { isGeneratedGitHookPath, isOverdeckWorkspaceRuntimePath, parsePorcelainStatusPaths } from '../../../../lib/state-plane.js';
 import { assertWorkspaceStackHealthyForSpawn } from '../../../../lib/agents/spawn-prep.js';
 import { getWorkspaceStackHealth } from '../../../../lib/workspace/stack-health.js';
@@ -605,24 +604,10 @@ export const postAgentsRoute = HttpRouter.add(
         }
       }
 
-      try {
-        const { appendSessionEntry, getProjectConfigFromWorkspacePath, resolveProjectForIssue } =
-          await import('../../../../lib/pan-dir/record.js');
-        const recordProject = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
-        await appendSessionEntry(recordProject, issueId, {
-          timestamp: new Date().toISOString(),
-          reason: 'start',
-          agentModel: spawnModel,
-        });
-        console.log(`[start-agent] Wrote start session entry to record for ${issueId}`);
-      } catch (continueErr: any) {
-        console.warn(`[start-agent] Failed to write start entry to record (non-fatal): ${continueErr?.message ?? continueErr}`);
-      }
-
-      const pipelineStatus = getReviewStatusSync(issueId);
-      if (pipelineStatus?.stuckReason === 'planning_auto_handoff_failed') {
-        clearWorkspaceStuck(issueId);
-      }
+      // PAN-3917: the record's sessionHistory and the workspace `stuck` flag
+      // are gone. The agent.started event (emitted by the PTY supervisor when
+      // the harness process exists) is the durable record that this agent
+      // started, and a stuck agent is derived — idle with unpushed commits.
     };
     if (isRemote && workspaceMetadata) {
       const admitted = yield* Effect.promise(() => withActiveOrderDispatchReservation(
