@@ -194,7 +194,7 @@
     "recordedAt": "2026-09-18T07:31:28.942Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-18T08:12:14.050Z",
+  "updated": "2026-09-18T08:12:15.064Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "pending",
@@ -204,7 +204,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T08:06:25.651Z",
+    "updatedAt": "2026-09-18T08:12:14.040Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "verificationNotes": "Verification FAILED at test (773461ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3842/.overdeck/verification/2026-09-18T07-31-33-842Z-ad879ac7.json",
     "mergeNotes": "Review stale: approved ff31b427, workspace HEAD is ad879ac7. Run pan done or pan review request to re-review.",
@@ -283,8 +283,7 @@
     },
     "deaconIgnored": true,
     "deaconIgnoredAt": "2026-09-16T22:55:47.495Z",
-    "deaconIgnoredReason": "Operator requested all agents stopped for independent code review and PRD redesign. Hold issue scheduling until explicit authorization.",
-    "panDoneRecoveredAt": "2026-09-18T08:12:09.990Z"
+    "deaconIgnoredReason": "Operator requested all agents stopped for independent code review and PRD redesign. Hold issue scheduling until explicit authorization."
   },
   "closeOut": {
     "usage": {
@@ -350,7 +349,7 @@
       },
       "costAtCloseOut": {
         "usd": 19.952098,
-        "pricingAsOf": "2026-09-18T08:06:25.654Z"
+        "pricingAsOf": "2026-09-18T08:12:14.044Z"
       }
     },
     "merges": [
