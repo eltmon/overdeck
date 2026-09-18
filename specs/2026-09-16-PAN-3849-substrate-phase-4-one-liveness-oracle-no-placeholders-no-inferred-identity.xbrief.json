@@ -4,17 +4,17 @@
     "created": "2026-09-16T21:36:47.000Z",
     "author": "overdeck/0.50.4",
     "description": "Plan for PAN-3849: Substrate Phase 4: one liveness oracle; no placeholders; no inferred identity",
-    "updated": "2026-09-16T21:40:24.692Z"
+    "updated": "2026-09-18T02:44:03.258Z"
   },
   "plan": {
     "id": "pan-3849",
     "title": "Substrate Phase 4: one liveness oracle; no placeholders; no inferred identity",
-    "status": "proposed",
+    "status": "completed",
     "uid": "483b9422-70bf-4c61-b3b1-db58cefe14cc",
     "author": "agent:claude-fable-5-1",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-16T21:36:47.000Z",
-    "updated": "2026-09-16T21:40:24.692Z",
+    "updated": "2026-09-18T02:44:03.258Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3849",
@@ -574,5 +574,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "completed"
 }
