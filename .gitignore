@@ -228,8 +228,11 @@ __pycache__/
 /reports/
 .vercel
 
-# PAN-2541: permanent state is on overdeck-state; workspace runtime stays local.
-.pan/
+# PAN-3917: planning artifacts live in `.pan/` in this repo and are TRACKED
+# (specs, drafts, continues, orders, notes, backlog/sequence.md). Only the
+# workspace working copies are ignored — see the `.pan/` entries above.
+# Records are gone with the state layer; if one is ever written, do not track it.
+.pan/records/
 .beads/
 .overdeck/continue.json
 .overdeck/pending-promotion.json

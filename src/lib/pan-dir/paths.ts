@@ -1,16 +1,16 @@
 /**
- * Project state-plane path authority.
+ * Project plan-home path authority (PAN-3917).
  *
- * PAN-3165: the specs/drafts/continues directories had two derivations — this
- * one (state-branch aware) and a hardcoded `<projectRoot>/.pan/specs` inside
- * `xbrief/xbrief-index.ts`, which resolved to the pre-cutover in-repo location
- * and returned null for every spec written since PAN-2541. The resolution lives
- * here, in a leaf module, so both the sync and async spec resolvers can import
- * it without a cycle through `pan-dir/specs.ts`.
+ * Planning artifacts live in `.pan/` inside the repo they describe. There is no
+ * state worktree and no migration marker: `getProjectPanPaths` is unconditional.
+ *
+ * A polyrepo project may nominate one of its sub-repos as the plan home through
+ * `pan_records.repo` in `projects.yaml` (MYN uses `infra`). `resolvePlanHome`
+ * resolves that sub-repo relative to the root it is given, so an agent working
+ * in a worktree writes — and commits — the plan inside that same worktree.
  */
-import { join } from 'path'
-import { findProjectByPathSync, type ProjectConfig } from '../projects.js'
-import { resolveStateReadHomeSync } from '../state-read-home.js'
+import { join, relative, resolve, sep } from 'path'
+import { findProjectByPathSync, resolveInfraRepo } from '../projects.js'
 import {
   PAN_DIRNAME,
   PAN_CONTINUES_DIRNAME,
@@ -19,13 +19,38 @@ import {
   type ProjectPanPaths,
 } from './types.js'
 
-export function getProjectPanPaths(projectRoot: string): ProjectPanPaths {
-  const project: ProjectConfig = findProjectByPathSync(projectRoot) ?? {
-    name: projectRoot,
-    path: projectRoot,
+/**
+ * The checkout a path belongs to: its workspace worktree when the path is
+ * inside `<project>/workspaces/<name>/`, otherwise the project root. Callers
+ * hand this function anything from a project root to a nested `process.cwd()`,
+ * so the answer must not depend on how deep the path is.
+ */
+function checkoutRootFor(project: { path: string }, somePath: string): string {
+  const rel = relative(resolve(project.path), resolve(somePath))
+  if (rel && !rel.startsWith('..')) {
+    const [first, second] = rel.split(sep)
+    if (first === 'workspaces' && second) return join(resolve(project.path), 'workspaces', second)
   }
-  const stateHome = resolveStateReadHomeSync(project)
-  const panDir = stateHome.migrated ? stateHome.root : join(stateHome.root, PAN_DIRNAME)
+  return resolve(project.path)
+}
+
+/**
+ * The checkout that holds `.pan/` for `projectRoot`: the `pan_records.repo`
+ * sub-repo when the project config names one, otherwise the checkout itself.
+ * An unregistered path is its own plan home.
+ *
+ * Idempotent over depth — a nested path inside a checkout resolves to the same
+ * plan home as the checkout root, so a CLI invoked from a subdirectory writes
+ * the same `.pan/` a CLI invoked from the root does.
+ */
+export function resolvePlanHome(projectRoot: string): string {
+  const project = findProjectByPathSync(projectRoot)
+  if (!project) return projectRoot
+  return resolveInfraRepo(project, checkoutRootFor(project, projectRoot)).repoPath
+}
+
+export function getProjectPanPaths(projectRoot: string): ProjectPanPaths {
+  const panDir = join(resolvePlanHome(projectRoot), PAN_DIRNAME)
   return {
     panDir,
     specsDir: join(panDir, PAN_SPECS_DIRNAME),
