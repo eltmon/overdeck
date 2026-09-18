@@ -783,9 +783,8 @@ export async function completePlanningForIssue(options: {
     // Suppress unused variable warning — remoteVmName used for remote session cleanup if added later
     void isRemotePlanning; void remoteVmName;
 
-    // PAN-2386: if auto-start is requested, make sure the workspace tree is clean
-    // before we ask start-agent to spawn. The per-issue record may have been
-    // modified by debounced auto-commit writes during finalize.
+    // PAN-3917: if auto-start is requested, commit the plan artifacts finalize
+    // just wrote so the tree handed to start-agent is clean.
     const effectiveAutoSpawn = autoSpawn || completePlanningLease.autoSpawnRequested();
     if (effectiveAutoSpawn && workspacePath) {
       await commitWorkspacePlanArtifacts(workspacePath, id);

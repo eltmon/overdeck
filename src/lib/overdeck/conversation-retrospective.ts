@@ -162,17 +162,13 @@ export async function handleRetrospectiveConversationCreate(
   return deps.createConversation({ message, model, harness, effort });
 }
 
-// ─── Canonical evidence bridge ────────────────────────────────────────────────
+// ─── Evidence bridge ──────────────────────────────────────────────────────────
 //
-// The retrospective conversation must NOT be told to read record JSON off
-// disk: that is a direct-store read of canonical state, which
-// sync-sources/rules/single-source-of-truth.md forbids, and the legacy record
-// path is issue-workspace scoped (getIssueRecordPath -> getIssueRecordBasePath)
-// so a project state-root concatenation is not even equivalent. Instead the
-// server collects the evidence itself through the issue-record read door's
-// bounded enumeration facet (`listIssueRecords`, which already resolves BOTH
-// the migrated layout and the legacy workspace-scoped layout) and renders a
-// window-scoped snapshot into the kickoff message.
+// PAN-3917: the retrospective reads the owners of what happened — the tracker
+// for issues, labels and timestamps, the forge for pull requests, reviews and
+// checks. The server collects that evidence itself and renders a window-scoped
+// snapshot into the kickoff message, rather than telling the conversation to go
+// read files off disk.
 
 /** Caps keep the kickoff prompt bounded; anything dropped is disclosed, never silent. */
 export const EVIDENCE_LIMITS = {

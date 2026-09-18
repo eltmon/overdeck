@@ -58,14 +58,32 @@ async function defaultResolveBackend(): Promise<TerminalBackend> {
 }
 
 /**
- * `<workspace>/.swarm/<item>/` as a git worktree on the feature branch. Async
- * git only. An existing worktree is reused.
+ * `<workspace>/.swarm/<item>/` as a git worktree on its own item branch, cut
+ * from the issue's feature branch. The branch matters: a detached worktree
+ * orphans everything the worker commits. An existing worktree is reused.
+ * Async git only.
  */
 async function defaultCreateWorktree(workspacePath: string, itemId: string): Promise<string> {
   const path = join(workspacePath, '.swarm', itemId);
   if (existsSync(path)) return path;
+
   const { stdout } = await execFileAsync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: workspacePath });
-  await execFileAsync('git', ['worktree', 'add', '--detach', path, stdout.trim()], { cwd: workspacePath });
+  const featureBranch = stdout.trim();
+  const itemBranch = `${featureBranch}/${itemId}`;
+
+  const branchExists = await execFileAsync(
+    'git',
+    ['rev-parse', '--verify', '--quiet', `refs/heads/${itemBranch}`],
+    { cwd: workspacePath },
+  ).then(() => true, () => false);
+
+  await execFileAsync(
+    'git',
+    branchExists
+      ? ['worktree', 'add', path, itemBranch]
+      : ['worktree', 'add', '-b', itemBranch, path, featureBranch],
+    { cwd: workspacePath },
+  );
   return path;
 }
 

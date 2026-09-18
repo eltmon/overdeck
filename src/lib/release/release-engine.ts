@@ -101,8 +101,8 @@ export async function runRelease(
 
   if (failure) {
     releaseSet = haltRemainingComponents(releaseSet, failure.componentKey);
-    const releaseStatus = finalFailureStatus(releaseSet, failure.rollbackRan);
-    releaseSet = persistReleaseSetStatus(releaseSet, releaseStatus);
+    const finalStatus = finalFailureStatus(releaseSet, failure.rollbackRan);
+    releaseSet = persistReleaseSetStatus(releaseSet, finalStatus);
     return releaseSet;
   }
 
