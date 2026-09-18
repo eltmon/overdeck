@@ -1,9 +1,8 @@
 /**
  * PAN-3165 regression: the async xBRIEF index and the sync lifecycle resolver
- * must agree on where specs live. The index hardcoded `<projectRoot>/.pan/specs`
- * — the pre-PAN-2541 in-repo location — so every spec written to the
- * `overdeck-state` worktree since the cutover resolved to null, and the UAT
- * panel rendered that miss as the confident sentence "No UAT steps in plan".
+ * must agree on where specs live — both go through `getProjectPanPaths`, so a
+ * project whose plan home is not its own root still resolves. When they
+ * disagreed, the UAT panel rendered the miss as "No UAT steps in plan".
  */
 import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -44,21 +43,6 @@ function writeSpecFile(specsDir: string, issueId: string): string {
   return path;
 }
 
-/** Mark the project migrated so the state read door resolves the state worktree. */
-function markMigrated(stateRoot: string): void {
-  mkdirSync(stateRoot, { recursive: true });
-  writeFileSync(
-    join(stateRoot, 'migration-complete.json'),
-    JSON.stringify({
-      version: 1,
-      sourceMainSha: 'a'.repeat(40),
-      stateBranchSha: 'b'.repeat(40),
-      completedAt: '2026-07-26T00:00:00Z',
-    }),
-    'utf-8',
-  );
-}
-
 beforeEach(() => {
   projectRoot = mkdtempSync(join(tmpdir(), 'xbrief-index-project-'));
   overdeckHome = mkdtempSync(join(tmpdir(), 'xbrief-index-home-'));
@@ -77,10 +61,8 @@ afterEach(() => {
 });
 
 describe('findXBriefByIssue (async index) vs findXBriefByIssueSync', () => {
-  it('resolves a state-branch spec to the same path as the sync resolver', async () => {
-    const stateRoot = join(overdeckHome, 'state', basename(projectRoot));
-    markMigrated(stateRoot);
-    const specPath = writeSpecFile(join(stateRoot, PAN_SPECS_DIRNAME), 'PAN-3158');
+  it('resolves the plan-home spec to the same path as the sync resolver', async () => {
+    const specPath = writeSpecFile(join(projectRoot, PAN_DIRNAME, PAN_SPECS_DIRNAME), 'PAN-3158');
 
     const asyncFound = await Effect.runPromise(findXBriefByIssue(projectRoot, 'PAN-3158'));
     const syncFound = findXBriefByIssueSync(projectRoot, 'PAN-3158');
@@ -90,20 +72,15 @@ describe('findXBriefByIssue (async index) vs findXBriefByIssueSync', () => {
     expect(asyncFound?.path).toBe(syncFound?.path);
   });
 
-  it('finds a state-branch spec even when the legacy <root>/.pan/specs directory exists', async () => {
+  it('never resolves a spec out of an overdeck state worktree (PAN-3917)', async () => {
     const stateRoot = join(overdeckHome, 'state', basename(projectRoot));
-    markMigrated(stateRoot);
-    const specPath = writeSpecFile(join(stateRoot, PAN_SPECS_DIRNAME), 'PAN-3158');
-    // A stale pre-cutover directory holding an unrelated spec must not shadow it.
-    writeSpecFile(join(projectRoot, PAN_DIRNAME, PAN_SPECS_DIRNAME), 'PAN-2000');
+    writeSpecFile(join(stateRoot, PAN_SPECS_DIRNAME), 'PAN-3158');
 
-    const asyncFound = await Effect.runPromise(findXBriefByIssue(projectRoot, 'PAN-3158'));
-
-    expect(asyncFound?.path).toBe(specPath);
-    expect(await Effect.runPromise(findXBriefByIssue(projectRoot, 'PAN-2000'))).toBeNull();
+    expect(await Effect.runPromise(findXBriefByIssue(projectRoot, 'PAN-3158'))).toBeNull();
+    expect(findXBriefByIssueSync(projectRoot, 'PAN-3158')).toBeNull();
   });
 
-  it('agrees with the sync resolver for an unmigrated project', async () => {
+  it('agrees with the sync resolver for an in-repo spec', async () => {
     const specPath = writeSpecFile(join(projectRoot, PAN_DIRNAME, PAN_SPECS_DIRNAME), 'PAN-3158');
 
     const asyncFound = await Effect.runPromise(findXBriefByIssue(projectRoot, 'PAN-3158'));

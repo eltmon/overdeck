@@ -45,7 +45,6 @@ export {
   getWorkspacePanPaths,
 } from './continue.js'
 
-export { appendSession, readSessions } from './sessions.js'
 export { clearFeedback, readFeedback, writeFeedback } from './feedback.js'
 export {
   checkPrdGateSync,

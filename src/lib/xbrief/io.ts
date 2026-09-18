@@ -1,22 +1,19 @@
 /**
  * xBRIEF File I/O Utilities
  *
- * Single-spec model (PAN-1124): the canonical xBRIEF spec lives in `specs/`
- * on `overdeck-state` with a `.xbrief.json` filename behind the project state
- * read/write doors. Work and task operations cannot mutate its structure; they
- * may only advance `plan.status` through
- * `updateSpecStatus()` in `pan-dir/specs.ts`. A deliberate return to planning
- * may replace the full document at the same canonical path through
+ * Single-spec model (PAN-1124): the canonical xBRIEF spec lives in
+ * `<planHome>/.pan/specs/` with a `.xbrief.json` filename. Work and task
+ * operations cannot mutate its structure; they may only advance `plan.status`
+ * through `updateSpecStatus()` in `pan-dir/specs.ts`. A deliberate return to
+ * planning may replace the full document at the same canonical path through
  * `writeSpecDocument()`, preserving stable item IDs so existing progress still
  * applies.
  *
- * Runtime item/subItem status is tracked as a flat `statusOverrides` map in
- * the workspace continue file (`<workspace>/.overdeck/continue.json`).
+ * Runtime item/subItem status lives in the per-issue continue file
+ * (`<planHome>/.pan/continues/<ISSUE>.xbrief.json`, PAN-3917) under `items`.
  * `readWorkspacePlan()` returns a merged view (canonical spec + overlay) so
- * callers never need to know about the overlay.
- *
- * `updateItemStatus` and `updateSubItemStatus` write ONLY to the workspace
- * continue file — they cannot mutate the canonical spec.
+ * callers never need to know about the overlay, and `updateItemStatus` /
+ * `updateSubItemStatus` write ONLY to the continue file.
  */
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
@@ -25,18 +22,17 @@ import { basename, join, resolve } from 'path';
 import { Data, Effect } from 'effect';
 import { getLegacyWorkspacePanPaths, getWorkspacePanPaths } from '../pan-dir/continue.js';
 import { getProjectPanPaths } from '../pan-dir/specs.js';
-import {
-  getProjectConfigFromWorkspacePath,
-  readIssueRecord,
-  readIssueRecordSync,
-  resolveProjectForIssue,
-  writeStatusOverrideSync,
-} from '../pan-dir/record.js';
-import type { ProjectConfig } from '../projects.js';
+import { resolvePlanHome } from '../pan-dir/paths.js';
 import { parseXBriefFilename } from './lifecycle.js';
 import { FsError } from '../errors.js';
 import { subItemsOf, type XBriefDifficulty, type XBriefDocument, type XBriefInfo, type XBriefItemStatus } from './types.js';
-import type { TierOverridesMap, TierRetriesMap } from './continue-state.js';
+import {
+  readItemStatuses,
+  readItemStatusesAsync,
+  setItemStatus,
+  type TierOverridesMap,
+  type TierRetriesMap,
+} from './continue-state.js';
 
 export type { TierOverride, TierOverridesMap, TierPromotionHistoryEntry, TierRetriesMap, TierRetryEntry } from './continue-state.js';
 
@@ -258,10 +254,10 @@ export function readPlanSync(planPath: string): XBriefDocument {
 
 
 /**
- * Apply statusOverrides from workspace continue.json onto a deep-cloned spec.
+ * Overlay per-item statuses from the continue file onto a deep-cloned spec.
  * Keys are either `"item-id"` (item status) or `"item-id.sub-id"` (subItem status).
  */
-export function applyStatusOverrides(doc: XBriefDocument, overrides: Record<string, string>): XBriefDocument {
+export function applyItemStatuses(doc: XBriefDocument, overrides: Record<string, string>): XBriefDocument {
   const merged = JSON.parse(JSON.stringify(doc)) as XBriefDocument;
   for (const [key, status] of Object.entries(overrides)) {
     const dotIndex = key.indexOf('.');
@@ -290,18 +286,15 @@ export function applyStatusOverrides(doc: XBriefDocument, overrides: Record<stri
   return merged;
 }
 
-function resolveProjectForWorkspace(workspacePath: string): ProjectConfig | null {
-  const issueId = issueIdFromWorkspacePath(workspacePath);
-  if (!issueId) return null;
-  return resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+/** The plan home that owns this workspace's `.pan/` artifacts. */
+function planHomeForWorkspace(workspacePath: string): string {
+  return resolvePlanHome(projectRootFromWorkspace(workspacePath));
 }
 
-function readStatusOverridesSync(workspacePath: string): Record<string, string> | undefined {
+function readItemStatusesSync(workspacePath: string): Record<string, string> | undefined {
   const issueId = issueIdFromWorkspacePath(workspacePath);
   if (!issueId) return undefined;
-  const project = resolveProjectForWorkspace(workspacePath);
-  if (!project) return undefined;
-  return readIssueRecordSync(project, issueId)?.statusOverrides;
+  return readItemStatuses(planHomeForWorkspace(workspacePath), issueId);
 }
 
 export function readTierOverrides(workspacePath: string): TierOverridesMap {
@@ -403,34 +396,28 @@ export function recordTierRetry(
 }
 
 /**
- * Reads the xBRIEF plan for a workspace, returning a merged view with
- * statusOverrides applied from the per-issue record.
- * Returns null if no plan exists on main or locally.
+ * PAN-2401: overlay the continue file's item statuses onto an already-loaded
+ * plan document. The single overlay door for read paths that resolve the spec
+ * themselves (e.g. the /plan API route) — without this, a completed task reads
+ * 'pending' forever in every display.
  */
-/**
- * PAN-2401: overlay the per-issue record's statusOverrides onto an
- * already-loaded plan document. The single overlay door for read paths that
- * resolve the spec themselves (e.g. the /plan API route) — without this, a
- * merged task reads 'pending' forever in every display.
- */
-export function mergeRecordStatusOverrides(doc: XBriefDocument, workspacePath: string): XBriefDocument {
-  const overrides = readStatusOverridesSync(workspacePath);
+export function mergeContinueItemStatuses(doc: XBriefDocument, workspacePath: string): XBriefDocument {
+  const overrides = readItemStatusesSync(workspacePath);
   if (overrides && Object.keys(overrides).length > 0) {
-    return applyStatusOverrides(doc, overrides);
+    return applyItemStatuses(doc, overrides);
   }
   return doc;
 }
 
+/**
+ * Reads the xBRIEF plan for a workspace, returning a merged view with item
+ * statuses applied from the continue file.
+ * Returns null if no plan exists.
+ */
 export function readWorkspacePlanSync(workspacePath: string): XBriefDocument | null {
   const planPath = findPlanSync(workspacePath);
   if (!planPath) return null;
-  const doc = readPlanSync(planPath);
-
-  const overrides = readStatusOverridesSync(workspacePath);
-  if (overrides && Object.keys(overrides).length > 0) {
-    return applyStatusOverrides(doc, overrides);
-  }
-  return doc;
+  return mergeContinueItemStatuses(readPlanSync(planPath), workspacePath);
 }
 
 
@@ -485,9 +472,8 @@ function checkPlanStatus(
 
 
 /**
- * Updates the status of a specific item by writing to the per-issue record's
- * `statusOverrides` map. Does NOT mutate the spec on main.
- * No-ops gracefully if no plan exists for this workspace.
+ * Updates the status of a specific item in the continue file. Does NOT mutate
+ * the canonical spec. No-ops gracefully if no plan exists for this workspace.
  */
 export function updateItemStatus(workspacePath: string, itemId: string, status: XBriefItemStatus): void {
   const planPath = findPlanSync(workspacePath);
@@ -499,16 +485,13 @@ export function updateItemStatus(workspacePath: string, itemId: string, status: 
 
   const issueId = issueIdFromWorkspacePath(workspacePath);
   if (!issueId) return;
-  const project = resolveProjectForWorkspace(workspacePath);
-  if (!project) return;
 
-  writeStatusOverrideSync(project, issueId, itemId, status);
+  setItemStatus(planHomeForWorkspace(workspacePath), issueId, itemId, status);
 }
 
 /**
- * Updates the status of a specific subItem by writing to the per-issue record's
- * `statusOverrides` map. Uses `itemId.subItemId` as the key.
- * Does NOT mutate the spec on main.
+ * Updates the status of a specific subItem in the continue file, keyed
+ * `itemId.subItemId`. Does NOT mutate the canonical spec.
  * No-ops gracefully if the file, item, or subItem doesn't exist.
  */
 export function updateSubItemStatus(
@@ -531,10 +514,8 @@ export function updateSubItemStatus(
 
   const issueId = issueIdFromWorkspacePath(workspacePath);
   if (!issueId) return;
-  const project = resolveProjectForWorkspace(workspacePath);
-  if (!project) return;
 
-  writeStatusOverrideSync(project, issueId, fullSubId, status);
+  setItemStatus(planHomeForWorkspace(workspacePath), issueId, fullSubId, status);
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
@@ -634,8 +615,8 @@ export const findPlan = (
 
 /**
  * Effect variant of readWorkspacePlanAsync. Returns null when there's no plan
- * for the workspace; otherwise returns the merged document with statusOverrides
- * applied from the per-issue record. IO/decoding failures surface as typed errors.
+ * for the workspace; otherwise returns the merged document with item statuses
+ * applied from the continue file. IO/decoding failures surface as typed errors.
  */
 export const readWorkspacePlan = (
   workspacePath: string,
@@ -648,16 +629,12 @@ export const readWorkspacePlan = (
     const issueId = issueIdFromWorkspacePath(workspacePath);
     const overrides = issueId
       ? yield* Effect.tryPromise({
-          try: async () => {
-            const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
-            const record = await readIssueRecord(project, issueId);
-            return record?.statusOverrides;
-          },
-          catch: (cause) => new FsError({ path: workspacePath, operation: 'readIssueRecord', cause }),
+          try: () => readItemStatusesAsync(planHomeForWorkspace(workspacePath), issueId),
+          catch: (cause) => new FsError({ path: workspacePath, operation: 'readItemStatuses', cause }),
         })
       : undefined;
     if (overrides && Object.keys(overrides).length > 0) {
-      return applyStatusOverrides(doc, overrides);
+      return applyItemStatuses(doc, overrides);
     }
     return doc;
   });

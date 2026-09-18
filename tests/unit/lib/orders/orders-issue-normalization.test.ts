@@ -1,9 +1,9 @@
 /**
  * Order books written with bare issue numbers ("2351") must resolve as the
  * project's prefixed issues ("PAN-2351") everywhere: the read door expands
- * them using the state root's project prefix, and the write door canonicalizes
- * on entry. Locks the fix for start validation reporting "could not be
- * resolved as an open issue" for every bare-number item.
+ * them using the project prefix of the checkout that owns the `.pan` directory,
+ * and the write door canonicalizes on entry. Locks the fix for start validation
+ * reporting "could not be resolved as an open issue" for every bare-number item.
  */
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -40,9 +40,9 @@ const at = '2026-08-09T12:00:00.000Z';
 let fakeHome: string;
 const roots: string[] = [];
 
-/** A migrated-layout state root: <fakeHome>/state/<projectKey>. */
-function stateRoot(projectKey = 'panopticon-cli'): string {
-  const root = join(fakeHome!, 'state', projectKey);
+/** A plan-home pan directory: <fakeHome>/<checkout>/.pan (PAN-3917). */
+function panRoot(checkout = 'panopticon-cli'): string {
+  const root = join(fakeHome!, checkout, '.pan');
   roots.push(root);
   mkdirSync(join(root, 'orders'), { recursive: true });
   writeFileSync(join(root, 'orders', 'index.json'), '[]', 'utf8');
@@ -93,9 +93,8 @@ afterEach(() => {
 
 describe('order-book issue id normalization', () => {
   it('expands bare-number items and prereqs through the read door', async () => {
-    const root = stateRoot();
-    projectMocks.getProjectSync.mockReturnValue({ name: 'panopticon-cli', path: '/unused', issue_prefix: 'PAN' });
-    projectMocks.findProjectByPathSync.mockReturnValue(null);
+    const root = panRoot();
+    projectMocks.findProjectByPathSync.mockReturnValue({ name: 'panopticon-cli', path: root, issue_prefix: 'PAN' });
     writeBook(root, book([item('2351', ['2350']), item('PAN-1166')]));
 
     const read = getBook(root, '2026-08-09-anywhere');
@@ -109,30 +108,27 @@ describe('order-book issue id normalization', () => {
   });
 
   it('leaves ids untouched when no project prefix is derivable', () => {
-    const root = stateRoot();
-    projectMocks.getProjectSync.mockReturnValue(null);
+    const root = panRoot();
     projectMocks.findProjectByPathSync.mockReturnValue(null);
     writeBook(root, book([item('2351')]));
 
     expect(getBook(root, '2026-08-09-anywhere')?.items.map((entry) => entry.issue)).toEqual(['2351']);
   });
 
-  it('prefers the path-containment project match for legacy roots', () => {
-    const root = join(fakeHome, 'Projects', 'legacy-checkout');
+  it('derives the prefix from the checkout that contains the pan directory', () => {
+    const root = join(fakeHome, 'Projects', 'legacy-checkout', '.pan');
     roots.push(root);
     mkdirSync(join(root, 'orders'), { recursive: true });
     writeFileSync(join(root, 'orders', 'index.json'), '[]', 'utf8');
     projectMocks.findProjectByPathSync.mockReturnValue({ name: 'legacy', path: root, issue_prefix: 'LEG' });
-    projectMocks.getProjectSync.mockReturnValue(null);
     writeBook(root, book([item('42')]));
 
     expect(getBook(root, '2026-08-09-anywhere')?.items[0]?.issue).toBe('LEG-42');
   });
 
   it('canonicalizes bare numbers at the write door (addItems)', async () => {
-    const root = stateRoot();
-    projectMocks.getProjectSync.mockReturnValue({ name: 'panopticon-cli', path: '/unused', issue_prefix: 'PAN' });
-    projectMocks.findProjectByPathSync.mockReturnValue(null);
+    const root = panRoot();
+    projectMocks.findProjectByPathSync.mockReturnValue({ name: 'panopticon-cli', path: root, issue_prefix: 'PAN' });
     writeBook(root, book([]));
 
     await addItems(root, '2026-08-09-anywhere', [item('2351'), item('pan-2352')], 'operator');
@@ -141,9 +137,8 @@ describe('order-book issue id normalization', () => {
   });
 
   it('matches per-issue verbs by canonical id (removeItem accepts bare numbers)', async () => {
-    const root = stateRoot();
-    projectMocks.getProjectSync.mockReturnValue({ name: 'panopticon-cli', path: '/unused', issue_prefix: 'PAN' });
-    projectMocks.findProjectByPathSync.mockReturnValue(null);
+    const root = panRoot();
+    projectMocks.findProjectByPathSync.mockReturnValue({ name: 'panopticon-cli', path: root, issue_prefix: 'PAN' });
     writeBook(root, book([item('2351'), item('2352')]));
 
     const updated = await removeItem(root, '2026-08-09-anywhere', '2351');

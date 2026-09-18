@@ -12,7 +12,6 @@ import {
 } from '../xbrief/lifecycle.js'
 import { invalidateXBriefIndex } from '../xbrief/xbrief-index.js'
 import type { XBriefDocument } from '../xbrief/types.js'
-import { deriveProjectRoot, flushAutoCommits, queueAutoCommit } from './auto-commit.js'
 import { getProjectPanPaths } from './paths.js'
 import {
   type PanSpecDocument,
@@ -144,15 +143,8 @@ export function writeSpec(
       Effect.mapError((cause) => new FsError({ path, operation: 'rename', cause })),
     )
 
-    const projectRoot = deriveProjectRoot(path)
-    if (projectRoot) {
-      const issueId = (doc as any)?.plan?.id ?? 'unknown'
-      queueAutoCommit({
-        projectRoot,
-        paths: [path],
-        subject: `chore(state): update spec for ${String(issueId).toUpperCase()} (status=${doc.status})`,
-      })
-    }
+    // PAN-3917: the spec is a tracked file in the plan home. The agent that
+    // wrote it commits it on its own branch.
   }).pipe(Effect.provide(NodeFileSystem.layer))
 }
 
@@ -271,19 +263,6 @@ export function writeSpecForIssue(
     const nextFilename = filename ?? generateXBriefFilename(doc.plan.id, doc.plan.title)
     const path = join(paths.specsDir, nextFilename)
     yield* writeSpec(path, specDocument)
-    queueAutoCommit({
-      projectRoot,
-      paths: [path],
-      subject: `chore(state): update spec for ${doc.plan.id.toUpperCase()} (status=${status})`,
-    })
-    const flushed = yield* flushAutoCommits(projectRoot)
-    if (flushed.errored || flushed.pushed === false) {
-      return yield* Effect.fail(new FsError({
-        path,
-        operation: 'pushSpec',
-        cause: new Error(flushed.reason ?? 'spec commit was not pushed'),
-      }))
-    }
     invalidateXBriefIndex(projectRoot)
     return {
       path,
@@ -312,19 +291,6 @@ export function updateSpecStatus(
       status: newStatus,
     }
     yield* writeSpec(existing.path, nextDocument)
-    queueAutoCommit({
-      projectRoot,
-      paths: [existing.path],
-      subject: `chore(state): update spec for ${issueId.toUpperCase()} (status=${newStatus})`,
-    })
-    const flushed = yield* flushAutoCommits(projectRoot)
-    if (flushed.errored || flushed.pushed === false) {
-      return yield* Effect.fail(new FsError({
-        path: existing.path,
-        operation: 'pushSpecStatus',
-        cause: new Error(flushed.reason ?? 'spec status commit was not pushed'),
-      }))
-    }
     invalidateXBriefIndex(projectRoot)
     return {
       ...existing,
@@ -335,13 +301,10 @@ export function updateSpecStatus(
 }
 
 /**
- * Overwrite an existing spec file's full document and commit+push through the
- * door. Use this — never bare `writeSpec` — when rewriting an existing spec at
- * a known path (e.g. re-promoting a workspace plan). `writeSpec` only queues a
- * deferred auto-commit; without the flush a short-lived process exits and
- * strands the spec as a dirty state-worktree file (PAN-2677). Mirrors
- * `writeSpecForIssue`/`updateSpecStatus`: fails loudly if a configured origin
- * did not accept the push.
+ * Overwrite an existing spec file's full document and invalidate the index.
+ * Use this — never bare `writeSpec` — when rewriting an existing spec at a
+ * known path (e.g. re-promoting a workspace plan), so stale index entries do
+ * not survive the rewrite.
  */
 export function writeSpecDocument(
   projectRoot: string,
@@ -350,20 +313,6 @@ export function writeSpecDocument(
 ): Effect.Effect<void, FsError> {
   return Effect.gen(function* () {
     yield* writeSpec(path, doc)
-    const issueId = (doc as { plan?: { id?: string } }).plan?.id ?? 'unknown'
-    queueAutoCommit({
-      projectRoot,
-      paths: [path],
-      subject: `chore(state): update spec for ${String(issueId).toUpperCase()} (status=${doc.status})`,
-    })
-    const flushed = yield* flushAutoCommits(projectRoot)
-    if (flushed.errored || flushed.pushed === false) {
-      return yield* Effect.fail(new FsError({
-        path,
-        operation: 'pushSpec',
-        cause: new Error(flushed.reason ?? 'spec commit was not pushed'),
-      }))
-    }
     invalidateXBriefIndex(projectRoot)
   })
 }

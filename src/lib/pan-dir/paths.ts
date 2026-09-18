@@ -1,16 +1,16 @@
 /**
- * Project state-plane path authority.
+ * Project plan-home path authority (PAN-3917).
  *
- * PAN-3165: the specs/drafts/continues directories had two derivations — this
- * one (state-branch aware) and a hardcoded `<projectRoot>/.pan/specs` inside
- * `xbrief/xbrief-index.ts`, which resolved to the pre-cutover in-repo location
- * and returned null for every spec written since PAN-2541. The resolution lives
- * here, in a leaf module, so both the sync and async spec resolvers can import
- * it without a cycle through `pan-dir/specs.ts`.
+ * Planning artifacts live in `.pan/` inside the repo they describe. There is no
+ * state worktree and no migration marker: `getProjectPanPaths` is unconditional.
+ *
+ * A polyrepo project may nominate one of its sub-repos as the plan home through
+ * `pan_records.repo` in `projects.yaml` (MYN uses `infra`). `resolvePlanHome`
+ * resolves that sub-repo relative to the root it is given, so an agent working
+ * in a worktree writes — and commits — the plan inside that same worktree.
  */
 import { join } from 'path'
-import { findProjectByPathSync, type ProjectConfig } from '../projects.js'
-import { resolveStateReadHomeSync } from '../state-read-home.js'
+import { findProjectByPathSync, resolveInfraRepo } from '../projects.js'
 import {
   PAN_DIRNAME,
   PAN_CONTINUES_DIRNAME,
@@ -19,13 +19,19 @@ import {
   type ProjectPanPaths,
 } from './types.js'
 
+/**
+ * The checkout that holds `.pan/` for `projectRoot`: the `pan_records.repo`
+ * sub-repo when the project config names one, otherwise `projectRoot` itself.
+ * An unregistered path is its own plan home.
+ */
+export function resolvePlanHome(projectRoot: string): string {
+  const project = findProjectByPathSync(projectRoot)
+  if (!project) return projectRoot
+  return resolveInfraRepo(project, projectRoot).repoPath
+}
+
 export function getProjectPanPaths(projectRoot: string): ProjectPanPaths {
-  const project: ProjectConfig = findProjectByPathSync(projectRoot) ?? {
-    name: projectRoot,
-    path: projectRoot,
-  }
-  const stateHome = resolveStateReadHomeSync(project)
-  const panDir = stateHome.migrated ? stateHome.root : join(stateHome.root, PAN_DIRNAME)
+  const panDir = join(resolvePlanHome(projectRoot), PAN_DIRNAME)
   return {
     panDir,
     specsDir: join(panDir, PAN_SPECS_DIRNAME),
