@@ -608,21 +608,22 @@
     "recordedAt": "2026-09-18T09:36:36.969Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-09-18T09:36:38.418Z",
+  "updated": "2026-09-18T09:36:40.311Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "pending",
+    "verificationStatus": "skipped",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T09:36:38.415Z",
+    "updatedAt": "2026-09-18T09:36:40.281Z",
     "reviewNotes": "killAgent skips terminate when the abort RPC fails and has no grace period; runtime-adapter.ac3 + message-delivery.ac3 unmet, only test exercises an unreachable registry",
     "verificationNotes": "Verification FAILED at test (808662ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3668/.overdeck/verification/2026-09-18T08-06-31-225Z-37430f70.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3670",
+    "reviewRequestedAt": "2026-09-18T09:36:38.415Z",
     "reviewSpawnedAt": "2026-09-18T09:14:44.094Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -900,9 +901,7 @@
         "tsdown.config.ts"
       ],
       "recordedAt": "2026-09-18T09:36:36.969Z"
-    },
-    "reviewRequestedAt": "2026-09-18T09:36:38.415Z",
-    "completedAt": "2026-09-18T09:36:38.415Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -966,7 +965,7 @@
       },
       "costAtCloseOut": {
         "usd": 182.1714763,
-        "pricingAsOf": "2026-09-18T09:14:46.146Z"
+        "pricingAsOf": "2026-09-18T09:36:40.298Z"
       }
     },
     "merges": [
