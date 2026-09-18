@@ -21,13 +21,12 @@ import { Effect } from 'effect';
 import { getAgentStateSync } from '../agents/agent-state.js';
 import { isAlive, isIdle } from '../agents/liveness.js';
 import { createSession, killSession, listSessions, sendKeys, sessionExists } from '../tmux.js';
-import { checkPrompt } from './prompt-guard.js';
+import { checkPrompt, toPaneRole, tokensFromLaunchMetadata } from './prompt-guard.js';
 import { registerTerminalBackend } from './registry.js';
 import {
   TerminalBackendError,
   unsupported,
   type AgentPaneRef,
-  type AgentRole,
   type AgentState,
   type AgentTarget,
   type BackendAgentSnapshot,
@@ -49,41 +48,11 @@ import {
 const BACKEND = 'tmux' as const;
 
 /**
- * Overdeck's own role vocabulary is wider than the pane-token roles (FR-5).
- * `ship` is the UAT/ship specialist; the singleton runners (`flywheel`,
- * `sequencer`, `knowledge`) are operator-side conversations and carry no issue
- * token, so they never reach a role-gated target.
- */
-export function toPaneRole(role: string | undefined): AgentRole {
-  switch (role) {
-    case 'work':
-    case 'review':
-    case 'test':
-    case 'strike':
-    case 'plan':
-    case 'worker':
-    case 'uat':
-      return role;
-    case 'ship':
-      return 'uat';
-    default:
-      return 'work';
-  }
-}
-
-/**
  * The target's tokens on tmux. There are no pane tokens, so they come from the
  * agent's launch metadata — the same four values a Herdr pane is stamped with.
  */
 export function tmuxTargetTokens(sessionName: string): Partial<PaneTokens> {
-  const state = getAgentStateSync(sessionName);
-  if (!state) return {};
-  return {
-    issue: state.issueId,
-    role: toPaneRole(state.role),
-    harness: state.harness ?? 'claude-code',
-    model: state.model,
-  };
+  return tokensFromLaunchMetadata(getAgentStateSync(sessionName));
 }
 
 function sessionNameOf(target: AgentTarget): string {
@@ -104,6 +73,8 @@ function fail(operation: string, cause: unknown): TerminalBackendError {
 function attempt<T>(operation: string, run: () => Promise<T>): Effect.Effect<T, TerminalBackendError> {
   return Effect.tryPromise({ try: run, catch: (cause) => fail(operation, cause) });
 }
+
+export { toPaneRole };
 
 export class TmuxBackend implements TerminalBackend {
   readonly name = BACKEND;

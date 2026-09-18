@@ -19,9 +19,8 @@ import {
 } from '../agents.js';
 import { getAgentRuntimeState } from './runtime-state.js';
 import { isPaneDead, sendKeys, sessionExists } from '../tmux.js';
-import { checkPrompt, senderFromEnv } from '../terminal-backends/prompt-guard.js';
-import { resolveLaunchBackend } from '../terminal-backends/launch.js';
-import { tmuxTargetTokens } from '../terminal-backends/tmux.js';
+import { checkPrompt, senderFromEnv, tokensFromLaunchMetadata } from '../terminal-backends/prompt-guard.js';
+import { selectTerminalBackend } from '../terminal-backends/select.js';
 import { isPromptDropped, isPromptRefused, isUnsupported } from '../terminal-backends/types.js';
 import { completeKeyedSubmit, sendKeysDedup } from '../tmux-dedup.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync } from '../bridge-token.js';
@@ -35,6 +34,19 @@ import {
   probeTranscriptSince,
   type TranscriptUserRecordSnapshot,
 } from '../transcript-landing.js';
+
+/**
+ * `terminal.backend` from config.yaml, for the D10 selection. Read lazily: the
+ * delivery door must not pull the config loader into its module graph.
+ */
+async function loadTerminalBackendConfig(): Promise<{ terminal?: { backend?: 'herdr' | 'tmux' } }> {
+  try {
+    const { loadConfigSync } = await import('../config-yaml.js');
+    return loadConfigSync() as { terminal?: { backend?: 'herdr' | 'tmux' } };
+  } catch {
+    return {};
+  }
+}
 
 export type DeliveryResult = {
   ok: boolean;
@@ -310,33 +322,6 @@ export async function deliverAgentMessage(
   const normalizedId = normalizeAgentId(agentId);
   const dedupKey = opts.dedupKey;
 
-  // PAN-3917 FR-17: every prompt is role-checked and idempotent, on both
-  // backends. On Herdr the whole delivery is `backend.prompt`; on tmux only
-  // the guard is new — the PTY supervisor cascade below is unchanged.
-  const messageId = opts.messageId ?? randomUUID();
-  const sender = opts.sender ?? senderFromEnv(process.env, (id) => tmuxTargetTokens(id));
-  const backend = await resolveLaunchBackend();
-  if (backend.name === 'herdr') {
-    const result = await Effect.runPromise(
-      backend.prompt({ agentName: normalizedId }, message, { messageId, sender }),
-    );
-    if (isUnsupported(result)) return { ok: false, path: 'herdr', failure: result.reason };
-    if (isPromptRefused(result)) return { ok: false, path: 'herdr', failure: `refused: ${result.reason}` };
-    if (isPromptDropped(result)) {
-      return { ok: true, path: 'herdr', deduplicated: true, failure: `dropped: ${result.reason}` };
-    }
-    return { ok: true, path: 'herdr' };
-  }
-  const guard = checkPrompt({
-    targetId: normalizedId,
-    targetTokens: tmuxTargetTokens(normalizedId),
-    sender,
-    messageId,
-  });
-  if ('refused' in guard) return { ok: false, path: 'tmux', failure: `refused: ${guard.reason}` };
-  if ('dropped' in guard) {
-    return { ok: true, path: 'tmux', deduplicated: true, failure: `dropped: ${guard.reason}` };
-  }
 
   let channelsEnabled = false;
   let resolvedMethod = deliveryMethod;
@@ -357,6 +342,34 @@ export async function deliverAgentMessage(
     resolvedMethod ??= resilientDeliveryMethod(state?.deliveryMethod) ?? 'auto';
   } catch {
     resolvedMethod ??= 'auto';
+  }
+
+  // PAN-3917 FR-17: every prompt is role-checked and idempotent, on both
+  // backends. On Herdr the whole delivery is `backend.prompt`; on tmux only the
+  // guard is new — the PTY supervisor cascade below is unchanged. The target's
+  // tokens come from the agent state already read above, and the Herdr adapter
+  // is imported only on a Herdr host (it must not be a module-load dependency
+  // of the delivery door).
+  const messageId = opts.messageId ?? randomUUID();
+  const targetTokens = tokensFromLaunchMetadata(state);
+  const sender = opts.sender ?? senderFromEnv(process.env, () => targetTokens);
+  const selection = await selectTerminalBackend(await loadTerminalBackendConfig());
+  if (selection.backend === 'herdr') {
+    const { herdrBackend } = await import('../terminal-backends/herdr.js');
+    const result = await Effect.runPromise(
+      herdrBackend.prompt({ agentName: normalizedId }, message, { messageId, sender }),
+    );
+    if (isUnsupported(result)) return { ok: false, path: 'herdr', failure: result.reason };
+    if (isPromptRefused(result)) return { ok: false, path: 'herdr', failure: `refused: ${result.reason}` };
+    if (isPromptDropped(result)) {
+      return { ok: true, path: 'herdr', deduplicated: true, failure: `dropped: ${result.reason}` };
+    }
+    return { ok: true, path: 'herdr' };
+  }
+  const guard = checkPrompt({ targetId: normalizedId, targetTokens, sender, messageId });
+  if ('refused' in guard) return { ok: false, path: 'tmux', failure: `refused: ${guard.reason}` };
+  if ('dropped' in guard) {
+    return { ok: true, path: 'tmux', deduplicated: true, failure: `dropped: ${guard.reason}` };
   }
 
   const isAcpTarget = state?.harness === 'acp' || state?.harness === 'opencode';

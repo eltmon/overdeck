@@ -21,6 +21,45 @@
 
 import type { AgentRole, PaneTokens, PromptSender } from './types.js';
 
+/**
+ * Overdeck's own role vocabulary is wider than the pane-token roles (FR-5).
+ * `ship` is the UAT/ship specialist; the singleton runners (`flywheel`,
+ * `sequencer`, `knowledge`) are operator-side and carry no issue token, so they
+ * never reach a role-gated target.
+ */
+export function toPaneRole(role: string | undefined): AgentRole {
+  switch (role) {
+    case 'work':
+    case 'review':
+    case 'test':
+    case 'strike':
+    case 'plan':
+    case 'worker':
+    case 'uat':
+      return role;
+    case 'ship':
+      return 'uat';
+    default:
+      return 'work';
+  }
+}
+
+/**
+ * The four pane tokens derived from an agent's launch metadata. This is where a
+ * tmux target's tokens come from — a tmux pane carries none of its own.
+ */
+export function tokensFromLaunchMetadata(
+  state: { issueId?: string; role?: string; harness?: string; model?: string } | null | undefined,
+): Partial<PaneTokens> {
+  if (!state) return {};
+  return {
+    issue: state.issueId,
+    role: toPaneRole(state.role),
+    harness: state.harness ?? 'claude-code',
+    model: state.model ?? 'unknown',
+  };
+}
+
 /** How many recent message ids are remembered per target. */
 export const PROMPT_RING_SIZE = 64;
 
