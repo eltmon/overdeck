@@ -88,19 +88,7 @@ export { messageAgent } from './agents/messaging.js';
 export { buildCompactRecoverySeed, resumeAgent } from './agents/resume.js';
 
 export { autoRecoverAgents, detectCrashedAgents, recoverAgent, restartAgent, type RestartAgentOptions } from './agents/recovery.js';
-export {
-  compactAtTierRunBoundary,
-  contextWindowForModel,
-  replayCrashedStandingAgent,
-  replayStandingAgent,
-  shouldReplayCompactAtTierRunBoundary,
-  type ReplayCommit,
-  type ReplayDelivery,
-  type ReplayResult,
-  type ReplayStandingTierTarget,
-  type ReplaySupervisorTarget,
-  type ReplayTarget,
-  type TierReplayDeps,
-  type TierRunCompactionInput,
-  type TierRunCompactionOptions,
-} from './agents/tier-replay.js';
+// PAN-3917: tier-replay.ts (standing-tier swarm replay) deleted — it depended
+// on agents/slot-reconcile.ts and agents/standing-tiers.ts (Appendix A.5,
+// permanently gone) and had no surviving caller outside this barrel and its
+// own smoke test. Swarm standing-tiers are dormant in the new architecture.

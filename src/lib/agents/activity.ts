@@ -12,7 +12,6 @@ import { findLatestRollout, extractThreadIdFromRollout } from '../runtimes/codex
 import { resolveLatestOhmypiSessionId } from '../runtimes/ohmypi.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { readLatestAgentClaudeSessionIdEventSync } from '../overdeck/event-reads.js';
-import { appendAgentPlaneSession, readAgentPlaneRecordSync } from '../pan-dir/agents.js';
 import { appendSessionIdToHistory, isSessionResetMarker, persistCurrentSessionId } from '../session-history.js';
 
 /** Activity log entry (still written by heartbeat-hook as a forensic artifact). */
@@ -73,30 +72,19 @@ export function getActivity(agentId: string, limit = 100): ActivityEntry[] {
 }
 
 /**
- * Save Claude session ID for later resume
+ * Save Claude session ID for later resume. `reason` distinguishes an
+ * ordinary rotation from a crash-recovery pickup for callers/logs that care;
+ * both paths persist identically (PAN-3917: the durable cross-machine
+ * agent-plane mirror this used to also write is gone with the record plane —
+ * session.id/sessions.json, written below, are the only copy now).
  */
 export function saveSessionId(
   agentId: string,
   sessionId: string,
-  reason: 'rotation' | 'recovered' = 'rotation',
+  _reason: 'rotation' | 'recovered' = 'rotation',
 ): void {
   persistCurrentSessionId(agentId, sessionId);
   appendSessionIdToHistory(agentId, sessionId);
-  const state = getAgentStateSync(agentId);
-  if (!state) {
-    console.warn(`[agents] Could not append durable session ${sessionId} for ${agentId}: agent state is missing`);
-    return;
-  }
-  void appendAgentPlaneSession(state, {
-    id: sessionId,
-    startedAt: new Date().toISOString(),
-    reason,
-  }).catch((error) => {
-    console.warn(
-      `[agents] Could not append durable session ${sessionId} for ${agentId}: `
-      + `${error instanceof Error ? error.message : String(error)}`,
-    );
-  });
 }
 
 /**
@@ -178,7 +166,6 @@ export interface SessionResolutionResult {
 export interface ClaudeSessionRecoveryDeps {
   getAgentState?: typeof getAgentStateSync;
   isSessionReset?: (agentId: string) => boolean;
-  readAgentPlaneRecord: typeof readAgentPlaneRecordSync;
   readEventSessionId: typeof readLatestAgentClaudeSessionIdEventSync;
   transcriptExists: (workspace: string, sessionId: string) => boolean;
   log: (message: string) => void;
@@ -191,13 +178,19 @@ function claudeProjectDir(workspace: string): string {
 function defaultClaudeSessionRecoveryDeps(): ClaudeSessionRecoveryDeps {
   return {
     isSessionReset: isSessionResetMarker,
-    readAgentPlaneRecord: readAgentPlaneRecordSync,
     readEventSessionId: readLatestAgentClaudeSessionIdEventSync,
     transcriptExists: (workspace, sessionId) => existsSync(join(claudeProjectDir(workspace), `${sessionId}.jsonl`)),
     log: (message) => console.warn(message),
   };
 }
 
+/**
+ * Last-resort claude-code session lookup, tried once nothing on disk (session.id,
+ * sessions.json, runtime.json) has an answer: the `agent.model_set` event-store
+ * history. PAN-3917: this used to check the durable git-tracked agent-plane
+ * record first — that door (pan-dir/agents.ts) and its writer are gone with the
+ * record plane, so the event-store check is the only surviving source.
+ */
 export function resolveClaudeSessionRecoverySync(
   agentId: string,
   agentState: ReturnType<typeof getAgentStateSync>,
@@ -205,21 +198,7 @@ export function resolveClaudeSessionRecoverySync(
 ): SessionResolutionResult {
   const checked: string[] = [];
   if (!agentState?.workspace || !agentState.issueId) {
-    return { sessionId: null, checked: ['durable agents plane and event store unavailable because agent metadata is missing'] };
-  }
-
-  try {
-    checked.push('durable agents plane');
-    const record = deps.readAgentPlaneRecord(agentState.issueId, agentId);
-    const candidates = [...(record?.sessions ?? [])]
-      .sort((left, right) => right.startedAt.localeCompare(left.startedAt));
-    const candidate = candidates.find((entry) => deps.transcriptExists(agentState.workspace, entry.id));
-    if (candidate) return { sessionId: candidate.id, checked, needsPointerRepair: true };
-  } catch (error) {
-    deps.log(
-      `[agents] Durable agent-plane session lookup failed for ${agentId}: `
-      + `${error instanceof Error ? error.message : String(error)}`,
-    );
+    return { sessionId: null, checked: ['event store unavailable because agent metadata is missing'] };
   }
 
   try {

@@ -17,7 +17,6 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { renderWorkspaceGitShowPromise } from '../git-utils.js';
 import { deliverAgentMessage, type DeliveryResult } from './delivery.js';
-import type { StandingTierAgent } from './standing-tiers.js';
 import { estimateFeedDeliveryTokens, recordTierFeedDelivery } from './tier-metrics.js';
 import type { ValidatedTieredExecutionFeedConfig } from './tier-table.js';
 import { DEFAULT_TIERED_EXECUTION_CONFIG } from './tier-table.js';
@@ -37,8 +36,14 @@ export interface BroadcastCommitOptions {
   itemId?: string;
   /** Commit subject used by feed.exclude_subjects. Defaults to itemTitle for legacy callers. */
   commitSubject?: string;
-  /** The standing tier agents to deliver to — every one of them hears it. */
-  tiers: Array<Pick<StandingTierAgent, 'tierName' | 'agentId'>>;
+  /**
+   * The standing tier agents to deliver to — every one of them hears it.
+   * Structurally matches the deleted standing-tiers.ts's StandingTierAgent
+   * (PAN-3917: agents/standing-tiers.ts is gone, Appendix A.5; this caller
+   * — cloister/swarm-tiered-hooks.ts — supplies the two fields this module
+   * actually needs).
+   */
+  tiers: Array<{ tierName: string; agentId: string }>;
   /** Issue id for delivery metrics. */
   issueId?: string;
   /** Dashboard API base URL used in the listener call-out curl snippet. */
