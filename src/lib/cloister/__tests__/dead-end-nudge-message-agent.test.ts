@@ -17,9 +17,9 @@ vi.mock('../../tmux.js', async (importOriginal) => {
   return { ...actual, sendKeys: mocks.sendKeys }
 })
 
-vi.mock('../agent-idle.js', () => ({
-  isAgentIdleForNudge: mocks.isAgentIdleForNudge,
-  getAgentIdleAgeMs: mocks.getAgentIdleAgeMs,
+vi.mock('../../agents/liveness.js', () => ({
+  isIdle: mocks.isAgentIdleForNudge,
+  idleAgeMs: mocks.getAgentIdleAgeMs,
 }))
 
 import { checkDeadEndAgents, type CheckDeadEndAgentsDeps } from '../deacon.js'

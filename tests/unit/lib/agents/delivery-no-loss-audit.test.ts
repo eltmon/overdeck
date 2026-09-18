@@ -213,6 +213,13 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
   sessionExists: mocks.sessionExists,
 }));
 
+// PAN-3849: the liveness oracle's process probe lives here now; the fixture's
+// hasAgentRuntimeInSubtree flag drives it (true → pid 4242, false → missing).
+vi.mock('../../../../src/lib/agents/runtime-pid-probe.js', () => ({
+  findAgentRuntimePidInSubtree: async (...args: unknown[]) => ((await mocks.hasAgentRuntimeInSubtree(...args)) ? 4242 : null),
+  findAgentRuntimePidInSubtreeSync: () => null,
+}));
+
 vi.mock('../../../../src/lib/agents/runtime-command.js', () => ({
   claudeSystemPromptFiles: vi.fn(),
   getCodexLauncherFields: vi.fn(),
@@ -310,7 +317,7 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
     mocks.messageAgentDispatch.mockImplementation((...args: unknown[]) => mocks.realMessageAgent!(...args));
     mocks.getAgentRuntimeStateSync.mockReturnValue({ state: 'idle', lastActivity: new Date().toISOString() });
     mocks.sessionExists.mockReturnValue(Effect.succeed(true));
-    mocks.listPaneValues.mockReturnValue(Effect.succeed([]));
+    mocks.listPaneValues.mockReturnValue(Effect.succeed(['4242\t0']));
     mocks.waitForAgentIdle.mockResolvedValue(true);
     mocks.deliverAgentMessage.mockResolvedValue({ ok: true });
     mocks.resumeAgent.mockResolvedValue({ success: true, messageDelivered: true });

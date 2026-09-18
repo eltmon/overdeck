@@ -109,6 +109,9 @@ async function saveSettings(settings: SettingsConfig): Promise<SaveSettingsRespo
       ...(settings.conversations?.title_model !== undefined
         ? { title_model: settings.conversations.title_model }
         : {}),
+      ...(settings.conversations?.handoff_author_model !== undefined
+        ? { handoff_author_model: settings.conversations.handoff_author_model }
+        : {}),
       // Background AI section edits these through the parent too; the embedding
       // card syncs its own saves back into parent formData, so the parent's
       // values are never stale for them (PAN-1589).

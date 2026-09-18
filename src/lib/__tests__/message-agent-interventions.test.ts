@@ -12,6 +12,11 @@ const interventionMocks = vi.hoisted(() => ({
   appendOperatorInterventionEvent: vi.fn(),
 }));
 
+vi.mock('../agents/runtime-pid-probe.js', () => ({
+  findAgentRuntimePidInSubtree: vi.fn(async () => 4242),
+  findAgentRuntimePidInSubtreeSync: vi.fn(() => 4242),
+}));
+
 vi.mock('../operator-interventions.js', () => ({
   appendOperatorInterventionEvent: interventionMocks.appendOperatorInterventionEvent,
   operatorInterventionEvent: vi.fn(),
@@ -31,7 +36,8 @@ vi.mock('../tmux.js', () => ({
   getAgentSessionsSync: vi.fn(() => []),
   capturePane: vi.fn(() => Effect.succeed('')),
   capturePaneSync: vi.fn(() => ''),
-  listPaneValues: vi.fn(() => Effect.succeed([])),
+  // PAN-3849: one live pane row ('<pid>\t<dead>') so the liveness oracle reads alive.
+  listPaneValues: vi.fn(() => Effect.succeed(['4242\t0'])),
   listPaneValuesSync: vi.fn(() => []),
   setOption: vi.fn(() => Effect.void),
 }));

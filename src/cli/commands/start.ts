@@ -17,7 +17,7 @@ import { ROLE_EFFORTS, resolveModel as resolveRoleModel, loadConfigSync as loadY
 import { getModelEffortLevelsSync } from '../../lib/model-capabilities.js';
 import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
 import { resolveWorkspaceRepoRootsSync } from '../../lib/project-repos.js';
-import { resolveProjectFromIssueSync, hasProjectsSync } from '../../lib/projects.js';
+import { resolveProjectFromIssueSync, hasProjectsSync, type ResolvedProject } from '../../lib/projects.js';
 import { hasPRDDraft, getPRDDraftPathSync } from '../../lib/prd-draft.js';
 import { isGitHubIssueSync, resolveGitHubIssueSync } from '../../lib/tracker-utils.js';
 import { Effect } from 'effect';
@@ -95,7 +95,7 @@ import { requireAutomaticStateMigration } from '../../lib/state-auto-migrate.js'
 import { checkActiveOrderDispatch } from '../../lib/orders/dispatch-gate.js';
 import { withActiveOrderDispatchReservation } from '../../lib/orders/dispatch-reservation.js';
 import type { IssueOptions } from './start-options.js';
-import { applyStartPolicyOptions } from './start-policy-overrides.js';
+import { applyStartPolicyOptionsAfterSpawn, persistStartPoliciesThenCheckKickoff } from './start-policy-overrides.js';
 import { prepareFreshWorkAgentSession } from './start-fresh-session.js';
 
 /**
@@ -300,6 +300,11 @@ async function fetchIssueForAutoStart(issueId: string): Promise<AutoSynthesizeIs
   return { issueId, title: issueId, body: '' };
 }
 
+/** PAN-3848 (W24): pre-spawn reconcile is the migration only; policy-override record writes moved post-spawn. */
+async function reconcileStartState(resolved: ResolvedProject, signal: AbortSignal): Promise<void> {
+  await requireAutomaticStateMigration(resolved, signal);
+}
+
 /**
  * Handle remote workspace agent spawning
  */
@@ -307,7 +312,8 @@ async function handleRemoteWorkspace(
   issueId: string,
   options: IssueOptions,
   spinner: Ora,
-  clearPauseBeforeSpawn: boolean
+  clearPauseBeforeSpawn: boolean,
+  resolved?: ResolvedProject,
 ): Promise<void> {
   const config = loadConfigSync();
 
@@ -434,6 +440,10 @@ async function handleRemoteWorkspace(
       tier: fly.getResiliencyTier(),
     });
     spinner.succeed(`Remote agent spawned: ${remoteAgent.id}`);
+
+    if (resolved) {
+      await applyStartPolicyOptionsAfterSpawn(resolved, issueId, options, false, (message) => spinner.warn(message));
+    }
 
     // Handle shadow mode
     const skipTrackerUpdate = await Effect.runPromise(shouldSkipTrackerUpdate(issueId, options.shadow));
@@ -849,10 +859,12 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
     const effectiveRemote = isRemote || overflowToRemote || (locationPreference === 'remote' && !workspacePath);
     if (resolved) {
+      // PAN-3848 (W24, FR-19): only the state migration runs here — the
+      // policy-override record write moved post-spawn so spawning never takes
+      // the record lock.
       const reconcileState = async (signal: AbortSignal) => {
         spinner.text = `Reconciling permanent state for ${resolved.projectName}...`;
-        await requireAutomaticStateMigration(resolved, signal);
-        await applyStartPolicyOptions(resolved, id, options, options.dryRun === true, signal);
+        await reconcileStartState(resolved, signal);
       };
       await runStateReconcile(prep, spinner, effectiveRemote, reconcileState);
     }
@@ -953,7 +965,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     // Handle remote workspace
     if (effectiveRemote) {
-      await handleRemoteWorkspace(id, options, spinner, shouldClearPauseBeforeSpawn);
+      await handleRemoteWorkspace(id, options, spinner, shouldClearPauseBeforeSpawn, resolved ?? undefined);
       return;
     }
 
@@ -1195,7 +1207,17 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       throw new Error(admitted.check.decision.message ?? `Order-book dispatch blocked for ${id}`);
     }
     const agent = admitted.result;
-    if (agent.role === 'work' && agent.kickoffDelivered === false) {
+    // PAN-3848 (F4): policy overrides persist BEFORE the kickoff-failure
+    // return — the live session already carries them through state.json.
+    const kickoffFailed = await persistStartPoliciesThenCheckKickoff(
+      resolved,
+      agent,
+      id,
+      options,
+      false,
+      (message) => spinner.warn(message),
+    );
+    if (kickoffFailed) {
       spinner.fail(`Agent spawned but kickoff delivery was not confirmed: ${agent.id}`);
       for (const line of ['', chalk.red(`Kickoff delivery did not land for ${agent.id}.`), chalk.dim('The live session is preserved and the agent may be idle until the kickoff lands.'), chalk.dim('Deacon will retry delivery after the stuck threshold, or you can send a manual message now:'), `  pan tell ${id} "continue from your kickoff brief"`]) console.log(line);
       process.exitCode = 1; return;
@@ -1254,4 +1276,4 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   }
 }
 
-export const __testInternals = { failPostCreateValidation, repairMainBranchWorkspace, resolveExplicitHarnessFlag, runStartPrepStep };
+export const __testInternals = { failPostCreateValidation, repairMainBranchWorkspace, resolveExplicitHarnessFlag, runStartPrepStep, reconcileStartState };

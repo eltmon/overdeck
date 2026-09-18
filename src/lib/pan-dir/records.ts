@@ -231,9 +231,6 @@ function projectAgentHarnessModel(issueId: string): { harness?: RuntimeName; mod
         .filter((a) => a.role === 'work')
         .sort((a, b) => (b.startedAt ?? '').localeCompare(a.startedAt ?? ''))[0]
       ?? agents[agents.length - 1];
-    // Mid-spawn placeholder row (spawn routes write model 'pending-work-spawn'
-    // with a defaulted harness) — not authoritative yet.
-    if (workAgent?.model === 'pending-work-spawn') return {};
     return {
       harness: workAgent?.harness,
       model: workAgent?.model ?? undefined,
