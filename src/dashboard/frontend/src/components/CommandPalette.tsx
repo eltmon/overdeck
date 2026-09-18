@@ -470,15 +470,6 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
   // ─── Action builders (stable wrt query — filtered later) ────────────────────
 
   const staticActions = useMemo<PaletteAction[]>(() => [
-    {
-      id: 'pan-flywheel',
-      label: 'Run flywheel',
-      description: 'Start the autonomous pipeline run on all In Progress / In Review issues',
-      icon: Zap,
-      group: 'Actions',
-      keywords: ['flywheel', 'all-up', 'orchestrator', 'fixall', 'autonomous'],
-      onSelect: () => onNavigate('flywheel'),
-    },
     ...(onNewWorkspace ? [{
       id: 'new-workspace',
       label: 'New workspace…',

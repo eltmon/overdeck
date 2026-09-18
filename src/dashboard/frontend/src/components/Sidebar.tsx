@@ -59,16 +59,10 @@ function setPipelineFilterUrl(key: 'phase' | 'projects', value: string | null) {
 
 const SIDEBAR_STORAGE_KEY = 'overdeck.ui.sidebarCollapsed';
 
-interface FlywheelRunSummary {
-  id: string;
-  status: 'running' | 'paused' | 'complete' | 'aborted';
-}
-
 interface NavItem {
   id: Tab;
   label: string;
   icon: LucideIcon;
-  badge?: 'flywheel-live';
   title?: string;
 }
 
@@ -77,12 +71,11 @@ interface NavGroup {
   items: NavItem[];
 }
 
-// PAN-1561: the primary rail is Home · Flywheel · Projects. Everything else
+// PAN-1561: the primary rail is Home · Order Book · Projects. Everything else
 // moves into the collapsible "More" section (MORE_GROUPS) below the Projects
 // list — every route stays reachable, no feature is lost.
 const PRIMARY_ITEMS: NavItem[] = [
   { id: 'home' as Tab, label: 'Home', icon: Home },
-  { id: 'flywheel' as Tab, label: 'Flywheel', icon: Loader2, badge: 'flywheel-live' },
   { id: 'orders' as Tab, label: 'Order Book', icon: BookOpen },
 ];
 
@@ -416,17 +409,6 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
 
   const isDev = versionData?.isDev ?? false;
 
-  const { data: flywheelRunsRaw } = useQuery({
-    queryKey: ['flywheel-runs'],
-    queryFn: async () => {
-      const res = await fetch('/api/flywheel/runs?limit=10');
-      if (!res.ok) return [];
-      return res.json() as Promise<FlywheelRunSummary[]>;
-    },
-    refetchInterval: 5000,
-  });
-  const flywheelRuns = Array.isArray(flywheelRunsRaw) ? flywheelRunsRaw : [];
-  const hasActiveFlywheelRun = flywheelRuns.some((run) => run.status === 'running');
   const { data: experimentalFeaturesEnabled = false } = useQuery({
     queryKey: ['settings', 'experimental-features'],
     queryFn: fetchExperimentalFeaturesEnabled,
@@ -470,9 +452,8 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [toggleCollapsed]);
 
-  const renderNavItem = ({ id, label, icon: Icon, badge, title }: NavItem) => {
+  const renderNavItem = ({ id, label, icon: Icon, title }: NavItem) => {
     const isActive = activeTab === id;
-    const liveBadge = badge === 'flywheel-live' && hasActiveFlywheelRun;
     return (
       <button
         key={id}
@@ -490,11 +471,6 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
       >
         <Icon className="shrink-0 w-4 h-4" />
         {!collapsed && <span className="truncate">{label}</span>}
-        {!collapsed && liveBadge && (
-          <span className="ml-auto rounded-full border border-success/30 bg-success/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-success">
-            live
-          </span>
-        )}
       </button>
     );
   };
@@ -597,7 +573,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
           )}
         </div>
 
-        {/* ─── Nav: Home · Flywheel · Projects · More (PAN-1561) ─── */}
+        {/* ─── Nav: Home · Order Book · Projects · More (PAN-1561) ─── */}
         <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2 scrollbar-hide">
           {/* Primary rail */}
           <div className={collapsed ? 'mb-2' : 'mb-1'}>

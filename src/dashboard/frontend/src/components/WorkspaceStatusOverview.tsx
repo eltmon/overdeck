@@ -23,7 +23,6 @@ import type { ReviewStatus, WorkspaceInfo } from '../lib/workspace-types';
 import { ReviewPipelineSection } from './CommandDeck/ZoneCOverviewTabs/ReviewPipelineSection';
 import { isReviewPipelineStuck } from '../lib/pipeline-state';
 import { getFriendlyModelName } from '../lib/dashboard-utils';
-import { VerifyingOnMainBadge } from './VerifyingOnMainBadge';
 
 export interface WorkspaceStatusOverviewProps {
   issue: Issue;
@@ -157,7 +156,6 @@ export function WorkspaceStatusOverview({
 
     return (
       <div className="space-y-2">
-        {isVerifyingOnMain && <VerifyingOnMainBadge compact />}
         {/* Pipeline status */}
         {showPipelineStatus && reviewStatus && (
           <div className="mt-2">
@@ -401,7 +399,6 @@ export function WorkspaceStatusOverview({
   // ─── Full layout (inspector panel) ───
   return (
     <div className="space-y-2">
-      {isVerifyingOnMain && <VerifyingOnMainBadge />}
       {/* Pipeline status */}
       {showPipelineStatus && reviewStatus && (
         <ReviewPipelineSection reviewStatus={reviewStatus} />

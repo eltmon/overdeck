@@ -23,7 +23,6 @@ import { KanbanSkeleton } from '../components/skeletons/KanbanSkeleton';
 import { AgentsSkeleton } from '../components/skeletons/AgentsSkeleton';
 import { PipelineSkeleton } from '../components/skeletons/PipelineSkeleton';
 import { GodViewSkeleton } from '../components/skeletons/GodViewSkeleton';
-import { FlywheelPage } from '../pages/FlywheelPage';
 import { OrderBookPage } from '../pages/OrderBookPage';
 import { BacklogSequencerPage } from '../pages/BacklogSequencerPage';
 import { HomePage } from '../pages/HomePage';
@@ -245,18 +244,6 @@ export function AppRoutes({
       {activeTab === 'autopreso' && (
         <div className="w-full h-full overflow-hidden">
           <AutoPresoView />
-        </div>
-      )}
-      {activeTab === 'flywheel' && (
-        <div className="w-full h-full overflow-hidden">
-          <FlywheelPage
-            onOpenSettings={onOpenSettings}
-            onNavigateAgent={(agentId) => {
-              onSelectAgent(agentId);
-              onTabChange('agents');
-            }}
-            onNavigateIssue={(issueId) => onOpenIssue(issueId)}
-          />
         </div>
       )}
       {activeTab === 'orders' && (

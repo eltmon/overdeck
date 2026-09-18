@@ -1,7 +1,7 @@
 /**
  * UAT batches rail card — the Flywheel rail's centerpiece.
  *
- * PAN-1696: this is now a thin RailCard shell around the shared
+ * PAN-1696: a thin RailCard shell around the shared
  * <MergeTrainView>, so the Flywheel page is ONE VIEWER of the merge train
  * rather than its owner. The body previously read
  * `/api/flywheel/uat-generations` and `/api/flywheel/merge-queue`, which
@@ -17,7 +17,7 @@
  */
 import { GitMerge } from 'lucide-react';
 import { RailCard } from './RailCard';
-import { MergeTrainView, mergeTrainTotals, useMergeTrainData } from '../merge-train/MergeTrainView';
+import { MergeTrainView, mergeTrainTotals, useMergeTrainData } from './MergeTrainView';
 
 export function MergeQueueCard({ active = true, onNavigateIssue }: { active?: boolean; onNavigateIssue?: (issueId: string) => void }) {
   const { sections } = useMergeTrainData(active);

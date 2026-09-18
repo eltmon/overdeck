@@ -16,7 +16,6 @@ import { getIssueWorkAgentMap, isAgentSessionAttachable } from '../../../lib/wor
 import { IssueActionMenu, useIssueActions } from '../../IssueActionMenu';
 import IssueCardPrimitive from '../../primitives/IssueCard';
 import VerbBadge from '../../primitives/VerbBadge';
-import { VerifyingOnMainBadge } from '../../VerifyingOnMainBadge';
 import { CostBreakdownModal } from '../../CostBreakdownModal';
 import type { WorkspaceData } from '../../CommandDeck/ZoneCOverviewTabs/queries';
 import { DifficultyBadge, TrackerShadowBadges } from '../badges';
@@ -610,7 +609,6 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const pinActionRow = isRunning || issueActionPhase === 'STUCK' || issueActionPhase === 'INPUT' || issueActionPhase === 'READY_TO_MERGE';
   const cardVerb = CARD_VERB_BY_PHASE[issueActionPhase];
   const cardVerbBadge =
-    canonical === 'verifying_on_main' ? <VerifyingOnMainBadge compact /> :
     cardVerb ? <VerbBadge variant={cardVerb} /> :
     null;
   const taskProgressColor =

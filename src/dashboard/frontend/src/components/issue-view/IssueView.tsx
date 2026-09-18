@@ -1,5 +1,5 @@
 import type { HTMLAttributes, ReactNode } from 'react';
-import { ReviewPolicyControl } from '../ReviewPolicyControl';
+import { IssuePolicyStrip } from '../IssuePolicyStrip';
 import { ShipProgress } from './ShipProgress';
 import { deriveShip } from './derivations';
 import { useReviewStatusQuery } from '../CommandDeck/ZoneCOverviewTabs/queries';
@@ -28,8 +28,8 @@ export function IssueView({ issueId, density, children, ...rootProps }: IssueVie
   return (
     <div {...rootProps} data-component={typeof dataComponent === 'string' ? dataComponent : 'issue-view'} data-density={density}>
       {(density === 'cockpit' || density === 'console') && (
-        <div data-section={density === 'console' ? 'IssuePolicyStrip / PoliciesControl' : 'ReviewPolicyControl'}>
-          <ReviewPolicyControl issueId={issueId} />
+        <div data-section="IssuePolicyStrip / PoliciesControl">
+          <IssuePolicyStrip issueId={issueId} />
         </div>
       )}
       {density === 'console' && (

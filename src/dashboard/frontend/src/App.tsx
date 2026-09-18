@@ -59,7 +59,6 @@ import {
 import {
   StandaloneConversationPopoutRoute,
   StandaloneDiffPopoutRoute,
-  StandaloneFlywheelPopoutRoute,
   StandaloneTerminalRoute,
 } from './App/StandaloneRoutes';
 import { AppRoutes, type PendingConversationTarget } from './App/AppRoutes';
@@ -118,10 +117,6 @@ export default function App() {
       : terminalSession!;
     const token = new URLSearchParams(window.location.search).get('token') ?? undefined;
     return <StandaloneTerminalRoute sessionName={sessionName} token={token} />;
-  }
-
-  if (terminalPath === '/popout/flywheel-conversation') {
-    return <StandaloneFlywheelPopoutRoute />;
   }
 
   // /popout/conversation/<id> — bare conversation window, no dashboard chrome.
@@ -877,7 +872,6 @@ export default function App() {
           isSessionFeedSidebarOpen={isSessionFeedSidebarOpen}
           onSearchOpen={() => setIsSearchOpen(true)}
           onOpenSettings={() => setActiveTab('settings')}
-          onNavigateOpenQuestions={() => setActiveTab('flywheel')}
           onDismissTrackerBanner={() => setTrackerBannerDismissed(true)}
           onRestartBackend={() => restartBackendMutation.mutate()}
           onRestartCliproxy={() => restartCliproxyMutation.mutate()}

@@ -1,13 +1,10 @@
 import { AlertTriangle, CheckCircle2, History, RefreshCw, Search, StopCircle } from 'lucide-react';
-import { BootReconciliationModal } from '../components/BootReconciliationModal';
 import { DeaconPauseToggle } from '../components/DeaconPauseToggle';
 import { LowCostModePill } from '../components/LowCostModePill';
 import { DecisionsIndicator } from '../components/DecisionsIndicator';
-import { OpenQuestionsIndicator } from '../components/OpenQuestionsIndicator';
 import { SystemMenu } from '../components/SystemMenu';
 import { StoppedAgentsBanner } from '../components/StoppedAgentsBanner';
 import { RunningAgentsPill } from '../components/RunningAgentsPill';
-import { OrphanTestAgentsSurface } from '../components/OrphanTestAgentsSurface';
 import { CodexAuthBanner } from '../components/CodexAuthBanner';
 import { ConversationSearchBanner } from '../components/ConversationSearchBanner';
 import { InotifyPressureBanner } from '../components/InotifyPressureBanner';
@@ -42,7 +39,6 @@ interface AppChromeProps {
   isSessionFeedSidebarOpen: boolean;
   onSearchOpen: () => void;
   onOpenSettings: () => void;
-  onNavigateOpenQuestions: () => void;
   onDismissTrackerBanner: () => void;
   onRestartBackend: () => void;
   onRestartCliproxy: () => void;
@@ -64,7 +60,6 @@ export function AppChrome({
   isSessionFeedSidebarOpen,
   onSearchOpen,
   onOpenSettings,
-  onNavigateOpenQuestions,
   onDismissTrackerBanner,
   onRestartBackend,
   onRestartCliproxy,
@@ -75,12 +70,6 @@ export function AppChrome({
       {/* PAN-2908 C-FRESH: system notices render in ONE slim row instead of
           stacked full-width banners. */}
       <div data-component="system-notices-row" className="flex flex-wrap items-stretch border-b border-border">
-        <BootReconciliationModal />
-
-        {/* Deacon-frozen state and stopped-agents are now compact pills in the
-            app bar (PAN-1591), not persistent full-width banners. */}
-        <OrphanTestAgentsSurface />
-
         {/* A deploy script, `pan reload`, or `pan restart` is blocked waiting
             for the operator to approve a dashboard restart (PAN-3729) */}
         <RestartApprovalBanner />
@@ -244,7 +233,6 @@ export function AppChrome({
           <StaleBuildChip />
           <SystemHealthPill />
           <DecisionsIndicator />
-          <OpenQuestionsIndicator onActivate={onNavigateOpenQuestions} />
           <SystemMenu onOpenSettings={onOpenSettings} />
           {/* The Command Deck has the always-on Awareness rail, so the global
               feed toggle only appears on other pages (PAN-1591). */}

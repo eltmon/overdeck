@@ -25,7 +25,7 @@ import { useConvoDock } from '../../../lib/convoDock';
 import { PROJECT_TREE_CONTEXT_ACTIONS, type NonIssueActionContext } from '../../../lib/issueActions';
 import { parseContainerServiceName } from '../../../lib/resource-utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { MergeButton } from '../../MergeButton'; import { OrderBookIssueChip } from '../../orders/OrderBookModule';
+import { MergeButton } from '../../MergeButton'; import { OrderBookIssueChip } from '../../orders/OrderBookIssueChip';
 import { TroubledBadges } from './TroubledBadges';
 import { IssueView, IssueViewFullscreenButton, RailShipProgress } from '../../issue-view/IssueView';
 import { StartAgentCta } from '../../issue-view/StartAgentCta';

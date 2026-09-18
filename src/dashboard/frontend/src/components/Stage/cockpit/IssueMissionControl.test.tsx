@@ -229,7 +229,7 @@ vi.mock('../../IssueActionMenu/useIssueActions', () => ({
 }))
 
 vi.mock('../../MergeButton', () => ({ MergeButton: () => <div>Merge button</div> }))
-vi.mock('../../ReviewPolicyControl', () => ({ ReviewPolicyControl: () => <div>Review policy</div> }))
+vi.mock('../../IssuePolicyStrip', () => ({ IssuePolicyStrip: () => <div>Review policy</div> }))
 vi.mock('../../issue-view/StartAgentCta', () => ({
   StartAgentCta: ({ issueId, density }: { issueId: string; density: string }) => (
     <div data-testid="start-agent-cta" data-issue-id={issueId} data-density={density}>Start work agent · Overrides · model · harness</div>
@@ -376,7 +376,7 @@ describe('IssueMissionControl', () => {
     const { container } = renderMissionControl();
     // A known session makes Session the default: route chrome + the ONE
     // IssueDetail at page density.
-    for (const section of ['Header bar', 'StatusNarrative', 'Pipeline Band', 'AgentsLane', 'Detail Tabs', 'ReviewPolicyControl', 'Session tab']) {
+    for (const section of ['Header bar', 'StatusNarrative', 'Pipeline Band', 'AgentsLane', 'Detail Tabs', 'IssuePolicyStrip / PoliciesControl', 'Session tab']) {
       expect(container.querySelector(`[data-section="${section}"]`), section).toBeInTheDocument();
     }
     expect(container.querySelectorAll('[data-section="Pipeline Band"]')).toHaveLength(1);
