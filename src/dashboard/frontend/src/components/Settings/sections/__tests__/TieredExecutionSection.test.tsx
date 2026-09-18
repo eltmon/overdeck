@@ -759,3 +759,219 @@ describe('no-loss inventory', () => {
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
   });
 });
+
+describe('tier fitness badges (PAN-3842)', () => {
+  function settingsWith(tiered_execution: SettingsConfig['tiered_execution']): SettingsConfig {
+    return baseSettings({ tiered_execution });
+  }
+
+  it('renders one badge naming small-class and expert for a haiku crew that owns expert', () => {
+    render(
+      <TieredExecutionSection
+        formData={settingsWith({
+          enabled: true,
+          tiers: {
+            cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'] },
+            capable: { model: 'claude-sonnet-5', harness: 'claude-code', difficulties: ['medium', 'complex'] },
+            frontier: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['expert'] },
+          },
+          by_kind: {},
+          supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
+          replay_threshold: 0.5,
+        })}
+        onSettingsChange={vi.fn()}
+      />,
+    );
+
+    const badges = screen.getAllByTestId('tier-fitness-warning');
+    expect(badges).toHaveLength(1);
+    expect(badges[0].textContent).toContain('small-class');
+    expect(badges[0].textContent).toContain('expert');
+  });
+
+  it('renders no badge for the same haiku crew owning only trivial and simple', () => {
+    render(
+      <TieredExecutionSection
+        formData={settingsWith({
+          enabled: true,
+          tiers: {
+            cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'] },
+            capable: { model: 'claude-opus-5', harness: 'claude-code', difficulties: ['medium', 'complex', 'expert'] },
+          },
+          by_kind: {},
+          supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
+          replay_threshold: 0.5,
+        })}
+        onSettingsChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryAllByTestId('tier-fitness-warning')).toHaveLength(0);
+  });
+
+  it("renders a 'would cost less' badge for a claude-opus-5 crew owning only trivial", () => {
+    render(
+      <TieredExecutionSection
+        formData={settingsWith({
+          enabled: true,
+          tiers: {
+            cheap: { model: 'claude-opus-5', harness: 'claude-code', difficulties: ['trivial'] },
+            capable: { model: 'claude-fable-5-1', harness: 'claude-code', difficulties: ['simple', 'medium', 'complex', 'expert'] },
+          },
+          by_kind: {},
+          supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
+          replay_threshold: 0.5,
+        })}
+        onSettingsChange={vi.fn()}
+      />,
+    );
+
+    const badges = screen.getAllByTestId('tier-fitness-warning');
+    expect(badges).toHaveLength(1);
+    expect(badges[0].textContent).toContain('would cost less');
+  });
+
+  it('renders a badge in the supervisor block for a haiku supervisor', () => {
+    render(
+      <TieredExecutionSection
+        formData={settingsWith({
+          enabled: true,
+          tiers: {
+            cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'] },
+            capable: { model: 'claude-opus-5', harness: 'claude-code', difficulties: ['medium', 'complex', 'expert'] },
+          },
+          by_kind: {},
+          supervisor: { model: 'claude-haiku-4-5', harness: 'claude-code', subscribe: 'flagged' },
+          replay_threshold: 0.5,
+        })}
+        onSettingsChange={vi.fn()}
+      />,
+    );
+
+    const badges = screen.getAllByTestId('tier-fitness-warning');
+    expect(badges).toHaveLength(1);
+    expect(badges[0].textContent).toContain('supervisor');
+  });
+
+  it("renders a 'not enabled' badge when the crew model's provider is disabled", () => {
+    render(
+      <TieredExecutionSection
+        formData={settingsWith({
+          enabled: true,
+          tiers: {
+            cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'] },
+            capable: { model: 'gpt-5.6-luna', harness: 'codex', difficulties: ['medium', 'complex', 'expert'] },
+          },
+          by_kind: {},
+          supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
+          replay_threshold: 0.5,
+        })}
+        onSettingsChange={vi.fn()}
+      />,
+    );
+
+    const texts = screen.getAllByTestId('tier-fitness-warning').map((badge) => badge.textContent ?? '');
+    expect(texts.some((text) => text.includes('not enabled'))).toBe(true);
+  });
+
+  it('removes the badge when the crew model changes to a fitting model, before any save', () => {
+    const onSettingsChange = vi.fn();
+    const formData = settingsWith({
+      enabled: true,
+      tiers: {
+        only: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'] },
+      },
+      by_kind: {},
+      supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
+      replay_threshold: 0.5,
+    });
+    const { rerender } = render(<TieredExecutionSection formData={formData} onSettingsChange={onSettingsChange} />);
+
+    expect(screen.getAllByTestId('tier-fitness-warning').length).toBeGreaterThan(0);
+
+    fireEvent.change(screen.getByLabelText('Model'), { target: { value: 'claude-fable-5-1' } });
+    expect(onSettingsChange).toHaveBeenCalled();
+    const draft = onSettingsChange.mock.calls[onSettingsChange.mock.calls.length - 1][0] as SettingsConfig;
+
+    rerender(<TieredExecutionSection formData={draft} onSettingsChange={onSettingsChange} />);
+    expect(screen.queryAllByTestId('tier-fitness-warning')).toHaveLength(0);
+  });
+});
+
+// PAN-3842 (adjudicated F-3): every fitness badge was keyed on the warning
+// code alone, so a distribution whose entries share a code rendered siblings
+// with the same key and React logged a duplicate-key error.
+describe('fitness badge keys', () => {
+  function renderWithConsoleCapture(ui: Parameters<typeof render>[0]) {
+    const messages: string[] = [];
+    const spy = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      messages.push(args.map(String).join(' '));
+    });
+    try {
+      render(ui);
+    } finally {
+      spy.mockRestore();
+    }
+    return messages;
+  }
+
+  it('renders one badge per warning with no duplicate-key error for a same-code distribution', () => {
+    // Two small-class models on an expert crew: two 'underpowered' warnings,
+    // one per distribution entry. Keyed on the code alone these collided.
+    const formData = baseSettings({
+      tiered_execution: {
+        enabled: true,
+        tiers: {
+          top: {
+            model: 'claude-haiku-4-5',
+            harness: 'claude-code',
+            difficulties: ['expert'],
+            distribution: [
+              { model: 'claude-haiku-4-5', harness: 'claude-code', weight: 50 },
+              { model: 'gpt-5.6-luna', harness: 'codex', weight: 50 },
+            ],
+          },
+        },
+        by_kind: {},
+        replay_threshold: 0.5,
+      },
+    } as never);
+
+    const messages = renderWithConsoleCapture(
+      <TieredExecutionSection formData={formData} onSettingsChange={vi.fn()} />,
+    );
+
+    const duplicateKeyErrors = messages.filter((message) => /same key|duplicate key|Encountered two children/i.test(message));
+    expect(duplicateKeyErrors, duplicateKeyErrors.join('\n')).toEqual([]);
+
+    const badges = screen.getAllByTestId('tier-fitness-warning');
+    expect(badges.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('keeps every badge message rather than collapsing duplicates', () => {
+    const formData = baseSettings({
+      tiered_execution: {
+        enabled: true,
+        tiers: {
+          top: {
+            model: 'claude-haiku-4-5',
+            harness: 'claude-code',
+            difficulties: ['expert'],
+            distribution: [
+              { model: 'claude-haiku-4-5', harness: 'claude-code', weight: 50 },
+              { model: 'gpt-5.6-luna', harness: 'codex', weight: 50 },
+            ],
+          },
+        },
+        by_kind: {},
+        replay_threshold: 0.5,
+      },
+    } as never);
+
+    render(<TieredExecutionSection formData={formData} onSettingsChange={vi.fn()} />);
+
+    const titles = screen.getAllByTestId('tier-fitness-warning').map((badge) => badge.getAttribute('title') ?? '');
+    expect(titles.some((title) => title.includes('claude-haiku-4-5'))).toBe(true);
+    expect(titles.some((title) => title.includes('gpt-5.6-luna'))).toBe(true);
+  });
+});

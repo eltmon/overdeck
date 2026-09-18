@@ -172,6 +172,64 @@ describe('useConfluenceOrbs', () => {
     });
   });
 
+  it('lets a live agent outvote its own stopped-and-paused specialists', () => {
+    // PAN-3841's real shape: eight review specialists stopped and paused by an
+    // operator, one work agent still running. Nothing clears `paused` on a dead
+    // row, so the issue rendered "yielded" on the shelf while that agent worked.
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-6': agent({ id: 'agent-pan-6', issueId: 'PAN-6', role: 'work' }),
+        'agent-pan-6-review-security': agent({
+          id: 'agent-pan-6-review-security',
+          issueId: 'PAN-6',
+          role: 'review',
+          status: 'stopped',
+          paused: true,
+          pausedReason: 'Operator requested stop of these agents for independent code review',
+        }),
+      },
+      issuesRaw: [{ id: 'PAN-6', identifier: 'PAN-6', title: 'Working', labels: [] }],
+      reviewStatusByIssueId: {},
+    });
+
+    const client = queryClient();
+    client.setQueryData(['workspace-stack-health', ['PAN-6']], { workspaces: {} });
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+
+    expect(result.current.find((orb) => orb.id === 'PAN-6')).toMatchObject({
+      state: 'active',
+      yieldReason: null,
+      yieldedByScheduler: false,
+    });
+  });
+
+  it('keeps a wholly stopped, paused issue on the shelf', () => {
+    // The other half of the same rule: with no live agent, the stopped rows are
+    // the only evidence there is, and an operator-parked issue belongs shelved.
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-7': agent({
+          id: 'agent-pan-7',
+          issueId: 'PAN-7',
+          status: 'stopped',
+          paused: true,
+          pausedReason: 'Operator paused the slot',
+        }),
+      },
+      issuesRaw: [{ id: 'PAN-7', identifier: 'PAN-7', title: 'Parked', labels: [] }],
+      reviewStatusByIssueId: {},
+    });
+
+    const client = queryClient();
+    client.setQueryData(['workspace-stack-health', ['PAN-7']], { workspaces: {} });
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+
+    expect(result.current.find((orb) => orb.id === 'PAN-7')).toMatchObject({
+      state: 'shelf',
+      yieldReason: 'Operator paused the slot',
+    });
+  });
+
   it('groups four review specialists and the review parent into a five-member convoy', () => {
     const reviewAgents = [
       'agent-min-839-review-security',

@@ -29,9 +29,12 @@ import { normalizeFlywheelRunId } from './provenance.js';
 import { clearStaleClosedOutBeforeSpawn } from './reopen-guard.js';
 import { resolveStaffing } from './staffing.js';
 import { applyEffectiveDifficulty } from './tier-escalation.js';
+import { checkStaffingFitness } from './tier-fitness.js';
+import { buildTierFitnessContextSync } from './tier-fitness-context.js';
 import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue, type ValidatedTieredExecutionConfig } from './tier-table.js';
 import {
   buildCavemanExports,
+  determineModel,
   getProviderEnvForModel,
   getProviderExportsForModel,
 } from './provider-env.js';
@@ -219,10 +222,21 @@ export interface SlotTierSpawnParams {
   model?: string;
   harness?: RuntimeName;
   tierName?: string;
+  /** The slot item's xBRIEF difficulty, when the plan item declares one. */
+  difficulty?: XBriefDifficulty;
+  /** Single-work path only: deduplicated difficulties across the plan's pending items. */
+  planDifficulties?: XBriefDifficulty[];
+  /** Single-work path only: pending items that carry a difficulty, as id/difficulty pairs. */
+  planItems?: Array<{ id: string; difficulty?: XBriefDifficulty }>;
   /** PAN-2397: true when staffing came from the implicit roles.work tier.
    * Implicit staffing intentionally omits `harness` so the spawn keeps its
    * historical harness handling (provider-default derived from the model). */
   implicit?: boolean;
+  /** PAN-3842: when the caller passed an explicit per-spawn model override,
+   * the helpers still surface plan difficulty info but leave `model` and
+   * `harness` unset so override precedence is preserved. This field echoes
+   * the override for clarity in tests and logs. */
+  explicitOverride?: string;
 }
 
 /**
@@ -246,11 +260,29 @@ export function resolveSlotTierSpawnParams(
   explicitModel?: string,
   spawnKey?: string,
 ): SlotTierSpawnParams {
-  // An explicit per-spawn model override outranks all staffing (same
-  // precedence as determineModel).
-  if (explicitModel) return {};
   const doc = readWorkspacePlanSync(baseWorkspace);
-  if (!doc) return {};
+  if (!doc) {
+    // PAN-3842 (review): under an explicit --model a missing plan never
+    // aborts the spawn — return the override marker and let the caller
+    // proceed (FR-7 / NonGoal 1).
+    if (explicitModel) return { explicitOverride: explicitModel };
+    return {};
+  }
+
+  // PAN-3842 (review): override path short-circuits BEFORE the missing-item
+  // throw so a slot/plan desync under an explicit --model never aborts the
+  // spawn (FR-7 / NonGoal 1).
+  if (explicitModel) {
+    const item = doc.plan.items.find((candidate) => candidate.id === slotItemId);
+    return {
+      // PAN-3858: warn against the promoted difficulty, not the authored one.
+      difficulty: item
+        ? (applyEffectiveDifficulty(item, readTierOverrides(baseWorkspace)).metadata?.difficulty as XBriefDifficulty | undefined)
+        : undefined,
+      explicitOverride: explicitModel,
+    };
+  }
+
   const planMetadata = doc?.plan?.metadata;
 
   // Extract issueId from workspace path: feature-<issueId>
@@ -288,6 +320,10 @@ export function resolveSlotTierSpawnParams(
     harness: staffing.implicit ? undefined : staffing.harness,
     tierName: staffing.tierName,
     implicit: staffing.implicit,
+    // PAN-3858: staffing routed this item by its effective (promoted)
+    // difficulty, so the fitness warning must judge the model against the
+    // same difficulty.
+    difficulty: applyEffectiveDifficulty(item, tierOverrides).metadata?.difficulty as XBriefDifficulty | undefined,
   };
 }
 
@@ -382,6 +418,110 @@ function selectHardestItem(
 }
 
 /**
+ * Statuses excluded from the single-work fitness sweep (PAN-3842). Deliberately
+ * NARROWER than SINGLE_WORK_NON_CANDIDATE_STATUSES: that set picks the one item
+ * staffing keys on, while this set answers "what will this agent actually
+ * touch". A blocked item unblocks and gets worked by the same agent, so its
+ * difficulty still belongs in the warning.
+ */
+const FITNESS_DONE_STATUSES: ReadonlySet<XBriefItemStatus> = new Set<XBriefItemStatus>(['completed', 'cancelled']);
+
+/**
+ * Pending-item difficulties for the single-work fitness warning (PAN-3842).
+ * Recorded tier promotions (PAN-3858) are applied first, so an item escalated
+ * to `expert` is warned about at `expert` — staffing already routes it that
+ * way, and reading the raw metadata here would silently under-warn on exactly
+ * the items the escalation path just raised.
+ */
+function collectPlanFitnessItems(
+  doc: XBriefDocument,
+  tierOverrides: TierOverridesMap,
+): { planDifficulties: XBriefDifficulty[]; planItems: Array<{ id: string; difficulty?: XBriefDifficulty }> } {
+  const planItems = doc.plan.items
+    .filter((candidate) => !FITNESS_DONE_STATUSES.has(candidate.status))
+    .map((candidate) => ({
+      id: candidate.id,
+      difficulty: applyEffectiveDifficulty(candidate, tierOverrides).metadata?.difficulty as XBriefDifficulty | undefined,
+    }))
+    .filter((candidate): candidate is { id: string; difficulty: XBriefDifficulty } => Boolean(candidate.difficulty));
+  return {
+    planDifficulties: [...new Set(planItems.map((candidate) => candidate.difficulty))],
+    planItems,
+  };
+}
+
+/**
+ * PAN-3842: build the fitness-check payload for a slot spawn. Centralizes
+ * the model reassignment + harness fallback so the fitness check always
+ * sees the FINAL selected model, and tests can drive the production
+ * ordering through this exported helper.
+ */
+export function resolveSlotSpawnFitness(
+  role: Role,
+  spawnKey: string,
+  tierParams: SlotTierSpawnParams,
+  optionsModel: string | undefined,
+  optionsHarness: RuntimeName | undefined,
+  slotItemId: string,
+): {
+  staffing: { tierName: string; model?: string; harness?: RuntimeName };
+  difficulties: XBriefDifficulty[];
+  items: Array<{ id: string; difficulty?: XBriefDifficulty }>;
+} {
+  // Reassign to the FINAL model — the same step spawn.ts performs after
+  // resolveSlotTierSpawnParams so the agent genuinely spawns the staffed
+  // model, not the pre-reassignment parent default.
+  const finalModel = tierParams.model
+    ? determineModel({ model: tierParams.model, role, spawnKey })
+    : optionsModel;
+  const finalHarness: RuntimeName | undefined = tierParams.model
+    ? (tierParams.harness ?? optionsHarness)
+    : optionsHarness;
+
+  return {
+    staffing: {
+      tierName: tierParams.tierName ?? 'default',
+      model: finalModel,
+      harness: finalHarness,
+    },
+    difficulties: tierParams.difficulty ? [tierParams.difficulty] : [],
+    items: [{ id: slotItemId, difficulty: tierParams.difficulty }],
+  };
+}
+
+/**
+ * PAN-3842: one `[spawn] tier fitness:` console.warn line per fitness warning
+ * for the staffed (model, harness) at spawn time. Never throws — a fitness
+ * check failure must not prevent a spawn.
+ */
+export function logTierFitnessAtSpawn(
+  label: string,
+  staffing: { tierName: string; model?: string; harness?: RuntimeName },
+  difficulties: XBriefDifficulty[],
+  items: Array<{ id: string; difficulty?: XBriefDifficulty }>,
+  log: (line: string) => void = console.warn,
+): void {
+  if (!staffing.model || difficulties.length === 0) return;
+  try {
+    const ctx = buildTierFitnessContextSync(loadYamlConfig().config);
+    const warnings = checkStaffingFitness(
+      { tierName: staffing.tierName, model: staffing.model, harness: staffing.harness, path: `tier '${staffing.tierName}'` },
+      difficulties,
+      ctx,
+    );
+    for (const w of warnings) {
+      // List only the items whose difficulty the warning names; fall back to
+      // every item so the line never reads "(items: )".
+      const offending = items.filter((i) => i.difficulty !== undefined && w.difficulties.includes(i.difficulty));
+      const ids = (offending.length > 0 ? offending : items).map((i) => i.id);
+      log(`[spawn] tier fitness: ${label} — ${w.message} (items: ${ids.join(', ')}) — PAN-3842`);
+    }
+  } catch (error) {
+    log(`[spawn] tier fitness check skipped: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
  * Tiered-execution model resolution for the single work-agent path.
  * Auto-start and non-swarm issues still run one foreground work agent, and
  * that agent executes the whole plan — so it is staffed for the plan's
@@ -394,11 +534,19 @@ export function resolveSingleWorkTierSpawnParams(
   explicitModel?: string,
   spawnKey?: string,
 ): SlotTierSpawnParams {
-  if (explicitModel) return {};
-
   const doc = readWorkspacePlanSync(workspace);
   if (!doc) return {};
   const planMetadata = doc?.plan?.metadata;
+
+  // PAN-3842: an override skips tier selection entirely, so it must also skip
+  // staffing. Difficulty still comes off doc.plan.items so the caller warns
+  // against the FINAL model; model and harness stay unset so options.model wins.
+  if (explicitModel) {
+    return {
+      ...collectPlanFitnessItems(doc, readTierOverrides(workspace)),
+      explicitOverride: explicitModel,
+    };
+  }
 
   // Extract issueId from workspace path: feature-<issueId>
   const workspaceName = basename(workspace);
@@ -428,11 +576,15 @@ export function resolveSingleWorkTierSpawnParams(
     tierOverrides,
     config: { ...config, tieredExecution: { ...tiered, enabled: effectiveTieredEnabled } },
   });
+  // PAN-3842: the single agent works the WHOLE plan, so its fitness check runs
+  // against every pending item's difficulty (FR-6), not just the one item that
+  // selected the tier.
   return {
     model: staffing.model,
     harness: staffing.implicit ? undefined : staffing.harness,
     tierName: staffing.tierName,
     implicit: staffing.implicit,
+    ...collectPlanFitnessItems(doc, tierOverrides),
   };
 }
 
