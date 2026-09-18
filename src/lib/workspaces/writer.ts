@@ -16,10 +16,9 @@ import { stat } from 'node:fs/promises';
 import { join, resolve as resolvePath } from 'node:path';
 import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
 import { writeWorkspaceIdentity } from '../memory/identity-record.js';
-import { mirrorPin, unmirrorPin } from '../memory/state-mirror.js';
 import type { ProjectConfig } from '../projects.js';
 import type { PinScope, WorkspaceKind } from './types.js';
-import { getMainWorkspace, getProjectByKey, getWorkspaceById, listPinnedDocs } from './resolver.js';
+import { getMainWorkspace, getProjectByKey, getWorkspaceById } from './resolver.js';
 
 // ─── Projects ──────────────────────────────────────────────────────────────
 
@@ -209,22 +208,15 @@ export async function relocateWorkspace(id: string, path: string, options: Reloc
 /**
  * Delete a non-main workspace row. Conversations attributed to it are
  * preserved with workspace_id set to NULL — never deleted. Workspace-scoped
- * pins are removed, including their committed overdeck-state mirror
- * descriptors (FR-10/FR-11 — the mirror is the durable representation, so a
- * pin row deleted here without unmirroring it would let a future recovery
- * from state resurrect a pin the workspace deletion was supposed to remove).
- * Project-scoped pins are untouched. Never touches JSONL transcripts or the
- * memory home (memory purge is a separate explicit flag on the CLI destroy
- * verb).
+ * pins are removed; project-scoped pins are untouched. Never touches JSONL
+ * transcripts or the memory home (memory purge is a separate explicit flag
+ * on the CLI destroy verb).
  *
- * Review fix (durability): the durable mirror is unmirrored FIRST, before
- * the SQLite rows are ever touched. If a state-door commit/push fails here,
- * the function throws and the workspace + pin rows are untouched — a caller
- * retry re-lists the same pins from the unharmed DB row and re-attempts.
- * Doing the DB delete first (the previous ordering) would forget the pin
- * list before the mirror cleanup could be retried, permanently stranding it.
- * unmirrorPin/removeMemoryStateMirror already no-op on an already-removed
- * target, so retrying an already-unmirrored pin is safe.
+ * PAN-3917: this used to also unmirror each pin's committed overdeck-state
+ * descriptor (FR-10/FR-11) before the SQLite rows were touched, so a failed
+ * state-door commit couldn't strand a pin a recovery-from-state could later
+ * resurrect. That branch and mirror are gone — the pinned_docs table is the
+ * only copy now, so a plain transactional delete is sufficient.
  */
 export async function deleteWorkspace(id: string): Promise<void> {
   const db = getOverdeckDatabaseSync();
@@ -233,8 +225,6 @@ export async function deleteWorkspace(id: string): Promise<void> {
   if (workspace.kind === 'main') {
     throw new Error(`Cannot delete the main workspace for project ${workspace.projectId}`);
   }
-  const workspacePins = listPinnedDocs('workspace', id);
-  await Promise.all(workspacePins.map((pin) => unmirrorPin(workspace.projectId, 'workspace', id, pin.docPath)));
 
   const run = db.transaction(() => {
     db.prepare(`UPDATE conversations SET workspace_id = NULL WHERE workspace_id = ?`).run(id);
@@ -245,12 +235,10 @@ export async function deleteWorkspace(id: string): Promise<void> {
 }
 
 // ─── Pinned docs ───────────────────────────────────────────────────────────
-
-/** The classic projects.yaml key that owns a pin scope, for memory-state mirroring. */
-function pinProjectId(scope: PinScope, scopeId: string): string | null {
-  if (scope === 'project') return scopeId;
-  return getWorkspaceById(scopeId)?.projectId ?? null;
-}
+// PAN-3917: pins used to also mirror onto the project's overdeck-state
+// branch (memory/state-mirror.ts's mirrorPin/unmirrorPin) as a durability
+// convenience keyed by the classic projects.yaml key. That branch is gone —
+// the pinned_docs table below is the only copy now.
 
 export async function pinDoc(scope: PinScope, scopeId: string, docPath: string): Promise<void> {
   const createdAt = Date.now();
@@ -259,14 +247,10 @@ export async function pinDoc(scope: PinScope, scopeId: string, docPath: string):
     VALUES (?, ?, ?, ?, ?)
     ON CONFLICT (scope, scope_id, doc_path) DO NOTHING
   `).run(randomUUID(), scope, scopeId, docPath, createdAt);
-  const projectId = pinProjectId(scope, scopeId);
-  if (projectId) await mirrorPin(projectId, scope, scopeId, docPath, createdAt);
 }
 
 export async function unpinDoc(scope: PinScope, scopeId: string, docPath: string): Promise<void> {
   getOverdeckDatabaseSync()
     .prepare(`DELETE FROM pinned_docs WHERE scope = ? AND scope_id = ? AND doc_path = ?`)
     .run(scope, scopeId, docPath);
-  const projectId = pinProjectId(scope, scopeId);
-  if (projectId) await unmirrorPin(projectId, scope, scopeId, docPath);
 }

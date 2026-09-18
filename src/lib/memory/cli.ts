@@ -16,7 +16,6 @@ import {
 } from './paths.js';
 import { readVerifiedPinFile, resolveContainedPinPath } from './pin-path.js';
 import { getMemoryHealthPath, type MemoryHealthSnapshot } from './health.js';
-import { mirrorDailySummary } from './state-mirror.js';
 import { readArchivedStatusEntries, readCurrentStatus, readObservationsSince, type ArchivedStatusEntry } from './rollup.js';
 import { getAgentStateSync } from '../agents.js';
 import {
@@ -469,7 +468,10 @@ export async function generateDailySummary(input: {
   await ensureParentDir(path);
   await writeFile(path, markdown, 'utf8');
   await indexDailySummary(projectId, target, date, observations, markdown);
-  await mirrorDailySummary(projectId, target.workspaceName, date, markdown);
+  // PAN-3917: this used to also mirror the summary onto the project's
+  // overdeck-state branch (memory/state-mirror.ts) as a durability
+  // convenience — that branch and its state-door commit path are gone; the
+  // memory-home file written above is already the source of truth.
   return { status: 'generated', path, markdown, observationCount: observations.length, previousObservationCount };
 }
 
