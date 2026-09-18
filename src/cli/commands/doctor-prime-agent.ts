@@ -5,6 +5,7 @@ import { Effect } from 'effect';
 import { getClaudeAuthStatus } from '../../lib/claude-auth.js';
 import { getOpenAIAuthStatus } from '../../lib/openai-auth.js';
 import { loadConfigSync } from '../../lib/config-yaml.js';
+import { SETTINGS_FILE } from '../../lib/paths.js';
 import {
   checkSystemPrerequisite,
   normalizeResolution,
@@ -36,7 +37,13 @@ export async function checkPrimeAgent(
   resolver?: PrerequisiteResolver,
   credentialCheck?: () => Promise<boolean>,
 ): Promise<PrimeAgentDoctorResult[]> {
-  const productionProbe: PrerequisiteProbe = async (path, args) => (await promisify(execFile)(path, args, { encoding: 'utf8' })).stdout;
+  // `prime-agent --version` prints to stderr, so this probe has to honour the
+  // same opt-in the shared default probe does — reading stdout alone would make
+  // the doctor report "did not return a semantic version" on a healthy install.
+  const productionProbe: PrerequisiteProbe = async (path, args, options) => {
+    const { stdout, stderr } = await promisify(execFile)(path, args, { encoding: 'utf8' });
+    return stdout || (options?.allowStderrVersion ? stderr : '');
+  };
   const activeProbe = probe ?? productionProbe;
   const prime = await checkSystemPrerequisite('prime-agent', activeProbe, resolver);
   if (!prime.found) return [{ name: prime.name, status: 'warn', message: 'Not installed (prime-agent harness unavailable)', fix: `Install: ${prime.install.linux}` }];
@@ -74,7 +81,16 @@ export async function checkPrimeAgent(
     }
     results.push(hasCredential
       ? { name: 'Prime Agent provider credentials', status: 'ok', message: 'At least one configured provider credential is available' }
-      : { name: 'Prime Agent provider credentials', status: 'warn', message: 'No provider credential is configured', fix: 'Configure credentials for the provider used by the selected Prime Agent model.' });
+      : {
+        name: 'Prime Agent provider credentials',
+        status: 'warn',
+        message: 'No provider credential is configured',
+        // The doctor has no model in hand, so it names the two places a
+        // credential can live rather than one variable. A launch DOES know the
+        // model and names the exact variable or auth file
+        // (assertPrimeAgentCredentialAvailable, provider-map.ac2).
+        fix: `Export the provider API key for the model you intend to run (for example ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY), or set the matching "api_keys.<provider>" entry in ${SETTINGS_FILE}. Launching names the exact variable for the selected model.`,
+      });
   }
   return results;
 }

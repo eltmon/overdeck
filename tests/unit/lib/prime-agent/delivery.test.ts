@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 let home: string;
+let savedOverdeckHome: string | undefined;
 let server: Server | undefined;
 let received: Array<Record<string, unknown>>;
 let respond: (body: Record<string, unknown>) => { status: number; payload: string };
@@ -40,6 +41,7 @@ async function startHost(): Promise<void> {
 
 beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), 'prime-delivery-'));
+  savedOverdeckHome = process.env.OVERDECK_HOME;
   process.env.OVERDECK_HOME = home;
   received = [];
   respond = () => ({ status: 200, payload: JSON.stringify({ command: 'prompt' }) });
@@ -50,6 +52,11 @@ afterEach(async () => {
   if (server) await new Promise<void>(resolve => server!.close(() => resolve()));
   server = undefined;
   rmSync(home, { recursive: true, force: true });
+  // Restore rather than leave OVERDECK_HOME pointing at a directory this
+  // afterEach just deleted — the per-worker home is shared by every test file
+  // that runs after this one in the same worker.
+  if (savedOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = savedOverdeckHome;
   vi.useRealTimers();
 });
 
