@@ -1,107 +1,104 @@
-import type { ProjectConfig } from '../projects.js';
-import type { PanIssueRecord } from '../pan-dir/record.js';
-import { listIssueRecords } from '../pan-dir/record-list.js';
-import { acknowledgeAllOpenRecoveryTrips } from './recovery-trip.js';
-import { clearAgentOperatorGatesForIssuesSync } from '../agents/agent-state.js';
-import type { StatePlaneReconcileAction } from './state-plane-patrol.js';
-
 /**
- * Record-level terminality: closedOut is the durable close-out marker, and a
- * mergeStatus of 'merged' with no reopenedAt means the issue merged and was
- * never reopened afterward (reopen drops the stale mergeStatus — see
- * clearRecordPipelineClosedOut in record-update.ts). Shared with the parked
- * resolver's record-first terminality check (PAN-3727) so both surfaces agree
- * by construction on what counts as terminal.
+ * Operator-gate residue on terminal issues (PAN-3727, re-pointed by PAN-3917).
+ *
+ * The original sweep read every project's per-issue records, called an issue
+ * terminal when the record said `closedOut` or `mergeStatus === 'merged'`, and
+ * then acknowledged open "recovery trips" — a stored copy of a stored copy. The
+ * records and the trip ledger are gone.
+ *
+ * What survives is the one real piece of residue: an agent row for a finished
+ * issue still carrying an operator gate (stoppedByUser / paused / troubled),
+ * which keeps the issue showing up as needing a human. Terminality now comes
+ * from the owner of the fact — the tracker says the issue is closed, or the
+ * forge says its PR merged.
  */
-export function isRecordPipelineTerminal(record: Pick<PanIssueRecord, 'pipeline'>): boolean {
-  if (!record.pipeline) return false;
-  return record.pipeline.closedOut === true
-    || (record.pipeline.mergeStatus === 'merged' && !record.pipeline.reopenedAt);
+import type { ProjectConfig } from '../projects.js';
+
+export interface ParkedResidueAction {
+  message: string;
+  level: 'action' | 'warn';
+}
+
+export interface TerminalIssueSignal {
+  issueId: string;
+  /** The tracker says the issue is closed. */
+  issueClosed: boolean;
+  /** The forge says the issue's PR merged. */
+  prMerged: boolean;
 }
 
 export interface ParkedResiduePatrolDeps {
-  listRecords: (project: ProjectConfig) => Promise<PanIssueRecord[]>;
-  ackTrips: (issueId: string) => Promise<number>;
-  clearGatesForIssues: (issueIds: ReadonlySet<string>) => Map<string, string[]>;
+  /** Terminal-issue signals per project, from the tracker and the forge. */
+  listTerminalIssues: (project: ProjectConfig) => Promise<TerminalIssueSignal[]>;
+  clearGatesForIssues?: (issueIds: ReadonlySet<string>) => Map<string, string[]>;
+}
+
+/** An issue is terminal when its tracker issue is closed or its PR merged. */
+export function isIssueTerminal(signal: TerminalIssueSignal): boolean {
+  return signal.issueClosed || signal.prMerged;
+}
+
+async function defaultListTerminalIssues(project: ProjectConfig): Promise<TerminalIssueSignal[]> {
+  const { gatherProjectLensSignals } = await import('../pipeline-membership-gather.js');
+  const signals = await gatherProjectLensSignals(project);
+  return signals.map((signal) => ({
+    issueId: signal.issueId.toUpperCase(),
+    issueClosed: !signal.issueOpen,
+    prMerged: signal.hasMergedPr,
+  }));
 }
 
 function defaultDeps(): ParkedResiduePatrolDeps {
-  return {
-    listRecords: listIssueRecords,
-    ackTrips: acknowledgeAllOpenRecoveryTrips,
-    clearGatesForIssues: clearAgentOperatorGatesForIssuesSync,
-  };
+  return { listTerminalIssues: defaultListTerminalIssues };
+}
+
+async function resolveClearGates(deps: ParkedResiduePatrolDeps) {
+  return deps.clearGatesForIssues
+    ?? (await import('../agents/agent-state.js')).clearAgentOperatorGatesForIssuesSync;
 }
 
 /**
- * Sweep every project's terminal-issue records for parked-population residue
- * left over from before close-out started acknowledging it (PAN-3727): open
- * recovery trips and operator-gate flags (stoppedByUser/paused/troubled) on a
- * terminal issue's stopped agent rows. Runs on the state-plane patrol cadence
- * so the backlog existing before this fix self-heals without a manual sweep,
- * and any future leak path is caught on the next cycle.
+ * Clear operator-gate residue from the agent rows of terminal issues.
  *
- * Three passes, each isolating its own failure mode (review findings,
- * PAN-3727):
- *   1. Gather every terminal record across every project. A project whose
- *      record listing fails is warned and skipped — it must never abort the
- *      sweep for the remaining projects.
- *   2. Clear operator-gate residue for every terminal issue in ONE batched
- *      agent-table scan (not one scan per issue — cost scales with the agent
- *      table once per patrol run, not with the number of terminal issues).
- *   3. Acknowledge open recovery trips per issue (the record-write door is
- *      inherently per-record). A trip-ack failure for one issue is isolated
- *      to that issue and never suppresses the gate clearing already done in
- *      pass 2 — the two cleanup operations are independent residue.
+ * One batched agent-table scan per run (cost scales with the agent table, not
+ * with the number of terminal issues). A project whose gather fails is warned
+ * and skipped; it never aborts the sweep for the remaining projects.
  */
 export async function reconcileTerminalIssueResidue(
   projects: Array<{ config: ProjectConfig }>,
   deps: ParkedResiduePatrolDeps = defaultDeps(),
-): Promise<StatePlaneReconcileAction[]> {
-  const actions: StatePlaneReconcileAction[] = [];
+): Promise<ParkedResidueAction[]> {
+  const actions: ParkedResidueAction[] = [];
 
   const terminalIssueIds: string[] = [];
   for (const { config } of projects) {
     if (!config.path) continue;
-    let records: PanIssueRecord[];
+    let signals: TerminalIssueSignal[];
     try {
-      records = await deps.listRecords(config);
+      signals = await deps.listTerminalIssues(config);
     } catch (error) {
       actions.push({
-        message: `Failed to list records for ${config.name ?? config.path}: ${error instanceof Error ? error.message : String(error)}`,
+        message: `Failed to read issue state for ${config.name ?? config.path}: ${error instanceof Error ? error.message : String(error)}`,
         level: 'warn',
       });
       continue;
     }
-    for (const record of records) {
-      if (isRecordPipelineTerminal(record)) terminalIssueIds.push(record.issueId.toUpperCase());
+    for (const signal of signals) {
+      if (isIssueTerminal(signal)) terminalIssueIds.push(signal.issueId.toUpperCase());
     }
   }
 
   if (terminalIssueIds.length === 0) return actions;
 
-  const gatesByIssue = deps.clearGatesForIssues(new Set(terminalIssueIds));
+  const gatesByIssue = (await resolveClearGates(deps))(new Set(terminalIssueIds));
 
   for (const issueId of terminalIssueIds) {
     const gates = gatesByIssue.get(issueId) ?? [];
-    let trips = 0;
-    try {
-      trips = await deps.ackTrips(issueId);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      actions.push({
-        message: `Failed to acknowledge open trips for ${issueId}: ${message}`
-          + (gates.length > 0 ? `; cleared operator gates on ${gates.length} agent row(s)` : ''),
-        level: 'warn',
-      });
-      continue;
-    }
-    if (trips > 0 || gates.length > 0) {
-      actions.push({
-        message: `Cleaned parked residue for ${issueId}: acked ${trips} open trip(s), cleared operator gates on ${gates.length} agent row(s)`,
-        level: 'action',
-      });
-    }
+    if (gates.length === 0) continue;
+    actions.push({
+      message: `Cleaned parked residue for ${issueId}: cleared operator gates on ${gates.length} agent row(s)`,
+      level: 'action',
+    });
   }
 
   return actions;
