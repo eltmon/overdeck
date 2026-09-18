@@ -1,0 +1,202 @@
+/**
+ * Deacon-lite (PAN-3917 W4): the surviving watcher.
+ *
+ * Replaces the 3,400-line `deacon.ts` (~60 awaited patrol routines writing to
+ * the record plane) with four routines that only observe and nudge/notify —
+ * never reconcile a stored copy. See docs/PIPELINE-GATES.md and the PAN-3917
+ * PRD ("The patrol loop", FR-11, D1/D4/D5/D6/D7).
+ *
+ * No heartbeat file, no patrol-result aggregation, no firing budgets, no
+ * invariant checker. Status is in-memory only (see getDeaconLiteStatus
+ * below) and is lost on process restart by design.
+ */
+import type { AgentState } from '../agents/agent-state.js';
+import { listAgentStates } from '../agents.js';
+import { isAliveSync, isConfirmedDead, isIdle } from '../agents/liveness.js';
+import { deliverAgentMessage } from '../agents/delivery.js';
+import { getWorkspaceGitState } from '../workspaces/git-state.js';
+import { isDeaconGloballyPausedSync } from '../overdeck/control-settings.js';
+import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
+import { checkApiErrorAgents } from './deacon-api-recovery.js';
+
+export { checkApiErrorAgents };
+
+// ============================================================================
+// checkStuckWorkAgents (FR-11): a work agent idle for N minutes whose feature
+// branch has commits not on its upstream gets one nudge, at most once/hour.
+// ============================================================================
+
+const STUCK_IDLE_MINUTES_DEFAULT = 20;
+const STUCK_IDLE_THRESHOLD_MS = STUCK_IDLE_MINUTES_DEFAULT * 60_000;
+const STUCK_NUDGE_COOLDOWN_MS = 60 * 60_000; // one nudge per agent per hour
+
+const lastStuckNudgeAt = new Map<string, number>();
+
+/** Test seam: clear the per-agent nudge cooldown between test cases. */
+export function __resetStuckWorkAgentCooldownForTests(): void {
+  lastStuckNudgeAt.clear();
+}
+
+function stuckNudgeMessage(idleMinutes: number, unpushedCommits: number): string {
+  return `You've been idle for ${idleMinutes}+ minutes with ${unpushedCommits} commit(s) not pushed to your upstream branch. ` +
+    'Continue your work, or push and open a PR if it is ready.';
+}
+
+export async function checkStuckWorkAgents(now = Date.now()): Promise<string[]> {
+  const actions: string[] = [];
+  const workAgents = listAgentStates({ role: 'work', status: 'running' });
+
+  for (const agent of workAgents) {
+    if (!agent.workspace) continue;
+    if (!isIdle(agent.id, STUCK_IDLE_THRESHOLD_MS, now)) continue;
+
+    const lastNudge = lastStuckNudgeAt.get(agent.id);
+    if (lastNudge !== undefined && now - lastNudge < STUCK_NUDGE_COOLDOWN_MS) continue;
+
+    let ahead: number | null;
+    try {
+      const gitState = await getWorkspaceGitState(agent.workspace);
+      ahead = gitState.ahead;
+    } catch {
+      continue;
+    }
+    if (!ahead) continue; // null (probe failed) or 0 — nothing unpushed to nudge about
+
+    try {
+      await deliverAgentMessage(
+        agent.id,
+        stuckNudgeMessage(STUCK_IDLE_MINUTES_DEFAULT, ahead),
+        'deacon-lite:checkStuckWorkAgents',
+      );
+      lastStuckNudgeAt.set(agent.id, now);
+      actions.push(`checkStuckWorkAgents: nudged ${agent.id} (idle ${STUCK_IDLE_MINUTES_DEFAULT}+ min, ${ahead} unpushed commit(s))`);
+    } catch (err) {
+      console.error(`[deacon-lite] Failed to nudge stuck work agent ${agent.id}:`, err);
+    }
+  }
+
+  return actions;
+}
+
+// ============================================================================
+// reconcileAgentLiveness (FR-11): compare the live backend inventory against
+// the dashboard's in-memory cache and correct the cache side only, via the
+// same notifier seam deacon.ts used to wire to the server's event-sourced
+// read model (src/dashboard/server/main.ts). Never writes a record or a
+// state file itself.
+// ============================================================================
+
+type AgentStoppedNotifier = (agentId: string) => void;
+type AgentStatusChangedNotifier = (
+  state: AgentState,
+  previousStatus?: AgentState['status'],
+  hasLiveTmuxSession?: boolean,
+) => void;
+
+let agentStoppedNotifier: AgentStoppedNotifier | null = null;
+let agentStatusChangedNotifier: AgentStatusChangedNotifier | null = null;
+
+/** Registered by the dashboard server layer (main.ts) to project a confirmed-dead agent into its own read model. */
+export function setAgentStoppedNotifier(fn: AgentStoppedNotifier | null): void {
+  agentStoppedNotifier = fn;
+}
+
+/** Registered by the dashboard server layer (main.ts) to project a status change into its own read model. */
+export function setAgentStatusChangedNotifier(fn: AgentStatusChangedNotifier | null): void {
+  agentStatusChangedNotifier = fn;
+}
+
+export async function reconcileAgentLiveness(): Promise<string[]> {
+  const actions: string[] = [];
+  const runningAgents = listAgentStates({ status: 'running' });
+
+  for (const agent of runningAgents) {
+    const verdict = isAliveSync(agent.id);
+    if (verdict.alive || !isConfirmedDead(verdict)) continue;
+
+    if (agentStoppedNotifier) {
+      try {
+        agentStoppedNotifier(agent.id);
+        actions.push(`reconcileAgentLiveness: corrected cache for ${agent.id} (confirmed dead: ${verdict.reason})`);
+      } catch (err) {
+        console.error(`[deacon-lite] Failed to notify cache correction for ${agent.id}:`, err);
+      }
+    }
+  }
+
+  return actions;
+}
+
+// ============================================================================
+// reapClosedIssueAgents (D4): keep closed-issue-reaper.ts as-is — it reads
+// the tracker only.
+// ============================================================================
+
+export const reapClosedIssueAgents = reconcileClosedIssueAgents;
+
+// ============================================================================
+// The patrol loop
+// ============================================================================
+
+export async function runDeaconLite(): Promise<void> {
+  // D7 keeps DeaconPauseToggle / pan admin cloister pause — honor it here so
+  // a manual "run patrol now" and the interval both respect it. Host hygiene
+  // is unaffected (FR-11 runs it outside deacon-lite).
+  if (isDeaconGloballyPausedSync()) return;
+  await checkStuckWorkAgents();
+  await checkApiErrorAgents();
+  await reconcileAgentLiveness();
+  await reapClosedIssueAgents();
+}
+
+// ============================================================================
+// Loop control + in-memory status. No heartbeat file, no patrol-result
+// aggregation — just enough to answer "is it running and did it last run
+// cleanly" (see module docstring).
+// ============================================================================
+
+const DEACON_LITE_INTERVAL_MS = 60_000; // the 60s cadence runScheduledPatrol used
+
+let deaconLiteInterval: ReturnType<typeof setInterval> | null = null;
+let lastRunAt: string | null = null;
+let lastRunError: string | null = null;
+
+async function tick(): Promise<void> {
+  try {
+    await runDeaconLite();
+    lastRunAt = new Date().toISOString();
+    lastRunError = null;
+  } catch (err) {
+    lastRunAt = new Date().toISOString();
+    lastRunError = err instanceof Error ? err.message : String(err);
+    console.error('[deacon-lite] run error:', err);
+  }
+}
+
+export function startDeaconLite(): void {
+  if (deaconLiteInterval) return;
+  void tick();
+  deaconLiteInterval = setInterval(() => { void tick(); }, DEACON_LITE_INTERVAL_MS);
+  deaconLiteInterval.unref?.();
+}
+
+export function stopDeaconLite(): void {
+  if (!deaconLiteInterval) return;
+  clearInterval(deaconLiteInterval);
+  deaconLiteInterval = null;
+}
+
+export function isDeaconLiteRunning(): boolean {
+  return deaconLiteInterval !== null;
+}
+
+export interface DeaconLiteStatus {
+  running: boolean;
+  intervalMs: number;
+  lastRunAt: string | null;
+  lastRunError: string | null;
+}
+
+export function getDeaconLiteStatus(): DeaconLiteStatus {
+  return { running: isDeaconLiteRunning(), intervalMs: DEACON_LITE_INTERVAL_MS, lastRunAt, lastRunError };
+}

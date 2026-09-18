@@ -20,8 +20,6 @@ import type { FPPViolation } from './fpp-violations.js';
 import { getCostSummary, type CostAlert } from './cost-monitor.js';
 import type { SessionRotationResult } from './session-rotation.js';
 import {
-  startDeacon,
-  stopDeacon,
   isDeaconRunning,
   getDeaconStatus,
   getLastPatrolResult,
@@ -30,6 +28,11 @@ import {
   type PatrolResult,
   type DeaconLogEntry,
 } from './deacon.js';
+// PAN-3917 W4: deacon.ts (~60 patrol routines, record-plane writes) is
+// deleted. Its patrol loop is replaced by deacon-lite's four
+// observe-and-nudge routines plus the host-hygiene scheduler.
+import { startDeaconLite, stopDeaconLite } from './deacon-lite.js';
+import { startHygieneScheduler, stopHygieneScheduler } from './hygiene-scheduler.js';
 import { OVERDECK_HOME } from '../paths.js';
 import { existsSync, writeFileSync, unlinkSync, readFileSync, readdirSync } from 'fs';
 import { rm } from 'fs/promises';
@@ -475,15 +478,16 @@ export class CloisterService {
     // No initialization needed; specialists are spawned on-demand via spawnEphemeralSpecialist().
     console.log('  → Specialists: per-project ephemeral mode (no global pool)');
 
-    // Start deacon health monitor for specialists
+    // Start deacon-lite (patrol loop) and the host-hygiene scheduler
     try {
-      console.log('  → Starting deacon health monitor...');
-      startDeacon();
-      console.log('  ✓ Deacon started');
-      emitActivityEntrySync({ source: 'cloister', level: 'info', message: 'Deacon health monitor started' });
+      console.log('  → Starting deacon-lite + hygiene scheduler...');
+      startDeaconLite();
+      startHygieneScheduler();
+      console.log('  ✓ Deacon-lite started');
+      emitActivityEntrySync({ source: 'cloister', level: 'info', message: 'Deacon-lite and hygiene scheduler started' });
     } catch (error) {
-      console.error('  ✗ Failed to start deacon:', error);
-      emitActivityEntrySync({ source: 'cloister', level: 'error', message: `Failed to start deacon: ${error instanceof Error ? error.message : String(error)}` });
+      console.error('  ✗ Failed to start deacon-lite:', error);
+      emitActivityEntrySync({ source: 'cloister', level: 'error', message: `Failed to start deacon-lite: ${error instanceof Error ? error.message : String(error)}` });
     }
 
     this.running = true;
@@ -581,12 +585,13 @@ export class CloisterService {
       this.domainEventUnsubscribe = null;
     }
 
-    // Stop deacon health monitor
+    // Stop deacon-lite and the host-hygiene scheduler
     try {
-      stopDeacon();
-      console.log('  ✓ Deacon stopped');
+      stopDeaconLite();
+      stopHygieneScheduler();
+      console.log('  ✓ Deacon-lite stopped');
     } catch (error) {
-      console.error('Failed to stop deacon:', error);
+      console.error('Failed to stop deacon-lite:', error);
     }
 
     this.emit({ type: 'stopped' });
