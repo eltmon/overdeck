@@ -18,6 +18,9 @@ vi.mock('../../../../../lib/review-status.js', () => ({
   setDeaconIgnored: vi.fn(),
   setAutoMerge: vi.fn(),
   registerReviewVerdictFeedbackDelivery: vi.fn(),
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../../../lib/agents.js', () => ({

@@ -3,8 +3,9 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { getPullRequestState as getPullRequestStateEffect, isGitHubAppConfigured, type GitHubPullRequestState } from '../github-app.js';
 import { parseArtifactRef } from '../forge.js';
-import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
+import { type ReviewStatus } from '../review-status.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
+import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -191,7 +192,7 @@ export async function isAutoMergeEligible(
   issueId: string,
   deps: AutoMergeEligibilityDeps = {},
 ): Promise<AutoMergeEligibility> {
-  const reviewStatus = (deps.getReviewStatus ?? getReviewStatusSync)(issueId);
+  const reviewStatus = (deps.getReviewStatus ?? getPipelineStatus)(issueId);
   if (reviewStatus?.readyForMerge !== true) {
     return { eligible: false, reason: 'review status is not readyForMerge' };
   }

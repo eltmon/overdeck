@@ -107,3 +107,7 @@
 1141 src/cli/commands/doctor.ts # PAN-3842
 1091 src/lib/agents/spawn.ts # PAN-3842
 1138 src/lib/agents/spawn-prep.ts # PAN-3842
+1076 src/lib/cloister/deacon-merge.ts # PAN-3903
+1077 src/lib/cloister/deacon-review-status.ts # PAN-3903
+1398 src/lib/cloister/merge-agent.ts # PAN-3903
+1089 src/lib/cloister/verification-runner.ts # PAN-3903

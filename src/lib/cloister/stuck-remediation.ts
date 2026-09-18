@@ -9,7 +9,7 @@ import {
 } from '../agents.js';
 import { countPendingAskUserQuestionsForAgent } from '../agent-enrichment.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
-import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
+import { type ReviewStatus } from '../review-status.js';
 import { capturePaneSync, detectTerminalApiErrorSync, sessionExistsSync, killSession, killSessionSync, listPaneValuesSync, sendEscapeKeyAsync } from '../tmux.js';
 import { loadCloisterConfigSync, DEFAULT_CLOISTER_CONFIG, type StuckRemediationConfig } from './config.js';
 import { getAgentEffectiveLastActivityMs, getAgentWorkActivityMs, isAliveSync, isConfirmedDead, isIdle } from '../agents/liveness.js';
@@ -25,6 +25,7 @@ import { readWorkspacePlanSync } from '../xbrief/io.js';
 import { getDispatchableItems } from '../xbrief/dag.js';
 import { recordRecoveryFailure } from './recovery-trip.js';
 import { readAgentBackgroundTaskWedgeEvidence } from './planning-wedge.js';
+import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 
 export interface StuckRemediationOptions {
   now?: number;
@@ -66,7 +67,7 @@ export function shouldSkipReviewStatus(status: ReviewStatus | null): boolean {
  */
 export function shouldSkipIdlePokeForAgent(
   agent: Pick<AgentState, 'id' | 'issueId' | 'role'> | null,
-  readStatus: (issueId: string) => ReviewStatus | null = getReviewStatusSync,
+  readStatus: (issueId: string) => ReviewStatus | null = getPipelineStatus,
 ): boolean {
   if (!agent) return false;
   if (agent.role !== 'work' && agent.role !== 'review' && agent.role !== 'test') return false;
@@ -112,7 +113,7 @@ async function evaluateWedgedReworkAgent(
   if (agent.role !== 'work' || !agent.workspace) return false;
 
   const issueId = issueIdForAgent(agent);
-  const status = getReviewStatusSync(issueId);
+  const status = getPipelineStatus(issueId);
   if (!hasPendingRework(status)) return false;
 
   const lastActivityMs = getAgentEffectiveLastActivityMs(agentId);
@@ -163,7 +164,7 @@ function shouldCheckReadyBeadsForAgent(agent: AgentState, now: number): boolean 
   const completedAt = (agent as AgentState & { completedAt?: string }).completedAt;
   if (agent.paused || agent.troubled || completedAt) return false;
   if (!sessionExistsSync(agentId)) return false;
-  if (shouldSkipReviewStatus(getReviewStatusSync(issueIdForAgent(agent)))) return false;
+  if (shouldSkipReviewStatus(getPipelineStatus(issueIdForAgent(agent)))) return false;
   return isIdle(agentId, 5 * 60 * 1000, now);
 }
 

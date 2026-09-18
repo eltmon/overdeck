@@ -38,7 +38,8 @@ import { listRunningAgentsSync } from '../agents/queries.js';
 import { readIssueRecord, type PanIssuePipelineRecord } from '../pan-dir/record.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { getOverdeckHome } from '../paths.js';
-import { loadReviewStatuses, type ReviewStatus } from '../review-status.js';
+import { type ReviewStatus } from '../review-status.js';
+import { listPipelineStatuses } from '../overdeck/pipeline-view.js';
 
 /** The pipeline fields both the record and the review-status row carry. */
 export const INVARIANT_PIPELINE_FIELDS = [
@@ -197,7 +198,7 @@ function describeMismatch(mismatch: InvariantMismatch): string {
 export async function runInvariantChecker(deps: InvariantCheckerDeps = {}): Promise<InvariantReport> {
   const now = deps.now ?? new Date();
   const day = now.toISOString().slice(0, 10);
-  const loadRows = deps.loadRows ?? loadReviewStatuses;
+  const loadRows = deps.loadRows ?? listPipelineStatuses;
   const readPipeline = deps.readPipeline ?? defaultReadPipeline;
   const listAgents = deps.listAgents ?? listRunningAgentsSync;
   const emitOnce = deps.emitOnce ?? emitActivityEntryOnce;

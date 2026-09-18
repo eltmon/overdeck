@@ -31,7 +31,7 @@ import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { resolveProjectReposForIssueSync } from '../project-repos.js';
 import { listOpenPullRequestsSnapshot } from '../pipeline-membership-gather.js';
 import { listOpenGitLabMergeRequests } from '../gitlab-merge-requests.js';
-import { getReviewStatusSync } from '../review-status.js';
+import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 
 export interface AgentGcResult { removed: string[]; preserved: string[] }
 export interface AgentGcRow {
@@ -107,7 +107,7 @@ async function hasOpenChangeRequest(agent: AgentGcRow): Promise<boolean> {
 }
 
 function hasInFlightReviewOrTest(agent: AgentGcRow): boolean {
-  const status = getReviewStatusSync(agent.issueId);
+  const status = getPipelineStatus(agent.issueId);
   if (
     status?.reviewStatus === 'reviewing'
     || status?.testStatus === 'testing'

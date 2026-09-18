@@ -17,7 +17,7 @@ import { isIssueClosed } from './issue-closed.js';
 import { listAllAgentsSync as listAllAgents, RETAINED_TRANSCRIPTS_PHASE } from '../overdeck/agents.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { logDeaconEventSync, logAgentLifecycleSync } from '../persistent-logger.js';
-import { getReviewStatusSync } from '../review-status.js';
+import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 import { getBootReconciliationState } from '../overdeck/control-settings.js';
 import {
   buildResumeContinueMessage,
@@ -54,7 +54,7 @@ const orphanFailureRecordedForAutoResume = new Set<string>();
 
 function isVerifyPausedAgentState(state: Pick<AgentState, 'issueId' | 'paused'>): boolean {
   if (state.paused !== true || !state.issueId) return false;
-  return getReviewStatusSync(state.issueId)?.mergeStatus === 'merged';
+  return getPipelineStatus(state.issueId)?.mergeStatus === 'merged';
 }
 
 function reviewArtifactExistsForRun(path: string | undefined, startedAt: string | undefined): boolean {
@@ -662,7 +662,7 @@ export async function handleAgentStoppedEvent(
   const completedFile = join(getAgentDir(agentId), 'completed');
   const processedFile = join(getAgentDir(agentId), 'completed.processed');
   const handedOffViaDone = existsSync(completedFile) || existsSync(processedFile);
-  let review = getReviewStatusSync(state.issueId);
+  let review = getPipelineStatus(state.issueId);
   if (handedOffViaDone) {
     const needsFix =
       review?.reviewStatus === 'blocked' ||
@@ -677,7 +677,7 @@ export async function handleAgentStoppedEvent(
   }
 
   // Refresh review status if we haven't loaded it yet.
-  review ??= getReviewStatusSync(state.issueId);
+  review ??= getPipelineStatus(state.issueId);
 
   if (await isIssueClosed(state.issueId)) {
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — issue ${state.issueId} is closed`);

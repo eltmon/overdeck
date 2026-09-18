@@ -66,8 +66,8 @@ export async function checkCompletionMarkers(host: CompletionHost): Promise<void
       const issueId = dir.name.replace('agent-', '').toUpperCase();
 
       // Skip if `pan done` already triggered review.
-      const { getReviewStatusSync } = await import('../review-status.js');
-      const existingReview = getReviewStatusSync(issueId);
+      const { getPipelineStatus } = await import('../overdeck/pipeline-view.js');
+      const existingReview = getPipelineStatus(issueId);
       if (existingReview && ['reviewing', 'passed'].includes(existingReview.reviewStatus || '')) {
         console.log(`🔔 Cloister: Completion marker for ${issueId} — review already ${existingReview.reviewStatus}, marking processed`);
         try { renameSync(completedFile, processedFile); } catch {}

@@ -88,6 +88,9 @@ vi.mock('../../../../src/lib/git/operations.js', () => {
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
   markWorkspaceStuck: vi.fn(),
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('fs', async (importOriginal) => {

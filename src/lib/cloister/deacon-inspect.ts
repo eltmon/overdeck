@@ -1,8 +1,9 @@
 import { Effect } from 'effect';
 
 import { logDeaconEventSync } from '../persistent-logger.js';
-import { loadReviewStatuses, setReviewStatusSync } from '../review-status.js';
+import { setReviewStatusSync } from '../review-status.js';
 import { killSession, sessionExists } from '../tmux.js';
+import { listPipelineStatuses } from '../overdeck/pipeline-view.js';
 
 /**
  * Inspect prompts state a 10-minute budget. Deacon gives the agent a small
@@ -23,7 +24,7 @@ function formatInspectElapsed(elapsedMs: number): string {
 
 export async function checkInspectAgentTimeouts(now = new Date()): Promise<string[]> {
   const actions: string[] = [];
-  const statuses = loadReviewStatuses();
+  const statuses = listPipelineStatuses();
   const nowMs = now.getTime();
 
   for (const [rawIssueId, status] of Object.entries(statuses)) {

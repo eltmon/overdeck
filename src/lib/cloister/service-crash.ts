@@ -261,8 +261,8 @@ export async function handleAgentCrash(host: CrashHost, agentId: string): Promis
     let recoverUnfinishedOneShot = false;
     if (ONE_SHOT_ROLES.has(agentState.role) && agentState.sessionId && agentState.issueId) {
       try {
-        const { getReviewStatusSync } = await import('../review-status.js');
-        const status = getReviewStatusSync(agentState.issueId);
+        const { getPipelineStatus } = await import('../overdeck/pipeline-view.js');
+        const status = getPipelineStatus(agentState.issueId);
         const verdictTerminal = status
           ? isRoleTerminal(agentState.role as AdvancingRole, {
               reviewStatus: status.reviewStatus,

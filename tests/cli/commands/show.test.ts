@@ -56,6 +56,9 @@ vi.mock('../../../src/lib/agents.js', () => ({
 }));
 vi.mock('../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: getReviewStatusMock,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 import { showCommand } from '../../../src/cli/commands/show.js';

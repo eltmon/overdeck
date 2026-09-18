@@ -16,7 +16,7 @@ import { emitActivityEntrySync } from '../activity-logger.js';
 import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
 import { getProjectPanPaths } from '../pan-dir/paths.js';
 import { listProjects, resolveProjectFromIssueSync, type ProjectConfig } from '../projects.js';
-import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
+import { type ReviewStatus } from '../review-status.js';
 import { listSessionNames } from '../tmux.js';
 import { findPlanSync, readPlanSync } from '../xbrief/io.js';
 import { isXBriefFilename } from '../xbrief/lifecycle.js';
@@ -35,6 +35,7 @@ import {
   spawnWorkAgentThroughAgentsEndpoint,
   type SpawnWorkAgentResult,
 } from './work-agent-start.js';
+import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 
 export { spawnWorkAgentThroughAgentsEndpoint };
 export type { SpawnWorkAgentResult };
@@ -210,7 +211,7 @@ export async function findOrphanProposedSpecsForReconciler(options: FindOrphanPr
   const projects = await loadProjectsForScan(options.projects);
   const tmuxSessionNames = await loadTmuxSessionNames(options.tmuxSessionNames);
   const getState = options.getAgentStateForIssue ?? defaultGetAgentState;
-  const getReviewStatus = options.getReviewStatusForIssue ?? getReviewStatusSync;
+  const getReviewStatus = options.getReviewStatusForIssue ?? getPipelineStatus;
   const candidates: OrphanProposedCandidate[] = [];
 
   for (const { key, config } of projects) {
@@ -466,7 +467,7 @@ export async function handleOrphanProposedSpec(
     return [];
   }
 
-  if (hasReviewPipelinePresence(getReviewStatusSync(upperIssueId))) {
+  if (hasReviewPipelinePresence(getPipelineStatus(upperIssueId))) {
     logReconcilerDiagnostic('candidate-excluded', { issueId: upperIssueId, reason: 'review-pipeline-presence' });
     return [];
   }

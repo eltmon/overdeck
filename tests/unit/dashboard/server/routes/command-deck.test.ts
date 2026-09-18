@@ -33,6 +33,9 @@ vi.mock('../../../../../src/dashboard/server/services/session-presence.js', () =
 
 vi.mock('../../../../../src/dashboard/server/review-status.js', () => ({
   getReviewStatusSync: vi.fn(() => null),
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../../../src/dashboard/server/routes/jsonl-resolver.js', () => ({

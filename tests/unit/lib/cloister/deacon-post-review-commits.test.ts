@@ -31,6 +31,9 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
     mocks.setReviewStatus(issueId, update),
   loadReviewStatuses: () => mocks.statuses,
   MAX_AUTO_REQUEUE: 25,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../../src/lib/cloister/review-agent.js', () => ({

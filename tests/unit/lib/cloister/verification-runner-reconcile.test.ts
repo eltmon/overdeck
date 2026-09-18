@@ -14,6 +14,9 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: vi.fn(() => null),
   markWorkspaceStuck: vi.fn(),
   setReviewStatusSync: mockSetReviewStatus,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../../src/lib/cloister/review-status-source.js', () => ({
@@ -32,6 +35,10 @@ vi.mock('../../../../src/lib/projects.js', () => ({
 }));
 
 import { reconcileInterruptedVerifications } from '../../../../src/lib/cloister/verification-runner.js';
+import {
+  INTERRUPTED_VERIFICATION_NOTE,
+  requiresFreshTerminalVerification,
+} from '../../../../src/lib/cloister/verification-types.js';
 
 describe('reconcileInterruptedVerifications', () => {
   beforeEach(() => {
@@ -73,8 +80,13 @@ describe('reconcileInterruptedVerifications', () => {
     expect(reconcileInterruptedVerifications('test')).toBe(1);
     expect(mockSetReviewStatus).toHaveBeenCalledExactlyOnceWith('PAN-3296', {
       verificationStatus: 'pending',
-      verificationNotes: expect.stringContaining('verification re-runs on the next cycle'),
+      verificationNotes: INTERRUPTED_VERIFICATION_NOTE,
+      lastVerifiedCommit: undefined,
     });
+    expect(requiresFreshTerminalVerification({
+      verificationStatus: 'pending',
+      verificationNotes: INTERRUPTED_VERIFICATION_NOTE,
+    })).toBe(true);
   });
 
   it('preserves a running verification owned by a live supervised worker', () => {
@@ -85,5 +97,6 @@ describe('reconcileInterruptedVerifications', () => {
 
     expect(reconcileInterruptedVerifications('test')).toBe(0);
     expect(mockSetReviewStatus).not.toHaveBeenCalled();
+    expect(requiresFreshTerminalVerification({ verificationStatus: 'running' })).toBe(true);
   });
 });

@@ -5,9 +5,10 @@ import { rehydrateHeadAnchor } from '../git-utils.js';
 import { listUatGenerationsSync } from '../overdeck/merge-sync.js';
 import type { UatGeneration, UatGenerationMember } from '../overdeck/merge-types.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
+import { setReviewStatusSync } from '../review-status.js';
 import type { ReviewStatus } from '../review-status.js';
 import type { ReviewStatusUpdate } from '../workspace-anchor-drift.js';
+import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -40,7 +41,7 @@ export function recordUatPromotionVerdicts(gen: UatGeneration, mergeSha: string)
   const stampedIssueIds: string[] = [];
 
   for (const member of gen.members) {
-    const current = getReviewStatusSync(member.issueId);
+    const current = getPipelineStatus(member.issueId);
     const stamp = buildUatPromotionStamp(current, member, {
       generationName: gen.name,
       mergeSha,
@@ -89,7 +90,7 @@ async function findUatPromotionMergeSha(
 const DEFAULT_HEAL_DEPS: UatPromotionHealDeps = {
   resolveProject: resolveProjectFromIssueSync,
   listGenerations: listUatGenerationsSync,
-  getReviewStatus: getReviewStatusSync,
+  getReviewStatus: getPipelineStatus,
   setReviewStatus: setReviewStatusSync,
   findMergeSha: findUatPromotionMergeSha,
 };

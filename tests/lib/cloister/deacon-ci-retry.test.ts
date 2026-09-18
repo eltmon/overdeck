@@ -69,6 +69,9 @@ vi.mock('../../../src/lib/review-status.js', () => ({
   setReviewStatusSync: (...args: unknown[]) => mockSetReviewStatus(...args),
   loadReviewStatuses: (...args: unknown[]) => mockLoadReviewStatuses(...args),
   MAX_AUTO_REQUEUE: 25,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {

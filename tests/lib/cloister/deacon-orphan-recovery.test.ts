@@ -39,6 +39,13 @@ vi.mock('../../../src/lib/review-status.js', async (importOriginal) => {
     ...actual,
     loadReviewStatuses: (...args: unknown[]) => mockLoadReviewStatuses(...args as []),
     getReviewStatusSync: (...args: unknown[]) => mockGetReviewStatus(...args),
+    // PAN-3903: the pipeline read door's bulk read. Spreading `actual` would
+    // leave the real SQLite/journal reader in place and resolve projects behind
+    // the fixtures; answer from the same mocked map the door's cache read uses.
+    getReviewStatusesSync: (issueIds: string[]) => {
+      const rows = mockLoadReviewStatuses() as Record<string, unknown>;
+      return Object.fromEntries(issueIds.map((id) => [id, rows?.[id]]).filter(([, v]) => Boolean(v)));
+    },
     setReviewStatus: (...args: unknown[]) => mockSetReviewStatus(...args),
   setReviewStatusSync: (...args: unknown[]) => mockSetReviewStatus(...args),
   };

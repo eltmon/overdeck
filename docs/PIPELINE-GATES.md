@@ -159,3 +159,52 @@ entity per day plus a per-run summary count, persists
 resolver's `invariant-mismatch` orbit — and writes no store it reads. Repairs
 go through the owning doors: `pan review resync <id>` for verdict drift,
 `pan admin agents exited <id>` for liveness drift.
+
+## The in-flight owner (PAN-3903)
+
+Budgets cap how often a patrol can be wrong. The in-flight owner stops one
+whole class of being wrong: acting on a transition another actor already owns.
+
+Every pipeline read under `src/lib/cloister/` goes through the read door,
+`src/lib/overdeck/pipeline-view.ts` (see
+[API-SURFACE.md](API-SURFACE.md#the-pipeline-read-door-pan-3903)). Alongside the
+canonical state it returns `inFlightOwner`: `{ actor, since, transition }` or
+`null`. It is derived from durable transition writes **only** — never tmux,
+never a live pane, never agent liveness — so a dead actor's claim stays visible
+to the patrols whose job is to revive it.
+
+Precedence runs latest-stage first, because an issue that reached the merge
+queue is no longer the reviewer's:
+
+| Owner | Derived from |
+|---|---|
+| `merge` | `mergeStatus` is `queued`, `merging` or `verifying` |
+| `strike` | `strikeLandingState` is `landing`, `recovering` or `needs_you` (`ready` is unclaimed, `landed` terminal) |
+| `verification` | `verificationStatus` is `running` |
+| `uat` / `test` | `uatStatus` / `testStatus` is `testing` |
+| `review` | `reviewStatus` is `reviewing`, or `reviewSpawnedAt` is set with no terminal verdict |
+| `conflict-resolution` | `conflictResolutionDispatchedAt` set, review non-terminal |
+| `work` | `reviewStaleSince` set (PAN-3847); or a `failed` review/test/verification/uat verdict routed back; or `needsReviewDispatch` — `pan done`'s request awaiting dispatch |
+
+A merged or retired issue has no owner.
+
+**Which patrols consult it.** The line is what the patrol's action *is*:
+
+- A patrol that **initiates** a transition must skip an owned issue and log one
+  line naming the owner — `checkOrphanedCompletions`,
+  `salvageStrandedStrikeBranches`.
+- A patrol that **recovers a stalled** transition must NOT skip: `checkStuckReviewing`,
+  auto-resume, stuck-merging and the crash handlers exist to revive a dead
+  owner, so an owner check there would deadlock the issue instead of healing it.
+- Resource governors (`memory-governor`, `preemption`) classify agents, not
+  transitions, and the invariant checker is report-only. Neither consults it.
+
+**Why it exists.** PAN-3842, 2026-09-18. Review passed at `ff31b427`; the work
+agent pushed more commits; the post-review-commit patrol marked the row stale at
+07:30 — `reviewStaleSince` set, "no automatic re-dispatch" by design, because
+only `pan done` or `pan review request` may clear staleness. That row satisfied
+every condition `checkOrphanedCompletions` checked, so it "recovered" the issue
+nine times between 07:36 and 08:17, stacking a review convoy on top of the work
+agent's own re-review. No individual patrol was buggy: none of them could see
+that someone else was already handling it. Locked by
+`tests/unit/lib/cloister/check-orphaned-completions-inflight-owner.test.ts`.

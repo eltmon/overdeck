@@ -9,7 +9,7 @@ import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { AGENTS_DIR } from '../paths.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
+import { setReviewStatusSync, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
 import { observeActiveReviewArtifact } from './verdict-restore.js';
 import { recordOrphanRestoreVerdict } from './orphan-restore-verdict.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
@@ -25,6 +25,7 @@ import { isIssueClosed } from './issue-closed.js';
 import { shouldSkipDispatchAsMerged } from './merge-verification.js';
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
 import { evaluateReviewConvoyLiveness } from './review-convoy-liveness.js';
+import { getPipelineStatus, listPipelineStatuses } from '../overdeck/pipeline-view.js';
 
 const execAsync = promisify(exec);
 
@@ -386,7 +387,7 @@ export async function handleReviewCoordinatorDied(
   _reason: string,
 ): Promise<string[]> {
   const actions: string[] = [];
-  const status = getReviewStatusSync(issueId);
+  const status = getPipelineStatus(issueId);
 
   if (!status) {
     logDeaconEventSync(`handleReviewCoordinatorDied: ${issueId} skipped — no review-status row`);
@@ -479,7 +480,7 @@ export async function handleReviewCoordinatorDied(
  */
 export async function handleWorkCompleted(issueId: string): Promise<string[]> {
   const actions: string[] = [];
-  const status = getReviewStatusSync(issueId);
+  const status = getPipelineStatus(issueId);
   if (status) {
     logDeaconEventSync(`handleWorkCompleted: ${issueId} already has review-status row`);
     return actions;
@@ -510,7 +511,7 @@ async function reconcileReviewStatusOrphan(
 ): Promise<string[]> {
   const actions: string[] = [];
 
-  const status = getReviewStatusSync(issueId) ?? rawStatus;
+  const status = getPipelineStatus(issueId) ?? rawStatus;
 
   if (status.stuck && !(status.stuckReason === 'verification_stuck' && status.reviewStatus === 'reviewing')) return actions;
   if (status.deaconIgnored) return actions;
@@ -808,7 +809,7 @@ export async function checkOrphanedReviewStatuses(options: OrphanRecoveryOptions
     // PAN-1908: the primary orphan recovery path is now reactive
     // (review.coordinator.died / work.completed events). This function is kept
     // as a thin SQLite-only safety net for dropped events.
-    const statuses = loadReviewStatuses();
+    const statuses = listPipelineStatuses();
     for (const [issueId, status] of Object.entries(statuses)) {
       const result = await reconcileReviewStatusOrphan(issueId, status as ReviewStatusLike, options);
       actions.push(...result);
@@ -830,7 +831,7 @@ export async function recoverStalledReviewConvoys(
 
   let statuses: Record<string, ReviewStatus>;
   try {
-    statuses = loadReviewStatuses();
+    statuses = listPipelineStatuses();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error('[deacon] Error loading review statuses for stalled convoy recovery:', message);
@@ -839,7 +840,7 @@ export async function recoverStalledReviewConvoys(
 
   for (const [issueId, rawStatus] of Object.entries(statuses)) {
     try {
-      const status = getReviewStatusSync(issueId) ?? rawStatus;
+      const status = getPipelineStatus(issueId) ?? rawStatus;
       if (status.reviewStatus !== 'reviewing' && status.reviewStatus !== 'pending') continue;
       if (status.stuck || status.deaconIgnored) continue;
 
@@ -998,7 +999,7 @@ export async function checkMissingReviewStatuses(options: PatrolShadowOptions = 
     // PAN-1908: primary missing-status creation is now reactive (work.completed
     // event). This function is kept as a thin safety net that queries the
     // agents table instead of scanning directories.
-    const statuses = loadReviewStatuses();
+    const statuses = listPipelineStatuses();
     const agents = listAllAgents();
 
     for (const agent of agents) {

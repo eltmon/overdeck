@@ -42,6 +42,9 @@ vi.mock('../../tmux.js', () => ({
 }));
 vi.mock('../../review-status.js', () => ({
   getReviewStatusSync: mocks.getReviewStatusSync,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 vi.mock('../review-verdict-report.js', () => ({
   findVerdictReport: mocks.findVerdictReport,

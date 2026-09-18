@@ -13,6 +13,9 @@ vi.mock('../../../src/lib/review-status.js', () => ({
   setReviewStatus: (...args: [string, Record<string, unknown>]) => Effect.sync(() => mockSetReviewStatus(args[0], args[1])),
   setReviewStatusSync: (...args: [string, Record<string, unknown>]) => Effect.sync(() => mockSetReviewStatus(args[0], args[1])),
   loadReviewStatuses: () => ({}),
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../src/dashboard/server/services/tracker-config.js', () => ({

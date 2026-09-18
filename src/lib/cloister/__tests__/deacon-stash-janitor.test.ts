@@ -48,9 +48,9 @@ vi.mock('../../../lib/review-status.js', () => ({
   setReviewStatus: vi.fn(),
   setReviewStatusSync: vi.fn(),
   loadReviewStatuses: vi.fn(() => ({})),
-  getReviewStatusSync: vi.fn(() => undefined),
   getReviewStatus: vi.fn(),
-  getReviewStatusSync: vi.fn(),
+  getReviewStatusSync: vi.fn(() => undefined),
+  getReviewStatusesSync: vi.fn(() => ({})),
 }));
 
 vi.mock('../../overdeck/review-status-sync.js', () => ({ markWorkspaceStuck: vi.fn(), clearWorkspaceStuck: vi.fn() }));

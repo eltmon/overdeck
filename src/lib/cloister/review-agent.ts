@@ -48,7 +48,7 @@ import { emitActivityEntrySync } from '../activity-logger.js';
 import { removeAgent } from '../agents/removal.js';
 import { listAgentIdsByPrefixSync } from '../overdeck/agents.js';
 import { getAgentStateSync as getAgentStateFileSync } from '../agents/agent-state.js';
-import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
+import { setReviewStatusSync } from '../review-status.js';
 import { clearSupersededReviewInfrastructureFailure } from '../review-verdict-guards.js';
 import { loadConfigSync as loadYamlConfig, type ReviewMode } from '../config-yaml.js';
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
@@ -390,7 +390,7 @@ async function spawnReviewRoleForIssuePromise(
       let finishedIdle = false;
       if (!paneDead && !opts.force && !staleRunId) {
         try {
-          const status = getReviewStatusSync(opts.issueId);
+          const status = getPipelineStatus(opts.issueId);
           const terminal = status?.reviewStatus === 'passed'
             || status?.reviewStatus === 'blocked'
             || status?.reviewStatus === 'failed';
@@ -535,7 +535,7 @@ async function spawnReviewRoleForIssuePromise(
   }
 
   try {
-    const currentStatus = getReviewStatusSync(opts.issueId);
+    const currentStatus = getPipelineStatus(opts.issueId);
     setReviewStatusSync(opts.issueId, {
       reviewStatus: 'reviewing',
       reviewSpawnedAt: new Date().toISOString(),
@@ -890,6 +890,7 @@ export {
   spawnReviewSubRoleForIssue,
   recoverMissingConvoyReviewers,
 } from './review-convoy.js';
+import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 
 /**
  * Is the issue carrying leftover EXTENDED-review (convoy) sub-reviewer agents from a

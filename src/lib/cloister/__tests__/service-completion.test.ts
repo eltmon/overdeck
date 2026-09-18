@@ -19,6 +19,9 @@ vi.mock('../../internal-token.js', async (importOriginal) => ({
 
 vi.mock('../../review-status.js', () => ({
   getReviewStatusSync: testMocks.getReviewStatusSync,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 import { INTERNAL_TOKEN_HEADER } from '../../internal-token.js';

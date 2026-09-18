@@ -35,7 +35,7 @@ import { existsSync, writeFileSync, unlinkSync, readFileSync, readdirSync } from
 import { rm } from 'fs/promises';
 import { join } from 'path';
 import { AGENTS_DIR } from '../paths.js';
-import { loadReviewStatuses, setReviewStatusSync } from '../review-status.js';
+import { setReviewStatusSync } from '../review-status.js';
 import { sessionExists } from '../tmux.js';
 import { Effect } from 'effect';
 import { emitActivityEntrySync } from '../activity-logger.js';
@@ -62,6 +62,7 @@ export {
   parseSpecialistAgentSession,
   stateToRole,
 } from './service-reactive.js';
+import { listPipelineStatuses } from '../overdeck/pipeline-view.js';
 export type { CloisterDomainEventLike, ReactiveIssueState } from './service-reactive.js';
 export type { CloisterStatus } from './service-status.js';
 export { nonRestartableReason } from './service-crash.js';
@@ -311,7 +312,7 @@ export class CloisterService {
     // verification reruns automatically. Verification is idempotent — this is always safe.
     let resetVerificationCount = 0;
     try {
-      const statuses = loadReviewStatuses();
+      const statuses = listPipelineStatuses();
       for (const [issueId, status] of Object.entries(statuses)) {
         if (status.verificationStatus === 'running') {
           setReviewStatusSync(issueId, { verificationStatus: 'pending' });
@@ -380,7 +381,7 @@ export class CloisterService {
     // If Cloister crashes after reviewStatus was set to 'reviewing' but before the specialist
     // completes, the issue is stuck. On startup, find such issues and re-dispatch directly.
     try {
-      const reviewStatuses = loadReviewStatuses();
+      const reviewStatuses = listPipelineStatuses();
       const { resolveProjectFromIssueSync } = await import('../projects.js');
       const { getTmuxSessionName, getAllProjectSpecialistStatuses } = await import('./specialists.js');
 

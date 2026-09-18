@@ -38,6 +38,9 @@ vi.mock('../checkpoint/checkpoint-manager.js', () => ({
 vi.mock('../review-status.js', () => ({
   clearReviewStatus: mocks.clearReviewStatus,
   loadReviewStatuses: mocks.loadReviewStatuses,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../pan-dir/records.js', () => ({

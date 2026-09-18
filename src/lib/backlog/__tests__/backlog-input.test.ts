@@ -6,6 +6,9 @@ import type { Issue } from '../../tracker/interface.js';
 
 vi.mock('../../review-status.js', () => ({
   getReviewStatusSync: vi.fn().mockReturnValue(null),
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 import { collectOpenBacklog } from '../backlog-input.js';

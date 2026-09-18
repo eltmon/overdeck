@@ -31,6 +31,9 @@ vi.mock('../../review-status.js', () => ({
       ...update,
     };
   }),
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../release-set.js', () => ({

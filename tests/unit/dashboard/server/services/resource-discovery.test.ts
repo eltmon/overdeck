@@ -86,6 +86,9 @@ vi.mock('../../../../../src/lib/runtime-census.js', () => ({
 
 vi.mock('../../../../../src/dashboard/server/review-status.js', () => ({
   loadReadyForMergeFlags: mocks.loadReadyForMergeFlags,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../../../src/dashboard/server/services/git-info.js', () => ({
