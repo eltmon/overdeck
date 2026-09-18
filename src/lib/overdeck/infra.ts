@@ -30,75 +30,6 @@ import type { ProjectConfig } from '../projects.js';
 import { packageRoot, getOverdeckHome } from '../paths.js';
 import { sessionExists as tmuxSessionExists, killSession as tmuxKillSession, getAgentSessions } from '../tmux.js';
 import { getOverdeckDatabasePath, OVERDECK_MIGRATION_PATH } from './paths.js';
-import {
-  auditOverdeckSchemaSync,
-  type SchemaTopUpExpectations,
-} from './schema-audit.js';
-
-export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
-  columns: [
-    { table: 'discovered_sessions', column: 'harness' },
-    { table: 'flywheel_substrate_bugs', column: 'affected_criteria' },
-    { table: 'review_status', column: 'release_status' },
-    { table: 'review_status', column: 'release_notes' },
-    { table: 'review_status', column: 'uat_status' },
-    { table: 'review_status', column: 'uat_notes' },
-    { table: 'review_status', column: 'retired_at' },
-    { table: 'review_status', column: 'inspect_owner_session' },
-    { table: 'review_status', column: 'strike_ready_head' },
-    { table: 'review_status', column: 'strike_ready_at' },
-    { table: 'review_status', column: 'strike_landing_state' },
-    { table: 'review_status', column: 'strike_recovery_count' },
-    { table: 'review_status', column: 'strike_transport_retry_count' },
-    { table: 'review_status', column: 'strike_next_attempt_at' },
-    { table: 'review_status', column: 'strike_landing_attempts' },
-    { table: 'review_status', column: 'conflicts_since' },
-    { table: 'review_status', column: 'review_stale_since' },
-    { table: 'agents', column: 'yielded_by_scheduler' },
-    { table: 'agents', column: 'review_context_manifest_path' },
-    { table: 'agents', column: 'yielded_at' },
-    { table: 'agents', column: 'last_yield_resume_at' },
-    { table: 'agents', column: 'started_by' },
-    { table: 'agents', column: 'branch' },
-    { table: 'uat_generation_repos', column: 'target_branch' },
-    { table: 'uat_generation_repos', column: 'merge_sha' },
-    { table: 'uat_generation_resolutions', column: 'kind' },
-    { table: 'uat_generation_resolutions', column: 'note' },
-    // PAN-3092: listed explicitly so the drift audit reports the table's
-    // absence if the runtime top-up ever fails on an existing database.
-    { table: 'event_idempotency', column: 'key' },
-    // PAN-1990: sentinels for the four brand-new tables (SchemaTopUpExpectations
-    // has no dedicated "tables" list).
-    { table: 'projects', column: 'id' },
-    { table: 'workspaces', column: 'id' },
-    { table: 'project_targets', column: 'project_id' },
-    { table: 'pinned_docs', column: 'id' },
-    { table: 'conversations', column: 'workspace_id' },
-    { table: 'agents', column: 'workspace_id' },
-    // PAN-1577: explicit project assignment override for moving a conversation
-    // between projects without relying on cwd-derived grouping.
-    { table: 'conversations', column: 'project_key' },
-    // PAN-3331: the quick-action band's per-workspace run command.
-    { table: 'workspaces', column: 'run_command' },
-  ],
-  indexes: [
-    'cost_session_id_idx',
-    'idx_cost_agent_id',
-    'idx_cost_issue_upper',
-    'release_sets_project_idx',
-    'release_set_components_issue_component_idx',
-    'release_set_components_issue_order_idx',
-    'uat_generation_repos_uat_order_idx',
-    'uat_generation_member_repos_uat_idx',
-    'uat_generations_uncleaned_terminal_idx',
-    'projects_primary_path_idx',
-    'idx_workspace_project',
-    'idx_workspace_kind',
-    'idx_workspace_last_accessed',
-    'idx_project_targets_one_primary',
-    'idx_pinned_docs_scope',
-  ],
-};
 
 export const overdeckEvents = sqliteTable('events', {
   sequence: integer('sequence').primaryKey({ autoIncrement: true }),
@@ -124,8 +55,12 @@ let overdeckDbSync: { path: string; db: SqliteDatabase } | null = null;
 let overdeckReadOnlyDbSync: { path: string; db: SqliteDatabase } | null = null;
 
 function runOverdeckMigrationSync(db: SqliteDatabase): void {
+  // PAN-3917: the sentinel used to be the `agents` table, but the pipeline-state
+  // mirror tables (agents, review_status, ...) are dropped by
+  // dropStateLayerMirrorTablesSync below on every boot. `events` is drizzle-owned
+  // and never dropped, so it stays a valid fresh-vs-existing signal.
   const row = db
-    .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'agents'`)
+    .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'events'`)
     .get();
   if (row) return;
 
@@ -160,24 +95,6 @@ export function runSchemaTopUp(db: SqliteDatabase, statement: string): void {
 function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `discovered_sessions` ADD COLUMN `harness` text');
   runSchemaTopUp(db, "UPDATE `discovered_sessions` SET `harness` = 'claude-code' WHERE `harness` IS NULL");
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `release_status` text');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `release_notes` text');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `uat_status` text');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `uat_notes` text');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `retired_at` integer');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `inspect_owner_session` text');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_ready_head` text');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_ready_at` integer');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_landing_state` text');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_recovery_count` integer DEFAULT 0');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_transport_retry_count` integer');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_next_attempt_at` integer');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_landing_attempts` text');
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `review_cycle_history` text');
-  // PAN-3154: main-head SHA/paths that first made this branch conflict.
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `conflicts_since` text');
-  // PAN-3847: a passed review whose anchor no longer matches HEAD is stale, not reset.
-  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `review_stale_since` text');
   ensureReleaseSetTablesSync(db);
   ensureUatGenerationRepoTablesSync(db);
   // PAN-1491: existing overdeck.db files created before substrate-bug weights need
@@ -191,22 +108,29 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_cost_agent_id` ON `cost_events` (`agent_id`, `ts`)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_cost_issue_upper` ON `cost_events` (UPPER(`issue_id`))');
   runSchemaTopUp(db, 'CREATE TABLE IF NOT EXISTS `cost_reconcile_file_state` (`path` text PRIMARY KEY NOT NULL, `mtime_ms` integer NOT NULL, `size` integer NOT NULL, `verdict` text NOT NULL)');
-  // PAN-2507: preemptive-scheduler yield attribution on agents. The init
-  // migration only runs on a fresh DB, so existing overdeck.db files need these
-  // columns added idempotently here.
-  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `yielded_by_scheduler` integer');
-  // Existing databases need the run context manifest for missing-reviewer recovery.
-  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_context_manifest_path` text');
-  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `yielded_at` integer');
-  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `last_yield_resume_at` integer');
-  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `started_by` text');
-  // PAN-3362: the init migration's `agents` table never carried `branch`, so it
-  // was silently dropped on every DB round-trip (fixture and real agents alike).
-  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `branch` text');
   ensureWorkspaceTablesSync(db);
   // PAN-1577: explicit project assignment override for moving a conversation
   // between projects without relying on cwd-derived grouping.
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `project_key` text');
+  dropPipelineStateMirrorTablesSync(db);
+}
+
+/**
+ * PAN-3917 (W3): drop the overdeck.db tables that mirrored pipeline state an
+ * owner elsewhere already holds — agent status/liveness (now the terminal
+ * backend), review/test/merge/release status (now PR reviews, check runs, and
+ * forge mergeability), and their run-scoped children. Runs on every boot so
+ * an existing overdeck.db converges the same way a fresh one does.
+ * Costs, conversation search, health history, caches, and the events table
+ * are untouched. Child tables first so FK-enforced DROP TABLE succeeds.
+ */
+function dropPipelineStateMirrorTablesSync(db: SqliteDatabase): void {
+  runSchemaTopUp(db, 'DROP TABLE IF EXISTS `review_run_agents`');
+  runSchemaTopUp(db, 'DROP TABLE IF EXISTS `review_runs`');
+  runSchemaTopUp(db, 'DROP TABLE IF EXISTS `agents`');
+  runSchemaTopUp(db, 'DROP TABLE IF EXISTS `issue_policy`');
+  runSchemaTopUp(db, 'DROP TABLE IF EXISTS `status_history`');
+  runSchemaTopUp(db, 'DROP TABLE IF EXISTS `review_status`');
 }
 
 /**
@@ -384,24 +308,6 @@ function ensureUatGenerationRepoTablesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `uat_generation_resolutions` ADD COLUMN `note` text');
 }
 
-function warnSchemaDriftSync(db: SqliteDatabase): void {
-  try {
-    const report = auditOverdeckSchemaSync(db, OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS);
-    for (const table of report.missingTables) {
-      console.warn(`[schema-audit] missing table: ${table}`);
-    }
-    for (const index of report.missingIndexes) {
-      console.warn(`[schema-audit] missing index: ${index}`);
-    }
-    for (const { table, column } of report.missingColumns) {
-      console.warn(`[schema-audit] missing column: ${table}.${column}`);
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.warn(`[schema-audit] audit failed: ${message}`);
-  }
-}
-
 export function getOverdeckDatabaseSync(
   dbPath = getOverdeckDatabasePath(),
   options: { readOnly?: boolean } = {},
@@ -436,7 +342,6 @@ export function getOverdeckDatabaseSync(
   db.pragma('synchronous = NORMAL');
   runOverdeckMigrationSync(db);
   ensureRuntimeIndexesSync(db);
-  warnSchemaDriftSync(db);
   overdeckDbSync = { path: dbPath, db };
   return db;
 }
@@ -447,16 +352,6 @@ function getOverdeckDatabaseReadOnlySync(dbPath: string): SqliteDatabase {
   overdeckReadOnlyDbSync?.db.close();
   const db = openDatabase(dbPath, { readOnly: true });
   db.pragma('foreign_keys = ON');
-  const report = auditOverdeckSchemaSync(db, OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS);
-  const missing = [
-    ...report.missingTables.map((table) => `table ${table}`),
-    ...report.missingIndexes.map((index) => `index ${index}`),
-    ...report.missingColumns.map(({ table, column }) => `column ${table}.${column}`),
-  ];
-  if (missing.length > 0) {
-    db.close();
-    throw new Error(`overdeck.db schema is incompatible; writable dashboard startup must update: ${missing.join(', ')}`);
-  }
   overdeckReadOnlyDbSync = { path: dbPath, db };
   return db;
 }

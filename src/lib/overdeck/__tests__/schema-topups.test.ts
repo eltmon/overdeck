@@ -73,24 +73,20 @@ describe('overdeck schema top-ups', () => {
     expect(costIndexRows(reopened)).toHaveLength(2);
   });
 
-  it('restores review-status top-up columns in an existing database', () => {
+  it('drops the pipeline-state mirror tables on open (PAN-3917)', () => {
     const dbPath = makeDbPath();
-    const initial = getOverdeckDatabaseSync(dbPath);
-    initial.exec('ALTER TABLE `review_status` DROP COLUMN `strike_transport_retry_count`');
-    initial.exec('ALTER TABLE `review_status` DROP COLUMN `strike_next_attempt_at`');
-    initial.exec('ALTER TABLE `review_status` DROP COLUMN `uat_status`');
-    initial.exec('ALTER TABLE `review_status` DROP COLUMN `uat_notes`');
-    closeOverdeckDatabaseSync();
-
-    const toppedUp = getOverdeckDatabaseSync(dbPath);
-    const columns = toppedUp
-      .prepare('PRAGMA table_info(`review_status`)')
+    const db = getOverdeckDatabaseSync(dbPath);
+    const tableNames = db
+      .prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`)
       .all<{ name: string }>()
-      .map((column) => column.name);
-    expect(columns).toContain('strike_transport_retry_count');
-    expect(columns).toContain('strike_next_attempt_at');
-    expect(columns).toContain('uat_status');
-    expect(columns).toContain('uat_notes');
+      .map((row) => row.name);
+    for (const dropped of ['review_status', 'status_history', 'agents', 'issue_policy', 'review_runs', 'review_run_agents']) {
+      expect(tableNames).not.toContain(dropped);
+    }
+    // Foreign-key anchor and kept data planes survive.
+    expect(tableNames).toContain('issues');
+    expect(tableNames).toContain('cost_events');
+    expect(tableNames).toContain('events');
   });
 
   it('uses idx_cost_agent_id for the agent daily-cost query', () => {
@@ -111,7 +107,7 @@ describe('overdeck schema top-ups', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const db = getOverdeckDatabaseSync(makeDbPath());
 
-    expect(() => runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `id` text')).not.toThrow();
+    expect(() => runSchemaTopUp(db, 'ALTER TABLE `app_settings` ADD COLUMN `value` text')).not.toThrow();
     expect(errorSpy).not.toHaveBeenCalled();
   });
 
