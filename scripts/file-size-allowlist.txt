@@ -104,3 +104,4 @@
 1071 src/lib/pan-dir/auto-commit.ts # PAN-3848
 1106 src/cli/commands/doctor.ts # PAN-3850
 1139 src/cli/commands/doctor.ts # PAN-3850
+1188 src/cli/commands/doctor.ts # PAN-3894

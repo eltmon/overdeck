@@ -10,6 +10,8 @@ import { listProjectsSync, type ProjectConfig } from '../../lib/projects.js';
 import { findMixedWouldFireModes, readWouldFireCounts, readWouldFireRecorderHealth, wouldFireRecorderHealthPath } from '../../lib/cloister/patrol-would-fire.js';
 import { readInvariantReport } from '../../lib/cloister/invariant-checker.js';
 import { listPatrolBudgetRows } from '../../lib/cloister/patrol-budget.js';
+import { TICK_PATROLS, CADENCE_MS, type PatrolCadence } from '../../lib/cloister/patrol-registry.js';
+import { listHousekeepingRows } from '../../lib/cloister/housekeeping-scheduler.js';
 import { homedir } from 'os';
 import { isAbsolute, join, resolve } from 'path';
 import {
@@ -400,6 +402,49 @@ export function printPatrolWouldFireTable(): void {
     const mixed = shadow > 0 && normal > 0;
     const line = `  ${patrol}: shadow=${shadow} live=${normal}${mixed ? ' (MIXED — soak evidence invalid)' : ''}`;
     console.log(mixed ? chalk.red(line) : line);
+  }
+}
+
+/**
+ * PAN-3894 (W4, FR-4): print what runs on the 60 s tick and what runs from the
+ * housekeeping scheduler, with each chore's cadence, last run, and next due
+ * time. Sourced from the patrol registry and the scheduler's persisted
+ * due-times file, so it never disagrees with what actually runs.
+ */
+export function printPatrolCadenceTable(): void {
+  console.log(chalk.bold('Patrol cadences (tick = 60s runPatrol; chores run from the housekeeping scheduler):'));
+
+  const ALARMS = new Set([
+    'runStallSweeperPatrol',
+    'checkApiErrorAgents',
+    'recreatedStateWarnings',
+    'recordMainDivergenceHealth',
+    'checkMassDeath',
+  ]);
+  const cadenceLabel: Record<PatrolCadence, string> = {
+    fast: `every ${CADENCE_MS.fast / 60_000}m`,
+    hourly: `every ${CADENCE_MS.hourly / 3_600_000}h`,
+    daily: `every ${CADENCE_MS.daily / 3_600_000}h`,
+  };
+
+  for (const patrol of TICK_PATROLS) {
+    const when = patrol === 'runInvariantChecker'
+      ? 'every 10 ticks'
+      : `every tick${ALARMS.has(patrol) ? ' (alarm)' : ''}`;
+    console.log(`  tick   ${patrol.padEnd(44)} ${when}`);
+  }
+
+  const order: PatrolCadence[] = ['fast', 'hourly', 'daily'];
+  const rows = listHousekeepingRows();
+  for (const cadence of order) {
+    for (const row of rows.filter((r) => r.cadence === cadence)) {
+      const last = row.lastRunAt ?? 'never';
+      const next = row.nextDueAt ?? 'now';
+      const trigger = row.trigger ? `  (also on ${row.trigger})` : '';
+      console.log(
+        `  ${cadence.padEnd(6)} ${row.name.padEnd(44)} ${cadenceLabel[cadence].padEnd(10)} last ${last.padEnd(26)} next ${next}${trigger}`,
+      );
+    }
   }
 }
 
@@ -1109,6 +1154,10 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   // for the last 7 days. Zeroes across the board while OVERDECK_PATROL_SHADOW=1
   // prove the deleted-patrol candidates' repaired states are unreachable.
   printPatrolWouldFireTable();
+
+  // PAN-3894 (W5): what runs on the tick vs. what runs from the housekeeping
+  // scheduler, with each chore's cadence and its next due time.
+  printPatrolCadenceTable();
 
   // PAN-3850 (W39): the per-patrol firing-budget table — today's action tally
   // against each patrol's budget, with suspended patrols named in red.
