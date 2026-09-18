@@ -55,6 +55,18 @@
     {
       "at": "2026-09-16T22:31:12.514Z",
       "event": "stopped"
+    },
+    {
+      "at": "2026-09-18T16:27:02.246Z",
+      "event": "tombstoned",
+      "predicate": {
+        "closedOutFlag": true,
+        "trackerState": "closed-preverified-by-close-out",
+        "liveTmux": null,
+        "openChangeRequest": null,
+        "inFlightReviewOrTest": null
+      },
+      "filesRemoved": []
     }
   ],
   "archiveRef": null,
