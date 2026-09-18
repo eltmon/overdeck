@@ -384,7 +384,7 @@
     "recordedAt": "2026-08-14T13:16:21.774Z"
   },
   "created": "2026-08-14T01:43:04.391Z",
-  "updated": "2026-08-15T15:44:42.239Z",
+  "updated": "2026-09-18T09:07:37.569Z",
   "pipeline": {
     "issueId": "PAN-3680",
     "reviewStatus": "passed",
@@ -698,7 +698,6 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "recoveryTrips": [],
-  "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 28,
     "claims": {},
