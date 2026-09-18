@@ -209,7 +209,7 @@ export interface PanIssuePipelineRecord extends StrikeLandingStatus {
   panDoneRecoveredAt?: string;
   closedOut?: boolean;
   closedOutAt?: string; reopenedAt?: string;
-  reviewCycleHistory?: unknown;
+  reviewCycleHistory?: unknown; /** PAN-3906: operator waiver past the test-skip gate's removed-test rule, pinned to one head anchor; never waives an added `.skip`/`.only`. */ testSkipWaiver?: { sha: string; reason: string; at: string; by?: string };
   updatedAt: string;
 }
 

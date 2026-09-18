@@ -283,8 +283,9 @@ describe('verification pass clears verification_stuck (PAN-3847)', () => {
     ));
 
     expect(mockRunTestSkipGate).toHaveBeenCalledTimes(2);
-    expect(mockRunTestSkipGate).toHaveBeenCalledWith('/tmp/ws/fe', 'origin/main');
-    expect(mockRunTestSkipGate).toHaveBeenCalledWith('/tmp/ws/api', 'origin/develop');
+    // PAN-3906: the third argument carries the operator-waiver decision.
+    expect(mockRunTestSkipGate).toHaveBeenCalledWith('/tmp/ws/fe', 'origin/main', { waiveRemovedTests: false });
+    expect(mockRunTestSkipGate).toHaveBeenCalledWith('/tmp/ws/api', 'origin/develop', { waiveRemovedTests: false });
     expect(result.outcome).toBe('failed');
     // The violation is attributed to its repo in the recorded gate output, and
     // the quality gates never ran.

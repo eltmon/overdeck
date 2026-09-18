@@ -79,7 +79,7 @@ import { registerCloseCommand } from './commands/close.js';
 import { showCommand } from './commands/show.js';
 import { listCommand as issuesCommand } from './commands/issues.js';
 import { triageCommand } from './commands/triage.js';
-import { registerReviewCommands } from './commands/review-subcommands.js';
+import { registerReviewCommands } from './commands/review-subcommands.js'; import { registerVerifyCommands } from './commands/verify-waiver.js';
 import { staffingCommand } from './commands/staffing.js';
 import { destroyCommand as destroyWorkspaceCommand, registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
@@ -331,7 +331,7 @@ program
   .option('-e, --editor <editor>', 'Editor to use (cursor, windsurf, vscode, zed, etc.)')
   .action(openCommand);
 
-registerReviewCommands(program);
+registerReviewCommands(program); registerVerifyCommands(program);
 
 program.command('staffing <id>').description('Show or set per-issue work-model and swarm overrides').option('--model <model>', 'Set the work model, or default to clear the override').option('--swarm <mode>', 'Set swarm mode (off, auto, always), or default to clear the override').action(staffingCommand);
 

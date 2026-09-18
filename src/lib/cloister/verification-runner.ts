@@ -21,7 +21,7 @@ import {
   verificationArtifactPath,
   writeVerificationArtifact,
 } from './verification-artifact.js';
-import { runTestSkipGate, type TestSkipViolation } from './test-skip-gate.js';
+import { evaluateTestSkipGate } from './test-skip-run.js';
 import { buildFinalFailureInstructions } from './verification-feedback.js';
 import {
   isVerificationWorkerActive,
@@ -41,7 +41,7 @@ import { isXBriefFilename } from '../xbrief/lifecycle.js';
 import { checkIncompletePlanItemsPromise } from '../work/done-preflight.js';
 import { capturePipelineStageForIssue } from '../telemetry/pipeline.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
-import { parseCompositeSnapshot, type HeadAnchor } from '../git-utils.js';
+import { parseCompositeSnapshot, snapshotWorkspaceHeadsPromise, type HeadAnchor } from '../git-utils.js';
 import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 
 const execAsync = promisify(exec);
@@ -445,6 +445,11 @@ async function runVerificationForIssuePromise(
     const repoRoots = resolveWorkspaceRepoRootsSync(issueId, workspacePath);
     const isPolyrepo = repoRoots.some(root => root.isPolyrepo);
 
+    // PAN-3906: the head a test-skip waiver is pinned to. Snapshotted BEFORE the
+    // sync below, which merges `origin/<target>` in and moves HEAD — that would
+    // expire a waiver the operator just recorded. The gate diff is three-dot.
+    const testSkipHead = await snapshotWorkspaceHeadsPromise(issueId, workspacePath);
+
     // === Sync target branch ===
     if (options.syncTargetBranch !== false) {
       if (repoRoots.length === 0) {
@@ -611,25 +616,16 @@ async function runVerificationForIssuePromise(
     writeLiveArtifact();
 
     // PAN-3847 (FR-12): the test-skip gate runs before the quality gates — a diff
-    // that adds skipped/only tests or removes test cases fails verification as a
-    // required `test-skip` gate without burning a full suite run. PR #3872
-    // finding 4: a diff that cannot be computed fails the gate too. Finding 6:
-    // the gate runs once per repository root and violations aggregate, so a
-    // skipped test in a secondary repo cannot slip past it.
+    // that adds skipped/only tests, or removes more test calls across the whole
+    // diff than it adds (PAN-3906), fails verification as a required `test-skip`
+    // gate without burning a full suite run. PR #3872 finding 4: a diff that
+    // cannot be computed fails the gate too. Finding 6: the gate runs once per
+    // repository root and violations aggregate, so a skipped test in a secondary
+    // repo cannot slip past it.
     const testSkipStart = Date.now();
-    const testSkipViolations: TestSkipViolation[] = [];
-    const testSkipErrors: string[] = [];
-    for (const root of repoRoots) {
-      const outcome = await runTestSkipGate(root.dir, `origin/${root.targetBranch}`);
-      if (outcome.error) testSkipErrors.push(`${root.repoKey}: ${outcome.error}`);
-      testSkipViolations.push(...outcome.violations.map(v => ({
-        ...v,
-        file: root.isPolyrepo ? `${root.repoKey}/${v.file}` : v.file,
-      })));
-    }
-    const testSkipFailed = testSkipErrors.length > 0 || testSkipViolations.length > 0;
+    const testSkip = await evaluateTestSkipGate(issueId, repoRoots, testSkipHead);
 
-    const gateResults = !testSkipFailed
+    const rawGateResults = !testSkip.failed
       ? await Effect.runPromise(runQualityGates(gates, workspacePath, 'pre_push', {
       issueId,
       isRemote: workspaceInfo.isRemote,
@@ -660,17 +656,13 @@ async function runVerificationForIssuePromise(
         writeLiveArtifact();
       },
     }))
-      : [{
-        name: 'test-skip',
-        passed: false,
-        required: true,
-        output: [
-          ...testSkipErrors,
-          ...testSkipViolations.map(v => `${v.file}: [${v.kind}] ${v.line}`),
-        ].join('\n'),
-        durationMs: Date.now() - testSkipStart,
-        error: testSkipErrors[0] ?? 'Diff adds skipped or only-tests or removes test cases',
-      }];
+      : [{ name: 'test-skip', passed: false, required: true, output: testSkip.evidence, durationMs: Date.now() - testSkipStart, error: testSkip.error ?? 'Diff adds skipped or only-tests or removes test cases' }];
+
+    // PAN-3906: an operator override stays visible in the verification artifact
+    // even though it let the gate pass.
+    const gateResults = !testSkip.failed && testSkip.waiverApplied
+      ? [{ name: 'test-skip', passed: true, required: true, output: testSkip.evidence, durationMs: Date.now() - testSkipStart }, ...rawGateResults]
+      : rawGateResults;
 
     const postGateMergedOutcome = skipMergedVerification(issueId, logPrefix);
     if (postGateMergedOutcome) return postGateMergedOutcome;

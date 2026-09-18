@@ -21,13 +21,41 @@ feedback references the per-run file, so the evidence a later run cannot overwri
 what the agent reads. Per-run files older than 30 days are pruned by the idle-stack
 patrol.
 
-## Test-skip gate (PAN-3847)
+## Test-skip gate (PAN-3847, PAN-3906)
 
 Before the quality gates run, the verification runner diffs the workspace against
-`origin/<target>` and fails a required `test-skip` gate when the diff adds `.skip`,
-`.only`, `xit`, `xdescribe`, or `xtest` in test files, or removes more `it(`/`test(`
-calls than it adds. `allowOnly: false` in both vitest configs makes `.only` fail every
-gate run outright. Related: the anchor-equality test skip is gone — a review whose
+`origin/<target>` and fails a required `test-skip` gate on two independent rules.
+
+**Added `.skip`/`.only`/`xit`/`xdescribe`/`xtest` in a test file** is always a
+violation, one per line. Disabling a test is never balanced by writing another one,
+and it is never waivable. `allowOnly: false` in both vitest configs makes `.only` fail
+every gate run outright.
+
+**Removed `it(`/`test(` calls are balanced across the whole diff**, not per file
+(PAN-3906). The gate sums removed and added test calls over every test file in the
+diff and fails only when the total removed exceeds the total added. Per-file lines are
+still emitted as gate evidence, marked `(evidence only — not a gate failure)` when the
+total absorbs them. Per-file failure made any component deletion unmergeable: deleting
+a component together with its test file always read as a removal, however many tests
+the same refactor added elsewhere.
+
+Two escapes exist for a genuine net removal:
+
+- **Deleted-subject exemption (structural).** A test file deleted whole
+  (`deleted file mode` in the diff) whose subject module is deleted in the same diff is
+  not a violation, and its counts stay out of the whole-diff total. The subject is
+  resolved by stripping a `__tests__/` segment and the `.test`/`.spec` infix, then
+  matching `.ts`/`.tsx`/`.js`/`.jsx` among the diff's deleted files — so
+  `components/__tests__/Foo.test.tsx` is exempt when `components/Foo.tsx` is deleted.
+- **Operator waiver (judgment).** `pan verify waive-test-removal <id> --reason "…"`
+  records `pipeline.testSkipWaiver = { sha, reason, at, by }` through the record write
+  door. The gate demotes `removed-test` to evidence when the waiver's head anchor
+  equals the head under verification, and prints the waiver as gate evidence in the
+  verification artifact. It expires the moment the branch head moves, it never waives
+  an added `.skip`/`.only`, and it is operator-conversation-only (`conv-*`) — a
+  pipeline agent cannot waive the coverage loss it just produced.
+
+Related: the anchor-equality test skip is gone — a review whose
 `reviewedAtCommit` equals `lastVerifiedCommit` no longer auto-passes the test role;
 `review.approved` always dispatches it. CI runs vitest on every push and never reads
 the `overdeck/test` commit status; that stamp now records only that the changed-file-
