@@ -177,10 +177,18 @@ export async function handleAgentHeartbeatDeadEvent(
       try { await Effect.runPromise(killSession(agentId)); } catch { /* ignore */ }
       logDeaconEventSync(`handleAgentHeartbeatDeadEvent: killed dead planning pane ${agentId} (${verdict.reason})`);
     } else {
-      // Work agent with a live tmux session and running/starting status: not
-      // orphaned. (The placeholder-reconciliation special case is gone with
-      // the placeholders themselves — PAN-3849 W34.)
-      return [];
+      // Work agent with a tmux session: consult the oracle — a live session
+      // whose harness has exited (zombie pane / bare shell) is orphaned and
+      // falls through to recovery, exactly like the planning branch above.
+      // (The placeholder-reconciliation special case is gone with the
+      // placeholders themselves — PAN-3849 W34.)
+      const verdict = await isAlive(agentId);
+      if (verdict.alive) return []; // truly still running
+      if (verdict.reason === 'no-session') {
+        return []; // probe raced the confirmed query — assume alive, recheck next pass
+      }
+      try { await Effect.runPromise(killSession(agentId)); } catch { /* ignore */ }
+      logDeaconEventSync(`handleAgentHeartbeatDeadEvent: killed dead work pane ${agentId} (${verdict.reason})`);
     }
   } else if (state.status === 'starting') {
     // PAN-1256: work agents in `starting` status need a startup grace

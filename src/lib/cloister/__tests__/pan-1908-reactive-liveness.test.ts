@@ -557,11 +557,31 @@ describe('PAN-1908 reactive liveness handlers', () => {
       mockGetAgentStateSync.mockReturnValue(makeState({ status: 'running' }));
       mockSessionExistsSync.mockReturnValue(true);
       mockQuerySessionSync.mockReturnValue({ status: 'exists' });
+      mockIsAlive.mockResolvedValue({ alive: true, paneAlive: true });
 
       const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
 
       expect(actions).toEqual([]);
       expect(mockSaveAgentState).not.toHaveBeenCalled();
+    });
+
+    it('recovers a work agent whose session exists but whose harness has exited', async () => {
+      // PAN-3849 findings round: the W34 placeholder removal left a bare
+      // `return []` for any work agent with a session, so a zombie pane / bare
+      // shell never fell through to recovery. The oracle verdict decides now.
+      mockGetAgentStateSync.mockReturnValue(makeState({ status: 'running', kickoffDelivered: true }));
+      mockSessionExistsSync.mockReturnValue(true);
+      mockQuerySessionSync.mockReturnValue({ status: 'exists' });
+      mockIsAlive.mockResolvedValue({ alive: false, reason: 'runtime-missing' });
+
+      const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
+
+      expect(actions.length).toBeGreaterThan(0);
+      expect(mockKillSession).toHaveBeenCalledWith('agent-pan-1908');
+      expect(mockSaveAgentState).toHaveBeenCalled();
+      const saved = mockSaveAgentState.mock.calls[0][0];
+      expect(saved.status).toBe('stopped');
+      expect(mockRecordAgentFailure).toHaveBeenCalled();
     });
 
     it('does not reap on a tmux query error or a single confirmed miss', async () => {

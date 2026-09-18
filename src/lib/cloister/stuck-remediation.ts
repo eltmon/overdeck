@@ -12,7 +12,7 @@ import { logDeaconEventSync } from '../persistent-logger.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { capturePaneSync, detectTerminalApiErrorSync, sessionExistsSync, killSession, killSessionSync, listPaneValuesSync, sendEscapeKeyAsync } from '../tmux.js';
 import { loadCloisterConfigSync, DEFAULT_CLOISTER_CONFIG, type StuckRemediationConfig } from './config.js';
-import { getAgentEffectiveLastActivityMs, getAgentWorkActivityMs, isIdle } from '../agents/liveness.js';
+import { getAgentEffectiveLastActivityMs, getAgentWorkActivityMs, isAliveSync, isIdle } from '../agents/liveness.js';
 import { describeAgentDeath } from './agent-death.js';
 import { getFlywheelActiveRunId, isFlywheelGloballyPaused } from '../overdeck/control-settings.js';
 import {
@@ -628,10 +628,12 @@ export function decideFlywheelRemediation(opts: {
   return { kind: 'relaunch', respawnCount: respawnCount + 1 };
 }
 
-/** True when the orchestrator's process is actually gone (session missing or dead pane). */
+/** True when the orchestrator's process is actually gone (oracle verdict, not just tmux presence). */
 function isFlywheelOrchestratorDead(agentId: string): boolean {
-  if (!sessionExistsSync(agentId)) return true;
-  return listPaneValuesSync(agentId, '#{pane_dead}').some((v) => v === '1');
+  // The flywheel role is not exempt from the liveness contract: a live
+  // session with an exited harness (runtime-missing) is dead even though the
+  // old sessionExists + pane_dead checks said otherwise.
+  return !isAliveSync(agentId).alive;
 }
 
 /**
@@ -766,7 +768,7 @@ async function evaluateFlywheelOrchestrator(
 async function reconcileActiveFlywheelWithoutRunningAgent(now: number, actions: string[]): Promise<void> {
   if (!getFlywheelActiveRunId()) return;
   if (isFlywheelGloballyPaused()) return;
-  if (sessionExistsSync(FLYWHEEL_ORCHESTRATOR_AGENT_ID)) return;
+  if (isAliveSync(FLYWHEEL_ORCHESTRATOR_AGENT_ID).alive) return;
 
   await remediateFlywheelOrchestrator(
     FLYWHEEL_ORCHESTRATOR_AGENT_ID,
