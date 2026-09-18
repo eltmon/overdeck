@@ -1,7 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { lstat, mkdir, readFile, rm } from 'node:fs/promises';
-import { homedir } from 'node:os';
+import { lstat, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { Role } from '@overdeck/contracts';
@@ -10,9 +9,7 @@ import { Effect } from 'effect';
 import { buildChildEnvWithoutTmuxSync } from '../../../../lib/child-env.js';
 import {
   saveAgentState,
-  saveAgentStateSync,
 } from '../../../../lib/agents.js';
-import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import type { RemoteWorkspaceMetadata } from '../../../../lib/remote/interface.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { saveAgentStateAndEmitEventProgram } from '../../services/agent-projection.js';
@@ -45,8 +42,6 @@ type EventStoreAppend = {
 
 type SpawnPanCommand = (args: string[], cwd?: string) => Promise<string>;
 
-type PlaceholderHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | null;
-
 /**
  * PAN-3849 (W34): the single in-flight work-spawn claim is an in-process set.
  * The retired placeholder row (state.json + agents row with a
@@ -74,31 +69,6 @@ export function releaseAgentStart(agentSessionName: string): void {
 /** Test hook: clear all in-flight claims (a dashboard restart does this). */
 export function resetAgentStartsInFlight(): void {
   startsInFlight.clear();
-}
-
-export function buildContainerStartState(input: {
-  agentSessionName: string;
-  issueId: string;
-  workspacePath: string;
-  role: Role;
-  effectiveHarness: PlaceholderHarness;
-  startedBy: string;
-  allowHost: boolean;
-  status: 'starting' | 'error';
-  startedAt: string;
-}): AgentState {
-  return {
-    id: input.agentSessionName,
-    issueId: input.issueId,
-    ...(input.effectiveHarness ? { harness: input.effectiveHarness } : {}),
-    model: 'pending-container-start',
-    status: input.status,
-    startedAt: input.startedAt,
-    workspace: input.workspacePath,
-    role: input.role,
-    startedBy: input.startedBy,
-    hostOverride: input.allowHost || undefined,
-  };
 }
 
 export async function requestWorkStartAfterContainers(input: {
@@ -281,7 +251,6 @@ export function handleContainerOrchestration(input: {
       agentSessionName,
       role,
       effectiveHarness,
-      startedBy,
       allowHost,
       explicitModel,
       spawnGuardrails,
@@ -367,20 +336,11 @@ export function handleContainerOrchestration(input: {
 
         if (!containersReady && !allowHost) {
           const earlyAgentId = agentSessionName;
-          const earlyStateDir = join(homedir(), '.overdeck', 'agents', earlyAgentId);
-          yield* Effect.promise(() => mkdir(earlyStateDir, { recursive: true }));
-          saveAgentStateSync(buildContainerStartState({
-            agentSessionName: earlyAgentId,
-            issueId,
-            workspacePath,
-            role,
-            effectiveHarness,
-            startedBy,
-            allowHost,
-            status: 'starting',
-            startedAt: new Date().toISOString(),
-          }));
-          updateRegistryForAgentStart(issueId, workspacePath, earlyAgentId);
+          // PAN-3849 (W34): no placeholder row — the request-scoped claim
+          // (acquired in spawn.ts before orchestration) is retained by the
+          // background job below, so a concurrent spawn 409s instead of
+          // starting a second container wait. Container progress lives in
+          // the lifecycle log + phase events, never in AgentState.
           yield* Effect.promise(() => appendAgentLifecycleLog(earlyAgentId, 'agent.start_waiting_for_containers', {
             issueId,
             featureName,
@@ -437,17 +397,11 @@ export function handleContainerOrchestration(input: {
                   });
 
                   if (!healthy) {
-                    saveAgentStateSync(buildContainerStartState({
-                      agentSessionName: earlyAgentId,
-                      issueId,
-                      workspacePath,
-                      role,
-                      effectiveHarness,
-                      startedBy,
-                      allowHost,
-                      status: 'error',
-                      startedAt: new Date().toISOString(),
-                    }));
+                    // No agent state: the wait simply ends (visibility is the
+                    // timed-out log entry above plus the phase failure below).
+                    // Release the retained claim so a later spawn may retry.
+                    emitStartAgentPhase(issueId, 'spawn', 'failure', `containers for ${issueId} did not become healthy in time`, { workspacePath });
+                    releaseAgentStart(earlyAgentId);
                     return;
                   }
 
@@ -487,6 +441,7 @@ export function handleContainerOrchestration(input: {
                     markWorkStartAccepted,
                     updateIssueStatus,
                   });
+                  releaseAgentStart(earlyAgentId);
                   emitStartAgentPhase(issueId, 'spawn', 'success', 'local work agent spawn requested after container startup', {
                     workspacePath,
                     activityId,
@@ -498,19 +453,7 @@ export function handleContainerOrchestration(input: {
                     issueId,
                     error: errorMessage,
                   }).catch(() => undefined);
-                  try {
-                    saveAgentStateSync(buildContainerStartState({
-                      agentSessionName: earlyAgentId,
-                      issueId,
-                      workspacePath,
-                      role,
-                      effectiveHarness,
-                      startedBy,
-                      allowHost,
-                      status: 'error',
-                      startedAt: new Date().toISOString(),
-                    }));
-                  } catch { /* non-fatal */ }
+                  releaseAgentStart(earlyAgentId);
                   console.error(`[start-agent] Background container startup failed for ${issueId}:`, err);
                 }
               })();

@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
 
-import { Effect } from 'effect';
+import { Cause, Effect, Exit } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import {
@@ -823,7 +823,27 @@ export const postAgentsRoute = HttpRouter.add(
       );
     };
 
-    const containerResponse = yield* handleContainerOrchestration({
+    // Claim BEFORE container orchestration (PAN-3849 W34): the claim is the
+    // no-placeholder replacement for the retired pending- rows. The direct
+    // path below releases it when the spawn settles; the container-wait
+    // background job retains it until it spawns or gives up — so concurrent
+    // requests 409 here instead of starting duplicate container waits.
+    if (!claimAgentStart(agentSessionName)) {
+      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_in_flight_blocked', {
+        issueId,
+        role,
+        workspacePath,
+      }));
+      return jsonResponse({
+        error: `Agent ${agentSessionName} is already starting or running.`,
+        code: 'AGENT_START_IN_FLIGHT',
+      }, { status: 409 });
+    }
+
+    // Orchestration takes the request into a background job (claim retained
+    // there). If its Effect fails instead, no background job exists to
+    // release the claim — release here and re-raise the original cause.
+    const containerExit = yield* Effect.exit(handleContainerOrchestration({
       issueId,
       workspacePath,
       devScript,
@@ -839,25 +859,13 @@ export const postAgentsRoute = HttpRouter.add(
       spawnPanCommand,
       markWorkStartAccepted,
       updateIssueStatus,
-    });
-    if (containerResponse) return containerResponse;
-
-    // Containers already ready or no containers needed. Claim the spawn before
-    // launching `pan start`: two requests can pass the lifecycle read together,
-    // but only one may hold the in-flight claim (PAN-3849 W34: an in-process
-    // set, not a placeholder row — agent state is written only when the child
-    // writes its real state after the tmux session exists).
-    if (!claimAgentStart(agentSessionName)) {
-      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_in_flight_blocked', {
-        issueId,
-        role,
-        workspacePath,
-      }));
-      return jsonResponse({
-        error: `Agent ${agentSessionName} is already starting or running.`,
-        code: 'AGENT_START_IN_FLIGHT',
-      }, { status: 409 });
+    }));
+    if (Exit.isFailure(containerExit)) {
+      releaseAgentStart(agentSessionName);
+      return yield* Effect.failCause(containerExit.cause);
     }
+    const containerResponse = containerExit.value;
+    if (containerResponse) return containerResponse;
 
     yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_requested', {
       issueId,
@@ -865,10 +873,14 @@ export const postAgentsRoute = HttpRouter.add(
       workspacePath,
     }));
 
-    let activityId: string;
-    try {
+    // Effect failures are values, not JS exceptions (see lifecycle-restart):
+    // a JS try/catch/finally around `yield*` never sees a spawnPanCommand
+    // rejection (Effect.promise turns it into a defect) — the mapped errors
+    // below would never render and the claim would leak. Capture the Exit so
+    // both run on every outcome.
+    const spawnExit = yield* Effect.exit(Effect.gen(function* () {
       emitStartAgentPhase(issueId, 'spawn', 'start', 'starting local work agent', { workspacePath });
-      activityId = yield* Effect.promise(() => spawnPanCommand(
+      const id = yield* Effect.promise(() => spawnPanCommand(
         buildPanStartArgs({
           issueId,
           model: explicitModel,
@@ -881,9 +893,13 @@ export const postAgentsRoute = HttpRouter.add(
       yield* Effect.promise(markWorkStartAccepted);
       emitStartAgentPhase(issueId, 'spawn', 'success', 'local work agent spawn requested', {
         workspacePath,
-        activityId,
+        activityId: id,
       });
-    } catch (error: any) {
+      return id;
+    }));
+    releaseAgentStart(agentSessionName);
+    if (Exit.isFailure(spawnExit)) {
+      const error: any = Cause.squash(spawnExit.cause);
       // Nothing to roll back (PAN-3849 W34): no placeholder was written, so a
       // failed spawn leaves whatever state existed before — usually none — and
       // a later `pan start` proceeds fresh instead of being refused by a
@@ -939,9 +955,8 @@ export const postAgentsRoute = HttpRouter.add(
         error: output.trim() || `Failed to start agent for ${issueId}`,
         activityId: error?.activityId,
       }, { status: 500 });
-    } finally {
-      releaseAgentStart(agentSessionName);
     }
+    const activityId = spawnExit.value;
 
     updateRegistryForAgentStart(issueId, workspacePath, agentSessionName);
     yield* Effect.promise(() => updateIssueStatus());
