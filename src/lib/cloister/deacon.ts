@@ -177,9 +177,9 @@ import {
   SpecialistAgentName,
   getTmuxSessionName,
   isRunning,
-  getAllProjectSpecialistStatuses,
   parseReviewerSessionName,
 } from './specialists.js';
+import { perProjectSpecialistPatrol } from './specialist-patrol.js';
 import { getAgentRuntimeStateSync, saveAgentRuntimeState, saveSessionId, listRunningAgentsSync, listRunningAgents, listAgentStates, getAgentDir, getAgentStateSync, getAgentState, saveAgentStateSync, saveAgentState, resumeAgent, recordAgentFailure, resetAgentFailureCount, markAgentRunningState, buildDefaultResumeContinueMessage, clearAgentTroubledSync, type AgentState } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { buildTmuxCommandString, capturePane, createSession, getManagedTmuxSocketName, isPaneDead, killSessionSync, killSession, listPaneValuesSync, listPaneValues, listSessionNames, sessionExistsSync, sessionExists, sendKeys } from '../tmux.js';
@@ -3021,107 +3021,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   // Patrol per-project ephemeral specialists (PAN-300)
   // Ephemeral specialists are spawned on-demand and are not auto-restarted by the deacon.
   // Patrol detects stuck sessions, dead sessions, and auto-completes successful merges (PAN-375).
-  const specialistPatrolActions = await runBudgetedPatrol('perProjectSpecialistPatrol', async () => {
-  const collected: string[] = [];
-  try {
-    const projectSpecialists = await getAllProjectSpecialistStatuses();
-    for (const projSpec of projectSpecialists) {
-      if (!projSpec.isRunning) {
-        // Session is dead — reset any stale active runtime state so the next
-        // merge request is not blocked by a phantom busy signal.
-        const runtimeState = getAgentRuntimeStateSync(projSpec.tmuxSession);
-        if (runtimeState?.state === 'active') {
-          saveAgentRuntimeState(projSpec.tmuxSession, { state: 'idle', lastActivity: new Date().toISOString() });
-          const msg = `Dead-session reset: per-project ${projSpec.specialistType} (${projSpec.projectKey}) was active but session is gone`;
-          collected.push(msg);
-          addLog('action', msg, state.patrolCycle);
-          console.log(`[deacon] ${msg}`);
-
-          // PAN-375: If merge specialist died while merging, check if merge actually succeeded
-          if (projSpec.specialistType === 'merge-agent' && runtimeState.currentIssue) {
-            const issueId = runtimeState.currentIssue;
-            try {
-              const currentStatus = getReviewStatusSync(issueId);
-              if (currentStatus?.mergeStatus === 'merging') {
-                const { resolveProjectFromIssueSync } = await import('../projects.js');
-                const resolved = resolveProjectFromIssueSync(issueId);
-                if (resolved) {
-                  const branch = `feature/${issueId.toLowerCase()}`;
-                  const { stdout } = await execAsync(
-                    `git -C "${resolved.projectPath}" log --oneline origin/main --grep="Merge branch '${branch}'" 2>/dev/null | head -1`,
-                    { encoding: 'utf-8', timeout: 15_000 }
-                  );
-                  if (stdout.trim()) {
-                    console.log(`[deacon] PAN-375: merge specialist died but ${issueId} IS merged (${stdout.trim()}). Auto-completing.`);
-                    setReviewStatusSync(issueId, { mergeStatus: 'merged', readyForMerge: false });
-                    const { postMergeLifecycle } = await import('./merge-agent.js');
-                    postMergeLifecycle(issueId, resolved.projectPath).catch(err =>
-                      console.warn(`[deacon] postMergeLifecycle failed for ${issueId}: ${err}`)
-                    );
-                    collected.push(`Auto-completed stale merge for ${issueId}`);
-                  } else {
-                    console.log(`[deacon] Merge specialist died and ${issueId} NOT merged. Resetting to readyForMerge.`);
-                    setReviewStatusSync(issueId, { mergeStatus: 'pending' });
-                  }
-                }
-              }
-            } catch (err) {
-              console.warn(`[deacon] PAN-375 check failed for ${issueId}: ${err}`);
-            }
-          }
-        }
-        continue;
-      }
-
-      const runtimeState = getAgentRuntimeStateSync(projSpec.tmuxSession);
-      // A running ephemeral specialist with no runtime state, or active for more than
-      // the max specialist timeout (ephemeral specialist spawn uses 15 min), is considered stuck.
-      const isStuck = runtimeState?.state === 'active' && runtimeState.lastActivity
-        ? (Date.now() - new Date(runtimeState.lastActivity).getTime()) > 15 * 60 * 1000
-        : false;
-
-      if (isStuck) {
-        addLog('warn', `Per-project ${projSpec.specialistType} (${projSpec.projectKey}) stuck, force-killing`, state.patrolCycle);
-        console.log(`[deacon] Per-project ${projSpec.specialistType} (${projSpec.projectKey}) stuck, force-killing ${projSpec.tmuxSession}`);
-        try {
-          await Effect.runPromise(killSession(projSpec.tmuxSession));
-          // Preserve Claude JSONL/session artifacts; only reset Overdeck runtime state.
-          saveAgentRuntimeState(projSpec.tmuxSession, { state: 'idle', lastActivity: new Date().toISOString() });
-          collected.push(`Force-killed stuck per-project ${projSpec.specialistType} (${projSpec.projectKey})`);
-        } catch {
-          // Non-fatal — session may have already exited
-        }
-      }
-
-      // PAN-919: Idle-but-alive specialist — task completed but session lingers
-      // (e.g. Claude Code sitting at "Press Ctrl-D again to exit" after one-shot task).
-      // Ephemeral specialists have no reason to stay alive once idle.
-      const IDLE_LINGER_MS = 5 * 60 * 1000; // 5 minutes
-      if (
-        !isStuck &&
-        (!runtimeState || runtimeState.state === 'idle') &&
-        runtimeState?.lastActivity &&
-        Date.now() - new Date(runtimeState.lastActivity).getTime() > IDLE_LINGER_MS
-      ) {
-        const ageMin = Math.round((Date.now() - new Date(runtimeState.lastActivity).getTime()) / 60000);
-        const msg = `Killed lingering idle specialist ${projSpec.specialistType} (${projSpec.projectKey}) — idle ${ageMin}min`;
-        console.log(`[deacon] ${msg}`);
-        try {
-          await Effect.runPromise(killSession(projSpec.tmuxSession));
-          collected.push(msg);
-          addLog('action', msg, state.patrolCycle);
-        } catch {
-          // Non-fatal
-        }
-      }
-    }
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('[deacon] Error during per-project specialist patrol:', msg);
-  }
-  return collected;
-  });
+  const specialistPatrolActions = await runBudgetedPatrol('perProjectSpecialistPatrol', () => perProjectSpecialistPatrol());
   actions.push(...specialistPatrolActions);
+  // PAN-3894 (W3a): the extracted patrol returns action strings instead of calling
+  // addLog itself; a '[warn] ' prefix marks the lines the inline closure logged at warn.
+  for (const a of specialistPatrolActions) addLog(a.startsWith('[warn] ') ? 'warn' : 'action', a.replace(/^\[warn\] /, ''), state.patrolCycle);
 
   refreshPatrolHeartbeat(state);
 
