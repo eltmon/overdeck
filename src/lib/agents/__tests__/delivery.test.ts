@@ -5,6 +5,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+/** The real timer, captured before any test installs a fake clock. */
+const realSetTimeout = globalThis.setTimeout.bind(globalThis);
+
 let tmpHome: string;
 let stateDir: string;
 let socketDir: string;
@@ -359,14 +362,26 @@ describe('app-server delivery tier', () => {
     const server = await startFakeBridge(join(socketDir, `appserver-${agentId}.sock`), { delayMs: 20_000 });
     try {
       const delivered = deliverAgentMessage(agentId, 'timeout', 'timeout-caller');
-      await vi.advanceTimersByTimeAsync(8_100);
+      // PAN-3917: the delivery door asks the terminal backend where this agent
+      // lives before it reaches the app-server tier, so the 8s timer is armed a
+      // few real I/O turns in. Advance in slices, yielding the event loop
+      // between them, instead of one jump that lands before the timer exists.
+      let settled = false;
+      void delivered.then(() => { settled = true; });
+      for (let slice = 0; slice < 100 && !settled; slice += 1) {
+        await vi.advanceTimersByTimeAsync(500);
+        // A real pause between slices, on the timer captured before the fake
+        // clock was installed: the probe's socket round trip needs event-loop
+        // turns that advancing a fake clock does not provide.
+        await new Promise<void>((resolve) => { realSetTimeout(resolve, 10); });
+      }
       const result = await delivered;
       expect(result).toMatchObject({ ok: true, path: 'tmux' });
       expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'timeout');
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
-  });
+  }, 20_000);
 });
 
 describe('native Kimi context delivery', () => {

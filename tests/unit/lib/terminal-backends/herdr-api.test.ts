@@ -138,15 +138,16 @@ describe('HerdrApiClient.call safety rules', () => {
     await expect(pending).rejects.toMatchObject({ ambiguous: false });
   });
 
-  it('times out on the caller deadline (fake timers)', async () => {
-    vi.useFakeTimers();
+  it('times out on the caller deadline', async () => {
+    // The deadline runs on the timer the client captured at module load, never
+    // on a test's fake clock — a request must give up on its own even when the
+    // caller installed fake timers (that is exactly the delivery door's case).
     const socket = new FakeSocket();
-    const client = clientWith(socket, { requestTimeoutMs: 5_000 });
+    const client = clientWith(socket, { requestTimeoutMs: 20 });
     const pending = client.call('agent.list', {});
     socket.connect();
-    const assertion = expect(pending).rejects.toMatchObject({ code: 'timeout' });
-    await vi.advanceTimersByTimeAsync(5_001);
-    await assertion;
+    await expect(pending).rejects.toMatchObject({ code: 'timeout' });
+    expect(socket.destroyed).toBe(true);
   });
 
   it('classifies every mutating method it sends', () => {

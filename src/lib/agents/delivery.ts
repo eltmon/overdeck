@@ -48,6 +48,27 @@ async function loadTerminalBackendConfig(): Promise<{ terminal?: { backend?: 'he
   }
 }
 
+/**
+ * Which backend this host delivers through. Resolved once per process: the
+ * answer is a property of the host (binary plus socket, or an explicit
+ * `terminal.backend`), not of the message, and a probe per delivery would put
+ * filesystem work on every message's hot path.
+ */
+let backendSelection: Promise<'herdr' | 'tmux'> | null = null;
+
+function deliveryBackendName(): Promise<'herdr' | 'tmux'> {
+  backendSelection ??= loadTerminalBackendConfig()
+    .then((config) => selectTerminalBackend(config))
+    .then((selection) => selection.backend)
+    .catch(() => 'tmux' as const);
+  return backendSelection;
+}
+
+/** Tests reset the memoized host selection. */
+export function resetDeliveryBackendSelection(): void {
+  backendSelection = null;
+}
+
 export type DeliveryResult = {
   ok: boolean;
   path: 'app-server' | 'acp' | 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex' | 'herdr';
@@ -353,11 +374,13 @@ export async function deliverAgentMessage(
   const messageId = opts.messageId ?? randomUUID();
   const targetTokens = tokensFromLaunchMetadata(state);
   const sender = opts.sender ?? senderFromEnv(process.env, () => targetTokens);
-  const selection = await selectTerminalBackend(await loadTerminalBackendConfig());
-  if (selection.backend === 'herdr') {
+  const herdrAgent = (await deliveryBackendName()) === 'herdr'
+    ? await (await import('../terminal-backends/herdr.js')).findHerdrAgent(normalizedId)
+    : null;
+  if (herdrAgent) {
     const { herdrBackend } = await import('../terminal-backends/herdr.js');
     const result = await Effect.runPromise(
-      herdrBackend.prompt({ agentName: normalizedId }, message, { messageId, sender }),
+      herdrBackend.prompt({ paneId: herdrAgent.paneId }, message, { messageId, sender }),
     );
     if (isUnsupported(result)) return { ok: false, path: 'herdr', failure: result.reason };
     if (isPromptRefused(result)) return { ok: false, path: 'herdr', failure: `refused: ${result.reason}` };
@@ -366,6 +389,8 @@ export async function deliverAgentMessage(
     }
     return { ok: true, path: 'herdr' };
   }
+  // Not a Herdr agent (or a tmux host): the cascade below is unchanged, with
+  // the same guard in front of it.
   const guard = checkPrompt({ targetId: normalizedId, targetTokens, sender, messageId });
   if ('refused' in guard) return { ok: false, path: 'tmux', failure: `refused: ${guard.reason}` };
   if ('dropped' in guard) {

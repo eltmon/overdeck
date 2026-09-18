@@ -47,6 +47,16 @@ export const DEFAULT_MAX_FRAME_BYTES = 8 * 1024 * 1024;
 export const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
 /**
+ * The request deadline runs on the timer this module captured at load, not on
+ * whatever `setTimeout` is current. A caller under Vitest fake timers (the
+ * delivery door's tests, for one) must still see a socket that answers or gives
+ * up on its own — a deadline that only fires when a test advances a fake clock
+ * is not a deadline.
+ */
+const scheduleTimeout: typeof setTimeout = globalThis.setTimeout.bind(globalThis);
+const cancelTimeout: typeof clearTimeout = globalThis.clearTimeout.bind(globalThis);
+
+/**
  * Methods that change server state. A disconnect with no response after one of
  * these was written is ambiguous and is never retried.
  */
@@ -201,7 +211,7 @@ export class HerdrApiClient {
       const finish = (outcome: () => void): void => {
         if (settled) return;
         settled = true;
-        if (timer) clearTimeout(timer);
+        if (timer) cancelTimeout(timer);
         try {
           socket.destroy();
         } catch {
@@ -214,7 +224,7 @@ export class HerdrApiClient {
         finish(() => reject(new HerdrApiError({ method, code, message, ambiguous, cause })));
       };
 
-      timer = setTimeout(() => {
+      timer = scheduleTimeout(() => {
         fail(
           'timeout',
           `herdr ${method} did not answer within ${timeoutMs}ms`,

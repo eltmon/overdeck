@@ -157,6 +157,41 @@ export function toBackendEvent(kind: string, data: Record<string, unknown>): Bac
   }
 }
 
+/** A routing probe must never hold up a delivery: give up and let tmux answer. */
+export const HERDR_PROBE_TIMEOUT_MS = 2_000;
+
+/**
+ * The live Herdr agent behind an Overdeck agent id, or null when there is none.
+ *
+ * The adapter binds the Overdeck agent id as Herdr's live agent name
+ * (`agent.rename`), so one `agent.get` answers it. A null answer means the
+ * target is not a Herdr agent — a tmux session from before the cut, or an id
+ * that no longer exists — and the caller keeps its tmux path.
+ */
+export async function findHerdrAgent(
+  agentName: string,
+  api: HerdrApiClient = getHerdrApiClient(),
+): Promise<{ paneId: string; terminalId: string; workspaceId: string; state: AgentState; tokens: Partial<PaneTokens> } | null> {
+  try {
+    const info = await api.call<{ agent?: HerdrPaneInfo }>(
+      'agent.get',
+      { target: agentName },
+      { timeoutMs: HERDR_PROBE_TIMEOUT_MS },
+    );
+    const agent = info.agent;
+    if (!agent) return null;
+    return {
+      paneId: agent.pane_id,
+      terminalId: agent.terminal_id,
+      workspaceId: agent.workspace_id,
+      state: toAgentState(agent.agent_status),
+      tokens: (agent.tokens ?? {}) as Partial<PaneTokens>,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export class HerdrBackend implements TerminalBackend {
   readonly name = BACKEND;
 

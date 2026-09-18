@@ -16,7 +16,7 @@ import { homedir } from 'node:os';
 import { PanRpcError, TerminalOutput } from '@overdeck/contracts';
 import { buildTmuxArgs, resizeWindow, sessionExists } from '../../../lib/tmux.js';
 import { buildChildEnvWithoutTmuxSync } from '../../../lib/child-env.js';
-import { getHerdrApiClient } from '../../../lib/terminal-backends/herdr-api.js';
+import { findHerdrAgent } from '../../../lib/terminal-backends/herdr.js';
 import { controlTerminal, observeTerminal } from '../../../lib/terminal-backends/herdr-stream.js';
 import { resolveLaunchBackend } from '../../../lib/terminal-backends/launch.js';
 
@@ -193,11 +193,7 @@ export async function resolveHerdrTerminalId(sessionName: string): Promise<strin
   try {
     const backend = await resolveLaunchBackend();
     if (backend.name !== 'herdr') return null;
-    const info = await getHerdrApiClient().call<{ agent?: { terminal_id?: string } }>(
-      'agent.get',
-      { target: sessionName },
-    );
-    return info.agent?.terminal_id ?? null;
+    return (await findHerdrAgent(sessionName))?.terminalId ?? null;
   } catch {
     return null;
   }
