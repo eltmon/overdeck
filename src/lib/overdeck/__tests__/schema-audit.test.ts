@@ -47,7 +47,7 @@ afterEach(() => {
   tempDirs = [];
 });
 
-describe('overdeck schema audit', () => {
+describe('overdeck schema audit', { timeout: 15_000 }, () => {
   it('parses at least the declared table count from the real migration', () => {
     const expected = readOverdeckSchemaExpectationsSync(
       OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS,

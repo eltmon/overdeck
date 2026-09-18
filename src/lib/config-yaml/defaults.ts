@@ -258,6 +258,9 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
     permissionMode: 'auto',
   },
   kimiCode: {},
+  primeAgent: {
+    rpcStartupTimeoutMs: 30_000,
+  },
 };
 
 /**

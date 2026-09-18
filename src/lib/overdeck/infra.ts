@@ -491,6 +491,18 @@ function createDrizzleNodeSqliteDatabase(raw: SqliteDatabase): OverdeckDrizzleDa
   return drizzle(callback, { schema: overdeckSchema });
 }
 
+/**
+ * The Effect-side Db layer over `overdeck.db`.
+ *
+ * `openDatabase` CREATES the file when it is missing, so this layer must apply
+ * the schema exactly like the sync door (`getOverdeckDatabaseSync`) does.
+ * Without it, building this layer against a not-yet-created path leaves a
+ * table-less database behind, and the next read-only open of that same path
+ * fails its schema audit with "overdeck.db schema is incompatible" — a failure
+ * that surfaces in whatever unrelated code reads next. `runOverdeckMigrationSync`
+ * short-circuits on an existing `agents` table, so an established database pays
+ * one `sqlite_master` lookup.
+ */
 export function makeDbLive(dbPath = getOverdeckDatabasePath()): Layer.Layer<Db> {
   return Layer.effect(
     Db,
@@ -498,6 +510,7 @@ export function makeDbLive(dbPath = getOverdeckDatabasePath()): Layer.Layer<Db> 
       Effect.sync(() => {
         const raw = openDatabase(dbPath);
         raw.exec('PRAGMA foreign_keys = ON');
+        runOverdeckMigrationSync(raw);
         return raw;
       }),
       (raw) => Effect.sync(() => raw.close()),

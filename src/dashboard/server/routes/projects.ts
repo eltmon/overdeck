@@ -72,7 +72,7 @@ import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
 import { getOverdeckHome } from '../../../lib/paths.js';
 import { parseIssueIdFromTextSync } from '../../../lib/resource-utils.js';
 import { isDiscoverableAgentSession } from '../services/resource-discovery.js';
-
+import { projectRuntimeSession } from '../services/runtime-session-projection.js';
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
 
 async function getIssueDataService(): Promise<IssueDataService> {
@@ -295,7 +295,7 @@ async function collectSessionTreeNodes(
         awaitingInputReason: awaitingInput?.reason,
         pendingInputKinds: context.agentSnapshotsById?.get(checkId)?.pendingInputKinds,
         hasJsonl: !!jsonlPath,
-        harness: state.harness,
+        ...projectRuntimeSession(checkId, state.harness ?? 'claude-code'),
         deliveryMethod: state.deliveryMethod,
         planningComplete: isPlanning ? planningFinished : undefined,
         ...await readSessionGateFields(checkId, state),

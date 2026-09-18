@@ -100,17 +100,28 @@ const FIXTURE_DIR = process.env.LIVENESS_AUDIT_FIXTURE_DIR
 
 let odb: OverdeckTestDb;
 let savedHome: string | undefined;
+let savedNoResume: string | undefined;
 
 beforeEach(() => {
   odb = setupOverdeckTestDb();
   savedHome = process.env.HOME;
   process.env.HOME = odb.home; // ~/.claude resolves inside the fixture world
+  // Same reason as the getDashboardApiUrlSync mock above: pan status's
+  // no-resume probe short-circuits on OVERDECK_NO_RESUME before it ever
+  // reaches the (deliberately unreachable) dashboard URL. The verification
+  // gate inherits that variable from a dashboard booted with --no-resume, so
+  // leaving it set makes every agent row carry gatingReason "Boot
+  // --no-resume" and the fixture comparison machine-dependent.
+  savedNoResume = process.env.OVERDECK_NO_RESUME;
+  delete process.env.OVERDECK_NO_RESUME;
   seedAuditWorld(odb);
 }, 30_000);
 
 afterEach(() => {
   if (savedHome === undefined) delete process.env.HOME;
   else process.env.HOME = savedHome;
+  if (savedNoResume === undefined) delete process.env.OVERDECK_NO_RESUME;
+  else process.env.OVERDECK_NO_RESUME = savedNoResume;
   teardownOverdeckTestDb(odb);
 });
 

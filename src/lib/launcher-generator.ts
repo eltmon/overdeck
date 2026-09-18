@@ -17,7 +17,7 @@ import { getClaudeCodeLaunchModelSync } from './kimi-claude-routing.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
-export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
+export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent';
 
 export interface LauncherConfig {
   role: Role;
@@ -534,6 +534,9 @@ function buildCommand(config: LauncherConfig): string[] {
     if (behavior.launchCommandKind === 'kimi-code-tui') {
       return buildKimiCodeCommand(config, false);
     }
+    if (behavior.launchCommandKind === 'prime-agent-rpc') {
+      return buildPrimeAgentCommand(config, false);
+    }
 
     // Conversation panel doesn't use exec — it runs the command then loops
     if (config.baseCommand) {
@@ -634,8 +637,11 @@ function buildReviewSubRoleCommand(config: LauncherConfig): string[] {
  * frontmatter), permission flags are skipped — the frontmatter handles them.
  */
 function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): string[] {
-  if (config.harness === 'muse') return buildMuseCommand(config, useExec);
   const behavior = getHarnessBehavior(config.harness ?? 'claude-code');
+  if (behavior.launchCommandKind === 'muse-tui') return buildMuseCommand(config, useExec);
+  if (behavior.launchCommandKind === 'prime-agent-rpc') {
+    return buildPrimeAgentCommand(config, useExec);
+  }
   if (behavior.launchCommandKind === 'ohmypi-rpc') {
     return buildOhmypiCommand(config, useExec);
   }
@@ -648,7 +654,6 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
   if (behavior.launchCommandKind === 'kimi-code-tui') {
     return buildKimiCodeCommand(config, useExec);
   }
-
   const parts: string[] = [];
   if (!config.baseCommand) return parts;
 
@@ -701,6 +706,15 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
   const wrapped = wrapWithSupervisor(config, cmd.trim());
   parts.push(useExec ? `exec ${wrapped}` : wrapped);
   return parts;
+}
+
+function buildPrimeAgentCommand(config: LauncherConfig, useExec: boolean): string[] {
+  if (!config.baseCommand) return [];
+  const args: string[] = [];
+  if (config.resumeSessionId) args.push(`--resume ${shellQuote(config.resumeSessionId)}`);
+  if (config.promptFile) args.push(`--prompt-file ${shellQuote(config.promptFile)}`);
+  else if (config.promptInline) args.push(`--prompt ${shellQuote(config.promptInline)}`);
+  return [`${useExec ? 'exec ' : ''}${config.baseCommand} ${args.join(' ')}`.trim()];
 }
 
 /**

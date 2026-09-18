@@ -28,6 +28,7 @@ const HARNESS_ROW_LABELS = {
   'claude-code': 'Claude Code',
   'kimi-code': 'Kimi Code CLI',
   muse: 'Muse Code',
+  'prime-agent': 'Prime Agent',
   acp: 'ACP (Kimi Code)',
 } as const;
 

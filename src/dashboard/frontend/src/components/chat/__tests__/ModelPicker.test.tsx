@@ -18,6 +18,9 @@ function installFetchMock(options: { showHarnessModelPermutations?: boolean; mis
     if (url === '/api/settings/available-models') {
       await options.availableModelsGate;
       return new Response(JSON.stringify({
+        meta: [
+          { id: 'muse-spark-1.3', name: 'Muse Spark 1.3 Standard', costPer1MTokens: 2.75 },
+        ],
         anthropic: [
           { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', costPer1MTokens: 15 },
         ],
@@ -53,6 +56,7 @@ function installFetchMock(options: { showHarnessModelPermutations?: boolean; mis
           default_conversation_model: options.defaultConversationModel ?? 'claude-sonnet-4-6',
           provider_harnesses: {},
           provider_default_harnesses: {
+            meta: 'muse',
             anthropic: 'claude-code',
             openai: 'codex',
             google: 'ohmypi',
@@ -138,6 +142,7 @@ describe('chat ModelPicker live harness labels', () => {
     expect(screen.getByLabelText('Kimi Code logo')).toBeInTheDocument();
     expect(screen.getByLabelText('OpenCode logo')).toBeInTheDocument();
     expect(screen.getByLabelText('Muse Code logo')).toBeInTheDocument();
+    expect(screen.getByLabelText('Prime Agent logo')).toBeInTheDocument();
     // Every harness row except the current one (claude-code) carries the
     // experimental warning — derive the count so a new harness option does
     // not silently break this assertion.
@@ -158,7 +163,7 @@ describe('chat ModelPicker live harness labels', () => {
 
     await user.click(screen.getByRole('button', { name: /Claude Sonnet 4\.6/i }));
 
-    for (const label of ['Anthropic', 'OpenAI', 'Google', 'MiniMax', 'Z.AI', 'Kimi', 'MiMo', 'Nous Portal', 'Alibaba DashScope', 'OpenRouter']) {
+    for (const label of ['Meta (Muse)', 'Anthropic', 'OpenAI', 'Google', 'MiniMax', 'Z.AI', 'Kimi', 'MiMo', 'Nous Portal', 'Alibaba DashScope', 'OpenRouter']) {
       expect(screen.getAllByLabelText(`${label} logo`).length).toBeGreaterThan(0);
     }
   });

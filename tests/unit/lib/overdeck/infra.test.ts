@@ -101,6 +101,35 @@ describe('overdeck infra', () => {
     }
   });
 
+  it('applies the schema when the database file does not exist yet (PAN-3668)', async () => {
+    // openDatabase CREATES a missing file. Before this was fixed, building the
+    // layer against a not-yet-created path left a table-less overdeck.db behind,
+    // and the next read-only open of that path failed its schema audit inside
+    // whatever unrelated code happened to read next.
+    const dbPath = join(makeTempDir(), 'overdeck.db');
+
+    const resolvedPath = await Effect.runPromise(
+      Effect.gen(function* () {
+        const db = yield* Db;
+        return db.path;
+      }).pipe(Effect.provide(makeDbLive(dbPath))),
+    );
+    expect(resolvedPath).toBe(dbPath);
+
+    const raw = openDatabase(dbPath);
+    try {
+      const tableCount = raw.prepare(`
+        SELECT COUNT(*) AS count
+        FROM sqlite_master
+        WHERE type = 'table'
+          AND name NOT LIKE 'sqlite_%'
+      `).get<{ count: number }>()?.count;
+      expect(tableCount).toBe(OVERDECK_TABLE_COUNT);
+    } finally {
+      raw.close();
+    }
+  });
+
   it('emits, reads, and streams events through EventBusLive', async () => {
     const dbPath = makeDbPath();
 

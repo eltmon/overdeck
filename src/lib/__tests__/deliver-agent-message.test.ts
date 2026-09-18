@@ -664,6 +664,19 @@ describe('channel bridge delivery', () => {
     ).rejects.toThrow(/Channels tier cannot enforce a dedup key/);
   });
 
+  it('rejects keyed delivery to a Prime Agent target', async () => {
+    // The Prime branch used to sit above the keyed branch, so a keyed delivery
+    // reached the host POST with its key silently dropped and a retried keyed
+    // message was delivered twice. One host POST cannot enforce at-most-once
+    // across a crash, so it refuses like the ACP tier does.
+    const agentId = 'agent-dedup-prime';
+    writeAgentState(agentId, { harness: 'prime-agent' });
+
+    await expect(
+      deliverAgentMessage(agentId, 'wake', 'caller-wake', undefined, { dedupKey: 'wake:seq-1' }),
+    ).rejects.toThrow(/Prime Agent tier cannot enforce a dedup key/);
+  });
+
   it('rejects keyed delivery to an ACP target (PAN-2997 cycle 7)', async () => {
     const agentId = 'agent-dedup-acp';
     writeAgentState(agentId, { harness: 'acp' });

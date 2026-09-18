@@ -45,6 +45,7 @@ export {
   createKimiCodeRuntimeSync,
   KimiCodeSpawnTimeout,
 } from './kimi-code.js';
+export { PrimeAgentRuntimeSync, createPrimeAgentRuntimeSync } from './prime-agent.js';
 
 import type {
   AgentRuntimeSync,
@@ -58,6 +59,7 @@ import { createOhmypiRuntimeSync } from './ohmypi.js';
 import { createCodexRuntimeSync } from './codex.js';
 import { createAcpRuntimeSync } from './acp.js';
 import { createKimiCodeRuntimeSync } from './kimi-code.js';
+import { createPrimeAgentRuntimeSync } from './prime-agent.js';
 
 /**
  * Runtime registry implementation
@@ -118,6 +120,9 @@ export class RuntimeRegistry implements RuntimeRegistryInterface {
     if (harness === 'kimi-code') {
       return this.get('kimi-code') ?? null;
     }
+    if (harness === 'prime-agent') {
+      return this.get('prime-agent') ?? null;
+    }
     return this.get('claude-code') ?? null;
   }
 }
@@ -148,6 +153,7 @@ export function getGlobalRegistry(): RuntimeRegistry {
     globalRegistry.register(createAcpRuntimeSync({ name: 'opencode', provider: 'opencode' }));
     globalRegistry.register(createKimiCodeRuntimeSync());
     globalRegistry.register(createMuseRuntimeSync());
+    globalRegistry.register(createPrimeAgentRuntimeSync());
   }
   return globalRegistry;
 }

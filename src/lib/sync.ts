@@ -24,6 +24,7 @@ import {
   piGlobalContextFile,
   codexGlobalContextFile,
   claudeGlobalContextFile,
+  primeAgentGlobalContextFile,
 } from './context-layers/index.js';
 export { isStartupSyncNeededSync, writeSyncManifestSync } from './sync-startup-gate.js';
 export interface SyncItem {
@@ -554,6 +555,8 @@ export interface ContextLayerSyncResult {
   piGlobalWritten: boolean;
   /** True when ~/.overdeck/context/codex-global.md was written this run. */
   codexGlobalWritten: boolean;
+  /** True when ~/.overdeck/context/prime-agent-global.md was written this run. */
+  primeAgentGlobalWritten: boolean;
   errors: string[];
 }
 
@@ -584,6 +587,7 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
     globalStubCreated: false,
     piGlobalWritten: false,
     codexGlobalWritten: false,
+    primeAgentGlobalWritten: false,
     errors: [],
   };
 
@@ -620,6 +624,22 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
   } catch (err: any) {
     result.errors.push(`codex-global: ${err?.message ?? err}`);
   }
+
+  // PAN-3668: Global layer → ~/.overdeck/context/prime-agent-global.md.
+  // Injected into the Prime Agent root RPC session's supplemental system prompt
+  // at spawn; Overdeck never writes ~/.prime/agent.
+  try {
+    const managed = renderGlobalLayer('prime-agent', isDevMode());
+    const file = primeAgentGlobalContextFile();
+    if (writeContextArtifactSync(file, managed)) {
+      result.primeAgentGlobalWritten = true;
+    }
+  } catch (err: any) {
+    result.errors.push(`prime-agent-global: ${err?.message ?? err}`);
+  }
+
+  // PAN-1837 (D6): kimi-code intentionally gets no dedicated global render file here —
+  // it reads the shared AGENTS.md layer natively via ~/.agents/skills discovery, same as acp.
 
   return result;
 }

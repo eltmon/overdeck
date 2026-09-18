@@ -6,6 +6,12 @@ import { describe, it, expect } from 'vitest';
 import { renderForHarness, validateTemplate } from '../../../src/lib/context-layers/harness.js';
 
 describe('renderForHarness', () => {
+  it('keeps Prime-only blocks only for Prime Agent', () => {
+    const source = 'shared\n{{#harness:prime-agent}}prime only{{/harness:prime-agent}}\n';
+    expect(renderForHarness(source, 'prime-agent')).toContain('prime only');
+    expect(renderForHarness(source, 'claude-code')).not.toContain('prime only');
+    expect(validateTemplate(source).issues).toEqual([]);
+  });
   it('keeps always-on content for every harness', () => {
     expect(renderForHarness('Always here.', 'claude-code')).toBe('Always here.');
     expect(renderForHarness('Always here.', 'ohmypi')).toBe('Always here.');

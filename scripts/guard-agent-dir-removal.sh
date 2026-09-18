@@ -74,6 +74,10 @@ is_allowlisted() {
     src/lib/overdeck/conversation-runtime.ts)
       [[ "$content" == *'rm(sessionIdPath'* ]]
       ;;
+    src/lib/runtimes/prime-agent.ts)
+      [[ "$content" == *"'prime-agent-session-id'"* ||
+         "$content" == *"'prime-agent-launch-error'"* ]]
+      ;;
     *)
       return 1
       ;;

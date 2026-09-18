@@ -53,7 +53,6 @@ import { writeBridgeTokenSync } from '../bridge-token.js';
 import { isClaudeCodeChannelsEnabled, loadConfigSync } from '../config-yaml.js';
 import { writePtyToken } from '../pty-token.js';
 import { canUseHarnessSync } from '../harness-policy.js';
-import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { getProviderForModelSync, piProviderForModel, UnknownModelError } from '../providers.js';
 import { getOhmypiCodexAuthStatus } from '../ohmypi-codex-auth.js';
@@ -78,6 +77,8 @@ import {
   deliverMandatoryKimiResumeContext,
   deliverResumeContractUnlessGated,
 } from './resume-contract-delivery.js';
+import { preparePrimeAgentConversationLaunch, resolveAllowedHarness } from './conversation-harness.js';
+export { preparePrimeAgentConversationLaunch, resolveAllowedHarness } from './conversation-harness.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 const PROCESS_CLEANUP_GRACE_MS = 750;
@@ -199,14 +200,6 @@ const PI_CONVERSATION_SOURCE_CONTRACT = [
   "A message marked source:'extension' was injected by the Overdeck orchestrator or another agent, not typed by the human operator.",
   'Treat it as coordination guidance; do not attribute it to the human operator.',
 ].join(' ');
-export async function resolveAllowedHarness(requested: unknown, model?: string | null): Promise<RuntimeName> {
-  if (!model) return 'claude-code';
-  const explicit: RuntimeName | undefined =
-    requested === 'ohmypi' || requested === 'claude-code' || requested === 'codex' || requested === 'acp' || requested === 'kimi-code' || requested === 'opencode' || requested === 'muse'
-      ? requested
-      : undefined;
-  return resolveHarness({ model, explicit });
-}
 export async function isInsideGitWorkTree(dir: string): Promise<boolean> {
   try {
     const { stdout } = await execAsync('git rev-parse --is-inside-work-tree', { cwd: dir, encoding: 'utf-8' });
@@ -579,6 +572,7 @@ export async function spawnConversationSession(
     resumeSessionId?: string;
   } | undefined;
   let acpFields: (ReturnType<typeof getAcpLauncherFields> & { resumeSessionId?: string }) | undefined;
+  let primeAgentFields: { harness: 'prime-agent'; resumeSessionId?: string } | undefined;
   const museSavedSession = harness === 'muse' && resume ? await resolveMuseSessionPath(tmuxSession) : null;
   const museFields = harness === 'muse' ? {
     harness: 'muse' as const,
@@ -606,9 +600,16 @@ export async function spawnConversationSession(
     if (!SAFE_MODEL_PATTERN.test(model)) {
       throw new Error('Invalid model name');
     }
-    runtimeCommand = await getAgentRuntimeBaseCommand(model, undefined, undefined, harness);
-    // Map permissions through the canonical helper; Claude rejects the literal `auto` flag.
-    runtimeCommand = ensureClaudePermissionFlagSync(runtimeCommand);
+    if (behavior.launchCommandKind === 'prime-agent-rpc') {
+      const primeLaunch = await preparePrimeAgentConversationLaunch(tmuxSession, cwd, model, resume);
+      runtimeCommand = primeLaunch.runtimeCommand;
+      primeAgentFields = primeLaunch.fields;
+    } else {
+      runtimeCommand = await getAgentRuntimeBaseCommand(model, undefined, undefined, harness);
+      // The mode→flag mapping lives in claude-permissions.ts. In particular,
+      // Claude Code rejects the literal permission-mode value `auto`.
+      runtimeCommand = ensureClaudePermissionFlagSync(runtimeCommand);
+    }
     providerExportsStr = (await getProviderExportsForModel(model, harness)).trim();
     if (behavior.transcriptKind === 'ohmypi-jsonl') {
       if (getProviderForModelSync(model).name === 'openai') {
@@ -763,7 +764,7 @@ export async function spawnConversationSession(
         setTerminalEnv: true,
         unsetProviderEnv: true,
         managedStateKey: tmuxSession,
-        overdeckEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || acpFields || useSupervisor) ? { agentId: tmuxSession } : {}) },
+        overdeckEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || acpFields || primeAgentFields || useSupervisor) ? { agentId: tmuxSession } : {}) },
         extraEnvExports: [
           harnessLaunch.pathExport,
           `export OVERDECK_DASHBOARD_URL="http://127.0.0.1:${process.env['API_PORT'] ?? process.env['PORT'] ?? '3011'}"`,
@@ -775,17 +776,17 @@ export async function spawnConversationSession(
           ? await piConversationSystemPromptFiles(cwd)
           : codexFields
             ? await codexConversationSystemPromptFiles(cwd)
-            : acpFields || museFields
+            : acpFields || museFields || primeAgentFields
               ? []
               : kimiCodeFields
                 ? await claudeSystemPromptFiles(cwd, 'kimi-code')
               : await claudeConversationSystemPromptFiles(cwd),
         model: launcherModel,
-        ...(piFields ?? codexFields ?? acpFields ?? kimiCodeFields ?? museFields ?? {
+        ...(piFields ?? codexFields ?? acpFields ?? kimiCodeFields ?? museFields ?? primeAgentFields ?? {
           resumeSessionId: resume ? claudeSessionId : undefined,
           sessionId: resume ? undefined : claudeSessionId,
         }),
-        extraArgs: !piFields && !acpFields && !kimiCodeFields && !museFields && effort ? `--effort "${effort}"` : undefined,
+        extraArgs: !piFields && !acpFields && !kimiCodeFields && !museFields && !primeAgentFields && effort ? `--effort "${effort}"` : undefined,
         keepAlive: true,
         fileMode: 0o700,
         channelsBridgeMcpConfig,
@@ -1051,6 +1052,7 @@ export async function handleConversationResume(
     if (oldSessionId) {
       const resumeFile = await deps.resolveSessionFile(conv);
       if (!resumeFile || !existsSync(resumeFile)) {
+        if (harness === 'prime-agent') throw new Error(`Prime Agent conversation ${name} cannot resume because its durable session is missing or unreadable: ${resumeFile ?? '<missing sidecar>'}`);
         canResume = false;
         console.error(`[conversations] SESSION-LOST ${name} harness=${harness} claudeSessionId=${oldSessionId} resolved=${resumeFile ?? 'null'} — resuming with a fresh session`);
       }
@@ -1129,6 +1131,7 @@ export async function handleConversationRestartAll(
         const canResume = !!oldSessionId && !!sessionFileForResume && existsSync(sessionFileForResume);
         const harness = await resolveAllowedHarness(conv.harness, conv.model);
         attemptedHarness = harness;
+        if (harness === 'prime-agent' && !canResume) throw new Error(`Prime Agent conversation ${conv.name} cannot restart because its durable session is missing or unreadable: ${sessionFileForResume ?? '<missing sidecar>'}`);
         await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), conv.model ?? undefined, conv.effort ?? undefined, conv.issueId ?? undefined, canResume, harness);
         if (harness === 'acp' || harness === 'opencode' || harness === 'kimi-code' || harness === 'muse') {
           await waitForConversationRuntimeReady(conv.tmuxSession, harness, 'respawn');

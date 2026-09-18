@@ -16,6 +16,7 @@ export default defineConfig({
     'pty-supervisor': 'src/lib/channels/pty-supervisor.ts',
     'codex-app-server-host': 'src/lib/codex/app-server-host.ts',
     'acp-host': 'src/lib/acp/host.ts',
+    'prime-agent-host': 'src/lib/prime-agent/host.ts',
     'verification-worker': 'src/lib/cloister/verification-worker.ts',
     'lib/memory/fts-worker': 'src/lib/memory/fts-worker.ts',
   },

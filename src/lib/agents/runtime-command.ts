@@ -12,7 +12,6 @@ import type { MemoryIdentity } from '@overdeck/contracts';
 import { getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
 import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import type { RoleEffort } from '../config-yaml.js';
-import { getClaudeAuthStatus } from '../claude-auth.js';
 import { materializeAcpContextFile } from '../acp/context.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { findAgentRuntimePidInSubtree } from './runtime-pid-probe.js';
@@ -21,18 +20,24 @@ import { createOhmypiFifo, ohmypiFifoPaths, OhmypiNotReady, writeOhmypiCommandSy
 import { createPiFifo, piFifoPaths, PiNotReady, writePiCommandSync } from '../runtimes/pi-fifo.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { requireModelOverrideSync, shellQuoteModelIdSync } from '../model-validation.js';
-import { getOpenAIAuthStatus } from '../openai-auth.js';
 import { getOverdeckHome, packageRoot, resolveOhmypiExtensionPath, resolvePiExtensionPath } from '../paths.js';
 import { getProviderForModelSync, resolveKimiCodeModelAlias } from '../providers.js';
-import type { AuthMode } from '../subscription-types.js';
 import { capturePane, sessionExists } from '../tmux.js';
 import { getAgentDir, getAgentStateSync, type Role } from './agent-state.js';
 import { waitForReadySignal } from './identity.js';
 import { CLI_PROXY_MODEL_ALIASES } from './provider-env.js';
+import { buildPrimeAgentBaseCommand } from '../prime-agent/launch-command.js';
+import { getProviderAuthMode } from './provider-auth.js';
+export { getProviderAuthMode } from './provider-auth.js';
 import { getClaudeCodeLaunchModelSync } from '../kimi-claude-routing.js';
 
 const execAsync = promisify(exec);
 const missingRoleDefinitionWarnings = new Set<string>();
+
+export async function getPrimeAgentBaseCommand(agentId: string, model: string, workspace: string): Promise<string> {
+  const authMode = await getProviderAuthMode(model) ?? 'api-key';
+  return buildPrimeAgentBaseCommand({ agentId, model, workspace, authMode });
+}
 
 export interface RoleMcpServerDef {
   type?: string;
@@ -653,30 +658,6 @@ export async function writeOhmypiAgentPrompt(agentId: string, prompt: string, ti
   }
 }
 
-export async function getProviderAuthMode(model: string): Promise<AuthMode | undefined> {
-  const provider = getProviderForModelSync(model);
-  if (provider.name === 'anthropic') {
-    const authStatus = await Effect.runPromise(getClaudeAuthStatus());
-    if (authStatus.hasAnthropicApiKey) return 'api-key';
-    return authStatus.loggedIn ? 'subscription' : undefined;
-  }
-
-  if (provider.name === 'openai') {
-    const { config } = loadYamlConfig();
-    const authStatus = await Effect.runPromise(getOpenAIAuthStatus());
-    return authStatus.loggedIn
-      ? 'subscription'
-      : (config.providerAuth?.openai ?? 'api-key');
-  }
-
-  if (provider.name === 'google') {
-    const { config } = loadYamlConfig();
-    return config.providerAuth?.google;
-  }
-
-  return undefined;
-}
-
 /**
  * Build the base command that the launcher will exec for an agent.
  *
@@ -714,6 +695,12 @@ export async function getAgentRuntimeBaseCommand(
     // buildKimiCodeCommand in launcher-generator builds the full `kimi -m ... --yolo`
     // command; return a stub base command so the launcher generator can short-circuit.
     return 'kimi-code';
+  }
+  if (behavior.launchCommandKind === 'prime-agent-rpc') {
+    if (!agentName) throw new Error('prime-agent launcher requires an agent ID');
+    const workspace = getAgentStateSync(agentName)?.workspace;
+    if (!workspace) throw new Error(`prime-agent launcher cannot resolve workspace for ${agentName}`);
+    return getPrimeAgentBaseCommand(agentName, validatedModel, workspace);
   }
 
   // Integration tests can inject a harmless harness command so a leaked or
@@ -908,6 +895,11 @@ export async function getRoleRuntimeBaseCommand(
     // buildKimiCodeCommand in launcher-generator builds the full `kimi -m ... --yolo`
     // command; return a stub base command so the launcher generator can short-circuit.
     return 'kimi-code';
+  }
+  if (behavior.launchCommandKind === 'prime-agent-rpc') {
+    const workspace = getAgentStateSync(agentName)?.workspace;
+    if (!workspace) throw new Error(`prime-agent launcher cannot resolve workspace for ${agentName}`);
+    return getPrimeAgentBaseCommand(agentName, validatedModel, workspace);
   }
 
   // Integration tests can inject a harmless harness command so a leaked or
