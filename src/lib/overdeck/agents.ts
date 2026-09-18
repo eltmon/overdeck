@@ -8,11 +8,10 @@ import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
 import { Db, EventBus, Records, Tmux, getOverdeckDatabaseSync } from './infra.js';
-import { IssueId } from './issues.js';
+import { IssueId, type Stage } from './issues.js';
 import { getOverdeckHome } from '../paths.js';
 import { logAgentLifecycleSync } from '../persistent-logger.js';
 import type { AgentState } from '../agents.js';
-export { getIssueStageSync, isTerminalIssueStage } from './issue-stage-sync.js';
 
 // ── Local table definitions (mirrors overdeck-schema.ts — no FK/index annotations here) ─
 
@@ -41,6 +40,25 @@ const overdeckAgents = sqliteTable('agents', {
   lastFailureNextRetryAt: integer('last_failure_next_retry_at', { mode: 'timestamp_ms' }),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 });
+
+/**
+ * PAN-3917: issue-stage-sync.ts (Appendix A.3 mirror sync) is deleted, but
+ * both reads below only ever touched the still-live `issues` table (kept as
+ * an FK anchor; its stage column is unwritten going forward but not yet
+ * dropped) — inlined here rather than recreated at the deleted path.
+ */
+export function getIssueStageSync(issueId: string): string | null {
+  const row = getOverdeckDatabaseSync()
+    .prepare(`SELECT stage FROM issues WHERE id = ?`)
+    .get(issueId) as { stage: string } | undefined;
+  return row?.stage ?? null;
+}
+
+const TERMINAL_ISSUE_STAGES = new Set<Stage>(['verifying_on_main', 'closed', 'cancelled']);
+
+export function isTerminalIssueStage(stage: string | null): boolean {
+  return TERMINAL_ISSUE_STAGES.has(stage as Stage);
+}
 
 export const RETAINED_TRANSCRIPTS_PHASE = 'retained-transcripts';
 
