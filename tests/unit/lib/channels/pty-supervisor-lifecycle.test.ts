@@ -34,13 +34,16 @@ describe('postAgentLifecycleEvent (PAN-3849)', () => {
     await expect(postAgentLifecycleEvent(AGENT, 'session-started', {}, depsWith(fetchImpl))).resolves.toBe(true);
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, { headers: Record<string, string>; body: string; method: string }];
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, { headers: Record<string, string>; body: string; method: string; signal: AbortSignal }];
     expect(url).toBe(`${URL_BASE}/api/agents/${AGENT}/lifecycle`);
     expect(init.method).toBe('POST');
     expect(init.headers['x-overdeck-pty-token']).toBe('test-token');
     const body = JSON.parse(init.body) as Record<string, unknown>;
     expect(body['event']).toBe('session-started');
     expect(typeof body['at']).toBe('string');
+    // Every attempt carries a per-attempt timeout signal: a dashboard that
+    // accepts the connection but never responds must not hang the supervisor.
+    expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 
   it('includes exitCode for the exited event', async () => {
@@ -104,5 +107,33 @@ describe('postAgentLifecycleEvent (PAN-3849)', () => {
     await expect(postAgentLifecycleEvent(AGENT, 'session-started', {}, deps)).resolves.toBe(false);
     expect(fetchImpl).not.toHaveBeenCalled();
     stderrSpy.mockRestore();
+  });
+
+  it('aborts a hung attempt and retries within the budget', async () => {
+    // First attempt hangs until its per-attempt timeout fires; the retry then
+    // succeeds. AbortSignal.timeout runs on real timers outside vitest fake
+    // timers, so this case runs on real timers (~550ms wall-clock).
+    vi.useRealTimers();
+    try {
+      const seen: AbortSignal[] = [];
+      const fetchImpl = vi.fn(async (_url: string, init: { signal: AbortSignal }) => {
+        seen.push(init.signal);
+        if (seen.length === 1) {
+          await new Promise((_resolve, reject) => {
+            init.signal.addEventListener('abort', () => reject(init.signal.reason));
+          });
+        }
+        return { ok: true, status: 200 };
+      });
+
+      await expect(postAgentLifecycleEvent(AGENT, 'exited', {}, {
+        ...depsWith(fetchImpl),
+        postTimeoutMs: 50,
+      })).resolves.toBe(true);
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+      expect(seen[0].aborted).toBe(true);
+    } finally {
+      vi.useFakeTimers();
+    }
   });
 });

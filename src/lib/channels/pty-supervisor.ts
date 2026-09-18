@@ -277,6 +277,15 @@ export type AgentLifecycleEventName = 'session-started' | 'turn-started' | 'turn
 
 const LIFECYCLE_RETRY_DELAYS_MS = [500, 1500] as const;
 
+/**
+ * Per-attempt ceiling for a lifecycle POST. The retry loop only advances
+ * after fetch settles, so without this a dashboard that accepts the
+ * connection but never responds hangs the `exited` path (and the supervisor
+ * with it) indefinitely. A timeout surfaces as a retryable failure like any
+ * other fetch rejection.
+ */
+const LIFECYCLE_POST_TIMEOUT_MS = 10_000;
+
 /** Sleep that never holds the process open (fire-and-forget retries). */
 function sleepUnref(ms: number): Promise<void> {
   return new Promise(resolve => {
@@ -290,6 +299,8 @@ export interface PostAgentLifecycleDeps {
   sleepImpl?: (ms: number) => Promise<void>;
   dashboardUrl?: string;
   readToken?: (agentId: string) => Promise<string | null>;
+  /** Override for the per-attempt POST timeout (tests; default 10s). */
+  postTimeoutMs?: number;
 }
 
 export async function postAgentLifecycleEvent(
@@ -304,6 +315,7 @@ export async function postAgentLifecycleEvent(
     ?? process.env.OVERDECK_DASHBOARD_URL
     ?? getDashboardLoopbackApiUrlSync();
   const readToken = deps.readToken ?? readPtyToken;
+  const postTimeoutMs = deps.postTimeoutMs ?? LIFECYCLE_POST_TIMEOUT_MS;
 
   const token = await readToken(agentId);
   if (!token) {
@@ -324,6 +336,7 @@ export async function postAgentLifecycleEvent(
         method: 'POST',
         headers: { 'Content-Type': 'application/json', [PTY_TOKEN_HEADER]: token },
         body,
+        signal: AbortSignal.timeout(postTimeoutMs),
       });
       if (res.ok) return true;
       throw new Error(`HTTP ${res.status}`);
