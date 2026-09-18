@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T13:20:46.402Z",
-  "updated": "2026-08-15T16:53:54.825Z",
+  "updated": "2026-09-18T09:06:47.418Z",
   "pipeline": {
     "issueId": "PAN-3406",
     "reviewStatus": "pending",
@@ -100,7 +100,6 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "recoveryTrips": [],
-  "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 4,
     "claims": {},
