@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-09-18T06:43:33.655Z",
-  "updated": "2026-09-18T07:25:58.018Z",
+  "updated": "2026-09-18T07:28:50.542Z",
   "pipeline": {
     "issueId": "PAN-3894",
     "reviewStatus": "pending",
@@ -63,18 +63,29 @@
     }
   ],
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "w1-patrol-registry": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3894",
         "agentId": "agent-pan-3894",
         "pid": 433894,
         "host": "eltmon-z790",
-        "claimedAt": "2026-09-18T07:25:58.017Z"
+        "claimedAt": "2026-09-18T07:25:58.017Z",
+        "itemId": "w1-patrol-registry",
+        "outcome": "blocked",
+        "reason": "Blocked until W3a creates src/lib/cloister/specialist-patrol.ts: the registry's perProjectSpecialistPatrol chore dynamically imports it, and TS2307 + vi.mock resolution both fail on a missing module. Working W8 -> W3a first (DAG-legal: neither is blocked by W1).",
+        "releasedAt": "2026-09-18T07:28:50.542Z"
+      }
+    ],
+    "statusReasons": {
+      "w1-patrol-registry": {
+        "reason": "Blocked until W3a creates src/lib/cloister/specialist-patrol.ts: the registry's perProjectSpecialistPatrol chore dynamically imports it, and TS2307 + vi.mock resolution both fail on a missing module. Working W8 -> W3a first (DAG-legal: neither is blocked by W1).",
+        "updatedAt": "2026-09-18T07:28:50.542Z"
       }
     }
   },
   "statusOverrides": {
-    "w1-patrol-registry": "running"
+    "w1-patrol-registry": "blocked"
   }
 }
