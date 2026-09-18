@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-09-18T06:43:33.655Z",
-  "updated": "2026-09-18T08:23:54.038Z",
+  "updated": "2026-09-18T08:32:21.475Z",
   "pipeline": {
     "issueId": "PAN-3894",
     "reviewStatus": "pending",
@@ -65,16 +65,8 @@
     }
   ],
   "tasks": {
-    "sequence": 18,
-    "claims": {
-      "w5-doctor-cadence-table": {
-        "writerId": "agent-pan-3894",
-        "agentId": "agent-pan-3894",
-        "pid": 1238537,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-18T08:23:54.038Z"
-      }
-    },
+    "sequence": 19,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3894",
@@ -163,6 +155,17 @@
         "outcome": "completed",
         "reason": "runPatrol down to 38 budgeted registrations (9 tick + 29 pending-soak) from 67; one patrolCycle % left (invariant checker). deacon.ts 3476 -> 3207 lines. Scheduler started/stopped from startDeacon/stopDeacon with the 4 deacon-resident chores injected; appendDeaconLog exported. statePlaneReconcileEveryCycles deleted. Audit test holds TICK (14) union CHORES (29) == KEEP_REWIRE (42) + runInvariantChecker. DEVIATION: kept patrol-cadence.ts — its orphan-reviewer gate still wraps cleanupOrphanReviewerSessions, a pending-soak patrol; removing it would 60x its firing rate and corrupt PAN-3895's evidence. 20 tests green.",
         "releasedAt": "2026-09-18T08:23:46.976Z"
+      },
+      {
+        "writerId": "agent-pan-3894",
+        "agentId": "agent-pan-3894",
+        "pid": 1238537,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-18T08:23:54.038Z",
+        "itemId": "w5-doctor-cadence-table",
+        "outcome": "completed",
+        "reason": "pan doctor prints a Patrol cadences block: 14 tick rows (alarms and the 10-tick invariant checker labeled) then 29 chore rows grouped fast/hourly/daily with cadence, last run, next due, and the (also on <event>) trigger suffix. Sourced from the registry + the scheduler's persisted file; imports never touch deacon.js. doctor.ts 1139->1188 with the allowlist row in the same commit. 4 tests green.",
+        "releasedAt": "2026-09-18T08:32:21.475Z"
       }
     ],
     "statusReasons": {
@@ -193,6 +196,10 @@
       "w4-wire-tick-and-scheduler": {
         "reason": "runPatrol down to 38 budgeted registrations (9 tick + 29 pending-soak) from 67; one patrolCycle % left (invariant checker). deacon.ts 3476 -> 3207 lines. Scheduler started/stopped from startDeacon/stopDeacon with the 4 deacon-resident chores injected; appendDeaconLog exported. statePlaneReconcileEveryCycles deleted. Audit test holds TICK (14) union CHORES (29) == KEEP_REWIRE (42) + runInvariantChecker. DEVIATION: kept patrol-cadence.ts — its orphan-reviewer gate still wraps cleanupOrphanReviewerSessions, a pending-soak patrol; removing it would 60x its firing rate and corrupt PAN-3895's evidence. 20 tests green.",
         "updatedAt": "2026-09-18T08:23:46.976Z"
+      },
+      "w5-doctor-cadence-table": {
+        "reason": "pan doctor prints a Patrol cadences block: 14 tick rows (alarms and the 10-tick invariant checker labeled) then 29 chore rows grouped fast/hourly/daily with cadence, last run, next due, and the (also on <event>) trigger suffix. Sourced from the registry + the scheduler's persisted file; imports never touch deacon.js. doctor.ts 1139->1188 with the allowlist row in the same commit. 4 tests green.",
+        "updatedAt": "2026-09-18T08:32:21.475Z"
       }
     }
   },
@@ -233,6 +240,10 @@
     "w4-wire-tick-and-scheduler.ac3": "completed",
     "w4-wire-tick-and-scheduler.ac4": "completed",
     "w4-wire-tick-and-scheduler.ac5": "completed",
-    "w5-doctor-cadence-table": "running"
+    "w5-doctor-cadence-table": "completed",
+    "w5-doctor-cadence-table.ac1": "completed",
+    "w5-doctor-cadence-table.ac2": "completed",
+    "w5-doctor-cadence-table.ac3": "completed",
+    "w5-doctor-cadence-table.ac4": "completed"
   }
 }
