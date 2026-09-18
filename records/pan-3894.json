@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-09-18T06:43:33.655Z",
-  "updated": "2026-09-18T07:50:35.193Z",
+  "updated": "2026-09-18T07:57:40.616Z",
   "pipeline": {
     "issueId": "PAN-3894",
     "reviewStatus": "pending",
@@ -63,16 +63,8 @@
     }
   ],
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "w7-inflight-journal-counter": {
-        "writerId": "agent-pan-3894",
-        "agentId": "agent-pan-3894",
-        "pid": 812114,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-18T07:50:35.193Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3894",
@@ -117,6 +109,17 @@
         "outcome": "completed",
         "reason": "Moved the PAN-464 container restart backoff from DeaconState.containerRestarts to a process-local Map, dropped the sharedState param and the racing saveState(). Deviation: added seed/get test hooks alongside reset because four cases need a pre-existing record. Note: loadState() passes unknown keys through, so existing health-state.json files keep a dead containerRestarts key (no migration). 38 tests green.",
         "releasedAt": "2026-09-18T07:50:27.683Z"
+      },
+      {
+        "writerId": "agent-pan-3894",
+        "agentId": "agent-pan-3894",
+        "pid": 812114,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-18T07:50:35.193Z",
+        "itemId": "w7-inflight-journal-counter",
+        "outcome": "completed",
+        "reason": "reconcileInFlightJournals now records a would-fire and an action only when readJournalStatusSync returns a journal newer than the cached row — the same condition review-status.ts uses to actually fold. The old before/after comparison counted the enrichment delta (F15: 145 firings in 5h). getReviewStatusSync stays unconditional (it IS the repair); statusChanged deleted as unused. 4 new cases + 5 existing updated; 14 tests green.",
+        "releasedAt": "2026-09-18T07:57:40.616Z"
       }
     ],
     "statusReasons": {
@@ -135,6 +138,10 @@
       "w3b-container-restarts-map": {
         "reason": "Moved the PAN-464 container restart backoff from DeaconState.containerRestarts to a process-local Map, dropped the sharedState param and the racing saveState(). Deviation: added seed/get test hooks alongside reset because four cases need a pre-existing record. Note: loadState() passes unknown keys through, so existing health-state.json files keep a dead containerRestarts key (no migration). 38 tests green.",
         "updatedAt": "2026-09-18T07:50:27.683Z"
+      },
+      "w7-inflight-journal-counter": {
+        "reason": "reconcileInFlightJournals now records a would-fire and an action only when readJournalStatusSync returns a journal newer than the cached row — the same condition review-status.ts uses to actually fold. The old before/after comparison counted the enrichment delta (F15: 145 firings in 5h). getReviewStatusSync stays unconditional (it IS the repair); statusChanged deleted as unused. 4 new cases + 5 existing updated; 14 tests green.",
+        "updatedAt": "2026-09-18T07:57:40.616Z"
       }
     }
   },
@@ -154,6 +161,10 @@
     "w3b-container-restarts-map.ac1": "completed",
     "w3b-container-restarts-map.ac2": "completed",
     "w3b-container-restarts-map.ac3": "completed",
-    "w7-inflight-journal-counter": "running"
+    "w7-inflight-journal-counter": "completed",
+    "w7-inflight-journal-counter.ac1": "completed",
+    "w7-inflight-journal-counter.ac2": "completed",
+    "w7-inflight-journal-counter.ac3": "completed",
+    "w7-inflight-journal-counter.ac4": "completed"
   }
 }
