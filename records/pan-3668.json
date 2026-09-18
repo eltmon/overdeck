@@ -613,7 +613,7 @@
     "recordedAt": "2026-09-18T09:36:36.969Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-09-18T09:39:10.926Z",
+  "updated": "2026-09-18T09:39:12.543Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
@@ -627,7 +627,7 @@
     "updatedAt": "2026-09-18T09:39:04.996Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3668-review",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3670",
-    "reviewRequestedAt": "2026-09-18T09:36:38.415Z",
+    "reviewRequestedAt": "2026-09-18T09:39:11.868Z",
     "reviewSpawnedAt": "2026-09-18T09:36:42.576Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -905,7 +905,8 @@
         "tsdown.config.ts"
       ],
       "recordedAt": "2026-09-18T09:36:36.969Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-09-18T09:39:11.868Z"
   },
   "closeOut": {
     "usage": {
