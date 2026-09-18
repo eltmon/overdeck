@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   getWorkAgentLifecycleState: vi.fn(),
   appendAgentLifecycleLog: vi.fn(),
   invalidateAgentsCache: vi.fn(),
+  spawnPanCommandDetached: vi.fn(),
+  saveAgentStateSync: vi.fn(),
 }))
 
 vi.mock('../../../../lib/agents.js', async (importOriginal) => {
@@ -24,6 +26,7 @@ vi.mock('../../../../lib/agents.js', async (importOriginal) => {
     getAgentState: mocks.getAgentState,
     wipeAgentStateDirs: mocks.wipeAgentStateDirs,
     getProviderAuthMode: mocks.getProviderAuthMode,
+    saveAgentStateSync: mocks.saveAgentStateSync,
   }
 })
 
@@ -73,6 +76,7 @@ vi.mock('../agents/shared.js', async (importOriginal) => {
     ...actual,
     appendAgentLifecycleLog: mocks.appendAgentLifecycleLog,
     invalidateAgentsCache: mocks.invalidateAgentsCache,
+    spawnPanCommandDetached: mocks.spawnPanCommandDetached,
   }
 })
 
@@ -130,6 +134,7 @@ describe('POST /api/agents/:id/restart-fresh — harness-gate ordering (PAN-1837
     mocks.getProviderAuthMode.mockResolvedValue('api-key')
     mocks.appendAgentLifecycleLog.mockResolvedValue(undefined)
     mocks.invalidateAgentsCache.mockReturnValue(undefined)
+    mocks.spawnPanCommandDetached.mockResolvedValue('activity-1')
   })
 
   it('returns 400 with the policy reason and never kills the session or wipes state when the explicit harness/model pair is denied', async () => {
@@ -155,5 +160,33 @@ describe('POST /api/agents/:id/restart-fresh — harness-gate ordering (PAN-1837
     expect(response.status).toBe(200)
     expect(mocks.killSession).toHaveBeenCalledWith('agent-pan-1837')
     expect(mocks.wipeAgentStateDirs).toHaveBeenCalledWith('PAN-1837')
+  })
+
+  it('writes no agent state when the fresh spawn fails — the failure lives in the lifecycle log', async () => {
+    // PAN-3849 findings round: the catch path recreated a sessionless
+    // `stopped` row (and bypassed the supervisor `exited` event as the source
+    // of `stopped`). A failed spawn must leave nothing to roll back. The
+    // failure branch is Effect-native: a JS try/catch around `yield*` never
+    // sees an Effect.promise rejection (it becomes a defect), and the same
+    // applied to the `finally` — so the claim release is asserted too.
+    mocks.spawnPanCommandDetached.mockRejectedValue(new Error('boom'))
+
+    const response = await postRestartFresh({ spawn: true })
+
+    expect(response.status).toBe(500)
+    const payload = readJson(response)
+    expect(payload.error).toContain('could not start')
+    expect(payload.details).toBe('boom')
+    expect(mocks.saveAgentStateSync).not.toHaveBeenCalled()
+    expect(mocks.appendAgentLifecycleLog).toHaveBeenCalledWith(
+      'agent-pan-1837',
+      'agent.restart_fresh_spawn_failed',
+      expect.objectContaining({ issueId: 'PAN-1837', error: 'boom' }),
+    )
+
+    // The in-flight claim was released: a retry reaches the spawner instead
+    // of 409ing on a leaked claim.
+    await postRestartFresh({ spawn: true })
+    expect(mocks.spawnPanCommandDetached).toHaveBeenCalledTimes(2)
   })
 })

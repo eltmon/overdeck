@@ -46,8 +46,7 @@ afterEach(() => {
 
 // Imports after mocks are registered.
 import {
-  claimAgentStartPlaceholderWithDeps,
-  rollbackAgentStartPlaceholderWithDeps,
+  applyAgentLifecycleEventWithDeps,
   saveAgentStateAndEmitEventWithDeps,
 } from '../../../../../src/dashboard/server/services/agent-projection.js';
 
@@ -291,145 +290,46 @@ describe('saveAgentStateAndEmitEventWithDeps', () => {
   });
 });
 
-describe('work-spawn placeholder ownership', () => {
-  it('refuses to overwrite a live or already-running agent', () => {
-    const eventStore = { emitStored: vi.fn() };
-    const running = makeAgentState({ model: 'gpt-5.6-sol', status: 'running' });
-    saveAgentStateAndEmitEventWithDeps(odb.raw(), eventStore, running, makeStartedEvent());
+describe('applyAgentLifecycleEventWithDeps exited idempotency (PAN-3849)', () => {
+  const stoppedEvents = () => readEvents().filter((e) => e.type === 'agent.stopped');
 
-    const placeholder = makeAgentState({
-      model: 'pending-work-spawn',
-      status: 'starting',
-      startedAt: '2026-06-15T10:02:00.000Z',
-    });
-    expect(claimAgentStartPlaceholderWithDeps(
-      odb.raw(),
-      eventStore,
-      placeholder,
-      makeStartedEvent(),
-      true,
-    )).toEqual({ claimed: false, reason: 'live-session' });
-    expect(claimAgentStartPlaceholderWithDeps(
-      odb.raw(),
-      eventStore,
-      placeholder,
-      makeStartedEvent(),
-      false,
-    )).toEqual({ claimed: false, reason: 'active-state' });
-
-    expect(getOverdeckAgentStateSync(running.id)).toMatchObject({
-      model: 'gpt-5.6-sol',
-      status: 'running',
-    });
-  });
-
-  it('allows only one concurrent starting placeholder', () => {
-    const eventStore = { emitStored: vi.fn() };
-    const startedAt = new Date().toISOString();
-    const first = makeAgentState({
-      model: 'pending-work-spawn',
-      status: 'starting',
-      startedAt,
-    });
-    const second = makeAgentState({
-      model: 'pending-work-spawn',
-      status: 'starting',
-      startedAt: new Date(Date.parse(startedAt) + 1).toISOString(),
-    });
-
-    expect(claimAgentStartPlaceholderWithDeps(
-      odb.raw(),
-      eventStore,
-      first,
-      makeStartedEvent(),
-      false,
-    )).toEqual({ claimed: true });
-    expect(claimAgentStartPlaceholderWithDeps(
-      odb.raw(),
-      eventStore,
-      second,
-      makeStartedEvent(),
-      false,
-    )).toEqual({ claimed: false, reason: 'active-state' });
-    expect(getOverdeckAgentStateSync(first.id)?.startedAt).toBe(first.startedAt);
-  });
-
-  it('allows a stale starting placeholder to be replaced', () => {
+  it('acks a retried exited with the same timestamp without duplicating agent.stopped', () => {
     const eventStore = { emitStored: vi.fn() };
     saveAgentStateAndEmitEventWithDeps(
       odb.raw(),
       eventStore,
-      makeAgentState({
-        model: 'pending-work-spawn',
-        status: 'starting',
-        startedAt: '2026-06-15T10:02:00.000Z',
-      }),
+      makeAgentState({ status: 'running' }),
       makeStartedEvent(),
     );
-    const replacement = makeAgentState({
-      model: 'pending-work-spawn',
-      status: 'starting',
-      startedAt: new Date().toISOString(),
-    });
 
-    expect(claimAgentStartPlaceholderWithDeps(
-      odb.raw(),
-      eventStore,
-      replacement,
-      makeStartedEvent(),
-      false,
-    )).toEqual({ claimed: true });
-    expect(getOverdeckAgentStateSync(replacement.id)?.startedAt).toBe(replacement.startedAt);
+    // The supervisor builds one body and retries it, so both POSTs carry the
+    // same `at`.
+    const at = '2026-06-15T11:00:00.000Z';
+    const first = applyAgentLifecycleEventWithDeps(odb.raw(), eventStore, 'agent-pan-1908', { event: 'exited', at });
+    expect(first).toEqual({ applied: true, status: 'stopped' });
+    expect(stoppedEvents()).toHaveLength(1);
+
+    const retry = applyAgentLifecycleEventWithDeps(odb.raw(), eventStore, 'agent-pan-1908', { event: 'exited', at });
+    expect(retry).toEqual({ applied: true, status: 'stopped' });
+    expect(stoppedEvents()).toHaveLength(1);
   });
 
-  it('rolls back only the placeholder owned by the failed spawn', () => {
+  it('still records exited when the row was stopped by another path with a different timestamp', () => {
     const eventStore = { emitStored: vi.fn() };
-    const placeholder = makeAgentState({
-      model: 'pending-work-spawn',
-      status: 'starting',
-      startedAt: '2026-06-15T10:02:00.000Z',
-    });
-    claimAgentStartPlaceholderWithDeps(
-      odb.raw(),
-      eventStore,
-      placeholder,
-      makeStartedEvent(),
-      false,
-    );
-
-    const stopped = makeAgentState({
-      model: 'gpt-5.6-sol',
-      status: 'stopped',
-      startedAt: placeholder.startedAt,
-    });
-    expect(rollbackAgentStartPlaceholderWithDeps(
-      odb.raw(),
-      eventStore,
-      placeholder,
-      stopped,
-      makeStatusChangedEvent({ agentId: placeholder.id, status: 'stopped' }),
-    )).toBe(true);
-    expect(getOverdeckAgentStateSync(placeholder.id)).toMatchObject({
-      model: 'gpt-5.6-sol',
-      status: 'stopped',
-    });
-
+    // A patrol marked the row stopped directly (no lifecycle event emitted).
     saveAgentStateAndEmitEventWithDeps(
       odb.raw(),
       eventStore,
-      makeAgentState({ model: 'gpt-5.6-sol', status: 'running' }),
-      makeStartedEvent(),
+      makeAgentState({ status: 'stopped', stoppedAt: '2026-06-15T10:30:00.000Z' }),
+      makeStatusChangedEvent({ agentId: 'agent-pan-1908', status: 'stopped' }),
     );
-    expect(rollbackAgentStartPlaceholderWithDeps(
-      odb.raw(),
-      eventStore,
-      placeholder,
-      stopped,
-      makeStatusChangedEvent({ agentId: placeholder.id, status: 'stopped' }),
-    )).toBe(false);
-    expect(getOverdeckAgentStateSync(placeholder.id)).toMatchObject({
-      model: 'gpt-5.6-sol',
-      status: 'running',
+    expect(stoppedEvents()).toHaveLength(0);
+
+    const result = applyAgentLifecycleEventWithDeps(odb.raw(), eventStore, 'agent-pan-1908', {
+      event: 'exited',
+      at: '2026-06-15T11:00:00.000Z',
     });
+    expect(result).toEqual({ applied: true, status: 'stopped' });
+    expect(stoppedEvents()).toHaveLength(1);
   });
 });

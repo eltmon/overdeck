@@ -28,6 +28,30 @@ and ACP sockets — precede these but are no-ops for Claude Code agents):
 2. legacy Claude Code Channels MCP socket for already-wired sessions
 3. tmux paste-buffer fallback
 
+## Supervisor lifecycle events (PAN-3849)
+
+The supervisor is also the lifecycle reporter for its agent (W33, FR-21/FR-24).
+Because it spawns the harness child and reaps its exit, it posts the events
+only it can know to `POST /api/agents/:id/lifecycle` (authenticated with the
+same `pty-token` as the delivery socket):
+
+- `session-started` — right after the harness process spawns; the projection
+  writes `running` and emits `agent.started` here, never from a pre-spawn
+  placeholder row.
+- `turn-started` — after each accepted injection; touches `lastActivity`.
+- `turn-ended` — reserved in the route's event union.
+- `exited` — after the child exits; the projection writes `stopped` through
+  `applyAgentLifecycleEvent` (`src/dashboard/server/services/agent-projection.ts`)
+  in one transaction with the agents-row upsert.
+
+Posts retry three times with backoff and are logged on failure; an
+unreachable dashboard never blocks the child, and `exited` is awaited (the
+child is already dead) before the supervisor exits. The event is additive
+with the delivery contract above: a confirmed turn is still reported by
+`messageAgent` through transcript probing (PAN-3846), while these events
+drive the agents-table status and activity columns.
+
+
 ## Delivery contract (PAN-3846)
 
 `messageAgent` returns `delivered: true` for a running Claude Code agent only

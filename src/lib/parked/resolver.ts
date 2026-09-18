@@ -38,6 +38,7 @@
 
 import { loadReviewStatuses, type ReviewStatus } from '../review-status.js';
 import { listAgentStates, listRunningAgentsSync } from '../agents/queries.js';
+import { isAliveSync, isConfirmedDead } from '../agents/liveness.js';
 import type { AgentState } from '../agents.js';
 import { FAILED_MERGE_MAX_RETRIES } from '../cloister/deacon-merge.js';
 import { shouldSkipReviewStatus } from '../cloister/stuck-remediation.js';
@@ -513,7 +514,15 @@ export async function resolveParkedPopulation(options: ResolveParkedOptions = {}
 
   const statuses = loadReviewStatuses();
   const allAgents = listAgentStates();
-  const liveAgents = listRunningAgentsSync().filter((a) => a.tmuxActive && (a.status === 'running' || a.status === 'starting'));
+  // PAN-3849 (W32): "live" is the liveness oracle's verdict (session + live
+  // pane + harness process in the pane subtree), not the batch tmux listing —
+  // a remain-on-exit zombie pane no longer counts as a live agent. The oracle
+  // replaces the tmuxActive check, NOT the status gate: a stopped/error agent
+  // with a live session is resumable residue, not a running agent, and must
+  // not suppress uat-failed or mint zombie-session/idle-running rows. A
+  // failed probe (runtime-indeterminate) counts as live — never park an
+  // issue out from under an agent the probe could not observe.
+  const liveAgents = listRunningAgentsSync().filter((a) => (a.status === 'running' || a.status === 'starting') && !isConfirmedDead(isAliveSync(a.id)));
 
   // Group the checker's mismatches by issue: pipeline rows key by issue id,
   // liveness rows attribute through the agent's issueId (dropped when unknown).

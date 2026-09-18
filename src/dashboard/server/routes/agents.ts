@@ -43,6 +43,7 @@ import {
   postAgentPlanChecklistRoute,
   getAgentRuntimeRoute,
 } from './agents/runtime-events.js';
+import { postAgentLifecycleRoute } from './agents/lifecycle.js';
 import {
   deleteAgentRoute,
   postAgentStopRoute,
@@ -111,6 +112,7 @@ export const agentsRouteLayer = Layer.mergeAll(
   postAgentAnswerQuestionRoute,
   postAgentPlanActionRoute,
   postAgentHeartbeatRoute,
+  postAgentLifecycleRoute,
   postAgentWorkCompleteRoute,
   postAgentStuckRoute,
   postAgentClassifyCompletionRoute,

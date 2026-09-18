@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, appendFileSync, statSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, statSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { Effect } from 'effect';
@@ -181,7 +181,6 @@ export interface ClaudeSessionRecoveryDeps {
   readAgentPlaneRecord: typeof readAgentPlaneRecordSync;
   readEventSessionId: typeof readLatestAgentClaudeSessionIdEventSync;
   transcriptExists: (workspace: string, sessionId: string) => boolean;
-  listTranscriptSessionIds: (workspace: string) => string[];
   log: (message: string) => void;
 }
 
@@ -195,22 +194,6 @@ function defaultClaudeSessionRecoveryDeps(): ClaudeSessionRecoveryDeps {
     readAgentPlaneRecord: readAgentPlaneRecordSync,
     readEventSessionId: readLatestAgentClaudeSessionIdEventSync,
     transcriptExists: (workspace, sessionId) => existsSync(join(claudeProjectDir(workspace), `${sessionId}.jsonl`)),
-    listTranscriptSessionIds: (workspace) => {
-      const projectDir = claudeProjectDir(workspace);
-      try {
-        return readdirSync(projectDir, { withFileTypes: true })
-          .filter((entry) => entry.isFile() && entry.name.endsWith('.jsonl'))
-          .map((entry) => entry.name.slice(0, -'.jsonl'.length));
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-          console.warn(
-            `[agents] Transcript-directory scan failed for ${projectDir}: `
-            + `${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
-        return [];
-      }
-    },
     log: (message) => console.warn(message),
   };
 }
@@ -222,7 +205,7 @@ export function resolveClaudeSessionRecoverySync(
 ): SessionResolutionResult {
   const checked: string[] = [];
   if (!agentState?.workspace || !agentState.issueId) {
-    return { sessionId: null, checked: ['durable agents plane, event store, and transcript directory unavailable because agent metadata is missing'] };
+    return { sessionId: null, checked: ['durable agents plane and event store unavailable because agent metadata is missing'] };
   }
 
   try {
@@ -252,11 +235,9 @@ export function resolveClaudeSessionRecoverySync(
     );
   }
 
-  checked.push('exactly-one transcript-directory scan');
-  const transcriptIds = deps.listTranscriptSessionIds(agentState.workspace);
-  return transcriptIds.length === 1
-    ? { sessionId: transcriptIds[0] ?? null, checked, needsPointerRepair: true }
-    : { sessionId: null, checked };
+  // PAN-3849: a transcript is never adopted by directory listing. The planner and the work
+  // agent share a workspace path, so "exactly one file" proved nothing about ownership.
+  return { sessionId: null, checked };
 }
 
 export function resolveLatestSessionIdSync(

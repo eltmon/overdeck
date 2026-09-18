@@ -3,7 +3,7 @@ import { join } from 'path';
 import { cpus, loadavg } from 'os';
 import { Effect } from 'effect';
 import { isStartingWithinGrace } from './agent-grace.js';
-import { isAgentIdleForNudge } from './agent-idle.js';
+import { isAlive, isAliveSync, isIdle } from '../agents/liveness.js';
 import { getConcurrencyLimits, countRunningAgents, workResumeSlotsAvailable } from './concurrency.js';
 import { assessMemoryPressure } from './memory-governor.js';
 import { resumeYieldedAgents } from './preemption.js';
@@ -37,15 +37,11 @@ import {
 } from '../agents.js';
 import {
   killSession,
-  listPaneValues,
   listSessionNames,
-  sessionExists,
-  sessionExistsSync,
 } from '../tmux.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
 import { getDispatchableItems } from '../xbrief/dag.js';
 import type { XBriefItem } from '../xbrief/types.js';
-import { reconcileLiveWorkSpawnPlaceholder } from '../agents/placeholder-reconciliation.js';
 import { consumeConfirmedSessionDetail, queryConfirmedSession } from './confirmed-session-query.js';
 import { isTerminalSwarmSlotAgent } from './swarm-slot-lifecycle.js';
 import { buildInspectionBlockedNudge, getBlockingMandatoryInspection } from './idle-nudge-inspection.js';
@@ -144,19 +140,23 @@ export async function handleAgentHeartbeatDeadEvent(
 
   // PAN-1557: convoy reviewers are interactive — they own a tmux session
   // (remain-on-exit on) like other specialists, so liveness is the session's
-  // pane, not a launcher pid. While the pane is alive the reviewer is working
-  // or idling attachably; a dead pane (Claude exited) or a missing session
-  // past the startup grace means it's done — fall through to mark stopped.
+  // pane, not a launcher pid. While the oracle (PAN-3849) says alive the
+  // reviewer is working or idling attachably; a dead pane or a live pane
+  // with no harness process in its subtree (Claude exited) or a missing
+  // session past the startup grace means it's done — fall through to mark
+  // stopped.
   if (state.reviewSubRole) {
     if (sessionQuery.status === 'exists') {
-      try {
-        const dead = ((await Effect.runPromise(listPaneValues(agentId, '#{pane_dead}')))[0]?.trim() ?? '') === '1';
-        if (!dead) return []; // pane alive — still working / idling attachably
-        try { await Effect.runPromise(killSession(agentId)); } catch { /* ignore */ }
-        logDeaconEventSync(`handleAgentHeartbeatDeadEvent: killed dead reviewer pane ${agentId}`);
-      } catch {
-        return []; // can't check — assume alive
+      const verdict = await isAlive(agentId);
+      if (verdict.alive) return []; // still working / idling attachably
+      if (verdict.reason === 'no-session') {
+        return []; // probe raced the confirmed query — assume alive, recheck next pass
       }
+      if (verdict.reason === 'runtime-indeterminate') {
+        return []; // probe failed — assume alive, recheck next pass
+      }
+      try { await Effect.runPromise(killSession(agentId)); } catch { /* ignore */ }
+      logDeaconEventSync(`handleAgentHeartbeatDeadEvent: killed dead reviewer pane ${agentId} (${verdict.reason})`);
     } else {
       // No session yet — startup grace keyed off startedAt before orphaning.
       const startedMs = Date.parse(state.startedAt ?? '');
@@ -168,20 +168,36 @@ export async function handleAgentHeartbeatDeadEvent(
     // Session gone (or dead pane past grace) — fall through to mark stopped.
   } else if (sessionQuery.status === 'exists') {
     // Planning sessions use remain-on-exit, so the tmux session persists after
-    // Claude exits. Check if the pane's process is actually dead.
+    // Claude exits. The oracle detects the dead pane / missing runtime.
     if (agentId.startsWith('planning-')) {
-      try {
-        const result = (await Effect.runPromise(listPaneValues(agentId, '#{pane_dead}')))[0]?.trim() ?? '';
-        if (result !== '1') return []; // pane is alive — truly still running
-        // Pane is dead — kill the zombie tmux session and fall through to recovery
-        try { await Effect.runPromise(killSession(agentId)); } catch { /* ignore */ }
-        logDeaconEventSync(`handleAgentHeartbeatDeadEvent: killed dead planning pane ${agentId}`);
-      } catch {
-        return []; // can't check — assume alive
+      const verdict = await isAlive(agentId);
+      if (verdict.alive) return []; // pane is alive — truly still running
+      if (verdict.reason === 'no-session') {
+        return []; // probe raced the confirmed query — assume alive, recheck next pass
       }
+      if (verdict.reason === 'runtime-indeterminate') {
+        return []; // probe failed — assume alive, recheck next pass
+      }
+      // Pane is dead or the runtime is gone — kill the zombie tmux session
+      // and fall through to recovery.
+      try { await Effect.runPromise(killSession(agentId)); } catch { /* ignore */ }
+      logDeaconEventSync(`handleAgentHeartbeatDeadEvent: killed dead planning pane ${agentId} (${verdict.reason})`);
     } else {
-      const action = await reconcileLiveWorkSpawnPlaceholder(state, deps.notifyAgentStatusChanged);
-      return action ? [action] : [];
+      // Work agent with a tmux session: consult the oracle — a live session
+      // whose harness has exited (zombie pane / bare shell) is orphaned and
+      // falls through to recovery, exactly like the planning branch above.
+      // (The placeholder-reconciliation special case is gone with the
+      // placeholders themselves — PAN-3849 W34.)
+      const verdict = await isAlive(agentId);
+      if (verdict.alive) return []; // truly still running
+      if (verdict.reason === 'no-session') {
+        return []; // probe raced the confirmed query — assume alive, recheck next pass
+      }
+      if (verdict.reason === 'runtime-indeterminate') {
+        return []; // probe failed — a broken ps/pgrep is not death; recheck next pass
+      }
+      try { await Effect.runPromise(killSession(agentId)); } catch { /* ignore */ }
+      logDeaconEventSync(`handleAgentHeartbeatDeadEvent: killed dead work pane ${agentId} (${verdict.reason})`);
     }
   } else if (state.status === 'starting') {
     // PAN-1256: work agents in `starting` status need a startup grace
@@ -195,9 +211,20 @@ export async function handleAgentHeartbeatDeadEvent(
   // Orphaned — crashed agent with no tmux session
   const oldStatus = state.status;
   const missingSessionDetail = consumeConfirmedSessionDetail(agentId, sessionQuery);
-  state.status = 'stopped';
-  state.stoppedAt = new Date().toISOString();
-  await Effect.runPromise(saveAgentState(state));
+  // PAN-3849: supervisor-enabled agents are projected to `stopped` by the
+  // authenticated supervisor `exited` event (agent-projection.ts owns that
+  // transition, and the supervisor worker survives its tmux session per
+  // PAN-3002). A direct save here races it — stale stoppedAt, a duplicate
+  // agent.stopped domain event — so record the failure for auto-resume
+  // tracking but leave the status projection to the supervisor.
+  const supervisorOwned = state.supervisorEnabled === true;
+  if (!supervisorOwned) {
+    state.status = 'stopped';
+    state.stoppedAt = new Date().toISOString();
+    await Effect.runPromise(saveAgentState(state));
+  } else {
+    logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} supervisor-owned — session reaped, stopped projection left to supervisor exited event`);
+  }
   // PAN-1530: only record failure markers for agents the auto-resume gate
   // will actually retry. Planning agents are one-shot by design.
   const isResumableRole = !agentId.startsWith('planning-');
@@ -230,12 +257,21 @@ export async function handleAgentHeartbeatDeadEvent(
   } else if (verifyPaused) {
     logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} stopped after verify pause; not recording orphan failure`);
   }
-  const msg = `Recovered orphaned agent ${agentId} (${oldStatus}→stopped)`;
+  const msg = supervisorOwned
+    ? `Reaped dead session for supervisor-owned agent ${agentId} (status left ${oldStatus}; stopped projection owned by supervisor exited event)`
+    : `Recovered orphaned agent ${agentId} (${oldStatus}→stopped)`;
   console.log(`[deacon] ${msg}`);
-  logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${msg} — tmux session missing (${missingSessionDetail}), state.json reset`);
-  logAgentLifecycleSync(agentId, `status changed: ${oldStatus} → stopped (orphaned: tmux session missing)`);
-  // Notify server layer so the read model and frontend update
-  deps.notifyAgentStopped(agentId);
+  logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${msg} — tmux session missing (${missingSessionDetail})${supervisorOwned ? '' : ', state.json reset'}`);
+  logAgentLifecycleSync(agentId, supervisorOwned
+    ? `dead session reaped (oracle verdict); awaiting supervisor exited event for stopped projection`
+    : `status changed: ${oldStatus} → stopped (orphaned: tmux session missing)`);
+  // Notify server layer so the read model and frontend update. Skipped for
+  // supervisor-owned agents: their agent.stopped domain event arrives with
+  // the supervisor's exited event — notifying here would flip the read
+  // model while state.json still says running.
+  if (!supervisorOwned) {
+    deps.notifyAgentStopped(agentId);
+  }
   return [msg];
 }
 
@@ -309,7 +345,7 @@ export async function cleanupOrphanedPlanningSessions(deps: AutoResumeNotifierDe
   for (const planningSession of planningSessions) {
     // planning-pan-596 → agent-pan-596
     const workAgentSession = planningSession.replace(/^planning-/, 'agent-');
-    if (!sessionExistsSync(workAgentSession)) {
+    if (!isAliveSync(workAgentSession).alive) {
       logDeaconEventSync(`cleanupOrphanedPlanningSessions: ${planningSession} kept — work agent ${workAgentSession} not running`);
       continue;
     }
@@ -359,7 +395,7 @@ export async function cleanupOrphanedPlanningSessions(deps: AutoResumeNotifierDe
  *   - state.status === 'running'                  (process still alive)
  *   - phase === 'implementation' or 'review-response'
  *   - tmux session exists                          (not orphaned)
- *   - isAgentIdleForNudge() returns true           (Stop hook authoritative)
+ *   - isIdle() returns true                        (work activity stale, FR-5)
  *   - pan task next -l <issueLabel> has ≥1 ready bead   (work remaining)
  *   - last nudge older than NUDGE_COOLDOWN_MS      (don't spam)
  *
@@ -386,13 +422,14 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
       continue;
     }
 
-    // Tmux must be alive; orphans are handled by recoverOrphanedAgents.
-    if (!await Effect.runPromise(sessionExists(agentId))) continue;
+    // Liveness comes from the oracle (PAN-3849); orphans are handled by
+    // recoverOrphanedAgents. A remain-on-exit zombie pane is not alive.
+    if (!(await isAlive(agentId)).alive) continue;
 
-    // Authoritative idle signal — Stop hook fired and runtime mirror is idle.
-    // Skips agents currently mid-thought (state='active') and ones we already
-    // know are stopped/suspended.
-    if (!isAgentIdleForNudge(agentId)) continue;
+    // Authoritative idle signal — work activity older than the threshold
+    // (FR-5). Skips agents currently mid-thought and ones we already know
+    // are stopped/suspended.
+    if (!isIdle(agentId)) continue;
 
     // Cooldown — don't nudge the same agent more than once per BEAD_NUDGE_COOLDOWN_MS.
     const cooldownFile = join(getAgentDir(agentId), '.last-bead-nudge');
@@ -533,7 +570,13 @@ export async function handleAgentStoppedEvent(
   }
 
   if (isTerminalSwarmSlotAgent(state)) {
-    if (await Effect.runPromise(sessionExists(agentId))) {
+    // Reap semantics, not liveness: stop the agent whenever anything remains
+    // in tmux — a zombie pane (pane-dead / runtime-missing) needs reaping
+    // just as much as a live one. Only 'no-session' means nothing to reap,
+    // and 'runtime-indeterminate' reaps nothing this pass — killing on an
+    // unobserved tree risks a healthy session (re-probed next cycle).
+    const liveness = await isAlive(agentId);
+    if (liveness.alive || (liveness.reason !== 'no-session' && liveness.reason !== 'runtime-indeterminate')) {
       try {
         await Effect.runPromise(stopAgent(agentId));
         logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} reaped — assigned swarm item is terminal`);
@@ -584,13 +627,16 @@ export async function handleAgentStoppedEvent(
     return null;
   }
 
-  const hasLiveTmuxSession = await Effect.runPromise(sessionExists(agentId));
-  if (hasLiveTmuxSession) {
+  // PAN-3849: the oracle decides — a stopped agent with a remain-on-exit
+  // zombie pane is NOT flipped back to running. (This reconcile flip itself is
+  // slated for deletion in W36 after its soak.)
+  const liveness = await isAlive(agentId);
+  if (liveness.alive) {
     const previousStatus = state.status;
     markAgentRunningState(state);
     await Effect.runPromise(saveAgentState(state));
     deps.notifyAgentStatusChanged(state, previousStatus, true);
-    const msg = `Reconciled ${agentId} (${previousStatus}→running; tmux session alive)`;
+    const msg = `Reconciled ${agentId} (${previousStatus}→running; liveness oracle confirms alive)`;
     logDeaconEventSync(`handleAgentStoppedEvent: ${msg}`);
     return null;
   }
