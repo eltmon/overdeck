@@ -35,7 +35,7 @@ import { setUiTheme } from '../../../lib/ui-theme.js';
 import { getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
 import { PROVIDERS, getKimiAnthropicBaseUrl } from '../../../lib/providers.js';
 import { getDashScopeUpstreamBaseUrl } from '../../../lib/openai-compatible-proxy.js';
-import { OpenRouterService } from '../services/openrouter-service.js';
+import { OpenRouterService, includeOpenRouterFavorites } from '../services/openrouter-service.js';
 import { httpHandler } from './http-handler.js';
 import { getProviderAuthMode, getProviderEnvForModel } from '../../../lib/agents.js';
 import { buildHarnessPolicyDecisions, parseHarnessPolicyModels } from '../../../lib/harness-policy-decisions.js';
@@ -941,7 +941,7 @@ const getOpenRouterModelsRoute = HttpRouter.add(
     const orService = yield* OpenRouterService;
     const models = yield* orService.fetchModels();
     const favorites = getOpenRouterFavorites();
-    return jsonResponse({ models, favorites });
+    return jsonResponse({ models: includeOpenRouterFavorites(models, favorites), favorites });
   })),
 );
 
