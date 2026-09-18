@@ -4,17 +4,17 @@
     "created": "2026-09-16T14:40:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3836: Deliberate project creation: clone from GitHub, resolve-before-create, remote-derived identity, /projects/new",
-    "updated": "2026-09-16T14:31:53.553Z"
+    "updated": "2026-09-18T16:45:33.506Z"
   },
   "plan": {
     "id": "pan-3836",
     "title": "Deliberate project creation: clone from GitHub, resolve-before-create, remote-derived identity, /projects/new",
-    "status": "running",
+    "status": "completed",
     "uid": "ebfdf1fe-0237-432a-9525-3d421658521e",
     "author": "agent:claude-fable-5-1",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-09-16T14:40:00.000Z",
-    "updated": "2026-09-16T14:31:53.553Z",
+    "updated": "2026-09-18T16:45:33.506Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3836",
@@ -1200,5 +1200,5 @@
       }
     ]
   },
-  "status": "active"
+  "status": "completed"
 }
