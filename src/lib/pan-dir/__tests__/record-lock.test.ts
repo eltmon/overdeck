@@ -11,6 +11,8 @@ const mockGetCostForIssueSync = vi.hoisted(() => vi.fn());
 const mockGetMergeSetSync = vi.hoisted(() => vi.fn());
 const mockQueueAutoCommit = vi.hoisted(() => vi.fn());
 const mockFlushAutoCommits = vi.hoisted(() => vi.fn());
+const mockCommitAutoCommits = vi.hoisted(() => vi.fn());
+const mockPushAutoCommits = vi.hoisted(() => vi.fn());
 const mockListOverdeckAgentStatesSync = vi.hoisted(() => vi.fn());
 const mockGetProjectSync = vi.hoisted(() => vi.fn());
 const mockResolveProjectFromIssueSync = vi.hoisted(() => vi.fn());
@@ -27,6 +29,8 @@ vi.mock('../../merge-set.js', () => ({
 vi.mock('../auto-commit.js', () => ({
   queueAutoCommit: mockQueueAutoCommit,
   flushAutoCommits: mockFlushAutoCommits,
+  commitAutoCommits: mockCommitAutoCommits,
+  pushAutoCommits: mockPushAutoCommits,
 }));
 
 vi.mock('../../overdeck/agent-state-sync.js', () => ({
@@ -142,6 +146,10 @@ describe('updateIssueRecordForIssue record lock integration', () => {
     mockQueueAutoCommit.mockClear();
     mockFlushAutoCommits.mockReset();
     mockFlushAutoCommits.mockReturnValue(Effect.succeed({ committed: true, pushed: true }));
+    mockCommitAutoCommits.mockReset();
+    mockCommitAutoCommits.mockReturnValue(Effect.succeed({ committed: true, pushDeferred: true }));
+    mockPushAutoCommits.mockReset();
+    mockPushAutoCommits.mockReturnValue(Effect.succeed({ pushed: true }));
   });
 
   afterEach(() => {
@@ -196,20 +204,22 @@ describe('updateIssueRecordForIssue record lock integration', () => {
     vi.useFakeTimers();
     writeIssueRecordForWorkspaceSync(workspacePath, 'PAN-2214', baseRecord('PAN-2214'));
 
-    let announceFirstFlush: () => void = () => {};
-    const firstFlushStarted = new Promise<void>((resolve) => {
-      announceFirstFlush = resolve;
+    // PAN-3848 (W23): the under-lock phase is the commit; the push runs after
+    // the locks are released. Gate the first rebuild's commit.
+    let announceFirstCommit: () => void = () => {};
+    const firstCommitStarted = new Promise<void>((resolve) => {
+      announceFirstCommit = resolve;
     });
-    let releaseFirstFlush: (result: { committed: boolean; pushed: boolean }) => void = () => {};
-    const firstFlush = new Promise<{ committed: boolean; pushed: boolean }>((resolve) => {
-      releaseFirstFlush = resolve;
+    let releaseFirstCommit: (result: { committed: boolean; pushDeferred: boolean }) => void = () => {};
+    const firstCommit = new Promise<{ committed: boolean; pushDeferred: boolean }>((resolve) => {
+      releaseFirstCommit = resolve;
     });
-    mockFlushAutoCommits
+    mockCommitAutoCommits
       .mockImplementationOnce(() => {
-        announceFirstFlush();
-        return Effect.promise(() => firstFlush);
+        announceFirstCommit();
+        return Effect.promise(() => firstCommit);
       })
-      .mockReturnValue(Effect.succeed({ committed: true, pushed: true }));
+      .mockReturnValue(Effect.succeed({ committed: true, pushDeferred: true }));
 
     const first = updateIssueRecordForIssue('PAN-2214', {
       issueId: 'PAN-2214',
@@ -218,7 +228,7 @@ describe('updateIssueRecordForIssue record lock integration', () => {
       readyForMerge: false,
       updatedAt: '2026-07-02T00:00:01.000Z',
     });
-    await firstFlushStarted;
+    await firstCommitStarted;
 
     const second = updateIssueRecordForIssue('PAN-2214', {
       issueId: 'PAN-2214',
@@ -228,9 +238,10 @@ describe('updateIssueRecordForIssue record lock integration', () => {
       updatedAt: '2026-07-02T00:00:02.000Z',
     });
     await vi.advanceTimersByTimeAsync(2_000);
-    releaseFirstFlush({ committed: true, pushed: true });
+    releaseFirstCommit({ committed: true, pushDeferred: true });
 
     await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
-    expect(mockFlushAutoCommits).toHaveBeenCalledTimes(2);
+    expect(mockCommitAutoCommits).toHaveBeenCalledTimes(2);
+    expect(mockPushAutoCommits).toHaveBeenCalledTimes(2);
   });
 });

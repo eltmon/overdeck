@@ -19,7 +19,7 @@ vi.mock('../../../../lib/agents.js', () => ({
 }));
 
 import { resolveStartAgentGateForRoute, spawnAfterClearingStartGates } from '../agents/spawn.js';
-import { buildAgentStartPlaceholder, buildContainerStartState, requestWorkStartAfterContainers } from '../agents/spawn-helpers.js';
+import { requestWorkStartAfterContainers } from '../agents/spawn-helpers.js';
 import type { AgentState } from '../../../../lib/agents.js';
 
 function makeState(overrides: Partial<AgentState> & { id: string; issueId: string }): AgentState {
@@ -34,48 +34,6 @@ function makeState(overrides: Partial<AgentState> & { id: string; issueId: strin
     ...overrides,
   } as AgentState;
 }
-
-describe('buildAgentStartPlaceholder', () => {
-  it('preserves accepted provenance in starting, event, and failure states', () => {
-    const { state, event } = buildAgentStartPlaceholder({
-      agentSessionName: 'agent-pan-3111',
-      issueId: 'PAN-3111',
-      workspacePath: '/tmp/workspace',
-      role: 'work',
-      effectiveHarness: 'claude-code',
-      startedBy: 'planning-auto-handoff',
-      allowHost: false,
-      startedAt: '2026-07-26T00:00:00.000Z',
-    });
-    const failedState = { ...state, model: 'gpt-5.5', status: 'stopped' as const };
-
-    expect(state.startedBy).toBe('planning-auto-handoff');
-    expect(event.payload.agent.startedBy).toBe('planning-auto-handoff');
-    expect(failedState.startedBy).toBe('planning-auto-handoff');
-  });
-});
-
-describe('buildContainerStartState', () => {
-  it.each(['starting', 'error'] as const)('preserves accepted provenance in %s container-wait state', (status) => {
-    const state = buildContainerStartState({
-      agentSessionName: 'agent-pan-3111',
-      issueId: 'PAN-3111',
-      workspacePath: '/tmp/workspace',
-      role: 'work',
-      effectiveHarness: 'claude-code',
-      startedBy: 'planning-auto-handoff',
-      allowHost: false,
-      status,
-      startedAt: '2026-07-26T00:00:00.000Z',
-    });
-
-    expect(state).toMatchObject({
-      status,
-      startedBy: 'planning-auto-handoff',
-      harness: 'claude-code',
-    });
-  });
-});
 
 describe('requestWorkStartAfterContainers', () => {
   it('consumes consent only after the work start command succeeds', async () => {

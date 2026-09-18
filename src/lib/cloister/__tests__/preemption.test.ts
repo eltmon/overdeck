@@ -64,8 +64,8 @@ vi.mock('../config.js', () => ({
   loadCloisterConfigSync: mocks.loadCloisterConfigSync,
 }));
 
-vi.mock('../agent-idle.js', () => ({
-  isAgentIdleForNudge: mocks.isAgentIdleForNudge,
+vi.mock('../../agents/liveness.js', () => ({
+  isIdle: mocks.isAgentIdleForNudge,
 }));
 
 vi.mock('../memory-governor.js', () => ({

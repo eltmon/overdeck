@@ -162,6 +162,16 @@ write door. The unsignaled reconciler also converges pending or reviewing rows
 through that door after the settle window, current-head check, newer-request
 check, and freshness check. It preserves the normal blocked-feedback path.
 
+A reviewer's exit writes its own state (PAN-3848 W26): the review sub-role
+launcher runs `pan admin agents exited <agentId> --code <n>` when the reviewer
+process exits (retrying transient write failures, PAN-3848 F5), and the
+Stop-hook's convoy reaper calls the same verb before killing a signaled
+reviewer's session. No patrol is the designed exit path — but Deacon's orphan
+recovery (`handleAgentHeartbeatDeadEvent`) still marks a reviewer stopped when
+its session is gone past the startup grace, so a persistently failed exit
+write converges on the next sweep: without the exit code, and counted as an
+orphan rather than a reported exit.
+
 The stall sweeper is observation-only. It may recommend that an operator inspect
 fresh evidence, but it never writes a verdict, clears a stuck flag, starts a
 reviewer, stops an agent, or un-parks an issue.

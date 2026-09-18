@@ -13,7 +13,8 @@ import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { ALLOW_SESSION_ROTATION_ON_RESUME } from '../session-rotation.js';
 import type { ModelId } from '../settings.js';
-import { createSession, killSession, listPaneValues, sessionExists } from '../tmux.js';
+import { createSession, killSession } from '../tmux.js';
+import { isAlive, isConfirmedDead } from './liveness.js';
 import {
   clearReadySignal,
   normalizeAgentId,
@@ -44,7 +45,6 @@ import {
   getCodexAppServerStatus,
   getOhmypiLauncherFields,
   getRoleRuntimeBaseCommand,
-  hasAgentRuntimeInSubtree,
   waitForPromptReady,
 } from './runtime-command.js';
 import {
@@ -314,9 +314,9 @@ export async function messageAgent(
   // prior conversation, destroying agent continuity every time feedback arrived.
   //
   // We also restart when the tmux session still exists. Planning/work sessions use
-  // `remain-on-exit on` so the shell persists after the agent process exits, and
-  // sessionExists() returns true for that dead shell. resumeAgent() kills the zombie
-  // session before re-creating it.
+  // `remain-on-exit on` so the shell persists after the agent process exits, and the
+  // liveness oracle (src/lib/agents/liveness.ts) reports that dead shell as not alive.
+  // resumeAgent() kills the zombie session before re-creating it.
   if (agentState && agentState.status === 'stopped') {
     const stoppedGate = decideMessageGate();
     if (stoppedGate.decision !== 'proceed') {
@@ -326,7 +326,7 @@ export async function messageAgent(
       console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
       return { delivered: false, queuedToMail: true, reason: gateBlockReason };
     }
-    console.log(`[agents] Auto-resuming stopped agent ${normalizedId} to deliver feedback (session exists: ${await Effect.runPromise(sessionExists(normalizedId))})`);
+    console.log(`[agents] Auto-resuming stopped agent ${normalizedId} to deliver feedback (alive: ${(await isAlive(normalizedId)).alive})`);
 
     if (opts.dedupKey !== undefined) {
       // Keyed deliveries resume bare and then enforce the key at the delivery
@@ -383,9 +383,9 @@ export async function messageAgent(
     }
 
     clearReadySignal(normalizedId);
-    if (await Effect.runPromise(sessionExists(normalizedId))) {
-      try { await Effect.runPromise(killSession(normalizedId)); } catch { /* ignore */ }
-    }
+    // Kill any leftover session unconditionally — killSession on a missing
+    // session throws and is ignored; no separate existence check needed.
+    try { await Effect.runPromise(killSession(normalizedId)); } catch { /* ignore */ }
 
     const providerExports = await getProviderExportsForModel(agentState.model || 'claude-sonnet-4-6');
     const fallbackLauncher = join(getAgentDir(normalizedId), 'launcher.sh');
@@ -580,27 +580,29 @@ export async function messageAgent(
     };
   }
 
-  if (!(await Effect.runPromise(sessionExists(normalizedId)))) {
+  // Guard: if the tmux session exists but the harness process is gone (a
+  // remain-on-exit dead shell), resume instead of typing the message into a
+  // bare bash shell. Liveness is the single oracle (PAN-3849): session +
+  // live pane + harness process in the pane's process subtree. Only a
+  // CONFIRMED death takes the resume path — an indeterminate probe delivers
+  // normally and lets the transport fail on its own rather than resuming a
+  // possibly-healthy agent.
+  const liveness = await isAlive(normalizedId);
+  if (!liveness.alive && liveness.reason === 'no-session') {
     throw new Error(`Agent ${normalizedId} not running`);
   }
-
-  // Guard: if tmux session exists but Claude Code has exited, resume instead
-  // of typing the message into a bare bash shell.
-  //
-  // Launchers differ: specialists `exec claude` so pane_pid IS claude, but
-  // work-agent launchers run `bash launcher.sh` so pane_pid is bash and claude
-  // runs as a descendant. Walk the pane's process subtree and treat the pane
-  // as live if any descendant is the expected runtime for the saved harness.
-  const panePids = await Effect.runPromise(listPaneValues(normalizedId, '#{pane_pid}'));
-  if (panePids.length > 0 && !(await hasAgentRuntimeInSubtree(panePids[0], expectedHarness))) {
-    // PAN-3879: resumeAgent requires agent state plus a resumable session
-    // pointer and refuses conv- ids outright — never call it on a
-    // conversation. For opencode/acp/codex targets the delivery door already
-    // routes by harness (ACP fails loudly on a dead socket instead of typing
-    // into a dead shell), so skip the guard and hand off.
+  // PAN-3849 + PAN-3879: the liveness oracle decides whether the pane is a
+  // zombie (one module, and `runtime-indeterminate` is NOT death — a broken
+  // probe must never trigger a resume). The conversation handling below is
+  // PAN-3879's: resumeAgent requires agent state plus a resumable session
+  // pointer and refuses conv- ids outright, so a conversation is never resumed.
+  if (!liveness.alive && isConfirmedDead(liveness)) {
     if (isConversationTarget) {
+      // For opencode/acp/codex the delivery door already routes by harness
+      // (ACP fails loudly on a dead socket instead of typing into a dead
+      // shell), so skip the zombie resume and hand off.
       if (expectedHarness === 'opencode' || expectedHarness === 'acp' || expectedHarness === 'codex') {
-        console.warn(`[agents] ${normalizedId} pane shows no ${expectedHarness} runtime — skipping the zombie resume and handing off to the harness delivery door`);
+        console.warn(`[agents] ${normalizedId} pane shows no ${expectedHarness} runtime (${liveness.reason}) — skipping the zombie resume and handing off to the harness delivery door`);
         logAgentLifecycleSync(normalizedId, `messageAgent: pane shows no ${expectedHarness} runtime; handing off to the delivery door (conversations are never resumed, PAN-3879)`);
       } else {
         throw new Error(`Conversation ${normalizedId} tmux session is dead (no ${expectedHarness} runtime in its pane) and conversations cannot be resumed by pan tell — resume it from the dashboard, then send again.`);

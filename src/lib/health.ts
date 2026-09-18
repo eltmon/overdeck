@@ -13,7 +13,7 @@ import { Effect, Data } from 'effect';
 import { AGENTS_DIR } from './paths.js';
 import { recoverAgent, stopAgentSync, getAgentStateSync, getAgentRuntimeStateSync } from './agents.js';
 import { capturePane, listSessionNames, sessionExists } from './tmux.js';
-import { getAgentEffectiveLastActivityMs } from './cloister/agent-idle.js';
+import { getAgentEffectiveLastActivityMs } from './agents/liveness.js';
 
 /** A health-monitor operation (ping, classify, recover) failed unexpectedly. */
 export class HealthError extends Data.TaggedError('HealthError')<{

@@ -19,6 +19,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../../../src/lib/pan-dir/auto-commit.js', () => ({
   queueAutoCommit: vi.fn(),
   flushAutoCommits: vi.fn(() => Effect.succeed({ committed: false, reason: 'no pending' })),
+  commitAutoCommits: vi.fn(() => Effect.succeed({ committed: false, reason: 'no pending' })),
+  pushAutoCommits: vi.fn(() => Effect.succeed(null)),
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({

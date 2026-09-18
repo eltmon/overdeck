@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   listPaneValues: vi.fn(),
   waitForAgentIdle: vi.fn(),
   getCodexAppServerStatus: vi.fn(),
+  findAgentRuntimePidInSubtree: vi.fn(),
   appendOperatorInterventionEvent: vi.fn(),
   logAgentLifecycleSync: vi.fn(),
   resumeAgent: vi.fn(),
@@ -85,6 +86,14 @@ vi.mock('../../../../src/lib/agents/runtime-command.js', () => ({
   waitForPromptReady: vi.fn(),
 }));
 
+// PAN-3849: the liveness oracle's process probe lives in runtime-pid-probe.js.
+// Kept alongside the PAN-3879 conversations mock — messageAgent now needs BOTH:
+// the oracle decides zombie-ness, the conversation lookup decides routing.
+vi.mock('../../../../src/lib/agents/runtime-pid-probe.js', () => ({
+  findAgentRuntimePidInSubtree: mocks.findAgentRuntimePidInSubtree,
+  findAgentRuntimePidInSubtreeSync: vi.fn(() => null),
+}));
+
 vi.mock('../../../../src/lib/overdeck/conversations.js', () => ({
   getConversationByName: mocks.getConversationByName,
 }));
@@ -151,7 +160,10 @@ describe('messageAgent', () => {
     vi.clearAllMocks();
     mocks.getAgentRuntimeStateSync.mockReturnValue({ state: 'idle', lastActivity: new Date().toISOString() });
     mocks.sessionExists.mockReturnValue(Effect.succeed(true));
-    mocks.listPaneValues.mockReturnValue(Effect.succeed([]));
+    // PAN-3849: the liveness oracle reads pane rows as '<pid>\t<dead>'; one
+    // live pane plus a runtime pid in its subtree means a live agent.
+    mocks.listPaneValues.mockReturnValue(Effect.succeed(['4242\t0']));
+    mocks.findAgentRuntimePidInSubtree.mockResolvedValue(4242);
     mocks.waitForAgentIdle.mockResolvedValue(true);
     mocks.deliverAgentMessage.mockResolvedValue({ ok: true });
     mocks.resumeAgent.mockResolvedValue({ success: true, messageDelivered: true });

@@ -281,6 +281,69 @@ describe('record push-race merge reconciliation (PAN-3291)', () => {
     expect(readPushHealth(project).consecutiveReconcileFailures).toBe(0);
   });
 
+  it('does not replay the mutator when a concurrent writer extends the same top-level field (PAN-3848 F6)', async () => {
+    // The peer changes statusOverrides['wi-14'] while the local forced block
+    // changes statusOverrides['wi-01'] plus the tasks sequence/claims/history.
+    // The one-line entries sit lines apart, so the merge is clean and the
+    // survival check runs on merged state: every caller-changed leaf is
+    // present, so no replay. A whole-field comparison misfires on the peer's
+    // entry and replays the block, advancing the sequence a second time.
+    const seed = readRecord(stateRoot, ISSUE_ID);
+    const overrides: Record<string, string> = {};
+    for (let n = 0; n < 16; n += 1) overrides[`wi-${String(n).padStart(2, '0')}`] = 'completed';
+    overrides['wi-01'] = 'running';
+    overrides['wi-14'] = 'running';
+    seed.statusOverrides = overrides;
+    seed.tasks = {
+      sequence: 5,
+      claims: {
+        'wi-01': { writerId: 'agent-local', agentId: 'agent-local-1', pid: 111, host: 'local', claimedAt: '2026-07-30T00:00:00.000Z' },
+        'wi-02': { writerId: 'agent-local', agentId: 'agent-local-1', pid: 111, host: 'local', claimedAt: '2026-07-30T00:00:00.000Z' },
+      },
+      claimHistory: [
+        { writerId: 'agent-local', agentId: 'agent-local-1', pid: 111, host: 'local', claimedAt: '2026-07-30T00:00:00.000Z', itemId: 'wi-00', releasedAt: '2026-07-30T00:01:00.000Z', outcome: 'completed' },
+      ],
+    };
+    writeRecord(stateRoot, seed);
+    git(stateRoot, 'add', `records/${ISSUE_ID.toLowerCase()}.json`);
+    git(stateRoot, 'commit', '-q', '-m', 'seed mid-flight tasks record');
+    git(stateRoot, 'push', '-q', 'origin', STATE_BRANCH);
+
+    const other = cloneState('f6-peer');
+    const peerRecord = readRecord(other, ISSUE_ID);
+    peerRecord.statusOverrides = { ...(peerRecord.statusOverrides ?? {}), 'wi-14': 'completed' };
+    writeRecord(other, peerRecord);
+    git(other, 'add', `records/${ISSUE_ID.toLowerCase()}.json`);
+    git(other, 'commit', '-q', '-m', 'peer completes wi-14');
+    git(other, 'push', '-q', 'origin', STATE_BRANCH);
+
+    // Shaped like task-door's forced block: idempotent status set, conditional
+    // claim archive, unconditional sequence advance.
+    await updateIssueRecord(project, ISSUE_ID, (current) => {
+      const now = '2026-07-30T00:05:00.000Z';
+      current.statusOverrides = { ...(current.statusOverrides ?? {}), 'wi-01': 'blocked' };
+      current.tasks ??= { sequence: 0, claims: {} };
+      const claim = current.tasks.claims['wi-01'];
+      if (claim) {
+        current.tasks.claimHistory = [...(current.tasks.claimHistory ?? []),
+          { ...claim, itemId: 'wi-01', outcome: 'blocked', reason: 'peer is down', forced: true, releasedAt: now }];
+        delete current.tasks.claims['wi-01'];
+      }
+      current.tasks.sequence = (current.tasks.sequence ?? 0) + 1;
+    });
+
+    const durable = readRecordAtRef(stateRoot, `origin/${STATE_BRANCH}`, ISSUE_ID);
+    expect(durable.tasks?.sequence).toBe(6);
+    expect(durable.tasks?.claimHistory).toHaveLength(2);
+    expect(durable.statusOverrides?.['wi-01']).toBe('blocked');
+    expect(durable.statusOverrides?.['wi-14']).toBe('completed');
+    expect(durable.tasks?.claims?.['wi-02']).toBeDefined();
+    const subjects = git(stateRoot, 'log', `origin/${STATE_BRANCH}`, '--format=%s');
+    expect(subjects).not.toContain(`re-apply ${ISSUE_ID} mutation after state reconcile`);
+    expect(git(stateRoot, 'rev-list', '--left-right', '--count', `${STATE_BRANCH}...origin/${STATE_BRANCH}`))
+      .toBe('0\t0');
+  });
+
   it('preserves the reconcile error when push-health persistence fails', async () => {
     const other = cloneState('health-failure-remote-writer');
     writeFileSync(join(stateRoot, 'specs', 'shared.json'), JSON.stringify({ value: 'local' }, null, 2));
@@ -333,7 +396,7 @@ describe('record push-race merge reconciliation (PAN-3291)', () => {
     });
     const failedUpdateAssertion = expect(failedUpdate).rejects.toThrow('specs/shared.json');
     await deliveryStarted;
-    expect(existsSync(stateGitLockPath(stateRoot))).toBe(false);
+    expect(existsSync(stateGitLockPath(stateRoot, ISSUE_ID))).toBe(false);
     await vi.advanceTimersByTimeAsync(10_000);
     settleDelivery('failed');
     await failedUpdateAssertion;
@@ -434,7 +497,7 @@ describe('record push-race merge reconciliation (PAN-3291)', () => {
     });
     await deliveryStarted;
 
-    expect(existsSync(stateGitLockPath(stateRoot))).toBe(false);
+    expect(existsSync(stateGitLockPath(stateRoot, ISSUE_ID))).toBe(false);
     await vi.advanceTimersByTimeAsync(10_000);
     settleDelivery('failed');
 

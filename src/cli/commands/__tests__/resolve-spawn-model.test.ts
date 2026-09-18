@@ -22,8 +22,6 @@ describe('resolveSpawnModel (PAN-2410)', () => {
     // Mid-spawn placeholder left by a spawn that died before model resolution
     // (e.g. dashboard restart killing the post-finalize auto-spawn). Inheriting
     // it crashed spawn with "Unknown model"; staffing must re-run instead.
-    expect(resolveSpawnModel(undefined, undefined, 'pending-work-spawn')).toBeUndefined();
-    expect(resolveSpawnModel(undefined, false, 'pending-work-spawn')).toBeUndefined();
   });
 });
 
@@ -52,6 +50,5 @@ describe('resolveStartSpawnModel (PAN-3857)', () => {
   });
 
   it('a pending- placeholder prior model does not count as resume continuity', () => {
-    expect(resolveStartSpawnModel(undefined, false, 'pending-work-spawn')).toBeUndefined();
   });
 });

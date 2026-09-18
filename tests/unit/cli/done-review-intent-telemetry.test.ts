@@ -51,12 +51,20 @@ describe('done review intent telemetry', () => {
   });
 
   it('does not capture work_done when the durable review intent fails', async () => {
-    updateIssueRecordMock.mockRejectedValueOnce(new Error('state write failed'));
+    // PAN-3848 (W25): the write retries three times on the lock backoff
+    // ladder before failing — every attempt must fail for the intent to fail.
+    vi.useFakeTimers();
+    updateIssueRecordMock.mockRejectedValue(new Error('state write failed'));
 
-    await expect(persistDoneReviewIntent('PAN-2599', '/workspace', {
+    const promise = persistDoneReviewIntent('PAN-2599', '/workspace', {
       reviewRequestedAt: '2026-07-22T12:00:00.000Z',
-    })).rejects.toThrow('state write failed');
+    });
+    const rejection = expect(promise).rejects.toThrow('state write failed');
+    await vi.runAllTimersAsync();
+    await rejection;
 
+    expect(updateIssueRecordMock).toHaveBeenCalledTimes(4);
     expect(capturePipelineStageForIssueMock).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 });

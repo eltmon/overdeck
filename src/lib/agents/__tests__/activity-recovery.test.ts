@@ -25,7 +25,6 @@ function deps(overrides: Partial<ClaudeSessionRecoveryDeps> = {}): ClaudeSession
     readAgentPlaneRecord: () => null,
     readEventSessionId: () => null,
     transcriptExists: () => false,
-    listTranscriptSessionIds: () => [],
     log: vi.fn(),
     ...overrides,
   };
@@ -123,25 +122,17 @@ describe('Claude session reconstruction fallback', () => {
     });
   });
 
-  it('accepts a transcript-directory fallback only when exactly one JSONL exists', () => {
-    const result = resolveClaudeSessionRecoverySync(agentState.id, agentState, deps({
-      listTranscriptSessionIds: () => ['only-session'],
-    }));
-
-    expect(result.sessionId).toBe('only-session');
-    expect(result.checked).toContain('exactly-one transcript-directory scan');
-  });
-
-  it('refuses an ambiguous transcript directory', () => {
-    const result = resolveClaudeSessionRecoverySync(agentState.id, agentState, deps({
-      listTranscriptSessionIds: () => ['reviewer-session', 'work-session'],
-    }));
+  it('PAN-3849: never adopts a transcript by directory listing, even when exactly one JSONL exists', () => {
+    // The planner and the work agent share a workspace path, so "exactly one
+    // file" proved nothing about ownership — an unreferenced transcript
+    // resolves to null, and only the two durable sources are consulted.
+    const result = resolveClaudeSessionRecoverySync(agentState.id, agentState, deps());
 
     expect(result.sessionId).toBeNull();
+    expect(result.needsPointerRepair).toBeUndefined();
     expect(result.checked).toEqual([
       'durable agents plane',
       'agent.model_set event history',
-      'exactly-one transcript-directory scan',
     ]);
   });
 
@@ -151,7 +142,6 @@ describe('Claude session reconstruction fallback', () => {
       checked: [
         'durable agents plane',
         'agent.model_set event history',
-        'exactly-one transcript-directory scan',
       ],
     });
   });
