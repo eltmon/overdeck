@@ -194,17 +194,17 @@
     "recordedAt": "2026-09-18T07:31:28.942Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-18T08:28:22.137Z",
+  "updated": "2026-09-18T08:28:29.193Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T08:28:20.762Z",
+    "updatedAt": "2026-09-18T08:28:29.170Z",
     "reviewNotes": "Tier fitness lands on all three surfaces and never blocks; 30/30 files reviewed across four dimensions, no blockers, 2 advisory notes (by_kind difficulty, deprecated-id badge)",
     "mergeNotes": "Review stale: approved ff31b427, workspace HEAD is ad879ac7. Run pan done or pan review request to re-review.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3851",
@@ -347,7 +347,7 @@
       },
       "costAtCloseOut": {
         "usd": 19.952098,
-        "pricingAsOf": "2026-09-18T08:28:20.807Z"
+        "pricingAsOf": "2026-09-18T08:28:29.175Z"
       }
     },
     "merges": [
@@ -356,7 +356,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3842",
