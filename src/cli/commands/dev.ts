@@ -6,7 +6,7 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { parse } from '@iarna/toml';
 import chalk from 'chalk';
-import { isNoResumeCliOptionEnabled } from '../../lib/cloister/no-resume-mode.js';
+import { isNoResumeCliOptionEnabled } from '../../lib/boot-no-resume.js';
 import { writeDevSupervisorMarker, clearDevSupervisorMarker } from '../../lib/dev-supervisor.js';
 import { getInternalTokenSync } from '../../lib/internal-token.js';
 

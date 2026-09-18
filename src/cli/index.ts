@@ -107,7 +107,7 @@ import { planDoneCommand } from './commands/plan-done.js';
 import { registerCavemanCommands } from './commands/caveman.js';
 import { registerReleaseCommands } from './commands/release.js';
 import { registerRolloutCommands } from './commands/rollout.js';
-import { isNoResumeCliOptionEnabled } from '../lib/cloister/no-resume-mode.js';
+import { isNoResumeCliOptionEnabled } from '../lib/boot-no-resume.js';
 import { applyBootGateEnv, formatBootGateState, resolveBootGates } from '../lib/boot-gates.js';
 import { getManagedTmuxSocketName } from '../lib/tmux.js';
 import { registerResourceCommands } from './commands/resources.js';
