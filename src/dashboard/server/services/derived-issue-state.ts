@@ -319,15 +319,15 @@ export function mrFromGlabRow(row: GlabMrRow): LoadedPr | null {
   const state = (row.state ?? '').toLowerCase();
   const merged = state === 'merged';
   if (!merged && state !== 'opened') return null;
-  const mergeStatus = (row.detailed_merge_status ?? row.merge_status ?? '').toLowerCase();
+  const glabMergeability = (row.detailed_merge_status ?? row.merge_status ?? '').toLowerCase();
   return {
     url: row.web_url ?? '',
     number: row.iid,
     reviewState: row.approved ? 'approved' : (row.approvals_required ?? 0) > 0 ? 'review-requested' : 'none',
     checks: toChecksStateFromPipeline(row.head_pipeline?.status),
     mergeable: row.has_conflicts === true ? false
-      : mergeStatus === 'mergeable' || mergeStatus === 'can_be_merged' ? true
-      : mergeStatus ? false : null,
+      : glabMergeability === 'mergeable' || glabMergeability === 'can_be_merged' ? true
+      : glabMergeability ? false : null,
     merged,
   };
 }

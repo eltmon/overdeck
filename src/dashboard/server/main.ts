@@ -35,14 +35,11 @@ import { processPendingFeedbackDeliveries } from './pending-feedback.js';
 import { initRestartGate } from './services/restart-gate.js';
 import { setPipelineHandlerSync } from '../../lib/pipeline-notifier.js';
 import { ensureInternalTokenSync } from '../../lib/internal-token.js';
-import { clearStuckMergeStatuses, fixStuckReadyForMerge, fixStuckCommentedReviews, getReviewStatusSync, loadReviewStatuses, clearReviewStatus } from '../../lib/review-status.js';
-import { reconcileStaleGitHubBlockers } from '../../lib/webhook-handlers.js';
 import { recoverStuckForks, waitForInFlightForkPipelines } from '../../lib/overdeck/conversation-forks.js';
 import { getEventStore, initEventStore } from './event-store.js';
-import { emitReviewStatusChanged } from './review-status-emit.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
-import { setAgentStoppedNotifier, setAgentStatusChangedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
+import { setAgentStoppedNotifier, setAgentStatusChangedNotifier } from '../../lib/cloister/deacon.js';
 import { getAgentState, type AgentState } from '../../lib/agents.js';
 import { saveAgentStateAndEmitEvent } from './services/agent-projection.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
@@ -168,16 +165,8 @@ if (isPeerDashboard) {
 } else {
   void startSharedIssueService().then(() => {
     console.log('[overdeck] IssueDataService background fetch complete');
-    // Once the issue cache is warm, prune review-status rows for issues that
-    // are CLOSED on the tracker. Without this, manually-closed issues
-    // (`gh issue close` instead of `pan close`) leave stale review-state
-    // behind, and the deacon keeps auto-resuming agents and re-dispatching
-    // test specialists for them every patrol — observed on PAN-951 / PAN-512 /
-    // PAN-714. Runs once per boot as a sweep; the canonical close-out flow
-    // already calls clearReviewStatus on its own path.
-    void pruneClosedIssueReviewStatuses().catch((err) => {
-      console.warn('[overdeck] pruneClosedIssueReviewStatuses failed:', err?.message ?? err);
-    });
+    // PAN-3917: there are no review-status rows to prune. A manually-closed
+    // issue derives to `closed` on the next read, so nothing stale survives it.
     void Effect.runPromise(cleanupClosedIssueAgentDirectories({
       issues: getSharedIssueService().getIssues({ cycle: 'all', includeCompleted: true }),
       force: true,
@@ -232,24 +221,11 @@ if (process.env.OVERDECK_MODE === 'desktop') {
   })();
 }
 
-// Wire up pipeline notifier → domain events.
-// Library code (review-status.ts) calls notifyPipeline() on every status change.
-// This handler converts those into domain events so the frontend Zustand store updates.
+// Wire up pipeline notifier → domain events, so the frontend Zustand store
+// updates on review and test outcomes. PAN-3917: there is no `status_changed`
+// variant — nothing stores a status to change.
 setPipelineHandlerSync((event) => {
   switch (event.type) {
-    case 'status_changed': {
-      try {
-        emitReviewStatusChanged(
-          (domainEvent) => getEventStore().append(domainEvent as any),
-          event.issueId,
-          event.status,
-        );
-      } catch (err) {
-        console.error('[pipeline] Failed to append status_changed event:', err);
-      }
-      return;
-    }
-
     case 'review.approved':
     case 'test.passed': {
       try {
@@ -457,22 +433,9 @@ setAgentStatusChangedNotifier((state, previousStatus, hasLiveTmuxSession) => {
 });
 console.log('[overdeck] Agent stopped/status notifiers → domain events wired');
 
-// Wire deacon merge-ready reminder → domain events so the frontend re-reads the
-// Awaiting Merge list when deacon fires its 1h staleness reminder.
-setMergeReadyNotifier((issueId) => {
-  const status = getReviewStatusSync(issueId);
-  if (!status) return;
-  try {
-    emitReviewStatusChanged(
-      (domainEvent) => getEventStore().append(domainEvent as any),
-      issueId,
-      status,
-    );
-  } catch (err) {
-    console.error('[pipeline] Failed to append merge-ready event:', err);
-  }
-});
-console.log('[overdeck] Merge-ready notifier → domain events wired');
+// PAN-3917: the deacon's 1h merge-ready staleness reminder is gone — deacon-lite
+// runs four routines (FR-11) and this is not one of them. The Awaiting Merge
+// list is derived on read, so it has nothing to be reminded about.
 
 // Start background conversation lifecycle polling (10s interval)
 startConversationLifecycleService();
@@ -702,9 +665,11 @@ process.once('SIGHUP', () => void handleShutdownSignal('SIGHUP'));
 startRestartAnnouncer();
 console.log('[overdeck] Restart announcer started');
 
-// Clear any mergeStatus stuck at 'merging'/'verifying' from before the restart (PAN-490).
-clearStuckMergeStatuses();
-emitActivityEntrySync({ source: 'dashboard', level: 'info', message: 'Cleared stuck merge statuses on startup' });
+// PAN-3917: the four boot repairs that lived here — clearing a stuck
+// mergeStatus (PAN-490), restoring readyForMerge, restoring a reviewStatus
+// mis-marked from a COMMENTED review (PAN-869), and re-deriving GitHub-native
+// blockers after missed webhooks (PAN-1771) — all repaired a stored copy of a
+// fact the forge owns. There is no copy left to repair.
 // Resume recoverable in-progress forks after boot services settle (PAN-1744).
 setTimeout(() => {
   void recoverStuckForks()
@@ -719,21 +684,6 @@ setTimeout(() => {
       emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Failed to recover stuck forks on startup' });
     });
 }, 1000);
-// Restore readyForMerge for issues where review+test passed but readyForMerge is stuck false.
-await fixStuckReadyForMerge();
-// PAN-869: restore reviewStatus='passed' for issues with COMMENTED reviews that were incorrectly marked 'failed'
-fixStuckCommentedReviews();
-// PAN-1771: re-derive GitHub-native blockers from live PR state. Webhooks missed
-// while the server was down otherwise leave stale blockers pinning readyForMerge=false.
-void reconcileStaleGitHubBlockers()
-  .then((n) => {
-    if (n > 0) {
-      console.log(`[overdeck] Reconciled GitHub-native blockers for ${n} issue(s) on startup`);
-      emitActivityEntrySync({ source: 'dashboard', level: 'info', message: `Reconciled GitHub-native blockers for ${n} issue(s) on startup` });
-    }
-  })
-  .catch((err: any) => console.warn(`[overdeck] Startup blocker reconciliation failed: ${err.message}`));
-
 // PAN-3537: seed the per-project CI chip before the first webhook arrives, and
 // repair it every 15 minutes so a dropped webhook delivery cannot leave a
 // long-running dashboard showing an indefinitely stale CI state. The Effect
@@ -850,38 +800,3 @@ if (process.env.OVERDECK_DISABLE_DEACON === '1') {
   }
 }
 
-/**
- * Drop review-status rows for issues that are CLOSED on the tracker. Runs once
- * after the IssueDataService warm-fetch so closed issues don't keep waking the
- * deacon's orphan-recovery and feedback-redelivery loops.
- */
-async function pruneClosedIssueReviewStatuses(): Promise<void> {
-  const issues = getSharedIssueService().getIssues();
-  const closed = new Set<string>();
-  for (const issue of issues) {
-    const id = (issue?.identifier ?? '').toString().toUpperCase();
-    if (!id) continue;
-    const state = (issue?.state ?? '').toString().toUpperCase();
-    const status = (issue?.status ?? '').toString().toLowerCase();
-    if (state === 'CLOSED' || status === 'done' || status === 'closed' || status === 'cancelled') {
-      closed.add(id);
-    }
-  }
-  if (closed.size === 0) return;
-
-  const statuses = loadReviewStatuses();
-  let removed = 0;
-  for (const issueId of Object.keys(statuses)) {
-    if (closed.has(issueId.toUpperCase())) {
-      try {
-        clearReviewStatus(issueId.toUpperCase());
-        removed++;
-      } catch {
-        // Non-fatal — next boot will retry.
-      }
-    }
-  }
-  if (removed > 0) {
-    console.log(`[overdeck] Pruned ${removed} stale review-status entr${removed === 1 ? 'y' : 'ies'} for closed issues`);
-  }
-}
