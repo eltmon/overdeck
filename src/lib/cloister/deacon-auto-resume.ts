@@ -202,9 +202,20 @@ export async function handleAgentHeartbeatDeadEvent(
   // Orphaned — crashed agent with no tmux session
   const oldStatus = state.status;
   const missingSessionDetail = consumeConfirmedSessionDetail(agentId, sessionQuery);
-  state.status = 'stopped';
-  state.stoppedAt = new Date().toISOString();
-  await Effect.runPromise(saveAgentState(state));
+  // PAN-3849: supervisor-enabled agents are projected to `stopped` by the
+  // authenticated supervisor `exited` event (agent-projection.ts owns that
+  // transition, and the supervisor worker survives its tmux session per
+  // PAN-3002). A direct save here races it — stale stoppedAt, a duplicate
+  // agent.stopped domain event — so record the failure for auto-resume
+  // tracking but leave the status projection to the supervisor.
+  const supervisorOwned = state.supervisorEnabled === true;
+  if (!supervisorOwned) {
+    state.status = 'stopped';
+    state.stoppedAt = new Date().toISOString();
+    await Effect.runPromise(saveAgentState(state));
+  } else {
+    logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} supervisor-owned — session reaped, stopped projection left to supervisor exited event`);
+  }
   // PAN-1530: only record failure markers for agents the auto-resume gate
   // will actually retry. Planning agents are one-shot by design.
   const isResumableRole = !agentId.startsWith('planning-');
@@ -237,12 +248,21 @@ export async function handleAgentHeartbeatDeadEvent(
   } else if (verifyPaused) {
     logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} stopped after verify pause; not recording orphan failure`);
   }
-  const msg = `Recovered orphaned agent ${agentId} (${oldStatus}→stopped)`;
+  const msg = supervisorOwned
+    ? `Reaped dead session for supervisor-owned agent ${agentId} (status left ${oldStatus}; stopped projection owned by supervisor exited event)`
+    : `Recovered orphaned agent ${agentId} (${oldStatus}→stopped)`;
   console.log(`[deacon] ${msg}`);
-  logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${msg} — tmux session missing (${missingSessionDetail}), state.json reset`);
-  logAgentLifecycleSync(agentId, `status changed: ${oldStatus} → stopped (orphaned: tmux session missing)`);
-  // Notify server layer so the read model and frontend update
-  deps.notifyAgentStopped(agentId);
+  logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${msg} — tmux session missing (${missingSessionDetail})${supervisorOwned ? '' : ', state.json reset'}`);
+  logAgentLifecycleSync(agentId, supervisorOwned
+    ? `dead session reaped (oracle verdict); awaiting supervisor exited event for stopped projection`
+    : `status changed: ${oldStatus} → stopped (orphaned: tmux session missing)`);
+  // Notify server layer so the read model and frontend update. Skipped for
+  // supervisor-owned agents: their agent.stopped domain event arrives with
+  // the supervisor's exited event — notifying here would flip the read
+  // model while state.json still says running.
+  if (!supervisorOwned) {
+    deps.notifyAgentStopped(agentId);
+  }
   return [msg];
 }
 

@@ -584,6 +584,29 @@ describe('PAN-1908 reactive liveness handlers', () => {
       expect(mockRecordAgentFailure).toHaveBeenCalled();
     });
 
+    it('leaves the stopped projection to the supervisor for supervisor-enabled work agents', async () => {
+      // The authenticated supervisor `exited` event owns the `stopped`
+      // projection (agent-projection.ts), and the supervisor worker survives
+      // its tmux session (PAN-3002) — so a direct stopped save here races it
+      // (stale stoppedAt, duplicate agent.stopped). Kill the dead pane and
+      // record the failure, but do not write `stopped` directly.
+      mockGetAgentStateSync.mockReturnValue(makeState({
+        status: 'running',
+        kickoffDelivered: true,
+        supervisorEnabled: true,
+      }));
+      mockSessionExistsSync.mockReturnValue(true);
+      mockQuerySessionSync.mockReturnValue({ status: 'exists' });
+      mockIsAlive.mockResolvedValue({ alive: false, reason: 'runtime-missing' });
+
+      const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
+
+      expect(actions.length).toBeGreaterThan(0);
+      expect(mockKillSession).toHaveBeenCalledWith('agent-pan-1908');
+      expect(mockRecordAgentFailure).toHaveBeenCalled();
+      expect(mockSaveAgentState).not.toHaveBeenCalled();
+    });
+
     it('does not reap on a tmux query error or a single confirmed miss', async () => {
       mockGetAgentStateSync.mockReturnValue(makeState({ status: 'running' }));
       mockQuerySessionSync.mockReturnValueOnce({ status: 'error', detail: 'exit=unknown code=ETIMEDOUT' });
