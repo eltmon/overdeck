@@ -16,6 +16,9 @@ import { homedir } from 'node:os';
 import { PanRpcError, TerminalOutput } from '@overdeck/contracts';
 import { buildTmuxArgs, resizeWindow, sessionExists } from '../../../lib/tmux.js';
 import { buildChildEnvWithoutTmuxSync } from '../../../lib/child-env.js';
+import { getHerdrApiClient } from '../../../lib/terminal-backends/herdr-api.js';
+import { controlTerminal, observeTerminal } from '../../../lib/terminal-backends/herdr-stream.js';
+import { resolveLaunchBackend } from '../../../lib/terminal-backends/launch.js';
 
 // ─── Runtime detection ────────────────────────────────────────────────────────
 
@@ -178,6 +181,100 @@ interface TerminalSessionState {
   queue: Queue.Queue<TerminalOutput, PanRpcError | Cause.Done> | null;
 }
 
+// ─── Herdr terminal bridge (PAN-3917 FR-4) ───────────────────────────────────
+
+/**
+ * The Herdr terminal id behind an Overdeck session name, or null when this host
+ * runs on tmux or the name is not a live Herdr agent. Herdr's live agent name
+ * is the Overdeck agent id (the adapter binds it with `agent.rename`), so one
+ * `agent.get` answers it.
+ */
+export async function resolveHerdrTerminalId(sessionName: string): Promise<string | null> {
+  try {
+    const backend = await resolveLaunchBackend();
+    if (backend.name !== 'herdr') return null;
+    const info = await getHerdrApiClient().call<{ agent?: { terminal_id?: string } }>(
+      'agent.get',
+      { target: sessionName },
+    );
+    return info.agent?.terminal_id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A Herdr terminal wearing the PTY interface: output comes from the `observe`
+ * stream, input and resizes go out through `control`. The controller is opened
+ * lazily, so a read-only viewer never takes control away from another client
+ * (Herdr allows many observers and one controller).
+ */
+export class HerdrTerminalProcess implements PtyProcess {
+  private readonly dataListeners = new Set<(data: string) => void>();
+  private readonly exitListeners = new Set<(exitCode: number) => void>();
+  private readonly observation: ReturnType<typeof observeTerminal>;
+  private controller: ReturnType<typeof controlTerminal> | null = null;
+  private cols: number;
+  private rows: number;
+  private ended = false;
+
+  constructor(private readonly terminalId: string, cols: number, rows: number) {
+    this.cols = cols;
+    this.rows = rows;
+    this.observation = observeTerminal(terminalId, { cols, rows });
+    void this.pump();
+  }
+
+  private async pump(): Promise<void> {
+    for await (const frame of this.observation.frames) {
+      if (frame.kind === 'snapshot' || frame.kind === 'output') {
+        for (const listener of this.dataListeners) listener(frame.data);
+      } else if (frame.kind === 'exit') {
+        this.emitExit(frame.code ?? 0);
+        return;
+      }
+    }
+    this.emitExit(0);
+  }
+
+  private emitExit(code: number): void {
+    if (this.ended) return;
+    this.ended = true;
+    for (const listener of this.exitListeners) listener(code);
+  }
+
+  private ensureController(): ReturnType<typeof controlTerminal> {
+    this.controller ??= controlTerminal(this.terminalId, { cols: this.cols, rows: this.rows });
+    return this.controller;
+  }
+
+  write(data: string): void {
+    this.ensureController().write(data);
+  }
+
+  resize(cols: number, rows: number): void {
+    this.cols = cols;
+    this.rows = rows;
+    this.ensureController().resize(cols, rows);
+  }
+
+  onData(cb: (data: string) => void): () => void {
+    this.dataListeners.add(cb);
+    return () => { this.dataListeners.delete(cb); };
+  }
+
+  onExit(cb: (exitCode: number) => void): () => void {
+    this.exitListeners.add(cb);
+    return () => { this.exitListeners.delete(cb); };
+  }
+
+  close(): void {
+    this.controller?.close();
+    this.observation.close();
+    this.emitExit(0);
+  }
+}
+
 // ─── Service interface ────────────────────────────────────────────────────────
 
 export interface TerminalServiceShape {
@@ -211,7 +308,31 @@ export const TerminalServiceLive = Layer.effect(
       // Wait for tmux session + preload node-pty, then spawn PTY and register
       // callbacks with ZERO async gap. This ensures onData is registered before
       // any data can be emitted from the initial tmux screen paint.
-      Promise.all([waitForTmuxSession(state.sessionName), getNodePty()]).then(() => {
+      //
+      // PAN-3917: on a Herdr host the terminal is not a tmux session at all —
+      // it is a Herdr terminal id, streamed through `observe`/`control`. That
+      // bridge wears the same PtyProcess interface, so everything below is
+      // unchanged; only the tmux wait and the SIGWINCH toggle are skipped.
+      resolveHerdrTerminalId(state.sessionName).then(async (herdrTerminalId) => {
+        if (herdrTerminalId) {
+          const bridge = new HerdrTerminalProcess(herdrTerminalId, cols, rows);
+          state.ptyProcess = bridge;
+          bridge.onData((data) => {
+            if (state.queue && state.queue.state._tag !== "Done") {
+              Queue.offerUnsafe(Queue.asEnqueue(state.queue), { sessionName: state.sessionName, data });
+            }
+          });
+          bridge.onExit((exitCode) => {
+            state.ptyProcess = null;
+            if (state.queue && state.queue.state._tag !== "Done") Queue.endUnsafe(Queue.asEnqueue(state.queue));
+            console.log(`[terminal-service] Herdr terminal ${herdrTerminalId} ended with code ${exitCode}`);
+            sessions.delete(state.sessionName);
+          });
+          for (const input of state.pendingInput) bridge.write(input);
+          state.pendingInput.length = 0;
+          return;
+        }
+        await Promise.all([waitForTmuxSession(state.sessionName), getNodePty()]);
         // spawnPtyImmediate is now SYNCHRONOUS (node-pty cached) — no microtask gap
         const proc = spawnPtyImmediate(state.sessionName, cols, rows);
         state.ptyProcess = proc;

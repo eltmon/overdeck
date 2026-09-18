@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { request as httpRequest } from 'node:http';
 import { join, dirname } from 'path';
@@ -7,6 +8,7 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { markKimiContextDelivered, prepareKimiMessage, type PreparedKimiMessage } from '../runtimes/kimi-context-envelope.js';
 import type { AgentState } from '../agents.js';
+import type { PromptSender } from '../terminal-backends/types.js';
 import {
   normalizeAgentId,
   getAgentState,
@@ -17,6 +19,10 @@ import {
 } from '../agents.js';
 import { getAgentRuntimeState } from './runtime-state.js';
 import { isPaneDead, sendKeys, sessionExists } from '../tmux.js';
+import { checkPrompt, senderFromEnv } from '../terminal-backends/prompt-guard.js';
+import { resolveLaunchBackend } from '../terminal-backends/launch.js';
+import { tmuxTargetTokens } from '../terminal-backends/tmux.js';
+import { isPromptDropped, isPromptRefused, isUnsupported } from '../terminal-backends/types.js';
 import { completeKeyedSubmit, sendKeysDedup } from '../tmux-dedup.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync } from '../bridge-token.js';
 import { PTY_TOKEN_HEADER, readPtyToken } from '../pty-token.js';
@@ -32,7 +38,7 @@ import {
 
 export type DeliveryResult = {
   ok: boolean;
-  path: 'app-server' | 'acp' | 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex';
+  path: 'app-server' | 'acp' | 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex' | 'herdr';
   failure?: string;
   /** True when the delivery was suppressed by the keyed dedup record — the
    * side effect already happened on an earlier call with the same key. */
@@ -61,6 +67,19 @@ export interface DeliverAgentMessageOptions {
    * caller's acknowledgment would otherwise replay the wake.
    */
   dedupKey?: string;
+  /**
+   * Idempotency key for the prompt guard (PAN-3917 FR-17). A repeat of the
+   * same id for the same target inside the guard's window is dropped and the
+   * reason is reported. Callers that do not pass one get a fresh id per call,
+   * so nothing is dropped by accident — a retry of a FAILED delivery must use
+   * a new id, because the guard records an id when it admits it.
+   */
+  messageId?: string;
+  /**
+   * Who is sending. Defaults to this process's `OVERDECK_AGENT_ID` (an
+   * operator shell with none is treated as an operator conversation).
+   */
+  sender?: PromptSender;
 }
 
 /**
@@ -290,6 +309,34 @@ export async function deliverAgentMessage(
 ): Promise<DeliveryResult> {
   const normalizedId = normalizeAgentId(agentId);
   const dedupKey = opts.dedupKey;
+
+  // PAN-3917 FR-17: every prompt is role-checked and idempotent, on both
+  // backends. On Herdr the whole delivery is `backend.prompt`; on tmux only
+  // the guard is new — the PTY supervisor cascade below is unchanged.
+  const messageId = opts.messageId ?? randomUUID();
+  const sender = opts.sender ?? senderFromEnv(process.env, (id) => tmuxTargetTokens(id));
+  const backend = await resolveLaunchBackend();
+  if (backend.name === 'herdr') {
+    const result = await Effect.runPromise(
+      backend.prompt({ agentName: normalizedId }, message, { messageId, sender }),
+    );
+    if (isUnsupported(result)) return { ok: false, path: 'herdr', failure: result.reason };
+    if (isPromptRefused(result)) return { ok: false, path: 'herdr', failure: `refused: ${result.reason}` };
+    if (isPromptDropped(result)) {
+      return { ok: true, path: 'herdr', deduplicated: true, failure: `dropped: ${result.reason}` };
+    }
+    return { ok: true, path: 'herdr' };
+  }
+  const guard = checkPrompt({
+    targetId: normalizedId,
+    targetTokens: tmuxTargetTokens(normalizedId),
+    sender,
+    messageId,
+  });
+  if ('refused' in guard) return { ok: false, path: 'tmux', failure: `refused: ${guard.reason}` };
+  if ('dropped' in guard) {
+    return { ok: true, path: 'tmux', deduplicated: true, failure: `dropped: ${guard.reason}` };
+  }
 
   let channelsEnabled = false;
   let resolvedMethod = deliveryMethod;

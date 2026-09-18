@@ -27,6 +27,7 @@ import { consumeReauthTerminalToken } from './routes/codex-auth.js';
 import { validateOriginHeaders } from './routes/origin-validation.js';
 import { buildChildEnvWithoutTmuxSync } from '../../lib/child-env.js';
 import { isRespawnPending, waitForSessionRespawn } from './services/pending-respawn.js';
+import { HerdrTerminalProcess, resolveHerdrTerminalId } from './services/terminal-service.js';
 
 // Worst-case respawn window for switch-model / resume / restart-all is
 // dominated by `waitForReadySignal`'s 30s ceiling. 35s gives a comfortable
@@ -179,6 +180,57 @@ async function captureViewportSnapshot(sessionName: string): Promise<string> {
 }
 
 /**
+ * Serve one WebSocket client from a Herdr terminal (PAN-3917 FR-4).
+ *
+ * Herdr already multiplexes a terminal — many observers, one controller — so
+ * there is no PTY hub here: every client gets its own `observe` stream, and
+ * the `control` stream is opened lazily on the client's first keystroke or
+ * resize. The wire protocol the browser sees is unchanged: a `snapshot`
+ * control frame first, then raw output, with `size` frames on a geometry
+ * change.
+ */
+function serveHerdrTerminal(
+  ws: WebSocket,
+  sessionName: string,
+  terminalId: string,
+  attach: Extract<ClientControlMessage, { type: 'attach' }>,
+  pendingMessages: readonly string[],
+): (message: string) => void {
+  console.log(`[ws-terminal] Serving ${sessionName} from herdr terminal ${terminalId}`);
+  const bridge = new HerdrTerminalProcess(terminalId, attach.cols, attach.rows);
+  let sentSnapshot = false;
+
+  bridge.onData((data) => {
+    if (ws.readyState !== WebSocket.OPEN) return;
+    if (!sentSnapshot) {
+      sentSnapshot = true;
+      sendControl(ws, { type: 'snapshot', cols: attach.cols, rows: attach.rows, data });
+      return;
+    }
+    ws.send(data);
+  });
+
+  bridge.onExit((code) => {
+    if (ws.readyState === WebSocket.OPEN) ws.close(1000, `Session ended (${code})`);
+  });
+
+  const handleMessage = (message: string): void => {
+    const parsed = parseControlMessage(message);
+    if (parsed?.type === 'ready' || parsed?.type === 'attach') return;
+    if (parsed?.type === 'resize') {
+      bridge.resize(parsed.cols, parsed.rows);
+      sendControl(ws, { type: 'size', cols: parsed.cols, rows: parsed.rows });
+      return;
+    }
+    bridge.write(message);
+  };
+
+  ws.on('close', () => bridge.close());
+  for (const message of pendingMessages) handleMessage(message);
+  return handleMessage;
+}
+
+/**
  * Install the raw WebSocket terminal handler on the given HTTP server.
  *
  * Handles `upgrade` requests for `/ws/terminal?session=<name>`. All other
@@ -291,8 +343,12 @@ export function setupTerminalWebSocket(server: http.Server): void {
 
     // Check if tmux session exists and set up PTY (async)
     (async () => {
+      // PAN-3917: on a Herdr host the session name is a live Herdr agent, not a
+      // tmux session. Resolve it first; a null answer means tmux, and the PTY
+      // path below is exactly what it always was.
+      const herdrTerminalId = await resolveHerdrTerminalId(sessionName);
       try {
-        const sessions = await Effect.runPromise(listSessionNames());
+        const sessions = herdrTerminalId ? [sessionName] : await Effect.runPromise(listSessionNames());
         if (!sessions.includes(sessionName)) {
           // The session may legitimately be gone, OR it may be in the
           // middle of a switch-model / resume / restart-all kill→spawn
@@ -366,6 +422,12 @@ export function setupTerminalWebSocket(server: http.Server): void {
       }
       if (attachTimer) clearTimeout(attachTimer);
       if (!attachMessage) {
+        return;
+      }
+
+      if (herdrTerminalId) {
+        preAttachTerminalClients.delete(ws);
+        messageHandler = serveHerdrTerminal(ws, sessionName, herdrTerminalId, attachMessage, remainingMessages);
         return;
       }
 
