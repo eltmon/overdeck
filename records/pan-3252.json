@@ -87,7 +87,7 @@
     "recordedAt": "2026-07-29T00:22:24.082Z"
   },
   "created": "2026-07-28T21:39:15.918Z",
-  "updated": "2026-08-15T16:53:14.758Z",
+  "updated": "2026-09-18T09:06:22.230Z",
   "pipeline": {
     "issueId": "PAN-3252",
     "reviewStatus": "passed",
@@ -251,7 +251,6 @@
       "accepted": []
     }
   },
-  "workModel": "kimi-code/k3",
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "recoveryTrips": [],
