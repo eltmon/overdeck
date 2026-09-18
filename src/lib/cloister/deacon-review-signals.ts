@@ -14,7 +14,7 @@ import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { capturePane, isPaneDead, killSession, listSessionNames, listSessions, sessionExists, sessionExistsSync } from '../tmux.js';
 import { applyCodexAuthBurnFlag, isCodexAuthRouted, paneShowsCodexAuthBurn } from '../codex-auth.js';
 import { extractMarkdownSection, findBlockingFindings } from '../review-findings.js';
-import { getAgentEffectiveLastActivityMs } from './agent-idle.js';
+import { getAgentEffectiveLastActivityMs } from '../agents/liveness.js';
 
 const REVIEWER_IDLE_FAILURE_MS = 3 * 60 * 1000;
 const REVIEW_REPORTS_PRESENT_NUDGE_COOLDOWN_MS = 60 * 1000;

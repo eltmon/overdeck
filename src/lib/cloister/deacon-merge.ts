@@ -14,7 +14,7 @@ import { resolveProjectFromIssueSync } from '../projects.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { getMergeSetSync } from '../merge-set.js';
 import { sessionExistsSync, sendKeys } from '../tmux.js';
-import { isAgentIdleForNudge } from './agent-idle.js';
+import { isIdle } from '../agents/liveness.js';
 import { loadCloisterConfig } from './config.js';
 import { getAutoCloseOutCanonicalState, sweepAutoCloseOutCache } from './deacon-canonical-state.js';
 import { isStuckMergingState, observeGitHubBranchMerge } from './deacon-stuck-merging.js';
@@ -951,9 +951,9 @@ export async function checkFirstCompletionAgents(options: PatrolShadowOptions = 
       if (existsSync(completedFile) || existsSync(processedMarker)) continue;
 
       // Check idle duration and idle state via Stop hook
-      // isAgentIdleForNudge uses FIRST_COMPLETION_IDLE_MS as the stale-active threshold:
+      // isIdle uses FIRST_COMPLETION_IDLE_MS as the stale-active threshold:
       // if the agent's heartbeat is older than the idle minimum, it's safe to treat as idle.
-      if (!isAgentIdleForNudge(agent.id, FIRST_COMPLETION_IDLE_MS)) continue;
+      if (!isIdle(agent.id, FIRST_COMPLETION_IDLE_MS)) continue;
 
       const runtimeState = getAgentRuntimeStateSync(agent.id);
       // PAN-2946: agents with no runtime record yet (fresh spawn, wiped state)

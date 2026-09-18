@@ -5,7 +5,7 @@ import { getAgentStateSync, getAgentState, getAgentRuntimeStateSync, getAgentRun
 import { hasCompletionMarkerForAgent } from './agents/supervisor-channels.js';
 import { claudeSessionTranscriptExists } from './paths.js';
 import { getReviewStatusSync } from './review-status.js';
-import { sessionExistsSync, sessionExists } from './tmux.js';
+import { isAlive, isAliveSync, isConfirmedDead } from './agents/liveness.js';
 
 export type WorkAgentOperation = 'start' | 'resume' | 'restart_with_context' | 'reset_session';
 export type WorkAgentRecommendedAction = 'start' | 'resume' | 'restart_with_context' | 'reset_session' | 'none';
@@ -49,7 +49,6 @@ export interface WorkAgentLifecycleState {
   hasSavedSession: boolean;
   hasResumableTranscript: boolean;
   hasWorkspace: boolean;
-  isPlaceholder: boolean;
   isOrphaned: boolean;
   isRunning: boolean;
   /** Agent has a live tmux session and running status, but its runtime is idle or
@@ -101,7 +100,12 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
   const hasAgentState = !!agentState;
   const sessionId = getLatestSessionIdSync(agentId) ?? null;
   const hasSavedSession = !!sessionId;
-  const hasLiveTmuxSession = sessionExistsSync(agentId);
+  // PAN-3849 (W32): liveness comes from the single oracle — a remain-on-exit
+  // zombie pane (session alive, harness process gone) reads as NOT live here,
+  // so a dead shell classifies as crashed/orphaned instead of running. A
+  // failed probe (runtime-indeterminate) is NOT death: assume live so the
+  // classifier never offers a fresh start over a healthy agent.
+  const hasLiveTmuxSession = !isConfirmedDead(isAliveSync(agentId));
   const hasWorkspace = !!agentState?.workspace && existsSync(agentState.workspace);
   const hasResumableTranscript = !sessionId
     || (!!agentState?.harness && agentState.harness !== 'claude-code')
@@ -110,21 +114,20 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
   const agentStatus = agentState?.status || 'unknown';
   const runtime = runtimeState?.state || 'uninitialized';
   const isCompleted = runtimeState?.resolution === 'completed';
-  const isPlaceholder = !!agentState && agentStatus === 'starting' && typeof agentState.model === 'string' && agentState.model.startsWith('pending-');
   const isStopped = agentStatus === 'stopped' || agentStatus === 'error' || isCompleted || runtime === 'stopped' || runtime === 'idle' || runtime === 'suspended';
-  const isRunning = (agentStatus === 'running' || isPlaceholder) && hasLiveTmuxSession;
-  const isCrashed = (agentStatus === 'running' || isPlaceholder) && !hasLiveTmuxSession;
+  const isRunning = agentStatus === 'running' && hasLiveTmuxSession;
+  const isCrashed = agentStatus === 'running' && !hasLiveTmuxSession;
   // Running-but-stuck: live session + running status, but the runtime is idle or suspended
   // (e.g. the model returned errors and stopped producing output). The tmux session exists but
   // the agent is no longer making progress — it needs a resume, not a message.
   const isRunningButStuck = isRunning && (runtime === 'idle' || runtime === 'suspended');
-  const hasResumableBackingState = hasAgentState && hasWorkspace && !isPlaceholder;
+  const hasResumableBackingState = hasAgentState && hasWorkspace;
   const handedOff = agentState ? hasCompletionMarkerForAgent(agentState) : false;
   const owesRework = handedOff && issueOwesReworkSync(agentState?.issueId);
   const canWarmResumeAfterHandoff = owesRework && !isRunning && hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed);
   const isOrphaned = !hasLiveTmuxSession && (
     (hasSavedSession && !hasResumableBackingState)
-    || (hasAgentState && (!hasWorkspace || isPlaceholder))
+    || (hasAgentState && !hasWorkspace)
   );
   // A saved resumable session is never discarded by a plain start. The explicit
   // --fresh intent is evaluated by assertCanStartFreshSync before the state wipe.
@@ -179,7 +182,6 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
     hasSavedSession,
     hasResumableTranscript,
     hasWorkspace,
-    isPlaceholder,
     isOrphaned,
     isRunning,
     isRunningButStuck,
@@ -211,7 +213,9 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
   const hasAgentState = !!agentState;
   const sessionId = await Effect.runPromise(getLatestSessionId(agentId)) ?? null;
   const hasSavedSession = !!sessionId;
-  const hasLiveTmuxSession = await Effect.runPromise(sessionExists(agentId));
+  // Same not-dead default as the sync variant above: an indeterminate probe
+  // reads as live.
+  const hasLiveTmuxSession = !isConfirmedDead(await isAlive(agentId));
   const hasWorkspace = !!agentState?.workspace && await pathExists(agentState.workspace);
   const hasResumableTranscript = !sessionId
     || (!!agentState?.harness && agentState.harness !== 'claude-code')
@@ -220,18 +224,17 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
   const agentStatus = agentState?.status || 'unknown';
   const runtime = runtimeState?.state || 'uninitialized';
   const isCompleted = runtimeState?.resolution === 'completed';
-  const isPlaceholder = !!agentState && agentStatus === 'starting' && typeof agentState.model === 'string' && agentState.model.startsWith('pending-');
   const isStopped = agentStatus === 'stopped' || agentStatus === 'error' || isCompleted || runtime === 'stopped' || runtime === 'idle' || runtime === 'suspended';
-  const isRunning = (agentStatus === 'running' || isPlaceholder) && hasLiveTmuxSession;
-  const isCrashed = (agentStatus === 'running' || isPlaceholder) && !hasLiveTmuxSession;
+  const isRunning = agentStatus === 'running' && hasLiveTmuxSession;
+  const isCrashed = agentStatus === 'running' && !hasLiveTmuxSession;
   const isRunningButStuck = isRunning && (runtime === 'idle' || runtime === 'suspended');
-  const hasResumableBackingState = hasAgentState && hasWorkspace && !isPlaceholder;
+  const hasResumableBackingState = hasAgentState && hasWorkspace;
   const handedOff = agentState ? hasCompletionMarkerForAgent(agentState) : false;
   const owesRework = handedOff && issueOwesReworkSync(agentState?.issueId);
   const canWarmResumeAfterHandoff = owesRework && !isRunning && hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed);
   const isOrphaned = !hasLiveTmuxSession && (
     (hasSavedSession && !hasResumableBackingState)
-    || (hasAgentState && (!hasWorkspace || isPlaceholder))
+    || (hasAgentState && !hasWorkspace)
   );
   // A saved resumable session is never discarded by a plain start. The explicit
   // --fresh intent is evaluated by assertCanStartFreshSync before the state wipe.
@@ -286,7 +289,6 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
     hasSavedSession,
     hasResumableTranscript,
     hasWorkspace,
-    isPlaceholder,
     isOrphaned,
     isRunning,
     isRunningButStuck,
