@@ -34,10 +34,9 @@ import { getForgeAdapter } from '../forge.js';
 import { resolveProjectReposForIssueSync } from '../project-repos.js';
 import { pruneStoppedAgentsForIssue } from '../cloister/agent-gc.js';
 import { isTrackerIssueClosed } from '../cloister/issue-closed.js';
-import { acknowledgeAllOpenRecoveryTrips } from '../cloister/recovery-trip.js';
 import { clearAgentOperatorGatesForIssueSync } from '../agents/agent-state.js';
 import { evaluateDodGate, readCompletedCloseOut } from './dod-gate.js';
-import { closeResidueConventionPrs, extractGitHubCoordinates, extractGitLabProject } from './residue.js';
+import { closeResidueConventionPrs, extractGitHubCoordinates, extractGitLabProject } from './pr-residue.js';
 import {
   capturePipelineStage,
   resolvePipelineTelemetryContext,
@@ -414,21 +413,15 @@ export function closeOut(
         ? stepSkipped('close-out:prune-agent-rows', [`Preserved live agents or terminal rows with retained transcripts: ${pruned.preserved.join(', ')}`])
         : stepOk('close-out:prune-agent-rows', [`Pruned ${pruned.removed.length} stopped agent row(s)`]));
 
-      // PAN-3727: acknowledge open recovery trips and clear operator-gate
-      // residue (stoppedByUser/paused/troubled) so a terminal issue's
-      // preserved agent rows and record stop reappearing in the parked
-      // population. The two doors are independent residue — run and catch
-      // each separately (review finding) so a trip-ack failure can never
-      // suppress gate clearing, or vice versa. Non-blocking overall — a
-      // bookkeeping failure must never strand an already-merged close-out.
+      // PAN-3727: clear operator-gate residue (stoppedByUser/paused/troubled)
+      // so a terminal issue's preserved agent rows stop reappearing in the
+      // parked population. Non-blocking — a bookkeeping failure must never
+      // strand an already-merged close-out.
+      // PAN-3917: the open-recovery-trip acknowledgement this also did is
+      // dropped — cloister/recovery-trip.ts (Appendix A.1) and the whole
+      // parked-orbit/recovery-trip patrol concept it served are gone with
+      // the old patrol system (deacon-lite replaces it).
       allSteps.push(yield* Effect.promise(async () => {
-        let trips = 0;
-        let tripsError: string | undefined;
-        try {
-          trips = await acknowledgeAllOpenRecoveryTrips(ctx.issueId);
-        } catch (err) {
-          tripsError = (err as Error).message ?? String(err);
-        }
         let gates: string[] = [];
         let gatesError: string | undefined;
         try {
@@ -436,14 +429,13 @@ export function closeOut(
         } catch (err) {
           gatesError = (err as Error).message ?? String(err);
         }
-        const summary = `Acked ${trips} open trip(s); cleared operator gates on ${gates.length} agent row(s)`;
-        if (!tripsError && !gatesError) {
+        const summary = `Cleared operator gates on ${gates.length} agent row(s)`;
+        if (!gatesError) {
           return stepOk('close-out:ack-parked-residue', [summary]);
         }
         return stepSkipped('close-out:ack-parked-residue', [
           summary,
-          ...(tripsError ? [`trip acknowledgement failed: ${tripsError}`] : []),
-          ...(gatesError ? [`gate clearing failed: ${gatesError}`] : []),
+          `gate clearing failed: ${gatesError}`,
         ]);
       }));
     }
