@@ -2,7 +2,7 @@
   "issueId": "PAN-3684",
   "schemaVersion": 2,
   "created": "2026-08-13T16:05:04.907Z",
-  "updated": "2026-09-18T07:17:07.898Z",
+  "updated": "2026-09-18T09:07:40.210Z",
   "pipeline": {
     "issueId": "PAN-3684",
     "reviewStatus": "pending",
@@ -18,7 +18,6 @@
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "workModel": "ollama:gemma4:12b",
   "recoveryTrips": [
     {
       "issue": "PAN-3684",
