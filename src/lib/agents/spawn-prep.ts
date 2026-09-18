@@ -13,7 +13,7 @@ import { createTrackerFromConfig, createTracker } from '../tracker/factory.js';
 import type { IssueState } from '../tracker/interface.js';
 import { findProjectByPathSync, getIssuePrefix, resolveProjectFromIssueSync } from '../projects.js';
 import { getWorkspaceStackHealth } from '../workspace/stack-health.js';
-import { resolveCanonicalReviewStatus } from '../cloister/review-status-source.js';
+import { getReviewStatusSync } from '../review-status.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
 import type { ModelId } from '../settings.js';
@@ -26,7 +26,6 @@ import type { XBriefDocument, XBriefDifficulty, XBriefItem, XBriefItemStatus } f
 import { type Role } from './agent-state.js';
 import type { TierAssignment } from './dispatch-tier.js';
 import { normalizeFlywheelRunId } from './provenance.js';
-import { clearStaleClosedOutBeforeSpawn } from './reopen-guard.js';
 import { resolveStaffing } from './staffing.js';
 import { applyEffectiveDifficulty } from './tier-escalation.js';
 import { checkStaffingFitness } from './tier-fitness.js';
@@ -971,7 +970,11 @@ export async function prepareWorkspaceForAgentSpawn(
   allowHost = false,
   workspacePath?: string,
 ): Promise<void> {
-  await clearStaleClosedOutBeforeSpawn(issueId);
+  // PAN-3917: the stale-closedOut-record clear this used to run
+  // (reopen-guard.ts's clearStaleClosedOutBeforeSpawn) read/wrote
+  // record.pipeline.closedOut, which no longer exists — status is derived
+  // live from git/tracker/PR state, not a stored record, so there is
+  // nothing stale to clear before a respawn.
   await assertWorkspaceStackHealthyForSpawn(issueId, role, allowHost, workspacePath);
 }
 
@@ -1066,7 +1069,7 @@ export async function assertWorkspaceStackHealthyForSpawn(
   // restarted to repair known-broken code. Rebuilding its container stack would
   // compile the same broken branch and can only delay that repair, so work from
   // the host instead.
-  const reviewStatus = role === 'work' ? resolveCanonicalReviewStatus(normalizedIssue).status?.reviewStatus : undefined;
+  const reviewStatus = role === 'work' ? getReviewStatusSync(normalizedIssue)?.reviewStatus : undefined;
   if (reviewStatus === 'blocked' || reviewStatus === 'failed') {
     fallbackToHost(`review is ${reviewStatus}; rework must repair the branch before its stack can build`);
     return;
