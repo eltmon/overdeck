@@ -461,8 +461,11 @@ export async function resolveParkedPopulation(options: ResolveParkedOptions = {}
   const allAgents = listAgentStates();
   // PAN-3849 (W32): "live" is the liveness oracle's verdict (session + live
   // pane + harness process in the pane subtree), not the batch tmux listing —
-  // a remain-on-exit zombie pane no longer counts as a live agent.
-  const liveAgents = listRunningAgentsSync().filter((a) => isAliveSync(a.id).alive);
+  // a remain-on-exit zombie pane no longer counts as a live agent. The oracle
+  // replaces the tmuxActive check, NOT the status gate: a stopped/error agent
+  // with a live session is resumable residue, not a running agent, and must
+  // not suppress uat-failed or mint zombie-session/idle-running rows.
+  const liveAgents = listRunningAgentsSync().filter((a) => (a.status === 'running' || a.status === 'starting') && isAliveSync(a.id).alive);
 
   const agentsByIssue = new Map<string, AgentState[]>();
   for (const agent of allAgents) {

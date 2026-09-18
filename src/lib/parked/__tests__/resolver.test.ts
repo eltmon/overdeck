@@ -356,6 +356,28 @@ describe('resolveParkedPopulation record-first terminality (PAN-3727)', () => {
     // (no zombie-session row for a live agent on an open issue).
     expect(rows.some((row) => row.issueId === 'PAN-502' && row.orbit === 'zombie-session')).toBe(false);
   });
+
+  it('status gate survives the oracle migration: a stopped agent with a live session is not live', async () => {
+    // The W32 oracle migration dropped the pre-migration status gate
+    // (tmuxActive && (running || starting)); a stopped agent whose session is
+    // still alive then entered liveAgents, minting zombie-session rows for an
+    // agent that is resumable residue, not a running agent.
+    const stopped = baseAgent({ id: 'agent-pan-503', issueId: 'PAN-503', status: 'stopped', stoppedAt: new Date(NOW - HOUR).toISOString(), lastActivity: new Date(NOW - HOUR).toISOString() });
+    gather.statuses = { 'PAN-503': baseStatus({ issueId: 'PAN-503', mergeStatus: 'merged' }) };
+    gather.agents = [stopped];
+    // Oracle verdict is alive (the session outlived the harness) — the status
+    // gate alone must keep this agent out of liveAgents.
+    gather.liveAgents = [{ ...stopped, tmuxActive: true }];
+    const isClosedSpy = vi.fn(async () => false);
+
+    const rows = await resolveParkedPopulation({
+      now: NOW,
+      readRecordTerminal: async () => false,
+      isClosed: isClosedSpy,
+    });
+
+    expect(rows.filter((row) => row.issueId === 'PAN-503')).toHaveLength(0);
+  });
 });
 
 describe('defaultReadRecordTerminal (PAN-3727)', () => {
