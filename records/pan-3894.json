@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-09-18T06:43:33.655Z",
-  "updated": "2026-09-18T07:47:38.834Z",
+  "updated": "2026-09-18T07:50:27.683Z",
   "pipeline": {
     "issueId": "PAN-3894",
     "reviewStatus": "pending",
@@ -63,16 +63,8 @@
     }
   ],
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "w3b-container-restarts-map": {
-        "writerId": "agent-pan-3894",
-        "agentId": "agent-pan-3894",
-        "pid": 778810,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-18T07:47:38.833Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3894",
@@ -106,6 +98,17 @@
         "outcome": "completed",
         "reason": "Extracted the 100-line inline perProjectSpecialistPatrol closure into src/lib/cloister/specialist-patrol.ts with injectable deps; it returns action strings ('[warn] ' prefix for warn-level lines) instead of calling deacon's private addLog. Behavior unchanged. 7-case test at tests/unit/lib/cloister/specialist-patrol.test.ts. deacon.ts 3476 -> 3343 lines. typecheck, eslint, lint-circular-deps, and 33 tests green.",
         "releasedAt": "2026-09-18T07:47:32.775Z"
+      },
+      {
+        "writerId": "agent-pan-3894",
+        "agentId": "agent-pan-3894",
+        "pid": 778810,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-18T07:47:38.833Z",
+        "itemId": "w3b-container-restarts-map",
+        "outcome": "completed",
+        "reason": "Moved the PAN-464 container restart backoff from DeaconState.containerRestarts to a process-local Map, dropped the sharedState param and the racing saveState(). Deviation: added seed/get test hooks alongside reset because four cases need a pre-existing record. Note: loadState() passes unknown keys through, so existing health-state.json files keep a dead containerRestarts key (no migration). 38 tests green.",
+        "releasedAt": "2026-09-18T07:50:27.683Z"
       }
     ],
     "statusReasons": {
@@ -120,6 +123,10 @@
       "w3a-extract-specialist-patrol": {
         "reason": "Extracted the 100-line inline perProjectSpecialistPatrol closure into src/lib/cloister/specialist-patrol.ts with injectable deps; it returns action strings ('[warn] ' prefix for warn-level lines) instead of calling deacon's private addLog. Behavior unchanged. 7-case test at tests/unit/lib/cloister/specialist-patrol.test.ts. deacon.ts 3476 -> 3343 lines. typecheck, eslint, lint-circular-deps, and 33 tests green.",
         "updatedAt": "2026-09-18T07:47:32.775Z"
+      },
+      "w3b-container-restarts-map": {
+        "reason": "Moved the PAN-464 container restart backoff from DeaconState.containerRestarts to a process-local Map, dropped the sharedState param and the racing saveState(). Deviation: added seed/get test hooks alongside reset because four cases need a pre-existing record. Note: loadState() passes unknown keys through, so existing health-state.json files keep a dead containerRestarts key (no migration). 38 tests green.",
+        "updatedAt": "2026-09-18T07:50:27.683Z"
       }
     }
   },
@@ -135,6 +142,9 @@
     "w3a-extract-specialist-patrol.ac2": "completed",
     "w3a-extract-specialist-patrol.ac3": "completed",
     "w3a-extract-specialist-patrol.ac4": "completed",
-    "w3b-container-restarts-map": "running"
+    "w3b-container-restarts-map": "completed",
+    "w3b-container-restarts-map.ac1": "completed",
+    "w3b-container-restarts-map.ac2": "completed",
+    "w3b-container-restarts-map.ac3": "completed"
   }
 }
