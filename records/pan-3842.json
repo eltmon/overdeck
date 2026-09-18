@@ -194,7 +194,7 @@
     "recordedAt": "2026-09-18T07:31:28.942Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-18T08:55:40.741Z",
+  "updated": "2026-09-18T08:55:45.569Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "passed",
@@ -205,10 +205,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": true,
-    "updatedAt": "2026-09-18T08:55:40.684Z",
+    "updatedAt": "2026-09-18T08:55:40.713Z",
     "reviewNotes": "Tier fitness lands on all three surfaces and never blocks; 30/30 files reviewed across four dimensions, no blockers, 2 advisory notes (by_kind difficulty, deprecated-id badge)",
-    "testNotes": "typecheck, lint, and full test suite (14671+112 tests) passed at HEAD 097e315e; see .pan/test/result.json for detail",
-    "uatNotes": "Tiered Execution Settings badges (AC1 underpowered, AC4 supervisor, AC5 live-clear-on-fix) verified live via Playwright against the workspace's own rebuilt Docker stack; see .pan/test/result.json for detail",
+    "testNotes": "At HEAD 097e315e (workspace feature/pan-3842): npm run typecheck passed (tsc + hooks/evals/dashboard/frontend/acp guards, 0 new errors). npm run lint passed (eslint + all 20 project guards: effect, permissions, state-writes/paths, overdeck-boundaries, pipeline-membership, liveness, workspace-doors, park-exits, agent-dir-removal, skills, slash-commands, prompts, prompt-trailer, file-size, source-introspection, no-coderabbit-merge-gate, circular, ratchet-audit, quarantine-audit, effect-diagnostics — no new findings). npm test passed: 1564 test files / 14671 tests passed, 51 skipped (root vitest suite), plus frontend suite 6 files / 112 tests passed (issueActions parity, fr7 conversation pending-input, TieredExecutionSection, tiered-crews) — exit code 0. Matches the pipeline's own verification-latest.json (ranAt 2026-09-18T08:03:44Z, outcome passed) run at the same commit.",
     "mergeNotes": "Review stale: approved ff31b427, workspace HEAD is ad879ac7. Run pan done or pan review request to re-review.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3851",
     "reviewedAtCommit": "097e315edccbbc5921178c8be60f95183ee317f5",
@@ -350,7 +349,7 @@
       },
       "costAtCloseOut": {
         "usd": 25.113763,
-        "pricingAsOf": "2026-09-18T08:55:40.725Z"
+        "pricingAsOf": "2026-09-18T08:55:45.558Z"
       }
     },
     "merges": [
