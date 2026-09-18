@@ -1,59 +1,141 @@
+/**
+ * Prime delivery and kill, exercised through the paths production actually
+ * takes. An earlier version of this file drove an in-process session registry
+ * that nothing ever populated, so it proved a code path the adapter never runs
+ * — which is how the kill-path defect (abort rejects, terminate skipped) got
+ * past several review cycles.
+ */
+import { createServer, type Server } from 'node:http';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  clearPrimeAgentSessionsForTests,
-  deliverPrimeAgentMessage,
-  killPrimeAgentSession,
-  registerPrimeAgentSession,
-} from '../../../../src/lib/prime-agent/session-controller.js';
 
-function session(streaming: boolean) {
-  const commands: Array<Record<string, unknown>> = [];
-  const terminate = vi.fn(async () => undefined);
-  registerPrimeAgentSession('agent-prime', {
-    client: {
-      request: vi.fn(async (command: Record<string, unknown>) => {
-        commands.push(command);
-        return { type: 'response', id: 'test', command: command.type, success: true, data: { isStreaming: streaming } };
-      }),
-    },
-    terminate,
+let home: string;
+let server: Server | undefined;
+let received: Array<Record<string, unknown>>;
+let respond: (body: Record<string, unknown>) => { status: number; payload: string };
+
+const AGENT = 'agent-prime';
+
+/** Stand up the host's unix socket exactly where `postPrimeAgentHost` looks. */
+async function startHost(): Promise<void> {
+  const socketDir = join(home, 'sockets');
+  mkdirSync(socketDir, { recursive: true });
+  mkdirSync(join(home, 'agents', AGENT), { recursive: true });
+  writeFileSync(join(home, 'agents', AGENT, 'prime-agent-token'), 'test-token');
+
+  server = createServer((request, response) => {
+    const chunks: Buffer[] = [];
+    request.on('data', chunk => chunks.push(Buffer.from(chunk)));
+    request.on('end', () => {
+      const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>;
+      received.push({ ...body, token: request.headers['x-overdeck-bridge-token'] });
+      const { status, payload } = respond(body);
+      response.writeHead(status, { 'content-type': 'application/json' }).end(payload);
+    });
   });
-  return { commands, terminate };
+  await new Promise<void>(resolve => server!.listen(join(socketDir, `prime-agent-${AGENT}.sock`), resolve));
 }
 
-describe('Prime Agent managed delivery', () => {
-  beforeEach(() => {
-    clearPrimeAgentSessionsForTests();
+beforeEach(() => {
+  home = mkdtempSync(join(tmpdir(), 'prime-delivery-'));
+  process.env.OVERDECK_HOME = home;
+  received = [];
+  respond = () => ({ status: 200, payload: JSON.stringify({ command: 'prompt' }) });
+  vi.resetModules();
+});
+
+afterEach(async () => {
+  if (server) await new Promise<void>(resolve => server!.close(() => resolve()));
+  server = undefined;
+  rmSync(home, { recursive: true, force: true });
+  vi.useRealTimers();
+});
+
+describe('Prime Agent delivery', () => {
+  it('posts the message to the host and reports the command the host chose', async () => {
+    await startHost();
+    respond = () => ({ status: 200, payload: JSON.stringify({ command: 'steer' }) });
+    const { deliverPrimeAgentMessage } = await import('../../../../src/lib/prime-agent/session-controller.js');
+
+    await expect(deliverPrimeAgentMessage(AGENT, 'guidance', 'steer')).resolves.toEqual({ accepted: true, command: 'steer' });
+    expect(received).toEqual([{ op: 'message', message: 'guidance', preferred: 'steer', token: 'test-token' }]);
+  });
+
+  it('rejects when the host answers non-2xx', async () => {
+    await startHost();
+    respond = () => ({ status: 500, payload: 'child is wedged' });
+    const { deliverPrimeAgentMessage } = await import('../../../../src/lib/prime-agent/session-controller.js');
+
+    await expect(deliverPrimeAgentMessage(AGENT, 'hello')).rejects.toThrow('HTTP 500');
+  });
+
+  it('rejects when no host socket exists', async () => {
+    const { deliverPrimeAgentMessage } = await import('../../../../src/lib/prime-agent/session-controller.js');
+    await expect(deliverPrimeAgentMessage(AGENT, 'hello')).rejects.toThrow('host is unavailable');
+  });
+});
+
+describe('Prime Agent kill', () => {
+  it('aborts, waits a bounded grace period, then terminates', async () => {
     vi.useFakeTimers();
-  });
-  afterEach(() => vi.useRealTimers());
-
-  it('uses prompt when idle', async () => {
-    const target = session(false);
-    await expect(deliverPrimeAgentMessage('agent-prime', 'hello')).resolves.toEqual({ accepted: true, command: 'prompt' });
-    expect(target.commands.map(command => command.type)).toEqual(['get_state', 'prompt']);
-  });
-
-  it.each(['steer', 'follow_up'] as const)('uses %s while streaming', async (preferred) => {
-    const target = session(true);
-    await expect(deliverPrimeAgentMessage('agent-prime', 'guidance', preferred)).resolves.toEqual({ accepted: true, command: preferred });
-    expect(target.commands.map(command => command.type)).toEqual(['get_state', preferred]);
-  });
-
-  it('reports rejected and crashed sessions', async () => {
-    registerPrimeAgentSession('agent-prime', {
-      client: { request: vi.fn(async () => { throw new Error('process exited'); }) },
-      terminate: vi.fn(async () => undefined),
+    const order: string[] = [];
+    const { PrimeAgentRuntimeSync } = await import('../../../../src/lib/runtimes/prime-agent.js');
+    const { PRIME_AGENT_KILL_GRACE_MS } = await import('../../../../src/lib/prime-agent/session-controller.js');
+    const runtime = new PrimeAgentRuntimeSync({
+      controller: {
+        spawn: vi.fn(), send: vi.fn(), isRunning: vi.fn(), stats: vi.fn(), lastEventAt: vi.fn(), sessionPath: vi.fn(),
+        abort: async () => { order.push('abort'); },
+        terminate: async () => { order.push('terminate'); },
+      } as never,
     });
-    await expect(deliverPrimeAgentMessage('agent-prime', 'hello')).rejects.toThrow('process exited');
+
+    const killed = runtime.killAgent(AGENT);
+    expect(order).toEqual(['abort']);
+    await vi.advanceTimersByTimeAsync(PRIME_AGENT_KILL_GRACE_MS);
+    await killed;
+    expect(order).toEqual(['abort', 'terminate']);
   });
 
-  it('aborts, waits a bounded grace period, and terminates', async () => {
-    const target = session(true);
-    const killed = killPrimeAgentSession('agent-prime', 500);
-    await vi.advanceTimersByTimeAsync(500);
+  it('still terminates the process tree when abort rejects', async () => {
+    // The wedged-child case: the host's own RPC request times out and it
+    // answers 500. Skipping terminate here left the tmux session, the host,
+    // and the Prime child alive while Cloister emitted killed_agent.
+    vi.useFakeTimers();
+    const order: string[] = [];
+    const { PrimeAgentRuntimeSync } = await import('../../../../src/lib/runtimes/prime-agent.js');
+    const { PRIME_AGENT_KILL_GRACE_MS } = await import('../../../../src/lib/prime-agent/session-controller.js');
+    const runtime = new PrimeAgentRuntimeSync({
+      controller: {
+        spawn: vi.fn(), send: vi.fn(), isRunning: vi.fn(), stats: vi.fn(), lastEventAt: vi.fn(), sessionPath: vi.fn(),
+        abort: async () => { order.push('abort'); throw new Error('Prime Agent host returned HTTP 500: timed out'); },
+        terminate: async () => { order.push('terminate'); },
+      } as never,
+    });
+
+    const killed = runtime.killAgent(AGENT);
+    await vi.advanceTimersByTimeAsync(PRIME_AGENT_KILL_GRACE_MS);
+    await expect(killed).resolves.toBeUndefined();
+    expect(order).toEqual(['abort', 'terminate']);
+  });
+
+  it('terminates even when the host socket is already gone', async () => {
+    vi.useFakeTimers();
+    const terminate = vi.fn(async () => undefined);
+    const { PrimeAgentRuntimeSync } = await import('../../../../src/lib/runtimes/prime-agent.js');
+    const { PRIME_AGENT_KILL_GRACE_MS } = await import('../../../../src/lib/prime-agent/session-controller.js');
+    const runtime = new PrimeAgentRuntimeSync({
+      controller: {
+        spawn: vi.fn(), send: vi.fn(), isRunning: vi.fn(), stats: vi.fn(), lastEventAt: vi.fn(), sessionPath: vi.fn(),
+        abort: async () => { throw new Error('MessageDeliveryFailed: Prime Agent host is unavailable for agent-prime'); },
+        terminate,
+      } as never,
+    });
+
+    const killed = runtime.killAgent(AGENT);
+    await vi.advanceTimersByTimeAsync(PRIME_AGENT_KILL_GRACE_MS);
     await killed;
-    expect(target.commands.map(command => command.type)).toEqual(['abort']);
-    expect(target.terminate).toHaveBeenCalledOnce();
+    expect(terminate).toHaveBeenCalledOnce();
   });
 });

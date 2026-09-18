@@ -3,7 +3,10 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const ROOT = join(import.meta.dirname, '../../..');
-const ALL = ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code', 'muse', 'prime-agent'];
+// Every harness literal that must survive, not only the new one: the audit
+// exists to catch a pre-existing literal disappearing (no-loss-audit.ac3), so
+// omitting one silently exempts it.
+const ALL = ['claude-code', 'ohmypi', 'codex', 'acp', 'opencode', 'kimi-code', 'muse', 'prime-agent'];
 
 function source(path: string): string {
   return readFileSync(join(ROOT, path), 'utf8');

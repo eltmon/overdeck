@@ -86,8 +86,9 @@ silently switching harnesses.
 
 Overdeck owns the persistent root RPC process, session directory, resume,
 delivery, abort, and termination. A detached session resumes only when its
-recorded model, provider, and workspace match. Otherwise Overdeck starts a
-fresh session or reports a recovery error. Prime schedules, heartbeats,
+recorded session file is readable and the reopened session reports the same
+session id. A missing file or an id mismatch stops the process and reports a
+recovery error rather than silently starting a fresh session. Prime schedules, heartbeats,
 observation, autonomous continuation, and cross-agent messaging are disabled
 because Cloister owns that lifecycle. RLM children remain internal tool work
 attributed to the root session and cannot claim Overdeck tasks.

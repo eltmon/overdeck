@@ -12,6 +12,13 @@ export interface PrimeAgentJsonlFramerOptions {
   maxRecordBytes?: number;
 }
 
+export interface PrimeAgentJsonlPushResult {
+  /** Every record that parsed, in stream order. */
+  records: unknown[];
+  /** One entry per record that did not parse. The stream continues past each. */
+  errors: PrimeAgentJsonlError[];
+}
+
 /** Incremental strict-LF JSONL decoder. It intentionally does not use readline. */
 export class PrimeAgentJsonlFramer {
   private chunks: Buffer[] = [];
@@ -25,34 +32,60 @@ export class PrimeAgentJsonlFramer {
     }
   }
 
-  push(chunk: Uint8Array): unknown[] {
-    if (chunk.byteLength === 0) return [];
+  /**
+   * A malformed record is reported and skipped, never thrown (rpc-framing.ac3:
+   * "a malformed JSON record yields a per-record error while later records
+   * still parse"). The buffered prefix and the record boundary are reset
+   * BEFORE the record is parsed, so a parse failure cannot leave stale state
+   * behind and corrupt every record after it.
+   */
+  push(chunk: Uint8Array): PrimeAgentJsonlPushResult {
+    if (chunk.byteLength === 0) return { records: [], errors: [] };
     const input = Buffer.from(chunk);
     const records: unknown[] = [];
+    const errors: PrimeAgentJsonlError[] = [];
     let start = 0;
 
     for (let index = 0; index < input.byteLength; index += 1) {
       if (input[index] !== LF) continue;
       const piece = input.subarray(start, index);
       const byteLength = this.bufferedBytes + piece.byteLength;
-      if (byteLength > this.maxRecordBytes) this.throwOversized(byteLength);
+      const oversized = byteLength > this.maxRecordBytes;
       const record = this.chunks.length === 0
         ? piece
         : Buffer.concat([...this.chunks, piece], byteLength);
-      const rawEnd = record.byteLength > 0 && record[record.byteLength - 1] === CR ? record.byteLength - 1 : record.byteLength;
-      if (rawEnd > 0) records.push(this.parse(record.subarray(0, rawEnd)));
+      // Reset first: everything below this line may fail on THIS record, and
+      // the next record's boundary must not depend on whether it did.
       this.chunks = [];
       this.bufferedBytes = 0;
       start = index + 1;
+      if (oversized) {
+        errors.push(this.oversizedError(byteLength));
+        continue;
+      }
+      const rawEnd = record.byteLength > 0 && record[record.byteLength - 1] === CR ? record.byteLength - 1 : record.byteLength;
+      if (rawEnd === 0) continue;
+      try {
+        records.push(this.parse(record.subarray(0, rawEnd)));
+      } catch (error) {
+        errors.push(error as PrimeAgentJsonlError);
+      }
     }
 
     if (start < input.byteLength) {
       const tail = input.subarray(start);
       this.chunks.push(tail);
       this.bufferedBytes += tail.byteLength;
-      if (this.bufferedBytes > this.maxRecordBytes) this.throwOversized(this.bufferedBytes);
+      if (this.bufferedBytes > this.maxRecordBytes) {
+        // An unterminated prefix past the cap cannot be recovered per record —
+        // there is no boundary yet. Drop it and report, so the framer keeps
+        // bounded memory and resynchronises on the next newline.
+        this.chunks = [];
+        this.bufferedBytes = 0;
+        errors.push(this.oversizedError(tail.byteLength));
+      }
     }
-    return records;
+    return { records, errors };
   }
 
   finish(): void {
@@ -70,8 +103,8 @@ export class PrimeAgentJsonlFramer {
     }
   }
 
-  private throwOversized(byteLength: number): never {
-    throw new PrimeAgentJsonlError(
+  private oversizedError(byteLength: number): PrimeAgentJsonlError {
+    return new PrimeAgentJsonlError(
       `Prime Agent RPC JSON record exceeded the ${this.maxRecordBytes}-byte limit (${byteLength} bytes received)`,
     );
   }

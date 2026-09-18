@@ -312,7 +312,22 @@ export async function deliverAgentMessage(
     resolvedMethod ??= 'auto';
   }
 
-  if (state?.harness === 'prime-agent' || await import('../prime-agent/session-controller.js').then(({ hasPrimeAgentSession }) => hasPrimeAgentSession(normalizedId))) return import('../prime-agent/session-controller.js').then(({ deliverPrimeAgentMessage }) => deliverPrimeAgentMessage(normalizedId, message)).then(() => ({ ok: true, path: 'prime-agent' as const }));
+  // A Prime target is reached through its host's unix socket and nothing else:
+  // it has no PTY supervisor, and its tmux pane runs the host process rather
+  // than an interactive harness, so no tier below can serve it. A keyed
+  // delivery has to refuse here for the same reason the ACP tier refuses —
+  // one host POST cannot enforce at-most-once across a crash. Falling through
+  // with the key dropped would silently deliver a retried keyed message twice.
+  if (state?.harness === 'prime-agent') {
+    if (dedupKey !== undefined) {
+      throw new Error(
+        `MessageDeliveryFailed: keyed delivery failed for ${normalizedId} (${caller}): the Prime Agent tier cannot enforce a dedup key`,
+      );
+    }
+    return import('../prime-agent/session-controller.js')
+      .then(({ deliverPrimeAgentMessage }) => deliverPrimeAgentMessage(normalizedId, message))
+      .then(() => ({ ok: true, path: 'prime-agent' as const }));
+  }
   const isAcpTarget = state?.harness === 'acp' || state?.harness === 'opencode';
   if (isAcpTarget && resolvedMethod !== 'auto') {
     throw new Error(

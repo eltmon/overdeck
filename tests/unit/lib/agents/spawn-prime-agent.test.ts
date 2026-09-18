@@ -1,7 +1,7 @@
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../../src/lib/agents/agent-state.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../src/lib/agents/agent-state.js')>();
@@ -25,6 +25,18 @@ vi.mock('../../../../src/lib/openai-auth.js', async () => {
 
 import { getPrimeAgentBaseCommand } from '../../../../src/lib/agents/runtime-command.js';
 import { generateLauncherScriptSync } from '../../../../src/lib/launcher-generator.js';
+
+// The launch paths refuse a model whose credential is absent (provider-map.ac2),
+// so give this assembly test one.
+let savedOpenAiKey: string | undefined;
+beforeEach(() => {
+  savedOpenAiKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = 'test-openai-key';
+});
+afterEach(() => {
+  if (savedOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
+  else process.env.OPENAI_API_KEY = savedOpenAiKey;
+});
 
 describe('Prime Agent work launch', () => {
   it('assembles explicit RPC provider, model, session directory, and managed policy arguments', async () => {

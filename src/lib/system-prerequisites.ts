@@ -37,10 +37,12 @@ export interface PrerequisiteDefinition {
   required: boolean;
   purpose: string;
   versionArgs: string[];
+  /** This tool prints `--version` to stderr, not stdout. Default: stdout only. */
+  versionFromStderr?: boolean;
   install: PrerequisiteInstallHints;
 }
 
-export interface PrerequisiteCheck extends Omit<PrerequisiteDefinition, 'versionArgs'> {
+export interface PrerequisiteCheck extends Omit<PrerequisiteDefinition, 'versionArgs' | 'versionFromStderr'> {
   found: boolean;
   version: string | null;
 }
@@ -195,6 +197,7 @@ export const PREREQUISITES: readonly PrerequisiteDefinition[] = [
     required: false,
     purpose: 'Prime Agent managed harness using persistent RPC mode',
     versionArgs: ['--version'],
+    versionFromStderr: true,
     install: {
       linux: 'https://github.com/PrimeIntellect-ai/prime-agent#installation',
       mac: 'https://github.com/PrimeIntellect-ai/prime-agent#installation',
@@ -203,7 +206,11 @@ export const PREREQUISITES: readonly PrerequisiteDefinition[] = [
   },
 ];
 
-export type PrerequisiteProbe = (cmd: string, args: string[]) => Promise<string>;
+export type PrerequisiteProbe = (
+  cmd: string,
+  args: string[],
+  options?: { allowStderrVersion?: boolean },
+) => Promise<string>;
 /**
  * Resolves a prerequisite to its executable path. May return the detailed
  * resolution so diagnostics can explain a miss (e.g. a harness that is only
@@ -220,9 +227,16 @@ export function normalizeResolution(result: string | null | ExecutableResolution
     : result;
 }
 
-const defaultProbe: PrerequisiteProbe = async (cmd, args) => {
+/**
+ * Version output comes from stdout. `prime-agent --version` is the one
+ * prerequisite that writes it to stderr instead, so the fallback is opt-in per
+ * prerequisite (`versionFromStderr`) rather than global: a tool that exits 0
+ * while printing only a warning to stderr would otherwise be reported as found
+ * with that warning as its version string.
+ */
+const defaultProbe: PrerequisiteProbe = async (cmd, args, options) => {
   const { stdout, stderr } = await execFileAsync(cmd, args, { encoding: 'utf-8', timeout: 10_000 });
-  return stdout || stderr;
+  return stdout || (options?.allowStderrVersion ? stderr : '');
 };
 
 const defaultResolver: PrerequisiteResolver = async (command, options) => {
@@ -279,7 +293,7 @@ export async function collectSetupDiagnostics(
   resolver: PrerequisiteResolver = defaultResolver,
 ): Promise<SetupDiagnosticsReport> {
   const pathValue = process.env['PATH'] ?? '';
-  const toolLines = await Promise.all(PREREQUISITES.map(async ({ id, versionArgs }) => {
+  const toolLines = await Promise.all(PREREQUISITES.map(async ({ id, versionArgs, versionFromStderr }) => {
     const { path: resolvedPath, windowsInterop } = await resolvePrerequisiteExecutable(id, resolver, pathValue);
     if (!resolvedPath) {
       return windowsInterop.length > 0
@@ -287,7 +301,7 @@ export async function collectSetupDiagnostics(
         : `✗ ${id}: command not found`;
     }
     try {
-      const output = await probe(resolvedPath, versionArgs);
+      const output = await probe(resolvedPath, versionArgs, { allowStderrVersion: versionFromStderr === true });
       return `✓ ${id}: ${firstLine(output) ?? 'version unavailable'} — ${redactHome(resolvedPath)}`;
     } catch (error) {
       return `✗ ${id}: ${failureKind(error)} — ${redactHome(resolvedPath)}`;
@@ -337,11 +351,11 @@ export async function checkSystemPrerequisite(
     throw new Error(`Unknown system prerequisite: ${id}`);
   }
 
-  const { versionArgs, ...checkDefinition } = definition;
+  const { versionArgs, versionFromStderr, ...checkDefinition } = definition;
   try {
     const { path: executable } = await resolvePrerequisiteExecutable(id, resolver);
     if (!executable) return { ...checkDefinition, found: false, version: null };
-    const output = await probe(executable, versionArgs);
+    const output = await probe(executable, versionArgs, { allowStderrVersion: versionFromStderr === true });
     return { ...checkDefinition, found: true, version: firstLine(output) };
   } catch {
     return { ...checkDefinition, found: false, version: null };

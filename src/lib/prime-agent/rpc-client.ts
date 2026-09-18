@@ -24,6 +24,12 @@ export interface PrimeAgentRpcClientOptions {
   maxPendingRequests?: number;
   maxRecordBytes?: number;
   onEvent?: (event: Record<string, unknown>) => void;
+  /**
+   * Called once per record the client could not decode or route. Stdout is a
+   * shared channel — an upstream banner or a warning line is not a reason to
+   * lose the session — so these are reported, not thrown.
+   */
+  onRecordError?: (error: Error) => void;
 }
 
 export class PrimeAgentRpcClient {
@@ -33,6 +39,7 @@ export class PrimeAgentRpcClient {
   private readonly maxPendingRequests: number;
   private readonly stdin: Pick<Writable, 'write'>;
   private readonly onEvent: (event: Record<string, unknown>) => void;
+  private readonly onRecordError: (error: Error) => void;
   private nextId = 1;
   private closedError: Error | null = null;
 
@@ -41,6 +48,7 @@ export class PrimeAgentRpcClient {
     this.requestTimeoutMs = options.requestTimeoutMs ?? 30_000;
     this.maxPendingRequests = options.maxPendingRequests ?? 128;
     this.onEvent = options.onEvent ?? (() => undefined);
+    this.onRecordError = options.onRecordError ?? (() => undefined);
     this.framer = new PrimeAgentJsonlFramer({ maxRecordBytes: options.maxRecordBytes });
   }
 
@@ -68,8 +76,21 @@ export class PrimeAgentRpcClient {
     });
   }
 
+  /**
+   * Never throws. This runs inside the host's stdout `'data'` listener, where a
+   * synchronous throw becomes an uncaught exception that kills the host process
+   * and orphans the Prime child without writing a launch-error file.
+   */
   acceptStdout(chunk: Uint8Array): void {
-    for (const value of this.framer.push(chunk)) this.route(value);
+    const { records, errors } = this.framer.push(chunk);
+    for (const error of errors) this.onRecordError(error);
+    for (const value of records) {
+      try {
+        this.route(value);
+      } catch (error) {
+        this.onRecordError(error instanceof Error ? error : new Error(String(error)));
+      }
+    }
   }
 
   close(cause: Error = new Error('Prime Agent RPC process exited')): void {

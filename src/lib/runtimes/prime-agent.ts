@@ -14,7 +14,7 @@ import type {
   TokenUsage,
 } from './types.js';
 import { getAgentDir } from '../agents/agent-state.js';
-import { deliverPrimeAgentMessage, postPrimeAgentHost } from '../prime-agent/session-controller.js';
+import { deliverPrimeAgentMessage, postPrimeAgentHost, PRIME_AGENT_KILL_GRACE_MS } from '../prime-agent/session-controller.js';
 import { tmuxKillSession, tmuxSessionExists } from './tmux-cli.js';
 import { tmuxCreateSession } from './tmux-cli.js';
 import { getProviderAuthMode } from '../agents/provider-auth.js';
@@ -41,8 +41,13 @@ const productionController: PrimeAgentRuntimeController = {
   async spawn(config) {
     if (!config.model) throw new Error('Prime Agent spawn requires a model');
     const startupTimeoutMs = loadConfigSync().config.primeAgent.rpcStartupTimeoutMs;
-    const authMode = await getProviderAuthMode(config.model);
-    if (!authMode) throw new Error(`Prime Agent provider credentials are unavailable for ${config.model}`);
+    // `undefined` here means "no explicit auth-mode preference", not "no
+    // credentials": getProviderAuthMode only answers for anthropic, openai, and
+    // google. Treating it as fatal made the nine other mapped providers
+    // unlaunchable as work agents while the conversation path launched them
+    // happily — the same model, two different answers. Both now default to
+    // api-key and let the credential gate in buildPrimeAgentBaseCommand decide.
+    const authMode = await getProviderAuthMode(config.model) ?? 'api-key';
     let command = await buildPrimeAgentBaseCommand({ agentId: config.agentId, model: config.model, workspace: config.workspace, authMode, rpcStartupTimeoutMs: startupTimeoutMs });
     if (config.sessionId) command += ` --resume ${shellQuote(config.sessionId)}`;
     if (config.prompt) command += ` --prompt ${shellQuote(config.prompt)}`;
@@ -143,8 +148,27 @@ export class PrimeAgentRuntimeSync implements AgentRuntimeSync {
 
   sendMessage(agentId: string, message: string): Promise<void> { return this.controller.send(agentId, message); }
 
+  /**
+   * Abort generation, wait the bounded grace period, then terminate the owned
+   * process tree — in that order and unconditionally (runtime-adapter.ac3,
+   * message-delivery.ac3).
+   *
+   * The abort is best-effort on purpose. It rejects when the host socket is
+   * gone, when the host answers non-2xx, and when the request times out because
+   * the Prime child is wedged. Letting that rejection escape used to skip the
+   * terminate entirely, so Cloister recorded the agent as killed
+   * (`service-crash.ts` swallows the rejection and emits `killed_agent`
+   * regardless) while its tmux session, host process, and Prime child kept
+   * running and burning provider tokens.
+   */
   async killAgent(agentId: string): Promise<void> {
-    await this.controller.abort(agentId);
+    try {
+      await this.controller.abort(agentId);
+    } catch {
+      // Host already gone, or wedged past its request deadline. Either way the
+      // process tree below still has to come down.
+    }
+    await new Promise(resolve => setTimeout(resolve, PRIME_AGENT_KILL_GRACE_MS));
     await this.controller.terminate(agentId);
   }
 

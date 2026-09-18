@@ -3,7 +3,7 @@ import { join } from 'path';
 import type { AuthMode } from '../subscription-types.js';
 import { getAgentDir } from '../agents/agent-state.js';
 import { PRIME_AGENT_MANAGED_POLICY } from './policy.js';
-import { resolvePrimeAgentModelRoute } from './provider-map.js';
+import { assertPrimeAgentCredentialAvailable, resolvePrimeAgentModelRoute } from './provider-map.js';
 import { primeAgentGlobalContextFile, resolveWorkspaceContextFile } from '../context-layers/layers.js';
 import { existsSync, readFileSync } from 'fs';
 import { packageRoot } from '../paths.js';
@@ -24,6 +24,10 @@ export interface PrimeAgentLaunchCommandOptions {
 
 export async function buildPrimeAgentBaseCommand(options: PrimeAgentLaunchCommandOptions): Promise<string> {
   const route = resolvePrimeAgentModelRoute(options.model, options.authMode);
+  // Every Prime launch passes through here — work agent and conversation alike
+  // — so this is the one place the credential gate has to run for the two paths
+  // to give the same model the same answer (provider-map.ac2).
+  assertPrimeAgentCredentialAvailable(options.model, options.authMode);
   const sessionDir = join(getAgentDir(options.agentId), 'prime-sessions');
   await mkdir(sessionDir, { recursive: true, mode: 0o700 });
   const context = [primeAgentGlobalContextFile(), resolveWorkspaceContextFile(options.workspace)]

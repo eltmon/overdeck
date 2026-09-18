@@ -89,6 +89,15 @@ const PiHarnessIcon = (props: IconProps) => (
   </svg>
 );
 
+const PrimeAgentHarnessIcon = (props: IconProps) => (
+  <svg viewBox="0 0 24 24" role="img" aria-label="Prime Agent harness mark" {...props}>
+    <rect width="24" height="24" rx="5" fill="currentColor" />
+    <text x="12" y="16" textAnchor="middle" fontSize="12" fontWeight="700" fill="white">
+      P
+    </text>
+  </svg>
+);
+
 const AcpHarnessIcon = (props: IconProps) => (
   <svg viewBox="0 0 24 24" role="img" aria-label="ACP harness mark" {...props}>
     <rect width="24" height="24" rx="5" fill="currentColor" />
@@ -129,7 +138,9 @@ export const HARNESS_BRANDS: Record<Harness, BrandDef> = {
   ohmypi: { id: 'ohmypi', label: 'oh-my-pi', color: '#7c3aed', Icon: PiHarnessIcon },
   acp: { id: 'acp', label: 'ACP', color: '#475569', Icon: AcpHarnessIcon },
   'kimi-code': { id: 'kimi-code', label: 'Kimi Code', color: PROVIDER_BRANDS.kimi.color, Icon: KimiIcon },
-  'prime-agent': { id: 'prime-agent', label: 'Prime Agent', color: '#64748b', Icon: PiHarnessIcon },
+  // Its own lettermark, not oh-my-pi's π: a shared glyph makes the two
+  // harnesses indistinguishable in every badge surface (dashboard-frontend.ac1).
+  'prime-agent': { id: 'prime-agent', label: 'Prime Agent', color: '#64748b', Icon: PrimeAgentHarnessIcon },
 };
 
 export const PROVIDER_COLORS: Record<Provider, string> = Object.fromEntries(

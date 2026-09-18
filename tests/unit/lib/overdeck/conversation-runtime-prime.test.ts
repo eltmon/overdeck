@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
   getAgentDir: (agentId: string) => `/tmp/${agentId}`,
@@ -20,6 +20,18 @@ vi.mock('../../../../src/lib/harness-binary.js', async (importOriginal) => ({
 const { preparePrimeAgentConversationLaunch, resolveAllowedHarness } = await import(
   '../../../../src/lib/overdeck/conversation-runtime.js'
 );
+
+// The launch paths refuse a model whose credential is absent (provider-map.ac2),
+// so give this assembly test one.
+let savedOpenAiKey: string | undefined;
+beforeEach(() => {
+  savedOpenAiKey = process.env.OPENAI_API_KEY;
+  process.env.OPENAI_API_KEY = 'test-openai-key';
+});
+afterEach(() => {
+  if (savedOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
+  else process.env.OPENAI_API_KEY = savedOpenAiKey;
+});
 
 describe('Prime Agent conversation launch', () => {
   beforeEach(() => vi.clearAllMocks());

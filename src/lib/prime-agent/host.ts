@@ -89,6 +89,12 @@ async function main(): Promise<void> {
       lastEventAt = new Date().toISOString();
       scheduleStatsWrite();
       if (event.type === 'agent_end') void refreshStats().catch(() => undefined);
+    }, onRecordError: error => {
+      // Stdout carries whatever the binary prints, banners included. Report the
+      // bad record on stderr and keep decoding — the client never throws here,
+      // so this listener cannot become an uncaught exception that kills the
+      // host and orphans the child.
+      process.stderr.write(`[prime-agent-host] ${error.message}\n`);
     } });
     child.once('error', error => client.close(new Error(`Prime Agent process failed to start: ${error.message}`)));
     child.stdout.on('data', chunk => client.acceptStdout(chunk));
@@ -147,12 +153,21 @@ async function main(): Promise<void> {
   try {
     await new Promise<void>((resolve, reject) => server!.listen(socketPath, resolve).once('error', reject));
     const state = await active.client.request<Record<string, unknown>>({ type: 'get_state' });
+    // Two distinct concepts, kept in two variables on purpose: the durable
+    // session FILE the resume path reopens, and the session IDENTITY that
+    // resume compares against. Both currently resolve from `sessionFile`
+    // because that is the value `--resume` is handed back and the value
+    // `resumePrimeAgentSession` compares — changing the id to prefer
+    // `state.data.sessionId` would require the resume path to carry the path
+    // and the id separately end to end, which cannot be verified without a
+    // live Prime binary. Keeping them as separate expressions means that
+    // untangling touches only these two lines.
+    const sessionPath = String(state.data?.sessionFile ?? state.data?.sessionPath ?? '');
     const sessionId = String(state.data?.sessionFile ?? state.data?.sessionId ?? agentId);
     const promptFile = args.get('--prompt-file');
     const prompt = promptFile ? await readFile(promptFile, 'utf8') : args.get('--prompt');
     if (prompt) await active.client.request({ type: 'prompt', message: prompt });
     await refreshStats();
-    const sessionPath = String(state.data?.sessionFile ?? state.data?.sessionPath ?? '');
     if (!sessionPath) throw new Error('Prime Agent did not report a durable session path');
     await writeFile(join(agentDir, 'prime-agent-session-path'), sessionPath, { mode: 0o600 });
     await writeFile(join(agentDir, 'prime-agent-session-id'), sessionId, { mode: 0o600 });

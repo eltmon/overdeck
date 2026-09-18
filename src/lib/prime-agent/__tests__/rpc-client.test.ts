@@ -33,6 +33,27 @@ describe('PrimeAgentRpcClient', () => {
     await expect(second).rejects.toThrow('code 7');
   });
 
+  it('never throws out of acceptStdout, and keeps routing past a bad record', async () => {
+    // acceptStdout runs inside the host's stdout 'data' listener. A synchronous
+    // throw there is an uncaught exception: the host dies, its cleanup never
+    // runs, and the Prime child is orphaned with no launch-error file written.
+    const errors: string[] = [];
+    const events: Array<Record<string, unknown>> = [];
+    const client = new PrimeAgentRpcClient({
+      stdin: { write: () => true },
+      onEvent: event => events.push(event),
+      onRecordError: error => errors.push(error.message),
+    });
+
+    expect(() => client.acceptStdout(Buffer.from('Prime Agent v1.2.3 starting up\n'))).not.toThrow();
+    expect(() => client.acceptStdout(Buffer.from('42\n'))).not.toThrow();
+    expect(() => client.acceptStdout(Buffer.from('{"type":"response","command":"get_state","success":true}\n'))).not.toThrow();
+    client.acceptStdout(Buffer.from('{"type":"agent_end"}\n'));
+
+    expect(errors).toHaveLength(3);
+    expect(events).toEqual([{ type: 'agent_end' }]);
+  });
+
   it('bounds the pending request map', async () => {
     const client = new PrimeAgentRpcClient({ stdin: { write: () => true }, maxPendingRequests: 1 });
     const first = client.request({ type: 'get_state' });
