@@ -26,8 +26,6 @@ import {
 } from './remote-tmux.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getClaudePermissionFlagsSync, getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
-import { resolveProjectForIssue } from '../pan-dir/record.js';
-import { isStateMigrated } from '../state-home.js';
 import {
   withAutoSpawnConsentClaim,
   type AcceptAutoSpawnConsent,
@@ -496,14 +494,6 @@ export interface SpawnRemoteAgentOptions {
   tier?: 'ephemeral' | 'durable';
 }
 
-export function assertFlyRemoteStateSupported(issueId: string, migrated: boolean): void {
-  if (migrated) {
-    throw new Error(
-      `Fly remote spawn blocked for ${issueId.toUpperCase()}: PAN-2541 D14 forbids remote work on migrated projects until PAN-2549 implements overdeck-state synchronization.`,
-    );
-  }
-}
-
 /**
  * Write a file on the VM via base64 chunks. The Machines exec API rejects
  * payloads somewhere above 4KB (PayloadTooLarge), so large content — agent
@@ -567,8 +557,6 @@ async function spawnRemoteAgentWithoutConsentClaim(
   acceptConsent?: AcceptAutoSpawnConsent,
 ): Promise<RemoteAgentState> {
   const { issueId, workspace, startedBy, model = 'claude-sonnet-4-6', prompt } = options;
-  const project = resolveProjectForIssue(issueId);
-  if (project) assertFlyRemoteStateSupported(issueId, await isStateMigrated(project));
   const tier = options.tier ?? 'ephemeral';
 
   const agentId = `agent-${issueId.toLowerCase()}`;

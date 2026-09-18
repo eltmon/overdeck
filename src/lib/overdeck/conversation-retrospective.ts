@@ -16,7 +16,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { packageRoot, getOverdeckHome } from '../paths.js';
-import { listProjectsAsync, getProjectSync } from '../projects.js';
+import { listProjectsAsync, getProjectSync, getIssuePrefix } from '../projects.js';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -483,7 +483,8 @@ export async function listRecordsThroughReadDoor(
     { encoding: 'utf-8', timeout: 30000, maxBuffer: 8 * 1024 * 1024 },
   );
 
-  const prefix = repo.split('/')[1]?.toUpperCase() ?? project.key.toUpperCase();
+  const config = getProjectSync(project.key);
+  const prefix = (config ? getIssuePrefix(config) : undefined) ?? project.key.toUpperCase();
   const issues = JSON.parse(stdout) as Array<{
     number: number;
     title?: string;

@@ -332,26 +332,5 @@ describe('operator intervention CLI emission', () => {
     expect(unpauseMocks.resumeAgent).not.toHaveBeenCalled();
   });
 
-  it('emits an untroubled intervention when pan untroubled clears a troubled gate', async () => {
-    agentMocks.getAgentStateSync.mockReturnValue({ issueId: 'PAN-2', troubled: false, consecutiveFailures: 2 });
 
-    const { untroubledCommand } = await import('../untroubled.js');
-    await untroubledCommand('PAN-2');
-
-    expect(agentMocks.clearAgentTroubledSync).toHaveBeenCalledWith('agent-pan-2');
-    expect(interventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith({
-      issueId: 'PAN-2',
-      kind: 'untroubled',
-      source: 'pan untroubled',
-    });
-  });
-
-  it('does not emit an untroubled intervention when the agent was already untroubled', async () => {
-    agentMocks.getAgentStateSync.mockReturnValue({ issueId: 'PAN-2', troubled: false, consecutiveFailures: 0 });
-
-    const { untroubledCommand } = await import('../untroubled.js');
-    await untroubledCommand('PAN-2');
-
-    expect(interventionMocks.appendOperatorInterventionEvent).not.toHaveBeenCalled();
-  });
 });

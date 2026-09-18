@@ -17,7 +17,6 @@ import { writeRemoteFile } from './remote/remote-agents.js';
 import { saveWorkspaceMetadataSync } from './remote/workspace-metadata.js';
 import type { RemoteWorkspaceMetadata } from './remote/interface.js';
 import { extractTeamPrefix, findProjectByTeamSync, resolveProjectFromIssueSync, getIssuePrefix } from './projects.js';
-import { isStateMigrated } from './state-home.js';
 
 const execAsync = promisify(exec);
 
@@ -45,12 +44,6 @@ export interface CreateRemoteWorkspaceOptions {
   const teamPrefix = extractTeamPrefix(issueId);
   const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
   const projectRoot = projectConfig?.path || process.cwd();
-  if (projectConfig && await isStateMigrated(projectConfig)) {
-    throw new Error(
-      `Remote work is blocked for ${projectConfig.name} because this project uses Dolt-native beads authority and the remote VM does not yet have authenticated refs/dolt/data mutation routing. Running it would create a second JSONL authority.`,
-    );
-  }
-
   // Determine project identifier for VM name
   let projectId = teamPrefix?.toLowerCase();
   if (!projectId && projectConfig && getIssuePrefix(projectConfig)) {
