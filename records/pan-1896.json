@@ -130,7 +130,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T11:18:25.871Z",
-  "updated": "2026-08-15T16:51:44.165Z",
+  "updated": "2026-09-18T09:04:04.316Z",
   "pipeline": {
     "issueId": "PAN-1896",
     "reviewStatus": "pending",
@@ -333,6 +333,5 @@
     "codex-workagent-wire": "cancelled",
     "codex-conversation-wire": "cancelled"
   },
-  "workModel": "gpt-5.6-sol",
   "recoveryTrips": []
 }
