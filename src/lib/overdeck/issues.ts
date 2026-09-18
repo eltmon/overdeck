@@ -4,6 +4,7 @@ import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
 import { Db, EventBus, Records } from './infra.js';
+import { getPipelineView as getPipelineViewSync, type PipelineView } from './pipeline-view.js';
 import type { ProjectConfig } from '../projects.js';
 import type { PanIssueRecord } from '../pan-dir/record.js';
 
@@ -21,6 +22,25 @@ export const overdeckIssues = sqliteTable('issues', {
   prHeadSha: text('pr_head_sha'),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 });
+
+/**
+ * PAN-3903: the pipeline read door. Cloister patrols are plain sync/async code
+ * and cannot take an Effect dependency, so the door itself lives in the leaf
+ * module `./pipeline-view.js` (no `./infra.js` edge, so importing it from
+ * `src/lib/cloister/` cannot create the ESM cycle Node rejects at boot). The
+ * resolver re-exports it and wraps it below, so both surfaces answer from one
+ * implementation.
+ */
+export {
+  getPipelineView,
+  getPipelineStatus,
+  listPipelineViews,
+  listPipelineViewsForIssues,
+  listPipelineStatuses,
+  deriveInFlightOwner,
+  describeOwner,
+} from './pipeline-view.js';
+export type { PipelineView, PipelineOwner, PipelineOwnerActor } from './pipeline-view.js';
 
 export const IssueId = Schema.String.pipe(Schema.brand('IssueId'));
 export type IssueId = typeof IssueId.Type;
@@ -185,6 +205,8 @@ export interface IssuesResolverServiceShape {
   readonly get: (id: IssueId) => Effect.Effect<Issue, IssueNotFound>;
   readonly list: (filter: IssueFilter) => Effect.Effect<ReadonlyArray<Issue>>;
   readonly getPlan: (id: IssueId) => Effect.Effect<unknown, IssueNotFound>;
+  /** PAN-3903: canonical pipeline state plus the in-flight transition owner. */
+  readonly getPipelineView: (id: IssueId) => Effect.Effect<PipelineView | null>;
 }
 
 export class IssuesResolver extends Context.Service<IssuesResolver, IssuesResolverServiceShape>()(
@@ -227,7 +249,9 @@ export const IssuesResolverLive = Layer.effect(
         return issue.planRef ? yield* records.readSpec(issue.planRef) : null;
       });
 
-    return IssuesResolver.of({ get, list, getPlan });
+    const getPipelineView = (id: IssueId) => Effect.sync(() => getPipelineViewSync(id));
+
+    return IssuesResolver.of({ get, list, getPlan, getPipelineView });
   }),
 );
 
