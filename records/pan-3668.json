@@ -292,6 +292,11 @@
       "timestamp": "2026-09-18T08:00:33.056Z",
       "reason": "end",
       "note": "Resolved the standing merge conflict with origin/main (46 conflicts) without degrading either changeset. Union-resolved every harness enumeration so main's OpenCode harness (PAN-3783) and this branch's Prime Agent harness both survive; where main had refactored shared code, main's newer structure is kept and prime-agent re-added in its idiom (sync.ts writeContextArtifactSync, conversation-runtime Kimi resume + managedStateKey, spawn-planning-session delegation, ExecutableResolution + WSL-interop guard PAN-3827, branding/ModelPicker assertions). Branch is conflict-free: PR #3670 is MERGEABLE/CLEAN and all CI checks are green. Verified locally: typecheck, lint, build, slash-command regeneration, Prime no-loss audit, and the full suite (1573 files / 14666 tests, 0 failures). Re-review is needed only because review had been approved at the pre-merge commit be1bc0bb."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5",
+      "timestamp": "2026-09-18T08:00:41.630Z"
     }
   ],
   "feedback": [],
@@ -561,18 +566,19 @@
     "recordedAt": "2026-09-18T08:00:26.249Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-09-18T08:00:37.462Z",
+  "updated": "2026-09-18T08:00:41.631Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T08:00:36.396Z",
+    "updatedAt": "2026-09-18T08:00:41.055Z",
+    "verificationNotes": "Verification FAILED at test-skip (32ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3668/.overdeck/verification/2026-09-18T08-00-33-581Z-27e8d7d1.json",
     "mergeNotes": "Review stale: approved be1bc0bb, workspace HEAD is f95437e6. Run pan done or pan review request to re-review.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3670",
     "reviewedAtCommit": "be1bc0bb6e9cbe1830da5684263d56901dcbd08e",
@@ -907,7 +913,7 @@
       },
       "costAtCloseOut": {
         "usd": 182.1714763,
-        "pricingAsOf": "2026-09-18T08:00:36.450Z"
+        "pricingAsOf": "2026-09-18T08:00:41.145Z"
       }
     },
     "merges": [
