@@ -2,7 +2,6 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { getMergeSetSync } from '../merge-set.js';
 import { findProjectByPathSync, getProjectSync, type ReleaseComponentConfig } from '../projects.js';
-import { setReviewStatusSync } from '../review-status.js';
 import {
   type ReleaseCheckStatus,
   type ReleaseComponentState,
@@ -46,20 +45,13 @@ export async function runRelease(
   }
 
   const project = getProjectSync(mergeSet.projectKey) ?? findProjectByPathSync(projectPath);
-  if (!project?.release) {
-    setReviewStatusSync(issueId, {
-      releaseStatus: 'skipped',
-      releaseNotes: 'No release config found for project.',
-    });
-    return null;
-  }
+  if (!project?.release) return null;
 
   const now = options.now ?? (() => new Date());
   options.commandCwd = options.commandCwd ?? projectPath;
   const plan = resolveReleasePlan(project.release);
   let releaseSet = buildReleaseSet(issueId, mergeSet, plan, now().toISOString());
   upsertReleaseSetSync(releaseSet);
-  setReviewStatusSync(issueId, { releaseStatus: 'releasing' });
 
   let failure: ComponentFailure | null = null;
   for (const entry of plan) {
@@ -109,12 +101,8 @@ export async function runRelease(
 
   if (failure) {
     releaseSet = haltRemainingComponents(releaseSet, failure.componentKey);
-    const releaseStatus = finalFailureStatus(releaseSet, failure.rollbackRan);
-    releaseSet = persistReleaseSetStatus(releaseSet, releaseStatus);
-    setReviewStatusSync(issueId, {
-      releaseStatus,
-      releaseNotes: `Release halted at ${failure.componentKey}.`,
-    });
+    const finalStatus = finalFailureStatus(releaseSet, failure.rollbackRan);
+    releaseSet = persistReleaseSetStatus(releaseSet, finalStatus);
     return releaseSet;
   }
 
@@ -122,17 +110,11 @@ export async function runRelease(
     (component) => component.status === 'blocked',
   );
   if (blockedComponents.length > 0) {
-    const blockedKeys = blockedComponents.map((component) => component.componentKey).join(', ');
     releaseSet = persistReleaseSetStatus(releaseSet, 'partial');
-    setReviewStatusSync(issueId, {
-      releaseStatus: 'partial',
-      releaseNotes: `Release awaiting manual step(s): ${blockedKeys}.`,
-    });
     return releaseSet;
   }
 
   releaseSet = persistReleaseSetStatus(releaseSet, 'passed');
-  setReviewStatusSync(issueId, { releaseStatus: 'passed' });
   return releaseSet;
 }
 

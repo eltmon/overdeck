@@ -6,7 +6,7 @@ import { Effect } from 'effect';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
-import { getIssueWorkspacePath } from '../../lib/pan-dir/record.js';
+import { getIssueWorkspacePath } from '../../lib/overdeck/issue-projects.js';
 import { createWorkspace } from '../../lib/workspace-manager.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/xbrief/swarm-readiness.js';

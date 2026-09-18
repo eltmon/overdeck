@@ -8,8 +8,9 @@ import { createWorkspace } from '../../lib/workspace-manager.js';
 import type { ProjectConfig } from '../../lib/workspace-config.js';
 import type { XBriefDocument } from '../../lib/xbrief/types.js';
 import { analyzeSwarmReadiness } from '../../lib/xbrief/swarm-readiness.js';
-import { applyStatusOverrides } from '../../lib/xbrief/io.js';
-import { readIssueRecordForWorkspaceSync } from '../../lib/pan-dir/record.js';
+import { applyItemStatuses } from '../../lib/xbrief/io.js';
+import { resolvePlanHome } from '../../lib/pan-dir/paths.js';
+import { readItemStatuses } from '../../lib/xbrief/continue-state.js';
 import { readSwarmHold } from '../../lib/cloister/deacon-swarm-record.js';
 import {
   classifyInFlightSlots,
@@ -112,9 +113,9 @@ export async function swarmDispatchCommand(
     return { ok: false, actions: [], workspacePath };
   }
 
-  const overrides = readIssueRecordForWorkspaceSync(workspacePath, issue)?.statusOverrides;
-  const doc = overrides && Object.keys(overrides).length > 0
-    ? applyStatusOverrides(loaded.doc, overrides)
+  const itemStatuses = readItemStatuses(resolvePlanHome(workspacePath), issue);
+  const doc = Object.keys(itemStatuses).length > 0
+    ? applyItemStatuses(loaded.doc, itemStatuses)
     : loaded.doc;
   const readiness = deps.analyzeSwarmReadiness(doc);
   const reconciled = await deps.reconcileSlotState(issue, workspacePath, doc);
@@ -160,11 +161,14 @@ export async function swarmMergeCommand(
     return { ok: false, actions: [], workspacePath };
   }
 
-  const overrides = readIssueRecordForWorkspaceSync(workspacePath, issue)?.statusOverrides;
-  const doc = overrides && Object.keys(overrides).length > 0
-    ? applyStatusOverrides(loaded.doc, overrides)
+  const itemStatuses = readItemStatuses(resolvePlanHome(workspacePath), issue);
+  const doc = Object.keys(itemStatuses).length > 0
+    ? applyItemStatuses(loaded.doc, itemStatuses)
     : loaded.doc;
-  const reconciled = await deps.reconcileSlotState(issue, workspacePath, doc, { statusOverrides: overrides });
+  // NOTE (PAN-3917 W9): the option key below belongs to slot-reconcile.ts, which is
+  // on the delete list (src/lib/agents/slot-reconcile.ts); the key goes with it. The
+  // values are item statuses read from .pan/continues/, not from a record.
+  const reconciled = await deps.reconcileSlotState(issue, workspacePath, doc, { statusOverrides: itemStatuses });
   const slot = reconciled.inFlight.find(candidate => candidate.slotIndex === slotIndex);
   if (!slot) {
     deps.console.error(chalk.red(`No in-flight swarm slot ${slotIndex} exists for ${issue}.`));

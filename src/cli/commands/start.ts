@@ -23,7 +23,7 @@ import { isGitHubIssueSync, resolveGitHubIssueSync } from '../../lib/tracker-uti
 import { Effect } from 'effect';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { getReadableWorkspacePanPaths } from '../../lib/pan-dir/index.js';
-import { getIssueWorkspacePath, readIssueRecordForWorkspaceSync } from '../../lib/pan-dir/record.js';
+import { resolveSwarmPolicy } from '../../lib/swarm-policy.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
 import { findPlanSync, readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
@@ -92,10 +92,7 @@ import { assertCanStartFreshSync, getWorkAgentLifecycleStateSync } from '../../l
 import { normalizeModelOverrideSync } from '../../lib/model-validation.js';
 import { resolvePlanningMode, type PlanningMode } from './planning-mode.js';
 import { requireAutomaticStateMigration } from '../../lib/state-auto-migrate.js';
-import { checkActiveOrderDispatch } from '../../lib/orders/dispatch-gate.js';
-import { withActiveOrderDispatchReservation } from '../../lib/orders/dispatch-reservation.js';
 import type { IssueOptions } from './start-options.js';
-import { applyStartPolicyOptionsAfterSpawn, persistStartPoliciesThenCheckKickoff } from './start-policy-overrides.js';
 import { prepareFreshWorkAgentSession } from './start-fresh-session.js';
 
 /**
@@ -440,10 +437,6 @@ async function handleRemoteWorkspace(
       tier: fly.getResiliencyTier(),
     });
     spinner.succeed(`Remote agent spawned: ${remoteAgent.id}`);
-
-    if (resolved) {
-      await applyStartPolicyOptionsAfterSpawn(resolved, issueId, options, false, (message) => spinner.warn(message));
-    }
 
     // Handle shadow mode
     const skipTrackerUpdate = await Effect.runPromise(shouldSkipTrackerUpdate(issueId, options.shadow));
@@ -812,9 +805,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   // only recovery door for a frozen agent is closed to the one role that runs
   // unattended.
   const lifecycleState = getWorkAgentLifecycleStateSync(agentId);
-  const swarmWorkspace = getIssueWorkspacePath(id);
-  const swarmActive = !!swarmWorkspace
-    && readIssueRecordForWorkspaceSync(swarmWorkspace, id)?.swarm?.policy?.mode === 'always';
+  const swarmActive = resolveSwarmPolicy(id).mode === 'always';
   if (lifecycleState.isRunning && !lifecycleState.isRunningButStuck && !options.fresh) {
     console.log(chalk.green(`Work agent for ${id} is already running.`));
     console.log('');
@@ -1169,11 +1160,6 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       });
     }
 
-    const orderDispatch = await checkActiveOrderDispatch(projectRoot, id, { offBook: options.offBook });
-    if (!orderDispatch.decision.eligible) {
-      throw new Error(orderDispatch.decision.message ?? `Order-book dispatch blocked for ${id}`);
-    }
-
     prep.update('Building agent prompt with planning context...');
     const trackerContext = await runStartPrepStep(prep, spinner, 'tracker-context', (signal) => getTrackerContext(id, workspace, signal), '');
     const prompt = await buildWorkAgentPrompt({ issueId: id, env: 'LOCAL', workspacePath: workspace, projectRoot, trackerContext });
@@ -1185,38 +1171,20 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     if (shouldClearPauseBeforeSpawn) {
       clearAgentPausedSync(agentId);
     }
-    const admitted = await withActiveOrderDispatchReservation(
-      projectRoot,
-      id,
-      { offBook: options.offBook, recordOverride: !options.dryRun },
-      () => runStartPrepStep(prep, spinner, 'spawn', () => spawnAgent({
-        issueId: id,
-        workspace,
-        harness: requestedHarness,
-        model: spawnModel,
-        role: 'work',
-        prompt,
-        allowHost: options.host,
-        startedBy: process.env['OVERDECK_AGENT_STARTED_BY']!,
-        autoSpawnConsentRequired: process.env['OVERDECK_AUTO_SPAWN_CONSENT_REQUIRED'] === '1',
-        effort: resolvedEffort,
-        foreman: readIssueRecordForWorkspaceSync(workspace, id)?.swarm?.policy?.mode === 'always' || undefined,
-      })),
-    );
-    if (!admitted.check.decision.eligible || !admitted.result) {
-      throw new Error(admitted.check.decision.message ?? `Order-book dispatch blocked for ${id}`);
-    }
-    const agent = admitted.result;
-    // PAN-3848 (F4): policy overrides persist BEFORE the kickoff-failure
-    // return — the live session already carries them through state.json.
-    const kickoffFailed = await persistStartPoliciesThenCheckKickoff(
-      resolved,
-      agent,
-      id,
-      options,
-      false,
-      (message) => spinner.warn(message),
-    );
+    const agent = await runStartPrepStep(prep, spinner, 'spawn', () => spawnAgent({
+      issueId: id,
+      workspace,
+      harness: requestedHarness,
+      model: spawnModel,
+      role: 'work',
+      prompt,
+      allowHost: options.host,
+      startedBy: process.env['OVERDECK_AGENT_STARTED_BY']!,
+      autoSpawnConsentRequired: process.env['OVERDECK_AUTO_SPAWN_CONSENT_REQUIRED'] === '1',
+      effort: resolvedEffort,
+      foreman: resolveSwarmPolicy(id).mode === 'always' || undefined,
+    }));
+    const kickoffFailed = agent.role === 'work' && agent.kickoffDelivered === false;
     if (kickoffFailed) {
       spinner.fail(`Agent spawned but kickoff delivery was not confirmed: ${agent.id}`);
       for (const line of ['', chalk.red(`Kickoff delivery did not land for ${agent.id}.`), chalk.dim('The live session is preserved and the agent may be idle until the kickoff lands.'), chalk.dim('Deacon will retry delivery after the stuck threshold, or you can send a manual message now:'), `  pan tell ${id} "continue from your kickoff brief"`]) console.log(line);

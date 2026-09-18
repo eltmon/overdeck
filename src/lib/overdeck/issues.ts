@@ -4,8 +4,6 @@ import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
 import { Db, EventBus, Records } from './infra.js';
-import type { ProjectConfig } from '../projects.js';
-import type { PanIssueRecord } from '../pan-dir/record.js';
 
 export const overdeckIssues = sqliteTable('issues', {
   id: text('id').primaryKey(),
@@ -170,31 +168,6 @@ function readyForMerge(issue: Issue): boolean {
     && issue.blockers.length === 0;
 }
 
-function issueToRecord(issue: Issue, reason: string): PanIssueRecord {
-  const updatedAt = issue.updatedAt.toISOString();
-  return {
-    issueId: issue.id,
-    schemaVersion: 2,
-    pipeline: {
-      issueId: issue.id,
-      reviewStatus: issue.reviewOutcome ?? 'pending',
-      testStatus: issue.testOutcome ?? 'pending',
-      verificationStatus: issue.verificationOutcome ?? 'pending',
-      readyForMerge: readyForMerge(issue),
-      prUrl: issue.pr?.url,
-      prNumber: issue.pr?.number,
-      prHeadSha: issue.pr?.headSha,
-      blockerReasons: [...issue.blockers],
-      updatedAt,
-    },
-    closeOut: {
-      usage: { byStage: {}, totals: {} },
-      merges: [],
-      ranOn: reason,
-    },
-  };
-}
-
 export interface IssuesResolverServiceShape {
   readonly get: (id: IssueId) => Effect.Effect<Issue, IssueNotFound>;
   readonly list: (filter: IssueFilter) => Effect.Effect<ReadonlyArray<Issue>>;
@@ -265,16 +238,11 @@ export interface IssueWriterServiceShape {
 
 export class IssueWriter extends Context.Service<IssueWriter, IssueWriterServiceShape>()('overdeck/IssueWriter') {}
 
-export function makeIssueWriterLive(project: ProjectConfig = {
-  name: 'overdeck',
-  path: process.cwd(),
-  issue_prefix: 'PAN',
-}): Layer.Layer<IssueWriter, never, Db | Records | EventBus> {
+export function makeIssueWriterLive(): Layer.Layer<IssueWriter, never, Db | EventBus> {
   return Layer.effect(
     IssueWriter,
     Effect.gen(function* () {
       const db = yield* Db;
-      const records = yield* Records;
       const bus = yield* EventBus;
       const now = () => new Date();
 
@@ -287,7 +255,6 @@ export function makeIssueWriterLive(project: ProjectConfig = {
           }
 
           const next: Issue = { ...issue, ...outcomeForMove(issue.stage, to, hint), stage: to, updatedAt: now() };
-          yield* records.writeIssue(project, id, issueToRecord(next, reason));
           yield* Effect.promise(() =>
             db.q.update(overdeckIssues).set({
               stage: next.stage,
@@ -306,7 +273,6 @@ export function makeIssueWriterLive(project: ProjectConfig = {
           const resolver = yield* IssuesResolver;
           const issue = yield* resolver.get(id);
           const next: Issue = { ...issue, pr, updatedAt: now() };
-          yield* records.writeIssue(project, id, issueToRecord(next, 'pr-identity'));
           yield* Effect.promise(() =>
             db.q.update(overdeckIssues).set({
               prUrl: pr?.url ?? null,
@@ -324,7 +290,6 @@ export function makeIssueWriterLive(project: ProjectConfig = {
           const resolver = yield* IssuesResolver;
           const issue = yield* resolver.get(id);
           const next: Issue = { ...issue, blockers: [...blockers], updatedAt: now() };
-          yield* records.writeIssue(project, id, issueToRecord(next, reason));
           yield* Effect.promise(() =>
             db.q.update(overdeckIssues).set({
               blockers: [...blockers],

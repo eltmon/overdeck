@@ -1,7 +1,6 @@
 import { Effect } from 'effect';
 
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
-import { getReviewStatusSync } from '../../dashboard/server/review-status.js';
 import type { IssueDataService } from '../../dashboard/server/services/issue-data-service.js';
 import { getSharedIssueService } from '../../dashboard/server/services/issue-service-singleton.js';
 import { EventStoreService } from '../../dashboard/server/services/domain-services.js';
@@ -167,7 +166,6 @@ export function closeOutIssue(id: string, opts: { acceptedRows?: DodRowId[]; acc
         state: 'done',
         canonicalStatus: 'done',
         targetCanonicalState: 'done',
-        mergeStatus: undefined,
         labels: newLabels,
       });
     } catch { /* non-fatal */ }
@@ -266,8 +264,13 @@ export function bulkCloseOut(body: Record<string, unknown>) {
         const cachedIssue = issueDataService.getIssues().find(
           (issue: any) => (issue.identifier || '').toUpperCase() === id.toUpperCase(),
         );
-        const reviewStatus = getReviewStatusSync(id.toUpperCase());
-        const allowPausedMerged = reviewStatus?.mergeStatus === 'merged' || cachedIssue?.mergeStatus === 'merged';
+        // PAN-3917: the pull request owns "merged"; nothing mirrors it.
+        let allowPausedMerged = false;
+        try {
+          const { fetchIssuePullRequest } = await import('./pull-requests.js');
+          allowPausedMerged = Boolean((await fetchIssuePullRequest(id)).pr?.mergedAt);
+        } catch { /* forge unreachable — treat as not merged */ }
+        void cachedIssue;
         const hasActiveAgent = await hasActiveAgentForIssue(id, allowPausedMerged);
         return { id, hasActiveAgent };
       })),
@@ -352,8 +355,7 @@ export function bulkCloseOut(body: Record<string, unknown>) {
             state: 'done',
             canonicalStatus: 'done',
             targetCanonicalState: 'done',
-            mergeStatus: undefined,
-            labels: newLabels,
+                labels: newLabels,
           });
         } catch (e) {
           console.error('Failed to patch issue status:', e);

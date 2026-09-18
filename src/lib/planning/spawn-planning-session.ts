@@ -41,12 +41,6 @@ import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { ensureWorkspacePanDir, getWorkspacePanPaths, writeWorkspaceContext } from '../pan-dir/index.js';
 import { getIssueDraftPath } from '../pan-dir/drafts.js';
-import {
-  appendSessionEntrySync,
-  getIssueRecordPath,
-  getProjectConfigFromWorkspacePath,
-  resolveProjectForIssue,
-} from '../pan-dir/record.js';
 import { claudeGlobalContextFile, workspaceContextFile } from '../context-layers/layers.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
 import {
@@ -300,13 +294,13 @@ ${effort === 'high'
 
 ` : '';
 
-  // Canonical PRD reference: the draft lives at drafts/<issue-lower>.md on
-  // overdeck-state (through the draft write door). Reference it — never
-  // inline it; the role instructions tell the agent to read it.
+  // Canonical PRD reference: the draft lives at `.pan/drafts/<issue-lower>.md`
+  // in the project's plan home. Reference it — never inline it; the role
+  // instructions tell the agent to read it.
   const prdPath = projectConfig ? getIssueDraftPath(projectConfig.path, issue.identifier) : null;
   const prdExists = prdPath !== null && existsSync(prdPath);
   const prdReferences = prdExists
-    ? `,\n      { "uri": "${prdPath}", "label": "PRD draft (drafts/${issueLower}.md on overdeck-state)", "type": "prd" }`
+    ? `,\n      { "uri": "${prdPath}", "label": "PRD draft (.pan/drafts/${issueLower}.md)", "type": "prd" }`
     : '';
   const prdDraftLine = prdExists
     ? `- **PRD draft:** ${prdPath}\n`
@@ -563,15 +557,6 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true, probe === true, memoryContext, effectiveHarness);
     }
 
-    // Capture planning prompt in per-issue record (PAN-1919: replaces workspace continue.json).
-    const recordProject = resolveProjectForIssue(issue.identifier) ?? getProjectConfigFromWorkspacePath(workspacePath);
-    appendSessionEntrySync(recordProject, issue.identifier, {
-      reason: 'planning',
-      content: planningPrompt,
-      note: `Planning session started for ${issue.identifier}: ${issue.title}`,
-      timestamp: new Date().toISOString(),
-    });
-
     await writeFeatureContext(workspacePath, issue);
 
     // PAN-1048: emit 'claude --agent roles/plan.md --name <sessionName>'.
@@ -608,8 +593,11 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       : await getProviderExportsForModel(planningModel, effectiveHarness);
 
     // ── Write launcher script ──────────────────────────────────────────────
-    const recordFilePath = getIssueRecordPath(recordProject, issue.identifier);
-    const initMessage = `Please read the \`content\` field of the \`planning\` sessionHistory entry in ${recordFilePath} and begin the planning session for ${issue.identifier}: ${issue.title}`;
+    // PAN-3917: the planning prompt is a file next to the launcher, not a
+    // sessionHistory entry on a record. The agent is pointed straight at it.
+    const planningPromptFile = join(agentStateDir, 'planning-prompt.md');
+    await writeFile(planningPromptFile, planningPrompt);
+    const initMessage = `Please read ${planningPromptFile} and begin the planning session for ${issue.identifier}: ${issue.title}`;
     const promptFile = join(agentStateDir, 'init-prompt.txt');
     const launcherScript = join(agentStateDir, 'launcher.sh');
     await writeFile(promptFile, initMessage);

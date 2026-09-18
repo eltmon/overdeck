@@ -32,7 +32,6 @@ import {
   type DashboardRestartResult,
 } from '../../lib/platform-lifecycle.js';
 import { writeRestartStatus, type RestartPhase } from '../../lib/restart-status.js';
-import { agentRestartBlockReason } from '../../lib/deploy/agent-restart-gate.js';
 import { restartGateRequesterId, waitForRestartApproval } from '../../lib/restart-gate-client.js';
 import {
   refuseNonPrimaryDashboardCwd,
@@ -156,17 +155,9 @@ async function runReload(
 
   if (refuseNonPrimaryDashboardCwd(process.cwd(), 'reload')) return;
 
-  const restartInitiator = process.env.OVERDECK_AGENT_ID;
-  if (restartInitiator) {
-    const restartBlock = await agentRestartBlockReason({
-      initiator: restartInitiator,
-      force: options.force === true,
-    });
-    if (restartBlock) {
-      console.error(restartBlock);
-      process.exitCode = 1;
-      return;
-    }
+  // A restart is voluntary, so the operator gate below is the only thing that
+  // holds it. There is no deploy queue and no deploy window to consult.
+  if (process.env.OVERDECK_AGENT_ID) {
     console.log(chalk.yellow(
       '  This agent-issued restart will disconnect every live conversation and terminal until clients reconnect.',
     ));

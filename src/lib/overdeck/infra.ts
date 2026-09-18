@@ -20,12 +20,6 @@ import {
   type SqliteRow,
   type SqliteScalar,
 } from '../database/driver.js';
-import {
-  getIssueRecordPath,
-  readIssueRecordSync,
-  type PanIssueRecord,
-} from '../pan-dir/record.js';
-import { updateIssueRecord } from '../pan-dir/record-update.js';
 import type { ProjectConfig } from '../projects.js';
 import { packageRoot, getOverdeckHome } from '../paths.js';
 import { sessionExists as tmuxSessionExists, killSession as tmuxKillSession, getAgentSessions } from '../tmux.js';
@@ -517,9 +511,8 @@ export const EventBusLive = Layer.effect(
   }),
 );
 
+/** PAN-3917: reads plan artifacts. There is no per-issue record to write. */
 export interface RecordsServiceShape {
-  readonly writeIssue: (project: ProjectConfig, issueId: string, record: PanIssueRecord) => Effect.Effect<string>;
-  readonly readIssue: (project: ProjectConfig, issueId: string) => Effect.Effect<PanIssueRecord | null>;
   readonly readSpec: (planRef: string) => Effect.Effect<unknown>;
   readonly writeAgentIdentity: (issueId: string, opts: { harness: string; model: string }) => Effect.Effect<void>;
 }
@@ -529,11 +522,6 @@ export class Records extends Context.Service<Records, RecordsServiceShape>()('ov
 export const RecordsLive = Layer.succeed(
   Records,
   Records.of({
-    writeIssue: (project, issueId, record) => Effect.promise(async () => {
-      await updateIssueRecord(project, issueId, () => record);
-      return getIssueRecordPath(project, issueId);
-    }),
-    readIssue: (project, issueId) => Effect.sync(() => readIssueRecordSync(project, issueId)),
     readSpec: (planRef) =>
       Effect.sync(() => {
         const path = isAbsolute(planRef) ? planRef : join(packageRoot, planRef);

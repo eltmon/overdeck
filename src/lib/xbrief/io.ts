@@ -116,8 +116,25 @@ export function issueIdFromWorkspacePath(workspacePath: string): string | null {
   return match ? match[1].toUpperCase() : null;
 }
 
-/** Derive the project root from a workspace path. */
-function projectRootFromWorkspace(workspacePath: string): string {
+/**
+ * The checkout that OWNS this workspace's plan artifacts (PAN-3917 W9).
+ *
+ * Planning artifacts for an issue live in the issue workspace's own `.pan/`,
+ * on the feature branch, committed by the verb that wrote them. The workspace
+ * is a git worktree, so it is its own checkout; `resolvePlanHome` maps it to
+ * the `pan_records.repo` sub-repo inside the same worktree for polyrepo
+ * projects.
+ */
+function planCheckoutFromWorkspace(workspacePath: string): string {
+  return workspacePath;
+}
+
+/**
+ * The main checkout the workspace was cut from. Read-only fallback: a spec
+ * that has already merged lives in `<main>/.pan/specs/` and not in the
+ * workspace that produced it.
+ */
+function mainCheckoutFromWorkspace(workspacePath: string): string {
   return resolve(workspacePath, '..', '..');
 }
 
@@ -190,8 +207,9 @@ export function findWorkspaceDraftPlanSync(
 export function findPlanSync(workspacePath: string): string | null {
   const issueId = issueIdFromWorkspacePath(workspacePath);
   if (!issueId) return null;
-  const projectRoot = projectRootFromWorkspace(workspacePath);
-  const entry = findSpecByIssueSync(projectRoot, issueId);
+  const entry =
+    findSpecByIssueSync(planCheckoutFromWorkspace(workspacePath), issueId)
+    ?? findSpecByIssueSync(mainCheckoutFromWorkspace(workspacePath), issueId);
   return entry ? entry.path : findWorkspaceDraftPlanSync(workspacePath);
 }
 
@@ -288,7 +306,7 @@ export function applyItemStatuses(doc: XBriefDocument, overrides: Record<string,
 
 /** The plan home that owns this workspace's `.pan/` artifacts. */
 function planHomeForWorkspace(workspacePath: string): string {
-  return resolvePlanHome(projectRootFromWorkspace(workspacePath));
+  return resolvePlanHome(planCheckoutFromWorkspace(workspacePath));
 }
 
 function readItemStatusesSync(workspacePath: string): Record<string, string> | undefined {
@@ -605,11 +623,14 @@ export const findPlan = (
   Effect.gen(function* () {
     const issueId = issueIdFromWorkspacePath(workspacePath);
     if (!issueId) return null;
-    const projectRoot = projectRootFromWorkspace(workspacePath);
-    const entry = yield* Effect.tryPromise({
-      try: () => findSpecByIssueFromDisk(projectRoot, issueId),
-      catch: (cause) => new FsError({ path: projectRoot, operation: 'findSpecByIssue', cause }),
-    });
+    const lookIn = (root: string) =>
+      Effect.tryPromise({
+        try: () => findSpecByIssueFromDisk(root, issueId),
+        catch: (cause) => new FsError({ path: root, operation: 'findSpecByIssue', cause }),
+      });
+    const entry =
+      (yield* lookIn(planCheckoutFromWorkspace(workspacePath)))
+      ?? (yield* lookIn(mainCheckoutFromWorkspace(workspacePath)));
     return entry ? entry.path : yield* findWorkspaceDraftPlan(workspacePath);
   });
 

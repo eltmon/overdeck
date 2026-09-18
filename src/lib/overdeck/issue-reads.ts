@@ -12,14 +12,14 @@ import {
   sanitizeResourceAllocatedIssues,
 } from '../../dashboard/server/services/resource-discovery.js';
 import { getGitHubConfig } from '../../dashboard/server/services/tracker-config.js';
-import { spawnInspectAgent } from '../cloister/inspect-agent.js';
 import { extractPrefixSync, parseIssueIdSync } from '../issue-id.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { loadRemoteAgentState } from '../remote/remote-agents.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataStatic } from '../remote/workspace-metadata.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
-import { readIssueRecordSync } from '../pan-dir/record.js';
+import { readContinueState } from '../xbrief/continue-state.js';
+import { resolvePlanHome } from '../pan-dir/paths.js';
 import { findPrdAnywhereSync, readPrdContent } from '../prd-locations.js';
 
 function isGitHubIssue(issueId: string): {
@@ -130,7 +130,7 @@ export function getIssueTasks(id: string) {
 
     const doc = workspacePath ? readWorkspacePlanSync(workspacePath) : null;
     if (!doc) return jsonResponse({ error: `The xBRIEF for ${id} is missing or unreadable.` }, { status: 404 });
-    const record = projectPath ? readIssueRecordSync({ name: resolvedProject?.projectName ?? id, path: projectPath }, id) : null;
+    const items = workspacePath ? (readContinueState(resolvePlanHome(workspacePath), id)?.items ?? {}) : {};
     const blockers = new Map<string, string[]>();
     for (const edge of doc.plan.edges) if (edge.type === 'blocks') blockers.set(edge.to, [...(blockers.get(edge.to) ?? []), edge.from]);
     // The dashboard task views (TasksRail/TasksPanel) contract is
@@ -144,7 +144,9 @@ export function getIssueTasks(id: string) {
         : item.metadata?.difficulty
           ? [`difficulty:${item.metadata.difficulty}`]
           : [];
-      return { ...item, labels, blockedBy: blockers.get(item.id) ?? [], claim: record?.tasks?.claims[item.id] };
+      const state = items[item.id];
+      const claim = state?.claimedBy ? { agentId: state.claimedBy, claimedAt: state.claimedAt } : undefined;
+      return { ...item, labels, blockedBy: blockers.get(item.id) ?? [], claim };
     });
 
     // Suppress unused variable warning — remoteVmName available for callers if needed
@@ -156,7 +158,6 @@ export function getIssueTasks(id: string) {
       count: tasks.length,
       source: 'vbrief',
       isRemote: isRemoteWorkspace,
-      sequence: record?.tasks?.sequence ?? 0,
     });
   });
 }
@@ -182,60 +183,6 @@ export function getIssuePrd(id: string) {
       status: location.status,
       format: location.format,
     });
-  });
-}
-
-function isValidItemId(itemId: string): boolean {
-  return /^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(itemId);
-}
-
-export function inspectIssueTask(options: {
-  id: string;
-  itemId: string;
-  body: unknown;
-}) {
-  return Effect.gen(function* () {
-    const { id, itemId, body } = options;
-    if (!parseIssueIdSync(id)) {
-      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
-    }
-    if (!itemId.trim()) {
-      return jsonResponse({ error: 'Missing item ID' }, { status: 400 });
-    }
-    if (!isValidItemId(itemId)) {
-      return jsonResponse({ error: 'Invalid item ID' }, { status: 400 });
-    }
-
-    const project = resolveProjectFromIssueSync(id);
-    if (!project) {
-      return jsonResponse({ error: `Could not resolve project for ${id}` }, { status: 404 });
-    }
-
-    const issueLower = id.toLowerCase();
-    const workspace = join(project.projectPath, 'workspaces', `feature-${issueLower}`);
-    const workspaceExists = yield* Effect.promise(() => pathIsDirectory(workspace));
-    if (!workspaceExists) {
-      return jsonResponse({ error: `No workspace found for ${id}` }, { status: 404 });
-    }
-
-    const result = yield* spawnInspectAgent({
-      projectKey: project.projectKey,
-      projectPath: project.projectPath,
-      issueId: id,
-      itemId,
-      workspace,
-      branch: `feature/${issueLower}`,
-    }, { deep: (body as { deep?: unknown }).deep === true });
-
-    if (!result.success) {
-      return jsonResponse({ success: false, error: result.error ?? result.message }, { status: 500 });
-    }
-
-    if (result.skipped) {
-      return jsonResponse({ success: true, skipped: true, message: result.message, tmuxSession: result.tmuxSession });
-    }
-
-    return jsonResponse({ success: true, runId: result.runId, tmuxSession: result.tmuxSession });
   });
 }
 
@@ -269,3 +216,4 @@ export function getIssueResourceDetails(rawId: string) {
     return jsonResponse(details);
   });
 }
+export { deriveIssueState, deriveIssueAttention, readPullRequestFacts, branchIsAheadOfMain, type DerivedIssueState, type IssueAttention } from './derived-issue-state.js';

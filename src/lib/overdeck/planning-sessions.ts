@@ -21,7 +21,6 @@ import { isPlanningComplete, findPlan } from '../xbrief/io.js';
 import { extractPrefixSync } from '../issue-id.js';
 import { spawnPlanningSession, type PlanningIssue } from '../planning/spawn-planning-session.js';
 import { findProjectByTeamSync, getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
-import { updateIssueRecord } from '../pan-dir/record-update.js';
 import { requireModelOverrideSync } from '../model-validation.js';
 import { resolveGitHubIssueSync, resolveTrackerTypeSync } from '../tracker-utils.js';
 import { killSession, listSessionNames, sessionExists } from '../tmux.js';
@@ -194,30 +193,16 @@ export function startPlanningForIssue(options: {
     }
 
     // Role-scoped model selection (PAN-2997 flow): `workModel` targets the WORK
-    // agent only. It persists to the issue record — the staffing resolver
-    // ('issue-override' tier) picks it up for the post-planning auto-spawn and
-    // every later work spawn — while `model` keeps targeting the planning
-    // agent. A start that names a model for the work agent therefore leaves
-    // the planning default (the operator's Fable) untouched.
+    // agent only, `model` the planning agent. PAN-3917 removed the per-issue
+    // record this override persisted to, so the value is validated here and the
+    // work model is named explicitly on the spawn that needs it.
     const workModelRaw = (body as any).workModel;
     if (typeof workModelRaw === 'string' && workModelRaw.trim()) {
-      const staffingProject = (() => {
-        const resolved = resolveProjectFromIssueSync(id);
-        return resolved ? getProjectSync(resolved.projectKey) : null;
-      })();
-      if (!staffingProject) {
-        return jsonResponse({ error: `Issue project not found for ${id}` }, { status: 404 });
-      }
-      let normalizedWorkModel: string;
       try {
-        normalizedWorkModel = requireModelOverrideSync(workModelRaw.trim());
+        requireModelOverrideSync(workModelRaw.trim());
       } catch (err) {
         return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
       }
-      yield* Effect.promise(() =>
-        updateIssueRecord(staffingProject, id.toUpperCase(), (record) => { record.workModel = normalizedWorkModel; }),
-      );
-      console.log(`[start-planning] ${id} work agent model recorded: ${normalizedWorkModel} (planning agent uses the configured default)`);
     }
 
     console.log(`[start-planning] START for ${id}, workspaceLocation=${workspaceLocation}, shadow=${shadowMode}`);
@@ -789,19 +774,6 @@ export function restartFromPlan(options: {
       type: 'issue.statusChanged',
       timestamp: new Date().toISOString(),
       payload: { issueId: id, status: 'In Progress', canonicalStatus: 'in_progress' },
-    });
-    yield* eventStore.append({
-      type: 'pipeline.status_changed',
-      timestamp: new Date().toISOString(),
-      payload: {
-        issueId: id,
-        status: {
-          issueId: id,
-          reviewStatus: 'pending',
-          testStatus: 'pending',
-          readyForMerge: false,
-        },
-      },
     });
     try { getIssueDataService().patchIssue(id, { status: 'In Progress', canonicalStatus: 'in_progress' }); } catch { /* non-fatal */ }
 

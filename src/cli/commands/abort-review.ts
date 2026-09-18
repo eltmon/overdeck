@@ -1,8 +1,9 @@
 /**
  * pan review abort <id>
  *
- * Kill all running reviewer tmux sessions for an issue and reset reviewStatus
- * to 'pending'. Does NOT message the work agent — leaves the worker idle.
+ * Kill every running reviewer session for an issue. Does NOT message the work
+ * agent — it leaves the worker idle. Whether the issue is in review is read
+ * from the PR, so there is nothing to reset.
  */
 
 import { exitCli } from '../exit.js';

@@ -112,10 +112,7 @@ describe('runRelease', () => {
       { command: 'npm run smoke:api', timeoutMs: 1234 },
       { command: 'npm run smoke:frontend', timeoutMs: 1234 },
     ]);
-    expect(mocks.reviewUpdates.at(-1)).toMatchObject({
-      issueId: 'PAN-399',
-      update: { releaseStatus: 'passed' },
-    });
+    expect(result?.status).toBe('passed');
   });
 
   it('halts remaining components and marks a later smoke failure partial', async () => {
@@ -153,7 +150,7 @@ describe('runRelease', () => {
       ['worker', 'skipped'],
     ]);
     expect(commands).toEqual(['npm run smoke:api', 'npm run smoke:frontend']);
-    expect(mocks.reviewUpdates.at(-1)?.update.releaseStatus).toBe('partial');
+    expect(result?.status).toBe('partial');
   });
 
   it('executes rollback and marks the release rolled_back when rollback succeeds', async () => {
@@ -182,7 +179,7 @@ describe('runRelease', () => {
       status: 'rolled_back',
       rollbackStatus: 'rolled_back',
     });
-    expect(mocks.reviewUpdates.at(-1)?.update.releaseStatus).toBe('rolled_back');
+    expect(result?.status).toBe('rolled_back');
   });
 
   it('uses async command execution with explicit timeouts and no execSync path', async () => {

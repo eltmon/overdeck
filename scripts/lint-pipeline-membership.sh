@@ -54,7 +54,6 @@ fi
 
 require_reference src/dashboard/server/services/resource-discovery.ts 'readPipelineMembershipSnapshotsForProjects' 'resource discovery'
 require_reference src/dashboard/frontend/src/lib/pipeline-state.ts 'pipelineMembership' 'frontend pipeline state'
-require_reference src/cli/commands/pending.ts 'resolvePipelineMembership' 'pan pending'
 require_reference src/lib/reconstruct/enumerate-in-flight.ts 'resolvePipelineMembership' 'in-flight reconstruction'
 require_reference src/lib/cloister/flywheel.ts 'resolvePipelineMembership' 'flywheel'
 require_reference sync-sources/skills/pipeline-status/SKILL.md '/api/pipeline/membership' 'pipeline-status skill'
@@ -62,7 +61,6 @@ require_reference sync-sources/skills/pipeline-status/SKILL.md '/api/pipeline/me
 # Named legacy predicates from the six pre-PAN-1966 membership views.
 ban_pattern src/dashboard/server/services/resource-discovery.ts 'filter\(\(issue\) => !isTerminalTrackerState' 'resource discovery'
 ban_pattern src/dashboard/frontend/src/lib/pipeline-state.ts "stateType.*in_progress.*in_review" 'frontend pipeline state'
-ban_pattern src/cli/commands/pending.ts 'const memberIds = new Set\(Object\.values\(allStatuses\)' 'pan pending'
 ban_pattern src/lib/reconstruct/enumerate-in-flight.ts 'openIssueIds|FEATURE_DIR_RE' 'in-flight reconstruction'
 ban_pattern src/lib/cloister/flywheel.ts 'workspacesDir.*feature-' 'flywheel'
 ban_pattern sync-sources/skills/pipeline-status/SKILL.md "in_progress','in_review" 'pipeline-status skill'

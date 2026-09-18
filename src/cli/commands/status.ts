@@ -3,7 +3,6 @@ import { Effect } from 'effect';
 import { existsSync, readFileSync, statSync, readdirSync } from 'fs';
 import { join, basename } from 'path';
 import { listRunningAgentsSync, getAgentDir, type AgentState } from '../../lib/agents.js';
-import { isShadowed, getShadowState } from '../../lib/shadow-state.js';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { isNoResumeValueEnabled } from '../../lib/cloister/no-resume-mode.js';
 import { getTldrMetricsSync, getTldrDaemonServiceSync } from '../../lib/tldr-daemon.js';
@@ -169,15 +168,9 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     .filter((entry): entry is { issueId: string; stackHealth: NonNullable<typeof entry.stackHealth> } => Boolean(entry.stackHealth && !entry.stackHealth.healthy));
 
   if (options.json) {
-    // Add shadow mode info and optional context % to JSON output
     const agentsWithShadow = await Promise.all(agents.map(async agent => {
-      const shadowed = agent.issueId ? await Effect.runPromise(isShadowed(agent.issueId)) : false;
-      const shadowState = shadowed && agent.issueId ? await Effect.runPromise(getShadowState(agent.issueId)) : null;
       return {
         ...agent,
-        shadowMode: shadowed,
-        shadowStatus: shadowState?.shadowStatus,
-        trackerStatus: shadowState?.trackerStatus,
         stackHealth: agent.issueId ? stackHealthByIssue.get(issueKey(agent.issueId)) : undefined,
         gatingReason: formatGatingReason(agent, noResumeModeActive) || undefined,
         ...(options.context ? { contextPercent: readContextPercent(agent.id) } : {}),
@@ -212,10 +205,6 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     const startedAt = new Date(agent.startedAt);
     const duration = Math.floor((Date.now() - startedAt.getTime()) / 1000 / 60);
 
-    // Check shadow mode (only if issueId exists)
-    const shadowed = agent.issueId ? await Effect.runPromise(isShadowed(agent.issueId)) : false;
-    const shadowState = shadowed && agent.issueId ? await Effect.runPromise(getShadowState(agent.issueId)) : null;
-
     const gatingReason = formatGatingReason(agent, noResumeModeActive);
 
     console.log(`${chalk.cyan(agent.id)}`);
@@ -223,11 +212,6 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     console.log(`  Status:   ${statusColor(status)}`);
     if (gatingReason) {
       console.log(`  Gate:     ${chalk.yellow(gatingReason)}`);
-    }
-
-    if (shadowed && shadowState) {
-      const statusStr = `${shadowState.shadowStatus}${shadowState.trackerStatus !== shadowState.shadowStatus ? ` (tracker: ${shadowState.trackerStatus})` : ''}`;
-      console.log(`  Shadow:   ${chalk.cyan('👻')} ${statusStr}`);
     }
 
     if (options.context) {
@@ -269,15 +253,6 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     }
   }
 
-  // Show legend
-  const shadowChecks = await Promise.all(
-    agents.map(async agent => agent.issueId ? await Effect.runPromise(isShadowed(agent.issueId)) : false),
-  );
-  const anyShadowed = shadowChecks.some(Boolean);
-  if (anyShadowed) {
-    console.log(chalk.dim('👻 = Shadow mode (tracking status locally)'));
-    console.log('');
-  }
 }
 
 interface TldrIndexEntry {
