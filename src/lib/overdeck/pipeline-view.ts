@@ -229,6 +229,12 @@ export function listPipelineStatuses(): Record<string, ReviewStatus> {
   return Object.fromEntries(Object.entries(views).map(([id, view]) => [id, view.status]));
 }
 
+/** Bulk statuses restricted to `issueIds`, for readers that only display them. */
+export function listPipelineStatusesForIssues(issueIds: string[]): Record<string, ReviewStatus> {
+  const views = listPipelineViewsForIssues(issueIds);
+  return Object.fromEntries(Object.entries(views).map(([id, view]) => [id, view.status]));
+}
+
 /** The single-issue status without the owner, for readers that only display it. */
 export function getPipelineStatus(issueId: string): ReviewStatus | null {
   return getPipelineView(issueId)?.status ?? null;

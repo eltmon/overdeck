@@ -311,8 +311,8 @@ export async function reconcileClosedIssueAgents(): Promise<string[]> {
   let mergedIssueIds: string[] | null = devnetIssueIds ? [] : null;
   if (openDevnetIssueIds.length > 0) {
     try {
-      const { getReviewStatusesSync } = await import('../review-status.js');
-      const statuses = getReviewStatusesSync(openDevnetIssueIds);
+      const { listPipelineStatusesForIssues } = await import('../overdeck/pipeline-view.js');
+      const statuses = listPipelineStatusesForIssues(openDevnetIssueIds);
       mergedIssueIds = openDevnetIssueIds.filter(
         (issueId) => statuses[issueId]?.mergeStatus === 'merged',
       );

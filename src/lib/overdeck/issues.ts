@@ -4,7 +4,6 @@ import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
 import { Db, EventBus, Records } from './infra.js';
-import { getPipelineView as getPipelineViewSync, type PipelineView } from './pipeline-view.js';
 import type { ProjectConfig } from '../projects.js';
 import type { PanIssueRecord } from '../pan-dir/record.js';
 
@@ -24,23 +23,18 @@ export const overdeckIssues = sqliteTable('issues', {
 });
 
 /**
- * PAN-3903: the pipeline read door. Cloister patrols are plain sync/async code
- * and cannot take an Effect dependency, so the door itself lives in the leaf
- * module `./pipeline-view.js` (no `./infra.js` edge, so importing it from
- * `src/lib/cloister/` cannot create the ESM cycle Node rejects at boot). The
- * resolver re-exports it and wraps it below, so both surfaces answer from one
- * implementation.
+ * PAN-3903: the pipeline read door is `./pipeline-view.js`, deliberately NOT a
+ * method on this resolver and deliberately NOT re-exported here.
+ *
+ * The door has to answer a cloister patrol, which is plain sync code that
+ * cannot take an Effect dependency. Importing it from this module pulls
+ * `review-status.js` — and the `cloister/feedback-target.js` subgraph behind it
+ * — into every importer of `IssuesResolver`, and `overdeck/control-settings.js`
+ * already imports this file. That closes a cycle the circular-dependency guard
+ * rejects and that Node's strict ESM refuses at boot (Bun tolerates it, so a
+ * green typecheck proves nothing). Keeping the door a leaf module is what makes
+ * one implementation reachable from both the patrols and the dashboard.
  */
-export {
-  getPipelineView,
-  getPipelineStatus,
-  listPipelineViews,
-  listPipelineViewsForIssues,
-  listPipelineStatuses,
-  deriveInFlightOwner,
-  describeOwner,
-} from './pipeline-view.js';
-export type { PipelineView, PipelineOwner, PipelineOwnerActor } from './pipeline-view.js';
 
 export const IssueId = Schema.String.pipe(Schema.brand('IssueId'));
 export type IssueId = typeof IssueId.Type;
@@ -205,8 +199,6 @@ export interface IssuesResolverServiceShape {
   readonly get: (id: IssueId) => Effect.Effect<Issue, IssueNotFound>;
   readonly list: (filter: IssueFilter) => Effect.Effect<ReadonlyArray<Issue>>;
   readonly getPlan: (id: IssueId) => Effect.Effect<unknown, IssueNotFound>;
-  /** PAN-3903: canonical pipeline state plus the in-flight transition owner. */
-  readonly getPipelineView: (id: IssueId) => Effect.Effect<PipelineView | null>;
 }
 
 export class IssuesResolver extends Context.Service<IssuesResolver, IssuesResolverServiceShape>()(
@@ -249,9 +241,7 @@ export const IssuesResolverLive = Layer.effect(
         return issue.planRef ? yield* records.readSpec(issue.planRef) : null;
       });
 
-    const getPipelineView = (id: IssueId) => Effect.sync(() => getPipelineViewSync(id));
-
-    return IssuesResolver.of({ get, list, getPlan, getPipelineView });
+    return IssuesResolver.of({ get, list, getPlan });
   }),
 );
 

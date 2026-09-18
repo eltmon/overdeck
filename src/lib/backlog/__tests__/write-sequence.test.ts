@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 vi.mock('../../pan-dir/auto-commit.js', () => ({ queueAutoCommit: vi.fn() }));
-vi.mock('../../review-status.js', () => ({ getReviewStatusSync: vi.fn().mockReturnValue(null) 
+vi.mock('../../review-status.js', () => ({ getReviewStatusSync: vi.fn().mockReturnValue(null),
   // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
   getReviewStatusesSync: () => ({}),
 }));
