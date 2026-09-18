@@ -1,17 +1,24 @@
 {
   "issueId": "PAN-3887",
   "schemaVersion": 2,
+  "feedback": [],
   "created": "2026-09-18T02:26:58.976Z",
-  "updated": "2026-09-18T04:28:08.227Z",
+  "updated": "2026-09-18T06:58:34.358Z",
   "pipeline": {
     "issueId": "PAN-3887",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T04:28:08.208Z",
     "closedOut": true,
     "closedOutAt": "2026-09-18T04:28:08.208Z",
-    "mergeStatus": "merged"
+    "updatedAt": "2026-09-18T06:58:34.305Z",
+    "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3887 after its harness exited before push.",
+    "strikeReadyHead": "650df022f95202dfc858082c64ada7e897979326",
+    "strikeReadyAt": "2026-09-18T06:58:34.304Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": []
   },
   "closeOut": {
     "usage": {
