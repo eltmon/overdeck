@@ -1,25 +1,40 @@
 {
   "issueId": "PAN-3740",
   "schemaVersion": 2,
-  "feedback": [],
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-09-18T07:04Z] merge-agent → NEEDS-YOU — seq 1",
+      "timestamp": "2026-09-18T07:04:43.272Z"
+    }
+  ],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "merge-agent",
+      "outcome": "needs-you",
+      "timestamp": "2026-09-18T07:04:43Z",
+      "markdownBody": "## Strike landing needs operator attention\n\nStrike landing for PAN-3740 needs operator attention after 1 cycle(s).\n1. strike a8ab83ab4e430ee169781a787b9f94db85fe4f80; main d06a4cb889d45281dbbb2f22cb591354f5909a4a; transport-failed: Strike merge request failed: fetch failed\n2. strike a8ab83ab4e430ee169781a787b9f94db85fe4f80; main 38c9da1ce2a06531479edc27541c505c577f7e56; failed: Rebase conflicts in: packages/contracts/src/composer-commands.generated.ts; Work agent strike-pan-3740 could not be prepared for the rebase: agent is paused (needs-you: idle-alive — no observable progress across 40 pokes (idle-alive escalation)); run pan unpause before merging; recovery not delivered: agent is paused (needs-you: idle-alive — no observable progress across 40 pokes (idle-alive escalation))"
+    }
+  ],
   "created": "2026-08-15T13:56:03.035Z",
-  "updated": "2026-09-18T07:04:41.645Z",
+  "updated": "2026-09-18T07:04:43.301Z",
   "pipeline": {
     "issueId": "PAN-3740",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "failed",
-    "mergeStatus": "merging",
-    "mergeStep": "rebasing",
+    "mergeStatus": "failed",
+    "mergeStep": "preparing-work-agent",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T07:04:40.589Z",
+    "updatedAt": "2026-09-18T07:04:43.255Z",
     "verificationNotes": "Branch has no implementation — only pipeline artifacts (.pan/xBRIEF task state) changed across workspace repos vs panopticon-cli:origin/main. The work agent produced no code (likely a kickoff-delivery zombie — PAN-2179).",
-    "mergeNotes": "Rebase conflicts in: packages/contracts/src/composer-commands.generated.ts; Work agent strike-pan-3740 could not be prepared for the rebase: agent is paused (needs-you: idle-alive — no observable progress across 40 pokes (idle-alive escalation)); run pan unpause before merging",
+    "mergeNotes": "Rebase conflicts in: packages/contracts/src/composer-commands.generated.ts; Work agent strike-pan-3740 could not be prepared for the rebase: agent is paused (needs-you: idle-alive — no observable progress across 40 pokes (idle-alive escalation)); run pan unpause before merging; recovery not delivered: agent is paused (needs-you: idle-alive — no observable progress across 40 pokes (idle-alive escalation))",
     "strikeReadyHead": "a8ab83ab4e430ee169781a787b9f94db85fe4f80",
     "strikeReadyAt": "2026-08-16T10:01:22.951Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
+    "strikeLandingState": "needs_you",
+    "strikeRecoveryCount": 1,
     "strikeTransportRetryCount": 1,
     "strikeNextAttemptAt": "2026-08-16T10:09:37.338Z",
     "strikeLandingAttempts": [
@@ -29,6 +44,13 @@
         "mainHead": "d06a4cb889d45281dbbb2f22cb591354f5909a4a",
         "outcome": "transport-failed",
         "detail": "Strike merge request failed: fetch failed"
+      },
+      {
+        "timestamp": "2026-09-18T07:04:43.252Z",
+        "strikeHead": "a8ab83ab4e430ee169781a787b9f94db85fe4f80",
+        "mainHead": "38c9da1ce2a06531479edc27541c505c577f7e56",
+        "outcome": "failed",
+        "detail": "Rebase conflicts in: packages/contracts/src/composer-commands.generated.ts; Work agent strike-pan-3740 could not be prepared for the rebase: agent is paused (needs-you: idle-alive — no observable progress across 40 pokes (idle-alive escalation)); run pan unpause before merging; recovery not delivered: agent is paused (needs-you: idle-alive — no observable progress across 40 pokes (idle-alive escalation))"
       }
     ]
   },
@@ -80,7 +102,7 @@
       },
       "costAtCloseOut": {
         "usd": 21.788638,
-        "pricingAsOf": "2026-09-18T07:04:41.638Z"
+        "pricingAsOf": "2026-09-18T07:04:43.284Z"
       }
     },
     "merges": [],
