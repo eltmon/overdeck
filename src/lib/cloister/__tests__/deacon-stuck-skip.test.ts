@@ -3,7 +3,7 @@ import { Effect } from 'effect';
  * PAN-653: Deacon must not poke or respawn workspaces marked stuck.
  *
  * When review_status.stuck=true for a workspace, patrolWorkAgentResolutions
- * and checkStuckWorkAgents must skip all poke/respawn actions for that issueId.
+ * must skip all poke/respawn actions for that issueId.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 

@@ -96,7 +96,6 @@ const PENDING_SOAK_DELETION = new Set([
   'checkStalledReviewParents',
   'checkStuckAgentRemediation',
   'checkStuckReviewing',
-  'checkStuckWorkAgents',
   'cleanupOrphanReviewerSessions',
   'cleanupOrphanedInspectSessions',
   'cleanupOrphanedPlanningSessions',
@@ -141,6 +140,10 @@ const DELETED_PATROLS: Record<string, { file: string; namedIndividually: boolean
   cleanupAbandonedFeedback: { file: 'unit/lib/agents/delivery-no-loss-audit.test.ts', namedIndividually: false },
   reconcileTestStatusFromGreenCi: { file: 'unit/lib/cloister/verdict-gate-no-loss-audit.test.ts', namedIndividually: true },
   checkVerificationReviewContradiction: { file: 'unit/lib/cloister/verdict-gate-no-loss-audit.test.ts', namedIndividually: true },
+  // PAN-3894 (W8): no-op stub since PAN-800 — the body was `return []`, so it
+  // repaired nothing and needed no soak. Stuck detection lives in
+  // checkStuckAgentRemediation (stuck-remediation.ts).
+  checkStuckWorkAgents: { file: 'unit/lib/cloister/stuck-remediation-oracle.test.ts', namedIndividually: false },
 };
 
 function registeredBudgetedNames(): string[] {

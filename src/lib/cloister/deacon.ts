@@ -783,38 +783,6 @@ export async function checkAndSuspendIdleAgents(): Promise<string[]> {
 // the single source of truth now; capture-pane activity detection is gone.
 // isAgentActiveInTmux had no remaining callers at deletion time.
 
-// ============================================================================
-// Stuck Work Agent Detection
-// ============================================================================
-
-/**
- * checkStuckWorkAgents gutted in PAN-800 Phase 5.
- *
- * The old implementation `capturePane`d every work agent and ran a
- * `parseThinkingDuration` regex over the tmux status line to decide an agent
- * was "stuck thinking", then escalated Escape → Ctrl-C → kill/respawn. That is
- * exactly the capture-pane scraping PAN-798/PAN-800 eliminate, and it was
- * brittle: it only recognised the "Thinking"/"Fermenting" spinner words (not
- * "Quantumizing" et al.) and could not parse hour-scale durations.
- *
- * Stuck detection is now hook-based and lives in `checkStuckAgentRemediation`
- * (stuck-remediation.ts), which reads the runtime mirror via
- * `isIdle` + `getAgentRuntimeStateSync` and escalates
- * nudge → resume → troubled. PAN-1586 made `isIdle` treat a stale
- * 'active' mirror (Stop hook never fired) as idle, so a genuinely-stalled agent
- * — regardless of spinner word or duration — is now caught there.
- *
- * The "exclude-from-context" dialog auto-dismiss that also lived here was a
- * pane-scrape active intervention; like auto-suspend and lazy-detection it is
- * out of scope for PAN-800 and tracked under PAN-188. The notification hook
- * already surfaces that dialog as `waiting-on-human`.
- *
- * Retained as a no-op stub so the patrol-cycle wiring stays stable.
- */
-export async function checkStuckWorkAgents(): Promise<string[]> {
-  return [];
-}
-
 export {
   checkApiErrorAgents,
   CONTEXT_PROACTIVE_COMPACT_HIGH_WATER_PERCENT,
@@ -2978,12 +2946,6 @@ export async function runPatrol(): Promise<PatrolResult> {
 
   // Lazy agent correction DISABLED — sends messages to agents which costs
   // API credits. Human operator can check lazy behavior via dashboard.
-
-  // Stuck work agent recovery still runs — it only intervenes after 10 minutes
-  // of no tool use, escalating to Escape/Ctrl-C/respawn (not paid messages).
-  const stuckActions = await runBudgetedPatrol('checkStuckWorkAgents', () => checkStuckWorkAgents());
-  actions.push(...stuckActions);
-  for (const a of stuckActions) addLog('action', a, state.patrolCycle);
 
   const apiErrorActions = await checkApiErrorAgents();
   actions.push(...apiErrorActions);

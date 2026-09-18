@@ -6,7 +6,6 @@ The Deacon is Overdeck's health monitor, running as part of the dashboard server
 
 | Detection | What it catches | Threshold | Action | Max attempts |
 |-----------|----------------|-----------|--------|-------------|
-| **Extended Thinking** | Agent stuck in Claude's thinking loop | 10 min | Esc → Ctrl+C → Kill+Respawn | 3 then kill |
 | **Dead-End Agent** | Review blocked or tests failed, agent idle | 5 min idle | Nudge with feedback + requeue | 7 requeues |
 | **First-Completion** | Agent idle with commits but never called `pan done` | 10 min idle | Nudge to call done | Every 15 min |
 | **Resolution Patrol** | Agent evidence shows done/stuck (from enrichment) | 2+ nudges (done) or 3+ (stuck) | Auto-complete or poke | Per resolution |
@@ -24,15 +23,6 @@ The Deacon is Overdeck's health monitor, running as part of the dashboard server
 | **Pending Planning Promotion** | `complete-planning` did not produce the canonical spec | 120s marker grace; 5min markerless fallback | Re-run `complete-planning`; trip needs-you after 5 failures | Retries continue once per patrol |
 
 ## Detection Details
-
-### Extended Thinking (`checkStuckWorkAgents`)
-- **File:** `src/lib/cloister/deacon.ts:946-1051`
-- **How:** Parses tmux output for `Thinking… (Xm Ys)` pattern
-- **Escalation:**
-  1. Send Escape key to cancel thinking
-  2. Send Ctrl+C to interrupt
-  3. Kill tmux session and respawn via `launcher.sh`
-- **Cooldown:** 5 minutes between recovery attempts
 
 ### Dead-End Agent (`checkDeadEndAgents`)
 - **File:** `src/lib/cloister/deacon.ts:1652-1744`
@@ -308,7 +298,6 @@ set while also stuck or healthy.
 Every patrol path that already respected `status.stuck` now also short-circuits
 on `status.deaconIgnored`:
 
-- `checkStuckWorkAgents` — skip extended-thinking recovery
 - Orphaned review re-dispatch loop in `patrolOrphanedReviews` — `if (status.deaconIgnored) continue;`
 - `patrolWorkAgentResolutions` — skip auto-complete / poke
 
