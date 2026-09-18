@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-09-16T18:03:23.625Z",
-  "updated": "2026-09-18T07:41:41.522Z",
+  "updated": "2026-09-18T07:46:19.567Z",
   "pipeline": {
     "issueId": "PAN-3839",
     "reviewStatus": "pending",
@@ -12,10 +12,10 @@
     "readyForMerge": false,
     "closedOut": true,
     "closedOutAt": "2026-09-18T06:29:43.382Z",
-    "updatedAt": "2026-09-18T07:41:41.507Z",
+    "updatedAt": "2026-09-18T07:46:19.548Z",
     "mergeNotes": "Automatically salvaged completed strike branch strike/pan-3839 after its harness exited before push.",
     "strikeReadyHead": "ff4d1232f54096e2b671149f7f647ea890ce6121",
-    "strikeReadyAt": "2026-09-18T07:41:41.506Z",
+    "strikeReadyAt": "2026-09-18T07:46:19.547Z",
     "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
     "strikeLandingAttempts": []
