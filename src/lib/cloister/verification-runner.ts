@@ -13,7 +13,7 @@ import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
-import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
+import { markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
 import { MERGED_VERIFICATION_REASON } from '../review-status-reconcile.js';
 import { runQualityGates, DEFAULT_GATES } from './validation.js';
 import {
@@ -46,6 +46,7 @@ import { checkIncompletePlanItemsPromise } from '../work/done-preflight.js';
 import { capturePipelineStageForIssue } from '../telemetry/pipeline.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
 import { parseCompositeSnapshot, type HeadAnchor } from '../git-utils.js';
+import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 
 const execAsync = promisify(exec);
 
@@ -57,7 +58,7 @@ export type { VerificationRunnerOptions, VerificationRunnerOutcome, WorkspaceInf
 function skipMergedVerification(
   issueId: string,
   logPrefix: string,
-  status = getReviewStatusSync(issueId),
+  status = getPipelineStatus(issueId),
 ): VerificationRunnerOutcome | null {
   if (status?.mergeStatus !== 'merged') return null;
 
@@ -85,7 +86,7 @@ function isFinalVerificationAttempt(cycleCount: number): boolean {
 }
 
 function isRepeatFailedCheck(
-  status: ReturnType<typeof getReviewStatusSync> | null | undefined,
+  status: ReturnType<typeof getPipelineStatus> | null | undefined,
   failedCheck: string,
 ): boolean {
   return (
@@ -95,7 +96,7 @@ function isRepeatFailedCheck(
 }
 
 function shouldEscalateVerificationFailure(
-  status: ReturnType<typeof getReviewStatusSync> | null | undefined,
+  status: ReturnType<typeof getPipelineStatus> | null | undefined,
   failedCheck: string,
   cycleCount: number,
 ): boolean {
@@ -108,7 +109,7 @@ function setStateDerivedVerificationFailure(
   failedCheck: string,
   summary: string,
   cycleCount: number,
-  currentStatus: ReturnType<typeof getReviewStatusSync> | null | undefined,
+  currentStatus: ReturnType<typeof getPipelineStatus> | null | undefined,
 ): void {
   setReviewStatusSync(issueId, {
     verificationStatus: 'failed',
@@ -423,7 +424,7 @@ async function runVerificationForIssuePromise(
   logPrefix: string,
   options: VerificationRunnerOptions = {},
 ): Promise<VerificationRunnerOutcome> {
-  const currentStatus = getReviewStatusSync(issueId);
+  const currentStatus = getPipelineStatus(issueId);
   const mergedOutcome = skipMergedVerification(issueId, logPrefix, currentStatus);
   if (mergedOutcome) return mergedOutcome;
 
@@ -983,7 +984,7 @@ async function runVerificationForIssuePromise(
     // passing undefined never unpauses). If the unpause fails, keep the
     // consistent paused+stuck pair; then clear the marker with one retry so a
     // transient write failure cannot strand the pair unpaused+stuck.
-    const stuckRow = getReviewStatusSync(issueId);
+    const stuckRow = getPipelineStatus(issueId);
     if (stuckRow?.stuck && stuckRow.stuckReason === 'verification_stuck') {
       const stuckAgentId = `agent-${issueId.toLowerCase()}`;
       const agentState = getAgentStateSync(stuckAgentId);

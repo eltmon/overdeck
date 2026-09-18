@@ -71,6 +71,9 @@ vi.mock('../../../lib/review-status.js', () => ({
   getReviewStatusSync: vi.fn(() => undefined),
   setReviewStatus: vi.fn(),
   setReviewStatusSync: vi.fn(),
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../lib/stashes.js', () => ({

@@ -4,18 +4,14 @@ import { Effect } from 'effect';
 import { getAgentStateSync } from '../agents.js';
 import { getMergeSetSync, type MergeSet } from '../merge-set.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import {
-  loadReviewStatuses,
-  reviewGatesPassedSync,
-  setReviewStatusSync,
-  type ReviewStatus,
-} from '../review-status.js';
+import { reviewGatesPassedSync, setReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import {
   observeForgeMergeState,
   type ForgeMergeObservationResult,
 } from './merge-completeness.js';
 import { recordWouldFire } from './patrol-would-fire.js';
+import { listPipelineStatuses } from '../overdeck/pipeline-view.js';
 
 const execFileAsync = promisify(execFile);
 export const STUCK_MERGING_MS = 30 * 60 * 1000;
@@ -169,7 +165,7 @@ export async function reconcileStuckMergingStatesWithDeps(deps: StuckMergingDeps
 export async function reconcileStuckMergingStates(options: { shadow?: boolean } = {}): Promise<string[]> {
   return reconcileStuckMergingStatesWithDeps({
     now: () => Date.now(),
-    loadStatuses: loadReviewStatuses,
+    loadStatuses: listPipelineStatuses,
     resolveProject: resolveProjectFromIssueSync,
     getMergeSet: getMergeSetSync,
     resolveGitHubIssue: resolveGitHubIssueSync,

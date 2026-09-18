@@ -76,6 +76,9 @@ vi.mock('../../persistent-logger.js', () => ({
 
 vi.mock('../../review-status.js', () => ({
   getReviewStatusSync: vi.fn((issueId: string) => mocks.reviewStatuses.get(issueId) ?? null),
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../overdeck/control-settings.js', () => ({

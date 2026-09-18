@@ -37,7 +37,7 @@ const status = {
 
 function createDeps(overrides: CheckDeadEndAgentsDeps = {}): CheckDeadEndAgentsDeps {
   return {
-    loadReviewStatuses: vi.fn(() => ({ [issueId]: status as any })),
+    listPipelineStatuses: vi.fn(() => ({ [issueId]: status as any })),
     sessionExistsSync: vi.fn(() => true),
     getAgentStateSync: vi.fn(() => ({
       id: 'agent-pan-3846',
@@ -87,7 +87,7 @@ describe('checkDeadEndAgents idle nudge delivery (PAN-3846 W5)', () => {
     // A distinct issue key avoids the module-level dead-end cooldown.
     const other = { ...status, issueId: 'PAN-3847', updatedAt: status.updatedAt }
     const deps = createDeps({
-      loadReviewStatuses: vi.fn(() => ({ 'PAN-3847': other as any })),
+      listPipelineStatuses: vi.fn(() => ({ 'PAN-3847': other as any })),
     })
 
     const actions = await checkDeadEndAgents(deps)

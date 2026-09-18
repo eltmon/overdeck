@@ -57,6 +57,9 @@ vi.mock('../dead-end-trip.js', () => ({
 
 vi.mock('../../review-status.js', () => ({
   getReviewStatusSync: reviewStatusStore.getReviewStatusSync,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../github-app.js', async (importOriginal) => ({

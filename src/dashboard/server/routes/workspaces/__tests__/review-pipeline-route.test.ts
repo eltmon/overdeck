@@ -45,6 +45,9 @@ vi.mock('../../../../../lib/review-status.js', () => ({
   getReviewStatusSync: routeMocks.getReviewStatusSync,
   clearFeedbackDeliveryStuck: routeMocks.clearFeedbackDeliveryStuck,
   registerReviewVerdictFeedbackDelivery: routeMocks.registerReviewVerdictFeedbackDelivery,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../../../lib/cloister/conflict-gate.js', () => ({

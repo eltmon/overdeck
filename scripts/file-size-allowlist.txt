@@ -104,3 +104,7 @@
 1071 src/lib/pan-dir/auto-commit.ts # PAN-3848
 1106 src/cli/commands/doctor.ts # PAN-3850
 1139 src/cli/commands/doctor.ts # PAN-3850
+1076 src/lib/cloister/deacon-merge.ts # PAN-3903
+1077 src/lib/cloister/deacon-review-status.ts # PAN-3903
+1398 src/lib/cloister/merge-agent.ts # PAN-3903
+1089 src/lib/cloister/verification-runner.ts # PAN-3903

@@ -17,7 +17,8 @@ import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { getCloisterEventStore } from './event-store-provider.js';
-import { getReviewStatusSync, setReviewStatusSync, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
+import { setReviewStatusSync, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
+import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -127,7 +128,7 @@ async function classifyEvidenceAgainstAnchor(
  * {landed: false; reason} if the verdict was rejected (stale evidence only).
  */
 export async function recordReviewVerdict(issueId: string, input: VerdictInput): Promise<VerdictOutcome> {
-  const status = getReviewStatusSync(issueId);
+  const status = getPipelineStatus(issueId);
 
   // A terminal verdict without an evidence anchor cannot be compared with anything later;
   // refuse it so the caller re-snapshots instead of landing a verdict that carries a stale anchor.

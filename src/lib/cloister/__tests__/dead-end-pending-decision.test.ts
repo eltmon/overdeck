@@ -15,7 +15,7 @@ const status = {
 
 function createDeps(overrides: CheckDeadEndAgentsDeps = {}): CheckDeadEndAgentsDeps {
   return {
-    loadReviewStatuses: vi.fn(() => ({ [issueId]: status as any })),
+    listPipelineStatuses: vi.fn(() => ({ [issueId]: status as any })),
     sessionExistsSync: vi.fn(() => false),
     getAgentStateSync: vi.fn(() => ({
       id: 'agent-pan-3228',

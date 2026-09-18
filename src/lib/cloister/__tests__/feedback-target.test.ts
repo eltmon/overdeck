@@ -74,6 +74,9 @@ vi.mock('../../review-status.js', () => ({
   setReviewStatusSync: reviewStatus.setReviewStatusSync,
   getReviewStatusSync: reviewStatus.getReviewStatusSync,
   FEEDBACK_DELIVERY_STUCK_REASON: 'feedback_delivery_needs_you',
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';

@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockGetAll = vi.fn();
-vi.mock('../../overdeck/review-status-sync.js', () => ({
-  getAllReviewStatusesFromDb: () => mockGetAll(),
+// PAN-3903: merge-blockers reads through the pipeline read door, which resolves
+// statuses from review-status.js rather than the raw SQLite module.
+vi.mock('../../overdeck/pipeline-view.js', () => ({
+  listPipelineStatuses: () => mockGetAll(),
 }));
 
 import { getMergeBlockersPayload } from '../merge-blockers.js';

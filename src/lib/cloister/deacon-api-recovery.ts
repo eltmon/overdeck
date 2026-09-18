@@ -5,7 +5,7 @@ import { getAgentRuntimeStateSync, getAgentStateSync, saveAgentRuntimeState, sav
 import { applyCodexAuthBurnFlag, isCodexAuthRouted, paneShowsCodexAuthBurn } from '../codex-auth.js';
 import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { sessionFilePath } from '../paths.js';
-import { getReviewStatusSync } from '../review-status.js';
+import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 import { capturePane, listSessionNames, sendKeys } from '../tmux.js';
 import { handleKnownAgentModal, paneShowsModelSwitch } from './modal-detector.js';
 import {
@@ -299,7 +299,7 @@ export async function checkApiErrorAgents(): Promise<string[]> {
         : null;
       const overflowBlocked = (() => {
         if (!issueId) return false;
-        const st = getReviewStatusSync(issueId);
+        const st = getPipelineStatus(issueId);
         return Boolean(st?.stuck || st?.deaconIgnored);
       })();
       const ov = contextOverflowRecoveryState.get(sessionName);
@@ -333,7 +333,7 @@ export async function checkApiErrorAgents(): Promise<string[]> {
       // resumeAgent), so a recovered agent re-enters the normal flow. deacon-
       // ignored issues are still left alone.
       {
-        const stuckStatus = issueId ? getReviewStatusSync(issueId) : null;
+        const stuckStatus = issueId ? getPipelineStatus(issueId) : null;
         const isStuckOverflow = Boolean(
           stuckStatus?.stuck && stuckStatus.stuckReason === 'context_overflow' && !stuckStatus.deaconIgnored,
         );
@@ -530,7 +530,7 @@ export async function checkApiErrorAgents(): Promise<string[]> {
     // For work agents, respect stuck/deacon-ignored flags
     if (sessionName.startsWith('agent-')) {
       const agentIssueId = (sessionName.replace('agent-', '')).toUpperCase();
-      const agentReviewStatus = getReviewStatusSync(agentIssueId);
+      const agentReviewStatus = getPipelineStatus(agentIssueId);
       if (agentReviewStatus?.stuck || agentReviewStatus?.deaconIgnored) {
         continue;
       }

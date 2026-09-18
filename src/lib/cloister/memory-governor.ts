@@ -464,13 +464,13 @@ export async function shed(): Promise<ShedResult> {
   // before touching any work agent. This shed — plus a reboot — is the ONLY
   // sanctioned way a warm session dies (see docs/ROLES.md warm-by-default policy).
   try {
-    const { loadReviewStatuses } = await import('../review-status.js');
+    const { listPipelineStatuses } = await import('../overdeck/pipeline-view.js');
     const { listSessionNames, killSession } = await import('../tmux.js');
     const { selectNonMergedTerminalAdvancingSessions } = await import('./reap-terminal-sessions.js');
     const { markAdvancingSessionStopped } = await import('./advancing-selfheal.js');
     const { Effect } = await import('effect');
     const aliveSessions = await Effect.runPromise(listSessionNames());
-    const warmIdle = selectNonMergedTerminalAdvancingSessions(loadReviewStatuses(), [...aliveSessions]);
+    const warmIdle = selectNonMergedTerminalAdvancingSessions(listPipelineStatuses(), [...aliveSessions]);
     for (const session of warmIdle) {
       if (verdict.band !== 'hard') break;
       try {

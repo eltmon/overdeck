@@ -22,6 +22,13 @@ vi.mock('node:child_process', async (importOriginal) => {
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
   loadReviewStatuses: (...args: Parameters<typeof mockLoadReviewStatuses>) => mockLoadReviewStatuses(...args),
+  // PAN-3903: cloister now reads through the pipeline read door, which
+  // reconciles the durable journal per issue on top of this cache map. The
+  // door's single-issue and bulk reads must answer from the same fixture.
+  getReviewStatusSync: (issueId: string) => mockLoadReviewStatuses()?.[issueId] ?? null,
+  getReviewStatusesSync: (issueIds: string[]) => Object.fromEntries(
+    issueIds.map((id) => [id, mockLoadReviewStatuses()?.[id]]).filter(([, value]) => Boolean(value)),
+  ),
   setReviewStatusSync: (...args: Parameters<typeof mockSetReviewStatusSync>) => mockSetReviewStatusSync(...args),
   reviewGatesPassedSync: vi.fn(() => false),
 }));

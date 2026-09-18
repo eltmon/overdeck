@@ -10,6 +10,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../review-status.js', () => ({
   loadReviewStatuses: mocks.loadReviewStatuses,
   setReviewStatusSync: mocks.setReviewStatusSync,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 vi.mock('../../agents.js', () => ({
   getAgentRuntimeStateSync: vi.fn(),

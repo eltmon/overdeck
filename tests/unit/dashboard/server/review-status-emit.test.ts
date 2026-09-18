@@ -13,6 +13,9 @@ vi.mock('../../../../src/lib/review-status-enrichment.js', () => ({
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: mockGetReviewStatusSync,
+
+  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
+  getReviewStatusesSync: () => ({}),
 }));
 
 import { emitReviewStatusChanged } from '../../../../src/dashboard/server/review-status-emit.js';

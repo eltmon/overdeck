@@ -1,7 +1,7 @@
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { Effect } from 'effect';
-import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync, type ReviewStatus } from '../review-status.js';
+import { setReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { isIssueClosed } from './issue-closed.js';
 import {
@@ -11,6 +11,7 @@ import {
 } from './concurrency.js';
 import { ciRetryMap } from './deacon-merge.js';
 import { tryYieldForAdvancingDispatch } from './preemption.js';
+import { getPipelineStatus, listPipelineStatuses } from '../overdeck/pipeline-view.js';
 
 const BLOCKED_REVIEW_MISSING_ANCHOR_LOG_INTERVAL_MS = 60 * 60 * 1000;
 const blockedReviewMissingAnchorLogs = new Map<string, number>();
@@ -37,7 +38,7 @@ export async function checkPostReviewCommits(): Promise<string[]> {
   const actions: string[] = [];
 
   try {
-    const statuses = loadReviewStatuses();
+    const statuses = listPipelineStatuses();
     const { resolveProjectFromIssueSync } = await import('../projects.js');
 
     for (const [issueId, status] of Object.entries(statuses)) {
@@ -174,7 +175,7 @@ export async function checkPostReviewCommits(): Promise<string[]> {
       // Redispatch a fresh review convoy. Re-read status to guard against races
       // with other dispatch paths (HTTP request-review, manual CLI) that may have
       // already picked up the work between the reset above and now.
-      const freshStatus = getReviewStatusSync(issueId);
+      const freshStatus = getPipelineStatus(issueId);
       // PAN-2507: also a blocked advancing (review) dispatch — try to yield an
       // idle work agent before deferring. (This 7th site was not in the PRD's
       // six-site enumeration but is the same `!tryReserveAdvancingSlot()` shape.)

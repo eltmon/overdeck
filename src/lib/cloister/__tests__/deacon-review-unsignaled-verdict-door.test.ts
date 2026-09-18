@@ -30,6 +30,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../review-verdict-writer.js', () => ({ recordReviewVerdict: mocks.recordReviewVerdict }));
 vi.mock('../../review-status.js', () => ({
   loadReviewStatuses: mocks.loadReviewStatuses,
+  getReviewStatusSync: (issueId: string) => mocks.loadReviewStatuses()?.[issueId] ?? null,
+  getReviewStatusesSync: (issueIds: string[]) => Object.fromEntries(
+    issueIds.map((id) => [id, mocks.loadReviewStatuses()?.[id]]).filter(([, value]) => Boolean(value)),
+  ),
   setReviewStatusSync: vi.fn(),
 }));
 vi.mock('../../projects.js', () => ({ resolveProjectFromIssueSync: mocks.resolveProjectFromIssueSync }));

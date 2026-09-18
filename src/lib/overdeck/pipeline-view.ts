@@ -193,14 +193,23 @@ export function getPipelineView(issueId: string): PipelineView | null {
 /**
  * The canonical bulk read, keyed by issue id.
  *
- * Deliberately routed through `getReviewStatusesSync` rather than the raw
- * `loadReviewStatuses` cache read: the single-issue door reconciles the durable
- * journal, and a bulk door that skipped that step would answer differently for
- * the same issue — the exact divergence PAN-3903 exists to remove.
+ * Routed through `getReviewStatusesSync`, the codebase's bulk journal
+ * reconciler, so a bulk answer cannot differ from `getPipelineView`'s for the
+ * same issue — `getReviewStatusSync` reconciles the durable journal and
+ * `loadReviewStatuses` returns the raw cache, and that divergence is what
+ * PAN-3903 exists to remove. The cache row is the fallback when reconciliation
+ * yields nothing, so an issue never drops out of a bulk listing.
  */
 export function listPipelineViews(): Record<string, PipelineView> {
-  const ids = Object.keys(loadReviewStatuses());
-  return listPipelineViewsForIssues(ids);
+  const rows = loadReviewStatuses();
+  const ids = Object.keys(rows);
+  const reconciled = ids.length > 0 ? getReviewStatusesSync(ids) : {};
+  const views: Record<string, PipelineView> = {};
+  for (const issueId of ids) {
+    const view = toView(issueId, reconciled[issueId] ?? rows[issueId]);
+    if (view) views[issueId] = view;
+  }
+  return views;
 }
 
 /** The canonical bulk read restricted to `issueIds`. */
