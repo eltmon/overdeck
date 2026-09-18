@@ -23,17 +23,17 @@
     }
   ],
   "created": "2026-09-09T13:35:30.301Z",
-  "updated": "2026-09-18T09:43:11.686Z",
+  "updated": "2026-09-18T16:28:14.677Z",
   "pipeline": {
     "issueId": "PAN-3814",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
-    "mergeStatus": "failed",
+    "mergeStatus": "merged",
     "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T09:43:11.661Z",
+    "updatedAt": "2026-09-18T16:28:14.659Z",
     "mergeNotes": "GitHub PR #3818 has failing required checks on HEAD e71f3ae6. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/3818 for details.",
     "lastVerifiedCommit": "e71f3ae6cd8a9e6028da0991cc7048efaee9c84a",
     "strikeReadyHead": "8b1aad5775dbcf07bb7b9ae3880746246bec873a",
@@ -48,7 +48,9 @@
         "outcome": "failed",
         "detail": "GitHub PR #3818 has failing required checks on HEAD e71f3ae6. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/3818 for details.; recovery not delivered: agent is paused (Operator requested immediate PAN agent reduction due to extreme memory pressure)"
       }
-    ]
+    ],
+    "closedOut": true,
+    "closedOutAt": "2026-09-18T16:28:14.659Z"
   },
   "closeOut": {
     "usage": {
@@ -76,7 +78,107 @@
       }
     },
     "merges": [],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-09-18T16:28:14.675Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: pending",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-review",
+            "by": "conv-20260916-01d7",
+            "at": "2026-09-18T16:28:01.827Z"
+          }
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: pending",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-tests",
+            "by": "conv-20260916-01d7",
+            "at": "2026-09-18T16:28:01.827Z"
+          }
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at e71f3ae6cd8a9e6028da0991cc7048efaee9c84a",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "PR #3818 is squash-merged and strike/pan-3814 matches the merged PR head; Superseded feature/pan-3814 residual: Feature branch is absent; positive merge evidence is required; PR #3818 MERGED at 2026-09-18T15:05:56Z",
+          "status": "pass",
+          "mergedAt": "2026-09-18T15:05:56Z",
+          "mergeCommit": "2d2b5ffe1ede95eca1733a12a0d4edb285e09a08"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: todo; no running work/planning agents",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-post-merge",
+            "by": "conv-20260916-01d7",
+            "at": "2026-09-18T16:28:01.827Z"
+          }
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "required checks concluded successfully on 2d2b5ffe1ede95eca1733a12a0d4edb285e09a08: test, lint, build (22), guard",
+          "status": "pass"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Version strings propagated",
+          "expected": "every declared version_sync.expect path reports the batch version",
+          "observed": "project declares no version_sync; ship step not applicable",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit b15c6854 contains merge 2d2b5ffe",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Preserved strike worktree — strike/pan-3814 not merged to main; Cleaned 1 agent state directory (4 transcript files preserved); Preserved local branch strike/pan-3814 — not merged to main; Pruned 2 checkpoint ref(s) for agent-pan-3814, planning-pan-3814, strike-pan-3814; No specialist registry entries for PAN-3814"
+        }
+      ],
+      "accepted": [
+        "review",
+        "tests",
+        "post-merge"
+      ]
+    }
   },
   "harness": "codex",
   "model": "gpt-5.6-sol"
