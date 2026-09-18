@@ -1,53 +1,5 @@
 import type { GitStatus } from '../types';
 
-export interface StatusHistoryEntry {
-  type: 'review' | 'test' | 'merge' | 'inspect' | 'uat' | 'verification' | 'release';
-  status: string;
-  timestamp: string;
-  notes?: string;
-}
-
-export interface ReviewStatus {
-  issueId: string;
-  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked' | 'skipped';
-  testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
-  mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
-  inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed' | 'error';
-  inspectNotes?: string;
-  inspectStartedAt?: string;
-  inspectTaskId?: string;
-  uatStatus?: 'pending' | 'testing' | 'passed' | 'failed';
-  uatNotes?: string;
-  verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
-  verificationNotes?: string;
-  verificationCycleCount?: number;
-  verificationMaxCycles?: number;
-  reviewNotes?: string;
-  testNotes?: string;
-  mergeNotes?: string;
-  mergeRetryCount?: number;
-  releaseStatus?: 'pending' | 'releasing' | 'passed' | 'failed' | 'partial' | 'rolled_back' | 'skipped';
-  releaseNotes?: string;
-  updatedAt: string;
-  /** Timestamp when the current/last review fan-out was dispatched. */
-  reviewSpawnedAt?: string;
-  readyForMerge: boolean;
-  autoRequeueCount?: number;
-  history?: StatusHistoryEntry[];
-  /** Active review orchestrator session (agent-<issueId>-review) */
-  reviewCoordinatorSessionName?: string;
-  /** Active review sub-role session names (agent-<issueId>-review-<role>) */
-  reviewSessionNames?: string[];
-  /** Per-role completion status for parallel review sub-agents */
-  reviewSubStatuses?: Record<string, 'running' | 'done'>;
-  /** PAN-366: Queue position — null = not queued, 0 = active, 1+ = position */
-  queuePosition?: number | null;
-  /** PAN-366: Which specialist is active or will handle this issue */
-  activeSpecialist?: 'review' | 'test' | 'merge' | null;
-  /** PAN-905: GitHub-native merge blockers preventing merge */
-  blockerReasons?: ReadonlyArray<{ type: string; summary: string; details?: string; detectedAt: string }>;
-}
-
 export interface ContainerStatus {
   running: boolean;
   uptime: string | null;

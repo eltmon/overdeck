@@ -1,5 +1,5 @@
 import { MergeTrainView } from './MergeTrainView';
-import { useFlywheelConfig, useFlywheelConfigMutation } from '../../pages/FlywheelPage';
+import { useMergeTrainConfig, useMergeTrainConfigMutation } from './config';
 
 /**
  * PAN-1696 fe-awaiting-merge: the merge train hosted on the merge gate.
@@ -15,8 +15,8 @@ import { useFlywheelConfig, useFlywheelConfigMutation } from '../../pages/Flywhe
  * A project can override the global default in its cockpit settings.
  */
 export function MergeTrainSection() {
-  const { data: config } = useFlywheelConfig();
-  const configMutation = useFlywheelConfigMutation();
+  const { data: config } = useMergeTrainConfig();
+  const configMutation = useMergeTrainConfigMutation();
   const enabled = config?.merge_train_enabled ?? false;
 
   return (
