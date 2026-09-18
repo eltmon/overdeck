@@ -44,6 +44,11 @@
       "id": "01147d32-2bfe-4bbf-bba5-028770476015",
       "startedAt": "2026-09-18T09:36:45.255Z",
       "reason": "spawn"
+    },
+    {
+      "id": "37beee35-9329-41a1-b894-1e74fdad186d",
+      "startedAt": "2026-09-18T09:39:52.013Z",
+      "reason": "rotation"
     }
   ],
   "lifecycle": [
