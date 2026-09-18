@@ -566,10 +566,10 @@
     "recordedAt": "2026-09-18T08:00:26.249Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-09-18T08:00:45.557Z",
+  "updated": "2026-09-18T08:00:48.419Z",
   "pipeline": {
     "issueId": "PAN-3668",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "passed",
     "verificationStatus": "failed",
@@ -577,8 +577,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T08:00:45.492Z",
-    "reviewNotes": "Verification failed at test-skip",
+    "updatedAt": "2026-09-18T08:00:45.519Z",
+    "reviewNotes": "Verification failed at test-skip — fix and resubmit",
     "verificationNotes": "Verification FAILED at test-skip (32ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3668/.overdeck/verification/2026-09-18T08-00-33-581Z-27e8d7d1.json",
     "mergeNotes": "Review stale: approved be1bc0bb, workspace HEAD is f95437e6. Run pan done or pan review request to re-review.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3670",
@@ -914,7 +914,7 @@
       },
       "costAtCloseOut": {
         "usd": 182.1714763,
-        "pricingAsOf": "2026-09-18T08:00:45.545Z"
+        "pricingAsOf": "2026-09-18T08:00:48.410Z"
       }
     },
     "merges": [
