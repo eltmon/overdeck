@@ -111,7 +111,7 @@ describe('updateIssueRecord durability', () => {
     }
   });
 
-  it('restores retryable state when a remote-ref race survives reconciliation', async () => {
+  it('keeps the mutation local when a remote-ref race survives reconciliation, and a later write carries it', async () => {
     const stateRoot = join(process.env.OVERDECK_HOME!, 'state', basename(root));
     mkdirSync(join(stateRoot, 'records'), { recursive: true });
     git(stateRoot, 'init', '-q');
@@ -151,11 +151,15 @@ describe('updateIssueRecord durability', () => {
     await expect(updateIssueRecord(migratedProject, ISSUE_ID, completeTask))
       .rejects.toThrow('after 3 reconciliation attempts');
 
+    // PAN-3848 (W23): the push and reconcile run after the per-issue locks are
+    // released, so rewinding to the pre-mutation snapshot could clobber a newer
+    // writer — there is no restore after lock release. The mutation stays in
+    // the local record and in local HEAD; only origin lacks it.
     const localAfterFailure = JSON.parse(readFileSync(join(stateRoot, 'records', 'durable-1.json'), 'utf8')) as PanIssueRecord;
     const headAfterFailure = JSON.parse(git(stateRoot, 'show', 'HEAD:records/durable-1.json')) as PanIssueRecord;
     const remoteAfterFailure = JSON.parse(git(stateRoot, 'show', 'origin/overdeck-state:records/durable-1.json')) as PanIssueRecord;
-    expect(localAfterFailure.statusOverrides).toEqual({});
-    expect(headAfterFailure.statusOverrides).toEqual({});
+    expect(localAfterFailure.statusOverrides).toEqual({ 'wi-1': 'completed' });
+    expect(headAfterFailure.statusOverrides).toEqual({ 'wi-1': 'completed' });
     expect(remoteAfterFailure.statusOverrides).toEqual({});
     expect(git(stateRoot, 'status', '--porcelain')).toBe('');
 

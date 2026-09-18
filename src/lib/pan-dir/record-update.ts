@@ -9,7 +9,7 @@ import { emitActivityEntryOncePortable } from '../activity-logger.js';
 import type { ProjectConfig } from '../projects.js';
 import { resolveStateReadHomeSync, STATE_BRANCH } from '../state-read-home.js';
 import { STATE_BRANCH_PATHS } from '../state-plane.js';
-import { flushAutoCommits } from './auto-commit.js';
+import { commitAutoCommits, pushAutoCommits } from './auto-commit.js';
 import { withRecordFsLock } from './fs-lock.js';
 import {
   markPushEscalationDelivered,
@@ -17,7 +17,7 @@ import {
   recordReconcileSuccess,
   type PendingPushEscalation,
 } from './push-health.js';
-import { withStateGitLock } from './state-git-lock.js';
+import { withStateGitLock, withStateRepoLock } from './state-git-lock.js';
 import {
   ensureIssueRecordSync,
   getIssueRecordPath,
@@ -347,26 +347,31 @@ async function restoreRetryableRecord(
   }
 
   throwIfDurabilityAborted(signal);
-  writeIssueRecordSync(project, issueId, restored);
-  await git(gitRoot, ['add', '--', relativeRecordPath], { signal });
+  // The compensating add/commit runs under the repo-scoped lock (PAN-3848
+  // F7): the restore runs inside the caller's per-issue locks, which do not
+  // exclude a peer issue's git mutation on this checkout.
+  await withStateRepoLock(gitRoot, `restore:${issueId}`, async () => {
+    writeIssueRecordSync(project, issueId, restored);
+    await git(gitRoot, ['add', '--', relativeRecordPath], { signal });
 
-  try {
-    await git(gitRoot, ['diff', '--cached', '--quiet', '--', relativeRecordPath], { signal });
-    return;
-  } catch (diffError) {
-    throwIfDurabilityAborted(signal);
-    void diffError;
-    // A staged diff needs a compensating commit so HEAD, not only the worktree,
-    // is retryable. The failed mutation remains auditable in local history.
-  }
+    try {
+      await git(gitRoot, ['diff', '--cached', '--quiet', '--', relativeRecordPath], { signal });
+      return;
+    } catch (diffError) {
+      throwIfDurabilityAborted(signal);
+      void diffError;
+      // A staged diff needs a compensating commit so HEAD, not only the worktree,
+      // is retryable. The failed mutation remains auditable in local history.
+    }
 
-  await git(gitRoot, [
-    'commit',
-    '-m',
-    `chore(records): restore ${issueId} after failed state push`,
-    '--',
-    relativeRecordPath,
-  ], { signal });
+    await git(gitRoot, [
+      'commit',
+      '-m',
+      `chore(records): restore ${issueId} after failed state push`,
+      '--',
+      relativeRecordPath,
+    ], { signal });
+  });
 }
 
 async function deliverPendingEscalation(
@@ -430,6 +435,107 @@ async function recordReconcileFailureHealth(
   }
 }
 
+/**
+ * Verify the caller's mutation survived a reconcile merge (PAN-3848 W23). With
+ * the push released after the per-issue locks, a peer issue's queued record
+ * rides the same batch commit, and a merge that resolves that peer's conflict
+ * with `--theirs` can wipe THIS issue's mutation from the worktree before this
+ * issue's own reconcile sees an already-merged branch. The conflict path
+ * re-applies the mutator only when the issue's own record conflicted, so a
+ * mutation lost any other way must be re-applied here.
+ *
+ * Footprint rule (PAN-3848 F6): compare only the leaf paths the mutator
+ * actually changed (original → next), never whole serialized top-level
+ * fields. A concurrent writer may add another entry under the same field
+ * while the caller's change remains present — a whole-field comparison
+ * misfires there and replays the mutator, which double-advances
+ * `record.tasks.sequence` on a forced block or duplicates `claimHistory`.
+ * Re-apply is guarded a second time — if running the mutator on the current
+ * record changes nothing, the mutation is already reflected and no churn
+ * commit is written.
+ */
+type MutationJsonPath = Array<string | number>;
+
+function changedMutationLeafPaths(original: unknown, next: unknown, path: MutationJsonPath = []): MutationJsonPath[] {
+  if (Object.is(original, next)) return [];
+  if (typeof original !== 'object' || typeof next !== 'object' || original === null || next === null) {
+    return [path];
+  }
+  if (Array.isArray(original) !== Array.isArray(next)) return [path];
+  const paths: MutationJsonPath[] = [];
+  const keys = new Set([...Object.keys(original), ...Object.keys(next)]);
+  for (const key of keys) {
+    const segment = Array.isArray(original) ? Number(key) : key;
+    paths.push(...changedMutationLeafPaths(
+      (original as Record<string, unknown>)[key],
+      (next as Record<string, unknown>)[key],
+      [...path, segment],
+    ));
+  }
+  return paths;
+}
+
+function mutationValueAtPath(root: unknown, path: MutationJsonPath): unknown {
+  let node = root;
+  for (const segment of path) {
+    if (typeof node !== 'object' || node === null) return undefined;
+    node = (node as Record<string | number, unknown>)[segment];
+  }
+  return node;
+}
+async function ensureMutationSurvivedReconcile(
+  project: ProjectConfig,
+  issueId: string,
+  mutator: IssueRecordMutator,
+  mutation: { original: PanIssueRecord; next: PanIssueRecord },
+  gitRoot: string,
+  recordPath: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  const current = readIssueRecordSync(project, issueId);
+  if (!current) return;
+
+  const changedPaths = changedMutationLeafPaths(mutation.original, mutation.next);
+  let mutationLost = false;
+  for (const path of changedPaths) {
+    const after = mutationValueAtPath(mutation.next, path);
+    if (JSON.stringify(mutationValueAtPath(current, path)) !== JSON.stringify(after)) {
+      mutationLost = true;
+      break;
+    }
+  }
+  if (!mutationLost) return;
+
+  const working = structuredClone(current);
+  // Mutators may mutate in place and return void — the working copy is the
+  // record either way.
+  const reapplied = (await mutator(working)) ?? working;
+  throwIfDurabilityAborted(signal);
+  if (JSON.stringify(reapplied) === JSON.stringify(current)) return;
+
+  console.warn(
+    `[pan-dir/records] reconcile merge dropped the ${issueId} mutation; re-applying it on top of the merged record`,
+  );
+  writeIssueRecordSync(project, issueId, reapplied);
+  const relativeRecordPath = relative(gitRoot, recordPath).replace(/\\/g, '/');
+  await git(gitRoot, ['add', '--', relativeRecordPath], { signal });
+  try {
+    await git(gitRoot, ['diff', '--cached', '--quiet', '--', relativeRecordPath], { signal });
+    return;
+  } catch {
+    // A staged diff remains: commit so the re-applied mutation reaches origin
+    // with this reconcile's push.
+  }
+  throwIfDurabilityAborted(signal);
+  await git(gitRoot, [
+    'commit',
+    '-m',
+    `chore(records): re-apply ${issueId} mutation after state reconcile`,
+    '--',
+    relativeRecordPath,
+  ], { signal });
+}
+
 async function reconcileStatePush(
   project: ProjectConfig,
   issueId: string,
@@ -437,36 +543,49 @@ async function reconcileStatePush(
   recordPath: string,
   signal?: AbortSignal,
   onPendingEscalation?: (escalation: PendingPushEscalation | undefined) => void,
+  mutation?: { original: PanIssueRecord; next: PanIssueRecord },
 ): Promise<PanIssueRecord> {
   const gitRoot = resolveStateReadHomeSync(project).root;
   let conflictedPaths: string[] = [];
 
   try {
-    await abortMerge(gitRoot, { signal });
-    await abortRebase(gitRoot, { signal });
-
     for (let attempt = 0; attempt < MAX_STATE_PUSH_RECONCILIATIONS; attempt += 1) {
       throwIfDurabilityAborted(signal);
       await git(gitRoot, ['fetch', 'origin', STATE_BRANCH], { signal });
-      await adoptOrphanedStateWrites(gitRoot, signal);
-      try {
-        await git(gitRoot, ['merge', '--no-edit', `origin/${STATE_BRANCH}`], { signal });
-      } catch (error) {
-        throwIfDurabilityAborted(signal);
-        try {
-          await resolveMergeConflicts(project, issueId, mutator, gitRoot, recordPath, error, signal);
-        } catch (resolveError) {
-          if (resolveError instanceof StateMergeConflictError) {
-            conflictedPaths = resolveError.conflictedPaths;
-          }
+      // Mutating section under the repo-scoped lock (PAN-3848 F7): adopt,
+      // merge, conflict resolution, and the survival re-apply must never run
+      // concurrently with another writer's git mutation on this checkout — in
+      // this process or another. The fetch above and the push below are
+      // read-only and network-bound, so they stay outside the lock.
+      await withStateRepoLock(gitRoot, `reconcile:${issueId}`, async () => {
+        if (attempt === 0) {
           await abortMerge(gitRoot, { signal });
           await abortRebase(gitRoot, { signal });
-          throw new Error(
-            `Failed to reconcile ${issueId} state after push race: ${gitFailureMessage(resolveError)}`,
-            { cause: error },
-          );
         }
-      }
+        await adoptOrphanedStateWrites(gitRoot, signal);
+        try {
+          await git(gitRoot, ['merge', '--no-edit', `origin/${STATE_BRANCH}`], { signal });
+        } catch (error) {
+          throwIfDurabilityAborted(signal);
+          try {
+            await resolveMergeConflicts(project, issueId, mutator, gitRoot, recordPath, error, signal);
+          } catch (resolveError) {
+            if (resolveError instanceof StateMergeConflictError) {
+              conflictedPaths = resolveError.conflictedPaths;
+            }
+            await abortMerge(gitRoot, { signal });
+            await abortRebase(gitRoot, { signal });
+            throw new Error(
+              `Failed to reconcile ${issueId} state after push race: ${gitFailureMessage(resolveError)}`,
+              { cause: error },
+            );
+          }
+        }
+
+        if (mutation) {
+          await ensureMutationSurvivedReconcile(project, issueId, mutator, mutation, gitRoot, recordPath, signal);
+        }
+      });
 
       try {
         await git(gitRoot, ['push', 'origin', STATE_BRANCH], { signal });
@@ -505,6 +624,11 @@ export async function updateIssueRecord(
   const recordPath = getIssueRecordPath(project, normalizedIssueId);
   const writerId = options.writerId ?? process.env.OVERDECK_AGENT_ID ?? `process-${process.pid}@${hostname()}`;
   let pendingEscalation: PendingPushEscalation | undefined;
+  let commitRoot: string | undefined;
+  let needsPostLockPush = false;
+  let mutationSnapshot: { original: PanIssueRecord; next: PanIssueRecord } | undefined;
+  let deadlineMs = 0;
+  let budgetMs = DEFAULT_RECORD_DURABILITY_BUDGET_MS;
   try {
     const record = await withRecordFsLock(project, normalizedIssueId, { writerId, recordPath }, async () => {
       const operation = async (): Promise<PanIssueRecord> => {
@@ -512,64 +636,37 @@ export async function updateIssueRecord(
         const original = structuredClone(current);
         const result = await mutator(current);
         const next = result ?? current;
+        mutationSnapshot = { original, next: structuredClone(next) };
         const path = writeIssueRecordSync(project, normalizedIssueId, next);
         if (options.autoCommit === false) {
           return readIssueRecordSync(project, normalizedIssueId) ?? next;
         }
 
-        const budgetMs = recordDurabilityBudgetMs();
-        const deadlineMs = Date.now() + budgetMs;
+        budgetMs = recordDurabilityBudgetMs();
+        deadlineMs = Date.now() + budgetMs;
         try {
-          const commitRoot = queueIssueRecordCommit(project, normalizedIssueId, path);
-          // Start and await the explicit flush while the issue lock is held. No second
-          // writer may observe the local terminal state before its durability outcome
-          // is known, and the queue's zero-delay timer cannot consume this batch first.
-          // The wait is bounded (PAN-2989): a stalled push must not starve peer writers
-          // for minutes — on timeout the lock releases and the flush continues in the
-          // background.
-          const flushed = await withRecordDurabilityDeadline(
+          commitRoot = queueIssueRecordCommit(project, normalizedIssueId, path);
+          // PAN-3848 (W23): the per-issue locks cover only the
+          // read-mutate-write-commit. The push runs after they are released so
+          // a slow network push never starves peer writers (F1: one
+          // project-wide lock held across a push, taken 23 times in 70 seconds
+          // by a patrol, starved a spawn). The commit wait is still bounded
+          // (PAN-2989): on timeout the lock releases and the flush continues
+          // in the background.
+          const committed = await withRecordDurabilityDeadline(
             normalizedIssueId,
-            Effect.runPromise(flushAutoCommits(commitRoot)),
+            Effect.runPromise(commitAutoCommits(commitRoot)),
             deadlineMs,
             budgetMs,
           );
-          if (flushed.pushed === false) {
-            const stateHome = resolveStateReadHomeSync(project);
-            if (stateHome.migrated && isRemoteRefRaceError(flushed.reason ?? '')) {
-              const reconcileAbort = new AbortController();
-              const reconcilePromise = reconcileStatePush(
-                project,
-                normalizedIssueId,
-                mutator,
-                path,
-                reconcileAbort.signal,
-                (escalation) => {
-                  pendingEscalation = escalation;
-                },
-              );
-              return await withRecordDurabilityDeadline(
-                normalizedIssueId,
-                reconcilePromise,
-                deadlineMs,
-                budgetMs,
-                async () => {
-                  // Stop the reconcile's git subprocesses and wait for them to die —
-                  // nothing it started may rebase/push/write after the lock releases.
-                  reconcileAbort.abort();
-                  await reconcilePromise.catch(() => undefined);
-                  // Leave the worktree out of a mid-reconcile state; bounded local
-                  // cleanup, not another full git timeout under the lock.
-                  const gitRoot = resolveStateReadHomeSync(project).root;
-                  await abortRebase(gitRoot);
-                  await abortMerge(gitRoot);
-                },
-              );
-            }
-            throw new Error(`Failed to push ${normalizedIssueId} state: ${flushed.reason ?? 'unknown push failure'}`);
+          if (!committed.committed && !['no diff', 'no pending'].includes(committed.reason ?? '')) {
+            throw new Error(`Failed to commit ${normalizedIssueId} state: ${committed.reason ?? 'unknown commit failure'}`);
           }
-          if (!flushed.committed && !['no diff', 'no pending'].includes(flushed.reason ?? '')) {
-            throw new Error(`Failed to commit ${normalizedIssueId} state: ${flushed.reason ?? 'unknown commit failure'}`);
-          }
+          // Always confirm with a post-lock push (PAN-3848 W23): our own
+          // deferred push, a no-op push covering a peer batch that consumed
+          // our queued commit, or — after a 'no diff' no-op — the push that
+          // carries a commit stranded by an earlier failed attempt.
+          needsPostLockPush = true;
 
           return readIssueRecordSync(project, normalizedIssueId) ?? next;
         } catch (error) {
@@ -605,13 +702,115 @@ export async function updateIssueRecord(
 
       const stateHome = resolveStateReadHomeSync(project);
       return stateHome.migrated
-        ? withStateGitLock(stateHome.root, writerId, recordPath, operation)
+        ? withStateGitLock(stateHome.root, normalizedIssueId, writerId, recordPath, operation)
         : operation();
     });
+    const finalRecord = await pushRecordStateAfterLock(
+      project,
+      normalizedIssueId,
+      mutator,
+      recordPath,
+      record,
+      needsPostLockPush && options.autoCommit !== false ? commitRoot : undefined,
+      deadlineMs,
+      budgetMs,
+      (escalation) => {
+        pendingEscalation = escalation;
+      },
+      mutationSnapshot,
+    );
     await attemptPendingEscalationDelivery(project, pendingEscalation);
-    return record;
+    return finalRecord;
   } catch (error) {
     await attemptPendingEscalationDelivery(project, pendingEscalation);
     throw error;
   }
+}
+
+/**
+ * In-process chain serializing push-race reconciles per state worktree. Two
+ * reconciles must never run `git merge` concurrently on one checkout; the
+ * per-issue locks (PAN-3848 W23) no longer provide that exclusion because the
+ * reconcile deliberately runs after they are released.
+ */
+const stateReconcileChains = new Map<string, Promise<void>>();
+
+function enqueueStateReconcile<T>(gitRoot: string, operation: () => Promise<T>): Promise<T> {
+  const prior = stateReconcileChains.get(gitRoot) ?? Promise.resolve();
+  const result = prior.catch(() => undefined).then(operation);
+  const tail = result.then(() => undefined, () => undefined);
+  stateReconcileChains.set(gitRoot, tail);
+  void tail.then(() => {
+    if (stateReconcileChains.get(gitRoot) === tail) stateReconcileChains.delete(gitRoot);
+  });
+  return result;
+}
+
+/**
+ * Post-lock push phase of `updateIssueRecord` (PAN-3848 W23, FR-18). Runs only
+ * after both per-issue locks are released, so the push and any push-race
+ * reconcile may wait on the network without starving peer writers. The push
+ * promise starts before the durability race, so on a deadline timeout it
+ * continues in the background exactly like the pre-split flush did.
+ */
+async function pushRecordStateAfterLock(
+  project: ProjectConfig,
+  issueId: string,
+  mutator: IssueRecordMutator,
+  recordPath: string,
+  record: PanIssueRecord,
+  commitRoot: string | undefined,
+  deadlineMs: number,
+  budgetMs: number,
+  onPendingEscalation: (escalation: PendingPushEscalation | undefined) => void,
+  mutation?: { original: PanIssueRecord; next: PanIssueRecord },
+): Promise<PanIssueRecord> {
+  if (!commitRoot) return record;
+
+  const pushed = await withRecordDurabilityDeadline(
+    issueId,
+    Effect.runPromise(pushAutoCommits(commitRoot)),
+    deadlineMs,
+    budgetMs,
+  );
+  if (pushed === null || pushed.pushed !== false) return record;
+
+  const stateHome = resolveStateReadHomeSync(project);
+  if (stateHome.migrated && isRemoteRefRaceError(pushed.reason ?? '')) {
+    const gitRoot = stateHome.root;
+    return enqueueStateReconcile(gitRoot, async () => {
+      const reconcileAbort = new AbortController();
+      const reconcilePromise = reconcileStatePush(
+        project,
+        issueId,
+        mutator,
+        recordPath,
+        reconcileAbort.signal,
+        onPendingEscalation,
+        mutation,
+      );
+      return await withRecordDurabilityDeadline(
+        issueId,
+        reconcilePromise,
+        deadlineMs,
+        budgetMs,
+        async () => {
+          // Stop the reconcile's git subprocesses and wait for them to die —
+          // nothing it started may rebase/push/write after the caller has
+          // already been failed by the durability deadline.
+          reconcileAbort.abort();
+          await reconcilePromise.catch(() => undefined);
+          // Leave the worktree out of a mid-reconcile state; bounded local
+          // cleanup, not another full git timeout.
+          await abortRebase(gitRoot);
+          await abortMerge(gitRoot);
+        },
+      );
+    });
+  }
+
+  throw new Error(
+    `Failed to push ${issueId} state: ${pushed.reason ?? 'unknown push failure'}; ` +
+    'the mutation remains committed locally and the next state flush will carry it',
+  );
 }

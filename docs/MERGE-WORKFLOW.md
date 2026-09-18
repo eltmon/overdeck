@@ -110,6 +110,14 @@ The work agent has called `pan done`. The work-agent role prompt refuses
 `pan done` from a dirty worktree, so this state guarantees the workspace
 branch contains only committed work.
 
+PAN-3848 (W25): `pan done` writes the review request in one durable record
+write — `pipeline.prUrl`, `pipeline.reviewRequestedAt`, and
+`pipeline.completedAt` land in a single mutator, retried on the state lock's
+backoff ladder. If every attempt fails, the completion marker is still written
+(the branch is pushed and the PR exists, so the work is real), a
+`review-request-unrecorded` needs-you names the missing `reviewRequestedAt`,
+and the command exits 1: a pushed PR with no review request is never silent.
+
 If the worktree is dirty at `pan done` time, the CLI returns non-zero with
 three options surfaced to the agent or operator:
 

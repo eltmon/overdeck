@@ -35,6 +35,16 @@ export function ConversationSettingsSection({
     });
   };
 
+  const handleHandoffAuthorModelChange = (modelId: ModelId | undefined) => {
+    onSettingsChange({
+      ...formData,
+      conversations: {
+        ...formData.conversations,
+        handoff_author_model: modelId,
+      },
+    });
+  };
+
   const handleManualCompactModeChange = (mode: 'claude-code' | 'overdeck-native') => {
     onSettingsChange({
       ...formData,
@@ -96,6 +106,32 @@ export function ConversationSettingsSection({
             onChange={(e) => handleTitleModelChange(e.target.value as ModelId)}
             className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary max-w-[200px]"
           >
+            {Object.entries(MODELS_BY_PROVIDER).flatMap(([, providerDef]) =>
+              providerDef.models.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {providerDef.name} — {model.name}
+                </option>
+              ))
+            )}
+            {openRouterFavoriteModels.map((model) => (
+              <option key={model.id} value={model.id}>
+                OpenRouter — {model.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
+          <div className="min-w-0">
+            <span className="text-sm font-medium text-foreground">Handoff author model</span>
+            <p className="text-xs text-muted-foreground mt-0.5">Authors external handoff docs — required for pan handoff</p>
+          </div>
+          <select
+            value={formData.conversations?.handoff_author_model || ''}
+            onChange={(e) => handleHandoffAuthorModelChange(e.target.value ? (e.target.value as ModelId) : undefined)}
+            className="bg-background border border-border rounded-md px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary max-w-[200px]"
+          >
+            <option value="">Not set</option>
             {Object.entries(MODELS_BY_PROVIDER).flatMap(([, providerDef]) =>
               providerDef.models.map((model) => (
                 <option key={model.id} value={model.id}>

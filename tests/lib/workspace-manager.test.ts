@@ -25,6 +25,12 @@ vi.mock('util', async () => {
 });
 
 let mockHomedir = '';
+
+/** Matches both exec shell strings and execFile argv vectors for `git worktree add`. */
+const isWorktreeAddCall = (command: unknown, args?: unknown): boolean =>
+  (typeof command === 'string' && command.includes('git worktree add'))
+  || (command === 'git' && Array.isArray(args) && args[0] === 'worktree' && args[1] === 'add');
+
 vi.mock('os', async () => {
   const actual = await vi.importActual<typeof import('os')>('os');
   return {
@@ -236,8 +242,8 @@ describe('createWorkspace', () => {
     mkdirSync(join(workspacePath, '.pan', 'records'), { recursive: true });
     writeFileSync(recordPath, '{"issueId":"PAN-2050"}\n', 'utf8');
 
-    mockExecAsync.mockImplementation(async (command: string) => {
-      if (command.includes('git worktree add')) {
+    mockExecAsync.mockImplementation(async (command: string, args?: string[]) => {
+      if (isWorktreeAddCall(command, args)) {
         expect(existsSync(workspacePath)).toBe(false);
         mkdirSync(workspacePath, { recursive: true });
       }
@@ -263,8 +269,11 @@ describe('createWorkspace', () => {
 
       expect(result.success).toBe(true);
       expect(result.steps).toContain('Staged pre-worktree .pan metadata');
+      // execFile argv form (CWE-78 fix, PR #3872 finding 8): the branch is
+      // cut from origin/main after a fetch, never interpolated into a shell.
       expect(mockExecAsync).toHaveBeenCalledWith(
-        expect.stringContaining(`git worktree add -b "feature/pan-2050" "${workspacePath}"`),
+        'git',
+        ['worktree', 'add', '-b', 'feature/pan-2050', workspacePath, 'origin/main'],
         expect.objectContaining({ cwd: tempDir }),
       );
       expect(readFileSync(recordPath, 'utf8')).toBe('{"issueId":"PAN-2050"}\n');

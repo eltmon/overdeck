@@ -7,6 +7,8 @@ import { Effect, Fiber, Stream } from 'effect';
 vi.mock('../../../../src/lib/pan-dir/auto-commit.js', () => ({
   queueAutoCommit: vi.fn(),
   flushAutoCommits: vi.fn(() => Effect.succeed({ committed: false, reason: 'no pending' })),
+  commitAutoCommits: vi.fn(() => Effect.succeed({ committed: false, reason: 'no pending' })),
+  pushAutoCommits: vi.fn(() => Effect.succeed(null)),
 }));
 
 import { createOverdeckDatabase, OVERDECK_TABLE_COUNT } from '../../../../scripts/create-overdeck-db.js';

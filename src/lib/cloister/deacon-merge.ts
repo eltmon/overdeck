@@ -4,6 +4,7 @@ import { join } from 'path';
 import { exec, execFile } from 'node:child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
+import { recordWouldFire, type PatrolShadowOptions } from './patrol-would-fire.js';
 import { AGENTS_DIR } from '../paths.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { getAgentRuntimeStateSync, getAgentStateSync, listRunningAgentsSync, type AgentState } from '../agents.js';
@@ -74,8 +75,9 @@ const mergeStuckCooldowns = new Map<string, number>();
  *   - Per-issue cooldown: 10 min between successive attempts
  *   - Circuit breaker: max 3 attempts per issue per process lifetime
  */
-export async function checkReadyForMergeStuck<State extends MergeReminderState>(deps: MergeReadyReminderDeps<State>): Promise<string[]> {
+export async function checkReadyForMergeStuck<State extends MergeReminderState>(deps: MergeReadyReminderDeps<State>, options: PatrolShadowOptions = {}): Promise<string[]> {
   const actions: string[] = [];
+  const shadow = options.shadow === true;
 
   try {
     const statuses = loadReviewStatuses();
@@ -106,6 +108,14 @@ export async function checkReadyForMergeStuck<State extends MergeReminderState>(
 
       const ageHours = Math.round((now - new Date(status.updatedAt).getTime()) / 3600000 * 10) / 10;
       console.log(`[deacon] Merge-ready reminder for ${key} (ready for ${ageHours}h, reminder ${attempts + 1}/${MERGE_READY_REMINDER_MAX})`);
+
+      // PAN-3848 (W30): count the would-fire; shadow mode leaves the cooldown,
+      // the persisted attempt counter, and the notification untouched.
+      recordWouldFire('checkReadyForMergeStuck', key);
+      if (shadow) {
+        actions.push(`Would send merge-ready reminder for ${key} (ready for ${ageHours}h, shadow)`);
+        continue;
+      }
 
       // Record attempt before notifying so a crash doesn't leave us in a retry loop
       mergeStuckCooldowns.set(key, now);
@@ -146,8 +156,9 @@ export async function checkReadyForMergeStuck<State extends MergeReminderState>(
  */
 const staleMergeReconciled = new Set<string>();
 
-export async function reconcileStaleMergeStatus(): Promise<string[]> {
+export async function reconcileStaleMergeStatus(options: PatrolShadowOptions = {}): Promise<string[]> {
   const actions: string[] = [];
+  const shadow = options.shadow === true;
   try {
     const statuses = loadReviewStatuses();
 
@@ -185,6 +196,11 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
 
       const branch = `feature/${issueId.toLowerCase()}`;
       if (postMergeIncomplete) {
+        recordWouldFire('reconcileStaleMergeStatus', issueId);
+        if (shadow) {
+          actions.push(`Would enqueue post-merge lifecycle for ${issueId} (shadow)`);
+          continue;
+        }
         const { enqueuePostMergeLifecycle } = await import('./post-merge-lifecycle-worker.js');
         const action = enqueuePostMergeLifecycle(issueId, project.projectPath, branch);
         if (action) actions.push(action);
@@ -251,6 +267,12 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
           continue;
         }
 
+        recordWouldFire('reconcileStaleMergeStatus', issueId);
+        if (shadow) {
+          actions.push(`Would reconcile stale mergeStatus for ${issueId} — branch ${branch} is merged to main (shadow)`);
+          continue;
+        }
+
         setReviewStatusSync(issueId, { mergeStatus: 'merged', mergeStep: 'post-merge-cleanup', readyForMerge: false });
         const msg = `Reconciled stale mergeStatus for ${issueId} — branch ${branch} is merged to main`;
         actions.push(msg);
@@ -278,8 +300,9 @@ export async function reconcileStaleMergeStatus(): Promise<string[]> {
  */
 const falseMergedReset = new Set<string>();
 
-export async function reconcileFalseMerged(): Promise<string[]> {
+export async function reconcileFalseMerged(options: PatrolShadowOptions = {}): Promise<string[]> {
   const actions: string[] = [];
+  const shadow = options.shadow === true;
   try {
     const { getPullRequestState, isGitHubAppConfigured } = await import('../github-app.js');
     if (!isGitHubAppConfigured()) return actions;
@@ -301,6 +324,11 @@ export async function reconcileFalseMerged(): Promise<string[]> {
           // Leave reviewStatus alone (it may legitimately be passed/failed/blocked from
           // the prior cycle); the issue can proceed through the pipeline once mergeStatus
           // is no longer blocking.
+          recordWouldFire('reconcileFalseMerged', issueId);
+          if (shadow) {
+            actions.push(`Would reset stale mergeStatus=merged for ${issueId} — PR ${status.prUrl} is not merged on GitHub (shadow)`);
+            continue;
+          }
           setReviewStatusSync(issueId, { mergeStatus: 'pending' });
           falseMergedReset.add(issueId);
           const msg = `Reset stale mergeStatus=merged for ${issueId} — PR ${status.prUrl} is not merged on GitHub`;
@@ -348,8 +376,9 @@ const CLOSED_PR_RECONCILE_COOLDOWN_MS = 10 * 60 * 1000;/**
  * CLOSED-without-merge, reset readyForMerge=false and surface why on
  * mergeNotes so the human sees what happened instead of a missing button.
  */
-export async function reconcileClosedPrReadyForMerge(): Promise<string[]> {
+export async function reconcileClosedPrReadyForMerge(options: PatrolShadowOptions = {}): Promise<string[]> {
   const actions: string[] = [];
+  const shadow = options.shadow === true;
   try {
     const { getPullRequestState, isGitHubAppConfigured } = await import('../github-app.js');
     if (!isGitHubAppConfigured()) return actions;
@@ -373,6 +402,13 @@ export async function reconcileClosedPrReadyForMerge(): Promise<string[]> {
       try {
         const prState = await Effect.runPromise(getPullRequestState(owner, repo, prNumber));
         if (prState.state === 'OPEN' && !prState.merged) continue;
+
+        recordWouldFire('reconcileClosedPrReadyForMerge', issueId);
+        if (shadow) {
+          actions.push(`Would reset readyForMerge for ${issueId} — PR #${prNumber} is ${prState.merged ? 'already merged' : `${prState.state} (not OPEN)`} (shadow)`);
+          closedPrReadyReconcileCooldowns.set(issueId, now + CLOSED_PR_RECONCILE_COOLDOWN_MS);
+          continue;
+        }
 
         if (prState.merged) {
           setReviewStatusSync(issueId, {
@@ -440,8 +476,10 @@ export async function reconcileStaleMergeBlockers(
       ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`)
       : null;
   },
+  options: PatrolShadowOptions = {},
 ): Promise<string[]> {
   const actions: string[] = [];
+  const shadow = options.shadow === true;
   try {
     const { resolveConflictGate, buildRealConflictGateDeps } = await import('./conflict-gate.js');
     const statuses = loadReviewStatuses();
@@ -460,7 +498,8 @@ export async function reconcileStaleMergeBlockers(
 
       const membership = memberships.get(issueId.toUpperCase());
       if (!membership || membership.bucket !== 'in_flight') {
-        if (membership) setReviewStatusSync(issueId, { readyForMerge: false, retiredAt: new Date(now).toISOString() });
+        if (membership && !shadow) setReviewStatusSync(issueId, { readyForMerge: false, retiredAt: new Date(now).toISOString() });
+        if (membership) recordWouldFire('reconcileStaleMergeBlockers', issueId);
         console.log(`[deacon] skipping ${issueId} — pipeline membership is ${membership?.bucket ?? 'unavailable'}, not merge-eligible`);
         continue;
       }
@@ -468,9 +507,19 @@ export async function reconcileStaleMergeBlockers(
       if (!workspacePath) continue;
       if (!workspaceExists(workspacePath)) continue;
 
+      // PAN-3848 (W30): shadow mode counts the would-fire — a stale merge
+      // blocker on an in-flight issue is what this patrol exists to clear —
+      // without running the conflict gate (which clears/dispatches).
+      if (shadow) {
+        recordWouldFire('reconcileStaleMergeBlockers', issueId);
+        actions.push(`Would re-evaluate stale merge blocker for ${issueId} (shadow)`);
+        continue;
+      }
+
       try {
         const result = await resolveConflictGate(issueId, workspacePath, 'main', deps);
         if (result.clearedStaleBlocker) {
+          recordWouldFire('reconcileStaleMergeBlockers', issueId);
           const msg = `Cleared stale merge blocker for ${issueId} — branch is mergeable again; readyForMerge will recompute`;
           actions.push(msg);
           console.log(`[deacon] ${msg}`);
@@ -494,8 +543,10 @@ export async function reconcileStaleMergeBlockers(
 export async function reconcileStuckReadyForMerge(
   gatherEligibility: typeof import('./merge-eligibility.js').gatherMergeEligibility = async (ids) =>
     (await import('./merge-eligibility.js')).gatherMergeEligibility(ids),
+  options: PatrolShadowOptions = {},
 ): Promise<string[]> {
   const actions: string[] = [];
+  const shadow = options.shadow === true;
   try {
     const candidates = Object.entries(loadReviewStatuses()).filter(([, status]) =>
       !status.retiredAt
@@ -506,8 +557,14 @@ export async function reconcileStuckReadyForMerge(
     for (const [issueId] of candidates) {
       const membership = memberships.get(issueId.toUpperCase());
       if (!membership || membership.bucket !== 'in_flight') {
-        if (membership) setReviewStatusSync(issueId, { readyForMerge: false, retiredAt: new Date().toISOString() });
+        if (membership && !shadow) setReviewStatusSync(issueId, { readyForMerge: false, retiredAt: new Date().toISOString() });
+        if (membership) recordWouldFire('reconcileStuckReadyForMerge', issueId);
         console.log(`[deacon] skipping ${issueId} — pipeline membership is ${membership?.bucket ?? 'unavailable'}, not merge-eligible`);
+        continue;
+      }
+      recordWouldFire('reconcileStuckReadyForMerge', issueId);
+      if (shadow) {
+        actions.push(`Would restore readyForMerge for ${issueId} — review+test+verify passed, no blocker (shadow)`);
         continue;
       }
       setReviewStatusSync(issueId, { readyForMerge: true });
@@ -521,8 +578,9 @@ export async function reconcileStuckReadyForMerge(
   return actions;
 }
 
-export async function reconcileMergedButReviewing(): Promise<string[]> {
+export async function reconcileMergedButReviewing(options: PatrolShadowOptions = {}): Promise<string[]> {
   const actions: string[] = [];
+  const shadow = options.shadow === true;
   try {
     const statuses = loadReviewStatuses();
     const nonTerminal = new Set(['reviewing', 'pending', undefined, null]);
@@ -533,6 +591,14 @@ export async function reconcileMergedButReviewing(): Promise<string[]> {
       const testNonTerminal = nonTerminal.has(status.testStatus as string | undefined);
       if (!reviewNonTerminal && !testNonTerminal) continue;
       if (mergedReviewingReconciled.has(issueId)) continue;
+
+      // PAN-3848 (W30): count the would-fire; shadow mode suppresses the write
+      // and leaves the reconciled set untouched so detection repeats.
+      recordWouldFire('reconcileMergedButReviewing', issueId);
+      if (shadow) {
+        actions.push(`Would reconcile review_status=${status.reviewStatus ?? 'null'}, test_status=${status.testStatus ?? 'null'} → passed for ${issueId} (shadow)`);
+        continue;
+      }
 
       // Set BOTH review and test to 'passed' atomically. Setting only review='passed'
       // trips the review.approved dispatch in setReviewStatus and spawns a test-agent
@@ -864,8 +930,9 @@ export async function autoCloseOut(now = new Date()): Promise<string[]> {
  * status exists (meaning it never entered the specialist pipeline), and the agent
  * has committed code (git log shows commits on the feature branch).
  */
-export async function checkFirstCompletionAgents(): Promise<string[]> {
+export async function checkFirstCompletionAgents(options: PatrolShadowOptions = {}): Promise<string[]> {
   const actions: string[] = [];
+  const shadow = options.shadow === true;
 
   try {
     const agents = listRunningAgentsSync();
@@ -979,6 +1046,14 @@ export async function checkFirstCompletionAgents(): Promise<string[]> {
       // All heuristics passed: agent likely forgot pan done
       const idleMinutes = Math.round(idleMs / 60000);
       console.log(`[deacon] First-completion gap detected: ${agent.id} (${issueId}) idle for ${idleMinutes}m with commits but no completion marker`);
+
+      // PAN-3848 (W30): count the would-fire; shadow mode never nudges and
+      // leaves the cooldown untouched so detection repeats.
+      recordWouldFire('checkFirstCompletionAgents', issueId);
+      if (shadow) {
+        actions.push(`Would send first-completion nudge: ${agent.id} (idle ${idleMinutes}m, shadow)`);
+        continue;
+      }
 
       firstCompletionCooldowns.set(agent.id, now);
 

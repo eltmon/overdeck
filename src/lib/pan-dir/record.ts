@@ -194,6 +194,8 @@ export interface PanIssuePipelineRecord extends StrikeLandingStatus {
   lastVerifiedCommit?: string;
   /** PAN-1988 auto-heal: durable "the work agent finished and wants review" intent (set by `pan done`). */
   reviewRequestedAt?: string;
+  /** PAN-3848 (W25): written by `pan done`'s single review-request record write. */
+  completedAt?: string;
   /** PAN-2587: dispatch anchor — journaled so a journal overlay cannot revert the
    * status to pre-dispatch while the request timestamp survives (dispatch-loop fuel). */
   reviewSpawnedAt?: string;

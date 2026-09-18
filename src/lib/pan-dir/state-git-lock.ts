@@ -21,18 +21,26 @@ export const STATE_GIT_LOCK_RETRY_DELAYS_MS = [
 
 const processQueues = new Map<string, Promise<void>>();
 
-export function stateGitLockPath(gitRoot: string): string {
-  const key = createHash('sha256').update(resolve(gitRoot)).digest('hex');
+/**
+ * PAN-3848 (W23): the state git lock is keyed per issue, not per project. A
+ * project-wide lock held across a network push starved peer writers (F1: one
+ * patrol took it 23 times in 70 seconds and starved a spawn). The lock scope id
+ * is the issue id for record writes; the agent-plane flush passes its own
+ * per-agent scope.
+ */
+export function stateGitLockPath(gitRoot: string, issueId: string): string {
+  const key = createHash('sha256').update(`${resolve(gitRoot)}::${issueId.toUpperCase()}`).digest('hex');
   return join(getOverdeckHome(), 'locks', 'state-git', `${key}.lock`);
 }
 
 export async function withStateGitLock<T>(
   gitRoot: string,
+  issueId: string,
   writerId: string,
   recordPath: string,
   operation: () => Promise<T>,
 ): Promise<T> {
-  const key = resolve(gitRoot);
+  const key = `${resolve(gitRoot)}::${issueId.toUpperCase()}`;
   const prior = processQueues.get(key) ?? Promise.resolve();
   let releaseQueue!: () => void;
   const gate = new Promise<void>((resolveGate) => {
@@ -42,11 +50,12 @@ export async function withStateGitLock<T>(
   processQueues.set(key, tail);
 
   await prior.catch(() => undefined);
-  const lockPath = stateGitLockPath(gitRoot);
+  const lockPath = stateGitLockPath(gitRoot, issueId);
   try {
     await acquireRecordLock(lockPath, {
       writerId,
       recordPath,
+      issueId,
       retryDelaysMs: STATE_GIT_LOCK_RETRY_DELAYS_MS,
     });
     try {
@@ -57,5 +66,55 @@ export async function withStateGitLock<T>(
   } finally {
     releaseQueue();
     if (processQueues.get(key) === tail) processQueues.delete(key);
+  }
+}
+
+const repoProcessQueues = new Map<string, Promise<void>>();
+
+/**
+ * PAN-3848 (F7): the repo-scoped state git lock. `withStateGitLock` is keyed
+ * per (gitRoot, issue) — the per-issue record lock — so two issues (or two
+ * processes) can run `git add`/`git commit` concurrently on one state
+ * checkout and contest the index, and two push-race reconciles can merge
+ * concurrently on one worktree. This lock is keyed on the git root alone and
+ * covers local index/commit operations plus the mutating sections of
+ * push-race reconciliation. The per-issue lock is retained; this one is added.
+ *
+ * LEAF RULE: acquire this lock inside per-issue locks (or with no other pan
+ * lock held), never acquire a per-issue/record lock while holding it — the
+ * reverse order self-deadlocks.
+ */
+export function stateRepoLockPath(gitRoot: string): string {
+  const key = createHash('sha256').update(resolve(gitRoot)).digest('hex');
+  return join(getOverdeckHome(), 'locks', 'state-git', `repo-${key}.lock`);
+}
+
+export async function withStateRepoLock<T>(
+  gitRoot: string,
+  writerId: string,
+  operation: () => Promise<T>,
+  retryDelaysMs: readonly number[] = STATE_GIT_LOCK_RETRY_DELAYS_MS,
+): Promise<T> {
+  const key = resolve(gitRoot);
+  const prior = repoProcessQueues.get(key) ?? Promise.resolve();
+  let releaseQueue!: () => void;
+  const gate = new Promise<void>((resolveGate) => {
+    releaseQueue = resolveGate;
+  });
+  const tail = prior.catch(() => undefined).then(() => gate);
+  repoProcessQueues.set(key, tail);
+
+  await prior.catch(() => undefined);
+  const lockPath = stateRepoLockPath(gitRoot);
+  try {
+    await acquireRecordLock(lockPath, { writerId, issueId: `repo:${key}`, retryDelaysMs });
+    try {
+      return await operation();
+    } finally {
+      await releaseRecordLock(lockPath);
+    }
+  } finally {
+    releaseQueue();
+    if (repoProcessQueues.get(key) === tail) repoProcessQueues.delete(key);
   }
 }

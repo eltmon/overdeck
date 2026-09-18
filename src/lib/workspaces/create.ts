@@ -375,7 +375,10 @@ export async function performWorkspaceCreate(intent: ResolvedWorkspaceIntent): P
     // change how the worktree is made (PAN-3330 review).
     // PAN-3847 (FR-15): the branch is cut from origin/<parent> after a fetch —
     // a local main can be stale or ahead and silently mis-root the workspace.
+    // CWE-78 residual: validate the branch before it reaches any refspec position.
     const parent = intent.parentBranch ?? 'main';
+    const { assertValidBranchNamePromise } = await import('../git-utils.js');
+    await assertValidBranchNamePromise(parent.replace(/^origin\//, ''), 'workspace parent branch');
     let baseRef = parent.startsWith('origin/') ? parent : `origin/${parent}`;
     try {
       await execFileAsync('git', ['fetch', 'origin', parent.replace(/^origin\//, '')], { cwd: project.config.path });

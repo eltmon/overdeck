@@ -318,7 +318,15 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
     // Clear ready signal before resuming (clean slate for PAN-87 fix)
     clearReadySignal(normalizedId);
 
-    const model = requestedModel || requireModelOverrideSync(agentState.model || 'claude-sonnet-4-6');
+    // PAN-3859: no hardcoded model fallback — a state file with no model and
+    // no explicit override fails loudly here, naming the agent, instead of
+    // silently resuming on a model nobody chose.
+    if (!requestedModel && !agentState.model) {
+      throw new Error(
+        `Cannot resume ${normalizedId}: agent state has no model and no model override was requested (PAN-3859: no hardcoded fallback)`,
+      );
+    }
+    const model = requestedModel || requireModelOverrideSync(agentState.model);
     if (requestedModel && requestedModel !== agentState.model) {
       agentState.model = requestedModel;
       saveAgentStateSync(agentState);
