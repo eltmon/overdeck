@@ -28,12 +28,7 @@ import {
   markVerificationWorkerAdmissionPhase,
   runSupervisedVerification,
 } from './verification-worker-supervisor.js';
-import type {
-  VerificationRunnerOptions,
-  VerificationRunnerOutcome,
-  WorkspaceInfo,
-} from './verification-types.js';
-import { INTERRUPTED_VERIFICATION_NOTE } from './verification-types.js';
+import { INTERRUPTED_VERIFICATION_NOTE, type VerificationRunnerOptions, type VerificationRunnerOutcome, type WorkspaceInfo } from './verification-types.js';
 import { readReviewStatusMap } from './review-status-source.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
