@@ -311,7 +311,7 @@
     "recordedAt": "2026-07-26T10:07:26.737Z"
   },
   "created": "2026-07-21T23:09:49.270Z",
-  "updated": "2026-07-26T13:54:00.732Z",
+  "updated": "2026-09-18T09:04:48.488Z",
   "pipeline": {
     "issueId": "PAN-2997",
     "reviewStatus": "passed",
@@ -560,7 +560,6 @@
       "accepted": []
     }
   },
-  "workModel": "k3[1m]",
   "harness": "claude-code",
   "model": "k3[1m]",
   "tasks": {
