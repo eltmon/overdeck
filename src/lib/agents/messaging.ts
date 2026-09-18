@@ -587,7 +587,11 @@ export async function messageAgent(
   // CONFIRMED death takes the resume path — an indeterminate probe delivers
   // normally and lets the transport fail on its own rather than resuming a
   // possibly-healthy agent.
-  const liveness = await isAlive(normalizedId);
+  // PAN-3879: a conversation has no agent state, so the oracle's default
+  // harness reader would fall back to claude-code and report a live
+  // acp-host/codex pane as runtime-missing. Probe with the harness the
+  // conversation row declares.
+  const liveness = await isAlive(normalizedId, { readHarness: () => expectedHarness });
   if (!liveness.alive && liveness.reason === 'no-session') {
     throw new Error(`Agent ${normalizedId} not running`);
   }

@@ -433,22 +433,25 @@ describe('messageAgent', () => {
     // Conversations have no agents/<id>/state.json, so messageAgent must
     // resolve the harness from the conversation row. The idle wait is mocked,
     // so no fake timers are needed for these paths.
+    // PAN-3849: the liveness oracle reads pane rows as '<pid>\t<dead>' and asks
+    // runtime-pid-probe for a runtime pid in the pane subtree; the old
+    // hasAgentRuntimeInSubtree seam is no longer on this path.
     function mockLiveConvPane() {
       mocks.getCodexAppServerStatus.mockRejectedValue(new Error('no app-server'));
-      mocks.listPaneValues.mockReturnValue(Effect.succeed(['4242']));
+      mocks.listPaneValues.mockReturnValue(Effect.succeed(['4242\t0']));
     }
 
     it('resolves an opencode conversation harness from the conversation row', async () => {
       mocks.getAgentStateSync.mockReturnValue(undefined);
       mocks.getConversationByName.mockReturnValue({ name: 'conv-20260917-1267', harness: 'opencode' });
       mockLiveConvPane();
-      mocks.hasAgentRuntimeInSubtree.mockResolvedValue(true);
+      mocks.findAgentRuntimePidInSubtree.mockResolvedValue(4242);
 
       const outcome = await messageAgent('conv-20260917-1267', 'steer this session', 'pan-tell');
 
-      // The subtree probe runs against the conversation harness (acp-host
-      // lives), not the claude-code fallback.
-      expect(mocks.hasAgentRuntimeInSubtree).toHaveBeenCalledWith('4242', 'opencode');
+      // The oracle's subtree probe runs against the conversation harness
+      // (acp-host lives), not the claude-code fallback.
+      expect(mocks.findAgentRuntimePidInSubtree).toHaveBeenCalledWith('4242', 'opencode');
       expect(mocks.resumeAgent).not.toHaveBeenCalled();
       expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
         'conv-20260917-1267',
@@ -463,7 +466,7 @@ describe('messageAgent', () => {
       mocks.getAgentStateSync.mockReturnValue(undefined);
       mocks.getConversationByName.mockReturnValue({ name: 'conv-20260917-1267', harness: 'opencode' });
       mockLiveConvPane();
-      mocks.hasAgentRuntimeInSubtree.mockResolvedValue(false);
+      mocks.findAgentRuntimePidInSubtree.mockResolvedValue(null);
 
       const outcome = await messageAgent('conv-20260917-1267', 'steer this session', 'pan-tell');
 
@@ -481,7 +484,7 @@ describe('messageAgent', () => {
       mocks.getAgentStateSync.mockReturnValue(undefined);
       mocks.getConversationByName.mockReturnValue({ name: 'conv-20260917-1300', harness: 'codex' });
       mockLiveConvPane();
-      mocks.hasAgentRuntimeInSubtree.mockResolvedValue(false);
+      mocks.findAgentRuntimePidInSubtree.mockResolvedValue(null);
 
       const outcome = await messageAgent('conv-20260917-1300', 'steer this session', 'pan-tell');
 
@@ -505,8 +508,8 @@ describe('messageAgent', () => {
         sessionId: 'session-2262',
       });
       mocks.getCodexAppServerStatus.mockRejectedValue(new Error('no app-server'));
-      mocks.listPaneValues.mockReturnValue(Effect.succeed(['4242']));
-      mocks.hasAgentRuntimeInSubtree.mockResolvedValue(false);
+      mocks.listPaneValues.mockReturnValue(Effect.succeed(['4242\t0']));
+      mocks.findAgentRuntimePidInSubtree.mockResolvedValue(null);
       mocks.resumeAgent.mockResolvedValue({ success: true, messageDelivered: true });
 
       const outcome = await messageAgent('agent-pan-2262', 'review feedback', 'pan-tell');
@@ -520,7 +523,7 @@ describe('messageAgent', () => {
       mocks.getAgentStateSync.mockReturnValue(undefined);
       mocks.getConversationByName.mockReturnValue({ name: 'conv-20260917-1400', harness: 'claude-code' });
       mockLiveConvPane();
-      mocks.hasAgentRuntimeInSubtree.mockResolvedValue(false);
+      mocks.findAgentRuntimePidInSubtree.mockResolvedValue(null);
 
       await expect(messageAgent('conv-20260917-1400', 'operator message', 'pan-tell'))
         .rejects.toThrow('cannot be resumed by pan tell');
