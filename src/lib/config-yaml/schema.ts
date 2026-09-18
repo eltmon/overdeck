@@ -6,6 +6,7 @@ import type { SubscriptionPlan, AuthMode } from '../subscription-types.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { BackgroundAiFeature } from '../background-ai/registry.js';
 import type { TieredExecutionConfig, ValidatedTieredExecutionConfig } from '../agents/tier-table.js';
+import type { TerminalBackendName } from '../terminal-backends/types.js';
 
 export type { SubscriptionPlan, AuthMode };
 
@@ -533,6 +534,8 @@ export interface YamlConfig {
   /** tmux runtime configuration */
   tmux?: TmuxConfig;
 
+  terminal?: { backend?: TerminalBackendName }; // D10; unset auto-selects (terminal-backends/select.ts)
+
   /** Conversation-specific configuration */
   conversations?: ConversationsConfig;
 
@@ -779,6 +782,8 @@ export interface NormalizedConfig {
   tmux: {
     configMode: TmuxConfigMode;
   };
+
+  terminal: { backend?: TerminalBackendName }; // D10; unset means auto-select
 
   /** Enabled providers */
   enabledProviders: Set<ModelProvider>;
