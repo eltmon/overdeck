@@ -97,11 +97,11 @@ describe('terminal backend registry', () => {
     expect(registeredTerminalBackends()).toContain('tmux');
   });
 
-  it('throws a message naming the module to import when nothing is registered', () => {
+  // One test on purpose: the throw only holds while herdr is unregistered, and
+  // registration is process-wide, so asserting it in a separate `it` would
+  // depend on file order.
+  it('throws a message naming the module to import, then resolves once that adapter registers', () => {
     expect(() => resolveTerminalBackend('herdr')).toThrowError(/terminal-backends\/herdr\.js/);
-  });
-
-  it('resolves the adapter registered later under a second name', () => {
     registerTerminalBackend(fakeBackend('herdr'));
     expect(resolveTerminalBackend('herdr').name).toBe('herdr');
   });
