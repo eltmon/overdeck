@@ -353,6 +353,17 @@ volumes, project-owned containers, and the leaked devnet while preserving worksp
 branches, agents, sessions, state, and xBRIEF. The single `rebuildWorkspaceStack`
 chokepoint no-ops for closed and merged issues, so patrols never recreate a terminal stack.
 
+### Frozen Deacon freezes workspace reclamation (PAN-3887)
+
+The residue patrols above only run while the Deacon is live. A frozen Deacon
+freezes workspace reclamation with it: merged strike workspaces
+(`workspaces/feature-<id>-strike/`, each carrying its own `node_modules`) and
+slot worktrees sit on disk indefinitely — 29 of them reached ~72 GB before
+anyone noticed. When the Deacon has been frozen, check the pileup with
+`pan workspace list --stale [--all]` (merged branches still on disk, with
+sizes) and reclaim with `pan workspace destroy <id>` (removes base, strike,
+and slot shapes by default; `--shape base|strike|slot` narrows it).
+
 The destructive/non-reversible completion steps are owned by close-out, not merge:
 `pan close <id>` / dashboard Close Out completes the xBRIEF, archives planning artifacts,
 optionally tears down the workspace or deletes feature branches according to `close_out`
