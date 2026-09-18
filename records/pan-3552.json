@@ -445,7 +445,7 @@
     "recordedAt": "2026-08-05T23:47:10.054Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-15T16:54:17.602Z",
+  "updated": "2026-09-18T09:07:16.674Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "passed",
@@ -873,7 +873,6 @@
   "harness": "claude-code",
   "model": "gpt-5.6-terra",
   "recoveryTrips": [],
-  "workModel": "gpt-5.6-terra",
   "tasks": {
     "sequence": 35,
     "claims": {},
