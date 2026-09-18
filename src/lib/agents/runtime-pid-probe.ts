@@ -20,6 +20,18 @@ function matchesHarnessProcess(name: string, expectedProcessNames: ReadonlySet<s
 }
 
 /**
+ * PAN-3879: a codex app-server session execs `node dist/codex-app-server-host.js`,
+ * so its pane process comm is `node`, not `codex`, and the name-only match above
+ * misses it. Confirm via the full command line — matching a bare `node` comm would
+ * false-positive on any node child in the subtree. Ported here when PAN-3849 moved
+ * the subtree walk out of runtime-command.ts; the check must survive that move or
+ * codex conversations read as dead.
+ */
+function isCodexAppServerHost(harness: RuntimeName, name: string | null, args: string | null): boolean {
+  return harness === 'codex' && name === 'node' && args !== null && args.includes('codex-app-server-host');
+}
+
+/**
  * One subtree walk ends in three states: the runtime pid, null when the
  * tree was cleanly observed to hold no harness process, or 'indeterminate'
  * when a probe exec itself failed. An unavailable probe is not evidence of
@@ -74,6 +86,17 @@ export async function findAgentRuntimePidInSubtree(rootPid: string, harness: Run
       if (!isCleanProcessLookupMiss(error)) probeFailed = true;
     }
     if (name !== null && matchesHarnessProcess(name, expectedProcessNames, harness)) return Number.parseInt(pid, 10);
+    // PAN-3879: codex app-server hosts present as `node` — confirm by args.
+    if (harness === 'codex' && name === 'node') {
+      let args: string | null = null;
+      try {
+        const { stdout } = await execAsync(`ps -p ${pid} -o args=`);
+        args = stdout;
+      } catch (error) {
+        if (!isCleanProcessLookupMiss(error)) probeFailed = true;
+      }
+      if (isCodexAppServerHost(harness, name, args)) return Number.parseInt(pid, 10);
+    }
 
     try {
       const { stdout: kids } = await execAsync(`pgrep -P ${pid}`);
@@ -119,6 +142,16 @@ export function findAgentRuntimePidInSubtreeSync(rootPid: string, harness: Runti
       if (!isCleanProcessLookupMiss(error)) probeFailed = true;
     }
     if (name !== null && matchesHarnessProcess(name, expectedProcessNames, harness)) return Number.parseInt(pid, 10);
+    // PAN-3879: codex app-server hosts present as `node` — confirm by args.
+    if (harness === 'codex' && name === 'node') {
+      let args: string | null = null;
+      try {
+        args = execFileSync('ps', ['-p', pid, '-o', 'args='], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+      } catch (error) {
+        if (!isCleanProcessLookupMiss(error)) probeFailed = true;
+      }
+      if (isCodexAppServerHost(harness, name, args)) return Number.parseInt(pid, 10);
+    }
 
     try {
       const kids = execFileSync('pgrep', ['-P', pid], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
