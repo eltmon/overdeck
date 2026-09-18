@@ -101,7 +101,7 @@
     "recordedAt": "2026-08-14T09:01:11.684Z"
   },
   "created": "2026-08-14T06:01:28.966Z",
-  "updated": "2026-09-18T13:17:46.358Z",
+  "updated": "2026-09-18T13:17:48.837Z",
   "pipeline": {
     "issueId": "PAN-3703",
     "reviewStatus": "passed",
@@ -312,8 +312,8 @@
       }
     }
   },
-  "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "harness": "claude-code",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 2,
