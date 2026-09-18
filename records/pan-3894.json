@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-09-18T06:43:33.655Z",
-  "updated": "2026-09-18T07:28:50.542Z",
+  "updated": "2026-09-18T07:29:08.558Z",
   "pipeline": {
     "issueId": "PAN-3894",
     "reviewStatus": "pending",
@@ -63,8 +63,16 @@
     }
   ],
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "w8-delete-stuck-stub": {
+        "writerId": "agent-pan-3894",
+        "agentId": "agent-pan-3894",
+        "pid": 486445,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-18T07:29:08.558Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3894",
@@ -86,6 +94,7 @@
     }
   },
   "statusOverrides": {
-    "w1-patrol-registry": "blocked"
+    "w1-patrol-registry": "blocked",
+    "w8-delete-stuck-stub": "running"
   }
 }
