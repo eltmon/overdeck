@@ -100,17 +100,29 @@ const FIXTURE_DIR = process.env.LIVENESS_AUDIT_FIXTURE_DIR
 
 let odb: OverdeckTestDb;
 let savedHome: string | undefined;
+let savedNoResume: string | undefined;
 
 beforeEach(() => {
   odb = setupOverdeckTestDb();
   savedHome = process.env.HOME;
   process.env.HOME = odb.home; // ~/.claude resolves inside the fixture world
+  // Same reason the dashboard URL above is unreachable: pan status's no-resume
+  // probe reads the env BEFORE it probes the dashboard, so mocking only the URL
+  // left the fixture machine-dependent. Verification gates are spawned from the
+  // dashboard process, which carries OVERDECK_NO_RESUME=1 whenever the operator
+  // booted with --no-resume — that inherited value made every stopped agent
+  // report `gatingReason: 'Boot --no-resume'` and reddened the audit for reasons
+  // that have nothing to do with the branch under test. Fail closed instead.
+  savedNoResume = process.env.OVERDECK_NO_RESUME;
+  delete process.env.OVERDECK_NO_RESUME;
   seedAuditWorld(odb);
 }, 30_000);
 
 afterEach(() => {
   if (savedHome === undefined) delete process.env.HOME;
   else process.env.HOME = savedHome;
+  if (savedNoResume === undefined) delete process.env.OVERDECK_NO_RESUME;
+  else process.env.OVERDECK_NO_RESUME = savedNoResume;
   teardownOverdeckTestDb(odb);
 });
 
