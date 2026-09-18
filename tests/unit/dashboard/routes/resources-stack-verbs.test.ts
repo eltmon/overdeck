@@ -6,10 +6,8 @@ import {
   dockerStackVerbEffect,
   resetCurrentDockerStatsReaderForTests,
   resetDockerStackVerbExecForTests,
-  resetResourceStackReviewStatusReaderForTests,
   setCurrentDockerStatsReaderForTests,
   setDockerStackVerbExecForTests,
-  setResourceStackReviewStatusReaderForTests,
 } from '../../../../src/dashboard/server/routes/resources.js';
 
 const appendedEvents: unknown[] = [];
@@ -24,7 +22,6 @@ const EventStoreTest = Layer.succeed(EventStoreService, {
 });
 
 beforeEach(() => {
-  setResourceStackReviewStatusReaderForTests(() => null);
   setCurrentDockerStatsReaderForTests(() => [
     container('c-api', 'feature-min-857-api-1'),
     container('c-web', 'feature-min-857-web-1'),
@@ -36,7 +33,6 @@ afterEach(() => {
   appendedEvents.length = 0;
   resetCurrentDockerStatsReaderForTests();
   resetDockerStackVerbExecForTests();
-  resetResourceStackReviewStatusReaderForTests();
 });
 
 describe('stack verb resources routes', () => {

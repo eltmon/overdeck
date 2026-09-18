@@ -1,6 +1,17 @@
-import { getReviewStatusSync, type ReviewStatus } from '../../../../lib/review-status.js';
+/**
+ * Docker stacks grouped by compose project, with each stack's issue state.
+ *
+ * PAN-3917 W6: a stack's pipeline position used to be `phase`, computed from
+ * the six status fields on the review-status record. It is now `state` — the
+ * derived issue state (FR-6), read from the tracker, the forge, git, and the
+ * terminal backend. `buildResourceStacks` stays pure over an already-loaded
+ * state map so the grouping logic is testable without touching a forge.
+ */
 
-export type ResourceStackPhase = 'merged' | 'ship' | 'review' | 'work' | 'plan' | 'ready' | 'todo' | 'verifying';
+import type { DerivedIssueState, IssueState } from '@overdeck/contracts';
+
+import { loadIssueStatesForProject } from '../../services/derived-issue-state.js';
+import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 
 export interface StackContainerResource {
   id: string;
@@ -25,29 +36,30 @@ export interface ResourceStack {
     memoryBytes: number;
     diskBytes: number;
   };
-  phase: ResourceStackPhase;
+  /** Derived issue state (FR-6). `null` for a stack with no issue. */
+  state: IssueState | null;
 }
 
-let reviewStatusReader: (issueId: string) => ReviewStatus | null = (issueId) => getReviewStatusSync(issueId);
+/** Derived state per issue id, as `buildResourceStacks` wants it. */
+export type IssueStatesByIssueId = ReadonlyMap<string, DerivedIssueState>;
 
-export function getResourceStacks(containers: StackContainerResource[]): ResourceStack[] {
-  return buildResourceStacks(containers, reviewStatusesFor(containers));
+/**
+ * Group containers into stacks and stamp each one's derived issue state.
+ *
+ * Async because the state is read from its owners; `buildResourceStacks` is
+ * the pure half.
+ */
+export async function getResourceStacks(containers: StackContainerResource[]): Promise<ResourceStack[]> {
+  return buildResourceStacks(containers, await loadStackIssueStates(containers));
 }
 
+/** Pure: group containers and attach the states the caller already loaded. */
 export function buildResourceStacks(
   containers: StackContainerResource[],
-  reviewStatuses: Record<string, ReviewStatus | undefined> = {},
+  issueStates: IssueStatesByIssueId = new Map(),
 ): ResourceStack[] {
-  const groups = new Map<string, StackContainerResource[]>();
-
-  for (const container of containers) {
-    const key = composeProjectFor(container) ?? 'unassigned';
-    groups.set(key, [...(groups.get(key) ?? []), container]);
-  }
-
-  return [...groups.entries()].map(([composeProject, services]) => {
+  return [...groupByComposeProject(containers).entries()].map(([composeProject, services]) => {
     const issueId = issueIdFor(composeProject, services);
-    const reviewStatus = issueId ? reviewStatuses[issueId] : undefined;
     return {
       id: issueId ?? composeProject,
       issueId,
@@ -60,36 +72,49 @@ export function buildResourceStacks(
         memoryBytes: services.reduce((sum, service) => sum + (service.memoryUsage ?? 0), 0),
         diskBytes: services.reduce((sum, service) => sum + (service.diskUsage ?? 0), 0),
       },
-      phase: phaseFor(reviewStatus),
+      state: issueId ? issueStates.get(issueId)?.state ?? null : null,
     };
   }).sort((a, b) => a.id.localeCompare(b.id));
 }
 
-export function setResourceStackReviewStatusReaderForTests(reader: (issueId: string) => ReviewStatus | null): void {
-  reviewStatusReader = reader;
+/**
+ * Derive the state of every issue these containers belong to, one batched
+ * forge read per project rather than one per stack.
+ */
+export async function loadStackIssueStates(
+  containers: StackContainerResource[],
+): Promise<IssueStatesByIssueId> {
+  const byProject = new Map<string, string[]>();
+  for (const [composeProject, services] of groupByComposeProject(containers)) {
+    const issueId = issueIdFor(composeProject, services);
+    if (!issueId) continue;
+    const projectPath = resolveProjectFromIssueSync(issueId)?.projectPath;
+    if (!projectPath) continue;
+    byProject.set(projectPath, [...(byProject.get(projectPath) ?? []), issueId]);
+  }
+
+  const states = new Map<string, DerivedIssueState>();
+  const loaded = await Promise.allSettled(
+    [...byProject.entries()].map(([projectPath, issueIds]) =>
+      loadIssueStatesForProject(projectPath, issueIds),
+    ),
+  );
+  for (const outcome of loaded) {
+    if (outcome.status !== 'fulfilled') continue;
+    for (const [issueId, state] of outcome.value) states.set(issueId, state);
+  }
+  return states;
 }
 
-export function resetResourceStackReviewStatusReaderForTests(): void {
-  reviewStatusReader = (issueId) => getReviewStatusSync(issueId);
-}
-
-function reviewStatusesFor(containers: StackContainerResource[]): Record<string, ReviewStatus | undefined> {
-  const issueIds = new Set<string>();
+function groupByComposeProject(
+  containers: StackContainerResource[],
+): Map<string, StackContainerResource[]> {
   const groups = new Map<string, StackContainerResource[]>();
   for (const container of containers) {
     const key = composeProjectFor(container) ?? 'unassigned';
     groups.set(key, [...(groups.get(key) ?? []), container]);
   }
-  for (const [composeProject, services] of groups.entries()) {
-    const issueId = issueIdFor(composeProject, services);
-    if (issueId) issueIds.add(issueId);
-  }
-
-  const statuses: Record<string, ReviewStatus | undefined> = {};
-  for (const issueId of issueIds) {
-    statuses[issueId] = reviewStatusReader(issueId) ?? undefined;
-  }
-  return statuses;
+  return groups;
 }
 
 function composeProjectFor(container: StackContainerResource): string | null {
@@ -122,33 +147,6 @@ function issueIdFromText(value: string): string | null {
     ?? value.match(/\b(pan|min|aur|krux)[-_]?(\d+)\b/i);
   if (!match) return null;
   return `${match[1].toUpperCase()}-${match[2]}`;
-}
-
-function phaseFor(status: ReviewStatus | undefined): ResourceStackPhase {
-  if (!status) return 'todo';
-  if (status.mergeStatus === 'merged') return 'merged';
-  if (
-    status.mergeStatus === 'queued' ||
-    status.mergeStatus === 'merging' ||
-    status.mergeStatus === 'verifying' ||
-    status.mergeStatus === 'failed' ||
-    status.readyForMerge === true
-  ) return 'ship';
-  if (status.verificationStatus === 'running') return 'verifying';
-  if (
-    status.reviewStatus === 'reviewing' ||
-    status.reviewStatus === 'passed' ||
-    status.reviewStatus === 'failed' ||
-    status.reviewStatus === 'blocked' ||
-    status.testStatus === 'testing' ||
-    status.testStatus === 'passed' ||
-    status.testStatus === 'failed' ||
-    status.inspectStatus === 'inspecting' ||
-    status.inspectStatus === 'passed' ||
-    status.inspectStatus === 'failed' ||
-    status.inspectStatus === 'error'
-  ) return 'review';
-  return 'todo';
 }
 
 function roundOne(value: number): number {

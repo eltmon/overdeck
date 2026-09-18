@@ -108,6 +108,9 @@ export {
   buildReclaimPayload,
   deleteResourceVenvEffect,
   deleteResourceVenvRoute,
+  isClosedStack,
+  listReclaimVenvIssueIds,
+  loadClosedIssueIds,
   resetReclaimForTests,
   setReclaimIssueClosedReaderForTests,
   setReclaimProjectRootForTests,
@@ -130,10 +133,8 @@ export {
 export {
   buildResourceStacks,
   getResourceStacks,
-  resetResourceStackReviewStatusReaderForTests,
-  setResourceStackReviewStatusReaderForTests,
+  loadStackIssueStates,
   type ResourceStack,
-  type ResourceStackPhase,
   type StackContainerResource,
 } from './resources/stacks.js';
 export {

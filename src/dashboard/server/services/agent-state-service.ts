@@ -17,8 +17,11 @@
  * - `emit()` MUST route through `appendAsync`, never `emitOnly`. emitOnly
  *   assigns sequence=-1 which would regress `updatedAtSequence` and break the
  *   Math.max(state.sequence, event.sequence) invariant in the shared reducer.
- * - `readFileSync` is forbidden — bootstrap uses `fs.promises.readFile` for
- *   the one-time runtime.json migration fallback.
+ * - `readFileSync` is forbidden.
+ *
+ * PAN-3917 (FR-12): the bootstrap seed is the terminal backend's live pane
+ * inventory, not a reconstruction from `state.json` plus tmux. There is no
+ * persisted runtime mirror to reconstruct from any more.
  */
 
 import { Effect, Layer, Context, Stream, SubscriptionRef } from 'effect';
@@ -27,17 +30,16 @@ import {
   INITIAL_READ_MODEL_STATE,
 } from '@overdeck/contracts';
 import type {
+  Activity,
   AgentRuntimeSnapshot,
-  AgentSnapshot,
+  AgentState,
   DomainEvent,
 } from '@overdeck/contracts';
 import { initEventStore } from '../event-store.js';
 import type { StoredEvent } from '../event-store.js';
 import { setAgentRuntimeMirror, getRuntimeSnapshot as getMirrorSnapshot, markAgentStateServiceInProcess } from '../../../lib/agent-runtime-mirror.js';
-import { getAgentStateSync } from '../../../lib/agents/agent-state.js';
-import { appendAgentPlaneSession } from '../../../lib/pan-dir/agents.js';
 import { appendSessionIdToHistory } from '../../../lib/session-history.js';
-import { emitBootReconciledStopEvents } from './boot-reconciled-stop-events.js';
+import { getBackendPanes } from './backend-inventory.js';
 
 // ─── Event filtering ──────────────────────────────────────────────────────────
 
@@ -106,60 +108,53 @@ export const AgentStateServiceLive = Layer.effect(
     const store = yield* Effect.promise(() => initEventStore());
     const ref = yield* SubscriptionRef.make<Record<string, AgentRuntimeSnapshot>>({});
 
-    // ── Bootstrap from sources (PAN-1920) ───────────────────────────────────
-    // Reconstruct runtime snapshots from state.json + tmux in a background fork
-    // so the dashboard port binds fast. The merge keeps any live events that
-    // arrived during the fork (they have a higher sequence than reconstruction).
-    const seedFromSources = Effect.gen(function* () {
-      const { reconstructCacheAuto } = yield* Effect.promise(() =>
-        import('../../../lib/reconstruct/reconstruct-cache.js'),
-      );
-      const result = yield* Effect.promise(() => reconstructCacheAuto());
-      const seeded = result.agentRuntimeById;
-      yield* Effect.promise(() => emitBootReconciledStopEvents(store, result.markedStoppedIds, seeded, '[AgentStateService] Failed to emit boot-reconciled stop event:'));
+    // ── Bootstrap from the backend inventory (PAN-3917) ─────────────────────
+    // Seed the runtime map from the live pane inventory in a background fork so
+    // the dashboard port binds fast. The merge keeps any live events that
+    // arrived during the fork (they carry a higher sequence than the seed).
+    const seedFromBackend = Effect.gen(function* () {
+      const panes = yield* Effect.promise(() => getBackendPanes());
+      const seeded: Record<string, AgentRuntimeSnapshot> = {};
+      const liveById: Record<string, boolean> = {};
+      for (const pane of panes) {
+        const id = pane.terminalId ?? pane.id;
+        liveById[id] = pane.state !== 'exited';
+        seeded[id] = {
+          id,
+          activity: activityForPaneState(pane.state),
+          lastActivity: new Date(pane.stateSince ?? Date.now()).toISOString(),
+          ...(pane.model && pane.model !== 'unknown' ? { model: pane.model } : {}),
+          ...(pane.harness && pane.harness !== 'unknown' ? { sessionHarness: pane.harness } : {}),
+          ...(pane.issue ? { currentIssue: pane.issue } : {}),
+          updatedAtSequence: 0,
+        } as AgentRuntimeSnapshot;
+      }
       if (Object.keys(seeded).length > 0) {
         yield* SubscriptionRef.update(ref, (current) =>
-          mergeRuntimeBySequence(current, seeded, result.agentsById),
+          mergeRuntimeBySequence(current, seeded, liveById),
         );
         yield* setAgentRuntimeMirror(yield* SubscriptionRef.get(ref));
         console.log(
-          `[AgentStateService] Bootstrapped ${Object.keys(seeded).length} runtime snapshot(s) from sources`,
+          `[AgentStateService] Seeded ${Object.keys(seeded).length} runtime snapshot(s) from the backend inventory`,
         );
       }
     });
-    yield* Effect.forkDetach(seedFromSources);
+    yield* Effect.forkDetach(seedFromBackend);
 
     // ── Subscribe forward ────────────────────────────────────────────────────
     // No unsubscribe — the service lives for the whole dashboard process.
     store.subscribe((ev) => {
       if (!isRuntimeEvent(ev)) return;
-      // PAN-1989: durably mirror a newly-learned Claude session id to the
-      // agent's sessions.json. This is the single convergence point — every
+      // PAN-1989: record a newly-learned Claude session id in the agent's
+      // session history. This is the single convergence point — every
       // model_set, hook-emitted or server-emitted, flows through here — so the
-      // resume pointer is persisted to disk the instant it is known, instead of
-      // living only in the in-memory snapshot that a restart/reboot discards.
+      // resume pointer is written the instant it is known, instead of living
+      // only in the in-memory snapshot that a restart discards. The state-plane
+      // copy of the same list is gone with the record plane (PAN-3917).
       if (ev.type === 'agent.model_set') {
         const payload = (ev as { payload?: { agentId?: string; claudeSessionId?: string } }).payload;
         if (payload?.agentId && payload.claudeSessionId) {
           appendSessionIdToHistory(payload.agentId, payload.claudeSessionId);
-          const state = getAgentStateSync(payload.agentId);
-          if (!state) {
-            console.warn(
-              `[AgentStateService] Could not append durable session ${payload.claudeSessionId} `
-              + `for ${payload.agentId}: agent state is missing`,
-            );
-          } else {
-            void appendAgentPlaneSession(state, {
-              id: payload.claudeSessionId,
-              startedAt: new Date().toISOString(),
-              reason: 'rotation',
-            }).catch((error) => {
-              console.warn(
-                `[AgentStateService] Could not append durable session ${payload.claudeSessionId} `
-                + `for ${payload.agentId}: ${error instanceof Error ? error.message : String(error)}`,
-              );
-            });
-          }
         }
       }
       Effect.runFork(applyEventToRef(ref, ev));
@@ -180,20 +175,35 @@ export const AgentStateServiceLive = Layer.effect(
 
 // ─── Internals ────────────────────────────────────────────────────────────────
 
+/** BackendPane state → the read model's Activity vocabulary. */
+export function activityForPaneState(state: AgentState): Activity {
+  switch (state) {
+    case 'working': return 'working';
+    case 'blocked': return 'waiting';
+    case 'done':
+    case 'exited': return 'stopped';
+    default: return 'idle';
+  }
+}
+
+/**
+ * Fold the backend seed under whatever live events already arrived. A seeded
+ * `stopped` for a pane the backend says is not live always wins: it is the
+ * backend's own answer, and a stale in-memory snapshot must not resurrect it.
+ */
 export function mergeRuntimeBySequence(
   current: Record<string, AgentRuntimeSnapshot>,
-  reconstructed: Record<string, AgentRuntimeSnapshot>,
-  reconstructedAgents: Record<string, AgentSnapshot>,
+  seeded: Record<string, AgentRuntimeSnapshot>,
+  liveById: Record<string, boolean>,
 ): Record<string, AgentRuntimeSnapshot> {
-  const merged: Record<string, AgentRuntimeSnapshot> = { ...reconstructed };
+  const merged: Record<string, AgentRuntimeSnapshot> = { ...seeded };
   for (const [id, snap] of Object.entries(current)) {
-    const recon = reconstructed[id];
+    const recon = seeded[id];
     if (!recon) {
       merged[id] = snap;
       continue;
     }
-    const sourceAgent = reconstructedAgents[id];
-    if (recon.activity === 'stopped' && sourceAgent?.hasLiveTmuxSession === false) {
+    if (recon.activity === 'stopped' && liveById[id] === false) {
       continue;
     }
     const currentSeq = snap.updatedAtSequence ?? -1;

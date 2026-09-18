@@ -40,8 +40,10 @@ import { detectAwaitingInputForAgent, detectAwaitingInputFromPaneSync, type Awai
 import { syncCacheSync, getCostsForIssueSync } from '../../../lib/costs/index.js';
 import { capturePane, listSessionNames } from '../../../lib/tmux.js';
 import { buildLintSessionNode } from './command-deck-lint-node.js';
+import { getBackendPanesForIssue } from '../services/backend-inventory.js';
+import { getDerivedIssueState } from '../services/derived-issue-state.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
-import type { AgentSnapshot, SessionNodePresence } from '@overdeck/contracts';
+import type { AgentSnapshot, BackendPane, SessionNodePresence } from '@overdeck/contracts';
 import { deriveSessionPresence } from '../services/session-presence.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
@@ -50,7 +52,6 @@ import { resolveProjectFromIssueSync, listProjectsSync } from '../../../lib/proj
 import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
 import { loadSettingsApi } from '../../../lib/settings-api.js';
 import { getAgentCommandSync } from '../../../lib/settings.js';
-import { getReviewStatusSync } from '../review-status.js';
 import { getGitHubConfig } from '../services/tracker-config.js';
 import { LinearClient } from '../services/linear-client.js';
 import { IssueDataService } from '../services/issue-data-service.js';
@@ -409,250 +410,131 @@ export async function fetchActivityDataWithContext(
     }
   }
 
-  // Build specialist sections from review-status history
-  const centralStatus = getReviewStatusSync(issueId.toUpperCase());
-
   // Lint node (PAN-2665): the verification quality-gate run that gates review
-  // dispatch, rendered between Work and Review in the tree.
-  const lintSection = buildLintSessionNode({ workspacePath, issueLower, includeTranscripts, centralStatus: centralStatus ?? null });
+  // dispatch, rendered between Work and Review in the tree. FR-8: the workspace
+  // artifact IS the result.
+  const lintSection = buildLintSessionNode({ workspacePath, issueLower, includeTranscripts });
   if (lintSection) sections.push(lintSection);
 
-  if (centralStatus?.history && centralStatus.history.length > 0) {
-    const tasksDir = join(homedir(), '.overdeck', 'specialists', 'tasks');
-    const taskFilesByType: Record<string, string[]> = { review: [], test: [], merge: [] };
+  // ── Specialist rows from the backend inventory (PAN-3917 FR-5) ─────────────
+  //
+  // The issue tree renders every pane in the issue workspace. There is no
+  // status history to replay: a pane's role token says which row it is, its
+  // state says whether it is live, and the PR's own review state says whether
+  // the review passed. `buildReviewerNodes` still reads the round artifacts.
+  const issuePanes = await getBackendPanesForIssue(issueId);
+  const derivedState = await getDerivedIssueState(issueId);
 
-    // Use shared task file contents if provided, else read once and cache (PAN-821)
-    let taskFileContents = context.taskFileContents;
-    if (!taskFileContents) {
-      taskFileContents = new Map<string, string>();
-      if (await pathExists(tasksDir)) {
-        const filenames = (await readdir(tasksDir).catch(() => [] as string[])).filter(f => f.endsWith('.md'));
-        await Promise.all(filenames.map(async (f) => {
-          const content = await readOptional(join(tasksDir, f));
-          if (content) taskFileContents!.set(f, content);
-        }));
-      }
+  const firstPaneWithRole = (role: BackendPane['role']): BackendPane | undefined =>
+    issuePanes.find((pane) => pane.role === role);
+
+  /** Pane state → the tree node's status + presence pair. */
+  const nodeStatusFor = (pane: BackendPane | undefined, verdict?: 'completed' | 'failed'): {
+    status: string;
+    presence: SessionNodePresence;
+  } => {
+    if (!pane) return { status: verdict ?? 'completed', presence: 'ended' };
+    switch (pane.state) {
+      case 'working': return { status: 'running', presence: 'active' };
+      case 'blocked': return { status: 'running', presence: 'active' };
+      case 'idle': return { status: 'running', presence: 'idle' };
+      case 'done': return { status: verdict ?? 'completed', presence: 'ended' };
+      case 'exited': return { status: verdict ?? 'completed', presence: 'ended' };
+      default: return { status: 'running', presence: 'idle' };
     }
+  };
 
-    for (const [f, content] of taskFileContents) {
-      if (content.includes(issueId.toUpperCase()) || content.includes(issueId)) {
-        if (f.startsWith('review-agent')) taskFilesByType.review!.push(f);
-        else if (f.startsWith('test-agent')) taskFilesByType.test!.push(f);
-        else if (f.startsWith('merge-agent')) taskFilesByType.merge!.push(f);
-      }
-    }
-    for (const type of Object.keys(taskFilesByType)) {
-      taskFilesByType[type]!.sort();
-    }
+  const startedAtFor = (pane: BackendPane | undefined): string =>
+    new Date(pane?.stateSince ?? Date.now()).toISOString();
 
-    const typeMap: Record<string, string> = { review: 'review', test: 'test', merge: 'merge' };
-    type SpecialistSection = { type: string; startedAt: string; endedAt?: string; status: string; notes?: string };
-    let currentSection: SpecialistSection | null = null;
-    const specialistSections: SpecialistSection[] = [];
+  // Review row: the review pane plus the four convoy reviewer nodes. The verdict
+  // is the PR's own review state (FR-7), not a stored reviewStatus.
+  const reviewPane = firstPaneWithRole('review');
+  const reviewVerdict: 'completed' | 'failed' | undefined =
+    derivedState.pr?.reviewState === 'approved' ? 'completed'
+    : derivedState.pr?.reviewState === 'changes-requested' ? 'failed'
+    : undefined;
+  const reviewerProjectKey = resolveProjectFromIssueSync(issueId)?.projectKey ?? issuePrefix.toLowerCase();
 
-    for (const entry of centralStatus.history) {
-      const sectionType = typeMap[entry.type] || entry.type;
-      if (entry.status === 'reviewing' || entry.status === 'testing' || entry.status === 'merging') {
-        currentSection = { type: sectionType, startedAt: entry.timestamp, status: 'running' };
-      } else if (currentSection && currentSection.type === sectionType) {
-        currentSection.endedAt = entry.timestamp;
-        currentSection.status = entry.status === 'passed' ? 'completed' : entry.status === 'failed' ? 'failed' : 'completed';
-        currentSection.notes = (entry as { notes?: string }).notes;
-        specialistSections.push(currentSection);
-        currentSection = null;
-      } else {
-        specialistSections.push({
-          type: sectionType,
-          startedAt: entry.timestamp,
-          status: entry.status === 'passed' ? 'completed' : entry.status === 'failed' ? 'failed' : 'completed',
-          notes: (entry as { notes?: string }).notes,
-        });
-      }
-    }
-    if (currentSection) specialistSections.push(currentSection);
-
-    const taskFileIndex: Record<string, number> = { review: 0, test: 0, merge: 0 };
-
-    // PAN-830: Reviewer panes are canonical (`specialist-<projectKey>-<issueId>-review-<role>`)
-    // and persist across review rounds, so we emit exactly four convoy reviewer
-    // nodes anchored to the *most recent* review section in history.
-    // Earlier review sections are skipped to avoid duplicate role nodes.
-    //
-    // Same for test and merge/ship: each role has one canonical session reused
-    // across rounds, so emit exactly one node anchored to the latest section.
-    // Without this, an issue with N test/merge history entries produced N
-    // same-sessionId nodes — the frontend collapsed them and the agent
-    // effectively vanished from the tree.
-    const lastReviewIndex = specialistSections.reduce(
-      (idx, s, i) => (s.type === 'review' ? i : idx),
-      -1,
-    );
-    const lastTestIndex = specialistSections.reduce(
-      (idx, s, i) => (s.type === 'test' ? i : idx),
-      -1,
-    );
-    const lastMergeIndex = specialistSections.reduce(
-      (idx, s, i) => (s.type === 'merge' ? i : idx),
-      -1,
-    );
-    const resolvedProject = resolveProjectFromIssueSync(issueId);
-    const reviewerProjectKey = resolvedProject?.projectKey ?? issuePrefix.toLowerCase();
-
-    for (let i = 0; i < specialistSections.length; i++) {
-      const ss = specialistSections[i]!;
-      const duration = ss.startedAt && ss.endedAt
-        ? (() => {
-            const ms = new Date(ss.endedAt).getTime() - new Date(ss.startedAt).getTime();
-            return Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
-          })()
-        : null;
-
-      const transcriptParts: string[] = [];
-      const statusLabel = ss.status === 'completed' ? 'PASSED' : ss.status === 'running' ? 'IN PROGRESS...' : ss.status.toUpperCase();
-      transcriptParts.push(`${ss.type.toUpperCase()} ${statusLabel}`);
-
-      const taskFiles = taskFilesByType[ss.type] || [];
-      const taskIdx = taskFileIndex[ss.type] || 0;
-      if (taskIdx < taskFiles.length) {
-        const taskContent = taskFileContents.get(taskFiles[taskIdx]!);
-        if (taskContent) {
-          const meaningfulLines = taskContent.split('\n').filter(l =>
-            !l.startsWith('```') && !l.startsWith('# EXECUTE') && !l.startsWith('⚠️')
-          );
-          transcriptParts.push(`\n--- Task ---\n${meaningfulLines.slice(0, 5).join('\n')}`);
-        }
-        taskFileIndex[ss.type] = taskIdx + 1;
-      }
-
-      if (ss.status === 'running') {
-        const ageMs = Date.now() - new Date(ss.startedAt).getTime();
-        const STALE_THRESHOLD_MS = 30 * 60 * 1000;
-
-        if (ageMs > STALE_THRESHOLD_MS) {
-          ss.status = 'completed';
-          transcriptParts[0] = `${ss.type.toUpperCase()} TIMED OUT (no result recorded)`;
-        }
-      }
-
-      if (ss.notes) {
-        transcriptParts.push(`\n--- Results ---\n${ss.notes}`);
-      }
-
-      // PAN-830: For review sections, emit the four canonical convoy reviewer
-      // nodes exactly once (anchored to the latest review section in history). Earlier
-      // review sections are absorbed into the round metadata read from
-      // `~/.overdeck/agents/<reviewer-id>/round-N.json`.
-      if (ss.type === 'review') {
-        if (i !== lastReviewIndex) continue;
-        const synthesisRoundMetadata = await readSynthesisRounds(issueId, reviewerProjectKey);
-        // PAN-1048: review orchestrator uses spawnRun naming — agent-<issue>-review
-        const orchestratorSessionName = `agent-${issueLower}-review`;
-        const orchestratorPresence: SessionNodePresence = tmuxSessionNames.has(orchestratorSessionName)
-          ? (ss.status === 'running' ? 'active' : 'idle')
-          : 'ended';
-        const orchestratorJsonlPath = await resolveJsonlPath(orchestratorSessionName, workspacePath);
-        // PAN-1832: surface the ACTUAL review agent's model/harness (e.g. after a
-        // restart onto pi/glm-5.2) instead of a hardcoded 'specialist' label that
-        // the frontend then back-fills with the role-default model (gpt-5.6-sol).
-        const orchestratorState = getAgentStateSync(orchestratorSessionName);
-        const orchestratorAwaitingInput = awaitingInputFromProjection(orchestratorSessionName, context.agentSnapshotsById);
-        const orchestratorSnapshot = context.agentSnapshotsById?.get(orchestratorSessionName);
-        sections.push({
-          type: 'review',
-          sessionId: orchestratorSessionName,
-          model: orchestratorState?.model || 'specialist',
-          startedAt: ss.startedAt,
-          endedAt: ss.endedAt,
-          duration: ss.startedAt && ss.endedAt
-            ? (() => {
-                const ms = new Date(ss.endedAt).getTime() - new Date(ss.startedAt).getTime();
-                return Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
-              })()
-            : null,
-          status: ss.status,
-          presence: orchestratorPresence,
-          roundMetadata: synthesisRoundMetadata,
-          awaitingInput: orchestratorAwaitingInput !== undefined ? (orchestratorAwaitingInput !== null) : false,
-          awaitingInputPrompt: orchestratorAwaitingInput?.prompt,
-          awaitingInputReason: orchestratorAwaitingInput?.reason,
-          pendingInputKinds: orchestratorSnapshot?.pendingInputKinds ? [...orchestratorSnapshot.pendingInputKinds] : undefined,
-          hasJsonl: !!orchestratorJsonlPath,
-          tmuxSession: orchestratorSessionName,
-        });
-        const reviewerNodes = await buildReviewerNodes({
-          issueId,
-          projectKey: reviewerProjectKey,
-          workspacePath,
-          projectPath,
-          tmuxSessionNames,
-          startedAt: ss.startedAt,
-          endedAt: ss.endedAt,
-          status: ss.status,
-          agentSnapshotsById: context.agentSnapshotsById,
-        });
-        for (const node of reviewerNodes) sections.push(node);
-        continue;
-      }
-
-      // Normal handling for non-review types — test and merge/ship history.
-      // Emit exactly one node per identity, anchored to the latest section, the
-      // same way review does. Earlier sections are skipped (their history is
-      // still in the DB and surfaced via status history elsewhere).
-      if (ss.type === 'test' && i !== lastTestIndex) continue;
-      if (ss.type === 'merge' && i !== lastMergeIndex) continue;
-
-      // Server-side shipping records `merge` history but no longer spawns a
-      // ship agent. Surface merge history as the `ship` node identity for
-      // continuity with old sessions and activity records.
-      // The test role still uses spawnRun(issueId, 'test'), which names the
-      // tmux session `agent-<issue>-test` — not the legacy
-      // `specialist-<project>-<issue>-<role>-agent` form.
-      const isShipStage = ss.type === 'merge';
-      const nodeType: 'ship' | 'test' = isShipStage ? 'ship' : 'test';
-      const specialistSessionId = isShipStage
-        ? `agent-${issueLower}-ship`
-        : `agent-${issueLower}-test`;
-      const specialistIsLive = tmuxSessionNames.has(specialistSessionId);
-      const specialistState = getAgentStateSync(specialistSessionId);
-      if (isShipStage && !specialistIsLive && !specialistState) continue;
-
-      if (includeTranscripts && ss.status === 'running') {
-        try {
-          const output = (await Effect.runPromise(capturePane(specialistSessionId, 100))).trim();
-          if (output && (output.includes(issueId.toUpperCase()) || output.includes(issueId) || output.includes(issueLower))) {
-            transcriptParts.push(`\n--- Live Output ---\n${output}`);
-          } else if (output) {
-            transcriptParts.push(`\n--- Waiting ---\nSpecialist is processing another issue. Will update when it reaches ${issueId}.`);
-          }
-        } catch { /* specialist may not be running */ }
-      }
-
-      const specialistIsZombie = specialistIsLive && (ss.status === 'completed' || ss.status === 'failed');
-      const specialistPresence: SessionNodePresence = specialistIsLive && !specialistIsZombie
-        ? (ss.status === 'running' ? 'active' : 'idle')
-        : specialistIsZombie ? 'idle' : 'ended';
-      const specialistJsonlPath = await resolveJsonlPath(specialistSessionId, workspacePath);
-      if (isShipStage && !specialistIsLive && !specialistJsonlPath) continue;
-
-      const specialistAwaitingInput = awaitingInputFromProjection(specialistSessionId, context.agentSnapshotsById);
-      const specialistSnapshot = context.agentSnapshotsById?.get(specialistSessionId);
-
+  if (reviewPane || reviewVerdict) {
+    const orchestratorSessionName = `agent-${issueLower}-review`;
+    const orchestratorJsonlPath = await resolveJsonlPath(orchestratorSessionName, workspacePath);
+    if (reviewPane || orchestratorJsonlPath) {
+      const { status, presence } = nodeStatusFor(reviewPane, reviewVerdict);
+      const startedAt = startedAtFor(reviewPane);
+      const synthesisRoundMetadata = await readSynthesisRounds(issueId, reviewerProjectKey);
+      const orchestratorAwaitingInput = awaitingInputFromProjection(orchestratorSessionName, context.agentSnapshotsById);
+      const orchestratorSnapshot = context.agentSnapshotsById?.get(orchestratorSessionName);
       sections.push({
-        type: nodeType,
-        sessionId: specialistSessionId,
-        model: specialistState?.model || 'specialist',
-        startedAt: ss.startedAt,
-        duration,
-        status: (specialistIsLive && !specialistIsZombie) ? 'running' : ss.status,
-        transcript: specialistJsonlPath ? undefined : transcriptParts.join('\n'),
-        presence: specialistPresence,
-        awaitingInput: specialistAwaitingInput !== undefined ? (specialistAwaitingInput !== null) : false,
-        awaitingInputPrompt: specialistAwaitingInput?.prompt,
-        awaitingInputReason: specialistAwaitingInput?.reason,
-        pendingInputKinds: specialistSnapshot?.pendingInputKinds ? [...specialistSnapshot.pendingInputKinds] : undefined,
-        hasJsonl: !!specialistJsonlPath,
+        type: 'review',
+        sessionId: reviewPane?.terminalId ?? orchestratorSessionName,
+        model: reviewPane && reviewPane.model !== 'unknown' ? reviewPane.model : 'specialist',
+        startedAt,
+        endedAt: presence === 'ended' ? startedAt : undefined,
+        duration: null,
+        status,
+        presence,
+        roundMetadata: synthesisRoundMetadata,
+        awaitingInput: reviewPane?.state === 'blocked'
+          || (orchestratorAwaitingInput !== undefined ? (orchestratorAwaitingInput !== null) : false),
+        awaitingInputPrompt: orchestratorAwaitingInput?.prompt,
+        awaitingInputReason: orchestratorAwaitingInput?.reason,
+        pendingInputKinds: orchestratorSnapshot?.pendingInputKinds ? [...orchestratorSnapshot.pendingInputKinds] : undefined,
+        hasJsonl: !!orchestratorJsonlPath,
+        tmuxSession: orchestratorSessionName,
       });
+      const reviewerNodes = await buildReviewerNodes({
+        issueId,
+        projectKey: reviewerProjectKey,
+        workspacePath,
+        projectPath,
+        tmuxSessionNames,
+        startedAt,
+        endedAt: presence === 'ended' ? startedAt : undefined,
+        status,
+        agentSnapshotsById: context.agentSnapshotsById,
+      });
+      for (const node of reviewerNodes) sections.push(node);
     }
+  }
+
+  // Test and ship rows. The ship row is the server-side merge, whose progress
+  // lives in the in-memory ship log, not in a merge-history record.
+  for (const [role, nodeType, sessionId] of [
+    ['test', 'test', `agent-${issueLower}-test`],
+    ['uat', 'ship', `agent-${issueLower}-ship`],
+  ] as const) {
+    const pane = firstPaneWithRole(role);
+    const jsonlPath = await resolveJsonlPath(sessionId, workspacePath);
+    if (!pane && !jsonlPath) continue;
+    const { status, presence } = nodeStatusFor(pane);
+    const awaitingInput = awaitingInputFromProjection(sessionId, context.agentSnapshotsById);
+    const snapshot = context.agentSnapshotsById?.get(sessionId);
+
+    const transcriptParts: string[] = [`${nodeType.toUpperCase()} ${status === 'running' ? 'IN PROGRESS...' : 'PASSED'}`];
+    if (includeTranscripts && status === 'running') {
+      try {
+        const output = (await Effect.runPromise(capturePane(sessionId, 100))).trim();
+        if (output) transcriptParts.push(`\n--- Live Output ---\n${output}`);
+      } catch { /* pane may not be a tmux session */ }
+    }
+
+    sections.push({
+      type: nodeType,
+      sessionId,
+      model: pane && pane.model !== 'unknown' ? pane.model : 'specialist',
+      startedAt: startedAtFor(pane),
+      duration: null,
+      status,
+      transcript: jsonlPath ? undefined : transcriptParts.join('\n'),
+      presence,
+      awaitingInput: pane?.state === 'blocked'
+        || (awaitingInput !== undefined ? (awaitingInput !== null) : false),
+      awaitingInputPrompt: awaitingInput?.prompt,
+      awaitingInputReason: awaitingInput?.reason,
+      pendingInputKinds: snapshot?.pendingInputKinds ? [...snapshot.pendingInputKinds] : undefined,
+      hasJsonl: !!jsonlPath,
+    });
   }
 
   sections.sort((a, b) => {
@@ -1005,13 +887,17 @@ async function generateStatusReview(issueId: string): Promise<
     execSafe(`cd "${workspacePath}" && git diff --name-only main 2>/dev/null || git diff --name-only HEAD~5 2>/dev/null || echo "No files changed"`),
   ]);
 
-  const centralReviewStatus = getReviewStatusSync(issueId.toUpperCase());
-  const reviewStatus = centralReviewStatus?.reviewStatus || 'unknown';
-  const testStatus = centralReviewStatus?.testStatus || 'unknown';
+  // PAN-3917 FR-6: the status-review prompt describes the issue's DERIVED
+  // position — the tracker, the PR, its checks, and the live panes — not two
+  // stored status fields.
+  const statusDerived = await getDerivedIssueState(issueId);
+  const pipelineState = statusDerived.state;
+  const checksState = statusDerived.pr?.checks ?? 'unknown';
+  const reviewState = statusDerived.pr?.reviewState ?? 'none';
 
   const { createHash } = await import('crypto');
   const contentHash = createHash('md5')
-    .update([state, discussionsContent, transcriptsContent, notesContent, issueContext, gitDiff, gitDiffFull, gitLog, filesChanged, reviewStatus, testStatus].filter(Boolean).join('|'))
+    .update([state, discussionsContent, transcriptsContent, notesContent, issueContext, gitDiff, gitDiffFull, gitLog, filesChanged, pipelineState, checksState, reviewState].filter(Boolean).join('|'))
     .digest('hex');
 
   await mkdir(planningDir, { recursive: true });
@@ -1033,8 +919,9 @@ async function generateStatusReview(issueId: string): Promise<
 ## Issue: ${issueId}
 ${issueContext ? `\n${issueContext}\n` : ''}
 ## Pipeline Status
-- Review: ${reviewStatus}
-- Tests: ${testStatus}
+- Pipeline state: ${pipelineState}
+- PR review: ${reviewState}
+- Checks: ${checksState}
 
 ## Planning Context (.overdeck/continue.json)
 ${state ? state.slice(0, 4000) : '(No planning state available)'}
@@ -1119,9 +1006,9 @@ Be specific: reference actual file names, function names, requirement text, disc
 
 | Stage | Status |
 |-------|--------|
-| Work | ${reviewStatus === 'unknown' ? 'In Progress' : 'Complete'} |
-| Review | ${reviewStatus} |
-| Tests | ${testStatus} |
+| Work | ${pipelineState === 'working' ? 'In Progress' : 'Complete'} |
+| Review | ${reviewState} |
+| Checks | ${checksState} |
 
 ## Files Changed
 \`\`\`

@@ -20,7 +20,7 @@ export const execFileAsync = promisify(execFile);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-export type SpecialistAgentName = 'merge-agent' | 'review-agent' | 'test-agent' | 'inspect-agent' | 'uat-agent';
+export type SpecialistAgentName = 'merge-agent' | 'review-agent' | 'test-agent' | 'uat-agent';
 export type ProjectSpecialistAgentName = 'review-agent' | 'test-agent' | 'merge-agent';
 export type SpecialistEventRole = 'review' | 'test' | 'ship';
 

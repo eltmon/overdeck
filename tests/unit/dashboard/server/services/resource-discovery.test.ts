@@ -245,7 +245,7 @@ describe('resource-discovery grouping', () => {
         hasState: false,
         isShadow: false,
         isRally: false,
-        readyForMerge: false,
+        state: null,
         resourceSources: ['workspace'],
         resourceDetails: {
           hasWorkspace: true,
@@ -282,7 +282,7 @@ describe('resource-discovery grouping', () => {
         childCount: 3,
         completedCount: 1,
         inProgressCount: 1,
-        readyForMerge: false,
+        state: null,
         resourceSources: ['branch'],
         resourceDetails: {
           hasWorkspace: false,
@@ -316,7 +316,7 @@ describe('resource-discovery grouping', () => {
         hasState: true,
         isShadow: false,
         isRally: false,
-        readyForMerge: false,
+        state: null,
         resourceSources: ['tmux', 'pr'],
         resourceDetails: {
           hasWorkspace: true,
@@ -370,7 +370,7 @@ describe('resource-discovery sanitization', () => {
         hasState: false,
         isShadow: false,
         isRally: false,
-        readyForMerge: false,
+        state: null,
         resourceSources: ['workspace', 'branch', 'tmux', 'docker', 'pr'],
         resourceDetails: {
           hasWorkspace: true,

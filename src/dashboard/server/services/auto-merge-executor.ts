@@ -1,6 +1,5 @@
 import { emitActivityTtsSync } from '../../../lib/activity-logger.js';
 import {
-  isFlywheelGloballyPaused,
   listDuePendingAutoMerges,
   markBlocked,
   markFailed,
@@ -11,11 +10,41 @@ import {
   type PendingAutoMerge,
 } from '../../../lib/overdeck/merge-sync.js';
 import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
-import { FAILED_MERGE_MAX_RETRIES } from '../../../lib/cloister/deacon-merge.js';
+import { isMergeTrainEnabled } from '../../../lib/overdeck/control-settings.js';
 import { readPendingDeploy } from '../../../lib/deploy/deploy-queue.js';
-import { getReviewStatusSync, setReviewStatusSync } from '../../../lib/review-status.js';
+import { getDerivedIssueState } from './derived-issue-state.js';
 
 export const AUTO_MERGE_EXECUTOR_INTERVAL_MS = 30_000;
+
+/**
+ * Consecutive retryable merge failures before the circuit breaker trips.
+ * PAN-3917: was `FAILED_MERGE_MAX_RETRIES` in the deleted `cloister/deacon-merge.ts`.
+ */
+export const FAILED_MERGE_MAX_RETRIES = 3;
+
+/**
+ * Retries consumed by the current executor process, per issue.
+ *
+ * This is the state of a retry loop this process is running, not a fact about
+ * the issue — the forge cannot answer "how many times have we tried". It used
+ * to live on the review-status record as `mergeRetryCount`; keeping it in
+ * memory means a restart starts the budget over, which is the correct behavior
+ * for a circuit breaker whose whole purpose is to stop a hot loop.
+ */
+const mergeRetryCounts = new Map<string, number>();
+
+function readMergeRetryCount(issueId: string): number {
+  return mergeRetryCounts.get(issueId.toUpperCase()) ?? 0;
+}
+
+function writeMergeRetryCount(issueId: string, count: number): void {
+  mergeRetryCounts.set(issueId.toUpperCase(), count);
+}
+
+/** Test seam: forget every retry budget. */
+export function _resetMergeRetryCountsForTests(): void {
+  mergeRetryCounts.clear();
+}
 
 interface MergeResult {
   success: boolean;
@@ -30,8 +59,10 @@ interface MergeResult {
 export interface AutoMergeExecutorDeps {
   now?: () => Date;
   listEntries?: () => PendingAutoMerge[];
+  /** The merge train must be on for auto-merge to act. */
   isPaused?: () => boolean;
   isEligible?: (issueId: string) => Promise<AutoMergeEligibility>;
+  derivedState?: (issueId: string) => ReturnType<typeof getDerivedIssueState>;
   hasPendingDeploy?: () => Promise<boolean>;
   transition?: (id: number) => boolean;
   markBlocked?: (id: number, reason: string) => boolean;
@@ -86,10 +117,10 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
 
   if (entries.length === 0) return;
 
-  const isPaused = deps.isPaused ?? isFlywheelGloballyPaused;
+  const isPaused = deps.isPaused ?? (() => !isMergeTrainEnabled());
   const log = deps.log ?? console.log;
   if (isPaused()) {
-    log('[auto-merge] flywheel paused, skipping tick');
+    log('[auto-merge] merge train disabled, skipping tick');
     return;
   }
   const hasPendingDeploy = deps.hasPendingDeploy
@@ -101,13 +132,26 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
 
   for (const entry of entries) {
     if (isPaused()) {
-      log('[auto-merge] flywheel paused, skipping tick');
+      log('[auto-merge] merge train disabled, skipping tick');
       return;
     }
 
     const eligibility = await (deps.isEligible ?? isAutoMergeEligible)(entry.issueId);
     if (!eligibility.eligible) {
       if (!(deps.markBlocked ?? markBlocked)(entry.id, eligibility.reason)) {
+        log(`[auto-merge] lost block race for ${entry.issueId} (#${entry.id}), skipping`);
+      }
+      continue;
+    }
+
+    // FR-9/D3: the merge gate is the forge — approvals, green checks, and
+    // mergeability — which is exactly `ready`. Re-read on every tick, because
+    // a push or a failing check between scheduling and the cooldown expiring
+    // must stop the merge.
+    const derived = await (deps.derivedState ?? getDerivedIssueState)(entry.issueId);
+    if (derived.state !== 'ready') {
+      const reason = `${entry.issueId} is ${derived.state}, not ready to merge`;
+      if (!(deps.markBlocked ?? markBlocked)(entry.id, reason)) {
         log(`[auto-merge] lost block race for ${entry.issueId} (#${entry.id}), skipping`);
       }
       continue;
@@ -150,7 +194,7 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
         continue;
       }
       if (result.retryable) {
-        const retryCount = (deps.getMergeRetryCount ?? ((issueId) => getReviewStatusSync(issueId)?.mergeRetryCount ?? 0))(entry.issueId);
+        const retryCount = (deps.getMergeRetryCount ?? readMergeRetryCount)(entry.issueId);
         if (retryCount >= FAILED_MERGE_MAX_RETRIES) {
           const blockedReason = `Auto-merge for ${entry.issueId} blocked: ${reason} (retried ${retryCount} times — fix the underlying cause and re-schedule)`;
           const blocked = (deps.markMergingBlocked ?? markMergingBlocked)(entry.id, blockedReason);
@@ -161,7 +205,7 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
           }
         } else {
           const nextRetryCount = retryCount + 1;
-          (deps.setMergeRetryCount ?? ((issueId, count) => setReviewStatusSync(issueId, { mergeRetryCount: count })))(entry.issueId, nextRetryCount);
+          (deps.setMergeRetryCount ?? writeMergeRetryCount)(entry.issueId, nextRetryCount);
           const retryAt = new Date(nowDate.getTime() + REQUEUE_BACKOFF_MS).toISOString();
           const requeued = (deps.requeueToPending ?? requeueToPending)(entry.id, retryAt);
           log(requeued

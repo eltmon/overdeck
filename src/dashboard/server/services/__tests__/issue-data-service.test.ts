@@ -3,6 +3,20 @@ import { computeTaskCounts, IssueDataService, shouldRefreshPlanningStateForIssue
 import type { XBriefDocument } from '../../../../lib/xbrief/types.js';
 import { mergeConfigs } from '../../../../lib/config-yaml.js';
 
+// PAN-3917 W6: W3 deletes the record plane; config-yaml still reaches it
+// transitively (config-yaml/defaults → agents/tier-table → pan-dir/record).
+// Stub the chain entry so the module under test loads.
+vi.mock('../../../../lib/pan-dir/record.js', () => ({
+  getIssueRecordPath: () => '/dev/null',
+  readIssueRecordSync: () => null,
+  readIssueRecordForWorkspaceSync: () => null,
+  readIssueRecord: async () => null,
+  batchReadIssueRecords: async () => new Map(),
+}));
+vi.mock('../../../../lib/pan-dir/record-update.js', () => ({
+  updateIssueRecord: async () => undefined,
+}));
+
 const mockResolveMissingIssue = vi.hoisted(() => vi.fn());
 vi.mock('../issue-title-fallback.js', () => ({
   resolveMissingIssue: (id: string) => mockResolveMissingIssue(id),
@@ -343,7 +357,7 @@ describe('IssueDataService.backfillIssue (PAN-3659)', () => {
   function makeService() {
     const svc = new IssueDataService({ getBackoffMs: () => 0 } as any);
     vi.spyOn(svc as any, 'schedulePlanningRefreshForIssues').mockImplementation(() => {});
-    vi.spyOn(svc as any, 'scheduleReviewStatusRefreshForIssues').mockImplementation(() => {});
+    vi.spyOn(svc as any, 'scheduleDerivedStateRefreshForIssues').mockImplementation(() => {});
     return svc;
   }
 

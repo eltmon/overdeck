@@ -17,30 +17,56 @@ import { EventStoreService } from '../services/domain-services.js';
 import { activityEntriesFromStoredEvents } from '../read-model.js';
 
 import { getCloisterService } from '../../../lib/cloister/service.js';
-import { listRunningAgents } from '../../../lib/agents.js';
-import { loadReviewStatuses } from '../../../lib/review-status.js';
+import { getBackendPanes } from '../services/backend-inventory.js';
+import { getDerivedIssueState } from '../services/derived-issue-state.js';
 import { getTodayCostSync } from '../../../lib/overdeck/cost-sync.js';
 import { getEventLoopDelaySample } from '../services/event-loop-monitor.js';
 import { readDurableCloisterStatus } from '../services/cloister-control-surface.js';
 
-// ─── Cached review statuses ───────────────────────────────────────────────────
-// loadReviewStatuses() hits SQLite with SELECT * FROM review_status on every
-// metrics request. Cache for 5s — review status changes are low-frequency.
-let _cachedReviewStatuses: ReturnType<typeof loadReviewStatuses> | null = null;
-let _cachedReviewStatusesAt = 0;
-const REVIEW_STATUS_CACHE_TTL_MS = 5_000;
+// ─── Stuck issues, derived ────────────────────────────────────────────────────
+// PAN-3917 FR-6: "stuck" is the derived `stuck` attention (idle N minutes with
+// unpushed commits), not a persisted flag on a review-status row. Cached for
+// 5s so the metrics endpoints do not re-read the forge per request.
+let _cachedStuckIssueIds: Set<string> | null = null;
+let _cachedStuckAt = 0;
+const STUCK_CACHE_TTL_MS = 5_000;
 
-function getReviewStatusesCached(): ReturnType<typeof loadReviewStatuses> {
+async function getStuckIssueIdsCached(): Promise<Set<string>> {
   const now = Date.now();
-  if (_cachedReviewStatuses && now - _cachedReviewStatusesAt < REVIEW_STATUS_CACHE_TTL_MS) {
-    return _cachedReviewStatuses;
+  if (_cachedStuckIssueIds && now - _cachedStuckAt < STUCK_CACHE_TTL_MS) {
+    return _cachedStuckIssueIds;
   }
-  _cachedReviewStatuses = loadReviewStatuses();
-  _cachedReviewStatusesAt = now;
-  return _cachedReviewStatuses;
+  const issueIds = [...new Set(
+    (await getBackendPanes())
+      .filter((pane) => pane.state !== 'exited' && pane.issue)
+      .map((pane) => pane.issue as string),
+  )];
+  const stuck = new Set<string>();
+  const derived = await Promise.allSettled(issueIds.map((issueId) => getDerivedIssueState(issueId)));
+  for (const outcome of derived) {
+    if (outcome.status === 'fulfilled' && outcome.value.attention === 'stuck') {
+      stuck.add(outcome.value.issueId.toUpperCase());
+    }
+  }
+  _cachedStuckIssueIds = stuck;
+  _cachedStuckAt = now;
+  return stuck;
+}
+
+/** Test seam: drop the derived stuck cache. */
+export function _resetStuckCacheForTests(): void {
+  _cachedStuckIssueIds = null;
+  _cachedStuckAt = 0;
 }
 import { listGitOperationsSync, type GitOperation } from '../../../lib/git-activity.js';
 import { httpHandler } from './http-handler.js';
+
+/** Live panes in the shape the metrics helpers read. */
+async function listRunningPanes(): Promise<Array<{ id: string; issueId?: string; tmuxActive: boolean }>> {
+  return (await getBackendPanes())
+    .filter((pane) => pane.state !== 'exited')
+    .map((pane) => ({ id: pane.id, ...(pane.issue ? { issueId: pane.issue } : {}), tmuxActive: true }));
+}
 
 // ─── Exported helper: safe agentId→issueId map ───────────────────────────────
 // Exported for unit testing — skips agents with missing/empty issueId so the
@@ -64,13 +90,9 @@ export function computeStuckCount(
   agentsNeedingAttention: string[],
   getAgentHealth: (id: string) => { state: string } | null | undefined,
   agentIdToIssueId: Map<string, string>,
-  reviewStatuses: Record<string, { stuck?: boolean; issueId: string }>,
+  stuckIssueIds: ReadonlySet<string>,
 ): number {
-  const persistentSet = new Set(
-    Object.values(reviewStatuses)
-      .filter((rs) => rs.stuck === true)
-      .map((rs) => rs.issueId.toUpperCase()),
-  );
+  const persistentSet = new Set([...stuckIssueIds].map((issueId) => issueId.toUpperCase()));
   const healthSet = new Set<string>();
   for (const agentId of agentsNeedingAttention) {
     const health = getAgentHealth(agentId);
@@ -97,7 +119,7 @@ export function buildMetricsSummaryPayload(params: {
     topIssues: unknown[];
   };
   runningAgents: Array<{ id: string; issueId?: string; tmuxActive: boolean }>;
-  reviewStatuses: Record<string, { stuck?: boolean; issueId: string }>;
+  stuckIssueIds: ReadonlySet<string>;
   getAgentHealth: (id: string) => { state: string } | null | undefined;
   eventLoop: ReturnType<typeof getEventLoopDelaySample>;
 }) {
@@ -107,7 +129,7 @@ export function buildMetricsSummaryPayload(params: {
     params.status.agentsNeedingAttention,
     params.getAgentHealth,
     buildAgentIssueMap(params.runningAgents),
-    params.reviewStatuses,
+    params.stuckIssueIds,
   );
 
   return {
@@ -138,13 +160,13 @@ const getMetricsSummaryRoute = HttpRouter.add(
     const costSummary = service.getCostSummary();
     const todayCost = getTodayCostSync();
 
-    const runningAgents = yield* listRunningAgents();
+    const runningAgents = yield* Effect.promise(() => listRunningPanes());
     return jsonResponse(buildMetricsSummaryPayload({
       todayCost,
       status,
       costSummary,
       runningAgents,
-      reviewStatuses: getReviewStatusesCached(),
+      stuckIssueIds: yield* Effect.promise(() => getStuckIssueIdsCached()),
       getAgentHealth: (id) => service.getAgentHealth(id),
       eventLoop: getEventLoopDelaySample(),
     }));
@@ -177,12 +199,12 @@ const getMetricsStuckRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const service = getCloisterService();
     const status = readDurableCloisterStatus();
-    const runningAgents = yield* listRunningAgents();
+    const runningAgents = yield* Effect.promise(() => listRunningPanes());
     const current = computeStuckCount(
       status.agentsNeedingAttention,
       (id) => service.getAgentHealth(id),
       buildAgentIssueMap(runningAgents),
-      getReviewStatusesCached(),
+      yield* Effect.promise(() => getStuckIssueIdsCached()),
     );
     return jsonResponse({ current, incidents: [] });
   })),

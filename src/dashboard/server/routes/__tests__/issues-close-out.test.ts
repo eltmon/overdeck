@@ -46,6 +46,45 @@ import { INTERNAL_TOKEN_HEADER, _resetInternalTokenCacheForTests } from '../../.
 import { DASHBOARD_CSRF_HEADER, DASHBOARD_SESSION_COOKIE, _resetDashboardSessionTokenForTests, dashboardCsrfToken } from '../dashboard-auth.js';
 import { _resetTrustedOriginsForTests } from '../origin-validation.js';
 
+// PAN-3917 W6: the record plane is deleted by W3; these route trees still reach
+// it transitively (config-yaml → tier-table → record, workspaces/resolver →
+// overdeck/infra → record). Stub the chain entry so the route under test loads.
+vi.mock('../../../../lib/pan-dir/record.js', () => ({
+  getIssueRecordPath: () => '/dev/null',
+  readIssueRecordSync: () => null,
+  readIssueRecordForWorkspaceSync: () => null,
+  readIssueRecord: async () => null,
+  batchReadIssueRecords: async () => new Map(),
+}));
+vi.mock('../../../../lib/pan-dir/record-update.js', () => ({
+  updateIssueRecord: async () => undefined,
+}));
+vi.mock('../../../../lib/pan-dir/agents.js', () => ({
+  appendAgentPlaneLifecycle: () => undefined,
+  appendAgentPlaneSession: () => undefined,
+  recordAgentPlaneSpawn: () => undefined,
+  readAgentPlaneRecordSync: () => null,
+  backfillAgentPlaneRecord: () => undefined,
+  flushAgentPlaneWrites: async () => null,
+}));
+vi.mock('../../../../lib/overdeck/agent-state-sync.js', () => ({
+  getOverdeckAgentStateSync: () => null,
+  saveOverdeckAgentStateSync: () => undefined,
+  listOverdeckAgentStatesSync: () => [],
+}));
+vi.mock('../../../../lib/overdeck/agent-record-sync.js', () => ({
+  readAgentHarnessModelRecordSync: () => null,
+  writeAgentHarnessModelRecordSync: () => undefined,
+}));
+vi.mock('../../../../lib/pan-dir/records.js', () => ({
+  listIssueRecordsSync: () => [],
+  listIssueRecords: async () => [],
+}));
+vi.mock('../../../../lib/overdeck/review-status-record-sync.js', () => ({
+  syncReviewStatusToRecord: async () => undefined,
+  syncReviewStatusToRecordSync: () => undefined,
+}));
+
 const originalApiPort = process.env.API_PORT;
 const originalPort = process.env.PORT;
 const originalDashboardUrl = process.env.DASHBOARD_URL;

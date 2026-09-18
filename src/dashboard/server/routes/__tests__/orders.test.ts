@@ -14,15 +14,13 @@ const {
   mockGetProjectSync,
   mockFindProjectByPathSync,
   mockListProjectsSync,
-  mockResolveStateReadHomeSync,
-  mockResolveStateReadHomeAsync,
+  mockGetProjectPanPaths,
   mockStartFlywheelRun,
 } = vi.hoisted(() => ({
   mockGetProjectSync: vi.fn(),
   mockFindProjectByPathSync: vi.fn(),
   mockListProjectsSync: vi.fn(),
-  mockResolveStateReadHomeSync: vi.fn(),
-  mockResolveStateReadHomeAsync: vi.fn(),
+  mockGetProjectPanPaths: vi.fn(),
   mockStartFlywheelRun: vi.fn(),
 }));
 
@@ -40,18 +38,29 @@ vi.mock('../../../../cli/commands/flywheel.js', () => ({
   startFlywheelRun: mockStartFlywheelRun,
 }));
 
-vi.mock('../../../../lib/state-read-home.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../lib/state-read-home.js')>();
+// PAN-3917 FR-2: order books live under the project repo's `.pan/`, resolved by
+// getProjectPanPaths — there is no state worktree to read from any more.
+vi.mock('../../../../lib/pan-dir/paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../lib/pan-dir/paths.js')>();
   return {
     ...actual,
-    resolveStateReadHomeSync: mockResolveStateReadHomeSync,
-    resolveStateReadHomeAsync: mockResolveStateReadHomeAsync,
+    getProjectPanPaths: mockGetProjectPanPaths,
   };
 });
 
 interface RouteResult {
   status: number;
   body: Record<string, unknown>;
+}
+
+/** getProjectPanPaths' shape, with the fixture root standing in for `.pan/`. */
+function panPaths(panDir: string) {
+  return {
+    panDir,
+    specsDir: join(panDir, 'specs'),
+    draftsDir: join(panDir, 'drafts'),
+    continuesDir: join(panDir, 'continues'),
+  };
 }
 
 const roots: string[] = [];
@@ -153,12 +162,9 @@ beforeEach(() => {
   mockGetProjectSync.mockReset().mockReturnValue(null);
   mockFindProjectByPathSync.mockReset().mockReturnValue(null);
   mockListProjectsSync.mockReset().mockReturnValue([]);
-  mockResolveStateReadHomeSync.mockReset();
+  mockGetProjectPanPaths.mockReset();
   // Delegates to whatever the sync mock is configured to return, so tests only
   // need to configure one mock regardless of which resolution path they exercise.
-  mockResolveStateReadHomeAsync.mockReset().mockImplementation(
-    async (project: ProjectConfig, key?: string) => mockResolveStateReadHomeSync(project, key),
-  );
   mockStartFlywheelRun.mockReset();
 });
 
@@ -371,10 +377,9 @@ describe('/api/orders routes', () => {
       if (key === 'project-b') return projectB;
       return null;
     });
-    mockResolveStateReadHomeSync.mockImplementation((project: ProjectConfig) => ({
-      root: project === projectA ? rootA : rootB,
-      migrated: true,
-    }));
+    mockGetProjectPanPaths.mockImplementation((projectRoot: string) => panPaths(
+      projectRoot === projectA.path ? rootA : rootB,
+    ));
 
     const layer = makeOrdersRouteLayer({ issueLookup: () => new Map() });
     await expect(requestOrdersRoute(layer, '/api/orders?project=project-a', mutation('POST', {
@@ -424,10 +429,9 @@ describe('/api/orders routes', () => {
       { key: 'default-project', config: defaultProject },
       { key: 'other-project', config: otherProject },
     ]);
-    mockResolveStateReadHomeSync.mockImplementation((project: ProjectConfig) => ({
-      root: project === defaultProject ? defaultRoot : otherRoot,
-      migrated: true,
-    }));
+    mockGetProjectPanPaths.mockImplementation((projectRoot: string) => panPaths(
+      projectRoot === defaultProject.path ? defaultRoot : otherRoot,
+    ));
 
     const layer = makeOrdersRouteLayer({ issueLookup: () => new Map() });
     await requestOrdersRoute(layer, '/api/orders?project=other-project', mutation('POST', {
@@ -452,10 +456,9 @@ describe('/api/orders routes', () => {
       { key: 'default-project', config: defaultProject },
       { key: 'other-project', config: otherProject },
     ]);
-    mockResolveStateReadHomeSync.mockImplementation((project: ProjectConfig) => ({
-      root: project === defaultProject ? defaultRoot : otherRoot,
-      migrated: true,
-    }));
+    mockGetProjectPanPaths.mockImplementation((projectRoot: string) => panPaths(
+      projectRoot === defaultProject.path ? defaultRoot : otherRoot,
+    ));
 
     const layer = makeOrdersRouteLayer({ issueLookup: () => new Map() });
     await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-nowhere')).resolves.toMatchObject({
@@ -468,7 +471,7 @@ describe('/api/orders routes', () => {
     const otherRoot = gitFixture();
     const otherProject = { path: '/fake/other-project' } as ProjectConfig;
     mockGetProjectSync.mockImplementation((key: string) => (key === 'other-project' ? otherProject : null));
-    mockResolveStateReadHomeSync.mockReturnValue({ root: otherRoot, migrated: true });
+    mockGetProjectPanPaths.mockReturnValue(panPaths(otherRoot));
     mockListProjectsSync.mockReturnValue([{ key: 'other-project', config: otherProject }]);
 
     const layer = makeOrdersRouteLayer({ issueLookup: () => new Map() });
@@ -481,7 +484,7 @@ describe('/api/orders routes', () => {
     const otherRoot = gitFixture();
     const otherProject = { path: '/fake/other-project' } as ProjectConfig;
     mockGetProjectSync.mockImplementation((key: string) => (key === 'other-project' ? otherProject : null));
-    mockResolveStateReadHomeSync.mockReturnValue({ root: otherRoot, migrated: true });
+    mockGetProjectPanPaths.mockReturnValue(panPaths(otherRoot));
     mockStartFlywheelRun.mockResolvedValue({ runId: 'RUN-OTHER' });
 
     const states = new Map<string, OrderIssueState>([['PAN-20', { issue: 'PAN-20', open: true, parked: false }]]);
@@ -504,7 +507,7 @@ describe('/api/orders routes', () => {
     const defaultProject = { path: process.cwd() } as ProjectConfig;
     mockFindProjectByPathSync.mockReturnValue(defaultProject);
     mockListProjectsSync.mockReturnValue([{ key: 'default-project', config: defaultProject }]);
-    mockResolveStateReadHomeSync.mockReturnValue({ root: defaultRoot, migrated: true });
+    mockGetProjectPanPaths.mockReturnValue(panPaths(defaultRoot));
     mockStartFlywheelRun.mockResolvedValue({ runId: 'RUN-DEFAULT' });
 
     const states = new Map<string, OrderIssueState>([['PAN-21', { issue: 'PAN-21', open: true, parked: false }]]);

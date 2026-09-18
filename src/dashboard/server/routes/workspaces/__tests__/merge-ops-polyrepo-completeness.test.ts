@@ -8,9 +8,75 @@ const mocks = vi.hoisted(() => ({
   mergeReviewArtifact: vi.fn(),
   mergeSet: null as any,
   postMergeLifecycle: vi.fn(),
-  reviewStatus: {} as Record<string, unknown>,
-  setReviewStatus: vi.fn(),
+  setMergeRun: vi.fn(),
   upsertMergeSet: vi.fn(),
+}));
+
+// PAN-3917: config-yaml's defaults import lib/agents/tier-table, which still
+// reaches the record plane W3 is deleting. Stub the one constant it needs.
+// The record plane itself: W3 deletes `pan-dir/record*` and `pan-dir/auto-commit`,
+// and `auto-commit` already imports the removed `state-read-home`, so the module
+// graph cannot load at all. Stubbing the deleted modules cuts every chain that
+// still reaches them (workspaces/resolver → overdeck/infra, agents →
+// agent-record-sync, git-activity → overdeck/git-activity) at their real end.
+vi.mock('../../../../../lib/pan-dir/record.js', () => ({
+  appendSessionEntrySync: vi.fn(),
+  getIssueRecordPath: vi.fn(),
+  getIssueRecordPathForWorkspace: vi.fn(),
+  getIssueWorkspacePath: vi.fn(() => null),
+  getProjectConfigFromWorkspacePath: vi.fn(() => null),
+  markRecordPipelineClosedOutSync: vi.fn(),
+  markRecordPipelineResidueClosedOutSync: vi.fn(),
+  readIssueRecord: vi.fn(),
+  readIssueRecordForWorkspaceSync: vi.fn(() => null),
+  readIssueRecordSync: vi.fn(() => null),
+  readRecordContinueViewSync: vi.fn(() => null),
+  resolveProjectForIssue: vi.fn(() => null),
+  writeAgentHarnessModelSync: vi.fn(),
+  writeCloseOutDodGate: vi.fn(),
+  writeIssueRecordSync: vi.fn(),
+  writeRecordDecisionsSync: vi.fn(),
+  writeRecordScopeDriftSync: vi.fn(),
+}));
+vi.mock('../../../../../lib/pan-dir/record-update.js', () => ({
+  clearRecordPipelineClosedOut: vi.fn(),
+  clearRecordPipelineClosedOutSync: vi.fn(),
+  updateIssueRecord: vi.fn(),
+  updateIssueRecordForWorkspace: vi.fn(),
+}));
+vi.mock('../../../../../lib/pan-dir/auto-commit.js', () => ({
+  flushAllPendingAutoCommits: vi.fn(),
+  flushAutoCommits: vi.fn(),
+  pushPendingStateCommits: vi.fn(),
+  queueAutoCommit: vi.fn(),
+  reconcileStatePlaneDrift: vi.fn(),
+}));
+vi.mock('../../../../../lib/pan-dir/records.js', () => ({
+  markRecordPipelineClosedOutSync: vi.fn(),
+  resolveContinuePath: vi.fn(() => null),
+  updateIssueRecordForIssue: vi.fn(),
+}));
+vi.mock('../../../../../lib/memory/state-mirror.js', () => ({
+  mirrorPin: vi.fn(),
+  unmirrorPin: vi.fn(),
+}));
+vi.mock('../../../../../lib/pan-dir/agents.js', () => ({
+  appendAgentPlaneLifecycle: vi.fn(),
+  appendAgentPlaneSession: vi.fn(),
+  backfillAgentPlaneRecord: vi.fn(),
+  flushAgentPlaneWrites: vi.fn(),
+  readAgentPlaneRecordSync: vi.fn(() => null),
+  recordAgentPlaneSpawn: vi.fn(),
+}));
+// lib/agents pulls agents/spawn, which imports the removed `state-home`.
+vi.mock('../../../../../lib/agents.js', () => ({
+  getAgentState: vi.fn(),
+  messageAgent: vi.fn(),
+  spawnAgent: vi.fn(),
+}));
+vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperationsSync: vi.fn(() => []) }));
+vi.mock('../../../../../lib/agents/tier-table.js', () => ({
+  DEFAULT_TIERED_EXECUTION_CONFIG: { enabled: false, tiers: [], subscription: 'all' },
 }));
 
 vi.mock('node:child_process', () => {
@@ -58,20 +124,18 @@ vi.mock('../../../../../lib/projects.js', () => ({
     },
     quality_gates: {},
   })),
+  findProjectByPathSync: vi.fn(() => null),
+  listProjectsSync: vi.fn(() => []),
+  resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'overdeck', projectName: 'Overdeck', projectPath: '/project' })),
 }));
 
-vi.mock('../../../../../lib/review-status.js', () => ({
-  getReviewStatusSync: vi.fn(() => ({
-    reviewStatus: 'passed',
-    testStatus: 'passed',
-    mergeStatus: 'pending',
-    readyForMerge: true,
+// PAN-3917: merge readiness is the forge's answer, not a review-status record.
+vi.mock('../../../services/derived-issue-state.js', () => ({
+  getDerivedIssueState: vi.fn(async (issueId: string) => ({
+    issueId,
+    state: 'ready',
+    pr: { url: 'https://github.com/eltmon/overdeck/pull/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true },
   })),
-  markWorkspaceStuck: vi.fn(),
-  setReviewStatusSync: vi.fn(),
-
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../../../lib/tmux.js', () => ({
@@ -85,19 +149,15 @@ vi.mock('../../workspaces.js', () => ({
   getWorkspaceInfoForIssue: vi.fn(() => ({ isRemote: false, localPath: '/workspace' })),
   readJsonBody: vi.fn(),
   setPendingOperation: vi.fn(),
-  setReviewStatus: (issueId: string, patch: Record<string, unknown>) => {
-    mocks.reviewStatus = { ...mocks.reviewStatus, ...patch };
-    mocks.setReviewStatus(issueId, patch);
-  },
 }));
 
 vi.mock('../merge-strike.js', () => ({
   activeStrikeMerge: vi.fn(() => false),
-  advanceMergeQueue: vi.fn(),
+  advanceMergeQueue: vi.fn(async () => {}),
   ensureAgentReadyForMerge: vi.fn(),
-  mergeCompletionStatus: vi.fn(() => ({})),
   mergeVerificationOptions: vi.fn(() => ({})),
   normalMergeEligibility: vi.fn(() => null),
+  readStrikeHead: vi.fn(async () => null),
   validateStrikeMergeRequest: vi.fn(() => null),
 }));
 
@@ -107,6 +167,9 @@ vi.mock('../../specialists.js', () => ({
 
 vi.mock('../../../services/merge-queue-service.js', () => ({
   setMergeQueueAdvanceHandler: vi.fn(),
+  setMergeRun: (issueId: string, patch: Record<string, unknown>) => mocks.setMergeRun(issueId, patch),
+  getMergeRun: () => null,
+  clearMergeRun: vi.fn(),
 }));
 
 vi.mock('../../../../../lib/merge-set.js', () => ({
@@ -210,7 +273,6 @@ function mergeSet(repos: ReturnType<typeof repo>[]) {
 describe('coordinated polyrepo merge completeness gate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.reviewStatus = {};
     mocks.discoverArtifact.mockResolvedValue(null);
     mocks.findMergedArtifact.mockResolvedValue(null);
     mocks.mergeReviewArtifact.mockResolvedValue(undefined);
@@ -241,13 +303,11 @@ describe('coordinated polyrepo merge completeness gate', () => {
       statusCode: 409,
       error: expect.stringContaining('repo-b has 2 commits'),
     }));
-    expect(mocks.reviewStatus).toEqual(expect.objectContaining({
-      mergeStatus: 'failed',
-      readyForMerge: false,
-      blockerReasons: [expect.objectContaining({
-        type: 'unmerged_sibling_repo',
-        summary: expect.stringContaining('repo-b'),
-      })],
+    // PAN-3917: the blocker is reported on the merge run and in the response,
+    // not written to a record as `blockerReasons`.
+    expect(mocks.setMergeRun).toHaveBeenCalledWith('PAN-2467', expect.objectContaining({
+      phase: 'failed',
+      notes: expect.stringContaining('repo-b'),
     }));
     expect(mocks.mergeSet.status).toBe('failed');
     expect(mocks.postMergeLifecycle).not.toHaveBeenCalled();
@@ -271,7 +331,6 @@ describe('coordinated polyrepo merge completeness gate', () => {
       mergeStatus: 'merged',
     }));
     expect(mocks.mergeSet.status).toBe('merged');
-    expect(mocks.reviewStatus).toEqual(expect.objectContaining({ mergeStatus: 'merged' }));
     expect(mocks.postMergeLifecycle).toHaveBeenCalledTimes(1);
   });
 
@@ -309,7 +368,6 @@ describe('coordinated polyrepo merge completeness gate', () => {
       expect.objectContaining({ repoKey: 'repo-b', mergeStatus: 'merged' }),
     ]);
     expect(mocks.mergeReviewArtifact).not.toHaveBeenCalled();
-    expect(mocks.reviewStatus).toEqual(expect.objectContaining({ mergeStatus: 'merged' }));
     expect(mocks.postMergeLifecycle).toHaveBeenCalledTimes(1);
   });
 

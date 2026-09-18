@@ -59,7 +59,6 @@ import { paletteRouteLayer } from './routes/palette.js';
 import { conversationsRouteLayer } from './routes/conversations.js';
 import { conversationsRetrospectiveRouteLayer } from './routes/conversations-retrospective.js';
 import { eventsRouteLayer } from './routes/events.js';
-import { showRouteLayer } from './routes/show.js';
 import { projectsRouteLayer } from './routes/projects.js';
 import { projectsMergeTrainRouteLayer } from './routes/projects-merge-train.js';
 import { mergeTrainRouteLayer } from './routes/merge-train.js';
@@ -76,13 +75,11 @@ import { codexAuthRouteLayer } from './routes/codex-auth.js';
 import { linearMcpAuthRouteLayer } from './routes/linear-mcp-auth.js';
 import { terminalsRouteLayer } from './routes/terminals.js';
 import { discoveredSessionsRouteLayer } from './routes/discovered-sessions.js';
-import { flywheelRouteLayer } from './routes/flywheel.js';
 import { ordersRouteLayer } from './routes/orders.js';
 import { artifactsRouteLayer } from './routes/artifacts.js';
 import { backlogRouteLayer } from './routes/backlog.js';
 import { featureRegistryRouteLayer } from './routes/feature-registry.js';
 import { fsRouteLayer } from './routes/fs.js';
-import { tieredCalloutsRouteLayer } from './routes/tiered-callouts.js';
 import { internalEventsRouteLayer } from './routes/internal-events.js';
 import { restartGateRouteLayer } from './routes/restart-gate.js';
 import { dashboardCsrfToken, dashboardSessionCookieHeader, rejectUnauthorizedDashboardRequest, rejectUnauthorizedDashboardSessionMintRequest } from './routes/dashboard-auth.js';
@@ -362,7 +359,6 @@ export const makeRoutesLayer = Layer.mergeAll(
   conversationsRouteLayer,
   conversationsRetrospectiveRouteLayer,
   eventsRouteLayer,
-  showRouteLayer,
   projectsRouteLayer,
   projectsMergeTrainRouteLayer,
   mergeTrainRouteLayer,
@@ -379,12 +375,10 @@ export const makeRoutesLayer = Layer.mergeAll(
   linearMcpAuthRouteLayer,
   terminalsRouteLayer,
   discoveredSessionsRouteLayer,
-  flywheelRouteLayer,
   ordersRouteLayer,
   artifactsRouteLayer,
   featureRegistryRouteLayer,
   fsRouteLayer,
-  tieredCalloutsRouteLayer,
   backlogRouteLayer,
   internalEventsRouteLayer,
   restartGateRouteLayer,

@@ -17,7 +17,68 @@ const mocks = vi.hoisted(() => ({
   rebaseFeatureBranch: vi.fn(),
   reviewStatus: {} as Record<string, unknown>,
   sessionExists: vi.fn(),
-  setReviewStatus: vi.fn(),
+  setMergeRun: vi.fn(),
+}));
+
+// PAN-3917: config-yaml's defaults import lib/agents/tier-table, which still
+// reaches the record plane W3 is deleting. Stub the one constant it needs.
+// The record plane itself: W3 deletes `pan-dir/record*` and `pan-dir/auto-commit`,
+// and `auto-commit` already imports the removed `state-read-home`, so the module
+// graph cannot load at all. Stubbing the deleted modules cuts every chain that
+// still reaches them (workspaces/resolver → overdeck/infra, agents →
+// agent-record-sync, git-activity → overdeck/git-activity) at their real end.
+vi.mock('../../../../../lib/pan-dir/record.js', () => ({
+  appendSessionEntrySync: vi.fn(),
+  getIssueRecordPath: vi.fn(),
+  getIssueRecordPathForWorkspace: vi.fn(),
+  getIssueWorkspacePath: vi.fn(() => null),
+  getProjectConfigFromWorkspacePath: vi.fn(() => null),
+  markRecordPipelineClosedOutSync: vi.fn(),
+  markRecordPipelineResidueClosedOutSync: vi.fn(),
+  readIssueRecord: vi.fn(),
+  readIssueRecordForWorkspaceSync: vi.fn(() => null),
+  readIssueRecordSync: vi.fn(() => null),
+  readRecordContinueViewSync: vi.fn(() => null),
+  resolveProjectForIssue: vi.fn(() => null),
+  writeAgentHarnessModelSync: vi.fn(),
+  writeCloseOutDodGate: vi.fn(),
+  writeIssueRecordSync: vi.fn(),
+  writeRecordDecisionsSync: vi.fn(),
+  writeRecordScopeDriftSync: vi.fn(),
+}));
+vi.mock('../../../../../lib/pan-dir/record-update.js', () => ({
+  clearRecordPipelineClosedOut: vi.fn(),
+  clearRecordPipelineClosedOutSync: vi.fn(),
+  updateIssueRecord: vi.fn(),
+  updateIssueRecordForWorkspace: vi.fn(),
+}));
+vi.mock('../../../../../lib/pan-dir/auto-commit.js', () => ({
+  flushAllPendingAutoCommits: vi.fn(),
+  flushAutoCommits: vi.fn(),
+  pushPendingStateCommits: vi.fn(),
+  queueAutoCommit: vi.fn(),
+  reconcileStatePlaneDrift: vi.fn(),
+}));
+vi.mock('../../../../../lib/pan-dir/records.js', () => ({
+  markRecordPipelineClosedOutSync: vi.fn(),
+  resolveContinuePath: vi.fn(() => null),
+  updateIssueRecordForIssue: vi.fn(),
+}));
+vi.mock('../../../../../lib/memory/state-mirror.js', () => ({
+  mirrorPin: vi.fn(),
+  unmirrorPin: vi.fn(),
+}));
+vi.mock('../../../../../lib/pan-dir/agents.js', () => ({
+  appendAgentPlaneLifecycle: vi.fn(),
+  appendAgentPlaneSession: vi.fn(),
+  backfillAgentPlaneRecord: vi.fn(),
+  flushAgentPlaneWrites: vi.fn(),
+  readAgentPlaneRecordSync: vi.fn(() => null),
+  recordAgentPlaneSpawn: vi.fn(),
+}));
+vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperationsSync: vi.fn(() => []) }));
+vi.mock('../../../../../lib/agents/tier-table.js', () => ({
+  DEFAULT_TIERED_EXECUTION_CONFIG: { enabled: false, tiers: [], subscription: 'all' },
 }));
 
 vi.mock('node:child_process', () => {
@@ -89,17 +150,17 @@ vi.mock('../../../../../lib/overdeck/merge.js', () => ({
 }));
 vi.mock('../../../../../lib/projects.js', () => ({
   findProjectByTeamSync: vi.fn(() => ({ workspace: { type: 'monorepo' }, quality_gates: {} })),
+  findProjectByPathSync: vi.fn(() => null),
+  listProjectsSync: vi.fn(() => []),
+  resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'overdeck', projectName: 'Overdeck', projectPath: '/project' })),
 }));
-vi.mock('../../../../../lib/review-status.js', () => ({
-  getReviewStatusSync: vi.fn(() => ({
-    issueId: 'PAN-3110', reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed',
-    mergeStatus: 'pending', readyForMerge: true,
+// PAN-3917: merge readiness is the forge's answer, not a review-status record.
+vi.mock('../../../services/derived-issue-state.js', () => ({
+  getDerivedIssueState: vi.fn(async (issueId: string) => ({
+    issueId,
+    state: 'ready',
+    pr: { url: PR_URL, number: 3102, reviewState: 'approved', checks: 'green', mergeable: true },
   })),
-  markWorkspaceStuck: vi.fn(),
-  setReviewStatusSync: vi.fn(),
-
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
 }));
 vi.mock('../../../../../lib/tmux.js', () => ({ sessionExists: mocks.sessionExists }));
 vi.mock('../../../../../lib/forge.js', () => ({
@@ -112,17 +173,15 @@ vi.mock('../../workspaces.js', () => ({
   getWorkspaceInfoForIssue: vi.fn(() => ({ isRemote: false, localPath: '/workspace/feature-pan-3110' })),
   readJsonBody: vi.fn(),
   setPendingOperation: vi.fn(),
-  setReviewStatus: (issueId: string, patch: Record<string, unknown>) => {
-    mocks.reviewStatus = { ...mocks.reviewStatus, ...patch };
-    mocks.setReviewStatus(issueId, patch);
-  },
 }));
-vi.mock('../merge-strike.js', async (importOriginal) => ({
-  ...((await importOriginal()) as typeof import('../merge-strike.js')),
-  recordCiGreenVerificationVerdict: vi.fn(),
+vi.mock('../../../services/merge-queue-service.js', () => ({
+  setMergeQueueAdvanceHandler: vi.fn(),
+  setMergeRun: (issueId: string, patch: Record<string, unknown>) => mocks.setMergeRun(issueId, patch),
+  getMergeRun: () => null,
+  clearMergeRun: vi.fn(),
 }));
+
 vi.mock('../../specialists.js', () => ({ _serverManagedMerges: new Set<string>() }));
-vi.mock('../../../services/merge-queue-service.js', () => ({ setMergeQueueAdvanceHandler: vi.fn() }));
 
 import { triggerMerge } from '../merge-ops.js';
 
@@ -160,7 +219,7 @@ describe('triggerMerge server rebase escalation', () => {
     vi.useRealTimers();
   });
 
-  it('queues a retry without clearing verdict readiness when the local workspace is missing', async () => {
+  it('queues a retry when the local workspace is missing', async () => {
     mocks.existsSync.mockReturnValue(false);
 
     const result = await triggerMerge('PAN-3110');
@@ -171,14 +230,10 @@ describe('triggerMerge server rebase escalation', () => {
       error: 'Workspace does not exist',
       retryable: true,
     });
-    expect(mocks.setReviewStatus).toHaveBeenCalledWith('PAN-3110', {
-      mergeStatus: 'queued',
-      mergeNotes: 'Workspace does not exist',
+    expect(mocks.setMergeRun).toHaveBeenCalledWith('PAN-3110', {
+      phase: 'queued',
+      notes: 'Workspace does not exist',
     });
-    expect(mocks.setReviewStatus).not.toHaveBeenCalledWith(
-      'PAN-3110',
-      expect.objectContaining({ readyForMerge: false }),
-    );
     expect(mocks.rebaseFeatureBranch).not.toHaveBeenCalled();
   });
 
@@ -208,10 +263,10 @@ describe('triggerMerge server rebase escalation', () => {
     expect(mocks.messageAgent).toHaveBeenCalledWith('agent-pan-3110', expect.stringContaining('MERGE REQUESTED'));
     expect(result).toEqual(expect.objectContaining({ success: false }));
     expect(result).not.toHaveProperty('retryable');
-    expect(mocks.setReviewStatus).toHaveBeenCalledWith('PAN-3110', expect.objectContaining({ mergeStatus: 'failed', readyForMerge: false }));
+    expect(mocks.setMergeRun).toHaveBeenCalledWith('PAN-3110', expect.objectContaining({ phase: 'failed' }));
   });
 
-  it('queues a retry without clearing verdict readiness when the agent stops after a non-conflict failure', async () => {
+  it('queues a retry when the agent stops after a non-conflict failure', async () => {
     mocks.rebaseFeatureBranch.mockReturnValue(Effect.fail(new Error('git fetch failed')));
 
     const resultPromise = triggerMerge('PAN-3110');
@@ -219,11 +274,10 @@ describe('triggerMerge server rebase escalation', () => {
     const result = await resultPromise;
 
     expect(result).toEqual(expect.objectContaining({ success: false, retryable: true }));
-    expect(mocks.setReviewStatus).toHaveBeenCalledWith('PAN-3110', expect.objectContaining({
-      mergeStatus: 'queued',
-      mergeNotes: expect.stringContaining('stopped before completing the rebase'),
+    expect(mocks.setMergeRun).toHaveBeenCalledWith('PAN-3110', expect.objectContaining({
+      phase: 'queued',
+      notes: expect.stringContaining('stopped before completing the rebase'),
     }));
-    expect(mocks.setReviewStatus).not.toHaveBeenCalledWith('PAN-3110', expect.objectContaining({ readyForMerge: false }));
   });
 
   it('queues a retry when a non-conflict rebase times out with the agent still running', async () => {
@@ -235,14 +289,10 @@ describe('triggerMerge server rebase escalation', () => {
     const result = await resultPromise;
 
     expect(result).toEqual(expect.objectContaining({ success: false, retryable: true }));
-    expect(mocks.setReviewStatus).toHaveBeenCalledWith('PAN-3110', expect.objectContaining({
-      mergeStatus: 'queued',
-      mergeNotes: expect.stringContaining('did not push the rebased branch within 30 minutes'),
+    expect(mocks.setMergeRun).toHaveBeenCalledWith('PAN-3110', expect.objectContaining({
+      phase: 'queued',
+      notes: expect.stringContaining('did not push the rebased branch within 30 minutes'),
     }));
-    expect(mocks.setReviewStatus).not.toHaveBeenCalledWith(
-      'PAN-3110',
-      expect.objectContaining({ readyForMerge: false }),
-    );
   });
 
   it('keeps failing CI as a non-retryable content failure', async () => {
@@ -253,6 +303,6 @@ describe('triggerMerge server rebase escalation', () => {
     expect(result).toEqual(expect.objectContaining({ success: false, statusCode: 409 }));
     expect(result).not.toHaveProperty('retryable');
     expect(mocks.rebaseFeatureBranch).not.toHaveBeenCalled();
-    expect(mocks.setReviewStatus).toHaveBeenCalledWith('PAN-3110', expect.objectContaining({ mergeStatus: 'failed', readyForMerge: false }));
+    expect(mocks.setMergeRun).toHaveBeenCalledWith('PAN-3110', expect.objectContaining({ phase: 'failed' }));
   });
 });

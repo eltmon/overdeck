@@ -65,9 +65,12 @@ const getPlanningStatusRoute = HttpRouter.add(
         const remoteState = loadRemoteAgentState(sessionName);
         const isRemote = !!remoteState;
         const vmName = remoteState?.vmName ?? '';
-        const { getAgentStateSync } = await import('../../../../lib/agents.js');
-        const agentState = getAgentStateSync(sessionName);
-        const agentStarting = agentState?.status === 'starting';
+        // PAN-3917 FR-12: the pane's own state, not a persisted agent mirror.
+        // Herdr reports `unknown` for a pane whose agent has not reported yet,
+        // which is the state the old mirror called `starting`.
+        const { getBackendPanes } = await import('../../services/backend-inventory.js');
+        const pane = (await getBackendPanes()).find((candidate) => candidate.id === sessionName);
+        const agentStarting = pane?.state === 'unknown';
 
         let tmuxSessionAlive = false;
         if (!isRemote) {

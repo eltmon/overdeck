@@ -14,22 +14,20 @@ import {
   listAgentStates,
   type AgentState,
 } from '../../../../lib/agents.js';
-import { getReviewStatusSync } from '../../../../lib/review-status.js';
+import { getBackendPanes } from '../../services/backend-inventory.js';
 import { computeAgentEnrichment, isBlockedOnPendingInput } from '../../../../lib/agent-enrichment.js';
 import { normalizeAwaitingInputPrompt } from '../../../../lib/agent-input-detection.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
 import { resolveAgentGitInfo } from '../../services/git-info.js';
-import { listSessions, sessionExists } from '../../../../lib/tmux.js';
+import { getDerivedIssueState } from '../../services/derived-issue-state.js';
 import {
   AGENTS_CACHE_TTL_MS,
   agentsCache,
-  buildAgentGateFailureSnapshot,
   buildStoppedAgentLifecycle,
   filterClosedIssueAgents,
   getGitStatusAsync,
   getIssueDataService,
   getWorkspaceLocation,
-  hasActiveAgentGateOrRetry,
   readRemoteAgentState,
 } from './shared.js';
 
@@ -65,8 +63,19 @@ export const getAgentsRoute = HttpRouter.add(
           return jsonResponse(agentsCache.data);
         }
 
-        const sessions = yield* listSessions();
-        const sessionByName = new Map(sessions.map((session) => [session.name, session]));
+        // PAN-3917 (FR-12): the terminal backend is the inventory. `listAgentStates`
+        // still supplies the PERMANENT facts stamped at spawn (issue, workspace,
+        // role, harness, model, branch); every liveness and state answer below
+        // comes from the pane.
+        const panes = yield* Effect.promise(() => getBackendPanes());
+        const paneById = new Map(panes.map((pane) => [pane.terminalId ?? pane.id, pane]));
+        const specialistIssues = new Set(
+          panes
+            .filter((pane) => pane.state !== 'exited' && (pane.role === 'review' || pane.role === 'test' || pane.role === 'uat'))
+            .map((pane) => pane.issue)
+            .filter((issue): issue is string => Boolean(issue)),
+        );
+
         const registeredStates = listAgentStates()
           .filter((state) => state.id.startsWith('agent-') || state.id.startsWith('planning-') || state.id.startsWith('strike-'));
 
@@ -77,34 +86,38 @@ export const getAgentsRoute = HttpRouter.add(
             const isStrike = name.startsWith('strike-');
             const issueId = state.issueId?.toUpperCase() ||
               (isPlanning ? name.replace('planning-', '') : isStrike ? name.replace('strike-', '') : name.replace('agent-', '')).toUpperCase();
-            const session = sessionByName.get(name);
+            const pane = paneById.get(name);
+            const live = pane !== undefined && pane.state !== 'exited';
             const remoteState = await readRemoteAgentState(name);
             const isRemote = remoteState.location === 'remote';
             const runtimeData = await Effect.runPromise(getAgentRuntimeState(name));
-            const startedAt = state.startedAt || (session ? new Date(session.created).toISOString() : new Date().toISOString());
+            const startedAt = state.startedAt
+              || (pane?.stateSince ? new Date(pane.stateSince).toISOString() : new Date().toISOString());
             const healthFile = join(homedir(), '.overdeck', 'agents', name, 'health.json');
             let health: any = { killCount: 0 };
             if (existsSync(healthFile)) {
               try { health = { ...health, ...JSON.parse(await readFile(healthFile, 'utf-8')) }; } catch {}
             }
+            const role = pane?.role ?? state.role ?? (isStrike ? 'strike' : isPlanning ? 'plan' : 'work');
+            const runtime = (pane?.harness && pane.harness !== 'unknown' ? pane.harness : state.harness) ?? 'claude-code';
+            const model = (pane?.model && pane.model !== 'unknown' ? pane.model : state.model)
+              || (isPlanning ? 'opus' : 'sonnet');
 
-            if (state.status === 'stopped') {
-              const stoppedTimestamp = state.stoppedAt || runtimeData?.lastActivity || state.lastActivity;
+            // No live pane and not remote: the agent is stopped. There is no
+            // persisted `starting`/`error` status any more — a pane either
+            // exists in the backend or it does not.
+            if (!live && !isRemote) {
+              const stoppedTimestamp = pane?.stateSince
+                ? new Date(pane.stateSince).toISOString()
+                : runtimeData?.lastActivity ?? state.lastActivity;
               const stoppedAt = stoppedTimestamp ? new Date(stoppedTimestamp) : null;
-              const reviewStatus = getReviewStatusSync(issueId);
-              const keepStoppedAgentVisible =
-                hasActiveAgentGateOrRetry(state, now) ||
-                (
-                  !!reviewStatus &&
-                  reviewStatus.mergeStatus !== 'merged' &&
-                  (
-                    !!reviewStatus.prUrl ||
-                    reviewStatus.readyForMerge === true ||
-                    reviewStatus.reviewStatus !== 'pending' ||
-                    reviewStatus.testStatus !== 'pending' ||
-                    reviewStatus.mergeStatus === 'failed'
-                  )
-                );
+              // Keep a recently-stopped agent visible while its PR is still in
+              // play: that is the forge's answer, not a stored status row.
+              const derived = await getDerivedIssueState(issueId).catch(() => null);
+              const keepStoppedAgentVisible = derived !== null
+                && derived.state !== 'merged'
+                && derived.state !== 'closed'
+                && derived.pr !== undefined;
               if (stoppedAt && (now - stoppedAt.getTime()) > 60 * 60 * 1000 && !keepStoppedAgentVisible) return null;
               const lifecycle = buildStoppedAgentLifecycle(name, state, runtimeData ?? {});
               const needsInput = runtimeData?.resolution === 'needs_input';
@@ -120,22 +133,22 @@ export const getAgentsRoute = HttpRouter.add(
               return {
                 id: name,
                 issueId,
-                runtime: state.harness ?? 'claude-code',
-                model: state.model || (isPlanning ? 'opus' : 'sonnet'),
+                runtime,
+                model,
                 status: 'stopped' as const,
+                paneState: pane?.state ?? 'exited',
                 startedAt,
-                ...buildAgentGateFailureSnapshot(state),
                 killCount: health.killCount || 0,
-                workspace: state.workspace || null,
-                workspaceLocation: isRemote ? 'remote' : 'local',
+                workspace: pane?.workspace ?? state.workspace ?? null,
+                workspaceLocation: 'local' as const,
                 // A stopped agent never shells `git` against its workspace (no
                 // process cost for a row nobody is actively watching), so this
                 // can only report the persisted branch, not live uncommitted/
-                // commit detail — better than the unconditional null every
-                // stopped agent used to report regardless of what it stored.
+                // commit detail.
                 git: state.branch ? { branch: state.branch, uncommittedFiles: 0, latestCommit: '' } : null,
                 type: 'agent',
-                role: state.role ?? (isStrike ? 'strike' : isPlanning ? 'plan' : 'work'),
+                role,
+                hasLiveTmuxSession: false,
                 hasPendingQuestion: needsInput,
                 pendingQuestionCount: 0,
                 pendingQuestionPrompt,
@@ -144,88 +157,15 @@ export const getAgentsRoute = HttpRouter.add(
                 resolutionCount: runtimeData?.resolutionCount || 0,
                 hasSession: lifecycle.canResumeSession,
                 lifecycle,
-                ...(isRemote ? { remote: true, vmName: remoteState.vmName } : {}),
               };
             }
 
-            if (state.status === 'starting') {
-              return {
-                id: name,
-                issueId,
-                runtime: state.harness ?? 'claude-code',
-                model: state.model || (isPlanning ? 'opus' : 'sonnet'),
-                status: 'starting' as const,
-                startedAt,
-                ...buildAgentGateFailureSnapshot(state),
-                killCount: health.killCount || 0,
-                workspace: state.workspace || null,
-                workspaceLocation: isRemote ? 'remote' : 'local',
-                git: null,
-                type: 'agent',
-                role: state.role ?? (isStrike ? 'strike' : isPlanning ? 'plan' : 'work'),
-                hasPendingQuestion: false,
-                pendingQuestionCount: 0,
-                message: (state as { message?: string }).message || 'Starting...',
-                ...(isRemote ? { remote: true, vmName: remoteState.vmName } : {}),
-              };
-            }
-
-            if (state.status === 'error') {
-              return {
-                id: name,
-                issueId,
-                runtime: state.harness ?? 'claude-code',
-                model: state.model || (isPlanning ? 'opus' : 'sonnet'),
-                status: 'error' as const,
-                startedAt,
-                ...buildAgentGateFailureSnapshot(state),
-                killCount: health.killCount || 0,
-                workspace: state.workspace || null,
-                workspaceLocation: isRemote ? 'remote' : 'local',
-                git: null,
-                type: 'agent',
-                role: state.role ?? (isStrike ? 'strike' : isPlanning ? 'plan' : 'work'),
-                hasPendingQuestion: false,
-                pendingQuestionCount: 0,
-                error: state.lastFailureReason || 'Unknown error',
-                ...(isRemote ? { remote: true, vmName: remoteState.vmName } : {}),
-              };
-            }
-
-            if (!session && !isRemote) {
-              return {
-                id: name,
-                issueId,
-                runtime: state.harness ?? 'claude-code',
-                model: state.model || (isPlanning ? 'opus' : 'sonnet'),
-                status: 'unknown' as const,
-                startedAt,
-                lastActivity: runtimeData?.lastActivity || state.lastActivity,
-                ...buildAgentGateFailureSnapshot(state),
-                killCount: health.killCount || 0,
-                workspace: state.workspace || null,
-                workspaceLocation: 'local' as const,
-                git: null,
-                type: 'agent',
-                role: state.role ?? (isStrike ? 'strike' : isPlanning ? 'plan' : 'work'),
-                hasLiveTmuxSession: false,
-                hasPendingQuestion: false,
-                pendingQuestionCount: 0,
-                lastFailureReason: state.lastFailureReason || 'No live tmux session found for registered agent',
-                resolution: runtimeData?.resolution || 'working',
-                resolutionCount: runtimeData?.resolutionCount || 0,
-              };
-            }
-
-            const issueReviewStatus = getReviewStatusSync(issueId);
-            const hasActiveSpecialist = issueReviewStatus?.reviewStatus === 'reviewing'
-              || issueReviewStatus?.testStatus === 'testing'
-              || issueReviewStatus?.mergeStatus === 'merging';
+            const hasActiveSpecialist = specialistIssues.has(issueId);
             const enrichment = await Effect.runPromise(computeAgentEnrichment(name, startedAt, hasActiveSpecialist));
             const workspaceLocation = isRemote ? 'remote' : await getWorkspaceLocation(issueId);
             const workspace = isRemote && remoteState.vmName
               ? `/workspace (${String(remoteState.vmName)})`
-              : state.workspace || null;
+              : pane?.workspace ?? state.workspace ?? null;
             const gitStatus = workspace && !isRemote ? await getGitStatusAsync(issueId, workspace) : null;
 
             let contextPercent: number | null = null;
@@ -243,19 +183,21 @@ export const getAgentsRoute = HttpRouter.add(
             return {
               id: name,
               issueId,
-              runtime: state.harness ?? 'claude-code',
-              model: state.model || (isPlanning ? 'opus' : 'sonnet'),
-              status: liveAgentHealthStatus(enrichment),
+              runtime,
+              model,
+              // A pane the backend reports `blocked` is waiting on the operator,
+              // which is the same thing the enrichment calls a pending input.
+              status: pane?.state === 'blocked' ? 'warning' as const : liveAgentHealthStatus(enrichment),
+              paneState: pane?.state ?? 'unknown',
               startedAt,
-              ...buildAgentGateFailureSnapshot(state),
               killCount: health.killCount || 0,
               workspace,
               workspaceLocation,
               git: gitStatus,
               type: 'agent',
-              role: state.role ?? (isStrike ? 'strike' : isPlanning ? 'plan' : 'work'),
+              role,
               hasLiveTmuxSession: true,
-              hasPendingQuestion: enrichment.hasPendingQuestion,
+              hasPendingQuestion: enrichment.hasPendingQuestion || pane?.state === 'blocked',
               pendingQuestionCount: enrichment.pendingQuestionCount,
               pendingQuestionPrompt: enrichment.pendingQuestionPrompt,
               pendingQuestionReason: enrichment.pendingQuestionReason,
@@ -266,7 +208,7 @@ export const getAgentsRoute = HttpRouter.add(
               // too: `runtimeData.resolution` is written by the stop hook and
               // stays at whatever it last was, so a frozen agent reported
               // `working` even once the enrichment knew better.
-              resolution: blockedOnPendingInput
+              resolution: blockedOnPendingInput || pane?.state === 'blocked'
                 ? 'needs_input'
                 : (runtimeData?.resolution || enrichment.resolution || 'working'),
               resolutionCount: runtimeData?.resolutionCount || enrichment.resolutionCount || 0,
@@ -351,6 +293,9 @@ export const getAgentGitInfoRoute = HttpRouter.add(
 );
 
 // ─── Route: GET /api/agents/:id/tmux-alive ──────────────────────────────────
+//
+// PAN-3917: the answer is the terminal backend's, whichever adapter is live.
+// The path keeps its name so existing callers do not change.
 
 export const getAgentTmuxAliveRoute = HttpRouter.add(
   'GET',
@@ -358,8 +303,9 @@ export const getAgentTmuxAliveRoute = HttpRouter.add(
   Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const agentId = params['id'] ?? '';
-    const alive = yield* sessionExists(agentId);
-    return jsonResponse({ alive });
+    const panes = yield* Effect.promise(() => getBackendPanes());
+    const pane = panes.find((candidate) => (candidate.terminalId ?? candidate.id) === agentId);
+    return jsonResponse({ alive: pane !== undefined && pane.state !== 'exited' });
   }),
 );
 

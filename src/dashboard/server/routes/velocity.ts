@@ -2,12 +2,17 @@
  * Pipeline velocity (PAN-3485 phase 6 / PAN-3491).
  *
  * The dashboard's visible signals measure agent tool-call rate, not issue
- * advancement — 34k of 40k daily events are hook noise, and
- * review.status_changed fires on every status WRITE, not every transition
- * (PAN-3447 logged 88 events for ~6 real changes). This module counts the
+ * advancement — 34k of 40k daily events are hook noise. This module counts the
  * thing the operator actually means by "is anything moving": real stage
- * transitions per hour, deduped against unchanged writes, bucketed by stage,
- * alongside the parked census from the one resolver door.
+ * transitions per hour, bucketed by stage, alongside the parked census from
+ * the one resolver door.
+ *
+ * PAN-3917: `review.status_changed` is gone with the status door it wrote for.
+ * Stage transitions now come from events that survive because they record an
+ * ACT, not a stored status: a reviewer starting, a review being approved, a
+ * merge becoming ready. `test` and `verify` had no surviving event source and
+ * are folded into `review` — gate results are check runs and workspace
+ * artifacts now (FR-8), not a counted status write.
  *
  * The pure counter is fixture-tested offline; the Effect wrapper is a thin
  * read through EventStoreService (queryByType only — no new SQL).
@@ -24,8 +29,6 @@ export interface VelocityStageCounts {
   plan: number;
   work: number;
   review: number;
-  test: number;
-  verify: number;
   merge: number;
 }
 
@@ -46,7 +49,7 @@ interface StoredEventLike {
 }
 
 function emptyCounts(): VelocityStageCounts {
-  return { plan: 0, work: 0, review: 0, test: 0, verify: 0, merge: 0 };
+  return { plan: 0, work: 0, review: 0, merge: 0 };
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -54,10 +57,10 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 /**
- * Count real stage transitions inside [windowStartMs, nowMs]. Events may
- * include history before the window — that history seeds per-issue prior
- * state so a change that lands INSIDE the window counts even when its "from"
- * side sits outside it. Unchanged writes never count (the PAN-3447 rule).
+ * Count real stage transitions inside [windowStartMs, nowMs]. Every counted
+ * event records something that happened once, so there is no unchanged-write
+ * class left to dedupe against (the PAN-3447 rule is satisfied by the event
+ * choice rather than by prior-state tracking).
  */
 export function computeTransitions(
   events: readonly StoredEventLike[],
@@ -71,53 +74,34 @@ export function computeTransitions(
     return Number.isFinite(ms) && ms >= windowStartMs && ms <= nowMs;
   };
 
-  // Per-issue prior verdict tuple, seeded from history and walked forward.
-  const priorByIssue = new Map<string, { review?: string; test?: string; merge?: string }>();
   const sorted = [...events].sort((a, b) => a.sequence - b.sequence);
 
   for (const event of sorted) {
+    if (!inWindow(event.timestamp)) continue;
     const payload = asRecord(event.payload);
-    const issueId = typeof payload['issueId'] === 'string' ? payload['issueId'] : null;
 
     if (event.type === 'issue.transitioned') {
       const state = String(payload['state'] ?? '');
-      if (inWindow(event.timestamp)) {
-        if (state === 'in_planning') { byStage.plan++; transitions++; }
-        else if (state === 'in_progress' || state === 'in_work') { byStage.work++; transitions++; }
-      }
+      if (state === 'in_planning') { byStage.plan++; transitions++; }
+      else if (state === 'in_progress' || state === 'in_work') { byStage.work++; transitions++; }
       continue;
     }
 
     if (event.type === 'issue.statusChanged') {
-      const status = String(payload['status'] ?? '');
-      if (inWindow(event.timestamp) && status === 'Planned') { byStage.plan++; transitions++; }
+      if (String(payload['status'] ?? '') === 'Planned') { byStage.plan++; transitions++; }
       continue;
     }
 
-    if (event.type !== 'review.status_changed' || !issueId) continue;
+    // A reviewer starting and a review landing are each one real act.
+    if (event.type === 'review.reviewer_started' || event.type === 'review.approved') {
+      byStage.review++; transitions++;
+      continue;
+    }
 
-    const status = asRecord(payload['status']);
-    const review = typeof status['reviewStatus'] === 'string' ? status['reviewStatus'] : undefined;
-    const test = typeof status['testStatus'] === 'string' ? status['testStatus'] : undefined;
-    const merge = typeof status['mergeStatus'] === 'string' ? status['mergeStatus'] : undefined;
-    const prior = priorByIssue.get(issueId) ?? {};
-    const changed = inWindow(event.timestamp);
-
-    if (changed && review !== undefined && review !== prior.review) {
-      if (review === 'reviewing' || review === 'passed') { byStage.review++; transitions++; }
+    if (event.type === 'merge.ready') {
+      byStage.merge++; transitions++;
+      continue;
     }
-    if (changed && test !== undefined && test !== prior.test) {
-      if (test === 'testing' || test === 'passed') { byStage.test++; transitions++; }
-    }
-    if (changed && merge !== undefined && merge !== prior.merge) {
-      if (merge === 'verifying') { byStage.verify++; transitions++; }
-      else if (merge === 'merging' || merge === 'queued' || merge === 'merged') { byStage.merge++; transitions++; }
-    }
-    priorByIssue.set(issueId, {
-      ...(review !== undefined ? { review } : prior.review !== undefined ? { review: prior.review } : {}),
-      ...(test !== undefined ? { test } : prior.test !== undefined ? { test: prior.test } : {}),
-      ...(merge !== undefined ? { merge } : prior.merge !== undefined ? { merge: prior.merge } : {}),
-    });
   }
 
   return { transitions, byStage };
@@ -132,14 +116,16 @@ const getVelocityRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
     const now = Date.now();
     const windowStart = now - VELOCITY_WINDOW_MINUTES * 60_000;
-    // Pull enough of each type to seed per-issue prior state beyond the window;
-    // review.status_changed is the high-volume one (~100/hour fleet-wide).
-    const [transitions, statusChanges, reviewChanges] = yield* Effect.all([
+    const [transitions, statusChanges, reviewerStarts, approvals, mergeReady] = yield* Effect.all([
       eventStore.queryByType('issue.transitioned', 200),
       eventStore.queryByType('issue.statusChanged', 200),
-      eventStore.queryByType('review.status_changed', 500),
+      eventStore.queryByType('review.reviewer_started', 200),
+      eventStore.queryByType('review.approved', 200),
+      eventStore.queryByType('merge.ready', 200),
     ]);
-    const events = [...transitions, ...statusChanges, ...reviewChanges] as StoredEventLike[];
+    const events = [
+      ...transitions, ...statusChanges, ...reviewerStarts, ...approvals, ...mergeReady,
+    ] as StoredEventLike[];
     const { transitions: count, byStage } = computeTransitions(events, windowStart, now);
 
     let parkedTotal: number | null = null;

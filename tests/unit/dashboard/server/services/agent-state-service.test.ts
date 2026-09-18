@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { AgentRuntimeSnapshot, AgentSnapshot } from '@overdeck/contracts';
-import { mergeRuntimeBySequence } from '../../../../../src/dashboard/server/services/agent-state-service.js';
+import type { AgentRuntimeSnapshot } from '@overdeck/contracts';
+import {
+  activityForPaneState,
+  mergeRuntimeBySequence,
+} from '../../../../../src/dashboard/server/services/agent-state-service.js';
 
 function runtime(activity: AgentRuntimeSnapshot['activity'], sequence: number): AgentRuntimeSnapshot {
   return {
@@ -11,49 +14,61 @@ function runtime(activity: AgentRuntimeSnapshot['activity'], sequence: number): 
   } as AgentRuntimeSnapshot;
 }
 
-function sourceAgent(hasLiveTmuxSession: boolean, status: AgentSnapshot['status'] = 'stopped'): AgentSnapshot {
-  return {
-    id: 'agent-pan-3183',
-    issueId: 'PAN-3183',
-    status,
-    hasLiveTmuxSession,
-  } as AgentSnapshot;
-}
+describe('activityForPaneState', () => {
+  it('maps the backend pane vocabulary onto the read model activity', () => {
+    expect(activityForPaneState('working')).toBe('working');
+    expect(activityForPaneState('blocked')).toBe('waiting');
+    expect(activityForPaneState('idle')).toBe('idle');
+    expect(activityForPaneState('done')).toBe('stopped');
+    expect(activityForPaneState('exited')).toBe('stopped');
+    expect(activityForPaneState('unknown')).toBe('idle');
+  });
+});
 
 describe('mergeRuntimeBySequence', () => {
-  it('keeps a source-reconstructed stop when no live tmux session exists', () => {
+  it('keeps the backend-seeded stop when the pane is not live', () => {
     const merged = mergeRuntimeBySequence(
       { 'agent-pan-3183': runtime('working', 726958) },
       { 'agent-pan-3183': runtime('stopped', 0) },
-      { 'agent-pan-3183': sourceAgent(false) },
+      { 'agent-pan-3183': false },
     );
 
     expect(merged['agent-pan-3183']?.activity).toBe('stopped');
   });
 
-  it('keeps the event-folded running state when a live tmux session exists', () => {
+  it('keeps the event-folded running state when the pane is live', () => {
     const merged = mergeRuntimeBySequence(
       { 'agent-pan-3183': runtime('working', 726958) },
       { 'agent-pan-3183': runtime('stopped', 0) },
-      { 'agent-pan-3183': sourceAgent(true) },
+      { 'agent-pan-3183': true },
     );
 
     expect(merged['agent-pan-3183']?.activity).toBe('working');
   });
 
   it('preserves sequence precedence when both snapshots are running', () => {
-    const source = { 'agent-pan-3183': sourceAgent(true, 'running') };
+    const live = { 'agent-pan-3183': true };
 
     expect(mergeRuntimeBySequence(
       { 'agent-pan-3183': runtime('working', 1) },
       { 'agent-pan-3183': runtime('working', 2) },
-      source,
+      live,
     )['agent-pan-3183']?.updatedAtSequence).toBe(2);
 
     expect(mergeRuntimeBySequence(
       { 'agent-pan-3183': runtime('working', 3) },
       { 'agent-pan-3183': runtime('working', 2) },
-      source,
+      live,
     )['agent-pan-3183']?.updatedAtSequence).toBe(3);
+  });
+
+  it('keeps an in-memory snapshot the backend seed does not know about', () => {
+    const merged = mergeRuntimeBySequence(
+      { 'agent-pan-9999': runtime('working', 5) },
+      {},
+      {},
+    );
+
+    expect(merged['agent-pan-9999']?.activity).toBe('working');
   });
 });

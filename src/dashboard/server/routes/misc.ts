@@ -42,7 +42,6 @@
 
 import { Layer } from 'effect';
 
-import { bootReconciliationRouteLayer } from './boot-reconciliation.js';
 import { projectMappingsRouteLayer } from './misc/project-mappings.js';
 import { trackersRouteLayer } from './misc/trackers.js';
 import { healthRouteLayer } from './misc/health.js';
@@ -59,7 +58,6 @@ export const miscRouteLayer = Layer.mergeAll(
   projectMappingsRouteLayer,
   healthRouteLayer,
   deaconRouteLayer,
-  bootReconciliationRouteLayer,
   planningRouteLayer,
   tldrRouteLayer,
   metaRouteLayer,

@@ -4,6 +4,20 @@ import { join } from 'node:path';
 import { getOverdeckHome } from '../../../../../src/lib/paths.js';
 import type { AgentState } from '../../../../../src/lib/agents.js';
 
+// PAN-3917 W6: W3 deletes the record plane; config-yaml still reaches it
+// transitively (config-yaml/defaults → agents/tier-table → pan-dir/record).
+// Stub the chain entry so the module under test loads.
+vi.mock('../../../../../src/lib/pan-dir/record.js', () => ({
+  getIssueRecordPath: () => '/dev/null',
+  readIssueRecordSync: () => null,
+  readIssueRecordForWorkspaceSync: () => null,
+  readIssueRecord: async () => null,
+  batchReadIssueRecords: async () => new Map(),
+}));
+vi.mock('../../../../../src/lib/pan-dir/record-update.js', () => ({
+  updateIssueRecord: async () => undefined,
+}));
+
 vi.mock('../../../../../src/lib/projects.js', () => ({
   listProjects: vi.fn(),
   listProjectsSync: vi.fn(),
