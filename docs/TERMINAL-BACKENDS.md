@@ -87,6 +87,13 @@ terminal id first (`resolveHerdrTerminalId`) and serves that client from `observ
 opened `control`; a null answer means the PTY hub path, exactly as before. The RPC
 `TerminalService` uses the same bridge, wearing the PTY interface (`HerdrTerminalProcess`).
 
+A prompt whose `wait` stalls or times out is reported **delivered**, not failed: Herdr writes the
+text and Enter before it starts watching for activity, so a stalled wait is no proof the prompt never
+landed, and its own guide says never to re-send on one. `agent_blocked` stays an error — Herdr
+refuses a blocked agent before writing any input. The kickoff retry's "is the terminal still there"
+check is backend-aware for the same reason: without it a Herdr spawn would look like a session that
+exited before kickoff.
+
 Spawn guards are backend-aware too: "is this agent already running" is `agentPaneExists`, a live
 tmux session or a live Herdr agent of that name, and the tmux-only session options
 (`destroy-unattached`, `remain-on-exit`) are applied only when the pane really is a tmux session.
@@ -107,6 +114,10 @@ Verified live on 2026-09-18 against the running `overdeck` session.
   (`{bytes: base64, encoding:"ansi", full, width, height, seq}`) ending in `terminal.closed`;
   `control` takes `{"type":"terminal.input","text":…}` and `{"type":"terminal.resize","cols","rows"}`
   on stdin. An EOF without a close record synthesizes an `exit` frame so no viewer hangs.
+- Lifecycle events arrive as `pane_updated` records carrying the pane's `agent_status`: the
+  `pane.agent_status_changed` subscription is per-pane (it requires a `pane_id`), so the
+  workspace-wide stream reports state transitions through `pane_updated`. Verified live —
+  `unknown → idle` arrived that way when a harness finished starting.
 - `probe()` compares the live `ping` protocol against the committed fixture
   (`src/lib/terminal-backends/__fixtures__/herdr-v0.9.1/schema.json`, protocol 22, schema_version 1).
   A mismatch is a typed error — never a reason to stop or update a server.

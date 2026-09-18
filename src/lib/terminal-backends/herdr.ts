@@ -129,31 +129,46 @@ function targetHandle(target: AgentTarget): string {
   throw new Error('prompt target carries neither a pane id nor an agent name');
 }
 
-/** Herdr event kinds the contract knows about. */
-export function toBackendEvent(kind: string, data: Record<string, unknown>): BackendEvent | null {
+/**
+ * Herdr event kinds the contract knows about. One record can carry more than
+ * one contract event, so this returns a list.
+ *
+ * `pane_updated` is where agent state arrives: the global
+ * `pane.agent_status_changed` subscription requires a pane id (it is per-pane),
+ * but `pane_updated` carries the pane's `agent_status`, and a live run on
+ * 2026-09-18 showed the `unknown → idle` transition arriving that way.
+ */
+export function toBackendEvents(kind: string, data: Record<string, unknown>): BackendEvent[] {
   switch (kind) {
     case 'pane_agent_status_changed':
-      return {
+      return [{
         kind: 'agent-state',
         paneId: String(data.pane_id ?? ''),
         state: toAgentState(typeof data.agent_status === 'string' ? data.agent_status : undefined),
-      };
+      }];
     case 'pane_created': {
       const pane = data.pane as HerdrPaneInfo | undefined;
-      if (!pane) return null;
-      return { kind: 'pane-created', paneId: pane.pane_id, workspaceId: pane.workspace_id };
+      if (!pane) return [];
+      return [{ kind: 'pane-created', paneId: pane.pane_id, workspaceId: pane.workspace_id }];
     }
     case 'pane_exited':
-      return { kind: 'pane-exited', paneId: String(data.pane_id ?? ''), code: null };
+      return [{ kind: 'pane-exited', paneId: String(data.pane_id ?? ''), code: null }];
     case 'pane_updated': {
       const pane = data.pane as HerdrPaneInfo | undefined;
-      if (!pane?.tokens) return null;
-      return { kind: 'metadata', paneId: pane.pane_id, tokens: pane.tokens as Partial<PaneTokens> };
+      if (!pane) return [];
+      const events: BackendEvent[] = [];
+      if (pane.agent_status) {
+        events.push({ kind: 'agent-state', paneId: pane.pane_id, state: toAgentState(pane.agent_status) });
+      }
+      if (pane.tokens) {
+        events.push({ kind: 'metadata', paneId: pane.pane_id, tokens: pane.tokens as Partial<PaneTokens> });
+      }
+      return events;
     }
     case 'workspace_closed':
-      return { kind: 'workspace-closed', workspaceId: String(data.workspace_id ?? '') };
+      return [{ kind: 'workspace-closed', workspaceId: String(data.workspace_id ?? '') }];
     default:
-      return null;
+      return [];
   }
 }
 
@@ -308,16 +323,34 @@ export class HerdrBackend implements TerminalBackend {
             ...(options.wait.timeoutMs ? { timeout_ms: options.wait.timeoutMs } : {}),
           }
         : undefined;
-      const result = await this.api.call<{ agent?: HerdrPaneInfo }>(
-        'agent.prompt',
-        { target: handle, text, ...(wait ? { wait } : {}) },
-        { timeoutMs: (options.wait?.timeoutMs ?? 30_000) + 10_000 },
-      );
-      return {
-        delivered: true,
-        messageId: options.messageId,
-        ...(result.agent ? { state: toAgentState(result.agent.agent_status) } : {}),
-      };
+      try {
+        const result = await this.api.call<{ agent?: HerdrPaneInfo }>(
+          'agent.prompt',
+          { target: handle, text, ...(wait ? { wait } : {}) },
+          { timeoutMs: (options.wait?.timeoutMs ?? 30_000) + 10_000 },
+        );
+        return {
+          delivered: true,
+          messageId: options.messageId,
+          ...(result.agent ? { state: toAgentState(result.agent.agent_status) } : {}),
+        };
+      } catch (error) {
+        // Herdr submits the text and Enter before it watches for activity, so a
+        // stalled or timed-out WAIT is not proof the prompt never landed — its
+        // own guide says never to re-send on one. Report it delivered, with the
+        // state the agent is actually in. `agent_blocked` is different: Herdr
+        // refuses a blocked agent before writing any input, so it stays an error.
+        const settledWait = error instanceof HerdrApiError
+          && (error.code === 'agent_prompt_stalled' || error.code === 'timeout');
+        if (!settledWait) throw error;
+        const current = await this.api.call<{ agent?: HerdrPaneInfo }>('agent.get', { target: handle })
+          .catch(() => ({ agent: undefined }));
+        return {
+          delivered: true,
+          messageId: options.messageId,
+          ...(current.agent ? { state: toAgentState(current.agent.agent_status) } : {}),
+        };
+      }
     });
   }
 
@@ -411,8 +444,7 @@ export class HerdrBackend implements TerminalBackend {
         },
         {
           onEvent: (kind, data) => {
-            const event = toBackendEvent(kind, data);
-            if (event) push(event);
+            for (const event of toBackendEvents(kind, data)) push(event);
           },
           onClose: finish,
         },

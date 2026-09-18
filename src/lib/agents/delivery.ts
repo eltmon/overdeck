@@ -8,10 +8,11 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { markKimiContextDelivered, prepareKimiMessage, type PreparedKimiMessage } from '../runtimes/kimi-context-envelope.js';
 import type { AgentState } from '../agents.js';
-import type { PromptSender } from '../terminal-backends/types.js';
+import type { PromptResult, PromptSender } from '../terminal-backends/types.js';
 import {
   normalizeAgentId,
   getAgentState,
+  getAgentStateSync,
   saveAgentState,
   getAgentDir,
   waitForPromptReady,
@@ -373,15 +374,23 @@ export async function deliverAgentMessage(
   // of the delivery door).
   const messageId = opts.messageId ?? randomUUID();
   const targetTokens = tokensFromLaunchMetadata(state);
-  const sender = opts.sender ?? senderFromEnv(process.env, () => targetTokens);
+  // The SENDER's own tokens, looked up from ITS agent id — never the target's.
+  const sender = opts.sender
+    ?? senderFromEnv(process.env, (senderId) => tokensFromLaunchMetadata(getAgentStateSync(senderId)));
   const herdrAgent = (await deliveryBackendName()) === 'herdr'
     ? await (await import('../terminal-backends/herdr.js')).findHerdrAgent(normalizedId)
     : null;
   if (herdrAgent) {
     const { herdrBackend } = await import('../terminal-backends/herdr.js');
+    // A backend failure is a delivery result, not a throw: callers branch on
+    // `.ok`, and throwing here would skip the mail-queue path every other
+    // failing tier gets.
     const result = await Effect.runPromise(
       herdrBackend.prompt({ paneId: herdrAgent.paneId }, message, { messageId, sender }),
-    );
+    ).catch((error: unknown): PromptResult => ({
+      unsupported: true,
+      reason: error instanceof Error ? error.message : String(error),
+    }));
     if (isUnsupported(result)) return { ok: false, path: 'herdr', failure: result.reason };
     if (isPromptRefused(result)) return { ok: false, path: 'herdr', failure: `refused: ${result.reason}` };
     if (isPromptDropped(result)) {
@@ -829,9 +838,17 @@ export async function deliverInitialPromptWithRetry(
     }
   });
   const waitForReady = options.waitForReady ?? waitForPromptReady;
-  const sessionExistsForAgent = options.sessionExists ?? (async (id: string) => (
-    Effect.runPromise(sessionExists(normalizeAgentId(id)))
-  ));
+  // "Is the agent's terminal still there?" is a backend question: a live tmux
+  // session, or a live Herdr agent of that name. Without the Herdr half, a
+  // kickoff on a Herdr host reports SESSION_EXITED_BEFORE_KICKOFF and the
+  // spawn path kills a perfectly healthy pane (PAN-3917).
+  const sessionExistsForAgent = options.sessionExists ?? (async (id: string) => {
+    const normalized = normalizeAgentId(id);
+    if (await Effect.runPromise(sessionExists(normalized)).catch(() => false)) return true;
+    if ((await deliveryBackendName()) !== 'herdr') return false;
+    const { findHerdrAgent } = await import('../terminal-backends/herdr.js');
+    return (await findHerdrAgent(normalized)) !== null;
+  });
 
   function promptReadyTimeoutSeconds(): number {
     const raw = process.env.OVERDECK_PROMPT_READY_TIMEOUT_SECONDS;

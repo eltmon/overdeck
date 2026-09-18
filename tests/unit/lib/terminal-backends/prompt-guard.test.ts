@@ -140,6 +140,20 @@ describe('senderFromEnv', () => {
     expect(sender).toMatchObject({ id: 'agent-min-1039', issue: 'MIN-1039', role: 'work' });
   });
 
+  it('looks the SENDER up by its own id, never the target', () => {
+    // Regression: passing the target's tokens as the lookup made a foreman look
+    // like a `worker` to its own worker pane, and the authority check refused
+    // the one sender it must always allow.
+    const asked: string[] = [];
+    const sender = senderFromEnv(
+      { OVERDECK_AGENT_ID: 'agent-min-1039' } as NodeJS.ProcessEnv,
+      (id) => { asked.push(id); return { issue: 'MIN-1039', role: 'work' }; },
+    );
+    expect(asked).toEqual(['agent-min-1039']);
+    expect(checkPrompt({ targetId: 'w1:p2', targetTokens: WORKER_TOKENS, sender, messageId: 'f1' }))
+      .toEqual({ allow: true });
+  });
+
   it('treats a process with no agent id as an operator conversation', () => {
     const sender = senderFromEnv({} as NodeJS.ProcessEnv);
     expect(isOperatorConversation(sender)).toBe(true);
