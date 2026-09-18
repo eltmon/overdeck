@@ -61,10 +61,9 @@ import { tellCommand } from './commands/tell.js';
 import { answerCommand } from './commands/answer.js';
 import { registerMonitorCommands } from './commands/monitor.js';
 import { killCommand } from './commands/kill.js';
-import { registerResetToPlannedCommand } from './commands/reset-to-planned.js'; import { registerResetSessionCommand } from './commands/reset-session.js';
+import { registerResetSessionCommand } from './commands/reset-session.js';
 import { pauseCommand } from './commands/pause.js';
 import { unpauseCommand } from './commands/unpause.js';
-import { untroubledCommand } from './commands/untroubled.js'; import { registerUnstickCommand } from './commands/unstick.js';
 import { forkCommand } from './commands/fork.js';
 import { handoffCommand } from './commands/handoff.js';
 import { unarchiveConversationCommand } from './commands/unarchive-conversation.js';
@@ -72,14 +71,13 @@ import { resumeCommand } from './commands/resume.js';
 import { recoverCommand } from './commands/recover.js';
 import { syncMainCommand } from './commands/sync-main.js';
 import { doneCommand } from './commands/done.js';
-import { approveCommand } from './commands/approve.js';
 import { reopenCommand } from './commands/reopen.js';
 import { wipeCommand } from './commands/wipe.js';
 import { registerCloseCommand } from './commands/close.js';
 import { showCommand } from './commands/show.js';
 import { listCommand as issuesCommand } from './commands/issues.js';
 import { triageCommand } from './commands/triage.js';
-import { registerReviewCommands } from './commands/review-subcommands.js'; import { registerVerifyCommands } from './commands/verify-waiver.js';
+import { registerReviewCommands } from './commands/review-subcommands.js';
 import { staffingCommand } from './commands/staffing.js';
 import { destroyCommand as destroyWorkspaceCommand, registerWorkspaceCommands } from './commands/workspace.js';
 import { registerTestCommands } from './commands/test.js';
@@ -94,7 +92,6 @@ import { systemHealthCommand } from './commands/system-health.js';
 import { updateCommand } from './commands/update.js';
 import { restartCommand } from './commands/restart.js';
 import { reloadCommand } from './commands/reload.js';
-import { registerInspectCommand } from './commands/inspect.js';
 import { createCostCommand } from './commands/cost.js';
 import { createMemoryCommand } from './commands/memory.js';
 import { createBriefingCommand } from './commands/briefing.js';
@@ -303,7 +300,6 @@ program
   .option('--json', 'Output as JSON')
   .option('--tracker <type>', 'Query specific tracker (linear/github/gitlab)')
   .option('--all-trackers', 'Query all configured trackers')
-  .option('--shadow-only', 'Show only shadowed issues')
   .option('--triage', 'Show triage queue')
   .action((options) => {
     if (options.triage) {
@@ -316,8 +312,7 @@ program
 // pan show <id> — unified observation
 program
   .command('show <id>')
-  .description('Unified lens: shadow state, CV, context, health for one issue')
-  .option('--shadow', 'Shadow state details only')
+  .description('Unified lens: derived issue state, CV, context, health for one issue')
   .option('--cv', 'Agent work history only')
   .option('--context', 'Context engineering state only')
   .option('--health', 'Health + heartbeat only')
@@ -331,7 +326,7 @@ program
   .option('-e, --editor <editor>', 'Editor to use (cursor, windsurf, vscode, zed, etc.)')
   .action(openCommand);
 
-registerReviewCommands(program); registerVerifyCommands(program);
+registerReviewCommands(program);
 
 program.command('staffing <id>').description('Show or set per-issue work-model and swarm overrides').option('--model <model>', 'Set the work model, or default to clear the override').option('--swarm <mode>', 'Set swarm mode (off, auto, always), or default to clear the override').action(staffingCommand);
 
@@ -411,7 +406,7 @@ program
   .description('Stop one qualified agent, or all agents when given an issue ID (workspace preserved)')
   .option('--force', 'Force kill without confirmation')
   .action(killCommand);
-registerResetToPlannedCommand(program); registerResetSessionCommand(program);
+registerResetSessionCommand(program);
 program
   .command('pause <id>')
   .description('Persistently pause an agent and stop it if running')
@@ -423,11 +418,6 @@ program
   .description('Clear an agent pause gate without spawning it')
   .action(unpauseCommand);
 
-program
-  .command('untroubled <id>')
-  .description('Clear an agent troubled gate without spawning it')
-  .action(untroubledCommand);
-registerUnstickCommand(program);
 program
   .command('fork [conv]')
   .description('Summary Fork a conversation — creates new session from a summary of previous work; omit <conv> to fork the conversation you are in')
@@ -488,11 +478,6 @@ program
   .action(doneCommand);
 
 program
-  .command('approve <id>')
-  .description('[REMOVED] Use dashboard MERGE button instead')
-  .action(approveCommand);
-
-program
   .command('reopen <id>')
   .description('Re-enter the pipeline for a closed/completed/cancelled issue (resets specialist state). For issues already in progress, use `pan review restart`.')
   .option('--reason <reason>', 'Reason for reopening')
@@ -524,8 +509,6 @@ program
   .option('--effort <level>', 'Claude Code effort: low | medium | high | xhigh | max (defaults to roles.work.effort)')
   .option('--tier <tier>', 'Remote workspace resiliency tier: ephemeral | durable (defaults to remote.resiliency_tier)')
   .option('--dry-run', 'Show what would be created')
-  .option('--shadow', 'Enable shadow mode')
-  .option('--no-shadow', 'Disable shadow mode')
   .option('--remote', 'Use remote workspace (Fly.io)')
   .option('--local', 'Use local workspace (explicit override)')
   .option('--plan <mode>', "Planning depth when no plan exists yet: interactive | auto | skip (default: config planning.default_mode, shipped default auto)")
@@ -573,9 +556,6 @@ registerOhmypiAuthCommands(program);
 
 // Register install command
 registerInstallCommand(program);
-
-// Register inspect command (pan inspect <issueId> --item <itemId>)
-registerInspectCommand(program);
 
 // Register caveman commands (pan caveman-compress)
 registerCavemanCommands(program);
