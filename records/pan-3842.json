@@ -194,18 +194,21 @@
     "recordedAt": "2026-09-18T07:31:28.942Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-18T08:28:29.193Z",
+  "updated": "2026-09-18T08:55:40.741Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
+    "uatStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-09-18T08:28:29.170Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-09-18T08:55:40.684Z",
     "reviewNotes": "Tier fitness lands on all three surfaces and never blocks; 30/30 files reviewed across four dimensions, no blockers, 2 advisory notes (by_kind difficulty, deprecated-id badge)",
+    "testNotes": "typecheck, lint, and full test suite (14671+112 tests) passed at HEAD 097e315e; see .pan/test/result.json for detail",
+    "uatNotes": "Tiered Execution Settings badges (AC1 underpowered, AC4 supervisor, AC5 live-clear-on-fix) verified live via Playwright against the workspace's own rebuilt Docker stack; see .pan/test/result.json for detail",
     "mergeNotes": "Review stale: approved ff31b427, workspace HEAD is ad879ac7. Run pan done or pan review request to re-review.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3851",
     "reviewedAtCommit": "097e315edccbbc5921178c8be60f95183ee317f5",
@@ -304,10 +307,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 250,
-            "output": 46129,
-            "cacheRead": 23634013,
-            "cacheWrite": 357773
+            "input": 448,
+            "output": 81903,
+            "cacheRead": 44039380,
+            "cacheWrite": 646754
           }
         },
         "work": {
@@ -333,10 +336,10 @@
           "cacheWrite": 270975
         },
         "anthropic/claude-sonnet-5": {
-          "input": 250,
-          "output": 46129,
-          "cacheRead": 23634013,
-          "cacheWrite": 357773
+          "input": 448,
+          "output": 81903,
+          "cacheRead": 44039380,
+          "cacheWrite": 646754
         },
         "custom/MiniMax-M3": {
           "input": 471640,
@@ -346,8 +349,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 19.952098,
-        "pricingAsOf": "2026-09-18T08:28:29.175Z"
+        "usd": 25.113763,
+        "pricingAsOf": "2026-09-18T08:55:40.725Z"
       }
     },
     "merges": [
