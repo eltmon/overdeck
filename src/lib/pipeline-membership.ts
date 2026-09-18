@@ -64,8 +64,6 @@ export interface IssueLensSignals {
   hasXbriefSpec: boolean;
   /** Durable Definition-of-Ready signal from the issue's `ready` label. */
   explicitlyReady: boolean;
-  /** L7-record — a terminal close-out record exists (pipeline.closedOut === true via the record door, durable only). */
-  hasTerminalCloseOut: boolean;
 }
 
 export interface PipelineMembership {
@@ -131,15 +129,13 @@ export function resolvePipelineMembership(s: IssueLensSignals): PipelineMembersh
     // Closed ⇒ terminal, regardless of lingering state — except an open PR, which
     // is a live mergeable artifact that needs closing.
     if (s.hasOpenPr) {
-      // Closed with open PR: reclassify to clean_terminal if a terminal close-out
-      // record exists (L7-record), since the record confirms durable closure intent.
-      // The still-open PR is residue to be closed on the forge.
-      if (s.hasTerminalCloseOut) {
-        return result(
-          'clean_terminal',
-          'issue closed out (durable close-out record) — the still-open PR is residue; close it on the forge',
-        );
-      }
+      // PAN-3917: this used to reclassify to clean_terminal when a durable
+      // close-out record confirmed deliberate closure intent (the record
+      // plane's L7-record lens, now gone) — there is no tracker/git signal
+      // that distinguishes that from any other closed-with-dangling-PR case,
+      // so it always resolves zombie_pr now. pr-residue.ts closes residue
+      // PRs at close-out time, so a PR reaching this state is genuinely
+      // worth flagging.
       return result('zombie_pr', 'issue is closed but a PR is still open — close/reconcile the PR');
     }
     return result(
