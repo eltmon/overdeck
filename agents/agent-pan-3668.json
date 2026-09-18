@@ -19,6 +19,11 @@
       "id": "30809057-8650-45ca-9b0e-a2d9e9522221",
       "startedAt": "2026-09-18T07:01:12.020Z",
       "reason": "spawn"
+    },
+    {
+      "id": "b67b343a-2b94-4d77-9fc3-e303298b9adb",
+      "startedAt": "2026-09-18T08:00:42.844Z",
+      "reason": "rotation"
     }
   ],
   "lifecycle": [
