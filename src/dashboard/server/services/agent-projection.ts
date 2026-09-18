@@ -240,6 +240,15 @@ export function applyAgentLifecycleEventWithDeps(
       return { applied: true, status: next.status };
     }
     case 'exited': {
+      // Idempotent delivery: the supervisor builds one request body and
+      // retries it after a failed POST, so a retry carries the same `at` as
+      // the already-committed event. Re-appending would duplicate
+      // agent.stopped in the events table. A stopped row with a DIFFERENT
+      // timestamp was stopped by another path (no event was ever emitted for
+      // it), so that case still applies below.
+      if (state.status === 'stopped' && state.stoppedAt === at) {
+        return { applied: true, status: 'stopped' };
+      }
       const next: AgentState = {
         ...state,
         status: 'stopped',

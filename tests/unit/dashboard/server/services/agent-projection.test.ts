@@ -46,6 +46,7 @@ afterEach(() => {
 
 // Imports after mocks are registered.
 import {
+  applyAgentLifecycleEventWithDeps,
   saveAgentStateAndEmitEventWithDeps,
 } from '../../../../../src/dashboard/server/services/agent-projection.js';
 
@@ -286,5 +287,49 @@ describe('saveAgentStateAndEmitEventWithDeps', () => {
     expect(emitted[0].sequence).toBe(result.sequence);
     expect(emitted[0].type).toBe('agent.started');
     expect(emitted[0].timestamp).toBe('2026-06-15T10:00:00.000Z');
+  });
+});
+
+describe('applyAgentLifecycleEventWithDeps exited idempotency (PAN-3849)', () => {
+  const stoppedEvents = () => readEvents().filter((e) => e.type === 'agent.stopped');
+
+  it('acks a retried exited with the same timestamp without duplicating agent.stopped', () => {
+    const eventStore = { emitStored: vi.fn() };
+    saveAgentStateAndEmitEventWithDeps(
+      odb.raw(),
+      eventStore,
+      makeAgentState({ status: 'running' }),
+      makeStartedEvent(),
+    );
+
+    // The supervisor builds one body and retries it, so both POSTs carry the
+    // same `at`.
+    const at = '2026-06-15T11:00:00.000Z';
+    const first = applyAgentLifecycleEventWithDeps(odb.raw(), eventStore, 'agent-pan-1908', { event: 'exited', at });
+    expect(first).toEqual({ applied: true, status: 'stopped' });
+    expect(stoppedEvents()).toHaveLength(1);
+
+    const retry = applyAgentLifecycleEventWithDeps(odb.raw(), eventStore, 'agent-pan-1908', { event: 'exited', at });
+    expect(retry).toEqual({ applied: true, status: 'stopped' });
+    expect(stoppedEvents()).toHaveLength(1);
+  });
+
+  it('still records exited when the row was stopped by another path with a different timestamp', () => {
+    const eventStore = { emitStored: vi.fn() };
+    // A patrol marked the row stopped directly (no lifecycle event emitted).
+    saveAgentStateAndEmitEventWithDeps(
+      odb.raw(),
+      eventStore,
+      makeAgentState({ status: 'stopped', stoppedAt: '2026-06-15T10:30:00.000Z' }),
+      makeStatusChangedEvent({ agentId: 'agent-pan-1908', status: 'stopped' }),
+    );
+    expect(stoppedEvents()).toHaveLength(0);
+
+    const result = applyAgentLifecycleEventWithDeps(odb.raw(), eventStore, 'agent-pan-1908', {
+      event: 'exited',
+      at: '2026-06-15T11:00:00.000Z',
+    });
+    expect(result).toEqual({ applied: true, status: 'stopped' });
+    expect(stoppedEvents()).toHaveLength(1);
   });
 });
