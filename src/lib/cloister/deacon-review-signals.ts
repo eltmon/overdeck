@@ -535,7 +535,9 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
  * A session is "orphaned" when the corresponding work-agent session
  * `agent-<issueLower>` does not exist.
  */
-export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
+export async function cleanupOrphanedReviewSessions(
+  options: PatrolShadowOptions = {},
+): Promise<string[]> {
   const actions: string[] = [];
   let reviewSessions: string[];
   try {
@@ -590,6 +592,14 @@ export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
       continue;
     }
 
+    // PAN-3894 (W6): count the would-fire so PAN-3895 has deletion evidence.
+    recordWouldFire('cleanupOrphanedReviewSessions', issueId);
+    const msg = `Killed orphaned ${reviewSession} (synthesis ${synthesisAgentSession} and work ${workAgentSession} not running)`;
+    if (options.shadow) {
+      actions.push(`${msg} (shadow)`);
+      continue;
+    }
+
     try {
       await Effect.runPromise(killSession(reviewSession)).catch(() => {});
     } catch (err: unknown) {
@@ -597,7 +607,6 @@ export async function cleanupOrphanedReviewSessions(): Promise<string[]> {
       logDeaconEventSync(`cleanupOrphanedReviewSessions: error killing ${reviewSession}: ${reason}`);
     }
 
-    const msg = `Killed orphaned ${reviewSession} (synthesis ${synthesisAgentSession} and work ${workAgentSession} not running)`;
     actions.push(msg);
     console.log(`[deacon] ${msg}`);
     logDeaconEventSync(`cleanupOrphanedReviewSessions: ${msg}`);

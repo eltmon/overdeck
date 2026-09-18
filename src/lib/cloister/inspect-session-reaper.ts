@@ -4,6 +4,7 @@ import { Effect } from 'effect';
 import { AGENTS_DIR } from '../paths.js';
 import { isPaneDead, killSession, listSessionNames } from '../tmux.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
+import { recordWouldFire, type PatrolShadowOptions } from './patrol-would-fire.js';
 
 function describeReason(hasStateFile: boolean, paneDead: boolean): string {
   if (!hasStateFile && paneDead) return 'missing state.json and pane is dead';
@@ -17,7 +18,9 @@ function describeReason(hasStateFile: boolean, paneDead: boolean): string {
  * inspect pane is a zombie. Kill either shape so Deacon does not rely on the
  * stale agent-state janitor to eventually notice the directory.
  */
-export async function cleanupOrphanedInspectSessions(): Promise<string[]> {
+export async function cleanupOrphanedInspectSessions(
+  options: PatrolShadowOptions = {},
+): Promise<string[]> {
   const actions: string[] = [];
   let inspectSessions: readonly string[];
 
@@ -35,13 +38,20 @@ export async function cleanupOrphanedInspectSessions(): Promise<string[]> {
 
     if (hasStateFile && !paneDead) continue;
 
+    // PAN-3894 (W6): count the would-fire so PAN-3895 has deletion evidence.
+    recordWouldFire('cleanupOrphanedInspectSessions', session);
+    const reason = describeReason(hasStateFile, paneDead);
+    if (options.shadow) {
+      actions.push(`Killed orphaned inspect session ${session} (${reason}) (shadow)`);
+      continue;
+    }
+
     try {
       await Effect.runPromise(killSession(session)).catch(() => {});
     } catch {
       // best-effort; keep the patrol moving
     }
 
-    const reason = describeReason(hasStateFile, paneDead);
     const msg = `Killed orphaned inspect session ${session} (${reason})`;
     actions.push(msg);
     console.log(`[deacon] ${msg}`);

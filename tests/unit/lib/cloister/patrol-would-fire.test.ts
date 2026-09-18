@@ -328,3 +328,107 @@ describe('would-fire recorder health (PAN-3848 F1)', () => {
     expect(results[0]!.fix).toContain('would-fire.unhealthy.json');
   });
 });
+
+/**
+ * PAN-3894 (W6, FR-6): the six Phase 4 patrols that had no counter now record a
+ * would-fire at every action site and accept PatrolShadowOptions, so PAN-3895
+ * has deletion evidence for them.
+ *
+ * Four of the six are cleanly shadowable: their detection is a pure predicate,
+ * so shadow mode counts and returns a would-have-acted line without acting. Two
+ * are not, and skip instead of counting a fiction — see the cases below.
+ */
+describe('Phase 4 patrol would-fire counters (PAN-3894 W6)', () => {
+  let home: string;
+  const originalHome = process.env.OVERDECK_HOME;
+
+  beforeEach(() => {
+    home = mkdtempSync(join(tmpdir(), 'pan-3894-w6-'));
+    process.env.OVERDECK_HOME = home;
+    resetInMemoryWouldFireCounts();
+    vi.restoreAllMocks();
+  });
+
+  afterEach(() => {
+    if (originalHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalHome;
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it('every one of the six names records a would-fire somewhere in src (AC-5)', async () => {
+    const { execSync } = await import('node:child_process');
+    const names = [
+      'checkStuckAgentRemediation',
+      'reconcileAgentLiveness',
+      'cleanupOrphanedPlanningSessions',
+      'cleanupOrphanedInspectSessions',
+      'cleanupOrphanedReviewSessions',
+      'cleanupOrphanReviewerSessions',
+    ];
+    for (const name of names) {
+      const hits = execSync(`grep -rn "recordWouldFire('${name}'" src || true`, { encoding: 'utf8' }).trim();
+      expect(hits, `${name} has no recordWouldFire call site`).not.toBe('');
+    }
+  });
+
+  it('deacon.ts wraps each of the six registrations in runShadowablePatrol under its own name', () => {
+    const source = readFileSync('src/lib/cloister/deacon.ts', 'utf8');
+    for (const name of [
+      'checkStuckAgentRemediation',
+      'reconcileAgentLiveness',
+      'cleanupOrphanedPlanningSessions',
+      'cleanupOrphanedInspectSessions',
+      'cleanupOrphanedReviewSessions',
+      'cleanupOrphanReviewerSessions',
+    ]) {
+      expect(source, `${name} is not wrapped`).toContain(
+        `runBudgetedPatrol('${name}', () => runShadowablePatrol('${name}',`,
+      );
+    }
+  });
+
+  it('cleanupOrphanedPlanningSessions counts in both modes and only kills when not shadowing', async () => {
+    const tmux = await import('../../../../src/lib/tmux.js');
+    const agents = await import('../../../../src/lib/agents.js');
+    const liveness = await import('../../../../src/lib/agents/liveness.js');
+    const killSpy = vi.spyOn(tmux, 'killSession').mockReturnValue(Effect.succeed(undefined) as never);
+    vi.spyOn(tmux, 'listSessionNames').mockReturnValue(Effect.succeed(['planning-pan-1']) as never);
+    vi.spyOn(liveness, 'isAliveSync').mockReturnValue({ alive: true } as never);
+    vi.spyOn(agents, 'getAgentStateSync').mockReturnValue(null as never);
+
+    const { cleanupOrphanedPlanningSessions } = await import(
+      '../../../../src/lib/cloister/deacon-auto-resume.js'
+    );
+    const deps = { notifyAgentStopped: vi.fn(), notifyAgentStarted: vi.fn() } as never;
+
+    const shadowActions = await cleanupOrphanedPlanningSessions(deps, { shadow: true });
+    expect(killSpy).not.toHaveBeenCalled();
+    expect(shadowActions[0]).toContain('(shadow)');
+    expect(getInMemoryWouldFireCounts().cleanupOrphanedPlanningSessions).toBe(1);
+
+    resetInMemoryWouldFireCounts();
+    const liveActions = await cleanupOrphanedPlanningSessions(deps, {});
+    expect(killSpy).toHaveBeenCalledTimes(1);
+    expect(liveActions[0]).not.toContain('(shadow)');
+    expect(getInMemoryWouldFireCounts().cleanupOrphanedPlanningSessions).toBe(1);
+  });
+
+  it('reconcileAgentLiveness skips in shadow mode instead of counting a firing it would not make', async () => {
+    const { reconcileAgentLiveness } = await import(
+      '../../../../src/lib/cloister/deacon-auto-resume.js'
+    );
+    const deps = { notifyAgentStopped: vi.fn(), notifyAgentStarted: vi.fn() } as never;
+
+    await expect(reconcileAgentLiveness(deps, { shadow: true })).resolves.toEqual([]);
+    expect(getInMemoryWouldFireCounts().reconcileAgentLiveness ?? 0).toBe(0);
+  });
+
+  it('checkStuckAgentRemediation skips in shadow mode because its ladder advances by acting', async () => {
+    const { checkStuckAgentRemediation } = await import(
+      '../../../../src/lib/cloister/stuck-remediation.js'
+    );
+
+    await expect(checkStuckAgentRemediation({ shadow: true })).resolves.toEqual([]);
+    expect(getInMemoryWouldFireCounts().checkStuckAgentRemediation ?? 0).toBe(0);
+  });
+});

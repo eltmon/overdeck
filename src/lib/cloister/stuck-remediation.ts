@@ -25,8 +25,9 @@ import { readWorkspacePlanSync } from '../xbrief/io.js';
 import { getDispatchableItems } from '../xbrief/dag.js';
 import { recordRecoveryFailure } from './recovery-trip.js';
 import { readAgentBackgroundTaskWedgeEvidence } from './planning-wedge.js';
+import { recordWouldFire, type PatrolShadowOptions } from './patrol-would-fire.js';
 
-export interface StuckRemediationOptions {
+export interface StuckRemediationOptions extends PatrolShadowOptions {
   now?: number;
 }
 
@@ -143,14 +144,14 @@ async function evaluateWedgedReworkAgent(
     // parking as troubled surfaces it for an operator instead of a dead session.
     markAgentTroubled(agentId);
     writeStuckRemediationState(agentId, stageState(3, now, firstStuck));
-    logAction(actions, transitionAction(3, issueId, idleMinutes, 'rework-wedge-troubled'));
+    logAction(actions, transitionAction(3, issueId, idleMinutes, 'rework-wedge-troubled'), issueId);
     await surfaceStuckNeedsYou(agent, issueId, firstStuck, actions);
     return true;
   }
 
   killSessionSync(agentId);
   writeStuckRemediationState(agentId, stageState(3, now, firstStuck));
-  logAction(actions, transitionAction(3, issueId, idleMinutes, 'killed-for-respawn'));
+  logAction(actions, transitionAction(3, issueId, idleMinutes, 'killed-for-respawn'), issueId);
   return true;
 }
 
@@ -193,7 +194,12 @@ function transitionAction(stage: 1 | 2 | 3, issueId: string, idleMinutes: number
   return `[deacon] stuck-remediation stage=${stage} issue=${issueId} idleMin=${idleMinutes} action=${action}`;
 }
 
-function logAction(actions: string[], action: string): void {
+/**
+ * PAN-3894 (W6): every ladder transition and escalation this patrol performs
+ * funnels through here, so this is the one place a would-fire is counted.
+ */
+function logAction(actions: string[], action: string, issueId?: string): void {
+  recordWouldFire('checkStuckAgentRemediation', issueId);
   actions.push(action);
   console.log(action);
   logDeaconEventSync(action);
@@ -202,7 +208,7 @@ function logAction(actions: string[], action: string): void {
 async function surfaceStuckNeedsYou(agent: AgentState, issueId: string, generation: string, actions: string[]): Promise<void> {
   if (!agent.workspace) return;
   const failure = await recordRecoveryFailure(agent.workspace, issueId, 'stuck-remediation', generation, 1);
-  if (failure.emitNeedsYou) logAction(actions, `[deacon] needs-you ${issueId}: stuck remediation exhausted`);
+  if (failure.emitNeedsYou) logAction(actions, `[deacon] needs-you ${issueId}: stuck remediation exhausted`, issueId);
 }
 
 async function evaluateAgent(
@@ -265,7 +271,7 @@ async function evaluateAgent(
   if (terminalProviderError) {
     markAgentTroubled(agentId);
     writeStuckRemediationState(agentId, stageState(3, now, firstStuck));
-    logAction(actions, `${agentId} provider-terminal: ${terminalProviderError.summary}`);
+    logAction(actions, `${agentId} provider-terminal: ${terminalProviderError.summary}`, issueId);
     await surfaceStuckNeedsYou(agent, issueId, firstStuck, actions);
     return;
   }
@@ -273,7 +279,7 @@ async function evaluateAgent(
   if (idleMinutes >= config.stage3_minutes && lastStage < 3) {
     markAgentTroubled(agentId);
     writeStuckRemediationState(agentId, stageState(3, now, firstStuck));
-    logAction(actions, transitionAction(3, issueId, idleMinutes, 'marked-troubled'));
+    logAction(actions, transitionAction(3, issueId, idleMinutes, 'marked-troubled'), issueId);
     await surfaceStuckNeedsYou(agent, issueId, firstStuck, actions);
     return;
   }
@@ -283,7 +289,7 @@ async function evaluateAgent(
     const result = await resumeAgent(agentId, message);
     if (result.success) {
       writeStuckRemediationState(agentId, stageState(2, now, firstStuck));
-      logAction(actions, transitionAction(2, issueId, idleMinutes, 'resumed'));
+      logAction(actions, transitionAction(2, issueId, idleMinutes, 'resumed'), issueId);
     } else {
       // PAN-2108: surface WHY (exit code + output tail) instead of an opaque
       // "resume-failed" — a resume usually fails because the process died.
@@ -298,7 +304,7 @@ async function evaluateAgent(
     const message = `You appear stuck — no tool calls for ${idleMinutes} min. If your implementation is complete, run \`pan done ${issueId}\`. Otherwise reply with a one-line summary of what you're waiting on, then continue.`;
     await messageAgent(agentId, message);
     writeStuckRemediationState(agentId, stageState(1, now, firstStuck));
-    logAction(actions, transitionAction(1, issueId, idleMinutes, 'poked'));
+    logAction(actions, transitionAction(1, issueId, idleMinutes, 'poked'), issueId);
   }
 }
 
@@ -520,7 +526,7 @@ async function evaluatePlanningAgent(
       `Only halt for a genuine contradiction between authoritative inputs.`;
     await messageAgent(agentId, message);
     writeStuckRemediationState(agentId, stageState(1, now, firstStuckAt(lastActivity, stuckState)));
-    logAction(actions, transitionAction(1, issueId, idleMinutes, 'auto-planning-default'));
+    logAction(actions, transitionAction(1, issueId, idleMinutes, 'auto-planning-default'), issueId);
     return;
   }
 
@@ -755,7 +761,7 @@ async function evaluateFlywheelOrchestrator(
     const message = `Stage 2: idle ${idleMinutes} min — run a FULL flywheel tick NOW: inventory -> diagnose -> suggest -> launch ready work -> \`pan flywheel emit-status\`. Then call ScheduleWakeup(delaySeconds:1000) to arm the next tick. Do NOT ask the operator a question, do NOT wait, and do NOT just emit a stale status or pause.`;
     await messageAgent(agentId, message);
     writeStuckRemediationState(agentId, stageState(2, now, firstStuck, stuckState));
-    logAction(actions, transitionAction(2, 'FLYWHEEL', idleMinutes, 'escalated-nudge'));
+    logAction(actions, transitionAction(2, 'FLYWHEEL', idleMinutes, 'escalated-nudge'), 'FLYWHEEL');
     return;
   }
 
@@ -763,7 +769,7 @@ async function evaluateFlywheelOrchestrator(
     const message = `You appear stuck — ${idleMinutes} min since your last tick. Run a FULL flywheel tick NOW: inventory -> diagnose -> suggest -> launch ready work -> \`pan flywheel emit-status\`. Then call ScheduleWakeup(delaySeconds:1000) to arm the next tick. Do NOT ask the operator a question, do NOT wait, and do NOT just emit a stale status or pause.`;
     await messageAgent(agentId, message);
     writeStuckRemediationState(agentId, stageState(1, now, firstStuck, stuckState));
-    logAction(actions, transitionAction(1, 'FLYWHEEL', idleMinutes, 'poked'));
+    logAction(actions, transitionAction(1, 'FLYWHEEL', idleMinutes, 'poked'), 'FLYWHEEL');
   }
 }
 
@@ -785,6 +791,15 @@ async function reconcileActiveFlywheelWithoutRunningAgent(now: number, actions: 
 export async function checkStuckAgentRemediation(opts: StuckRemediationOptions = {}): Promise<string[]> {
   const config = loadCloisterConfigSync().stuck_remediation ?? DEFAULT_CLOISTER_CONFIG.stuck_remediation!;
   if (!config.enabled) return [];
+
+  // PAN-3894 (W6): the escalation ladder (poke -> resume -> troubled) advances
+  // only because each rung acts and records that it acted. A shadow run that
+  // never acts would re-detect rung 1 on every pass forever, counting a firing
+  // that the real patrol would not make. Skip rather than count a fiction.
+  if (opts.shadow) {
+    console.log('[deacon] checkStuckAgentRemediation: not shadowable (the ladder advances by acting) — skipped');
+    return [];
+  }
 
   const actions: string[] = [];
   const now = opts.now ?? Date.now();

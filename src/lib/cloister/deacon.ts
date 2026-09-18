@@ -965,6 +965,7 @@ async function handleOrphanReviewerSession(
   sessions: string[],
   creationTimes: Map<string, number>,
   now: number,
+  options: PatrolShadowOptions = {},
 ): Promise<string | null> {
   // PAN-1059: convoy sub-role sessions are agent-<id>-review-<subRole>.
   // Legacy specialist sessions matched specialist-*-review-*. Both contain -review-.
@@ -989,9 +990,13 @@ async function handleOrphanReviewerSession(
     // No status entry → safe to clean
   }
 
+  // PAN-3894 (W6): count the would-fire so PAN-3895 has deletion evidence.
+  recordWouldFire('cleanupOrphanReviewerSessions', issueId);
+  const ageMin = Math.round((now - createdMs) / 60000);
+  if (options.shadow) return `Killed orphan reviewer session ${sessionName} (${ageMin}m old) (shadow)`;
+
   try {
     await Effect.runPromise(killSession(sessionName));
-    const ageMin = Math.round((now - createdMs) / 60000);
     const msg = `Killed orphan reviewer session ${sessionName} (${ageMin}m old)`;
     console.log(`[deacon] ${msg}`);
     return msg;
@@ -1038,7 +1043,9 @@ export async function handleAgentStoppedForOrphanReviewerSessions(agentId: strin
  * PAN-1908: this is now a thin dropped-event safety net. The primary cleanup
  * path is reactive via handleAgentStoppedForOrphanReviewerSessions.
  */
-export async function cleanupOrphanReviewerSessions(): Promise<string[]> {
+export async function cleanupOrphanReviewerSessions(
+  options: PatrolShadowOptions = {},
+): Promise<string[]> {
   const loaded = await loadTmuxSessionsWithCreationTimes();
   if (!loaded) return [];
   const { sessions, creationTimes } = loaded;
@@ -1046,7 +1053,7 @@ export async function cleanupOrphanReviewerSessions(): Promise<string[]> {
   const actions: string[] = [];
   const now = Date.now();
   for (const sessionName of sessions) {
-    const result = await handleOrphanReviewerSession(sessionName, sessions, creationTimes, now);
+    const result = await handleOrphanReviewerSession(sessionName, sessions, creationTimes, now, options);
     if (result) actions.push(result);
   }
 
@@ -1523,8 +1530,8 @@ export async function recoverOrphanedAgents(context?: string): Promise<string[]>
   return recoverOrphanedAgentsWithDeps(context, autoResumeNotifierDeps());
 }
 
-export async function cleanupOrphanedPlanningSessions(): Promise<string[]> {
-  return cleanupOrphanedPlanningSessionsWithDeps(autoResumeNotifierDeps());
+export async function cleanupOrphanedPlanningSessions(options: PatrolShadowOptions = {}): Promise<string[]> {
+  return cleanupOrphanedPlanningSessionsWithDeps(autoResumeNotifierDeps(), options);
 }
 
 export async function handleAgentStoppedEvent(agentId: string, opts = {}): Promise<string | null> {
@@ -1539,9 +1546,9 @@ export async function applyBootReconciliationDecision(opts: BootReconciliationAp
   return applyBootReconciliationDecisionWithDeps(autoResumeNotifierDeps(), opts);
 }
 
-export async function reconcileAgentLiveness(): Promise<string[]> {
+export async function reconcileAgentLiveness(options: PatrolShadowOptions = {}): Promise<string[]> {
   if (isDeaconGloballyPaused()) { logDeaconEventSync('reconcileAgentLiveness skipped — deacon globally paused'); return []; }
-  return reconcileAgentLivenessWithDeps(autoResumeNotifierDeps());
+  return reconcileAgentLivenessWithDeps(autoResumeNotifierDeps(), options);
 }
 // Callback set by the server layer to emit Socket.io merge:ready notifications.
 // Deacon is a library module and does not own the Socket.io instance directly.
@@ -2538,7 +2545,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   addLog('info', `Patrol cycle ${state.patrolCycle} — checking per-project specialists`, state.patrolCycle);
   console.log(`[deacon] Patrol cycle ${state.patrolCycle} - checking per-project specialists`);
 
-  const stuckRemediationActions = await runBudgetedPatrol('checkStuckAgentRemediation', () => checkStuckAgentRemediation());
+  const stuckRemediationActions = await runBudgetedPatrol('checkStuckAgentRemediation', () => runShadowablePatrol('checkStuckAgentRemediation', (shadow) => checkStuckAgentRemediation({ shadow })));
   actions.push(...stuckRemediationActions);
   for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);
 
@@ -2569,7 +2576,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // PAN-1908: primary liveness recovery is now reactive (agent.stopped /
   // agent.heartbeat_dead events handled by the Cloister domain-event scheduler).
   // Keep a thin table-query safety net on the patrol for dropped events.
-  const livenessActions = await runBudgetedPatrol('reconcileAgentLiveness', () => reconcileAgentLiveness());
+  const livenessActions = await runBudgetedPatrol('reconcileAgentLiveness', () => runShadowablePatrol('reconcileAgentLiveness', (shadow) => reconcileAgentLiveness({ shadow })));
   actions.push(...livenessActions);
   for (const a of livenessActions) addLog('action', a, state.patrolCycle);
 
@@ -2659,7 +2666,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // PAN-1559: reap untracked inspect tmux sessions. Inspect agents now write
   // state.json at spawn, but this safety net kills older leaked sessions and
   // any future dead inspect panes before they burn compute indefinitely.
-  const inspectReaperActions = await runBudgetedPatrol('cleanupOrphanedInspectSessions', () => cleanupOrphanedInspectSessions());
+  const inspectReaperActions = await runBudgetedPatrol('cleanupOrphanedInspectSessions', () => runShadowablePatrol('cleanupOrphanedInspectSessions', (shadow) => cleanupOrphanedInspectSessions({ shadow })));
   actions.push(...inspectReaperActions);
   for (const a of inspectReaperActions) addLog('action', a, state.patrolCycle);
 
@@ -2732,7 +2739,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // because either (a) `skipKill=true` was set or (b) complete-planning was never invoked
   // (work agent was started via a different path). If the corresponding work agent session
   // `agent-pan-<id>` is alive, planning is definitively over — kill the planning session.
-  const planningCleanupActions = await runBudgetedPatrol('cleanupOrphanedPlanningSessions', () => cleanupOrphanedPlanningSessions());
+  const planningCleanupActions = await runBudgetedPatrol('cleanupOrphanedPlanningSessions', () => runShadowablePatrol('cleanupOrphanedPlanningSessions', (shadow) => cleanupOrphanedPlanningSessions({ shadow })));
   actions.push(...planningCleanupActions);
   for (const a of planningCleanupActions) addLog('action', a, state.patrolCycle);
 
@@ -2749,7 +2756,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // Kill orphaned review sessions whose work agent is no longer running.
   // Review sessions are named review-<issueId>-<timestamp>-<role> and are
   // never killed by teardown because the exact-match pattern doesn't catch them.
-  const reviewCleanupActions = await runBudgetedPatrol('cleanupOrphanedReviewSessions', () => cleanupOrphanedReviewSessions());
+  const reviewCleanupActions = await runBudgetedPatrol('cleanupOrphanedReviewSessions', () => runShadowablePatrol('cleanupOrphanedReviewSessions', (shadow) => cleanupOrphanedReviewSessions({ shadow })));
   actions.push(...reviewCleanupActions);
   for (const a of reviewCleanupActions) addLog('action', a, state.patrolCycle);
 
@@ -2854,7 +2861,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   // (agent.stopped for the owning work agent). This is a thin safety-net
   // sweep for dropped events (PAN-846).
   if (shouldRunRecoveryJanitor('orphan-reviewer', state.patrolCycle)) {
-    const orphanActions = await runBudgetedPatrol('cleanupOrphanReviewerSessions', () => cleanupOrphanReviewerSessions());
+    const orphanActions = await runBudgetedPatrol('cleanupOrphanReviewerSessions', () => runShadowablePatrol('cleanupOrphanReviewerSessions', (shadow) => cleanupOrphanReviewerSessions({ shadow })));
     actions.push(...orphanActions);
     for (const a of orphanActions) addLog('action', a, state.patrolCycle);
   }

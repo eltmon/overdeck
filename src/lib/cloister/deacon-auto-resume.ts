@@ -45,6 +45,7 @@ import type { XBriefItem } from '../xbrief/types.js';
 import { consumeConfirmedSessionDetail, queryConfirmedSession } from './confirmed-session-query.js';
 import { isTerminalSwarmSlotAgent } from './swarm-slot-lifecycle.js';
 import { buildInspectionBlockedNudge, getBlockingMandatoryInspection } from './idle-nudge-inspection.js';
+import { recordWouldFire, type PatrolShadowOptions } from './patrol-would-fire.js';
 export interface AutoResumeNotifierDeps {
   notifyAgentStopped: (agentId: string) => void;
   notifyAgentStatusChanged: (state: AgentState, previousStatus?: AgentState['status'], hasLiveTmuxSession?: boolean) => void;
@@ -330,7 +331,10 @@ async function recoverOrphanedAgentsOnce(context: string | undefined, deps: Auto
  * kill it (skipKill=true path, or complete-planning never invoked because the
  * work agent was started via a different code path).
  */
-export async function cleanupOrphanedPlanningSessions(deps: AutoResumeNotifierDeps): Promise<string[]> {
+export async function cleanupOrphanedPlanningSessions(
+  deps: AutoResumeNotifierDeps,
+  options: PatrolShadowOptions = {},
+): Promise<string[]> {
   const actions: string[] = [];
   let planningSessions: string[];
   try {
@@ -347,6 +351,13 @@ export async function cleanupOrphanedPlanningSessions(deps: AutoResumeNotifierDe
     const workAgentSession = planningSession.replace(/^planning-/, 'agent-');
     if (!isAliveSync(workAgentSession).alive) {
       logDeaconEventSync(`cleanupOrphanedPlanningSessions: ${planningSession} kept — work agent ${workAgentSession} not running`);
+      continue;
+    }
+
+    // PAN-3894 (W6): count the would-fire so PAN-3895 has deletion evidence.
+    recordWouldFire('cleanupOrphanedPlanningSessions', planningSession);
+    if (options.shadow) {
+      actions.push(`Killed orphaned ${planningSession} (work agent ${workAgentSession} is running) (shadow)`);
       continue;
     }
 
@@ -876,13 +887,31 @@ export async function autoResumeStoppedWorkAgents(deps: AutoResumeNotifierDeps):
  * The primary path is reactive (agent.stopped / agent.heartbeat_dead events);
  * this is only a fallback.
  */
-export async function reconcileAgentLiveness(deps: AutoResumeNotifierDeps): Promise<string[]> {
+export async function reconcileAgentLiveness(
+  deps: AutoResumeNotifierDeps,
+  options: PatrolShadowOptions = {},
+): Promise<string[]> {
   const actions: string[] = [];
+
+  // PAN-3894 (W6): this patrol cannot detect without repairing — its detection
+  // IS handleAgentHeartbeatDeadEvent / handleAgentStoppedEvent, which decide and
+  // act in one step. Re-implementing the liveness predicate here to "detect
+  // only" would be a second, drifting copy — exactly the F15 mistake that made
+  // reconcileInFlightJournals count noise. So shadow mode skips the patrol
+  // outright rather than counting something the real path would not do.
+  if (options.shadow) {
+    console.log('[deacon] reconcileAgentLiveness: not shadowable (detection is inseparable from repair) — skipped');
+    return actions;
+  }
+
   const agents = listAllAgents();
 
   const orphanCandidates = agents.filter((agent) => agent.status === 'running' || agent.status === 'starting').map((agent) => agent.id);
   for (const agentId of orphanCandidates) {
     const result = await handleAgentHeartbeatDeadEvent(agentId, 'reconcile', deps);
+    // Count only a real repair: an empty result means the agent was alive and
+    // nothing happened, which is not a firing.
+    if (result.length > 0) recordWouldFire('reconcileAgentLiveness', agentId);
     actions.push(...result);
   }
 
@@ -893,7 +922,10 @@ export async function reconcileAgentLiveness(deps: AutoResumeNotifierDeps): Prom
 
   for (const agentId of stoppedWorkCandidates) {
     const resumed = await handleAgentStoppedEvent(agentId, { context: 'reconcile' }, deps);
-    if (resumed) actions.push(`Auto-resumed ${agentId} via reconcile`);
+    if (resumed) {
+      recordWouldFire('reconcileAgentLiveness', agentId);
+      actions.push(`Auto-resumed ${agentId} via reconcile`);
+    }
   }
 
   if (actions.length > 0) {
