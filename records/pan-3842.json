@@ -189,7 +189,7 @@
     "recordedAt": "2026-09-18T07:31:28.942Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-18T07:56:11.897Z",
+  "updated": "2026-09-18T07:56:12.904Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "pending",
@@ -199,7 +199,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T07:50:05.375Z",
+    "updatedAt": "2026-09-18T07:56:11.885Z",
     "mergeNotes": "Review stale: approved ff31b427, workspace HEAD is ad879ac7. Run pan done or pan review request to re-review.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3851",
     "reviewedAtCommit": "ff31b42704cd1c4aad54547e796b30f6f2daac4f",
@@ -276,8 +276,7 @@
     },
     "deaconIgnored": true,
     "deaconIgnoredAt": "2026-09-16T22:55:47.495Z",
-    "deaconIgnoredReason": "Operator requested all agents stopped for independent code review and PRD redesign. Hold issue scheduling until explicit authorization.",
-    "panDoneRecoveredAt": "2026-09-18T07:56:11.179Z"
+    "deaconIgnoredReason": "Operator requested all agents stopped for independent code review and PRD redesign. Hold issue scheduling until explicit authorization."
   },
   "closeOut": {
     "usage": {
@@ -343,7 +342,7 @@
       },
       "costAtCloseOut": {
         "usd": 19.952098,
-        "pricingAsOf": "2026-09-18T07:50:05.378Z"
+        "pricingAsOf": "2026-09-18T07:56:11.889Z"
       }
     },
     "merges": [
