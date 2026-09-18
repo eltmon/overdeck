@@ -372,6 +372,11 @@
       "reason": "resume",
       "agentModel": "claude-opus-5",
       "timestamp": "2026-09-18T10:04:57.485Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5",
+      "timestamp": "2026-09-18T10:05:02.405Z"
     }
   ],
   "feedback": [
@@ -503,7 +508,7 @@
     "recordedAt": "2026-09-17T04:24:56.466Z"
   },
   "created": "2026-09-16T14:16:33.191Z",
-  "updated": "2026-09-18T10:04:57.486Z",
+  "updated": "2026-09-18T10:05:02.406Z",
   "pipeline": {
     "issueId": "PAN-3836",
     "reviewStatus": "pending",
