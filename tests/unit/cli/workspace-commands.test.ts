@@ -308,3 +308,89 @@ describe('pan workspace get/activate/archive (PAN-1990)', () => {
     expect(getWorkspaceById(id)?.isArchived).toBe(false);
   });
 });
+
+describe('pan workspace destroy multi-shape (PAN-3887)', () => {
+  it('destroys a lone strike workspace (previously refused as not found)', async () => {
+    const { mkdirSync: mkdirSyncReal } = await import('node:fs');
+    const { Effect } = await import('effect');
+    const worktreeModule = await import('../../../src/lib/worktree.js');
+    const strikePath = join(projectRoot, 'workspaces', 'feature-pan-9040-strike');
+    mkdirSyncReal(strikePath, { recursive: true });
+
+    const removeSpy = vi.spyOn(worktreeModule, 'removeWorktree').mockReturnValue(Effect.succeed(undefined));
+
+    const { destroyCommand } = await import('../../../src/cli/commands/workspace-list.js');
+    await destroyCommand('pan-9040', { project: projectRoot });
+    vi.restoreAllMocks();
+
+    expect(removeSpy).toHaveBeenCalledTimes(1);
+    expect(removeSpy.mock.calls[0]?.[1]).toBe(strikePath);
+  });
+
+  it('destroys base, strike, and slot shapes by default', async () => {
+    const { mkdirSync: mkdirSyncReal } = await import('node:fs');
+    const { Effect } = await import('effect');
+    const worktreeModule = await import('../../../src/lib/worktree.js');
+    const names = ['feature-pan-9041', 'feature-pan-9041-strike', 'feature-pan-9041-slot-1'];
+    for (const name of names) mkdirSyncReal(join(projectRoot, 'workspaces', name), { recursive: true });
+
+    const removeSpy = vi.spyOn(worktreeModule, 'removeWorktree').mockReturnValue(Effect.succeed(undefined));
+
+    const { destroyCommand } = await import('../../../src/cli/commands/workspace-list.js');
+    await destroyCommand('pan-9041', { project: projectRoot });
+    vi.restoreAllMocks();
+
+    expect(removeSpy).toHaveBeenCalledTimes(3);
+    expect(removeSpy.mock.calls.map((call) => call[1]).sort()).toEqual(
+      names.map((name) => join(projectRoot, 'workspaces', name)).sort(),
+    );
+  });
+
+  it('--shape strike removes only the strike worktree', async () => {
+    const { mkdirSync: mkdirSyncReal } = await import('node:fs');
+    const { Effect } = await import('effect');
+    const worktreeModule = await import('../../../src/lib/worktree.js');
+    mkdirSyncReal(join(projectRoot, 'workspaces', 'feature-pan-9042'), { recursive: true });
+    const strikePath = join(projectRoot, 'workspaces', 'feature-pan-9042-strike');
+    mkdirSyncReal(strikePath, { recursive: true });
+
+    const removeSpy = vi.spyOn(worktreeModule, 'removeWorktree').mockReturnValue(Effect.succeed(undefined));
+
+    const { destroyCommand } = await import('../../../src/cli/commands/workspace-list.js');
+    await destroyCommand('pan-9042', { project: projectRoot, shape: 'strike' });
+    vi.restoreAllMocks();
+
+    expect(removeSpy).toHaveBeenCalledTimes(1);
+    expect(removeSpy.mock.calls[0]?.[1]).toBe(strikePath);
+  });
+
+  it('rejects an invalid --shape', async () => {
+    const { destroyCommand } = await import('../../../src/cli/commands/workspace-list.js');
+    const exitError = new Error('process exited');
+    vi.spyOn(process, 'exit').mockImplementation(() => { throw exitError; });
+    try {
+      await expect(destroyCommand('pan-9043', { project: projectRoot, shape: 'bogus' })).rejects.toThrow(exitError);
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it('names the strike shape when nothing matches', async () => {
+    const { destroyCommand } = await import('../../../src/cli/commands/workspace-list.js');
+    const exitError = new Error('process exited');
+    vi.spyOn(process, 'exit').mockImplementation(() => { throw exitError; });
+    // ora's spinner.fail writes to stderr — capture it to prove the not-found
+    // message names the strike shape (so the operator knows it was considered).
+    const chunks: string[] = [];
+    const writeSpy = vi.spyOn(process.stderr, 'write').mockImplementation((chunk: any) => {
+      chunks.push(String(chunk));
+      return true;
+    });
+    try {
+      await expect(destroyCommand('pan-9044', { project: projectRoot })).rejects.toThrow(exitError);
+    } finally {
+      vi.restoreAllMocks();
+    }
+    expect(chunks.join('')).toContain('feature-pan-9044-strike');
+  });
+});
