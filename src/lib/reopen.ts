@@ -12,10 +12,9 @@ import {
   setReviewStatusSync,
 } from './review-status.js';
 import { Data, Effect } from 'effect';
-import { getProjectSync, resolveProjectFromIssueSync } from './projects.js';
 import { appendContinueSessionEntryForIssue } from './xbrief/lifecycle-io.js';
+import { resolveProjectFromIssueSync } from './projects.js';
 import { clearIssueClosedCache } from './cloister/issue-closed.js';
-import { clearRecordPipelineClosedOutSync } from './pan-dir/record-update.js';
 
 export interface ReopenResult {
   specialistStatesReset: boolean;
@@ -61,14 +60,13 @@ async function reopenWorkspaceStatePromise(
     result.previousMergeStatus = existing.mergeStatus ?? null;
   }
 
+  // PAN-3917: this used to clear a terminal close-out marker on the
+  // per-issue record before publishing the fresh status (otherwise a stale
+  // record write could outrace the reset and restore old verdicts). The
+  // record plane is gone — reviewStatus below is the only copy now, so
+  // there is nothing left that could resurrect stale verdicts. `resolved`
+  // is still needed below for the continue-file breadcrumb.
   const resolved = resolveProjectFromIssueSync(issueId);
-  if (resolved) {
-    // Clear the terminal close-out marker before publishing the fresh status.
-    // Otherwise this record write can become newer than the reset and restore
-    // its old verdicts during the next canonical read.
-    const project = getProjectSync(resolved.projectKey);
-    if (project) clearRecordPipelineClosedOutSync(project, issueId.toUpperCase());
-  }
 
   setReviewStatusSync(issueId, {
     reviewStatus: 'pending',
