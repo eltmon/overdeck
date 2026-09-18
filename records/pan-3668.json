@@ -584,7 +584,7 @@
     "recordedAt": "2026-09-18T08:00:26.249Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-09-18T08:30:27.700Z",
+  "updated": "2026-09-18T08:35:16.416Z",
   "pipeline": {
     "issueId": "PAN-3668",
     "reviewStatus": "pending",
@@ -598,7 +598,7 @@
     "updatedAt": "2026-09-18T08:30:27.025Z",
     "reviewNotes": "Verification failed at test-skip — fix and resubmit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3670",
-    "reviewRequestedAt": "2026-09-18T08:30:26.350Z",
+    "reviewRequestedAt": "2026-09-18T08:35:15.738Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/TELEMETRY.md",
@@ -863,7 +863,8 @@
         "tsdown.config.ts"
       ],
       "recordedAt": "2026-09-18T08:00:26.249Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-09-18T08:35:15.738Z"
   },
   "closeOut": {
     "usage": {
