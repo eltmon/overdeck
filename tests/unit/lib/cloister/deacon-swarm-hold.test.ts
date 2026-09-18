@@ -10,8 +10,7 @@ import type { CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deac
 
 const mocks = vi.hoisted(() => ({
   listProjectsSync: vi.fn(),
-  getReviewStatusSync: vi.fn(),
-  setReviewStatusSync: vi.fn(),
+  readSwarmHold: vi.fn(),
   isDeaconGloballyPausedSync: vi.fn(() => false),
 }));
 
@@ -41,12 +40,10 @@ vi.mock(import('../../../../src/lib/swarm-policy.js'), async (importOriginal) =>
   resolveAutomaticSwarmPolicy: () => ({ policy: { mode: 'auto', maxSlots: 3, autoAdvance: true, source: { mode: 'global', maxSlots: 'global', autoAdvance: 'global' } }, enabled: true }),
 }));
 
-vi.mock('../../../../src/lib/review-status.js', () => ({
-  getReviewStatusSync: mocks.getReviewStatusSync,
-  setReviewStatusSync: mocks.setReviewStatusSync,
-
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
+// PAN-3917: the only per-issue halt is the swarm's own hold in the slot ledger.
+vi.mock(import('../../../../src/lib/cloister/deacon-swarm-record.js'), async (importOriginal) => ({
+  ...(await importOriginal()),
+  readSwarmHold: mocks.readSwarmHold,
 }));
 
 vi.mock('../../../../src/lib/overdeck/control-settings.js', async (importOriginal) => ({
@@ -61,7 +58,8 @@ const recordRoots: string[] = [];
 beforeEach(async () => {
   tempRoot = await mkdtemp(join(tmpdir(), 'overdeck-swarm-hold-'));
   mocks.listProjectsSync.mockReset();
-  mocks.getReviewStatusSync.mockReset();
+  mocks.readSwarmHold.mockReset();
+  mocks.readSwarmHold.mockReturnValue(undefined);
   mocks.setReviewStatusSync.mockReset();
   mocks.isDeaconGloballyPausedSync.mockReset();
   mocks.isDeaconGloballyPausedSync.mockReturnValue(false);
@@ -133,42 +131,28 @@ describe('coordinateSwarmSlots per-issue operator hold (PAN-2214)', () => {
   it('skips a deacon-ignored issue before any reconcile/dispatch work', async () => {
     const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
     setupWorkspace('pan-100', 'PAN-100');
-    mocks.getReviewStatusSync.mockReturnValue({ deaconIgnored: true });
+    mocks.readSwarmHold.mockReturnValue({ reason: 'operator hold', setBy: 'operator', at: 'now' });
 
     const actions = await coordinateSwarmSlots({ manual: true });
 
-    expect(actions).toContain('[swarm] skipped PAN-100: deacon-ignored — operator hold');
+    expect(actions).toContain('[swarm] skipped PAN-100: swarm hold — operator hold');
     expect(actions).not.toContain('[swarm] considered PAN-100: swarm eligible');
-  });
-
-  it('coordinates THROUGH a system-stuck issue, logging the pass (PAN-2469)', async () => {
-    // PAN-2469 semantic change: `stuck` is a system-set failure marker, not an
-    // operator hold. Halting coordination on it froze PAN-2388's ready slots
-    // for hours. Only deaconIgnored halts coordination now.
-    const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
-    setupWorkspace('pan-101', 'PAN-101');
-    mocks.getReviewStatusSync.mockReturnValue({ stuck: true, stuckReason: 'verification_stuck' });
-
-    const actions = await coordinateSwarmSlots({ manual: true });
-
-    expect(actions).toContain('[swarm] PAN-101 is system-stuck (verification_stuck) — coordinating anyway (stuck no longer halts assembly, PAN-2469)');
-    expect(actions).not.toContain('[swarm] skipped PAN-101: stuck — operator hold');
   });
 
   it('honors the hold even when coordination is filtered to that issue (reactive path)', async () => {
     const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
     setupWorkspace('pan-102', 'PAN-102');
-    mocks.getReviewStatusSync.mockReturnValue({ deaconIgnored: true });
+    mocks.readSwarmHold.mockReturnValue({ reason: 'operator hold', setBy: 'operator', at: 'now' });
 
     const actions = await coordinateSwarmSlots({ issueId: 'PAN-102', manual: true });
 
-    expect(actions).toContain('[swarm] skipped PAN-102: deacon-ignored — operator hold');
+    expect(actions).toContain('[swarm] skipped PAN-102: swarm hold — operator hold');
   });
 
   it('coordinates normally when no hold is set', async () => {
     const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
     setupWorkspace('pan-103', 'PAN-103');
-    mocks.getReviewStatusSync.mockReturnValue(null);
+    mocks.readSwarmHold.mockReturnValue(undefined);
 
     const actions = await coordinateSwarmSlots({ manual: true });
 
@@ -178,8 +162,8 @@ describe('coordinateSwarmSlots per-issue operator hold (PAN-2214)', () => {
   it('a hold read failure fails open (coordination proceeds)', async () => {
     const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
     setupWorkspace('pan-104', 'PAN-104');
-    mocks.getReviewStatusSync.mockImplementation(() => {
-      throw new Error('journal unreadable');
+    mocks.readSwarmHold.mockImplementation(() => {
+      throw new Error('slot ledger unreadable');
     });
 
     const actions = await coordinateSwarmSlots({ manual: true });
@@ -233,7 +217,7 @@ describe('per-spawn freeze/hold re-check (PAN-2214 slot-20 regression)', () => {
   it('a global freeze activating mid-wave halts every subsequent spawn in the same wave', async () => {
     const { dispatchNextWave } = await import('../../../../src/lib/cloister/deacon-swarm.js');
     const { analyzeSwarmReadiness } = await import('../../../../src/lib/xbrief/swarm-readiness.js');
-    mocks.getReviewStatusSync.mockReturnValue(null);
+    mocks.readSwarmHold.mockReturnValue(undefined);
     const doc = makeDoc('PAN-105', 3);
     const deps = dispatchDeps({
       spawnRun: vi.fn(async () => {
@@ -259,11 +243,11 @@ describe('per-spawn freeze/hold re-check (PAN-2214 slot-20 regression)', () => {
   it('a hold set mid-wave halts remaining spawns and unwinds the halted claim', async () => {
     const { dispatchNextWave } = await import('../../../../src/lib/cloister/deacon-swarm.js');
     const { analyzeSwarmReadiness } = await import('../../../../src/lib/xbrief/swarm-readiness.js');
-    mocks.getReviewStatusSync.mockReturnValue(null);
+    mocks.readSwarmHold.mockReturnValue(undefined);
     const doc = makeDoc('PAN-106', 2);
     const deps = dispatchDeps({
       spawnRun: vi.fn(async () => {
-        mocks.getReviewStatusSync.mockReturnValue({ deaconIgnored: true });
+        mocks.readSwarmHold.mockReturnValue({ reason: 'operator hold', setBy: 'operator', at: 'now' });
       }),
     });
 
@@ -302,7 +286,7 @@ describe('per-spawn freeze/hold re-check (PAN-2214 slot-20 regression)', () => {
     const projectPath = setupWorkspace('pan-107', 'PAN-107');
     const workspacePath = join(projectPath, 'workspaces', 'feature-pan-107');
     recordFailedMergeBlock({ issueId: 'PAN-107', itemId: 'wi-1', slotIndex: 1, note: 'test block' });
-    mocks.getReviewStatusSync.mockReturnValue(null);
+    mocks.readSwarmHold.mockReturnValue(undefined);
     mocks.isDeaconGloballyPausedSync.mockReturnValue(true);
     const doc = makeDoc('PAN-107', 1);
     const deps = dispatchDeps();
@@ -377,7 +361,7 @@ describe('PAN-2364 coordinator continues around blocked slots', () => {
     const workspacePath = join(projectPath, 'workspaces', 'feature-pan-200');
     recordFailedMergeBlock({ issueId: 'PAN-200', itemId: 'wi-1', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
     recordFailedMergeBlock({ issueId: 'PAN-200', itemId: 'wi-3', slotIndex: 3, note: 'slot 3 conflict' }, workspacePath);
-    mocks.getReviewStatusSync.mockReturnValue(null);
+    mocks.readSwarmHold.mockReturnValue(undefined);
     const deps = makeCoordinateDeps('PAN-200', projectPath, workspacePath);
 
     const actions = await coordinateSwarmSlots({ manual: true }, deps);
@@ -390,7 +374,7 @@ describe('PAN-2364 coordinator continues around blocked slots', () => {
     const projectPath = setupWorkspace('pan-201', 'PAN-201');
     const workspacePath = join(projectPath, 'workspaces', 'feature-pan-201');
     recordFailedMergeBlock({ issueId: 'PAN-201', itemId: 'wi-1', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
-    mocks.getReviewStatusSync.mockReturnValue(null);
+    mocks.readSwarmHold.mockReturnValue(undefined);
     const deps = makeCoordinateDeps('PAN-201', projectPath, workspacePath, {
       // PAN-3720: runtime `done` is no longer merge authority — completion
       // comes from the durable, item-bound slotCompletion marker.
@@ -435,7 +419,7 @@ describe('PAN-2364 coordinator continues around blocked slots', () => {
     const projectPath = setupWorkspace('pan-202', 'PAN-202');
     const workspacePath = join(projectPath, 'workspaces', 'feature-pan-202');
     recordFailedMergeBlock({ issueId: 'PAN-202', itemId: 'wi-1', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
-    mocks.getReviewStatusSync.mockReturnValue(null);
+    mocks.readSwarmHold.mockReturnValue(undefined);
     const deps = makeCoordinateDeps('PAN-202', projectPath, workspacePath);
 
     const actions = await coordinateSwarmSlots({ manual: true }, deps);

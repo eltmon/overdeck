@@ -280,10 +280,10 @@ async function deliverReviewVerdictFeedbackPromise(
             } else if (dedupKey) {
               suppressedReviewFeedbackDeliveries.delete(dedupKey);
             }
-            // PAN-3074/PAN-3917: a fresh delivery ends the suppression run. The
-            // loop is process state now, not a stored stuck flag, so a
-            // non-deduplicated delivery simply resets the counter.
-            if (!repeatedDeliveryLoop && dedupKey) suppressedReviewFeedbackDeliveries.delete(dedupKey);
+            // PAN-3074, re-pointed by PAN-3917: a fresh (non-deduplicated)
+            // delivery already reset the counter above. There is no stored
+            // feedback-delivery stuck flag left to clear here.
+            void repeatedDeliveryLoop;
             }
           } catch (err) {
             // PAN-2228: a resolved-but-unreachable target is a real delivery failure,

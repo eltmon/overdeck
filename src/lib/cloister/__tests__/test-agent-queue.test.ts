@@ -10,22 +10,19 @@ vi.mock('../../projects.js', () => ({
   resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'overdeck', projectPath: '/tmp/overdeck' })),
 }));
 
-vi.mock('../../review-status.js', () => ({
-  setReviewStatus: vi.fn(),
-  setReviewStatusSync: vi.fn(),
-
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
+const prFacts = vi.hoisted(() => ({
+  getPrFacts: vi.fn(async (issueId: string) => ({
+    issueId, forge: 'github', url: 'https://github.com/o/r/pull/1', number: 1,
+    exists: true, open: true, merged: false, closed: false, draft: false,
+    headSha: 'abc', headBranch: 'feature/pan-503', reviewDecision: 'APPROVED',
+    approved: true, changesRequested: false, mergeable: true, mergeableState: 'mergeable',
+    checks: 'green' as const,
+  })),
 }));
-
-vi.mock('../merge-verification.js', () => ({
-  shouldSkipDispatchAsMerged: vi.fn(async () => ({ skip: false, reason: 'open' })),
-  verifyMergedBeforeLifecycle: vi.fn(),
-}));
+vi.mock('../pr-facts.js', () => prFacts);
 
 import { spawnRun } from '../../agents.js';
 import { resolveProjectFromIssueSync } from '../../projects.js';
-import { setReviewStatusSync } from '../../review-status.js';
 import { buildTestRolePrompt, dispatchTestAgentAndNotify } from '../test-agent-queue.js';
 
 describe('test role dispatch', () => {
@@ -51,14 +48,12 @@ describe('test role dispatch', () => {
     expect(prompt).toContain('Do NOT spawn, wake, or delegate to test-agent or uat-agent specialists');
   });
 
-  it('points test roles at durable records instead of retired workspace-local planning files', () => {
+  it('points test roles at the plan and its continue file, never a record (PAN-3917)', () => {
     const prompt = buildTestRolePrompt({ issueId: 'PAN-503' });
 
-    expect(prompt).toContain('.pan/records/pan-503.json');
     expect(prompt).toContain('the canonical xBRIEF under .pan/specs/ for PAN-503');
-    expect(prompt).toContain('Do not require retired workspace-local .pan/continue.json or .pan/spec.vbrief.json files to exist.');
-    expect(prompt).not.toContain('Read .pan/continue.json');
-    expect(prompt).not.toContain('Read .pan/spec.vbrief.json');
+    expect(prompt).toContain('.pan/continues/PAN-503.xbrief.json');
+    expect(prompt).not.toContain('.pan/records/');
   });
 
   it('instructs the test role to write the .pan/test/result.json verdict artifact before signaling (PAN-1681)', () => {
@@ -89,16 +84,18 @@ describe('test role dispatch', () => {
     expect(prompt.slice(oneAttemptIdx)).toContain('.pan/test/result.json');
   });
 
-  it('starts spawnRun(issueId, test) and marks testing', async () => {
+  it('starts spawnRun(issueId, test) and writes no status', async () => {
     const notifyAgent = vi.fn(async () => {});
 
-    await Effect.runPromise(dispatchTestAgentAndNotify('PAN-503', '/tmp/workspace', 'feature/pan-503', notifyAgent));
+    const result = await Effect.runPromise(
+      dispatchTestAgentAndNotify('PAN-503', '/tmp/workspace', 'feature/pan-503', notifyAgent),
+    );
 
     expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'test', expect.objectContaining({
       workspace: '/tmp/workspace',
       prompt: expect.stringContaining('TEST TASK for PAN-503'),
     }));
-    expect(setReviewStatusSync).toHaveBeenCalledWith('PAN-503', { testStatus: 'testing' });
+    expect(result).toMatchObject({ delivered: true, notified: true });
     expect(notifyAgent).toHaveBeenCalledWith(
       'agent-pan-503',
       expect.stringContaining('The test role has been dispatched automatically'),
@@ -108,12 +105,39 @@ describe('test role dispatch', () => {
   it('does not spawn when no project is configured', async () => {
     vi.mocked(resolveProjectFromIssueSync).mockReturnValueOnce(null);
 
-    await Effect.runPromise(dispatchTestAgentAndNotify('PAN-503', '/tmp/workspace', 'feature/pan-503'));
+    const result = await Effect.runPromise(
+      dispatchTestAgentAndNotify('PAN-503', '/tmp/workspace', 'feature/pan-503'),
+    );
 
     expect(spawnRun).not.toHaveBeenCalled();
-    expect(setReviewStatusSync).toHaveBeenCalledWith('PAN-503', {
-      testStatus: 'dispatch_failed',
-      testNotes: 'No project configured for PAN-503. Add it to projects.yaml.',
-    });
+    expect(result).toEqual({ delivered: false, notified: false, reason: 'no-project' });
+  });
+
+  it('PAN-3917 (FR-8): does not dispatch until the issue has an open pull request', async () => {
+    prFacts.getPrFacts.mockResolvedValueOnce({
+      issueId: 'PAN-503', forge: null, url: null, number: null, exists: false,
+      open: false, merged: false, closed: false, draft: false, headSha: null,
+      headBranch: null, reviewDecision: null, approved: false, changesRequested: false,
+      mergeable: null, mergeableState: null, checks: 'none' as const,
+    } as never);
+
+    const result = await Effect.runPromise(dispatchTestAgentAndNotify('PAN-503', '/tmp/workspace'));
+
+    expect(spawnRun).not.toHaveBeenCalled();
+    expect(result).toEqual({ delivered: false, notified: false, reason: 'no-open-pr' });
+  });
+
+  it('does not dispatch once the pull request merged', async () => {
+    prFacts.getPrFacts.mockResolvedValueOnce({
+      issueId: 'PAN-503', forge: 'github', url: 'https://github.com/o/r/pull/1', number: 1,
+      exists: true, open: false, merged: true, closed: false, draft: false, headSha: 'abc',
+      headBranch: 'feature/pan-503', reviewDecision: 'APPROVED', approved: true,
+      changesRequested: false, mergeable: true, mergeableState: 'mergeable', checks: 'green' as const,
+    } as never);
+
+    const result = await Effect.runPromise(dispatchTestAgentAndNotify('PAN-503', '/tmp/workspace'));
+
+    expect(spawnRun).not.toHaveBeenCalled();
+    expect(result).toEqual({ delivered: false, notified: false, reason: 'no-open-pr' });
   });
 });

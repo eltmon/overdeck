@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { gcMergedSlots, gcOrphanedSlots, type CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
-import type { ReconciledSlotItem, SlotReconcileResult } from '../../../../src/lib/agents/slot-reconcile.js';
+import type { ReconciledSlotItem, SlotReconcileResult } from '../../../../src/lib/cloister/swarm-slot-reconcile.js';
 
 function slot(overrides: Partial<ReconciledSlotItem> = {}): ReconciledSlotItem {
   return {

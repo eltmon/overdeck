@@ -5,7 +5,7 @@ import {
   type ReconciledSlotAgent,
   type ReconciledSlotAssignment,
   type ReconciledSlotBranch,
-} from '../../../../src/lib/agents/slot-reconcile.js';
+} from '../../../../src/lib/cloister/swarm-slot-reconcile.js';
 import { listAgentStates } from '../../../../src/lib/agents/queries.js';
 
 vi.mock('../../../../src/lib/agents/queries.js', () => ({
@@ -54,7 +54,7 @@ function deps(
 describe('reconcileSlotState', () => {
   it('does not infer ownership for unowned branch slots from plan order', async () => {
     const result = await reconcileSlotState('PAN-1762', '/workspace', makeDoc(['a', 'b', 'c']), {
-      statusOverrides: { a: 'completed' },
+      itemStatuses: { a: 'completed' },
       deps: deps(
         [{ slotIndex: 2, branch: 'feature/pan-1762-slot-2', merged: false }],
         [{ slotIndex: 2, agentId: 'agent-pan-1762-slot-2', status: 'running' }],
@@ -70,7 +70,7 @@ describe('reconcileSlotState', () => {
 
   it('marks a completed item merged only when durable ownership identifies its slot', async () => {
     const result = await reconcileSlotState('PAN-1762', '/workspace', makeDoc(['a', 'b']), {
-      statusOverrides: { a: 'completed' },
+      itemStatuses: { a: 'completed' },
       deps: deps(
         [{ slotIndex: 1, branch: 'feature/pan-1762-slot-1', merged: true }],
         [],
