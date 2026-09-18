@@ -152,7 +152,7 @@ export interface ConfluenceData {
   meta: ConfluenceMeta;
 }
 
-type IssueRecord = Issue & Record<string, unknown>;
+type IssueRow = Issue & Record<string, unknown>;
 type WorkspaceHealthRecord = Record<string, {
   stackHealth?: { healthy?: boolean };
 }>;
@@ -177,7 +177,7 @@ function emptyHookStream(): ConfluenceHookStream {
   };
 }
 
-function issueKey(issue: IssueRecord): string {
+function issueKey(issue: IssueRow): string {
   return String(issue.identifier || issue.id || '').toUpperCase();
 }
 
@@ -258,7 +258,7 @@ function pauseVoters(agents: readonly AgentSnapshot[]): readonly AgentSnapshot[]
   return live.length > 0 ? live : agents;
 }
 
-function closedIssueState(issue: IssueRecord | undefined): boolean {
+function closedIssueState(issue: IssueRow | undefined): boolean {
   if (!issue) return false;
   const state = String(issue.state ?? issue.status ?? '').toLowerCase();
   return state === 'closed' || state === 'done' || state === 'completed' || state === 'cancelled';
@@ -585,7 +585,7 @@ function parkedPrimaryByIssue(parked: ParkedResponse | null): Map<string, Parked
 }
 
 /** A parked issue with no live agent gets a synthesized Doldrums orb — the graveyard is real cast. */
-function parkedOnlyOrb(row: ParkedRowView, issue: IssueRecord | undefined, now: number): ConfluenceOrb {
+function parkedOnlyOrb(row: ParkedRowView, issue: IssueRow | undefined, now: number): ConfluenceOrb {
   const parkedMs = Math.max(0, now - Date.parse(row.parkedAt));
   const parkedMin = Math.floor(parkedMs / 60_000);
   return {
@@ -638,7 +638,7 @@ export function useConfluenceOrbs(
   const cache = useRef(new Map<string, { signature: string; orb: ConfluenceOrb }>());
 
   return useMemo(() => {
-    const issues = issuesRaw as IssueRecord[];
+    const issues = issuesRaw as IssueRow[];
     const issuesById = new Map(issues.map((issue) => [issueKey(issue), issue]));
     const parkedByIssue = parkedPrimaryByIssue(parked);
     const agentsByIssue = new Map<string, AgentSnapshot[]>();

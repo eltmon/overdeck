@@ -621,7 +621,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const pausedReason = pausedAgent ? (pausedAgent as { pausedReason?: string }).pausedReason : undefined;
 
   // PAN-3917: the attention signal comes from the derived issue state, not a
-  // stored troubled/stuck flag. One badge, one meaning.
+  // stored agent gate flag. One badge, one meaning.
   const attentionLabel = derived?.attention === 'api-error'
     ? '⚠ API error'
     : derived?.attention === 'stuck'

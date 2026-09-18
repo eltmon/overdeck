@@ -350,7 +350,7 @@ function derivePipeline(
 
 /**
  * PAN-3917 (FR-8): verification is the PR's check runs. There is one gate and
- * the forge owns it — no stored verificationStatus, no cycle counter.
+ * the forge owns it — nothing about checks is stored, and there is no cycle counter.
  */
 function deriveVerification(derived: DerivedIssueState | undefined): IssueVerificationModel {
   const checks = derived?.pr?.checks;
