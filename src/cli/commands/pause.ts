@@ -1,7 +1,7 @@
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
-import { getAgentStateSync, resolveAgentTargetSync, setAgentPausedSync, stopAgentSync } from '../../lib/agents.js';
-import { listSlotAgents } from '../../lib/agents/slot-reconcile.js';
+import { getAgentStateSync, listAgentStates, resolveAgentTargetSync, setAgentPausedSync, stopAgentSync } from '../../lib/agents.js';
+import { RETAINED_TRANSCRIPTS_PHASE } from '../../lib/overdeck/agents.js';
 import { listSessionNamesSync, sessionExistsSync } from '../../lib/tmux.js';
 import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
 
@@ -60,7 +60,13 @@ function printSwarmPauseGuidance(id: string): boolean {
   const slotPattern = new RegExp(`^agent-${escaped}-slot-\\d+$`);
   const slotAgentIds = new Set<string>();
   try {
-    for (const agent of listSlotAgents(issueId)) slotAgentIds.add(agent.agentId);
+    // PAN-3917: agents/slot-reconcile.ts (listSlotAgents) is gone with the
+    // Appendix A.5 reconcilers; the swarm-slot pattern match it did over
+    // listAgentStates is inlined here — this is the only caller left.
+    for (const agent of listAgentStates({ role: 'work' })) {
+      if (agent.phase === RETAINED_TRANSCRIPTS_PHASE) continue;
+      if (slotPattern.test(agent.id)) slotAgentIds.add(agent.id);
+    }
   } catch {
     // Agent registry unavailable — fall through to the live-session probe.
   }
