@@ -113,6 +113,9 @@ export function projectPipeline(
     // from ReviewStatus (which has no such field) must not erase it, or the
     // orphaned-completions patrol re-arms the same issue forever (36x on PAN-399).
     panDoneRecoveredAt: existing?.panDoneRecoveredAt,
+    // PAN-3906: same reason — the waiver lives only in the record, so a
+    // ReviewStatus-driven rebuild must carry it forward rather than erase it.
+    testSkipWaiver: existing?.testSkipWaiver,
     updatedAt: status?.updatedAt ?? new Date().toISOString(),
   };
 

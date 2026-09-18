@@ -210,6 +210,12 @@ export interface PanIssuePipelineRecord extends StrikeLandingStatus {
   closedOut?: boolean;
   closedOutAt?: string; reopenedAt?: string;
   reviewCycleHistory?: unknown;
+  /**
+   * PAN-3906: operator waiver letting a net test-call removal past the
+   * test-skip gate. Pinned to one head anchor — it expires as soon as the
+   * branch moves — and never waives an added `.skip`/`.only`.
+   */
+  testSkipWaiver?: { sha: string; reason: string; at: string; by?: string };
   updatedAt: string;
 }
 
