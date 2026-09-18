@@ -23,7 +23,7 @@
     }
   ],
   "created": "2026-09-09T13:35:30.301Z",
-  "updated": "2026-09-18T08:45:25.238Z",
+  "updated": "2026-09-18T09:43:11.686Z",
   "pipeline": {
     "issueId": "PAN-3814",
     "reviewStatus": "pending",
@@ -33,14 +33,22 @@
     "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-09T15:52:53.997Z",
+    "updatedAt": "2026-09-18T09:43:11.661Z",
     "mergeNotes": "GitHub PR #3818 has failing required checks on HEAD e71f3ae6. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/3818 for details.",
     "lastVerifiedCommit": "e71f3ae6cd8a9e6028da0991cc7048efaee9c84a",
-    "strikeReadyHead": "e71f3ae6cd8a9e6028da0991cc7048efaee9c84a",
-    "strikeReadyAt": "2026-09-09T15:04:04.268Z",
-    "strikeLandingState": "landing",
+    "strikeReadyHead": "8b1aad5775dbcf07bb7b9ae3880746246bec873a",
+    "strikeReadyAt": "2026-09-18T09:43:11.660Z",
+    "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-09-09T15:52:54.006Z",
+        "strikeHead": "e71f3ae6cd8a9e6028da0991cc7048efaee9c84a",
+        "mainHead": "456a33352b96e9ddf3c3a0b70b5b02be9c5f6d8c",
+        "outcome": "failed",
+        "detail": "GitHub PR #3818 has failing required checks on HEAD e71f3ae6. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/3818 for details.; recovery not delivered: agent is paused (Operator requested immediate PAN agent reduction due to extreme memory pressure)"
+      }
+    ]
   },
   "closeOut": {
     "usage": {
@@ -64,7 +72,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.0011920000000000001,
-        "pricingAsOf": "2026-09-09T15:53:36.258Z"
+        "pricingAsOf": "2026-09-18T09:43:11.673Z"
       }
     },
     "merges": [],
