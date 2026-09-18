@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-09-18T06:43:33.655Z",
-  "updated": "2026-09-18T07:57:52.595Z",
+  "updated": "2026-09-18T08:05:38.490Z",
   "pipeline": {
     "issueId": "PAN-3894",
     "reviewStatus": "pending",
@@ -63,16 +63,8 @@
     }
   ],
   "tasks": {
-    "sequence": 12,
-    "claims": {
-      "w1-patrol-registry": {
-        "writerId": "agent-pan-3894",
-        "agentId": "agent-pan-3894",
-        "pid": 901399,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-09-18T07:57:52.595Z"
-      }
-    },
+    "sequence": 13,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3894",
@@ -128,12 +120,23 @@
         "outcome": "completed",
         "reason": "reconcileInFlightJournals now records a would-fire and an action only when readJournalStatusSync returns a journal newer than the cached row — the same condition review-status.ts uses to actually fold. The old before/after comparison counted the enrichment delta (F15: 145 firings in 5h). getReviewStatusSync stays unconditional (it IS the repair); statusChanged deleted as unused. 4 new cases + 5 existing updated; 14 tests green.",
         "releasedAt": "2026-09-18T07:57:40.616Z"
+      },
+      {
+        "writerId": "agent-pan-3894",
+        "agentId": "agent-pan-3894",
+        "pid": 901399,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-18T07:57:52.595Z",
+        "itemId": "w1-patrol-registry",
+        "outcome": "completed",
+        "reason": "Created src/lib/cloister/patrol-registry.ts: PatrolCadence/CADENCE_MS, TICK_PATROLS (14, D2 order), DeaconChoreFns/ChoreContext, HousekeepingChore, and HOUSEKEEPING_CHORES (29 in D5 order: 20 fast / 7 hourly / 2 daily) with all six return-shape adapters and the three trigger strings. D7 verified two ways: the source contains no 'deacon.js' string, and madge over the module reaches 521 files with neither deacon.ts nor service.ts present. 12 tests green; typecheck, eslint, lint-circular-deps clean.",
+        "releasedAt": "2026-09-18T08:05:38.490Z"
       }
     ],
     "statusReasons": {
       "w1-patrol-registry": {
-        "reason": "W3a landed src/lib/cloister/specialist-patrol.ts, so the registry's dynamic import of it now resolves.",
-        "updatedAt": "2026-09-18T07:57:44.534Z"
+        "reason": "Created src/lib/cloister/patrol-registry.ts: PatrolCadence/CADENCE_MS, TICK_PATROLS (14, D2 order), DeaconChoreFns/ChoreContext, HousekeepingChore, and HOUSEKEEPING_CHORES (29 in D5 order: 20 fast / 7 hourly / 2 daily) with all six return-shape adapters and the three trigger strings. D7 verified two ways: the source contains no 'deacon.js' string, and madge over the module reaches 521 files with neither deacon.ts nor service.ts present. 12 tests green; typecheck, eslint, lint-circular-deps clean.",
+        "updatedAt": "2026-09-18T08:05:38.490Z"
       },
       "w8-delete-stuck-stub": {
         "reason": "Deleted the checkStuckWorkAgents no-op stub (body was 'return []'), its runPatrol registration, the stale header reference in deacon-stuck-skip.test.ts, and the three DEACON-HEALTH-MONITORING.md mentions. Audit test moved the name to DELETED_PATROLS covered by stuck-remediation-oracle.test.ts. 68 -> 67 registrations. Tests green (3 files, 27 tests).",
@@ -154,7 +157,7 @@
     }
   },
   "statusOverrides": {
-    "w1-patrol-registry": "running",
+    "w1-patrol-registry": "completed",
     "w8-delete-stuck-stub": "completed",
     "w8-delete-stuck-stub.ac1": "completed",
     "w8-delete-stuck-stub.ac2": "completed",
@@ -173,6 +176,10 @@
     "w7-inflight-journal-counter.ac1": "completed",
     "w7-inflight-journal-counter.ac2": "completed",
     "w7-inflight-journal-counter.ac3": "completed",
-    "w7-inflight-journal-counter.ac4": "completed"
+    "w7-inflight-journal-counter.ac4": "completed",
+    "w1-patrol-registry.ac1": "completed",
+    "w1-patrol-registry.ac2": "completed",
+    "w1-patrol-registry.ac3": "completed",
+    "w1-patrol-registry.ac4": "completed"
   }
 }
