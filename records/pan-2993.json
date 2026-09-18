@@ -201,7 +201,7 @@
     "recordedAt": "2026-07-22T20:02:42.067Z"
   },
   "created": "2026-07-21T22:47:36.935Z",
-  "updated": "2026-07-22T20:59:19.987Z",
+  "updated": "2026-09-18T09:04:45.850Z",
   "pipeline": {
     "issueId": "PAN-2993",
     "reviewStatus": "passed",
@@ -423,7 +423,6 @@
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
-  "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 12,
     "claims": {},
