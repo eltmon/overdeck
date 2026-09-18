@@ -73,6 +73,24 @@ Sender identity: the Herdr adapter reads the target's tokens from `agent.get`; o
 `deliverAgentMessage` returns the drop or refusal in `DeliveryResult.failure` (`refused: …` /
 `dropped: …`); a refusal is `ok: false`, so `pan tell` exits non-zero.
 
+## Message delivery routing
+
+`deliverAgentMessage` (`src/lib/agents/delivery.ts`) resolves the host's backend once per process,
+then asks it whether the target is a **live Herdr agent** (`findHerdrAgent`, a bounded 2 s probe on
+its own real timer, so a wedged socket can never hold up a message). If it is, the whole delivery is
+`backend.prompt`. If it is not — a tmux host, or a tmux session that predates the cut — the existing
+cascade runs unchanged: app-server socket, ACP socket, PTY supervisor, Channels, tmux paste buffer.
+The prompt guard runs in front of both.
+
+The dashboard terminal follows the same rule: `/ws/terminal` resolves the session name to a Herdr
+terminal id first (`resolveHerdrTerminalId`) and serves that client from `observe` plus a lazily
+opened `control`; a null answer means the PTY hub path, exactly as before. The RPC
+`TerminalService` uses the same bridge, wearing the PTY interface (`HerdrTerminalProcess`).
+
+Spawn guards are backend-aware too: "is this agent already running" is `agentPaneExists`, a live
+tmux session or a live Herdr agent of that name, and the tmux-only session options
+(`destroy-unattached`, `remain-on-exit`) are applied only when the pane really is a tmux session.
+
 ## Herdr wire facts (v0.9.1, protocol 22)
 
 Verified live on 2026-09-18 against the running `overdeck` session.

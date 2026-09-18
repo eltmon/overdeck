@@ -24,7 +24,7 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { writeBridgeTokenSync } from '../bridge-token.js';
 import { exactPaneTarget, sessionExists, setOption } from '../tmux.js';
-import { launchAgentPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
+import { agentPaneExists, launchAgentPane } from '../terminal-backends/launch.js';
 import { toPaneRole } from '../terminal-backends/tmux.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
 import {
@@ -167,7 +167,7 @@ async function spawnRunWithoutConsentClaim(
   const flywheelEnv = resolveFlywheelSpawnEnv(role, options.flywheelRunId);
   const startedBy = resolveAgentStartedBy(options.startedBy, flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID);
   const agentId = options.agentId ?? runAgentId(issueId, role, options.subRole);
-  if (await Effect.runPromise(sessionExists(agentId))) {
+  if (await agentPaneExists(agentId)) {
     // PAN-2579 (warm-by-default lifecycle): a session alive at dispatch time may
     // be a warm-idle leftover from the PREVIOUS cycle rather than an active run.
     // Reap it here — at the moment its slot is needed — when that is provable:
@@ -426,6 +426,7 @@ async function spawnRunWithoutConsentClaim(
   // terminal backend and carries the `issue`, `role`, `harness`, `model`
   // tokens. On tmux this is the same `createSession` call as before, with the
   // same session name, env, and cwd.
+  let launchedPane: Awaited<ReturnType<typeof launchAgentPane>> | null = null;
   const launchRoleSession = () => launchAgentPane({
     issueId,
     cwd: workspace,
@@ -449,7 +450,7 @@ async function spawnRunWithoutConsentClaim(
       harness: resolvedHarness,
       model: selectedModel,
     },
-  }).then(() => undefined);
+  }).then((pane) => { launchedPane = pane; });
   if (resolvedHarness === 'kimi-code') {
     try {
       rawSessionId = await launchAndCaptureManagedKimiSession({
@@ -476,8 +477,11 @@ async function spawnRunWithoutConsentClaim(
       }),
     });
   }
-  await Effect.runPromise(setOption(agentId, 'destroy-unattached', 'off'));
-  await Effect.runPromise(setOption(exactPaneTarget(agentId), 'remain-on-exit', 'on'));
+  // tmux-only session options: Herdr owns its panes' lifetime itself.
+  if ((launchedPane as { backend?: string } | null)?.backend === 'tmux') {
+    await Effect.runPromise(setOption(agentId, 'destroy-unattached', 'off'));
+    await Effect.runPromise(setOption(exactPaneTarget(agentId), 'remain-on-exit', 'on'));
+  }
 
   if (prompt || resolvedHarness === 'kimi-code') {
     if (shouldDeliverPromptViaAcp) {
@@ -616,8 +620,8 @@ async function spawnAgentWithoutConsentClaim(
   const sessionPrefix = role === 'strike' ? 'strike' : 'agent';
   const agentId = options.agentId ?? `${sessionPrefix}-${options.issueId.toLowerCase()}`;
 
-  // Check if already running (scoped to the exact session name, including slot suffix)
-  if (await Effect.runPromise(sessionExists(agentId))) {
+  // Check if already running (scoped to the exact session/pane name, including slot suffix)
+  if (await agentPaneExists(agentId)) {
     throw new Error(`Agent ${agentId} already running. Use 'pan tell' to message it.`);
   }
 
@@ -834,6 +838,7 @@ async function spawnAgentWithoutConsentClaim(
 
   // PAN-3917 FR-5: same launcher, placed in the issue workspace on the selected
   // backend and stamped with the four pane tokens.
+  let launchedPane: Awaited<ReturnType<typeof launchAgentPane>> | null = null;
   const launchWorkSession = () => launchAgentPane({
     issueId: options.issueId,
     cwd: options.workspace,
@@ -857,7 +862,7 @@ async function spawnAgentWithoutConsentClaim(
       harness: resolvedHarness,
       model: selectedModel,
     },
-  }).then(() => undefined);
+  }).then((pane) => { launchedPane = pane; });
 
   if (resolvedHarness === 'kimi-code') {
     try {

@@ -86,3 +86,18 @@ export async function launchAgentPane(
   return pane;
 }
 
+/**
+ * Does a pane for this agent id already exist on the host's backend? On tmux
+ * that is a live session; on Herdr, a live agent with that name. The spawn
+ * guards use it so a second dispatch cannot stomp a running agent on either
+ * backend.
+ */
+export async function agentPaneExists(agentId: string, backend?: TerminalBackend): Promise<boolean> {
+  const resolved = backend ?? (await resolveLaunchBackend());
+  if (resolved.name === 'herdr') {
+    const { findHerdrAgent } = await import('./herdr.js');
+    return (await findHerdrAgent(agentId)) !== null;
+  }
+  const { sessionExists } = await import('../tmux.js');
+  return await Effect.runPromise(sessionExists(agentId));
+}
