@@ -371,21 +371,8 @@ describe('Phase 4 patrol would-fire counters (PAN-3894 W6)', () => {
     }
   });
 
-  it('deacon.ts wraps each of the six registrations in runShadowablePatrol under its own name', () => {
-    const source = readFileSync('src/lib/cloister/deacon.ts', 'utf8');
-    for (const name of [
-      'checkStuckAgentRemediation',
-      'reconcileAgentLiveness',
-      'cleanupOrphanedPlanningSessions',
-      'cleanupOrphanedInspectSessions',
-      'cleanupOrphanedReviewSessions',
-      'cleanupOrphanReviewerSessions',
-    ]) {
-      expect(source, `${name} is not wrapped`).toContain(
-        `runBudgetedPatrol('${name}', () => runShadowablePatrol('${name}',`,
-      );
-    }
-  });
+  // The runShadowablePatrol wrapping of these six registrations is asserted in
+  // patrol-no-loss-audit.test.ts, which already owns parsing runPatrol's source.
 
   it('cleanupOrphanedPlanningSessions counts in both modes and only kills when not shadowing', async () => {
     const tmux = await import('../../../../src/lib/tmux.js');

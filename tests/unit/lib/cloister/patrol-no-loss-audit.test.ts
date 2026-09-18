@@ -215,6 +215,22 @@ describe('Phase 5 patrol no-loss audit (PAN-3850 W42)', () => {
     }
   });
 
+  it('PAN-3894: the six Phase 4 patrols are registered through runShadowablePatrol', () => {
+    const source = readFileSync(DEACON_PATH, 'utf8');
+    for (const name of [
+      'checkStuckAgentRemediation',
+      'reconcileAgentLiveness',
+      'cleanupOrphanedPlanningSessions',
+      'cleanupOrphanedInspectSessions',
+      'cleanupOrphanedReviewSessions',
+      'cleanupOrphanReviewerSessions',
+    ]) {
+      expect(source, `${name} is not wrapped in runShadowablePatrol`).toContain(
+        `runBudgetedPatrol('${name}', () => runShadowablePatrol('${name}',`,
+      );
+    }
+  });
+
   it('every already-deleted patrol has a covering no-loss audit file', () => {
     for (const [patrol, { file, namedIndividually }] of Object.entries(DELETED_PATROLS)) {
       const path = resolve(TESTS_ROOT, file);
