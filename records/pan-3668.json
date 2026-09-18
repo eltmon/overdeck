@@ -586,10 +586,10 @@
     "recordedAt": "2026-09-18T08:00:26.249Z"
   },
   "created": "2026-08-12T17:28:11.491Z",
-  "updated": "2026-09-18T08:46:58.760Z",
+  "updated": "2026-09-18T08:55:40.247Z",
   "pipeline": {
     "issueId": "PAN-3668",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "uatStatus": "passed",
     "verificationStatus": "skipped",
@@ -597,11 +597,11 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T08:37:41.330Z",
-    "reviewNotes": "Verification failed at test — fix and resubmit",
+    "updatedAt": "2026-09-18T08:55:40.178Z",
+    "reviewNotes": "killAgent skips terminate when the abort RPC fails and has no grace period; runtime-adapter.ac3 + message-delivery.ac3 unmet, only test exercises an unreachable registry",
     "verificationNotes": "Verification FAILED at test (808662ms).\n\nFull gate output: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3668/.overdeck/verification/2026-09-18T08-06-31-225Z-37430f70.json",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3670",
-    "reviewRequestedAt": "2026-09-18T08:35:15.738Z",
+    "reviewedAtCommit": "325bb2333b723c51ebf7b60720b2ec7f7cf863e2",
     "reviewSpawnedAt": "2026-09-18T08:37:41.329Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -931,7 +931,7 @@
       },
       "costAtCloseOut": {
         "usd": 182.1714763,
-        "pricingAsOf": "2026-09-18T08:37:41.550Z"
+        "pricingAsOf": "2026-09-18T08:55:40.227Z"
       }
     },
     "merges": [
@@ -939,8 +939,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "harness": "claude-code",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3668",
