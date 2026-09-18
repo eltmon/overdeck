@@ -1,13 +1,10 @@
 ---
 name: pan-review
-description: "pan review <subcommand> — manage the code review lifecycle: list pending work, re-request review, heal status drift, reset/abort/restart review cycles"
+description: "pan review <subcommand> — manage the code review lifecycle: re-request review, set review mode, abort/restart review cycles"
 triggers:
   - pan review
-  - review pending
   - request review
   - review mode
-  - reset review
-  - resync review
   - restart review
   - abort review
   - code review lifecycle
@@ -20,48 +17,33 @@ allowed-tools:
 
 Manage the review pipeline for completed agent work. Use this when an issue
 has been signaled done by the work agent but you need to inspect, retry, or
-abandon the review/test/ship pass.
+abandon the review pass. Review verdicts are PR reviews (approve or request
+changes) — there is no separate pipeline status to list, reset, or resync;
+`gh pr list` and `gh pr view` answer "what's waiting" directly from the forge.
 
 ## Usage
 
 ```
-pan review pending                                 # List completed work awaiting review
-pan review pending --ready                         # List issues ready for merge
-pan review pending --blocked                       # List blocked review/test/merge issues
 pan review request <id>                            # Re-request review after fixing feedback
 pan review mode <id> <quick|full>                  # Set this issue's review mode override
-pan review reset <id> [--session]                  # Reset review/test/merge cycles (human override)
-pan review resync <id>                             # Re-emit canonical status to heal dashboard drift
-pan review abort <id>                              # Kill all running reviewers, leave worker idle
-pan review restart <id> [--model <m>] [--role <r>] # Resume review and re-dispatch reviewers missing a report
+pan review abort <id>                               # Kill all running reviewers, leave worker idle
+pan review restart <id> [--model <m>] [--role <r>]  # Resume review and re-dispatch reviewers missing a report
 ```
 
 ## What each subcommand does
 
-- **`pending`** — Uses durable pipeline membership as the issue universe, then
-  shows review state as an annotation. The default view lists pending reviews
-  plus `zombie_pr` and `post_merge_limbo` drift; with no pending review rows it
-  still prints the resolver-derived pipeline set. `--ready` and `--blocked`
-  preserve their review/test/merge meanings, filtered to pipeline members.
 - **`request <id>`** — After fixing the issues a reviewer flagged, this
   re-triggers the review pipeline against the current branch state. Use this
   when the worker has committed fixes and you want the existing review pass
   to re-evaluate.
-- **`mode <id> <quick|full>`** — Sets a per-issue review-mode override in the
-  issue record. `quick` runs the single parent review agent. `full` opts the
-  issue into the convoy review: security, correctness, performance, and
-  requirements sub-reviewers plus synthesis. Use this only when heavier review
-  is worth the extra agent/runtime cost for this one issue.
-- **`reset <id>`** — Clears the review/test/merge state for an issue, so the
-  pipeline can be re-dispatched from scratch. Use when the saved state is
-  inconsistent or corrupt. `--session` additionally clears the saved Claude
-  session for each reviewer so they restart with a clean conversation.
-- **`resync <id>`** — Reads the canonical review status and re-emits it without
-  changing any verdict. Use when an issue passed review but is missing from
-  Awaiting Merge or its actions are wrongly gated by stale dashboard state.
+- **`mode <id> <quick|full>`** — Sets a per-issue review-mode override.
+  `quick` runs the single parent review agent. `full` opts the issue into
+  the convoy review: security, correctness, performance, and requirements
+  sub-reviewers plus synthesis. Use this only when heavier review is worth
+  the extra agent/runtime cost for this one issue.
 - **`abort <id>`** — Kills any currently running reviewer sessions but
   leaves the work agent alone. Use when reviewers are stuck or running
-  against the wrong commit and you want to halt without resetting state.
+  against the wrong commit and you want to halt without waiting them out.
 - **`restart <id>`** — Restarts the review parent, preserves completed reports,
   and re-dispatches reviewer lanes that have no report. Use when a reviewer
   crashed and the synthesis parent is waiting on that missing lane. Optional flags:
@@ -75,24 +57,20 @@ pan review restart <id> [--model <m>] [--role <r>] # Resume review and re-dispat
 
 | Situation | Command |
 |---|---|
-| "What's waiting on me?" | `pan review pending` |
-| "What's ready to merge?" | `pan review pending --ready` |
-| "What's blocked in review/test/merge?" | `pan review pending --blocked` |
+| "What's waiting on me?" | `gh pr list --search "review-requested:@me"` |
+| "What's ready to merge?" | `gh pr list --search "review:approved status:success"` |
 | Worker pushed a fix, want re-review | `pan review request <id>` |
 | This issue needs the full review convoy | `pan review mode <id> full` |
 | Return an issue to default quick review | `pan review mode <id> quick` |
-| Pipeline state is inconsistent, need a clean slate | `pan review reset <id>` |
-| Issue passed but is missing from Awaiting Merge or actions are wrongly gated | `pan review resync <id>` |
-| Same as above plus reviewer Claude sessions are bad | `pan review reset <id> --session` |
 | Reviewer is hung, just kill it | `pan review abort <id>` |
 | Reviewer crashed, resume the convoy with a different model | `pan review restart <id> --model gpt-5.4` |
 | Only the security reviewer is broken | `pan review restart <id> --role security` |
 
 ## Merging is NOT here
 
-`pan approve` has been removed. To merge an approved branch, use the
-**MERGE** button on the dashboard. The merge agent runs autonomously after
-all reviewers + the test specialist sign off; humans only click the button.
+To merge an approved branch, use the **MERGE** button on the dashboard, or
+`gh pr merge`. The merge agent runs autonomously once approvals and checks
+are green and the PR is mergeable; humans only click the button.
 
 ## See also
 

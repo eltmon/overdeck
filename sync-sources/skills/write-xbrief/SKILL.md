@@ -3,11 +3,11 @@ name: write-xbrief
 description: >
   Write an xBRIEF spec and continue.json directly — without launching the interactive
   planning agent. The workspace copy lives in the runtime dir `.overdeck/`; finalize
-  reads it and promotes the canonical spec to `specs/` on `overdeck-state`. Use when the work is well-understood
+  reads it and promotes the canonical spec to `.pan/specs/` in the project repo. Use when the work is well-understood
   and the agent can author the plan from the issue body and codebase alone.
   Also use when you ARE the work agent and need to self-plan before implementing.
   Covers the full xBRIEF v0.8 schema, continue.json format, task sizing rules,
-  inspection gates, and the `pan plan finalize` handoff command.
+  and the `pan plan finalize` handoff command.
 triggers:
   - write xbrief
   - create xbrief
@@ -34,7 +34,7 @@ Use this skill when you want to author an xBRIEF plan directly, bypassing the in
 - The issue is small enough that a full planning session would cost more than the work itself
 - You need to rewrite or patch a broken xBRIEF before continuing work
 
-After writing the plan, run `pan plan finalize` to materialize xBRIEF tasks and promote the spec to the canonical state worktree.
+After writing the plan, run `pan plan finalize` to materialize xBRIEF tasks and promote the spec to `.pan/specs/` in the project repo (or the configured plan-home repo for polyrepo projects).
 
 ---
 
@@ -43,16 +43,16 @@ After writing the plan, run `pan plan finalize` to materialize xBRIEF tasks and 
 Before writing a single line of JSON, read the issue and explore the relevant code. A plan written without codebase context will have wrong file paths, wrong difficulty estimates, and spurious edges.
 
 Minimum exploration:
-- Read the issue body and the canonical PRD at `${OVERDECK_HOME}/state/<project>/drafts/<issue-id-lowercase>.md`
+- Read the issue body and the canonical PRD at `.pan/drafts/<issue-id-lowercase>.md` in the project repo
 - Grep for the primary symbols, commands, or files the issue mentions
 - Identify which subsystems are affected and how many files will change
-- Check `${OVERDECK_HOME}/state/<project>/specs/` for an existing issue spec
+- Check `.pan/specs/` in the project repo for an existing issue spec
 
 ---
 
 ## Step 2 — Write `.overdeck/spec.vbrief.json`
 
-The file goes at `.overdeck/spec.vbrief.json` in the workspace root and MUST conform to xBRIEF v0.8. The workspace copy lives in the runtime dir `.overdeck/`; finalize reads it and promotes the canonical spec to `specs/` on `overdeck-state` with the `.xbrief.json` extension.
+The file goes at `.overdeck/spec.vbrief.json` in the workspace root and MUST conform to xBRIEF v0.8. The workspace copy lives in the runtime dir `.overdeck/`; finalize reads it and promotes the canonical spec to `.pan/specs/` in the project repo with the `.xbrief.json` extension, committed on the feature branch.
 
 ### Full schema
 
@@ -94,8 +94,6 @@ The file goes at `.overdeck/spec.vbrief.json` in the workspace root and MUST con
           "difficulty": "trivial|simple|medium|complex|expert",
           "kind": "docs|api|backend|frontend|infra|test|refactor|design|spike",
           "issueLabel": "<issue-id-lowercase>",
-          "requiresInspection": false,
-          "inspectionDepth": "fast",
           "files_scope": ["src/path/to/file.ts"],
           "files_scope_confidence": "high",
           "verify_commands": ["npm run typecheck"],
@@ -131,8 +129,6 @@ The file goes at `.overdeck/spec.vbrief.json` in the workspace root and MUST con
 | `items[].status` | One of: `draft`, `proposed`, `approved`, `pending`, `running`, `completed`, `blocked`, `cancelled`, `failed`. Use `"pending"` for new items. |
 | `items[].metadata.kind` | Required routing category: `docs`, `api`, `backend`, `frontend`, `infra`, `test`, `refactor`, `design`, or `spike`. |
 | `plan.narratives.NonGoals` | Required narrative. List everything discovery established as out of scope (`"none"` if genuinely nothing); review enforces these as must-not constraints. |
-| `items[].metadata.requiresInspection` | **Required on every item.** See inspection rules below. |
-| `items[].metadata.inspectionDepth` | `"fast"` (default) or `"deep"`. Only matters when `requiresInspection: true`. |
 | `items[].metadata.files_scope` | Required `string[]` of files/globs this item is expected to touch. Use concrete paths or narrow globs, not broad repo-wide patterns. |
 | `items[].metadata.files_scope_confidence` | Required confidence in `files_scope`: `"high"`, `"medium"`, or `"low"`. |
 | `items[].metadata.verify_commands` | Required for slot-eligible items. List commands that verify this item before slot merge, e.g. `["npm run typecheck", "npx vitest run tests/unit/foo.test.ts"]`. |
@@ -160,24 +156,14 @@ The continue file records decisions and hazards so the work agent (and review/te
   "hazards": [
     { "id": "H1", "summary": "<risk or edge case>", "mitigation": "<how to handle it>" }
   ],
-  "resumePoint": null,
   "tasksMapping": {},
-  "agentModel": "agent:<model-slug>",
-  "sessionHistory": [
-    {
-      "timestamp": "<ISO 8601 timestamp>",
-      "reason": "planning",
-      "note": "Self-authored plan (no planning agent)",
-      "agentModel": "agent:<model-slug>"
-    }
-  ]
+  "agentModel": "agent:<model-slug>"
 }
 ```
 
 Rules:
 - `version` must be `"1"`
 - `issueId` must be uppercase (e.g. `"PAN-1234"`)
-- `resumePoint` stays `null` — the work agent populates it when it begins
 - `tasksMapping` stays `{}` — `pan plan finalize` populates it
 
 ---
@@ -194,8 +180,8 @@ This atomically:
 1. Reads the workspace spec at `.overdeck/spec.vbrief.json`
 2. Creates xBRIEF tasks through the canonical writer (one per `items[]` entry, edges respected)
 3. Sets `plan.status` to `"proposed"`
-4. Promotes the canonical spec to `${OVERDECK_HOME}/state/<project>/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.xbrief.json`
-5. Commits and pushes `overdeck-state`, then transitions the tracker issue to Planned
+4. Promotes the canonical spec to `.pan/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.xbrief.json` in the project repo
+5. Commits and pushes the feature branch, then transitions the tracker issue to Planned
 
 
 ---
@@ -216,7 +202,7 @@ Default to **many small xBRIEF tasks** over a few large ones. A well-sized task:
 - One schema migration = one task
 - One doc update = one task (or one per logical cluster, not "update all docs")
 
-When in doubt, split. Too-small xBRIEF tasks: mild overhead. Too-large xBRIEF tasks: reviewers can't reason about them, agents deliver partial results, and the inspection gate can't verify mid-implementation.
+When in doubt, split. Too-small xBRIEF tasks: mild overhead. Too-large xBRIEF tasks: reviewers can't reason about them and agents deliver partial results.
 
 ---
 
@@ -233,28 +219,6 @@ Add an edge only when there is a **real** dependency:
 Absent edges = permission for the work agent to run items in parallel. A spurious edge silently forces serialization that was never intended.
 
 Edge types: `blocks` (hard), `informs` (soft/advisory), `invalidates`, `suggests`
-
----
-
-## Inspection gate (`requiresInspection`)
-
-Set `requiresInspection: true` **only** when a wrong implementation would cascade into downstream xBRIEF tasks before the verification gate catches it:
-
-- **Foundation for downstream xBRIEF tasks** — subsequent xBRIEF tasks depend on this task's interfaces, types, or module boundaries
-- **Architectural decision crystallizing in code** — naming a public API, choosing a library boundary, picking an event shape
-- **Spec ambiguity risk** — the description is broad enough that two very different diffs could both look "done"
-- **Security/auth surface** — defects here propagate into later xBRIEF tasks assuming the security posture
-- **Cross-cutting protocol or schema** — wire format, DB migration, RPC contract, event payload
-
-Set `requiresInspection: false` for:
-- Mechanical changes (flag flip, rename, single-file tweak)
-- Leaf xBRIEF tasks (no downstream task depends on their internals)
-- Tests, docs, comment-only updates
-- Wrongs that surface immediately at typecheck/lint
-
-When `requiresInspection: true`, you **must** also set `metadata.foundationFor: ["<task-id>", ...]` listing the downstream xBRIEF tasks that would need to be redone if this one were wrong. An empty `foundationFor` on an inspection task is a planning error — flip it back to `false`.
-
-Most plans have 0–2 inspection xBRIEF tasks. More than 3 suggests the xBRIEF tasks are too large.
 
 ---
 
@@ -278,11 +242,10 @@ Before running `pan plan finalize`:
 - [ ] `plan.id` is lowercase issue ID
 - [ ] `plan.uid` is a fresh UUID v4
 - [ ] `plan.status` is `"approved"`
-- [ ] Every item has `metadata.kind` and `metadata.requiresInspection`
+- [ ] Every item has `metadata.kind`
 - [ ] Every item has `metadata.files_scope`, `metadata.files_scope_confidence`, and `metadata.readiness`
 - [ ] Every slot-eligible item has `metadata.verify_commands` and `metadata.expected_outputs`
 - [ ] Every item has at least one nested `items` AC entry
-- [ ] `foundationFor` populated on every `requiresInspection: true` item
 - [ ] No spurious edges
 - [ ] `.overdeck/continue.json` written with at least one `decisions[]` entry
 

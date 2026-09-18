@@ -53,8 +53,8 @@ Overdeck is a multi-agent orchestration framework for AI coding assistants. This
 | `pan status` | Show all running agents | `pan status` |
 | `pan tell <id> <msg>` | Send message to running agent | `pan tell PAN-3 "Check tests"` |
 | `pan kill <id>` | Stop a running agent | `pan kill PAN-3` |
-| `pan review pending` | Show completed work awaiting review | `pan review pending` |
-| Dashboard MERGE | Merge reviewed work via dashboard button | Click MERGE when `readyForMerge` |
+| `gh pr list --search "review-requested:@me"` | Show completed work awaiting review | `gh pr list --search "review-requested:@me"` |
+| Dashboard MERGE | Merge reviewed work via dashboard button | Click MERGE when approved and checks are green |
 | `pan issues` | List issues from configured trackers | `pan issues` |
 | `pan recover <id>` | Recover crashed agent | `pan recover PAN-3` |
 | `pan health check` | Check agent health | `pan health check` |
@@ -89,12 +89,7 @@ Overdeck is a multi-agent orchestration framework for AI coding assistants. This
 
 | Command | Description | Example |
 |---------|-------------|---------|
-| `pan flywheel start` | Start the singleton Fix-All Flywheel orchestrator | `pan flywheel start --brief docs/flywheel-brief.md` |
-| `pan flywheel status` | Show the active Flywheel run snapshot | `pan flywheel status --json` |
-| `pan flywheel pause` | Pause the active Flywheel run gate | `pan flywheel pause` |
-| `pan flywheel resume` | Resume a paused Flywheel run | `pan flywheel resume` |
-| `pan flywheel emit-status` | Validate and publish a FlywheelStatus payload | `pan flywheel emit-status --file latest.json` |
-| `pan flywheel report` | Write and commit end-of-run Flywheel report artifacts | `pan flywheel report` |
+| `pan flywheel start` | Launch the Fix-All Flywheel loop skill in a conversation | `pan flywheel start --orders <book-id>` |
 
 ### Maintenance
 

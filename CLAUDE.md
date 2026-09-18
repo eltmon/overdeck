@@ -4,10 +4,10 @@
 
 > **Knowledge bundle (OKF):** Project knowledge lives in the OKF bundle at [`../overdeck-knowledge`](../overdeck-knowledge) (remote `eltmon/overdeck-knowledge`), pointed to by [`.okf.yml`](.okf.yml). Use `/okf extract "<query>"` to pull cited context and `/okf author`/`/okf sync`/`/okf study` to maintain it. Edit through `/okf author`; the upstream viewer does not preserve YAML formatting losslessly.
 
+**Overdeck stores no status it can derive: state is what git, the tracker, the PR, and the terminal backend say.**
+
 ## Engineering Philosophy
 
-- **No bandaids.** Fix root causes. Never paper over symptoms with fallbacks, special cases, or manual workarounds — every workaround is a bug you chose not to fix. If a tool/test/flow is broken, fix it; don't route around it.
-- **Never do agent work — fix the system.** When a pipeline agent produces a bad result, fix the prompt/gate/flow that allowed it. Ask "why did the system allow this?" before touching output.
 - **Deliver complete features.** Partial implementation of an issue is zero value; don't signal done until all of it is done.
 - **JSONL session files are sacred.** Never delete/truncate `~/.claude/projects/*/*.jsonl` — irreversible conversation history.
 - **Commit and push when working on main.** Finish a coherent change, verify it builds, commit, push — unpushed local commits cause divergence against the pipeline's merges.
@@ -15,7 +15,7 @@
 ## Critical Operational Facts
 
 - **tmux socket:** agents live on `tmux -L overdeck` (the default socket shows nothing). Attach/capture with `-L overdeck`.
-- **Dashboard runs Node 22 dist only — never Bun, never tsx** (`@lydell/node-pty` + circular ESM). `pan up`/`pan reload` handle it; after server changes run `npm run build` first. Startup/triage: [docs/OVERDECK_DEV_SOP.md](docs/OVERDECK_DEV_SOP.md).
+- **Dashboard runs Node 22 dist only — never Bun, never tsx** (`@lydell/node-pty` + circular ESM). `pan up`/`pan reload` handle it; after server changes run `npm run build` first.
 - **Releases:** always `pan release stable --version X.Y.Z`, then push main + tag. Never manual tags, `npm version`, or `--no-verify`; hooks enforce it.
 - **Deep-wipe** (`POST /api/issues/:id/deep-wipe`) destroys workspace, branches, and tracker state irreversibly. Never call it — or any destructive HTTP request — speculatively.
 - **Issue tracker:** GitHub Issues (`PAN-<n>` = `eltmon/overdeck#<n>`), not Linear. Issue→project resolution reads `issue_prefix` in `projects.yaml`.
@@ -28,21 +28,15 @@
 - **Stack:** TypeScript, Node 22+, React dashboard, SQLite, Effect.js. Package manager: Bun (9 workspaces incl. `packages/contracts`, `packages/effect-acp`, `apps/desktop`).
 - **Build:** `npm run build` (tsdown + Vite). **Dev:** `npm run dev`.
 - **Quality gates** (must pass before `pan done`): `npm run typecheck`, `npm run lint`, `npm test`.
-- **Workspaces** are git worktrees at `workspaces/feature-<issue>/` with their own `bun install` — never symlink node_modules. Details: [docs/WORKSPACE-CONTAINERS.md](docs/WORKSPACE-CONTAINERS.md).
+- **Workspaces** are git worktrees at `workspaces/feature-<issue>/` with their own `bun install` — never symlink node_modules.
+- **Planning artifacts** (drafts, specs, continues, orders, notes, backlog sequence) live under `.pan/` in the project repo (or the configured plan-home repo for polyrepo projects), committed on the feature branch.
 
 ## Key Invariants (one-liners)
 
-- The canonical xBRIEF spec on `overdeck-state` is **immutable after planning**; item status lives in the project-side per-issue record's `statusOverrides`. [docs/XBRIEF.md](docs/XBRIEF.md)
-- Every state domain has **one read door and one write door**; never touch stores directly. [docs/API-SURFACE.md](docs/API-SURFACE.md)
-- The resource governor holds dispatch during memory or CPU saturation, and every local Vitest run enters the shared CPU admission queue. [docs/RESOURCE-GOVERNOR.md](docs/RESOURCE-GOVERNOR.md)
-- The post-merge lifecycle runs **at most once per merge** — keep `tests/unit/lib/cloister/in-flight-guard.test.ts` green. [docs/MERGE-WORKFLOW.md](docs/MERGE-WORKFLOW.md)
+- The resource governor holds dispatch during memory or CPU saturation, and every local Vitest run enters the shared CPU admission queue. See "Agent Auto-Resume Gates" in [docs/PIPELINE-GATES.md](docs/PIPELINE-GATES.md).
 - `.claude/agents/` + `.claude/skills/` in worktrees are **sync targets** populated from `sync-sources/`; shipped subagent definitions carry no `model:` pin — they inherit the session model so Cloister routing applies (prefer built-in `Explore`/`general-purpose` for ad-hoc exploration).
-- Pipeline membership, decisions, and workspace tables each have a canonical resolver — never derive independently. [docs/PIPELINE-MEMBERSHIP.md](docs/PIPELINE-MEMBERSHIP.md), [docs/DECISIONS.md](docs/DECISIONS.md), [docs/WORKSPACES-AND-PROJECTS.md](docs/WORKSPACES-AND-PROJECTS.md)
 - Project CI state reaches Command Deck rows through the shared read-model event path (`ciByProjectKey` → `/ws/rpc`); webhook observations and server-side REST repair feed it, never frontend polling. [docs/EXTERNAL-EVENT-STREAM.md](docs/EXTERNAL-EVENT-STREAM.md)
-- A terminal review verdict always carries its anchor (the write door refuses anchorless verdicts); a passed review is never reset by a patrol — post-review drift marks it `reviewStaleSince`, blocking merge until re-review (PAN-3847). [docs/REVIEW-AGENT-ARCHITECTURE.md](docs/REVIEW-AGENT-ARCHITECTURE.md)
-- pan done writes its review request; no patrol re-creates it (PAN-3848): `prUrl` + `reviewRequestedAt` + `completedAt` land in one durable record write, retried on the lock ladder. Record writes hold the per-issue lock across the commit only — the push runs after release. [docs/MERGE-WORKFLOW.md](docs/MERGE-WORKFLOW.md)
-- Patrols are alarms with budgets; transitions write their own state (PAN-3850): every `runPatrol` step runs inside `runBudgetedPatrol()` with a per-UTC-day action budget (excess suspends the patrol until the next day with one needs-you), and the report-only invariant checker alarms when record, review-status row, and liveness disagree — repairs go through the owning doors, never the checker. [docs/PIPELINE-GATES.md](docs/PIPELINE-GATES.md)
-- One module answers agent liveness and idleness — `src/lib/agents/liveness.ts` (session + live pane + harness process in the pane subtree; idle = stale work activity, never the mirror label alone). Agent state is written only after the tmux session exists — there are no placeholder rows — and supervisor-launched agents write `stopped` from the supervisor's `exited` lifecycle event, not from patrol inference (PAN-3849). [docs/AGENT-STATE-PLANES.md](docs/AGENT-STATE-PLANES.md)
+- One module answers agent liveness and idleness — `src/lib/agents/liveness.ts` (session + live pane + harness process in the pane subtree; idle = stale work activity, never the mirror label alone). Agent state is written only after the terminal-backend session exists — there are no placeholder rows — and supervisor-launched agents write `stopped` from the supervisor's own `exited` lifecycle event, never inferred.
 
 ## Topic Index
 
@@ -50,25 +44,21 @@
 | --- | --- |
 | Harnesses (claude-code, ohmypi, codex, acp, kimi-code), ToS gate | [configuration/harnesses.mdx](configuration/harnesses.mdx), [reference/harness-landscape.mdx](reference/harness-landscape.mdx) |
 | Roles, sub-roles, agent taxonomy, review architecture | [docs/ROLES.md](docs/ROLES.md), [docs/REVIEW-AGENT-ARCHITECTURE.md](docs/REVIEW-AGENT-ARCHITECTURE.md) |
-| Skills ↔ CLI convention (`sync-sources/skills/pan-<verb>/`) | [docs/SKILLS-CONVENTION.md](docs/SKILLS-CONVENTION.md) |
-| Agent message delivery (confirmed turn, PTY supervisor, Channels fallback, blocking-menu guard) | [docs/AGENT-MESSAGE-DELIVERY.md](docs/AGENT-MESSAGE-DELIVERY.md) |
 | Dashboard server architecture, WS endpoints, terminal protocol | [docs/DASHBOARD-ARCHITECTURE.md](docs/DASHBOARD-ARCHITECTURE.md) |
-| Verification gate, verdict feedback routing, review convergence, auto-resume gates | [docs/PIPELINE-GATES.md](docs/PIPELINE-GATES.md) |
-| Resource governor (memory gate, preemption) | [docs/RESOURCE-GOVERNOR.md](docs/RESOURCE-GOVERNOR.md) |
-| Agent state planes (permanent/runtime/liveness) | [docs/AGENT-STATE-PLANES.md](docs/AGENT-STATE-PLANES.md) |
+| Terminal backends (Herdr default, tmux supported) | [docs/TERMINAL-BACKENDS.md](docs/TERMINAL-BACKENDS.md) |
+| The foreman protocol for parallel-wave issues | [docs/FOREMAN.md](docs/FOREMAN.md) |
+| Verification gate, verdict feedback routing, review convergence, resource governor | [docs/PIPELINE-GATES.md](docs/PIPELINE-GATES.md) |
 | Workspaces & projects domain, quick actions, memory homes | [docs/WORKSPACES-AND-PROJECTS.md](docs/WORKSPACES-AND-PROJECTS.md) |
-| Merge workflow, post-merge handoff, Docker cleanup, close-out | [docs/MERGE-WORKFLOW.md](docs/MERGE-WORKFLOW.md), [docs/DEFINITION-OF-DONE.md](docs/DEFINITION-OF-DONE.md) |
-| Restart gate (operator approval for voluntary dashboard restarts, exempt paths) | [docs/RESTART-GATE.md](docs/RESTART-GATE.md) |
+| Merge workflow, post-merge handoff, Docker cleanup, close-out | [docs/MERGE-WORKFLOW.md](docs/MERGE-WORKFLOW.md) |
 | xBRIEF plans, four artifacts, status lifecycle | [docs/XBRIEF.md](docs/XBRIEF.md) |
-| Flywheel + order books | [docs/FLYWHEEL.md](docs/FLYWHEEL.md), [docs/ORDER-BOOKS.md](docs/ORDER-BOOKS.md) |
 | Effect bridging + diagnostics ratchet | [docs/EFFECT-BRIDGING.md](docs/EFFECT-BRIDGING.md), [docs/EFFECT-DIAGNOSTICS.md](docs/EFFECT-DIAGNOSTICS.md) |
-| Issue views, God View, AskUserQuestion pipeline | [docs/ISSUE-VIEW.md](docs/ISSUE-VIEW.md), [docs/GOD-VIEW.md](docs/GOD-VIEW.md), [docs/ASKUSERQUESTION-DASHBOARD.md](docs/ASKUSERQUESTION-DASHBOARD.md) |
-| Telemetry write doors | [docs/TELEMETRY.md](docs/TELEMETRY.md) |
+| Issue views, God View | [docs/ISSUE-VIEW.md](docs/ISSUE-VIEW.md), [docs/GOD-VIEW.md](docs/GOD-VIEW.md) |
 | Context layers (rules/skills distribution) | [docs/CONTEXT-LAYERS.md](docs/CONTEXT-LAYERS.md) |
+| The no-loss map: every deleted verb/route/view and its new home | [docs/THE-CUT.md](docs/THE-CUT.md) |
 
 ## Small But Sharp
 
 - **TLDR:** large-file Reads auto-summarize via a PreToolUse hook; for exploration use `.venv/bin/tldr context|extract` via Bash. The `tldr_*` MCP tools are not registered — don't call them (PAN-3534).
 - **RTK:** when `agents.rtk.enabled`, Bash output may be compressed; re-run with `OVERDECK_RTK_ENABLED=0` for raw output.
-- **Issue creation from PRDs:** reference the PRD at the top of the issue body (`**PRD:** [link]`); summarize, don't duplicate — canonical PRD is `drafts/<issue>.md` on `overdeck-state`.
-- **Task enforcement:** work agents need a readable xBRIEF (start returns 422 otherwise); completion is gated on the checklist via `pan task` (`failedCheck: 'incomplete-plan-items'`).
+- **Issue creation from PRDs:** reference the PRD at the top of the issue body (`**PRD:** [link]`); summarize, don't duplicate — canonical PRD is `.pan/drafts/<issue>.md` in the project repo.
+- **Task enforcement:** work agents need a readable xBRIEF (start returns 422 otherwise); completion is gated on the checklist via `pan task`.

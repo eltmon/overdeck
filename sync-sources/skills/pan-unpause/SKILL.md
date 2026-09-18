@@ -35,10 +35,8 @@ After unpausing, the Deacon's next patrol can auto-resume eligible stopped work 
 
 - Use `pan unpause` after the reason for a manual pause has been resolved.
 - Use `pan start <id> --force` instead only when you intentionally want to clear the pause gate and spawn in one step.
-- Do not use this to clear repeated crash state; use `pan untroubled <id>` for the troubled gate.
 
 ## See Also
 
 - `pan pause <id>` — set the persistent pause gate
 - `pan start <id>` — spawn after the gate is clear
-- `pan untroubled <id>` — clear repeated-failure troubled state

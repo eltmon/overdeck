@@ -191,7 +191,7 @@ describe('role definitions', () => {
     expect(existsSync(join(process.cwd(), 'sync-sources/agents/planning-agent.md'))).toBe(false);
     expect(existsSync(join(process.cwd(), 'sync-sources/agents/pan-work-agent.md'))).toBe(true);
     expect(existsSync(join(process.cwd(), 'sync-sources/agents/pan-review-agent.md'))).toBe(true);
-    expect(existsSync(join(process.cwd(), 'sync-sources/agents/pan-inspect-agent.md'))).toBe(true);
+    expect(existsSync(join(process.cwd(), 'sync-sources/agents/pan-inspect-agent.md'))).toBe(false);
     expect(existsSync(join(process.cwd(), 'sync-sources/agents/pan-test-agent.md'))).toBe(true);
     expect(existsSync(join(process.cwd(), 'sync-sources/agents/pan-uat-agent.md'))).toBe(true);
     expect(existsSync(join(process.cwd(), 'sync-sources/agents/pan-merge-agent.md'))).toBe(true);

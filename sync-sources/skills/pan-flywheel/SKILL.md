@@ -1,156 +1,129 @@
 ---
 name: pan-flywheel
-description: "pan flywheel — start, pause, resume, complete, stop, inspect, emit, and report on the singleton Fix-All Flywheel orchestrator"
+description: >-
+  pan flywheel start — run the Fix-All Flywheel as a loop skill: tick the
+  order books and backlog sequence in `.pan/`, pick the next issue, launch
+  work with `pan start`, watch its PR and checks to landing, run `pan
+  reload` after an overdeck merge lands with green CI, and park whatever it
+  cannot decide.
 triggers:
   - pan flywheel
-  - flywheel orchestrator
+  - flywheel
   - fix-all flywheel
   - start flywheel
-  - pause flywheel
-  - flywheel status
-allowed-tools:
-  - Bash
-  - Read
+  - run the flywheel
 ---
 
 # pan flywheel
 
-Use this skill when operating the singleton Fix-All Flywheel orchestrator.
-
-The Flywheel is not an issue-scoped work agent. It runs as `flywheel-orchestrator`, reads a brief, emits typed status snapshots to the dashboard, and writes a deterministic end-of-run report.
-
-## Commands
-
-```bash
-pan flywheel start
-pan flywheel start --brief docs/flywheel-brief.md
-pan flywheel start --orders <book-id>
-pan flywheel config --get
-pan flywheel config --get flywheel.require_uat_before_merge
-pan flywheel config --set flywheel.auto_pickup_backlog=true
-pan flywheel config --set flywheel.require_uat_before_merge=false
-pan flywheel status
-pan flywheel status --json
-pan flywheel pause
-pan flywheel resume
-pan flywheel complete
-pan flywheel complete --force
-pan flywheel stop
-pan flywheel abort
-pan flywheel emit-status --file latest.json
-pan flywheel report
-```
-
-## When to Use Each Subcommand
-
-### Start
+The Flywheel is a loop, not a daemon. It runs inside this conversation, ticks
+the backlog, and keeps issues moving through `pan start` → PR → review →
+merge without a supervising process or a stored run record. State is never
+duplicated here: every fact this loop acts on is read live from `.pan/`, the
+tracker, and the forge.
 
 ```bash
 pan flywheel start
-pan flywheel start --brief docs/flywheel-brief.md
 pan flywheel start --orders <book-id>
 ```
 
-Starts `flywheel-orchestrator` and opens a new run under `~/.overdeck/flywheel/runs/<runId>/`.
+`pan flywheel start` opens this skill in a conversation. `--orders <book-id>`
+scopes the run to one order book (`pan orders show <book-id>`); without it,
+the loop works the open backlog directly.
 
-Use the default brief unless the user gives a specific markdown brief. The default is `docs/flywheel-brief.md`. The command validates that the brief path stays inside the project root.
+## Phase 1 — Orient
 
-`--orders <book-id>` validates a ready order book, stamps the book binding into the run launch metadata, and marks the book running only after the Flywheel start gate succeeds. Validation or gate failures leave the book ready.
+1. Read `.pan/backlog/sequence.md` for the operator-set pickup order.
+2. If an order book is bound (`--orders`, or one is `running`), read it with
+   `pan orders show <book-id>` — its Lane A/B items and prereqs take priority
+   over the general backlog.
+3. List in-flight work: `gh pr list --search "is:open"` for this repo, and
+   `pan status` for live sessions. Anything already moving does not need a
+   new pick.
 
-### Config
+## Phase 2 — Pick the next item
 
-```bash
-pan flywheel config --get
-pan flywheel config --get flywheel.require_uat_before_merge
-pan flywheel config --set flywheel.auto_pickup_backlog=true
-pan flywheel config --set flywheel.require_uat_before_merge=false
-```
+Walk the backlog sequence (or the bound order book's next lane item whose
+prereqs are terminal) and pick the first issue that is not already in flight,
+not blocked, and not parked. "Parked" means the tracker issue carries the
+`parked` label or is listed in `.pan/parked.md` — skip it silently, it was
+parked on purpose.
 
-Reads or writes the two persisted Flywheel autonomy toggles. `--get` without a key prints both keys as `<key>=<bool>`; `--get <key>` prints one key; `--set <key>=<bool>` writes one key and prints the new value.
+If nothing is pickable — every remaining item is blocked, parked, or the
+book/backlog is empty — say so plainly (`needs-you: pipeline idle — nothing
+pickable`) and stop the loop rather than inventing work.
 
-Only these keys are accepted: `flywheel.auto_pickup_backlog` and `flywheel.require_uat_before_merge`.
-
-### Status
-
-```bash
-pan flywheel status
-pan flywheel status --json
-```
-
-Shows the active run's latest `FlywheelStatus` snapshot. Use `--json` when another tool or script needs the raw contract payload.
-
-### Pause and Resume
+## Phase 3 — Launch
 
 ```bash
-pan flywheel pause
-pan flywheel resume
+pan start <issue-id>
 ```
 
-`pause` flips the Flywheel gate and stops active orchestration without clearing the active run id. `resume` clears the gate and restarts the singleton if needed.
+`pan start` plans (if unplanned) and starts the work agent in one command.
+Do not use `pan spawn`, `pan swarm`, or any lower-level launcher for the
+Flywheel's own picks — `pan spawn` is for the foreman dispatching item
+workers *within* an already-started issue, not for the Flywheel picking a
+new one.
 
-If the Flywheel is already paused or already running, these commands report the current gate state and exit successfully.
+## Phase 4 — Watch to landing
 
-### Complete
+Poll the issue's derived state, not a stored one:
+
+| Signal | Source |
+|---|---|
+| Is work still running? | `pan status` / `pan show <id>` |
+| Is a PR open? | `gh pr view` for the feature branch |
+| Is it in review? | PR review requested, or a reviewer pane live |
+| Changes requested? | Latest PR review state is `CHANGES_REQUESTED` |
+| Ready to merge? | PR approved, checks green, `mergeable` true |
+| Merged? | PR merged |
+
+An issue sitting in "changes requested" for a while is normal — the work
+agent handles its own review feedback loop. Only intervene (`pan tell`) if
+the agent looks stuck (idle with unaddressed feedback) — deacon-lite already
+nudges this case; give it a chance before you do.
+
+Once a PR onto Overdeck's own `main` merges with green CI, run:
 
 ```bash
-pan flywheel complete
-pan flywheel complete --force
+pan reload
 ```
 
-Completes an orders-bound run after every book item is closed or parked. The command refuses a non-drained book and names each remaining issue unless `--force` is passed. It writes `report.md`, adds `## Retrospective` from the run's `retro.md` when present or the exact no-findings line otherwise, commits any `docs/FLYWHEEL-STATE.md` change, clears the active-run gate, and marks the book complete.
+Only for an Overdeck merge — not for merges in other projects the loop is
+also driving. Other projects deploy their own way; do not `pan reload` on
+their behalf.
 
-Continuation is mechanical: the next ready book in queue order starts in-process; when no book is ready and `flywheel.auto_pickup_backlog=true`, a bookless backlog run starts; otherwise the command stays stopped and emits `needs-you: pipeline idle — no order book queued and auto-pickup is off`.
+## Phase 5 — Park what you cannot decide
 
-### Stop
+Some calls are the operator's: ambiguous scope, a design tradeoff with no
+clear default, anything destructive, anything outside the issue's stated
+acceptance criteria. For those, write the issue to `.pan/parked.md` with a
+one-line reason and move to the next pickable item. Do not block the loop on
+an operator decision — park it and keep going.
 
-```bash
-pan flywheel stop
-```
+## Stop conditions
 
-Gracefully stops the active Flywheel run. Kills any live `flywheel-orchestrator` session (even when the gate is already paused), writes the per-run `report.md`, commits any orchestrator-authored changes to `docs/FLYWHEEL-STATE.md`, and clears the SQLite active-run gate so the next `pan flywheel start` opens a fresh run.
-
-Use this as the normal way to wind down a run and keep its report. Idempotent: a no-op with a clear message when nothing is running and nothing is left to report.
-
-### Abort
-
-```bash
-pan flywheel abort
-```
-
-Discards the active Flywheel run without writing a report. Stops `flywheel-orchestrator` if it is still attached, writes `aborted.json` under the run directory, and clears the SQLite gate so the next `pan flywheel start` can proceed.
-
-Use this when a run is stuck because the orchestrator died (reboot, crash) and there is nothing worth reporting, or when you want a clean slate without ceremony. Idempotent: a no-op when nothing is active.
-
-### Emit Status
-
-```bash
-pan flywheel emit-status --file latest.json
-```
-
-Validates a `FlywheelStatus` JSON payload and posts it to the local dashboard. The `--file` value is normally a path; pass a single dash as the value when reading the payload from stdin.
-
-The role prompt should use this helper instead of hand-writing HTTP requests so schema validation stays centralized.
-
-### Report
-
-```bash
-pan flywheel report
-```
-
-Writes the per-run report under the run directory (`${OVERDECK_HOME}/flywheel/runs/<runId>/report.md`) and commits any orchestrator-authored changes to `docs/FLYWHEEL-STATE.md` (durable cumulative memory). Produces a `docs(flywheel): run N` commit when there are changes.
-
-Run this at the end of a Flywheel revolution, not after every status tick.
+- **The operator is the brake.** Nothing here finishes on its own; when told
+  to stop, stop cleanly and report what shipped, what's in flight, and
+  what's parked.
+- **Backlog and bound book both exhausted** — every item merged, parked, or
+  blocked with no path forward. Report and stop; do not manufacture more
+  scope.
 
 ## Guardrails
 
-- Do not start a second Flywheel run while one is active.
-- Do not spawn the Flywheel from a workspace devcontainer.
-- Do not bypass `pan flywheel emit-status` with raw HTTP.
-- Do not auto-merge or deep-wipe from the Flywheel; keep those as explicit human-controlled actions.
+- Do not start a second Flywheel loop in the same repo while one is active
+  in another conversation — check `pan status` first.
+- Do not auto-merge or deep-wipe from the loop; those stay explicit,
+  human-triggered actions (the MERGE button, `gh pr merge`, `pan wipe`).
+- Do not write a pipeline status field anywhere. If you find yourself about
+  to `curl` a `/status` endpoint, stop — that endpoint does not exist
+  anymore; the derived state table above is the only source of truth.
 
 ## See Also
 
-- `roles/flywheel.md` — orchestrator role prompt
-- `docs/flywheel-brief.md` — default brief
-- `docs/FLYWHEEL.md` — operator documentation
-- `docs/FLYWHEEL-STATE.md` — durable cumulative memory across all runs (created on first orchestrator write)
+- `pan-gauntlet-loop` skill — the loop shape this skill follows
+- `pan-orders` skill — order book verbs
+- `pan-foreman` skill — how a single issue's parallel waves get dispatched
+  once the Flywheel has started it
+- `pan-start` skill — the paved-road launcher
