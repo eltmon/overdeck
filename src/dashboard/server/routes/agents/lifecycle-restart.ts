@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, basename } from 'node:path';
 
-import { Effect } from 'effect';
+import { Cause, Effect, Exit } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 import type { RuntimeName } from '../../../../lib/runtimes/types.js';
 import { resolveStaffing } from '../../../../lib/agents/staffing.js';
@@ -22,7 +22,6 @@ import {
   recoverAgent,
   resumeAgent,
   restartAgent,
-  saveAgentStateSync,
   getAgentDir,
   getProviderAuthMode,
   listRunningAgents,
@@ -583,38 +582,37 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
       }, { status: 409 });
     }
 
-    try {
-      yield* Effect.promise(() => spawnPanCommandDetached({
-        agentSessionName,
+    // Effect failures are values, not JS exceptions: a JS try/catch/finally
+    // around `yield*` never sees the Effect.promise rejection (it becomes a
+    // defect), so capture the Exit — otherwise the friendly 500 never
+    // renders and the claim leaks, 409ing later spawns until a restart.
+    const spawnExit = yield* Effect.exit(Effect.promise(() => spawnPanCommandDetached({
+      agentSessionName,
+      issueId,
+      role: 'work',
+      workspacePath,
+      args,
+      cwd: workspacePath,
+    })));
+    releaseAgentStart(agentSessionName);
+    if (Exit.isFailure(spawnExit)) {
+      // Wipe removed the old state and the launch failed, so nothing owns a
+      // tmux session: write no agent state (W34 — a failed spawn leaves
+      // nothing to roll back). Visibility lives in the lifecycle log and the
+      // 500 below, never in a recreated row or the `exited` event path.
+      const raw: unknown = Cause.squash(spawnExit.cause);
+      const details = raw instanceof Error ? raw.message : typeof raw === 'string' ? raw : 'unknown spawn failure';
+      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.restart_fresh_spawn_failed', {
         issueId,
-        role: 'work',
-        workspacePath,
-        args,
-        cwd: workspacePath,
+        error: details,
+        wiped: wipeResult.removed,
       }));
-    } catch (err: any) {
-      // The dir wipe above removed the old state; restore an honest stopped
-      // row so the agent stays visible when the launch itself failed.
-      saveAgentStateSync({
-        id: agentSessionName,
-        issueId,
-        workspace: workspacePath,
-        harness: effectiveHarness ?? agentState.harness ?? 'claude-code',
-        role: 'work',
-        model: spawnModel,
-        status: 'stopped',
-        startedAt: new Date().toISOString(),
-        stoppedAt: new Date().toISOString(),
-      });
-      const details = err?.message ?? String(err);
       return jsonResponse({
         success: false,
         error: 'The old agent state was cleared, but the fresh agent could not start. Resolve the startup blocker, then try again.',
         details,
         wiped: wipeResult.removed,
       }, { status: 500 });
-    } finally {
-      releaseAgentStart(agentSessionName);
     }
 
     yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.restart_fresh_spawn_requested_complete', {
