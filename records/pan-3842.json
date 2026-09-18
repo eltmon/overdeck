@@ -181,10 +181,10 @@
       "src/lib/configurable-providers.ts",
       "src/lib/model-capability-class.ts"
     ],
-    "recordedAt": "2026-09-17T01:40:01.804Z"
+    "recordedAt": "2026-09-18T07:31:28.942Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-18T07:31:23.152Z",
+  "updated": "2026-09-18T07:31:28.944Z",
   "pipeline": {
     "issueId": "PAN-3842",
     "reviewStatus": "passed",
