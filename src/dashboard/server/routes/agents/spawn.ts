@@ -27,8 +27,6 @@ import { OrderDispatchReservationError, withActiveOrderDispatchReservation } fro
 import type { OrderDispatchEligibility } from '../../../../lib/orders/eligibility.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { clearWorkspaceStuck, getReviewStatusSync } from '../../../../lib/review-status.js';
-import { isStateMigrated } from '../../../../lib/state-home.js';
-import { shouldCommitLegacyWorkspaceArtifacts } from '../../../../lib/state-read-home.js';
 import { isGeneratedGitHookPath, isOverdeckWorkspaceRuntimePath, parsePorcelainStatusPaths } from '../../../../lib/state-plane.js';
 import { assertWorkspaceStackHealthyForSpawn } from '../../../../lib/agents/spawn-prep.js';
 import { getWorkspaceStackHealth } from '../../../../lib/workspace/stack-health.js';
@@ -549,34 +547,9 @@ export const postAgentsRoute = HttpRouter.add(
       console.warn(`[agents] agent-spawn-host-override: ${issueId.toUpperCase()} (dashboard-confirmed)`);
     }
 
-    const migratedState = projectConfig ? yield* Effect.promise(() => isStateMigrated(projectConfig)) : false;
-    if (shouldCommitLegacyWorkspaceArtifacts(migratedState) && (existsSync(workspacePanContinuePath) || existsSync(workspacePanDir))) {
-      // Commit workspace orchestration artifacts before handing off to the work agent.
-      // The entire block is best-effort — never let git errors abort the agent start.
-      yield* Effect.gen(function* () {
-        const gitRoot = workspacePath;
-        if (existsSync(join(gitRoot, PAN_DIRNAME))) {
-          // PAN-1819: use plain git add (never -f) and exclude workspace-state/sync-target paths.
-          yield* Effect.promise(() => execAsync(`git add .pan/`, { cwd: gitRoot, encoding: 'utf-8' }));
-          yield* Effect.promise(() => execAsync(
-            `git reset HEAD -- .pan/kickoff.md .pan/continue.json .pan/handoff-*.md .pan/spec.vbrief.json`,
-            { cwd: gitRoot, encoding: 'utf-8' },
-          ));
-        }
-        // git diff --cached --quiet exits 1 when there ARE staged changes (normal).
-        // Handle exit-1 in the Promise so it never becomes an Effect failure.
-        const diffResult = yield* Effect.promise(() =>
-          execAsync(`git diff --cached --quiet`, { cwd: gitRoot, encoding: 'utf-8' })
-            .then(() => false)
-            .catch(() => true)
-        );
-        if (diffResult) {
-          yield* Effect.promise(() => execAsync(`git commit -m "chore: planning artifacts for ${issueId} before agent start"`, { cwd: gitRoot, encoding: 'utf-8' }));
-          const pushChild = spawn('git', ['push'], { cwd: gitRoot, detached: true, stdio: 'ignore' });
-          pushChild.unref();
-        }
-      }).pipe(Effect.catch(() => Effect.void));
-    }
+    // PAN-3917: planning artifacts live in the repo's `.pan/` and are committed
+    // by the agent that changes them (FR-2). The dashboard no longer commits and
+    // pushes a workspace copy on the agent's behalf before start.
 
     let gatesCommitted = false;
     const commitClearedGates = async (): Promise<void> => {

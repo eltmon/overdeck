@@ -13,8 +13,6 @@ import { ServerConfigLayer } from './config.js';
 import { runServer } from './server.js';
 import { startSharedIssueService, getSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
-import { startMergeBlockerReconcileService } from './services/merge-blocker-reconcile-service.js';
-import { startReviewStatusReconcileService } from './services/review-status-reconcile-service.js';
 import { startResourceRefreshTriggers } from './services/resource-refresh-triggers.js';
 import {
   enqueueProjectsResourceRefresh,
@@ -24,15 +22,9 @@ import {
   whenProjectResourceRefreshIdle,
 } from './services/project-resource-refresh-queue.js';
 import { whenDashboardListening } from './dashboard-listening.js';
-import {
-  shouldStartStaleCheckRetriggerService,
-  startStaleCheckRetriggerService,
-  stopStaleCheckRetriggerService,
-} from './services/stale-check-retrigger-service.js';
 import { startAgentOutputService, stopAgentOutputService } from './services/agent-output-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
 import { startRestartAnnouncer, stopRestartAnnouncer } from './services/restart-announcer.js';
-import { startSubstrateBugPoller, stopSubstrateBugPoller } from './services/substrate-bug-poller.js';
 import { startUatTrainReconciler, stopUatTrainReconciler } from './services/uat-train.js';
 import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer.js';
 import { startTtsPlayback, stopTtsPlayback } from './services/tts-playback.js';
@@ -50,7 +42,7 @@ import { getEventStore, initEventStore } from './event-store.js';
 import { emitReviewStatusChanged } from './review-status-emit.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
-import { applyBootReconciliationDecision, setAgentStoppedNotifier, setAgentStatusChangedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
+import { setAgentStoppedNotifier, setAgentStatusChangedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
 import { getAgentState, type AgentState } from '../../lib/agents.js';
 import { saveAgentStateAndEmitEvent } from './services/agent-projection.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
@@ -75,7 +67,6 @@ import { startCostReconcileService, stopCostReconcileService } from './services/
 import { startEventLoopMonitor, stopEventLoopMonitor } from './services/event-loop-monitor.js';
 import { formatBootGateState, resolveBootGates } from '../../lib/boot-gates.js';
 import { setLastCleanShutdownAt } from '../../lib/overdeck/control-settings.js';
-import { startBootReconciliation } from '../../lib/cloister/boot-reconciliation.js';
 import { startDeaconChild, stopDeaconChild } from './services/deacon-supervisor.js';
 import { stopAllKnowledgeViewers } from './services/knowledge-viewer.js';
 import { existsSync } from 'node:fs';
@@ -214,22 +205,10 @@ console.log('[overdeck] AgentEnrichmentService started');
 startAgentOutputService();
 console.log('[overdeck] AgentOutputService started');
 
-// Start merge-blocker reconcile poller (PAN-1620) — proactively refreshes GitHub
-// mergeability for readyForMerge PRs so a stale/conflicting one drops out of the
-// Awaiting-Merge queue (and its live MERGE button) before any click.
-startMergeBlockerReconcileService();
-console.log('[overdeck] MergeBlockerReconcileService started');
-
-if (startReviewStatusReconcileService()) {
-  console.log('[overdeck] ReviewStatusReconcileService started');
-} else {
-  console.log('[overdeck] ReviewStatusReconcileService skipped — non-primary dashboard process');
-}
-
-if (shouldStartStaleCheckRetriggerService()) {
-  startStaleCheckRetriggerService();
-  console.log('[overdeck] StaleCheckRetriggerService started');
-}
+// PAN-3917: the merge-blocker, review-status, and stale-check reconcilers are
+// gone. Mergeability, review state, and check state are read from the forge at
+// request time through services/derived-issue-state.ts — there is no stored
+// copy left for a poller to reconcile.
 
 // Desktop installs never run `pan install`, so provision the Claude Code hook
 // bundle (auto-approve, heartbeat, cost, lifecycle) at boot (PAN-2595).
@@ -499,12 +478,6 @@ console.log('[overdeck] Merge-ready notifier → domain events wired');
 startConversationLifecycleService();
 console.log('[overdeck] ConversationLifecycleService started');
 
-if (isPeerDashboard) {
-  console.log('[overdeck] SubstrateBugPoller skipped — peer dashboard does not poll trackers');
-} else {
-  startSubstrateBugPoller();
-}
-
 // PAN-1737 UAT batch trains: keep one assembled, testable batch ready at all
 // times (gated per-tick on flywheel.merge_train_enabled; no-op without an
 // active flywheel run).
@@ -692,7 +665,6 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopAgentEnrichmentService();
   stopAgentOutputService();
   stopConversationLifecycleService();
-  stopSubstrateBugPoller();
   stopUatTrainReconciler();
   stopTtsSummarizer();
   stopTtsPlayback();
@@ -700,7 +672,6 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopEventLoopMonitor();
   stopTranscriptPoller();
   stopCostReconcileService();
-  stopStaleCheckRetriggerService();
   stopRestartAnnouncer();
   await stopAllKnowledgeViewers().catch((err) => console.warn('[knowledge-viewer] shutdown failed:', err?.message ?? err));
   await stopDeaconChild().catch((err) => console.warn('[deacon-supervisor] child shutdown failed:', err?.message ?? err));
@@ -862,10 +833,6 @@ if (process.env.OVERDECK_DISABLE_DEACON === '1') {
         + 'Resolve each prerequisite listed above, then run "pan sync".';
       console.error(`[overdeck] ${summary}`);
       emitActivityEntrySync({ source: 'dashboard', level: 'error', message: summary });
-    }
-    const reconciliation = startBootReconciliation({ onGraceExpired: async () => { await applyBootReconciliationDecision(); } });
-    if (reconciliation.decision !== 'pending') {
-      void applyBootReconciliationDecision();
     }
     startDeaconChild().catch((err) => {
       console.error('[overdeck] Cloister auto-start failed:', err);

@@ -25,7 +25,6 @@ import type { ReviewStatus } from '../../lib/review-status.js';
 import { listOverdeckAgentStatesSync } from '../../lib/overdeck/agent-state-sync.js';
 import { computeQueuePositionFromStatusSync } from '../../lib/queue-position.js'
 import { AgentsResolver, type Agent as OverdeckAgent } from '../../lib/overdeck/agents.js';
-import { emitBootReconciledStopEvents } from './services/boot-reconciled-stop-events.js';
 
 // ─── Exported async helpers (used by bootstrap Effect + tests) ───────────────
 
@@ -610,13 +609,12 @@ export const ReadModelServiceLive = Layer.effect(
           () => import('./event-store.js'),
         );
         const eventStore = getEventStore();
-        yield* Effect.promise(() => emitBootReconciledStopEvents(eventStore, result.markedStoppedIds, result.agentsById, '[ReadModel] Failed to emit boot-reconciled stop events:'));
         sequence = eventStore.getLatestSequence();
         recentActivity = activityEntriesFromStoredEvents(
           eventStore.queryByType('activity.entry', MAX_SNAPSHOT_ACTIVITY_ENTRIES),
         );
       } catch (err) {
-        console.error('[ReadModel] Failed to emit boot-reconciled stop events:', err);
+        console.error('[ReadModel] Failed to read the event-store sequence:', err);
       }
 
       state = {

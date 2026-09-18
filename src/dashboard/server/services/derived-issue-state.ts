@@ -350,3 +350,61 @@ export async function getDerivedIssueState(
 ): Promise<DerivedIssueState> {
   return deriveIssueState(await loadIssueStateFacts(issueId, deps));
 }
+
+// ─── the ready set (FR-9) ────────────────────────────────────────────────────
+
+/** One issue whose PR is ready to merge: approved, green, and mergeable. */
+export interface ReadyIssue {
+  readonly issueId: string;
+  readonly title: string;
+  readonly pr?: number;
+}
+
+interface GhOpenPrRow extends GhPrRow {
+  title?: string;
+  headRefName?: string;
+  isDraft?: boolean;
+}
+
+/** `feature/pan-3917` → `PAN-3917`. Anything else has no issue. */
+export function issueIdFromBranch(branch: string | undefined): string | null {
+  const match = /^feature\/([a-z]+-\d+)$/i.exec(branch ?? '');
+  return match?.[1] ? match[1].toUpperCase() : null;
+}
+
+/**
+ * The project's ready set, in one forge read. This replaces the review-status
+ * record scan: readiness is approvals plus green checks plus forge
+ * mergeability, and nothing else (FR-9, D3).
+ */
+export async function listReadyIssuesForProject(
+  projectPath: string,
+  deps: { readonly listOpenPrs?: (projectPath: string) => Promise<readonly GhOpenPrRow[]> } = {},
+): Promise<ReadyIssue[]> {
+  const rows = await (deps.listOpenPrs ?? listOpenPrsWithGh)(projectPath);
+  const ready: ReadyIssue[] = [];
+  for (const row of rows) {
+    if (row.isDraft) continue;
+    const issueId = issueIdFromBranch(row.headRefName);
+    if (!issueId || typeof row.number !== 'number') continue;
+    if (toReviewState(row.reviewDecision, false) !== 'approved') continue;
+    if (toChecksState(row.statusCheckRollup) !== 'green') continue;
+    if (row.mergeable !== 'MERGEABLE') continue;
+    ready.push({ issueId, title: row.title ?? issueId, pr: row.number });
+  }
+  return ready;
+}
+
+async function listOpenPrsWithGh(projectPath: string): Promise<readonly GhOpenPrRow[]> {
+  try {
+    const { stdout } = await execFileAsync('gh', [
+      'pr', 'list',
+      '--state', 'open',
+      '--limit', '200',
+      '--json', 'number,title,url,headRefName,isDraft,mergeable,reviewDecision,statusCheckRollup',
+    ], { cwd: projectPath, encoding: 'utf-8', timeout: 20_000 });
+    return JSON.parse(stdout || '[]') as GhOpenPrRow[];
+  } catch {
+    return [];
+  }
+}
