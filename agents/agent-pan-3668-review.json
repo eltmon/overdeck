@@ -39,6 +39,11 @@
       "id": "14ffa2cd-c907-44d2-b73f-64aef360fa56",
       "startedAt": "2026-09-18T09:14:45.469Z",
       "reason": "rotation"
+    },
+    {
+      "id": "01147d32-2bfe-4bbf-bba5-028770476015",
+      "startedAt": "2026-09-18T09:36:45.255Z",
+      "reason": "spawn"
     }
   ],
   "lifecycle": [
@@ -64,6 +69,10 @@
     },
     {
       "at": "2026-09-18T08:37:44.013Z",
+      "event": "spawned"
+    },
+    {
+      "at": "2026-09-18T09:36:45.255Z",
       "event": "spawned"
     }
   ],
