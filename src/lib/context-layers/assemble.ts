@@ -1,29 +1,16 @@
 /**
  * Workspace context assembly (PAN-1201).
  *
- * The workspace layer is not hand-authored — Overdeck assembles it when a
- * workspace is created, into `<workspace>/.pan/context/workspace.md`. It is a
- * single bundle composed, in order, of:
- *
- *   1. issue metadata (id, title, branch, phase)
- *   2. the parent project's layer, rendered for the workspace's harness
- *   3. injected memory (PAN-1052 MEMORY_CONTEXT), when available
- *   4. a live workspace status summary, when available
- *
- * The same content is written to the workspace's CLAUDE.md (so Claude Code
- * picks it up) and consumed harness-neutrally by the briefing system.
+ * The persisted workspace layer is harness-neutral. Overdeck assembles it at
+ * workspace creation under `<workspace>/.overdeck/context/workspace.md`, then
+ * launch-time composition renders global and project sources for the active
+ * harness and combines them with this workspace-only content.
  */
-
-import type { Harness } from '@overdeck/contracts';
-import { renderProjectLayer } from './render.js';
 
 const SECTION_SEPARATOR = '\n\n---\n\n';
 export const PROJECT_LAYER_START = '<!-- overdeck:project-layer:start';
 export const PROJECT_LAYER_END = '<!-- overdeck:project-layer:end -->';
-
-function markedProjectLayer(content: string): string {
-  return [`${PROJECT_LAYER_START} chars=${content.length} -->`, content, PROJECT_LAYER_END].join('\n');
-}
+export const WORKSPACE_CONTEXT_V2 = '<!-- overdeck:workspace-context:v2 harness-neutral -->';
 
 function removeMarkedProjectLayer(content: string): string | null {
   const start = content.indexOf(PROJECT_LAYER_START);
@@ -53,28 +40,25 @@ function removeMarkedProjectLayer(content: string): string | null {
 }
 
 /**
- * Remove the project layer embedded in a workspace bundle.
+ * Remove a project layer embedded by pre-PAN-3779 workspace assembly.
  *
- * New bundles carry reserved structural markers, so project Markdown can contain
- * horizontal rules without becoming ambiguous. Legacy bundles predate those
- * markers; their only safely identifiable workspace-owned section is the
- * generated header before the first top-level separator. Keeping that header is
- * preferable to forwarding an unknown amount of stale, harness-specific text.
+ * New bundles contain no project layer. Legacy marked bundles can be stripped
+ * exactly. Ambiguous legacy bundles must be reviewed before launch; silently
+ * truncating them would lose memory or status alongside stale project text.
  */
 export function workspaceContextWithoutProjectLayer(content: string): string {
+  if (content.includes(WORKSPACE_CONTEXT_V2)) return content.trim();
   const marked = removeMarkedProjectLayer(content);
   if (marked !== null) return marked;
 
-  const firstSeparator = content.indexOf(SECTION_SEPARATOR);
-  return (firstSeparator < 0 ? content : content.slice(0, firstSeparator)).trim();
+  if (content.includes(PROJECT_LAYER_START) || content.includes(SECTION_SEPARATOR)) {
+    throw new Error('Legacy workspace context has no valid project boundary. Review it with pan context edit --layer workspace and preserve its memory/status before rebuilding the workspace context.');
+  }
+  return content.trim();
 }
 
 /** Inputs for {@link assembleWorkspaceContext}. */
 export interface WorkspaceContextInput {
-  /** Absolute path to the parent project's root. */
-  projectRoot: string;
-  /** Harness the workspace's agent runs under. */
-  harness: Harness;
   /** Issue identifier, e.g. "PAN-1201". */
   issueId: string;
   /** Absolute path to the workspace worktree. */
@@ -93,16 +77,10 @@ export interface WorkspaceContextInput {
   statusSummary?: string;
 }
 
-/**
- * Assemble the workspace-layer bundle for a workspace.
- *
- * Pure: every input is explicit, so the caller decides how much context
- * (memory, status) it can supply. Sections with no content are omitted.
- */
+/** Assemble a harness-neutral workspace layer. */
 export function assembleWorkspaceContext(input: WorkspaceContextInput): string {
-  const sections: string[] = [];
+  const sections: string[] = [WORKSPACE_CONTEXT_V2];
 
-  // 1. Issue metadata header.
   const header = [`# Workspace: ${input.issueId}`, ''];
   if (input.issueTitle) header.push(`**Issue:** ${input.issueId} — ${input.issueTitle}`);
   else header.push(`**Issue:** ${input.issueId}`);
@@ -114,16 +92,10 @@ export function assembleWorkspaceContext(input: WorkspaceContextInput): string {
   }
   sections.push(header.join('\n'));
 
-  // 2. Parent project layer, rendered for this harness.
-  const projectLayer = renderProjectLayer(input.projectRoot, input.harness);
-  if (projectLayer) sections.push(markedProjectLayer(projectLayer));
-
-  // 3. Injected memory (PAN-1052).
   if (input.memoryContext && input.memoryContext.trim()) {
     sections.push(input.memoryContext.trim());
   }
 
-  // 4. Live workspace status.
   if (input.statusSummary && input.statusSummary.trim()) {
     sections.push(['## Workspace Status', '', input.statusSummary.trim()].join('\n'));
   }

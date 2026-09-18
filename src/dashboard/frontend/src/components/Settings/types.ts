@@ -1,10 +1,10 @@
 // Settings data types matching the new config.yaml structure
 // Now uses smart (capability-based) model selection instead of static presets
 
-export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'minimax' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'meta';
+export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'minimax' | 'mimo' | 'openrouter' | 'nous' | 'dashscope' | 'meta' | 'opencode' | 'opencode-go';
 
 export type ModelId = string;
-export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse' | 'prime-agent';
+export type Harness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse' | 'opencode' | 'prime-agent';
 export type HarnessOverride = Harness | '';
 export type XBriefDifficulty = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
 export type XBriefItemKind = 'docs' | 'api' | 'backend' | 'frontend' | 'infra' | 'test' | 'refactor' | 'design' | 'spike';
@@ -20,6 +20,8 @@ export interface ProvidersConfig {
   openrouter: boolean;
   nous: boolean;
   dashscope: boolean;
+  opencode?: boolean;
+  "opencode-go"?: boolean;
   meta?: boolean;
 }
 
@@ -44,7 +46,7 @@ export interface ModelsConfig {
   /** Legacy model-route overrides are accepted only to preserve form round-trips. */
   overrides: Partial<Record<string, ModelId>>;
   provider_harnesses?: Partial<Record<Provider, HarnessOverride>>;
-  provider_default_harnesses?: Record<Provider, Harness>;
+  provider_default_harnesses?: Partial<Record<Provider, Harness>>;
   gemini_thinking_level?: number; // 1-4 (Minimal, Low, Medium, High)
   default_conversation_model?: ModelId;
 }
@@ -188,7 +190,6 @@ export interface TieredExecutionConfig {
     enabled: boolean;
     retries_at_tier: number;
     max_promotions: number;
-    flounder_budget_minutes: Partial<Record<XBriefDifficulty, number>>;
   };
   compaction_reroute?: 'off' | 'on';
   replay_threshold: number;
@@ -239,6 +240,7 @@ export interface SettingsConfig {
     manual_compact_mode?: 'claude-code' | 'overdeck-native';
     rich_compaction?: boolean;
     title_model?: ModelId;
+    handoff_author_model?: ModelId;
     watch_dirs?: string[];
     scan_max_parallel?: number | null;
     embeddings?: boolean;

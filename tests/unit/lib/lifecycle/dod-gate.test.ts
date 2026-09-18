@@ -289,6 +289,7 @@ describe('contained strike reconciliation', () => {
         reviewStatus: 'pending', testStatus: 'pending', verificationStatus: undefined,
         strikeReadyHead: head, strikeReadyAt: '2026-08-13T00:00:00Z', strikeLandingState: 'needs_you',
       }),
+      getJournalStatus: () => null,
       setStatus,
     });
 
@@ -299,10 +300,69 @@ describe('contained strike reconciliation', () => {
     }));
   });
 
+  it('uses a matching durable marker when the live projection is incomplete', async () => {
+    const setStatus = vi.fn();
+    await reconcileContainedStrike(ctx, contained, {
+      getStatus: () => live({
+        reviewStatus: 'pending', testStatus: 'pending', verificationStatus: undefined,
+        strikeReadyHead: undefined, strikeReadyAt: undefined, strikeLandingState: 'needs_you',
+      }),
+      getJournalStatus: () => journal({
+        reviewStatus: 'pending', testStatus: 'pending', verificationStatus: undefined,
+        strikeReadyHead: head, strikeReadyAt: '2026-08-13T00:00:00Z', strikeLandingState: 'needs_you',
+      }),
+      setStatus,
+    });
+
+    expect(setStatus).toHaveBeenCalledWith(issueId, expect.objectContaining({
+      reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed',
+      lastVerifiedCommit: head, mergeStatus: 'merged', strikeLandingState: 'landed',
+      strikeReadyHead: undefined, strikeReadyAt: undefined,
+    }));
+  });
+
+  it('preserves negative durable verdicts while using the durable marker', async () => {
+    const setStatus = vi.fn();
+    await reconcileContainedStrike(ctx, contained, {
+      getStatus: () => live({
+        reviewStatus: 'pending', testStatus: 'pending', verificationStatus: undefined,
+        strikeReadyHead: undefined,
+      }),
+      getJournalStatus: () => journal({
+        reviewStatus: 'blocked', testStatus: 'failed', verificationStatus: 'failed',
+        strikeReadyHead: head,
+      }),
+      setStatus,
+    });
+
+    const update = setStatus.mock.calls[0]?.[1];
+    expect(update).not.toHaveProperty('reviewStatus');
+    expect(update).not.toHaveProperty('testStatus');
+    expect(update).not.toHaveProperty('verificationStatus');
+  });
+
+  it('is idempotent after the ready marker has been consumed', async () => {
+    const setStatus = vi.fn();
+    await reconcileContainedStrike(ctx, contained, {
+      getStatus: () => live({
+        reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed',
+        mergeStatus: 'merged', strikeLandingState: 'landed', strikeReadyHead: undefined,
+      }),
+      getJournalStatus: () => journal({
+        reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed',
+        mergeStatus: 'merged', strikeLandingState: 'landed', strikeReadyHead: undefined,
+      }),
+      setStatus,
+    });
+
+    expect(setStatus).not.toHaveBeenCalled();
+  });
+
   it('requires readiness evidence tied to the contained head', async () => {
     const setStatus = vi.fn();
     await reconcileContainedStrike(ctx, contained, {
       getStatus: () => live({ strikeReadyHead: 'c'.repeat(40) }),
+      getJournalStatus: () => null,
       setStatus,
     });
     expect(setStatus).not.toHaveBeenCalled();
@@ -314,6 +374,7 @@ describe('contained strike reconciliation', () => {
       getStatus: () => live({
         reviewStatus: 'blocked', testStatus: 'failed', verificationStatus: 'failed', strikeReadyHead: head,
       }),
+      getJournalStatus: () => null,
       setStatus,
     });
     const update = setStatus.mock.calls[0]?.[1];
@@ -326,6 +387,7 @@ describe('contained strike reconciliation', () => {
     const setStatus = vi.fn();
     await reconcileContainedStrike(ctx, { ...contained, evidence: undefined }, {
       getStatus: () => live({ strikeReadyHead: head }),
+      getJournalStatus: () => null,
       setStatus,
     });
     expect(setStatus).not.toHaveBeenCalled();

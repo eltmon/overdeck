@@ -44,6 +44,7 @@ import {
   type DodRowId,
   type DodRowResult,
 } from './dod.js';
+import { loadContainedStrikeStatus, NEGATIVE_STRIKE_VERDICTS } from './contained-strike-status.js';
 import type { LifecycleContext, StepResult } from './types.js';
 
 const execFileAsync = promisify(execFile);
@@ -545,8 +546,6 @@ export async function checkMergedRow(
   return merged;
 }
 
-const NEGATIVE_STRIKE_VERDICTS = new Set(['failed', 'blocked', 'dispatch_failed']);
-
 /**
  * Reconcile an out-of-band strike landing only when its durable ready marker
  * names the exact strike tip proven contained in main. This is the evidence a
@@ -557,12 +556,16 @@ export async function reconcileContainedStrike(
   merged: MergedDodRowResult,
   deps: {
     getStatus?: (issueId: string) => Awaitable<ReviewStatus | null>;
+    getJournalStatus?: (issueId: string) => Awaitable<PanIssuePipelineRecord | null>;
     setStatus?: typeof setReviewStatusSync;
   } = {},
 ): Promise<void> {
   const head = merged.evidence === 'branch-containment' ? merged.containedStrikeHead : undefined;
   if (!head) return;
-  const current = await (deps.getStatus ?? (issueId => Effect.runPromise(getReviewStatus(issueId))))(ctx.issueId);
+  const current = await loadContainedStrikeStatus(ctx.issueId, {
+    getReviewStatus: deps.getStatus ?? defaultDeps.getReviewStatus,
+    getJournalStatus: deps.getJournalStatus ?? defaultDeps.getJournalStatus,
+  });
   if (!current || current.strikeReadyHead !== head) return;
 
   const update: ReviewStatusUpdate = {};

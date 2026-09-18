@@ -131,31 +131,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # If Overdeck's verification gate or test specialist already validated
-      # tests for this exact commit, the overdeck/test commit status will be
-      # success. In that case, skip the redundant vitest run here — but keep
-      # the rest of the job (build, Playwright, smoke test) since those exercise
-      # different surfaces. Falls through to a full run when the status is
-      # absent (non-pipeline pushes) or not success (verification failed).
-      - name: Check for Overdeck test validation
-        id: overdeck-test
-        run: |
-          # In PR events github.sha is the temporary merge commit, not the branch
-          # head — Overdeck posts status against the branch head SHA. Prefer
-          # pull_request.head.sha when present (PR runs), fall back to github.sha
-          # (push to main).
-          sha="${{ github.event.pull_request.head.sha || github.sha }}"
-          state=$(gh api "repos/${{ github.repository }}/commits/${sha}/status" --jq \
-            '.statuses[]? | select(.context == "overdeck/test") | .state' | head -n 1)
-          if [ "$state" = "success" ]; then
-            echo "Overdeck test specialist already validated $sha — skipping vitest."
-            echo "skip_vitest=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "No overdeck/test=success on $sha (got '${state:-none}') — running vitest."
-            echo "skip_vitest=false" >> "$GITHUB_OUTPUT"
-          fi
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # PAN-3847 (FR-13): CI runs vitest on every push. The overdeck/test commit
+      # status used to let this job skip the suite; it now only records that the
+      # verification gate passed (changed-file scope) and is never read here.
 
       - name: Use Node.js 22
         uses: actions/setup-node@v4
@@ -183,11 +161,9 @@ jobs:
         run: npm run build
 
       - name: Install Playwright browsers (root) for vitest e2e
-        if: steps.overdeck-test.outputs.skip_vitest != 'true'
         run: npx playwright install --with-deps chromium
 
       - name: Test
-        if: steps.overdeck-test.outputs.skip_vitest != 'true'
         # GitHub Actions runners have limited memory. Vitest config automatically uses 1 fork
         # in CI, preventing OOM. Local development uses up to 4 concurrent workers.
         # Root cause (PAN-805): reconciler tests with real async I/O (Retry-After sleeping)

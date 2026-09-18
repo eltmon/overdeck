@@ -182,10 +182,21 @@ export async function pollConversations(): Promise<void> {
       // between the snapshot above and here (kill → spawn → ready), making the
       // verdict stale: marking then flips a just-revived conversation to
       // "ended" while its harness is alive, and the next send fails (conv 2596
-      // incident, 2026-06-09). Skip when a respawn is in flight or the row
-      // shows a spawn/attach signal within the grace window.
+      // incident, 2026-06-09). Skip when a respawn is in flight, a fork/handoff
+      // pipeline is still authoring or spawning, or the row shows a spawn/attach
+      // signal within the grace window.
       if (isRespawnPending(conv.tmuxSession)) continue;
       const fresh = getConversationByName(conv.name) ?? conv;
+      // PAN-3860: `pan handoff` creates the conversation row (status=active,
+      // forkStatus='handoff') before authoring the handoff doc, which for a
+      // >1M-char transcript takes well over SPAWN_GRACE_PERIOD_MS to finish —
+      // the tmux session doesn't exist yet because the spawn step hasn't run.
+      // forkStatus is the DB-persisted spawn-pending signal for the whole
+      // author+spawn window (cleared to null on success; runForkPipeline's
+      // catch already marks 'failed' rows ended, so exclude only 'failed' here
+      // — a stranded-but-alive fork must remain eligible to be swept once its
+      // session actually dies).
+      if (fresh.forkStatus && fresh.forkStatus !== 'failed') continue;
       const lastAliveSignalMs = Math.max(
         new Date(fresh.createdAt).getTime() || 0,
         fresh.lastAttachedAt ? new Date(fresh.lastAttachedAt).getTime() || 0 : 0,

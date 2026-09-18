@@ -82,6 +82,12 @@ export async function spawnSequencerAgent(
   pass: PassMode | 'auto',
   opts: SpawnSequencerOptions = {},
 ): Promise<AgentState> {
+  const assertUnpaused = () => {
+    if (getAgentStateSync(SEQUENCER_AGENT_ID)?.paused) {
+      throw new Error('Sequencer is paused. Run pan unpause sequencer-runner before starting it again.');
+    }
+  };
+  assertUnpaused();
   const projectRoot = opts.projectRoot ?? process.cwd();
   const projectKey = opts.projectKey ?? 'overdeck';
   const batchSize = opts.batchSize ?? 20;
@@ -152,6 +158,8 @@ export async function spawnSequencerAgent(
   const model = determineModel({ role: 'sequencer', model: opts.model, spawnKey: 'sequencer:global' });
   const prompt = buildSequencerPrompt(resolvedPass, { projectRoot, projectKey, input, batchSize });
 
+  // Backlog collection and manifest writes yield; an operator may pause meanwhile.
+  assertUnpaused();
   return spawnRun(SEQUENCER_AGENT_ID, 'sequencer', {
     agentId: SEQUENCER_AGENT_ID,
     workspace: opts.workspace ?? projectRoot,

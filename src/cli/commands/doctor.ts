@@ -7,6 +7,9 @@ import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import { getAgentSessionsSync, listSessionNamesSync } from '../../lib/tmux.js';
 import { listProjectsSync, type ProjectConfig } from '../../lib/projects.js';
+import { findMixedWouldFireModes, readWouldFireCounts, readWouldFireRecorderHealth, wouldFireRecorderHealthPath } from '../../lib/cloister/patrol-would-fire.js';
+import { readInvariantReport } from '../../lib/cloister/invariant-checker.js';
+import { listPatrolBudgetRows } from '../../lib/cloister/patrol-budget.js';
 import { homedir } from 'os';
 import { isAbsolute, join, resolve } from 'path';
 import {
@@ -333,6 +336,118 @@ function countItems(path: string): number {
     return readdirSync(path).length;
   } catch {
     return 0;
+  }
+}
+
+/**
+ * PAN-3848 (W30): print the per-patrol would-have-fired counts for the last 7
+ * days. During a soak (OVERDECK_PATROL_SHADOW=1 on the dashboard) the wrapped
+ * patrols detect but never act; a week of zeroes is the deletion gate's
+ * evidence. Outside a soak the counts show which patrols actually fired.
+ */
+/**
+ * PAN-3848 (F1): the would-fire JSONL is soak evidence for patrol deletion —
+ * a dropped append reads back as a false zero. A failed append leaves
+ * `would-fire.unhealthy.json` behind; report it as an error (with a fix) so a
+ * tainted zero can never silently gate a deletion.
+ */
+export function checkPatrolSoakEvidence(): CheckResult[] {
+  const results: CheckResult[] = [];
+  const health = readWouldFireRecorderHealth();
+  if (!health.healthy) {
+    const since = health.firstFailureAt ?? 'unknown time';
+    const failures = health.failureCount ?? 1;
+    results.push({
+      name: 'Patrol soak evidence',
+      status: 'error',
+      message: `would-fire recorder unhealthy since ${since} (${failures} failed append(s)}${health.lastError ? `: ${health.lastError}` : ''} — counts may be false zeroes, soak evidence is invalid`,
+      fix: `Inspect disk space and permissions for the deacon state dir, then delete ${wouldFireRecorderHealthPath()} to re-arm. Zeroes recorded during the outage stay untrustworthy — restart the soak window for any patrol gated on them.`,
+    });
+  }
+  const sinceIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  for (const patrol of findMixedWouldFireModes(sinceIso)) {
+    results.push({
+      name: 'Patrol soak evidence',
+      status: 'error',
+      message: `${patrol} recorded both shadow and live firings in the last 7 days — its zeroes prove nothing about either mode, soak evidence is invalid`,
+      fix: `Decide which mode ${patrol} should soak in, keep it there for a full 7-day window, then re-check. Entries carry their own shadow flag; the daemon's OVERDECK_PATROL_SHADOW and this shell's may differ.`,
+    });
+  }
+  return results;
+}
+
+/**
+ * PAN-3848 (W30, F3): print the per-patrol would-have-fired counts for the
+ * last 7 days, split by the shadow mode recorded with each entry. During a
+ * soak (OVERDECK_PATROL_SHADOW=1 on the dashboard) the wrapped patrols detect
+ * but never act; a week of zeroes is the deletion gate's evidence. The mode
+ * shown is the recorder's, never this process's environment — the two can
+ * differ, and the header must not claim otherwise.
+ */
+export function printPatrolWouldFireTable(): void {
+  const sinceIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const counts = readWouldFireCounts(sinceIso);
+
+  console.log(chalk.bold('Patrol would-fire counts (last 7 days, by recorded mode):'));
+  const patrols = [...new Set([...Object.keys(counts.shadow), ...Object.keys(counts.normal)])]
+    .sort((a, b) => a.localeCompare(b));
+  if (patrols.length === 0) {
+    console.log(chalk.dim('  (no would-fire events recorded)'));
+    return;
+  }
+  for (const patrol of patrols) {
+    const shadow = counts.shadow[patrol] ?? 0;
+    const normal = counts.normal[patrol] ?? 0;
+    const mixed = shadow > 0 && normal > 0;
+    const line = `  ${patrol}: shadow=${shadow} live=${normal}${mixed ? ' (MIXED — soak evidence invalid)' : ''}`;
+    console.log(mixed ? chalk.red(line) : line);
+  }
+}
+
+/**
+ * PAN-3850 (W39, FR-26): print each patrol's action tally for the current UTC
+ * day against its budget. A suspended patrol is a needs-you the operator
+ * already got; this table is where they see the whole picture.
+ */
+export function printPatrolBudgetTable(): void {
+  console.log(chalk.bold('Patrol firing budgets (current UTC day):'));
+  const rows = listPatrolBudgetRows();
+  if (rows.length === 0) {
+    console.log(chalk.dim('  (no patrol actions recorded today)'));
+    return;
+  }
+  for (const row of rows) {
+    const budgetText = row.budget === 'exempt' ? '(exempt)' : `of ${row.budget}`;
+    const line = `  ${row.patrol}: ${row.actions} ${budgetText}${row.suspended ? ` — SUSPENDED (${row.suspendedReason ?? 'budget exceeded'})` : ''}`;
+    console.log(row.suspended ? chalk.red(line) : line);
+  }
+}
+
+/**
+ * PAN-3850 (W40, FR-27): print the invariant checker's last report — every
+ * entity whose record, review-status row, or liveness disagree. The checker
+ * is report-only; each line names the repair door for its kind of drift.
+ */
+export function printInvariantMismatchTable(): void {
+  console.log(chalk.bold('Invariant mismatches (record vs row vs liveness):'));
+  const report = readInvariantReport();
+  if (!report.generatedAt) {
+    console.log(chalk.dim('  (no invariant report yet — the checker runs every 10 patrol passes)'));
+    return;
+  }
+  console.log(chalk.dim(`  last checked ${report.generatedAt}`));
+  if (report.mismatches.length === 0) {
+    console.log('  all planes agree');
+    return;
+  }
+  for (const mismatch of report.mismatches) {
+    const what = mismatch.kind === 'liveness'
+      ? (mismatch.detail ?? 'liveness drift')
+      : `record/row drift on ${mismatch.fields.map((f) => `${f.field} (record=${JSON.stringify(f.recordValue)} row=${JSON.stringify(f.rowValue)})`).join(', ')}`;
+    const fix = mismatch.kind === 'liveness'
+      ? `pan admin agents exited ${mismatch.entity}`
+      : `pan review resync ${mismatch.entity}`;
+    console.log(chalk.yellow(`  ${mismatch.entity}: ${what} — fix: ${fix}`));
   }
 }
 
@@ -915,6 +1030,10 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   // Check inotify watch budget and persistence (PAN-3063)
   for (const c of await checkInotify()) checks.push(c);
 
+  // Patrol soak evidence (PAN-3848 F1): an unhealthy would-fire recorder or
+  // mixed-mode counts invalidate the deletion gate's zeroes.
+  for (const c of checkPatrolSoakEvidence()) checks.push(c);
+
   // Check for legacy command invocations in shell rc files (PAN-705)
   const legacyPatterns = [
     'pan work ',
@@ -985,6 +1104,19 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
     if (check.status === 'error') hasErrors = true;
     if (check.status === 'warn') hasWarnings = true;
   }
+
+  // PAN-3848 (W30): the patrol soak table — would-have-fired counts per patrol
+  // for the last 7 days. Zeroes across the board while OVERDECK_PATROL_SHADOW=1
+  // prove the deleted-patrol candidates' repaired states are unreachable.
+  printPatrolWouldFireTable();
+
+  // PAN-3850 (W39): the per-patrol firing-budget table — today's action tally
+  // against each patrol's budget, with suspended patrols named in red.
+  printPatrolBudgetTable();
+
+  // PAN-3850 (W40): the invariant checker's last report — record vs row vs
+  // liveness drift, with the repair door named on each line.
+  printInvariantMismatchTable();
 
   console.log('');
 

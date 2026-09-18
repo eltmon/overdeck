@@ -7,6 +7,7 @@ import { getOpenAIAuthStatus } from '../../lib/openai-auth.js';
 import { loadConfigSync } from '../../lib/config-yaml.js';
 import {
   checkSystemPrerequisite,
+  normalizeResolution,
   type PrerequisiteProbe,
   type PrerequisiteResolver,
 } from '../../lib/system-prerequisites.js';
@@ -46,9 +47,9 @@ export async function checkPrimeAgent(
     return [{ name: prime.name, status: 'warn', message: `v${version} is unsupported; requires >= ${SUPPORTED_PRIME_AGENT_VERSION_MIN} and < ${SUPPORTED_PRIME_AGENT_VERSION_MAX_EXCLUSIVE}`, fix: 'Install a compatible Prime Agent release; Overdeck will not fall back to another harness.' }];
   }
 
-  const executable = await (resolver
+  const executable = normalizeResolution(await (resolver
     ? resolver('prime-agent', { primeAgentHarness: true })
-    : resolveHarnessBinary('prime-agent'));
+    : resolveHarnessBinary('prime-agent'))).path;
   try {
     const help = executable ? await activeProbe(executable, ['--help']) : '';
     if (!/(?:--mode\b[^\n]*\brpc\b|--mode\s+<[^>]+>)/i.test(help)) {

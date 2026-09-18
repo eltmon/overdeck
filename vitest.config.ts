@@ -41,6 +41,9 @@ export default defineConfig({
     // retry:0 so flakes remain visible during development. A retried-then-passed
     // test is still surfaced by vitest's default reporter.
     retry: retryEnabled ? 1 : 0,
+    // PAN-3847 (FR-12): vitest refuses .only in every gate run — a focused test
+    // must never shrink the suite silently.
+    allowOnly: false,
     experimental: {
       // Persist transformed module cache across runs in node_modules/.experimental-vitest-cache.
       // Vitest v4 introduced this; meaningful on a ~200-file suite where re-running a
@@ -61,7 +64,7 @@ export default defineConfig({
         '**/*.d.ts',
       ],
     },
-    globalSetup: ['tests/global-setup.ts'],
+    globalSetup: ['tests/vitest-cpu-admission.ts', 'tests/global-setup.ts'],
     setupFiles: ['tests/setup/overdeck-home.ts', 'tests/setup/no-real-home-writes.ts', 'tests/setup.ts'],
     // 5s is enough for unit/integration tests; tests that legitimately need
     // more time should opt in via `test('...', { timeout: 20_000 }, ...)`.

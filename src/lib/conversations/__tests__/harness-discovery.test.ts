@@ -22,14 +22,14 @@ afterEach(() => {
 });
 
 describe('ACP transcript discovery', () => {
-  it('discovers the direct agent transcript as the ACP harness', async () => {
+  it.each(['acp', 'opencode'])('discovers the direct agent transcript as the %s harness', async (harness) => {
     tempHome = mkdtempSync(join(tmpdir(), 'overdeck-acp-discovery-'));
     savedHome = process.env.HOME;
     process.env.HOME = tempHome;
     const agentDir = join(tempHome, '.overdeck', 'agents', 'agent-acp');
     const transcriptPath = join(agentDir, 'acp-session.jsonl');
     mkdirSync(agentDir, { recursive: true });
-    writeFileSync(join(agentDir, 'state.json'), JSON.stringify({ harness: 'acp' }), 'utf8');
+    writeFileSync(join(agentDir, 'state.json'), JSON.stringify({ harness }), 'utf8');
     writeFileSync(transcriptPath, '{}\n', 'utf8');
 
     const discovered = await discoverJsonlFiles([]);
@@ -37,7 +37,7 @@ describe('ACP transcript discovery', () => {
     expect(discovered).toContainEqual({
       projectDir: agentDir,
       jsonlPath: transcriptPath,
-      harness: 'acp',
+      harness,
     });
   });
 });

@@ -24,7 +24,7 @@
 import type { Harness } from '@overdeck/contracts';
 
 /** Short marker name used in `{{#harness:<name>}}` blocks. */
-export type HarnessMarker = 'claude' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse' | 'prime-agent';
+export type HarnessMarker = 'claude' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | 'prime-agent';
 
 /** Maps a Overdeck {@link Harness} to its templating marker name. */
 export const HARNESS_MARKERS: Record<Harness, HarnessMarker> = {
@@ -32,13 +32,14 @@ export const HARNESS_MARKERS: Record<Harness, HarnessMarker> = {
   ohmypi: 'ohmypi',
   codex: 'codex',
   acp: 'acp',
+  opencode: 'opencode',
   'kimi-code': 'kimi-code',
   muse: 'muse',
   'prime-agent': 'prime-agent',
 };
 
 /** Marker names Overdeck ships an adapter for in v1. */
-export const KNOWN_HARNESS_MARKERS: ReadonlySet<string> = new Set<HarnessMarker>(['claude', 'pi', 'ohmypi', 'codex', 'acp', 'kimi-code', 'muse', 'prime-agent']);
+export const KNOWN_HARNESS_MARKERS: ReadonlySet<string> = new Set<HarnessMarker>(['claude', 'pi', 'ohmypi', 'codex', 'acp', 'kimi-code', 'opencode', 'muse', 'prime-agent']);
 
 /** Matches an open `{{#harness:x}}` or close `{{/harness:x}}` marker. */
 const MARKER_RE = /\{\{([#/])harness:([a-zA-Z0-9_-]+)\}\}/g;

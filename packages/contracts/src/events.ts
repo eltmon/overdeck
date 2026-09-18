@@ -975,6 +975,18 @@ export const IssuesSnapshotEvent = Schema.Struct({
 })
 export type IssuesSnapshotEvent = typeof IssuesSnapshotEvent.Type
 
+/** Complete changed rows since the initial snapshot; preserves tracker ordering. */
+export const IssuesDeltaEvent = Schema.Struct({
+  type: Schema.Literal("issues.delta"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    length: Schema.Number,
+    changes: Schema.Array(Schema.Struct({ index: Schema.Number, issue: Schema.Unknown })),
+  }),
+})
+export type IssuesDeltaEvent = typeof IssuesDeltaEvent.Type
+
 /** Replaces socket.io `issues:updated` */
 export const IssuesUpdatedEvent = Schema.Struct({
   type: Schema.Literal("issues.updated"),
@@ -1517,6 +1529,7 @@ export const DomainEvent = Schema.Union([
   ResourcesUpdatedEvent,
   SystemHealthSeverityChangedEvent,
   IssuesSnapshotEvent,
+  IssuesDeltaEvent,
   IssuesUpdatedEvent,
   IssueStatusChangedEvent,
   ActivityUpdatedEvent,

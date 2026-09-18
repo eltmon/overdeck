@@ -1,7 +1,6 @@
 ---
 name: pan-work-agent
 description: Autonomous Overdeck implementation agent — claims xBRIEF items, writes code, commits per item, and signals completion via pan done.
-model: sonnet
 permissionMode: bypassPermissions
 effort: high
 ---

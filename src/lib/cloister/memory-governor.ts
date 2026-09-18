@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { cpus, loadavg } from 'node:os';
 import { promisify } from 'node:util';
 import { readProcMemory } from '../../dashboard/server/services/system-health-service.js';
 import { loadConfigSync } from '../config-yaml/load.js';
@@ -53,9 +54,9 @@ export function classifyMemoryPressure(
 // The deacon governor uses its OWN three reserve thresholds (config-yaml
 // resources.governor{Soft,Hard,Recovery}ReserveGb — NOT memoryWarnGb/
 // memoryBlockGb, which belong to the unrelated HTTP-path predicate above) and
-// a small state machine so it never oscillates: once below SOFT it holds
-// (admits nothing new); once below HARD it sheds; it never re-admits until
-// MemAvailable clears RECOVERY, which is always > SOFT.
+// a small state machine so it never oscillates. Memory pressure can hold or
+// shed. CPU saturation only holds admissions because running work self-heals
+// as it finishes; re-admission waits for lower load as well as memory runway.
 
 export type GovernorMode = 'admitting' | 'holding' | 'shedding';
 
@@ -69,12 +70,15 @@ export interface GovernorRunway {
   swapTotalBytes: number;
   swapFreeBytes: number;
   psiFullAvg10: number | null;
+  loadPerCore: number | null;
 }
 
 export interface GovernorRunwayThresholds {
   swapSoftFreePercent: number;
   swapRecoveryFreePercent: number;
   psiFullShedAvg10: number;
+  cpuSoftLoadPerCore: number;
+  cpuRecoveryLoadPerCore: number;
 }
 
 export interface GovernorPsiCalmConfig {
@@ -125,6 +129,8 @@ export function readGovernorRunwayThresholds(): GovernorRunwayThresholds {
     swapSoftFreePercent: resources.governorSwapSoftFreePercent,
     swapRecoveryFreePercent: resources.governorSwapRecoveryFreePercent,
     psiFullShedAvg10: resources.governorPsiFullShedAvg10,
+    cpuSoftLoadPerCore: resources.governorCpuSoftLoadPerCore,
+    cpuRecoveryLoadPerCore: resources.governorCpuRecoveryLoadPerCore,
   };
 }
 
@@ -169,15 +175,17 @@ export function nextGovernorModeWithRunway(
     : previousMode === 'admitting' && memoryMode === 'holding'
       ? { kind: 'soft-dip', readingBytes: availableBytes, thresholdBytes: reserves.softBytes }
       : null;
-  if (runway.swapTotalBytes <= 0) return { mode: memoryMode, trigger: memoryTrigger };
-
+  const swapEnabled = runway.swapTotalBytes > 0;
   const swapSoftBytes = runway.swapTotalBytes * runwayThresholds.swapSoftFreePercent / 100;
   const swapRecoveryBytes = runway.swapTotalBytes * runwayThresholds.swapRecoveryFreePercent / 100;
   const activeSwapThresholdBytes = previousMode === 'admitting' ? swapSoftBytes : swapRecoveryBytes;
-  const swapLow = runway.swapFreeBytes < activeSwapThresholdBytes;
+  const swapLow = swapEnabled && runway.swapFreeBytes < activeSwapThresholdBytes;
   const psiShed = swapLow
     && runway.psiFullAvg10 != null
     && runway.psiFullAvg10 >= runwayThresholds.psiFullShedAvg10;
+  const cpuSaturated = runway.loadPerCore != null && (previousMode === 'admitting'
+    ? runway.loadPerCore >= runwayThresholds.cpuSoftLoadPerCore
+    : runway.loadPerCore >= runwayThresholds.cpuRecoveryLoadPerCore);
 
   if (memoryMode === 'shedding') return { mode: 'shedding', trigger: memoryTrigger };
   if (psiShed) {
@@ -200,6 +208,7 @@ export function nextGovernorModeWithRunway(
       trigger: { kind: 'psi-unavailable', readingBytes: runway.swapFreeBytes, thresholdBytes: activeSwapThresholdBytes },
     };
   }
+  if (cpuSaturated) return { mode: 'holding', trigger: memoryTrigger };
   return { mode: memoryMode, trigger: memoryTrigger };
 }
 
@@ -221,6 +230,7 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
   const runwayThresholds = readGovernorRunwayThresholds();
   const psiCalmConfig = readGovernorPsiCalmConfig();
   const snapshot = await readProcMemory();
+  const loadPerCore = loadavg()[0] / Math.max(1, cpus().length);
   const now = Date.now();
   const psiIsCalm = snapshot.psiFullAvg10 != null
     && snapshot.psiFullAvg10 < psiCalmConfig.readmitAvg10;
@@ -232,6 +242,7 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
       swapTotalBytes: snapshot.swapTotal,
       swapFreeBytes: snapshot.swapFree,
       psiFullAvg10: snapshot.psiFullAvg10,
+      loadPerCore,
     },
     runwayThresholds,
     governorMode,
@@ -263,6 +274,7 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
     && psiCalmSinceMs != null
     && now - psiCalmSinceMs >= psiCalmConfig.windowMs
     && snapshot.memAvailable >= reserves.softBytes
+    && loadPerCore < runwayThresholds.cpuRecoveryLoadPerCore
   ) {
     governorMode = 'admitting';
     governorTrigger = null;
@@ -276,6 +288,7 @@ export async function assessMemoryPressure(): Promise<MemoryVerdict> {
     swapFreeBytes: snapshot.swapFree,
     psiSomeAvg10: snapshot.psiSomeAvg10,
     psiFullAvg10: snapshot.psiFullAvg10,
+    loadPerCore,
     trigger: governorTrigger,
   };
   setCachedMemoryVerdict(verdict);

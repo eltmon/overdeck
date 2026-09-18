@@ -2,6 +2,10 @@ import type { SystemHealthSnapshot as AcceptedSystemHealthSnapshot } from '@over
 import { Effect } from 'effect';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('../../../../src/dashboard/server/services/dashboard-poll-snapshots.js', () => ({
+  getAgentCostStatsSnapshot: async () => [],
+}));
+
 import {
   buildReclaimPayload,
   deleteResourceVenvEffect,

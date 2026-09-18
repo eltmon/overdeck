@@ -86,9 +86,11 @@ them.
 | `codex` | **Supported** (alternative) | `src/lib/runtimes/codex.ts` |
 | `acp` | **Supported** (Kimi first) | `src/lib/runtimes/acp.ts` + vendored `packages/effect-acp/` |
 | `kimi-code` | **Supported** (native, Kimi-only) | `src/lib/runtimes/kimi-code.ts` |
+| `opencode` | **Supported** (Go and Zen) | `src/lib/acp/opencode.ts` + shared ACP runtime |
 
 The native `acp` harness is a reusable protocol integration, but version one
-registers only Kimi Code CLI as a selectable ACP provider. `kimi-code` is a
+uses the `acp` harness name for Kimi Code CLI. OpenCode Go and Zen use the
+`opencode` harness name with the shared ACP transport. `kimi-code` is a
 separate, capability-layer harness: it drives Kimi's own terminal UI and wire
 protocol directly, reaching Kimi-specific behavior the ACP lowest-common-
 denominator surface can't. The remaining profiles are surveyed for planning
@@ -106,6 +108,7 @@ compatibility as automatic support.
 | ACP agent | Overdeck status | Next integration work |
 | --- | --- | --- |
 | **Kimi Code CLI** | **Wired now** through `kimi acp` | None for version one; run interactive `/login` once before use. |
+| **OpenCode** | **Wired now** through `opencode acp` | Go and Zen; sign in with `opencode auth login`. |
 | **Cursor CLI** | ACP-reachable next | Register its executable, launch arguments, and authentication mapping. |
 | **Grok CLI** | ACP-reachable next | Register its executable, launch arguments, and authentication mapping. |
 | **Google Gemini CLI** | ACP-reachable next | Register its executable, launch arguments, and authentication mapping. |
@@ -362,13 +365,19 @@ and should be re-checked before any decision.
 - **Why notable:** skill-bundled MCP and the TS plugin API are design ideas
   worth borrowing regardless of adoption.
 
-### OpenCode — Not supported (candidate)
+### OpenCode — Supported through ACP (Go and Zen)
+
+Overdeck supports persistent OpenCode ACP sessions with the `opencode` (Zen)
+and `opencode-go` provider namespaces. Verified version: 1.18.29. See
+[OpenCode setup](/configuration/harnesses#opencode-with-go-and-zen) for credentials,
+model discovery, resume behavior, and current transport limitations.
+
 
 - **Vendor / model:** SST / Anomaly. Provider-agnostic — any LLM provider via
   configurable keys; ships a curated "OpenCode Zen" model list.
 - **OSS / license:** Open source (**⚠ verify exact license**). The live repo is
-  `sst/opencode` — distinct from the archived Go `opencode-ai/opencode`.
-- **Auth:** per-provider API keys; OpenCode Zen billing.
+  `anomalyco/opencode` — distinct from the archived Go `opencode-ai/opencode`.
+- **Auth:** native saved credentials; OpenCode Go subscription or OpenCode Zen billing.
 - **Extensibility:**
   - **Skills — yes**, `SKILL.md`; reads `.opencode/skills/`, `.claude/skills/`,
     `.agents/skills/` (and `~/` equivalents). Pattern-based per-agent skill
@@ -378,10 +387,10 @@ and should be re-checked before any decision.
     with its own `model`, `prompt`, `permission`, `temperature`, `tools`. The
     closest thing OpenCode has to a loadable per-session profile.
   - **AGENTS.md — yes**; **MCP — yes**.
-- **Headless / RPC:** CLI run mode, Web mode, **Server/SDK** mode — drivable by
-  an orchestrator (**⚠ verify** exact flags/JSON schema).
-- **Why a candidate:** fully open, multi-provider, `SKILL.md`-native, and its
-  custom-Agent model is a clean fit for Overdeck's role taxonomy.
+- **Transport:** persistent `opencode acp`, verified with session creation,
+  message delivery, and resume on 1.18.29. Overdeck reuses its ACP transcript and
+  message transport while retaining the OpenCode harness identity.
+- **Provider scope:** Go and Zen. Other OpenCode providers are outside this integration.
 
 ### Goose (Block) — Not supported (strongest "bundle" primitive)
 
@@ -494,7 +503,7 @@ and should be re-checked before any decision.
 | **Cursor CLI** | Proprietary | — | ✅ | ✅ | ✅ | ✅ | ✅ | Rule scopes | No |
 | **Warp / Oz** | ⚠ AGPL-3.0? | Rust | ✅ | ✅ (+all dirs) | ✅ | ✅ (imports) | ✅ | Oz `--profile` | No |
 | **Amp** | Proprietary | — | ✅ | ❌ | ✅ | ✅ | ✅ | TS plugins | No |
-| **OpenCode** | OSS ⚠ | TS | ✅ | ✅ | ✅ | ✅ | ✅ | ⭐ Custom Agents | Candidate |
+| **OpenCode** | OSS ⚠ | TS | ✅ | ✅ | ✅ | ✅ | ✅ | ⭐ Custom Agents | Go and Zen via ACP |
 | **Goose** | Apache-2.0 | Rust | ✅ | ✅ | ✅ | ✅ (=ext) | ✅ | ⭐⭐ Recipes | Candidate |
 | **Crush** | FSL-1.1-MIT | Go | ✅ | ⚠ | ✅ | ✅ | ⚠ | — | No |
 | **Aider** | Apache-2.0 | Python | ❌ | ❌ | ❌ | ❌ | ❌ | — | No (poor fit) |

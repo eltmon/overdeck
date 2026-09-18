@@ -23,7 +23,8 @@ const mockKillSession = vi.fn();
 const mockListPaneValues = vi.fn();
 const mockGetReviewStatusSync = vi.fn();
 const mockGetAgentRuntimeStateSync = vi.fn();
-const mockReconcileLiveWorkSpawnPlaceholder = vi.fn();
+const mockIsAlive = vi.fn();
+const mockIsAliveSync = vi.fn();
 const mockWorkResumeSlotsAvailable = vi.fn();
 const mockCountRunningAgents = vi.fn();
 const mockGetConcurrencyLimits = vi.fn();
@@ -83,8 +84,10 @@ vi.mock('../../../lib/tmux.js', () => ({
   listPaneValues: (...args: unknown[]) => Effect.succeed(mockListPaneValues(...args)),
 }));
 
-vi.mock('../../../lib/agents/placeholder-reconciliation.js', () => ({
-  reconcileLiveWorkSpawnPlaceholder: (...args: unknown[]) => mockReconcileLiveWorkSpawnPlaceholder(...args),
+vi.mock('../../../lib/agents/liveness.js', () => ({
+  isAlive: (...args: unknown[]) => mockIsAlive(...args),
+  isAliveSync: (...args: unknown[]) => mockIsAliveSync(...args),
+  isIdle: vi.fn(() => false),
 }));
 
 vi.mock('../../../lib/review-status.js', () => ({
@@ -195,7 +198,8 @@ describe('PAN-1908 reactive liveness handlers', () => {
     mockListPaneValues.mockResolvedValue(['0']);
     mockGetReviewStatusSync.mockReturnValue(undefined);
     mockGetAgentRuntimeStateSync.mockReturnValue(null);
-    mockReconcileLiveWorkSpawnPlaceholder.mockResolvedValue(null);
+    mockIsAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
+    mockIsAliveSync.mockReturnValue({ alive: false, reason: 'no-session' });
     mockWorkResumeSlotsAvailable.mockReturnValue(6);
     mockCountRunningAgents.mockReturnValue({ work: 0, advancing: 0, total: 0 });
     mockGetConcurrencyLimits.mockReturnValue({ maxWorkAgents: 6, reservedAdvancingSlots: 3, totalCeiling: 9 });
@@ -381,7 +385,7 @@ describe('PAN-1908 reactive liveness handlers', () => {
         mergeStatus: 'merged',
         readyForMerge: false,
       });
-      mockSessionExists.mockResolvedValue(true);
+      mockIsAlive.mockResolvedValue({ alive: true, paneAlive: true });
 
       const result = await handleAgentStoppedEvent('agent-pan-1908');
 
@@ -549,34 +553,57 @@ describe('PAN-1908 reactive liveness handlers', () => {
       expect(mockSaveAgentState).not.toHaveBeenCalled();
     });
 
-    it('self-heals a live pending-work-spawn placeholder from its pinned launcher', async () => {
-      const state = makeState({ status: 'starting', model: 'pending-work-spawn' });
-      mockGetAgentStateSync.mockReturnValue(state);
-      mockSessionExistsSync.mockReturnValue(true);
-      mockQuerySessionSync.mockReturnValue({ status: 'exists' });
-      mockReconcileLiveWorkSpawnPlaceholder.mockResolvedValue(
-        'Reconciled agent-pan-1908 placeholder to running (claude-code/gpt-5.6-sol)',
-      );
-
-      const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
-
-      expect(actions).toEqual([
-        'Reconciled agent-pan-1908 placeholder to running (claude-code/gpt-5.6-sol)',
-      ]);
-      expect(mockReconcileLiveWorkSpawnPlaceholder).toHaveBeenCalledWith(
-        state,
-        expect.any(Function),
-      );
-    });
-
     it('skips running agents with a live tmux session', async () => {
       mockGetAgentStateSync.mockReturnValue(makeState({ status: 'running' }));
       mockSessionExistsSync.mockReturnValue(true);
       mockQuerySessionSync.mockReturnValue({ status: 'exists' });
+      mockIsAlive.mockResolvedValue({ alive: true, paneAlive: true });
 
       const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
 
       expect(actions).toEqual([]);
+      expect(mockSaveAgentState).not.toHaveBeenCalled();
+    });
+
+    it('recovers a work agent whose session exists but whose harness has exited', async () => {
+      // PAN-3849 findings round: the W34 placeholder removal left a bare
+      // `return []` for any work agent with a session, so a zombie pane / bare
+      // shell never fell through to recovery. The oracle verdict decides now.
+      mockGetAgentStateSync.mockReturnValue(makeState({ status: 'running', kickoffDelivered: true }));
+      mockSessionExistsSync.mockReturnValue(true);
+      mockQuerySessionSync.mockReturnValue({ status: 'exists' });
+      mockIsAlive.mockResolvedValue({ alive: false, reason: 'runtime-missing' });
+
+      const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
+
+      expect(actions.length).toBeGreaterThan(0);
+      expect(mockKillSession).toHaveBeenCalledWith('agent-pan-1908');
+      expect(mockSaveAgentState).toHaveBeenCalled();
+      const saved = mockSaveAgentState.mock.calls[0][0];
+      expect(saved.status).toBe('stopped');
+      expect(mockRecordAgentFailure).toHaveBeenCalled();
+    });
+
+    it('leaves the stopped projection to the supervisor for supervisor-enabled work agents', async () => {
+      // The authenticated supervisor `exited` event owns the `stopped`
+      // projection (agent-projection.ts), and the supervisor worker survives
+      // its tmux session (PAN-3002) — so a direct stopped save here races it
+      // (stale stoppedAt, duplicate agent.stopped). Kill the dead pane and
+      // record the failure, but do not write `stopped` directly.
+      mockGetAgentStateSync.mockReturnValue(makeState({
+        status: 'running',
+        kickoffDelivered: true,
+        supervisorEnabled: true,
+      }));
+      mockSessionExistsSync.mockReturnValue(true);
+      mockQuerySessionSync.mockReturnValue({ status: 'exists' });
+      mockIsAlive.mockResolvedValue({ alive: false, reason: 'runtime-missing' });
+
+      const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
+
+      expect(actions.length).toBeGreaterThan(0);
+      expect(mockKillSession).toHaveBeenCalledWith('agent-pan-1908');
+      expect(mockRecordAgentFailure).toHaveBeenCalled();
       expect(mockSaveAgentState).not.toHaveBeenCalled();
     });
 
@@ -587,6 +614,20 @@ describe('PAN-1908 reactive liveness handlers', () => {
       expect(await handleAgentHeartbeatDeadEvent('agent-pan-1908', 'patrol')).toEqual([]);
       expect(await handleAgentHeartbeatDeadEvent('agent-pan-1908', 'patrol')).toEqual([]);
       expect(mockSaveAgentState).not.toHaveBeenCalled();
+    });
+
+    it('does not kill on an indeterminate probe (a broken ps/pgrep is not death)', async () => {
+      mockGetAgentStateSync.mockReturnValue(makeState({ status: 'running', kickoffDelivered: true }));
+      mockSessionExistsSync.mockReturnValue(true);
+      mockQuerySessionSync.mockReturnValue({ status: 'exists' });
+      mockIsAlive.mockResolvedValue({ alive: false, reason: 'runtime-indeterminate' });
+
+      const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
+
+      expect(actions).toEqual([]);
+      expect(mockKillSession).not.toHaveBeenCalled();
+      expect(mockSaveAgentState).not.toHaveBeenCalled();
+      expect(mockRecordAgentFailure).not.toHaveBeenCalled();
     });
   });
 });

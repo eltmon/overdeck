@@ -20,7 +20,6 @@ import type { LegacyConversation } from '../../lib/overdeck/conversations.js';
 import { contextUsageFromParseResult, gateSnapshotEmission, parseConversationMessages, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
 import { isPiSessionFile } from './services/pi-conversation-parser.js';
 import { resolveAgentHarness, resolvePiSessionPath, resolveCodexRolloutPath, resolveAcpTranscriptPath, resolveKimiWirePath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
-import { watch as fsWatch } from 'node:fs';
 import { sessionFilePath } from '../../lib/paths.js';
 import { getRuntimeCensus } from '../../lib/runtime-census.js';
 import { listProjectsSync } from '../../lib/projects.js';
@@ -43,7 +42,11 @@ import { resolveFilePathExistsEffect } from './services/resolve-file-path-exists
 import { getHarnessBehavior } from '../../lib/runtimes/behavior.js';
 import { normalizeSessionsFeedFilter, toDiscoveredSessionSnapshot, toSessionsFeedRowSnapshot } from './services/sessions-feed-rpc.js';
 import { listCodexSubagents, resolveCodexSubagentTranscript } from './services/conversation/codex-subagents.js';
-import { startSubagentListPolling, subagentTranscriptPath, type SubagentListPoller } from './services/conversation/subagents.js';
+import { startSubagentListPolling, subagentTranscriptPath } from './services/conversation/subagents.js';
+
+import { sharedTranscriptParser } from './services/shared-transcript-parser.js';
+import { streamResolvedFullParseSnapshots } from './services/full-parse-stream.js';
+export { streamResolvedFullParseSnapshots } from './services/full-parse-stream.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -97,184 +100,6 @@ export function conversationDiscoveringStream(): Stream.Stream<ConversationEvent
   );
 }
 
-/**
- * Watch and emit full transcript snapshots for harnesses without incremental parsing.
- * Path resolution, file watching, debounce state, and event emission stay on the main
- * thread. Callers supply a parser callback that sends CPU-bound parsing through the
- * dashboard DB worker's parse lane via the job door.
- */
-export function streamResolvedFullParseSnapshots(
-  resolve: () => Promise<string | null>,
-  parse: (file: string) => Promise<ParseResult>,
-  model: string | null,
-  // When true, "no transcript file resolved yet" is treated as an EMPTY (ready)
-  // conversation rather than a still-discovering one. Interactive pi/codex
-  // conversations write no transcript until their first turn, so a brand-new
-  // one that is alive and simply waiting for the user's first message would
-  // otherwise sit on "Discovering conversation…" forever. resolve() returns
-  // null ONLY when no transcript exists on disk (a resumed conversation already
-  // has its file), so emitting an empty snapshot here never blanks real history.
-  unresolvedMeansEmpty = false,
-  discoverSubagents = false,
-): Stream.Stream<ConversationEvent, PanRpcError> {
-  return Stream.callback<ConversationEvent, PanRpcError>((queue) =>
-    Effect.acquireRelease(
-      Effect.promise(async () => {
-        let subagentPoller: SubagentListPoller | null = null;
-        let latestWorkLog: ParseResult['workLog'] = [];
-        let stopped = false;
-        let resolving = false;
-        let discoveryTimer: ReturnType<typeof setInterval> | null = null;
-        let debounce: ReturnType<typeof setTimeout> | null = null;
-        let watcher: ReturnType<typeof fsWatch> | null = null;
-        let parsing = false;
-        let pendingReparse = false;
-        let sessionFile: string | null = null;
-        // Whether we've already emitted the empty/ready snapshot for an
-        // unresolved interactive conversation, so the 2s discovery poll doesn't
-        // re-offer it on every tick.
-        let announcedEmpty = false;
-        // Lock onto a transcript only once we've actually parsed content from it.
-        // A brand-new pi/codex conversation can briefly resolve to an empty
-        // placeholder transcript while the real session is written under a
-        // different (session-id) filename. The old code stopped discovery at the
-        // FIRST resolved file and tailed that empty file forever — so the panel
-        // showed the empty "How can I help you?" state until a manual refresh
-        // re-subscribed. We keep re-resolving (and switch to the newest file)
-        // until content appears, which also covers a watcher that misses appends.
-        let hasContent = false;
-
-        const stopDiscovery = () => {
-          if (discoveryTimer) { clearInterval(discoveryTimer); discoveryTimer = null; }
-        };
-
-        const offer = (event: ConversationEvent) => {
-          try {
-            Queue.offerUnsafe(queue, event);
-          } catch {
-            // Queue shut down (client disconnected) — ignore.
-          }
-        };
-
-        const emit = async (): Promise<void> => {
-          if (!sessionFile || stopped) return;
-          if (parsing) { pendingReparse = true; return; }
-          parsing = true;
-          try {
-            const result = await parse(sessionFile);
-            if (stopped) return;
-            latestWorkLog = result.workLog;
-            if (result.messages.length > 0 && !hasContent) {
-              // Real content arrived — lock onto this file and stop polling.
-              hasContent = true;
-              stopDiscovery();
-            }
-            offer({
-              kind: 'messages' as const,
-              messages: result.messages,
-              workLog: result.workLog,
-              streaming: result.streaming,
-              snapshot: true,
-              proposedPlan: result.proposedPlan,
-              compactBoundaries:
-                result.compactBoundaries && result.compactBoundaries.length > 0
-                  ? result.compactBoundaries
-                  : undefined,
-              contextUsage: contextUsageFromParseResult(result, model),
-            });
-            if (discoverSubagents) {
-              if (subagentPoller) await subagentPoller.refresh();
-              else {
-                const file = sessionFile;
-                subagentPoller = await startSubagentListPolling(file, () => new Set(), offer,
-                  () => listCodexSubagents(file, latestWorkLog));
-                if (stopped) subagentPoller.stop();
-              }
-            }
-          } catch {
-            // Transient parse failure (read during a write) — the next change
-            // event re-parses cleanly.
-          } finally {
-            parsing = false;
-            if (pendingReparse) { pendingReparse = false; void emit(); }
-          }
-        };
-
-        const watchFile = (file: string) => {
-          try {
-            watcher = fsWatch(file, () => {
-              if (debounce) return;
-              debounce = setTimeout(() => { debounce = null; void emit(); }, 300);
-            });
-          } catch {
-            // If the watcher can't attach, the discovery poll still re-parses.
-          }
-        };
-
-        const tryResolve = async (): Promise<void> => {
-          if (stopped || resolving || hasContent) return;
-          resolving = true;
-          try {
-            const resolved = await resolve();
-            if (!resolved) {
-              // No transcript on disk yet. For an interactive conversation that
-              // means it is brand-new and waiting for its first turn — show the
-              // ready (empty) state like claude-code, not an endless
-              // "Discovering…" spinner. Emit once; keep polling so the first
-              // turn's transcript switches us to showing real content.
-              if (unresolvedMeansEmpty) {
-                if (!sessionFile && !announcedEmpty) {
-                  announcedEmpty = true;
-                  offer({ kind: 'messages', messages: [], workLog: [], streaming: false, snapshot: true });
-                }
-                return;
-              }
-              // Only announce "discovering" before we've ever resolved a file, so
-              // we don't blank an already-shown (empty) snapshot.
-              if (!sessionFile) offer({ kind: 'discovering' });
-              return;
-            }
-            if (resolved !== sessionFile) {
-              // First resolution, or a newer transcript appeared — point the
-              // watcher at it and re-parse.
-              if (watcher) { try { watcher.close(); } catch { /* ignore */ } watcher = null; }
-              subagentPoller?.stop();
-              subagentPoller = null;
-              sessionFile = resolved;
-              await emit();
-              if (!stopped) watchFile(resolved);
-            } else {
-              // Same (still-empty) file resolved — re-parse in case it grew
-              // without firing a watch event (some FS/watch combos miss appends).
-              await emit();
-            }
-          } finally {
-            resolving = false;
-          }
-        };
-
-        await tryResolve();
-        if (!hasContent) {
-          // Keep polling until the transcript has real content. Cheap readdir+stat
-          // every 2s; self-stops via stopDiscovery() the moment content is parsed.
-          discoveryTimer = setInterval(() => { void tryResolve(); }, 2000);
-        }
-
-        return {
-          stop: () => {
-            stopped = true;
-            subagentPoller?.stop();
-            if (discoveryTimer) { clearInterval(discoveryTimer); discoveryTimer = null; }
-            if (debounce) { clearTimeout(debounce); debounce = null; }
-            if (watcher) { try { watcher.close(); } catch { /* ignore */ } }
-          },
-        };
-      }),
-      (handle) => Effect.sync(() => handle.stop()),
-    ),
-  );
-}
-
 type FullParseSnapshotStream = Stream.Stream<ConversationEvent, PanRpcError>;
 
 export function streamHarnessFullParseSnapshots(
@@ -295,27 +120,27 @@ export function streamHarnessFullParseSnapshots(
   switch (behavior.transcriptKind) {
     case 'ohmypi-jsonl': return streamResolved(
       () => resolvePiSessionPath(sessionName),
-      file => runDashboardDbJob('parseTranscriptSnapshot', { sessionFile: file, parser: harness === 'pi' ? 'pi' : 'ohmypi' }),
+      sharedTranscriptParser(harness === 'pi' ? 'pi' : 'ohmypi'),
     );
     case 'codex-rollout-jsonl': return streamResolvedFullParseSnapshots(
       async () => {
         const parent = await resolveCodexRolloutPath(sessionName);
         return parent && agentId !== undefined ? resolveCodexSubagentTranscript(parent, agentId) : parent;
       },
-      file => runDashboardDbJob('parseTranscriptSnapshot', { sessionFile: file, parser: 'codex' }),
+      sharedTranscriptParser('codex'),
       model, unresolvedMeansEmpty, agentId === undefined,
     );
     case 'acp-jsonl': return streamResolved(
       () => resolveAcpTranscriptPath(sessionName),
-      file => runDashboardDbJob('parseTranscriptSnapshot', { sessionFile: file, parser: 'acp' }),
+      sharedTranscriptParser('acp'),
     );
     case 'muse-jsonl': return streamResolved(
       () => resolveMuseSessionPath(sessionName),
-      file => runDashboardDbJob('parseTranscriptSnapshot', { sessionFile: file, parser: 'muse' }),
+      sharedTranscriptParser('muse'),
     );
     case 'kimi-wire-jsonl': return streamResolved(
       () => resolveKimiWirePath(sessionName, workspace ? { workspaceOverride: workspace } : {}),
-      file => runDashboardDbJob('parseTranscriptSnapshot', { sessionFile: file, parser: 'kimi' }),
+      sharedTranscriptParser('kimi'),
     );
     default: return null;
   }
@@ -379,7 +204,7 @@ export function filterDomainEventForIssue(event: DomainEvent, issueId: string, a
   // global store's full dataset, causing every issue-dependent component to
   // re-render with incomplete data. The full bulk updates arrive via
   // subscribeDomainEvents instead.
-  if (event.type === 'issues.snapshot' || event.type === 'activity.updated') {
+  if (event.type === 'issues.snapshot' || event.type === 'issues.delta' || event.type === 'activity.updated') {
     return null;
   }
 

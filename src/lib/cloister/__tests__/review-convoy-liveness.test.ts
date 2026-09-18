@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   getAgentEffectiveLastActivityMs: vi.fn(),
 }));
 
-vi.mock('../agent-idle.js', () => ({
+vi.mock('../../agents/liveness.js', () => ({
   getAgentEffectiveLastActivityMs: mocks.getAgentEffectiveLastActivityMs,
 }));
 

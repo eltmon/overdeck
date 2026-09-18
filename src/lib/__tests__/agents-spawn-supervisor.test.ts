@@ -17,6 +17,7 @@ let prepareHarnessLaunchMock: ReturnType<typeof vi.fn>;
 let emitAgentEventMock: ReturnType<typeof vi.fn>;
 let ensureLifecycleHooksMock: ReturnType<typeof vi.fn>;
 let deliverAgentMessageMock: ReturnType<typeof vi.fn>;
+let deliverInitialPromptWithRetryMock: ReturnType<typeof vi.fn>;
 let waitForPromptReadyMock: ReturnType<typeof vi.fn>;
 let stopAgentMock: ReturnType<typeof vi.fn>;
 let shouldPreservePipelineVerdictsMock: ReturnType<typeof vi.fn>;
@@ -55,6 +56,7 @@ function mockSpawnDependencies(): void {
   emitAgentEventMock = vi.fn(() => Effect.succeed(true));
   ensureLifecycleHooksMock = vi.fn(async () => undefined);
   deliverAgentMessageMock = vi.fn(async () => ({ ok: true, path: 'acp' }));
+  deliverInitialPromptWithRetryMock = vi.fn(async () => ({ ok: true, path: 'supervisor' }));
   waitForPromptReadyMock = vi.fn(async () => true);
   stopAgentMock = vi.fn(() => Effect.void);
   shouldPreservePipelineVerdictsMock = vi.fn(async () => ({
@@ -90,6 +92,7 @@ function mockSpawnDependencies(): void {
   vi.doMock('../agents/delivery.js', async (importOriginal) => ({
     ...((await importOriginal()) as typeof import('../agents/delivery.js')),
     deliverAgentMessage: deliverAgentMessageMock,
+    deliverInitialPromptWithRetry: (...args: unknown[]) => deliverInitialPromptWithRetryMock(...args),
   }));
   vi.doMock('../agents/runtime-command.js', async (importOriginal) => ({
     ...((await importOriginal()) as typeof import('../agents/runtime-command.js')),
@@ -705,18 +708,18 @@ describe('spawnAgent PTY supervisor wiring', () => {
     );
   });
 
-  it('stops and rejects a non-flywheel ACP role when its initial prompt fails', async () => {
+  it.each(['acp', 'opencode'] as const)('stops and rejects a %s role when its initial prompt fails', async (harness) => {
     deliverAgentMessageMock.mockRejectedValueOnce(new Error('provider rejected prompt'));
     const { spawnRun } = await import('../agents.js');
 
     await expect(spawnRun('PAN-1405', 'review', {
       workspace,
-      model: 'kimi-k2.6',
-      harness: 'acp',
+      model: harness === 'opencode' ? 'opencode/kimi-k3' : 'kimi-k2.6',
+      harness,
       prompt: 'review the change',
     })).rejects.toThrow('Agent agent-pan-1405-review kickoff delivery failed: provider rejected prompt');
 
-    expect(waitForPromptReadyMock).toHaveBeenCalledWith('agent-pan-1405-review', 'acp', 30);
+    expect(waitForPromptReadyMock).toHaveBeenCalledWith('agent-pan-1405-review', harness, 30);
     expect(stopAgentMock).toHaveBeenCalledWith('agent-pan-1405-review');
     const persisted = JSON.parse(
       readFileSync(join(tmpHome, 'agents', 'agent-pan-1405-review', 'state.json'), 'utf8'),
@@ -890,9 +893,10 @@ describe('Muse lifecycle review regressions', () => {
     writeSupervisorArtifact();
     waitForPromptReadyMock.mockResolvedValue(ready);
     const { saveAgentStateSync } = await import('../agents/agent-state.js');
-    const delivery = await import('../agents/delivery.js');
-    const kickoff = vi.spyOn(delivery, 'deliverInitialPromptWithRetry').mockResolvedValue({ ok: true, path: 'supervisor' });
-    const { recoverAgent } = await import('../agents/recovery.js');
+    deliverInitialPromptWithRetryMock.mockResolvedValue({ ok: true, path: 'supervisor' });
+    const kickoff = deliverInitialPromptWithRetryMock;
+    const recMod = await import('../agents/recovery.js');
+    const { recoverAgent } = recMod;
     const { museDataHome } = await import('../runtimes/muse-session.js');
     const state = baseState({ harness: 'muse', model: 'muse-spark-1.3-contributor', status: 'stopped' });
     saveAgentStateSync(state);

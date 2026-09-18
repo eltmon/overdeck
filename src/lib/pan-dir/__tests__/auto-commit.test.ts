@@ -5,7 +5,7 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 import { vi } from 'vitest';
-import { __testInternals, deriveProjectRoot, flushAllPendingAutoCommits, flushAutoCommits, queueAutoCommit, reconcileStatePlaneDrift } from '../auto-commit.js';
+import { __testInternals, commitAutoCommits, deriveProjectRoot, flushAllPendingAutoCommits, flushAutoCommits, queueAutoCommit, reconcileStatePlaneDrift } from '../auto-commit.js';
 
 function exec(root: string, command: string): string {
   return execSync(command, { cwd: root, encoding: 'utf-8' }).trim();
@@ -129,6 +129,50 @@ describe('auto-commit', () => {
     const [firstResult, secondResult] = await Promise.all([first, second]);
     expect(firstResult.committed).toBe(true);
     expect(secondResult).toEqual(firstResult);
+  });
+
+  it('a deferred flush awaits only the commit phase, not another flush push tail (PAN-3848 F2)', async () => {
+    // Fixture: a pre-push hook that blocks until the test releases it, so the
+    // first (non-deferred) flush parks in its push phase.
+    const readyPath = join(tmp, '.git', 'pre-push-ready');
+    const hookPath = join(tmp, '.git', 'hooks', 'pre-push');
+    writeFileSync(hookPath, `#!/bin/sh\nwhile [ ! -f '${readyPath}' ]; do sleep 0.1; done\n`);
+    chmodSync(hookPath, 0o755);
+
+    mkdirSync(join(tmp, '.pan', 'records'), { recursive: true });
+    const firstPath = join(tmp, '.pan', 'records', 'pan-first.json');
+    writeFileSync(firstPath, '{"writer":"first"}');
+    queueAutoCommit({ projectRoot: tmp, paths: [firstPath], subject: 'chore(state): first write', defer: true });
+    let firstSettled = false;
+    const first = Effect.runPromise(flushAutoCommits(tmp)).then(
+      (result) => { firstSettled = true; return result; },
+      (error) => { firstSettled = true; throw error; },
+    );
+
+    try {
+      // Wait for the first flush's commit to land (it is now parked in push).
+      await vi.waitFor(() => {
+        expect(execSync('git log --oneline -1', { cwd: tmp, encoding: 'utf-8' })).toContain('chore(state): first write');
+      }, { timeout: 10_000 });
+
+      const secondPath = join(tmp, '.pan', 'records', 'pan-second.json');
+      writeFileSync(secondPath, '{"writer":"second"}');
+      queueAutoCommit({ projectRoot: tmp, paths: [secondPath], subject: 'chore(state): second write', defer: true });
+      const second = await Effect.runPromise(commitAutoCommits(tmp));
+
+      expect(second.committed).toBe(true);
+      expect(execSync('git log --oneline -1', { cwd: tmp, encoding: 'utf-8' })).toContain('chore(state): second write');
+      // The first flush is STILL parked in its push — the deferred wait did
+      // not sit behind the network tail. (On the old code this hangs: the
+      // deferred flushPromise awaited the full active flush promise.)
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      expect(firstSettled).toBe(false);
+    } finally {
+      writeFileSync(readyPath, 'go');
+    }
+
+    const firstResult = await first;
+    expect(firstResult.pushed).toBe(true);
   });
 
   it.effect('flushes every project root targeting the requested Git root', () =>
@@ -794,5 +838,71 @@ describe('deriveProjectRoot', () => {
 
   it('returns null for unrelated paths', () => {
     expect(deriveProjectRoot('/work/myproj/src/lib/foo.ts')).toBeNull();
+  });
+});
+
+describe('pushWithRetry', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('retries lock-ref rejections and succeeds on the third attempt', async () => {
+    let calls = 0;
+    const promise = __testInternals.pushWithRetry(async () => {
+      calls++;
+      return calls < 3
+        ? { ok: false, message: "error: cannot lock ref 'refs/heads/overdeck-state': is at abc but expected def" }
+        : { ok: true };
+    });
+    await vi.advanceTimersByTimeAsync(500);
+    await vi.advanceTimersByTimeAsync(1500);
+    const result = await promise;
+
+    expect(result).toEqual({ pushed: true });
+    expect(calls).toBe(3);
+  });
+
+  it('does not retry a non-fast-forward rejection (origin really advanced)', async () => {
+    let calls = 0;
+    const promise = __testInternals.pushWithRetry(async () => {
+      calls++;
+      return { ok: false, message: " ! [rejected]        overdeck-state -> overdeck-state (non-fast-forward)\nerror: failed to push some refs to 'origin'" };
+    });
+    const result = await promise;
+
+    expect(result.pushed).toBe(false);
+    expect(calls).toBe(1);
+  });
+
+  it('does not retry a non-retryable failure', async () => {
+    let calls = 0;
+    const promise = __testInternals.pushWithRetry(async () => {
+      calls++;
+      return { ok: false, message: 'Permission denied (publickey)' };
+    });
+    const result = await promise;
+
+    expect(result).toEqual({ pushed: false, reason: 'push failed: Permission denied (publickey)' });
+    expect(calls).toBe(1);
+  });
+
+  it('gives up after four attempts and reports the last reason', async () => {
+    let calls = 0;
+    const promise = __testInternals.pushWithRetry(async () => {
+      calls++;
+      return { ok: false, message: `error: cannot lock ref 'refs/heads/overdeck-state' (rejection ${calls})` };
+    });
+    await vi.advanceTimersByTimeAsync(5000);
+    const result = await promise;
+
+    expect(result).toEqual({
+      pushed: false,
+      reason: "push failed: error: cannot lock ref 'refs/heads/overdeck-state' (rejection 4)",
+    });
+    expect(calls).toBe(4);
   });
 });

@@ -287,7 +287,6 @@ describe('PAN-1908 backfill isolation (AC-2)', () => {
       'function resolveAgentTargetSync',
       'function autoResumeStoppedWorkAgents',
       'function recoverOrphanedAgents',
-      'function nudgeStalledResumeWorkAgents',
       'function nudgeIdleWorkAgentsWithOpenTasks',
       'function checkOrphanedReviewStatuses',
       'function checkMissingReviewStatuses',

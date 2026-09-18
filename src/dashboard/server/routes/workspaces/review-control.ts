@@ -291,6 +291,8 @@ export function processUnstickRequest(
     stuckAt: undefined,
     stuckDetails: undefined,
     reviewedAtCommit: undefined,
+    // PAN-3847: the lifecycle reset also clears the stale-review marker.
+    reviewStaleSince: undefined,
     // PAN-794: unstick opens a fresh recovery cycle — arm the breaker budget
     // again so legitimate transient failures don't inherit prior cycle counts.
     reviewRetryCount: 0,

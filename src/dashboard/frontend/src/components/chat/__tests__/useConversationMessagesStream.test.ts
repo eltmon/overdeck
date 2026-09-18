@@ -201,3 +201,33 @@ describe('shouldStreamConversationMessages', () => {
     expect(shouldStreamConversationMessages({ id: -1, name: 'agent-pan-1', sessionAlive: true, harness: 'ohmypi' })).toBe(true);
   });
 });
+
+describe('full parser delta no-loss audit', () => {
+  it('retains all history and tool fields while applying metadata-only updates and plan removal', () => {
+    const initial = applyConversationMessagesEvent(undefined, {
+      kind: 'messages', snapshot: true, metadataSnapshot: true, streaming: true, totalCost: 1,
+      messages: [{ id: 'user', role: 'user', text: 'Original prompt', createdAt: '2026-09-09' }],
+      workLog: [{ id: 'tool', label: 'Shell', tone: 'error', createdAt: '2026-09-09', command: 'pwd', result: 'Full error output' }],
+      proposedPlan: { id: 'plan', plan: 'Do the work', status: 'pending', createdAt: '2026-09-09' },
+      compactBoundaries: [{ id: 'compact', timestamp: '2026-09-09', trigger: 'auto' }],
+      contextUsage: { activeBytes: 100, estimatedTokens: 25, contextWindow: 1000, percentUsed: 2.5 },
+    });
+    const updated = applyConversationMessagesEvent(initial, {
+      kind: 'messages', snapshot: false, metadataSnapshot: true, streaming: false, totalCost: 2,
+      messages: [], workLog: [], compactBoundaries: [], contextUsage: null,
+    });
+    expect(updated.messages).toEqual(initial.messages);
+    expect(updated.workLog).toEqual(initial.workLog);
+    expect(updated).toMatchObject({ totalCost: 2, streaming: false, contextUsage: null, compactBoundaries: [] });
+    expect(updated.proposedPlan).toBeUndefined();
+  });
+
+  it('replaces history only when a smaller snapshot carries a confirmed reset', () => {
+    const initial = { messages: [{ id: 'old', role: 'user' as const, text: 'Old', createdAt: '2026-09-09' }],
+      workLog: [{ id: 'tool', label: 'Shell', tone: 'tool' as const, createdAt: '2026-09-09' }], streaming: false };
+    const snapshot = { kind: 'messages' as const, snapshot: true, streaming: false, messages: [], workLog: [] };
+    expect(applyConversationMessagesEvent(initial, snapshot).messages).toEqual(initial.messages);
+    expect(applyConversationMessagesEvent(initial, { ...snapshot, reset: true }))
+      .toMatchObject({ messages: [], workLog: [] });
+  });
+});

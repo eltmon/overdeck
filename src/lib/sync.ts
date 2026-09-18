@@ -21,17 +21,11 @@ import { planHooksSyncSync, syncHooksSync, type HookItem, type HooksSyncResult }
 import {
   ensureGlobalLayer,
   renderGlobalLayer,
-  renderProjectLayer,
-  applyManagedRegion,
-  hasManagedRegion,
-  cleanLegacyBeadsTargetSync,
-  type LegacyBeadsCleanup,
   piGlobalContextFile,
   codexGlobalContextFile,
+  claudeGlobalContextFile,
   primeAgentGlobalContextFile,
 } from './context-layers/index.js';
-import { backupFileSync, createBackupTimestamp } from './backup.js';
-import { writeRenderedGlobalContext } from './context-layers/rendered-global.js';
 export { isStartupSyncNeededSync, writeSyncManifestSync } from './sync-startup-gate.js';
 export interface SyncItem {
   name: string;
@@ -277,13 +271,15 @@ export function refreshCacheSync(): RefreshCacheResult {
 
   // Copy agent definitions from repo to cache.
   //
-  // PAN-982: This pass deploys both Claude Code subagent definitions
-  // (codebase-explorer, planning-agent, triage-agent, health-monitor — used by
-  // the in-session Agent tool) and the Overdeck pipeline agents
-  // (pan-work-agent, pan-planning-agent, pan-review-agent, pan-test-agent,
+  // PAN-982: This pass deploys the Overdeck pipeline agent definitions
+  // (no ad-hoc Claude Code subagents ship here any more — roles use the
+  // built-in `Explore` / `general-purpose` types, see docs/ROLES.md)
+  // (pan-work-agent, pan-review-agent, pan-test-agent,
   // pan-inspect-agent, pan-uat-agent, pan-merge-agent — used by `claude --agent
   // pan-<type>-agent` when Cloister spawns the work/review/test/inspect/uat/
-  // merge processes).
+  // merge processes). Planning is not among them: Cloister launches the
+  // planner with the role file `roles/plan.md` (see runtime-command.ts), not
+  // an agent definition.
   //
   // Both kinds live side by side in the repo's `agents/` directory and both get
   // mirrored into ~/.overdeck/agent-definitions/ here, then on to
@@ -308,7 +304,6 @@ export function refreshCacheSync(): RefreshCacheResult {
     // discovering it when a work/review/test/inspect/uat/merge spawn fails.
     const REQUIRED_PIPELINE_AGENTS = [
       'pan-work-agent.md',
-      'pan-planning-agent.md',
       'pan-review-agent.md',
       'pan-test-agent.md',
       'pan-inspect-agent.md',
@@ -551,84 +546,57 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
   return result;
 }
 
-export interface ContextFirstInjection {
-  file: string;
-  backupPath: string;
-}
-
 export interface ContextLayerSyncResult {
-  /** True when ~/.claude/CLAUDE.md's managed region was written this run. */
-  globalWritten: boolean;
+  /** True when ~/.overdeck/context/claude-global.md was written this run. */
+  claudeGlobalWritten: boolean;
   /** True when global.md did not exist and a starter template was seeded. */
   globalStubCreated: boolean;
-  /** Names of registered projects whose CLAUDE.md/AGENTS.md was written this run. */
-  projectsWritten: string[];
   /** True when ~/.overdeck/context/pi-global.md was written this run. */
   piGlobalWritten: boolean;
   /** True when ~/.overdeck/context/codex-global.md was written this run. */
   codexGlobalWritten: boolean;
+  /** True when ~/.overdeck/context/prime-agent-global.md was written this run. */
   primeAgentGlobalWritten: boolean;
-  firstInjections: ContextFirstInjection[];
-  legacyBeadsCleanups: LegacyBeadsCleanup[];
   errors: string[];
 }
 
 /**
- * Write a managed region into `targetFile`, preserving any hand-authored
- * content outside the markers. Returns true when the file changed. The first
- * time a region is injected into a non-empty file with no existing region, the
- * file is backed up first and recorded in `result.firstInjections`.
+ * Write an Overdeck-owned render artifact when its content changed.
  */
-function writeManagedTargetSync(
+function writeContextArtifactSync(
   targetFile: string,
-  managed: string,
-  result: ContextLayerSyncResult,
-  backupTimestamp: string,
+  content: string,
 ): boolean {
   const existing = existsSync(targetFile) ? readFileSync(targetFile, 'utf-8') : '';
-  const next = applyManagedRegion(existing, managed);
+  const next = content.trim() + '\n';
   if (next === existing) return false;
-  if (existing.trim().length > 0 && !hasManagedRegion(existing)) {
-    const backupPath = backupFileSync(targetFile, backupTimestamp);
-    if (backupPath) result.firstInjections.push({ file: targetFile, backupPath });
-  }
   mkdirSync(dirname(targetFile), { recursive: true });
   writeFileSync(targetFile, next, 'utf-8');
   return true;
 }
 
 /**
- * Render the global and project context layers into harness CLAUDE.md files.
- *
- * PAN-1201: the layered-context half of `pan sync`. The global layer
- * (~/.overdeck/context/global.md + the folded bundled rules) renders into
- * the managed region of ~/.claude/CLAUDE.md; each registered project's
- * `.pan/context/project.md` renders into the managed region of its own
- * CLAUDE.md. Content outside the managed region is preserved untouched, so a
- * hand-authored CLAUDE.md is never clobbered.
+ * Render harness-specific global context into Overdeck-owned artifacts.
+ * Native harness instruction files are user-owned and are never inspected or
+ * changed by this path. Canonical project context is rendered and combined with
+ * workspace context at managed-session launch.
  */
 export function syncContextLayersSync(): ContextLayerSyncResult {
   const result: ContextLayerSyncResult = {
-    globalWritten: false,
+    claudeGlobalWritten: false,
     globalStubCreated: false,
-    projectsWritten: [],
     piGlobalWritten: false,
     codexGlobalWritten: false,
     primeAgentGlobalWritten: false,
-    firstInjections: [],
-    legacyBeadsCleanups: [],
     errors: [],
   };
-  // One backup dir for every first-injection this run.
-  const backupTimestamp = createBackupTimestamp();
 
-  // Global layer → ~/.claude/CLAUDE.md
+  // Global layer → Overdeck-owned Claude launch artifact.
   result.globalStubCreated = ensureGlobalLayer();
   try {
     const managed = renderGlobalLayer('claude-code', isDevMode());
-    const claudeMd = join(CLAUDE_DIR, 'CLAUDE.md');
-    if (writeManagedTargetSync(claudeMd, managed, result, backupTimestamp)) {
-      result.globalWritten = true;
+    if (writeContextArtifactSync(claudeGlobalContextFile(), managed)) {
+      result.claudeGlobalWritten = true;
     }
   } catch (err: any) {
     result.errors.push(`global: ${err?.message ?? err}`);
@@ -638,56 +606,40 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
   try {
     const piManaged = renderGlobalLayer('ohmypi', isDevMode());
     const piGlobalFile = piGlobalContextFile();
-    result.piGlobalWritten = writeRenderedGlobalContext(piGlobalFile, piManaged);
+    if (writeContextArtifactSync(piGlobalFile, piManaged)) {
+      result.piGlobalWritten = true;
+    }
   } catch (err: any) {
     result.errors.push(`pi-global: ${err?.message ?? err}`);
   }
 
-  // PAN-1574: Global layer → ~/.overdeck/context/codex-global.md.
+  // PAN-1574: Global layer → ~/.overdeck/context/codex-global.md
+  // This artifact is passed as developer instructions when Overdeck launches Codex.
   try {
     const codexManaged = renderGlobalLayer('codex', isDevMode());
     const codexGlobalFile = codexGlobalContextFile();
-    result.codexGlobalWritten = writeRenderedGlobalContext(codexGlobalFile, codexManaged);
+    if (writeContextArtifactSync(codexGlobalFile, codexManaged)) {
+      result.codexGlobalWritten = true;
+    }
   } catch (err: any) {
     result.errors.push(`codex-global: ${err?.message ?? err}`);
   }
 
+  // PAN-3668: Global layer → ~/.overdeck/context/prime-agent-global.md.
+  // Injected into the Prime Agent root RPC session's supplemental system prompt
+  // at spawn; Overdeck never writes ~/.prime/agent.
   try {
     const managed = renderGlobalLayer('prime-agent', isDevMode());
     const file = primeAgentGlobalContextFile();
-    result.primeAgentGlobalWritten = writeRenderedGlobalContext(file, managed);
+    if (writeContextArtifactSync(file, managed)) {
+      result.primeAgentGlobalWritten = true;
+    }
   } catch (err: any) {
     result.errors.push(`prime-agent-global: ${err?.message ?? err}`);
   }
 
   // PAN-1837 (D6): kimi-code intentionally gets no dedicated global render file here —
   // it reads the shared AGENTS.md layer natively via ~/.agents/skills discovery, same as acp.
-  // PAN-1837 review fix: AGENTS.md itself must therefore render as the UNION of every
-  // harness that reads it (ohmypi + kimi-code), not ohmypi alone — rendering for 'ohmypi'
-  // in isolation stripped every span authored only under {{#harness:kimi-code}}.
-
-  // Clean stale agent instructions in every project; Beads itself remains installed.
-  for (const { config } of listProjectsSync()) {
-    if (!existsSync(config.path)) continue;
-    try {
-      let wrote = false;
-      for (const name of ['CLAUDE.md', 'AGENTS.md']) {
-        const cleanup = cleanLegacyBeadsTargetSync(join(config.path, name), backupTimestamp);
-        if (cleanup) result.legacyBeadsCleanups.push(cleanup);
-      }
-      const claudeManaged = renderProjectLayer(config.path, 'claude-code');
-      const piManaged = renderProjectLayer(config.path, ['ohmypi', 'kimi-code']);
-      if (claudeManaged) {
-        wrote = writeManagedTargetSync(join(config.path, 'CLAUDE.md'), claudeManaged, result, backupTimestamp) || wrote;
-      }
-      if (piManaged) {
-        wrote = writeManagedTargetSync(join(config.path, 'AGENTS.md'), piManaged, result, backupTimestamp) || wrote;
-      }
-      if (wrote) result.projectsWritten.push(config.name);
-    } catch (err: any) {
-      result.errors.push(`${config.name}: ${err?.message ?? err}`);
-    }
-  }
 
   return result;
 }

@@ -104,11 +104,29 @@ describe('skills-merge', () => {
       const result = mergeSkillsIntoWorkspaceSync(workspacePath);
 
       expect(result.pruned).toEqual([]);
-      expect(result.keptModified).toEqual([modifiedRelativePath]);
+      expect(result.keptModified).toEqual([]);
       expect(readFileSync(modifiedPath, 'utf-8')).toBe('user modified\n');
       expect(readFileSync(userPath, 'utf-8')).toBe('user skill\n');
-      expect(JSON.parse(readFileSync(manifestPath, 'utf-8')).installed).toEqual({});
+      expect(JSON.parse(readFileSync(manifestPath, 'utf-8')).installed[modifiedRelativePath]).toBeDefined();
     });
+  });
+
+  it('never copies or prunes native instructions while continuing to copy skills', () => {
+    const workspace = join(testDir, 'workspace');
+    write(join(cacheDirs.rules, 'new.md'), 'generated rule');
+    write(join(cacheDirs.skills, 'sample', 'SKILL.md'), 'skill');
+    const target = join(workspace, '.claude', 'rules', 'old.md');
+    write(target, 'historical rule');
+    write(join(workspace, '.claude', '.overdeck-manifest.json'), JSON.stringify({
+      version: 1, managed_by: 'overdeck', installed: {
+        'rules/old.md': { hash: hash('historical rule'), source: 'overdeck', installed_at: '' },
+      },
+    }));
+    const result = mergeSkillsIntoWorkspaceSync(workspace);
+    expect(readFileSync(target, 'utf8')).toBe('historical rule');
+    expect(existsSync(join(workspace, '.claude', 'rules', 'new.md'))).toBe(false);
+    expect(readFileSync(join(workspace, '.claude', 'skills', 'sample', 'SKILL.md'), 'utf8')).toBe('skill');
+    expect(result.pruned).toEqual([]);
   });
 
   describe('cleanupGitignore', () => {

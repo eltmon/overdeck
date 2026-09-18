@@ -12,10 +12,9 @@ import type { MemoryIdentity } from '@overdeck/contracts';
 import { getClaudePermissionFlagsStringSync } from '../claude-permissions.js';
 import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import type { RoleEffort } from '../config-yaml.js';
-import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
-import { workspaceContextFile } from '../context-layers/layers.js';
 import { materializeAcpContextFile } from '../acp/context.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
+import { findAgentRuntimePidInSubtree } from './runtime-pid-probe.js';
 import { initCodexHome } from '../runtimes/codex.js';
 import { createOhmypiFifo, ohmypiFifoPaths, OhmypiNotReady, writeOhmypiCommandSync } from '../runtimes/ohmypi-fifo.js';
 import { createPiFifo, piFifoPaths, PiNotReady, writePiCommandSync } from '../runtimes/pi-fifo.js';
@@ -90,83 +89,19 @@ export async function writeLauncherScriptAtomic(launcherScript: string, content:
   await renameAsync(tmp, launcherScript);
 }
 
-export async function claudeSystemPromptFiles(workspace: string, harness: RuntimeName | undefined): Promise<string[]> {
-  const behavior = getHarnessBehavior(harness);
-  if (behavior.contextLayerKind === 'acp' || behavior.contextLayerKind === 'muse') {
-    return [];
-  }
-
-  const files: string[] = [];
-  const contextFile = workspaceContextFile(workspace);
-  try {
-    await statAsync(contextFile);
-    files.push(contextFile);
-  } catch (error) {
-    if (!isNodeNotFound(error)) throw error;
-  }
-  files.push(await ensureSessionContextBriefingFile());
-
-  // PAN-1566: ohmypi also receives the rendered global context layer.
-  if (behavior.contextLayerKind === 'pi') {
-    const { piGlobalContextFile } = await import('../context-layers/index.js');
-    const globalFile = piGlobalContextFile();
-    if (existsSync(globalFile)) {
-      files.unshift(globalFile);
-    }
-  }
-
-  // PAN-1574: Codex receives its rendered global context layer (codex-global.md).
-  if (behavior.contextLayerKind === 'codex') {
-    const { codexGlobalContextFile } = await import('../context-layers/index.js');
-    const globalFile = codexGlobalContextFile();
-    if (existsSync(globalFile)) {
-      files.unshift(globalFile);
-    }
-  }
-
-  return files;
-}
+export { claudeSystemPromptFiles } from '../context-layers/launch-sources.js';
 
 function isNodeNotFound(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
 }
 
 /**
- * BFS-walk a process subtree rooted at `rootPid` looking for the active agent
- * runtime. Returns true if any process in the tree matches the expected harness,
- * false if the tree exists but no match, false on any error.
- *
- * Used by sendAgentMessage zombie detection. pane_pid is the tmux pane's root
- * process, which is bash for work-agent launchers (`bash launcher.sh`) but can
- * be the runtime directly for specialists (`exec claude ...` / `exec pi ...`).
+ * True when the pane's process subtree contains the expected harness runtime.
+ * The walk lives in runtime-pid-probe.ts (PAN-3849) so the liveness oracle and
+ * its no-loss audit share one mockable boundary.
  */
 export async function hasAgentRuntimeInSubtree(rootPid: string, harness: RuntimeName = 'claude-code'): Promise<boolean> {
-  const expectedProcessNames = new Set(getHarnessBehavior(harness).processNames);
-  const queue: string[] = [rootPid];
-  const seen = new Set<string>();
-  while (queue.length > 0) {
-    const pid = queue.shift()!;
-    if (seen.has(pid) || !/^\d+$/.test(pid)) continue;
-    seen.add(pid);
-
-    try {
-      const { stdout: comm } = await execAsync(`ps -p ${pid} -o comm=`);
-      const name = comm.trim();
-      if (expectedProcessNames.has(name) || (harness === 'muse' && name.startsWith('muse-bin-'))) return true;
-    } catch {
-      continue;
-    }
-
-    try {
-      const { stdout: kids } = await execAsync(`pgrep -P ${pid}`);
-      for (const kid of kids.trim().split('\n').filter(Boolean)) {
-        queue.push(kid);
-      }
-    } catch {
-      // pgrep exits non-zero when there are no children — not an error.
-    }
-  }
-  return false;
+  return (await findAgentRuntimePidInSubtree(rootPid, harness)) !== null;
 }
 
 export async function getPiLauncherFields(agentId: string, model: string): Promise<{
@@ -228,7 +163,7 @@ export function getAcpLauncherFields(
   _role?: Role,
   effort?: string,
 ): {
-  harness: 'acp';
+  harness: 'acp' | 'opencode';
   acpAgentId: string;
   acpProvider: string;
   acpWorkspace: string;
@@ -239,12 +174,12 @@ export function getAcpLauncherFields(
   unsetProviderEnv: true;
 } {
   return {
-    harness: 'acp',
+    harness: model.startsWith('opencode/') || model.startsWith('opencode-go/') ? 'opencode' : 'acp',
     acpAgentId: agentId,
     acpProvider: getProviderForModelSync(model).name,
     acpWorkspace: workspace,
     acpBinaryPath: binaryPath,
-    acpContextFile: materializeAcpContextFile(getAgentDir(agentId), workspace),
+    acpContextFile: materializeAcpContextFile(getAgentDir(agentId), workspace, model.startsWith('opencode/') || model.startsWith('opencode-go/') ? 'opencode' : 'acp'),
     ...(effort ? { acpEffort: effort } : {}),
     model,
     unsetProviderEnv: true,
@@ -258,6 +193,7 @@ export function getKimiCodeLauncherFields(model: string, effort?: string): {
   kimiCodeEffort?: string;
   model: string;
   unsetProviderEnv: true;
+  kimiContextDelivery: 'initial-message';
 } {
   const kimiCodeModel = resolveKimiCodeModelAlias(model);
   return {
@@ -267,6 +203,7 @@ export function getKimiCodeLauncherFields(model: string, effort?: string): {
     ...(effort ? { kimiCodeEffort: effort } : {}),
     model,
     unsetProviderEnv: true,
+    kimiContextDelivery: 'initial-message',
   };
 }
 
@@ -278,7 +215,7 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
   codexSessionDir: string;
   model: string;
 } {
-  const codexHome = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home');
+  const codexHome = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home-v2');
   const codexConfig = loadYamlConfig().config.codex;
   // Match conversation permissions and pre-trust the workspace to avoid onboarding prompts.
   const codexPermMode = codexConfig?.permissionMode ?? 'workspace';
@@ -895,7 +832,7 @@ export function roleSystemPromptInjectionSync(definitionPath: string, explicitEf
   mkdirSync(dir, { recursive: true });
   const stem = basename(definitionPath).replace(/\.md$/, '');
   const outPath = join(dir, `${stem}.md`);
-  writeFileSync(outPath, body);
+  writeFileSync(outPath, `Source: ${abs}\n\n${body}`);
 
   const flags: string[] = [` --append-system-prompt-file '${outPath}'`];
 

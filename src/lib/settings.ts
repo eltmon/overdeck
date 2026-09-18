@@ -43,12 +43,9 @@ export type NousModel = 'qwen/qwen3.6-plus';
 export type DashScopeModel = 'qwen3.7-plus' | 'qwen3.8-flash' | 'qwen3-max' | 'qwen3-coder-plus' | 'qwen3-plus' | 'qwen3.7-max' | 'qwen3.8-max';
 export type GrokModel = 'grok-build-0.1';
 export type QuantumLlamaModel = 'ql-reason-70b' | 'ql-swift-8b' | 'ql-nano-1b';
+export type OpenCodeModelId = `opencode/${string}` | `opencode-go/${string}`;
 export type MuseModel = 'muse-spark-1.3' | 'muse-spark-1.3-contributor';
-
-export type ModelId = MuseModel | AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel | DashScopeModel | GrokModel | QuantumLlamaModel;
-
-// Task complexity levels
-export type ComplexityLevel = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
+export type ModelId = OpenCodeModelId | MuseModel | AnthropicModel | OpenAIModel | GoogleModel | KimiModel | MiniMaxModel | ZAIModel | MimoModel | NousModel | DashScopeModel | GrokModel | QuantumLlamaModel;
 
 // Specialist agent types
 export interface SpecialistModels {
@@ -57,16 +54,10 @@ export interface SpecialistModels {
   merge_agent: ModelId;
 }
 
-// Complexity-based model mapping
-export type ComplexityModels = {
-  [K in ComplexityLevel]: ModelId;
-};
-
 // All model configuration
 export interface ModelsConfig {
   specialists: SpecialistModels;
   status_review: ModelId;
-  complexity: ComplexityModels;
 }
 
 // API keys for external providers
@@ -97,13 +88,6 @@ const DEFAULT_SETTINGS: SettingsConfig = {
       merge_agent: 'claude-sonnet-5',
     },
     status_review: 'claude-opus-4-6',
-    complexity: {
-      trivial: 'claude-haiku-4-5',
-      simple: 'claude-haiku-4-5',
-      medium: 'kimi-k2.5',
-      complex: 'kimi-k2.5',
-      expert: 'claude-opus-4-6',
-    },
   },
   api_keys: {},
 };
@@ -212,18 +196,6 @@ export function validateSettingsSync(settings: SettingsConfig): string | null {
   const specialists = settings.models.specialists;
   if (!specialists.review_agent || !specialists.test_agent || !specialists.merge_agent) {
     return 'Missing specialist agent model configuration';
-  }
-
-  // Validate complexity levels
-  if (!settings.models.complexity) {
-    return 'Missing complexity configuration';
-  }
-  const complexity = settings.models.complexity;
-  const requiredLevels: ComplexityLevel[] = ['trivial', 'simple', 'medium', 'complex', 'expert'];
-  for (const level of requiredLevels) {
-    if (!complexity[level]) {
-      return `Missing complexity level: ${level}`;
-    }
   }
 
   // Validate api_keys structure (optional keys)

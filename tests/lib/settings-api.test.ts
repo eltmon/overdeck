@@ -113,7 +113,7 @@ const validTieredExecution = {
   supervisor: { model: 'claude-opus-4-8', harness: 'claude-code' as const, subscribe: 'flagged' as const },
   by_kind: {},
   feed: { callouts: 'off' as const, exclude: [], exclude_subjects: [], max_diff_bytes: null },
-  escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0, flounder_budget_minutes: {} },
+  escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0 },
   compaction_reroute: 'off' as const,
   replay_threshold: 0.5,
 };
@@ -217,7 +217,7 @@ describe('settings-api', () => {
             by_kind: {},
             byKind: {},
             feed: { callouts: 'off', exclude: [], exclude_subjects: [], max_diff_bytes: null },
-            escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0, flounder_budget_minutes: {} },
+            escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0 },
             compaction_reroute: 'off',
             replay_threshold: 0.5,
             difficultyToTier: {
@@ -561,7 +561,7 @@ describe('settings-api', () => {
       });
 
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain('models.provider_harnesses.openai must be claude-code, ohmypi, codex, acp, kimi-code, muse, or empty string');
+      expect(result.errors).toContain('models.provider_harnesses.openai must be claude-code, ohmypi, codex, acp, kimi-code, opencode, muse, or empty string');
     });
   });
 

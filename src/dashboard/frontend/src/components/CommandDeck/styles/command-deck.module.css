@@ -4666,6 +4666,7 @@
 
 .pickerBtn {
   display: flex;
+  max-width: 100%;
   align-items: center;
   gap: 6px;
   padding: 4px 8px;

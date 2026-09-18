@@ -35,6 +35,7 @@ function shortHarness(harness: NonNullable<Conversation['harness']>): string {
   if (harness === 'ohmypi') return 'oh-my-pi';
   if (harness === 'pi') return 'oh-my-pi';
   if (harness === 'codex') return 'Codex';
+  if (harness === 'opencode') return 'OpenCode';
   if (harness === 'acp') return 'ACP';
   if (harness === 'kimi-code') return 'Kimi Code';
   if (harness === 'prime-agent') return 'Prime Agent';

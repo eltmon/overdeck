@@ -18,6 +18,7 @@ vi.mock('../../../../lib/internal-token.js', async (importOriginal) => ({
 import { INTERNAL_TOKEN_HEADER } from '../../../../lib/internal-token.js';
 import {
   beginCompletePlanningLease,
+  commitCompletePlanningWorkspaceGit,
   completePlanningArtifacts,
   completePlanningAutoSpawn,
   completePlanningAutoSpawnAndKill,
@@ -172,6 +173,52 @@ afterEach(() => {
   rmSync(overdeckHome, { recursive: true, force: true });
   if (previousOverdeckHome === undefined) delete process.env['OVERDECK_HOME'];
   else process.env['OVERDECK_HOME'] = previousOverdeckHome;
+});
+
+describe('commitCompletePlanningWorkspaceGit', () => {
+  it('never git-inits a pre-worktree metadata-only directory', async () => {
+    const { workspacePath } = makeProject('PAN-3901');
+    mkdirSync(join(workspacePath, '.pan'), { recursive: true });
+    writeFileSync(join(workspacePath, '.pan', 'spec.vbrief.json'), '{}\n');
+
+    const calls: string[][] = [];
+    const execSpy = vi.fn(async (_cmd: string, args: string[]) => {
+      calls.push(args);
+      return { stdout: '', stderr: '' };
+    });
+
+    const result = await commitCompletePlanningWorkspaceGit(workspacePath, 'PAN-3901', false, null, execSpy as never);
+
+    expect(result).toEqual({ pushed: true, taskWarning: null });
+    expect(calls.some((args) => args.length === 1 && args[0] === 'init')).toBe(false);
+    expect(calls).toEqual([]);
+    expect(existsSync(join(workspacePath, '.git'))).toBe(false);
+  });
+
+  it('git-inits and commits a populated workspace directory (PAN-2386 shape)', async () => {
+    const { workspacePath } = makeProject('PAN-3902');
+    mkdirSync(join(workspacePath, 'src'), { recursive: true });
+    writeFileSync(join(workspacePath, '.gitignore'), '.overdeck/\n');
+    writeFileSync(join(workspacePath, 'src', 'index.ts'), 'export {};\n');
+
+    const calls: string[][] = [];
+    const execSpy = vi.fn(async (_cmd: string, args: string[]) => {
+      calls.push(args);
+      if (args[0] === 'diff') throw new Error('staged changes present');
+      return { stdout: '', stderr: '' };
+    });
+
+    const result = await commitCompletePlanningWorkspaceGit(workspacePath, 'PAN-3902', false, null, execSpy as never);
+
+    expect(result).toEqual({ pushed: true, taskWarning: null });
+    expect(calls).toEqual([
+      ['init'],
+      ['add', '.gitignore'],
+      ['diff', '--cached', '--quiet'],
+      ['commit', '-m', 'chore(plan): complete planning for PAN-3902', '--no-verify'],
+      ['remote'],
+    ]);
+  });
 });
 
 describe('completePlanningArtifacts', () => {

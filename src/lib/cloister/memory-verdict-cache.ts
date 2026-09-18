@@ -35,6 +35,7 @@ export interface MemoryVerdict {
   swapFreeBytes?: number;
   psiSomeAvg10?: number | null;
   psiFullAvg10?: number | null;
+  loadPerCore?: number | null;
   trigger?: GovernorTrigger | null;
 }
 

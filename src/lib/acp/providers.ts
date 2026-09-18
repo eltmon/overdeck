@@ -1,11 +1,27 @@
 import {
+  buildOpenCodeAcpSpawnInput,
+  makeOpenCodeAcpRuntime,
+  resolveOpenCodeAuthMethodId,
+  translateOpenCodeAcpModelId,
+} from "./opencode.js";
+
+import {
   buildKimiAcpSpawnInput,
   makeKimiAcpRuntime,
   resolveKimiAuthMethodId,
   translateKimiAcpModelId,
 } from "./kimi.js";
 
+const openCodeSupport = {
+  buildSpawnInput: buildOpenCodeAcpSpawnInput,
+  resolveAuthMethodId: resolveOpenCodeAuthMethodId,
+  makeRuntime: makeOpenCodeAcpRuntime,
+  translateModelId: translateOpenCodeAcpModelId,
+};
+
 export const ACP_PROVIDER_SUPPORT = {
+  opencode: openCodeSupport,
+  "opencode-go": openCodeSupport,
   kimi: {
     buildSpawnInput: buildKimiAcpSpawnInput,
     resolveAuthMethodId: resolveKimiAuthMethodId,

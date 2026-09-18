@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ModelPicker, loadStoredModel, onKnownModelsSync } from '../ModelPicker';
+import { HARNESS_OPTIONS } from '../../shared/ModelPicker/ModelPicker';
 import { applyDefaultConversationModel } from '../defaultConversationModel';
 
 vi.mock('sonner', () => ({
@@ -11,7 +12,7 @@ vi.mock('sonner', () => ({
 
 type HarnessPolicyDecisionsMap = Record<string, Record<string, { allowed: boolean; reason?: string }>>;
 
-function installFetchMock(options: { showHarnessModelPermutations?: boolean; harnessPolicyDecisions?: HarnessPolicyDecisionsMap; defaultConversationModel?: string; availableModelsGate?: Promise<void> } = {}) {
+function installFetchMock(options: { showHarnessModelPermutations?: boolean; missingCatalogMetadata?: boolean; harnessPolicyDecisions?: HarnessPolicyDecisionsMap; defaultConversationModel?: string; availableModelsGate?: Promise<void> } = {}) {
   vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
     const url = input.toString();
     if (url === '/api/settings/available-models') {
@@ -73,8 +74,10 @@ function installFetchMock(options: { showHarnessModelPermutations?: boolean; har
     }
     if (url === '/api/settings/openrouter/models') {
       return new Response(JSON.stringify({
-        models: [{ id: 'openrouter/free-model', name: 'OpenRouter Free', promptCostPer1M: 0, supportsThinking: false }],
-        favorites: ['openrouter/free-model'],
+        models: options.missingCatalogMetadata
+          ? [{ id: 'stealth/union-alpha', name: 'stealth/union-alpha', promptCostPer1M: null, supportsThinking: false }]
+          : [{ id: 'openrouter/free-model', name: 'OpenRouter Free', promptCostPer1M: 0, supportsThinking: false }],
+        favorites: options.missingCatalogMetadata ? ['stealth/union-alpha'] : ['openrouter/free-model'],
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -100,6 +103,18 @@ describe('chat ModelPicker live harness labels', () => {
     vi.unstubAllGlobals();
   });
 
+  it('selects a saved model whose catalog metadata is unavailable', async () => {
+    installFetchMock({ missingCatalogMetadata: true });
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(<ModelPicker value="claude-sonnet-4-6" onChange={onChange} />);
+    await user.click(screen.getByRole('button', { name: /Claude Sonnet 4\.6/i }));
+    const model = await screen.findByRole('button', { name: /stealth\/union-alpha/i });
+    expect(within(model).getByText('Pricing unavailable')).toBeInTheDocument();
+    await user.click(model);
+    expect(onChange).toHaveBeenCalledWith('stealth/union-alpha', []);
+  });
+
   it('labels non-current harness rows experimental for live conversations', async () => {
     const user = userEvent.setup();
     render(
@@ -119,14 +134,19 @@ describe('chat ModelPicker live harness labels', () => {
     expect(within(screen.getByRole('button', { name: /^Codex/i })).getByText('Experimental')).toBeInTheDocument();
     expect(within(screen.getByRole('button', { name: /^ACP/i })).getByText('Experimental')).toBeInTheDocument();
     expect(within(screen.getByRole('button', { name: /^Kimi Code/i })).getByText('Experimental')).toBeInTheDocument();
+    expect(within(screen.getByRole('button', { name: /^Muse Code/i })).getByText('Experimental')).toBeInTheDocument();
     expect(screen.getByLabelText('Claude Code logo')).toBeInTheDocument();
     expect(screen.getByLabelText('oh-my-pi logo')).toBeInTheDocument();
     expect(screen.getByLabelText('Codex logo')).toBeInTheDocument();
     expect(screen.getByLabelText('ACP logo')).toBeInTheDocument();
     expect(screen.getByLabelText('Kimi Code logo')).toBeInTheDocument();
+    expect(screen.getByLabelText('OpenCode logo')).toBeInTheDocument();
     expect(screen.getByLabelText('Muse Code logo')).toBeInTheDocument();
     expect(screen.getByLabelText('Prime Agent logo')).toBeInTheDocument();
-    expect(screen.getAllByText(/May lose fidelity/)).toHaveLength(6);
+    // Every harness row except the current one (claude-code) carries the
+    // experimental warning — derive the count so a new harness option does
+    // not silently break this assertion.
+    expect(screen.getAllByText(/May lose fidelity/)).toHaveLength(HARNESS_OPTIONS.length - 1);
     expect(screen.getByRole('button', { name: /^oh-my-pi/i })).toHaveAttribute('title', expect.stringContaining('May lose fidelity'));
   });
 

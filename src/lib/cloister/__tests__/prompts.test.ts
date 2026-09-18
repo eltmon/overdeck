@@ -361,36 +361,6 @@ optional:
       })
     );
 
-    it.effect('renders planning TLDR guidance only when TLDR_AVAILABLE is true', () =>
-      Effect.gen(function* () {
-        const baseVars = {
-          ISSUE_ID: 'PAN-611',
-          ISSUE_ID_LOWER: 'pan-611',
-          ISSUE_TITLE: 'TLDR planning',
-          ISSUE_URL: 'https://example.test/PAN-611',
-          ISSUE_DESCRIPTION: 'Need TLDR planning context',
-          VERSION: '0.0.0',
-          MODEL_AUTHOR: 'agent:test',
-        };
-        const enabled = yield* renderPrompt({
-          name: 'planning',
-          vars: { ...baseVars, TLDR_AVAILABLE: true },
-        });
-        const disabled = yield* renderPrompt({
-          name: 'planning',
-          vars: { ...baseVars, TLDR_AVAILABLE: false },
-        });
-        const absent = yield* renderPrompt({ name: 'planning', vars: baseVars });
-
-        expect(enabled).toContain('### TLDR: Token-Efficient Code Discovery');
-        expect(enabled).toContain('PreToolUse hook on `Read`');
-        expect(enabled).toContain('.venv/bin/tldr context');
-        expect(enabled).toContain('not registered in agent');
-        expect(disabled).not.toContain('### TLDR: Token-Efficient Code Discovery');
-        expect(absent).not.toContain('### TLDR: Token-Efficient Code Discovery');
-      })
-    );
-
     it.effect('renders resume-work TLDR guidance only when TLDR_AVAILABLE is true', () =>
       Effect.gen(function* () {
         const baseVars = {

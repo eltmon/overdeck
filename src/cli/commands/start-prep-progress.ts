@@ -90,7 +90,10 @@ export function createPrepProgress(
 }
 
 export const START_PREP_STEP_POLICIES = {
-  'state-reconcile': { budgetMs: 60_000, timeout: 'fail-fast', awaitQuiescence: true },
+  // PAN-3848 (W24): state-reconcile is best-effort migration only — the
+  // policy-override record write moved post-spawn, so a slow migration must
+  // degrade, not fail the start.
+  'state-reconcile': { budgetMs: 60_000, timeout: 'degrade', awaitQuiescence: true },
   'sync-main': { budgetMs: 240_000, timeout: 'degrade', awaitQuiescence: true },
   'tracker-context': { budgetMs: 60_000, timeout: 'degrade', awaitQuiescence: true },
   spawn: { budgetMs: 600_000, timeout: 'fail-fast', awaitQuiescence: true },

@@ -49,26 +49,14 @@ describe('workspaceContextWithoutProjectLayer', () => {
     expect(result).not.toContain('Claude-only content');
   });
 
-  it('removes a stale legacy project layer without matching current project text', () => {
-    const workspace = [
-      '# Workspace: PAN-2858\n\n**Branch:** feature/pan-2858',
-      'Old generic rule.\n\n---\n\nOld Claude-only guardrail.',
-    ].join(SEPARATOR);
-
-    expect(workspaceContextWithoutProjectLayer(workspace)).toBe(
-      '# Workspace: PAN-2858\n\n**Branch:** feature/pan-2858',
-    );
-  });
-
-  it('conservatively drops ambiguous post-header sections from unmarked legacy bundles', () => {
+  it('blocks ambiguous legacy bundles rather than losing memory or status', () => {
     const workspace = [
       '# Workspace: PAN-2858',
       'Stale project rules.',
       '<overdeck-memory-context>legacy memory</overdeck-memory-context>',
       '## Workspace Status\n\nReviewing',
     ].join(SEPARATOR);
-
-    expect(workspaceContextWithoutProjectLayer(workspace)).toBe('# Workspace: PAN-2858');
+    expect(() => workspaceContextWithoutProjectLayer(workspace)).toThrow('no valid project boundary');
   });
 
   it('leaves a workspace-only legacy context unchanged', () => {

@@ -863,7 +863,7 @@ function getIssueStaffingPayload(
       model: record?.workModel ?? implicit.model,
       tiered: block.effective,
       source: record?.workModel ? 'issue' : 'default',
-      recordedModel: (liveModel && liveModel !== 'pending-work-spawn' ? liveModel : undefined) ?? record?.model ?? null,
+      recordedModel: liveModel ?? record?.model ?? null,
     },
   };
 }

@@ -15,6 +15,7 @@ import {
   type ReadModelState,
   INITIAL_READ_MODEL_STATE,
   applyEvent as applyEventReducer,
+  createIssueDelta,
   getMaxTurnDiffSummariesPerAgent,
   isTerminalTurnDiffSummaryStatus,
   trimTurnDiffSummaries,
@@ -767,11 +768,13 @@ export const ReadModelServiceLive = Layer.effect(
         // WebSocket subscribers (PAN-433).
         issueService.onIssuesChanged((issues) => {
           const cleaned = cleanIssues(issues);
+          const delta = createIssueDelta(state.issuesRaw, cleaned);
+          if (!delta) return;
           state = { ...state, issuesRaw: cleaned };
 
-          // Fan-out issues.snapshot to live WebSocket subscribers via in-memory PubSub.
-          // Uses emitOnly (NOT append) — issues.snapshot is ~1.5 MB and must never be
-          // persisted to the event log. Persisting it causes startup OOM on replay.
+          // Initial/reconnect snapshots retain every field. Subsequent updates
+          // send complete changed rows only, preserving descriptions and order.
+          // These cache projections must never enter the durable event log.
           // Uses cached reference to avoid async dynamic import delay
           // (delay caused frontend to miss updates after patchIssue)
           try {
@@ -780,17 +783,17 @@ export const ReadModelServiceLive = Layer.effect(
                 _cachedEventStore = getEventStore();
                 try {
                   _cachedEventStore.emitOnly({
-                    type: 'issues.snapshot',
+                    type: 'issues.delta',
                     timestamp: new Date().toISOString(),
-                    payload: { issues: cleaned },
+                    payload: delta,
                   } as any);
                 } catch { /* event store not ready */ }
               }).catch(() => {});
             } else {
               _cachedEventStore.emitOnly({
-                type: 'issues.snapshot',
+                type: 'issues.delta',
                 timestamp: new Date().toISOString(),
-                payload: { issues: cleaned },
+                payload: delta,
               } as any);
             }
           } catch { /* event store not ready yet */ }

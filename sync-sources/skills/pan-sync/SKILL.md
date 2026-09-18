@@ -37,12 +37,10 @@ run `pan sync` manually. Manual sync is useful when:
 ~/.agents/skills/            (Codex, Pi, Oh My Pi)
 
 ~/.overdeck/workspaces/       (Workspace directories)
-        ↓ pan sync (copies CLAUDE.md)
-~/.opencode/cl-aude-md/        (CLAUDE.md files)
-        ↓
-        feature-pan-73.md
-        feature-pan-101.md
-        ...
+        ↓ pan sync (renders managed context)
+~/.overdeck/context/{claude,pi,codex}-global.md
+        ↓ managed launch (explicit harness transport)
+Agent receives global, project, workspace, role, and briefing context
 ```
 
 **Key points:**
@@ -288,11 +286,11 @@ backup_before_sync = false
 2. Check target is in config: `cat ~/.overdeck/config.toml`
 3. Verify symlinks exist: `ls -la ~/.claude/skills/`
 
-**Problem:** CLAUDE.md files not available in opencode
+**Problem:** Managed launch context is missing
 **Solution:**
-1. Run `pan sync` to copy workspace CLAUDE.md files
-2. Check files exist: `ls -la ~/.opencode/cl-aude-md/`
-3. Create a new workspace: `pan workspace create PAN-XXX`
+1. Run `pan context diff` to inspect the rendered sources; `pan sync` refreshes Overdeck-owned artifacts and never copies native instruction Markdown.
+2. Check the context artifacts: `ls -la ~/.overdeck/context/`
+3. Start a fresh managed session so it receives the current context.
 
 **Problem:** Sync reports conflicts
 **Solution:**

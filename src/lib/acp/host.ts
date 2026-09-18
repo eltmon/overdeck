@@ -50,6 +50,7 @@ export type AcpHostRuntime = Pick<
   | "prompt"
   | "cancel"
   | "setModel"
+  | "getConfigOptions"
   | "setConfigOption"
 >;
 
@@ -132,6 +133,15 @@ export class AcpHost {
             resolveAcpModelId(this.options.provider, this.options.model),
           ),
         );
+      }
+      if (this.options.provider === "opencode" || this.options.provider === "opencode-go") {
+        const configOptions = await Effect.runPromise(this.options.runtime.getConfigOptions);
+        const effortOption = configOptions.find((option) => option.id === "effort");
+        if (effortOption) {
+          await Effect.runPromise(this.options.runtime.setConfigOption("effort", this.options.effort ?? "high"));
+        } else if (this.options.effort && this.options.effort !== "high") {
+          throw new Error(`The selected OpenCode model does not expose an effort setting (${this.options.effort} requested).`);
+        }
       }
       if (this.options.provider === "kimi" && this.options.model) {
         const effort = resolveKimiNativeEffort(this.options.model, this.options.effort);
@@ -284,11 +294,16 @@ export class AcpHost {
     if (this.state !== "ready") {
       return { status: 409, body: { error: "ACP session is not ready" } };
     }
-    if (this.options.provider !== "kimi" || !this.options.model) {
-      return { status: 400, body: { error: "This ACP model does not support adjustable effort" } };
-    }
     if (typeof op.effort !== "string" || !op.effort.trim()) {
       return { status: 400, body: { error: "effort is required" } };
+    }
+    if (this.options.provider === "opencode" || this.options.provider === "opencode-go") {
+      const effort = op.effort.trim();
+      await Effect.runPromise(this.options.runtime.setConfigOption("effort", effort));
+      return { status: 200, body: { ok: true, effort } };
+    }
+    if (this.options.provider !== "kimi" || !this.options.model) {
+      return { status: 400, body: { error: "This ACP model does not support adjustable effort" } };
     }
     let effort: ReturnType<typeof resolveKimiNativeEffort>;
     try {
@@ -609,6 +624,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
           cwd: args.workspace,
           resumeSessionId: args.resumeSessionId,
           kimiSettings: { binaryPath: args.binaryPath },
+          binaryPath: args.binaryPath,
           clientInfo: {
             name: "overdeck",
             version: process.env.npm_package_version ?? "development",

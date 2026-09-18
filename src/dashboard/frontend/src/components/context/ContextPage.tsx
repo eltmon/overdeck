@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { ContextEditableLayerRecord, ContextLayerDraft, ContextLayerTarget, ContextPreviewDiagnostic } from '@overdeck/contracts';
+import './ContextPage.css';
 import { ContextEditor } from './ContextEditor';
 import {
   useContextLayersQuery,
@@ -10,7 +11,9 @@ import {
 } from '../../lib/contextApi';
 
 type SelectedLayerKind = ContextLayerTarget['kind'];
-type PreviewTab = 'claude-code' | 'ohmypi' | 'fullPrompt';
+type PreviewTab = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse' | 'opencode' | 'fullPrompt';
+const scopeDescription = { global: 'Every project on this machine', project: 'One project, including its workspaces', workspace: 'One issue workspace' };
+const previewOptions: [PreviewTab, string][] = [['claude-code', 'Claude Code'], ['codex', 'Codex'], ['ohmypi', 'oh-my-pi'], ['kimi-code', 'Kimi Code'], ['acp', 'ACP'], ['muse', 'Muse'], ['opencode', 'OpenCode'], ['fullPrompt', 'All harnesses']];
 
 function targetKey(target: ContextLayerTarget): string {
   switch (target.kind) {
@@ -39,16 +42,16 @@ function layerPathLabel(layer: ContextEditableLayerRecord): string {
     case 'global':
       return '~/.overdeck/context/global.md';
     case 'project':
-      return '.pan/context/project.md';
+      return layer.file.includes('/.pan/') ? '.pan/context/project.md' : '.overdeck/context/project.md';
     case 'workspace':
-      return '.pan/context/workspace.md';
+      return layer.file.includes('/.pan/') ? '.pan/context/workspace.md' : '.overdeck/context/workspace.md';
   }
 }
 
 function layerTitle(kind: SelectedLayerKind): string {
   switch (kind) {
     case 'global':
-      return 'Global context';
+      return 'Machine context';
     case 'project':
       return 'Project context';
     case 'workspace':
@@ -85,6 +88,7 @@ export function ContextPage() {
   const [selectedProjectKey, setSelectedProjectKey] = useState('');
   const [selectedWorkspacePath, setSelectedWorkspacePath] = useState('');
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [view, setView] = useState<'edit' | 'preview'>('edit');
   const [previewTab, setPreviewTab] = useState<PreviewTab>('claude-code');
   const [previewResponse, setPreviewResponse] = useState<Awaited<ReturnType<typeof previewMutation.mutateAsync>> | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -136,17 +140,6 @@ export function ContextPage() {
   const isDirty = !!selectedLayer && drafts[selectedKey] !== undefined && drafts[selectedKey] !== selectedLayer.content;
   const actionPending = saveMutation.isPending || syncMutation.isPending;
 
-  // Injection targets relevant to the current selection — the files pan sync
-  // writes a managed region into for this layer.
-  const relevantTargets = useMemo(() => {
-    if (!data) return [];
-    if (selectedKind === 'global') return data.targets.filter((t) => t.layerKind === 'global');
-    if (selectedKind === 'project') {
-      return data.targets.filter((t) => t.layerKind === 'project' && t.projectKey === selectedProjectKey);
-    }
-    return [];
-  }, [data, selectedKind, selectedProjectKey]);
-
   useEffect(() => {
     if (!selectedTarget || !selectedLayer) {
       setPreviewResponse(null);
@@ -155,6 +148,7 @@ export function ContextPage() {
 
     let cancelled = false;
     setPreviewError(null);
+    setPreviewResponse(null);
     const timer = window.setTimeout(() => {
       void previewContext({
         operation: 'preview',
@@ -186,7 +180,7 @@ export function ContextPage() {
         const { [selectedKey]: _saved, ...remaining } = current;
         return remaining;
       });
-      toast.success(syncAfterSave ? 'Context saved and synced' : 'Context saved');
+      toast.success(syncAfterSave ? 'Context saved and outputs refreshed. Applies to new sessions.' : 'Context saved. Applies to new sessions.');
     } catch (failure) {
       const message = errorMessage(failure);
       setActionError(message);
@@ -206,234 +200,95 @@ export function ContextPage() {
   const diagnostics = previewResponse?.diagnostics ?? [];
 
   return (
-    <div className="flex h-full w-full overflow-hidden bg-background text-foreground">
-      <aside className="w-80 shrink-0 overflow-y-auto border-r border-border bg-card/40 p-4">
-        <div className="mb-5">
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Context</p>
-          <h1 className="mt-1 text-lg font-semibold">Layer editor</h1>
-          <p className="mt-2 text-xs leading-5 text-muted-foreground">
-            Edit the context markdown Overdeck injects into coding-agent sessions.
-          </p>
-        </div>
-
-        <fieldset className="space-y-2">
-          <legend className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Layer</legend>
-          {(['global', 'project', 'workspace'] as const).map((kind) => (
-            <label key={kind} className="flex cursor-pointer items-center gap-2 rounded-md border border-border bg-background/60 px-3 py-2 text-sm">
-              <input
-                type="radio"
-                name="context-layer-kind"
-                value={kind}
-                checked={selectedKind === kind}
-                onChange={() => setSelectedKind(kind)}
-              />
-              <span>{layerTitle(kind)}</span>
+    <div className="context-page h-full w-full min-w-0 overflow-auto bg-background text-foreground">
+      <header className="border-b border-border px-5 py-4">
+        <h1 className="text-xl font-semibold">Agent context</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Choose where instructions apply, edit their source, and preview what Overdeck adds to a new session.</p>
+        <p className="mt-2 text-xs text-muted-foreground">Running conversations keep their existing context. Your CLAUDE.md and AGENTS.md files stay under your control.</p>
+      </header>
+      <div className="context-layout">
+        <aside className="context-sources border-border bg-card/30 p-4">
+          <fieldset className="space-y-2">
+            <legend className="mb-2 text-sm font-semibold">Where should this apply?</legend>
+            {(['global', 'project', 'workspace'] as const).map((kind) => (
+              <label key={kind} className={`flex cursor-pointer items-start gap-2 rounded-md p-2 text-sm hover:bg-muted ${selectedKind === kind ? 'bg-accent text-accent-foreground' : ''}`}>
+                <input className="mt-1" type="radio" name="context-layer-kind" value={kind} aria-label={layerTitle(kind)} checked={selectedKind === kind} onChange={() => setSelectedKind(kind)} />
+                <span><span className="block font-medium">{layerTitle(kind)}</span><span className="mt-0.5 block text-xs leading-5 text-muted-foreground">{scopeDescription[kind]}</span></span>
+              </label>
+            ))}
+          </fieldset>
+          {selectedKind !== 'global' && (
+            <label className="mt-4 block text-sm">
+              <span className="font-medium">Project</span>
+              <select className="mt-1 w-full rounded-md border border-border bg-background px-2 py-2" value={selectedProjectKey} onChange={e => setSelectedProjectKey(e.target.value)} disabled={!data?.projects.length}>
+                {data?.projects.length ? data.projects.map(project => <option key={project.projectKey} value={project.projectKey}>{project.name}</option>) : <option value="">No registered projects</option>}
+              </select>
             </label>
-          ))}
-        </fieldset>
-
-        <div className="mt-5 space-y-4">
-          <label className="block space-y-1 text-xs text-muted-foreground">
-            <span>Project</span>
-            <select
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
-              value={selectedProjectKey}
-              onChange={(event) => setSelectedProjectKey(event.target.value)}
-              disabled={!data?.projects.length || selectedKind === 'global'}
-            >
-              {data?.projects.length ? data.projects.map((project) => (
-                <option key={project.projectKey} value={project.projectKey}>{project.name}</option>
-              )) : <option value="">No registered projects</option>}
-            </select>
-          </label>
-
-          <label className="block space-y-1 text-xs text-muted-foreground">
-            <span>Workspace</span>
-            <select
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
-              value={selectedWorkspacePath}
-              onChange={(event) => setSelectedWorkspacePath(event.target.value)}
-              disabled={selectedKind !== 'workspace' || selectedProjectWorkspaces.length === 0}
-            >
-              {selectedProjectWorkspaces.length ? selectedProjectWorkspaces.map((workspace) => (
-                <option key={workspace.path} value={workspace.path}>{workspace.issueId ?? workspace.name}</option>
-              )) : <option value="">No workspaces for this project</option>}
-            </select>
-          </label>
-        </div>
-
-        <div className="mt-5 rounded-lg border border-border bg-background/70 p-3 text-xs text-muted-foreground">
-          {selectedLayer ? (
-            <dl className="space-y-2">
-              <div>
-                <dt className="font-medium text-foreground">Layer file</dt>
-                <dd className="mt-1 font-mono">{layerPathLabel(selectedLayer)}</dd>
-              </div>
-              <div>
-                <dt className="font-medium text-foreground">Resolved path</dt>
-                <dd className="mt-1 break-all font-mono">{selectedLayer.file}</dd>
-              </div>
-              <div>
-                <dt className="font-medium text-foreground">Status</dt>
-                <dd className="mt-1">{selectedLayer.exists ? 'File exists' : 'File has not been created yet'}</dd>
-              </div>
-            </dl>
-          ) : (
-            <p>Select a project or workspace to edit its context layer.</p>
           )}
-        </div>
-
-        <div className="mt-4 rounded-lg border border-border bg-background/70 p-3 text-xs text-muted-foreground">
-          <p className="font-medium text-foreground">Where this gets injected</p>
-          <p className="mt-1 leading-5">
-            <code className="rounded bg-muted px-1">pan sync</code> writes a managed region —
-            between <code className="rounded bg-muted px-1">BEGIN/END OVERDECK CONTEXT</code> markers —
-            into the files below. Anything you wrote <span className="font-medium text-foreground">outside</span> those
-            markers is never modified. Edit the layer source here, not the region.
-          </p>
-          {relevantTargets.length > 0 ? (
-            <ul className="mt-2 space-y-2">
-              {relevantTargets.map((target) => (
-                <li key={target.path}>
-                  <div className="break-all font-mono text-foreground">{target.path}</div>
-                  <div className="mt-0.5">
-                    {!target.exists
-                      ? 'Not created yet — created on next sync.'
-                      : target.hasUserContent
-                        ? 'Has your own content — preserved outside the managed region.'
-                        : target.hasManagedRegion
-                          ? 'Managed by Overdeck (no other content).'
-                          : 'Exists — a managed region is added on next sync.'}
-                  </div>
-                </li>
-              ))}
+          {selectedKind === 'workspace' && (
+            <label className="mt-4 block text-sm">
+              <span className="font-medium">Workspace</span>
+              <select className="mt-1 w-full rounded-md border border-border bg-background px-2 py-2" value={selectedWorkspacePath} onChange={e => setSelectedWorkspacePath(e.target.value)} disabled={!selectedProjectWorkspaces.length}>
+                {selectedProjectWorkspaces.length ? selectedProjectWorkspaces.map(workspace => <option key={workspace.path} value={workspace.path}>{workspace.issueId ?? workspace.name}</option>) : <option value="">No workspaces for this project</option>}
+              </select>
+            </label>
+          )}
+          <div className="mt-5 border-t border-border pt-4 text-xs leading-5 text-muted-foreground">
+            <p className="font-medium text-foreground">{selectedKind === 'global' ? 'Keep machine context specific' : selectedKind === 'project' ? 'Shared project guidance' : 'Generated workspace context'}</p>
+            <p className="mt-1">{selectedKind === 'global' ? 'Use this for local paths or machine quirks. Rules for every machine belong in bundled rules.' : selectedKind === 'project' ? 'Use this for project conventions and requirements. Commit the source file to share it with your team.' : 'Overdeck assembles this from issue metadata, memory, and status. It may not exist until a workspace is created.'}</p>
+          </div>
+          <details className="mt-5 border-t border-border pt-4 text-xs leading-5 text-muted-foreground">
+            <summary className="cursor-pointer font-medium text-foreground">Other instruction sources</summary>
+            <p className="mt-2">The preview combines your selected scope with applicable machine context and bundled rules. Project and workspace sources join it when selected.</p>
+            <p className="mt-2">Bundled rules live in <code className="break-all">sync-sources/rules/</code>. Each rule in the preview names its source.</p>
+            <p className="mt-2">Role instructions and the session briefing can add launch context. The harness also loads its own user, project, and organization instructions, memory, and skills. These are not editable here.</p>
+          </details>
+          <details className="mt-4 border-t border-border pt-4 text-xs leading-5 text-muted-foreground">
+            <summary className="cursor-pointer font-medium text-foreground">Generated output files</summary>
+            <p className="mt-2">Overdeck passes context at launch. Refresh updates its saved global outputs; it does not rewrite native instruction files or update running conversations.</p>
+            <ul className="mt-3 space-y-3">
+              {data?.targets.map(target => <li key={target.path}><p className="font-medium text-foreground">{target.label}</p><code className="block break-all">{target.path}</code><p>{target.deliveryChannel === 'codex-developer-instructions' ? 'Added as developer instructions.' : 'Appended to the session’s system prompt.'}</p><p>{target.exists ? `${target.byteCount.toLocaleString()} bytes` : 'Created on next refresh.'}</p></li>)}
             </ul>
-          ) : selectedKind === 'workspace' ? (
-            <p className="mt-2">
-              Workspace context is auto-assembled into the workspace and is not injected into any hand-authored file.
-            </p>
-          ) : (
-            <p className="mt-2">No injection targets for this selection yet (the project has no project.md).</p>
-          )}
-        </div>
-
-        {selectedKind === 'workspace' ? (
-          <p className="mt-4 rounded-lg border border-info/30 bg-info/10 p-3 text-xs leading-5 text-info-foreground">
-            <span className="font-semibold">Workspace context:</span> .pan/context/workspace.md is auto-assembled for each workspace and may not exist until a workspace is created.
-          </p>
-        ) : null}
-      </aside>
-
-      <section className="flex min-w-0 flex-1 overflow-hidden">
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <header className="shrink-0 border-b border-border px-4 py-3">
-            <div className="flex items-center justify-between gap-4">
-              <div className="min-w-0">
-                <h2 className="text-sm font-semibold">{layerTitle(selectedKind)}</h2>
-                <p className="mt-1 truncate text-xs text-muted-foreground">
-                  {selectedKind === 'global'
-                    ? 'Applies to every registered project.'
-                    : selectedKind === 'project'
-                      ? selectedProject?.path ?? 'No project selected'
-                      : selectedWorkspace?.path ?? 'No workspace selected'}
-                </p>
-              </div>
-              {selectedLayer ? (
-                <span className="rounded-full border border-border px-2 py-1 text-xs text-muted-foreground">
-                  {isDirty ? 'Edited' : 'Loaded'}
-                </span>
-              ) : null}
+            <button type="button" className="mt-3 rounded-md border border-border px-3 py-2 text-foreground disabled:opacity-50" disabled={actionPending || isDirty} onClick={() => { setActionError(null); void syncMutation.mutateAsync({ operation: 'sync' }).then(() => refetch()).then(() => toast.success('Outputs refreshed. Applies to new sessions.')).catch(failure => setActionError(errorMessage(failure))); }}>Refresh outputs</button>
+            {isDirty && <p className="mt-1">Save your changes before refreshing outputs.</p>}
+          </details>
+        </aside>
+        <section className="context-workbench flex min-w-0 flex-col">
+          <header className="border-b border-border px-5 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-base font-semibold">{layerTitle(selectedKind)}</h2>
+              {selectedLayer && <span className="text-xs text-muted-foreground">{isDirty ? 'Edited' : 'Loaded'}</span>}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">{selectedKind === 'global' ? scopeDescription.global : selectedKind === 'project' ? selectedProject?.name ?? 'No project selected' : selectedWorkspace?.issueId ?? selectedWorkspace?.name ?? 'No workspace selected'}</p>
+            {selectedLayer && <details className="mt-2 text-xs text-muted-foreground"><summary className="cursor-pointer break-all font-mono">{layerPathLabel(selectedLayer)}</summary><p className="mt-2 break-all font-mono">{selectedLayer.file}</p><p className="mt-1">{selectedLayer.exists ? 'File exists' : 'File has not been created yet'}</p></details>}
+            <div className="mt-4 flex gap-2" role="group" aria-label="Context view">
+              {(['edit', 'preview'] as const).map(mode => <button key={mode} type="button" aria-pressed={view === mode} onClick={() => setView(mode)} className={`rounded-md px-3 py-2 text-sm font-medium ${view === mode ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:bg-muted'}`}>{mode === 'edit' ? 'Edit source' : 'Preview for agent'}</button>)}
             </div>
           </header>
-
-          <div className="min-h-0 flex-1">
-            {selectedLayer ? (
-              <ContextEditor
-                value={editorValue}
-                disabled={actionPending}
-                onChange={(value) => setDrafts((current) => ({ ...current, [selectedKey]: value }))}
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center p-6 text-sm text-muted-foreground">
-                No context layer is available for the current selection.
-              </div>
-            )}
+          <div className="context-editor flex-1" hidden={view !== 'edit'}>
+            {selectedLayer ? <ContextEditor value={editorValue} disabled={actionPending} onChange={value => setDrafts(current => ({ ...current, [selectedKey]: value }))} /> : <div className="p-6 text-sm text-muted-foreground">{selectedKind === 'workspace' ? 'Create a workspace for this project to edit its context.' : 'Register a project in Projects to add project context.'}</div>}
           </div>
-
-          <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border px-4 py-3">
-            <div className="min-w-0 text-xs text-muted-foreground">
-              {actionError ? <span className="text-destructive">{actionError}</span> : isDirty ? 'Unsaved changes' : 'No unsaved changes'}
+          <div className="min-w-0 flex-1" hidden={view !== 'preview'}>
+            <div className="border-b border-border px-5 py-4">
+              <label className="flex flex-wrap items-center gap-3 text-sm"><span className="font-medium">Preview for</span><select className="rounded-md border border-border bg-background px-3 py-2" aria-label="Preview for" value={previewTab} onChange={e => setPreviewTab(e.target.value as PreviewTab)}>{previewOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">{isDirty ? 'Includes your unsaved edits. ' : ''}This previews Overdeck’s context layers. It is not a transcript or a complete view of the harness’s system prompt.</p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={!isDirty || actionPending || !selectedLayer}
-                onClick={() => void saveSelectedLayer(false)}
-              >
-                {saveMutation.isPending && !syncMutation.isPending ? 'Saving…' : 'Save'}
-              </button>
-              <button
-                type="button"
-                className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={!isDirty || actionPending || !selectedLayer}
-                onClick={() => void saveSelectedLayer(true)}
-              >
-                {actionPending && syncMutation.isPending ? 'Syncing…' : 'Save & Sync'}
-              </button>
+            <div className="p-5" aria-live="polite">
+              {previewError ? <p role="alert" className="text-sm text-destructive">Could not render preview: {previewError}. Edit the source to try again.</p> : previewText ? <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-6">{previewText}</pre> : <p className="text-sm text-muted-foreground">{selectedLayer ? 'Rendering preview…' : 'Select an available source to preview its context.'}</p>}
+            </div>
+          </div>
+          <div className="border-t border-border px-5 py-3 text-xs" aria-live="polite">
+            {diagnostics.length > 0 ? <ul className="space-y-2">{diagnostics.map((diagnostic, index) => <li key={`${diagnostic.message}-${index}`} className={diagnostic.level === 'error' ? 'text-destructive' : 'text-warning-foreground'}>{diagnosticsLabel(diagnostic)}</li>)}</ul> : <p className="text-muted-foreground">{previewResponse ? 'No validation issues.' : selectedLayer ? 'Validation updates with the preview.' : 'No source selected.'}</p>}
+          </div>
+          <footer className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-background px-5 py-3">
+            <div className="text-xs text-muted-foreground">{actionError ? <span role="alert" className="text-destructive">{actionError}</span> : isDirty ? 'Unsaved changes' : 'No unsaved changes'}</div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className="rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50" disabled={!isDirty || actionPending || !selectedLayer} onClick={() => void saveSelectedLayer(false)}>{saveMutation.isPending && !syncMutation.isPending ? 'Saving…' : 'Save'}</button>
+              <button type="button" className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50" disabled={!isDirty || actionPending || !selectedLayer} onClick={() => void saveSelectedLayer(true)}>{syncMutation.isPending ? 'Refreshing…' : 'Save & refresh outputs'}</button>
             </div>
           </footer>
-        </div>
-
-        <aside className="flex w-[28rem] shrink-0 flex-col overflow-hidden border-l border-border bg-card/30">
-          <div className="shrink-0 border-b border-border p-4">
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Preview</p>
-            <div className="mt-3 grid grid-cols-3 gap-1 rounded-lg bg-muted p-1">
-              {([
-                ['claude-code', 'Claude Code output'],
-                ['ohmypi', 'oh-my-pi output'],
-                ['fullPrompt', 'Full injected prompt'],
-              ] as const).map(([tab, label]) => (
-                <button
-                  key={tab}
-                  type="button"
-                  className={`rounded-md px-2 py-1.5 text-xs transition-colors ${previewTab === tab ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
-                  onClick={() => setPreviewTab(tab)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-auto p-4">
-            {previewError ? (
-              <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{previewError}</div>
-            ) : previewMutation.isPending && !previewText ? (
-              <p className="text-sm text-muted-foreground">Rendering preview…</p>
-            ) : previewText ? (
-              <pre className="whitespace-pre-wrap rounded-lg border border-border bg-background p-3 text-xs leading-5 text-foreground">{previewText}</pre>
-            ) : (
-              <p className="text-sm text-muted-foreground">Preview updates after the editor changes.</p>
-            )}
-          </div>
-
-          <div className="max-h-40 shrink-0 overflow-auto border-t border-border p-4">
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Validation</p>
-            {diagnostics.length > 0 ? (
-              <ul className="mt-2 space-y-2 text-xs">
-                {diagnostics.map((diagnostic, index) => (
-                  <li key={`${diagnostic.message}-${index}`} className={diagnostic.level === 'error' ? 'text-destructive' : 'text-warning-foreground'}>
-                    {diagnosticsLabel(diagnostic)}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-2 text-xs text-muted-foreground">No validation issues.</p>
-            )}
-          </div>
-        </aside>
-      </section>
+        </section>
+      </div>
     </div>
   );
 }

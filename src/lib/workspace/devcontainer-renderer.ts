@@ -132,7 +132,10 @@ export function processTemplatesSync(
   const steps: string[] = [];
   if (!existsSync(templateDir)) return steps;
 
-  if (mappings && mappings.length > 0) {
+  // An explicitly empty mapping list means "process none". This distinction
+  // lets callers filter harness-native targets without accidentally falling
+  // back to the process-every-template behavior.
+  if (mappings !== undefined) {
     for (const { source, target } of mappings) {
       const sourcePath = join(templateDir, source);
       const targetPath = join(targetDir, target);

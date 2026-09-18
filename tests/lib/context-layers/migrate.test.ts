@@ -31,21 +31,22 @@ describe('migrateDevroot', () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  it('copies CLAUDE.md to global.md and skills into the global layer', () => {
+  it('leaves legacy CLAUDE.md untouched and copies only explicit skill sources', () => {
     const result = migrateDevroot({ oldClaudeDir, projectsRoot });
     expect(result.detected).toBe(true);
-    expect(existsSync(globalContextFile())).toBe(true);
-    expect(readFileSync(globalContextFile(), 'utf-8')).toBe('old global content');
+    expect(existsSync(globalContextFile())).toBe(false);
+    expect(readFileSync(join(oldClaudeDir, 'CLAUDE.md'), 'utf-8')).toBe('old global content');
     expect(existsSync(join(globalSkillsDir(), 'demo-skill', 'SKILL.md'))).toBe(true);
   });
 
-  it('never overwrites an existing target — idempotent on re-run', () => {
+  it('never overwrites an existing skill target — idempotent on re-run', () => {
     migrateDevroot({ oldClaudeDir, projectsRoot });
-    writeFileSync(globalContextFile(), 'edited by the user');
+    const target = join(globalSkillsDir(), 'demo-skill', 'SKILL.md');
+    writeFileSync(target, 'edited by the user');
 
     const second = migrateDevroot({ oldClaudeDir, projectsRoot });
-    expect(readFileSync(globalContextFile(), 'utf-8')).toBe('edited by the user');
-    expect(second.skipped.some((s) => s.includes('global.md'))).toBe(true);
+    expect(readFileSync(target, 'utf-8')).toBe('edited by the user');
+    expect(second.skipped.some((s) => s.includes('skills/'))).toBe(true);
   });
 
   it('never deletes the source devroot content', () => {

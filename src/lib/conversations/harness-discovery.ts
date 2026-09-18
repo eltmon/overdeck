@@ -10,7 +10,7 @@ import { promises as fs } from 'fs';
 import { homedir } from 'os';
 import { basename, join } from 'path';
 
-export type DiscoveredHarness = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'muse';
+export type DiscoveredHarness = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
 
 export interface DiscoveredFile {
   jsonlPath: string;
@@ -142,11 +142,15 @@ async function collectAgentDirFiles(root: string, warnings: string[] = []): Prom
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const agentDir = join(root, entry.name);
-    const agentHarness = await readAgentHarness(agentDir);
+    let agentHarness = await readAgentHarness(agentDir);
+    if (!agentHarness && (entry.name.startsWith('conv-') || entry.name.startsWith('conversation-'))) {
+      const { getConversationByTmuxSession } = await import('../overdeck/conversations.js');
+      agentHarness = getConversationByTmuxSession(entry.name)?.harness ?? null;
+    }
     const piHarness = agentHarness === 'pi' || agentHarness === 'ohmypi' ? agentHarness : 'ohmypi';
 
     result.push(...await collectPiFamilyRoot(join(agentDir, 'sessions'), piHarness, warnings));
-    await collectAgentRootFiles(agentDir, piHarness, warnings, result);
+    await collectAgentRootFiles(agentDir, piHarness, warnings, result, agentHarness === 'opencode' ? 'opencode' : 'acp');
     await collectJsonlFiles(join(agentDir, 'codex-home', 'sessions'), join(agentDir, 'codex-home', 'sessions'), 'codex', warnings, result);
     for (const jsonlPath of await listMuseSessionPaths(entry.name, root)) {
       result.push({ projectDir: agentDir, jsonlPath, harness: 'muse' });
@@ -161,6 +165,7 @@ async function collectAgentRootFiles(
   piHarness: 'pi' | 'ohmypi',
   warnings: string[],
   result: DiscoveredFile[],
+  acpHarness: 'acp' | 'opencode',
 ): Promise<void> {
   let entries: import('fs').Dirent[];
   try {
@@ -176,7 +181,7 @@ async function collectAgentRootFiles(
     const name = String(entry.name);
     if (!entry.isFile()) continue;
     if (name === 'acp-session.jsonl') {
-      result.push({ projectDir: agentDir, jsonlPath: join(agentDir, name), harness: 'acp' });
+      result.push({ projectDir: agentDir, jsonlPath: join(agentDir, name), harness: acpHarness });
     } else if (isPiWorkAgentJsonl(name)) {
       result.push({ projectDir: agentDir, jsonlPath: join(agentDir, name), harness: piHarness });
     }

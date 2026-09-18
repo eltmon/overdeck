@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { appendFile, chmod, mkdir, rm, writeFile } from 'node:fs/promises';
+import { appendFile, chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer, type Server, type ServerResponse } from 'node:http';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
@@ -46,6 +46,7 @@ export interface CodexAppServerHostOptions {
   model?: string;
   effort?: string;
   resumeThreadId?: string;
+  developerInstructions?: string;
   overdeckHome?: string;
   codexHome?: string;
   manager?: AppServerHostManager;
@@ -176,7 +177,14 @@ export class CodexAppServerHost {
 
     const state = this.manager.getState();
     if (!state.threadId) {
-      const threadOptions: ThreadOptions = { model, cwd: this.options.cwd, runtimeMode: 'default' };
+      const threadOptions: ThreadOptions = {
+        model,
+        cwd: this.options.cwd,
+        runtimeMode: 'default',
+        ...(this.options.developerInstructions
+          ? { developerInstructions: this.options.developerInstructions }
+          : {}),
+      };
       if (this.options.resumeThreadId) await this.manager.resumeThread(this.options.resumeThreadId, threadOptions);
       else await this.manager.startThread(threadOptions);
       this.threadModel = model;
@@ -472,12 +480,18 @@ function extractThreadId(message: AppServerMessage): string | undefined {
   return typeof thread.id === 'string' ? thread.id : typeof params.threadId === 'string' ? params.threadId : undefined;
 }
 
-function parseArgs(argv: string[]): { resumeThreadId?: string; model?: string; effort?: string } {
-  const parsed: { resumeThreadId?: string; model?: string; effort?: string } = {};
+function parseArgs(argv: string[]): { resumeThreadId?: string; model?: string; effort?: string; developerInstructionFiles: string[] } {
+  const parsed: { resumeThreadId?: string; model?: string; effort?: string; developerInstructionFiles: string[] } = {
+    developerInstructionFiles: [],
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--resume') parsed.resumeThreadId = argv[++index];
     else if (arg === '--model') parsed.model = argv[++index];
+    else if (arg === '--developer-instructions-file') {
+      const file = argv[++index];
+      if (file) parsed.developerInstructionFiles.push(file);
+    }
     else if (arg === '--effort') parsed.effort = argv[++index];
   }
   return parsed;
@@ -487,12 +501,16 @@ async function main(): Promise<void> {
   const agentId = process.env.OVERDECK_AGENT_ID;
   if (!agentId) throw new Error('OVERDECK_AGENT_ID is required for codex app-server host.');
   const args = parseArgs(process.argv.slice(2));
+  const developerInstructions = (
+    await Promise.all(args.developerInstructionFiles.map((file) => readFile(file, 'utf-8')))
+  ).filter((content) => content.trim()).join('\n\n---\n\n');
   const host = new CodexAppServerHost({
     agentId,
     cwd: process.cwd(),
     model: args.model,
     effort: args.effort,
     resumeThreadId: args.resumeThreadId,
+    developerInstructions: developerInstructions || undefined,
     codexHome: process.env.CODEX_HOME,
     stdin: process.stdin,
     stdout: process.stdout,

@@ -311,7 +311,7 @@ describe('Planning prompt includes xBRIEF field placeholders', () => {
         comments: [],
       },
       TEST_DIR,
-      'claude-opus-4-6'
+      'test-model'
     );
 
     expect(prompt).toContain('xBRIEFInfo');
@@ -319,15 +319,15 @@ describe('Planning prompt includes xBRIEF field placeholders', () => {
     expect(prompt).toContain('uid');
     expect(prompt).toContain('sequence');
     expect(prompt).toContain('references');
-    expect(prompt).toContain('agent:claude-opus-4-6');
+    expect(prompt).toContain('agent:test-model');
   });
 });
 
 // ─── PRD discovery ────────────────────────────────────────────────────────────
 
-describe('PRD discovery scans docs/prds/ for issue-matching files', () => {
-  it('includes discovered PRD path in references when file matches', async () => {
-    // Create a PRD file matching issue ID
+describe('legacy docs/prds discovery is removed from the planning prompt', () => {
+  it('does not reference docs/prds files even when one matches the issue', async () => {
+    // Create a legacy PRD file matching issue ID — must be ignored
     const prdDir = join(TEST_DIR, 'docs', 'prds', 'active');
     mkdirSync(prdDir, { recursive: true });
     writeFileSync(join(prdDir, 'PAN-999-plan.md'), '# Plan for PAN-999\n');
@@ -343,10 +343,11 @@ describe('PRD discovery scans docs/prds/ for issue-matching files', () => {
         comments: [],
       },
       TEST_DIR,
-      'claude-opus-4-6'
+      'test-model'
     );
 
-    expect(prompt).toContain('PAN-999-plan.md');
+    expect(prompt).not.toContain('PAN-999-plan.md');
+    expect(prompt).not.toContain('docs/prds');
   });
 
   it('does not error when no PRD exists for the issue', async () => {
@@ -362,7 +363,7 @@ describe('PRD discovery scans docs/prds/ for issue-matching files', () => {
         comments: [],
       },
       TEST_DIR,
-      'claude-opus-4-6'
+      'test-model'
     )).resolves.toBeDefined();
   });
 });

@@ -600,6 +600,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
         // When running in container, don't set host cwd (irrelevant)
         const useHostCwd = !isRemote && !(gate.container && gate.container_name);
         const env = buildQualityGateEnv(gate.env);
+        if (admission) env.OVERDECK_GATE_ADMITTED = '1';
         const execPromise = execAsync(resolvedCommand, {
           cwd: useHostCwd ? cwd : undefined,
           env,
