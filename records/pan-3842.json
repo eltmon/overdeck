@@ -194,23 +194,22 @@
     "recordedAt": "2026-09-18T07:31:28.942Z"
   },
   "created": "2026-09-16T19:16:49.560Z",
-  "updated": "2026-09-18T08:17:48.271Z",
+  "updated": "2026-09-18T08:28:20.828Z",
   "pipeline": {
     "issueId": "PAN-3842",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T08:17:47.966Z",
-    "reviewNotes": "Verification failed at test — fix and resubmit",
+    "updatedAt": "2026-09-18T08:28:20.762Z",
+    "reviewNotes": "Tier fitness lands on all three surfaces and never blocks; 30/30 files reviewed across four dimensions, no blockers, 2 advisory notes (by_kind difficulty, deprecated-id badge)",
     "mergeNotes": "Review stale: approved ff31b427, workspace HEAD is ad879ac7. Run pan done or pan review request to re-review.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3851",
-    "reviewedAtCommit": "ff31b42704cd1c4aad54547e796b30f6f2daac4f",
+    "reviewedAtCommit": "097e315edccbbc5921178c8be60f95183ee317f5",
     "lastVerifiedCommit": "097e315edccbbc5921178c8be60f95183ee317f5",
-    "reviewRequestedAt": "2026-09-18T08:17:27.797Z",
     "reviewSpawnedAt": "2026-09-18T08:17:47.965Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -348,7 +347,7 @@
       },
       "costAtCloseOut": {
         "usd": 19.952098,
-        "pricingAsOf": "2026-09-18T08:17:48.118Z"
+        "pricingAsOf": "2026-09-18T08:28:20.807Z"
       }
     },
     "merges": [
