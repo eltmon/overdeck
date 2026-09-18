@@ -1,13 +1,30 @@
+/**
+ * Prime Agent live production-path smoke (PAN-3668).
+ *
+ * This suite drives a real `prime-agent` binary against a real provider, so it
+ * lives in the opt-in slow lane: `vitest.config.ts` excludes every
+ * `*.slow.test.ts` file from `npm test`, from CI, and from the verification
+ * gate unless `VITEST_INCLUDE_SLOW=1` is set. It carries no `.skip`/`.skipIf`:
+ * an enabled run that is missing its prerequisites fails loudly with an
+ * actionable error instead of reporting a silent pass.
+ *
+ * Run it with:
+ *   VITEST_INCLUDE_SLOW=1 npx vitest run tests/integration/prime-agent-smoke.slow.test.ts
+ *
+ * Prerequisites: a `prime-agent` binary on PATH (or a configured executable
+ * path) and provider credentials for the selected model. Override the model
+ * with `OVERDECK_PRIME_AGENT_MODEL`.
+ */
 import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { requireHarnessBinary } from '../../src/lib/harness-binary.js';
 import { buildPrimeAgentBaseCommand } from '../../src/lib/prime-agent/launch-command.js';
 import { deliverPrimeAgentMessage, postPrimeAgentHost } from '../../src/lib/prime-agent/session-controller.js';
 import { createPrimeAgentRuntimeSync } from '../../src/lib/runtimes/prime-agent.js';
 
-const runLive = process.env.OVERDECK_PRIME_AGENT_LIVE === '1';
 const model = process.env.OVERDECK_PRIME_AGENT_MODEL ?? 'gpt-5.4-mini';
 const children: ChildProcess[] = [];
 
@@ -20,11 +37,17 @@ async function waitUntil(predicate: () => boolean | Promise<boolean>, timeoutMs 
   throw new Error('Timed out waiting for Prime Agent production host');
 }
 
+beforeAll(async () => {
+  // Fail fast with the installation guidance instead of spawning a shell that
+  // never produces a host and timing out 120s later inside waitUntil().
+  await requireHarnessBinary('prime-agent');
+});
+
 afterEach(() => {
   for (const child of children.splice(0)) if (child.exitCode === null) child.kill('SIGTERM');
 });
 
-describe.skipIf(!runLive)('Prime Agent production-path smoke', () => {
+describe('Prime Agent production-path smoke', () => {
   it('launches, delivers, uses a tool, reports cached stats, and resumes through the host', async () => {
     const root = await mkdtemp(join(tmpdir(), 'pan-prime-agent-smoke-'));
     process.env.OVERDECK_HOME = root;

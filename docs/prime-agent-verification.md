@@ -12,7 +12,7 @@ Verified on 2026-08-12 for PAN-3668 with Prime Agent 0.7.2 and Node.js 22.22.0.
 | `npm test` | 13,664 tests passed and 51 skipped. Two unrelated 5-second setup hooks timed out under full-suite load; both files passed immediately in a focused rerun (5/5 tests). |
 | Prime focused and no-loss tests | Passed, including the live smoke, runtime registry, parser, policy, picker, transcript, artifact, telemetry, and canonical-harness matrices. |
 
-The opt-in live test is `tests/integration/prime-agent-smoke.test.ts`. Run it with `OVERDECK_PRIME_AGENT_LIVE=1 npx vitest run tests/integration/prime-agent-smoke.test.ts`. Provider and model overrides are available through `OVERDECK_PRIME_AGENT_PROVIDER` and `OVERDECK_PRIME_AGENT_MODEL`.
+The opt-in live test is `tests/integration/prime-agent-smoke.slow.test.ts`. It lives in the slow lane, which `vitest.config.ts` excludes from `npm test`, from CI, and from the verification gate unless `VITEST_INCLUDE_SLOW=1` is set, so it never needs a `.skip` or `.skipIf` guard. Run it with `VITEST_INCLUDE_SLOW=1 npx vitest run tests/integration/prime-agent-smoke.slow.test.ts`. It requires a `prime-agent` binary and provider credentials; without the binary the suite fails immediately with the installation guidance rather than reporting a pass. Override the model with `OVERDECK_PRIME_AGENT_MODEL`.
 
 ## Live Prime Agent smoke
 
