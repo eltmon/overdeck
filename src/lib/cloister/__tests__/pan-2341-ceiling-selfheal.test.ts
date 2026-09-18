@@ -189,6 +189,10 @@ describe('PAN-2341 ceiling self-heal regression', () => {
         });
         return reviewRows[issueId];
       }),
+      // PAN-3894 (W7): the journal is what makes this a real fold — its
+      // updatedAt is newer than the raw 'reviewing' row, which is exactly the
+      // condition the read door uses to merge it.
+      readJournalStatusSync: vi.fn(() => ({ updatedAt: '2026-07-07T12:09:00.000Z' })),
       listSessionNames: vi.fn(async () => [...aliveSessions]),
       getAgentStateSync: vi.fn((session: string) => agentRows.get(session) ?? null),
       saveAgentStateSync: vi.fn((state: AgentState) => { agentRows.set(state.id, state); }),

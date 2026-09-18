@@ -129,17 +129,20 @@ describe('coordinateSwarmSlots enumerate-swarms', () => {
     await expect(coordinateSwarmSlots()).resolves.toEqual([]);
   });
 
-  it('wires runPatrol between failed-merge retry and stale merge reconciliation', () => {
+  it('wires runPatrol between the merge-stuck safety net and stale merge reconciliation', () => {
     const source = readFileSync(join(process.cwd(), 'src/lib/cloister/deacon.ts'), 'utf-8');
-    const failedMergeIndex = source.indexOf("const failedMergeRetryActions = await runBudgetedPatrol('checkFailedMergeRetry', () => checkFailedMergeRetry());");
+    // PAN-3894 moved checkFailedMergeRetry to the housekeeping scheduler, so the
+    // preceding anchor is now the merge-stuck safety net, the last tick patrol
+    // before strike landings. The ordering under test is unchanged.
+    const mergeStuckIndex = source.indexOf("const mergeStuckActions = await runBudgetedPatrol('checkReadyForMergeStuck', () => runShadowablePatrol('checkReadyForMergeStuck'");
     const strikeLandingIndex = source.indexOf("for (const a of await runBudgetedPatrol('patrolStrikeLandings', () => patrolStrikeLandings()))");
     const swarmIndex = source.indexOf("const swarmActions = await runBudgetedPatrol('swarmJanitorPass', () => swarmJanitorPass());");
     const staleMergeIndex = source.indexOf("const staleMergeActions = await runBudgetedPatrol('reconcileStaleMergeStatus', () => runShadowablePatrol('reconcileStaleMergeStatus'");
 
-    expect(failedMergeIndex).toBeGreaterThanOrEqual(0);
+    expect(mergeStuckIndex).toBeGreaterThanOrEqual(0);
     expect(source).toContain("import { patrolStrikeLandings } from './deacon-strike-landing.js';");
     expect(source).not.toContain("import('./deacon-strike-landing.js')");
-    expect(strikeLandingIndex).toBeGreaterThan(failedMergeIndex);
+    expect(strikeLandingIndex).toBeGreaterThan(mergeStuckIndex);
     expect(swarmIndex).toBeGreaterThan(strikeLandingIndex);
     expect(staleMergeIndex).toBeGreaterThan(swarmIndex);
     expect(source).toContain("export { coordinateSwarmSlots } from './deacon-swarm.js';");
