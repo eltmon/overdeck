@@ -233,9 +233,9 @@ export interface TerminalVerdictSettlement {
 }
 
 export interface EvaluateDodGateDeps {
-  review: (issueId: string, settlement?: TerminalVerdictSettlement) => DodRowResult | Promise<DodRowResult>;
-  tests: (issueId: string, settlement?: TerminalVerdictSettlement) => DodRowResult | Promise<DodRowResult>;
-  verification: (issueId: string, settlement?: TerminalVerdictSettlement) => DodRowResult | Promise<DodRowResult>;
+  review: (issueId: string, settlement?: TerminalVerdictSettlement, landing?: LandingEvidence) => DodRowResult | Promise<DodRowResult>;
+  tests: (issueId: string, settlement?: TerminalVerdictSettlement, landing?: LandingEvidence) => DodRowResult | Promise<DodRowResult>;
+  verification: (issueId: string, settlement?: TerminalVerdictSettlement, landing?: LandingEvidence) => DodRowResult | Promise<DodRowResult>;
   merged: (ctx: LifecycleContext) => MergedDodRowResult | Promise<MergedDodRowResult>;
   postMerge: (ctx: LifecycleContext, merged?: MergedDodRowResult) => DodRowResult | Promise<DodRowResult>;
   mainVerify: (ctx: LifecycleContext, mergeCommit?: string) => DodRowResult | Promise<DodRowResult>;
@@ -251,9 +251,9 @@ export interface EvaluateDodGateDeps {
 }
 
 const defaultEvaluateDodGateDeps: EvaluateDodGateDeps = {
-  review: (issueId, settlement) => checkReviewRow(issueId, defaultDeps, settlement),
-  tests: (issueId, settlement) => checkTestsRow(issueId, defaultDeps, settlement),
-  verification: (issueId, settlement) => checkVerificationRow(issueId, defaultDeps, settlement),
+  review: (issueId, settlement, landing) => checkReviewRow(issueId, defaultDeps, settlement, landing),
+  tests: (issueId, settlement, landing) => checkTestsRow(issueId, defaultDeps, settlement, landing),
+  verification: (issueId, settlement, landing) => checkVerificationRow(issueId, defaultDeps, settlement, landing),
   merged: checkMergedRow,
   postMerge: checkPostMergeRow,
   mainVerify: checkMainVerifyRow,
@@ -891,10 +891,13 @@ export async function evaluateDodGate(
     landedWork: merged.status === 'pass',
     mainVerifyStatus: mainVerify.status,
   };
+  // PAN-3917: "this landed as a strike" is derived from branch containment on
+  // row 4, not from a stored strikeLandingState.
+  const landing: LandingEvidence = { strikeLanded: Boolean(merged.containedStrikeHead) };
   const [review, tests, verification, postMerge, ship, deploy] = await Promise.all([
-    deps.review(ctx.issueId, settlement),
-    deps.tests(ctx.issueId, settlement),
-    deps.verification(ctx.issueId, settlement),
+    deps.review(ctx.issueId, settlement, landing),
+    deps.tests(ctx.issueId, settlement, landing),
+    deps.verification(ctx.issueId, settlement, landing),
     deps.postMerge(ctx, merged),
     deps.ship(ctx),
     deps.deploy(ctx, {

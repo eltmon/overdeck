@@ -17,8 +17,10 @@ import { join } from 'node:path';
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { packageRoot, getOverdeckHome } from '../paths.js';
 import { listProjectsAsync, getProjectSync } from '../projects.js';
-import { resolveStateReadHomeAsync } from '../state-read-home.js';
-import { listIssueRecordsDetailed } from '../pan-dir/record-list.js';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
 
 export const RETROSPECTIVE_WINDOWS = {
   '24h': { label: 'last 24 hours', ms: 24 * 60 * 60 * 1000 },
@@ -30,8 +32,6 @@ export const DEFAULT_RETROSPECTIVE_WINDOW: RetrospectiveWindow = '24h';
 export interface RetrospectiveProjectLine {
   key: string;
   path: string;
-  stateRoot: string;
-  migrated: boolean;
   githubRepo?: string;
 }
 
@@ -69,9 +69,7 @@ export function formatProjectLines(projects: RetrospectiveProjectLine[]): string
   return projects
     .map(
       (p) =>
-        `- ${p.key}: repo ${p.path}; state root ${p.stateRoot} (${
-          p.migrated ? 'migrated layout' : 'legacy .pan layout'
-        }); github ${p.githubRepo ?? 'none'}`,
+        `- ${p.key}: repo ${p.path}; github ${p.githubRepo ?? 'none'}`,
     )
     .join('\n');
 }
@@ -107,18 +105,11 @@ export async function loadRetrospectiveTemplate(
 
 export async function collectRetrospectiveProjects(): Promise<RetrospectiveProjectLine[]> {
   const projects = await listProjectsAsync();
-  const lines: RetrospectiveProjectLine[] = [];
-  for (const { key, config } of projects) {
-    const home = await resolveStateReadHomeAsync(config, key);
-    lines.push({
-      key,
-      path: config.path,
-      stateRoot: home.root,
-      migrated: home.migrated,
-      githubRepo: config.github_repo,
-    });
-  }
-  return lines;
+  return projects.map(({ key, config }) => ({
+    key,
+    path: config.path,
+    githubRepo: config.github_repo,
+  }));
 }
 
 export async function handleRetrospectiveConversationCreate(
@@ -132,7 +123,7 @@ export async function handleRetrospectiveConversationCreate(
     /** Injected for tests; defaults to the canonical issue-record read door. */
     listRecords?: (
       project: RetrospectiveProjectLine,
-    ) => Promise<RetrospectiveSourceRecord[] | RetrospectiveRecordListing>;
+    ) => Promise<RetrospectiveSourceIssue[] | RetrospectiveRecordListing>;
   },
 ): Promise<ReturnType<typeof jsonResponse>> {
   if (!isRetrospectiveRequestBody(body)) {
@@ -187,9 +178,6 @@ export async function handleRetrospectiveConversationCreate(
 export const EVIDENCE_LIMITS = {
   maxIssuesPerProject: 40,
   maxFeedbackPerIssue: 10,
-  maxSessionsPerIssue: 20,
-  maxRecoveryTripsPerIssue: 10,
-  maxScopeDriftFiles: 15,
   /**
    * Global ceiling on the rendered snapshot. handleConversationCreate caps the
    * whole kickoff message, so an unbounded snapshot does not just bloat the
@@ -200,19 +188,25 @@ export const EVIDENCE_LIMITS = {
   maxRenderedBytes: 262_144,
 } as const;
 
+/**
+ * What one issue did in the window, read from its owners (PAN-3917): the
+ * tracker owns the issue and its labels, the forge owns the pull request, its
+ * review decision and its checks.
+ */
 export interface RetrospectiveIssueEvidence {
   issueId: string;
+  title?: string;
   updated?: string;
-  harness?: string;
-  model?: string;
-  pipeline: Record<string, unknown>;
-  feedback: { seq: number; specialist: string; outcome: string; timestamp: string }[];
-  feedbackTruncated: number;
-  sessionHistory: { timestamp: string; reason: string; agentModel?: string }[];
-  sessionHistoryTruncated: number;
-  recoveryTrips: { recoveryPath: string; tripCount: number; open: boolean; needsYouEmittedAt?: string }[];
-  recoveryTripsTruncated: number;
-  scopeDrift?: { outsideDeclaredScope: string[]; declaredScopeUntouched: string[]; truncated: number };
+  /** Tracker state: `OPEN` or `CLOSED`. */
+  state?: string;
+  labels: string[];
+  pullRequest?: {
+    number: number;
+    state: string;
+    reviewDecision?: string;
+    mergedAt?: string;
+    checks?: string;
+  };
 }
 
 export interface RetrospectiveProjectEvidence {
@@ -222,28 +216,14 @@ export interface RetrospectiveProjectEvidence {
   outOfWindow: number;
   /** Records with no usable `updated` timestamp — kept, but flagged as undatable. */
   undated: number;
-  /** Records dated after `now` (clock skew or hand edit) — excluded, not silently ranked first. */
+  /** Issues dated after `now` (clock skew) — excluded, not silently ranked first. */
   future: number;
-  /** Directories or record files the read door could not read for this project. */
+  /** Trackers or forges this project's evidence could not be read from. */
   unreadable: { path: string; message: string }[];
   /** Issues dropped by the per-project cap. */
   truncated: number;
   /** Populated when the read door itself failed for this project. */
   unavailable?: string;
-}
-
-const PIPELINE_EVIDENCE_KEYS = [
-  'reviewStatus', 'reviewedAtCommit', 'reviewSpawnedAt', 'testStatus', 'uatStatus',
-  'uatNotes', 'verificationStatus', 'verificationNotes', 'mergeStatus', 'prUrl',
-] as const;
-
-function pickPipeline(pipeline: Record<string, unknown> | undefined): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  if (!pipeline) return out;
-  for (const key of PIPELINE_EVIDENCE_KEYS) {
-    if (pipeline[key] !== undefined && pipeline[key] !== null) out[key] = pipeline[key];
-  }
-  return out;
 }
 
 /**
@@ -266,84 +246,36 @@ export function isRecordInWindow(
   return parsed >= windowStart.getTime() ? 'in' : 'out';
 }
 
-/**
- * Newest-first, stable for entries whose timestamp is missing or unparseable
- * (those sort last, keeping their original relative order). The canonical
- * record stores these arrays append-only, i.e. OLDEST first, so slicing without
- * sorting keeps the oldest N and discards exactly the recent activity a
- * retrospective is about.
- */
-function newestFirst<T>(items: T[], timestampOf: (item: T) => string | undefined): T[] {
-  return items
-    .map((item, index) => ({ item, index, at: Date.parse(timestampOf(item) ?? '') }))
-    .sort((a, b) => {
-      const aBad = Number.isNaN(a.at);
-      const bBad = Number.isNaN(b.at);
-      if (aBad && bBad) return a.index - b.index;
-      if (aBad) return 1;
-      if (bBad) return -1;
-      if (a.at !== b.at) return b.at - a.at;
-      return a.index - b.index;
-    })
-    .map((entry) => entry.item);
-}
-
-function projectIssueEvidence(record: RetrospectiveSourceRecord): RetrospectiveIssueEvidence {
-  // Sort before slicing: these arrays are append-only oldest-first, so a plain
-  // slice would keep the oldest entries and drop the newest.
-  const feedback = newestFirst(record.feedback ?? [], (f) => f.timestamp);
-  const sessions = newestFirst(record.sessionHistory ?? [], (s) => s.timestamp);
-  const trips = newestFirst(record.recoveryTrips ?? [], (t) => t.needsYouEmittedAt);
-  const drift = record.scopeDrift;
-  const driftOutside = drift?.outsideDeclaredScope ?? [];
-  const driftUntouched = drift?.declaredScopeUntouched ?? [];
+function projectIssueEvidence(issue: RetrospectiveSourceIssue): RetrospectiveIssueEvidence {
   return {
-    issueId: record.issueId,
-    updated: record.updated,
-    harness: record.harness,
-    model: record.model,
-    pipeline: pickPipeline(record.pipeline as Record<string, unknown> | undefined),
-    feedback: feedback.slice(0, EVIDENCE_LIMITS.maxFeedbackPerIssue).map((f) => ({
-      seq: f.seq, specialist: f.specialist, outcome: f.outcome, timestamp: f.timestamp,
-    })),
-    feedbackTruncated: Math.max(0, feedback.length - EVIDENCE_LIMITS.maxFeedbackPerIssue),
-    sessionHistory: sessions.slice(0, EVIDENCE_LIMITS.maxSessionsPerIssue).map((s) => ({
-      timestamp: s.timestamp, reason: s.reason, agentModel: s.agentModel,
-    })),
-    sessionHistoryTruncated: Math.max(0, sessions.length - EVIDENCE_LIMITS.maxSessionsPerIssue),
-    recoveryTrips: trips.slice(0, EVIDENCE_LIMITS.maxRecoveryTripsPerIssue).map((t) => ({
-      recoveryPath: t.recoveryPath, tripCount: t.tripCount, open: t.open, needsYouEmittedAt: t.needsYouEmittedAt,
-    })),
-    recoveryTripsTruncated: Math.max(0, trips.length - EVIDENCE_LIMITS.maxRecoveryTripsPerIssue),
-    scopeDrift: drift
-      ? {
-        outsideDeclaredScope: driftOutside.slice(0, EVIDENCE_LIMITS.maxScopeDriftFiles),
-        declaredScopeUntouched: driftUntouched.slice(0, EVIDENCE_LIMITS.maxScopeDriftFiles),
-        // Count BOTH arrays: reporting only the `outside` overflow understated
-        // the omission whenever `declaredScopeUntouched` was the longer list.
-        truncated: Math.max(0, driftOutside.length - EVIDENCE_LIMITS.maxScopeDriftFiles)
-          + Math.max(0, driftUntouched.length - EVIDENCE_LIMITS.maxScopeDriftFiles),
-      }
-      : undefined,
+    issueId: issue.issueId,
+    title: issue.title,
+    updated: issue.updated,
+    state: issue.state,
+    labels: issue.labels ?? [],
+    pullRequest: issue.pullRequest,
   };
 }
 
-/** The subset of the canonical record this bridge consumes. */
-export interface RetrospectiveSourceRecord {
+/** The subset of tracker + forge data this bridge consumes. */
+export interface RetrospectiveSourceIssue {
   issueId: string;
+  title?: string;
   updated?: string;
-  harness?: string;
-  model?: string;
-  pipeline?: unknown;
-  feedback?: { seq: number; specialist: string; outcome: string; timestamp: string }[];
-  sessionHistory?: { timestamp: string; reason: string; agentModel?: string }[];
-  recoveryTrips?: { recoveryPath: string; tripCount: number; open: boolean; needsYouEmittedAt?: string }[];
-  scopeDrift?: { outsideDeclaredScope?: string[]; declaredScopeUntouched?: string[] };
+  state?: string;
+  labels?: string[];
+  pullRequest?: {
+    number: number;
+    state: string;
+    reviewDecision?: string;
+    mergedAt?: string;
+    checks?: string;
+  };
 }
 
-/** What the read door returns when the caller needs failures as well as records. */
+/** What the read door returns when the caller needs failures as well as issues. */
 export interface RetrospectiveRecordListing {
-  records: RetrospectiveSourceRecord[];
+  records: RetrospectiveSourceIssue[];
   failures?: { path: string; message: string }[];
 }
 
@@ -355,11 +287,11 @@ export async function collectRetrospectiveEvidence(input: {
   /** Injected for tests; defaults to the canonical enumeration read door. */
   listRecords: (
     project: RetrospectiveProjectLine,
-  ) => Promise<RetrospectiveSourceRecord[] | RetrospectiveRecordListing>;
+  ) => Promise<RetrospectiveSourceIssue[] | RetrospectiveRecordListing>;
 }): Promise<RetrospectiveProjectEvidence[]> {
   const out: RetrospectiveProjectEvidence[] = [];
   for (const project of input.projects) {
-    let records: RetrospectiveSourceRecord[];
+    let records: RetrospectiveSourceIssue[];
     let unreadable: { path: string; message: string }[] = [];
     try {
       const listed = await input.listRecords(project);
@@ -385,7 +317,7 @@ export async function collectRetrospectiveEvidence(input: {
     let outOfWindow = 0;
     let undated = 0;
     let future = 0;
-    const kept: RetrospectiveSourceRecord[] = [];
+    const kept: RetrospectiveSourceIssue[] = [];
     for (const record of records) {
       if (!record?.issueId) continue;
       const verdict = isRecordInWindow(record.updated, input.windowStart, input.now);
@@ -437,24 +369,19 @@ export function formatEvidence(projects: RetrospectiveProjectEvidence[]): string
     if (project.truncated) notes.push(`${project.truncated} dropped by the ${EVIDENCE_LIMITS.maxIssuesPerProject}-issue cap (most recently updated kept)`);
     lines.push(`${notes.join('; ')}.${unreadableNote}`, '');
     for (const issue of project.issues) {
-      lines.push(`- **${issue.issueId}** (updated ${issue.updated ?? 'unknown'}${issue.model ? `, model ${issue.model}` : ''}${issue.harness ? `, harness ${issue.harness}` : ''})`);
-      const pipe = Object.entries(issue.pipeline);
-      lines.push(pipe.length
-        ? `  - pipeline: ${pipe.map(([k, v]) => `${k}=${JSON.stringify(v)}`).join(', ')}`
-        : '  - pipeline: (no populated fields)');
-      if (issue.feedback.length) {
-        lines.push(`  - feedback: ${issue.feedback.map((f) => `#${f.seq} ${f.specialist} ${f.outcome} @ ${f.timestamp}`).join(' | ')}${issue.feedbackTruncated ? ` (+${issue.feedbackTruncated} more not shown)` : ''}`);
-      }
-      if (issue.sessionHistory.length) {
-        const reasons = issue.sessionHistory.map((s) => `${s.reason}@${s.timestamp}`).join(' | ');
-        lines.push(`  - sessionHistory (${issue.sessionHistory.length}${issue.sessionHistoryTruncated ? ` of ${issue.sessionHistory.length + issue.sessionHistoryTruncated}` : ''}): ${reasons}`);
-      }
-      if (issue.recoveryTrips.length) {
-        lines.push(`  - recoveryTrips: ${issue.recoveryTrips.map((t) => `${t.recoveryPath} x${t.tripCount}${t.open ? ' OPEN' : ''}`).join(' | ')}${issue.recoveryTripsTruncated ? ` (+${issue.recoveryTripsTruncated} more)` : ''}`);
-      }
-      if (issue.scopeDrift) {
-        const d = issue.scopeDrift;
-        lines.push(`  - scopeDrift: ${d.outsideDeclaredScope.length} file(s) outside declared scope${d.truncated ? ` (+${d.truncated} more)` : ''}, ${d.declaredScopeUntouched.length} declared-but-untouched`);
+      const head = [`updated ${issue.updated ?? 'unknown'}`];
+      if (issue.state) head.push(issue.state.toLowerCase());
+      lines.push(`- **${issue.issueId}**${issue.title ? ` ${issue.title}` : ''} (${head.join(', ')})`);
+      if (issue.labels.length) lines.push(`  - labels: ${issue.labels.join(', ')}`);
+      if (issue.pullRequest) {
+        const pr = issue.pullRequest;
+        const bits = [`#${pr.number} ${pr.state}`];
+        if (pr.reviewDecision) bits.push(`review ${pr.reviewDecision}`);
+        if (pr.checks) bits.push(`checks ${pr.checks}`);
+        if (pr.mergedAt) bits.push(`merged ${pr.mergedAt}`);
+        lines.push(`  - pull request: ${bits.join(', ')}`);
+      } else {
+        lines.push('  - pull request: none');
       }
     }
     blocks.push(lines.join('\n'));
@@ -522,25 +449,56 @@ function applyRenderedByteBudget(blocks: string[]): string {
 }
 
 /**
- * Default adapter: the canonical issue-record read door. `listIssueRecords` is
- * that door's bounded enumeration facet and already resolves BOTH layouts —
- * the migrated `<stateRoot>/records/` and the legacy layout, which is
- * issue-workspace scoped (`<project>/.pan/records/` plus every
- * every per-issue workspace's own `.pan/records/` directory). We deliberately do not reimplement
- * that resolution here; reimplementing it is what produced the wrong legacy
- * path in the first place.
+ * Default adapter (PAN-3917): the tracker is the read door. GitHub owns the
+ * issues, their labels and their timestamps; the forge owns each issue's pull
+ * request, its review decision and its checks. Nothing is stored, so the
+ * retrospective can never report a stale copy of what happened.
+ *
+ * A project with no `github_repo` is reported as unreadable rather than quiet:
+ * a retrospective that claims silence it never verified is worse than a gap.
  */
 export async function listRecordsThroughReadDoor(
   project: RetrospectiveProjectLine,
 ): Promise<RetrospectiveRecordListing> {
-  const config = getProjectSync(project.key);
-  if (!config) throw new Error(`project "${project.key}" is not registered`);
-  // Detailed form: the array-only facet cannot distinguish "no records" from
-  // "the directory could not be read", and a retrospective that reports silence
-  // it never actually verified is worse than one that reports a gap.
-  const listed = await listIssueRecordsDetailed(config);
+  const repo = project.githubRepo;
+  if (!repo) {
+    return {
+      records: [],
+      failures: [{
+        path: project.path,
+        message: 'project declares no github_repo, so its tracker could not be queried',
+      }],
+    };
+  }
+
+  const { stdout } = await execFileAsync(
+    'gh',
+    [
+      'issue', 'list',
+      '--repo', repo,
+      '--state', 'all',
+      '--limit', String(EVIDENCE_LIMITS.maxIssuesPerProject),
+      '--json', 'number,title,state,updatedAt,labels',
+    ],
+    { encoding: 'utf-8', timeout: 30000, maxBuffer: 8 * 1024 * 1024 },
+  );
+
+  const prefix = repo.split('/')[1]?.toUpperCase() ?? project.key.toUpperCase();
+  const issues = JSON.parse(stdout) as Array<{
+    number: number;
+    title?: string;
+    state?: string;
+    updatedAt?: string;
+    labels?: Array<{ name?: string }>;
+  }>;
+
   return {
-    records: listed.records as unknown as RetrospectiveSourceRecord[],
-    failures: listed.failures.map((f) => ({ path: f.path, message: f.message })),
+    records: issues.map((issue) => ({
+      issueId: `${prefix}-${issue.number}`,
+      title: issue.title,
+      updated: issue.updatedAt,
+      state: issue.state,
+      labels: (issue.labels ?? []).map((label) => label.name).filter((name): name is string => !!name),
+    })),
   };
 }

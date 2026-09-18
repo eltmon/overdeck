@@ -13,7 +13,7 @@ export function registerRolloutCommands(program: Command): void {
 
   rollout
     .command('status <issueId>')
-    .description('Print the release set for an issue (releaseStatus + per-component status)')
+    .description('Print the release set for an issue (overall + per-component status)')
     .action(rolloutStatusCommand);
 
   rollout
