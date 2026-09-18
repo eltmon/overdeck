@@ -457,20 +457,20 @@ export async function shed(): Promise<ShedResult> {
   let verdict = await assessMemoryPressure();
   if (verdict.band !== 'hard') return result;
 
-  // PAN-2579: warm-idle advancing sessions (review/test/ship with a recorded
-  // terminal verdict, kept alive for fast re-review) are the cheapest agent shed —
+  // PAN-2579 (PAN-3917: idleness, not a stored verdict, names the warm set):
+  // warm-idle advancing sessions are the cheapest agent shed —
   // killing one loses no state (the next dispatch resumes the saved session with
   // its context) while an active work agent's pause loses momentum. Shed them
   // before touching any work agent. This shed — plus a reboot — is the ONLY
   // sanctioned way a warm session dies (see docs/ROLES.md warm-by-default policy).
   try {
-    const { listPipelineStatuses } = await import('../overdeck/pipeline-view.js');
     const { listSessionNames, killSession } = await import('../tmux.js');
-    const { selectNonMergedTerminalAdvancingSessions } = await import('./reap-terminal-sessions.js');
+    const { selectIdleAdvancingSessions } = await import('./reap-terminal-sessions.js');
+    const { isIdle } = await import('../agents/liveness.js');
     const { markAdvancingSessionStopped } = await import('./advancing-selfheal.js');
     const { Effect } = await import('effect');
     const aliveSessions = await Effect.runPromise(listSessionNames());
-    const warmIdle = selectNonMergedTerminalAdvancingSessions(listPipelineStatuses(), [...aliveSessions]);
+    const warmIdle = selectIdleAdvancingSessions([...aliveSessions], (agentId) => isIdle(agentId));
     for (const session of warmIdle) {
       if (verdict.band !== 'hard') break;
       try {

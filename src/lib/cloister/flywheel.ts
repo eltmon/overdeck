@@ -7,14 +7,13 @@ import type { FlywheelRunId } from '@overdeck/contracts';
 import type { AgentState } from '../agents.js';
 import type { FlywheelScope, RoleEffort } from '../config-yaml.js';
 import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
-import { getProjectPanPaths } from '../pan-dir/paths.js';
+import { getProjectPanPaths, resolvePlanHome } from '../pan-dir/paths.js';
 import { getAgentDir, spawnRun, stopAgent } from '../agents.js';
 import { parseSequenceMd } from '../backlog/sequence-io.js';
 import { computePredictedConflictSignals, declaredIssueFootprint, pickFromSequence, type IssueFileFootprint } from '../flywheel-merge-order.js';
 import { requireFlywheelBrief } from '../flywheel-start.js';
 import { findProjectByPathSync, getProjectSwarmHotspots } from '../projects.js';
 import { getBookAsync as getOrderBook } from '../orders/resolver.js';
-import { resolveStateReadHomeSync } from '../state-read-home.js';
 import type { XBriefDocument } from '../xbrief/types.js';
 import {
   getFlywheelActiveRunId,
@@ -55,12 +54,10 @@ export async function activeOrderBookIssues(
   const launch = await (deps.readLaunch ?? readFlywheelLaunchMetadata)(activeRunId);
   const bookId = launch?.orders?.bookId;
   if (!bookId) return new Set();
-  const stateRoot = deps.stateRoot?.(projectRoot) ?? (() => {
-    const project = findProjectByPathSync(projectRoot);
-    return project ? resolveStateReadHomeSync(project).root : null;
-  })();
-  if (!stateRoot) return new Set();
-  const book = await (deps.getBook ?? getOrderBook)(stateRoot, bookId);
+  // PAN-3917: order books live in the repo's plan home, not a state worktree.
+  const planHome = deps.stateRoot?.(projectRoot) ?? resolvePlanHome(projectRoot);
+  if (!planHome) return new Set();
+  const book = await (deps.getBook ?? getOrderBook)(planHome, bookId);
   return new Set(book?.items.map((item) => item.issue.toUpperCase()) ?? []);
 }
 

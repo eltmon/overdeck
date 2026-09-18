@@ -14,7 +14,6 @@ import {
   type AgentPlaneLifecycleEntry,
   type AgentPlaneTombstonePredicate,
 } from '../pan-dir/agents.js';
-import { readIssueRecordForWorkspaceSync } from '../pan-dir/record.js';
 import { getOverdeckHome } from '../paths.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { getAgentStateSync } from '../agents/agent-state.js';
@@ -31,7 +30,6 @@ import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { resolveProjectReposForIssueSync } from '../project-repos.js';
 import { listOpenPullRequestsSnapshot } from '../pipeline-membership-gather.js';
 import { listOpenGitLabMergeRequests } from '../gitlab-merge-requests.js';
-import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 
 export interface AgentGcResult { removed: string[]; preserved: string[] }
 export interface AgentGcRow {
@@ -106,15 +104,11 @@ async function hasOpenChangeRequest(agent: AgentGcRow): Promise<boolean> {
   return false;
 }
 
+/**
+ * PAN-3917: a review or test is in flight when a review or test agent for the
+ * issue is live. That is the fact; the status row was a copy of it.
+ */
 function hasInFlightReviewOrTest(agent: AgentGcRow): boolean {
-  const status = getPipelineStatus(agent.issueId);
-  if (
-    status?.reviewStatus === 'reviewing'
-    || status?.testStatus === 'testing'
-    || status?.verificationStatus === 'running'
-    || (status?.reviewStatus === 'pending' && Boolean(status.reviewRequestedAt))
-  ) return true;
-
   return listAllAgentsSync().some((candidate) =>
     candidate.issueId.toUpperCase() === agent.issueId.toUpperCase()
     && (candidate.role === 'review' || candidate.role === 'test')
@@ -123,8 +117,9 @@ function hasInFlightReviewOrTest(agent: AgentGcRow): boolean {
 
 function defaultTerminalityDeps(): AgentGcTerminalityDeps {
   return {
-    hasClosedOutFlag: (agent) => Boolean(agent.workspace
-      && readIssueRecordForWorkspaceSync(agent.workspace, agent.issueId)?.pipeline?.closedOut === true),
+    // PAN-3917: close-out is the tracker closing the issue, read by
+    // readTrackerState below. There is no separate closedOut flag.
+    hasClosedOutFlag: () => false,
     readTrackerState: readLiveTrackerIssueState,
     hasLiveTmuxSession: (agentId) => Effect.runPromise(sessionExists(agentId)),
     hasOpenChangeRequest,

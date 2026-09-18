@@ -3,7 +3,6 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
-import { setReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { listProjectsAsync, resolveProjectFromIssueSync } from '../projects.js';
 import { getAgentState } from '../agents/agent-state.js';
 import { hasAgentRuntimeInSubtree } from '../agents/runtime-command.js';
@@ -12,9 +11,8 @@ import { listPaneValues } from '../tmux.js';
 import { messageAgent, type MessageDeliveryOutcome } from '../agents/messaging.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
-import type { StrikeLandingAttempt } from '../strike-landing.js';
 import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
-import { deriveInFlightOwner, describeOwner, getPipelineStatus, listPipelineStatuses } from '../overdeck/pipeline-view.js';
+import { getPrFacts } from './pr-facts.js';
 const execFileAsync = promisify(execFile);
 export interface StrikeMergeRequest {
   kind: 'strike'; markerHead: string; workspacePath: string; branchName: string; recoveryTarget: string;
@@ -60,10 +58,9 @@ export async function requestStrikeMerge(
 }
 
 export interface StrikeLandingDeps {
-  loadStatuses: () => Record<string, ReviewStatus>;
-  getStatus: (issueId: string) => ReviewStatus | null;
-  setStatus: typeof setReviewStatusSync;
   resolveProject: typeof resolveProjectFromIssueSync;
+  /** The forge's account of the issue's PR — merged strikes are never re-landed. */
+  getFacts: (issueId: string) => Promise<{ merged: boolean }>;
   mergeIssue: StrikeMergeTrigger;
   getMainHead: (projectPath: string) => Promise<string>;
   deliverRecovery: (agentId: string, message: string, dedupKey: string) => Promise<MessageDeliveryOutcome>;
@@ -126,10 +123,8 @@ async function defaultIsStrikeAgentAlive(agentId: string): Promise<boolean> {
 
 function defaultDeps(): StrikeLandingDeps {
   return {
-    loadStatuses: listPipelineStatuses,
-    getStatus: getPipelineStatus,
-    setStatus: setReviewStatusSync,
     resolveProject: resolveProjectFromIssueSync,
+    getFacts: getPrFacts,
     mergeIssue: requestStrikeMerge,
     getMainHead: async (projectPath) => (await execFileAsync('git', ['rev-parse', 'origin/main'], { cwd: projectPath, encoding: 'utf8' })).stdout.trim(),
     // A recovery must arrive through the live delivery door. A keyed message
@@ -152,15 +147,50 @@ const TRANSPORT_BACKOFF_BASE_MS = 60_000;
 const TRANSPORT_BACKOFF_CAP_MS = 1_800_000;
 const MAX_TRANSPORT_RETRIES = 10;
 const NON_ACTIONABLE = /permission|merge guard|configured project|integration|infrastructure|unavailable|not registered|workspace does not exist|fetch failed|ECONNREFUSED|ECONNRESET|socket hang up|ETIMEDOUT|EAI_AGAIN/i;
-function attemptHistory(attempts: StrikeLandingAttempt[]): string {
+/**
+ * PAN-3917: the landing attempt history, the recovery counter, and the transport
+ * retry counter all lived on the review row. They are process memory now: a
+ * restart forgets them, which is correct — a fresh process re-derives the
+ * candidate set from git and retries, and the feedback file plus the needs-you
+ * announcement are the durable operator-facing record.
+ */
+interface StrikeAttempt {
+  timestamp: string;
+  strikeHead: string;
+  mainHead: string;
+  outcome: 'failed' | 'transport-failed';
+  detail: string;
+}
+
+const strikeAttempts = new Map<string, StrikeAttempt[]>();
+const strikeRecoveryCounts = new Map<string, number>();
+const strikeTransportRetries = new Map<string, number>();
+const strikeNextAttemptAt = new Map<string, number>();
+
+/** Test hook: forget every in-process strike landing attempt. */
+export function resetStrikeLandingAttemptsForTests(): void {
+  strikeAttempts.clear();
+  strikeRecoveryCounts.clear();
+  strikeTransportRetries.clear();
+  strikeNextAttemptAt.clear();
+}
+
+function recordAttempt(issueId: string, attempt: StrikeAttempt): StrikeAttempt[] {
+  const attempts = [...(strikeAttempts.get(issueId) ?? []), attempt];
+  strikeAttempts.set(issueId, attempts);
+  return attempts;
+}
+
+function attemptHistory(attempts: StrikeAttempt[]): string {
   return attempts.map((attempt, index) => `${index + 1}. strike ${attempt.strikeHead}; main ${attempt.mainHead}; ${attempt.outcome}: ${attempt.detail}`).join('\n');
 }
 
-async function handleFailure(issueId: string, head: string, detail: string, projectPath: string, workspacePath: string, status: ReviewStatus, deps: StrikeLandingDeps): Promise<string> {
+async function handleFailure(issueId: string, head: string, detail: string, projectPath: string, workspacePath: string, deps: StrikeLandingDeps): Promise<string> {
   let mainHead = 'unknown';
   try { mainHead = await deps.getMainHead(projectPath); } catch (error) { detail += `; main HEAD unavailable: ${error instanceof Error ? error.message : String(error)}`; }
-  const attempts = [...(status.strikeLandingAttempts ?? []), { timestamp: deps.now(), strikeHead: head, mainHead, outcome: 'failed', detail }];
-  const recoveryCount = (status.strikeRecoveryCount ?? 0) + 1;
+  const attempts = recordAttempt(issueId, { timestamp: deps.now(), strikeHead: head, mainHead, outcome: 'failed', detail });
+  const recoveryCount = (strikeRecoveryCounts.get(issueId) ?? 0) + 1;
+  strikeRecoveryCounts.set(issueId, recoveryCount);
   const recoveryMessage = `Strike landing failed for ${issueId} at ${head}.\n\nCurrent main: ${mainHead}\nFailure: ${detail}\n\nRun pan sync-main ${issueId}, resolve every conflict, rerun the configured gates, push only strike/${issueId.toLowerCase()}, then run pan strike-ready ${issueId}. A fresh pushed HEAD is required before another landing attempt.`;
   if (!NON_ACTIONABLE.test(detail) && recoveryCount < 3) {
     try {
@@ -170,21 +200,18 @@ async function handleFailure(issueId: string, head: string, detail: string, proj
         `strike-landing:${issueId}:${head}:${recoveryCount}`,
       );
       if (outcome.delivered) {
-        deps.setStatus(issueId, { strikeLandingState: 'recovering', strikeRecoveryCount: recoveryCount, strikeLandingAttempts: attempts, mergeNotes: detail });
         return `[strike-landing] ${issueId} at ${head} recovering (${recoveryCount}/3)`;
       }
       detail += `; recovery not delivered: ${outcome.reason ?? 'queued to mail only'}`;
-      attempts[attempts.length - 1] = { ...attempts[attempts.length - 1], detail };
-    } catch (error) { detail += `; recovery delivery failed: ${error instanceof Error ? error.message : String(error)}`; attempts[attempts.length - 1] = { ...attempts[attempts.length - 1], detail }; }
+    } catch (error) { detail += `; recovery delivery failed: ${error instanceof Error ? error.message : String(error)}`; }
   }
   const reason = `Strike landing for ${issueId} needs operator attention after ${recoveryCount} cycle(s).\n${attemptHistory(attempts)}`;
-  deps.setStatus(issueId, { strikeLandingState: 'needs_you', strikeRecoveryCount: recoveryCount, strikeLandingAttempts: attempts, mergeNotes: detail });
   await deps.writeFeedback(issueId, workspacePath, `## Strike landing needs operator attention\n\n${reason}`);
   await deps.needsYou(issueId, reason, { attempts });
   return `[strike-landing] ${issueId} at ${head} needs-you`;
 }
 
-async function handleTransportFailure(issueId: string, head: string, detail: string, status: ReviewStatus, deps: StrikeLandingDeps): Promise<string> {
+async function handleTransportFailure(issueId: string, head: string, detail: string, deps: StrikeLandingDeps): Promise<string> {
   const timestamp = deps.now();
   const project = deps.resolveProject(issueId);
   const projectPath = project?.projectPath ?? '';
@@ -192,34 +219,18 @@ async function handleTransportFailure(issueId: string, head: string, detail: str
   let mainHead = 'unknown';
   try { if (projectPath) mainHead = await deps.getMainHead(projectPath); }
   catch (error) { detail += `; main HEAD unavailable: ${error instanceof Error ? error.message : String(error)}`; }
-  const attempts: StrikeLandingAttempt[] = [
-    ...(status.strikeLandingAttempts ?? []),
-    { timestamp, strikeHead: head, mainHead, outcome: 'transport-failed', detail },
-  ];
-  const retryCount = (status.strikeTransportRetryCount ?? 0) + 1;
+  const attempts = recordAttempt(issueId, { timestamp, strikeHead: head, mainHead, outcome: 'transport-failed', detail });
+  const retryCount = (strikeTransportRetries.get(issueId) ?? 0) + 1;
+  strikeTransportRetries.set(issueId, retryCount);
 
   if (retryCount < MAX_TRANSPORT_RETRIES) {
     const delayMs = Math.min(TRANSPORT_BACKOFF_CAP_MS, TRANSPORT_BACKOFF_BASE_MS * (2 ** (retryCount - 1)));
-    const nextAttemptAt = new Date(Date.parse(timestamp) + delayMs).toISOString();
-    deps.setStatus(issueId, {
-      strikeLandingState: 'ready',
-      strikeReadyHead: head,
-      strikeTransportRetryCount: retryCount,
-      strikeNextAttemptAt: nextAttemptAt,
-      strikeLandingAttempts: attempts,
-      mergeNotes: detail,
-    });
-    return `[strike-landing] ${issueId} at ${head} transport retry ${retryCount}/${MAX_TRANSPORT_RETRIES} after ${nextAttemptAt}`;
+    strikeNextAttemptAt.set(issueId, Date.parse(timestamp) + delayMs);
+    return `[strike-landing] ${issueId} at ${head} transport retry ${retryCount}/${MAX_TRANSPORT_RETRIES} after ${new Date(Date.parse(timestamp) + delayMs).toISOString()}`;
   }
 
   const reason = `Strike landing for ${issueId} needs operator attention after ${retryCount} transport attempt(s).\n${attemptHistory(attempts)}`;
-  deps.setStatus(issueId, {
-    strikeLandingState: 'needs_you',
-    strikeTransportRetryCount: retryCount,
-    strikeNextAttemptAt: undefined,
-    strikeLandingAttempts: attempts,
-    mergeNotes: detail,
-  });
+  strikeNextAttemptAt.delete(issueId);
   await deps.writeFeedback(issueId, workspacePath, `## Strike landing needs operator attention\n\n${reason}`);
   await deps.needsYou(issueId, reason, { attempts });
   return `[strike-landing] ${issueId} at ${head} needs-you`;
@@ -290,24 +301,17 @@ async function findStrandedStrikeCandidates(deps: StrikeLandingDeps): Promise<St
 }
 
 /**
- * Push and mark ready a completed strike whose harness has exited before it
- * could finish the commit → push → strike-ready handoff. The status update is
- * durable issue evidence and the returned action is recorded in the ship log.
+ * Push a completed strike whose harness exited before it could finish the
+ * commit → push → strike-ready handoff. PAN-3917: the push itself is the
+ * evidence — git shows the branch on origin — so nothing is stamped.
  */
 export async function salvageStrandedStrikeBranches(deps: StrikeLandingDeps): Promise<string[]> {
   const actions: string[] = [];
   for (const candidate of await findStrandedStrikeCandidates(deps)) {
-    const current = deps.getStatus(candidate.issueId);
-    if (current?.strikeReadyHead === candidate.head) continue;
-
-    // PAN-3903/PAN-3898: salvage INITIATES a landing. An issue already claimed
-    // by another actor — a landing in progress, a merge, an operator hold — is
-    // not salvage's to re-arm.
-    const owner = deriveInFlightOwner(current);
-    if (owner) {
-      console.log(`[strike-salvage] skipped ${describeOwner(candidate.issueId, owner)}`);
-      continue;
-    }
+    // PAN-3903/PAN-3898: salvage INITIATES a landing. A strike whose PR already
+    // merged is not salvage's to re-arm.
+    if ((await deps.getFacts(candidate.issueId)).merged) continue;
+    if (salvagedStrikeHeads.get(candidate.issueId) === candidate.head) continue;
 
     // Recheck immediately before the push to narrow the liveness race with an
     // agent that may have resumed after the initial branch scan.
@@ -321,16 +325,10 @@ export async function salvageStrandedStrikeBranches(deps: StrikeLandingDeps): Pr
       if (dirty || head !== candidate.head) continue;
 
       await deps.git(['push', 'origin', candidate.branchName], candidate.workspacePath);
-      deps.setStatus(candidate.issueId, {
-        strikeReadyHead: candidate.head,
-        strikeReadyAt: deps.now(),
-        strikeLandingState: 'ready',
-        strikeRecoveryCount: 0,
-        strikeTransportRetryCount: undefined,
-        strikeNextAttemptAt: undefined,
-        strikeLandingAttempts: current?.strikeLandingAttempts ?? [],
-        mergeNotes: `Automatically salvaged completed strike branch ${candidate.branchName} after its harness exited before push.`,
-      });
+      salvagedStrikeHeads.set(candidate.issueId, candidate.head);
+      strikeRecoveryCounts.delete(candidate.issueId);
+      strikeTransportRetries.delete(candidate.issueId);
+      strikeNextAttemptAt.delete(candidate.issueId);
       actions.push(`[strike-salvage] pushed ${candidate.issueId} at ${candidate.head}`);
     } catch (error) {
       console.warn(`[strike-salvage] could not push ${candidate.issueId} at ${candidate.head}: ${error instanceof Error ? error.message : String(error)}`);
@@ -339,45 +337,54 @@ export async function salvageStrandedStrikeBranches(deps: StrikeLandingDeps): Pr
   return actions;
 }
 
+/**
+ * Land every strike branch that git says is ready and the forge says has not
+ * merged. PAN-3917: the candidate set is derived every pass — clean strike
+ * worktree, ahead of main, no live strike agent — instead of being claimed and
+ * released through `strikeLandingState` on a row. The in-process supervisor
+ * lease is what keeps two passes from landing the same head twice.
+ */
 export async function patrolStrikeLandings(overrides: Partial<StrikeLandingDeps> = {}): Promise<string[]> {
   const deps = { ...defaultDeps(), ...overrides };
   const actions = await salvageStrandedStrikeBranches(deps);
-  for (const [key, candidate] of Object.entries(deps.loadStatuses())) {
-    const issueId = (candidate.issueId || key).toUpperCase();
-    const head = candidate.strikeReadyHead;
-    if (!head || (candidate.strikeLandingState !== 'ready' && candidate.strikeLandingState !== 'landing')) continue;
-    if (candidate.strikeNextAttemptAt && candidate.strikeNextAttemptAt > deps.now()) continue;
-    if (candidate.deaconIgnored || candidate.stuck || candidate.mergeStatus === 'merged') continue;
+  const nowMs = Date.parse(deps.now());
 
-    const current = deps.getStatus(issueId);
-    if (current?.strikeReadyHead !== head || (current.strikeLandingState !== 'ready' && current.strikeLandingState !== 'landing')) continue;
+  for (const candidate of await findStrandedStrikeCandidates(deps)) {
+    const { issueId, head } = candidate;
+    const nextAttemptAt = strikeNextAttemptAt.get(issueId);
+    if (nextAttemptAt && nextAttemptAt > nowMs) continue;
+    if ((await deps.getFacts(issueId)).merged) continue;
+
     const leaseKey = `${issueId}:${head}`;
-    if (current.strikeLandingState === 'landing' && deps.isScheduled(leaseKey)) continue;
-    if (current.strikeLandingState === 'landing' && deps.isPersistentlyOwned(issueId)) continue;
-    const claimed = current.strikeLandingState === 'ready' ? deps.setStatus(issueId, { strikeLandingState: 'landing' }) : current;
-    if (claimed.strikeReadyHead !== head || claimed.strikeLandingState !== 'landing') continue;
+    if (deps.isScheduled(leaseKey)) continue;
+    if (deps.isPersistentlyOwned(issueId)) continue;
 
     deps.schedule(leaseKey, async () => {
-      try { await executeStrikeLanding(issueId, head, claimed, deps); }
+      try { await executeStrikeLanding(issueId, head, deps); }
       catch (error) {
         const detail = `Unexpected supervised strike landing failure: ${error instanceof Error ? error.message : String(error)}`;
-        try {
-          const project = deps.resolveProject(issueId);
-          await handleFailure(issueId, head, detail, project?.projectPath ?? '', project ? join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}-strike`) : '', deps.getStatus(issueId) ?? claimed, deps);
-        } catch (recoveryError) {
-          deps.setStatus(issueId, { strikeLandingState: 'needs_you', mergeNotes: `${detail}; durable recovery failed: ${recoveryError instanceof Error ? recoveryError.message : String(recoveryError)}` });
-        }
+        const project = deps.resolveProject(issueId);
+        await handleFailure(
+          issueId,
+          head,
+          detail,
+          project?.projectPath ?? '',
+          project ? join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}-strike`) : '',
+          deps,
+        ).catch((recoveryError) => {
+          console.error(`[strike-landing] ${issueId}: ${detail}; durable recovery failed: ${recoveryError instanceof Error ? recoveryError.message : String(recoveryError)}`);
+        });
       }
     });
-    actions.push(`[strike-landing] ${candidate.strikeLandingState === 'landing' ? 'reclaimed' : 'claimed'} ${issueId} at ${head}`);
+    actions.push(`[strike-landing] claimed ${issueId} at ${head}`);
   }
   return actions;
 }
 
-async function executeStrikeLanding(issueId: string, head: string, claimed: ReviewStatus, deps: StrikeLandingDeps): Promise<void> {
+async function executeStrikeLanding(issueId: string, head: string, deps: StrikeLandingDeps): Promise<void> {
     const project = deps.resolveProject(issueId);
     if (!project) {
-      await handleFailure(issueId, head, `Strike landing could not resolve a configured project for ${issueId}`, '', '', claimed, deps);
+      await handleFailure(issueId, head, `Strike landing could not resolve a configured project for ${issueId}`, '', '', deps);
       return;
     }
     const request: StrikeMergeRequest = {
@@ -387,30 +394,24 @@ async function executeStrikeLanding(issueId: string, head: string, claimed: Revi
       recoveryTarget: `strike-${issueId.toLowerCase()}`,
     };
     const result = await deps.mergeIssue(issueId, request);
-    if (result.mergeStatus === 'merged') {
-      deps.setStatus(issueId, {
-        strikeLandingState: 'landed',
-        strikeReadyHead: undefined,
-        strikeReadyAt: undefined,
-        strikeTransportRetryCount: undefined,
-        strikeNextAttemptAt: undefined,
-      });
-    } else if (result.success || result.mergeStatus === 'queued' || result.mergeStatus === 'merging' || result.mergeStatus === 'merged') {
+    if (result.mergeStatus === 'merged' || result.success || result.mergeStatus === 'queued' || result.mergeStatus === 'merging') {
+      strikeNextAttemptAt.delete(issueId);
+      strikeTransportRetries.delete(issueId);
       return;
-    } else if (result.transport) {
-      const current = deps.getStatus(issueId) ?? claimed;
-      if (current.mergeStatus === 'merged' || current.strikeLandingState === 'landed') {
-        deps.setStatus(issueId, {
-          strikeLandingState: 'landed',
-          strikeReadyHead: undefined,
-          strikeReadyAt: undefined,
-          strikeTransportRetryCount: undefined,
-          strikeNextAttemptAt: undefined,
-        });
+    }
+    if (result.transport) {
+      // A transport failure may still have landed the merge — ask the forge
+      // before counting a retry.
+      if ((await deps.getFacts(issueId)).merged) {
+        strikeNextAttemptAt.delete(issueId);
+        strikeTransportRetries.delete(issueId);
         return;
       }
-      await handleTransportFailure(issueId, head, result.error ?? 'Strike landing transport failed', current, deps);
-    } else {
-      await handleFailure(issueId, head, result.error ?? 'Strike landing failed', project.projectPath, request.workspacePath, claimed, deps);
+      await handleTransportFailure(issueId, head, result.error ?? 'Strike landing transport failed', deps);
+      return;
     }
+    await handleFailure(issueId, head, result.error ?? 'Strike landing failed', project.projectPath, request.workspacePath, deps);
 }
+
+/** Heads already pushed by salvage in this process, so a pass does not re-push. */
+const salvagedStrikeHeads = new Map<string, string>();

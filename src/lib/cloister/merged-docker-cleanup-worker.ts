@@ -1,5 +1,5 @@
 import { emitActivityEntrySync } from '../activity-logger.js';
-import { resolveCanonicalReviewStatus } from './review-status-source.js';
+import { getPrFacts } from './pr-facts.js';
 
 const RETRY_BASE_MS = 60_000;
 const RETRY_MAX_MS = 15 * 60_000;
@@ -53,15 +53,18 @@ async function drainQueue(): Promise<void> {
   const { teardownWorkspaceDockerByNamePromise } = await import('../workspace-manager/docker.js');
   for (let entry = nextEligibleEntry(); entry; entry = nextEligibleEntry()) {
     entry.running = true;
-    const eligibility = resolveCanonicalReviewStatus(entry.issueId);
-    if (eligibility.status?.mergeStatus === 'merged') {
+    // PAN-3917: the forge says whether the PR merged. A lookup failure holds
+    // the entry for retry rather than cancelling the cleanup.
+    const facts = await getPrFacts(entry.issueId);
+    if (facts.merged) {
       entry.mergeVerified = false;
     } else if (entry.mergeVerified) {
-      // The merge-agent verified the merge immediately before enqueueing. Consume
-      // that proof once so a failed status write cannot cancel the first retry.
+      // The merge-agent verified the merge immediately before enqueueing.
+      // Consume that proof once so a transient forge failure cannot cancel the
+      // first retry.
       entry.mergeVerified = false;
-    } else if (!eligibility.available) {
-      recordFailure(entry, 'canonical merge status unavailable');
+    } else if (facts.error) {
+      recordFailure(entry, `merge state unavailable: ${facts.error}`);
       continue;
     } else {
       queue.delete(entry.issueId);

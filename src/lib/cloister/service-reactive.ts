@@ -17,24 +17,6 @@ import { recordDeadEndNeedsYou } from './dead-end-trip.js';
 import { isIssueClosed } from './issue-closed.js';
 import { shouldSkipDispatchAsMerged } from './merge-verification.js';
 
-/** Return issues orphaned in reviewStatus='reviewing' with no active reviewer. */
-export function identifyOrphanedReviewingIssues(
-  statuses: Record<string, { reviewStatus: string; history?: Array<{ type: string; status: string }> }>,
-  activeReviewIssues: Set<string>,
-): string[] {
-  const orphaned: string[] = [];
-  for (const [issueId, status] of Object.entries(statuses)) {
-    if (status.reviewStatus !== 'reviewing') continue;
-    const hasPassedReview = status.history?.some(
-      (h) => h.type === 'review' && h.status === 'passed',
-    );
-    if (hasPassedReview) continue;
-    if (activeReviewIssues.has(issueId.toUpperCase())) continue;
-    orphaned.push(issueId);
-  }
-  return orphaned;
-}
-
 export function parseSpecialistAgentSession(name: string): {
   projectKey: string;
   specialistType: 'review-agent' | 'test-agent' | 'merge-agent';
@@ -230,8 +212,8 @@ async function resolveWorkspaceForIssue(issueId: string): Promise<string | null>
   // state (e.g. `verifying-on-main`) would otherwise re-trigger a ship dispatch
   // for a branch that merged weeks ago. Mirror the isIssueClosed gate above:
   // mergeStatus='merged' is the same terminal signal closed-state is.
-  const { getPipelineStatus } = await import('../overdeck/pipeline-view.js');
-  if (getPipelineStatus(normalizedIssueId)?.mergeStatus === 'merged') {
+  const { getPrFacts } = await import('./pr-facts.js');
+  if ((await getPrFacts(normalizedIssueId)).merged) {
     const message = `${normalizedIssueId}: skipping ${role} dispatch — merge already landed (merge_status='merged' is terminal)`;
     console.log(`[cloister] ${message}`);
     emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });

@@ -25,6 +25,8 @@
 
 import { Effect } from 'effect';
 
+import { getPrFacts, isAwaitingReview } from './pr-facts.js';
+
 import {
   clearYieldForResumeSync,
   listAgentStates,
@@ -34,7 +36,6 @@ import {
   stopAgent,
   type AgentState,
 } from '../agents.js';
-import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 import { listSessions } from '../tmux.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
@@ -110,11 +111,14 @@ export function selectYieldVictim(
   return ordered[0];
 }
 
-function reviewBlockedFor(issueId: string): boolean {
-  const status = getPipelineStatus(issueId)?.reviewStatus;
-  // PAN-2507 (FR-2a): the enum has no `in_progress`; the faithful "waiting on
-  // its own review" states are `pending` (queued) and `reviewing` (running).
-  return status === 'pending' || status === 'reviewing';
+/**
+ * PAN-2507 (FR-2a), re-pointed by PAN-3917: a work agent is "waiting on its own
+ * review" when its pull request is open and the forge shows no verdict yet —
+ * neither approved nor changes-requested. That is the same set the review row's
+ * `pending`/`reviewing` used to name.
+ */
+async function reviewBlockedFor(issueId: string): Promise<boolean> {
+  return isAwaitingReview(await getPrFacts(issueId));
 }
 
 function parseMs(iso: string | undefined): number | null {
@@ -127,18 +131,18 @@ async function buildCandidates(): Promise<YieldCandidate[]> {
   const sessions = await Effect.runPromise(listSessions());
   const attached = new Set(sessions.filter((s) => s.attached).map((s) => s.name));
 
-  return listRunningAgentsSync()
+  return Promise.all(listRunningAgentsSync()
     .filter((s) => s.role === 'work' && s.status === 'running')
-    .map((s) => ({
+    .map(async (s) => ({
       id: s.id,
       issueId: s.issueId,
       idle: isIdle(s.id),
       attached: attached.has(s.id),
       paused: s.paused === true,
-      reviewBlocked: reviewBlockedFor(s.issueId),
+      reviewBlocked: await reviewBlockedFor(s.issueId),
       lastActivityMs: parseMs(s.lastActivity),
       lastYieldResumeMs: parseMs(s.lastYieldResumeAt),
-    }));
+    })));
 }
 
 function countYielded(): number {

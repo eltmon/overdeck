@@ -7,7 +7,7 @@ import { isConversationDirectory } from '../agent-directory-cleanup.js';
 import { RETAINED_TRANSCRIPTS_MARKER } from '../agents/state-dir-removal.js';
 import { listAllAgentsSync, removeAgentRecordSync } from '../overdeck/agents.js';
 import { listArchivedConversations, listConversations } from '../overdeck/conversations.js';
-import { readIssueRecordForWorkspaceSync } from '../pan-dir/record.js';
+import { getPrFacts } from './pr-facts.js';
 import { AGENTS_DIR } from '../paths.js';
 import { listSessionNames } from '../tmux.js';
 
@@ -27,17 +27,17 @@ export interface TranscriptRetentionAgent {
   stoppedByUser?: boolean | null;
 }
 
-type ReadClosedOutRecord = (
-  workspace: string,
-  issueId: string,
-) => { pipeline?: { closedOut?: boolean } } | null;
-
-export function isTranscriptRetentionTerminalAgent(
+/**
+ * PAN-3917: an agent's transcripts age out once its work has landed. "Landed"
+ * used to be a `closedOut` flag on the issue record; it is now the forge saying
+ * the pull request merged.
+ */
+export async function isTranscriptRetentionTerminalAgent(
   agent: TranscriptRetentionAgent,
-  readRecord: ReadClosedOutRecord = readIssueRecordForWorkspaceSync,
-): boolean {
+  readPrFacts: (issueId: string) => Promise<{ merged: boolean }> = getPrFacts,
+): Promise<boolean> {
   if (agent.status !== 'stopped' || !agent.workspace) return false;
-  return readRecord(agent.workspace, agent.issueId)?.pipeline?.closedOut === true;
+  return (await readPrFacts(agent.issueId)).merged;
 }
 
 export interface TranscriptRetentionDeps {
@@ -48,7 +48,7 @@ export interface TranscriptRetentionDeps {
   removeAgentRecord(agentId: string): void;
   listSessionNames(): Promise<readonly string[]>;
   listAgents(): readonly TranscriptRetentionAgent[];
-  isTerminalAgent(agent: TranscriptRetentionAgent): boolean;
+  isTerminalAgent(agent: TranscriptRetentionAgent): Promise<boolean>;
   listConversations(): readonly TranscriptRetentionConversation[];
   listArchivedConversations(): readonly TranscriptRetentionConversation[];
   now(): number;
@@ -96,7 +96,7 @@ function conversationEligibility(deps: TranscriptRetentionDeps): Map<string, boo
   }
 }
 
-function agentEligibility(deps: TranscriptRetentionDeps): Map<string, boolean> | null {
+async function agentEligibility(deps: TranscriptRetentionDeps): Promise<Map<string, boolean> | null> {
   try {
     const eligible = new Map<string, boolean>();
     const terminalByIssue = new Map<string, boolean>();
@@ -108,7 +108,7 @@ function agentEligibility(deps: TranscriptRetentionDeps): Map<string, boolean> |
       const issueKey = `${agent.workspace}\0${agent.issueId}`;
       let terminal = terminalByIssue.get(issueKey);
       if (terminal === undefined) {
-        terminal = deps.isTerminalAgent(agent);
+        terminal = await deps.isTerminalAgent(agent);
         terminalByIssue.set(issueKey, terminal);
       }
       eligible.set(agent.id, terminal);
@@ -231,7 +231,7 @@ export async function sweepTranscriptRetention(
       if (conversationEligibilityMap.get(conversationName) !== true) continue;
     } else {
       if (!agentEligibilityLoaded) {
-        agentEligibilityMap = agentEligibility(deps);
+        agentEligibilityMap = await agentEligibility(deps);
         agentEligibilityLoaded = true;
       }
       if (agentEligibilityMap === null || agentEligibilityMap.get(entry.name) !== true) continue;
