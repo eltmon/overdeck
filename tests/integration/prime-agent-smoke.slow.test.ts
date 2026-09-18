@@ -27,6 +27,23 @@ import { createPrimeAgentRuntimeSync } from '../../src/lib/runtimes/prime-agent.
 
 const model = process.env.OVERDECK_PRIME_AGENT_MODEL ?? 'gpt-5.4-mini';
 const children: ChildProcess[] = [];
+/**
+ * Output of the most recently spawned host. The host never coming up is almost
+ * always something it already explained on stderr (missing provider
+ * credentials, an unroutable model, a startup timeout), so the wait failure
+ * reports that text instead of a bare timeout the reader cannot act on.
+ */
+let hostOutput = '';
+
+function spawnHost(command: string): ChildProcess {
+  hostOutput = '';
+  const child = spawn('bash', ['-lc', command], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const record = (chunk: Buffer): void => { hostOutput += chunk.toString(); };
+  child.stdout?.on('data', record);
+  child.stderr?.on('data', record);
+  children.push(child);
+  return child;
+}
 
 async function waitUntil(predicate: () => boolean | Promise<boolean>, timeoutMs = 120_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
@@ -34,7 +51,11 @@ async function waitUntil(predicate: () => boolean | Promise<boolean>, timeoutMs 
     if (await predicate()) return;
     await new Promise(resolve => setTimeout(resolve, 50));
   }
-  throw new Error('Timed out waiting for Prime Agent production host');
+  const tail = hostOutput.trim().slice(-4000);
+  throw new Error(
+    `Timed out after ${timeoutMs}ms waiting for the Prime Agent production host.\n` +
+      `Host output:\n${tail || '(the host produced no output)'}`,
+  );
 }
 
 beforeAll(async () => {
@@ -54,8 +75,7 @@ describe('Prime Agent production-path smoke', () => {
     const agentId = 'agent-prime-live-smoke';
     const marker = join(root, 'prime-tool-ok.txt');
     const command = await buildPrimeAgentBaseCommand({ agentId, model, workspace: root, authMode: 'api-key' });
-    const first = spawn('bash', ['-lc', command], { stdio: 'inherit' });
-    children.push(first);
+    const first = spawnHost(command);
     await waitUntil(() => createPrimeAgentRuntimeSync().isRunning(agentId));
     await deliverPrimeAgentMessage(agentId, `Use the bash tool to run: printf prime-tool-ok > ${marker}. Then reply with only TOOL_OK.`);
     await deliverPrimeAgentMessage(agentId, 'Keep the final reply to exactly TOOL_OK.', 'steer');
@@ -66,8 +86,7 @@ describe('Prime Agent production-path smoke', () => {
     const sessionId = await readFile(join(root, 'agents', agentId, 'prime-agent-session-id'), 'utf8');
     first.kill('SIGTERM');
 
-    const resumed = spawn('bash', ['-lc', `${command} --resume '${sessionId.trim()}'`], { stdio: 'inherit' });
-    children.push(resumed);
+    spawnHost(`${command} --resume '${sessionId.trim()}'`);
     await waitUntil(() => createPrimeAgentRuntimeSync().isRunning(agentId));
     await deliverPrimeAgentMessage(agentId, 'Reply with only RESUMED.');
     await postPrimeAgentHost(agentId, { op: 'stats' });
