@@ -18,14 +18,13 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
 import { messageAgent } from '../agents/messaging.js';
-import { getAgentStateSync } from '../agents/agent-state.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import { clearFeedbackDeliveryStuck } from '../review-status.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 import { findVerdictReport } from './review-verdict-report.js';
-import { getPipelineStatus } from '../overdeck/pipeline-view.js';
+import { getPrFacts } from './pr-facts.js';
+import { assessReviewConvergence } from './review-rounds.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -54,11 +53,6 @@ export interface DeliverReviewVerdictFeedbackResult {
   agentMessageSent: boolean;
 }
 
-export interface ReviewVerdictFeedbackStatus {
-  reviewStatus: string;
-  reviewNotes?: string;
-  prUrl?: string;
-}
 
 async function findLatestSynthesis(workspacePath: string): Promise<{ path: string; body: string } | null> {
   const reviewRoot = join(workspacePath, PAN_DIRNAME, 'review');
@@ -131,15 +125,18 @@ async function deliverReviewVerdictFeedbackPromise(
   const resolved = resolveProjectFromIssueSync(issueId);
   const workspacePath = opts.workspacePath
     ?? (resolved ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`) : undefined);
-  const existingStatus = getPipelineStatus(issueId);
+  // PAN-3917: the PR is the source for the URL and the reviewed anchor; the
+  // round artifacts are the source for convergence. Nothing is read off a row.
+  const facts = await getPrFacts(issueId);
 
-  // PAN-3151: check if review loop is stuck in non-converging state
-  const isReviewNotConverging = existingStatus?.stuckReason === 'review-not-converging';
+  // PAN-3151: is the review loop making progress? Judged from the rounds.
+  const convergence = assessReviewConvergence(workspacePath);
+  const isReviewNotConverging = !convergence.converging;
 
   const deliveryIdentity = opts.runId
     ? `run:${opts.runId}`
-    : existingStatus?.reviewedAtCommit
-      ? `anchor:${existingStatus.reviewedAtCommit}`
+    : facts.headSha
+      ? `anchor:${facts.headSha}`
       : undefined;
   const dedupKey = deliveryIdentity
     ? `review-feedback:${issueId.toLowerCase()}:${createHash('sha256')
@@ -160,7 +157,7 @@ async function deliverReviewVerdictFeedbackPromise(
 
   let prCommentPosted = false;
   try {
-    prCommentPosted = await postPrComment(opts.prUrl ?? existingStatus?.prUrl, markdownBody);
+    prCommentPosted = await postPrComment(opts.prUrl ?? facts.url ?? undefined, markdownBody);
   } catch (err) {
     console.warn(`[review-verdict-feedback] Failed to post PR comment for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -178,9 +175,7 @@ async function deliverReviewVerdictFeedbackPromise(
   if (fileResult.success && fileResult.filePath) {
     if (isReviewNotConverging) {
       // PAN-3151: review loop not converging — suppress agent re-drive, surface needs-you instead
-      const countSeries = existingStatus?.reviewCycleHistory
-        ?.map(e => e.blockingCount)
-        .join(' → ') ?? 'unknown';
+      const countSeries = convergence.series || 'unknown';
       const needsYouMessage = `Review loop not converging (cycle counts: ${countSeries}). ` +
         `Consider decomposing the remaining work into sibling issues, or unstick to continue rework.`;
       try {
@@ -285,10 +280,10 @@ async function deliverReviewVerdictFeedbackPromise(
             } else if (dedupKey) {
               suppressedReviewFeedbackDeliveries.delete(dedupKey);
             }
-            // PAN-3074: a fresh delivery clears stale feedback-delivery state. Once
-            // repeated suppressions surface a loop, preserve that operator-visible
-            // state until a non-deduplicated delivery proves the loop ended.
-            if (!repeatedDeliveryLoop) clearFeedbackDeliveryStuck(issueId);
+            // PAN-3074/PAN-3917: a fresh delivery ends the suppression run. The
+            // loop is process state now, not a stored stuck flag, so a
+            // non-deduplicated delivery simply resets the counter.
+            if (!repeatedDeliveryLoop && dedupKey) suppressedReviewFeedbackDeliveries.delete(dedupKey);
             }
           } catch (err) {
             // PAN-2228: a resolved-but-unreachable target is a real delivery failure,
@@ -345,21 +340,3 @@ export const deliverReviewVerdictFeedback = (
   opts: DeliverReviewVerdictFeedbackOptions,
 ): Effect.Effect<DeliverReviewVerdictFeedbackResult> =>
   Effect.promise(() => deliverReviewVerdictFeedbackPromise(opts));
-
-/** Adapter for the review-status write door, registered by the dashboard composition root. */
-export async function deliverReviewVerdictFeedbackFromStatus(
-  issueId: string,
-  status: ReviewVerdictFeedbackStatus,
-): Promise<void> {
-  const runId = getAgentStateSync(`agent-${issueId.toLowerCase()}-review`)?.reviewRunId;
-  const result = await Effect.runPromise(deliverReviewVerdictFeedback({
-    issueId,
-    verdict: status.reviewStatus === 'failed' ? 'failed' : 'blocked',
-    notes: status.reviewNotes,
-    prUrl: status.prUrl,
-    ...(runId ? { runId } : {}),
-  }));
-  if (result.agentMessageSent) {
-    console.log(`[review-status] delivered review feedback to the work agent for ${issueId} (host-side)`);
-  }
-}

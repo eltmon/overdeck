@@ -1,17 +1,20 @@
 import type { AgentState } from '../agents/agent-state.js';
-import { readIssueRecordForWorkspaceSync, type PanIssueRecord } from '../pan-dir/record.js';
+import { readItemStatuses } from '../xbrief/continue-state.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
 import type { XBriefDocument } from '../xbrief/types.js';
+import { readSwarmSlotAssignments, type SwarmSlotAssignment } from './deacon-swarm-record.js';
 
 type SwarmSlotAgent = Pick<AgentState, 'id' | 'issueId' | 'role' | 'workspace' | 'slotIndex' | 'slotItemId'>;
 type PlanReader = (workspacePath: string) => XBriefDocument | null;
-type RecordReader = (workspacePath: string, issueId: string) => PanIssueRecord | null;
+type AssignmentReader = (workspacePath: string, issueId: string) => SwarmSlotAssignment[];
+type ItemStatusReader = (planHome: string, issueId: string) => Record<string, string>;
 
 /** A registered slot must not run after its assigned item reaches a terminal state. */
 export function isTerminalSwarmSlotAgent(
   agent: SwarmSlotAgent,
   readPlan: PlanReader = readWorkspacePlanSync,
-  readRecord: RecordReader = readIssueRecordForWorkspaceSync,
+  readAssignments: AssignmentReader = readSwarmSlotAssignments,
+  readStatuses: ItemStatusReader = readItemStatuses,
 ): boolean {
   if (agent.role !== 'work' || !agent.workspace) return false;
   const idMatch = /-slot-(\d+)$/.exec(agent.id);
@@ -19,18 +22,17 @@ export function isTerminalSwarmSlotAgent(
   if (!slotIndex) return false;
 
   const baseWorkspace = agent.workspace.replace(/-slot-\d+$/, '');
-  const record = readRecord(baseWorkspace, agent.issueId);
-  const assignment = record?.swarm?.slotAssignments
-    ?.find(candidate => candidate.slotIndex === slotIndex);
+  const assignment = readAssignments(baseWorkspace, agent.issueId)
+    .find(candidate => candidate.slotIndex === slotIndex);
   const itemId = agent.slotItemId ?? assignment?.itemId;
   if (!itemId) return false;
 
-  // Swarm task transitions are persisted through the issue record's write
-  // door. The immutable workspace plan can still say `running` after the
-  // member-repo branch has merged, so recovery must honor the canonical
-  // override before it considers reviving stale slot ownership.
-  const canonicalStatus = record?.statusOverrides?.[itemId];
-  if (canonicalStatus === 'completed' || canonicalStatus === 'cancelled') return true;
+  // PAN-3917: item done-ness lives in the issue's continue file, the one home
+  // for xBRIEF item progress. The immutable workspace plan can still say
+  // `running` after the member-repo branch merged, so the continue file's
+  // status wins when the two disagree.
+  const itemStatus = readStatuses(baseWorkspace, agent.issueId)[itemId];
+  if (itemStatus === 'completed' || itemStatus === 'cancelled') return true;
 
   const plan = readPlan(baseWorkspace) ?? readPlan(agent.workspace);
   const item = plan?.plan.items.find(candidate => candidate.id === itemId);

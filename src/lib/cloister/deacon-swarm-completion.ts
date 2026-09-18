@@ -1,7 +1,7 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { messageAgent } from '../agents/messaging.js';
-import type { ReconciledSlotItem } from '../agents/slot-reconcile.js';
+import type { ReconciledSlotItem } from './swarm-slot-reconcile.js';
 import { isStatePlaneOnlyStatus } from '../state-plane.js';
 import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
 import { loadCloisterConfigSync, type SwarmInferCompletionMode } from './config.js';
