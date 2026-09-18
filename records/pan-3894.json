@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-09-18T06:43:33.655Z",
-  "updated": "2026-09-18T07:47:32.775Z",
+  "updated": "2026-09-18T07:47:38.834Z",
   "pipeline": {
     "issueId": "PAN-3894",
     "reviewStatus": "pending",
@@ -63,8 +63,16 @@
     }
   ],
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "w3b-container-restarts-map": {
+        "writerId": "agent-pan-3894",
+        "agentId": "agent-pan-3894",
+        "pid": 778810,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-09-18T07:47:38.833Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3894",
@@ -126,6 +134,7 @@
     "w3a-extract-specialist-patrol.ac1": "completed",
     "w3a-extract-specialist-patrol.ac2": "completed",
     "w3a-extract-specialist-patrol.ac3": "completed",
-    "w3a-extract-specialist-patrol.ac4": "completed"
+    "w3a-extract-specialist-patrol.ac4": "completed",
+    "w3b-container-restarts-map": "running"
   }
 }
