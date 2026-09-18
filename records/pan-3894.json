@@ -11,16 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-09-18T06:43:33.655Z",
-  "updated": "2026-09-18T08:05:38.490Z",
+  "updated": "2026-09-18T08:05:52.277Z",
   "pipeline": {
     "issueId": "PAN-3894",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T07:25:29.784Z"
+    "updatedAt": "2026-09-18T08:05:52.247Z",
+    "inspectNotes": "Inspecting item w1-patrol-registry"
   },
   "closeOut": {
     "usage": {
@@ -44,7 +46,7 @@
       },
       "costAtCloseOut": {
         "usd": 24.120823,
-        "pricingAsOf": "2026-09-18T07:25:29.797Z"
+        "pricingAsOf": "2026-09-18T08:05:52.261Z"
       }
     },
     "merges": [],
