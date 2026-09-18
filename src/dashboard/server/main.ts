@@ -479,8 +479,8 @@ startConversationLifecycleService();
 console.log('[overdeck] ConversationLifecycleService started');
 
 // PAN-1737 UAT batch trains: keep one assembled, testable batch ready at all
-// times (gated per-tick on flywheel.merge_train_enabled; no-op without an
-// active flywheel run).
+// times. Gated per-tick on the merge-train setting; there is no flywheel run
+// to wait for (PAN-3917 D12).
 if (startUatTrainReconciler()) {
   console.log('[overdeck] UAT batch-train reconciler started');
 } else {

@@ -40,8 +40,11 @@ vi.mock('../../../../lib/overdeck/control-settings.js', () => ({
 
 const {
   deleteAutoMergePayload,
+  getMergeTrainConfigPayload,
   postAutoMergeSchedulePayload,
+  postMergeTrainConfigPayload,
 } = await import('../merge-train.js');
+const controlSettings = await import('../../../../lib/overdeck/control-settings.js');
 
 function derived(overrides: Partial<DerivedIssueState> = {}): DerivedIssueState {
   return {
@@ -172,5 +175,32 @@ describe('DELETE /api/merge-train/auto-merge/:id', () => {
   it('returns 404 when nothing is pending', () => {
     const result = deleteAutoMergePayload('PAN-3917', { getPending: () => null, announce: vi.fn() });
     expect(result.status).toBe(404);
+  });
+});
+
+describe('GET/POST /api/merge-train/config', () => {
+  it('returns the three merge-train settings', () => {
+    expect(getMergeTrainConfigPayload()).toEqual({
+      auto_pickup_backlog: false,
+      require_uat_before_merge: false,
+      merge_train_enabled: true,
+    });
+  });
+
+  it('applies only the keys the body carries', async () => {
+    const result = await postMergeTrainConfigPayload({ require_uat_before_merge: true });
+    expect(result.status).toBe(200);
+    expect(controlSettings.setFlywheelRequireUatBeforeMerge).toHaveBeenCalledWith(true);
+    expect(controlSettings.setFlywheelAutoPickupBacklog).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-boolean value', async () => {
+    const result = await postMergeTrainConfigPayload({ merge_train_enabled: 'yes' });
+    expect(result.status).toBe(400);
+    expect(result.body).toEqual({ error: 'merge_train_enabled must be a boolean' });
+  });
+
+  it('rejects a body that is not a JSON object', async () => {
+    expect((await postMergeTrainConfigPayload([])).status).toBe(400);
   });
 });
