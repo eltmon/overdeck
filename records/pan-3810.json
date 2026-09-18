@@ -18,17 +18,19 @@
     }
   ],
   "created": "2026-09-09T11:38:00.909Z",
-  "updated": "2026-09-18T06:59:03.804Z",
+  "updated": "2026-09-18T06:59:06.525Z",
   "pipeline": {
     "issueId": "PAN-3810",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "verifying",
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-09-18T06:58:56.978Z",
+    "updatedAt": "2026-09-18T06:58:57.002Z",
+    "verificationNotes": "merge-verify: CI green on the merged tip (PAN-2487 local-gate skip)",
+    "lastVerifiedCommit": "712ce86ba28e943f26dc90df37208b4efa4ac9e2",
     "strikeReadyHead": "712ce86ba28e943f26dc90df37208b4efa4ac9e2",
     "strikeReadyAt": "2026-09-09T14:33:04.699Z",
     "strikeLandingState": "landing",
@@ -57,7 +59,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.0011970000000000001,
-        "pricingAsOf": "2026-09-18T06:59:03.792Z"
+        "pricingAsOf": "2026-09-18T06:59:06.517Z"
       }
     },
     "merges": [],
