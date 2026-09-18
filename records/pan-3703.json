@@ -101,18 +101,18 @@
     "recordedAt": "2026-08-14T09:01:11.684Z"
   },
   "created": "2026-08-14T06:01:28.966Z",
-  "updated": "2026-09-18T09:07:42.671Z",
+  "updated": "2026-09-18T13:17:25.903Z",
   "pipeline": {
     "issueId": "PAN-3703",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "uatStatus": "failed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-14T09:03:25.953Z",
-    "updatedAt": "2026-08-21T09:03:30.569Z",
+    "updatedAt": "2026-09-18T13:17:25.888Z",
     "reviewNotes": "All four reviewers approved with no blocking or advisory findings",
     "testNotes": "npm run typecheck: passed (dashboard-types guard 30 known errors none new; frontend-types guard 0 known errors none new; all tsc projects clean). npm run lint: passed, exit 0 (eslint + all custom guards: file-size, circular-deps 54 baselined none new, ratchet-audit, quarantine-audit 12 entries, effect-diagnostics 308 known none new). npm test: full suite passed — 1450 test files / 13744 tests passed, 50 skipped (expected quarantine), plus 4 additional frontend files / 64 tests passed (issueActions + fr7-conversation-pending-input), duration 468.6s, exit 0. CommandPalette.test.tsx run in isolation: 23/23 passed, including the four new PAN-3703 ordering tests (T1 rank-disagreeing timestamps sort newest-first, T2 equal-ts falls back to rank, T3 missing ts sorts last, T4 memory group keeps rank order).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3709",
@@ -138,7 +138,9 @@
         "src/dashboard/server/routes/palette.ts"
       ],
       "recordedAt": "2026-08-14T09:01:11.684Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-09-18T13:17:25.888Z"
   },
   "closeOut": {
     "usage": {
@@ -208,7 +210,107 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3709"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-09-18T13:17:25.901Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "overridable": true,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260916-01d7: Abandoned ahead of PAN-3917 (see tracker comment)"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "overridable": true,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260916-01d7: Abandoned ahead of PAN-3917 (see tracker comment)"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "overridable": true,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260916-01d7: Abandoned ahead of PAN-3917 (see tracker comment)"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "overridable": true,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260916-01d7: Abandoned ahead of PAN-3917 (see tracker comment)"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "overridable": true,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260916-01d7: Abandoned ahead of PAN-3917 (see tracker comment)"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "overridable": true,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260916-01d7: Abandoned ahead of PAN-3917 (see tracker comment)"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Version strings propagated",
+          "expected": "every declared version_sync.expect path reports the batch version",
+          "overridable": true,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260916-01d7: Abandoned ahead of PAN-3917 (see tracker comment)"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "overridable": true,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260916-01d7: Abandoned ahead of PAN-3917 (see tracker comment)"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "skip",
+          "observed": "gate not evaluated — abandoned disposition recorded by conv-20260916-01d7: Abandoned ahead of PAN-3917 (see tracker comment)"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No strike worktree found; Cleaned 8 agent state directories (17 transcript files preserved); No strike branch strike/pan-3703 found; Pruned 32 checkpoint ref(s) for agent-pan-3703, planning-pan-3703, strike-pan-3703; No specialist registry entries for PAN-3703"
+        }
+      ],
+      "accepted": [],
+      "disposition": {
+        "reason": "Abandoned ahead of PAN-3917 (see tracker comment)",
+        "by": "conv-20260916-01d7"
+      }
+    }
   },
   "harness": "codex",
   "model": "gpt-5.6-sol",
