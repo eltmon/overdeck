@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3927",
   "created": "2026-09-19T13:27:49.865Z",
-  "updated": "2026-09-19T13:27:49.865Z",
+  "updated": "2026-09-19T13:29:07.740Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "w1-lint-push-before-done": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3927",
-      "claimedAt": "2026-09-19T13:27:49.864Z"
+      "claimedAt": "2026-09-19T13:27:49.864Z",
+      "doneAt": "2026-09-19T13:29:07.740Z"
     }
   }
 }
