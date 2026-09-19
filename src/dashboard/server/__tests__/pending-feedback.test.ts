@@ -36,24 +36,14 @@ describe('pending feedback recovery (PAN-585)', () => {
 
     const deliver = vi.fn(async () => {});
     const getAgentState = vi.fn(async () => ({ id: 'agent-pan-585' } as any));
-    const loadStatuses = vi.fn(() => ({
-      'PAN-585': {
-        issueId: 'PAN-585',
-        reviewStatus: 'blocked',
-        testStatus: 'pending',
-        readyForMerge: false,
-        updatedAt: '2026-04-27T06:00:00Z',
-      },
-    }));
-    const getStatus = vi.fn();
+    const getState = vi.fn(async () => ({ issueId: 'PAN-585', state: 'changes-requested' } as any));
 
     await processPendingFeedbackDeliveries({
       filePath: queueFile,
       now: Date.parse('2026-04-27T06:05:00Z'),
       _deliver: deliver,
       _getAgentState: getAgentState,
-      _loadStatuses: loadStatuses as any,
-      _getStatus: getStatus as any,
+      _getState: getState,
     });
 
     expect(deliver).toHaveBeenCalledWith(
@@ -80,16 +70,11 @@ describe('pending feedback recovery (PAN-585)', () => {
       now: Date.parse('2026-04-27T06:05:00Z'),
       _deliver: vi.fn(async () => { throw new Error('tmux unavailable'); }),
       _getAgentState: vi.fn(async () => ({ id: 'agent-pan-585' } as any)),
-      _loadStatuses: vi.fn(() => ({
-        'PAN-585': {
-          issueId: 'PAN-585',
-          reviewStatus: 'passed',
-          testStatus: 'failed',
-          readyForMerge: false,
-          updatedAt: '2026-04-27T06:00:00Z',
-        },
-      })) as any,
-      _getStatus: vi.fn() as any,
+      _getState: vi.fn(async () => ({
+        issueId: 'PAN-585',
+        state: 'in-review',
+        pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'none', checks: 'red', mergeable: null },
+      } as any)),
     });
 
     const stored = JSON.parse(await readFile(queueFile, 'utf-8'));
@@ -97,7 +82,7 @@ describe('pending feedback recovery (PAN-585)', () => {
     expect(stored.deliveries[0].kind).toBe('test-failed');
   });
 
-  it('drops obsolete feedback once the issue status no longer needs redelivery', async () => {
+  it('drops obsolete feedback once the derived state no longer needs redelivery', async () => {
     queueFile = await setupQueueFile();
 
     await enqueuePendingFeedbackDelivery({
@@ -116,16 +101,7 @@ describe('pending feedback recovery (PAN-585)', () => {
       now: Date.parse('2026-04-27T06:05:00Z'),
       _deliver: deliver,
       _getAgentState: vi.fn(async () => ({ id: 'agent-pan-585' } as any)),
-      _loadStatuses: vi.fn(() => ({
-        'PAN-585': {
-          issueId: 'PAN-585',
-          reviewStatus: 'passed',
-          testStatus: 'passed',
-          readyForMerge: true,
-          updatedAt: '2026-04-27T06:04:00Z',
-        },
-      })) as any,
-      _getStatus: vi.fn() as any,
+      _getState: vi.fn(async () => ({ issueId: 'PAN-585', state: 'ready' } as any)),
     });
 
     expect(deliver).not.toHaveBeenCalled();

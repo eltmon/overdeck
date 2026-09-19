@@ -37,7 +37,7 @@ describe('Deacon strike transport fork boundary', () => {
             body: JSON.parse(Buffer.concat(chunks).toString('utf8')),
           });
           response.writeHead(200, { 'content-type': 'application/json' });
-          response.end(JSON.stringify({ success: true, mergeStatus: 'merging' }));
+          response.end(JSON.stringify({ success: true, submitted: true }));
         });
       });
     });
@@ -65,7 +65,7 @@ describe('Deacon strike transport fork boundary', () => {
     });
     child.send({ issueId: 'PAN-2811', request });
 
-    await expect(result).resolves.toEqual({ success: true, mergeStatus: 'merging' });
+    await expect(result).resolves.toEqual({ success: true, submitted: true });
     await expect(received).resolves.toEqual({
       url: '/api/internal/strikes/PAN-2811/merge',
       token: 'fork-shared-token',

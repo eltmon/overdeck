@@ -528,17 +528,6 @@ export const DashboardSnapshot = Schema.Struct({
 })
 export type DashboardSnapshot = typeof DashboardSnapshot.Type
 
-// ─── Workspace Detail ────────────────────────────────────────────────────────
-
-export const WorkspaceDetail = Schema.Struct({
-  workspace: Schema.Unknown,
-  reviewStatus: Schema.Unknown,
-  planning: Schema.Unknown,
-  costs: Schema.Unknown,
-  agentOutput: Schema.Array(Schema.String),
-})
-export type WorkspaceDetail = typeof WorkspaceDetail.Type
-
 // ─── Resource Stats ──────────────────────────────────────────────────────────
 
 export const ResourceStats = Schema.Struct({

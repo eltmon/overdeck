@@ -14,7 +14,6 @@ import {
   SessionNodePresence,
   SessionsFeedFacetsSnapshot,
   SessionsFeedRowSnapshot,
-  WorkspaceDetail,
 } from "./types"
 import { EditorIdSchema, OpenInEditorInput } from "./editor"
 
@@ -47,7 +46,6 @@ export const WS_METHODS = {
   replayEvents: "pan.replayEvents",
 
   // Workspace detail (batched)
-  getWorkspaceDetail: "pan.getWorkspaceDetail",
   readWorkspaceFile: "pan.readWorkspaceFile",
 
   // Absolute-path markdown file door (PAN-3260) — read/write a single
@@ -313,13 +311,6 @@ export const TerminalResizeRpc = Rpc.make(WS_METHODS.terminalResize, {
 /** 9. Close a terminal session (unary) */
 export const TerminalCloseRpc = Rpc.make(WS_METHODS.terminalClose, {
   payload: Schema.Struct({ sessionName: Schema.String }),
-  error: PanRpcError,
-})
-
-/** 10. Get batched workspace detail (unary) — replaces 5 separate HTTP calls */
-export const GetWorkspaceDetailRpc = Rpc.make(WS_METHODS.getWorkspaceDetail, {
-  payload: Schema.Struct({ issueId: IssueId }),
-  success: WorkspaceDetail,
   error: PanRpcError,
 })
 
@@ -683,7 +674,6 @@ export const PanRpcGroup = RpcGroup.make(
   SubscribeAgentOutputRpc,
   GetSnapshotRpc,
   ReplayEventsRpc,
-  GetWorkspaceDetailRpc,
   ReadWorkspaceFileRpc,
   ReadFileAtPathRpc,
   WriteFileAtPathRpc,

@@ -26,7 +26,6 @@ const mocks = vi.hoisted(() => ({
   buildUatPromoteGitDeps: vi.fn(),
   buildUatGenerationStore: vi.fn(),
   getUatGenerationSync: vi.fn(),
-  notifyFlywheelOfUatPromote: vi.fn(),
   recordUatPromotionVerdicts: vi.fn(),
   findXBriefByIssue: vi.fn(),
   readXBriefDocument: vi.fn(),
@@ -115,10 +114,6 @@ vi.mock('../../../../lib/cloister/uat-promote.js', async (importOriginal) => {
     buildUatPromoteGitDeps: mocks.buildUatPromoteGitDeps,
   };
 });
-
-vi.mock('../../../../lib/cloister/uat-promote-notify.js', () => ({
-  notifyFlywheelOfUatPromote: mocks.notifyFlywheelOfUatPromote,
-}));
 
 vi.mock('../../../../lib/cloister/uat-promote-verification.js', () => ({
   recordUatPromotionVerdicts: mocks.recordUatPromotionVerdicts,
@@ -440,7 +435,6 @@ describe('postUatGenerationPromotePayload', () => {
     mocks.findProjectByPathSync.mockReturnValue(null);
     mocks.buildUatPromoteGitDeps.mockReturnValue({ git: 'deps' });
     mocks.buildUatGenerationStore.mockReturnValue({ listChain: vi.fn(), update: vi.fn() });
-    mocks.notifyFlywheelOfUatPromote.mockResolvedValue(undefined);
   });
 
   it('wires UAT promotion verdict recording into the promote dependencies', async () => {
@@ -464,22 +458,6 @@ describe('postUatGenerationPromotePayload', () => {
     expect(mocks.recordUatPromotionVerdicts).toHaveBeenCalledWith(generation, 'abc123');
   });
 
-  it('passes the promote result to notifyFlywheelOfUatPromote', async () => {
-    const result: PromoteResult = {
-      success: true,
-      generation: 'uat/pan-cobalt-0703',
-      mergeSha: 'abc123',
-      members: ['PAN-2294'],
-      postMergeStarted: ['PAN-2294'],
-      invalidated: [],
-    };
-    mocks.promoteUatGeneration.mockResolvedValue(result);
-
-    await postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn());
-
-    expect(mocks.notifyFlywheelOfUatPromote).toHaveBeenCalledWith(result);
-  });
-
   it('returns the exact promote result object unchanged for success and failure results', async () => {
     const success: PromoteResult = {
       success: true,
@@ -501,20 +479,6 @@ describe('postUatGenerationPromotePayload', () => {
     await expect(postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn())).resolves.toBe(failure);
   });
 
-  it('still resolves with the promote result when notifyFlywheelOfUatPromote rejects', async () => {
-    const result: PromoteResult = {
-      success: true,
-      generation: 'uat/pan-cobalt-0703',
-      mergeSha: 'abc123',
-      members: ['PAN-2294'],
-      postMergeStarted: ['PAN-2294'],
-      invalidated: [],
-    };
-    mocks.promoteUatGeneration.mockResolvedValue(result);
-    mocks.notifyFlywheelOfUatPromote.mockRejectedValue(new Error('delivery failed'));
-
-    await expect(postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn())).resolves.toBe(result);
-  });
 });
 
 // PAN-3093: polyrepo projects used to be skipped outright by a guard in
