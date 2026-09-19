@@ -20,8 +20,8 @@ export function setMergeQueueAdvanceHandler(handler: MergeQueueAdvanceHandler): 
 // reviewed, or merged is never read from here: that comes from
 // `services/derived-issue-state.ts`.
 //
-// This replaces the `mergeStatus` / `mergeStep` / `mergeNotes` fields the merge
-// routes used to write onto the review-status record.
+// This replaces the merge status, step, and notes fields the merge routes used
+// to write onto the review-status record.
 
 export type MergeRunPhase = 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
 

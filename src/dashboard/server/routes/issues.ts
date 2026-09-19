@@ -278,7 +278,7 @@ const getIssueVerificationRoute = HttpRouter.add(
         ? join(resolved.projectPath, 'workspaces', `feature-${id.toLowerCase()}`)
         : null;
       // PAN-3917 FR-8: the workspace artifact IS the verification result.
-      // Nothing writes a verificationStatus, so there is no second source.
+      // Nothing writes a stored verification status, so there is no second source.
       const artifact = workspacePath ? readVerificationArtifact(workspacePath) : null;
       return jsonResponse({
         issueId: id.toUpperCase(),

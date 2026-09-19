@@ -88,8 +88,9 @@ interface RestartMarker {
  */
 async function defaultLifecycleRunner(pending: PendingLifecycleData): Promise<void> {
   const { postMergeLifecycle, notifyTldrDaemon } = await import('../../lib/cloister/merge-agent.js');
-  // skipDeploy: we ARE the fresh rebuilt process — skip step 0 to avoid infinite rebuild loop
-  await postMergeLifecycle(pending.issueId, pending.projectPath, pending.sourceBranch, { skipDeploy: true });
+  // PAN-3917 (D1): the post-merge deploy step is gone, so there is no rebuild
+  // loop left for this fresh process to opt out of.
+  await postMergeLifecycle(pending.issueId, pending.projectPath, pending.sourceBranch);
   if (pending.sourceBranch) {
     await notifyTldrDaemon(pending.projectPath, pending.sourceBranch);
   }

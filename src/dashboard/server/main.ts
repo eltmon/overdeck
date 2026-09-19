@@ -662,8 +662,8 @@ process.once('SIGHUP', () => void handleShutdownSignal('SIGHUP'));
 startRestartAnnouncer();
 console.log('[overdeck] Restart announcer started');
 
-// PAN-3917: the four boot repairs that lived here — clearing a stuck
-// mergeStatus (PAN-490), restoring readyForMerge, restoring a reviewStatus
+// PAN-3917: the four boot repairs that lived here — clearing a stuck merge
+// status (PAN-490), restoring merge readiness, restoring a review status
 // mis-marked from a COMMENTED review (PAN-869), and re-deriving GitHub-native
 // blockers after missed webhooks (PAN-1771) — all repaired a stored copy of a
 // fact the forge owns. There is no copy left to repair.
@@ -738,15 +738,10 @@ if (process.env.OVERDECK_DISABLE_AUTO_MERGE === '1') {
   console.log('[overdeck] Auto-merge executor started');
 }
 
-try {
-  // Preserve running statuses backed by a live supervised worker. Reset only
-  // orphaned runs whose worker died without recording a terminal result.
-  const { reconcileInterruptedVerifications } = await import('../../lib/cloister/verification-runner.js');
-  const interrupted = reconcileInterruptedVerifications();
-  if (interrupted > 0) console.log(`[overdeck] recovered ${interrupted} orphaned verification worker(s)`);
-} catch (err) {
-  console.warn('[overdeck] interrupted-verification reconciliation failed:', err);
-}
+// PAN-3917: boot used to reset verification runs left `running` by a worker
+// that died. A verification result IS its artifact — an interrupted run simply
+// left none, so the next gate run re-verifies. There is no stored status to
+// reconcile.
 
 if (process.env.OVERDECK_DISABLE_DEACON === '1') {
   console.log('[overdeck] Cloister auto-start SKIPPED (OVERDECK_DISABLE_DEACON=1)');

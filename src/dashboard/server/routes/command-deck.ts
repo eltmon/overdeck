@@ -448,7 +448,7 @@ export async function fetchActivityDataWithContext(
     new Date(pane?.stateSince ?? Date.now()).toISOString();
 
   // Review row: the review pane plus the four convoy reviewer nodes. The verdict
-  // is the PR's own review state (FR-7), not a stored reviewStatus.
+  // is the PR's own review state (FR-7), not a stored review status.
   const reviewPane = firstPaneWithRole('review');
   const reviewVerdict: 'completed' | 'failed' | undefined =
     derivedState.pr?.reviewState === 'approved' ? 'completed'
@@ -702,7 +702,7 @@ async function fetchPlanningData(
 
   if (!result.prd) {
     // findPrdAnywhereSync covers legacy docs/prds roots and canonical
-    // drafts/<issue>.md on overdeck-state, which the status-only loop missed,
+    // drafts/<issue>.md on the state branch, which the status-only loop missed,
     // so promoted PRDs were invisible here.
     const prdLocation = findPrdAnywhereSync(projectPath, issueId);
     const content = prdLocation ? await readPrdContent(prdLocation) : null;
