@@ -13,6 +13,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const projectsMocks = vi.hoisted(() => ({
   listProjectsSync: vi.fn(),
   getProjectSync: vi.fn(),
+  // PAN-3917 (W6): the derived issue state resolves the owning project from a
+  // path before it asks the forge; unregistered here, so it never asks.
+  findProjectByPathSync: vi.fn(() => null),
 }));
 
 const mergeOrderMocks = vi.hoisted(() => ({
@@ -102,7 +105,20 @@ async function realShipMergeBatch(
   return outcomes;
 }
 
+// PAN-3917 D6: the deferred ship lives in the dashboard's generation-ship
+// service now — there is no ship record module behind it.
+vi.mock('../../services/generation-ship.js', () => shipRecordMocks);
 vi.mock('../../../../lib/projects.js', () => projectsMocks);
+// PAN-3917: the merge-train candidate list is the forge's — every open PR that
+// is approved, green, and mergeable — not a record-backed eligibility scan.
+vi.mock('../../services/derived-issue-state.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../../services/derived-issue-state.js')>();
+  return {
+    ...original,
+    listReadyIssuesForProject: async (projectPath: string) =>
+      mergeOrderMocks.listEligibleCandidatesByProject(projectPath),
+  };
+});
 vi.mock('../../../../lib/flywheel-merge-order.js', () => mergeOrderMocks);
 vi.mock('../../../../lib/overdeck/merge-sync.js', () => mergeSyncMocks);
 vi.mock('../../services/uat-train.js', () => uatTrainMocks);
