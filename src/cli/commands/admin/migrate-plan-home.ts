@@ -39,6 +39,36 @@ function resolveProjectTrackerType(project: ProjectConfig): TrackerType {
   throw new Error(`Cannot resolve tracker for ${project.name}`);
 }
 
+/**
+ * The `${issuePrefix}-<n>` id for one tracker issue.
+ *
+ * GitHub's `ref` is a bare `#<number>` (no team/prefix concept at the
+ * tracker layer — Overdeck's own `issue_prefix` convention, e.g.
+ * `PAN-<n>` == `eltmon/overdeck#<n>`, is layered on top), so it is combined
+ * with `issuePrefix` here. Linear/GitLab/Rally already return a prefixed
+ * identifier (e.g. `MIN-902`) as `ref`.
+ */
+export function issueIdFromTrackerIssue(issue: Issue, trackerType: TrackerType, issuePrefix: string): string {
+  if (trackerType === 'github') {
+    return `${issuePrefix.toUpperCase()}-${issue.ref.replace(/^#/, '')}`;
+  }
+  return issue.ref.toUpperCase();
+}
+
+/**
+ * Open-issue ids (case-normalized `${issuePrefix}-<n>`) out of a tracker's
+ * raw `listIssues` result. Pure — no tracker/network access — so it is unit
+ * tested directly with fixtures shaped like each tracker's normalized
+ * `Issue` output.
+ */
+export function filterOpenIssueIds(issues: readonly Issue[], trackerType: TrackerType, issuePrefix: string): string[] {
+  const prefix = issuePrefix.toUpperCase();
+  return issues
+    .filter((issue) => issue.state !== 'closed')
+    .map((issue) => issueIdFromTrackerIssue(issue, trackerType, prefix))
+    .filter((ref) => ref.startsWith(`${prefix}-`));
+}
+
 /** Live open-issue list for a registered project, filtered to this project's issue prefix. */
 async function listOpenIssuesFromTracker(project: ProjectConfig): Promise<string[]> {
   const trackerType = resolveProjectTrackerType(project);
@@ -59,12 +89,10 @@ async function listOpenIssuesFromTracker(project: ProjectConfig): Promise<string
     project: project.rally_project,
   });
 
+  // No `limit`: paginate fully (github.ts and linear.ts both page to
+  // exhaustion when limit is undefined).
   const issues = await Effect.runPromise(tracker.listIssues({ team: issuePrefix, includeClosed: true }));
-
-  return issues
-    .filter((issue: Issue) => issue.state !== 'closed')
-    .map((issue: Issue) => issue.ref.toUpperCase())
-    .filter((ref: string) => ref.startsWith(`${issuePrefix}-`));
+  return filterOpenIssueIds(issues, trackerType, issuePrefix);
 }
 
 export async function runMigratePlanHome(projectKey: string, options: MigratePlanHomeCliOptions): Promise<number> {
