@@ -78,17 +78,17 @@ describe('isStatePlaneOnlyDiff', () => {
   });
 
   it('returns true when the diff touches only state-plane paths', async () => {
-    mkdirSync(join(root, '.pan', 'records'), { recursive: true });
-    writeFileSync(join(root, '.pan', 'records', 'pan-2375.json'), '{}\n');
+    mkdirSync(join(root, '.pan', 'review'), { recursive: true });
+    writeFileSync(join(root, '.pan', 'review', 'pan-2375.json'), '{}\n');
     const tip = commitAll(root, 'state only');
 
     await expect(isStatePlaneOnlyDiff(base, tip, root)).resolves.toBe(true);
   });
 
   it('returns false when any non-state path changes', async () => {
-    mkdirSync(join(root, '.pan', 'records'), { recursive: true });
+    mkdirSync(join(root, '.pan', 'review'), { recursive: true });
     mkdirSync(join(root, 'src'), { recursive: true });
-    writeFileSync(join(root, '.pan', 'records', 'pan-2375.json'), '{}\n');
+    writeFileSync(join(root, '.pan', 'review', 'pan-2375.json'), '{}\n');
     writeFileSync(join(root, 'src', 'feature.ts'), 'export const feature = true;\n');
     const tip = commitAll(root, 'mixed state and source');
 
