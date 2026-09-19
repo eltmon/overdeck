@@ -26,6 +26,7 @@ import { getReadableWorkspacePanPaths } from '../../lib/pan-dir/index.js';
 import { resolveSwarmPolicy } from '../../lib/swarm-policy.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
 import { findPlanSync, readWorkspacePlanSync } from '../../lib/xbrief/io.js';
+import { checkPlanFreshness, formatPlanFreshnessRefusal } from '../../lib/xbrief/freshness.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
 import { writeAutoStartXBrief, type AutoSynthesizeIssueInput } from '../../lib/xbrief/auto-synthesize.js';
 import { transitionStartedXBrief, updateWorkspaceDraftPlanStatus } from './start-status.js';
@@ -1146,6 +1147,28 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
           console.log(chalk.dim(`Run \`pan plan ${id}\` and finalize a readable implementation plan before starting work.`));
         },
       });
+    }
+
+    // PAN-3917: refuse to spawn against a plan written for files that have
+    // since moved or been deleted — the agent would spin on missing paths.
+    if (options.skipFreshness) {
+      console.log(chalk.yellow('⚠ Skipping plan-freshness preflight (--skip-freshness)'));
+    } else {
+      const plan = readWorkspacePlanSync(workspace);
+      const freshness = plan ? checkPlanFreshness(plan, workspace, existsSync) : null;
+      if (freshness && freshness.missing.length > 0) {
+        await failPostCreateValidation({
+          spinner,
+          issueId: id,
+          projectRoot,
+          workspaceCreatedThisRun,
+          message: `The plan for ${id} references files that no longer exist`,
+          printDetails: () => {
+            console.log('');
+            console.log(formatPlanFreshnessRefusal(freshness.missing, id));
+          },
+        });
+      }
     }
 
     prep.update('Building agent prompt with planning context...');

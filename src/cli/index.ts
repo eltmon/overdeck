@@ -529,6 +529,7 @@ program
   .option('--fresh', 'Drop the saved Claude session (non-destructive) and start a new one — replaces a live session too, so it recovers an inert agent without a separate pan kill')
   .option('--host', 'Bypass workspace docker stack-health gate and spawn on the host')
   .option('--yes', 'Confirm --host in non-interactive contexts')
+  .option('--skip-freshness', 'Bypass the plan-freshness preflight and spawn even if the plan names files that no longer exist')
   .action(startCommand);
 
 program

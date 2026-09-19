@@ -30,4 +30,7 @@ export interface IssueOptions {
   fresh?: boolean;
   /** Resolved planning mode for this start invocation. Set by issueCommand. */
   planningMode?: PlanningMode;
+  /** Bypass the plan-freshness preflight (PAN-3917) and spawn against a plan
+   *  that names files no longer on disk. Prints a one-line warning. */
+  skipFreshness?: boolean;
 }
