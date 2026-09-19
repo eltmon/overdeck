@@ -1,117 +1,72 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { Effect } from 'effect';
-import type { ReviewStatus } from '../../../../src/lib/review-status.js';
-import type { PanIssuePipelineRecord } from '../../../../src/lib/pan-dir/record.js';
 
+/**
+ * PAN-3917: the idempotent close-out guard used to read `pipeline.closedOut`
+ * off the per-issue record. The tracker owns close-out now: the issue is
+ * CLOSED and carries the `closed-out` label.
+ */
 const mocks = vi.hoisted(() => ({
-  resolveProjectForIssue: vi.fn(),
-  getProjectConfigFromWorkspacePath: vi.fn(),
-  readIssueRecord: vi.fn(),
-  getReviewStatus: vi.fn(),
+  execFile: vi.fn(),
+  resolveGitHubIssueSync: vi.fn(),
 }));
 
-vi.mock('../../../../src/lib/pan-dir/record.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../src/lib/pan-dir/record.js')>();
-  return {
-    ...actual,
-    resolveProjectForIssue: mocks.resolveProjectForIssue,
-    getProjectConfigFromWorkspacePath: mocks.getProjectConfigFromWorkspacePath,
-    readIssueRecord: mocks.readIssueRecord,
-  };
-});
+vi.mock('node:child_process', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:child_process')>()),
+  execFile: mocks.execFile,
+}));
 
-vi.mock('../../../../src/lib/review-status.js', () => ({
-  getReviewStatus: mocks.getReviewStatus,
-
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
+vi.mock('../../../../src/lib/tracker-utils.js', () => ({
+  resolveGitHubIssueSync: mocks.resolveGitHubIssueSync,
 }));
 
 import { readCompletedCloseOut } from '../../../../src/lib/lifecycle/dod-gate.js';
 
-const issueId = 'PAN-3025';
-const projectPath = '/tmp/test-project';
+function ghReturns(payload: unknown | Error): void {
+  mocks.execFile.mockImplementation((
+    _cmd: string,
+    _args: string[],
+    _opts: unknown,
+    cb: (err: Error | null, result: { stdout: string; stderr: string }) => void,
+  ) => {
+    if (payload instanceof Error) return cb(payload, { stdout: '', stderr: '' });
+    cb(null, { stdout: JSON.stringify(payload), stderr: '' });
+  });
+}
 
-describe('readCompletedCloseOut idempotent guard (PAN-3025 WI-4)', () => {
+describe('readCompletedCloseOut idempotent guard (PAN-3025 WI-4, PAN-3917)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.resolveProjectForIssue.mockReturnValue(null);
-    mocks.getProjectConfigFromWorkspacePath.mockReturnValue({ name: 'test', path: projectPath });
+    mocks.resolveGitHubIssueSync.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 3025 });
   });
 
-  it('ac1: pipeline.closedOut=true + no live row → returns closedOutAt (idempotent short-circuit)', async () => {
-    // Record shows ceremony completed; live status absent → already done
-    const record: PanIssuePipelineRecord = {
-      issueId,
-      schemaVersion: 2,
-      pipeline: {
-        closedOut: true,
-        closedOutAt: '2026-07-28T08:00:00Z',
-      } as any,
-    } as any;
-    mocks.readIssueRecord.mockResolvedValue(record);
-    mocks.getReviewStatus.mockReturnValue(Effect.succeed(null)); // No live row
+  it('returns closedAt for a CLOSED issue labelled closed-out', async () => {
+    ghReturns({ state: 'CLOSED', closedAt: '2026-07-28T08:00:00Z', labels: [{ name: 'closed-out' }] });
 
-    const result = await readCompletedCloseOut(issueId, projectPath);
-
-    expect(result).toBe('2026-07-28T08:00:00Z');
+    await expect(readCompletedCloseOut('PAN-3025', '/repo/overdeck')).resolves.toBe('2026-07-28T08:00:00Z');
   });
 
-  it('ac2: pipeline.closedOut=true + live row present → returns null (fall through to ceremony)', async () => {
-    // Record shows closedOut=true but live row still exists → ceremony aborted mid-way, must complete it
-    const record: PanIssuePipelineRecord = {
-      issueId,
-      schemaVersion: 2,
-      pipeline: {
-        closedOut: true,
-        closedOutAt: '2026-07-28T08:00:00Z',
-      } as any,
-    } as any;
-    mocks.readIssueRecord.mockResolvedValue(record);
-    mocks.getReviewStatus.mockReturnValue(Effect.succeed({
-      reviewStatus: 'passed',
-    } as ReviewStatus)); // Live row exists
+  it('returns null for a CLOSED issue that was never closed out', async () => {
+    ghReturns({ state: 'CLOSED', closedAt: '2026-07-28T08:00:00Z', labels: [{ name: 'bug' }] });
 
-    const result = await readCompletedCloseOut(issueId, projectPath);
-
-    expect(result).toBeNull(); // Fall through to gate
+    await expect(readCompletedCloseOut('PAN-3025', '/repo/overdeck')).resolves.toBeNull();
   });
 
-  it('ac3: pipeline.closedOut=false → returns null (not completed yet)', async () => {
-    // Record shows ceremony not started yet
-    const record: PanIssuePipelineRecord = {
-      issueId,
-      schemaVersion: 2,
-      pipeline: { closedOut: false } as any,
-    } as any;
-    mocks.readIssueRecord.mockResolvedValue(record);
+  it('returns null for an open issue even when it carries the label', async () => {
+    ghReturns({ state: 'OPEN', labels: [{ name: 'closed-out' }] });
 
-    const result = await readCompletedCloseOut(issueId, projectPath);
-
-    expect(result).toBeNull();
+    await expect(readCompletedCloseOut('PAN-3025', '/repo/overdeck')).resolves.toBeNull();
   });
 
-  it('ac4: getReviewStatus read error → returns null (fail closed on uncertainty)', async () => {
-    // Live status read fails; we cannot confirm absence → conservative: do not short-circuit
-    const record: PanIssuePipelineRecord = {
-      issueId,
-      schemaVersion: 2,
-      pipeline: { closedOut: true, closedOutAt: '2026-07-28T08:00:00Z' } as any,
-    } as any;
-    mocks.readIssueRecord.mockResolvedValue(record);
-    mocks.getReviewStatus.mockReturnValue(Effect.fail(new Error('database read error')));
+  it('fails closed on a tracker read error', async () => {
+    ghReturns(new Error('gh unavailable'));
 
-    const result = await readCompletedCloseOut(issueId, projectPath);
-
-    expect(result).toBeNull(); // Fail closed
+    await expect(readCompletedCloseOut('PAN-3025', '/repo/overdeck')).resolves.toBeNull();
   });
 
-  it('ac5: readIssueRecord error → returns null (fail closed on uncertainty)', async () => {
-    // Record read fails; we cannot confirm closedOut status → conservative: do not short-circuit
-    mocks.readIssueRecord.mockRejectedValue(new Error('file read error'));
+  it('fails closed for a non-GitHub issue', async () => {
+    mocks.resolveGitHubIssueSync.mockReturnValue({ isGitHub: false });
 
-    const result = await readCompletedCloseOut(issueId, projectPath);
-
-    expect(result).toBeNull(); // Fail closed
+    await expect(readCompletedCloseOut('MIN-1', '/repo/myn')).resolves.toBeNull();
+    expect(mocks.execFile).not.toHaveBeenCalled();
   });
 });

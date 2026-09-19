@@ -14,8 +14,8 @@ vi.mock('../../../../src/lib/cloister/issue-closed.js', () => ({
   isTrackerIssueClosed: issueClosureMocks.isTrackerIssueClosed,
 }));
 
-import type { ReviewStatus } from '../../../../src/lib/review-status.js';
-import type { PanIssuePipelineRecord } from '../../../../src/lib/pan-dir/record.js';
+import type { VerificationArtifact } from '../../../../src/lib/cloister/verification-artifact.js';
+import type { IssuePullRequestData } from '../../../../src/lib/overdeck/pull-requests.js';
 import {
   checkMergedRow,
   checkMainVerifyRow,
@@ -25,7 +25,6 @@ import {
   checkTestsRow,
   checkVerificationRow,
   evaluateDodGate,
-  reconcileContainedStrike,
   readContainingDefaultBranchCommits,
   type DodStatusRowDeps,
 } from '../../../../src/lib/lifecycle/dod-gate.js';
@@ -34,363 +33,181 @@ import { stepFailed, stepOk, stepSkipped } from '../../../../src/lib/lifecycle/t
 
 const issueId = 'PAN-2715';
 
-function live(overrides: Partial<ReviewStatus> = {}): ReviewStatus {
+/**
+ * PAN-3917: rows 1-3 read the PR and the workspace's verification artifact —
+ * the two owners of those facts. There is no status row or journal left.
+ */
+function pr(overrides: Partial<IssuePullRequestData> = {}): IssuePullRequestData {
+  return {
+    number: 42,
+    reviewDecision: 'APPROVED',
+    statusCheckRollup: [{ name: 'test', conclusion: 'SUCCESS' }],
+    ...overrides,
+  } as IssuePullRequestData;
+}
+
+function artifact(overrides: Partial<VerificationArtifact> = {}): VerificationArtifact {
   return {
     issueId,
-    reviewStatus: 'passed',
-    testStatus: 'passed',
-    verificationStatus: 'passed',
-    lastVerifiedCommit: 'abc123',
-    updatedAt: '2026-07-15T00:00:00Z',
-    readyForMerge: true,
+    ranAt: '2026-07-15T00:00:00Z',
+    outcome: 'passed',
+    gates: [],
     ...overrides,
   };
 }
 
-function journal(overrides: Partial<PanIssuePipelineRecord> = {}): PanIssuePipelineRecord {
-  return {
-    issueId,
-    reviewStatus: 'passed',
-    testStatus: 'passed',
-    verificationStatus: 'passed',
-    lastVerifiedCommit: 'journal123',
-    readyForMerge: true,
-    updatedAt: '2026-07-15T00:00:00Z',
-    ...overrides,
-  };
-}
-
-function deps(status: ReviewStatus | null, pipeline: PanIssuePipelineRecord | null = null): DodStatusRowDeps {
-  return { getReviewStatus: () => status, getJournalStatus: () => pipeline };
+function deps(
+  pullRequest: IssuePullRequestData | null,
+  verification: VerificationArtifact | null = null,
+): DodStatusRowDeps {
+  return { readPullRequest: () => pullRequest, readVerification: () => verification };
 }
 
 describe('Definition-of-Done status rows', () => {
-  it('passes live review, test, and verified-commit verdicts', async () => {
-    const source = deps(live());
-    expect(await checkReviewRow(issueId, source)).toMatchObject({ status: 'pass', observed: 'reviewStatus: passed' });
-    expect(await checkTestsRow(issueId, source)).toMatchObject({ status: 'pass', observed: 'testStatus: passed' });
-    expect(await checkVerificationRow(issueId, source)).toMatchObject({ status: 'pass', observed: 'verificationStatus: passed at abc123' });
-  });
-
-  it('treats skipped verdicts as policy-approved passes', async () => {
-    const source = deps(live({ reviewStatus: 'skipped', testStatus: 'skipped', verificationStatus: 'skipped' }));
-    for (const row of await Promise.all([checkReviewRow(issueId, source), checkTestsRow(issueId, source), checkVerificationRow(issueId, source)])) {
-      expect(row.status).toBe('pass');
-      expect(row.observed).toContain('skipped per issue policy');
-    }
-  });
-
-  it('reports the actual non-passing verdict', async () => {
-    const source = deps(live({ reviewStatus: 'failed', testStatus: 'pending', verificationStatus: 'failed' }));
-    expect(await checkReviewRow(issueId, source)).toMatchObject({ status: 'miss', observed: 'reviewStatus: failed' });
-    expect(await checkTestsRow(issueId, source)).toMatchObject({ status: 'miss', observed: 'testStatus: pending' });
-    expect(await checkVerificationRow(issueId, source)).toMatchObject({ status: 'miss', observed: 'verificationStatus: failed at abc123' });
-  });
-
-  it('passes a verified verdict whose best-effort commit anchor was never recorded, and names the gap', async () => {
-    // PAN-3067: lastVerifiedCommit is written best-effort by the verification runner,
-    // so its absence must neither block the row nor hide itself from the observed string.
-    expect(await checkVerificationRow(issueId, deps(live({ lastVerifiedCommit: undefined })))).toMatchObject({
+  it('passes an approved PR with green checks and a passed verification artifact', async () => {
+    const source = deps(pr(), artifact());
+    expect(await checkReviewRow(issueId, source)).toMatchObject({ status: 'pass', observed: 'PR #42 reviewDecision: APPROVED' });
+    expect(await checkTestsRow(issueId, source)).toMatchObject({ status: 'pass', observed: 'PR #42 checks: all 1 check(s) green' });
+    expect(await checkVerificationRow(issueId, source)).toMatchObject({
       status: 'pass',
-      observed: 'verificationStatus: passed (no lastVerifiedCommit recorded)',
-    });
-    expect(
-      await checkVerificationRow(issueId, deps(live({ verificationStatus: 'skipped', lastVerifiedCommit: undefined }))),
-    ).toMatchObject({
-      status: 'pass',
-      observed: 'verificationStatus: skipped (skipped per issue policy; no lastVerifiedCommit recorded)',
+      observed: 'verification artifact: passed at 2026-07-15T00:00:00Z',
     });
   });
 
-  it('never claims a missing anchor for a verdict that already fails on its own', async () => {
-    expect(await checkVerificationRow(issueId, deps(live({ verificationStatus: undefined, lastVerifiedCommit: undefined })))).toMatchObject({
-      status: 'miss',
-      observed: 'verificationStatus: missing',
-    });
+  it('reports the actual non-passing forge verdict', async () => {
+    const source = deps(
+      pr({ reviewDecision: 'CHANGES_REQUESTED', statusCheckRollup: [{ name: 'test', conclusion: 'FAILURE' }] } as Partial<IssuePullRequestData>),
+      artifact({ outcome: 'failed', failedCheck: 'lint' }),
+    );
+    expect(await checkReviewRow(issueId, source)).toMatchObject({ status: 'miss', observed: 'PR #42 reviewDecision: CHANGES_REQUESTED' });
+    expect(await checkTestsRow(issueId, source)).toMatchObject({ status: 'miss', observed: 'PR #42 checks: 1 of 1 check(s) not green' });
+    expect(await checkVerificationRow(issueId, source)).toMatchObject({ status: 'miss' });
   });
 
-  it('accepts missing verification verdicts when merged work is green on main', async () => {
-    // An out-of-band landing bypasses merge-ops, which normally writes the
-    // verdict for CI-green skip. Merge plus main-CI evidence is still sufficient.
+  it('misses on a pending review and on checks still running', async () => {
+    const source = deps(pr({
+      reviewDecision: null,
+      statusCheckRollup: [{ name: 'test', status: 'IN_PROGRESS' }],
+    } as Partial<IssuePullRequestData>));
+    expect(await checkReviewRow(issueId, source)).toMatchObject({ status: 'miss', observed: 'PR #42 reviewDecision: none' });
+    expect(await checkTestsRow(issueId, source)).toMatchObject({ status: 'miss', observed: 'PR #42 checks: 1 of 1 check(s) still running' });
+  });
+
+  it('accepts a missing verification artifact when merged work is green on main', async () => {
+    // An out-of-band landing bypasses merge-ops, which normally runs the gate.
     const row = await checkVerificationRow(
       issueId,
-      deps(live({ verificationStatus: undefined, lastVerifiedCommit: undefined })),
+      deps(pr(), null),
       { trackerClosed: false, landedWork: true, mainVerifyStatus: 'pass' },
     );
 
     expect(row).toMatchObject({
       status: 'pass',
-      observed: 'verificationStatus: missing; verification satisfied by green main CI after landing',
+      observed: 'no verification artifact in the workspace; verification satisfied by green main CI after landing',
     });
   });
 
-  it('falls back to durable pipeline journal verdicts after live status is cleared', async () => {
-    const source = deps(null, journal());
-    for (const row of await Promise.all([checkReviewRow(issueId, source), checkTestsRow(issueId, source), checkVerificationRow(issueId, source)])) {
-      expect(row.status).toBe('pass');
-      expect(row.observed).toContain('from pipeline journal');
-    }
-  });
-
-  it('passes a durable journal verdict without a commit anchor and still reports both facts', async () => {
-    const row = await checkVerificationRow(issueId, deps(null, journal({ lastVerifiedCommit: undefined })));
-    expect(row).toMatchObject({
-      status: 'pass',
-      observed: 'verificationStatus: passed (from pipeline journal; no lastVerifiedCommit recorded)',
-    });
-  });
-
-  it('returns misses instead of throwing when both sources are empty or a door fails', async () => {
+  it('returns misses instead of throwing when there is no PR or a door fails', async () => {
     const empty = deps(null);
     const failing: DodStatusRowDeps = {
-      getReviewStatus: () => { throw new Error('database unavailable'); },
-      getJournalStatus: () => { throw new Error('journal unavailable'); },
+      readPullRequest: () => { throw new Error('forge unavailable'); },
+      readVerification: () => { throw new Error('workspace unavailable'); },
     };
     for (const source of [empty, failing]) {
-      for (const row of await Promise.all([checkReviewRow(issueId, source), checkTestsRow(issueId, source), checkVerificationRow(issueId, source)])) {
-        expect(row).toMatchObject({ status: 'miss', observed: 'no review status or journal record found' });
+      for (const row of await Promise.all([checkReviewRow(issueId, source), checkTestsRow(issueId, source)])) {
+        expect(row).toMatchObject({ status: 'miss', observed: 'no pull request found on the forge for this issue' });
       }
+      expect(await checkVerificationRow(issueId, source)).toMatchObject({
+        status: 'miss',
+        observed: 'no verification artifact in the workspace',
+      });
     }
   });
 
-  it('marks review and tests skipped-by-strike for a strike-landed issue, never passed', async () => {
+  it('marks review, tests and verification skipped-by-strike for a strike-landed issue, never passed', async () => {
     // PAN-3180: a strike dispatches neither specialist by design, so "never ran"
     // must resolve as a deliberate skip while still reporting the real verdict.
-    const source = deps(live({ reviewStatus: 'pending', testStatus: 'pending', strikeLandingState: 'landed' }));
-    const [review, tests] = await Promise.all([checkReviewRow(issueId, source), checkTestsRow(issueId, source)]);
+    const landing = { strikeLanded: true };
+    const source = deps(null, null);
 
+    const review = await checkReviewRow(issueId, source, undefined, landing);
     expect(review).toMatchObject({ status: 'skip' });
-    expect(review.observed).toContain('reviewStatus: pending');
-    expect(review.observed).toContain('skipped by the strike path (strikeLandingState: landed)');
     expect(review.observed).toContain('no review specialist is dispatched for a strike');
 
+    const tests = await checkTestsRow(issueId, source, undefined, landing);
     expect(tests).toMatchObject({ status: 'skip' });
-    expect(tests.observed).toContain('testStatus: pending');
     expect(tests.observed).toContain('no test specialist is dispatched for a strike');
+
+    const verification = await checkVerificationRow(issueId, source, undefined, landing);
+    expect(verification).toMatchObject({ status: 'skip' });
+    expect(verification.observed).toContain('no verification gate runs on the strike path');
   });
 
-  it('reads the strike waiver from the durable pipeline journal after live status is cleared', async () => {
-    const source = deps(null, journal({ reviewStatus: 'pending', testStatus: 'pending', strikeLandingState: 'landed' }));
-    for (const row of await Promise.all([checkReviewRow(issueId, source), checkTestsRow(issueId, source)])) {
-      expect(row.status).toBe('skip');
-      expect(row.observed).toContain('from pipeline journal');
-      expect(row.observed).toContain('skipped by the strike path');
-    }
-  });
-
-  it('keeps review and tests blocking for a normal work-agent issue and for an in-flight strike', async () => {
-    const normal = deps(live({ reviewStatus: 'pending', testStatus: 'pending' }));
+  it('keeps the rows blocking for a normal work-agent issue with no strike landing', async () => {
+    const normal = deps(pr({ reviewDecision: null, statusCheckRollup: [] } as Partial<IssuePullRequestData>));
     for (const row of await Promise.all([checkReviewRow(issueId, normal), checkTestsRow(issueId, normal)])) {
       expect(row.status).toBe('miss');
       expect(row.observed).not.toContain('strike');
     }
-
-    // Only `landed` is the strike path's statement that the work reached main.
-    for (const state of ['ready', 'landing', 'recovering', 'needs_you'] as const) {
-      const inFlight = deps(live({ reviewStatus: 'pending', testStatus: 'failed', strikeLandingState: state }));
-      for (const row of await Promise.all([checkReviewRow(issueId, inFlight), checkTestsRow(issueId, inFlight)])) {
-        expect(row.status).toBe('miss');
-      }
-    }
   });
 
-  it('never lets the strike waiver overwrite a verdict a specialist actually produced', async () => {
-    const passed = deps(live({ reviewStatus: 'passed', testStatus: 'passed', strikeLandingState: 'landed' }));
-    expect(await checkReviewRow(issueId, passed)).toMatchObject({ status: 'pass', observed: 'reviewStatus: passed' });
-    expect(await checkTestsRow(issueId, passed)).toMatchObject({ status: 'pass', observed: 'testStatus: passed' });
+  it('never lets the strike waiver overwrite a verdict the forge actually produced', async () => {
+    const landing = { strikeLanded: true };
+    const approved = deps(pr(), artifact());
+    expect(await checkReviewRow(issueId, approved, undefined, landing)).toMatchObject({ status: 'pass' });
+    expect(await checkTestsRow(issueId, approved, undefined, landing)).toMatchObject({ status: 'pass' });
 
-    // A specialist that ran and rejected the work is a different fact from one
-    // that was never dispatched — those keep blocking until an operator accepts.
-    const negative = deps(live({ reviewStatus: 'blocked', testStatus: 'failed', strikeLandingState: 'landed' }));
-    expect(await checkReviewRow(issueId, negative)).toMatchObject({ status: 'miss', observed: 'reviewStatus: blocked' });
-    expect(await checkTestsRow(issueId, negative)).toMatchObject({ status: 'miss', observed: 'testStatus: failed' });
+    // A review that rejected the work is a different fact from one never dispatched.
+    const negative = deps(
+      pr({ reviewDecision: 'CHANGES_REQUESTED', statusCheckRollup: [{ name: 'test', conclusion: 'FAILURE' }] } as Partial<IssuePullRequestData>),
+      artifact({ outcome: 'failed' }),
+    );
+    expect(await checkReviewRow(issueId, negative, undefined, landing)).toMatchObject({ status: 'miss' });
+    expect(await checkTestsRow(issueId, negative, undefined, landing)).toMatchObject({ status: 'miss' });
+    expect(await checkVerificationRow(issueId, negative, undefined, landing)).toMatchObject({ status: 'miss' });
   });
 
   it('settles absent or pending verdicts after a tracker-closed issue has landed', async () => {
-    const source = deps(live({
-      reviewStatus: 'pending',
-      testStatus: undefined,
-      verificationStatus: 'pending',
-      lastVerifiedCommit: undefined,
-    }));
+    const source = deps(pr({ reviewDecision: null, statusCheckRollup: [] } as Partial<IssuePullRequestData>), null);
     const settlement = { trackerClosed: true, landedWork: true, mainVerifyStatus: 'skip' as const };
-    const review = await checkReviewRow(issueId, source, settlement);
-    const tests = await checkTestsRow(issueId, source, settlement);
-    const verification = await checkVerificationRow(issueId, source, settlement);
 
-    expect(review).toMatchObject({ status: 'skip', observed: expect.stringContaining('reviewStatus: pending') });
-    expect(tests).toMatchObject({ status: 'skip', observed: expect.stringContaining('testStatus: missing') });
-    expect(verification).toMatchObject({ status: 'skip', observed: expect.stringContaining('verificationStatus: pending') });
+    expect(await checkReviewRow(issueId, source, settlement)).toMatchObject({ status: 'skip' });
+    expect(await checkTestsRow(issueId, source, settlement)).toMatchObject({ status: 'skip' });
+    expect(await checkVerificationRow(issueId, source, settlement)).toMatchObject({ status: 'skip' });
   });
 
   it('does not settle review without both tracker closure and landed work', async () => {
-    const source = deps(live({ reviewStatus: 'pending' }));
+    const source = deps(pr({ reviewDecision: null, statusCheckRollup: [] } as Partial<IssuePullRequestData>));
     const closedWithoutLanding = await checkReviewRow(issueId, source, {
-      trackerClosed: true,
-      landedWork: false,
-      mainVerifyStatus: 'pass',
+      trackerClosed: true, landedWork: false, mainVerifyStatus: 'pass',
     });
     const openWithLanding = await checkReviewRow(issueId, source, {
-      trackerClosed: false,
-      landedWork: true,
-      mainVerifyStatus: 'pass',
+      trackerClosed: false, landedWork: true, mainVerifyStatus: 'pass',
     });
 
-    expect(closedWithoutLanding).toMatchObject({ status: 'miss', observed: 'reviewStatus: pending' });
-    expect(openWithLanding).toMatchObject({ status: 'miss', observed: 'reviewStatus: pending' });
+    expect(closedWithoutLanding).toMatchObject({ status: 'miss' });
+    expect(openWithLanding).toMatchObject({ status: 'miss' });
   });
 
-  it('never supersedes a negative review verdict', async () => {
-    const row = await checkReviewRow(issueId, deps(live({ reviewStatus: 'blocked' })), {
-      trackerClosed: true,
-      landedWork: true,
-      mainVerifyStatus: 'pass',
+  it('never supersedes a review the forge rejected', async () => {
+    const row = await checkReviewRow(issueId, deps(pr({ reviewDecision: 'CHANGES_REQUESTED' })), {
+      trackerClosed: true, landedWork: true, mainVerifyStatus: 'pass',
     });
 
-    expect(row).toMatchObject({ status: 'miss', observed: 'reviewStatus: blocked' });
+    expect(row).toMatchObject({ status: 'miss', observed: 'PR #42 reviewDecision: CHANGES_REQUESTED' });
   });
 
-  it('supersedes a negative test verdict only when landed work is green on main', async () => {
-    const source = deps(live({ testStatus: 'failed' }));
+  it('supersedes red checks only when landed work is green on main', async () => {
+    const source = deps(pr({ statusCheckRollup: [{ name: 'test', conclusion: 'FAILURE' }] } as Partial<IssuePullRequestData>));
     const green = await checkTestsRow(issueId, source, {
-      trackerClosed: true,
-      landedWork: true,
-      mainVerifyStatus: 'pass',
+      trackerClosed: true, landedWork: true, mainVerifyStatus: 'pass',
     });
     const unproved = await checkTestsRow(issueId, source, {
-      trackerClosed: true,
-      landedWork: true,
-      mainVerifyStatus: 'skip',
+      trackerClosed: true, landedWork: true, mainVerifyStatus: 'skip',
     });
 
-    expect(green).toMatchObject({ status: 'skip', observed: expect.stringContaining('testStatus: failed') });
-    expect(unproved).toMatchObject({ status: 'miss', observed: 'testStatus: failed' });
-  });
-});
-
-describe('contained strike reconciliation', () => {
-  const head = 'b'.repeat(40);
-  const ctx = { issueId, projectPath: '/tmp/overdeck' };
-  const contained = {
-    id: 'merged' as const,
-    num: 4,
-    title: 'Merged to main',
-    expected: 'merged',
-    observed: 'contained strike',
-    status: 'pass' as const,
-    evidence: 'branch-containment' as const,
-    containedStrikeHead: head,
-  };
-
-  it('records terminal strike verdicts through the canonical writer', async () => {
-    const setStatus = vi.fn();
-    await reconcileContainedStrike(ctx, contained, {
-      getStatus: () => live({
-        reviewStatus: 'pending', testStatus: 'pending', verificationStatus: undefined,
-        strikeReadyHead: head, strikeReadyAt: '2026-08-13T00:00:00Z', strikeLandingState: 'needs_you',
-      }),
-      getJournalStatus: () => null,
-      setStatus,
-    });
-
-    expect(setStatus).toHaveBeenCalledWith(issueId, expect.objectContaining({
-      reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed',
-      lastVerifiedCommit: head, mergeStatus: 'merged', strikeLandingState: 'landed',
-      strikeReadyHead: undefined, strikeReadyAt: undefined,
-    }));
-  });
-
-  it('uses a matching durable marker when the live projection is incomplete', async () => {
-    const setStatus = vi.fn();
-    await reconcileContainedStrike(ctx, contained, {
-      getStatus: () => live({
-        reviewStatus: 'pending', testStatus: 'pending', verificationStatus: undefined,
-        strikeReadyHead: undefined, strikeReadyAt: undefined, strikeLandingState: 'needs_you',
-      }),
-      getJournalStatus: () => journal({
-        reviewStatus: 'pending', testStatus: 'pending', verificationStatus: undefined,
-        strikeReadyHead: head, strikeReadyAt: '2026-08-13T00:00:00Z', strikeLandingState: 'needs_you',
-      }),
-      setStatus,
-    });
-
-    expect(setStatus).toHaveBeenCalledWith(issueId, expect.objectContaining({
-      reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed',
-      lastVerifiedCommit: head, mergeStatus: 'merged', strikeLandingState: 'landed',
-      strikeReadyHead: undefined, strikeReadyAt: undefined,
-    }));
-  });
-
-  it('preserves negative durable verdicts while using the durable marker', async () => {
-    const setStatus = vi.fn();
-    await reconcileContainedStrike(ctx, contained, {
-      getStatus: () => live({
-        reviewStatus: 'pending', testStatus: 'pending', verificationStatus: undefined,
-        strikeReadyHead: undefined,
-      }),
-      getJournalStatus: () => journal({
-        reviewStatus: 'blocked', testStatus: 'failed', verificationStatus: 'failed',
-        strikeReadyHead: head,
-      }),
-      setStatus,
-    });
-
-    const update = setStatus.mock.calls[0]?.[1];
-    expect(update).not.toHaveProperty('reviewStatus');
-    expect(update).not.toHaveProperty('testStatus');
-    expect(update).not.toHaveProperty('verificationStatus');
-  });
-
-  it('is idempotent after the ready marker has been consumed', async () => {
-    const setStatus = vi.fn();
-    await reconcileContainedStrike(ctx, contained, {
-      getStatus: () => live({
-        reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed',
-        mergeStatus: 'merged', strikeLandingState: 'landed', strikeReadyHead: undefined,
-      }),
-      getJournalStatus: () => journal({
-        reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed',
-        mergeStatus: 'merged', strikeLandingState: 'landed', strikeReadyHead: undefined,
-      }),
-      setStatus,
-    });
-
-    expect(setStatus).not.toHaveBeenCalled();
-  });
-
-  it('requires readiness evidence tied to the contained head', async () => {
-    const setStatus = vi.fn();
-    await reconcileContainedStrike(ctx, contained, {
-      getStatus: () => live({ strikeReadyHead: 'c'.repeat(40) }),
-      getJournalStatus: () => null,
-      setStatus,
-    });
-    expect(setStatus).not.toHaveBeenCalled();
-  });
-
-  it('preserves every existing negative verdict', async () => {
-    const setStatus = vi.fn();
-    await reconcileContainedStrike(ctx, contained, {
-      getStatus: () => live({
-        reviewStatus: 'blocked', testStatus: 'failed', verificationStatus: 'failed', strikeReadyHead: head,
-      }),
-      getJournalStatus: () => null,
-      setStatus,
-    });
-    const update = setStatus.mock.calls[0]?.[1];
-    expect(update).not.toHaveProperty('reviewStatus');
-    expect(update).not.toHaveProperty('testStatus');
-    expect(update).not.toHaveProperty('verificationStatus');
-  });
-
-  it('does nothing for a normal PR-landed strike', async () => {
-    const setStatus = vi.fn();
-    await reconcileContainedStrike(ctx, { ...contained, evidence: undefined }, {
-      getStatus: () => live({ strikeReadyHead: head }),
-      getJournalStatus: () => null,
-      setStatus,
-    });
-    expect(setStatus).not.toHaveBeenCalled();
+    expect(green).toMatchObject({ status: 'skip' });
+    expect(unproved).toMatchObject({ status: 'miss' });
   });
 });
 
@@ -414,40 +231,41 @@ describe('Definition-of-Done merged row', () => {
     expect(miss).toMatchObject({ status: 'miss', observed: expect.stringContaining('2 unmerged commit') });
   });
 
-  it('rejects branch absence when neither the forge nor the durable record proves a merge', async () => {
+  it('rejects branch absence when the forge proves no merge', async () => {
     const row = await checkMergedRow(ctx, {
       verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
       readPullRequest: async () => ({}),
-      readDurableMerges: async () => [],
+      readMergedForgeArtifacts: async () => [],
     });
 
     expect(row).toMatchObject({
       status: 'miss',
-      observed: expect.stringContaining('no merged forge artifact or durable close-out merge record found'),
+      observed: expect.stringContaining('no merged forge artifact found'),
     });
   });
 
-  it('accepts a deleted branch only with positive durable or forge merge evidence', async () => {
-    const durable = await checkMergedRow({ issueId, projectPath: '/tmp/overdeck' }, {
+  it('accepts a deleted branch only with positive forge merge evidence', async () => {
+    const artifacts = await checkMergedRow({ issueId, projectPath: '/tmp/overdeck' }, {
       verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
       readPullRequest: async () => ({}),
-      readDurableMerges: async () => ['https://github.com/eltmon/overdeck/pull/2720'],
+      readMergedForgeArtifacts: async () => [{ forge: 'github', url: 'https://github.com/eltmon/overdeck/pull/2720' }],
+      readBranchContainment: async () => ({ mergedWorkRefs: [], unmergedRefs: [], pointerRefs: [] }),
     });
-    const forge = await checkMergedRow(ctx, {
+    const pullRequest = await checkMergedRow(ctx, {
       verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
       readPullRequest: async () => ({ number: 2720, state: 'MERGED', mergedAt: '2026-07-15T12:00:00Z' }),
-      readDurableMerges: async () => [],
+      readMergedForgeArtifacts: async () => [],
     });
 
-    expect(durable).toMatchObject({ status: 'pass', observed: expect.stringContaining('1 merge artifact') });
-    expect(forge).toMatchObject({ status: 'pass', mergedAt: '2026-07-15T12:00:00Z' });
+    expect(artifacts).toMatchObject({ status: 'pass', observed: expect.stringContaining('GitHub PR merged') });
+    expect(pullRequest).toMatchObject({ status: 'pass', mergedAt: '2026-07-15T12:00:00Z' });
   });
 
   it('records a merged GitLab MR as branch-absence evidence', async () => {
     const row = await checkMergedRow({ issueId, projectPath: '/tmp/mind-your-now' }, {
       verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
       readPullRequest: async () => ({}),
-      readDurableMerges: async () => [],
+      readMergedForgeArtifacts: async () => [],
       readMergedForgeArtifacts: async () => [{
         forge: 'gitlab',
         id: '75',
@@ -480,7 +298,7 @@ describe('Definition-of-Done merged row', () => {
     const row = await checkMergedRow({ issueId, projectPath: '/tmp/mind-your-now' }, {
       verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
       readPullRequest: async () => ({}),
-      readDurableMerges: async () => [],
+      readMergedForgeArtifacts: async () => [],
       readMergedForgeArtifacts: async () => [],
       readBranchContainment: async () => ({
         mergedWorkRefs: ['fe:feature/min-908'],
@@ -498,7 +316,7 @@ describe('Definition-of-Done merged row', () => {
     const row = await checkMergedRow({ issueId, projectPath: '/tmp/overdeck' }, {
       verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
       readPullRequest: async () => ({}),
-      readDurableMerges: async () => [],
+      readMergedForgeArtifacts: async () => [],
       readBranchContainment: async () => ({
         mergedWorkRefs: [`/tmp/overdeck:strike/${issueId.toLowerCase()}`],
         mergedWorkHeads: [{ ref: `/tmp/overdeck:strike/${issueId.toLowerCase()}`, head }],
@@ -514,7 +332,7 @@ describe('Definition-of-Done merged row', () => {
     const row = await checkMergedRow({ issueId, projectPath: '/tmp/mind-your-now' }, {
       verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
       readPullRequest: async () => ({}),
-      readDurableMerges: async () => [],
+      readMergedForgeArtifacts: async () => [],
       readMergedForgeArtifacts: async () => { throw new Error('glab unavailable'); },
       readBranchContainment: async () => ({ mergedWorkRefs: [], unmergedRefs: [], pointerRefs: [] }),
     });
@@ -567,7 +385,7 @@ describe('Definition-of-Done merged row', () => {
     const row = await checkMergedRow(ctx, {
       verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
       readPullRequest: async () => ({}),
-      readDurableMerges: async () => [],
+      readMergedForgeArtifacts: async () => [],
       readBranchContainment: async () => ({
         mergedWorkRefs: ['frontend:feature/min-873'],
         unmergedRefs: [],
@@ -588,7 +406,7 @@ describe('Definition-of-Done merged row', () => {
     const row = await checkMergedRow(ctx, {
       verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
       readPullRequest: async () => ({}),
-      readDurableMerges: async () => [],
+      readMergedForgeArtifacts: async () => [],
       readBranchContainment: async () => ({
         mergedWorkRefs: ['frontend:feature/min-873'],
         unmergedRefs: ['api:feature/min-873'],
@@ -604,7 +422,7 @@ describe('Definition-of-Done merged row', () => {
     const row = await checkMergedRow(ctx, {
       verifyMerged: async () => stepFailed('close-out:verify-merged', BRANCH_ABSENT_MERGE_ERROR),
       readPullRequest: async () => ({}),
-      readDurableMerges: async () => [],
+      readMergedForgeArtifacts: async () => [],
       readBranchContainment: async () => { throw new Error('git unavailable'); },
     });
 
@@ -662,7 +480,7 @@ describe('Definition-of-Done post-merge row', () => {
   it('passes when the issue is verifying on main and issue agents are stopped', async () => {
     const row = await checkPostMergeRow(ctx, undefined, {
       readCanonicalState: async () => 'verifying_on_main',
-      readMergeStatus: () => 'merged',
+      readMergedAt: () => '2026-07-15T12:00:00Z',
       listAgents: clearAgents,
     });
     expect(row).toMatchObject({ status: 'pass', observed: expect.stringContaining('no running work/planning agents') });
@@ -671,7 +489,7 @@ describe('Definition-of-Done post-merge row', () => {
   it('misses and names running work or planning agents', async () => {
     const row = await checkPostMergeRow(ctx, undefined, {
       readCanonicalState: async () => 'verifying_on_main',
-      readMergeStatus: () => 'merged',
+      readMergedAt: () => '2026-07-15T12:00:00Z',
       listAgents: () => [
         { id: 'agent-pan-2715', issueId, role: 'work', status: 'running' },
         { id: 'planning-pan-2715', issueId, role: 'plan', status: 'starting' },
@@ -685,7 +503,7 @@ describe('Definition-of-Done post-merge row', () => {
   it('misses when neither canonical state nor merge status proves lifecycle completion', async () => {
     const row = await checkPostMergeRow(ctx, undefined, {
       readCanonicalState: async () => 'in_review',
-      readMergeStatus: () => 'verifying',
+      readMergedAt: () => undefined,
       listAgents: clearAgents,
     });
     expect(row).toMatchObject({ status: 'miss', observed: expect.stringContaining('canonical state: in_review') });
@@ -697,7 +515,7 @@ describe('Definition-of-Done post-merge row', () => {
   it('passes on terminal canonical state done with no running agents', async () => {
     const row = await checkPostMergeRow(ctx, undefined, {
       readCanonicalState: async () => 'done',
-      readMergeStatus: () => null,
+      readMergedAt: () => undefined,
       listAgents: clearAgents,
     });
     expect(row).toMatchObject({ status: 'pass', observed: expect.stringContaining('terminal canonical state: done') });
@@ -706,7 +524,7 @@ describe('Definition-of-Done post-merge row', () => {
   it('skips on terminal canonical state canceled', async () => {
     const row = await checkPostMergeRow(ctx, undefined, {
       readCanonicalState: async () => 'canceled',
-      readMergeStatus: () => null,
+      readMergedAt: () => undefined,
       listAgents: clearAgents,
     });
     expect(row).toMatchObject({ status: 'skip', observed: expect.stringContaining('terminal canonical state: canceled') });
@@ -715,7 +533,7 @@ describe('Definition-of-Done post-merge row', () => {
   it('still misses on terminal state done while a work agent runs', async () => {
     const row = await checkPostMergeRow(ctx, undefined, {
       readCanonicalState: async () => 'done',
-      readMergeStatus: () => null,
+      readMergedAt: () => undefined,
       listAgents: () => [{ id: 'agent-pan-2715', issueId, role: 'work', status: 'running' }],
     });
     expect(row).toMatchObject({ status: 'miss' });
@@ -724,7 +542,7 @@ describe('Definition-of-Done post-merge row', () => {
   it('turns canonical-state probe failures into an observed miss', async () => {
     const row = await checkPostMergeRow(ctx, undefined, {
       readCanonicalState: async () => { throw new Error('gh timed out'); },
-      readMergeStatus: () => 'merged',
+      readMergedAt: () => '2026-07-15T12:00:00Z',
       listAgents: clearAgents,
     });
     expect(row).toMatchObject({ status: 'miss', observed: expect.stringContaining('gh timed out') });
@@ -739,7 +557,7 @@ describe('Definition-of-Done post-merge row', () => {
     };
     const row = await checkPostMergeRow(ctx, merged, {
       readCanonicalState: async () => 'in_review',
-      readMergeStatus: () => 'verifying',
+      readMergedAt: () => undefined,
       listAgents: clearAgents,
     });
 
@@ -758,7 +576,7 @@ describe('Definition-of-Done post-merge row', () => {
     };
     const row = await checkPostMergeRow(ctx, merged, {
       readCanonicalState: async () => 'in_review',
-      readMergeStatus: () => 'verifying',
+      readMergedAt: () => undefined,
       listAgents: () => [{ id: 'agent-pan-2715', issueId, role: 'work', status: 'running' }],
     });
 
@@ -770,15 +588,14 @@ describe('Definition-of-Done post-merge row', () => {
     // PAN-3180: `postMergeLifecycle()` is the work-agent handoff. A strike has no
     // work agent to pause and the Deacon owns its landing, so the marker this row
     // looks for is never written and its absence is not evidence of a gap.
-    const row = await checkPostMergeRow(ctx, undefined, {
+    const row = await checkPostMergeRow(ctx, { id: 'merged', num: 4, status: 'pass', expected: '', observed: '', containedStrikeHead: 'abc1234' }, {
       readCanonicalState: async () => 'in_review',
-      readMergeStatus: () => 'verifying',
+      readMergedAt: () => undefined,
       listAgents: clearAgents,
-      readStrikeLanded: () => true,
     });
 
     expect(row).toMatchObject({ status: 'skip' });
-    expect(row.observed).toContain('strikeLandingState: landed');
+    expect(row.observed).toContain('strike landing');
     expect(row.observed).toContain('not the strike path');
     expect(row.observed).toContain('no running work/planning agents');
   });
@@ -786,7 +603,7 @@ describe('Definition-of-Done post-merge row', () => {
   it('keeps a strike landing blocked while an issue work agent is still running', async () => {
     const row = await checkPostMergeRow(ctx, undefined, {
       readCanonicalState: async () => 'in_review',
-      readMergeStatus: () => 'verifying',
+      readMergedAt: () => undefined,
       listAgents: () => [{ id: 'agent-pan-2715', issueId, role: 'work', status: 'running' }],
       readStrikeLanded: () => true,
     });
@@ -798,7 +615,7 @@ describe('Definition-of-Done post-merge row', () => {
   it('prefers the observed work-agent lifecycle over the strike waiver when both are present', async () => {
     const row = await checkPostMergeRow(ctx, undefined, {
       readCanonicalState: async () => 'verifying_on_main',
-      readMergeStatus: () => 'merged',
+      readMergedAt: () => '2026-07-15T12:00:00Z',
       listAgents: clearAgents,
       readStrikeLanded: () => true,
     });
@@ -1305,7 +1122,7 @@ describe('assembled Definition-of-Done gate', () => {
       merged: async () => merged,
       postMerge: (postMergeCtx, mergedRow) => checkPostMergeRow(postMergeCtx, mergedRow, {
         readCanonicalState: async () => 'in_review',
-        readMergeStatus: () => 'verifying',
+        readMergedAt: () => undefined,
         listAgents: () => [],
       }),
       mainVerify: async () => makeRow('main-verify', 'skip'),
@@ -1327,26 +1144,20 @@ describe('assembled Definition-of-Done gate', () => {
     // PAN-3180 regression: rows 1, 2 and 5 resolve from the strike lens (PAN-3155
     // already covered row 4), so a strike that merged cleanly closes out on its own.
     const strikeCtx = { issueId: 'PAN-3165', projectPath: '/repo/overdeck' };
+    // A strike never opens a PR; the verification gate does not run on it either.
     const strikeStatus: DodStatusRowDeps = {
-      getReviewStatus: () => live({
-        issueId: strikeCtx.issueId,
-        reviewStatus: 'pending',
-        testStatus: 'pending',
-        verificationStatus: 'passed',
-        strikeLandingState: 'landed',
-      }),
-      getJournalStatus: () => null,
+      readPullRequest: () => null,
+      readVerification: () => null,
     };
     const gate = await evaluateDodGate(strikeCtx, {}, {
-      review: rowIssueId => checkReviewRow(rowIssueId, strikeStatus),
-      tests: rowIssueId => checkTestsRow(rowIssueId, strikeStatus),
-      verification: rowIssueId => checkVerificationRow(rowIssueId, strikeStatus),
-      merged: async () => ({ ...makeRow('merged'), mergeCommit: 'strike123' }),
+      review: (rowIssueId, settlement, landing) => checkReviewRow(rowIssueId, strikeStatus, settlement, landing),
+      tests: (rowIssueId, settlement, landing) => checkTestsRow(rowIssueId, strikeStatus, settlement, landing),
+      verification: (rowIssueId, settlement, landing) => checkVerificationRow(rowIssueId, strikeStatus, settlement, landing),
+      merged: async () => ({ ...makeRow('merged'), mergeCommit: 'strike123', containedStrikeHead: 'strike123' }),
       postMerge: (postMergeCtx, mergedRow) => checkPostMergeRow(postMergeCtx, mergedRow, {
         readCanonicalState: async () => 'in_review',
-        readMergeStatus: () => 'failed',
+        readMergedAt: () => undefined,
         listAgents: () => [],
-        readStrikeLanded: () => true,
       }),
       mainVerify: async () => makeRow('main-verify'),
       ship: async () => makeRow('ship', 'skip'),
@@ -1359,8 +1170,8 @@ describe('assembled Definition-of-Done gate', () => {
     // Row 8 is appended by the close-out workflow once teardown succeeds; the gate
     // itself owns rows 1–7, and none of them may be a silent pass for a strike.
     expect(gate.rows).toHaveLength(DOD_ROWS.length - 1);
-    expect(gate.rows.filter(row => row.status === 'skip').map(row => row.id)).toEqual(['review', 'tests', 'post-merge', 'ship']);
-    for (const id of ['review', 'tests', 'post-merge'] as const) {
+    expect(gate.rows.filter(row => row.status === 'skip').map(row => row.id)).toEqual(['review', 'tests', 'verification', 'post-merge', 'ship']);
+    for (const id of ['review', 'tests', 'verification', 'post-merge'] as const) {
       expect(gate.rows.find(row => row.id === id)?.observed).toContain('strike');
     }
   });

@@ -374,7 +374,9 @@ async function checkVerdict(
   settlement?: TerminalVerdictSettlement,
   landing?: LandingEvidence,
 ): Promise<DodRowResult> {
-  const pr = await Promise.resolve(deps.readPullRequest(issueId)).catch(() => null);
+  // A door that throws synchronously must read as "no evidence", not as a gate
+  // crash: `Promise.resolve(fn())` never sees a throw from `fn` itself.
+  const pr = await (async () => deps.readPullRequest(issueId))().catch(() => null);
 
   if (!pr) {
     const observed = 'no pull request found on the forge for this issue';
@@ -434,7 +436,7 @@ export async function checkVerificationRow(
   settlement?: TerminalVerdictSettlement,
   landing?: LandingEvidence,
 ): Promise<DodRowResult> {
-  const artifact = await Promise.resolve(deps.readVerification(issueId)).catch(() => null);
+  const artifact = await (async () => deps.readVerification(issueId))().catch(() => null);
   const outcome = artifact?.outcome;
   const observed = artifact
     ? `verification artifact: ${outcome}${artifact.ranAt ? ` at ${artifact.ranAt}` : ''}${

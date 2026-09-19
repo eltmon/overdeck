@@ -6,156 +6,92 @@ import {
   evaluateDodGate,
 } from '../../../../src/lib/lifecycle/dod-gate.js';
 import { DOD_ROWS, type DodRowId, type DodRowResult } from '../../../../src/lib/lifecycle/dod.js';
-import type { PanIssuePipelineRecord, PanIssueShipRecord } from '../../../../src/lib/pan-dir/record.js';
-import type { UatGeneration } from '../../../../src/lib/overdeck/merge-sync.js';
 
 const ctx = { issueId: 'PAN-3358', projectPath: '/repo/overdeck' };
 
-function pipeline(ship?: PanIssuePipelineRecord['ship']): PanIssuePipelineRecord {
-  return {
-    issueId: ctx.issueId,
-    reviewStatus: 'passed',
-    testStatus: 'passed',
-    readyForMerge: true,
-    ship,
-    updatedAt: '2026-07-31T00:00:00.000Z',
-  };
-}
-
-function promotedGeneration(name: string): UatGeneration {
-  return {
-    name,
-    worktreePath: '/repo/worktrees/uat',
-    projectRoot: ctx.projectPath,
-    baseSha: 'main-sha',
-    status: 'promoted',
-    members: [
-      { issueId: 'PAN-3358', title: 'Ship', branch: 'feature/pan-3358', headSha: 'head', mergeOrder: 1 },
-      { issueId: 'PAN-3359', title: 'Peer', branch: 'feature/pan-3359', headSha: 'peer', mergeOrder: 2 },
-    ],
-    heldOut: [],
-    resolutions: [],
-    stackStartedAt: null,
-    createdAt: '2026-07-31T00:00:00.000Z',
-    updatedAt: '2026-07-31T00:00:00.000Z',
-  };
-}
-
-function shipDeps(
-  versionSyncConfigured: boolean,
-  ship?: PanIssuePipelineRecord['ship'],
-  promotedBatch?: string,
-  batchShip: PanIssueShipRecord | null = ship ?? null,
-) {
+/**
+ * PAN-3917: the ship row reads the release tag reachable from origin/main and
+ * the project's declared version_sync expect paths — no batch ship record.
+ */
+function shipDeps(options: {
+  versionSync?: { expect: Array<{ path: string; pattern: string }> };
+  version?: string | null;
+  contents?: Record<string, string | null>;
+}) {
   return {
     readProject: () => ({
       name: 'Overdeck',
       path: ctx.projectPath,
-      ...(versionSyncConfigured ? { version_sync: {} } : {}),
+      ...(options.versionSync ? { version_sync: options.versionSync } : {}),
     }),
-    readPipeline: async () => pipeline(ship),
-    findPromotedBatch: () => promotedBatch ? promotedGeneration(promotedBatch) : null,
-    readBatchShip: async () => batchShip,
+    readShippedVersion: async () => options.version ?? null,
+    readExpectPath: async (_ctx: unknown, path: string) => options.contents?.[path] ?? null,
   };
 }
 
+const EXPECT_ONE = { expect: [{ path: 'package.json', pattern: '"version": "{version}"' }] };
+
 describe('checkShipRow', () => {
   it('skips when the project declares no version_sync', async () => {
-    expect(await checkShipRow(ctx, shipDeps(false))).toMatchObject({
+    expect(await checkShipRow(ctx, shipDeps({}))).toMatchObject({
       status: 'skip',
       observed: 'project declares no version_sync; ship step not applicable',
     });
   });
 
-  it('skips when the merge has no batch ship record', async () => {
-    expect(await checkShipRow(ctx, shipDeps(true))).toMatchObject({
+  it('skips when version_sync declares no expect paths', async () => {
+    expect(await checkShipRow(ctx, shipDeps({ versionSync: { expect: [] } }))).toMatchObject({
       status: 'skip',
-      observed: 'merged outside a batch; ship is batch-scoped',
+      observed: 'version_sync declares no expect paths; nothing to verify',
     });
   });
 
-  it('misses when promoted batch membership exists but durable settlement is missing', async () => {
-    expect(await checkShipRow(ctx, shipDeps(true, undefined, 'uat/pan-ember-0731'))).toMatchObject({
+  it('misses when no release tag is reachable from origin/main', async () => {
+    expect(await checkShipRow(ctx, shipDeps({ versionSync: EXPECT_ONE, version: null }))).toMatchObject({
       status: 'miss',
-      observed: 'batch uat/pan-ember-0731 includes this issue but no durable ship settlement was recorded',
+      observed: expect.stringContaining('pan release stable'),
     });
   });
 
-  it('keeps every member blocked when one terminal record persisted but the batch aggregate is pending', async () => {
-    const individualPassed: PanIssueShipRecord = {
-      status: 'passed',
-      version: '48.8.0',
-      batch: 'uat/pan-ember-0731',
-      paths: [{ path: 'package.json', ok: true, detail: 'reports 48.8.0' }],
-      at: '2026-07-31T01:00:00.000Z',
-    };
-    const conservativeBatch: PanIssueShipRecord = {
-      status: 'pending',
-      batch: 'uat/pan-ember-0731',
-      reason: '1 member(s) have no durable ship settlement',
-      at: '2026-07-31T01:00:00.000Z',
-    };
-    const deps = shipDeps(true, individualPassed, 'uat/pan-ember-0731', conservativeBatch);
+  it('passes when every declared path carries the shipped version', async () => {
+    const row = await checkShipRow(ctx, shipDeps({
+      versionSync: EXPECT_ONE,
+      version: '0.51.0',
+      contents: { 'package.json': '{ "version": "0.51.0" }' },
+    }));
 
-    const first = await checkShipRow(ctx, deps);
-    const second = await checkShipRow({ ...ctx, issueId: 'PAN-3359' }, deps);
-
-    expect(first).toMatchObject({ status: 'miss' });
-    expect(second).toMatchObject({ status: 'miss' });
-    expect(first.observed).toContain('Ship version action');
-  });
-
-  it('passes a recorded passed verdict with version, batch, and path count', async () => {
-    expect(await checkShipRow(ctx, shipDeps(true, {
-      status: 'passed',
-      version: '48.8.0',
-      batch: 'uat/pan-ember-0731',
-      paths: [
-        { path: 'package.json', ok: true, detail: 'reports 48.8.0' },
-        { path: 'apps/desktop/package.json', ok: true, detail: 'reports 48.8.0' },
-      ],
-      at: '2026-07-31T01:00:00.000Z',
-    }))).toMatchObject({
+    expect(row).toMatchObject({
       status: 'pass',
-      observed: 'version 48.8.0 shipped for batch uat/pan-ember-0731; 2 path(s) verified',
+      observed: 'version 0.51.0 present in all 1 declared version_sync path(s) on origin/main',
     });
   });
 
-  it('misses pending with the deferred Ship version action', async () => {
-    expect(await checkShipRow(ctx, shipDeps(true, {
-      status: 'pending',
-      batch: 'uat/pan-ember-0731',
-      reason: 'no version supplied at promote time',
-      at: '2026-07-31T01:00:00.000Z',
-    }))).toMatchObject({
-      status: 'miss',
-      observed: expect.stringContaining('use the Ship version action on the batch card for uat/pan-ember-0731'),
-    });
+  it('names the paths that did not receive the version', async () => {
+    const row = await checkShipRow(ctx, shipDeps({
+      versionSync: {
+        expect: [
+          { path: 'package.json', pattern: '"version": "{version}"' },
+          { path: 'ios/Info.plist', pattern: '<string>{majorMinor}</string>' },
+        ],
+      },
+      version: '0.51.0',
+      contents: { 'package.json': '{ "version": "0.51.0" }', 'ios/Info.plist': '<string>0.50</string>' },
+    }));
+
+    expect(row).toMatchObject({ status: 'miss' });
+    expect(row.observed).toContain('1 of 2 declared path(s)');
+    expect(row.observed).toContain('ios/Info.plist');
   });
 
-  it('misses partial and failed verdicts with their actionable evidence', async () => {
-    const partial = await checkShipRow(ctx, shipDeps(true, {
-      status: 'partial',
-      version: '48.8.0',
-      batch: 'uat/pan-ember-0731',
-      paths: [
-        { path: 'package.json', ok: true, detail: 'reports 48.8.0' },
-        { path: 'apps/desktop/package.json', ok: false, detail: 'pattern missed' },
-        { path: 'packages/contracts/package.json', ok: false, detail: 'pattern missed' },
-      ],
-      at: '2026-07-31T01:00:00.000Z',
+  it('reports an unreadable path rather than silently passing it', async () => {
+    const row = await checkShipRow(ctx, shipDeps({
+      versionSync: EXPECT_ONE,
+      version: '0.51.0',
+      contents: {},
     }));
-    expect(partial).toMatchObject({ status: 'miss' });
-    expect(partial.observed).toContain('apps/desktop/package.json, packages/contracts/package.json');
 
-    const failed = await checkShipRow(ctx, shipDeps(true, {
-      status: 'failed',
-      version: '48.8.0',
-      batch: 'uat/pan-ember-0731',
-      error: 'push rejected',
-      at: '2026-07-31T01:00:00.000Z',
-    }));
-    expect(failed).toMatchObject({ status: 'miss', observed: expect.stringContaining('push rejected') });
+    expect(row).toMatchObject({ status: 'miss' });
+    expect(row.observed).toContain('package.json (unreadable at origin/main)');
   });
 });
 

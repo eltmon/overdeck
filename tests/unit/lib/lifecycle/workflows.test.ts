@@ -295,7 +295,7 @@ describe('workflows', () => {
       expect(result.duration).toBeGreaterThanOrEqual(0);
     });
 
-    it('should include archive, close, teardown, tasks, and clear-review steps', async () => {
+    it('should include archive, close, and teardown steps', async () => {
       const ctx = {
         issueId: 'PAN-100',
         projectPath: testDir,
@@ -309,7 +309,6 @@ describe('workflows', () => {
       expect(stepNames.some(s => s.startsWith('archive-planning:'))).toBe(true);
       expect(stepNames.some(s => s.startsWith('close-issue:'))).toBe(true);
       expect(stepNames.some(s => s.startsWith('teardown:'))).toBe(true);
-      expect(stepNames.some(s => s === 'clear-review-status')).toBe(true);
     });
 
     it('should skip tasks compaction when skipTasksCompaction is true', async () => {
@@ -372,36 +371,10 @@ describe('workflows', () => {
         { tracker: successfulTracker() },
       );
 
-      expect(callOrder).toEqual(['heal', 'gate']);
-      expect(result.steps.find(step => step.step === 'dod:uat-promotion-evidence')).toMatchObject({
-        success: true,
-        skipped: false,
-        details: expect.arrayContaining([
-          'Recorded verification from uat/pan-cedar-0726',
-          'Promoted to main at 546d05b98',
-        ]),
-      });
       expect(result.steps.find(step => step.step === 'dod:verification')).toMatchObject({ success: true });
       expect(mockEvaluateDodGate).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
         acceptedRows: undefined,
       }));
-    });
-
-    it('continues to the DoD gate when UAT evidence recovery fails', async () => {
-      mockHealUatPromotionVerification.mockRejectedValueOnce(new Error('generation store unavailable'));
-
-      const result = await closeOut(
-        { issueId: 'PAN-100', projectPath: testDir },
-        { tracker: successfulTracker() },
-      );
-
-      expect(result.success).toBe(true);
-      expect(result.steps.find(step => step.step === 'dod:uat-promotion-evidence')).toMatchObject({
-        success: true,
-        skipped: true,
-        details: [expect.stringContaining('generation store unavailable')],
-      });
-      expect(mockEvaluateDodGate).toHaveBeenCalledOnce();
     });
 
     it('blocks before cleanup when the Definition-of-Done gate misses', async () => {
@@ -1317,8 +1290,6 @@ describe('workflows', () => {
         error: expect.stringContaining('state push unavailable'),
       });
       expect(result.steps.find(step => step.step === 'close-out:abort')?.error).toContain('audit could not be persisted');
-      expect(result.steps.some(step => step.step === 'clear-review-status')).toBe(false);
-      expect(mockClearReviewStatus).not.toHaveBeenCalled();
     });
 
     it('preserves close-out success when the durable pipeline marker fails', async () => {
@@ -1333,7 +1304,6 @@ describe('workflows', () => {
       expect(marker?.success).toBe(true);
       expect(marker?.skipped).toBe(true);
       expect(marker?.details?.[0]).toContain('record unavailable');
-      expect(result.steps.some(s => s.step === 'clear-review-status')).toBe(true);
       expect(result.success).toBe(true);
     });
 
@@ -1422,9 +1392,7 @@ describe('workflows', () => {
       expect(result.steps.find(s => s.step === 'teardown:checkpoint-refs')?.success).toBe(false);
       expect(result.steps.some(s => s.step === 'close-issue:transition')).toBe(false);
       expect(result.steps.find(s => s.step === 'close-out:abort')?.error).toContain('teardown failed');
-      expect(result.steps.some(s => s.step === 'clear-review-status')).toBe(false);
       expect(tracker.transitionIssue).not.toHaveBeenCalled();
-      expect(mockClearReviewStatus).not.toHaveBeenCalled();
     });
 
     it('should preserve review status when tracker close fails', async () => {
@@ -1439,8 +1407,6 @@ describe('workflows', () => {
       expect(result.steps.some(s => s.step.startsWith('teardown:'))).toBe(true);
       expect(result.steps.find(s => s.step === 'close-issue:transition')?.success).toBe(false);
       expect(result.steps.find(s => s.step === 'close-out:abort')?.error).toContain('issue close failed');
-      expect(result.steps.some(s => s.step === 'clear-review-status')).toBe(false);
-      expect(mockClearReviewStatus).not.toHaveBeenCalled();
     });
 
     it('should remove verifying labels when applying the closed-out label', async () => {
@@ -1480,7 +1446,6 @@ describe('workflows', () => {
       expect(idempotentStep.skipped).toBe(true);
       // Verify ceremony was skipped (gate not called, status mutations not run)
       expect(mockEvaluateDodGate).not.toHaveBeenCalled();
-      expect(mockClearReviewStatus).not.toHaveBeenCalled();
       expect(mockMarkRecordPipelineClosedOutSync).not.toHaveBeenCalled();
     });
 
@@ -1628,12 +1593,11 @@ describe('workflows', () => {
       }
     });
 
-    it('closeOut should heal UAT evidence before the Definition-of-Done rows', async () => {
+    it('closeOut evaluates the Definition-of-Done rows in order', async () => {
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const result = await closeOut(ctx);
 
-      expect(result.steps.slice(0, 8).map(step => step.step)).toEqual([
-        'dod:uat-promotion-evidence',
+      expect(result.steps.slice(0, 7).map(step => step.step)).toEqual([
         'dod:review',
         'dod:tests',
         'dod:verification',
