@@ -70,9 +70,45 @@ is correct precisely because `~/.overdeck` owns the `overdeck` instance. A secon
 needs its own unit with its own `--session overdeck-<hash>`; it must not reuse the default unit or
 the default session name.
 
+## Detection policy per harness (PAN-3917 W12)
+
+Herdr's agent detector reads the pane's **foreground process** and matches it against its own agent
+manifest. That decides how a launch is made, per harness, in `detectionPolicyFor`
+(`src/lib/terminal-backends/launch.ts`) — the launcher puts the answer on the start spec
+(`StartAgentSpec.detection`) and the Herdr adapter branches on it.
+
+| Harness | Pane foreground process | Detection | How `startAgent` ends |
+| --- | --- | --- | --- |
+| `claude-code` | `claude` (the real CLI; the PTY supervisor is refused on Herdr) | **required** | waits for detection (~2s live), `agent.rename` binds the Overdeck agent id |
+| `codex` | `node dist/codex-app-server-host.js` (or the codex TUI under `codex.transport: tui`) | not required | **pane-bound**: stamp, send the launcher, return |
+| `acp` / `opencode` | `node dist/acp-host.js` | not required | pane-bound |
+| `kimi-code` | the kimi launcher/supervisor | not required | pane-bound |
+| `ohmypi` / `muse` | `omp` / the muse TUI, both under Overdeck's wrapper | not required | pane-bound |
+
+A **pane-bound** launch splits the pane, stamps `pane.report_metadata` (the four tokens plus
+`agentId`, and `title` / `display_agent` so the Herdr UI still names it), sends the launcher, and
+returns the pane reference immediately. Herdr's agent state for that pane stays `unknown`, which is
+the truth. Nothing waits for a detection that cannot happen — waiting for it is what killed
+`agent-pan-3705-review` (codex, gpt-5.6-sol) 61s after launch on 2026-09-19 while its app-server
+host was already connected and writing `appserver-events.jsonl`.
+
+Everything downstream follows the pane instead of the agent record:
+
+- **Inventory** (`listHerdrAgents`) reads `agent.list` *and* the session snapshot's panes, keyed by
+  the `agentId` token, so a token-stamped pane with no detected agent is a live agent and a pane
+  Herdr later detects is not counted twice.
+- **Liveness** (`probeHerdrAgentLiveness`, used by `isAlive`) falls back to the same token scan when
+  `agent.get` says "no such agent": alive while the pane exists, `absent` only once the snapshot no
+  longer lists it, `indeterminate` whenever the socket itself failed. A pane-bound agent is never
+  reported dead merely because Herdr holds no agent record for it.
+- **Delivery** — see "Message delivery routing" below.
+- **Close** is by pane reference (`AgentState.paneId`, recorded the moment `startAgent` returns), so
+  a spawn failure cleans up its own pane on either policy.
+
 ## Pane metadata (FR-5)
 
-Every launcher stamps four tokens on its pane: `issue`, `role`, `harness`, `model`. `role` is one of
+Every launcher stamps four tokens on its pane: `issue`, `role`, `harness`, `model`, plus `agentId` —
+the Overdeck agent id. `role` is one of
 `work`, `worker`, `review`, `test`, `uat`, `strike`, `plan`. An operator conversation carries **no**
 `issue` token — that absence is also how the prompt guard recognizes an operator sender.
 Overdeck's own `ship` role maps to the `uat` token role (`toPaneRole`).
@@ -107,10 +143,20 @@ Sender identity: the Herdr adapter reads the target's tokens from `agent.get`; o
 
 `deliverAgentMessage` (`src/lib/agents/delivery.ts`) resolves the host's backend once per process,
 then asks it whether the target is a **live Herdr agent** (`findHerdrAgent`, a bounded 2 s probe on
-its own real timer, so a wedged socket can never hold up a message). If it is, the whole delivery is
-`backend.prompt`. If it is not — a tmux host, or a tmux session that predates the cut — the existing
-cascade runs unchanged: app-server socket, ACP socket, PTY supervisor, Channels, tmux paste buffer.
-The prompt guard runs in front of both.
+its own real timer, so a wedged socket can never hold up a message; it answers for a pane-bound
+agent too, through its `agentId` token).
+
+For a **detected** agent the whole delivery is `backend.prompt`. For a **pane-bound** agent Herdr
+cannot prompt the pane at all, so `prompt` answers `unsupported` — before the guard, since the
+target's metadata is perfectly well known — and delivery falls through to the harness's own
+transport, which is how those harnesses were always reached: app-server socket, ACP socket, PTY
+supervisor, Channels, tmux paste buffer (PAN-3879 routes them by harness). A tmux host, or a tmux
+session that predates the cut, takes the same cascade. The prompt guard runs in front of every path:
+on the fall-through it is `checkPrompt` with the target's launch tokens and the real sender, so an
+`unsupported` answer never becomes an ungated delivery.
+
+A THROW from the Herdr prompt stays a Herdr failure (`ok: false, path: 'herdr'`); only a returned
+`unsupported` falls through. The two are different facts and must not be folded together.
 
 The dashboard terminal follows the same rule: `/ws/terminal` resolves the session name to a Herdr
 terminal id first (`resolveHerdrTerminalId`) and serves that client from `observe` plus a lazily
@@ -187,8 +233,12 @@ adapter's own inventory keeps probing tmux on either host.
 
 **Known gap:** `isAliveSync` is still tmux-only — there is no synchronous Herdr client — so its
 callers (`work-agent-lifecycle.ts`, `parked/resolver.ts`) read a Herdr agent as `no-session`.
-Likewise `runtimes/muse.ts`, `runtimes/kimi-code.ts` and `overdeck/conversation-runtime.ts` still
-hardcode `useSupervisor: true`, so those launches hit the same detection failure on Herdr.
+
+`runtimes/muse.ts`, `runtimes/kimi-code.ts` and `overdeck/conversation-runtime.ts` still hardcode
+`useSupervisor: true`, but that is no longer a launch failure: those harnesses are launched
+pane-bound, so nothing waits for a detection the supervisor's second pty would have hidden, and
+their delivery already goes through the supervisor socket. Only `claude-code` needs the supervisor
+refused on Herdr, and `decideSupervisorForWorkAgent` does that.
 
 A detection failure now carries the pane's foreground process and its last 20 lines of output, so
 the next one names its own cause. (A full-screen harness renders on the alternate screen, where
@@ -353,3 +403,43 @@ detected on the live session (`flywheel-orchestrator`, `agent-pan-2468-knowledge
 `sequencer-runner`) also runs `claude` directly — none is supervisor-wrapped.
 
 Teardown: `workspace.close wF` → `{"result":{"type":"ok"}}`; no `fix11-*` processes survived.
+
+## Live verification record — pane-bound codex launch (PAN-3917 W12)
+
+Host: herdr 0.9.1, session `overdeck`, 2026-09-19. The subject is the launcher of the agent that
+failed the day before, run unchanged: `bash ~/.overdeck/agents/agent-pan-3705-review/launcher.sh`
+(codex app-server host, gpt-5.6-sol) in `workspaces/feature-pan-3705`, through
+`startAgent` with `detection: 'not-required'`, in a throwaway workspace.
+
+```
+workspace.create → wH            (label fix14-throwaway)
+startAgent       → {"paneId":"wH:p2","terminalId":"term_65bd520ce2a45148",
+                    "agentName":"agent-pan-3705-review"}   — returned at once, no detection wait
+
+herdr --session overdeck pane get wH:p2:
+  agent_status  = "unknown"        (Herdr detects nothing: the foreground process is the host)
+  title         = "agent-pan-3705-review"
+  display_agent = "codex"
+  tokens        = {agentId: agent-pan-3705-review, issue: PAN-3705, role: review,
+                   harness: codex, model: gpt-5.6-sol}
+
+~/.overdeck/agents/agent-pan-3705-review/appserver-events.jsonl: 259 → 518 bytes
+  (new remoteControl/status/changed record at 12:26:37Z — the host connected)
+~/.overdeck/sockets/appserver-agent-pan-3705-review.sock: created
+process: node …/dist/codex-app-server-host.js --effort high --model gpt-5.6-sol
+
+probeHerdrAgentLiveness → {"kind":"alive","paneId":"wH:p2","state":"unknown"}
+listHerdrAgents         → the agent is listed: agentId agent-pan-3705-review, paneBound true
+HerdrBackend.prompt     → {"unsupported":true,"reason":"herdr has no detected agent in pane wH:p2
+                           (codex runs through a host process); deliver through the harness
+                           transport instead"}
+```
+
+Teardown: `pane.close wH:p2` + `workspace.close wH` → `{ok:true}` twice; the workspace is gone from
+`workspace list` and no `gpt-5.6-sol` app-server host process survived.
+
+**What this settles.** A codex (and by the same mechanism ACP, kimi-code, ohmypi/muse) agent now
+starts on Herdr: the pane stays open, carries its identity, runs its real transport, and reads as a
+live agent everywhere Overdeck asks. The kickoff prompt is unaffected by the instant return —
+`deliverInitialPromptWithRetry` waits for `waitForCodexAppServerReady` (the socket plus token) before
+it delivers, exactly as on tmux.
