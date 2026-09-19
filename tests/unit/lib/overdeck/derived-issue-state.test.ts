@@ -101,17 +101,28 @@ describe('the plan home owns the spec', () => {
     writeFileSync(join(dir, name), '{}\n', 'utf8');
   }
 
-  it('finds the spec in the main checkout', () => {
-    writeSpec(projectPath, 'pan-1.xbrief.json');
+  it('finds the promoted, dated spec in the main checkout', () => {
+    writeSpec(projectPath, '2026-07-28-PAN-1-some-feature.xbrief.json');
+    expect(specExistsFor('PAN-1', projectPath)).toBe(true);
+  });
+
+  it('finds the legacy .vbrief spec name too', () => {
+    writeSpec(projectPath, '2026-01-01-PAN-1-some-feature.vbrief.json');
     expect(specExistsFor('PAN-1', projectPath)).toBe(true);
   });
 
   it('finds the spec the planning agent wrote in the issue workspace', () => {
-    writeSpec(join(projectPath, 'workspaces', 'feature-pan-1'), 'PAN-1.xbrief.json');
+    writeSpec(join(projectPath, 'workspaces', 'feature-pan-1'), '2026-07-28-PAN-1-some-feature.xbrief.json');
+    expect(specExistsFor('PAN-1', projectPath)).toBe(true);
+  });
+
+  it('accepts the bare <ISSUE>.xbrief.json name as well', () => {
+    writeSpec(projectPath, 'PAN-1.xbrief.json');
     expect(specExistsFor('PAN-1', projectPath)).toBe(true);
   });
 
   it('reports no spec when neither plan home has one', () => {
+    writeSpec(projectPath, '2026-07-28-PAN-2-another-issue.xbrief.json');
     expect(specExistsFor('PAN-1', projectPath)).toBe(false);
   });
 });

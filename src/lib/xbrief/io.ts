@@ -45,7 +45,7 @@ export type { TierOverride, TierOverridesMap, TierPromotionHistoryEntry, TierRet
  * `Effect.runSync` — so we keep a local sync mirror rather than break CLI
  * synchronous semantics. Dashboard server code uses `findPlanAsync`.
  */
-function findSpecByIssueSync(projectRoot: string, issueId: string): { path: string } | null {
+export function findSpecByIssueSync(projectRoot: string, issueId: string): { path: string } | null {
   const upperIssueId = issueId.toUpperCase();
   const { specsDir } = getProjectPanPaths(projectRoot);
   if (!existsSync(specsDir)) return null;

@@ -65,9 +65,10 @@ import type {
 } from '@overdeck/contracts';
 
 import { isUnsupported } from '../terminal-backends/types.js';
-import type { BackendAgentSnapshot } from '../terminal-backends/types.js';
+import type { BackendAgentSnapshot, TerminalBackend } from '../terminal-backends/types.js';
 import { createSettledTtlPromiseCache } from '../concurrency.js';
 import { getProjectPanPaths } from '../pan-dir/paths.js';
+import { findSpecByIssueSync } from '../xbrief/io.js';
 import { findProjectByPathSync, resolveProjectFromIssueSync } from '../projects.js';
 import { inferProjectForgeSync } from '../project-repos.js';
 
@@ -405,17 +406,19 @@ async function readBranchWithGit(projectPath: string, branch: string): Promise<D
 }
 
 /**
- * `<planHome>/.pan/specs/` holds `<ISSUE>.xbrief.json` once the issue is
- * planned. Both plan homes are checked — the issue workspace's, where the
- * planning agent writes, and the main checkout's, where the promoted spec
- * lands — so an archived or not-yet-created workspace never reads as "no spec".
+ * `<planHome>/.pan/specs/` holds the issue's spec once it is planned. The
+ * filename is whatever planning wrote — `PAN-1.xbrief.json`, or the dated
+ * `2026-07-28-PAN-1-title.xbrief.json` — so the shared resolver reads the
+ * directory rather than guessing two names. Both plan homes are checked: the
+ * issue workspace's, where the planning agent writes, and the main checkout's,
+ * where the promoted spec lands, so an absent workspace is not "no spec".
  */
 export function specExistsFor(issueId: string, projectPath: string): boolean {
-  const lower = issueId.toLowerCase();
-  const roots = [projectPath, join(projectPath, 'workspaces', `feature-${lower}`)];
-  return roots.some((root) => {
+  const workspace = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+  return [projectPath, workspace].some((root) => {
+    if (findSpecByIssueSync(root, issueId) !== null) return true;
     const { specsDir } = getProjectPanPaths(root);
-    return existsSync(join(specsDir, `${lower}.xbrief.json`))
+    return existsSync(join(specsDir, `${issueId.toLowerCase()}.xbrief.json`))
       || existsSync(join(specsDir, `${issueId.toUpperCase()}.xbrief.json`));
   });
 }
@@ -491,13 +494,24 @@ export function paneFromBackendSnapshot(
 async function listPanesWithBackend(now: number): Promise<readonly BackendPane[]> {
   const { Effect } = await import('effect');
   const { resolveLaunchBackend } = await import('../terminal-backends/launch.js');
-  try {
-    const backend = await resolveLaunchBackend();
+  const { resolveTerminalBackend } = await import('../terminal-backends/registry.js');
+
+  const read = async (backend: TerminalBackend): Promise<readonly BackendPane[] | null> => {
     const snapshots = await Effect.runPromise(
       backend.list().pipe(Effect.catch(() => Effect.succeed(null))),
     );
-    if (snapshots === null || isUnsupported(snapshots)) return [];
+    if (snapshots === null || isUnsupported(snapshots)) return null;
     return snapshots.map((snapshot) => paneFromBackendSnapshot(snapshot, now));
+  };
+
+  try {
+    const backend = await resolveLaunchBackend();
+    const panes = await read(backend);
+    if (panes) return panes;
+    // The selected backend could not answer — tmux still owns whatever sessions
+    // are running, so its inventory is the fallback (`launch.js` registered it).
+    if (backend.name === 'tmux') return [];
+    return (await read(resolveTerminalBackend('tmux'))) ?? [];
   } catch {
     return [];
   }
@@ -510,7 +524,8 @@ async function listPanesWithBackend(now: number): Promise<readonly BackendPane[]
  */
 export async function readIssueFromTracker(issueId: string): Promise<TrackerIssueFacts | null> {
   const { loadConfigSync } = await import('../config.js');
-  const { createTrackerFromConfig } = await import('../tracker/factory.js');
+  const { createTracker, createTrackerFromConfig } = await import('../tracker/factory.js');
+  const { resolveGitHubIssueSync } = await import('../tracker-utils.js');
   const { Effect } = await import('effect');
 
   let trackers;
@@ -521,10 +536,18 @@ export async function readIssueFromTracker(issueId: string): Promise<TrackerIssu
   }
   if (!trackers) return null;
 
+  // A GitHub tracker is configured with ONE owner/repo, but an issue id names
+  // its repo through its prefix (PAN-, TIN-, …). Reading `PAN-1` against the
+  // configured repo would answer about a different issue entirely.
+  const gh = resolveGitHubIssueSync(issueId);
+
   const order = [trackers.primary, ...(trackers.secondary ? [trackers.secondary] : [])];
   for (const type of order) {
     try {
-      const tracker = createTrackerFromConfig(trackers, type);
+      if (type === 'github' && !gh.isGitHub) continue;
+      const tracker = type === 'github' && gh.isGitHub
+        ? createTracker({ ...trackers.github, type: 'github', owner: gh.owner, repo: gh.repo })
+        : createTrackerFromConfig(trackers, type);
       const issue = await Effect.runPromise(tracker.getIssue(issueId));
       return { open: issue.state !== 'closed', labels: issue.labels ?? [] };
     } catch {
