@@ -14,12 +14,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
   cvMock, contextMock, healthMock,
-  gatherIssueStateMock, pingAgentMock, getAgentCVMock, getAgentRuntimeStateMock, getAgentStateMock,
+  derivedIssueStateMock, pingAgentMock, getAgentCVMock, getAgentRuntimeStateMock, getAgentStateMock,
 } = vi.hoisted(() => ({
   cvMock: vi.fn().mockResolvedValue(undefined),
   contextMock: vi.fn().mockResolvedValue(undefined),
   healthMock: vi.fn().mockResolvedValue(undefined),
-  gatherIssueStateMock: vi.fn(),
+  derivedIssueStateMock: vi.fn(),
   pingAgentMock: vi.fn(),
   getAgentCVMock: vi.fn(),
   getAgentRuntimeStateMock: vi.fn(),
@@ -37,7 +37,7 @@ vi.mock('../../../src/cli/commands/health.js', () => ({
 }));
 
 vi.mock('../../../src/lib/overdeck/derived-issue-state.js', () => ({
-  gatherIssueState: gatherIssueStateMock,
+  getDerivedIssueState: derivedIssueStateMock,
 }));
 vi.mock('../../../src/lib/health.js', () => ({
   pingAgent: pingAgentMock,
@@ -59,11 +59,10 @@ describe('showCommand', () => {
     vi.clearAllMocks();
     // Reasonable defaults for the compact-default-path tests; individual tests
     // can override via mockReturnValue / mockResolvedValue.
-    gatherIssueStateMock.mockResolvedValue({
+    derivedIssueStateMock.mockResolvedValue({
       issueId: 'PAN-6',
       state: 'working',
-      attention: null,
-      workspacePath: null,
+      attention: undefined,
     });
     pingAgentMock.mockReturnValue(Effect.succeed({
       agentId: 'agent-pan-6',
@@ -142,7 +141,7 @@ describe('showCommand', () => {
 
     it('reads derived issue state, health, and cv from the underlying lib modules', async () => {
       await showCommand('PAN-6');
-      expect(gatherIssueStateMock).toHaveBeenCalledWith('PAN-6');
+      expect(derivedIssueStateMock).toHaveBeenCalledWith('PAN-6');
       expect(getAgentStateMock).toHaveBeenCalledWith('agent-pan-6');
       expect(pingAgentMock).toHaveBeenCalledWith('agent-pan-6');
       expect(getAgentCVMock).toHaveBeenCalledWith('agent-pan-6');
@@ -152,11 +151,10 @@ describe('showCommand', () => {
       getAgentStateMock.mockReturnValue(null);
       getAgentRuntimeStateMock.mockReturnValue(null);
       getAgentCVMock.mockReturnValue(null);
-      gatherIssueStateMock.mockResolvedValue({
+      derivedIssueStateMock.mockResolvedValue({
         issueId: 'MIN-846',
         state: 'backlog',
-        attention: null,
-        workspacePath: null,
+        attention: undefined,
       });
 
       const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -172,11 +170,10 @@ describe('showCommand', () => {
     });
 
     it('shows a "stuck" attention as a needs-you line (derived, not stored)', async () => {
-      gatherIssueStateMock.mockResolvedValue({
+      derivedIssueStateMock.mockResolvedValue({
         issueId: 'PAN-2860',
         state: 'working',
         attention: 'stuck',
-        workspacePath: '/project/workspaces/feature-pan-2860',
       });
 
       const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -192,11 +189,10 @@ describe('showCommand', () => {
       // Populate every field so the summary is in its longest form —
       // attention present + healthy + stats + 3 recent work entries.
       const now = new Date().toISOString();
-      gatherIssueStateMock.mockResolvedValue({
+      derivedIssueStateMock.mockResolvedValue({
         issueId: 'PAN-6',
-        state: 'in review',
-        attention: 'needs you',
-        workspacePath: '/project/workspaces/feature-pan-6',
+        state: 'in-review',
+        attention: 'needs-you',
       });
       getAgentCVMock.mockReturnValue({
         agentId: 'agent-pan-6',
@@ -228,11 +224,10 @@ describe('showCommand', () => {
     });
 
     it('--json short-circuits to a single JSON payload (no human-formatted lines)', async () => {
-      gatherIssueStateMock.mockResolvedValue({
+      derivedIssueStateMock.mockResolvedValue({
         issueId: 'PAN-8',
         state: 'ready',
-        attention: null,
-        workspacePath: null,
+        attention: undefined,
       });
 
       const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});

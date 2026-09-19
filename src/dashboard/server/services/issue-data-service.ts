@@ -22,7 +22,8 @@ import { resolveMissingIssue } from './issue-title-fallback.js';
 import type { Issue as TrackerIssue } from '../../../lib/tracker/interface.js';
 import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig } from './tracker-config.js';
 import type { DerivedIssueState } from '@overdeck/contracts';
-import { loadIssueStatesForProject } from './derived-issue-state.js';
+import { loadIssueStatesForProject } from '../../../lib/overdeck/derived-issue-state.js';
+import { getBackendPanes } from './backend-inventory.js';
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { findPlan, readWorkspacePlan } from '../../../lib/xbrief/io.js';
 import type { XBriefDocument } from '../../../lib/xbrief/types.js';
@@ -989,30 +990,20 @@ export class IssueDataService {
 
   private async refreshDerivedStates(issueIds: readonly string[]): Promise<void> {
     const byProject = new Map<string, string[]>();
-    const labelsByIssue: Record<string, readonly string[]> = {};
-    const closedIssues = new Set<string>();
-
+    const issues: Record<string, { open: boolean; labels: readonly string[] } | null> = {};
     for (const raw of issueIds) {
       const issueId = raw.toUpperCase();
       const project = resolveProjectFromIssueSync(issueId);
       if (!project) continue;
-      const list = byProject.get(project.projectPath);
-      if (list) list.push(issueId); else byProject.set(project.projectPath, [issueId]);
-
-      const issue = this.findIssueByIdentifier(issueId);
-      const labels = Array.isArray(issue?.labels)
-        ? issue.labels.map((label: any) => (typeof label === 'string' ? label : label?.name)).filter(Boolean)
-        : [];
-      labelsByIssue[issueId] = labels;
-      const canonical = getCanonicalStatus(issue?.state ?? issue?.canonicalStatus ?? issue?.status, issue?.stateType);
-      if (canonical === 'done' || canonical === 'canceled') closedIssues.add(issueId);
+      byProject.set(project.projectPath, [...(byProject.get(project.projectPath) ?? []), issueId]);
+      issues[issueId] = this.getTrackerIssue(issueId);
     }
 
     let changed = false;
     const changedStates: DerivedIssueState[] = [];
     for (const [projectPath, ids] of byProject) {
       try {
-        const states = await loadIssueStatesForProject(projectPath, ids, { labelsByIssue, closedIssues });
+        const states = await loadIssueStatesForProject(projectPath, ids, { issues, panes: await getBackendPanes() });
         for (const [issueId, state] of states) {
           const previous = this.derivedStatesCache[issueId];
           this.derivedStatesCache[issueId] = state;
@@ -1027,6 +1018,15 @@ export class IssueDataService {
     }
     if (changedStates.length > 0) this._onDerivedStatesChanged?.(changedStates);
     if (changed && this.started) this.pushSnapshot();
+  }
+
+  /** The cached tracker row the FR-6 derivation reads; null = no tracker has it (unknown, never "open"). */
+  getTrackerIssue(identifier: string): { open: boolean; labels: readonly string[] } | null {
+    const issue = this.findIssueByIdentifier(identifier.toUpperCase());
+    if (!issue) return null;
+    const canonical = getCanonicalStatus(issue.state ?? issue.canonicalStatus ?? issue.status, issue.stateType);
+    const raw: any[] = Array.isArray(issue.labels) ? issue.labels : [];
+    return { open: canonical !== 'done' && canonical !== 'canceled', labels: raw.map((l) => (typeof l === 'string' ? l : l?.name)).filter(Boolean) };
   }
 
   /** The cached tracker row for an identifier, across every tracker. */

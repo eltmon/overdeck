@@ -216,4 +216,4 @@ export function getIssueResourceDetails(rawId: string) {
     return jsonResponse(details);
   });
 }
-export { deriveIssueState, deriveIssueAttention, readPullRequestFacts, branchIsAheadOfMain, type DerivedIssueState, type IssueAttention } from './derived-issue-state.js';
+export { deriveIssueState, getDerivedIssueState, loadIssueStateFacts, type IssueStateFacts } from './derived-issue-state.js';

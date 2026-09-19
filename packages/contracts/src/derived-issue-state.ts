@@ -4,7 +4,7 @@
 // computed at read time from the tracker, the plan home, the PR, checks, git,
 // and the terminal backend. This module holds the vocabulary the server
 // derives and the dashboard renders; the derivation itself lives in
-// `src/dashboard/server/services/derived-issue-state.ts`.
+// `src/lib/overdeck/derived-issue-state.ts`, shared by the CLI and the server.
 
 import { Schema } from "effect"
 
@@ -77,6 +77,12 @@ export const DerivedIssueState = Schema.Struct({
   attention: Schema.optional(IssueAttention),
   pr: Schema.optional(DerivedPrState),
   branch: Schema.optional(DerivedBranchState),
+  /**
+   * No tracker answered for this issue, so `closed` — the top of the
+   * precedence — could not be ruled in or out. Present only in that case; an
+   * unresolved tracker read is never reported as an open issue.
+   */
+  trackerUnknown: Schema.optional(Schema.Literal(true)),
 })
 export type DerivedIssueState = typeof DerivedIssueState.Type
 
