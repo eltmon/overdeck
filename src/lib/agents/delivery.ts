@@ -384,22 +384,26 @@ export async function deliverAgentMessage(
     const { herdrBackend } = await import('../terminal-backends/herdr.js');
     // A backend failure is a delivery result, not a throw: callers branch on
     // `.ok`, and throwing here would skip the mail-queue path every other
-    // failing tier gets.
-    const result = await Effect.runPromise(
-      herdrBackend.prompt({ paneId: herdrAgent.paneId }, message, { messageId, sender }),
-    ).catch((error: unknown): PromptResult => ({
-      unsupported: true,
-      reason: error instanceof Error ? error.message : String(error),
-    }));
-    if (isUnsupported(result)) return { ok: false, path: 'herdr', failure: result.reason };
+    // failing tier gets. A THROW is that failure; a returned `unsupported` is
+    // a different fact — "Herdr cannot carry this prompt" — and falls through
+    // to the harness's own transport below (PAN-3917 W12: a pane-bound codex /
+    // ACP / kimi agent has no Herdr agent record to prompt).
+    let result: PromptResult;
+    try {
+      result = await Effect.runPromise(
+        herdrBackend.prompt({ paneId: herdrAgent.paneId }, message, { messageId, sender }),
+      );
+    } catch (error: unknown) {
+      return { ok: false, path: 'herdr', failure: error instanceof Error ? error.message : String(error) };
+    }
     if (isPromptRefused(result)) return { ok: false, path: 'herdr', failure: `refused: ${result.reason}` };
     if (isPromptDropped(result)) {
       return { ok: true, path: 'herdr', deduplicated: true, failure: `dropped: ${result.reason}` };
     }
-    return { ok: true, path: 'herdr' };
+    if (!isUnsupported(result)) return { ok: true, path: 'herdr' };
   }
-  // Not a Herdr agent (or a tmux host): the cascade below is unchanged, with
-  // the same guard in front of it.
+  // Not a Herdr agent, a pane-bound one Herdr cannot prompt, or a tmux host:
+  // the cascade below is unchanged, with the same guard in front of it.
   const guard = checkPrompt({ targetId: normalizedId, targetTokens, sender, messageId });
   if ('refused' in guard) return { ok: false, path: 'tmux', failure: `refused: ${guard.reason}` };
   if ('dropped' in guard) {
