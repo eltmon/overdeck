@@ -97,6 +97,7 @@ function listFilesRecursive(root: string): string[] {
   const walk = (dir: string): void => {
     for (const name of readdirSync(dir)) {
       const full = join(dir, name);
+      if (!existsSync(full)) continue; // dangling symlink: nothing to migrate
       if (statSync(full).isDirectory()) walk(full);
       else out.push(relative(root, full));
     }
