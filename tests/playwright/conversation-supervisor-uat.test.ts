@@ -433,8 +433,6 @@ beforeEach(async () => {
     }),
   }));
 
-  const { resetDatabase } = await import('../../src/lib/database/index.js');
-  resetDatabase();
   await startRealConversationRoutes();
   browser = await chromium.launch();
   context = await browser.newContext();
@@ -455,8 +453,6 @@ afterEach(async () => {
     )));
   }
   tmuxSessions.clear();
-  const { resetDatabase } = await import('../../src/lib/database/index.js');
-  resetDatabase();
   if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
   else process.env.OVERDECK_HOME = originalOverdeckHome;
   if (originalHome === undefined) delete process.env.HOME;
