@@ -42,6 +42,7 @@ describe('AgentState role persistence', () => {
   afterEach(() => {
     vi.doUnmock('../config-yaml.js');
     vi.doUnmock('../tmux.js');
+    vi.doUnmock('../terminal-backends/select.js');
     vi.doUnmock('../workspace/stack-health.js');
     vi.doUnmock('../workspace/rebuild-stack.js');
     vi.doUnmock('../cloister/pr-facts.js');
@@ -445,6 +446,14 @@ describe('AgentState role persistence', () => {
       createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
       capturePane: vi.fn(() => Effect.succeed('Claude Code')),
       setOption: vi.fn(() => Effect.void),
+    }));
+    // PAN-3917 FR-5/W8: launchAgentPane auto-selects Herdr when the dev host has
+    // a live `herdr` binary and `overdeck` session socket, which would make this
+    // test drive the real Herdr session instead of the mocked tmux.js path. Force
+    // tmux selection so createSessionAsync stays the single source of truth.
+    vi.doMock('../terminal-backends/select.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../terminal-backends/select.js')),
+      selectTerminalBackend: vi.fn(async () => ({ backend: 'tmux' as const, diagnostic: 'test: forced tmux backend' })),
     }));
     vi.doMock('../tasks-query.js', () => ({ assertIssueHasTasks: vi.fn(() => Effect.succeed(undefined)) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
