@@ -1,0 +1,536 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-19T11:39:14Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3924: pipeline-membership: intermittent gh graphql failure surfaces as a toast; capture stderr, retry once; listProjectTrackerIssues is blind to GitHub-tracked projects",
+    "updated": "2026-09-19T11:51:11.465Z"
+  },
+  "plan": {
+    "id": "pan-3924",
+    "title": "pipeline-membership: intermittent gh graphql failure surfaces as a toast; capture stderr, retry once; listProjectTrackerIssues is blind to GitHub-tracked projects",
+    "status": "proposed",
+    "uid": "6c6fcf84-54a2-4374-b5b3-8e5c4b7053c2",
+    "author": "agent:claude-fable-5-1",
+    "sequence": 2,
+    "created": "2026-09-19T11:39:14Z",
+    "updated": "2026-09-19T11:51:11.465Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3924",
+        "label": "PAN-3924",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-3924.md",
+        "label": "PRD draft (.pan/drafts/pan-3924.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3917",
+        "label": "PAN-3917 (The Overdeck Cut)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "pipeline-membership",
+      "github",
+      "gh-cli",
+      "reliability",
+      "tracker"
+    ],
+    "narratives": {
+      "Problem": "runGitHubGraphql in src/lib/pipeline-membership-gather.ts shells out to `gh api graphql` and, on failure, rethrows execFile's error whose message embeds the 50-alias query and drops stderr. The operator sees `[pipeline-membership] refresh failed for overdeck ... Command failed: gh api graphql ... (forge_unavailable)` intermittently (4x on the 0.51.0 build) and cannot tell why; the same batch succeeds by hand. One transient subprocess failure fails the whole gather with no retry. Separately, listProjectTrackerIssues filters rows with `ref.startsWith(prefix + '-')`, but the GitHub tracker's ref is a bare `#N`, so the function returns nothing for GitHub-tracked projects (latent: the gather only calls it for non-GitHub trackers).",
+      "Proposal": "Extract the gh GraphQL runner into a new module src/lib/github-graphql-run.ts with injectable exec and delay. Its error message carries the exit code (or `timeout`), the attempt count, and up to 500 chars of stderr, and never the query. Retry exactly once after 1000 ms when stdout has no JSON envelope; a parsed envelope with usable data is returned (unchanged), and an errors-only envelope throws without retry. Keep gather.ts at or below its origin/main line count (765). Move issueIdFromTrackerIssue from the CLI migrate-plan-home module into src/lib/tracker/issue-id.ts (re-exported from the CLI file), and make listProjectTrackerIssues map rows through a pure exported projectTrackerIssueRows that uses it. The service and routes already keep and serve the last-good snapshot through a failed refresh; pin that with regression tests rather than changing it. Document the retry and last-good behavior in configuration/issue-trackers.mdx and a module header on the gatherer.",
+      "NonGoals": "- Retrying or capturing stderr for the REST `gh api --paginate` path in listOpenPullRequestsSnapshot (gather.ts:62-78).\n- Wiring src/lib/github-graphql-cooldown.ts into the gatherer.\n- Auto-rescheduling a failed cold (boot-time) membership refresh; periodic-convergence re-gathers within 5 minutes.\n- Any change to the frontend ProjectMembershipBoundary alert box.\n- Deduplicating the resolveProjectTrackerType copy in migrate-plan-home.ts.\n- Making the gather call listTrackerIssues for GitHub-tracked projects (they keep the REST issue lists).\n- Fixing the stale docs/PIPELINE-MEMBERSHIP.md pointer in routes/pipeline-membership.ts:7.\n- Adding a scripts/file-size-allowlist.txt row for pipeline-membership-gather.ts."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Retry discriminator: retry once only when gh's stdout is empty or not a JSON envelope; a parsed envelope with non-null data is returned, an errors-only envelope throws immediately.",
+        "rationale": "Network failures, gh crashes, and timeouts leave no envelope and are the intermittent class the issue describes; envelope errors (bad query, rate limit) are deterministic and retrying them burns quota. The rule is mechanical and needs no wiring of the unused cooldown module."
+      },
+      {
+        "summary": "One retry with a fixed 1000 ms delay, no backoff, per-attempt timeout unchanged at 30 s.",
+        "rationale": "The issue asks for 'retry once'; worst case per chunk is ~61 s in a background refresh, and the settled TTL cache evicts rejections so nothing caches the failure."
+      },
+      {
+        "summary": "Extract the runner into src/lib/github-graphql-run.ts instead of editing it in place.",
+        "rationale": "The file-size ratchet forbids growing gather.ts (765 lines on origin/main), and a module with injectable exec/delay is unit-testable without mocking node:child_process inside the 1361-line gather test, where that mock would also swallow defaultDeps.run and listOpenPullRequestsSnapshot."
+      },
+      {
+        "summary": "Relocate issueIdFromTrackerIssue to src/lib/tracker/issue-id.ts and re-export it from the CLI module, rather than importing the CLI module from lib as the issue text literally suggests.",
+        "rationale": "src/lib importing src/cli/commands is the wrong layering direction and risks the gatherer's import-graph guard test; the re-export keeps the existing CLI test compiling unchanged."
+      },
+      {
+        "summary": "Treat 'do not surface the banner for a single failed refresh when a last-good snapshot exists' as already satisfied and pin it with regression tests instead of changing server or frontend code.",
+        "rationale": "Verified in services/pipeline-membership.ts:94-106 (failure keeps value/refreshedAt) and :117-119 (memberships returned when refreshedAt is set) and routes/pipeline-membership.ts:39-40 and :71-72 (bare array). The observed boot-time banner is the cold-cache case, which the retry reduces and periodic-convergence heals within 5 minutes."
+      },
+      {
+        "summary": "Error is a plain Error with `cause` set to the original execFile rejection; no new error class.",
+        "rationale": "Every consumer (withUnavailableReason, snapshot.lastError, the unavailable body) reads only .message; a class would be speculative surface."
+      }
+    ],
+    "items": [
+      {
+        "id": "gh-run-stderr",
+        "title": "Extract gh GraphQL runner with stderr-carrying error and wire the gatherer to it",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:39:14Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3924",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/github-graphql-run.ts",
+            "src/lib/pipeline-membership-gather.ts",
+            "tests/unit/lib/github-graphql-run.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/github-graphql-run.test.ts tests/unit/lib/pipeline-membership-gather.test.ts",
+            "grep -c 'async function runGitHubGraphql' src/lib/pipeline-membership-gather.ts || true",
+            "wc -l src/lib/pipeline-membership-gather.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/github-graphql-run.test.ts reports all cases passing and the gather test file stays green",
+            "grep count of 'async function runGitHubGraphql' in the gatherer is 0",
+            "wc -l for src/lib/pipeline-membership-gather.ts is at most 765",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/github-graphql-run.ts per PRD WI-1: export runGitHubGraphql(query, exec = defaultExec, delay = defaultDelay), GhExec/Delay types, GH_GRAPHQL_RETRY_DELAY_MS, GH_GRAPHQL_STDERR_LIMIT, and describeGhGraphqlFailure(error, attempt). defaultExec wraps promisify(execFile)('gh', args, { encoding: 'utf-8', timeout: 30_000, maxBuffer: 4 MiB }); defaultDelay wraps the global setTimeout in a Promise. In the catch: if the rejection's stdout parses as JSON with a non-null data object, return stdout (existing partial-envelope behavior); otherwise throw new Error(describeGhGraphqlFailure(error, 1), { cause: error }). The message format is `gh api graphql failed (<exit N | timeout>, attempt <n>): <stderr trimmed to 500 chars | no stderr>` and must not include the query. In src/lib/pipeline-membership-gather.ts delete the private runGitHubGraphql (lines 89-114) and import runGitHubGraphql from './github-graphql-run.js'; leave listMergedPullRequestHeadsBatched and listIssueStatesBatched default parameters untouched and keep execFileAsync (still used by listOpenPullRequestsSnapshot and defaultDeps.run). Write tests/unit/lib/github-graphql-run.test.ts with injected exec. Assert message shape ONLY through the pure describeGhGraphqlFailure(error, attempt) (exit code, timeout, 'no stderr', 500-char truncation, no query text), and assert end-to-end runGitHubGraphql behavior only for: success passthrough with the exact gh args, partial envelope returned, and a non-JSON failure rejecting with an Error whose cause is the original rejection and whose message contains 'gh api graphql failed ('. Do not assert an attempt number through runGitHubGraphql in this item — gh-run-retry owns attempt-count assertions so no test is rewritten when the retry loop lands."
+        },
+        "items": [
+          {
+            "id": "gh-run-stderr.ac1",
+            "title": "Given the rejection { code: 1, killed: false, stdout: '', stderr: 'error connecting to api.github.com\\n' }, describeGhGraphqlFailure(error, 1) returns 'gh api graphql failed (exit 1, attempt 1): error connecting to api.github.com' and the string contains no 'query='",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gh-run-stderr.ac2",
+            "title": "Given the rejection { code: null, killed: true, signal: 'SIGTERM', stdout: '', stderr: '' }, describeGhGraphqlFailure(error, 1) returns 'gh api graphql failed (timeout, attempt 1): no stderr'; given a 600-character stderr, the returned detail contains exactly 500 characters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gh-run-stderr.ac3",
+            "title": "Given exec rejects with a stdout JSON envelope whose data is a non-null object, runGitHubGraphql returns that stdout string (partial-envelope behavior preserved); given exec resolves, it returns stdout and exec receives ['api','graphql','-f','query=<q>']",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gh-run-stderr.ac4",
+            "title": "Given exec rejects with non-JSON stdout, runGitHubGraphql rejects with an Error whose cause is the original rejection and whose message contains 'gh api graphql failed (' and no 'query='",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gh-run-stderr.ac5",
+            "title": "The gatherer file contains no 'async function runGitHubGraphql', imports it from './github-graphql-run.js', wc -l reports at most 765 lines, the import-graph guard test still passes, and the new module contains no execSync or spawnSync",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gh-run-retry",
+        "title": "Retry the gh GraphQL call once when stdout carries no JSON envelope",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:39:14Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3924",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/github-graphql-run.ts",
+            "tests/unit/lib/github-graphql-run.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/github-graphql-run.test.ts",
+            "grep -c 'timers/promises' src/lib/github-graphql-run.ts || true"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/github-graphql-run.test.ts passes including the fake-timer retry cases",
+            "grep count of 'timers/promises' in src/lib/github-graphql-run.ts is 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/github-graphql-run.ts turn the single attempt into `for (let attempt = 1; ; attempt++)` per PRD WI-2. Rule inside the catch, after the has-data check: if the stdout parsed as a JSON envelope (errors-only) OR attempt > 1, throw the wrapped error; otherwise `await delay(GH_GRAPHQL_RETRY_DELAY_MS)` and loop so the same args run a second time. Add fake-timer tests (vi.useFakeTimers in beforeEach, vi.useRealTimers in afterEach, vi.advanceTimersByTimeAsync(1000)): non-JSON failure then success resolves after one delay(1000) with exec called twice with identical args; two non-JSON failures reject with 'attempt 2'; an errors-only envelope `{\"errors\":[{\"message\":\"API rate limit exceeded\"}],\"data\":null}` rejects with 'attempt 1' and exec called once and delay never called; vi.getTimerCount() is 0 after resolution. gh-run-stderr's tests assert no attempt number through runGitHubGraphql, so this item only adds tests; the end-to-end attempt-count assertions live here."
+        },
+        "items": [
+          {
+            "id": "gh-run-retry.ac1",
+            "title": "Given exec rejects once with { code: 1, stdout: '', stderr: 'error connecting' } then resolves { stdout: '{\"data\":{}}' }, when timers advance 1000 ms then runGitHubGraphql resolves with the second stdout and exec was called twice with identical args",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gh-run-retry.ac2",
+            "title": "Given exec rejects twice with non-JSON stdout, the runner rejects with a message containing 'attempt 2' and exec was called exactly twice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gh-run-retry.ac3",
+            "title": "Given exec rejects with an errors-only JSON envelope on stdout, the runner rejects with 'attempt 1', exec was called once, and the injected delay was never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gh-run-retry.ac4",
+            "title": "Given fake timers (vi.useFakeTimers + vi.advanceTimersByTimeAsync), the retry test resolves and vi.getTimerCount() returns 0 afterwards; the default delay wraps the global setTimeout and the module contains no import of node:timers/promises",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tracker-issue-id-lib",
+        "title": "Move issueIdFromTrackerIssue to src/lib/tracker/issue-id.ts and re-export from the CLI module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T11:39:14Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-3924",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/tracker/issue-id.ts",
+            "src/cli/commands/admin/migrate-plan-home.ts",
+            "tests/unit/lib/tracker/issue-id.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/tracker/issue-id.test.ts tests/unit/cli/admin-migrate-plan-home.test.ts",
+            "grep -c 'export function issueIdFromTrackerIssue' src/cli/commands/admin/migrate-plan-home.ts || true",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "both test files pass with the CLI test file unmodified",
+            "grep count of 'export function issueIdFromTrackerIssue' in migrate-plan-home.ts is 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/tracker/issue-id.ts containing the issueIdFromTrackerIssue function and its doc comment moved verbatim from src/cli/commands/admin/migrate-plan-home.ts lines 42-56 (github → `${PREFIX}-${ref without leading #}`, else `ref.toUpperCase()`), importing Issue and TrackerType from './interface.js'. In migrate-plan-home.ts delete the local definition and add `import { issueIdFromTrackerIssue } from '../../../lib/tracker/issue-id.js'; export { issueIdFromTrackerIssue };` so filterOpenIssueIds and tests/unit/cli/admin-migrate-plan-home.test.ts keep working without edits. Add tests/unit/lib/tracker/issue-id.test.ts covering: '#3841' github PAN → 'PAN-3841'; '#7' github lowercase prefix 'pan' → 'PAN-7'; 'MIN-1039' linear MIN → 'MIN-1039'; 'min-5' gitlab MIN → 'MIN-5'. Use the Issue fixture shape from the CLI test (id, ref, title, description, state, labels, url, tracker)."
+        },
+        "items": [
+          {
+            "id": "tracker-issue-id-lib.ac1",
+            "title": "src/lib/tracker/issue-id.ts exports issueIdFromTrackerIssue and, given a github issue with ref '#3841' and prefix 'PAN', returns 'PAN-3841'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tracker-issue-id-lib.ac2",
+            "title": "Given a linear issue with ref 'MIN-1039', issueIdFromTrackerIssue returns 'MIN-1039' unchanged, and a lowercase github prefix 'pan' with ref '#7' returns 'PAN-7'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tracker-issue-id-lib.ac3",
+            "title": "tests/unit/cli/admin-migrate-plan-home.test.ts passes without modification because migrate-plan-home.ts re-exports issueIdFromTrackerIssue from the lib module",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tracker-issue-id-lib.ac4",
+            "title": "migrate-plan-home.ts no longer contains 'export function issueIdFromTrackerIssue' and typecheck completes without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tracker-rows-github-prefix",
+        "title": "listProjectTrackerIssues maps rows through projectTrackerIssueRows using the shared helper",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T11:39:14Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3924",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pipeline-membership-gather.ts",
+            "tests/unit/lib/pipeline-membership-gather.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts",
+            "wc -l src/lib/pipeline-membership-gather.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/pipeline-membership-gather.test.ts passes including the new projectTrackerIssueRows describe block and the import-graph guard",
+            "wc -l for src/lib/pipeline-membership-gather.ts is at most 765",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/pipeline-membership-gather.ts replace the flatMap at the end of listProjectTrackerIssues (the `issue.ref.toUpperCase()` + `startsWith(`${issuePrefix}-`)` block, lines 238-246) with `return projectTrackerIssueRows(issues, trackerType, issuePrefix);` and add the pure exported function projectTrackerIssueRows(issues: readonly Issue[], trackerType: TrackerType, issuePrefix: string): ProjectTrackerIssueRow[] exactly as shown in PRD WI-4: upper-case the prefix, map each issue through issueIdFromTrackerIssue (imported from './tracker/issue-id.js'), drop ids not starting with `${PREFIX}-`, and map state to 'closed' only when issue.state === 'closed', else 'open'. Add describe('projectTrackerIssueRows') to tests/unit/lib/pipeline-membership-gather.test.ts: github fixtures ref '#12' open ['ready'] and '#13' closed [] with ('github','PAN') → PAN-12 open and PAN-13 closed; linear fixtures MIN-1 and OTHER-2 with ('linear','MIN') → only MIN-1; a non-'closed' state such as 'in_progress' maps to 'open'. The gather test's existing forbidden-import guard must stay green; do not import anything from src/cli."
+        },
+        "items": [
+          {
+            "id": "tracker-rows-github-prefix.ac1",
+            "title": "Given github issues with refs '#12' (open, labels ['ready']) and '#13' (closed) and prefix 'PAN', projectTrackerIssueRows returns [{ issueId: 'PAN-12', state: 'open', labels: ['ready'] }, { issueId: 'PAN-13', state: 'closed', labels: [] }]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tracker-rows-github-prefix.ac2",
+            "title": "Given linear issues with refs 'MIN-1' and 'OTHER-2' and prefix 'MIN', projectTrackerIssueRows returns only the MIN-1 row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tracker-rows-github-prefix.ac3",
+            "title": "Given an issue whose state is 'in_progress', the returned row's state is 'open'; only state 'closed' produces 'closed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tracker-rows-github-prefix.ac4",
+            "title": "The gatherer's import-graph guard test passes (no src/cli import) and wc -l on src/lib/pipeline-membership-gather.ts reports at most 765 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "last-good-regression",
+        "title": "Regression tests: a failed refresh after a success keeps serving the last-good snapshot",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T11:39:14Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-3924",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/dashboard/pipeline-membership-service.test.ts",
+            "tests/unit/dashboard/routes/pipeline-membership-route.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/pipeline-membership-service.test.ts tests/unit/dashboard/routes/pipeline-membership-route.test.ts",
+            "git diff --stat -- src/"
+          ],
+          "expected_outputs": [
+            "both test files pass with the two new PAN-3924 cases present",
+            "git diff --stat -- src/ shows no production file changed by this item"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Add two regression tests with no production code change, per PRD WI-5. Service test (next to the existing getLastGoodMembershipSnapshot case; use a fresh project path such as '/pan-3924-last-good' because membershipSnapshots is a module-global map shared by every test in the file): refreshMembershipSnapshotsForProjects succeeds with [{ issueId: 'PAN-9' }], then getMembership.mockRejectedValueOnce(new PipelineMembershipUnavailableError('forge_unavailable', 'gh api graphql failed (exit 1, attempt 2): error connecting')), refresh again with console.warn spied, assert the warn call's second argument contains 'gh api graphql failed (exit 1, attempt 2): error connecting', and assert readPipelineMembershipSnapshotsForProjects([project])[0] has memberships [{ issueId: 'PAN-9' }] with error and unavailableReason undefined. Route test (inside the existing describe): with refreshMembershipSnapshotsForProjects mocked to resolve and readPipelineMembershipSnapshotsForProjects mocked to return [{ project, memberships: [{ issueId: 'PAN-9' }] }], POST /api/pipeline/membership/refresh?project=route-project returns status 200 and body [{ issueId: 'PAN-9' }]. Do not add a GET mirror — the existing 'preserves the bare membership array for a healthy GET snapshot' case already covers the GET read."
+        },
+        "items": [
+          {
+            "id": "last-good-regression.ac1",
+            "title": "Given a successful refresh then a refresh that rejects with PipelineMembershipUnavailableError('forge_unavailable', ...), readPipelineMembershipSnapshotsForProjects returns memberships [{ issueId: 'PAN-9' }] with error undefined and unavailableReason undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "last-good-regression.ac2",
+            "title": "The failed refresh logs a console.warn whose second argument contains 'gh api graphql failed (exit 1, attempt 2): error connecting'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "last-good-regression.ac3",
+            "title": "Given the read door returns memberships after a failed re-gather, POST /api/pipeline/membership/refresh returns HTTP 200 with the bare array [{ issueId: 'PAN-9' }] and no status: 'unavailable' body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "last-good-regression.ac4",
+            "title": "The service test uses a fresh project path (e.g. '/pan-3924-last-good') so it shares no snapshot with other cases, and git diff shows no file under src/ changed by this item",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-membership-retry",
+        "title": "Document retry-once and last-good behavior in issue-trackers.mdx and the gatherer module header",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T11:39:14Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3924",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/issue-trackers.mdx",
+            "src/lib/pipeline-membership-gather.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'retries it once' configuration/issue-trackers.mdx",
+            "head -3 src/lib/pipeline-membership-gather.ts",
+            "wc -l src/lib/pipeline-membership-gather.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "grep count of 'retries it once' in configuration/issue-trackers.mdx is 1",
+            "head -3 shows a /** Pipeline-membership gatherer module header",
+            "wc -l for src/lib/pipeline-membership-gather.ts is at most 765",
+            "lint (including scripts/lint-file-size.sh) completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-6: in configuration/issue-trackers.mdx, directly after the paragraph that ends 'Keep `github_repo`; removing it would hide GitHub pull requests from pipeline membership.' (line ~296), insert the paragraph from the PRD stating that membership is refreshed in the background and cached per project; a GitHub GraphQL call that fails without a response (network error, gh crash, 30-second timeout) is retried once after one second; if the refresh still fails the last successful snapshot keeps serving the dashboard and the server log records `[pipeline-membership] refresh failed for <project>; keeping last-good snapshot:` followed by gh's own error output; a response carrying only `errors` is not retried. Add the 7-line module header comment from PRD WI-6 at line 1 of src/lib/pipeline-membership-gather.ts naming ./github-graphql-run.ts as the home of stderr capture and retry-once and restating the no-disposable-state / no-sync-process import rule. Confirm the file stays at or below 765 lines."
+        },
+        "items": [
+          {
+            "id": "docs-membership-retry.ac1",
+            "title": "configuration/issue-trackers.mdx contains exactly one paragraph stating that a GitHub GraphQL call that fails without a response is retried once after one second, located after the 'Keep `github_repo`' paragraph",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-membership-retry.ac2",
+            "title": "The same paragraph states that the last successful membership snapshot keeps serving the dashboard and contains the log line '[pipeline-membership] refresh failed for <project>; keeping last-good snapshot:' described as carrying gh's error output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-membership-retry.ac3",
+            "title": "head -3 src/lib/pipeline-membership-gather.ts shows a module header comment that names ./github-graphql-run.ts, and wc -l reports at most 765 lines so scripts/lint-file-size.sh passes without an allowlist row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "gh-run-stderr",
+        "to": "gh-run-retry",
+        "type": "blocks"
+      },
+      {
+        "from": "tracker-issue-id-lib",
+        "to": "tracker-rows-github-prefix",
+        "type": "blocks"
+      },
+      {
+        "from": "gh-run-stderr",
+        "to": "tracker-rows-github-prefix",
+        "type": "blocks"
+      },
+      {
+        "from": "tracker-rows-github-prefix",
+        "to": "docs-membership-retry",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-19-PAN-3924-pipeline-membership-intermittent-gh-graphql-failure-surfaces-as-a-toast-capture-stderr-retry-once-listprojecttrackerissues-is-blind-to-github-tracked-projects.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
