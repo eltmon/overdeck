@@ -119,6 +119,35 @@ describe('pending feedback recovery (PAN-585)', () => {
     await expect(readFile(queueFile, 'utf-8')).rejects.toThrow();
   });
 
+  it('keeps queued feedback when the derived state cannot be read', async () => {
+    queueFile = await setupQueueFile();
+
+    await enqueuePendingFeedbackDelivery({
+      issueId: 'PAN-585',
+      agentId: 'agent-pan-585',
+      kind: 'review-blocked',
+      filePath: '/tmp/workspaces/feature-pan-585/.pan/feedback/004-review-agent-changes-requested.md',
+      message: 'SPECIALIST FEEDBACK: review-agent reported BLOCKED for PAN-585',
+      createdAt: '2026-04-27T06:00:00Z',
+    }, { filePath: queueFile });
+
+    const deliver = vi.fn(async () => {});
+
+    await processPendingFeedbackDeliveries({
+      filePath: queueFile,
+      now: Date.parse('2026-04-27T06:05:00Z'),
+      _deliver: deliver,
+      _getAgentState: vi.fn(async () => ({ id: 'agent-pan-585' } as any)),
+      // The forge was unreachable: an unreadable state is not "no longer
+      // relevant", so the delivery survives to the next startup.
+      _getState: vi.fn(async () => null),
+    });
+
+    expect(deliver).not.toHaveBeenCalled();
+    const stored = JSON.parse(await readFile(queueFile, 'utf-8'));
+    expect(stored.deliveries).toHaveLength(1);
+  });
+
   it('removes a specific queue entry after successful immediate delivery', async () => {
     queueFile = await setupQueueFile();
 

@@ -141,7 +141,14 @@ export async function processPendingFeedbackDeliveries(options?: {
       continue;
     }
 
-    if (!isDeliveryStillRelevant(delivery, await getState(delivery.issueId))) {
+    // A forge blip is not an answer: an unreadable state keeps the delivery
+    // queued, the same way an agent that is not up yet does.
+    const derived = await getState(delivery.issueId);
+    if (derived === null) {
+      remaining.push(delivery);
+      continue;
+    }
+    if (!isDeliveryStillRelevant(delivery, derived)) {
       continue;
     }
 
