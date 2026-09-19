@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-19T10:14:44.082Z · model: claude-opus-5 · open: 907_
+_Last sequenced: 2026-09-19T10:46:48.250Z · model: claude-opus-5 · open: 908_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -912,6 +912,7 @@ _Last sequenced: 2026-09-19T10:14:44.082Z · model: claude-opus-5 · open: 907_
 | 905 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
 | 906 | PAN-43 | M | low | stale |  |  | Add Slack and email notifications for agent events |
 | 907 | PAN-2070 | XS | low | stale |  |  | Stale: targets the flywheel orchestrator docs (docs/FLYWHEEL.md) deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 908 | PAN-3920 | L | medium | needs-refinement |  | PAN-3822 | Operator-requested 3-pane Agents directory (tree/list/detail); post-release follow-up, needs a PRD; PR pane depends on PAN-3822 |
 
 ## Rationale detail
 
@@ -1222,10 +1223,10 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-19T10:14:44.082Z",
+  "generatedAt": "2026-09-19T10:46:48.250Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 907,
+  "openCount": 908,
   "nodes": [
     {
       "issue": "PAN-3679",
@@ -12424,6 +12425,21 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "rationale": "Demoted from rank 869: the component this issue targets (the flywheel orchestrator docs (docs/FLYWHEEL.md)) was deleted by the PAN-3917 cut on main; the issue needs re-triage against the new tree or closure.",
       "gate": "auto",
       "planning": "skip"
+    },
+    {
+      "issue": "PAN-3920",
+      "rank": 908,
+      "size": "L",
+      "importance": "medium",
+      "score": 48,
+      "condition": "needs-refinement",
+      "dependsOn": [
+        "PAN-3822"
+      ],
+      "why": "Operator-requested 3-pane Agents directory (tree/list/detail); post-release follow-up, needs a PRD; PR pane depends on PAN-3822",
+      "rationale": "New since the prior run (filed 2026-09-19 during the PAN-3917 cut). Placed at the tail: the body marks it a post-release follow-up that needs a short PRD before planning, and its PR context pane cannot ship before PAN-3822 (rank 464) links pull requests to conversations. Ranked below PAN-3822 rather than inserted mid-list so pinned in-pipeline ranks stay unique.",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13483,6 +13499,13 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-3822",
+      "to": "PAN-3920",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
     }
   ]
 }
