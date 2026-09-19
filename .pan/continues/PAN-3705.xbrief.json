@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3705",
   "created": "2026-09-19T10:59:28.419Z",
-  "updated": "2026-09-19T11:23:10.842Z",
+  "updated": "2026-09-19T11:23:38.057Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -30,6 +30,10 @@
     "pin-conversations-scope-chip.ac1": {
       "status": "completed",
       "doneAt": "2026-09-19T11:23:10.841Z"
+    },
+    "pin-conversations-scope-chip.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-19T11:23:38.057Z"
     }
   }
 }
