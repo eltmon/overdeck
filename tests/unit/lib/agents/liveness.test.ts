@@ -130,6 +130,17 @@ describe('isAlive on the Herdr backend', () => {
     expect(deps.listPaneRows).not.toHaveBeenCalled();
   });
 
+  it('reports a PANE-BOUND agent alive on its pane alone, state and all', async () => {
+    // A codex / ACP / kimi agent runs behind a host process, so Herdr detects
+    // nothing in its pane and reports `unknown`. The probe answers from the
+    // token-stamped pane; "Herdr has no agent record" is not a death.
+    const deps = aliveDeps({
+      backend: 'herdr' as const,
+      probeHerdr: vi.fn(async () => ({ kind: 'alive' as const, paneId: 'wE:p2', state: 'unknown' as const })),
+    });
+    await expect(isAlive('agent-pan-3705-review', deps)).resolves.toEqual({ alive: true, paneAlive: true });
+  });
+
   it('reports an agent Herdr does not know as no-session (a confirmed death)', async () => {
     const deps = aliveDeps({
       backend: 'herdr' as const,

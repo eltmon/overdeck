@@ -929,11 +929,14 @@ async function spawnAgentWithoutConsentClaim(
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[${agentId}] ACP prompt delivery failed:`, message);
       if (tracksKickoffDelivery) {
+        // Already writes the reason markSpawnFailed below would clobber (PAN-2771).
         await recordKickoffDeliveryFailure(state, options.issueId, role);
       }
       await closeBackendPane(launchedPane);
       await Effect.runPromise(stopAgent(agentId)).catch(() => undefined);
-      await markSpawnFailed(agentId, `kickoff delivery failed: ${message}`);
+      if (!tracksKickoffDelivery) {
+        await markSpawnFailed(agentId, `kickoff delivery failed: ${message}`);
+      }
       throw new Error(`Agent ${agentId} kickoff delivery failed: ${message}`);
     }
   } else if (prompt && resolvedHarness === 'ohmypi') {
@@ -946,10 +949,10 @@ async function spawnAgentWithoutConsentClaim(
     } catch (err) {
       console.error(`[${agentId}] ohmypi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
       if (tracksKickoffDelivery) {
+        // No markSpawnFailed here — it would clobber the reason just recorded (PAN-2771).
         await recordKickoffDeliveryFailure(state, options.issueId, role);
         await closeBackendPane(launchedPane);
         await Effect.runPromise(stopAgent(agentId)).catch(() => undefined);
-        await markSpawnFailed(agentId, `kickoff delivery failed: ${err instanceof Error ? err.message : String(err)}`);
         throw new Error(`Agent ${agentId} kickoff delivery failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
@@ -968,11 +971,14 @@ async function spawnAgentWithoutConsentClaim(
           if (delivery.failure === SESSION_EXITED_BEFORE_KICKOFF) {
             await recordStartupSessionExit(state, options.issueId, role);
           }
+          // Already writes a reason markSpawnFailed below would clobber (PAN-2771).
           await recordKickoffDeliveryFailure(state, options.issueId, role);
         }
         await closeBackendPane(launchedPane);
         await Effect.runPromise(stopAgent(agentId)).catch(() => {});
-        await markSpawnFailed(agentId, `kickoff delivery failed: ${delivery.failure ?? 'unknown error'}`);
+        if (!tracksKickoffDelivery) {
+          await markSpawnFailed(agentId, `kickoff delivery failed: ${delivery.failure ?? 'unknown error'}`);
+        }
       },
     });
     if (delivery.ok) {
@@ -984,10 +990,10 @@ async function spawnAgentWithoutConsentClaim(
       if (delivery.failure === SESSION_EXITED_BEFORE_KICKOFF) {
         await recordStartupSessionExit(state, options.issueId, role);
       }
+      // No markSpawnFailed here — it would clobber the reason just recorded (PAN-2771).
       await recordKickoffDeliveryFailure(state, options.issueId, role);
       await closeBackendPane(launchedPane);
       await Effect.runPromise(stopAgent(agentId)).catch(() => undefined);
-      await markSpawnFailed(agentId, `kickoff delivery failed: ${delivery.failure ?? 'unknown error'}`);
       throw new Error(`Agent ${agentId} kickoff delivery failed: ${delivery.failure ?? 'unknown error'}`);
     }
   }

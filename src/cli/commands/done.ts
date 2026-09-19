@@ -2,10 +2,13 @@
  * `pan done` — the work agent's one submit step (PAN-3917 FR-10).
  *
  * It opens or updates the pull request for the issue's branches, marks it
- * ready for review, moves the tracker to In Review, and writes nothing else.
- * There is no pipeline record, no review-request row, and no dashboard status
- * post: "this issue is in review" is derived from the PR — open, not a draft —
- * and "this item is done" lives in `.pan/continues/`, written by `pan task`.
+ * ready for review, moves the tracker to In Review, asks the dashboard to
+ * start verification and the review convoy (the same request `pan review
+ * request` makes), and writes nothing else. There is no pipeline record and no
+ * review-request row: "this issue is in review" is derived from the PR — open,
+ * not a draft — and "this item is done" lives in `.pan/continues/`, written by
+ * `pan task`. A dashboard that cannot be reached prints a hint and exits 0;
+ * the GitHub webhook starts the same pipeline when it sees the PR.
  *
  * The pre-flight checks that survive are the ones git and the plan can answer:
  * a clean working tree, a branch that is pushed and ahead of its target, and
@@ -265,6 +268,37 @@ export async function recordTestWaiver(workspacePath: string, reason: string): P
   });
 }
 
+/**
+ * Ask the dashboard to start verification → review for the issue (PAN-3917
+ * W12). Reuses the `pan review request` door; the result is advisory, so the
+ * caller prints the line and carries on.
+ */
+export async function startReviewPipeline(
+  issueId: string,
+  message?: string,
+): Promise<{ started: boolean; line: string }> {
+  const { requestReviewViaDashboard } = await import('./request-review.js');
+  const response = await requestReviewViaDashboard(issueId, message);
+
+  if (response.kind === 'unreachable') {
+    return {
+      started: false,
+      line: chalk.yellow(`  ⚠ Review not started (dashboard unreachable): run pan review request ${issueId}`),
+    };
+  }
+  if (response.kind === 'rejected') {
+    const reason = response.result.error || `HTTP ${response.status}`;
+    return {
+      started: false,
+      line: chalk.yellow(`  ⚠ Review not started (${reason}): run pan review request ${issueId}`),
+    };
+  }
+  return {
+    started: true,
+    line: chalk.green(`  ✓ ${response.result.message ?? `Review pipeline started for ${issueId}`}`),
+  };
+}
+
 export function augmentCommentWithWaiver(comment: string | undefined, waiverReason: string): string {
   const waiverText = `Test gate waived: ${waiverReason}`;
   return comment ? `${comment}\n\n${waiverText}` : waiverText;
@@ -391,6 +425,20 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       ? chalk.green(`  ✓ Updated ${issueId} to In Review`)
       : chalk.yellow('  ⚠ Tracker not updated'));
 
+    // Step 4: ask the dashboard to start verification and the review convoy —
+    // the same request `pan review request` makes. Without it `pan done` left
+    // an open PR that nothing was watching. The PR and the tracker are already
+    // updated, so a dashboard that cannot be reached is a hint, never a
+    // failure: the agent must not re-run `pan done` over it.
+    spinner.text = 'Starting the review pipeline...';
+    const reviewStarted = await startReviewPipeline(issueId, options.comment).catch((error) => ({
+      started: false,
+      line: chalk.yellow(
+        `  ⚠ Review not started (${(error as Error).message}): run pan review request ${issueId}`,
+      ),
+    }));
+    console.log(reviewStarted.line);
+
     spinner.succeed(`Work complete: ${issueId}`);
     emitActivityEntrySync({
       source: 'work-agent',
@@ -411,11 +459,17 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     console.log(`  Issue:   ${chalk.cyan(issueId)}`);
     console.log(`  PR:      ${chalk.cyan(opened.map((pr) => pr.url).filter(Boolean).join(', ') || 'unknown')}`);
     console.log(`  Tracker: ${trackerUpdated ? chalk.green('In Review') : chalk.dim('Not updated')}`);
+    console.log(`  Review:  ${reviewStarted.started
+      ? chalk.green('verification started')
+      : chalk.yellow(`not started — run pan review request ${issueId}`)}`);
     if (options.comment) {
       console.log(`  Comment: ${chalk.dim(options.comment.slice(0, 50))}${options.comment.length > 50 ? '...' : ''}`);
     }
     console.log('');
     console.log(chalk.dim('Ready for review. Review state is read from the PR.'));
+    if (!reviewStarted.started) {
+      console.log(chalk.dim(`Start the review convoy with: pan review request ${issueId}`));
+    }
     console.log('');
   } catch (error) {
     spinner.fail((error as Error).message);
