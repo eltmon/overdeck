@@ -175,7 +175,12 @@ const snapshot = {
   specialists: [],
   agentRuntimeById: {},
   derivedIssueStates: [{ issueId: 'PAN-1148', state: 'working' }],
-  backendPanes: [],
+  // The fixture's work agent is a live backend pane under the derived read model;
+  // without it the card is idle and renders no verb badge.
+  backendPanes: [{ id: 'pane-pan-1148', issue: 'PAN-1148', role: 'work', harness: 'claude-code', model: 'claude-sonnet-5', state: 'working' }],
+  // W6 removes `reviewStatuses` from DashboardSnapshot; the contracts reducer
+  // still requires it, so the fixture carries an empty array until then.
+  reviewStatuses: [],
   resources: null,
   issues: [issue],
   channelPermissionRequests: [],

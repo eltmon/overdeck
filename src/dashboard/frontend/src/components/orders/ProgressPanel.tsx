@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 import { evaluateOrderDispatchEligibility } from '../../../../../lib/orders/eligibility.js';
+import { IN_FLIGHT_STATES } from '../../lib/pipeline-state';
 import { useDashboardStore } from '../../lib/store';
 import type { DerivedIssueState } from '../../types';
 import type { OrderBookView } from './BookStrip';
@@ -26,8 +27,7 @@ function liveStatus(derived: DerivedIssueState | undefined, closed: boolean): It
   return 'queued';
 }
 
-/** An item occupies a lane slot while its issue is past planning and not landed. */
-const IN_FLIGHT_STATES = new Set<DerivedIssueState['state']>(['working', 'in-review', 'changes-requested', 'ready']);
+
 
 function statusTone(status: ItemLiveStatus): string {
   if (status === 'planning' || status === 'working') return 'border-l-info bg-info/[0.08] text-info';

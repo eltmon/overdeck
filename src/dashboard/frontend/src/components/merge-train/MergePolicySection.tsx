@@ -10,16 +10,10 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Zap } from 'lucide-react';
 import { compareIssueIds } from '@overdeck/contracts';
+import { isIssueInFlight } from '../../lib/pipeline-state';
 import { useDashboardStore } from '../../lib/store';
 import type { DerivedIssueState } from '../../types';
 import { AutoMergeToggle, useAutoMergePolicyMap } from '../AutoMergeToggle';
-
-const IN_FLIGHT = new Set<DerivedIssueState['state']>([
-  'working',
-  'in-review',
-  'changes-requested',
-  'ready',
-]);
 
 const PHASE_LABEL: Partial<Record<DerivedIssueState['state'], string>> = {
   working: 'working',
@@ -69,7 +63,7 @@ export function MergePolicySection({ onNavigateIssue }: { onNavigateIssue?: (iss
 
   const rows = useMemo(
     () => Object.values(byId)
-      .filter((issue) => IN_FLIGHT.has(issue.state))
+      .filter(isIssueInFlight)
       .sort((a, b) => compareIssueIds(a.issueId, b.issueId)),
     [byId],
   );
