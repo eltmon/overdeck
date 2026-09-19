@@ -13,6 +13,7 @@ import {
 } from './github-app.js';
 import { createSettledTtlPromiseCache, withConcurrencyLimitPromise } from './concurrency.js';
 import { listOpenGitLabMergeRequests, listGitLabMergedMergeRequestHeads, type GitLabMergeRequestRow } from './gitlab-merge-requests.js';
+import { runGitHubGraphql } from './github-graphql-run.js';
 import { STALE_PIPELINE_LABELS } from './cloister/label-reconciler.js';
 import { loadConfigSync } from './config.js';
 import { listSpecs } from './pan-dir/specs.js';
@@ -84,33 +85,6 @@ interface MergedHeadGraphqlResponse {
       nodes?: Array<{ headRepository?: { name?: string; owner?: { login?: string } } | null }>;
     }>;
   };
-}
-
-async function runGitHubGraphql(query: string): Promise<string> {
-  try {
-    const { stdout } = await execFileAsync('gh', ['api', 'graphql', '-f', `query=${query}`], {
-      encoding: 'utf-8',
-      timeout: 30_000,
-      maxBuffer: 4 * 1024 * 1024,
-    });
-    return stdout;
-  } catch (error) {
-    // gh exits non-zero when the GraphQL envelope carries per-field errors
-    // (e.g. `issue(number: N)` where N is a PR — strike branches can point at
-    // PR numbers), but it still prints the full response with partial data to
-    // stdout. Surface that envelope so callers can use the resolvable fields
-    // instead of failing the whole gather (the zero-membership regression).
-    const stdout = (error as { stdout?: string }).stdout;
-    if (typeof stdout === 'string' && stdout.length > 0) {
-      try {
-        const parsed = JSON.parse(stdout) as { data?: unknown };
-        if (parsed.data !== undefined && parsed.data !== null) return stdout;
-      } catch {
-        // stdout is not a GraphQL envelope — fall through to the original error
-      }
-    }
-    throw error;
-  }
 }
 
 export async function listMergedPullRequestHeadsBatched(
