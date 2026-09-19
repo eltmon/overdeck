@@ -3,31 +3,21 @@ import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, ChevronRight, Shield, ScrollText } from 'lucide-react';
 import styles from './styles/command-deck.module.css';
 
-interface SpecialistHealthState {
-  specialistName: string;
-  lastPingTime?: string;
-  lastResponseTime?: string;
-  consecutiveFailures: number;
-  lastForceKillTime?: string;
-  forceKillCount: number;
-}
-
+/**
+ * PAN-3917 (W4): deacon-lite keeps no specialist health table and no patrol
+ * ledger. Its whole status is in-memory — running, last run, last error — so
+ * this widget reports that and nothing it would have to invent.
+ */
 interface DeaconStatusData {
   isRunning: boolean;
-  config: {
-    patrolIntervalMs: number;
+  pid: number | null;
+  startedAt: string | null;
+  deaconLite: {
+    running: boolean;
+    intervalMs: number;
+    lastRunAt: string | null;
+    lastRunError: string | null;
   };
-  state: {
-    specialists: Record<string, SpecialistHealthState>;
-    lastPatrol?: string;
-    patrolCycle: number;
-  };
-  lastPatrol?: {
-    cycle: number;
-    timestamp: string;
-    actions: string[];
-    massDeathDetected: boolean;
-  } | null;
 }
 
 interface DeaconLogEntry {
@@ -59,20 +49,6 @@ function timeAgo(iso: string | undefined): string {
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
   return `${hours}h ago`;
-}
-
-function specialistStatusColor(health: SpecialistHealthState): string {
-  if (health.consecutiveFailures >= 3) return 'var(--destructive)';
-  if (health.consecutiveFailures > 0) return 'var(--warning)';
-  if (health.lastForceKillTime) {
-    const killAge = Date.now() - new Date(health.lastForceKillTime).getTime();
-    if (killAge < 5 * 60 * 1000) return 'var(--warning)';
-  }
-  return 'var(--success)';
-}
-
-function formatSpecialistName(name: string): string {
-  return name.replace('-agent', '');
 }
 
 function formatLogTime(iso: string): string {
@@ -136,9 +112,7 @@ export function DeaconStatus() {
     );
   }
 
-  const specialists = Object.values(status.state.specialists || {});
-  const actions = status.lastPatrol?.actions || [];
-  const hasActions = actions.length > 0;
+  const lastRunError = status.deaconLite.lastRunError;
   const logs = logData?.logs || [];
 
   return (
@@ -147,11 +121,8 @@ export function DeaconStatus() {
         <Shield size={12} style={{ color: status.isRunning ? 'var(--success)' : 'var(--muted-foreground)', flexShrink: 0 }} />
         <span className={styles.deaconTitle}>Deacon</span>
         <span className={styles.deaconMeta}>
-          {status.isRunning ? timeAgo(status.state.lastPatrol) : 'stopped'}
+          {status.isRunning ? timeAgo(status.deaconLite.lastRunAt ?? undefined) : 'stopped'}
         </span>
-        {hasActions && (
-          <span className={styles.deaconActionCount}>{actions.length}</span>
-        )}
         {expanded ? (
           <ChevronDown size={12} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
         ) : (
@@ -159,37 +130,12 @@ export function DeaconStatus() {
         )}
       </div>
 
-      {/* Specialist rows — always visible */}
-      <div className={styles.deaconSpecialists}>
-        {specialists.map((spec) => (
-          <div key={spec.specialistName} className={styles.deaconSpecRow}>
-            <span
-              className={styles.deaconSpecDot}
-              style={{ background: specialistStatusColor(spec) }}
-            />
-            <span className={styles.deaconSpecName}>
-              {formatSpecialistName(spec.specialistName)}
-            </span>
-            {spec.consecutiveFailures > 0 && (
-              <span className={styles.deaconSpecFailures}>
-                {spec.consecutiveFailures}x
-              </span>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Expanded: actions + logs toggle */}
+      {/* Expanded: last error + logs toggle */}
       {expanded && (
         <>
-          {/* Recent actions */}
-          {hasActions && (
+          {lastRunError && (
             <div className={styles.deaconActions}>
-              {actions.map((action, i) => (
-                <div key={i} className={styles.deaconAction}>
-                  {action}
-                </div>
-              ))}
+              <div className={styles.deaconAction}>Last patrol failed: {lastRunError}</div>
             </div>
           )}
 

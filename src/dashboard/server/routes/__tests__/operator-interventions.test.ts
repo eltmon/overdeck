@@ -138,6 +138,10 @@ vi.mock('../../../../lib/tmux.js', async (importOriginal) => {
 });
 
 vi.mock('../../../../lib/lifecycle/index.js', () => ({
+  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listPaneValuesSync: () => [],
   resetToTodo: lifecycleMocks.resetToTodo,
   cancelIssueWorkflow: vi.fn(),
   closeOut: vi.fn(),
@@ -170,13 +174,6 @@ vi.mock('../../services/agent-projection.js', () => ({
   saveAgentStateAndEmitEventProgram: vi.fn(() => Effect.void),
 }));
 
-vi.mock('../../review-status.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../review-status.js')>();
-  return {
-    ...actual,
-    clearReviewStatus: vi.fn(),
-  };
-});
 
 vi.mock('../../../../lib/cloister/merge-agent.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/cloister/merge-agent.js')>();

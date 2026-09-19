@@ -52,7 +52,7 @@ describe('emitDirtyWorkspaceRefusalActivity', () => {
 
   it('emits a warn-level dashboard activity event with issueId and truncated porcelain', () => {
     emitDirtyWorkspaceRefusalActivity('MIN-857', [
-      'M .pan/records/min-857.json',
+      'M .pan/continue.json',
       '?? api/',
       '?? docs/',
       '?? fe/',
@@ -71,7 +71,7 @@ describe('emitDirtyWorkspaceRefusalActivity', () => {
     const details = JSON.parse(call.details);
     expect(details.reason).toContain('uncommitted changes');
     expect(details.porcelain).toEqual([
-      'M .pan/records/min-857.json',
+      'M .pan/continue.json',
       '?? api/',
       '?? docs/',
       '?? fe/',

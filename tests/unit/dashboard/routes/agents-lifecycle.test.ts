@@ -1,21 +1,24 @@
 /**
  * PAN-3849 (W33): POST /api/agents/:id/lifecycle.
  *
- * The route authenticates with the agent's pty-token and applies the event
- * through the one-transaction projection: an `exited` event writes
- * state.json `stopped` and the agents row agrees — the agent's own supervisor
+ * The route authenticates with the agent's pty-token and appends the
+ * supervisor's own observation as an event — the agent's own supervisor
  * reports its exit, no patrol inference (FR-21).
+ *
+ * PAN-3917 (W6): the projection writes no status anywhere. An `exited` event
+ * appends `agent.stopped`; whether the session is alive is the terminal
+ * backend's answer, read live, so there is no mirror row and no state.json
+ * status for this route to keep in step.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { writePtyTokenSync } from '../../../../src/lib/pty-token.js';
-import { saveOverdeckAgentStateSync } from '../../../../src/lib/overdeck/agent-state-sync.js';
-import { getOverdeckAgentStateSync } from '../../../helpers/overdeck-test-db.js';
+import { saveOverdeckAgentStateSync } from '../../../helpers/overdeck-test-db.js';
 import {
   setupOverdeckTestDb,
   teardownOverdeckTestDb,
@@ -28,8 +31,16 @@ vi.mock('../../../../src/lib/persistent-logger.js', () => ({
   logAgentLifecycleSync: vi.fn(),
 }));
 
+// PAN-3917: whether a late session-started may resurrect the agent is the
+// TERMINAL BACKEND's answer — the pane's own state — not a stored status.
+const backendPanes: Array<{ id: string; terminalId: string; state: string }> = [];
+vi.mock('../../../../src/dashboard/server/services/backend-inventory.js', () => ({
+  getBackendPanes: async () => backendPanes,
+}));
+
 import { postAgentLifecycleRoute } from '../../../../src/dashboard/server/routes/agents/lifecycle.js';
-import { initEventStore } from '../../../../src/dashboard/server/event-store.js';
+import { _resetAgentLifecycleDedupeForTests } from '../../../../src/dashboard/server/services/agent-projection.js';
+import { getEventStore, initEventStore } from '../../../../src/dashboard/server/event-store.js';
 
 const AGENT = 'agent-pan-3849';
 const TOKEN = 'route-test-token';
@@ -71,17 +82,37 @@ async function postLifecycle(body: Record<string, unknown>, token?: string) {
   return { status: response.status, body: JSON.parse(text) as Record<string, unknown> };
 }
 
-beforeEach(async () => {
+// The event store is a process singleton holding prepared statements against
+// the home it opened, so the home is set up once for the file rather than per
+// case — tearing it down between cases finalizes those statements.
+beforeAll(async () => {
   odb = setupOverdeckTestDb();
-  // The projection emits through the shared event store; initialize it once
-  // per process against the current home (emit-only for these tests).
   await initEventStore();
 }, 20_000);
 
-afterEach(() => {
+afterAll(() => {
   teardownOverdeckTestDb(odb);
+});
+
+beforeEach(() => {
+  _resetAgentLifecycleDedupeForTests();
+  rmSync(join(odb.home, 'agents', AGENT), { recursive: true, force: true });
+});
+
+afterEach(() => {
+  backendPanes.length = 0;
   vi.clearAllMocks();
 });
+
+/** The types appended since this call, so a case can assert what it emitted. */
+function eventsSince(sequence: number): string[] {
+  return getEventStore().readFrom(sequence).map((stored) => stored.type);
+}
+
+function currentSequence(): number {
+  const all = getEventStore().readFrom(0);
+  return all.length === 0 ? 0 : all[all.length - 1]!.sequence;
+}
 
 describe('POST /api/agents/:id/lifecycle (PAN-3849 W33)', () => {
   it('rejects an unauthenticated event with 401', async () => {
@@ -93,31 +124,18 @@ describe('POST /api/agents/:id/lifecycle (PAN-3849 W33)', () => {
 
     const noHeader = await postLifecycle({ event: 'exited', at: '2026-09-17T12:00:00.000Z' });
     expect(noHeader.status).toBe(401);
-
-    // State untouched.
-    expect(getOverdeckAgentStateSync(AGENT)?.status).toBe('running');
   });
 
-  it('exited → state.json status is stopped and the agents row agrees', async () => {
+  it('exited → the supervisor\'s exit is appended as agent.stopped', async () => {
     seedAgent();
     writePtyTokenSync(AGENT);
     const token = readFileSync(join(odb.home, 'agents', AGENT, 'pty-token'), 'utf8').trim();
+    const before = currentSequence();
 
     const res = await postLifecycle({ event: 'exited', at: '2026-09-17T12:00:00.000Z', exitCode: 0 }, token);
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ success: true, applied: true, status: 'stopped' });
-
-    // The agents row agrees.
-    const row = getOverdeckAgentStateSync(AGENT);
-    expect(row?.status).toBe('stopped');
-    expect(row?.stoppedAt).toBe('2026-09-17T12:00:00.000Z');
-
-    // state.json agrees (the rollback source the write door owns).
-    const stateJson = JSON.parse(
-      readFileSync(join(odb.home, 'agents', AGENT, 'state.json'), 'utf8'),
-    ) as { status: string; stoppedAt?: string };
-    expect(stateJson.status).toBe('stopped');
-    expect(stateJson.stoppedAt).toBe('2026-09-17T12:00:00.000Z');
+    expect(eventsSince(before)).toContain('agent.stopped');
   });
 
   it('session-started → running, emitted as agent.started only when the process exists', async () => {
@@ -125,20 +143,23 @@ describe('POST /api/agents/:id/lifecycle (PAN-3849 W33)', () => {
     writePtyTokenSync(AGENT);
     const token = readFileSync(join(odb.home, 'agents', AGENT, 'pty-token'), 'utf8').trim();
 
+    const before = currentSequence();
     const res = await postLifecycle({ event: 'session-started', at: '2026-09-17T12:05:00.000Z' }, token);
     expect(res.status).toBe(200);
-    expect(getOverdeckAgentStateSync(AGENT)?.status).toBe('running');
-    expect(getOverdeckAgentStateSync(AGENT)?.lastActivity).toBe('2026-09-17T12:05:00.000Z');
+    expect(res.body).toMatchObject({ success: true, applied: true, status: 'running' });
+    expect(eventsSince(before)).toContain('agent.started');
   });
 
-  it('a late session-started after exited does not resurrect the agent', async () => {
+  it('a late session-started after the backend reports the pane exited does not resurrect the agent', async () => {
     seedAgent({ status: 'stopped', stoppedAt: '2026-09-17T11:00:00.000Z' });
+    backendPanes.push({ id: AGENT, terminalId: AGENT, state: 'exited' });
     writePtyTokenSync(AGENT);
     const token = readFileSync(join(odb.home, 'agents', AGENT, 'pty-token'), 'utf8').trim();
 
+    const before = currentSequence();
     const res = await postLifecycle({ event: 'session-started', at: '2026-09-17T12:05:00.000Z' }, token);
     expect(res.status).toBe(409);
-    expect(getOverdeckAgentStateSync(AGENT)?.status).toBe('stopped');
+    expect(eventsSince(before)).not.toContain('agent.started');
   });
 
   it('rejects an unknown event name with 400', async () => {

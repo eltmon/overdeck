@@ -15,67 +15,12 @@ const mocks = vi.hoisted(() => ({
   messageAgent: vi.fn(),
   postMergeLifecycle: vi.fn(),
   rebaseFeatureBranch: vi.fn(),
-  reviewStatus: {} as Record<string, unknown>,
   sessionExists: vi.fn(),
   setMergeRun: vi.fn(),
 }));
 
 // PAN-3917: config-yaml's defaults import lib/agents/tier-table, which still
 // reaches the record plane W3 is deleting. Stub the one constant it needs.
-// The record plane itself: W3 deletes `pan-dir/record*` and `pan-dir/auto-commit`,
-// and `auto-commit` already imports the removed `state-read-home`, so the module
-// graph cannot load at all. Stubbing the deleted modules cuts every chain that
-// still reaches them (workspaces/resolver → overdeck/infra, agents →
-// agent-record-sync, git-activity → overdeck/git-activity) at their real end.
-vi.mock('../../../../../lib/pan-dir/record.js', () => ({
-  appendSessionEntrySync: vi.fn(),
-  getIssueRecordPath: vi.fn(),
-  getIssueRecordPathForWorkspace: vi.fn(),
-  getIssueWorkspacePath: vi.fn(() => null),
-  getProjectConfigFromWorkspacePath: vi.fn(() => null),
-  markRecordPipelineClosedOutSync: vi.fn(),
-  markRecordPipelineResidueClosedOutSync: vi.fn(),
-  readIssueRecord: vi.fn(),
-  readIssueRecordForWorkspaceSync: vi.fn(() => null),
-  readIssueRecordSync: vi.fn(() => null),
-  readRecordContinueViewSync: vi.fn(() => null),
-  resolveProjectForIssue: vi.fn(() => null),
-  writeAgentHarnessModelSync: vi.fn(),
-  writeCloseOutDodGate: vi.fn(),
-  writeIssueRecordSync: vi.fn(),
-  writeRecordDecisionsSync: vi.fn(),
-  writeRecordScopeDriftSync: vi.fn(),
-}));
-vi.mock('../../../../../lib/pan-dir/record-update.js', () => ({
-  clearRecordPipelineClosedOut: vi.fn(),
-  clearRecordPipelineClosedOutSync: vi.fn(),
-  updateIssueRecord: vi.fn(),
-  updateIssueRecordForWorkspace: vi.fn(),
-}));
-vi.mock('../../../../../lib/pan-dir/auto-commit.js', () => ({
-  flushAllPendingAutoCommits: vi.fn(),
-  flushAutoCommits: vi.fn(),
-  pushPendingStateCommits: vi.fn(),
-  queueAutoCommit: vi.fn(),
-  reconcileStatePlaneDrift: vi.fn(),
-}));
-vi.mock('../../../../../lib/pan-dir/records.js', () => ({
-  markRecordPipelineClosedOutSync: vi.fn(),
-  resolveContinuePath: vi.fn(() => null),
-  updateIssueRecordForIssue: vi.fn(),
-}));
-vi.mock('../../../../../lib/memory/state-mirror.js', () => ({
-  mirrorPin: vi.fn(),
-  unmirrorPin: vi.fn(),
-}));
-vi.mock('../../../../../lib/pan-dir/agents.js', () => ({
-  appendAgentPlaneLifecycle: vi.fn(),
-  appendAgentPlaneSession: vi.fn(),
-  backfillAgentPlaneRecord: vi.fn(),
-  flushAgentPlaneWrites: vi.fn(),
-  readAgentPlaneRecordSync: vi.fn(() => null),
-  recordAgentPlaneSpawn: vi.fn(),
-}));
 vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperationsSync: vi.fn(() => []) }));
 vi.mock('../../../../../lib/agents/tier-table.js', () => ({
   DEFAULT_TIERED_EXECUTION_CONFIG: { enabled: false, tiers: [], subscription: 'all' },
@@ -162,7 +107,11 @@ vi.mock('../../../services/derived-issue-state.js', () => ({
     pr: { url: PR_URL, number: 3102, reviewState: 'approved', checks: 'green', mergeable: true },
   })),
 }));
-vi.mock('../../../../../lib/tmux.js', () => ({ sessionExists: mocks.sessionExists }));
+vi.mock('../../../../../lib/tmux.js', () => ({  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listPaneValuesSync: () => [],
+ sessionExists: mocks.sessionExists }));
 vi.mock('../../../../../lib/forge.js', () => ({
   getForgeAdapter: vi.fn(() => ({ commentOnArtifact: vi.fn(), mergeReviewArtifact: mocks.mergeReviewArtifact })),
 }));
@@ -197,7 +146,6 @@ describe('triggerMerge server rebase escalation', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
-    mocks.reviewStatus = {};
     mocks.existsSync.mockReturnValue(true);
     mocks.getPullRequestState.mockReturnValue(Effect.succeed(pullRequestState()));
     mocks.rebaseFeatureBranch.mockReturnValue(Effect.succeed({ success: true, newHead: HEAD_SHA }));
@@ -241,7 +189,7 @@ describe('triggerMerge server rebase escalation', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
       const result = await triggerMerge('PAN-3110');
-      expect(result).toEqual(expect.objectContaining({ success: true, mergeStatus: 'merged' }));
+      expect(result).toEqual(expect.objectContaining({ success: true, outcome: 'merged' }));
       expect(mocks.rebaseFeatureBranch).toHaveBeenCalledWith('/workspace/feature-pan-3110', 'feature/pan-3110', 'main', 'PAN-3110');
       expect(mocks.messageAgent).not.toHaveBeenCalled();
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Could not determine whether feature/pan-3110 contains origin/main'));

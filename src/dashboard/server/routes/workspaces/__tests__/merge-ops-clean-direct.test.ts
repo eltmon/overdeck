@@ -20,65 +20,6 @@ const mocks = vi.hoisted(() => ({
   mergeRun: null as { phase: string } | null,
 }));
 
-// PAN-3917: several survivors still transitively import the record plane W3 is
-// deleting (config-yaml → tier-table; git-activity → overdeck/infra;
-// agents → agent-record-sync). `pan-dir/auto-commit` is the module whose own
-// import of the removed `state-read-home` breaks the load, so stubbing it cuts
-// every one of those chains at the single point that is actually gone.
-// The record plane itself: W3 deletes `pan-dir/record*` and `pan-dir/auto-commit`,
-// and `auto-commit` already imports the removed `state-read-home`, so the module
-// graph cannot load at all. Stubbing the deleted modules cuts every chain that
-// still reaches them (workspaces/resolver → overdeck/infra, agents →
-// agent-record-sync, git-activity → overdeck/git-activity) at their real end.
-vi.mock('../../../../../lib/pan-dir/record.js', () => ({
-  appendSessionEntrySync: vi.fn(),
-  getIssueRecordPath: vi.fn(),
-  getIssueRecordPathForWorkspace: vi.fn(),
-  getIssueWorkspacePath: vi.fn(() => null),
-  getProjectConfigFromWorkspacePath: vi.fn(() => null),
-  markRecordPipelineClosedOutSync: vi.fn(),
-  markRecordPipelineResidueClosedOutSync: vi.fn(),
-  readIssueRecord: vi.fn(),
-  readIssueRecordForWorkspaceSync: vi.fn(() => null),
-  readIssueRecordSync: vi.fn(() => null),
-  readRecordContinueViewSync: vi.fn(() => null),
-  resolveProjectForIssue: vi.fn(() => null),
-  writeAgentHarnessModelSync: vi.fn(),
-  writeCloseOutDodGate: vi.fn(),
-  writeIssueRecordSync: vi.fn(),
-  writeRecordDecisionsSync: vi.fn(),
-  writeRecordScopeDriftSync: vi.fn(),
-}));
-vi.mock('../../../../../lib/pan-dir/record-update.js', () => ({
-  clearRecordPipelineClosedOut: vi.fn(),
-  clearRecordPipelineClosedOutSync: vi.fn(),
-  updateIssueRecord: vi.fn(),
-  updateIssueRecordForWorkspace: vi.fn(),
-}));
-vi.mock('../../../../../lib/pan-dir/auto-commit.js', () => ({
-  flushAllPendingAutoCommits: vi.fn(),
-  flushAutoCommits: vi.fn(),
-  pushPendingStateCommits: vi.fn(),
-  queueAutoCommit: vi.fn(),
-  reconcileStatePlaneDrift: vi.fn(),
-}));
-vi.mock('../../../../../lib/pan-dir/records.js', () => ({
-  markRecordPipelineClosedOutSync: vi.fn(),
-  resolveContinuePath: vi.fn(() => null),
-  updateIssueRecordForIssue: vi.fn(),
-}));
-vi.mock('../../../../../lib/memory/state-mirror.js', () => ({
-  mirrorPin: vi.fn(),
-  unmirrorPin: vi.fn(),
-}));
-vi.mock('../../../../../lib/pan-dir/agents.js', () => ({
-  appendAgentPlaneLifecycle: vi.fn(),
-  appendAgentPlaneSession: vi.fn(),
-  backfillAgentPlaneRecord: vi.fn(),
-  flushAgentPlaneWrites: vi.fn(),
-  readAgentPlaneRecordSync: vi.fn(() => null),
-  recordAgentPlaneSpawn: vi.fn(),
-}));
 vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperationsSync: vi.fn(() => []) }));
 vi.mock('../../../../../lib/agents.js', () => ({
   getAgentState: vi.fn(),
@@ -172,6 +113,10 @@ vi.mock('../../../services/derived-issue-state.js', () => ({
 }));
 
 vi.mock('../../../../../lib/tmux.js', () => ({
+  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listPaneValuesSync: () => [],
   sessionExists: vi.fn(() => Effect.succeed(false)),
 }));
 
@@ -263,7 +208,7 @@ describe('triggerMerge clean PR direct merge', () => {
   it('merges a clean PR without a work agent or rebase probe', async () => {
     const result = await triggerMerge('PAN-3110');
 
-    expect(result).toEqual(expect.objectContaining({ success: true, mergeStatus: 'merged' }));
+    expect(result).toEqual(expect.objectContaining({ success: true, outcome: 'merged' }));
     expect(mocks.ensureAgentReadyForMerge).not.toHaveBeenCalled();
     expect(mocks.execFile).not.toHaveBeenCalledWith(
       'git',

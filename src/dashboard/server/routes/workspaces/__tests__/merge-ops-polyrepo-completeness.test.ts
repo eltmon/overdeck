@@ -14,60 +14,6 @@ const mocks = vi.hoisted(() => ({
 
 // PAN-3917: config-yaml's defaults import lib/agents/tier-table, which still
 // reaches the record plane W3 is deleting. Stub the one constant it needs.
-// The record plane itself: W3 deletes `pan-dir/record*` and `pan-dir/auto-commit`,
-// and `auto-commit` already imports the removed `state-read-home`, so the module
-// graph cannot load at all. Stubbing the deleted modules cuts every chain that
-// still reaches them (workspaces/resolver → overdeck/infra, agents →
-// agent-record-sync, git-activity → overdeck/git-activity) at their real end.
-vi.mock('../../../../../lib/pan-dir/record.js', () => ({
-  appendSessionEntrySync: vi.fn(),
-  getIssueRecordPath: vi.fn(),
-  getIssueRecordPathForWorkspace: vi.fn(),
-  getIssueWorkspacePath: vi.fn(() => null),
-  getProjectConfigFromWorkspacePath: vi.fn(() => null),
-  markRecordPipelineClosedOutSync: vi.fn(),
-  markRecordPipelineResidueClosedOutSync: vi.fn(),
-  readIssueRecord: vi.fn(),
-  readIssueRecordForWorkspaceSync: vi.fn(() => null),
-  readIssueRecordSync: vi.fn(() => null),
-  readRecordContinueViewSync: vi.fn(() => null),
-  resolveProjectForIssue: vi.fn(() => null),
-  writeAgentHarnessModelSync: vi.fn(),
-  writeCloseOutDodGate: vi.fn(),
-  writeIssueRecordSync: vi.fn(),
-  writeRecordDecisionsSync: vi.fn(),
-  writeRecordScopeDriftSync: vi.fn(),
-}));
-vi.mock('../../../../../lib/pan-dir/record-update.js', () => ({
-  clearRecordPipelineClosedOut: vi.fn(),
-  clearRecordPipelineClosedOutSync: vi.fn(),
-  updateIssueRecord: vi.fn(),
-  updateIssueRecordForWorkspace: vi.fn(),
-}));
-vi.mock('../../../../../lib/pan-dir/auto-commit.js', () => ({
-  flushAllPendingAutoCommits: vi.fn(),
-  flushAutoCommits: vi.fn(),
-  pushPendingStateCommits: vi.fn(),
-  queueAutoCommit: vi.fn(),
-  reconcileStatePlaneDrift: vi.fn(),
-}));
-vi.mock('../../../../../lib/pan-dir/records.js', () => ({
-  markRecordPipelineClosedOutSync: vi.fn(),
-  resolveContinuePath: vi.fn(() => null),
-  updateIssueRecordForIssue: vi.fn(),
-}));
-vi.mock('../../../../../lib/memory/state-mirror.js', () => ({
-  mirrorPin: vi.fn(),
-  unmirrorPin: vi.fn(),
-}));
-vi.mock('../../../../../lib/pan-dir/agents.js', () => ({
-  appendAgentPlaneLifecycle: vi.fn(),
-  appendAgentPlaneSession: vi.fn(),
-  backfillAgentPlaneRecord: vi.fn(),
-  flushAgentPlaneWrites: vi.fn(),
-  readAgentPlaneRecordSync: vi.fn(() => null),
-  recordAgentPlaneSpawn: vi.fn(),
-}));
 // lib/agents pulls agents/spawn, which imports the removed `state-home`.
 vi.mock('../../../../../lib/agents.js', () => ({
   getAgentState: vi.fn(),
@@ -139,6 +85,10 @@ vi.mock('../../../services/derived-issue-state.js', () => ({
 }));
 
 vi.mock('../../../../../lib/tmux.js', () => ({
+  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listPaneValuesSync: () => [],
   sessionExists: vi.fn(),
 }));
 
@@ -246,11 +196,11 @@ function repo(repoKey: string, patch: Record<string, unknown> = {}) {
     targetBranch: 'main',
     artifactUrl: undefined,
     artifactId: undefined,
-    reviewStatus: 'passed',
-    testStatus: 'passed',
+    repoReview: 'passed',
+    repoTests: 'passed',
     rebaseStatus: 'passed',
-    verificationStatus: 'passed',
-    mergeStatus: 'pending',
+    repoVerification: 'passed',
+    repoMerge: 'pending',
     mergeOrder: repoKey === 'repo-a' ? 0 : 1,
     required: true,
     ...patch,
@@ -315,7 +265,7 @@ describe('coordinated polyrepo merge completeness gate', () => {
 
   it('completes when the remaining required repo has no changes', async () => {
     mocks.mergeSet = mergeSet([
-      repo('repo-a', { mergeStatus: 'skipped' }),
+      repo('repo-a', { repoMerge: 'skipped' }),
       repo('repo-b'),
     ]);
     mocks.exec.mockImplementation(async (command) => ({
@@ -328,7 +278,7 @@ describe('coordinated polyrepo merge completeness gate', () => {
     expect(result).toEqual(expect.objectContaining({
       success: true,
       statusCode: 200,
-      mergeStatus: 'merged',
+      outcome: 'merged',
     }));
     expect(mocks.mergeSet.status).toBe('merged');
     expect(mocks.postMergeLifecycle).toHaveBeenCalledTimes(1);
@@ -338,11 +288,11 @@ describe('coordinated polyrepo merge completeness gate', () => {
     mocks.mergeSet = mergeSet([
       repo('repo-a', {
         artifactUrl: 'https://github.com/org/repo-a/pull/1',
-        mergeStatus: 'failed',
+        repoMerge: 'failed',
       }),
       repo('repo-b', {
         artifactUrl: 'https://github.com/org/repo-b/pull/2',
-        mergeStatus: 'pending',
+        repoMerge: 'pending',
       }),
     ]);
     mocks.findMergedArtifact.mockImplementation(async ({ cwd }: { cwd: string }) => ({
@@ -360,12 +310,12 @@ describe('coordinated polyrepo merge completeness gate', () => {
       success: true,
       statusCode: 200,
       message: 'No changed repos remain for PAN-2467',
-      mergeStatus: 'merged',
+      outcome: 'merged',
       repos: [],
     }));
     expect(mocks.mergeSet.repos).toEqual([
-      expect.objectContaining({ repoKey: 'repo-a', mergeStatus: 'merged' }),
-      expect.objectContaining({ repoKey: 'repo-b', mergeStatus: 'merged' }),
+      expect.objectContaining({ repoKey: 'repo-a', repoMerge: 'merged' }),
+      expect.objectContaining({ repoKey: 'repo-b', repoMerge: 'merged' }),
     ]);
     expect(mocks.mergeReviewArtifact).not.toHaveBeenCalled();
     expect(mocks.postMergeLifecycle).toHaveBeenCalledTimes(1);
@@ -375,11 +325,11 @@ describe('coordinated polyrepo merge completeness gate', () => {
     mocks.mergeSet = mergeSet([
       repo('repo-a', {
         artifactUrl: 'https://github.com/org/repo-a/pull/1',
-        mergeStatus: 'failed',
+        repoMerge: 'failed',
       }),
       repo('repo-b', {
         artifactUrl: 'https://github.com/org/repo-b/pull/2',
-        mergeStatus: 'pending',
+        repoMerge: 'pending',
       }),
     ]);
     mocks.findMergedArtifact.mockImplementation(async ({ cwd }: { cwd: string }) => (
@@ -397,7 +347,7 @@ describe('coordinated polyrepo merge completeness gate', () => {
 
     expect(result).toEqual(expect.objectContaining({
       success: true,
-      mergeStatus: 'merged',
+      outcome: 'merged',
       repos: [{ repo: 'repo-b', success: true, message: 'Merged via github' }],
     }));
     expect(mocks.mergeReviewArtifact).toHaveBeenCalledTimes(1);
@@ -408,8 +358,8 @@ describe('coordinated polyrepo merge completeness gate', () => {
       url: 'https://github.com/org/repo-a/pull/1',
     }));
     expect(mocks.mergeSet.repos).toEqual([
-      expect.objectContaining({ repoKey: 'repo-a', verificationStatus: 'passed', mergeStatus: 'merged' }),
-      expect.objectContaining({ repoKey: 'repo-b', verificationStatus: 'skipped', mergeStatus: 'merged' }),
+      expect.objectContaining({ repoKey: 'repo-a', repoVerification: 'passed', repoMerge: 'merged' }),
+      expect.objectContaining({ repoKey: 'repo-b', repoVerification: 'skipped', repoMerge: 'merged' }),
     ]);
   });
 });

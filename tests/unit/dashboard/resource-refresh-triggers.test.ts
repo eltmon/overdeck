@@ -63,11 +63,14 @@ describe('createResourceRefreshTriggers', () => {
     expect(deps.issueForAgent).not.toHaveBeenCalled();
   });
 
-  it('uses persisted agent ownership when an event has no issue id', () => {
+  it('uses agent ownership when an event has no issue id', async () => {
     const { deps, emit } = makeDeps();
     createResourceRefreshTriggers(deps);
 
     emit({ type: 'agent.stopped', payload: { agentId: 'agent-pan-42' } });
+    // PAN-3917: the agent → issue lookup is asynchronous now, so the handler
+    // settles on a later turn than the emit.
+    await new Promise<void>((resolve) => setImmediate(resolve));
 
     expect(deps.issueForAgent).toHaveBeenCalledWith('agent-pan-42');
     expect(deps.enqueueProjects).toHaveBeenCalledExactlyOnceWith([panProject], 'agent.stopped');

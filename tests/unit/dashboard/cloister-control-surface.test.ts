@@ -92,8 +92,8 @@ describe('cloister control surface (PAN-3917 W4: shrunk to deacon-lite\'s surfac
 
     expect(status.running).toBe(true);
     expect(status.lastCheck?.toISOString()).toBe('2026-07-03T00:00:00.000Z');
-    expect(status.patrol.loopRunning).toBe(true);
-    expect(status.patrol.patrolIntervalMs).toBe(60_000);
+    expect(status.patrol.running).toBe(true);
+    expect(status.patrol.intervalMs).toBe(60_000);
     expect(areDurableSpawnsPaused()).toBe(true);
     expect(mocks.readCloisterStateFile).toHaveBeenCalled();
     expect(mocks.getDeaconLiteStatus).toHaveBeenCalled();

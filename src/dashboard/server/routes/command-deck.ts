@@ -448,7 +448,7 @@ export async function fetchActivityDataWithContext(
     new Date(pane?.stateSince ?? Date.now()).toISOString();
 
   // Review row: the review pane plus the four convoy reviewer nodes. The verdict
-  // is the PR's own review state (FR-7), not a stored reviewStatus.
+  // is the PR's own review state (FR-7), not a stored review status.
   const reviewPane = firstPaneWithRole('review');
   const reviewVerdict: 'completed' | 'failed' | undefined =
     derivedState.pr?.reviewState === 'approved' ? 'completed'
@@ -505,6 +505,11 @@ export async function fetchActivityDataWithContext(
     ['uat', 'ship', `agent-${issueLower}-ship`],
   ] as const) {
     const pane = firstPaneWithRole(role);
+    // PAN-3020: a ship row is a real ship agent — live, or one that ran and
+    // left state behind. Without that check the synthetic `agent-<issue>-ship`
+    // id is probed for a transcript on every read and API-driven merges grow a
+    // phantom conversation row.
+    if (nodeType === 'ship' && !pane && !getAgentStateSync(sessionId)) continue;
     const jsonlPath = await resolveJsonlPath(sessionId, workspacePath);
     if (!pane && !jsonlPath) continue;
     const { status, presence } = nodeStatusFor(pane);
@@ -702,7 +707,7 @@ async function fetchPlanningData(
 
   if (!result.prd) {
     // findPrdAnywhereSync covers legacy docs/prds roots and canonical
-    // drafts/<issue>.md on overdeck-state, which the status-only loop missed,
+    // drafts/<issue>.md on the state branch, which the status-only loop missed,
     // so promoted PRDs were invisible here.
     const prdLocation = findPrdAnywhereSync(projectPath, issueId);
     const content = prdLocation ? await readPrdContent(prdLocation) : null;

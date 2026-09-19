@@ -5,40 +5,30 @@ import { DeaconPauseToggle } from './DeaconPauseToggle';
 
 /**
  * Deacon activity view (conv 2441 follow-up). A dedicated, roomy view of what
- * the Deacon — the Cloister lifecycle watchdog — is doing: patrol cadence,
- * specialist health, and a live feed of every patrol action grouped by cycle.
+ * the Deacon — the Cloister lifecycle watchdog — is doing.
  *
- * Reuses the existing deacon API surface (no backend change):
- *   - GET  /api/deacon/status  — running state, config, specialists, last patrol
- *   - GET  /api/deacon/logs    — in-memory ring buffer of patrol actions
+ * PAN-3917 (W4): deacon-lite keeps no patrol ledger and no specialist health
+ * table — no cycle counter, no per-specialist failure tallies, no mass-death
+ * brake. Its whole status is in-memory: whether the loop is running, when it
+ * last ran, and the error from that run if there was one.
+ *
+ *   - GET  /api/deacon/status  — child process state plus deacon-lite's own
+ *   - GET  /api/deacon/logs    — always empty; there is no ring buffer left
  *   - POST /api/deacon/patrol  — trigger a patrol cycle on demand
  * The compact CommandDeck `DeaconStatus` widget shows a peek of the same data;
  * this is the full page.
  */
 
-interface SpecialistHealthState {
-  specialistName: string;
-  lastPingTime?: string;
-  lastResponseTime?: string;
-  consecutiveFailures: number;
-  lastForceKillTime?: string;
-  forceKillCount: number;
-}
-
 interface DeaconStatusData {
   isRunning: boolean;
-  config: { patrolIntervalMs: number };
-  state: {
-    specialists: Record<string, SpecialistHealthState>;
-    lastPatrol?: string;
-    patrolCycle: number;
+  pid: number | null;
+  startedAt: string | null;
+  deaconLite: {
+    running: boolean;
+    intervalMs: number;
+    lastRunAt: string | null;
+    lastRunError: string | null;
   };
-  lastPatrol?: {
-    cycle: number;
-    timestamp: string;
-    actions: string[];
-    massDeathDetected: boolean;
-  } | null;
 }
 
 interface DeaconLogEntry {
@@ -88,16 +78,6 @@ const LEVEL_STYLES: Record<DeaconLogEntry['level'], { label: string; cls: string
   error: { label: 'ERR', cls: 'text-destructive bg-destructive/10' },
 };
 
-function specialistDotColor(health: SpecialistHealthState): string {
-  if (health.consecutiveFailures >= 3) return 'bg-destructive';
-  if (health.consecutiveFailures > 0) return 'bg-amber-500';
-  if (health.lastForceKillTime) {
-    const killAge = Date.now() - new Date(health.lastForceKillTime).getTime();
-    if (killAge < 5 * 60 * 1000) return 'bg-amber-500';
-  }
-  return 'bg-emerald-500';
-}
-
 interface CycleGroup {
   cycle: number | undefined;
   entries: DeaconLogEntry[];
@@ -144,18 +124,13 @@ export function DeaconActivityView() {
     },
   });
 
-  const specialists = useMemo(
-    () => Object.values(status?.state.specialists || {}),
-    [status],
-  );
-
   // Newest first for the feed.
   const groups = useMemo(
     () => groupByCycle([...(logData?.logs || [])].reverse()),
     [logData],
   );
 
-  const intervalSec = status ? Math.round(status.config.patrolIntervalMs / 1000) : null;
+  const intervalSec = status ? Math.round(status.deaconLite.intervalMs / 1000) : null;
 
   return (
     <div className="w-full h-full overflow-y-auto bg-background text-foreground">
@@ -187,46 +162,17 @@ export function DeaconActivityView() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
           <Stat label="Status" value={status ? (status.isRunning ? 'Running' : 'Stopped') : '—'}
             valueClass={status?.isRunning ? 'text-emerald-500' : 'text-muted-foreground'} />
-          <Stat label="Patrol cycle" value={status ? `#${status.state.patrolCycle}` : '—'} />
-          <Stat label="Last patrol" value={timeAgo(status?.state.lastPatrol)} />
+          <Stat label="Loop" value={status ? (status.deaconLite.running ? 'Patrolling' : 'Idle') : '—'} />
+          <Stat label="Last patrol" value={timeAgo(status?.deaconLite.lastRunAt ?? undefined)} />
           <Stat label="Interval" value={intervalSec != null ? `${intervalSec}s` : '—'} />
         </div>
 
-        {status?.lastPatrol?.massDeathDetected && (
+        {status?.deaconLite.lastRunError && (
           <div className="flex items-center gap-2 mb-6 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             <AlertTriangle className="w-4 h-4 shrink-0" />
-            Mass-death detected on the last patrol — auto-resume was held back as a safety brake.
+            Last patrol failed: {status.deaconLite.lastRunError}
           </div>
         )}
-
-        {/* Specialists */}
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-          Specialist health
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-6">
-          {specialists.length === 0 ? (
-            <div className="col-span-full text-xs text-muted-foreground">No specialists tracked yet.</div>
-          ) : (
-            specialists.map((spec) => (
-              <div key={spec.specialistName} className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
-                <span className={`w-2 h-2 rounded-full shrink-0 ${specialistDotColor(spec)}`} />
-                <span className="text-xs text-foreground truncate flex-1">
-                  {spec.specialistName.replace('-agent', '')}
-                </span>
-                {spec.consecutiveFailures > 0 && (
-                  <span className="text-[10px] text-amber-500" title="consecutive failures">
-                    {spec.consecutiveFailures}×
-                  </span>
-                )}
-                {spec.forceKillCount > 0 && (
-                  <span className="text-[10px] text-muted-foreground" title="force-kills">
-                    ⊘{spec.forceKillCount}
-                  </span>
-                )}
-              </div>
-            ))
-          )}
-        </div>
 
         {/* Activity feed */}
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">

@@ -392,19 +392,25 @@ async function collectSessionTreeNodes(
     panes: treePanes,
   }));
 
-  if (shipLog) {
+  // PAN-3020: a ship row is a real ship agent — live, or one that ran and left
+  // state behind. Probing the synthetic `agent-<issue>-ship` id unconditionally
+  // grows a phantom conversation row for every API-driven merge.
+  {
     const shipSessionName = `agent-${issueLower}-ship`;
     const shipIsLive = context.tmuxSessionNames.has(shipSessionName);
-    const shipJsonlPath = shipIsLive ? await resolveJsonlPath(shipSessionName, workspacePath) : null;
-    const shipRunning = shipIsLive && shipLog.step !== undefined && shipLog.step !== 'merged';
+    const shipState = getAgentStateSync(shipSessionName);
+    const shipJsonlPath = shipIsLive || shipState
+      ? await resolveJsonlPath(shipSessionName, workspacePath)
+      : null;
     if (shipIsLive || shipJsonlPath) {
+      const shipRunning = shipIsLive && shipLog?.step !== undefined && shipLog.step !== 'merged';
       const shipAwaitingInput = awaitingInputFromProjection(shipSessionName, context.agentSnapshotsById);
       const shipSnapshot = context.agentSnapshotsById?.get(shipSessionName);
       sections.push({
         type: 'ship',
         sessionId: shipSessionName,
         model: 'specialist',
-        startedAt: shipLog.startedAt,
+        startedAt: shipLog?.startedAt ?? shipState?.startedAt ?? new Date().toISOString(),
         endedAt: undefined,
         duration: 0,
         status: normalizeAgentStatus(shipRunning ? 'running' : 'completed'),

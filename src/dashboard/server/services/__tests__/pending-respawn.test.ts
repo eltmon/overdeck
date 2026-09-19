@@ -4,6 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Mock tmux.sessionExists — pending-respawn polls it. Each test resets
 // the mock's implementation so cases are independent.
 vi.mock('../../../../lib/tmux.js', () => ({
+  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listPaneValuesSync: () => [],
   sessionExists: vi.fn(),
   sessionExistsSync: vi.fn(),
 }));

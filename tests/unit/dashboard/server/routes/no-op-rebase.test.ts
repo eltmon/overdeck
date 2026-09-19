@@ -12,33 +12,6 @@ const mockExecFile = vi.hoisted(() =>
 // `auto-commit`) is being deleted by W3, and `auto-commit` already imports the
 // removed `state-read-home`, so merge-ops' module graph cannot load. Stub the
 // deleted modules and the boundaries that still reach them.
-vi.mock('../../../../../src/lib/pan-dir/record.js', () => ({
-  appendSessionEntrySync: vi.fn(), getIssueRecordPath: vi.fn(), getIssueRecordPathForWorkspace: vi.fn(),
-  getIssueWorkspacePath: vi.fn(() => null), getProjectConfigFromWorkspacePath: vi.fn(() => null),
-  markRecordPipelineClosedOutSync: vi.fn(), markRecordPipelineResidueClosedOutSync: vi.fn(),
-  readIssueRecord: vi.fn(), readIssueRecordForWorkspaceSync: vi.fn(() => null),
-  readIssueRecordSync: vi.fn(() => null), readRecordContinueViewSync: vi.fn(() => null),
-  resolveProjectForIssue: vi.fn(() => null), writeAgentHarnessModelSync: vi.fn(),
-  writeCloseOutDodGate: vi.fn(), writeIssueRecordSync: vi.fn(),
-  writeRecordDecisionsSync: vi.fn(), writeRecordScopeDriftSync: vi.fn(),
-}));
-vi.mock('../../../../../src/lib/pan-dir/record-update.js', () => ({
-  clearRecordPipelineClosedOut: vi.fn(), clearRecordPipelineClosedOutSync: vi.fn(),
-  updateIssueRecord: vi.fn(), updateIssueRecordForWorkspace: vi.fn(),
-}));
-vi.mock('../../../../../src/lib/pan-dir/auto-commit.js', () => ({
-  flushAllPendingAutoCommits: vi.fn(), flushAutoCommits: vi.fn(), pushPendingStateCommits: vi.fn(),
-  queueAutoCommit: vi.fn(), reconcileStatePlaneDrift: vi.fn(),
-}));
-vi.mock('../../../../../src/lib/pan-dir/records.js', () => ({
-  markRecordPipelineClosedOutSync: vi.fn(), resolveContinuePath: vi.fn(() => null),
-  updateIssueRecordForIssue: vi.fn(),
-}));
-vi.mock('../../../../../src/lib/pan-dir/agents.js', () => ({
-  appendAgentPlaneLifecycle: vi.fn(), appendAgentPlaneSession: vi.fn(), backfillAgentPlaneRecord: vi.fn(),
-  flushAgentPlaneWrites: vi.fn(), readAgentPlaneRecordSync: vi.fn(() => null), recordAgentPlaneSpawn: vi.fn(),
-}));
-vi.mock('../../../../../src/lib/memory/state-mirror.js', () => ({ mirrorPin: vi.fn(), unmirrorPin: vi.fn() }));
 vi.mock('../../../../../src/lib/agents/spawn.js', () => ({
   spawnAgent: vi.fn(), spawnRun: vi.fn(), postAgentsRoute: vi.fn(),
 }));

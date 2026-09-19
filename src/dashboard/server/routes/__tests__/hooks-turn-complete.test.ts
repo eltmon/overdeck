@@ -19,16 +19,7 @@ import {
 
 vi.setConfig({ testTimeout: 15_000 });
 
-const emittedEvents: unknown[] = [];
 const handleTurnCompleteMock = vi.fn().mockResolvedValue(undefined);
-
-vi.mock('../../../../lib/dashboard/server/event-store.js', () => ({
-  getEventStore: () => ({
-    emitOnly: (event: unknown) => {
-      emittedEvents.push(event);
-    },
-  }),
-}));
 
 vi.mock('../../../../lib/overdeck/title-refinement.js', () => ({
   handleTurnComplete: (...args: unknown[]) => handleTurnCompleteMock(...args),
@@ -39,7 +30,6 @@ let testHome: string;
 beforeEach(() => {
   testHome = mkdtempSync(join(tmpdir(), 'pan-hooks-turn-complete-test-'));
   process.env.OVERDECK_HOME = testHome;
-  emittedEvents.length = 0;
   handleTurnCompleteMock.mockClear();
 });
 

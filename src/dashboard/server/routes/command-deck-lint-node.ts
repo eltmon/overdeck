@@ -5,7 +5,7 @@
  * quality-gate table and the failing gate's output.
  *
  * PAN-3917 FR-8: the artifact IS the verification result. Nothing writes a
- * `verificationStatus` any more, so there is no second source to reconcile
+ * stored verification status any more, so there is no second source to reconcile
  * against — no artifact means the gates have not run in this workspace.
  */
 import type { SessionNodePresence } from '@overdeck/contracts';

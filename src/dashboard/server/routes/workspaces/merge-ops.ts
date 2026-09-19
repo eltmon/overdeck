@@ -334,7 +334,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
   const derived = await getDerivedIssueState(issueId);
   const run = getMergeRun(issueId);
   if (request.kind === 'strike') {
-    if (activeStrikeMerge(getCurrentMerge((extractPrefixSync(issueId) ?? issueId.split('-')[0]).toLowerCase()) === issueId.toUpperCase() ? issueId.toUpperCase() : null, getPendingOperation(issueId))) return { success: true, statusCode: 200, message: 'Strike merge already in progress', mergeStatus: 'merging' };
+    if (activeStrikeMerge(getCurrentMerge((extractPrefixSync(issueId) ?? issueId.split('-')[0]).toLowerCase()) === issueId.toUpperCase() ? issueId.toUpperCase() : null, getPendingOperation(issueId))) return { success: true, statusCode: 200, message: 'Strike merge already in progress', outcome: 'merging' };
     const projectPath = getProjectPath(undefined, extractPrefixSync(issueId) ?? issueId.split('-')[0]);
     const strikeError = await validateStrikeMergeRequest(issueId, request, { projectPath, git: gitIn });
     if (strikeError) {
@@ -368,7 +368,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
   const projectKey = issuePrefix.toLowerCase();
   const normalizedId = issueId.toUpperCase();
   const currentlyMerging = getCurrentMerge(projectKey);
-  if (request.kind === 'strike' && currentlyMerging === normalizedId) return { success: true, statusCode: 200, message: 'Strike merge already in progress', mergeStatus: 'merging' };
+  if (request.kind === 'strike' && currentlyMerging === normalizedId) return { success: true, statusCode: 200, message: 'Strike merge already in progress', outcome: 'merging' };
   if (currentlyMerging && currentlyMerging !== normalizedId) {
     // Another merge is in progress — queue this one
     const position = enqueueMerge(projectKey, normalizedId);
@@ -378,7 +378,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       success: true,
       statusCode: 200,
       message: `Queued for merge (position ${position}, waiting for ${currentlyMerging})`,
-      mergeStatus: 'queued',
+      outcome: 'queued',
     };
   }
   // Mark as processing IMMEDIATELY — before any async work — to prevent race conditions.
@@ -453,7 +453,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
           success: true,
           statusCode: 200,
           message: `Successfully merged PR #${remotePrNumber} for ${issueId}`,
-          mergeStatus: 'merged',
+          outcome: 'merged',
           prUrl: prResult.prUrl,
           remote: true,
         };
@@ -482,7 +482,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       console.log(`[merge] Polyrepo detected for ${issueId}, coordinating merge set...`);
       const { getMergeSetSync, ensureMergeSetForIssueSync, upsertMergeSetSync, withRepoStateSync } = await import('../../../../lib/merge-set.js');
       const { runQualityGates } = await import('../../../../lib/cloister/validation.js');
-      const { reconcileStrandedRepos } = await import('../../../../lib/cloister/merge-completeness.js');
+      const { assessRepoMergeCompleteness } = await import('../../../../lib/cloister/merge-completeness.js');
       const { getForgeAdapter } = await import('../../../../lib/forge.js');
       const { messageAgent } = await import('../../../../lib/agents.js');
       let mergeSet = getMergeSetSync(issueId) || ensureMergeSetForIssueSync(issueId);
@@ -493,19 +493,50 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
         return { success: false, statusCode: 400, error };
       }
 
-      const reconciliation = await reconcileStrandedRepos(mergeSet);
-      mergeSet = reconciliation.mergeSet;
-      if (reconciliation.blockers.length > 0) {
-        const error = reconciliation.blockers.map(blocker => blocker.reason).join('; ');
+      // PAN-3917: which repos still need merging is asked of the forge and git
+      // HERE, on every attempt — nothing writes a verdict for a later pass to
+      // read back. Only a required repo with no review artifact can block the
+      // set; one that HAS an artifact is simply not merged yet, which is what
+      // this run is for.
+      const blockers: string[] = [];
+      const alreadyLanded = new Set<string>();
+      for (const repo of mergeSet.repos.filter(candidate => candidate.required)) {
+        if (!repo.artifactUrl) {
+          let discovered: { url?: string; id?: string } | null = null;
+          try {
+            discovered = await getForgeAdapter(repo.forge).discoverArtifact({ sourceBranch: repo.sourceBranch, cwd: repo.repoPath });
+          } catch (discoverErr: any) {
+            blockers.push(`${repo.repoKey} artifact discovery is unverifiable: ${discoverErr?.message ?? String(discoverErr)}`);
+            continue;
+          }
+          if (discovered?.url) {
+            mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { artifactUrl: discovered.url, artifactId: discovered.id });
+            continue;
+          }
+        }
+        const assessed = await assessRepoMergeCompleteness(repo);
+        if (assessed.state === 'merged' || assessed.state === 'no-changes') {
+          alreadyLanded.add(repo.repoKey);
+          mergeSet = withRepoStateSync(mergeSet, repo.repoKey, assessed.state === 'merged'
+            ? { repoMerge: 'merged', ...(assessed.artifactUrl ? { artifactUrl: assessed.artifactUrl, artifactId: assessed.artifactId } : {}) }
+            : { repoMerge: 'skipped' });
+        } else if (!repo.artifactUrl) {
+          blockers.push(assessed.reason);
+        }
+      }
+
+      if (blockers.length > 0) {
+        const error = blockers.join('; ');
         mergeSet = { ...mergeSet, status: 'failed', updatedAt: new Date().toISOString() };
         upsertMergeSetSync(mergeSet);
         setStatus(issueId, { phase: 'failed', notes: error });
         completePendingOperation(issueId, error);
         return { success: false, statusCode: 409, error };
       }
+      upsertMergeSetSync(mergeSet);
 
       const activeRepos = mergeSet.repos
-        .filter(repo => repo.mergeStatus !== 'skipped' && repo.mergeStatus !== 'merged' && !!repo.artifactUrl)
+        .filter(repo => !alreadyLanded.has(repo.repoKey) && !!repo.artifactUrl)
         .sort((a, b) => a.mergeOrder - b.mergeOrder);
 
       if (activeRepos.length === 0) {
@@ -520,7 +551,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
         await postMergeLifecycle(issueId, projectPath);
         return {
           success: true, statusCode: 200, message: `No changed repos remain for ${issueId}`,
-          mergeStatus: 'merged', repos: [],
+          outcome: 'merged', repos: [],
         };
       }
 
@@ -682,11 +713,11 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
           )
         );
 
-        mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { verificationStatus: 'running' });
+        mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { repoVerification: 'running' });
         upsertMergeSetSync(mergeSet);
 
         if (Object.keys(gates).length === 0) {
-          mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { verificationStatus: 'skipped' });
+          mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { repoVerification: 'skipped' });
           upsertMergeSetSync(mergeSet);
           continue;
         }
@@ -697,14 +728,14 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
         const failedGate = gateResults.find(result => !result.passed && result.required !== false);
         if (failedGate) {
           const error = `Polyrepo post-rebase verification failed for ${repo.repoKey} at ${failedGate.name}`;
-          mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { verificationStatus: 'failed' });
+          mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { repoVerification: 'failed' });
           upsertMergeSetSync(mergeSet);
           setStatus(issueId, { phase: 'failed', notes: error });
           completePendingOperation(issueId, error);
           return { success: false, statusCode: 500, error };
         }
 
-        mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { verificationStatus: 'passed' });
+        mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { repoVerification: 'passed' });
         upsertMergeSetSync(mergeSet);
       }
 
@@ -712,7 +743,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       for (const repo of activeRepos) {
         const repoWorkspacePath = join(workspacePath, repo.repoKey);
         try {
-          mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { mergeStatus: 'merging' });
+          mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { repoMerge: 'merging' });
           upsertMergeSetSync(mergeSet);
           await getForgeAdapter(repo.forge).mergeReviewArtifact({
             forge: repo.forge,
@@ -721,7 +752,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
             cwd: repoWorkspacePath,
             method: 'squash',
           });
-          mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { mergeStatus: 'merged' });
+          mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { repoMerge: 'merged' });
           upsertMergeSetSync(mergeSet);
           mergeResults.push({
             repo: repo.repoKey,
@@ -730,7 +761,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
           });
         } catch (mergeErr: any) {
           const error = mergeErr.message || 'Artifact merge failed';
-          mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { mergeStatus: 'failed' });
+          mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { repoMerge: 'failed' });
           upsertMergeSetSync(mergeSet);
           mergeResults.push({ repo: repo.repoKey, success: false, message: error });
           break;
@@ -771,7 +802,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
         success: true,
         statusCode: 200,
         message: `Polyrepo merge complete for ${issueId}`,
-        mergeStatus: 'merged',
+        outcome: 'merged',
         repos: mergeResults,
       };
     }
@@ -853,7 +884,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
               success: true,
               statusCode: 200,
               message: `PR #${githubPrRef.number} for ${issueId} was already merged`,
-              mergeStatus: 'merged',
+              outcome: 'merged',
               prUrl: prResult.prUrl,
             };
           }
@@ -969,7 +1000,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     // A rebase produces a new SHA and an interrupted worker has no terminal
     // result, so both cases still require local verification.
     // PAN-3917: the "fresh terminal verification" guard keyed off the record's
-    // `verificationStatus === 'running'`. With no record there is no interrupted
+    // stored verification status of `running`. With no record there is no interrupted
     // marker to carry across attempts — an interrupted run simply is not green
     // on the tip, so the CI check below already refuses to skip.
     let skipLocalVerification = false;
@@ -1014,7 +1045,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
         appendShipLog(issueId, message, 'verifying');
         setStatus(issueId, { phase: 'queued', step: 'queued', notes: message });
         completePendingOperation(issueId, message);
-        return { success: false as const, statusCode: 409, error: message, deferred: true, mergeStatus: 'queued' as const };
+        return { success: false as const, statusCode: 409, error: message, deferred: true, outcome: 'queued' as const };
       })()
       : null;
     if (verificationDeferral) {
@@ -1157,7 +1188,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       success: true,
       statusCode: 200,
       message: `Successfully merged ${primaryForge} review artifact for ${issueId}`,
-      mergeStatus: 'merged',
+      outcome: 'merged',
       prUrl: prResult.prUrl,
     };
   } catch (error: any) {
@@ -1232,7 +1263,7 @@ const postForgeApproveRoute = HttpRouter.add(
 
       const results: Array<{ repoKey: string; approved: boolean; error?: string }> = [];
       for (const repo of mergeSet.repos) {
-        if (repo.mergeStatus === 'merged' || repo.mergeStatus === 'skipped') {
+        if (repo.repoMerge === 'merged' || repo.repoMerge === 'skipped') {
           results.push({ repoKey: repo.repoKey, approved: true });
           continue;
         }
@@ -1337,7 +1368,7 @@ const postForgeMergeRoute = HttpRouter.add(
 
       const results: Array<{ repoKey: string; merged: boolean; error?: string }> = [];
       for (const repo of mergeSet.repos) {
-        if (repo.mergeStatus === 'merged' || repo.mergeStatus === 'skipped') {
+        if (repo.repoMerge === 'merged' || repo.repoMerge === 'skipped') {
           results.push({ repoKey: repo.repoKey, merged: true });
           continue;
         }
@@ -1369,13 +1400,13 @@ const postForgeMergeRoute = HttpRouter.add(
           } else {
             const classification = await assessRepoMergeCompleteness(repo);
             if (classification.state === 'merged') {
-              mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { mergeStatus: 'merged' });
+              mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { repoMerge: 'merged' });
               results.push({ repoKey: repo.repoKey, merged: true });
             } else if (classification.state === 'no-changes') {
-              mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { mergeStatus: 'skipped' });
+              mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { repoMerge: 'skipped' });
               results.push({ repoKey: repo.repoKey, merged: true });
             } else {
-              mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { mergeStatus: 'blocked' });
+              mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { repoMerge: 'blocked' });
               results.push({ repoKey: repo.repoKey, merged: false, error: classification.reason });
             }
             upsertMergeSetSync(mergeSet);
@@ -1391,7 +1422,7 @@ const postForgeMergeRoute = HttpRouter.add(
             method: 'squash',
             cwd: existsSync(workspacePath) ? workspacePath : repo.repoPath,
           });
-          mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { mergeStatus: 'merged' });
+          mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { repoMerge: 'merged' });
           upsertMergeSetSync(mergeSet);
           results.push({ repoKey: repo.repoKey, merged: true });
         } catch (err: any) {
@@ -1714,8 +1745,8 @@ const getMergeQueueRoute = HttpRouter.add(
   '/api/merge-queue',
   httpHandler(Effect.gen(function* () {
     const queues = getAllActiveQueues();
-    // PAN-3917: the live step tracker used to read `mergeStatus`/`mergeStep`/
-    // `mergeNotes` off each issue's review-status record. Those were the
+    // PAN-3917: the live step tracker used to read the merge status, step, and
+    // notes off each issue's review-status record. Those were the
     // progress of a merge run this process is executing, so they are served
     // from the in-memory run map instead — one entry per run, and nothing
     // survives a restart.

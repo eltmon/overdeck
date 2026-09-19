@@ -6,41 +6,6 @@ import { homedir } from 'node:os';
 // PAN-3917 W6: W3 deletes the record plane; config-yaml still reaches it
 // transitively (config-yaml/defaults → agents/tier-table → pan-dir/record).
 // Stub the chain entry so the module under test loads.
-vi.mock('../../../../../src/lib/pan-dir/record.js', () => ({
-  getIssueRecordPath: () => '/dev/null',
-  readIssueRecordSync: () => null,
-  readIssueRecordForWorkspaceSync: () => null,
-  readIssueRecord: async () => null,
-  batchReadIssueRecords: async () => new Map(),
-}));
-vi.mock('../../../../../src/lib/pan-dir/record-update.js', () => ({
-  updateIssueRecord: async () => undefined,
-}));
-vi.mock('../../../../../src/lib/pan-dir/agents.js', () => ({
-  appendAgentPlaneLifecycle: () => undefined,
-  appendAgentPlaneSession: () => undefined,
-  recordAgentPlaneSpawn: () => undefined,
-  readAgentPlaneRecordSync: () => null,
-  backfillAgentPlaneRecord: () => undefined,
-  flushAgentPlaneWrites: async () => null,
-}));
-vi.mock('../../../../../src/lib/overdeck/agent-state-sync.js', () => ({
-  getOverdeckAgentStateSync: () => null,
-  saveOverdeckAgentStateSync: () => undefined,
-  listOverdeckAgentStatesSync: () => [],
-}));
-vi.mock('../../../../../src/lib/overdeck/agent-record-sync.js', () => ({
-  readAgentHarnessModelRecordSync: () => null,
-  writeAgentHarnessModelRecordSync: () => undefined,
-}));
-vi.mock('../../../../../src/lib/pan-dir/records.js', () => ({
-  listIssueRecordsSync: () => [],
-  listIssueRecords: async () => [],
-}));
-vi.mock('../../../../../src/lib/overdeck/review-status-record-sync.js', () => ({
-  syncReviewStatusToRecord: async () => undefined,
-  syncReviewStatusToRecordSync: () => undefined,
-}));
 
 const homeDir = homedir();
 
@@ -51,6 +16,10 @@ vi.mock('../../../../../src/lib/agents.js', () => ({
 }));
 
 vi.mock('../../../../../src/lib/tmux.js', () => ({
+  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listPaneValuesSync: () => [],
   listSessionNames: vi.fn(() => Effect.succeed([])),
   capturePane: vi.fn(() => Effect.succeed('')),
 }));
@@ -78,6 +47,9 @@ vi.mock('../../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssueSync: vi.fn(() => ({ projectPath: '/tmp/overdeck' })),
   listProjectsSync: vi.fn(() => []),
   resolveProjectFromIssue: vi.fn(),
+  // PAN-3917 (W6): the derived issue state resolves the owning project from a
+  // path before it asks the forge; unregistered here, so it never asks.
+  findProjectByPathSync: vi.fn(() => null),
 }));
 
 const mockIsPlanningComplete = vi.hoisted(() => vi.fn(() => Effect.succeed(false)));

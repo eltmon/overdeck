@@ -4,9 +4,7 @@ import {
   putProjectVersionSyncPayload,
 } from '../projects.js';
 import type { ProjectConfig, VersionSyncConfig } from '../../../../lib/projects.js';
-import type { PanIssueShipRecord } from '../../../../lib/pan-dir/record.js';
 import type { UatGeneration } from '../../../../lib/overdeck/merge-sync.js';
-import { aggregateGenerationShipStatus } from '../../../../lib/cloister/ship-status.js';
 
 const CONFIG = {
   set: [{ path: 'package.json', json_field: 'version' }],
@@ -51,17 +49,11 @@ function promotedGeneration(): UatGeneration {
 function deps(options: {
   config?: ProjectConfig | null;
   generation?: UatGeneration;
-  outcomes?: Record<string, PanIssueShipRecord | null>;
 } = {}) {
   return {
     getProject: vi.fn(() => options.config === undefined ? project() : options.config),
     listProjectKeys: vi.fn(() => ['overdeck', 'myn']),
     listPromotedGenerations: vi.fn(() => options.generation ? [options.generation] : []),
-    readOutcome: vi.fn(async (_project: ProjectConfig, generation: UatGeneration) =>
-      aggregateGenerationShipStatus(
-        generation,
-        new Map(generation.members.map(member => [member.issueId, options.outcomes?.[member.issueId] ?? null])),
-      )),
     writeVersionSync: vi.fn(async () => {}),
   };
 }
@@ -69,38 +61,19 @@ function deps(options: {
 describe('GET /api/projects/:projectKey/version-sync payload', () => {
   it('returns null config and null outcome for a project that skips ship', async () => {
     const result = await getProjectVersionSyncPayload('overdeck', deps({ config: project(null) }));
-    expect(result).toEqual({ status: 200, body: { config: null, lastOutcome: null } });
+    expect(result).toEqual({ status: 200, body: { config: null, lastOutcome: null, generation: null } });
   });
 
-  it('returns configured version_sync and a conservative all-member outcome', async () => {
-    const older: PanIssueShipRecord = {
-      status: 'partial',
-      version: '48.7.0',
-      batch: 'uat/pan-ember-0731',
-      paths: [],
-      error: 'operator-safe internal detail',
-      reason: 'internal settlement reason',
-      at: '2026-07-31T01:00:00Z',
-    };
-    const newest: PanIssueShipRecord = {
-      status: 'passed', version: '48.8.0', batch: 'uat/pan-ember-0731', paths: [], at: '2026-07-31T02:00:00Z',
-    };
+  // PAN-3917 D6: there are no ship records to aggregate — a shipped version is
+  // a git tag plus a GitHub release — so `lastOutcome` is null and the
+  // promoted generation's name is what the payload still carries.
+  it('returns the configured version_sync and the promoted generation name', async () => {
     const result = await getProjectVersionSyncPayload('overdeck', deps({
       generation: promotedGeneration(),
-      outcomes: { 'PAN-1': older, 'PAN-2': newest },
     }));
     expect(result).toEqual({
       status: 200,
-      body: {
-        config: CONFIG,
-        lastOutcome: {
-          status: 'partial',
-          version: '48.7.0',
-          batch: 'uat/pan-ember-0731',
-          paths: [],
-          at: '2026-07-31T01:00:00Z',
-        },
-      },
+      body: { config: CONFIG, lastOutcome: null, generation: 'uat/pan-ember-0731' },
     });
   });
 });

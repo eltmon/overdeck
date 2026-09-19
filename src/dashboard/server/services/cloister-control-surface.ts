@@ -46,13 +46,8 @@ export function readDurableCloisterStatus(deps: CloisterControlDeps = {}): Clois
     config: loadCloisterConfigSync(),
     summary: generateHealthSummary(agentHealths),
     agentsNeedingAttention: getAgentsNeedingAttention(agentHealths).map((health) => health.agentId),
-    patrol: {
-      loopRunning: deaconLite.running,
-      patrolIntervalMs: deaconLite.intervalMs,
-      lastRunAt: deaconLite.lastRunAt,
-      lastRunError: deaconLite.lastRunError,
-    },
-  } as CloisterStatus;
+    patrol: deaconLite,
+  };
 }
 
 export async function startDurableCloister(deps: CloisterControlDeps = {}): Promise<boolean> {

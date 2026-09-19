@@ -7,25 +7,22 @@ import type { AgentState } from '../../../../../src/lib/agents.js';
 // PAN-3917 W6: W3 deletes the record plane; config-yaml still reaches it
 // transitively (config-yaml/defaults → agents/tier-table → pan-dir/record).
 // Stub the chain entry so the module under test loads.
-vi.mock('../../../../../src/lib/pan-dir/record.js', () => ({
-  getIssueRecordPath: () => '/dev/null',
-  readIssueRecordSync: () => null,
-  readIssueRecordForWorkspaceSync: () => null,
-  readIssueRecord: async () => null,
-  batchReadIssueRecords: async () => new Map(),
-}));
-vi.mock('../../../../../src/lib/pan-dir/record-update.js', () => ({
-  updateIssueRecord: async () => undefined,
-}));
 
 vi.mock('../../../../../src/lib/projects.js', () => ({
   listProjects: vi.fn(),
   listProjectsSync: vi.fn(),
   resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'overdeck' })),
   resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'overdeck' })),
+  // PAN-3917 (W6): the derived issue state resolves the owning project from a
+  // path before it asks the forge; unregistered here, so it never asks.
+  findProjectByPathSync: vi.fn(() => null),
 }));
 
 vi.mock('../../../../../src/lib/tmux.js', () => ({
+  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listPaneValuesSync: () => [],
   listSessionNames: vi.fn(),
   capturePane: vi.fn(() => Effect.succeed('')),
 }));
@@ -50,6 +47,12 @@ vi.mock('../../../../../src/lib/cloister/specialists.js', () => ({
 
 vi.mock('../../../../../src/dashboard/server/routes/jsonl-resolver.js', () => ({
   resolveJsonlPath: vi.fn(async () => null),
+}));
+
+// PAN-3917 (W6): the session tree reads each issue's state from the forge,
+// which shells out to gh/git. There is no forge here — answer `working`.
+vi.mock('../../../../../src/dashboard/server/services/derived-issue-state.js', () => ({
+  getDerivedIssueState: vi.fn(async (issueId: string) => ({ issueId, state: 'working' })),
 }));
 
 vi.mock('../../../../../src/dashboard/server/routes/reviewer-tree.js', () => ({

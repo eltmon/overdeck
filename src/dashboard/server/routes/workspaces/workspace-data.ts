@@ -683,7 +683,7 @@ const getWorkspaceRoute = HttpRouter.add(
         const pendingOperation = getPendingOperation(issueId);
         const location = getWorkspaceLocation(issueId);
         // PAN-3917: a failed merge used to trigger a GitHub reconcile that
-        // repaired the stored mergeStatus. There is no stored mergeStatus —
+        // repaired the stored merge status. There is no stored merge status —
         // `services/derived-issue-state.ts` reads the PR every time, so a
         // merge that actually landed shows as `merged` on the next read.
 

@@ -177,27 +177,29 @@ describe('hasActiveAgentGateOrRetry', () => {
 describe('countAdmittedWorkAgents', () => {
   const now = Date.parse('2026-07-16T12:00:00.000Z');
 
-  it('excludes errored, stopped, unknown, and stale-starting work agents', () => {
+  // PAN-3917 FR-12: a candidate is a backend pane, so `status` is the pane's
+  // own state — `exited`/`done` are over, and `unknown` is a pane whose agent
+  // has not reported yet (what the deleted mirror called `starting`).
+  it('excludes finished panes and an unreported pane past the startup grace', () => {
     expect(countAdmittedWorkAgents([
-      { role: 'work', status: 'error', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
-      { role: 'work', status: 'stopped', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
-      { role: 'work', status: 'unknown', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
-      { role: 'work', status: 'starting', startedAt: '2026-07-16T11:55:00.000Z', tmuxActive: false },
-      { role: 'work', status: 'starting', startedAt: 'not-a-date', tmuxActive: false },
+      { role: 'work', status: 'exited', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+      { role: 'work', status: 'done', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+      { role: 'work', status: 'unknown', startedAt: '2026-07-16T11:55:00.000Z', tmuxActive: false },
+      { role: 'work', status: 'unknown', startedAt: 'not-a-date', tmuxActive: false },
     ], now)).toBe(0);
   });
 
-  it('counts live work agents and fresh starts without counting other roles', () => {
+  it('counts live work panes and fresh unreported starts without counting other roles', () => {
     expect(countAdmittedWorkAgents([
-      { role: 'work', status: 'running', startedAt: '2026-07-16T10:00:00.000Z', tmuxActive: true },
-      { role: 'work', status: 'starting', startedAt: '2026-07-16T11:55:01.000Z', tmuxActive: false },
-      { role: 'work', status: 'starting', startedAt: '2026-07-16T10:00:00.000Z', tmuxActive: true },
-      { role: 'work', status: 'running', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: false },
-      { role: 'plan', status: 'running', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
-      { role: 'review', status: 'running', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
-      { role: 'test', status: 'running', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
-      { role: 'ship', status: 'running', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
-      { role: 'conversation', status: 'running', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+      { role: 'work', status: 'working', startedAt: '2026-07-16T10:00:00.000Z', tmuxActive: true },
+      { role: 'work', status: 'unknown', startedAt: '2026-07-16T11:55:01.000Z', tmuxActive: false },
+      { role: 'work', status: 'idle', startedAt: '2026-07-16T10:00:00.000Z', tmuxActive: true },
+      { role: 'work', status: 'working', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: false },
+      { role: 'plan', status: 'working', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+      { role: 'review', status: 'working', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+      { role: 'test', status: 'working', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+      { role: 'uat', status: 'working', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+      { role: 'strike', status: 'working', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
     ], now)).toBe(3);
   });
 });

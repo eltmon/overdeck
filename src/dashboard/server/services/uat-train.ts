@@ -743,7 +743,9 @@ export async function postUatGenerationPromotePayload(
   // project_root, so a MIN generation must not be merged against the Overdeck repo.
   // For a generation belonging to this repo this resolves to the same path as before.
   const root = resolve(getUatGenerationSync(name)?.projectRoot ?? projectRoot());
-  const { recordUatPromotionVerdicts } = await import('../../../lib/cloister/uat-promote-verification.js');
+  // PAN-3917: promotion used to stamp a verification verdict onto every
+  // member's record. The merge itself is the evidence — the generation's own
+  // rows carry the merge sha, and readiness is re-derived from each PR.
 
   // PAN-3917 FR-9: a member may land only if its own PR is still ready —
   // approved, green, mergeable. `uat-promote`'s gate is synchronous, so the
@@ -808,7 +810,6 @@ export async function postUatGenerationPromotePayload(
     firePostMerge,
     memberEligibility: (issueId: string) =>
       memberStates.get(issueId.toUpperCase()) ?? { eligible: false, reason: 'state could not be read' },
-    recordVerification: (generation, mergeSha) => recordUatPromotionVerdicts(generation, mergeSha),
     // PAN-3917 D6: version ship no longer writes ship records. Tags and GitHub
     // releases are the record, and `pan release` owns writing them — promote
     // publishes the batch and stops there.

@@ -12,11 +12,13 @@ import {
 const NOW_MS = Date.parse('2026-07-07T12:00:00.000Z');
 
 describe('agent resource stats payload', () => {
+  // PAN-3917 FR-12: an agent row is a live backend pane, so the state that
+  // drops a row is the pane's own `exited` — not a stored `stopped` status.
   it('does not query tmux or start a cost worker when no agents are active', async () => {
     const listSessionNames = vi.fn(() => Effect.succeed([]));
     const readCostStats = vi.fn(async () => []);
     const snapshot = await Effect.runPromise(getAgentStatsSnapshotEffect({
-      listAgents: () => [{ ...agent('stopped'), status: 'stopped' }],
+      listAgents: async () => [{ ...agent('exited'), status: 'exited' }],
       listSessionNames,
       readCostStats,
     }));
@@ -32,7 +34,7 @@ describe('agent resource stats payload', () => {
     }]] as Array<[string, { burnUsdPerHour: number; hypotheticalUsdPerHour: number; totalUsd: number }]>);
     const snapshot = await Effect.runPromise(getAgentStatsSnapshotEffect({
       nowMs: NOW_MS,
-      listAgents: () => [agent('agent-a'), agent('agent-b'), { ...agent('stopped'), status: 'stopped' }],
+      listAgents: async () => [agent('agent-a'), agent('agent-b'), { ...agent('exited'), status: 'exited' }],
       listSessionNames: () => Effect.succeed([]),
       readCostStats,
     }));
@@ -95,7 +97,7 @@ describe('agent resource stats payload', () => {
 
     const snapshot = await Effect.runPromise(getAgentStatsSnapshotEffect({
       nowMs: NOW_MS,
-      listAgents: () => [agent('agent-pan-2464-tree')],
+      listAgents: async () => [agent('agent-pan-2464-tree')],
       listSessionNames: () => Effect.succeed(['agent-pan-2464-tree']),
       listPanePids: () => Effect.succeed([100]),
       readProcessTable,

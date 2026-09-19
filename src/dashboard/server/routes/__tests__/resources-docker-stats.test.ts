@@ -1,8 +1,9 @@
 /**
- * Tests for GET /api/resources using the SQLite agents table (PAN-1908).
+ * Tests for GET /api/resources (PAN-1908).
  *
- * Verifies that the resources endpoint reads agent states from the agents table
- * (not the filesystem) and computes hasLiveTmuxSession from tmux sessions.
+ * PAN-3917 FR-12: the agents table is gone. An agent row IS a live backend
+ * pane, and `routes/resources-agents.test.ts` covers that read. What is left
+ * here is the docker half of the payload and the ps parser.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -10,20 +11,19 @@ import { Effect } from 'effect';
 
 // ─── Module mocks ─────────────────────────────────────────────────────────────
 
-const mockListAgentStates = vi.hoisted(() => vi.fn());
 const mockListSessions = vi.hoisted(() => vi.fn());
 const mockListPaneValues = vi.hoisted(() => vi.fn());
 const mockGetStats = vi.hoisted(() => vi.fn());
-
-vi.mock('../../../../lib/agents.js', () => ({
-  listAgentStates: mockListAgentStates,
-}));
 
 vi.mock('../../services/dashboard-poll-snapshots.js', () => ({
   getAgentCostStatsSnapshot: async () => [],
 }));
 
 vi.mock('../../../../lib/tmux.js', () => ({
+  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listPaneValuesSync: () => [],
   listSessions: () => Effect.succeed(mockListSessions()),
   listPaneValues: (...args: unknown[]) => Effect.succeed(mockListPaneValues(...args)),
 }));
@@ -71,73 +71,11 @@ async function runResourcesEffect(): Promise<{
   return { status: response.status, body: JSON.parse(text) };
 }
 
-describe('GET /api/resources (agents table)', () => {
+describe('GET /api/resources (docker stats)', () => {
   beforeEach(() => {
-    mockListAgentStates.mockReturnValue([]);
     mockListSessions.mockReturnValue([]);
     mockListPaneValues.mockReturnValue([]);
     mockGetStats.mockReturnValue([]);
-  });
-
-  it('returns agents from the SQLite agents table, not the filesystem', async () => {
-    mockListAgentStates.mockReturnValue([
-      {
-        id: 'agent-pan-1908',
-        issueId: 'PAN-1908',
-        status: 'running',
-        model: 'claude-opus-4-8',
-        role: 'work',
-      },
-      {
-        id: 'agent-pan-1908-review',
-        issueId: 'PAN-1908',
-        status: 'stopped',
-        model: 'claude-sonnet-4-8',
-        role: 'review',
-      },
-    ]);
-    mockListSessions.mockReturnValue([{ name: 'agent-pan-1908' }]);
-
-    const { status, body } = await runResourcesEffect();
-
-    expect(status).toBe(200);
-    expect(body.containers).toEqual([]);
-    expect(body.agents).toHaveLength(1);
-    expect((body.agents as Record<string, unknown>[])[0]).toMatchObject({
-      id: 'agent-pan-1908',
-      status: 'running',
-      hasLiveTmuxSession: true,
-    });
-  });
-
-  it('filters out stopped agents', async () => {
-    mockListAgentStates.mockReturnValue([
-      { id: 'agent-1', status: 'running' },
-      { id: 'agent-2', status: 'stopped' },
-      { id: 'agent-3', status: 'error' },
-    ]);
-    mockListSessions.mockReturnValue([]);
-
-    const { body } = await runResourcesEffect();
-    const ids = (body.agents as Record<string, unknown>[]).map((a) => a.id);
-
-    expect(ids).toContain('agent-1');
-    expect(ids).toContain('agent-3');
-    expect(ids).not.toContain('agent-2');
-  });
-
-  it('sets hasLiveTmuxSession false when the tmux session is missing', async () => {
-    mockListAgentStates.mockReturnValue([
-      { id: 'agent-orphan', status: 'running' },
-    ]);
-    mockListSessions.mockReturnValue([]);
-
-    const { body } = await runResourcesEffect();
-
-    expect((body.agents as Record<string, unknown>[])[0]).toMatchObject({
-      id: 'agent-orphan',
-      hasLiveTmuxSession: false,
-    });
   });
 
   it('returns docker container stats from the collector', async () => {

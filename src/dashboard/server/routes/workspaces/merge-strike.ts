@@ -84,7 +84,7 @@ export interface TriggerMergeResult {
   /** The issue's derived pipeline state at the moment the merge was refused. */
   state?: DerivedIssueState['state'];
   /** Phase of THIS merge run (in-memory), never a stored pipeline status. */
-  mergeStatus?: MergeRunPhase;
+  outcome?: MergeRunPhase;
   prUrl?: string;
   remote?: boolean;
   repos?: Array<{ repo: string; success: boolean; message: string; testsStatus?: string }>;
@@ -109,7 +109,7 @@ export function activeStrikeMerge(currentMerge: string | null, pendingOperation?
   return currentMerge !== null || (pendingOperation?.type === 'merge' && pendingOperation.status === 'running');
 }
 export interface MergeEligibilityResult {
-  success: false; statusCode: number; error: string; state?: DerivedIssueState['state']; mergeStatus?: MergeRunPhase;
+  success: false; statusCode: number; error: string; state?: DerivedIssueState['state']; outcome?: MergeRunPhase;
 }
 
 export interface MergeQueueAdvanceDeps {
@@ -216,7 +216,7 @@ export function normalMergeEligibility(
     };
   }
   if (run?.phase === 'merging' && activelyMerging) {
-    return { success: false, statusCode: 400, error: 'Merge already in progress', mergeStatus: 'merging' };
+    return { success: false, statusCode: 400, error: 'Merge already in progress', outcome: 'merging' };
   }
   return null;
 }

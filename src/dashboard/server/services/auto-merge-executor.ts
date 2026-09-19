@@ -50,7 +50,7 @@ interface MergeResult {
   error?: string;
   message?: string;
   statusCode?: number;
-  mergeStatus?: string;
+  outcome?: string;
   retryable?: boolean;
   deferred?: boolean;
 }
@@ -164,10 +164,10 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
     try {
       const result = await (deps.mergeIssue ?? defaultMergeIssue)(entry.issueId);
       if (result.success) {
-        if (result.mergeStatus === 'merged') {
+        if (result.outcome === 'merged') {
           (deps.markMerged ?? markMerged)(entry.id);
         } else {
-          // Reviewer P1: triggerMerge() returns success=true with mergeStatus='queued'
+          // Reviewer P1: triggerMerge() returns success=true with outcome='queued'
           // when another merge is already in progress. The row was just transitioned
           // to 'merging'; without recovery it stays there forever (cancel breaks, no
           // completion record). Revert to 'pending' with a short backoff so the next
@@ -175,9 +175,9 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
           const retryAt = new Date(nowDate.getTime() + REQUEUE_BACKOFF_MS).toISOString();
           const requeued = (deps.requeueToPending ?? requeueToPending)(entry.id, retryAt);
           if (requeued) {
-            log(`[auto-merge] merge for ${entry.issueId} accepted as ${result.mergeStatus ?? 'queued'}; requeued for ${retryAt}`);
+            log(`[auto-merge] merge for ${entry.issueId} accepted as ${result.outcome ?? 'queued'}; requeued for ${retryAt}`);
           } else {
-            log(`[auto-merge] failed to requeue ${entry.issueId} (#${entry.id}) after non-terminal status ${result.mergeStatus ?? 'queued'}`);
+            log(`[auto-merge] failed to requeue ${entry.issueId} (#${entry.id}) after non-terminal status ${result.outcome ?? 'queued'}`);
           }
         }
         continue;
