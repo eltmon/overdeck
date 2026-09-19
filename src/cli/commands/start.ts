@@ -6,7 +6,7 @@ import { join, dirname, resolve } from 'path';
 import { homedir } from 'os';
 import { createInterface } from 'readline/promises';
 import { promisify } from 'util';
-import { exec, execFile, execSync } from 'child_process';
+import { exec, execFile, execFileSync, execSync } from 'child_process';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 import { clearAgentPausedSync, getAgentStateSync, spawnAgent } from '../../lib/agents.js';
@@ -1155,7 +1155,13 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       console.log(chalk.yellow('⚠ Skipping plan-freshness preflight (--skip-freshness)'));
     } else {
       const plan = readWorkspacePlanSync(workspace);
-      const freshness = plan ? checkPlanFreshness(plan, workspace, existsSync) : null;
+      // A missing path with no git history is a file the plan creates, not drift.
+      const everTracked = (scope: string): boolean => {
+        try {
+          return execFileSync('git', ['log', '--all', '--oneline', '-1', '--', scope], { cwd: workspace, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().length > 0;
+        } catch { return false; }
+      };
+      const freshness = plan ? checkPlanFreshness(plan, workspace, existsSync, (scope) => !everTracked(scope)) : null;
       if (freshness && freshness.missing.length > 0) {
         await failPostCreateValidation({
           spinner,
