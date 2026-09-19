@@ -44,24 +44,34 @@ export async function runGitHubGraphql(
   exec: GhExec = defaultExec,
   delay: Delay = defaultDelay,
 ): Promise<string> {
-  try {
-    const { stdout } = await exec(['api', 'graphql', '-f', `query=${query}`]);
-    return stdout;
-  } catch (error) {
-    // gh exits non-zero when the GraphQL envelope carries per-field errors
-    // (e.g. `issue(number: N)` where N is a PR — strike branches can point at
-    // PR numbers), but it still prints the full response with partial data to
-    // stdout. Surface that envelope so callers can use the resolvable fields
-    // instead of failing the whole gather (the zero-membership regression).
-    const stdout = (error as { stdout?: string }).stdout;
-    if (typeof stdout === 'string' && stdout.length > 0) {
-      try {
-        const parsed = JSON.parse(stdout) as { data?: unknown };
-        if (parsed.data !== undefined && parsed.data !== null) return stdout;
-      } catch {
-        // stdout is not a GraphQL envelope — fall through to the wrapped error
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const { stdout } = await exec(['api', 'graphql', '-f', `query=${query}`]);
+      return stdout;
+    } catch (error) {
+      // gh exits non-zero when the GraphQL envelope carries per-field errors
+      // (e.g. `issue(number: N)` where N is a PR — strike branches can point at
+      // PR numbers), but it still prints the full response with partial data to
+      // stdout. Surface that envelope so callers can use the resolvable fields
+      // instead of failing the whole gather (the zero-membership regression).
+      const stdout = (error as { stdout?: string }).stdout;
+      let parsedEnvelope = false;
+      if (typeof stdout === 'string' && stdout.length > 0) {
+        try {
+          const parsed = JSON.parse(stdout) as { data?: unknown };
+          parsedEnvelope = true;
+          if (parsed.data !== undefined && parsed.data !== null) return stdout;
+        } catch {
+          // stdout is not a GraphQL envelope — retry-eligible below
+        }
       }
+      // A parsed errors-only envelope (bad query, rate limit) is deterministic
+      // and retrying burns quota; an unparseable stdout (network failure, gh
+      // crash, timeout) is the intermittent class this retries once for.
+      if (parsedEnvelope || attempt > 1) {
+        throw new Error(describeGhGraphqlFailure(error, attempt), { cause: error });
+      }
+      await delay(GH_GRAPHQL_RETRY_DELAY_MS);
     }
-    throw new Error(describeGhGraphqlFailure(error, 1), { cause: error });
   }
 }

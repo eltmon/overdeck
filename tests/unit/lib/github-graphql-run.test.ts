@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   describeGhGraphqlFailure,
+  GH_GRAPHQL_RETRY_DELAY_MS,
   runGitHubGraphql,
 } from '../../../src/lib/github-graphql-run.js';
 
@@ -47,11 +48,54 @@ describe('runGitHubGraphql', () => {
   it('rejects with a stderr-carrying error (cause set, no query text) when stdout is not JSON', async () => {
     const originalError = { code: 1, killed: false, stdout: '', stderr: 'error connecting to api.github.com' };
     const exec = vi.fn().mockRejectedValue(originalError);
-    await expect(runGitHubGraphql('query { viewer { login } }', exec)).rejects.toMatchObject({
+    const delay = vi.fn().mockResolvedValue(undefined);
+    await expect(runGitHubGraphql('query { viewer { login } }', exec, delay)).rejects.toMatchObject({
       message: expect.stringContaining('gh api graphql failed ('),
       cause: originalError,
     });
-    const rejection = await runGitHubGraphql('query { viewer { login } }', exec).catch((error: Error) => error);
+    const rejection = await runGitHubGraphql('query { viewer { login } }', exec, delay).catch((error: Error) => error);
     expect(rejection.message).not.toContain('query=');
+  });
+});
+
+describe('runGitHubGraphql retry', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('retries once after a non-JSON failure and resolves with the second stdout', async () => {
+    const exec = vi.fn()
+      .mockRejectedValueOnce({ code: 1, killed: false, stdout: '', stderr: 'error connecting' })
+      .mockResolvedValueOnce({ stdout: '{"data":{}}' });
+    const resultPromise = runGitHubGraphql('query { x }', exec);
+    await vi.advanceTimersByTimeAsync(GH_GRAPHQL_RETRY_DELAY_MS);
+    await expect(resultPromise).resolves.toBe('{"data":{}}');
+    expect(exec).toHaveBeenCalledTimes(2);
+    expect(exec.mock.calls[0]).toEqual(exec.mock.calls[1]);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('rejects with attempt 2 after two non-JSON failures, exec called exactly twice', async () => {
+    const exec = vi.fn().mockRejectedValue({ code: 1, killed: false, stdout: '', stderr: 'error connecting' });
+    const resultPromise = runGitHubGraphql('query { x }', exec);
+    const assertion = expect(resultPromise).rejects.toThrow(/attempt 2/);
+    await vi.advanceTimersByTimeAsync(GH_GRAPHQL_RETRY_DELAY_MS);
+    await assertion;
+    expect(exec).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects immediately (attempt 1, no delay) given an errors-only JSON envelope', async () => {
+    const exec = vi.fn().mockRejectedValue({
+      code: 1,
+      killed: false,
+      stdout: '{"errors":[{"message":"API rate limit exceeded"}],"data":null}',
+      stderr: '',
+    });
+    await expect(runGitHubGraphql('query { x }', exec)).rejects.toThrow(/attempt 1/);
+    expect(exec).toHaveBeenCalledTimes(1);
   });
 });
