@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3924",
   "created": "2026-09-19T13:26:25.608Z",
-  "updated": "2026-09-19T13:31:16.153Z",
+  "updated": "2026-09-19T13:34:12.263Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-09-19T13:31:05.947Z"
     },
     "gh-run-retry": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3924",
-      "claimedAt": "2026-09-19T13:31:16.153Z"
+      "claimedAt": "2026-09-19T13:31:16.153Z",
+      "doneAt": "2026-09-19T13:34:12.263Z"
     }
   }
 }
