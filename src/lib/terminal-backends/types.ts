@@ -77,6 +77,19 @@ export interface AgentPaneRef {
   readonly agentName: string;
 }
 
+/**
+ * Whether the backend must recognize a harness in the pane for the launch to
+ * count (PAN-3917 W12).
+ *
+ * `required` — the harness CLI is the pane's foreground process, so Herdr's
+ * detector sees it and the pane becomes a first-class Herdr agent.
+ * `not-required` — Overdeck runs the harness through a host/transport process
+ * (the codex app-server host, the ACP host, kimi, ohmypi/muse), so the
+ * foreground process is `node …-host.js` and Herdr's manifest can never fire.
+ * The pane is then addressed by its own reference and its metadata tokens.
+ */
+export type AgentDetectionPolicy = 'required' | 'not-required';
+
 /** What to launch in a pane. */
 export interface StartAgentSpec {
   /** Harness kind (`claude-code`, `codex`, …) — Herdr's `agent.start.kind`. */
@@ -87,6 +100,8 @@ export interface StartAgentSpec {
   /** Live agent name; the adapter derives one when omitted. */
   readonly name?: string;
   readonly cwd?: string;
+  /** Detection policy for this harness; adapters default to `required`. */
+  readonly detection?: AgentDetectionPolicy;
 }
 
 /** A pane, an agent name, or a workspace-scoped role — whatever the caller holds. */

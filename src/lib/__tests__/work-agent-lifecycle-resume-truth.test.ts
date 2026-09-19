@@ -39,7 +39,19 @@ vi.mock('node:fs', async (importOriginal) => {
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
-  return { ...actual, access: () => Promise.resolve() };
+  return {
+    ...actual,
+    // Scoped to the test workspace only (PAN-3917 W12): a blanket `() =>
+    // Promise.resolve()` also answers the host-backend probe's herdr-binary
+    // and herdr-socket `access()` checks (hostTerminalBackendName, called
+    // from the async isAlive door), making every host look like it has Herdr
+    // and desyncing the async lifecycle snapshot from the sync one — which
+    // never makes that probe. Paths outside the workspace fall through to
+    // the real filesystem, where the synthetic test OVERDECK_HOME's herdr
+    // socket genuinely does not exist.
+    access: (path: unknown, ...rest: unknown[]) =>
+      path === '/tmp/ws' ? Promise.resolve() : (actual.access as (...args: unknown[]) => Promise<void>)(path, ...rest),
+  };
 });
 
 import { getWorkAgentLifecycleState } from '../work-agent-lifecycle.js';

@@ -19,13 +19,31 @@ verdict, every time it's asked.
 
 1. **Work agent calls `pan done`** on a clean tree. The work-agent role
    prompt refuses `pan done` from a dirty worktree. `pan done` runs quality
-   gates, opens or updates the PR, and requests review.
-2. **Review and test.** The four reviewer roles (correctness, security,
+   gates, rebases onto the target branch and pushes, opens or updates the PR
+   and marks it ready, moves the tracker to In Review, and finally POSTs
+   `/api/review/<id>/request` — the same request `pan review request` makes,
+   through the same helper
+   ([`src/cli/commands/request-review.ts`](../src/cli/commands/request-review.ts)).
+   That request is what starts verification and, when it passes, the review
+   convoy. A dashboard that cannot be reached prints
+   `Review not started (dashboard unreachable): run pan review request <id>`
+   and `pan done` still exits 0 — the PR and the tracker are already updated,
+   so re-running `pan done` is never the fix.
+2. **A PR opened or readied by hand gets the same pipeline.** The GitHub
+   webhook handler starts it on `opened` and `ready_for_review` when the PR is
+   not a draft, the repository is tracked and the head branch maps to an issue
+   ([`src/lib/webhook-handlers.ts`](../src/lib/webhook-handlers.ts)). It reaches
+   the dashboard's starter through the registry in
+   [`src/lib/cloister/request-review-pipeline.ts`](../src/lib/cloister/request-review-pipeline.ts),
+   never by importing a route, and `requestReviewPipeline.isInFlight` coalesces
+   it with the request `pan done` just made. The webhook path logs and returns
+   on every failure — it never throws.
+3. **Review and test.** The four reviewer roles (correctness, security,
    performance, requirements) post PR reviews — approve or request changes.
    Verification (typecheck, lint, tests) runs as check runs on the PR.
    "Ready" is derived, not stored: approvals in, checks green, forge reports
    `mergeable: true`.
-3. **Human clicks the dashboard Merge button** (or `gh pr merge`). The
+4. **Human clicks the dashboard Merge button** (or `gh pr merge`). The
    dashboard:
    - Merges a GitHub-clean PR directly when its head already contains the
      required base and checks are complete.
