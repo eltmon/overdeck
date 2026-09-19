@@ -21,7 +21,6 @@ import { httpHandler } from './http-handler.js';
  *   POST /api/issues/:id/close-out
  *   GET  /api/issues/:id/prd
  *   GET  /api/issues/:id/tasks
- *   POST /api/issues/:id/tasks/:taskId/inspect
  *   GET  /api/issues/:id/costs
  */
 
@@ -32,7 +31,6 @@ import { spawnPlanningSession, type PlanningIssue } from '../../../lib/planning/
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
-import { spawnInspectAgent } from '../../../lib/cloister/inspect-agent.js';
 import { createInFlightGuard } from '../../../lib/cloister/in-flight-guard.js';
 
 import { Duration, Effect, Layer, Option, Stream } from 'effect';
@@ -122,7 +120,6 @@ import {
   getIssueTasks,
   getIssueResourceDetails,
   getResourceAllocatedIssues,
-  inspectIssueTask,
 } from '../../../lib/overdeck/issue-reads.js';
 
 const execAsync = promisify(exec);
@@ -671,24 +668,6 @@ const getIssueTasksRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: POST /api/issues/:id/tasks/:taskId/inspect ───────────────────────
-
-const postIssueTaskInspectRoute = HttpRouter.add(
-  'POST',
-  '/api/issues/:id/tasks/:itemId/inspect',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const authError = rejectUnsafeDashboardMutationRequest(request);
-    if (authError) return authError;
-
-    const params = yield* HttpRouter.params;
-    const id = (params['id'] ?? '').toUpperCase();
-    const itemId = params['itemId'] ?? '';
-    const body = yield* readJsonBody;
-    return yield* inspectIssueTask({ id, itemId, body });
-  })),
-);
-
 // ─── Route: GET /api/issues/:id/planning-state ───────────────────────────────
 //
 // Lightweight summary of an issue's planning artifacts:
@@ -946,7 +925,6 @@ export const issuesRouteLayer = Layer.mergeAll(
   postIssuesBulkCloseOutRoute,
   getIssuePrdRoute,
   getIssueTasksRoute,
-  postIssueTaskInspectRoute,
   getIssuePlanningStateRoute,
   postIssueGenerateTasksRoute,
   getIssueCostsRoute,

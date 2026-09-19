@@ -35,7 +35,6 @@ import type { SessionsFeedRow } from '../../lib/overdeck/sessions-feed.js';
 import { validateOrigin } from './routes/origin-validation.js';
 import { jsonResponse } from './http-helpers.js';
 import { runDashboardDbJob } from './services/dashboard-db-task.js';
-import { readCurrentLatestFlywheelStatus, subscribeLatestFlywheelStatus } from './services/flywheel-run-state.js';
 import { readWorkspaceFileEffect } from './services/read-workspace-file.js';
 import { readFileAtPathEffect, writeFileAtPathEffect } from './services/file-at-path.js';
 import { resolveFilePathExistsEffect } from './services/resolve-file-path-exists.js';
@@ -566,21 +565,6 @@ const PanRpcLayer = PanRpcGroup.toLayer(
           Stream.merge(heartbeats),
         );
       },
-
-      [WS_METHODS.subscribeFlywheelStatus]: (_input) =>
-        Stream.callback((queue) =>
-          Effect.acquireRelease(
-            Effect.promise(async () => {
-              const activeRunId = await runDashboardDbJob<string | null>('getSetting', 'flywheel.active_run_id');
-              const latest = await readCurrentLatestFlywheelStatus({ activeRunId });
-              if (latest) Queue.offerUnsafe(queue, latest);
-              return subscribeLatestFlywheelStatus((status) => {
-                Queue.offerUnsafe(queue, status);
-              });
-            }),
-            (unsubscribe) => Effect.sync(() => unsubscribe()),
-          ),
-        ),
 
       // ── subscribeIssueEvents ──────────────────────────────────────────────────
       [WS_METHODS.subscribeIssueEvents]: (input) => {

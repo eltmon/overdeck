@@ -51,8 +51,6 @@ import { getConversationSearchConfigSync } from '../../../lib/config-yaml.js';
 import { getConversationSearchStatus } from '../services/conversation-search-status.js';
 import { recordConversationSearchFailure, recordConversationSearchSuccess } from '../../../lib/conversation-search/health.js';
 import { estimateFullReindexConversationSearchCost, fullReindexConversationSearch } from '../../../lib/conversation-search/indexer.js';
-import { getLegacyHome } from '../../../lib/paths.js';
-import { previewLegacyConversations, importLegacyConversations } from '../../../lib/overdeck/legacy-import.js';
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
@@ -1073,46 +1071,6 @@ const getProviderEnvConflictsRoute = HttpRouter.add(
 );
 
 
-const getLegacyImportPreviewRoute = HttpRouter.add(
-  'GET',
-  '/api/settings/legacy-import/conversations',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    return yield* Effect.try({
-      try: () => {
-        const urlPath = new URL(request.url, 'http://localhost').searchParams.get('path');
-        const defaultPath = join(getLegacyHome(), 'panopticon.db');
-        const resolvedPath = urlPath?.trim() || defaultPath;
-        const preview = previewLegacyConversations(resolvedPath);
-        if (!preview.found) {
-          return jsonResponse({ found: false, defaultPath, message: `No legacy database found at ${resolvedPath}` });
-        }
-        return jsonResponse({ found: true, path: resolvedPath, conversations: preview.rows });
-      },
-      catch: (err) => jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 500 }),
-    });
-  })),
-);
-
-const postLegacyImportRoute = HttpRouter.add(
-  'POST',
-  '/api/settings/legacy-import/conversations',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const authError = rejectUnsafeDashboardMutationRequest(request);
-    if (authError) return authError;
-    const body = yield* readJsonBody;
-    return yield* Effect.try({
-      try: () => {
-        const { path, names } = body as { path: string; names: string[] };
-        const result = importLegacyConversations(path, names);
-        return jsonResponse(result);
-      },
-      catch: (err) => jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 500 }),
-    });
-  })),
-);
-
 // ─── Compose all routes into a single Layer ───────────────────────────────────
 
 export const settingsRouteLayer = Layer.mergeAll(
@@ -1137,8 +1095,6 @@ export const settingsRouteLayer = Layer.mergeAll(
   postOpenRouterTestKeyRoute,
   getHarnessPolicyRoute,
   getProviderEnvConflictsRoute,
-  getLegacyImportPreviewRoute,
-  postLegacyImportRoute,
 );
 
 export default settingsRouteLayer;

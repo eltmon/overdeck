@@ -272,7 +272,7 @@ export async function postMergeTrainGenerationShipPayload(
   const generation = getUatGenerationSync(name);
   if (!generation) return { status: 404, body: { error: `No UAT generation named ${name}` } };
 
-  const { shipPromotedBatch, ShipPromotedBatchError } = await import('../../../lib/cloister/ship-record.js');
+  const { shipPromotedBatch, ShipPromotedBatchError } = await import('../services/generation-ship.js');
   try {
     return {
       status: 200,

@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -16,8 +16,9 @@ import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { getAgentCommandSync } from '../../../../lib/settings.js';
 import { killSession } from '../../../../lib/tmux.js';
 import { getAgentStateSync, saveAgentRuntimeState } from '../../../../lib/agents.js';
+import type { AgentState } from '../../../../lib/agents/agent-state.js';
+import { PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from '../../../../lib/cloister/review-monitor.js';
-import { resolveReviewParentRunState } from '../../../../lib/cloister/review-run-recovery.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { getDerivedIssueState } from '../../services/derived-issue-state.js';
 import { httpHandler } from '../http-handler.js';
@@ -640,6 +641,50 @@ const postProjectReviewRestartRoute = HttpRouter.add(
     });
   })),
 );
+
+/**
+ * The review parent's active run, recovered from its workspace artifacts.
+ *
+ * PAN-3917 (FR-7): review rounds are files under `<workspace>/.pan/review/<runId>/`,
+ * so the run id is recoverable from disk when the runtime registry lost it.
+ * Fail-closed: recovery only fires when exactly one run directory postdates the
+ * parent's start, and it never writes anything back.
+ */
+async function resolveReviewParentRunState(
+  parent: AgentState,
+): Promise<(AgentState & { reviewRunId?: string }) | null> {
+  if (!parent.workspace) return null;
+  if (parent.reviewRunId) return parent;
+
+  const startedAt = Date.parse(parent.startedAt);
+  if (!Number.isFinite(startedAt)) return null;
+
+  const reviewRoot = join(parent.workspace, PAN_DIRNAME, 'review');
+  let entries;
+  try {
+    entries = await readdir(reviewRoot, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+
+  const candidates: string[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !entry.name.startsWith(`${parent.id}-`)) continue;
+    try {
+      const runStat = await stat(join(reviewRoot, entry.name));
+      if (runStat.mtimeMs >= startedAt) candidates.push(entry.name);
+    } catch { /* raced away */ }
+  }
+  if (candidates.length !== 1) return null;
+
+  const runId = candidates[0]!;
+  const contextManifestPath = join(reviewRoot, runId, 'context.json');
+  return {
+    ...parent,
+    reviewRunId: runId,
+    ...(existsSync(contextManifestPath) ? { reviewContextManifestPath: contextManifestPath } : {}),
+  };
+}
 
 // ─── Route: POST /api/specialists/:project/:issueId/reviewer/:role/restart ───
 //
