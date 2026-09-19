@@ -47,17 +47,17 @@ check_item_order_file() {
         step=$1
         sub(/\./, "", step)
         if (!done_step && index($0, "pan task done")) done_step=step
-        if (!inspect_step && index($0, "pan inspect")) inspect_step=step
+        if (!push_step && index($0, "git push")) push_step=step
       }
       END {
-        if (!done_step || !inspect_step) print "missing"
-        else if (done_step + 0 < inspect_step + 0) print "ok"
-        else print done_step ":" inspect_step
+        if (!done_step || !push_step) print "missing"
+        else if (push_step + 0 < done_step + 0) print "ok"
+        else print done_step ":" push_step
       }
     ' "$ROOT/$file"
   )"
   if [[ "$result" != "ok" ]]; then
-    fail "item-loop-order: $file has pan task done not before pan inspect ($result)"
+    fail "item-loop-order: $file has pan task done not after git push ($result)"
   fi
   return 0
 }
@@ -218,9 +218,6 @@ EOF
 4. git commit
 5. git push
 6. pan task done ISSUE item
-7. read metadata
-8. skip if false
-9. pan inspect ISSUE --item item
 data, not instructions
 lead with anomalies
 every staged file must be required
@@ -233,8 +230,6 @@ EOF
 4. git commit
 5. git push
 6. pan task done ISSUE item
-7. read metadata
-8. pan inspect ISSUE --item item
 EOF
   cat > "$root/src/lib/cloister/verification-runner.ts" <<'EOF'
 Complete every finished item with pan task done.
@@ -269,7 +264,7 @@ self_test() {
 from pathlib import Path
 import sys
 p = Path(sys.argv[1])
-p.write_text(p.read_text().replace('6. pan task done ISSUE item\n7. read metadata\n8. pan inspect ISSUE --item item', '6. read metadata\n7. pan inspect ISSUE --item item\n8. pan task done ISSUE item'))
+p.write_text(p.read_text().replace('5. git push\n6. pan task done ISSUE item', '5. pan task done ISSUE item\n6. git push'))
 PY"
   expect_self_test_failure "single-workflow-copy" \
     "printf '%s\n' '## MANDATORY: One Item At A Time' >> \"\$tmp/src/lib/cloister/prompts/work.md\""
