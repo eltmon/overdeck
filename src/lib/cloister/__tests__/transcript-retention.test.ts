@@ -160,7 +160,6 @@ describe('sweepTranscriptRetention', () => {
         listSessionNames: vi.fn(async () => []),
         listAgents,
         isTerminalAgent,
-        removeAgentRecord: vi.fn(),
         listConversations: vi.fn(),
         listArchivedConversations: vi.fn(),
         log: vi.fn(),
@@ -200,7 +199,6 @@ describe('sweepTranscriptRetention', () => {
         listSessionNames: vi.fn(async () => []),
         listAgents,
         isTerminalAgent,
-        removeAgentRecord: vi.fn(),
         listConversations: vi.fn(),
         listArchivedConversations: vi.fn(),
         log: vi.fn(),
@@ -228,14 +226,12 @@ describe('sweepTranscriptRetention', () => {
       workspace: '/tmp/feature-pan-3357',
       paused: true,
     };
-    const removeRecord = vi.fn();
     const retentionDeps = {
       listSessionNames: vi.fn(async () => []),
       listAgents: vi.fn(() => [agent]),
       isTerminalAgent: vi.fn(() => true),
       listConversations: vi.fn(),
       listArchivedConversations: vi.fn(),
-      removeAgentRecord: removeRecord,
       now: () => Date.now(),
       log: vi.fn(),
     };
@@ -248,8 +244,6 @@ describe('sweepTranscriptRetention', () => {
       markRetained: markRetainedTranscripts,
       writeTombstone: vi.fn(async () => {}),
       emitPruneEvent: vi.fn(),
-      removeRecord,
-      tombstoneRecord: vi.fn(),
       isTerminalAgent: vi.fn(() => true),
     };
 
@@ -261,13 +255,13 @@ describe('sweepTranscriptRetention', () => {
     expect(repeatedGc).toEqual({ removed: [], preserved: ['agent-pan-3357'] });
     expect(cleanStateDir).toHaveBeenCalledTimes(1);
     expect(existsSync(transcriptPath)).toBe(true);
-    expect(removeRecord).not.toHaveBeenCalled();
+    expect(existsSync(join(agentsDir, 'agent-pan-3357'))).toBe(true);
 
     await vi.advanceTimersByTimeAsync(2 * DAY_MS);
     await sweepTranscriptRetention({ transcriptDays: 2, agentsDir, deps: retentionDeps });
 
     expect(existsSync(transcriptPath)).toBe(false);
-    expect(removeRecord).toHaveBeenCalledWith('agent-pan-3357');
+    expect(existsSync(join(agentsDir, 'agent-pan-3357'))).toBe(false);
   });
 
   it('fails closed when the canonical agent registry cannot be read', async () => {

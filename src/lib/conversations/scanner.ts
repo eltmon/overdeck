@@ -21,7 +21,7 @@ import {
   getDiscoveredSessionByJsonlPath,
   upsertDiscoveredSession,
 } from '../overdeck/discovered-sessions.js';
-import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
+import { getAgentStateSync } from '../agents/agent-state.js';
 import { parseSessionJsonl } from './jsonl-async.js';
 import { HashResolver } from './hash-resolver.js';
 import { getSystemCapabilities } from './system-probe.js';
@@ -336,10 +336,9 @@ function resolveAgentWorkspace(jsonlPath: string): string | null {
   const match = normalized.match(/\/\.overdeck\/agents\/([^/]+)\//);
   const agentId = match?.[1];
   if (!agentId) return null;
-  const row = getOverdeckDatabaseSync()
-    .prepare(`SELECT workspace FROM agents WHERE id = ?`)
-    .get(agentId) as { workspace: string | null } | undefined;
-  return row?.workspace ?? null;
+  // PAN-3917: the agents table is dropped on every boot — an agent's workspace
+  // lives in its own state file.
+  return getAgentStateSync(agentId)?.workspace ?? null;
 }
 
 // ─── Cost estimation ──────────────────────────────────────────────────────────
