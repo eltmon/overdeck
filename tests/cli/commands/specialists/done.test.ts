@@ -1,34 +1,44 @@
 /**
  * Tests for `pan admin specialists done <role> <issue> --status <...>`.
  *
- * PAN-3917: a specialist verdict is posted where the forge owns it — an
- * approval or a review comment on the pull/merge request — and nowhere
- * else. There is no review-status row, no verdict-anchor write door, and
- * no `inspect` role (that went with the per-item inspection gate).
+ * PAN-3917: a specialist verdict is posted where the forge owns it — and for
+ * the reviewer that means the forge's own review decision: APPROVE on a pass,
+ * REQUEST_CHANGES on blocked/failed. Test and UAT verdicts stay comments. There
+ * is no review-status row, no verdict-anchor write door, and no `inspect` role
+ * (that went with the per-item inspection gate).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 
 const {
   mockDiscoverArtifact,
-  mockApproveReviewArtifact,
   mockCommentOnArtifact,
   mockGetIssueWorkspacePath,
   mockDeliverReviewVerdictFeedback,
   mockSurfaceIssueFeedbackNeedsYou,
+  mockPostReviewVerdict,
+  mockGetPrFacts,
 } = vi.hoisted(() => ({
   mockDiscoverArtifact: vi.fn(),
-  mockApproveReviewArtifact: vi.fn(),
   mockCommentOnArtifact: vi.fn(),
   mockGetIssueWorkspacePath: vi.fn(),
   mockDeliverReviewVerdictFeedback: vi.fn(),
   mockSurfaceIssueFeedbackNeedsYou: vi.fn(),
+  mockPostReviewVerdict: vi.fn(),
+  mockGetPrFacts: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/forge.js', () => ({
   discoverArtifact: mockDiscoverArtifact,
-  approveReviewArtifact: mockApproveReviewArtifact,
   commentOnArtifact: mockCommentOnArtifact,
+}));
+
+vi.mock('../../../../src/lib/cloister/pr-review-verdict.js', () => ({
+  postReviewVerdict: mockPostReviewVerdict,
+}));
+
+vi.mock('../../../../src/lib/cloister/pr-facts.js', () => ({
+  getPrFacts: mockGetPrFacts,
 }));
 
 vi.mock('../../../../src/lib/overdeck/issue-projects.js', () => ({
@@ -64,8 +74,14 @@ describe('specialists done command', () => {
       id: '1059',
       created: false,
     }));
-    mockApproveReviewArtifact.mockReturnValue(Effect.succeed(undefined));
     mockCommentOnArtifact.mockReturnValue(Effect.succeed(undefined));
+    mockPostReviewVerdict.mockResolvedValue({
+      posted: true, forge: 'github', url: ARTIFACT_URL, verdict: 'request-changes',
+    });
+    mockGetPrFacts.mockResolvedValue({
+      issueId: 'PAN-1059', forge: 'github', url: ARTIFACT_URL, open: true,
+      approved: false, changesRequested: true,
+    });
     mockDeliverReviewVerdictFeedback.mockReturnValue(Effect.succeed({
       feedbackPath: '/workspace/.pan/feedback/001-review-agent-changes-requested.md',
       prCommentPosted: true,
@@ -141,26 +157,27 @@ describe('specialists done command', () => {
 
     expect(exit).toHaveBeenCalledWith(1);
     expect(error.mock.calls.map((c) => String(c[0])).join('\n')).toContain('No open review artifact');
-    expect(mockApproveReviewArtifact).not.toHaveBeenCalled();
+    expect(mockPostReviewVerdict).not.toHaveBeenCalled();
   });
 
-  it('a passed review approves the artifact instead of commenting', async () => {
-    const log = vi.spyOn(console, 'log');
+  it('a passed review posts APPROVE, not a comment', async () => {
+    mockPostReviewVerdict.mockResolvedValue({
+      posted: true, forge: 'github', url: ARTIFACT_URL, verdict: 'approve',
+    });
     const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
 
     await doneCommand('review', 'pan-1059', { status: 'passed', notes: 'looks good' });
 
-    expect(mockApproveReviewArtifact).toHaveBeenCalledWith('github', {
-      forge: 'github',
-      url: ARTIFACT_URL,
-      cwd: '/project/workspaces/feature-pan-1059',
+    expect(mockPostReviewVerdict).toHaveBeenCalledWith({
+      issueId: 'PAN-1059',
+      verdict: 'approve',
+      body: expect.stringContaining('review verdict: passed'),
     });
     expect(mockCommentOnArtifact).not.toHaveBeenCalled();
-    expect(log.mock.calls.map((c) => String(c[0])).join('\n')).toContain('Review approved');
     expect(mockDeliverReviewVerdictFeedback).not.toHaveBeenCalled();
   });
 
-  it('a blocked review comments the verdict and delivers feedback', async () => {
+  it('a blocked review posts REQUEST_CHANGES and delivers feedback', async () => {
     const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
 
     await doneCommand('review', 'pan-1059', {
@@ -169,13 +186,13 @@ describe('specialists done command', () => {
       runId: 'agent-pan-1059-review-abcdef12',
     });
 
-    expect(mockCommentOnArtifact).toHaveBeenCalledWith('github', {
-      forge: 'github',
-      url: ARTIFACT_URL,
+    expect(mockPostReviewVerdict).toHaveBeenCalledWith({
+      issueId: 'PAN-1059',
+      verdict: 'request-changes',
       body: expect.stringContaining('review verdict: blocked'),
-      cwd: '/project/workspaces/feature-pan-1059',
     });
-    expect(mockCommentOnArtifact.mock.calls[0][1].body).toContain('correctness blocker');
+    expect(mockPostReviewVerdict.mock.calls[0][0].body).toContain('correctness blocker');
+    expect(mockCommentOnArtifact).not.toHaveBeenCalled();
     expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledWith({
       issueId: 'PAN-1059',
       verdict: 'blocked',
@@ -185,18 +202,60 @@ describe('specialists done command', () => {
     });
   });
 
-  it('a failed review also delivers feedback', async () => {
+  it('a failed review also posts REQUEST_CHANGES and delivers feedback', async () => {
     const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
 
     await doneCommand('review', 'pan-1059', { status: 'failed', notes: 'synthesis crashed' });
 
-    expect(mockCommentOnArtifact.mock.calls[0][1].body).toContain('review verdict: failed');
+    expect(mockPostReviewVerdict.mock.calls[0][0]).toMatchObject({ verdict: 'request-changes' });
     expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledWith({
       issueId: 'PAN-1059',
       verdict: 'failed',
       notes: 'synthesis crashed',
       prUrl: ARTIFACT_URL,
     });
+  });
+
+  it('fails completion when the verdict could not be posted to the forge', async () => {
+    mockPostReviewVerdict.mockResolvedValue({ posted: false, reason: 'gh pr review failed: 403' });
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+    const error = vi.spyOn(console, 'error');
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await doneCommand('review', 'pan-1059', { status: 'blocked', notes: 'blocker' });
+
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(error.mock.calls.map((c) => String(c[0])).join('\n')).toContain('Could not post the review verdict');
+    expect(mockDeliverReviewVerdictFeedback).not.toHaveBeenCalled();
+  });
+
+  it('does not drive the work agent until a fresh PR read reports CHANGES_REQUESTED', async () => {
+    mockGetPrFacts.mockResolvedValue({
+      issueId: 'PAN-1059', forge: 'github', url: ARTIFACT_URL, open: true,
+      approved: false, changesRequested: false,
+    });
+    const warn = vi.spyOn(console, 'warn');
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await doneCommand('review', 'pan-1059', { status: 'blocked', notes: 'blocker' });
+
+    expect(mockDeliverReviewVerdictFeedback).not.toHaveBeenCalled();
+    expect(warn.mock.calls.map((c) => String(c[0])).join('\n')).toContain('does not report the rejection yet');
+  });
+
+  it('GitLab has no request-changes primitive, so an open unapproved MR is the rejection', async () => {
+    mockPostReviewVerdict.mockResolvedValue({
+      posted: true, forge: 'gitlab', url: 'https://gitlab.com/g/p/-/merge_requests/7', verdict: 'request-changes',
+    });
+    mockGetPrFacts.mockResolvedValue({
+      issueId: 'PAN-1059', forge: 'gitlab', url: 'https://gitlab.com/g/p/-/merge_requests/7',
+      open: true, approved: false, changesRequested: false,
+    });
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await doneCommand('review', 'pan-1059', { status: 'blocked', notes: 'blocker' });
+
+    expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalled();
   });
 
   it('records a test verdict with UAT recorded separately in the same comment', async () => {

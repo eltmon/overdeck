@@ -12,7 +12,8 @@
  */
 import type { AgentState } from '../agents/agent-state.js';
 import { listAgentStates } from '../agents.js';
-import { isAliveSync, isConfirmedDead, isIdle } from '../agents/liveness.js';
+import { isAlive, isConfirmedDead, isIdle } from '../agents/liveness.js';
+import { liveAgentInventory } from '../terminal-backends/inventory.js';
 import { deliverAgentMessage } from '../agents/delivery.js';
 import { getWorkspaceGitState } from '../workspaces/git-state.js';
 import { isDeaconGloballyPausedSync } from '../overdeck/control-settings.js';
@@ -45,9 +46,15 @@ function stuckNudgeMessage(idleMinutes: number, unpushedCommits: number): string
 export async function checkStuckWorkAgents(now = Date.now()): Promise<string[]> {
   const actions: string[] = [];
   const workAgents = listAgentStates({ role: 'work', status: 'running' });
+  // A nudge can only reach an agent the backend still hosts. An unreadable
+  // inventory is indeterminate: nudge nobody rather than message the dead.
+  const inventory = await liveAgentInventory();
+  if (inventory === null) return actions;
+  const liveIds = new Set(inventory.panes.map((pane) => pane.agentId));
 
   for (const agent of workAgents) {
     if (!agent.workspace) continue;
+    if (!liveIds.has(agent.id)) continue;
     if (!isIdle(agent.id, STUCK_IDLE_THRESHOLD_MS, now)) continue;
 
     const lastNudge = lastStuckNudgeAt.get(agent.id);
@@ -109,15 +116,29 @@ export function setAgentStatusChangedNotifier(fn: AgentStatusChangedNotifier | n
 export async function reconcileAgentLiveness(): Promise<string[]> {
   const actions: string[] = [];
   const runningAgents = listAgentStates({ status: 'running' });
+  // PAN-3917: the evidence is the SELECTED backend's inventory. Under Herdr no
+  // agent has a tmux session, so the tmux liveness oracle would declare every
+  // one of them dead and this routine would blank the dashboard's cache.
+  const inventory = await liveAgentInventory();
+  if (inventory === null) return actions;
+  const liveIds = new Set(inventory.panes.map((pane) => pane.agentId));
 
   for (const agent of runningAgents) {
-    const verdict = isAliveSync(agent.id);
-    if (verdict.alive || !isConfirmedDead(verdict)) continue;
+    if (liveIds.has(agent.id)) continue;
+    // On tmux an absent session can still mean a probe that failed rather than
+    // a death, so the oracle gets the final word; on Herdr the inventory IS the
+    // oracle, and absence from it is the confirmed death.
+    let reason = `absent from the ${inventory.backend} inventory`;
+    if (inventory.backend === 'tmux') {
+      const verdict = await isAlive(agent.id);
+      if (verdict.alive || !isConfirmedDead(verdict)) continue;
+      reason = verdict.reason;
+    }
 
     if (agentStoppedNotifier) {
       try {
         agentStoppedNotifier(agent.id);
-        actions.push(`reconcileAgentLiveness: corrected cache for ${agent.id} (confirmed dead: ${verdict.reason})`);
+        actions.push(`reconcileAgentLiveness: corrected cache for ${agent.id} (confirmed dead: ${reason})`);
       } catch (err) {
         console.error(`[deacon-lite] Failed to notify cache correction for ${agent.id}:`, err);
       }

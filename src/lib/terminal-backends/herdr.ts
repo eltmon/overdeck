@@ -207,6 +207,57 @@ export async function findHerdrAgent(
   }
 }
 
+/** One live Herdr agent, keyed by the Overdeck agent id bound with `agent.rename`. */
+export interface HerdrLiveAgent {
+  readonly agentId: string;
+  readonly paneId: string;
+  readonly terminalId: string;
+  readonly state: AgentState;
+  readonly tokens: Partial<PaneTokens>;
+}
+
+/**
+ * Every live Herdr agent, as the backend-aware inventory reads it.
+ *
+ * `BackendAgentSnapshot` carries no agent name, and on Herdr the Overdeck agent
+ * id is the *live agent name* (`agent.rename`), not the `w1:p1` pane id — so
+ * the inventory needs this narrower read. Agents Herdr detected but Overdeck
+ * never named are skipped: nothing can address them by agent id.
+ */
+export async function listHerdrAgents(
+  api: HerdrApiClient = getHerdrApiClient(),
+): Promise<readonly HerdrLiveAgent[]> {
+  const listed = await api.call<{ agents?: HerdrPaneInfo[] }>('agent.list', {});
+  const agents: HerdrLiveAgent[] = [];
+  for (const agent of listed.agents ?? []) {
+    const agentId = agent.name?.trim();
+    if (!agentId) continue;
+    agents.push({
+      agentId,
+      paneId: agent.pane_id,
+      terminalId: agent.terminal_id,
+      state: toAgentState(agent.agent_status),
+      tokens: (agent.tokens ?? {}) as Partial<PaneTokens>,
+    });
+  }
+  return agents;
+}
+
+/** The recent terminal text of a Herdr pane — the backend's `capture-pane`. */
+export async function readHerdrPaneText(
+  paneId: string,
+  lines: number,
+  api: HerdrApiClient = getHerdrApiClient(),
+): Promise<string> {
+  const result = await api.call<{ text?: string }>('pane.read', {
+    pane_id: paneId,
+    source: 'recent',
+    lines,
+    strip_ansi: true,
+  });
+  return result.text ?? '';
+}
+
 export class HerdrBackend implements TerminalBackend {
   readonly name = BACKEND;
 
@@ -263,12 +314,21 @@ export class HerdrBackend implements TerminalBackend {
       });
 
       const agentName = spec.name ?? `${spec.tokens.role}-${pane.pane_id.replace(':', '-')}`;
-      const detected = await this.waitForAgentDetection(pane.pane_id);
-      if (detected) {
-        // Bind the Overdeck agent id as the live agent name so `agent.prompt`
-        // and `agent.wait` address it the way every caller already names it.
-        await this.api.call('agent.rename', { target: pane.pane_id, name: agentName });
+      // Detection is what makes the pane addressable: only a detected agent can
+      // be renamed, and every caller addresses the pane by the Overdeck agent
+      // id. A timeout therefore has to be a LAUNCH FAILURE — returning the
+      // intended name for a pane that never took it hands the caller a
+      // reference no prompt, wait or close can reach.
+      if (!await this.waitForAgentDetection(pane.pane_id)) {
+        await this.api.call('pane.close', { pane_id: pane.pane_id }).catch(() => {});
+        throw new Error(
+          `herdr detected no agent in pane ${pane.pane_id} within ${AGENT_DETECT_TIMEOUT_MS}ms; `
+          + `the pane could not be bound to ${agentName} and was closed`,
+        );
       }
+      // Bind the Overdeck agent id as the live agent name so `agent.prompt`
+      // and `agent.wait` address it the way every caller already names it.
+      await this.api.call('agent.rename', { target: pane.pane_id, name: agentName });
 
       await this.api.call('pane.report_metadata', {
         pane_id: pane.pane_id,
@@ -304,13 +364,19 @@ export class HerdrBackend implements TerminalBackend {
   ): Effect.Effect<PromptResult, TerminalBackendError> {
     return attempt('prompt', async () => {
       const handle = targetHandle(target);
+      // FR-17: a failed `agent.get` is NOT "this pane carries no tokens" — it is
+      // "we do not know what this pane is". The guard has to be told which,
+      // because an unknown target must not be treated as ungated.
+      let metadataAvailable = true;
       const info = await this.api.call<{ agent?: HerdrPaneInfo }>('agent.get', { target: handle })
-        .catch(() => ({ agent: undefined }));
+        .catch(() => { metadataAvailable = false; return { agent: undefined }; });
+      if (!info.agent) metadataAvailable = false;
       const tokens = (info.agent?.tokens ?? {}) as Partial<PaneTokens>;
 
       const verdict = checkPrompt({
         targetId: info.agent?.pane_id ?? handle,
         targetTokens: tokens,
+        targetTokensAvailable: metadataAvailable,
         sender: options.sender,
         messageId: options.messageId,
       });

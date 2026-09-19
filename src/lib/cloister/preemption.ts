@@ -42,7 +42,7 @@ import { logDeaconEventSync } from '../persistent-logger.js';
 import { loadCloisterConfigSync } from './config.js';
 import { isIdle } from '../agents/liveness.js';
 import { assessMemoryPressure } from './memory-governor.js';
-import { tryReserveAdvancingSlot } from './concurrency.js';
+import { countRunningAgents, tryReserveAdvancingSlot } from './concurrency.js';
 
 /** RSS settle window after a resume before the next memory re-assessment (mirrors deacon-auto-resume). */
 const RSS_SETTLE_MS = 2000;
@@ -209,12 +209,12 @@ export async function tryYieldForAdvancingDispatch(role: AdvancingRole, issueId:
   if (!outcome.yielded) return false;
 
   // Count-gated: the killed session already dropped the running count.
-  if (tryReserveAdvancingSlot()) return true;
+  if (tryReserveAdvancingSlot(await countRunningAgents())) return true;
 
   // Memory-gated: settle freed RSS, refresh the cached verdict, retry once.
   await new Promise((r) => setTimeout(r, RSS_SETTLE_MS));
   await assessMemoryPressure();
-  if (tryReserveAdvancingSlot()) return true;
+  if (tryReserveAdvancingSlot(await countRunningAgents())) return true;
 
   // FR-6c: the yield freed no usable capacity — put the victim back immediately.
   if (outcome.victimId) await resumeYieldedVictim(outcome.victimId);

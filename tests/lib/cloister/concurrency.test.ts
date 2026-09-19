@@ -53,6 +53,17 @@ describe('concurrency governor — swarm reserve (PAN-2212)', () => {
   });
 });
 
+/**
+ * PAN-3917 FR-3: the ceiling's liveness evidence is the SELECTED terminal
+ * backend's inventory, so tests state which agents the backend hosts. `null`
+ * is an unreadable inventory.
+ */
+function mockLiveAgents(agentIds: string[] | null) {
+  vi.doMock('../../../src/lib/terminal-backends/inventory.js', () => ({
+    listLiveAgentIds: async () => (agentIds === null ? null : new Set(agentIds)),
+  }));
+}
+
 describe('concurrency governor — config + counting', () => {
   afterEach(() => {
     vi.resetModules();
@@ -60,6 +71,7 @@ describe('concurrency governor — config + counting', () => {
     vi.doUnmock('../../../src/lib/agents.js');
     vi.doUnmock('../../../src/lib/overdeck/agents.js');
     vi.doUnmock('../../../src/lib/cloister/swarm-slot-lifecycle.js');
+    vi.doUnmock('../../../src/lib/terminal-backends/inventory.js');
   });
 
   it('falls back to safe defaults when config omits/garbles concurrency', async () => {
@@ -74,57 +86,74 @@ describe('concurrency governor — config + counting', () => {
     expect(limits.exemptOperatorStarted).toBe(true); // defaults to true
   });
 
-  it('counts tmux-alive running agents, grouped into work vs advancing', async () => {
+  it('counts backend-live running agents, grouped into work vs advancing', async () => {
     vi.resetModules();
     vi.doMock('../../../src/lib/agents.js', () => ({
       listRunningAgentsSync: () => [
-        { id: 'agent-pan-1', role: 'work', issueId: 'PAN-1', status: 'running', tmuxActive: true },
-        { id: 'agent-pan-2-review', role: 'review', issueId: 'PAN-2', status: 'running', tmuxActive: true },
-        { id: 'agent-pan-3-ship', role: 'ship', issueId: 'PAN-3', status: 'running', tmuxActive: true },
-        { id: 'planning-pan-4', role: 'plan', issueId: 'PAN-4', status: 'running', tmuxActive: true },
+        { id: 'agent-pan-1', role: 'work', issueId: 'PAN-1', status: 'running' },
+        { id: 'agent-pan-2-review', role: 'review', issueId: 'PAN-2', status: 'running' },
+        { id: 'agent-pan-3-ship', role: 'ship', issueId: 'PAN-3', status: 'running' },
+        { id: 'planning-pan-4', role: 'plan', issueId: 'PAN-4', status: 'running' },
         // PAN-3917: a crashed agent's state file still says `running` — nothing
-        // rewrites it. Only the tmux census can retire it from the ceiling.
-        { id: 'agent-pan-5', role: 'work', issueId: 'PAN-5', status: 'running', tmuxActive: false },
+        // rewrites it. Only the backend inventory can retire it from the ceiling.
+        { id: 'agent-pan-5', role: 'work', issueId: 'PAN-5', status: 'running' },
       ],
     }));
+    mockLiveAgents(['agent-pan-1', 'agent-pan-2-review', 'agent-pan-3-ship', 'planning-pan-4']);
     const { countRunningAgents } = await import('../../../src/lib/cloister/concurrency.js');
-    expect(countRunningAgents()).toEqual({ work: 1, advancing: 2, swarm: 0, total: 3 });
+    expect(await countRunningAgents()).toEqual({ work: 1, advancing: 2, swarm: 0, total: 3 });
+  });
+
+  it('counts every running state file when the backend inventory cannot be read', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/lib/agents.js', () => ({
+      listRunningAgentsSync: () => [
+        { id: 'agent-pan-1', role: 'work', issueId: 'PAN-1', status: 'running' },
+        { id: 'agent-pan-5', role: 'work', issueId: 'PAN-5', status: 'running' },
+      ],
+    }));
+    mockLiveAgents(null);
+    const { countRunningAgents } = await import('../../../src/lib/cloister/concurrency.js');
+    // Indeterminate evidence holds work back rather than admitting more.
+    expect(await countRunningAgents()).toEqual({ work: 2, advancing: 0, swarm: 0, total: 2 });
   });
 
   it('excludes terminal swarm slots from both the swarm reserve and regular work count', async () => {
     vi.resetModules();
     vi.doMock('../../../src/lib/agents.js', () => ({
       listRunningAgentsSync: () => [
-        { id: 'agent-pan-1', role: 'work', issueId: 'PAN-1', status: 'running', tmuxActive: true },
-        { id: 'agent-pan-2-slot-1', role: 'work', issueId: 'PAN-2', status: 'running', tmuxActive: true },
+        { id: 'agent-pan-1', role: 'work', issueId: 'PAN-1', status: 'running' },
+        { id: 'agent-pan-2-slot-1', role: 'work', issueId: 'PAN-2', status: 'running' },
       ],
     }));
     vi.doMock('../../../src/lib/cloister/swarm-slot-lifecycle.js', () => ({
       isTerminalSwarmSlotAgent: (agent: { id: string }) => agent.id === 'agent-pan-2-slot-1',
     }));
+    mockLiveAgents(['agent-pan-1', 'agent-pan-2-slot-1']);
 
     const { countRunningAgents } = await import('../../../src/lib/cloister/concurrency.js');
 
-    expect(countRunningAgents()).toEqual({ work: 1, advancing: 0, swarm: 0, total: 1 });
+    expect(await countRunningAgents()).toEqual({ work: 1, advancing: 0, swarm: 0, total: 1 });
   });
 
   it('excludes warm-idle advancing sessions from the ceiling (PAN-2579, PAN-3917)', async () => {
     vi.resetModules();
     vi.doMock('../../../src/lib/agents.js', () => ({
       listRunningAgentsSync: () => [
-        { id: 'agent-pan-9', role: 'work', issueId: 'PAN-9', status: 'running', tmuxActive: true },
-        { id: 'agent-pan-1-review', role: 'review', issueId: 'PAN-1', status: 'running', tmuxActive: true },
-        { id: 'agent-pan-2-review', role: 'review', issueId: 'PAN-2', status: 'running', tmuxActive: true },
-        { id: 'agent-pan-3-test', role: 'test', issueId: 'PAN-3', status: 'running', tmuxActive: true },
+        { id: 'agent-pan-9', role: 'work', issueId: 'PAN-9', status: 'running' },
+        { id: 'agent-pan-1-review', role: 'review', issueId: 'PAN-1', status: 'running' },
+        { id: 'agent-pan-2-review', role: 'review', issueId: 'PAN-2', status: 'running' },
+        { id: 'agent-pan-3-test', role: 'test', issueId: 'PAN-3', status: 'running' },
       ],
     }));
+    mockLiveAgents(['agent-pan-9', 'agent-pan-1-review', 'agent-pan-2-review', 'agent-pan-3-test']);
     // PAN-3917: warm-idle is the pane's own liveness, not a stored verdict.
     vi.doMock('../../../src/lib/agents/liveness.js', () => ({
       isIdle: (agentId: string) => agentId !== 'agent-pan-2-review',
     }));
     const { countRunningAgents } = await import('../../../src/lib/cloister/concurrency.js');
     // 3 advancing rows − 2 warm-idle = 1 counted; warm sessions are free capacity.
-    expect(countRunningAgents()).toEqual({ work: 1, advancing: 1, swarm: 0, total: 2 });
+    expect(await countRunningAgents()).toEqual({ work: 1, advancing: 1, swarm: 0, total: 2 });
   });
 
   it('reserves advancing slots up to the ceiling per patrol, then resets', () => {

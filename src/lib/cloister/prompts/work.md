@@ -97,12 +97,12 @@ These files contain critical context that may have been updated since the last s
 {{/LOCAL}}
 {{#REMOTE}}
 Your workspace is at /workspace (a full clone of the repo, checked out on your feature branch). Check for planning artifacts:
-- `/workspace/.pan/records/{{ISSUE_ID_LOWER}}.json` — per-issue record: decisions, hazards, resumePoint, sessionHistory from planning. Do NOT read `.pan/continue.json` (retired).
+- `/workspace/.overdeck/continue.json` — decisions, hazards, and approach context carried over from planning.
 - `/workspace/.pan/specs/<date>-<ISSUE-ID>-*.xbrief.json` — the canonical xBRIEF plan. READ-ONLY: never edit a spec file.
 - `/workspace/.pan/drafts/<ISSUE-ID>.md` — PRD draft (markdown narrative), if planning produced one
 - Task state is read from the merged xBRIEF with `pan task next {{ISSUE_ID}}` and `pan task show {{ISSUE_ID}} <item>`.
 
-Start by reading the per-issue record (if present) and the spec to understand the plan, then begin implementation.
+Start by reading the continue file (if present) and the spec to understand the plan, then begin implementation.
 If neither exists, check the issue tracker for requirements.
 {{/REMOTE}}
 
@@ -122,7 +122,7 @@ If neither exists, check the issue tracker for requirements.
 
 ### Subagent permission prompts — never self-approve
 
-If you observe that any subagent (the inspector spawned by `pan inspect`, or any other Claude Code subagent in a tmux session you can see) appears stuck waiting on a permission prompt, do **NOT** send keystrokes via `tmux send-keys` to approve, decline, or otherwise interact with the prompt.
+If you observe that any subagent (a review or tier-supervisor subagent, or any other Claude Code subagent in a tmux session you can see) appears stuck waiting on a permission prompt, do **NOT** send keystrokes via `tmux send-keys` to approve, decline, or otherwise interact with the prompt.
 
 Permission prompts indicate a permissions configuration issue that must be raised to the user. Self-approving via `tmux send-keys` can silently authorize destructive operations (file deletion, force-pushes, outbound network calls) that the user did not intend to allow.
 

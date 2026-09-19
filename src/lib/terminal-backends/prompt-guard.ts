@@ -79,6 +79,12 @@ export interface PromptGuardInput {
   readonly targetId: string;
   /** The target's metadata tokens, as the backend reports them. */
   readonly targetTokens: Partial<PaneTokens>;
+  /**
+   * False when the backend could not be asked what this target is (an
+   * `agent.get` that errored, a pane that is gone). Absent tokens and unknown
+   * tokens are different facts; only the first means "ungated".
+   */
+  readonly targetTokensAvailable?: boolean;
   readonly sender: PromptSender;
   readonly messageId: string;
   readonly now?: number;
@@ -127,13 +133,27 @@ function sameIssue(a: string | undefined, b: string | undefined): boolean {
  * The authority half of FR-17. Only `worker` panes are gated: they are the
  * item panes a foreman dispatches, and the incident was a reviewer steering
  * one. Every other role keeps today's open delivery.
+ *
+ * `tokensAvailable: false` means the backend could not say what the target is.
+ * The guard cannot then prove the target is NOT a worker pane, so it refuses
+ * everyone but an operator — a human at a conversation always keeps the ability
+ * to steer, and an agent never gains one it could not be granted.
  */
 export function checkPromptAuthority(
   targetTokens: Partial<PaneTokens>,
   sender: PromptSender,
+  tokensAvailable = true,
 ): PromptGuardVerdict {
-  if (targetTokens.role !== 'worker') return { allow: true };
   if (isOperatorConversation(sender)) return { allow: true };
+  if (!tokensAvailable) {
+    return {
+      refused: true,
+      reason:
+        `the backend could not report what ${sender.id}'s target is, so its role cannot be checked; `
+        + 'only an operator conversation may prompt a target with unknown metadata.',
+    };
+  }
+  if (targetTokens.role !== 'worker') return { allow: true };
 
   const issue = targetTokens.issue;
   if (sender.role === 'work' && sameIssue(sender.issue, issue)) return { allow: true };
@@ -153,7 +173,7 @@ export function checkPromptAuthority(
  * in the target's ring.
  */
 export function checkPrompt(input: PromptGuardInput): PromptGuardVerdict {
-  const authority = checkPromptAuthority(input.targetTokens, input.sender);
+  const authority = checkPromptAuthority(input.targetTokens, input.sender, input.targetTokensAvailable ?? true);
   if ('refused' in authority) return authority;
 
   const now = input.now ?? Date.now();

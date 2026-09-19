@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   reapOrphanedDashboardServers: vi.fn(async () => [] as string[]),
   reapLeftoverPlaywrightBrowsers: vi.fn(async () => [] as string[]),
   sweepTranscriptRetention: vi.fn(async () => [] as string[]),
+  reconcileMergedIssueDocker: vi.fn(async () => [] as string[]),
+  sweepOrphanedSwarmSlots: vi.fn(async () => [] as string[]),
   patrolDiskPressure: vi.fn(async () => [] as string[]),
   patrolMemoryPressure: vi.fn(async () => [] as string[]),
   loadCloisterConfigSync: vi.fn(() => ({ retention: { transcript_days: 30 } })),
@@ -29,6 +31,12 @@ vi.mock('../../../../src/lib/cloister/playwright-mcp-reaper.js', () => ({
 }));
 vi.mock('../../../../src/lib/cloister/transcript-retention.js', () => ({
   sweepTranscriptRetention: mocks.sweepTranscriptRetention,
+}));
+vi.mock('../../../../src/lib/cloister/merged-docker-reconcile.js', () => ({
+  reconcileMergedIssueDocker: mocks.reconcileMergedIssueDocker,
+}));
+vi.mock('../../../../src/lib/cloister/swarm-orphan-sweep.js', () => ({
+  sweepOrphanedSwarmSlots: mocks.sweepOrphanedSwarmSlots,
 }));
 vi.mock('../../../../src/lib/cloister/disk-pressure-patrol.js', () => ({
   patrolDiskPressure: mocks.patrolDiskPressure,
@@ -73,11 +81,13 @@ describe('hygiene-scheduler', () => {
     expect(mocks.reapOrphanedDashboardServers).toHaveBeenCalledTimes(1);
     expect(mocks.reapLeftoverPlaywrightBrowsers).toHaveBeenCalledTimes(1);
     expect(mocks.sweepTranscriptRetention).toHaveBeenCalledTimes(1);
+    expect(mocks.reconcileMergedIssueDocker).toHaveBeenCalledTimes(1);
+    expect(mocks.sweepOrphanedSwarmSlots).toHaveBeenCalledTimes(1);
     expect(mocks.patrolDiskPressure).toHaveBeenCalledTimes(1);
     expect(mocks.patrolMemoryPressure).toHaveBeenCalledTimes(1);
   });
 
-  it('fires the 60s-cadence routines (bridge pool, idle stacks, strike GC) on their own interval', async () => {
+  it('fires the 60s-cadence routines on their own interval', async () => {
     startHygieneScheduler();
     await vi.advanceTimersByTimeAsync(0);
     vi.clearAllMocks();
@@ -87,6 +97,11 @@ describe('hygiene-scheduler', () => {
     expect(mocks.patrolDockerBridgePool).toHaveBeenCalledTimes(1);
     expect(mocks.reconcileIdleWorkspaceStacks).toHaveBeenCalledTimes(1);
     expect(mocks.reapMergedStrikeWorkspaces).toHaveBeenCalledTimes(1);
+    // PAN-3917 FR-11: both carried over from deacon.ts's 60s patrol — the
+    // merged-issue Docker half of the closed-issue reaper, and the swarm
+    // orphan-slot GC that swarmJanitorPass ran on every cycle.
+    expect(mocks.reconcileMergedIssueDocker).toHaveBeenCalledTimes(1);
+    expect(mocks.sweepOrphanedSwarmSlots).toHaveBeenCalledTimes(1);
     // ~10-minute-cadence routines must not have fired yet.
     expect(mocks.reapOrphanedDashboardServers).not.toHaveBeenCalled();
     expect(mocks.reapLeftoverPlaywrightBrowsers).not.toHaveBeenCalled();

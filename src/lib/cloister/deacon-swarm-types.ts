@@ -70,7 +70,8 @@ export interface CoordinateSwarmSlotsDeps {
   clearSlotAssignment: (workspacePath: string, issueId: string, slotIndex: number, itemId?: string) => Promise<void>;
   runGitCommand: (command: string, cwd: string) => Promise<unknown>;
   registeredSlotCapacityAvailable: (issueId: string, selectedCount: number) => boolean;
-  tryReserveSwarmSlot: () => boolean;
+  /** PAN-3917: the running count comes from the backend inventory, so this is async. */
+  tryReserveSwarmSlot: () => Promise<boolean>;
   releaseSwarmSlot: () => void;
   spawnRun: (issueId: string, role: 'work', options: SpawnRunOptions) => Promise<unknown>;
   /**

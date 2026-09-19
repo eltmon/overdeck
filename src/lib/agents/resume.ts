@@ -8,7 +8,6 @@ import { buildCompactRecoverySeedMessage } from '../context-overflow.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { normalizeModelOverrideSync, requireModelOverrideSync } from '../model-validation.js';
-import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
 import { claudeSessionTranscriptExists, sessionFilePath } from '../paths.js';
 import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
@@ -646,30 +645,10 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
       saveAgentStateSync(agentState);
     }
 
-    // PAN-1675: a successful compaction-resume genuinely recovers a
-    // context-overflow-wedged agent — so clear a context_overflow `stuck` flag
-    // here (set by markWorkspaceStuck once the old /compact+/clear ladder
-    // exhausted). Without this the agent would stay flagged stuck forever and
-    // the deacon's overflowBlocked gate would keep skipping its recovery, even
-    // though the agent is now healthy. Only clear when the stuck reason is
-    // context_overflow (don't clobber an unrelated stuck state).
-    if (opts?.compact && agentState?.issueId) {
-      try {
-        const db = getOverdeckDatabaseSync();
-        const row = db.prepare('SELECT stuck, stuck_reason FROM review_status WHERE issue_id = ?')
-          .get(agentState.issueId.toUpperCase()) as { stuck?: number; stuck_reason?: string | null } | undefined;
-        if (row?.stuck === 1 && row.stuck_reason === 'context_overflow') {
-          db.prepare(`
-            UPDATE review_status
-            SET stuck = 0, stuck_reason = NULL, stuck_at = NULL, stuck_details = NULL, updated_at = ?
-            WHERE issue_id = ?
-          `).run(Date.now(), agentState.issueId.toUpperCase());
-          logAgentLifecycleSync(normalizedId, `cleared context_overflow stuck flag after compaction-resume for ${agentState.issueId}`);
-        }
-      } catch (clearErr) {
-        console.warn(`[agents] Could not clear stuck flag after compaction-resume for ${normalizedId}:`, clearErr);
-      }
-    }
+    // PAN-3917: the context_overflow `stuck` flag this used to clear lived on a
+    // `review_status` row. The table is dropped and nothing writes the flag any
+    // more — a resumed agent is simply running again, which every surface reads
+    // from its liveness.
 
     return { success: true, messageDelivered };
   } catch (error: unknown) {
