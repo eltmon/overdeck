@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-3924",
+  "created": "2026-09-19T13:26:25.608Z",
+  "updated": "2026-09-19T13:26:25.608Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "gh-run-stderr": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3924",
+      "claimedAt": "2026-09-19T13:26:25.607Z"
+    }
+  }
+}
