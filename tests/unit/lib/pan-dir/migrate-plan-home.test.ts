@@ -178,6 +178,17 @@ describe('migratePanHome', () => {
     expect(dest.items['item-a'].status).toBe('done');
   });
 
+  it('reads statusOverrides nested under tasks, falling back from the top-level field', async () => {
+    writeJson(stateRoot, 'records/pan-100.json', {
+      issueId: 'PAN-100',
+      tasks: { statusOverrides: { 'item-c': 'completed' } },
+    });
+    const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN });
+    expect(result.progressUpdated).toEqual(['PAN-100']);
+    const dest = JSON.parse(readFileSync(join(planHome, '.pan/continues/PAN-100.xbrief.json'), 'utf8'));
+    expect(dest.items['item-c']).toEqual({ status: 'done', migratedFrom: 'records.statusOverrides' });
+  });
+
   it('is idempotent for progress-merged continue files — a second run reports no change', async () => {
     const first = await migratePanHome({ stateRoot, planHome, openIssues: OPEN });
     expect(first.progressUpdated).toEqual(['PAN-100']);
