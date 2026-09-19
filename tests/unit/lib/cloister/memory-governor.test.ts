@@ -79,9 +79,6 @@ import {
   type GovernorReserves,
 } from '../../../../src/lib/cloister/memory-governor.js';
 import {
-  getResourceStacks,
-  resetResourceStackReviewStatusReaderForTests,
-  setResourceStackReviewStatusReaderForTests,
   type ResourceStack,
   type StackContainerResource,
 } from '../../../../src/dashboard/server/routes/resources/stacks.js';
@@ -118,14 +115,6 @@ function procMemory(
     ...overrides,
   };
 }
-
-beforeEach(() => {
-  setResourceStackReviewStatusReaderForTests(() => null);
-});
-
-afterEach(() => {
-  resetResourceStackReviewStatusReaderForTests();
-});
 
 describe('classifyMemoryPressure', () => {
   const thresholds = { warningBytes: 4 * GIB, criticalBytes: 2 * GIB };
@@ -625,13 +614,13 @@ function mergedStack(issueId: string, memoryBytes: number, serviceId = `${issueI
     serviceCount: 1,
     services: [{ id: serviceId, name: serviceId, memoryUsage: memoryBytes, status: 'running' }] as StackContainerResource[],
     aggregates: { cpuPercent: 0, memoryBytes, diskBytes: 0 },
-    phase: 'merged',
+    state: 'merged',
   };
 }
 
 describe('selectStackShedCandidates (PAN-2500 tiered-eviction)', () => {
   it('selects merged/closed stacks with no live agent referencing them, via buildReclaimPayload (never re-derived)', () => {
-    const stacks = [mergedStack('PAN-1', 2 * GIB), { ...mergedStack('PAN-2', 1 * GIB), phase: 'work' as const }];
+    const stacks = [mergedStack('PAN-1', 2 * GIB), { ...mergedStack('PAN-2', 1 * GIB), state: 'working' as const }];
     const result = selectStackShedCandidates(stacks, []);
     expect(result.map((s) => s.issueId)).toEqual(['PAN-1']);
   });
@@ -681,7 +670,7 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
   it('stops both merged stacks first, then pauses the idle agent only if still HARD afterward (PRD AC-4)', async () => {
     getStatsMock.mockReturnValue([]); // stacks come from getResourceStacks(containers); stub via direct override below
     const stacks = [mergedStack('PAN-1', 1 * GIB, 'pan-1-svc'), mergedStack('PAN-2', 1 * GIB, 'pan-2-svc')];
-    vi.spyOn(await import('../../../../src/dashboard/server/routes/resources/stacks.js'), 'getResourceStacks').mockReturnValue(stacks);
+    vi.spyOn(await import('../../../../src/dashboard/server/routes/resources/stacks.js'), 'getResourceStacks').mockResolvedValue(stacks);
 
     listRunningAgentsSyncMock.mockReturnValue([
       { id: 'agent-pan-3', issueId: 'PAN-3', role: 'work', tmuxActive: true, flywheelRunId: 'run-1' },
@@ -702,7 +691,7 @@ describe('shed() (PAN-2500 tiered-eviction integration)', () => {
   });
 
   it('never sheds an operator-attached (no flywheelRunId) agent even under sustained HARD pressure', async () => {
-    vi.spyOn(await import('../../../../src/dashboard/server/routes/resources/stacks.js'), 'getResourceStacks').mockReturnValue([]);
+    vi.spyOn(await import('../../../../src/dashboard/server/routes/resources/stacks.js'), 'getResourceStacks').mockResolvedValue([]);
     listRunningAgentsSyncMock.mockReturnValue([
       { id: 'agent-operator', issueId: 'PAN-4', role: 'work', tmuxActive: true, flywheelRunId: undefined },
     ]);
