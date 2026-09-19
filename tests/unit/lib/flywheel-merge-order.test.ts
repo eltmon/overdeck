@@ -235,33 +235,10 @@ describe('planUatCandidate (PAN-1691 on-demand UAT branch)', () => {
   });
 });
 
-describe('mergeGateEligibility (PAN-1759 verb vs authoritative state)', () => {
-  it('passes only when review passed and test passed/skipped', async () => {
-    const { mergeGateEligibility } = await import('../../../src/lib/review-status.js');
-    expect(mergeGateEligibility({ reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed' })).toEqual({ eligible: true });
-    expect(mergeGateEligibility({ reviewStatus: 'passed', testStatus: 'skipped', verificationStatus: 'pending' })).toEqual({ eligible: true });
-  });
-
-  it('rejects mid-review, unfinished tests, failed verification, missing records, and already-merged', async () => {
-    const { mergeGateEligibility } = await import('../../../src/lib/review-status.js');
-    expect(mergeGateEligibility({ reviewStatus: 'reviewing', testStatus: 'pending', verificationStatus: 'passed' }))
-      .toEqual({ eligible: false, reason: 'review is reviewing' });
-    expect(mergeGateEligibility({ reviewStatus: 'passed', testStatus: 'testing', verificationStatus: 'passed' }))
-      .toEqual({ eligible: false, reason: 'test is testing' });
-    expect(mergeGateEligibility({ reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'failed' }))
-      .toEqual({ eligible: false, reason: 'verification failed' });
-    expect(mergeGateEligibility(null)).toEqual({ eligible: false, reason: 'no review record' });
-    expect(mergeGateEligibility({ reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed', mergeStatus: 'merged' }))
-      .toEqual({ eligible: false, reason: 'already merged' });
-  });
-});
-
-describe('listEligibleCandidatesByProject eligibility gate (PAN-1759, moved by PAN-1696)', () => {
-  // PAN-1696 retired the verb-based computeMergeQueue wrapper, so the gate this
-  // test protects moved here: the ready set is built from review-status records
-  // and must still exclude anything the review pipeline has not cleared. Without
-  // this, a mid-review or still-testing issue reaches the merge queue again.
-  it('includes only review-cleared, non-deacon-ignored issues for the project', async () => {
+describe('listEligibleCandidatesByProject ready set (PAN-1759, moved by PAN-1696)', () => {
+  // PAN-3917: the ready set is the forge's answer — approved, checks green,
+  // mergeable — restricted to the project. Nothing consults a status row.
+  it('includes only the forge-ready issues that belong to the project', async () => {
     vi.resetModules();
     vi.doMock('../../../src/lib/projects.js', () => ({
       findProjectByPathSync: () => ({ path: '/repo/overdeck', name: 'Overdeck' }),
@@ -269,41 +246,32 @@ describe('listEligibleCandidatesByProject eligibility gate (PAN-1759, moved by P
         issueId.startsWith('MIN-') ? { projectPath: '/repo/myn' } : { projectPath: '/repo/overdeck' },
       getProjectSwarmHotspots: () => [],
     }));
-    vi.doMock('../../../src/lib/review-status.js', () => ({
-      loadReviewStatuses: () => ({
-        'PAN-1': { readyForMerge: true, reviewStatus: 'reviewing', testStatus: 'pending', prNumber: 1 },
-        'PAN-2': { readyForMerge: true, reviewStatus: 'passed', testStatus: 'testing', prNumber: 2 },
-        'PAN-3': { readyForMerge: true, reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed', prNumber: 3 },
-        'PAN-4': { readyForMerge: true, reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed', deaconIgnored: true, prNumber: 4 },
-        'PAN-5': { readyForMerge: false, reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed', prNumber: 5 },
-        'PAN-6': { readyForMerge: true, reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed', mergeStatus: 'merged', prNumber: 6 },
-        'MIN-9': { readyForMerge: true, reviewStatus: 'passed', testStatus: 'passed', verificationStatus: 'passed', prNumber: 9 },
-      }),
-      mergeGateEligibility: (rs: { reviewStatus?: string; testStatus?: string; verificationStatus?: string; mergeStatus?: string }) => {
-        if (rs.reviewStatus !== 'passed') return { eligible: false, reason: `review is ${rs.reviewStatus}` };
-        if (rs.testStatus !== 'passed' && rs.testStatus !== 'skipped') return { eligible: false, reason: `test is ${rs.testStatus}` };
-        if (rs.verificationStatus === 'failed') return { eligible: false, reason: 'verification failed' };
-        if (rs.mergeStatus === 'merged') return { eligible: false, reason: 'already merged' };
-        return { eligible: true };
-      },
+    vi.doMock('../../../src/lib/cloister/merge-ready-set.js', () => ({
+      getMergeReadyIssues: async () => ['PAN-3', 'MIN-9'],
     }));
-    const gatherMergeEligibility = vi.fn(async (issueIds: string[]) => {
-      if (issueIds.some((issueId) => issueId.startsWith('MIN-'))) throw new Error('unrelated project unavailable');
-      return new Map(issueIds.map((issueId) => [issueId, { bucket: issueId === 'PAN-3' ? 'in_flight' : 'planned_backlog' }]));
-    });
-    vi.doMock('../../../src/lib/cloister/merge-eligibility.js', () => ({
-      gatherMergeEligibility,
-      isMergeEligible: (membership: { bucket: string }) => membership.bucket === 'in_flight',
+    vi.doMock('../../../src/lib/cloister/pr-facts.js', () => ({
+      getPrFacts: async (issueId: string) => ({ issueId, number: issueId === 'PAN-3' ? 3 : 9 }),
     }));
 
     const { listEligibleCandidatesByProject } = await import('../../../src/lib/flywheel-merge-order.js');
     const candidates = await listEligibleCandidatesByProject('/repo/overdeck');
 
-    // PAN-3 alone survives: PAN-1 is mid-review, PAN-2 still testing, PAN-4 is
-    // deacon-ignored, PAN-5 is not ready, PAN-6 is merged, and MIN-9 belongs to another project.
+    // MIN-9 belongs to another project even though the forge calls it ready.
     expect(candidates.map((candidate) => candidate.issueId)).toEqual(['PAN-3']);
     expect(candidates[0]).toMatchObject({ issueId: 'PAN-3', pr: 3 });
-    expect(gatherMergeEligibility).toHaveBeenCalledWith(['PAN-3']);
+    vi.resetModules();
+  });
+
+  it('returns nothing for an unregistered project root', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/lib/projects.js', () => ({
+      findProjectByPathSync: () => null,
+      resolveProjectFromIssueSync: () => null,
+      getProjectSwarmHotspots: () => [],
+    }));
+
+    const { listEligibleCandidatesByProject } = await import('../../../src/lib/flywheel-merge-order.js');
+    await expect(listEligibleCandidatesByProject('/repo/unknown')).resolves.toEqual([]);
     vi.resetModules();
   });
 });
