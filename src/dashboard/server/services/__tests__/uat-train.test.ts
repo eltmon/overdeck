@@ -18,7 +18,6 @@ import type { PromoteResult, UatPromoteDeps } from '../../../../lib/cloister/uat
 const mocks = vi.hoisted(() => ({
   findProjectByPathSync: vi.fn(),
   getDashboardIdentity: vi.fn(),
-  readCurrentFlywheelStatusForDashboard: vi.fn(),
   listUatGenerationsSync: vi.fn(),
   probeUatStack: vi.fn(),
   teardownUatStack: vi.fn(),
@@ -80,10 +79,6 @@ vi.mock('../../identity.js', async (importOriginal) => {
     getDashboardIdentity: mocks.getDashboardIdentity,
   };
 });
-
-vi.mock('../flywheel-actions.js', () => ({
-  readCurrentFlywheelStatusForDashboard: mocks.readCurrentFlywheelStatusForDashboard,
-}));
 
 // uat-train.ts now imports listUatGenerationsSync from overdeck/merge-sync (not database/uat-generations-db)
 vi.mock('../../../../lib/overdeck/merge-sync.js', async (importOriginal) => {
@@ -337,7 +332,6 @@ describe('getUatGenerationsPayload', () => {
     let activeReads = 0;
     let maxActiveReads = 0;
 
-    mocks.readCurrentFlywheelStatusForDashboard.mockResolvedValue({ runId: 'RUN-1' });
     mocks.listUatGenerationsSync.mockReturnValue([gen(members)]);
     mocks.findXBriefByIssue.mockImplementation((_root: string, issueId: string) => Effect.succeed({
       path: pathByIssue.get(issueId)!,
