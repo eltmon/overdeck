@@ -111,16 +111,9 @@
       "category": "Lifecycle"
     },
     {
-      "id": "pan-review-reset-session",
-      "label": "pan review reset --session",
-      "description": "Reset review and clear saved Claude session",
-      "insert": "pan review reset  --session",
-      "category": "Review"
-    },
-    {
       "id": "pan-fork-plain",
       "label": "pan fork --plain",
-      "description": "Plain fork — copy raw history, skip summary",
+      "description": "Plain fork \u2014 copy raw history, skip summary",
       "insert": "pan fork  --plain",
       "category": "Conversation"
     },

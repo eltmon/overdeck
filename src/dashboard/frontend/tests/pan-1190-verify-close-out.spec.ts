@@ -40,8 +40,8 @@ function snapshotFor(stage) {
     // PAN-3917 FR-6: the pipeline position is derived, not a status row.
     derivedIssueStates: [
       stage === 'ready'
-        ? { issueId: ISSUE_ID, state: 'ready', pr: { url: `https://example.test/pr/1`, number: 1, reviewState: 'approved', checks: 'green', mergeable: true } }
-        : { issueId: ISSUE_ID, state: 'merged', pr: { url: `https://example.test/pr/1`, number: 1, reviewState: 'approved', checks: 'green', mergeable: true } },
+        ? { issueId: ISSUE_ID, state: 'ready', pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true } }
+        : { issueId: ISSUE_ID, state: 'merged', pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true } },
     ],
     backendPanes: [],
     issues: [issue],
