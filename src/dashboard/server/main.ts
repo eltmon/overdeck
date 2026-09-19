@@ -706,28 +706,38 @@ await startProjectCiRefillAfterProjectionReady(15 * 60 * 1000);
 
 // Reset stuck merge queue entries (PAN-632): any 'processing' entries were
 // in-flight when the server died — reset to 'queued' so they resume.
-try {
-  const { resetProcessingToQueued, requeueOrphanedMergingAutoMerges } = await import('../../lib/overdeck/merge-sync.js');
-  const resetCount = resetProcessingToQueued();
-  if (resetCount > 0) {
-    console.log(`[overdeck] Reset ${resetCount} stuck merge queue entries to queued`);
-    emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Reset ${resetCount} stuck merge queue entries to queued on startup` });
+//
+// fix10: every step below writes to state the primary owns or sets work going
+// that spawns agents (resumeQueuedMerges → merge → post-merge lifecycle →
+// `pan knowledge --retro`; processPendingLifecycle does the same directly;
+// processPendingFeedbackDeliveries writes into the primary's live agent panes).
+// A peer dashboard is a read/UI peer and starts none of it.
+if (isPeerDashboard) {
+  console.log('[overdeck] Merge-queue repair, post-merge lifecycle and feedback replay SKIPPED — peer dashboard spawns nothing');
+} else {
+  try {
+    const { resetProcessingToQueued, requeueOrphanedMergingAutoMerges } = await import('../../lib/overdeck/merge-sync.js');
+    const resetCount = resetProcessingToQueued();
+    if (resetCount > 0) {
+      console.log(`[overdeck] Reset ${resetCount} stuck merge queue entries to queued`);
+      emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Reset ${resetCount} stuck merge queue entries to queued on startup` });
+    }
+    // PAN-3328: an auto-merge row left in 'merging' by a crash is invisible to the
+    // problems endpoint and to the deacon reconciler — requeue it so it is retried.
+    const requeuedAutoMerges = requeueOrphanedMergingAutoMerges();
+    if (requeuedAutoMerges > 0) {
+      console.log(`[overdeck] Requeued ${requeuedAutoMerges} orphaned auto-merge row(s) from merging to pending`);
+      emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Requeued ${requeuedAutoMerges} orphaned auto-merge row(s) stuck in merging on startup` });
+    }
+    await resumeQueuedMerges();
+  } catch (err: any) {
+    console.warn(`[overdeck] Failed to reset merge queue: ${err.message}`);
   }
-  // PAN-3328: an auto-merge row left in 'merging' by a crash is invisible to the
-  // problems endpoint and to the deacon reconciler — requeue it so it is retried.
-  const requeuedAutoMerges = requeueOrphanedMergingAutoMerges();
-  if (requeuedAutoMerges > 0) {
-    console.log(`[overdeck] Requeued ${requeuedAutoMerges} orphaned auto-merge row(s) from merging to pending`);
-    emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Requeued ${requeuedAutoMerges} orphaned auto-merge row(s) stuck in merging on startup` });
-  }
-  await resumeQueuedMerges();
-} catch (err: any) {
-  console.warn(`[overdeck] Failed to reset merge queue: ${err.message}`);
-}
 
-// Pending post-merge lifecycle hook (PAN-444) — see pending-lifecycle.ts for details
-await processPendingLifecycle();
-await processPendingFeedbackDeliveries();
+  // Pending post-merge lifecycle hook (PAN-444) — see pending-lifecycle.ts for details
+  await processPendingLifecycle();
+  await processPendingFeedbackDeliveries();
+}
 
 // Restart gate (PAN-3729): if the previous server died to perform an approved
 // restart, this boot IS that restart completing — mark the epoch's requesters
@@ -747,11 +757,12 @@ await initRestartGate().catch((err: unknown) => {
 // HTTP server from accepting connections (the "Bad Gateway after pan up"
 // failure mode). The dashboard comes up clean; start cloister manually from
 // the UI once the workspace backlog is cleaned up.
-if (process.env.OVERDECK_DISABLE_AUTO_MERGE === '1') {
-  console.log('[overdeck] Auto-merge executor SKIPPED (OVERDECK_DISABLE_AUTO_MERGE=1)');
-} else {
-  startAutoMergeExecutor();
+if (startAutoMergeExecutor()) {
   console.log('[overdeck] Auto-merge executor started');
+} else if (isPeerDashboard) {
+  console.log('[overdeck] Auto-merge executor SKIPPED — peer dashboard spawns nothing');
+} else {
+  console.log('[overdeck] Auto-merge executor SKIPPED (OVERDECK_DISABLE_AUTO_MERGE=1)');
 }
 
 // PAN-3917: boot used to reset verification runs left `running` by a worker
