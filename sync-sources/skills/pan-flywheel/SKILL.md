@@ -24,19 +24,19 @@ tracker, and the forge.
 
 ```bash
 pan flywheel start
-pan flywheel start --orders <book-id>
+pan orders start <book-id>
 ```
 
-`pan flywheel start` opens this skill in a conversation. `--orders <book-id>`
-scopes the run to one order book (`pan orders show <book-id>`); without it,
-the loop works the open backlog directly.
+`pan flywheel start` opens this skill in a conversation working the open
+backlog directly. `pan orders start <book-id>` opens the same skill bound to
+one order book (`pan orders show <book-id>`).
 
 ## Phase 1 — Orient
 
 1. Read `.pan/backlog/sequence.md` for the operator-set pickup order.
-2. If an order book is bound (`--orders`, or one is `running`), read it with
-   `pan orders show <book-id>` — its Lane A/B items and prereqs take priority
-   over the general backlog.
+2. If an order book is bound (started via `pan orders start`, or one is
+   `running`), read it with `pan orders show <book-id>` — its Lane A/B items
+   and prereqs take priority over the general backlog.
 3. List in-flight work: `gh pr list --search "is:open"` for this repo, and
    `pan status` for live sessions. Anything already moving does not need a
    new pick.

@@ -99,7 +99,10 @@ The file goes at `.overdeck/spec.vbrief.json` in the workspace root and MUST con
           "verify_commands": ["npm run typecheck"],
           "expected_outputs": ["typecheck completes without errors"],
           "readiness": "ready",
-          "traces": ["FR-1", "NFR-2"]
+          "traces": ["FR-1", "NFR-2"],
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
         },
         "narrative": { "Action": "<what needs to be done>" },
         "items": [
@@ -135,6 +138,9 @@ The file goes at `.overdeck/spec.vbrief.json` in the workspace root and MUST con
 | `items[].metadata.expected_outputs` | Required for slot-eligible items. List the observable evidence expected from `verify_commands`, e.g. `["foo.test.ts passes"]`. |
 | `items[].metadata.readiness` | Required static parallel-safety classification: `"ready"` when the item can run in its own slot after DAG blockers complete, `"sequential"` only when it must remain serialized after prerequisites, and `"needs_refinement"` when it must be split or clarified. Incoming `blocks` edges do not imply `"sequential"`; edges control dispatch order. |
 | `items[].metadata.traces` | Optional `string[]` of PRD requirement IDs (`FR-1`, `NFR-2`) this item satisfies. |
+| `items[].metadata.requiresInspection` | Required boolean. There is no blocking `pan inspect` gate anymore (PAN-3917) — this only decides whether a standing tier-supervisor subscribes to this item's commits (`flagged` subscription policy). Default `false`; set `true` for genuinely risky items (schema/migration changes, auth, money paths). |
+| `items[].metadata.inspectionDepth` | Required when `requiresInspection` is `true`: `"fast"` or `"deep"`, how closely the supervisor should read commits. |
+| `items[].metadata.foundationFor` | Required non-empty `string[]` when `requiresInspection` is `true`: the downstream item IDs that build on this one. `quality-lint.ts` rejects `requiresInspection: true` with an empty or missing list. |
 | nested `items` with `metadata.kind: "acceptance_criterion"` | Each item must have at least one acceptance-criterion child item. |
 
 ---
@@ -245,6 +251,7 @@ Before running `pan plan finalize`:
 - [ ] Every item has `metadata.kind`
 - [ ] Every item has `metadata.files_scope`, `metadata.files_scope_confidence`, and `metadata.readiness`
 - [ ] Every slot-eligible item has `metadata.verify_commands` and `metadata.expected_outputs`
+- [ ] Every item has `metadata.requiresInspection`; items with `requiresInspection: true` also have `metadata.inspectionDepth` and a non-empty `metadata.foundationFor`
 - [ ] Every item has at least one nested `items` AC entry
 - [ ] No spurious edges
 - [ ] `.overdeck/continue.json` written with at least one `decisions[]` entry
