@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3930",
   "created": "2026-09-19T13:31:31.437Z",
-  "updated": "2026-09-19T13:31:31.437Z",
+  "updated": "2026-09-19T13:34:48.031Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "context-ignore": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3930",
-      "claimedAt": "2026-09-19T13:31:31.437Z"
+      "claimedAt": "2026-09-19T13:31:31.437Z",
+      "doneAt": "2026-09-19T13:34:48.030Z"
     }
   }
 }
