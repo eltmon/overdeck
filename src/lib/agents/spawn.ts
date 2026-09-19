@@ -94,6 +94,21 @@ import { buildRegisteredSlotPrompt, ensureRegisteredSlotWorktree } from './regis
 import { launchAndCaptureManagedKimiSession } from '../runtimes/kimi-code.js';
 import { requireManagedKimiDelivery } from './managed-kimi-delivery.js';
 const execAsync = promisify(exec);
+/**
+ * PAN-3917 FR-3: close a pane a launch already created. `stopAgent` and
+ * `killSession` reach a tmux session; on Herdr there is none, so the pane is
+ * closed through the reference `launchAgentPane` returned. A backend that is
+ * tmux (or a launch that never got a reference) falls through to the tmux path
+ * the caller already runs.
+ */
+async function closeBackendPane(
+  pane: Awaited<ReturnType<typeof launchAgentPane>> | null,
+): Promise<void> {
+  if (!pane || pane.backend === 'tmux') return;
+  const { resolveTerminalBackend } = await import('../terminal-backends/registry.js');
+  await Effect.runPromise(resolveTerminalBackend(pane.backend).close(pane)).catch(() => {});
+}
+
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions): Promise<AgentState> {
   if (role !== 'work') return spawnRunWithoutConsentClaim(issueId, role, options);
 
@@ -461,6 +476,7 @@ async function spawnRunWithoutConsentClaim(
       });
       if (shouldRegisterConversation) setConversationClaudeSessionId(agentId, rawSessionId);
     } catch (error) {
+      await closeBackendPane(launchedPane);
       const { killSession } = await import('../tmux.js');
       await Effect.runPromise(killSession(agentId)).catch(() => {});
       throw error;
@@ -501,6 +517,7 @@ async function spawnRunWithoutConsentClaim(
         if (tracksKickoffDelivery) {
           await recordKickoffDeliveryFailure(state, issueId, role);
         }
+        await closeBackendPane(launchedPane);
         await Effect.runPromise(stopAgent(agentId));
         throw new Error(`Agent ${agentId} kickoff delivery failed: ${message}`);
       }
@@ -527,6 +544,7 @@ async function spawnRunWithoutConsentClaim(
               await recordStartupSessionExit(state, issueId, role);
             }
             await recordKickoffDeliveryFailure(state, issueId, role);
+            await closeBackendPane(launchedPane);
             await Effect.runPromise(stopAgent(agentId)).catch(() => {});
           },
         });
@@ -552,10 +570,12 @@ async function spawnRunWithoutConsentClaim(
               throw new Error(delivery.failure ?? `delivery returned ok=false via ${delivery.path}`);
             }
           } catch (error) {
+            if (resolvedHarness === 'kimi-code') await closeBackendPane(launchedPane);
             if (resolvedHarness === 'kimi-code') await Effect.runPromise(stopAgent(agentId)).catch(() => {});
             throw error;
           }
         } else {
+          if (resolvedHarness === 'kimi-code') await closeBackendPane(launchedPane);
           if (resolvedHarness === 'kimi-code') await Effect.runPromise(stopAgent(agentId)).catch(() => {});
           throw new Error(`[${agentId}] ${getHarnessBehavior(resolvedHarness).displayName} did not become ready within ${timeout}s`);
         }
@@ -872,6 +892,7 @@ async function spawnAgentWithoutConsentClaim(
         launch: launchWorkSession,
       });
     } catch (err) {
+      await closeBackendPane(launchedPane);
       await Effect.runPromise(stopAgent(agentId)).catch(() => undefined);
       throw err;
     }
@@ -911,6 +932,7 @@ async function spawnAgentWithoutConsentClaim(
       if (tracksKickoffDelivery) {
         await recordKickoffDeliveryFailure(state, options.issueId, role);
       }
+      await closeBackendPane(launchedPane);
       await Effect.runPromise(stopAgent(agentId));
       throw new Error(`Agent ${agentId} kickoff delivery failed: ${message}`);
     }
@@ -925,6 +947,7 @@ async function spawnAgentWithoutConsentClaim(
       console.error(`[${agentId}] ohmypi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
       if (tracksKickoffDelivery) {
         await recordKickoffDeliveryFailure(state, options.issueId, role);
+        await closeBackendPane(launchedPane);
         await Effect.runPromise(stopAgent(agentId));
         throw new Error(`Agent ${agentId} kickoff delivery failed: ${err instanceof Error ? err.message : String(err)}`);
       }
@@ -946,6 +969,7 @@ async function spawnAgentWithoutConsentClaim(
           }
           await recordKickoffDeliveryFailure(state, options.issueId, role);
         }
+        await closeBackendPane(launchedPane);
         await Effect.runPromise(stopAgent(agentId)).catch(() => {});
       },
     });
@@ -959,6 +983,7 @@ async function spawnAgentWithoutConsentClaim(
         await recordStartupSessionExit(state, options.issueId, role);
       }
       await recordKickoffDeliveryFailure(state, options.issueId, role);
+      await closeBackendPane(launchedPane);
       await Effect.runPromise(stopAgent(agentId));
       throw new Error(`Agent ${agentId} kickoff delivery failed: ${delivery.failure ?? 'unknown error'}`);
     }

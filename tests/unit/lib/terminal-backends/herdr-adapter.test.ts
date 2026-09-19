@@ -142,3 +142,72 @@ describe('HerdrBackend.workspaceFor', () => {
       .toMatchObject({ workspace_id: 'w8', source: 'overdeck', tokens: { issue: 'PAN-4000' } });
   });
 });
+
+describe('HerdrBackend.startAgent when Herdr never detects the agent', () => {
+  const workspace = { backend: 'herdr' as const, workspaceId: 'w1', issueId: 'PAN-1', cwd: '/w' };
+  const spec = {
+    kind: 'claude-code',
+    argv: ['bash', 'launcher.sh'],
+    env: {},
+    tokens: { issue: 'PAN-1', role: 'work' as const, harness: 'claude-code', model: 'claude-opus-5' },
+    name: 'agent-pan-1',
+  };
+
+  it('closes the pane and fails the launch instead of returning an unaddressable name', async () => {
+    // Only a DETECTED agent can be renamed, and every caller addresses the pane
+    // by the Overdeck agent id. Reporting success here hands back a reference
+    // that no prompt, wait or close can reach.
+    vi.useFakeTimers();
+    try {
+      const { api, log } = fakeApi(({ method }) => {
+        if (method === 'pane.split') return { pane: { pane_id: 'w1:p3', terminal_id: 't3', workspace_id: 'w1' } };
+        if (method === 'pane.get') return { pane: { pane_id: 'w1:p3', terminal_id: 't3', workspace_id: 'w1' } };
+        return {};
+      });
+
+      const launch = Effect.runPromise(new HerdrBackend(api as never).startAgent(workspace, spec));
+      const settled = expect(launch).rejects.toMatchObject({
+        message: expect.stringContaining('detected no agent'),
+      });
+      await vi.advanceTimersByTimeAsync(61_000);
+      await settled;
+
+      expect(log.some((call) => call.method === 'agent.rename')).toBe(false);
+      expect(log.find((call) => call.method === 'pane.close')?.params).toMatchObject({ pane_id: 'w1:p3' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('HerdrBackend.prompt when the target metadata cannot be read', () => {
+  const unreadable = () => fakeApi(({ method }) => {
+    if (method === 'agent.get') return new HerdrApiError({ method, code: 'not_found', message: 'no such agent' });
+    return {};
+  });
+
+  it('refuses a non-operator sender rather than treating the target as ungated', async () => {
+    const { api, log } = unreadable();
+    const result = await Effect.runPromise(
+      new HerdrBackend(api as never).prompt({ agentName: 'agent-pan-1-slot-2' }, 'do this', {
+        messageId: 'm1',
+        sender: { id: 'agent-pan-9-review', issue: 'PAN-9', role: 'review' },
+      }),
+    );
+
+    expect(result).toMatchObject({ refused: true });
+    expect(log.some((call) => call.method === 'agent.prompt')).toBe(false);
+  });
+
+  it('still lets an operator conversation through', async () => {
+    const { api } = unreadable();
+    const result = await Effect.runPromise(
+      new HerdrBackend(api as never).prompt({ agentName: 'agent-pan-1-slot-2' }, 'do this', {
+        messageId: 'm2',
+        sender: { id: 'conv-2781' },
+      }),
+    );
+
+    expect(result).toMatchObject({ delivered: true });
+  });
+});
