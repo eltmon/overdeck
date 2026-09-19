@@ -1,7 +1,7 @@
 /**
  * The post-merge release trigger (re-pointed by PAN-3917).
  *
- * `releaseStatus` was a row field three writers raced on: the trigger stamped
+ * The release verdict was a row field three writers raced on: the trigger stamped
  * `releasing`, the release engine stamped `passed`/`failed`, and the guard
  * against a double release read it back. The guard is the only part that has to
  * survive, and a merge only happens once per process, so a process-local set of

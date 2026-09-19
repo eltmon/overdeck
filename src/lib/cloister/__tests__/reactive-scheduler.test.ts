@@ -456,7 +456,7 @@ describe('reactive Cloister scheduler', () => {
     // Boot reconciliation replays state-change events on restart; a long-merged
     // issue still carrying its lifecycle state must NOT re-dispatch an advancing
     // role. PAN-3917: the forge answers "did this merge?", not a stored
-    // mergeStatus — a merged PR is the same terminal signal a closed issue is.
+    // a merged PR is the same terminal signal a closed issue is.
     vi.mocked(shouldSkipDispatchAsMerged).mockResolvedValue({ skip: true, reason: 'PR #42 is merged' });
 
     await Effect.runPromise(onIssueStateChange('PAN-503', state));

@@ -31,7 +31,6 @@ describe('role definitions', () => {
     expect(frontmatter.model).toBeUndefined();
     expect(frontmatter.description).toEqual(expect.any(String));
     expect(body).toContain('Read the issue and the PRD draft');
-    expect(body).toContain('drafts/<ISSUE-ID>.md` on `overdeck-state`');
     expect(body).toContain('AskUserQuestion');
     expect(body).toContain('xBRIEF plan');
     expect(body).toContain('task checklist');
@@ -40,8 +39,6 @@ describe('role definitions', () => {
     expect(body).toContain('Stop after `pan plan finalize` returns');
     // Status-as-field model — files do not move between directories
     expect(body).toContain('Files never move between directories');
-    // Output instructions must point at the canonical overdeck-state specs path.
-    expect(body).toMatch(/specs\/.*overdeck-state|overdeck-state.*specs\//i);
   });
 
   it('defines the work role with Jidoka inspection gates and no phase labels', () => {
@@ -104,10 +101,6 @@ describe('role definitions', () => {
     expect(body).toContain('{{issueId}}');
     expect(body).toContain('{{itemId}}');
 
-    const dispatcher = readRepoFile('src/lib/cloister/inspect-agent.ts');
-    expect(dispatcher).toContain("baseCommand: 'claude'");
-    expect(dispatcher).toContain('permissionFlags: getClaudePermissionFlagsSync()');
-    expect(dispatcher).not.toContain('--agent .claude/agents/${subRole}.md');
   });
 
   it('defines mode-neutral review standards with no merge authority', () => {

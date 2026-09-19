@@ -19,8 +19,6 @@ const mocks = vi.hoisted(() => ({
   killSessionSync: vi.fn(),
   emitActivityEntry: vi.fn(),
   emitActivityEntrySync: vi.fn(),
-  getReviewStatus: vi.fn(),
-  getReviewStatusSync: vi.fn(),
   setReviewStatus: vi.fn(),
   setReviewStatusSync: vi.fn(),
   buildReviewContext: vi.fn(),
@@ -74,14 +72,14 @@ vi.mock('../../activity-logger.js', () => ({
   emitActivityEntrySync: mocks.emitActivityEntry,
 }));
 
-vi.mock('../../review-status.js', () => ({
-  getReviewStatus: mocks.getReviewStatus,
-  getReviewStatusSync: mocks.getReviewStatus,
-  setReviewStatus: mocks.setReviewStatus,
-  setReviewStatusSync: mocks.setReviewStatus,
-
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
+// PAN-3917: the conflict gate asks the forge; keep the subprocess out of the test.
+vi.mock('../pr-facts.js', () => ({
+  getPrFacts: async (issueId: string) => ({
+    issueId, forge: 'github', url: null, number: null, exists: true, open: true,
+    merged: false, closed: false, draft: false, headSha: null, headBranch: null,
+    reviewDecision: null, approved: false, changesRequested: false,
+    mergeable: true, mergeableState: 'clean', checks: 'green',
+  }),
 }));
 
 vi.mock('../../config-yaml.js', () => ({
@@ -150,7 +148,6 @@ describe('spawnReviewRoleForIssue', () => {
     mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
     mocks.isPaneDead.mockReturnValue(Effect.succeed(false));
     mocks.killSession.mockReturnValue(Effect.void);
-    mocks.getReviewStatus.mockReturnValue(undefined);
     mocks.buildReviewContext.mockResolvedValue({ manifestPath: undefined, changedFiles: [] });
     mocks.formatTier1Summary.mockReturnValue('shared review context');
     mocks.archiveFeedbackFiles.mockResolvedValue(undefined);
@@ -315,11 +312,6 @@ describe('spawnReviewRoleForIssue', () => {
     await writeFile(`${reviewDir}/synthesis.md`, '# Review complete\n');
     mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1194-review']));
     mocks.getAgentStateFileSync.mockReturnValue({ reviewRunId: 'agent-pan-1194-review-abc12345' });
-    mocks.getReviewStatus.mockReturnValue({
-      reviewStatus: 'pending',
-      reviewRequestedAt: '2026-07-15T19:00:00.000Z',
-      reviewSpawnedAt: '2026-07-15T18:00:00.000Z',
-    });
     mocks.listAgentIdsByPrefixSync.mockReturnValue(['agent-pan-1194-review']);
     mocks.getAgentStateFileSync.mockReturnValue({
       id: 'agent-pan-1194-review',

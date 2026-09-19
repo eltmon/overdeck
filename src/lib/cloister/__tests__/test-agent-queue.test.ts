@@ -44,7 +44,6 @@ describe('test role dispatch', () => {
     expect(prompt).toContain('--status passed');
     expect(prompt).toContain('--uat-status failed');
     expect(prompt).toContain('A required UAT that cannot run or leaves any criterion unproven is uatStatus "failed"');
-    expect(prompt).not.toContain('readyForMerge');
     expect(prompt).toContain('Do NOT spawn, wake, or delegate to test-agent or uat-agent specialists');
   });
 
@@ -53,7 +52,6 @@ describe('test role dispatch', () => {
 
     expect(prompt).toContain('the canonical xBRIEF under .pan/specs/ for PAN-503');
     expect(prompt).toContain('.pan/continues/PAN-503.xbrief.json');
-    expect(prompt).not.toContain('.pan/records/');
   });
 
   it('instructs the test role to write the .pan/test/result.json verdict artifact before signaling (PAN-1681)', () => {

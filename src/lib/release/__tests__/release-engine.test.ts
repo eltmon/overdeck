@@ -6,7 +6,6 @@ import { runRelease } from '../release-engine.js';
 const mocks = vi.hoisted(() => ({
   mergeSet: null as any,
   project: null as any,
-  reviewUpdates: [] as Array<{ issueId: string; update: any }>,
   persistedSets: [] as any[],
 }));
 
@@ -19,22 +18,6 @@ vi.mock('../../projects.js', () => ({
   findProjectByPathSync: vi.fn(() => mocks.project),
 }));
 
-vi.mock('../../review-status.js', () => ({
-  setReviewStatusSync: vi.fn((issueId: string, update: any) => {
-    mocks.reviewUpdates.push({ issueId, update });
-    return {
-      issueId,
-      reviewStatus: 'passed',
-      testStatus: 'passed',
-      updatedAt: new Date().toISOString(),
-      readyForMerge: false,
-      ...update,
-    };
-  }),
-
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
-}));
 
 vi.mock('../../release-set.js', () => ({
   upsertReleaseSetSync: vi.fn((releaseSet: any) => {
@@ -73,7 +56,6 @@ describe('runRelease', () => {
   beforeEach(() => {
     mocks.mergeSet = null;
     mocks.project = null;
-    mocks.reviewUpdates = [];
     mocks.persistedSets = [];
     vi.clearAllMocks();
   });
