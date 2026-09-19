@@ -170,13 +170,6 @@ vi.mock('../../services/agent-projection.js', () => ({
   saveAgentStateAndEmitEventProgram: vi.fn(() => Effect.void),
 }));
 
-vi.mock('../../review-status.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../review-status.js')>();
-  return {
-    ...actual,
-    clearReviewStatus: vi.fn(),
-  };
-});
 
 vi.mock('../../../../lib/cloister/merge-agent.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/cloister/merge-agent.js')>();

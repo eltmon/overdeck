@@ -80,25 +80,11 @@ vi.mock('../../../../../lib/review-artifacts.js', () => ({
 // the record plane and the mirror syncs that import them. They are still on
 // this module's import chain in this tree, so stub the importers rather than
 // loading them. Every entry here disappears once W3 lands.
-vi.mock('../../../../../lib/pan-dir/record.js', () => ({}));
-vi.mock('../../../../../lib/pan-dir/record-update.js', () => ({}));
-vi.mock('../../../../../lib/pan-dir/record-list.js', () => ({}));
-vi.mock('../../../../../lib/pan-dir/records.js', () => ({}));
-vi.mock('../../../../../lib/pan-dir/records-backfill.js', () => ({}));
-vi.mock('../../../../../lib/pan-dir/auto-commit.js', () => ({}));
-vi.mock('../../../../../lib/pan-dir/agents.js', () => ({}));
-vi.mock('../../../../../lib/pan-dir/push-health.js', () => ({}));
-vi.mock('../../../../../lib/overdeck/review-status-record-sync.js', () => ({}));
 vi.mock('../../../../../lib/remote-workspace.js', () => ({}));
 vi.mock('../../../../../lib/remote/remote-agents.js', () => ({}));
-vi.mock('../../../../../lib/state-auto-migrate.js', () => ({}));
-vi.mock('../../../../../lib/memory/state-mirror.js', () => ({}));
 vi.mock('../../../../../lib/overdeck/planning-promotion.js', () => ({}));
 vi.mock('../../../../../lib/overdeck/conversation-retrospective.js', () => ({}));
-vi.mock('../../../../../lib/orders/dispatch-gate.js', () => ({}));
-vi.mock('../../../../../lib/orders/dispatch-reservation.js', () => ({}));
 vi.mock('../../../../../lib/cloister/flywheel.js', () => ({}));
-vi.mock('../../../../../lib/cloister/state-recreation-patrol.js', () => ({}));
 vi.mock('../../../../../lib/agents/spawn.js', () => ({ spawnRun: vi.fn(), spawnAgent: vi.fn(), spawnRunPromise: vi.fn() }));
 
 import { EventStoreService } from '../../../services/domain-services.js';

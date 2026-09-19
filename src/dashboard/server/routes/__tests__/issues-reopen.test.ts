@@ -5,41 +5,6 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 // PAN-3917 W6: the record plane is deleted by W3; these route trees still reach
 // it transitively (config-yaml → tier-table → record, workspaces/resolver →
 // overdeck/infra → record). Stub the chain entry so the route under test loads.
-vi.mock('../../../../lib/pan-dir/record.js', () => ({
-  getIssueRecordPath: () => '/dev/null',
-  readIssueRecordSync: () => null,
-  readIssueRecordForWorkspaceSync: () => null,
-  readIssueRecord: async () => null,
-  batchReadIssueRecords: async () => new Map(),
-}));
-vi.mock('../../../../lib/pan-dir/record-update.js', () => ({
-  updateIssueRecord: async () => undefined,
-}));
-vi.mock('../../../../lib/pan-dir/agents.js', () => ({
-  appendAgentPlaneLifecycle: () => undefined,
-  appendAgentPlaneSession: () => undefined,
-  recordAgentPlaneSpawn: () => undefined,
-  readAgentPlaneRecordSync: () => null,
-  backfillAgentPlaneRecord: () => undefined,
-  flushAgentPlaneWrites: async () => null,
-}));
-vi.mock('../../../../lib/overdeck/agent-state-sync.js', () => ({
-  getOverdeckAgentStateSync: () => null,
-  saveOverdeckAgentStateSync: () => undefined,
-  listOverdeckAgentStatesSync: () => [],
-}));
-vi.mock('../../../../lib/overdeck/agent-record-sync.js', () => ({
-  readAgentHarnessModelRecordSync: () => null,
-  writeAgentHarnessModelRecordSync: () => undefined,
-}));
-vi.mock('../../../../lib/pan-dir/records.js', () => ({
-  listIssueRecordsSync: () => [],
-  listIssueRecords: async () => [],
-}));
-vi.mock('../../../../lib/overdeck/review-status-record-sync.js', () => ({
-  syncReviewStatusToRecord: async () => undefined,
-  syncReviewStatusToRecordSync: () => undefined,
-}));
 
 const {
   issueDataServiceMock,
@@ -88,14 +53,6 @@ vi.mock('../../services/issue-service-singleton.js', () => ({
   getSharedIssueService: () => issueDataServiceMock,
 }));
 
-vi.mock('../review-status.js', () => ({
-  getReviewStatus: mockGetReviewStatus,
-  getReviewStatusSync: mockGetReviewStatus,
-  clearReviewStatus: mockClearReviewStatus,
-
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
-}));
 
 vi.mock('../../../../lib/projects.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/projects.js')>();

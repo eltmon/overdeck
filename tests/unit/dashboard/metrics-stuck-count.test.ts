@@ -36,12 +36,6 @@ vi.mock('../../../src/lib/agents.js', () => ({
 vi.mock('../../../src/lib/costs/index.js', () => ({
   readEvents: () => [],
 }));
-vi.mock('../../../src/lib/convoy.js', () => ({
-  startConvoy: vi.fn(),
-  stopConvoy: vi.fn(),
-  getConvoyStatus: vi.fn(),
-  listConvoys: vi.fn(() => []),
-}));
 vi.mock('../../../src/lib/git-activity.js', () => ({
   listGitOperations: vi.fn(() => []),
 }));

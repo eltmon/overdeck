@@ -46,15 +46,6 @@ vi.mock('../../../src/lib/projects.js', () => ({
 
 const mockSetReviewStatus = vi.fn();
 
-vi.mock('../../../src/lib/review-status.js', () => ({
-  setReviewStatus: (...args: unknown[]) => mockSetReviewStatus(...args),
-  setReviewStatusSync: (...args: unknown[]) => mockSetReviewStatus(...args),
-  getReviewStatus: vi.fn(),
-  getReviewStatusSync: vi.fn(),
-
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
-}));
 
 vi.mock('../../../src/lib/cloister/merge-verification.js', () => ({
   shouldSkipDispatchAsMerged: vi.fn(async () => ({ skip: false, reason: 'open' })),

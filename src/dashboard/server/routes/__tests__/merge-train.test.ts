@@ -105,7 +105,6 @@ async function realShipMergeBatch(
 vi.mock('../../../../lib/projects.js', () => projectsMocks);
 vi.mock('../../../../lib/flywheel-merge-order.js', () => mergeOrderMocks);
 vi.mock('../../../../lib/overdeck/merge-sync.js', () => mergeSyncMocks);
-vi.mock('../../../../lib/cloister/ship-record.js', () => shipRecordMocks);
 vi.mock('../../services/uat-train.js', () => uatTrainMocks);
 vi.mock('../../../../lib/cloister/merge-batch.js', () => mergeBatchMocks);
 vi.mock('../specialists.js', () => ({ firePostMergeLifecycle: vi.fn(() => true) }));

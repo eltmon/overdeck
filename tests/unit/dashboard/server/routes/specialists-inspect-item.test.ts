@@ -23,9 +23,6 @@ vi.mock('../../../../../src/lib/xbrief/io.js', () => ({
   readWorkspacePlanSync: mocks.readWorkspacePlan,
 }));
 
-vi.mock('../../../../../src/lib/cloister/inspect-agent.js', () => ({
-  onInspectComplete: mocks.onInspectComplete,
-}));
 
 vi.mock('../../../../../src/lib/cloister/specialists.js', () => ({
   getTmuxSessionName: vi.fn(() => 'inspect-agent-test'),

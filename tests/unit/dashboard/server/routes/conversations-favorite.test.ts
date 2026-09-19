@@ -16,9 +16,6 @@ import { initSchema } from '../../../../../src/lib/database/schema.js';
 
 let testDb: SqliteDatabase;
 
-vi.mock('../../../../../src/lib/database/index.js', () => ({
-  getDatabase: () => testDb,
-}));
 
 beforeEach(() => {
   testDb = openDatabase(':memory:');

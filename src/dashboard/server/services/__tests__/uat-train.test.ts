@@ -110,9 +110,6 @@ vi.mock('../../../../lib/cloister/uat-promote.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../../../../lib/cloister/uat-promote-verification.js', () => ({
-  recordUatPromotionVerdicts: mocks.recordUatPromotionVerdicts,
-}));
 
 vi.mock('../../../../lib/flywheel-merge-order.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../../../lib/flywheel-merge-order.js')>();

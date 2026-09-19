@@ -19,9 +19,6 @@ vi.mock('../../../../lib/projects.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../../../../lib/cloister/inspect-agent.js', () => ({
-  spawnInspectAgent: spawnInspectAgentMock,
-}));
 
 vi.mock('../../services/issue-service-singleton.js', () => ({
   getSharedIssueService: () => ({

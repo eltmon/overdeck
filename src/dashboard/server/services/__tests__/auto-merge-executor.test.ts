@@ -18,7 +18,6 @@ vi.mock('../../../../lib/overdeck/control-settings.js', () => ({
 vi.mock('../../../../lib/cloister/auto-merge-eligibility.js', () => ({
   isAutoMergeEligible: vi.fn(async () => ({ eligible: true })),
 }));
-vi.mock('../../../../lib/deploy/deploy-queue.js', () => ({ readPendingDeploy: vi.fn(async () => null) }));
 vi.mock('../../../../lib/activity-logger.js', () => ({ emitActivityTtsSync: vi.fn() }));
 vi.mock('../derived-issue-state.js', () => ({
   getDerivedIssueState: vi.fn(async (issueId: string) => ({ issueId, state: 'ready' })),
@@ -107,7 +106,7 @@ describe('auto-merge executor', () => {
     let deployQueued = true;
     const isEligible = vi.fn(async () => ({ eligible: true as const }));
     const transition = vi.fn(() => true);
-    const mergeIssue = vi.fn(async () => ({ success: true, mergeStatus: 'merged' }));
+    const mergeIssue = vi.fn(async () => ({ success: true, outcome: 'merged' }));
     const markMerged = vi.fn();
     const log = vi.fn();
     const deps = {
@@ -178,7 +177,7 @@ describe('auto-merge executor', () => {
   });
 
   it('marks successful merges as merged after invoking the dashboard merge path', async () => {
-    const mergeIssue = vi.fn().mockResolvedValue({ success: true, statusCode: 200, message: 'Merged', mergeStatus: 'merged' });
+    const mergeIssue = vi.fn().mockResolvedValue({ success: true, statusCode: 200, message: 'Merged', outcome: 'merged' });
     const markMerged = vi.fn();
     const markFailed = vi.fn();
 
@@ -215,7 +214,7 @@ describe('auto-merge executor', () => {
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
-      mergeIssue: async () => ({ success: true, statusCode: 200, message: 'Queued for merge', mergeStatus: 'queued' }),
+      mergeIssue: async () => ({ success: true, statusCode: 200, message: 'Queued for merge', outcome: 'queued' }),
       markMerged,
       markFailed,
       announceFailure,
@@ -254,7 +253,7 @@ describe('auto-merge executor', () => {
         statusCode: 409,
         error: 'Post-rebase verification deferred',
         deferred: true,
-        mergeStatus: 'queued',
+        outcome: 'queued',
       }),
       getMergeRetryCount: () => 2,
       setMergeRetryCount,
