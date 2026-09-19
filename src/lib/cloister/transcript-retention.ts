@@ -5,7 +5,7 @@ import { Effect } from 'effect';
 
 import { isConversationDirectory } from '../agent-directory-cleanup.js';
 import { RETAINED_TRANSCRIPTS_MARKER } from '../agents/state-dir-removal.js';
-import { listAllAgentsSync, removeAgentRecordSync } from '../overdeck/agents.js';
+import { listAgentStatesSync } from '../agents/agent-state.js';
 import { listArchivedConversations, listConversations } from '../overdeck/conversations.js';
 import { getPrFacts } from './pr-facts.js';
 import { AGENTS_DIR } from '../paths.js';
@@ -45,7 +45,6 @@ export interface TranscriptRetentionDeps {
   stat(path: string): Promise<Stats>;
   removeFile(path: string): Promise<void>;
   removeDir(path: string): Promise<void>;
-  removeAgentRecord(agentId: string): void;
   listSessionNames(): Promise<readonly string[]>;
   listAgents(): readonly TranscriptRetentionAgent[];
   isTerminalAgent(agent: TranscriptRetentionAgent): Promise<boolean>;
@@ -66,9 +65,8 @@ const defaultDeps: TranscriptRetentionDeps = {
   stat,
   removeFile: async (path) => { await rm(path, { force: true }); },
   removeDir: rmdir,
-  removeAgentRecord: removeAgentRecordSync,
   listSessionNames: () => Effect.runPromise(listSessionNames()),
-  listAgents: listAllAgentsSync,
+  listAgents: listAgentStatesSync,
   isTerminalAgent: isTranscriptRetentionTerminalAgent,
   listConversations,
   listArchivedConversations,
@@ -93,6 +91,22 @@ function conversationEligibility(deps: TranscriptRetentionDeps): Map<string, boo
     return eligible;
   } catch {
     return null;
+  }
+}
+
+/**
+ * PAN-3917: a directory carrying the retained-transcripts marker was already
+ * retired by removeAgent — its state.json is gone, so no agent listing can
+ * vouch for it. The marker IS the eligibility fact. Without this the retained
+ * transcripts would never age out, because the stopped tombstone row that used
+ * to keep such an agent listed is gone with the rest of the mirror.
+ */
+async function isRetiredAgentDir(agentDir: string, deps: TranscriptRetentionDeps): Promise<boolean> {
+  try {
+    await deps.stat(join(agentDir, RETAINED_TRANSCRIPTS_MARKER));
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -229,7 +243,7 @@ export async function sweepTranscriptRetention(
       if (conversationEligibilityMap === null) continue;
       const conversationName = entry.name.slice('conv-'.length);
       if (conversationEligibilityMap.get(conversationName) !== true) continue;
-    } else {
+    } else if (!(await isRetiredAgentDir(join(agentsDir, entry.name), deps))) {
       if (!agentEligibilityLoaded) {
         agentEligibilityMap = await agentEligibility(deps);
         agentEligibilityLoaded = true;
@@ -244,19 +258,17 @@ export async function sweepTranscriptRetention(
     prunedDirs += result.prunedDirs;
 
     if (!conversation && result.remainingTranscripts === 0) {
-      let removedDir = result.removedDir;
-      if (!removedDir) {
+      if (!result.removedDir) {
         await deps.removeFile(join(agentDir, RETAINED_TRANSCRIPTS_MARKER));
         try {
           await deps.removeDir(agentDir);
           prunedDirs++;
-          removedDir = true;
         } catch (error) {
-          if (hasErrorCode(error, 'ENOENT')) removedDir = true;
-          else if (!hasErrorCode(error, 'ENOTEMPTY') && !hasErrorCode(error, 'EEXIST')) throw error;
+          if (!hasErrorCode(error, 'ENOENT')
+            && !hasErrorCode(error, 'ENOTEMPTY')
+            && !hasErrorCode(error, 'EEXIST')) throw error;
         }
       }
-      if (removedDir) deps.removeAgentRecord(entry.name);
     }
   }
 

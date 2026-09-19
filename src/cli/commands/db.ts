@@ -6,9 +6,7 @@ import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { extractTeamPrefix, loadProjectsConfigSync, PROJECTS_CONFIG_FILE, getIssuePrefix } from '../../lib/projects.js';
-import {
-  listAllAgentsSync,
-} from '../../lib/overdeck/agents.js';
+import { listAgentStatesSync } from '../../lib/agents/agent-state.js';
 import {
   pruneTerminalStoppedAgents,
   type AgentGcResult,
@@ -150,7 +148,7 @@ async function gcAgentsCommand(
   options: { dryRun?: boolean },
   deps: DbCommandDeps,
 ): Promise<void> {
-  const result = await deps.pruneTerminalAgents(listAllAgentsSync(), {
+  const result = await deps.pruneTerminalAgents(listAgentStatesSync(), {
     dryRun: options.dryRun === true,
   });
 
@@ -523,7 +521,7 @@ async function rebuildCommand(options: { verbose?: boolean }): Promise<void> {
       .join(' ');
 
     spinner.succeed(
-      `Reconstructed: ${r.issuesEnumerated} in-flight issue(s), ${r.agentsRebuilt} agent(s); phases ${phases}`,
+      `Reconstructed: ${r.issuesEnumerated} in-flight issue(s), ${r.agentsEnumerated} agent(s); phases ${phases}`,
     );
   } catch (error: any) {
     spinner.fail(`Reconstruct failed: ${error.message}`);
