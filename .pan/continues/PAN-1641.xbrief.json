@@ -136,223 +136,223 @@
   "feedback": [],
   "items": {
     "register-ollama-provider": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "register-ollama-provider.ac1": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "register-ollama-provider.ac2": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "register-ollama-provider.ac3": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "register-ollama-provider.ac4": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "register-ollama-provider.ac5": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "ollama-lifecycle-module": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "ollama-lifecycle-module.ac1": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "ollama-lifecycle-module.ac2": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "ollama-lifecycle-module.ac3": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "ollama-lifecycle-module.ac4": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "ollama-lifecycle-module.ac5": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "config-ollama-base-url": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "config-ollama-base-url.ac1": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "config-ollama-base-url.ac2": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "config-ollama-base-url.ac3": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "pi-openai-env": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "pi-openai-env.ac1": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "pi-openai-env.ac2": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "pi-openai-env.ac3": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "pi-openai-env.ac4": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "pi-openai-env.ac5": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "lazy-ensure-on-spawn": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "lazy-ensure-on-spawn.ac1": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "lazy-ensure-on-spawn.ac2": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "lazy-ensure-on-spawn.ac3": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "install-ollama-step": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "install-ollama-step.ac1": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "install-ollama-step.ac2": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "install-ollama-step.ac3": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "install-ollama-step.ac4": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "doctor-ollama-check": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "doctor-ollama-check.ac1": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "doctor-ollama-check.ac2": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "docs-local-models": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "docs-local-models.ac1": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "docs-local-models.ac2": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "docs-local-models.ac3": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "e2e-pi-local-gemma": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "e2e-pi-local-gemma.ac1": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "e2e-pi-local-gemma.ac2": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "e2e-pi-local-gemma.ac3": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "async-omp-provisioning": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "async-omp-provisioning.ac1": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "async-omp-provisioning.ac2": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "async-omp-provisioning.ac3": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "async-omp-provisioning.ac4": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "async-omp-provisioning.ac5": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "bound-ollama-health-timeouts": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "bound-ollama-health-timeouts.ac1": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "bound-ollama-health-timeouts.ac2": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "bound-ollama-health-timeouts.ac3": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "preflight-fallback-regression-test": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "preflight-fallback-regression-test.ac1": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "preflight-fallback-regression-test.ac2": {
-      "status": "done",
+      "status": "completed",
       "migratedFrom": "records.statusOverrides"
     },
     "e2e-overdeck-spawn-evidence": {
