@@ -26,7 +26,7 @@
 import { spawn as nodeSpawn } from 'child_process';
 import type { ChildProcessWithoutNullStreams } from 'child_process';
 
-import { HERDR_SESSION_NAME, HERDR_BINARY } from './select.js';
+import { herdrSessionName, HERDR_BINARY } from './select.js';
 import type { TerminalControl, TerminalFrame, TerminalObservation } from './types.js';
 
 /** One decoded NDJSON record from a terminal stream. */
@@ -100,7 +100,7 @@ function streamArgs(
   terminalId: string,
   deps: HerdrStreamDeps,
 ): { command: string; args: string[] } {
-  const args = ['--session', deps.session ?? HERDR_SESSION_NAME, 'terminal', 'session', mode, terminalId];
+  const args = ['--session', deps.session ?? herdrSessionName(), 'terminal', 'session', mode, terminalId];
   if (deps.cols) args.push('--cols', String(deps.cols));
   if (deps.rows) args.push('--rows', String(deps.rows));
   return { command: deps.binary ?? HERDR_BINARY, args };

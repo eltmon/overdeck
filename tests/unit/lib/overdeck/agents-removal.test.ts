@@ -67,7 +67,23 @@ describe('canonical agent removal with retained transcripts', () => {
     return transcriptPath;
   }
 
-  it('retains the transcript and its linkage until the sweep expires it', async () => {
+  function sweep(agentsDir: string, listAgents = listAgentStatesSync): Promise<string[]> {
+    return sweepTranscriptRetention({
+      transcriptDays: 2,
+      agentsDir,
+      deps: {
+        listSessionNames: vi.fn(async () => []),
+        listAgents,
+        isTerminalAgent: vi.fn(async () => true),
+        listConversations: vi.fn(() => []),
+        listArchivedConversations: vi.fn(() => []),
+        now: () => Date.now(),
+        log: vi.fn(),
+      },
+    });
+  }
+
+  it('retains the transcript and its linkage, and the sweep keeps what it cannot vouch for', async () => {
     const agentId = 'agent-pan-3357-review-correctness';
     const agentsDir = join(testHome, 'agents');
     const agentDir = seedAgent(agentId, 'PAN-3357');
@@ -81,22 +97,30 @@ describe('canonical agent removal with retained transcripts', () => {
     expect(existsSync(transcriptPath)).toBe(true);
     expect(existsSync(join(agentDir, RETAINED_TRANSCRIPTS_MARKER))).toBe(true);
 
-    await sweepTranscriptRetention({
-      transcriptDays: 2,
-      agentsDir,
-      deps: {
-        listSessionNames: vi.fn(async () => []),
-        listAgents: listAgentStatesSync,
-        isTerminalAgent: vi.fn(async () => true),
-        listConversations: vi.fn(() => []),
-        listArchivedConversations: vi.fn(() => []),
-        now: () => Date.now(),
-        log: vi.fn(),
-      },
-    });
+    await sweep(agentsDir);
 
-    expect(existsSync(agentDir)).toBe(false);
+    // NFR-4: removeAgent took state.json, so no listing can say this agent
+    // stopped with its work landed. The retention gate fails closed — the
+    // marker is linkage, never a licence to delete.
+    expect(existsSync(agentDir)).toBe(true);
+    expect(existsSync(transcriptPath)).toBe(true);
     expect(listAgentStatesSync()).toEqual([]);
+  });
+
+  it('expires an aged transcript the listing CAN vouch for', async () => {
+    const agentId = 'agent-pan-3357-review-landed';
+    const agentsDir = join(testHome, 'agents');
+    const agentDir = seedAgent(agentId, 'PAN-3357', { status: 'stopped' });
+    const transcriptPath = seedAgedTranscript(agentDir);
+
+    await sweep(agentsDir);
+
+    // The listing says stopped and the forge says the work landed, so the
+    // expired transcript and its sessions/ directory go. state.json is the
+    // listing's own evidence and is removeAgent's job, not the sweep's.
+    expect(existsSync(transcriptPath)).toBe(false);
+    expect(existsSync(join(agentDir, 'sessions'))).toBe(false);
+    expect(existsSync(join(agentDir, 'state.json'))).toBe(true);
   });
 
   it('retires the runtime residue but never the session transcript (PAN-3479)', async () => {

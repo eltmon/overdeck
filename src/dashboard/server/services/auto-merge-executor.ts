@@ -10,6 +10,7 @@ import {
   type PendingAutoMerge,
 } from '../../../lib/overdeck/merge-sync.js';
 import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
+import { isPeerDashboardProcess } from '../../../lib/boot-gates.js';
 import { isMergeTrainEnabled } from '../../../lib/overdeck/control-settings.js';
 import { getDerivedIssueState } from './derived-issue-state.js';
 
@@ -238,6 +239,9 @@ function runTick(deps: AutoMergeExecutorDeps): void {
 
 export function startAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): boolean {
   if (process.env.OVERDECK_DISABLE_AUTO_MERGE === '1') return false;
+  // fix10: a peer dashboard shares the primary's database and forge. It must
+  // not merge, and must not start the post-merge work a merge sets off.
+  if (isPeerDashboardProcess()) return false;
   if (timer) return false;
 
   timer = setInterval(() => runTick(deps), AUTO_MERGE_EXECUTOR_INTERVAL_MS);

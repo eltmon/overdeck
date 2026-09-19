@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Effect } from 'effect';
+import { createHash } from 'node:crypto';
+import { homedir } from 'node:os';
 import { join } from 'path';
 import { registerTerminalBackend, registeredTerminalBackends, resolveTerminalBackend } from '../../../../src/lib/terminal-backends/registry.js';
-import { herdrSocketPath, selectTerminalBackend, type SelectTerminalBackendDeps } from '../../../../src/lib/terminal-backends/select.js';
+import { herdrSessionName, herdrSocketPath, selectTerminalBackend, type SelectTerminalBackendDeps } from '../../../../src/lib/terminal-backends/select.js';
 import { isUnsupported, unsupported, type TerminalBackend } from '../../../../src/lib/terminal-backends/types.js';
 
 /**
@@ -15,15 +17,31 @@ import { isUnsupported, unsupported, type TerminalBackend } from '../../../../sr
 const HOME = '/tmp/w2-home';
 const PATH_WITH_HERDR = ['/tmp/w2-bin', '/usr/bin'].join(':');
 const HERDR_BIN = join('/tmp/w2-bin', 'herdr');
+// fix10: the session name is derived from OVERDECK_HOME. The default home owns
+// `overdeck`; anything else owns `overdeck-<hash>` and therefore a different
+// socket, so a /tmp-home process can never reach the live session.
+const DEFAULT_OVERDECK_HOME = join(homedir(), '.overdeck');
+const OTHER_OVERDECK_HOME = '/tmp/w2-isolated-home';
+const OTHER_SESSION = `overdeck-${createHash('sha1').update(OTHER_OVERDECK_HOME).digest('hex').slice(0, 8)}`;
 const SOCKET = join(HOME, '.config', 'herdr', 'sessions', 'overdeck', 'herdr.sock');
+const OTHER_SOCKET = join(HOME, '.config', 'herdr', 'sessions', OTHER_SESSION, 'herdr.sock');
 
-function deps(overrides: { binary?: boolean; socket?: boolean } = {}): SelectTerminalBackendDeps {
+function deps(overrides: {
+  binary?: boolean;
+  socket?: boolean;
+  overdeckHome?: string;
+} = {}): SelectTerminalBackendDeps {
+  const socketPath = overrides.overdeckHome === undefined ? SOCKET : OTHER_SOCKET;
   return {
     pathEnv: PATH_WITH_HERDR,
     homeDir: HOME,
     configHome: join(HOME, '.config'),
+    overdeckHome: overrides.overdeckHome ?? DEFAULT_OVERDECK_HOME,
+    // Empty string = "no OVERDECK_TERMINAL_BACKEND in play", so these cases
+    // exercise the host probe even when the runner exports one.
+    backendEnv: '',
     isExecutable: async (path) => (overrides.binary ?? true) && path === HERDR_BIN,
-    exists: async (path) => (overrides.socket ?? true) && path === SOCKET,
+    exists: async (path) => (overrides.socket ?? true) && path === socketPath,
   };
 }
 
@@ -64,7 +82,49 @@ describe('selectTerminalBackend — D10 selection matrix', () => {
   });
 
   it('derives the session socket under the configured home', () => {
-    expect(herdrSocketPath({ homeDir: HOME, configHome: join(HOME, '.config') })).toBe(SOCKET);
+    expect(herdrSocketPath({
+      homeDir: HOME,
+      configHome: join(HOME, '.config'),
+      overdeckHome: DEFAULT_OVERDECK_HOME,
+    })).toBe(SOCKET);
+  });
+
+  // fix10 incident: a test process serving a /tmp OVERDECK_HOME selected the
+  // live `overdeck` Herdr session and spawned real agents into it.
+  it('names the session after the Overdeck home, not the default, for a non-default home', () => {
+    expect(herdrSessionName({ overdeckHome: DEFAULT_OVERDECK_HOME })).toBe('overdeck');
+    expect(herdrSessionName({ overdeckHome: OTHER_OVERDECK_HOME })).toBe(OTHER_SESSION);
+  });
+
+  it('selects herdr for a non-default home only when THAT session socket exists', async () => {
+    const selection = await selectTerminalBackend({}, deps({ overdeckHome: OTHER_OVERDECK_HOME }));
+    expect(selection.backend).toBe('herdr');
+    expect(selection.diagnostic).toContain(OTHER_SESSION);
+  });
+
+  it('falls back to tmux for a non-default home while the default session socket is live', async () => {
+    const selection = await selectTerminalBackend({}, {
+      ...deps({ overdeckHome: OTHER_OVERDECK_HOME }),
+      // The DEFAULT session's socket is present; this home's is not.
+      exists: async (path) => path === SOCKET,
+    });
+    expect(selection.backend).toBe('tmux');
+    expect(selection.diagnostic).toContain(OTHER_SOCKET);
+    expect(selection.diagnostic).toContain('does not exist');
+  });
+
+  it('honors OVERDECK_TERMINAL_BACKEND above config and the host probe', async () => {
+    const forced = await selectTerminalBackend(
+      { terminal: { backend: 'herdr' } },
+      { ...deps(), backendEnv: 'tmux' },
+    );
+    expect(forced.backend).toBe('tmux');
+    expect(forced.diagnostic).toContain('OVERDECK_TERMINAL_BACKEND');
+  });
+
+  it('ignores an unknown OVERDECK_TERMINAL_BACKEND value', async () => {
+    const selection = await selectTerminalBackend({}, { ...deps(), backendEnv: 'screen' });
+    expect(selection.backend).toBe('herdr');
   });
 });
 

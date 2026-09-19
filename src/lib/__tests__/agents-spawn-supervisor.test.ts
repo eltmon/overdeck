@@ -223,6 +223,9 @@ beforeEach(() => {
   createOverdeckDatabase({ dbPath: join(tmpHome, 'overdeck.db') });
   closeOverdeckDatabaseSync();
   process.env.OVERDECK_HOME = tmpHome;
+  // fix10: this suite drives the real spawn path. Pin tmux so no selection
+  // can reach a Herdr session and start a live agent in it.
+  process.env.OVERDECK_TERMINAL_BACKEND = 'tmux';
   process.env.OVERDECK_AGENT_STARTED_BY = 'test:agents-spawn-supervisor';
   capturePaneText = 'Claude Code';
   channelsMcpEnabled = false;

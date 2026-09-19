@@ -403,6 +403,21 @@ describe('auto-merge executor', () => {
     expect(listEntries).not.toHaveBeenCalled();
   });
 
+  // fix10: a peer dashboard shares the primary's database and forge; it starts
+  // nothing that merges or that a merge sets off.
+  it('does not start in a peer dashboard', async () => {
+    process.env.OVERDECK_DISABLE_DEACON = '1';
+    const listEntries = vi.fn(() => []);
+
+    try {
+      expect(startAutoMergeExecutor({ listEntries })).toBe(false);
+      await vi.advanceTimersByTimeAsync(AUTO_MERGE_EXECUTOR_INTERVAL_MS);
+      expect(listEntries).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.OVERDECK_DISABLE_DEACON;
+    }
+  });
+
   it('blocks a scheduled merge whose PR stopped being ready (PAN-3917 FR-9)', async () => {
     const markBlocked = vi.fn(() => true);
     const transition = vi.fn(() => true);

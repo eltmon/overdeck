@@ -36,6 +36,9 @@ describe('AgentState role persistence', () => {
     vi.resetModules();
     tempHome = mkdtempSync(join(tmpdir(), 'pan-agent-role-'));
     process.env.OVERDECK_HOME = tempHome;
+    // fix10: this suite drives the real spawn path. Pin tmux so no selection
+    // can reach a Herdr session and start a live agent in it.
+    process.env.OVERDECK_TERMINAL_BACKEND = 'tmux';
     process.env.OVERDECK_AGENT_STARTED_BY = 'test:agent-state-role';
   });
 

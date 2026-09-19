@@ -73,8 +73,9 @@ import { createOverdeckDatabase } from '../../../scripts/create-overdeck-db.js';
 import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
 import { startProjectCiRefillAfterProjectionReady } from './services/project-ci-refill-startup.js';
 import { ProjectsLive } from '../../lib/overdeck/config.js';
-import { RecordsLive, TmuxLive } from '../../lib/overdeck/infra.js';
+import { RecordsLive, TmuxLive, dropPipelineStateMirrorTablesSync } from '../../lib/overdeck/infra.js';
 import { startServerBootTelemetry } from './telemetry.js';
+import { isPeerDashboardProcess } from '../../lib/boot-gates.js';
 import { isSmeeConfiguredSync, startSmeeProcessSync } from '../../lib/smee.js';
 import { listProjectsSync } from '../../lib/projects.js';
 import { backfillIssueWorkspaces, migrateMemoryHomesToWorkspacesOnce, seedProjectsFromYaml } from '../../lib/workspaces/rebuild.js';
@@ -127,6 +128,21 @@ try {
   console.warn('[overdeck] Overdeck db init failed (non-fatal):', err);
 }
 
+// PAN-3917 fix10: the pipeline-state mirror drop is a DESTRUCTIVE migration, so
+// it runs here — once, and only in a primary dashboard. A peer shares another
+// dashboard's overdeck.db; running it there dropped `agents` out from under the
+// live 0.51.0 server, which then crash-looped. See infra.ts for both gates.
+try {
+  const drop = dropPipelineStateMirrorTablesSync();
+  if (drop.dropped) {
+    console.log('[overdeck] Dropped the pipeline-state mirror tables (once; marker written)');
+  } else if (drop.skipped === 'peer') {
+    console.log('[overdeck] Pipeline-state mirror drop SKIPPED — peer dashboard runs no destructive migration');
+  }
+} catch (err) {
+  console.warn('[overdeck] Pipeline-state mirror drop failed (non-fatal):', err);
+}
+
 // Bind the HTTP socket before starting any background service or the Deacon.
 // A bind failure is retried by server.ts and then terminates this process through
 // Effect's Node runtime; no headless orchestrator is allowed to survive it.
@@ -156,7 +172,7 @@ void warnIfAppCannotMerge();
 // container ran its own Linear/GitHub poller against the shared API key — ~17 of them
 // at once exhausted Linear's 2500/hr quota. This mirrors the single-deacon invariant:
 // a peer dashboard is a read/UI peer, never a second orchestrator.
-const isPeerDashboard = process.env.OVERDECK_DISABLE_DEACON === '1';
+const isPeerDashboard = isPeerDashboardProcess();
 if (isPeerDashboard) {
   void startSharedIssueService({ skipPolling: true });
   console.log('[overdeck] IssueDataService started in CACHE-ONLY mode — peer dashboard (OVERDECK_DISABLE_DEACON=1) does not poll trackers (PAN-1817)');
@@ -690,28 +706,38 @@ await startProjectCiRefillAfterProjectionReady(15 * 60 * 1000);
 
 // Reset stuck merge queue entries (PAN-632): any 'processing' entries were
 // in-flight when the server died — reset to 'queued' so they resume.
-try {
-  const { resetProcessingToQueued, requeueOrphanedMergingAutoMerges } = await import('../../lib/overdeck/merge-sync.js');
-  const resetCount = resetProcessingToQueued();
-  if (resetCount > 0) {
-    console.log(`[overdeck] Reset ${resetCount} stuck merge queue entries to queued`);
-    emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Reset ${resetCount} stuck merge queue entries to queued on startup` });
+//
+// fix10: every step below writes to state the primary owns or sets work going
+// that spawns agents (resumeQueuedMerges → merge → post-merge lifecycle →
+// `pan knowledge --retro`; processPendingLifecycle does the same directly;
+// processPendingFeedbackDeliveries writes into the primary's live agent panes).
+// A peer dashboard is a read/UI peer and starts none of it.
+if (isPeerDashboard) {
+  console.log('[overdeck] Merge-queue repair, post-merge lifecycle and feedback replay SKIPPED — peer dashboard spawns nothing');
+} else {
+  try {
+    const { resetProcessingToQueued, requeueOrphanedMergingAutoMerges } = await import('../../lib/overdeck/merge-sync.js');
+    const resetCount = resetProcessingToQueued();
+    if (resetCount > 0) {
+      console.log(`[overdeck] Reset ${resetCount} stuck merge queue entries to queued`);
+      emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Reset ${resetCount} stuck merge queue entries to queued on startup` });
+    }
+    // PAN-3328: an auto-merge row left in 'merging' by a crash is invisible to the
+    // problems endpoint and to the deacon reconciler — requeue it so it is retried.
+    const requeuedAutoMerges = requeueOrphanedMergingAutoMerges();
+    if (requeuedAutoMerges > 0) {
+      console.log(`[overdeck] Requeued ${requeuedAutoMerges} orphaned auto-merge row(s) from merging to pending`);
+      emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Requeued ${requeuedAutoMerges} orphaned auto-merge row(s) stuck in merging on startup` });
+    }
+    await resumeQueuedMerges();
+  } catch (err: any) {
+    console.warn(`[overdeck] Failed to reset merge queue: ${err.message}`);
   }
-  // PAN-3328: an auto-merge row left in 'merging' by a crash is invisible to the
-  // problems endpoint and to the deacon reconciler — requeue it so it is retried.
-  const requeuedAutoMerges = requeueOrphanedMergingAutoMerges();
-  if (requeuedAutoMerges > 0) {
-    console.log(`[overdeck] Requeued ${requeuedAutoMerges} orphaned auto-merge row(s) from merging to pending`);
-    emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Requeued ${requeuedAutoMerges} orphaned auto-merge row(s) stuck in merging on startup` });
-  }
-  await resumeQueuedMerges();
-} catch (err: any) {
-  console.warn(`[overdeck] Failed to reset merge queue: ${err.message}`);
-}
 
-// Pending post-merge lifecycle hook (PAN-444) — see pending-lifecycle.ts for details
-await processPendingLifecycle();
-await processPendingFeedbackDeliveries();
+  // Pending post-merge lifecycle hook (PAN-444) — see pending-lifecycle.ts for details
+  await processPendingLifecycle();
+  await processPendingFeedbackDeliveries();
+}
 
 // Restart gate (PAN-3729): if the previous server died to perform an approved
 // restart, this boot IS that restart completing — mark the epoch's requesters
@@ -731,11 +757,12 @@ await initRestartGate().catch((err: unknown) => {
 // HTTP server from accepting connections (the "Bad Gateway after pan up"
 // failure mode). The dashboard comes up clean; start cloister manually from
 // the UI once the workspace backlog is cleaned up.
-if (process.env.OVERDECK_DISABLE_AUTO_MERGE === '1') {
-  console.log('[overdeck] Auto-merge executor SKIPPED (OVERDECK_DISABLE_AUTO_MERGE=1)');
-} else {
-  startAutoMergeExecutor();
+if (startAutoMergeExecutor()) {
   console.log('[overdeck] Auto-merge executor started');
+} else if (isPeerDashboard) {
+  console.log('[overdeck] Auto-merge executor SKIPPED — peer dashboard spawns nothing');
+} else {
+  console.log('[overdeck] Auto-merge executor SKIPPED (OVERDECK_DISABLE_AUTO_MERGE=1)');
 }
 
 // PAN-3917: boot used to reset verification runs left `running` by a worker
@@ -743,7 +770,7 @@ if (process.env.OVERDECK_DISABLE_AUTO_MERGE === '1') {
 // left none, so the next gate run re-verifies. There is no stored status to
 // reconcile.
 
-if (process.env.OVERDECK_DISABLE_DEACON === '1') {
+if (isPeerDashboard) {
   console.log('[overdeck] Cloister auto-start SKIPPED (OVERDECK_DISABLE_DEACON=1)');
   emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Cloister auto-start skipped via OVERDECK_DISABLE_DEACON — deacon is not running' });
 } else if (shouldAutoStart()) {
