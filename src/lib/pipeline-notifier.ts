@@ -1,25 +1,22 @@
 /**
  * Pipeline Notifier — event bridge between library code and Socket.io
  *
- * Lightweight singleton that decouples state mutations (review-status, specialist queue)
- * from the dashboard's Socket.io server. Library code calls notifyPipeline() which is
+ * Lightweight singleton that decouples pipeline events (review convoy progress,
+ * specialist queue) from the dashboard's Socket.io server. Library code calls notifyPipeline() which is
  * fire-and-forget — when an in-process handler is registered (the dashboard server),
  * the handler is invoked synchronously. Otherwise the call is forwarded to the
  * dashboard via a best-effort HTTP POST so CLI-process state changes (e.g.
  * `pan review run`) still propagate to the live WebSocket event stream (PAN-891).
  *
- * File-based persistence (SQLite) remains the source of truth — the HTTP forward
- * is purely to wake the dashboard so it re-emits the domain event. If the
- * dashboard is offline the call silently fails; the next dashboard read will
- * pick up the latest DB state via `enrichReviewStatusFromSessions()`.
+ * The HTTP forward exists purely to wake the dashboard so it re-emits the
+ * domain event. If the dashboard is offline the call silently fails; the next
+ * dashboard read derives the current state from the tracker, git and the PR.
  */
 
 import { Effect } from 'effect';
-import type { ReviewStatus } from './review-status-reconcile.js';
 import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from './internal-token.js';
 
 export type PipelineEvent =
-  | { type: 'status_changed'; issueId: string; status: ReviewStatus }
   | { type: 'review.approved'; issueId: string }
   | { type: 'test.passed'; issueId: string }
   | { type: 'task_queued'; specialist: string; issueId: string }
@@ -61,12 +58,8 @@ export function notifyPipelineSync(event: PipelineEvent): void {
   const token = getInternalTokenSync();
   if (!token) return;
 
-  // PAN-915 — forward the full event. status_changed intentionally omits the
-  // `status` field because the server re-reads from SQLite to avoid stale
-  // snapshots; other types carry their own payload.
-  const body = event.type === 'status_changed'
-    ? { type: 'status_changed', issueId: event.issueId }
-    : event;
+  // PAN-915 — forward the full event; each type carries its own payload.
+  const body = event;
 
   const baseUrl = process.env.OVERDECK_DASHBOARD_URL || process.env.DASHBOARD_URL || 'http://localhost:3011';
   const ctrl = new AbortController();

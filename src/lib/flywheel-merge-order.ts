@@ -1,7 +1,6 @@
 import { Effect } from 'effect';
 import { ChildProcess, ChildProcessSpawner } from 'effect/unstable/process';
 import type { FlywheelPipelineItem } from '@overdeck/contracts';
-import { getReviewStatusSync, loadReviewStatuses, mergeGateEligibility, type MergeGateEligibility } from './review-status.js';
 import { resolveGitHubIssueSync } from './tracker-utils.js';
 import type { SequenceNode } from './backlog/types.js';
 import { classifyIssue, isAutoPickable, type ClassifyLookups } from './backlog/pickup.js';
@@ -204,69 +203,45 @@ export const MERGE_QUEUE_GIT_CONCURRENCY = 4;
 export interface ComputeMergeQueueOptions {
   getPrUrl?: (item: { issueId: string; pr?: number }) => string | undefined;
   gitConcurrency?: number;
-  /**
-   * Authoritative merge eligibility per issue (PAN-1759). Defaults to the
-   * review-status DB predicate; injectable for tests. The verb filter alone is
-   * the orchestrator's INTENT — an LLM emission that has tagged mid-review
-   * issues as merge-bound. Only verb ∩ eligibility enters the queue.
-   */
-  eligibility?: (issueId: string) => MergeGateEligibility;
   /** Called for each verb-tagged item the eligibility gate rejects. */
   onIneligible?: (issueId: string, reason: string) => void;
   /** Files treated as common hotspots and excluded from predicted-conflict math. */
   hotspots?: string[];
 }
 
-/** Default eligibility: the issue's review-status record, read synchronously. */
-export function reviewRecordEligibility(issueId: string): MergeGateEligibility {
-  return mergeGateEligibility(getReviewStatusSync(issueId.toUpperCase()));
-}
-
 /**
- * Server-side PR URL resolution for merge-queue items: prefer the review
- * status record, fall back to the GitHub repo + PR number — the browser never
- * guesses repo slugs.
+ * Server-side PR URL resolution for merge-queue items: the GitHub repo plus
+ * the candidate's PR number — the browser never guesses repo slugs.
  */
 export function resolveMergeQueuePrUrl(item: { issueId: string; pr?: number }): string | undefined {
-  const issueId = item.issueId.toUpperCase();
-  const reviewStatus = getReviewStatusSync(issueId);
-  if (reviewStatus?.prUrl) return reviewStatus.prUrl;
-
-  const prNumber = reviewStatus?.prNumber ?? item.pr;
-  if (prNumber === undefined) return undefined;
-
-  const githubIssue = resolveGitHubIssueSync(issueId);
+  if (item.pr === undefined) return undefined;
+  const githubIssue = resolveGitHubIssueSync(item.issueId.toUpperCase());
   if (!githubIssue.isGitHub) return undefined;
-  return `https://github.com/${githubIssue.owner}/${githubIssue.repo}/pull/${prNumber}`;
+  return `https://github.com/${githubIssue.owner}/${githubIssue.repo}/pull/${item.pr}`;
 }
 
 /**
- * PAN-1696 ready-set-source: List all merge-eligible candidates from review-status DB for a given project.
- * No flywheel run required — sources directly from persistent pipeline state.
- * Returns an array of candidate items compatible with computeMergeQueueFromCandidates.
+ * PAN-1696 ready-set-source: every issue in this project whose PR the forge
+ * says is ready to merge right now. PAN-3917: the ready set is the forge's
+ * answer (approved + checks green + mergeable), not a stored `readyForMerge`
+ * flag, and the in-flight membership lens supplies the candidate issues.
  */
 export async function listEligibleCandidatesByProject(projectRoot: string): Promise<Array<{ issueId: string; title: string; pr?: number }>> {
   const project = findProjectByPathSync(projectRoot);
   if (!project) return [];
 
-  const allStatuses = loadReviewStatuses();
-  const readyStatuses = Object.entries(allStatuses).filter(([issueId, rs]) => {
-    const issueProject = resolveProjectFromIssueSync(issueId);
-    return issueProject?.projectPath === project.path &&
-      rs.deaconIgnored !== true && rs.readyForMerge === true && mergeGateEligibility(rs).eligible;
-  });
-  const { gatherMergeEligibility, isMergeEligible } = await import('./cloister/merge-eligibility.js');
-  const memberships = await gatherMergeEligibility(readyStatuses.map(([issueId]) => issueId));
+  const { getMergeReadyIssues } = await import('./cloister/merge-ready-set.js');
+  const { getPrFacts } = await import('./cloister/pr-facts.js');
+  const ready = await getMergeReadyIssues();
+
   const candidates: Array<{ issueId: string; title: string; pr?: number }> = [];
-
-  for (const [issueId, rs] of readyStatuses) {
-    const membership = memberships.get(issueId.toUpperCase());
-    if (!membership || !isMergeEligible(membership)) continue;
-
-    // AC 10: title resolved downstream by computeMergeQueueFromCandidates; here use issue ID
-    candidates.push({ issueId, title: issueId, pr: rs.prNumber });
+  for (const issueId of ready) {
+    const issueProject = resolveProjectFromIssueSync(issueId);
+    if (issueProject?.projectPath !== project.path) continue;
+    const facts = await getPrFacts(issueId);
+    // AC 10: title resolved downstream by computeMergeQueueFromCandidates.
+    candidates.push({ issueId, title: issueId, ...(facts.number != null ? { pr: facts.number } : {}) });
   }
-
   return candidates;
 }
 
@@ -685,17 +660,14 @@ export function pickFromSequence(
   },
 ): SequencePickResult | null {
   // Single source of truth: the same classifier the Forecast UI uses (PAN-2006).
-  // `isReadyOrHasPrd` maps to the module's `planned` gate; review_status + the
-  // optional callback feed the `inPipeline` gate; vetoed / parked / gate-blocked are
+  // `isReadyOrHasPrd` maps to the module's `planned` gate; the caller's
+  // `isInPipeline` callback feeds the `inPipeline` gate (PAN-3917: there is no
+  // status row left to consult here); vetoed / parked / gate-blocked are
   // derived from labels + the node's gate inside classifyIssue.
   const lookups: ClassifyLookups = {
     labels: opts?.issueLabels ?? (() => []),
     isPlanned: opts?.isReadyOrHasPrd ?? (() => true),
-    isInPipeline: (issueId) => {
-      const reviewStatus = getReviewStatusSync(issueId.toUpperCase());
-      return (reviewStatus !== null && reviewStatus.reviewStatus !== 'pending') ||
-        (opts?.isInPipeline?.(issueId) ?? false);
-    },
+    isInPipeline: (issueId) => opts?.isInPipeline?.(issueId) ?? false,
   };
 
   const signalByIssue = new Map((opts?.predictedConflictSignals ?? []).map(signal => [signal.issueId.toUpperCase(), signal]));

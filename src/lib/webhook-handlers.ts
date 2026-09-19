@@ -1,17 +1,20 @@
 /**
- * GitHub webhook event handlers (PAN-905)
+ * GitHub webhook event handlers (PAN-905).
  *
- * Dispatches verified webhook events to per-type handlers that update
- * review_status blockerReasons based on GitHub-native merge blockers.
- * Shared advisory-check classification excludes signals such as CodeRabbit from merge gates.
+ * PAN-3917: the handlers used to mirror GitHub's own merge blockers into a
+ * `review_status` row. GitHub already owns that state and `cloister/pr-facts`
+ * reads it on demand, so nothing is written back here any more. What is left is
+ * the work a webhook can do that a read cannot: invalidate the PR-tab cache,
+ * record a default-branch CI suite observation, relay a CI failure to the work
+ * agent, and fire the post-merge lifecycle for merges that bypassed Overdeck.
+ * Shared advisory-check classification keeps CodeRabbit out of merge gates.
  */
 
 import { Effect } from 'effect';
-import { setReviewStatus, getReviewStatus, loadReviewStatuses, type BlockerReason, type ReviewStatus, type ReviewStatusUpdate } from './review-status.js';
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js';
 import { GitHubApiError } from './errors.js';
 import { relayCiFailureFeedback } from './cloister/ci-failure-feedback.js';
-import { isInGraphQLCooldown, noteGraphQLRateLimit } from './github-graphql-cooldown.js';
+import { getPrFacts } from './cloister/pr-facts.js';
 import { bumpIssuePrTabCacheGeneration } from '../dashboard/server/services/pr-tab-cache.js';
 import { ADVISORY_CHECK_NAMES, isAdvisoryCheckName } from './advisory-checks.js';
 import { appendDomainEventAsync } from './activity-logger.js';
@@ -66,6 +69,32 @@ export interface WebhookPayload {
   branches?: Array<{ name: string }>;
 }
 
+/** The canonical PR URL for a repo/number pair, for feedback copy. */
+function prUrlFor(repo: string, prNumber: number): string {
+  return `https://github.com/${repo}/pull/${prNumber}`;
+}
+
+/**
+ * Resolve the issue a PR belongs to from its head branch, asking the forge.
+ * PAN-3917: the branch name is the only issue binding Overdeck keeps.
+ */
+async function issueIdForPrNumber(repo: string, prNumber: number): Promise<string | null> {
+  try {
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const execFileAsync = promisify(execFile);
+    const { stdout } = await execFileAsync(
+      'gh',
+      ['pr', 'view', String(prNumber), '--repo', repo, '--json', 'headRefName'],
+      { encoding: 'utf-8', timeout: 15000 },
+    );
+    const parsed = JSON.parse(stdout) as { headRefName?: string };
+    return parsed.headRefName ? issueIdFromBranch(parsed.headRefName) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function issueIdFromBranch(ref: string): string | null {
   const match = ref.match(/(?:feature|strike|bypass)\/([a-z]+-\d+)$/i);
   return match ? match[1].toUpperCase() : null;
@@ -96,259 +125,10 @@ export function isTrackedRepositorySync(fullName: string | undefined): boolean {
   return getTrackedRepos().has(fullName.toLowerCase());
 }
 
-// ─── PR identity validation ──────────────────────────────────────────────────
-
-function getRepoFromPrUrl(prUrl: string): string | null {
-  const m = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/\d+/i);
-  return m ? `${m[1]}/${m[2]}`.toLowerCase() : null;
-}
-
-function parseGitHubPrUrl(prUrl: string): { owner: string; repo: string; number: number } | null {
-  const m = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/i);
-  if (!m) return null;
-  return { owner: m[1]!, repo: m[2]!, number: Number.parseInt(m[3]!, 10) };
-}
-
-function repoFromPrUrl(prUrl: string | undefined): string | null {
-  if (!prUrl) return null;
-  return getRepoFromPrUrl(prUrl);
-}
-
-async function loadAndValidateStatus(
-  issueId: string,
-  repo: string,
-  prNumber?: number,
-  headSha?: string,
-): Promise<ReviewStatus | null> {
-  const status = await Effect.runPromise(getReviewStatus(issueId));
-  if (!status) return null;
-
-  // If no PR identity is stored yet, allow the event (identity will be populated lazily).
-  if (!status.prUrl && !status.prNumber && !status.prHeadSha) {
-    return status;
-  }
-
-  const storedRepo = status.prUrl ? getRepoFromPrUrl(status.prUrl) : null;
-  if (storedRepo && storedRepo !== repo.toLowerCase()) {
-    console.warn(`[webhook] Repo mismatch for ${issueId}: stored=${storedRepo} event=${repo}`);
-    return null;
-  }
-
-  if (prNumber != null && status.prNumber != null && prNumber !== status.prNumber) {
-    console.warn(`[webhook] PR number mismatch for ${issueId}: stored=${status.prNumber} event=${prNumber}`);
-    return null;
-  }
-
-  if (headSha && status.prHeadSha && headSha !== status.prHeadSha) {
-    console.warn(`[webhook] Head SHA mismatch for ${issueId}: stored=${status.prHeadSha} event=${headSha}`);
-    return null;
-  }
-
-  return status;
-}
-
-// ─── Per-source failing_checks tracking ──────────────────────────────────────
-
-function getFailingChecksBlocker(blockers: BlockerReason[]): BlockerReason | undefined {
-  return blockers.find((b) => b.type === 'failing_checks');
-}
-
-function parseFailingSources(details?: string): Record<string, string> {
-  if (!details) return {};
-  try {
-    const parsed = JSON.parse(details) as { sources?: Record<string, string> };
-    return parsed.sources ?? {};
-  } catch {
-    return {};
-  }
-}
-
-function serializeFailingSources(sources: Record<string, string>): string {
-  return JSON.stringify({ sources });
-}
-
-function addFailingSource(blockers: BlockerReason[], sourceKey: string, summary: string): BlockerReason[] {
-  const existing = getFailingChecksBlocker(blockers);
-  const sources = parseFailingSources(existing?.details);
-  sources[sourceKey] = summary;
-  const updated: BlockerReason = {
-    type: 'failing_checks',
-    summary: Object.values(sources).join('; '),
-    details: serializeFailingSources(sources),
-    detectedAt: existing?.detectedAt ?? new Date().toISOString(),
-  };
-  return [...blockers.filter((b) => b.type !== 'failing_checks'), updated];
-}
-
-function removeFailingSource(blockers: BlockerReason[], sourceKey: string): BlockerReason[] {
-  const existing = getFailingChecksBlocker(blockers);
-  if (!existing) return blockers;
-  const sources = parseFailingSources(existing.details);
-  delete sources[sourceKey];
-  if (Object.keys(sources).length === 0) {
-    return blockers.filter((b) => b.type !== 'failing_checks');
-  }
-  const updated: BlockerReason = {
-    type: 'failing_checks',
-    summary: Object.values(sources).join('; '),
-    details: serializeFailingSources(sources),
-    detectedAt: existing.detectedAt,
-  };
-  return [...blockers.filter((b) => b.type !== 'failing_checks'), updated];
-}
-
-// ─── Merge state reconciliation for unknown mergeable_state ──────────────────
-
-const KNOWN_CONFLICT_STATES = new Set(['dirty']);
-const KNOWN_NON_BLOCKING_STATES = new Set(['clean', 'unstable']);
-const KNOWN_NOT_MERGEABLE_STATES = new Set(['blocked', 'behind']);
-
 /** `gh` statusCheckRollup conclusions/states that count as a failing required check. */
 export const FAILING_CHECK_CONCLUSIONS = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE', 'STALE']);
 
-const pendingReconciliation = new Set<string>();
-const reconciliationTimeouts = new Map<string, NodeJS.Timeout>();
-
-export function clearAllReconciliationTimeouts(): void {
-  for (const timeout of reconciliationTimeouts.values()) {
-    clearTimeout(timeout);
-  }
-  reconciliationTimeouts.clear();
-  pendingReconciliation.clear();
-}
-
-function scheduleMergeStateReconciliation(issueId: string, repo: string, prNumber: number): void {
-  if (pendingReconciliation.has(issueId)) return;
-  pendingReconciliation.add(issueId);
-  const timeout = setTimeout(() => {
-    pendingReconciliation.delete(issueId);
-    reconciliationTimeouts.delete(issueId);
-    refreshMergeStateFromGitHub(issueId, repo, prNumber).catch(() => {});
-  }, 30000);
-  timeout.unref();
-  reconciliationTimeouts.set(issueId, timeout);
-}
-
-export async function refreshMergeStateFromGitHub(issueId: string, repo: string, prNumber: number): Promise<void> {
-  try {
-    // Resolve PR merge state. Prefer the GitHub App REST path (installation
-    // token, separate rate-limit budget, no GraphQL) when configured; fall back
-    // to `gh pr view` (GraphQL) only when the App is not set up. Previously this
-    // unconditionally used `gh` GraphQL even with the App configured, which
-    // burned the GraphQL budget on every pull_request webhook + every
-    // merge-blocker poll. PAN-2265.
-    const [owner, repoName] = repo.split('/');
-    if (!owner || !repoName) return;
-
-    const { isGitHubAppConfigured, getPullRequestState } = await import('./github-app.js');
-    const githubAppConfigured = isGitHubAppConfigured();
-    if (!githubAppConfigured && isInGraphQLCooldown()) return;
-
-    const status = await Effect.runPromise(getReviewStatus(issueId));
-    if (!status || status.retiredAt) return;
-
-    let mergeable: string;
-    let mergeState: string;
-    let isDraft: boolean;
-    let checksFailed: boolean;
-    let headSha: string;
-    let headRef: string;
-    let prUrl: string | undefined;
-
-    if (githubAppConfigured) {
-      // App REST path — installation token, separate rate-limit budget, no GraphQL.
-      const prState = await Effect.runPromise(getPullRequestState(owner, repoName, prNumber));
-      mergeable = prState.mergeable === null ? 'UNKNOWN' : prState.mergeable ? 'MERGEABLE' : 'CONFLICTING';
-      mergeState = (prState.mergeableState ?? '').toUpperCase();
-      isDraft = prState.draft;
-      checksFailed = prState.checksFailed;
-      headSha = prState.headSha;
-      headRef = prState.headRef;
-      prUrl = prState.url ?? status.prUrl;
-    } else {
-      // gh CLI fallback (GraphQL) — only when the App is not configured.
-      const { execFile } = await import('child_process');
-      const { promisify } = await import('util');
-      const execFileAsync = promisify(execFile);
-      // gh GraphQL fields (NOT the REST webhook shape): mergeable is an enum
-      // (MERGEABLE | CONFLICTING | UNKNOWN), mergeStateStatus is CLEAN | DIRTY |
-      // UNSTABLE | BLOCKED | BEHIND | …, isDraft is a bool, and statusCheckRollup
-      // carries the required-check results. PAN-1620.
-      let stdout: string;
-      try {
-        ({ stdout } = await execFileAsync(
-          'gh',
-          ['pr', 'view', String(prNumber), '--repo', repo, '--json', 'mergeable,mergeStateStatus,isDraft,statusCheckRollup,headRefName,headRefOid,url'],
-          { encoding: 'utf-8', timeout: 15000 },
-        ));
-      } catch (err) {
-        noteGraphQLRateLimit(err);
-        throw err;
-      }
-      if (!stdout.trim()) return;
-      const pr = JSON.parse(stdout) as {
-        mergeable?: string | null;
-        mergeStateStatus?: string | null;
-        isDraft?: boolean;
-        headRefName?: string | null;
-        headRefOid?: string | null;
-        url?: string | null;
-        statusCheckRollup?: Array<{
-          name?: string | null;
-          context?: string | null;
-          conclusion?: string | null;
-          state?: string | null;
-        }>;
-      };
-      mergeable = (pr.mergeable ?? '').toUpperCase();
-      mergeState = (pr.mergeStateStatus ?? '').toUpperCase();
-      isDraft = pr.isDraft === true;
-      headSha = pr.headRefOid ?? '';
-      headRef = pr.headRefName ?? '';
-      prUrl = pr.url ?? status.prUrl;
-      checksFailed = (pr.statusCheckRollup ?? []).some((check) =>
-        !isAdvisoryCheckName(check.name ?? check.context)
-        && FAILING_CHECK_CONCLUSIONS.has((check.conclusion || check.state || '').toUpperCase()),
-      );
-    }
-
-    const isConflicting = mergeable === 'CONFLICTING' || mergeState === 'DIRTY';
-
-    // Rebuild the GitHub-native blockers from live state, preserving any
-    // non-GitHub-native ones (e.g. unresolved_conversations, changes_requested).
-    const GH_NATIVE = new Set<BlockerReason['type']>(['merge_conflict', 'not_mergeable', 'failing_checks', 'draft_pr']);
-    const now = new Date().toISOString();
-    const blockers: BlockerReason[] = (status.blockerReasons ?? []).filter((b) => !GH_NATIVE.has(b.type));
-    if (isDraft) blockers.push({ type: 'draft_pr', summary: 'Pull request is in draft state', detectedAt: now });
-    if (isConflicting) {
-      blockers.push({ type: 'merge_conflict', summary: 'Merge conflict with target branch', detectedAt: now });
-    } else if (mergeState === 'BLOCKED' && !checksFailed) {
-      blockers.push({ type: 'not_mergeable', summary: 'PR blocked by branch protection', detectedAt: now });
-    }
-    if (checksFailed) blockers.push({ type: 'failing_checks', summary: 'Required checks are failing', detectedAt: now });
-
-    // Only write when the GitHub-native blocker set actually changed.
-    const prevTypes = new Set((status.blockerReasons ?? []).filter((b) => GH_NATIVE.has(b.type)).map((b) => b.type));
-    const nextTypes = new Set(blockers.filter((b) => GH_NATIVE.has(b.type)).map((b) => b.type));
-    const changed = prevTypes.size !== nextTypes.size || [...nextTypes].some((t) => !prevTypes.has(t));
-    if (changed) {
-      await Effect.runPromise(setReviewStatus(issueId, { blockerReasons: blockers.length > 0 ? blockers : undefined }, status));
-      if (checksFailed && !prevTypes.has('failing_checks') && headSha && headRef) {
-        await Effect.runPromise(relayCiFailureFeedback({
-          issueId,
-          repo,
-          prNumber,
-          headSha,
-          headRef,
-          prUrl,
-          source: 'polling_reconciliation',
-        }));
-      }
-    }
-  } catch (err) {
-    console.warn(`[webhook] Merge state reconciliation failed for ${issueId}:`, err);
-  }
-}async function handleCheckSuitePromise(payload: WebhookPayload): Promise<void> {
+async function handleCheckSuitePromise(payload: WebhookPayload): Promise<void> {
   // PAN-3537: a push to the default branch produces a check suite with an empty
   // pull_requests array. Record it for the Command Deck CI chip, then fall
   // through to the existing PR-scoped merge-gate logic.
@@ -397,16 +177,7 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
 
     bumpIssuePrTabCacheGeneration(issueId);
 
-    const status = await loadAndValidateStatus(issueId, repo, pr.number, pr.head.sha);
-    if (!status) continue;
-
-    let blockers = [...(status.blockerReasons ?? [])];
-
-    if (suite.conclusion === 'success') {
-      blockers = removeFailingSource(blockers, 'check_suite');
-    } else if (suite.conclusion && FAILING_CHECK_CONCLUSIONS.has(suite.conclusion.toUpperCase())) {
-      // Any terminal failure conclusion is blocking
-      blockers = addFailingSource(blockers, 'check_suite', `CI check suite ${suite.conclusion}`);
+    if (suite.conclusion && FAILING_CHECK_CONCLUSIONS.has(suite.conclusion.toUpperCase())) {
       if (pr.head.sha && pr.number != null) {
         await Effect.runPromise(relayCiFailureFeedback({
           issueId,
@@ -414,21 +185,15 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
           prNumber: pr.number,
           headSha: pr.head.sha,
           headRef: pr.head.ref,
-          prUrl: status.prUrl,
+          prUrl: prUrlFor(repo, pr.number),
           source: 'check_suite',
         }));
       }
     }
-
-    const update: ReviewStatusUpdate = {};
-    if (blockers.length > 0) update.blockerReasons = blockers;
-    else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
-
-    if (Object.keys(update).length > 0) {
-      await Effect.runPromise(setReviewStatus(issueId, update, status));
-    }
   }
-}async function handleCheckRunPromise(payload: WebhookPayload): Promise<void> {
+}
+
+async function handleCheckRunPromise(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
   const run = payload.check_run;
   if (!run) return;
@@ -445,15 +210,7 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
     bumpIssuePrTabCacheGeneration(issueId);
     if (isAdvisory) continue;
 
-    const status = await loadAndValidateStatus(issueId, repo, pr.number, pr.head.sha);
-    if (!status) continue;
-
-    let blockers = [...(status.blockerReasons ?? [])];
-
-    if (run.conclusion === 'success') {
-      blockers = removeFailingSource(blockers, sourceKey);
-    } else if (run.conclusion && FAILING_CHECK_CONCLUSIONS.has(run.conclusion.toUpperCase())) {
-      blockers = addFailingSource(blockers, sourceKey, `CI check run ${run.conclusion}: ${run.name ?? 'unknown'}`);
+    if (run.conclusion && FAILING_CHECK_CONCLUSIONS.has(run.conclusion.toUpperCase())) {
       if (pr.head.sha && pr.number != null) {
         await Effect.runPromise(relayCiFailureFeedback({
           issueId,
@@ -461,21 +218,15 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
           prNumber: pr.number,
           headSha: pr.head.sha,
           headRef: pr.head.ref,
-          prUrl: status.prUrl,
+          prUrl: prUrlFor(repo, pr.number),
           source: sourceKey,
         }));
       }
     }
-
-    const update: ReviewStatusUpdate = {};
-    if (blockers.length > 0) update.blockerReasons = blockers;
-    else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
-
-    if (Object.keys(update).length > 0) {
-      await Effect.runPromise(setReviewStatus(issueId, update, status));
-    }
   }
-}async function handlePullRequestPromise(payload: WebhookPayload): Promise<void> {
+}
+
+async function handlePullRequestPromise(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   if (!pr) return;
@@ -516,8 +267,7 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
       const project = resolveProjectFromIssueSync(issueId);
       if (project) {
         const branchName = pr.head.ref;
-        const markReviewPassed = branchName.startsWith('strike/');
-        postMergeLifecycle(issueId, project.projectPath, branchName, { markReviewPassed }).catch(err =>
+        postMergeLifecycle(issueId, project.projectPath, branchName).catch(err =>
           console.warn(`[webhook] postMergeLifecycle failed for ${issueId} (${branchName}): ${err?.message ?? err}`),
         );
       }
@@ -526,79 +276,9 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
     }
   }
 
-  // For synchronize/opened/reopened the head SHA may have changed — skip SHA
-  // validation so the handler can refresh prHeadSha and recompute blockers.
-  const headMayHaveMoved = ['synchronize', 'opened', 'reopened', 'closed'].includes(payload.action ?? '');
-  const status = await loadAndValidateStatus(issueId, repo, pr.number, headMayHaveMoved ? undefined : pr.head.sha);
-  if (!status) return;
+}
 
-  const update: ReviewStatusUpdate = {};
-  let blockers = [...(status.blockerReasons ?? [])];
-
-  if (payload.action === 'closed' && pr.merged === false) {
-    update.readyForMerge = false;
-    update.retiredAt = new Date().toISOString();
-  }
-
-  // Populate missing PR identity and keep head SHA in sync on synchronize
-  if (!status.prUrl) update.prUrl = pr.html_url ?? `https://github.com/${repo}/pull/${pr.number}`;
-  if (!status.prNumber) update.prNumber = pr.number;
-  if (pr.head.sha && (!status.prHeadSha || payload.action === 'synchronize')) {
-    update.prHeadSha = pr.head.sha;
-  }
-
-  // Dismissed reviews
-  if (payload.action === 'review_dismissed') {
-    blockers = blockers.filter((b) => b.type !== 'changes_requested');
-  }
-
-  // Draft PR
-  if (pr.draft) {
-    const draftBlocker: BlockerReason = {
-      type: 'draft_pr',
-      summary: 'Pull request is in draft state',
-      detectedAt: new Date().toISOString(),
-    };
-    blockers = [...blockers.filter((b) => b.type !== 'draft_pr'), draftBlocker];
-  } else {
-    blockers = blockers.filter((b) => b.type !== 'draft_pr');
-  }
-
-  // Merge state
-  if (pr.mergeable_state === 'unknown') {
-    scheduleMergeStateReconciliation(issueId, repo, pr.number);
-  } else if (pr.mergeable_state && KNOWN_CONFLICT_STATES.has(pr.mergeable_state)) {
-    const mergeConflictBlocker: BlockerReason = {
-      type: 'merge_conflict',
-      summary: 'Merge conflict with target branch',
-      detectedAt: new Date().toISOString(),
-    };
-    blockers = [...blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable'), mergeConflictBlocker];
-  } else if (pr.mergeable === false && (pr.mergeable_state === null || pr.mergeable_state === undefined)) {
-    const mergeConflictBlocker: BlockerReason = {
-      type: 'merge_conflict',
-      summary: 'Merge conflict with target branch',
-      detectedAt: new Date().toISOString(),
-    };
-    blockers = [...blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable'), mergeConflictBlocker];
-  } else if ((pr.mergeable_state && KNOWN_NON_BLOCKING_STATES.has(pr.mergeable_state)) || pr.mergeable === true) {
-    blockers = blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable');
-  } else if (pr.mergeable_state && KNOWN_NOT_MERGEABLE_STATES.has(pr.mergeable_state)) {
-    const notMergeableBlocker: BlockerReason = {
-      type: 'not_mergeable',
-      summary: `PR not mergeable: ${pr.mergeable_state}`,
-      detectedAt: new Date().toISOString(),
-    };
-    blockers = [...blockers.filter((b) => b.type !== 'merge_conflict' && b.type !== 'not_mergeable'), notMergeableBlocker];
-  }
-
-  if (blockers.length > 0) update.blockerReasons = blockers;
-  else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
-
-  if (Object.keys(update).length > 0) {
-    await Effect.runPromise(setReviewStatus(issueId, update, status));
-  }
-}async function handlePullRequestReviewPromise(payload: WebhookPayload): Promise<void> {
+async function handlePullRequestReviewPromise(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   const review = payload.review;
@@ -607,32 +287,6 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
   if (!issueId) return;
   bumpIssuePrTabCacheGeneration(issueId);
 
-  const repo = payload.repository!.full_name;
-  const status = await loadAndValidateStatus(issueId, repo, pr.number);
-  if (!status) return;
-
-  // Dismissed reviews are handled by the pull_request review_dismissed action.
-  if (review.state === 'dismissed') return;
-
-  let blockers = [...(status.blockerReasons ?? [])];
-
-  if (review.state === 'changes_requested') {
-    blockers = [...blockers.filter((b) => b.type !== 'changes_requested'), {
-      type: 'changes_requested',
-      summary: 'Changes requested on pull request',
-      detectedAt: new Date().toISOString(),
-    }];
-  } else if (review.state === 'approved') {
-    blockers = blockers.filter((b) => b.type !== 'changes_requested');
-  }
-
-  const update: ReviewStatusUpdate = {};
-  if (blockers.length > 0) update.blockerReasons = blockers;
-  else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
-
-  if (Object.keys(update).length > 0) {
-    await Effect.runPromise(setReviewStatus(issueId, update, status));
-  }
 }
 
 async function handlePullRequestReviewCommentPromise(payload: WebhookPayload): Promise<void> {
@@ -649,81 +303,24 @@ async function handleIssueCommentPromise(payload: WebhookPayload): Promise<void>
   const issue = payload.issue;
   if (!issue?.pull_request || issue.number == null) return;
 
-  const repo = payload.repository!.full_name.toLowerCase();
-  const statuses = loadReviewStatuses();
-  for (const [issueId, status] of Object.entries(statuses)) {
-    if (status.prNumber !== issue.number) continue;
-    const statusRepo = repoFromPrUrl(status.prUrl);
-    if (statusRepo && statusRepo !== repo) continue;
-    bumpIssuePrTabCacheGeneration(issueId);
-  }
+  // PAN-3917: mapping a PR number back to an issue id used to be a scan of the
+  // review_status rows. The branch name is the only issue binding Overdeck
+  // keeps, and an issue_comment payload does not carry one, so ask the forge.
+  const repo = payload.repository!.full_name;
+  const issueId = await issueIdForPrNumber(repo, issue.number);
+  if (issueId) bumpIssuePrTabCacheGeneration(issueId);
 }
 
 async function handlePullRequestReviewThreadPromise(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
-  const thread = payload.thread;
-  if (!pr || !thread) return;
+  if (!pr || !payload.thread) return;
   const issueId = issueIdFromBranch(pr.head.ref);
   if (!issueId) return;
+  bumpIssuePrTabCacheGeneration(issueId);
+}
 
-  const repo = payload.repository!.full_name;
-  const status = await loadAndValidateStatus(issueId, repo, pr.number);
-  if (!status) return;
-
-  let blockers = [...(status.blockerReasons ?? [])];
-
-  if (thread.resolved === false) {
-    if (thread.id == null) {
-      console.warn(`[webhook] Unresolved review thread without id for ${issueId} — cannot track conversation`);
-    }
-    const existing = blockers.find((b) => b.type === 'unresolved_conversations');
-    let threadIds: Set<string>;
-    try {
-      threadIds = new Set<string>(JSON.parse(existing?.details ?? '[]') as string[]);
-    } catch {
-      threadIds = new Set<string>();
-    }
-    if (thread.id != null) threadIds.add(String(thread.id));
-    const updated: BlockerReason = {
-      type: 'unresolved_conversations',
-      summary: 'Unresolved review conversation',
-      details: JSON.stringify([...threadIds]),
-      detectedAt: existing?.detectedAt ?? new Date().toISOString(),
-    };
-    blockers = [...blockers.filter((b) => b.type !== 'unresolved_conversations'), updated];
-  } else if (thread.resolved === true) {
-    if (thread.id == null) return;
-    const existing = blockers.find((b) => b.type === 'unresolved_conversations');
-    if (!existing) return;
-    let threadIds: Set<string>;
-    try {
-      threadIds = new Set<string>(JSON.parse(existing.details ?? '[]') as string[]);
-    } catch {
-      threadIds = new Set<string>();
-    }
-    threadIds.delete(String(thread.id));
-    if (threadIds.size === 0) {
-      blockers = blockers.filter((b) => b.type !== 'unresolved_conversations');
-    } else {
-      const updated: BlockerReason = {
-        type: 'unresolved_conversations',
-        summary: 'Unresolved review conversation',
-        details: JSON.stringify([...threadIds]),
-        detectedAt: existing.detectedAt,
-      };
-      blockers = [...blockers.filter((b) => b.type !== 'unresolved_conversations'), updated];
-    }
-  }
-
-  const update: ReviewStatusUpdate = {};
-  if (blockers.length > 0) update.blockerReasons = blockers;
-  else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
-
-  if (Object.keys(update).length > 0) {
-    await Effect.runPromise(setReviewStatus(issueId, update, status));
-  }
-}async function handleStatusPromise(payload: WebhookPayload): Promise<void> {
+async function handleStatusPromise(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
   const state = payload.state;
   const branches = payload.branches;
@@ -732,53 +329,33 @@ async function handlePullRequestReviewThreadPromise(payload: WebhookPayload): Pr
   const repo = payload.repository!.full_name;
   const context = payload.context ?? 'default';
   const sourceKey = `status:${context}`;
-  const isAdvisory = isAdvisoryCheckName(context);
+  if (isAdvisoryCheckName(context)) {
+    for (const branch of branches) {
+      const issueId = issueIdFromBranch(branch.name);
+      if (issueId) bumpIssuePrTabCacheGeneration(issueId);
+    }
+    return;
+  }
 
   for (const branch of branches) {
     const issueId = issueIdFromBranch(branch.name);
-    if (issueId) {
-      bumpIssuePrTabCacheGeneration(issueId);
-      if (isAdvisory) continue;
+    if (!issueId) continue;
+    bumpIssuePrTabCacheGeneration(issueId);
+    if (state !== 'failure' && state !== 'error') continue;
+    if (!payload.sha) continue;
 
-      const status = await loadAndValidateStatus(issueId, repo, undefined, payload.sha);
-      if (!status) continue;
-
-      let blockers = [...(status.blockerReasons ?? [])];
-
-      if (state === 'success') {
-        blockers = removeFailingSource(blockers, sourceKey);
-      } else if (state === 'failure' || state === 'error') {
-        blockers = addFailingSource(blockers, sourceKey, `Commit status: ${state}`);
-        if (payload.sha && status.prNumber != null && status.prUrl) {
-          const parsed = parseGitHubPrUrl(status.prUrl);
-          if (parsed) {
-            await Effect.runPromise(relayCiFailureFeedback({
-              issueId,
-              repo,
-              prNumber: status.prNumber,
-              headSha: payload.sha,
-              headRef: branch.name,
-              prUrl: status.prUrl,
-              source: sourceKey,
-            }));
-          }
-        }
-      }
-
-      const update: ReviewStatusUpdate = {};
-      if (blockers.length > 0) update.blockerReasons = blockers;
-      else if (status.blockerReasons && status.blockerReasons.length > 0) update.blockerReasons = undefined;
-
-      // Do NOT populate prHeadSha from status events — we don't have the PR number
-      // to construct a prUrl, and the SHA alone isn't enough to bind identity.
-
-      if (Object.keys(update).length > 0) {
-        await Effect.runPromise(setReviewStatus(issueId, update, status));
-      }
-
-      // Keep scanning in case the payload includes multiple feature branches.
-      continue;
-    }
+    // A commit status carries no PR identity. The forge does.
+    const facts = await getPrFacts(issueId);
+    if (!facts.open || facts.number == null || !facts.url) continue;
+    await Effect.runPromise(relayCiFailureFeedback({
+      issueId,
+      repo,
+      prNumber: facts.number,
+      headSha: payload.sha,
+      headRef: branch.name,
+      prUrl: facts.url,
+      source: sourceKey,
+    }));
   }
 }
 
@@ -869,59 +446,3 @@ export const isTrackedRepository = (
   fullName: string | undefined,
 ): Effect.Effect<boolean> =>
   Effect.sync(() => isTrackedRepositorySync(fullName));
-
-// ─── Boot-time blocker reconciliation (PAN-1771) ─────────────────────────────
-
-const GH_NATIVE_BLOCKER_TYPES = new Set<BlockerReason['type']>([
-  'merge_conflict',
-  'not_mergeable',
-  'failing_checks',
-  'draft_pr',
-]);
-
-function prNumberFromUrl(prUrl: string): number | null {
-  const m = prUrl.match(/\/pull\/(\d+)/);
-  return m ? Number(m[1]) : null;
-}
-
-/**
- * Pure boot-sweep filter: returns the PR identity to refresh when a status
- * carries GitHub-native blockers that may have gone stale, null otherwise.
- * Exported for tests.
- */
-export function needsBlockerReconciliation(
-  status: Pick<ReviewStatus, 'mergeStatus' | 'blockerReasons' | 'prUrl' | 'prNumber'>,
-): { repo: string; prNumber: number } | null {
-  if (status.mergeStatus === 'merged') return null;
-  const ghBlockers = (status.blockerReasons ?? []).filter((b) => GH_NATIVE_BLOCKER_TYPES.has(b.type));
-  if (ghBlockers.length === 0) return null;
-  const repo = status.prUrl ? getRepoFromPrUrl(status.prUrl) : null;
-  const prNumber = status.prNumber ?? (status.prUrl ? prNumberFromUrl(status.prUrl) : null);
-  if (!repo || !prNumber) return null;
-  return { repo, prNumber };
-}
-
-/**
- * PAN-1771: GitHub-native blockers (failing_checks, merge_conflict, draft_pr,
- * not_mergeable) are refreshed only by webhook-driven
- * refreshMergeStateFromGitHub calls. Webhooks that arrive while the server is
- * down (reboot, deploy restart, crash) are lost, so a blocker recorded before
- * the outage can outlive the condition it describes — and a stale blocker pins
- * readyForMerge=false forever under the PAN-1650 event-driven derivation.
- *
- * Re-derives the blocker set from live PR state for every non-merged status
- * still carrying GitHub-native blockers. Sequential on purpose: the candidate
- * set is small and this avoids a gh subprocess burst at boot. Returns the
- * number of statuses refreshed.
- */
-export async function reconcileStaleGitHubBlockers(): Promise<number> {
-  const statuses = loadReviewStatuses();
-  let refreshed = 0;
-  for (const status of Object.values(statuses)) {
-    const target = needsBlockerReconciliation(status);
-    if (!target) continue;
-    await refreshMergeStateFromGitHub(status.issueId, target.repo, target.prNumber);
-    refreshed++;
-  }
-  return refreshed;
-}

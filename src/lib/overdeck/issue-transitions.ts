@@ -100,10 +100,6 @@ export async function closeIssuePullRequest(issueId: string, reason = 'Canceled 
       ],
       { encoding: 'utf-8', timeout: 15000 },
     );
-    try {
-      const { setReviewStatusSync } = await import('../review-status.js');
-      setReviewStatusSync(issueId.toUpperCase(), { prUrl: undefined });
-    } catch { /* non-fatal — validator catches this downstream */ }
     return [`Closed PR #${prNumber} on ${githubCheck.owner}/${githubCheck.repo}`];
   } catch (err: any) {
     return [`PR close warning: ${err.message}`];

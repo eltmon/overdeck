@@ -109,10 +109,6 @@ export function approve(
     const teardownSteps = yield* teardownWorkspace(ctx, { deleteBranches: true });
     allSteps.push(...teardownSteps);
 
-    // 5. Clear review status
-    const clearResult = yield* clearReviewStatusStep(ctx.issueId);
-    allSteps.push(clearResult);
-
     return buildResult('approve', ctx.issueId, allSteps, start);
   });
 }
@@ -141,9 +137,6 @@ export function close(
     allSteps.push(...teardownSteps);
 
     // 3. Clear review status
-    const clearResult = yield* clearReviewStatusStep(ctx.issueId);
-    allSteps.push(clearResult);
-
     return buildResult('close', ctx.issueId, allSteps, start);
   });
 }
@@ -183,25 +176,6 @@ export function closeOut(
       return buildResult('close-out', ctx.issueId, allSteps, start);
     }
 
-    // Recover UAT-promotion evidence before the gate reads the verification verdict.
-    const uatEvidenceStep = yield* Effect.promise(async () => {
-      try {
-        const { healUatPromotionVerification } = await import('../cloister/uat-promote-verification.js');
-        const evidence = await healUatPromotionVerification(ctx.issueId);
-        if (!evidence) {
-          return stepSkipped('dod:uat-promotion-evidence', ['No missing UAT-promotion verification evidence found']);
-        }
-        return stepOk('dod:uat-promotion-evidence', [
-          `Recorded verification from ${evidence.generation}`,
-          ...(evidence.mergeSha ? [`Promoted to main at ${evidence.mergeSha.slice(0, 9)}`] : []),
-        ]);
-      } catch (err) {
-        return stepSkipped('dod:uat-promotion-evidence', [
-          `Evidence recovery unavailable: ${err instanceof Error ? err.message : String(err)}`,
-        ]);
-      }
-    });
-    allSteps.push(uatEvidenceStep);
 
     // 1. Collect residue evidence BEFORE building the gate (if residue disposition)
     const abandon = opts.abandonDisposition;
@@ -441,9 +415,6 @@ export function closeOut(
     }
 
     // 9. Clear review status
-    const clearResult = yield* clearReviewStatusStep(ctx.issueId);
-    allSteps.push(clearResult);
-
     yield* Effect.promise(() => resetPostMergeStateForIssue(ctx.issueId));
     yield* Effect.promise(() => recordFeatureRegistryLifecycle({ issueId: ctx.issueId, status: 'archived' }));
 
@@ -552,8 +523,6 @@ function destructiveResetWorkflow(
 
     stepNum = resetIssue ? 4 : 3;
     progress('Clearing review status', 'Removing specialist state');
-    const clearResult = yield* clearReviewStatusStep(ctx.issueId);
-    allSteps.push(clearResult);
     progress('Clearing review status', 'Review status cleared', 'complete');
 
     return buildResult(workflow, ctx.issueId, allSteps, start);
@@ -1126,42 +1095,6 @@ async function resetPostMergeStateForIssue(issueId: string): Promise<void> {
     resetPostMergeState(issueId.toUpperCase());
   } catch {
     return;
-  }
-}
-
-function clearReviewStatusStep(issueId: string): Effect.Effect<StepResult> {
-  return Effect.tryPromise({
-    try: () => clearReviewStatusStepImpl(issueId),
-    catch: (err) => err,
-  }).pipe(
-    Effect.catch((err) =>
-      Effect.succeed(stepSkipped('clear-review-status', [`Failed to clear review status (non-fatal): ${(err as Error).message}`])),
-    ),
-  );
-}
-
-async function clearReviewStatusStepImpl(issueId: string): Promise<StepResult> {
-  const step = 'clear-review-status';
-  try {
-    const { clearReviewStatus } = await import('../review-status.js');
-    clearReviewStatus(issueId.toUpperCase());
-    return stepOk(step, ['Review status cleared']);
-  } catch {
-    // Fallback: direct file manipulation
-    try {
-      const statusFile = join(OVERDECK_HOME, 'review-status.json');
-      if (existsSync(statusFile)) {
-        const data = JSON.parse(await readFile(statusFile, 'utf-8'));
-        const upperKey = issueId.toUpperCase();
-        if (data[upperKey]) {
-          delete data[upperKey];
-          await writeFile(statusFile, JSON.stringify(data, null, 2));
-        }
-      }
-      return stepOk(step, ['Review status cleared (direct)']);
-    } catch (innerErr) {
-      return stepSkipped(step, [`Failed to clear review status (non-fatal): ${(innerErr as Error).message}`]);
-    }
   }
 }
 

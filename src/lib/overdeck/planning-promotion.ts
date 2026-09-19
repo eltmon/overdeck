@@ -22,7 +22,6 @@ import { checkPrdGateSync, promoteWorkspacePrdDraft, asPanSpecDocument, findSpec
 import { PENDING_PROMOTION_FILENAME } from '../pan-dir/types.js';
 import { resolveAutoSpawnOnFinalize } from '../planning/spawn-planning-session.js';
 import { extractTeamPrefix, findProjectByPathSync, findProjectByTeamSync, resolveProjectFromIssueSync } from '../projects.js';
-import { markWorkspaceStuck } from '../review-status.js';
 import { commitPlanArtifacts, planArtifactCommitMessage } from './plan-artifact-commit.js';
 import { loadRemoteAgentState } from '../remote/remote-agents.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
@@ -329,7 +328,6 @@ export async function recordPlanningAutoHandoffFailure(options: {
   result: CompletePlanningAutoSpawnResult;
   eventStore: any;
   now?: () => string;
-  markStuck?: typeof markWorkspaceStuck;
   emitActivity?: typeof emitActivityEntrySync;
 }): Promise<string> {
   const skipReason = options.result.workAgentSkipReason ?? 'spawn-failed';
@@ -349,7 +347,6 @@ export async function recordPlanningAutoHandoffFailure(options: {
       ...details,
     },
   }));
-  (options.markStuck ?? markWorkspaceStuck)(options.issueId, 'planning_auto_handoff_failed', details);
   (options.emitActivity ?? emitActivityEntrySync)({
     source: 'plan',
     level: 'error',
