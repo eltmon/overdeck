@@ -48,14 +48,6 @@ vi.mock('../../../../../src/lib/cloister/specialists.js', () => ({
   getTmuxSessionName: vi.fn(() => 'review-agent-overdeck'),
 }));
 
-vi.mock('../../../../../src/dashboard/server/review-status.js', () => ({
-  getReviewStatus: vi.fn(() => null),
-  getReviewStatusSync: vi.fn(() => null),
-
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
-}));
-
 vi.mock('../../../../../src/dashboard/server/routes/jsonl-resolver.js', () => ({
   resolveJsonlPath: vi.fn(async () => null),
 }));
@@ -108,7 +100,6 @@ import {
 import { listProjectsSync, resolveProjectFromIssueSync } from '../../../../../src/lib/projects.js';
 import { listSessionNames } from '../../../../../src/lib/tmux.js';
 import { getAgentRuntimeState } from '../../../../../src/lib/agents.js';
-import { getReviewStatusSync } from '../../../../../src/dashboard/server/review-status.js';
 import { resolveJsonlPath } from '../../../../../src/dashboard/server/routes/jsonl-resolver.js';
 import { buildReviewerNodes } from '../../../../../src/dashboard/server/routes/reviewer-tree.js';
 import { access, readdir, readFile, stat } from 'node:fs/promises';
@@ -157,7 +148,6 @@ describe('fetchProjectSessionTree', () => {
     mockIsPlanningComplete.mockReturnValue(Effect.succeed(false));
     (stat as any).mockResolvedValue({ mtime: RECENT_PLANNING_MTIME });
     mockFindSpecByIssue.mockReturnValue(Effect.succeed(null));
-    (getReviewStatusSync as any).mockReturnValue(null);
     (resolveProjectFromIssueSync as any).mockImplementation(() => ({ projectKey: 'overdeck' }));
     (resolveJsonlPath as any).mockResolvedValue(null);
     (getAgentRuntimeState as any).mockReturnValue(Effect.succeed(null));
@@ -493,15 +483,6 @@ describe('fetchProjectSessionTree', () => {
       },
     ]);
     (listSessionNames as any).mockReturnValue(Effect.succeed(['agent-pan-539-review']));
-    (getReviewStatusSync as any).mockReturnValue({
-      history: [
-        {
-          type: 'review',
-          status: 'reviewing',
-          timestamp: '2026-02-03T04:00:00Z',
-        },
-      ],
-    });
     mockAgentStates.set('agent-pan-539-review', agentState({
       id: 'agent-pan-539-review',
       role: 'review',
@@ -551,9 +532,6 @@ describe('fetchProjectSessionTree', () => {
       },
     ]);
     (listSessionNames as any).mockReturnValue(Effect.succeed([]));
-    (getReviewStatusSync as any).mockReturnValue({
-      history: [{ type: 'merge', status: 'merging', timestamp: '2026-07-24T12:00:00Z' }],
-    });
     mockAccess(new Set([
       '/tmp/overdeck/workspaces',
       '/tmp/overdeck/workspaces/feature-pan-3020/.overdeck',
@@ -575,9 +553,6 @@ describe('fetchProjectSessionTree', () => {
       },
     ]);
     (listSessionNames as any).mockReturnValue(Effect.succeed([]));
-    (getReviewStatusSync as any).mockReturnValue({
-      history: [{ type: 'merge', status: 'passed', timestamp: '2026-07-24T12:00:00Z' }],
-    });
     mockAgentStates.set('agent-pan-3020-ship', agentState({
       id: 'agent-pan-3020-ship',
       issueId: 'PAN-3020',
