@@ -28,7 +28,6 @@ import {
   resolveCompletePlanningTerminalStatus,
 } from '../../../../lib/overdeck/planning-promotion.js';
 import { readAutoSpawnOnFinalizeFlag, writeAutoSpawnOnFinalizeFlag } from '../../../../lib/planning/spawn-planning-session.js';
-import { applyStatusOverrides } from '../../../../lib/xbrief/io.js';
 import { PlanQualityLintError } from '../../../../lib/xbrief/quality-lint.js';
 import type { XBriefDocument } from '../../../../lib/xbrief/types.js';
 
@@ -191,7 +190,7 @@ describe('commitCompletePlanningWorkspaceGit', () => {
       return { stdout: '', stderr: '' };
     });
 
-    const result = await commitCompletePlanningWorkspaceGit(workspacePath, 'PAN-3901', false, null, execSpy as never);
+    const result = await commitCompletePlanningWorkspaceGit(workspacePath, 'PAN-3901', null, execSpy as never);
 
     expect(result).toEqual({ pushed: true, taskWarning: null });
     expect(calls.some((args) => args.length === 1 && args[0] === 'init')).toBe(false);
@@ -212,7 +211,7 @@ describe('commitCompletePlanningWorkspaceGit', () => {
       return { stdout: '', stderr: '' };
     });
 
-    const result = await commitCompletePlanningWorkspaceGit(workspacePath, 'PAN-3902', false, null, execSpy as never);
+    const result = await commitCompletePlanningWorkspaceGit(workspacePath, 'PAN-3902', null, execSpy as never);
 
     expect(result).toEqual({ pushed: true, taskWarning: null });
     expect(calls).toEqual([
@@ -266,16 +265,6 @@ describe('completePlanningArtifacts', () => {
     expect(commands.flat()).not.toContain('-f');
   });
 
-  it('does not stage workspace state paths after state migration', () => {
-    const { workspacePath } = makeProject('PAN-2541');
-    mkdirSync(join(workspacePath, '.pan'), { recursive: true });
-    mkdirSync(join(workspacePath, '.tasks'), { recursive: true });
-    writeFileSync(join(workspacePath, '.gitignore'), '.overdeck/\n');
-    expect(completePlanningWorkspaceGitAddCommands(workspacePath, true)).toEqual([
-      ['add', '.gitignore'],
-    ]);
-  });
-
   it('includes codebase map changes in the main-side promote commit pathspec', async () => {
     const issueId = 'PAN-1150';
     const { projectPath } = makeProject(issueId);
@@ -306,10 +295,12 @@ describe('completePlanningArtifacts', () => {
       issueId,
     });
 
-    const specFiles = readdirSync(join(projectPath, '.pan', 'specs'));
+    // PAN-3917: the promoted spec lands in the ISSUE WORKSPACE's own
+    // `.pan/specs`, on the feature branch, not on a shared state branch.
+    const specFiles = readdirSync(join(workspacePath, '.pan', 'specs'));
     expect(specFiles).toEqual([result.proposed.filename]);
     expect(result.proposed.filename).toMatch(/^\d{4}-\d{2}-\d{2}-PAN-1143-first-run-promotion\.xbrief\.json$/);
-    expect(result.proposed.path).toBe(join(projectPath, '.pan', 'specs', result.proposed.filename));
+    expect(result.proposed.path).toBe(join(workspacePath, '.pan', 'specs', result.proposed.filename));
     expect(result.taskCount).toBe(2);
 
     const promoted = JSON.parse(readFileSync(result.proposed.path, 'utf-8'));
@@ -378,15 +369,16 @@ describe('completePlanningArtifacts', () => {
     expect(existsSync(join(projectPath, '.pan', 'specs')) ? readdirSync(join(projectPath, '.pan', 'specs')) : []).toEqual([]);
   });
 
-  it('re-finalizes an active plan without losing stable item progress', async () => {
+  // PAN-3917: item progress was a `statusOverrides` map on the issue record.
+  // There is no record and no overlay — re-finalization rewrites the one spec
+  // in place, which is what this asserts.
+  it('re-finalizes an active plan in place', async () => {
     const issueId = 'PAN-2232';
     const { projectPath, workspacePath } = makeProject(issueId);
-    const specsDir = join(projectPath, '.pan', 'specs');
-    const recordsDir = join(projectPath, '.pan', 'records');
+    const specsDir = join(workspacePath, '.pan', 'specs');
     const workspacePanDir = join(workspacePath, '.pan');
     await Promise.all([
       mkdir(specsDir, { recursive: true }),
-      mkdir(recordsDir, { recursive: true }),
       mkdir(workspacePanDir, { recursive: true }),
     ]);
 
@@ -398,14 +390,6 @@ describe('completePlanningArtifacts', () => {
       status: 'active',
       plan: { ...activeDoc.plan, status: 'active' },
     }, null, 2));
-
-    const statusOverrides = {
-      'wi-1-spawn': 'running',
-      'wi-1-spawn.ac1': 'completed',
-    };
-    const recordPath = join(recordsDir, 'pan-2232.json');
-    writeFileSync(recordPath, JSON.stringify({ issueId, statusOverrides }, null, 2));
-    const recordBefore = readFileSync(recordPath, 'utf-8');
 
     const updatedDoc = makeRefinalizationDoc(issueId, 'npm run typecheck');
     writeFileSync(
@@ -424,11 +408,6 @@ describe('completePlanningArtifacts', () => {
     const promoted = JSON.parse(readFileSync(canonicalPath, 'utf-8')) as XBriefDocument & { status: string };
     expect(promoted.status).toBe('proposed');
     expect(promoted.plan.items[0]?.metadata?.verify_commands).toEqual(['npm run typecheck']);
-    expect(readFileSync(recordPath, 'utf-8')).toBe(recordBefore);
-
-    const effective = applyStatusOverrides(promoted, statusOverrides);
-    expect(effective.plan.items[0]?.status).toBe('running');
-    expect(effective.plan.items[0]?.subItems?.[0]?.status).toBe('completed');
   });
 
   it('does not auto-spawn when autoSpawn is omitted', async () => {
@@ -509,9 +488,10 @@ describe('completePlanningArtifacts', () => {
     expect(readAutoSpawnOnFinalizeFlag('PAN-1146')).toBe(true);
   });
 
-  it('records a refused auto-handoff as planning failure and pipeline stuck state', async () => {
+  // PAN-3917: there is no stored pipeline state to mark stuck — the failure is
+  // the event plus the operator-visible activity line.
+  it('records a refused auto-handoff as a planning failure event', async () => {
     const append = vi.fn(() => Effect.succeed(undefined));
-    const markStuck = vi.fn();
     const emitActivity = vi.fn();
 
     await expect(recordPlanningAutoHandoffFailure({
@@ -523,7 +503,6 @@ describe('completePlanningArtifacts', () => {
       },
       eventStore: { append },
       now: () => '2026-07-17T00:00:00.000Z',
-      markStuck,
       emitActivity,
     })).resolves.toBe('Workspace has uncommitted changes');
 
@@ -537,10 +516,6 @@ describe('completePlanningArtifacts', () => {
         workAgentSkipReason: 'guardrails',
         workAgentError: 'Workspace has uncommitted changes',
       },
-    });
-    expect(markStuck).toHaveBeenCalledWith('PAN-2860', 'planning_auto_handoff_failed', {
-      workAgentSkipReason: 'guardrails',
-      workAgentError: 'Workspace has uncommitted changes',
     });
     expect(emitActivity).toHaveBeenCalledWith(expect.objectContaining({
       source: 'plan',
