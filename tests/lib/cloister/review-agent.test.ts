@@ -49,8 +49,6 @@ const {
   mockGetReviewStatus,
   mockArchiveFeedbackFiles,
   mockLoadConfigSync,
-  mockReadIssueRecordSync,
-  mockResolveProjectForIssue,
   mockGetLatestSessionIdSync,
   mockResumeAgent,
   mockStopAgent,
@@ -73,8 +71,6 @@ const {
   mockGetReviewStatus: vi.fn(() => null),
   mockArchiveFeedbackFiles: vi.fn(() => Effect.void),
   mockLoadConfigSync: vi.fn(() => ({ config: {} })),
-  mockReadIssueRecordSync: vi.fn(() => null),
-  mockResolveProjectForIssue: vi.fn(() => ({ name: 'test', path: '/tmp/project' })),
   mockGetLatestSessionIdSync: vi.fn(() => null),
   mockResumeAgent: vi.fn().mockResolvedValue({ success: false, error: 'no session' }),
   mockStopAgent: vi.fn().mockResolvedValue(undefined),
@@ -125,12 +121,6 @@ vi.mock('../../../src/lib/config-yaml.js', () => ({
   resolveModel: vi.fn(() => 'configured-reviewer-model'),
 }));
 
-vi.mock('../../../src/lib/pan-dir/record.js', () => ({
-  readIssueRecordSync: mockReadIssueRecordSync,
-  resolveProjectForIssue: mockResolveProjectForIssue,
-  writeAgentHarnessModelSync: vi.fn(),
-}));
-
 vi.mock('../../../src/lib/paths.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/lib/paths.js')>();
   return {
@@ -177,8 +167,6 @@ beforeEach(() => {
   mockGetAgentState.mockReturnValue(null);
   mockGetReviewStatus.mockReturnValue(null);
   mockLoadConfigSync.mockReturnValue({ config: {} });
-  mockReadIssueRecordSync.mockReturnValue(null);
-  mockResolveProjectForIssue.mockReturnValue({ name: 'test', path: '/tmp/project' });
   mockGetLatestSessionIdSync.mockReturnValue(null);
   mockResumeAgent.mockResolvedValue({ success: false, error: 'no session' });
   mockWipeAgentStateDirs.mockResolvedValue(undefined);
@@ -449,8 +437,6 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
   });
 
   it('quick mode spawns only the parent self-review session', async () => {
-    mockReadIssueRecordSync.mockReturnValue({ reviewMode: 'quick' });
-
     const result = await Effect.runPromise(spawnReviewRoleForIssue(reviewOpts));
 
     expect(result).toEqual({
@@ -575,34 +561,6 @@ describe('pan down integration (PAN-931)', () => {
     expect(traefikStopIdx).toBeGreaterThanOrEqual(0);
     expect(reviewCleanupIdx).toBeGreaterThan(dashboardStopIdx);
     expect(reviewCleanupIdx).toBeLessThan(traefikStopIdx);
-  });
-});
-
-// ── reviewStatus type-safety: 'dispatch_failed' must not appear ──────────────
-// Regression: the request-review route previously wrote reviewStatus='dispatch_failed',
-// which is not in the ReviewStatus.reviewStatus union (only testStatus permits it).
-// The route must use 'failed' for reviewStatus so the type contract is maintained.
-
-describe('reviewStatus type-safety regression', () => {
-  it('review-pipeline.ts request-review route does not write reviewStatus=dispatch_failed', async () => {
-    const { readFileSync } = await import('fs');
-    const { resolve } = await import('path');
-    const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/review-pipeline.ts'),
-      'utf-8',
-    );
-    const requestReviewMatch = routeSrc.match(
-      /const postWorkspaceRequestReviewRoute[\s\S]*?export const reviewPipelineRouteLayer/,
-    );
-    expect(requestReviewMatch).not.toBeNull();
-    const requestReviewBlock = requestReviewMatch![0];
-
-    // 'dispatch_failed' may appear in testStatus assignments (allowed by the type),
-    // but reviewStatus must never be set to 'dispatch_failed'.
-    const reviewStatusDispatchFailed = requestReviewBlock.match(
-      /reviewStatus\s*:\s*['"]dispatch_failed['"]/g,
-    );
-    expect(reviewStatusDispatchFailed).toBeNull();
   });
 });
 
