@@ -27,6 +27,7 @@ pan
 pan-admin-cloister
 pan-admin-config
 pan-admin-hooks
+pan-admin-migrate-plan-home
 pan-admin-tldr
 pan-admin-tracker
 pan-agent-activity

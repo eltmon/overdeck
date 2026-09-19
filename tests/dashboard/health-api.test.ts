@@ -42,7 +42,6 @@ function snapshot(overrides: Record<string, unknown> = {}): Record<string, unkno
   return {
     agents: [],
     agentRuntimeById: {},
-    reviewStatuses: [],
     ...overrides,
   };
 }
@@ -289,7 +288,10 @@ describe('GET /api/health/agents response', () => {
     expect(health).not.toHaveProperty('lastPing');
   });
 
-  it('keeps terminal specialists warm and human-blocked work agents waiting', async () => {
+  it('flags an inactive reviewer as stalled and keeps human-blocked work agents waiting', async () => {
+    // PAN-3917 FR-11: there is no review-status row to read a "warm" verdict
+    // off of any more — liveness comes only from the terminal backend
+    // (sessionNames) and runtime activity, same as any other agent.
     const oldActivity = '2026-07-16T10:00:00.000Z';
     const { status, body } = await runResponse(buildHealthAgentsResponse({
       snapshot: Effect.succeed(snapshot({
@@ -314,10 +316,6 @@ describe('GET /api/health/agents response', () => {
             updatedAtSequence: 3,
           },
         },
-        reviewStatuses: [{
-          issueId: 'PAN-2647',
-          reviewStatus: 'passed',
-        }],
       })),
       sessionNames: Effect.succeed([
         'agent-pan-2647-review',
@@ -331,8 +329,12 @@ describe('GET /api/health/agents response', () => {
     expect(body).toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: 'agent-pan-2647-review',
-        status: 'idle',
-        lifecycle: 'warm',
+        status: 'stalled',
+        lifecycle: 'active',
+        tmuxActive: true,
+        reasons: [expect.objectContaining({
+          code: 'agent.runtime.inactive.stalled',
+        })],
       }),
       expect.objectContaining({
         id: 'agent-pan-2647',
