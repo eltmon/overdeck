@@ -11,17 +11,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockGetOverdeckAgentStateSync = vi.hoisted(() => vi.fn());
-const mockSaveOverdeckAgentStateSync = vi.hoisted(() => vi.fn());
-
-vi.mock('../../../src/lib/overdeck/agent-state-sync.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../src/lib/overdeck/agent-state-sync.js')>()),
-  getOverdeckAgentStateSync: mockGetOverdeckAgentStateSync,
-  saveOverdeckAgentStateSync: mockSaveOverdeckAgentStateSync,
-}));
-
 import { agentsExitedCommand } from '../../../src/cli/commands/admin/agents-exited.js';
+import * as agentStateModule from '../../../src/lib/agents/agent-state.js';
 import type { AgentState } from '../../../src/lib/agents/agent-state.js';
+
+// PAN-3917: there is no separate "agents row" (the SQLite mirror is gone) —
+// saveAgentStateSync writes state.json only. Spy on the real implementation
+// so the fixture's own state.json reads/writes still happen for real.
+const saveAgentStateSyncSpy = vi.spyOn(agentStateModule, 'saveAgentStateSync');
 
 const AGENT_ID = 'agent-pan-3848-review-security';
 
@@ -46,10 +43,7 @@ describe('pan admin agents exited (PAN-3848 W26)', () => {
   beforeEach(() => {
     home = mkdtempSync(join(tmpdir(), 'pan-agents-exited-'));
     process.env.OVERDECK_HOME = home;
-    mockGetOverdeckAgentStateSync.mockReset();
-    mockSaveOverdeckAgentStateSync.mockReset();
-    // No DB row in the fixture — the read falls through to state.json.
-    mockGetOverdeckAgentStateSync.mockReturnValue(null);
+    saveAgentStateSyncSpy.mockClear();
 
     mkdirSync(join(home, 'agents', AGENT_ID), { recursive: true });
     writeFileSync(
@@ -77,9 +71,8 @@ describe('pan admin agents exited (PAN-3848 W26)', () => {
     expect(state.status).toBe('stopped');
     expect(state.stoppedByUser).toBeUndefined();
     expect(state.stoppedAt).toBeDefined();
-    // The agents row is written through the same save (dashboard updates
-    // without a patrol sweep).
-    expect(mockSaveOverdeckAgentStateSync).toHaveBeenCalledTimes(1);
+    // The write door is used exactly once — no patrol sweep infers this.
+    expect(saveAgentStateSyncSpy).toHaveBeenCalledTimes(1);
 
     const lifecycle = readFileSync(join(home, 'agents', AGENT_ID, 'lifecycle.log'), 'utf8');
     expect(lifecycle).toContain('code 0');
@@ -98,7 +91,7 @@ describe('pan admin agents exited (PAN-3848 W26)', () => {
     const stopped = { ...runningState(), status: 'stopped' as const };
     writeFileSync(join(home, 'agents', AGENT_ID, 'state.json'), JSON.stringify(stopped, null, 2));
     await agentsExitedCommand(AGENT_ID, { code: '0' });
-    expect(mockSaveOverdeckAgentStateSync).not.toHaveBeenCalled();
+    expect(saveAgentStateSyncSpy).not.toHaveBeenCalled();
 
     await expect(agentsExitedCommand('agent-pan-9999-review-security', { code: '1' })).resolves.toBeUndefined();
   });
