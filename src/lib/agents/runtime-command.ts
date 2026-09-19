@@ -445,7 +445,11 @@ export async function waitForCodexAppServerReady(
 ): Promise<void> {
   const now = deps.now ?? (() => Date.now());
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolveSleep) => setTimeout(resolveSleep, ms)));
-  const sessionExistsForAgent = deps.sessionExists ?? (async (id: string) => Effect.runPromise(sessionExists(id)));
+  // PAN-3917: existence must come from the selected terminal backend. On a
+  // Herdr host a codex/ACP agent is pane-bound (no tmux session), so the tmux
+  // probe declared it "exited before readiness" while its host was starting.
+  const sessionExistsForAgent = deps.sessionExists
+    ?? (async (id: string) => (await import('../terminal-backends/launch.js')).agentPaneExists(id));
   const readStatus = deps.readStatus ?? getCodexAppServerStatus;
   const deadline = now() + timeoutSec * 1000;
   let lastState = 'unknown';
@@ -484,7 +488,11 @@ export async function waitForAcpHostReady(
 ): Promise<void> {
   const now = deps.now ?? (() => Date.now());
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolveSleep) => setTimeout(resolveSleep, ms)));
-  const sessionExistsForAgent = deps.sessionExists ?? (async (id: string) => Effect.runPromise(sessionExists(id)));
+  // PAN-3917: existence must come from the selected terminal backend. On a
+  // Herdr host a codex/ACP agent is pane-bound (no tmux session), so the tmux
+  // probe declared it "exited before readiness" while its host was starting.
+  const sessionExistsForAgent = deps.sessionExists
+    ?? (async (id: string) => (await import('../terminal-backends/launch.js')).agentPaneExists(id));
   const readText = deps.readText ?? ((path: string) => readFileSync(path, 'utf8'));
   const pathExists = deps.pathExists ?? existsSync;
   const agentDir = getAgentDir(agentId);
