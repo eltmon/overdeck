@@ -163,6 +163,37 @@ live agent name with `agent.rename`. Herdr then treats the pane as a first-class
 `agent.wait` and the `idle|working|blocked|done` states all work, and both backends run the identical
 launcher. This deviates from the PRD sketch for W8 step 2 on purpose.
 
+### The PTY supervisor is tmux-only (PAN-3917 W12)
+
+**Herdr's agent detector reads the pane's foreground process.** The PTY supervisor
+(`node dist/pty-supervisor.js claude …`) allocates a *second* pseudo-terminal for the harness with
+node-pty, so the pane's own foreground process stays `node`, and Herdr never sees `claude` — the
+60 s detection wait then times out and `startAgent` closes the pane. That is exactly how
+`pan start PAN-3705` failed on 2026-09-19.
+
+So `decideSupervisorForWorkAgent` refuses the supervisor whenever the selected backend is Herdr
+(`supervisor:ineligible:herdr-backend`) and the generated launcher execs the harness directly. Both
+the fresh-launch and the relaunch/resume paths re-derive the backend, so a resume cannot re-wrap a
+Herdr agent. Herdr needs nothing the supervisor provided: `agent.prompt` delivers (`delivery.ts`
+routes the whole delivery through the backend, with no socket to find), `agent.get`/`agent.list`
+answer liveness, and `terminal.session.observe|control` serves the terminal.
+
+`isAlive` (`src/lib/agents/liveness.ts`) is backend-aware for the same reason: a Herdr agent has no
+tmux session, so the tmux three-check probe would answer `no-session` for every healthy agent and
+the remediators would reap the fleet. On Herdr the oracle is `probeHerdrAgentLiveness`, which keeps
+"the server says there is no such agent" (`no-session`, a confirmed death) apart from "the socket
+did not answer" (`runtime-indeterminate`, never a death). `isAliveOnTmux` is exported so the tmux
+adapter's own inventory keeps probing tmux on either host.
+
+**Known gap:** `isAliveSync` is still tmux-only — there is no synchronous Herdr client — so its
+callers (`work-agent-lifecycle.ts`, `parked/resolver.ts`) read a Herdr agent as `no-session`.
+Likewise `runtimes/muse.ts`, `runtimes/kimi-code.ts` and `overdeck/conversation-runtime.ts` still
+hardcode `useSupervisor: true`, so those launches hit the same detection failure on Herdr.
+
+A detection failure now carries the pane's foreground process and its last 20 lines of output, so
+the next one names its own cause. (A full-screen harness renders on the alternate screen, where
+`pane.read` returns nothing — the output is there for the launcher-died-early case.)
+
 ## Live verification record (AC-8)
 
 Host: herdr 0.9.1, server protocol 22, socket `~/.config/herdr/sessions/overdeck/herdr.sock` (the
@@ -281,3 +312,44 @@ subscription frames seen: workspace_created, pane_created (×2), pane_agent_dete
 this verification was barred from stopping or restarting the live server, so `resume` returns
 `unsupported` with that reason on both adapters; Overdeck resumes by relaunching the harness with
 its own resume flag, which is `startAgent` again.
+
+## Live verification record — supervisor vs direct exec (PAN-3917 W12)
+
+Host: herdr 0.9.1, server protocol 22, socket `~/.config/herdr/sessions/overdeck/herdr.sock`.
+Date: 2026-09-19. Throwaway workspace `fix11-verify` (`wF`), closed at the end. Both runs used the
+*same* on-disk launcher from the failed `pan start PAN-3705`, copied to a scratch path with a fresh
+session id and a throwaway agent id; the only difference was the exec line.
+
+**Run A — `exec node …/pty-supervisor.js claude …` (as shipped)**
+
+```
+pane.get wF:p2 polled every 7s for 56s:
+  agent = None   agent_status = unknown   terminal_title = '✳ agent-fix11-sup'   (unchanged, all 8 polls)
+pane.process_info wF:p2:
+  foreground_processes[0].name    = "node"
+  foreground_processes[0].cmdline = "node /home/eltmon/.overdeck/deployments/dashboard/
+      .pan-reload-generation-b/dist/pty-supervisor.js claude --permission-mode bypassPermissions
+      --effort high --model claude-sonnet-5 --name agent-fix11-sup --session-id … "
+agent.list: the pane is absent — 3 pre-existing agents only.
+```
+
+**Run B — `exec claude …` (supervisor removed, nothing else changed)**
+
+```
+pane.get wF:p3 polled every 2.5s:
+  t=2s  agent = claude   → DETECTED
+  t=10s agent = claude   agent_status = idle   terminal_title = '✳ agent-fix11-dir'
+pane.process_info wF:p3:
+  foreground_processes[0].name = "claude"
+agent.rename wF:p3 agent-fix11-dir → {"type":"agent_info","agent":{"name":"agent-fix11-dir",
+  "agent":"claude","agent_status":"idle"}}
+agent.list: the pane is listed as a first-class agent.
+```
+
+**What this settles.** The terminal title was correct in *both* runs, so Herdr does not detect on the
+title and stamping a pane title would not have helped. Detection follows the pane's foreground
+process, which the supervisor's node-pty replaces with `node`. Every agent Herdr had already
+detected on the live session (`flywheel-orchestrator`, `agent-pan-2468-knowledge`,
+`sequencer-runner`) also runs `claude` directly — none is supervisor-wrapped.
+
+Teardown: `workspace.close wF` → `{"result":{"type":"ok"}}`; no `fix11-*` processes survived.

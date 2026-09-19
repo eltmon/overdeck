@@ -63,6 +63,8 @@ const METADATA_SOURCE = 'overdeck';
 /** How long to wait for Herdr to recognize the harness in a freshly launched pane. */
 const AGENT_DETECT_TIMEOUT_MS = 60_000;
 const AGENT_DETECT_POLL_MS = 500;
+/** How much pane output a detection failure carries so it is diagnosable. */
+const DETECTION_FAILURE_LINES = 20;
 
 interface HerdrPaneInfo {
   pane_id: string;
@@ -209,6 +211,61 @@ export async function findHerdrAgent(
   }
 }
 
+/**
+ * Transport codes: the request never reached a server answer. A probe that
+ * hits one knows NOTHING about the agent — it must never report a death.
+ */
+const HERDR_TRANSPORT_ERROR_CODES: ReadonlySet<string> = new Set([
+  'timeout',
+  'socket_error',
+  'disconnected',
+  'write_failed',
+  'invalid_json',
+  'frame_too_large',
+  'protocol_mismatch',
+]);
+
+/** What a Herdr liveness probe can conclude (PAN-3917 W12). */
+export type HerdrLivenessProbe =
+  | { readonly kind: 'alive'; readonly paneId: string; readonly state: AgentState }
+  | { readonly kind: 'exited'; readonly paneId: string }
+  | { readonly kind: 'absent' }
+  /** The socket, not the agent, failed — the caller must treat this as "not dead". */
+  | { readonly kind: 'indeterminate'; readonly reason: string };
+
+/**
+ * Ask Herdr whether an agent is live. Unlike `findHerdrAgent` (which folds
+ * every failure into `null`), this SEPARATES "the server says there is no such
+ * agent" from "the socket did not answer": a Herdr outage folded into `absent`
+ * would make the liveness oracle confirm every agent dead at once and the
+ * remediators would reap the whole fleet.
+ */
+export async function probeHerdrAgentLiveness(
+  agentName: string,
+  api: HerdrApiClient = getHerdrApiClient(),
+): Promise<HerdrLivenessProbe> {
+  let info: { agent?: HerdrPaneInfo };
+  try {
+    info = await api.call<{ agent?: HerdrPaneInfo }>(
+      'agent.get',
+      { target: agentName },
+      { timeoutMs: HERDR_PROBE_TIMEOUT_MS },
+    );
+  } catch (cause) {
+    if (cause instanceof HerdrApiError && !HERDR_TRANSPORT_ERROR_CODES.has(cause.code)) {
+      // The server answered — it simply does not know this agent.
+      return { kind: 'absent' };
+    }
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    return { kind: 'indeterminate', reason };
+  }
+  const agent = info.agent;
+  if (!agent) return { kind: 'absent' };
+  const state = toAgentState(agent.agent_status);
+  if (state === 'exited') return { kind: 'exited', paneId: agent.pane_id };
+  return { kind: 'alive', paneId: agent.pane_id, state };
+}
+
 /** One live Herdr agent, keyed by the Overdeck agent id bound with `agent.rename`. */
 export interface HerdrLiveAgent {
   readonly agentId: string;
@@ -260,10 +317,25 @@ export async function readHerdrPaneText(
   return result.text ?? '';
 }
 
+/** Detection-wait knobs. Production uses the defaults; tests shorten them. */
+export interface HerdrBackendOptions {
+  readonly detectTimeoutMs?: number;
+  readonly detectPollMs?: number;
+}
+
 export class HerdrBackend implements TerminalBackend {
   readonly name = BACKEND;
 
-  constructor(private readonly api: HerdrApiClient = getHerdrApiClient()) {}
+  private readonly detectTimeoutMs: number;
+  private readonly detectPollMs: number;
+
+  constructor(
+    private readonly api: HerdrApiClient = getHerdrApiClient(),
+    options: HerdrBackendOptions = {},
+  ) {
+    this.detectTimeoutMs = options.detectTimeoutMs ?? AGENT_DETECT_TIMEOUT_MS;
+    this.detectPollMs = options.detectPollMs ?? AGENT_DETECT_POLL_MS;
+  }
 
   /**
    * The issue's workspace. Looked up by the `issue` token first (a label can be
@@ -322,10 +394,17 @@ export class HerdrBackend implements TerminalBackend {
       // intended name for a pane that never took it hands the caller a
       // reference no prompt, wait or close can reach.
       if (!await this.waitForAgentDetection(pane.pane_id)) {
+        // Diagnose BEFORE closing: the pane is the only witness. Herdr's
+        // detector keys on the pane's FOREGROUND PROCESS, so the process line
+        // is what names the cause outright — a wrapper (`node
+        // pty-supervisor.js claude …`, PAN-3917 W12) hides the harness behind
+        // its own pty and can never be detected, while a launcher that died
+        // early leaves its error in the pane text.
+        const diagnosis = await this.diagnoseDetectionFailure(pane.pane_id);
         await this.api.call('pane.close', { pane_id: pane.pane_id }).catch(() => {});
         throw new Error(
-          `herdr detected no agent in pane ${pane.pane_id} within ${AGENT_DETECT_TIMEOUT_MS}ms; `
-          + `the pane could not be bound to ${agentName} and was closed`,
+          `herdr detected no agent in pane ${pane.pane_id} within ${this.detectTimeoutMs}ms; `
+          + `the pane could not be bound to ${agentName} and was closed.${diagnosis}`,
         );
       }
       // Bind the Overdeck agent id as the live agent name so `agent.prompt`
@@ -348,14 +427,59 @@ export class HerdrBackend implements TerminalBackend {
     });
   }
 
+  /**
+   * Why did detection fail? Returns the pane's foreground process and its last
+   * lines of output, formatted for the thrown message. Never throws: a probe
+   * that fails must not replace the real failure with its own.
+   */
+  private async diagnoseDetectionFailure(paneId: string): Promise<string> {
+    const parts: string[] = [];
+    try {
+      const info = await this.api.call<{
+        process_info?: { foreground_processes?: { name?: string; cmdline?: string }[] };
+      }>('pane.process_info', { pane_id: paneId });
+      const foreground = info.process_info?.foreground_processes ?? [];
+      if (foreground.length > 0) {
+        parts.push(
+          `Pane foreground process: ${foreground
+            .map((p) => p.cmdline || p.name || '(unnamed)')
+            .join(' | ')}`,
+        );
+      } else {
+        parts.push('Pane foreground process: none (the launcher exited).');
+      }
+    } catch (err) {
+      parts.push(`Pane foreground process unavailable: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    try {
+      const read = await this.api.call<{ text?: string }>('pane.read', {
+        pane_id: paneId,
+        source: 'recent_unwrapped',
+        lines: DETECTION_FAILURE_LINES,
+        strip_ansi: true,
+      });
+      const text = (read.text ?? '').trimEnd();
+      parts.push(
+        text
+          ? `Last ${DETECTION_FAILURE_LINES} lines of pane output:\n${text}`
+          : `Pane output is empty (a full-screen harness renders on the alternate screen).`,
+      );
+    } catch (err) {
+      parts.push(`Pane output unavailable: ${err instanceof Error ? err.message : String(err)}`);
+    }
+
+    return ` ${parts.join('\n')}`;
+  }
+
   /** Poll until Herdr's detector claims the pane, or give up and leave it a plain pane. */
   private async waitForAgentDetection(paneId: string): Promise<boolean> {
-    const deadline = Date.now() + AGENT_DETECT_TIMEOUT_MS;
+    const deadline = Date.now() + this.detectTimeoutMs;
     for (;;) {
       const info = await this.api.call<{ pane?: HerdrPaneInfo }>('pane.get', { pane_id: paneId });
       if (info.pane?.agent) return true;
       if (Date.now() >= deadline) return false;
-      await new Promise((resolve) => setTimeout(resolve, AGENT_DETECT_POLL_MS));
+      await new Promise((resolve) => setTimeout(resolve, this.detectPollMs));
     }
   }
 

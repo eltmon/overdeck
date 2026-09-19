@@ -23,7 +23,7 @@ import { Effect } from 'effect';
 // this backend transitively — import the read-only leaf instead so a terminal
 // backend computing pane tokens cannot close that cycle.
 import { getAgentStateSync } from '../agents/agent-state-read.js';
-import { isAlive, isIdle } from '../agents/liveness.js';
+import { isAliveOnTmux, isIdle } from '../agents/liveness.js';
 import { createSession, killSession, listSessions, sendKeys, sessionExists } from '../tmux.js';
 import { checkPrompt, toPaneRole, tokensFromLaunchMetadata } from './prompt-guard.js';
 import { registerTerminalBackend } from './registry.js';
@@ -175,7 +175,7 @@ export class TmuxBackend implements TerminalBackend {
       const sessions = await Effect.runPromise(listSessions());
       const snapshots: BackendAgentSnapshot[] = [];
       for (const session of sessions) {
-        const verdict = await isAlive(session.name);
+        const verdict = await isAliveOnTmux(session.name);
         const state: AgentState = !verdict.alive
           ? 'exited'
           : isIdle(session.name)

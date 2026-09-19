@@ -108,6 +108,40 @@ async function findHerdrBinary(deps: SelectTerminalBackendDeps): Promise<string 
 }
 
 /**
+ * Which backend THIS host runs on, memoized per process (PAN-3917 W12).
+ *
+ * The selection is a property of the host — binary, socket, config, env — not
+ * of the call, and the supervisor decision, the launch path and the liveness
+ * oracle all need the same answer. It lives here, not in `launch.ts`, because
+ * `launch.ts` imports both adapters and the tmux adapter imports the liveness
+ * oracle: a static edge from liveness to launch would close a load cycle.
+ * `config-yaml` is imported lazily for the same reason config is a parameter
+ * everywhere else in this module.
+ */
+let hostBackendName: Promise<TerminalBackendName> | null = null;
+
+export function hostTerminalBackendName(): Promise<TerminalBackendName> {
+  hostBackendName ??= (async () => {
+    let configured: TerminalBackendConfig = {};
+    try {
+      const { loadConfigSync } = await import('../config-yaml.js');
+      configured = loadConfigSync() as TerminalBackendConfig;
+    } catch {
+      // An unreadable config is a selection input, not a failure: the host
+      // probe then decides on the binary and socket alone.
+    }
+    const { backend } = await selectTerminalBackend(configured);
+    return backend;
+  })().catch((): TerminalBackendName => 'tmux');
+  return hostBackendName;
+}
+
+/** Tests only: drop the memoized host selection. */
+export function resetHostTerminalBackendName(): void {
+  hostBackendName = null;
+}
+
+/**
  * Pick the terminal backend for this host. Never throws: an unreadable PATH or
  * a missing socket is a tmux selection with a diagnostic.
  */

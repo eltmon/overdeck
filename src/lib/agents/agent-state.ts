@@ -139,6 +139,34 @@ export function saveAgentStateSync(state: AgentState): void {
 }
 
 /**
+ * Turn a spawn that died into a stopped agent with a reason (PAN-3917 W12).
+ *
+ * `pan start PAN-3705` died inside `launchAgentPane` — Herdr created the pane,
+ * never detected the harness behind the PTY supervisor's own pty, and closed
+ * it. The launch call had no try/catch, so nothing on the failure path ran and
+ * the state file sat at `status: 'starting'` with no reason forever.
+ * `stopAgent` — which the other failure paths do call — writes
+ * `stopped`/`stoppedAt` but never a reason, so even those failures were mute.
+ *
+ * Reads fresh from disk so a stale in-memory state cannot clobber writes the
+ * failure path already made. Call it LAST on every spawn failure path.
+ */
+export async function markSpawnFailed(agentId: string, reason: string): Promise<void> {
+  try {
+    const current = getAgentStateSync(agentId);
+    if (!current) return;
+    current.id ||= agentId;
+    current.status = 'stopped';
+    current.stoppedAt = new Date().toISOString();
+    current.lastFailureAt = current.stoppedAt;
+    current.lastFailureReason = reason;
+    saveAgentStateSync(current);
+  } catch (err) {
+    console.warn(`[${agentId}] could not record spawn failure: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+/**
  * Persist observed harness activity through the agent-state write door without
  * re-running lifecycle side effects such as harness/model record mirroring.
  */

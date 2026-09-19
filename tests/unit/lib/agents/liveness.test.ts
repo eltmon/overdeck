@@ -111,6 +111,69 @@ describe('isAlive: the single liveness oracle (PAN-3849)', () => {
   });
 });
 
+// ─── Herdr backend (PAN-3917 W12) ───────────────────────────────────────────
+
+/**
+ * A Herdr agent has no tmux session at all: the tmux probe would answer
+ * `no-session` for every healthy agent and the remediators (deacon-lite,
+ * feedback routing, the parked sweeper) would reap the fleet. On a Herdr host
+ * the backend's own agent registry is the oracle.
+ */
+describe('isAlive on the Herdr backend', () => {
+  it('reports a detected agent alive without touching tmux', async () => {
+    const deps = aliveDeps({
+      backend: 'herdr' as const,
+      probeHerdr: vi.fn(async () => ({ kind: 'alive' as const, paneId: 'wE:p2', state: 'working' as const })),
+    });
+    await expect(isAlive('agent-x', deps)).resolves.toEqual({ alive: true, paneAlive: true });
+    expect(deps.sessionExists).not.toHaveBeenCalled();
+    expect(deps.listPaneRows).not.toHaveBeenCalled();
+  });
+
+  it('reports an agent Herdr does not know as no-session (a confirmed death)', async () => {
+    const deps = aliveDeps({
+      backend: 'herdr' as const,
+      probeHerdr: vi.fn(async () => ({ kind: 'absent' as const })),
+    });
+    const verdict = await isAlive('agent-x', deps);
+    expect(verdict).toEqual({ alive: false, reason: 'no-session' });
+    expect(isConfirmedDead(verdict)).toBe(true);
+  });
+
+  it('reports an exited pane as pane-dead', async () => {
+    const deps = aliveDeps({
+      backend: 'herdr' as const,
+      probeHerdr: vi.fn(async () => ({ kind: 'exited' as const, paneId: 'wE:p2' })),
+    });
+    await expect(isAlive('agent-x', deps)).resolves.toEqual({ alive: false, reason: 'pane-dead' });
+  });
+
+  it('a Herdr socket outage is runtime-indeterminate, NEVER a confirmed death', async () => {
+    const deps = aliveDeps({
+      backend: 'herdr' as const,
+      probeHerdr: vi.fn(async () => ({ kind: 'indeterminate' as const, reason: 'timeout' })),
+    });
+    const verdict = await isAlive('agent-x', deps);
+    expect(verdict).toEqual({ alive: false, reason: 'runtime-indeterminate' });
+    expect(isConfirmedDead(verdict)).toBe(false);
+  });
+
+  it('a probe that throws is indeterminate too — a broken probe must not kill', async () => {
+    const deps = aliveDeps({
+      backend: 'herdr' as const,
+      probeHerdr: vi.fn(async () => { throw new Error('socket closed'); }),
+    });
+    expect(isConfirmedDead(await isAlive('agent-x', deps))).toBe(false);
+  });
+
+  it('keeps the tmux three-check probe when the backend is tmux', async () => {
+    const probeHerdr = vi.fn();
+    const deps = aliveDeps({ backend: 'tmux' as const, probeHerdr });
+    await expect(isAlive('agent-x', deps)).resolves.toEqual({ alive: true, paneAlive: true, runtimePid: 100 });
+    expect(probeHerdr).not.toHaveBeenCalled();
+  });
+});
+
 // ─── isAliveSync (lifecycle-classifier variant) ─────────────────────────────
 
 function aliveSyncDeps(overrides: Record<string, unknown> = {}) {
