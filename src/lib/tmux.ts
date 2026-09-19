@@ -7,6 +7,7 @@ import { homedir, tmpdir } from 'os';
 import { createHash, randomUUID } from 'node:crypto';
 import { Effect } from 'effect';
 import { getCanonicalOverdeckHome, getOverdeckHome } from './paths.js';
+import { DEFAULT_INSTANCE_NAME, managedInstanceName } from './instance-name.js';
 import { loadConfigSync, type TmuxConfigMode } from './config-yaml.js';
 import { buildChildEnvSync } from './child-env.js';
 import { MessageDeliveryFailed, TmuxError } from './errors.js';
@@ -75,7 +76,7 @@ export function getManagedTmuxConfigPath(): string {
   return join(getTmuxDir(), 'overdeck.tmux.conf');
 }
 
-const DEFAULT_MANAGED_TMUX_SOCKET = 'overdeck';
+const DEFAULT_MANAGED_TMUX_SOCKET = DEFAULT_INSTANCE_NAME;
 
 /**
  * PAN-3673: a process whose OVERDECK_HOME is not the default home is a separate
@@ -91,10 +92,7 @@ const DEFAULT_MANAGED_TMUX_SOCKET = 'overdeck';
  */
 export function getManagedTmuxSocketName(): string {
   if (process.env.OVERDECK_TMUX_SOCKET_NAME) return process.env.OVERDECK_TMUX_SOCKET_NAME;
-  const home = resolve(getOverdeckHome());
-  if (home === resolve(join(homedir(), '.overdeck'))) return DEFAULT_MANAGED_TMUX_SOCKET;
-  const hash = createHash('sha1').update(home).digest('hex').slice(0, 8);
-  return `${DEFAULT_MANAGED_TMUX_SOCKET}-${hash}`;
+  return managedInstanceName();
 }
 
 function ensureLogDir(): void {

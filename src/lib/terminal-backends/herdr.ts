@@ -1,7 +1,9 @@
 /**
  * Herdr terminal backend adapter (PAN-3917 FR-4, FR-5, FR-17, W8).
  *
- * Drives the headless `herdr --session overdeck` server over its unix-socket
+ * Drives the headless `herdr --session <instance>` server over its unix-socket
+ * — `overdeck` for the default home, `overdeck-<hash>` for any other, exactly
+ * as the managed tmux socket is derived (see `./select.ts`) —
  * NDJSON API (`./herdr-api.ts`) and bridges its terminal streams to the
  * dashboard's frame contract (`./herdr-stream.ts`). It never installs,
  * updates, stops, or replaces a server.

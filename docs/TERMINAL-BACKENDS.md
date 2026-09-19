@@ -10,7 +10,7 @@ Two adapters implement one contract:
 | | Herdr (default) | tmux |
 | --- | --- | --- |
 | Module | `src/lib/terminal-backends/herdr.ts` | `src/lib/terminal-backends/tmux.ts` |
-| Transport | NDJSON over `~/.config/herdr/sessions/overdeck/herdr.sock` | `tmux -L overdeck` |
+| Transport | NDJSON over `~/.config/herdr/sessions/<instance>/herdr.sock` | `tmux -L <instance>` |
 | Agent states | `idle`, `working`, `blocked`, `done`, `unknown` (Herdr's own) | `working`, `idle`, `exited` from `src/lib/agents/liveness.ts` |
 | `wait` | `agent.wait` | `unsupported` — tmux has no lifecycle state |
 | `observe` / `control` | `herdr terminal session observe\|control` | `unsupported` — the dashboard PTY supervisor serves tmux |
@@ -30,15 +30,45 @@ Operations: `workspaceFor`, `startAgent`, `prompt`, `wait`, `observe`, `control`
 
 ## Selection (D10)
 
-`selectTerminalBackend(config)` in `select.ts`: an explicit `terminal.backend` in `config.yaml`
-wins; otherwise Herdr when the `herdr` binary is on `PATH` **and** the `overdeck` session socket
-exists; otherwise tmux, with a diagnostic naming the reason. No subprocess — `fs.access` only, so
-it is safe on every spawn. Adapters register themselves at import time; `registry.ts` resolves a
-name to an adapter and throws with the missing import when nothing registered it.
+`selectTerminalBackend(config)` in `select.ts`, in precedence order:
+
+1. `OVERDECK_TERMINAL_BACKEND=tmux|herdr` — the explicit override, above config and above any host
+   probe. An unrecognized value is ignored with a warning. Every harness that spawns real agents
+   under an isolated home sets it to `tmux`.
+2. `terminal.backend` in `config.yaml`.
+3. The host probe: Herdr when the `herdr` binary is on `PATH` **and** *this instance's* session
+   socket exists; otherwise tmux, with a diagnostic naming the reason.
+
+No subprocess — `fs.access` only, so it is safe on every spawn. Adapters register themselves at
+import time; `registry.ts` resolves a name to an adapter and throws with the missing import when
+nothing registered it.
 
 `src/lib/terminal-backends/launch.ts` is the one launch path: it resolves the backend, finds or
 creates the issue workspace, starts the pane, and stamps the tokens. Every launcher goes through
 it, so none of them can forget a token.
+
+### Session naming and isolation
+
+The Herdr session name is the **per-home instance name**, `managedInstanceName()` in
+`src/lib/instance-name.ts` — the same value `tmux -L` uses as its socket name:
+
+| `OVERDECK_HOME` | instance | Herdr session / socket | tmux socket |
+| --- | --- | --- | --- |
+| `~/.overdeck` (default) | `overdeck` | `~/.config/herdr/sessions/overdeck/herdr.sock` | `tmux -L overdeck` |
+| anything else | `overdeck-<sha1(home)[0..8]>` | `~/.config/herdr/sessions/overdeck-<hash>/herdr.sock` | `tmux -L overdeck-<hash>` |
+
+It is resolved at call time, never at module load, because `OVERDECK_HOME` is set per process.
+
+This is the Herdr half of the PAN-3673 rule: **a derived per-home instance must never take over the
+default one.** Selection then requires *that* instance's socket, so a process serving a `/tmp` home
+(a test, an isolated verification stack) cannot see the live `overdeck` session and falls back to
+tmux. Before this, any test process on a host with the `herdr` binary and a live `overdeck` socket
+selected Herdr and spawned real agents into the operator's session.
+
+A systemd unit that serves the default home therefore runs `herdr --session overdeck server`, which
+is correct precisely because `~/.overdeck` owns the `overdeck` instance. A second Overdeck instance
+needs its own unit with its own `--session overdeck-<hash>`; it must not reuse the default unit or
+the default session name.
 
 ## Pane metadata (FR-5)
 
@@ -135,7 +165,8 @@ launcher. This deviates from the PRD sketch for W8 step 2 on purpose.
 
 ## Live verification record (AC-8)
 
-Host: herdr 0.9.1, server protocol 22, socket `~/.config/herdr/sessions/overdeck/herdr.sock`.
+Host: herdr 0.9.1, server protocol 22, socket `~/.config/herdr/sessions/overdeck/herdr.sock` (the
+default home owns the `overdeck` instance).
 Date: 2026-09-18. Throwaway workspace `pan-3917-verify`, closed at the end. JSON trimmed.
 
 **Probe**
