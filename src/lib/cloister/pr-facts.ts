@@ -228,7 +228,38 @@ function primaryGitLabRepo(repos: readonly ResolvedProjectRepo[]): ResolvedProje
  * so a caller that gates on `approved`/`mergeable` holds rather than acting on a
  * lookup failure.
  */
+/**
+ * A short-lived read cache (PAN-3917).
+ *
+ * Every caller that used to read a status row now asks the forge, and some of
+ * them ask per agent on a loop. The cache is process-local and expires in a
+ * minute: it stores nothing durable and answers nothing a fresh call would not,
+ * it just stops one sweep from running `gh pr view` a dozen times for the same
+ * issue. Callers with injected deps bypass it — those are tests and callers
+ * that want a specific forge reader.
+ */
+const PR_FACTS_TTL_MS = 60_000;
+const prFactsCache = new Map<string, { at: number; facts: PrFacts }>();
+
+/** Drop the cached forge reads. Exported for tests and for `pan reload`. */
+export function resetPrFactsCache(): void {
+  prFactsCache.clear();
+}
+
 export async function getPrFacts(issueId: string, deps: PrFactsDeps = {}): Promise<PrFacts> {
+  const cacheable = Object.keys(deps).length === 0;
+  const key = issueId.toUpperCase();
+  if (cacheable) {
+    const hit = prFactsCache.get(key);
+    if (hit && Date.now() - hit.at < PR_FACTS_TTL_MS) return hit.facts;
+  }
+  const facts = await readPrFacts(issueId, deps);
+  // An error is a lookup failure, not an answer — never cache it.
+  if (cacheable && !facts.error) prFactsCache.set(key, { at: Date.now(), facts });
+  return facts;
+}
+
+async function readPrFacts(issueId: string, deps: PrFactsDeps): Promise<PrFacts> {
   const fetchGitHubPr = deps.fetchGitHubPr ?? fetchIssuePullRequest;
   try {
     const gh = await fetchGitHubPr(issueId);

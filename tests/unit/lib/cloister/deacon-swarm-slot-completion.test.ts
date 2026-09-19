@@ -2,9 +2,9 @@
  * PAN-2372 WI-3 / FR-4, re-pointed by PAN-3917: the durable slot-completion
  * door.
  *
- * These were record-door tests: they wrote to `.pan/records/<issue>.json` on the
- * state plane and asserted that `statusOverrides` and the pipeline block
- * survived a read-modify-write. The record is gone. The same facts now live in
+ * These were record-door tests: they wrote to the per-issue record on the state
+ * plane and asserted that item overrides and the pipeline block survived a
+ * read-modify-write. The record is gone. The same facts now live in
  * the slot ledger — `<planHome>/.pan/continues/<ISSUE>.slots.json` — which is
  * ordinary repo content, so the tests read it back through the store instead of
  * parsing a record file.

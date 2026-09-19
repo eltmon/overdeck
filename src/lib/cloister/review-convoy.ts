@@ -387,7 +387,7 @@ export async function recoverMissingConvoyReviewers(
 
   let parent: typeof parentState | null;
   try {
-    const { resolveReviewParentRunState } = await import('./review-run-recovery.js');
+    const { resolveReviewParentRunState } = await import('./review-rounds.js');
     parent = await resolveReviewParentRunState(parentState, { persistCurrent: true });
   } catch (error) {
     return {

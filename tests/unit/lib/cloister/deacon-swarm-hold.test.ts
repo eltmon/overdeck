@@ -28,7 +28,7 @@ vi.mock('../../../../src/lib/projects.js', () => ({
   findProjectByPathSync: (projectPath: string) =>
     (mocks.listProjectsSync() ?? []).find(({ config }: { config: { path: string } }) => config.path === projectPath)?.config ?? null,
   // PAN-2372 WI-2: workspace-door record path now resolves the owning project;
-  // these tests fixture records at the workspace .pan/records/ path, so treat
+  // these tests fixture the continue file under the project root, so treat
   // issues as unregistered and use the workspace-door fallback.
   resolveProjectFromIssueSync: () => null,
 }));

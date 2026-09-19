@@ -39,10 +39,6 @@ vi.mock('../../projects.js', () => ({
   findProjectByPathSync: vi.fn(() => null),
   resolveInfraRepo: (_project: unknown, checkoutRoot: string) => ({ repoPath: checkoutRoot }),
 }));
-vi.mock('../../pan-dir/record.js', () => ({
-  readIssueRecordSync: vi.fn(() => null),
-  writeIssueRecordSync: vi.fn(),
-}));
 
 const agentState = vi.hoisted(() => ({
   states: new Map<string, Record<string, unknown>>(),

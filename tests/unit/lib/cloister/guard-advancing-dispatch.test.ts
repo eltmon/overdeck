@@ -76,10 +76,6 @@ vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
   archiveFeedbackFiles: vi.fn(() => Effect.succeed(undefined)),
 }));
 
-vi.mock('../../../../src/lib/pan-dir/record.js', () => ({
-  resolveProjectForIssue: vi.fn(() => null),
-  readIssueRecordSync: vi.fn(() => undefined),
-}));
 
 vi.mock('../../../../src/lib/cloister/issue-closed.js', () => ({
   isIssueClosed: vi.fn(async () => false),

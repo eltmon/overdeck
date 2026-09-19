@@ -16,7 +16,6 @@ import {
 } from '../overdeck/control-settings.js';
 import type { TriggerDetection } from './triggers.js';
 import type { HandoffResult } from './handoff.js';
-import type { FPPViolation } from './fpp-violations.js';
 import { getCostSummary, type CostAlert } from './cost-monitor.js';
 import type { SessionRotationResult } from './session-rotation.js';
 import {
@@ -42,14 +41,12 @@ import { handleCloisterDomainEvent, parseSpecialistAgentSession } from './servic
 import {
   checkHandoffTriggers,
   checkCostAlerts,
-  checkFPPViolations,
   checkSpecialistRotations,
   mapHeartbeatSource,
   performHealthCheck,
   recordHealthEvent,
   type HealthEvent, type HealthHost,
 } from './service-health.js';
-import { checkCompletionMarkers, type CompletionHost } from './service-completion.js';
 import { checkForMassDeaths as checkForMassDeathsWithHost, handleAgentCrash as handleAgentCrashWithHost, killAgent as killAgentWithHost, pauseSpawns as pauseSpawnsWithHost, pokeAgent as pokeAgentWithHost, pokeAgentWithEscalation as pokeAgentWithEscalationWithHost, progressFingerprint as progressFingerprintWithHost, restartAgent as restartAgentWithHost, type CrashEvent, type CrashHost } from './service-crash.js';
 import { getAllAgentHealth as getAllAgentHealthWithHost, getServiceAgentHealth, getStatus as getStatusWithHost, type CloisterStatus, type StatusHost } from './service-status.js';
 export {
@@ -150,9 +147,6 @@ export type CloisterEvent =
   | { type: 'mass_death_detected'; deathCount: number; windowSeconds: number }
   | { type: 'spawn_paused'; reason: string }
   | { type: 'spawn_resumed' }
-  | { type: 'fpp_violation_detected'; agentId: string; violation: FPPViolation }
-  | { type: 'fpp_nudge_sent'; agentId: string; nudgeCount: number }
-  | { type: 'fpp_max_nudges_exceeded'; agentId: string; violation: FPPViolation }
   | { type: 'cost_alert'; alert: CostAlert }
   | { type: 'session_rotated'; specialistName: string; result: SessionRotationResult }
   | { type: 'handoff_triggered'; agentId: string; trigger: TriggerDetection }
@@ -182,7 +176,6 @@ export class CloisterService {
   private previousRunningAgents: Set<string> = new Set();
   private deathTimestamps: Date[] = []; // Rolling window of agent death times
   private spawnsPaused: boolean = false;
-  private processedCompletions: Map<string, number> = new Map(); // Track completion marker retry counts (Infinity = done)
   private healthCheckCount: number = 0;
   private lastPokeTimestamps: Map<string, number> = new Map(); // agentId → last poke timestamp (ms)
   // PAN-2452 (idle-alive): progress fingerprint at last poke → consecutive
@@ -219,24 +212,14 @@ export class CloisterService {
       get previousStates() { return service.previousStates; },
       get activeCostAlertKeys() { return service.activeCostAlertKeys; },
       handleAgentCrash: (agentId: string) => service.handleAgentCrash(agentId),
-      checkCompletionMarkers: () => service.checkCompletionMarkers(),
       recordHealthEvent: (health: AgentHealth) => service.recordHealthEvent(health),
       emit: (event: HealthEvent) => service.emit(event),
       pokeAgent: (agentId: string) => service.pokeAgent(agentId),
       killAgent: (agentId: string) => service.killAgent(agentId),
       checkHandoffTriggers: (agentHealths: AgentHealth[]) => service.checkHandoffTriggers(agentHealths),
-      checkFPPViolations: (agentIds: string[]) => service.checkFPPViolations(agentIds),
       checkCostAlerts: (agentIds: string[]) => service.checkCostAlerts(agentIds),
       checkSpecialistRotations: () => service.checkSpecialistRotations(),
       mapHeartbeatSource: (source: string) => service.mapHeartbeatSource(source),
-    };
-  }
-
-  private completionHost(): CompletionHost {
-    const service = this;
-    return {
-      get processedCompletions() { return service.processedCompletions; },
-      getDashboardApiUrl: () => service.getDashboardApiUrl(),
     };
   }
 
@@ -550,11 +533,6 @@ export class CloisterService {
     return performHealthCheck(this.healthHost());
   }
 
-  /** Fallback scan for completion markers when `pan done` did not reach the dashboard. */
-  private async checkCompletionMarkers(): Promise<void> {
-    return checkCompletionMarkers(this.completionHost());
-  }
-
   /**
    * Poke an agent (send "are you stuck?" message).
    *
@@ -639,13 +617,6 @@ export class CloisterService {
    */
   isSpawnPaused(): boolean {
     return this.spawnsPaused || isCloisterSpawnsPausedSync();
-  }
-
-  /**
-   * Check for FPP violations and send nudges
-   */
-  private checkFPPViolations(agentIds: string[]): void {
-    return checkFPPViolations(this.healthHost(), agentIds);
   }
 
   /**

@@ -25,7 +25,7 @@
 
 import { Effect } from 'effect';
 
-import { getPrFacts, isAwaitingReview } from './pr-facts.js';
+import { getPrFacts, isAwaitingReview, type PrFacts } from './pr-facts.js';
 
 import {
   clearYieldForResumeSync,
@@ -282,4 +282,34 @@ export async function resumeYieldedAgents(maxToResume: number): Promise<string[]
     }
   }
   return resumed;
+}
+
+/**
+ * Is this idle agent waiting on the pipeline rather than stalled? (PAN-2581,
+ * re-pointed by PAN-3917.)
+ *
+ * The health check's poke loop must never ask "are you stuck?" of an agent
+ * that is legitimately waiting: a work agent that has opened its PR and is
+ * waiting on review, or a review/test agent between phases. A poke there spends
+ * tokens re-explaining the wait, and the idle-alive pause that follows it
+ * manufactures the paused-delivery-target deadlock PAN-2461 exists to undo.
+ *
+ * This used to read the issue's review row — `reviewing`, `passed`, or
+ * `pending` with a `reviewRequestedAt` stamp, plus the owed-rework states. The
+ * pull request says the same thing without a row: a work/review/test agent
+ * whose issue has a PR at all is inside the pipeline, and the pipeline, not a
+ * poke, is what moves it. Roles outside work/review/test keep their ordinary
+ * idleness semantics.
+ */
+export async function shouldSkipIdlePokeForAgent(
+  agent: Pick<AgentState, 'id' | 'issueId' | 'role'> | null,
+  readFacts: (issueId: string) => Promise<PrFacts> = getPrFacts,
+): Promise<boolean> {
+  if (!agent) return false;
+  if (agent.role !== 'work' && agent.role !== 'review' && agent.role !== 'test') return false;
+  const issueId = (agent.issueId
+    || agent.id.replace(/^agent-/, '').replace(/-(review|test|ship)(-.*)?$/, '').replace(/-slot-\d+$/, '')
+  ).toUpperCase();
+  const facts = await readFacts(issueId).catch(() => null);
+  return facts?.exists === true && !facts.merged;
 }

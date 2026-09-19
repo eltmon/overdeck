@@ -1,21 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
+/**
+ * Promote-time ship ordering (re-pointed by PAN-3917).
+ *
+ * The `durable ship records` and `shipPromotedBatch` suites went with D6:
+ * `ship-record.ts` and `ship-status.ts` are deleted, a ship settles as a git
+ * tag plus a GitHub release, and no test may construct an issue record. What
+ * remains is the promote path's own contract — one ship, then the per-member
+ * post-merge fan-out.
+ */
+import { describe, expect, it } from 'vitest';
 import {
   promoteUatGeneration,
   type UatPromoteDeps,
 } from '../../../../src/lib/cloister/uat-promote.js';
-import {
-  persistPendingShipRecords,
-  persistShipRecords,
-  shipPromotedBatch,
-  ShipPromotedBatchError,
-  withGenerationShipLock,
-} from '../../../../src/lib/cloister/ship-record.js';
-import { aggregateGenerationShipStatus } from '../../../../src/lib/cloister/ship-status.js';
-import { projectPipeline } from '../../../../src/lib/pan-dir/records.js';
-import type {
-  PanIssuePipelineRecord,
-  PanIssueRecord,
-} from '../../../../src/lib/pan-dir/record.js';
 import type { UatGeneration } from '../../../../src/lib/overdeck/merge-sync.js';
 
 const PROJECT_ROOT = '/repo';
@@ -99,200 +95,5 @@ describe('promote ship ordering', () => {
       postMergeStarted: ['PAN-1', 'PAN-2'],
     });
     expect(logs).toContain(`[uat-promote] ${BATCH}: version ship settlement failed after merge: push rejected`);
-  });
-});
-
-function record(issueId: string): PanIssueRecord {
-  return {
-    issueId,
-    schemaVersion: 1,
-    pipeline: {
-      issueId,
-      reviewStatus: 'passed',
-      testStatus: 'passed',
-      readyForMerge: true,
-      updatedAt: '2026-07-31T00:00:00.000Z',
-    },
-    closeOut: {},
-  } as PanIssueRecord;
-}
-
-function recordDeps(records: Map<string, PanIssueRecord>) {
-  return {
-    resolveProject: () => ({ name: 'Overdeck', path: PROJECT_ROOT }),
-    updateRecord: vi.fn(async (_project, issueId, mutator) => {
-      const current = records.get(issueId)!;
-      await mutator(current);
-      records.set(issueId, current);
-      return current;
-    }),
-  } as never;
-}
-
-describe('durable ship records', () => {
-  it('persists pending and passed reports to every generation member', async () => {
-    const records = new Map(generation().members.map(member => [member.issueId, record(member.issueId)]));
-    const deps = recordDeps(records);
-
-    await persistPendingShipRecords(generation(), 'no version supplied at promote time', deps);
-    expect([...records.values()].map(value => value.pipeline.ship)).toEqual([
-      expect.objectContaining({ status: 'pending', batch: BATCH, reason: 'no version supplied at promote time' }),
-      expect.objectContaining({ status: 'pending', batch: BATCH, reason: 'no version supplied at promote time' }),
-    ]);
-
-    await persistShipRecords(generation(), {
-      status: 'passed',
-      version: '1.2.3',
-      batch: BATCH,
-      paths: [{ path: 'package.json', ok: true, detail: 'reports 1.2.3' }],
-      at: '2026-07-31T01:00:00.000Z',
-    }, deps);
-    expect([...records.values()].map(value => value.pipeline.ship)).toEqual([
-      expect.objectContaining({ status: 'passed', version: '1.2.3' }),
-      expect.objectContaining({ status: 'passed', version: '1.2.3' }),
-    ]);
-  });
-
-  it('continues past a member write failure and retries every unsettled member', async () => {
-    const records = new Map(generation().members.map(member => [member.issueId, record(member.issueId)]));
-    const attempts = new Map<string, number>();
-    const deps = {
-      resolveProject: () => ({ name: 'Overdeck', path: PROJECT_ROOT }),
-      updateRecord: vi.fn(async (_project: unknown, issueId: string, mutator: (record: PanIssueRecord) => void | Promise<void>) => {
-        const count = (attempts.get(issueId) ?? 0) + 1;
-        attempts.set(issueId, count);
-        if (issueId === 'PAN-1' && count === 1) throw new Error('transient write failure');
-        const current = records.get(issueId)!;
-        await mutator(current);
-        records.set(issueId, current);
-        return current;
-      }),
-    } as never;
-
-    await persistPendingShipRecords(generation(), 'version ship in progress', deps);
-
-    expect(attempts).toEqual(new Map([['PAN-1', 2], ['PAN-2', 1]]));
-    expect([...records.values()].map(value => value.pipeline.ship?.status)).toEqual(['pending', 'pending']);
-  });
-
-  it('keeps the batch aggregate blocking when terminal persistence permanently splits members', async () => {
-    const gen = generation('promoted');
-    const records = new Map(gen.members.map(member => [member.issueId, record(member.issueId)]));
-    const deps = {
-      resolveProject: () => ({ name: 'Overdeck', path: PROJECT_ROOT }),
-      updateRecord: vi.fn(async (_project: unknown, issueId: string, mutator: (record: PanIssueRecord) => void | Promise<void>) => {
-        if (issueId === 'PAN-2') throw new Error('persistent write failure');
-        const current = records.get(issueId)!;
-        await mutator(current);
-        records.set(issueId, current);
-        return current;
-      }),
-    } as never;
-
-    await expect(persistShipRecords(gen, {
-      status: 'passed',
-      version: '1.2.3',
-      batch: BATCH,
-      paths: [{ path: 'package.json', ok: true, detail: 'reports 1.2.3' }],
-      at: '2026-07-31T01:00:00.000Z',
-    }, deps)).rejects.toMatchObject({
-      failedIssueIds: ['PAN-2'],
-      persistedIssueIds: ['PAN-1'],
-    });
-
-    const aggregate = aggregateGenerationShipStatus(gen, new Map([
-      ['PAN-1', records.get('PAN-1')?.pipeline.ship ?? null],
-      ['PAN-2', records.get('PAN-2')?.pipeline.ship ?? null],
-    ]));
-    expect(aggregate).toMatchObject({
-      status: 'pending',
-      reason: '1 member(s) have no durable ship settlement',
-    });
-  });
-
-  it('preserves pipeline.ship when the ordinary record projection runs later', () => {
-    const existing: PanIssuePipelineRecord = {
-      issueId: 'PAN-1',
-      reviewStatus: 'passed',
-      testStatus: 'passed',
-      readyForMerge: true,
-      ship: {
-        status: 'passed',
-        version: '1.2.3',
-        batch: BATCH,
-        paths: [],
-        at: '2026-07-31T01:00:00.000Z',
-      },
-      updatedAt: '2026-07-31T01:00:00.000Z',
-    };
-
-    expect(projectPipeline('PAN-1', null, existing).ship).toEqual(existing.ship);
-  });
-});
-
-describe('shipPromotedBatch', () => {
-  it('serializes a deferred request behind an in-flight promote-time ship', async () => {
-    const order: string[] = [];
-    let releasePromote!: () => void;
-    const promoteGate = new Promise<void>(resolve => { releasePromote = resolve; });
-    const promote = withGenerationShipLock(BATCH, async () => {
-      order.push('promote-start');
-      await promoteGate;
-      order.push('promote-end');
-    });
-    await Promise.resolve();
-
-    const deferred = shipPromotedBatch({
-      generationName: BATCH,
-      projectRoot: PROJECT_ROOT,
-      version: '2.0.0',
-    }, {
-      getGeneration: () => generation('promoted'),
-      findProject: () => ({ name: 'Overdeck', path: PROJECT_ROOT, version_sync: {} }),
-      persistPending: async () => { order.push('deferred-pending'); return []; },
-      execute: async () => {
-        order.push('deferred-execute');
-        return { status: 'passed', version: '2.0.0', batch: BATCH, paths: [], at: '2026-07-31T02:00:00.000Z' };
-      },
-      persist: async () => { order.push('deferred-persist'); return []; },
-    });
-    await Promise.resolve();
-    expect(order).toEqual(['promote-start']);
-
-    releasePromote();
-    await Promise.all([promote, deferred]);
-    expect(order).toEqual([
-      'promote-start',
-      'promote-end',
-      'deferred-pending',
-      'deferred-execute',
-      'deferred-persist',
-    ]);
-  });
-
-  it('refuses a generation that is not promoted', async () => {
-    await expect(shipPromotedBatch({
-      generationName: BATCH,
-      projectRoot: PROJECT_ROOT,
-      version: '1.2.3',
-    }, {
-      getGeneration: () => generation('ready'),
-      findProject: () => ({ name: 'Overdeck', path: PROJECT_ROOT, version_sync: {} }),
-      runShip: vi.fn(),
-      persist: vi.fn(),
-    })).rejects.toMatchObject<Partial<ShipPromotedBatchError>>({ reason: 'wrong-status' });
-  });
-
-  it('refuses a promoted generation whose project has no version_sync', async () => {
-    await expect(shipPromotedBatch({
-      generationName: BATCH,
-      projectRoot: PROJECT_ROOT,
-      version: '1.2.3',
-    }, {
-      getGeneration: () => generation('promoted'),
-      findProject: () => ({ name: 'Overdeck', path: PROJECT_ROOT }),
-      runShip: vi.fn(),
-      persist: vi.fn(),
-    })).rejects.toMatchObject<Partial<ShipPromotedBatchError>>({ reason: 'not-configured' });
   });
 });
