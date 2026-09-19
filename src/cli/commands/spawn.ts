@@ -27,6 +27,11 @@ import { exitCli } from '../exit.js';
 import { resolveIssueIdSync } from '../../lib/issue-id.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { readWorkspacePlanSync } from '../../lib/xbrief/io.js';
+// Adapters register themselves at import time (registry.ts) -- pull both in
+// for their side effect, same as terminal-backends/launch.ts, so the real
+// defaultResolveBackend() below has something to resolve.
+import '../../lib/terminal-backends/herdr.js';
+import '../../lib/terminal-backends/tmux.js';
 import { resolveTerminalBackend } from '../../lib/terminal-backends/registry.js';
 import { selectTerminalBackend } from '../../lib/terminal-backends/select.js';
 import {
