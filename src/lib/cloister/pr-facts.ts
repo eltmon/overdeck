@@ -311,10 +311,20 @@ export function evaluateMergeReadiness(facts: PrFacts): MergeReadiness {
   if (facts.draft) return { ready: false, reason: 'PR is a draft' };
   if (facts.changesRequested) return { ready: false, reason: 'latest review requested changes' };
   if (!facts.approved) return { ready: false, reason: 'PR is not approved' };
+  // FR-9 is a positive test on both: `none` (no checks reported for the head
+  // commit) and `null` (the forge has not computed mergeability yet) are the
+  // absence of evidence, not evidence of readiness. Merging on either is how a
+  // red or conflicting branch reaches main.
   if (facts.checks === 'red') return { ready: false, reason: `CI checks failing on PR HEAD ${facts.headSha ?? 'unknown'}` };
   if (facts.checks === 'pending') return { ready: false, reason: `CI checks still pending on PR HEAD ${facts.headSha ?? 'unknown'}` };
-  if (facts.mergeable === false) {
-    return { ready: false, reason: `PR is not mergeable${facts.mergeableState ? ` (state=${facts.mergeableState})` : ''}` };
+  if (facts.checks !== 'green') return { ready: false, reason: `no CI checks reported on PR HEAD ${facts.headSha ?? 'unknown'}` };
+  if (facts.mergeable !== true) {
+    return {
+      ready: false,
+      reason: facts.mergeable === false
+        ? `PR is not mergeable${facts.mergeableState ? ` (state=${facts.mergeableState})` : ''}`
+        : `the forge has not computed mergeability yet${facts.mergeableState ? ` (state=${facts.mergeableState})` : ''}`,
+    };
   }
   return { ready: true };
 }

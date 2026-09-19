@@ -3,11 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   listAgentStates: vi.fn(),
   isIdle: vi.fn(),
-  isAliveSync: vi.fn(),
+  isAlive: vi.fn(),
   deliverAgentMessage: vi.fn(async () => ({ ok: true })),
   getWorkspaceGitState: vi.fn(),
-  listSessionNames: vi.fn(() => [] as readonly string[]),
-  capturePane: vi.fn(() => ''),
+  liveAgentInventory: vi.fn(),
+  capturePaneText: vi.fn(() => ''),
   reconcileClosedIssueAgents: vi.fn(async () => [] as string[]),
   isDeaconGloballyPausedSync: vi.fn(() => false),
 }));
@@ -27,7 +27,7 @@ vi.mock('../../../../src/lib/agents.js', () => ({
 // deacon-lite. isConfirmedDead is one line; reimplement it directly.
 vi.mock('../../../../src/lib/agents/liveness.js', () => ({
   isIdle: mocks.isIdle,
-  isAliveSync: mocks.isAliveSync,
+  isAlive: mocks.isAlive,
   isConfirmedDead: (verdict: { alive: boolean; reason?: string }) =>
     !verdict.alive && verdict.reason !== 'runtime-indeterminate',
 }));
@@ -40,13 +40,28 @@ vi.mock('../../../../src/lib/workspaces/git-state.js', () => ({
   getWorkspaceGitState: mocks.getWorkspaceGitState,
 }));
 
-vi.mock('../../../../src/lib/tmux.js', async () => {
-  const { Effect } = await import('effect');
+// PAN-3917 FR-3/FR-11: liveness and pane text come from the SELECTED terminal
+// backend's inventory, never a tmux census — a Herdr-hosted agent has no tmux
+// session at all. The adapters keep the tmux behaviour inside themselves.
+vi.mock('../../../../src/lib/terminal-backends/inventory.js', () => ({
+  liveAgentInventory: mocks.liveAgentInventory,
+  listLiveAgentPanes: async () => (await mocks.liveAgentInventory())?.panes ?? null,
+  listLiveAgentIds: async () => {
+    const inventory = await mocks.liveAgentInventory();
+    return inventory === null ? null : new Set(inventory.panes.map((pane: { agentId: string }) => pane.agentId));
+  },
+  captureLiveAgentPaneText: (pane: { agentId: string }, lines: number) => mocks.capturePaneText(pane.agentId, lines),
+}));
+
+/** A tmux inventory holding the named agents, as the backend reports it. */
+function inventory(agentIds: string[], backend: 'tmux' | 'herdr' = 'tmux') {
   return {
-    listSessionNames: () => Effect.sync(() => mocks.listSessionNames()),
-    capturePane: (session: string, lines: number) => Effect.sync(() => mocks.capturePane(session, lines)),
+    backend,
+    panes: agentIds.map((agentId) => ({
+      backend, agentId, paneId: agentId, terminalId: agentId, state: 'working' as const,
+    })),
   };
-});
+}
 
 vi.mock('../../../../src/lib/cloister/closed-issue-reaper.js', () => ({
   reconcileClosedIssueAgents: mocks.reconcileClosedIssueAgents,
@@ -81,8 +96,8 @@ describe('deacon-lite', () => {
     vi.setSystemTime(new Date('2026-09-18T12:00:00.000Z'));
     vi.clearAllMocks();
     mocks.deliverAgentMessage.mockResolvedValue({ ok: true });
-    mocks.listSessionNames.mockReturnValue([]);
-    mocks.capturePane.mockReturnValue('');
+    mocks.liveAgentInventory.mockResolvedValue(inventory(['agent-pan-1']));
+    mocks.capturePaneText.mockReturnValue('');
     mocks.reconcileClosedIssueAgents.mockResolvedValue([]);
     __resetStuckWorkAgentCooldownForTests();
     __resetApiErrorRecoveryStateForTests();
@@ -146,8 +161,7 @@ describe('deacon-lite', () => {
 
   describe('checkApiErrorAgents', () => {
     it('emits no nudge for a healthy fixture (no error text)', async () => {
-      mocks.listSessionNames.mockReturnValue(['agent-pan-1']);
-      mocks.capturePane.mockReturnValue('❯ working normally\n');
+      mocks.capturePaneText.mockReturnValue('❯ working normally\n');
 
       const actions = await checkApiErrorAgents();
 
@@ -156,8 +170,7 @@ describe('deacon-lite', () => {
     });
 
     it('resumes exactly once when a provider error is showing at the prompt', async () => {
-      mocks.listSessionNames.mockReturnValue(['agent-pan-1']);
-      mocks.capturePane.mockReturnValue('API Error: Overloaded\n❯ ');
+      mocks.capturePaneText.mockReturnValue('API Error: Overloaded\n❯ ');
 
       const actions = await checkApiErrorAgents();
 
@@ -174,7 +187,7 @@ describe('deacon-lite', () => {
   describe('reconcileAgentLiveness', () => {
     it('emits no notification for a healthy fixture (agent alive)', async () => {
       mocks.listAgentStates.mockReturnValue([workAgent()]);
-      mocks.isAliveSync.mockReturnValue({ alive: true, paneAlive: true });
+      mocks.isAlive.mockResolvedValue({ alive: true, paneAlive: true });
       const notifier = vi.fn();
       setAgentStoppedNotifier(notifier);
 
@@ -187,7 +200,8 @@ describe('deacon-lite', () => {
 
     it('corrects the cache exactly once for a confirmed-dead agent', async () => {
       mocks.listAgentStates.mockReturnValue([workAgent()]);
-      mocks.isAliveSync.mockReturnValue({ alive: false, reason: 'no-session' });
+      mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+      mocks.isAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
       const notifier = vi.fn();
       setAgentStoppedNotifier(notifier);
 
@@ -201,7 +215,8 @@ describe('deacon-lite', () => {
 
     it('never writes a record — only calls the notifier seam', async () => {
       mocks.listAgentStates.mockReturnValue([workAgent()]);
-      mocks.isAliveSync.mockReturnValue({ alive: false, reason: 'pane-dead' });
+      mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+      mocks.isAlive.mockResolvedValue({ alive: false, reason: 'pane-dead' });
       setAgentStoppedNotifier(null);
 
       // No notifier registered — the routine must not throw or touch disk.
@@ -225,7 +240,7 @@ describe('deacon-lite', () => {
   describe('runDeaconLite', () => {
     it('awaits all four routines in order', async () => {
       mocks.listAgentStates.mockReturnValue([]);
-      mocks.listSessionNames.mockReturnValue([]);
+      mocks.liveAgentInventory.mockResolvedValue(inventory([]));
 
       await expect(runDeaconLite()).resolves.toBeUndefined();
       expect(mocks.reconcileClosedIssueAgents).toHaveBeenCalledTimes(1);
@@ -234,12 +249,11 @@ describe('deacon-lite', () => {
     it('runs none of the four routines while globally paused', async () => {
       mocks.isDeaconGloballyPausedSync.mockReturnValue(true);
       mocks.listAgentStates.mockReturnValue([workAgent()]);
-      mocks.listSessionNames.mockReturnValue(['agent-pan-1']);
 
       await expect(runDeaconLite()).resolves.toBeUndefined();
 
       expect(mocks.listAgentStates).not.toHaveBeenCalled();
-      expect(mocks.listSessionNames).not.toHaveBeenCalled();
+      expect(mocks.liveAgentInventory).not.toHaveBeenCalled();
       expect(mocks.reconcileClosedIssueAgents).not.toHaveBeenCalled();
     });
   });

@@ -1,6 +1,5 @@
-import { Effect } from 'effect';
-import { capturePane, listSessionNames } from '../tmux.js';
 import { deliverAgentMessage } from '../agents/delivery.js';
+import { captureLiveAgentPaneText, listLiveAgentPanes } from '../terminal-backends/inventory.js';
 
 // ============================================================================
 // API Error Recovery (PAN-3917 W4: detect-and-resume-once only — the
@@ -49,41 +48,35 @@ export async function checkApiErrorAgents(): Promise<string[]> {
   const actions: string[] = [];
   const now = Date.now();
 
-  // Check all tmux sessions — not just registered work agents — because
-  // specialist/planning sessions aren't always in the agents registry.
-  let sessionNames: readonly string[];
-  try {
-    sessionNames = await Effect.runPromise(listSessionNames());
-  } catch {
-    return actions;
-  }
+  // PAN-3917: read the SELECTED backend's inventory — not just registered work
+  // agents, because specialist/planning sessions aren't always in the agents
+  // registry, and not a tmux census, because under Herdr there isn't one.
+  const panes = await listLiveAgentPanes();
+  if (panes === null) return actions;
 
-  const agentSessions = sessionNames.filter(
-    name => name.startsWith('agent-') || name.startsWith('specialist-') || name.startsWith('planning-'),
+  const agentPanes = panes.filter(
+    pane => pane.agentId.startsWith('agent-')
+      || pane.agentId.startsWith('specialist-')
+      || pane.agentId.startsWith('planning-'),
   );
 
-  for (const sessionName of agentSessions) {
-    const recovery = apiErrorRecoveryState.get(sessionName);
+  for (const pane of agentPanes) {
+    const recovery = apiErrorRecoveryState.get(pane.agentId);
     if (recovery && (now - recovery.lastAttempt) < API_ERROR_RECOVERY_COOLDOWN_MS) continue;
 
-    let tmuxOutput: string;
-    try {
-      tmuxOutput = await Effect.runPromise(capturePane(sessionName, 100));
-    } catch {
-      continue;
-    }
-    if (!tmuxOutput.trim()) continue;
-    if (!tmuxOutput.includes('❯')) continue; // only nudge a session sitting idle at the prompt
+    const paneOutput = await captureLiveAgentPaneText(pane, 100);
+    if (!paneOutput?.trim()) continue;
+    if (!paneOutput.includes('❯')) continue; // only nudge a session sitting idle at the prompt
 
-    const hasApiError = API_ERROR_PATTERNS.some(pattern => tmuxOutput.includes(pattern));
+    const hasApiError = API_ERROR_PATTERNS.some(pattern => paneOutput.includes(pattern));
     if (!hasApiError) continue;
 
     try {
-      await deliverAgentMessage(sessionName, CONTINUE_MSG, 'deacon-lite:checkApiErrorAgents');
-      apiErrorRecoveryState.set(sessionName, { lastAttempt: now });
-      actions.push(`checkApiErrorAgents: nudged ${sessionName} to retry after a provider error`);
+      await deliverAgentMessage(pane.agentId, CONTINUE_MSG, 'deacon-lite:checkApiErrorAgents');
+      apiErrorRecoveryState.set(pane.agentId, { lastAttempt: now });
+      actions.push(`checkApiErrorAgents: nudged ${pane.agentId} to retry after a provider error`);
     } catch (err) {
-      console.error(`[deacon-lite] Failed to nudge ${sessionName} for API error retry:`, err);
+      console.error(`[deacon-lite] Failed to nudge ${pane.agentId} for API error retry:`, err);
     }
   }
 

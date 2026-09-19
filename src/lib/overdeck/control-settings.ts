@@ -16,17 +16,6 @@ const appSettings = sqliteTable('app_settings', {
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }),
 });
 
-// issueId has no FK in the local def — the FK to issues.id lives only in the
-// compiled schema (overdeck-schema.ts). Omitting FK here avoids a circular
-// import between control-settings and issues at module load time.
-const issuePolicy = sqliteTable('issue_policy', {
-  issueId: text('issue_id').primaryKey(),
-  deaconIgnored: integer('deacon_ignored', { mode: 'boolean' }),
-  deaconIgnoredReason: text('deacon_ignored_reason'),
-  autoMerge: integer('auto_merge', { mode: 'boolean' }),
-  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }),
-});
-
 // ── Schema entities ──────────────────────────────────────────────────────────
 
 export const FlywheelConfig = Schema.Struct({
@@ -49,15 +38,11 @@ export const FlywheelRuntime = Schema.Struct({
 });
 export type FlywheelRuntime = typeof FlywheelRuntime.Type;
 
-// Locked schema (overdeck-schema.ts:330) retains deaconIgnoredReason for functional
-// parity — the column was initially dropped as "display-only" but kept on review.
-export const IssuePolicy = Schema.Struct({
-  issueId: IssueId,
-  deaconIgnored: Schema.Boolean,
-  deaconIgnoredReason: Schema.NullOr(Schema.String),
-  autoMerge: Schema.NullOr(Schema.Boolean),
-});
-export type IssuePolicy = typeof IssuePolicy.Type;
+// PAN-3917 FR-1/FR-12: the `issue_policy` table is dropped at boot, and the
+// per-issue policy it stored is derived now — `deaconIgnored` went with the
+// review-status row, and auto-merge eligibility is read from the project config
+// and the tracker labels (auto-merge-eligibility.ts). What survives is the
+// global flywheel/deacon configuration above, which lives in app_settings.
 
 export const ProjectKey = Schema.String.pipe(Schema.brand('ProjectKey'));
 export type ProjectKey = typeof ProjectKey.Type;
@@ -82,7 +67,6 @@ export class SettingsResolver extends Context.Service<
     readonly isDeaconPaused: () => Effect.Effect<boolean>;
     readonly getFlywheelConfig: () => Effect.Effect<FlywheelConfig>;
     readonly getFlywheelRuntime: () => Effect.Effect<FlywheelRuntime>;
-    readonly getPolicy: (id: IssueId) => Effect.Effect<IssuePolicy>;
   }
 >()('overdeck/SettingsResolver') {}
 
@@ -127,18 +111,7 @@ export const SettingsResolverLive = Layer.effect(
         return { activeRunId, paused };
       });
 
-    const getPolicy = (id: IssueId) =>
-      Effect.promise(async () => {
-        const [row] = await q.select().from(issuePolicy).where(eq(issuePolicy.issueId, id));
-        return {
-          issueId: id,
-          deaconIgnored: Boolean(row?.deaconIgnored),
-          deaconIgnoredReason: row?.deaconIgnoredReason ?? null,
-          autoMerge: row?.autoMerge ?? null,
-        };
-      });
-
-    return SettingsResolver.of({ isDeaconPaused, getFlywheelConfig, getFlywheelRuntime, getPolicy });
+    return SettingsResolver.of({ isDeaconPaused, getFlywheelConfig, getFlywheelRuntime });
   }),
 );
 
@@ -154,15 +127,6 @@ export class SettingsWriter extends Context.Service<
   {
     readonly setDeaconPaused: (paused: boolean) => Effect.Effect<void>;
     readonly setFlywheelConfig: (patch: FlywheelConfigPatch) => Effect.Effect<FlywheelConfig>;
-    readonly setDeaconIgnored: (
-      id: IssueId,
-      ignored: boolean,
-      reason?: string,
-    ) => Effect.Effect<IssuePolicy>;
-    readonly setAutoMerge: (
-      id: IssueId,
-      autoMerge: boolean | null,
-    ) => Effect.Effect<IssuePolicy>;
   }
 >()('overdeck/SettingsWriter') {}
 
@@ -202,16 +166,6 @@ export const SettingsWriterLive = Layer.effect(
       };
     };
 
-    const readPolicy = async (id: IssueId): Promise<IssuePolicy> => {
-      const [row] = await q.select().from(issuePolicy).where(eq(issuePolicy.issueId, id));
-      return {
-        issueId: id,
-        deaconIgnored: Boolean(row?.deaconIgnored),
-        deaconIgnoredReason: row?.deaconIgnoredReason ?? null,
-        autoMerge: row?.autoMerge ?? null,
-      };
-    };
-
     const setDeaconPaused = (paused: boolean) =>
       Effect.gen(function* () {
         yield* Effect.promise(() => setFlag('deacon.globally_paused', paused));
@@ -234,52 +188,7 @@ export const SettingsWriterLive = Layer.effect(
         return next;
       });
 
-    const setDeaconIgnored = (id: IssueId, ignored: boolean, reason?: string) =>
-      Effect.gen(function* () {
-        yield* Effect.promise(async () => {
-          await q
-            .insert(issuePolicy)
-            .values({
-              issueId: id,
-              deaconIgnored: ignored,
-              deaconIgnoredReason: reason ?? null,
-              autoMerge: null,
-              updatedAt: now(),
-            })
-            .onConflictDoUpdate({
-              target: issuePolicy.issueId,
-              set: { deaconIgnored: ignored, deaconIgnoredReason: reason ?? null, updatedAt: now() },
-            });
-        });
-        yield* bus.emit({
-          type: 'settings.policy_changed',
-          payload: { id, deaconIgnored: ignored, reason },
-        });
-        return yield* Effect.promise(() => readPolicy(id));
-      });
-
-    const setAutoMerge = (id: IssueId, autoMerge: boolean | null) =>
-      Effect.gen(function* () {
-        yield* Effect.promise(async () => {
-          await q
-            .insert(issuePolicy)
-            .values({
-              issueId: id,
-              deaconIgnored: false,
-              deaconIgnoredReason: null,
-              autoMerge,
-              updatedAt: now(),
-            })
-            .onConflictDoUpdate({
-              target: issuePolicy.issueId,
-              set: { autoMerge, updatedAt: now() },
-            });
-        });
-        yield* bus.emit({ type: 'settings.policy_changed', payload: { id, autoMerge } });
-        return yield* Effect.promise(() => readPolicy(id));
-      });
-
-    return SettingsWriter.of({ setDeaconPaused, setFlywheelConfig, setDeaconIgnored, setAutoMerge });
+    return SettingsWriter.of({ setDeaconPaused, setFlywheelConfig });
   }),
 );
 
@@ -339,12 +248,6 @@ export const SettingsApi = HttpApiGroup.make('settings')
     }),
   )
   .add(
-    HttpApiEndpoint.get('getPolicy', '/issues/:id/policy', {
-      params: { id: IssueId },
-      success: IssuePolicy,
-    }),
-  )
-  .add(
     HttpApiEndpoint.post('setDeaconPause', '/deacon/pause', {
       payload: Schema.Struct({ paused: Schema.Boolean }),
       success: Schema.Struct({ paused: Schema.Boolean }),
@@ -354,23 +257,6 @@ export const SettingsApi = HttpApiGroup.make('settings')
     HttpApiEndpoint.post('setFlywheelConfig', '/flywheel/config', {
       payload: FlywheelConfigPatch,
       success: FlywheelConfig,
-    }),
-  )
-  .add(
-    HttpApiEndpoint.post('setDeaconIgnored', '/workspaces/:id/deacon-ignore', {
-      params: { id: IssueId },
-      payload: Schema.Struct({
-        ignored: Schema.Boolean,
-        reason: Schema.optional(Schema.String),
-      }),
-      success: IssuePolicy,
-    }),
-  )
-  .add(
-    HttpApiEndpoint.post('setAutoMerge', '/workspaces/:id/auto-merge', {
-      params: { id: IssueId },
-      payload: Schema.Struct({ autoMerge: Schema.NullOr(Schema.Boolean) }),
-      success: IssuePolicy,
     }),
   );
 

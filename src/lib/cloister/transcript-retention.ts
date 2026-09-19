@@ -94,22 +94,6 @@ function conversationEligibility(deps: TranscriptRetentionDeps): Map<string, boo
   }
 }
 
-/**
- * PAN-3917: a directory carrying the retained-transcripts marker was already
- * retired by removeAgent — its state.json is gone, so no agent listing can
- * vouch for it. The marker IS the eligibility fact. Without this the retained
- * transcripts would never age out, because the stopped tombstone row that used
- * to keep such an agent listed is gone with the rest of the mirror.
- */
-async function isRetiredAgentDir(agentDir: string, deps: TranscriptRetentionDeps): Promise<boolean> {
-  try {
-    await deps.stat(join(agentDir, RETAINED_TRANSCRIPTS_MARKER));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function agentEligibility(deps: TranscriptRetentionDeps): Promise<Map<string, boolean> | null> {
   try {
     const eligible = new Map<string, boolean>();
@@ -243,7 +227,12 @@ export async function sweepTranscriptRetention(
       if (conversationEligibilityMap === null) continue;
       const conversationName = entry.name.slice('conv-'.length);
       if (conversationEligibilityMap.get(conversationName) !== true) continue;
-    } else if (!(await isRetiredAgentDir(join(agentsDir, entry.name), deps))) {
+    } else {
+      // NFR-4: a transcript is deleted only when the sweep can SAY the work
+      // landed — the agent is stopped and the forge reports its PR merged.
+      // An agent the listing cannot vouch for (a retired dir whose state.json
+      // is gone, an unreadable listing, a forge read that failed) is skipped,
+      // never deleted: the retention gate fails closed.
       if (!agentEligibilityLoaded) {
         agentEligibilityMap = await agentEligibility(deps);
         agentEligibilityLoaded = true;

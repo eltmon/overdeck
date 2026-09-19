@@ -17,7 +17,6 @@ import {
   MERGE_TRAIN_ENABLED_KEY,
   setLastCleanShutdownAt,
   type FlywheelConfig,
-  type IssuePolicy,
 } from '../../../../src/lib/overdeck/control-settings.js';
 import type { IssueId } from '../../../../src/lib/overdeck/issues.js';
 
@@ -199,19 +198,6 @@ describe('SettingsResolver', () => {
     expect(paused).toBe(false);
   });
 
-  it('getPolicy returns defaults (not-ignored, no autoMerge) when no row exists', async () => {
-    const { dbLayer, busLayer } = makeWiredFakeDb();
-    const layer = SettingsResolverLive.pipe(Layer.provide(dbLayer), Layer.provide(busLayer));
-
-    const policy: IssuePolicy = await Effect.runPromise(
-      SettingsResolver.use((r) => r.getPolicy(makeIssueId('PAN-42'))).pipe(Effect.provide(layer)),
-    );
-
-    expect(policy.issueId).toBe('PAN-42');
-    expect(policy.deaconIgnored).toBe(false);
-    expect(policy.autoMerge).toBeNull();
-  });
-
   it('getFlywheelRuntime reads active_run_id and paused flag', async () => {
     const { dbLayer, busLayer, flags } = makeWiredFakeDb();
     flags.set('flywheel.active_run_id', 'run-abc');
@@ -228,7 +214,7 @@ describe('SettingsResolver', () => {
   });
 });
 
-// ── AC2: SettingsWriter persists to app_settings and issue_policy, no Records ─
+// ── AC2: SettingsWriter persists to app_settings, no Records ─────────────────
 
 describe('SettingsWriter', () => {
   it('setDeaconPaused writes the flag and emits an event', async () => {
@@ -278,71 +264,6 @@ describe('SettingsWriter', () => {
     );
     // If this compiles and runs, Records is not required.
     expect(layer).toBeDefined();
-  });
-});
-
-// ── AC3: setDeaconIgnored and setAutoMerge persist to issue_policy ───────────
-
-describe('SettingsWriter — issue_policy writes', () => {
-  it('setDeaconIgnored writes deacon_ignored and reason to issue_policy', async () => {
-    const { dbLayer, busLayer, insertedEvents, upsertedPolicies, policies } = makeWiredFakeDb();
-    const layer = Layer.mergeAll(
-      SettingsWriterLive,
-      SettingsResolverLive,
-    ).pipe(Layer.provide(dbLayer), Layer.provide(busLayer));
-
-    const result: IssuePolicy = await Effect.runPromise(
-      SettingsWriter.use((w) =>
-        w.setDeaconIgnored(makeIssueId('PAN-99'), true, 'stuck in review'),
-      ).pipe(Effect.provide(layer)),
-    );
-
-    expect(upsertedPolicies).toContain('PAN-99');
-    const stored = policies.get('PAN-99');
-    expect(stored?.deaconIgnored).toBe(true);
-    expect(stored?.deaconIgnoredReason).toBe('stuck in review');
-    expect(result.deaconIgnored).toBe(true);
-    expect(result.deaconIgnoredReason).toBe('stuck in review');
-    expect(insertedEvents.some((e) => e.type === 'settings.policy_changed')).toBe(true);
-  });
-
-  it('setAutoMerge writes auto_merge to issue_policy', async () => {
-    const { dbLayer, busLayer, insertedEvents, upsertedPolicies, policies } = makeWiredFakeDb();
-    const layer = Layer.mergeAll(
-      SettingsWriterLive,
-      SettingsResolverLive,
-    ).pipe(Layer.provide(dbLayer), Layer.provide(busLayer));
-
-    const result: IssuePolicy = await Effect.runPromise(
-      SettingsWriter.use((w) => w.setAutoMerge(makeIssueId('PAN-55'), true)).pipe(
-        Effect.provide(layer),
-      ),
-    );
-
-    expect(upsertedPolicies).toContain('PAN-55');
-    const stored = policies.get('PAN-55');
-    expect(stored?.autoMerge).toBe(true);
-    expect(result.autoMerge).toBe(true);
-    expect(insertedEvents.some((e) => e.type === 'settings.policy_changed')).toBe(true);
-  });
-
-  it('setAutoMerge with null clears the override', async () => {
-    const { dbLayer, busLayer, policies } = makeWiredFakeDb();
-    // Pre-seed a policy
-    policies.set('PAN-7', { deaconIgnored: false, deaconIgnoredReason: null, autoMerge: true, updatedAt: new Date() });
-
-    const layer = Layer.mergeAll(
-      SettingsWriterLive,
-      SettingsResolverLive,
-    ).pipe(Layer.provide(dbLayer), Layer.provide(busLayer));
-
-    const result: IssuePolicy = await Effect.runPromise(
-      SettingsWriter.use((w) => w.setAutoMerge(makeIssueId('PAN-7'), null)).pipe(
-        Effect.provide(layer),
-      ),
-    );
-
-    expect(result.autoMerge).toBeNull();
   });
 });
 

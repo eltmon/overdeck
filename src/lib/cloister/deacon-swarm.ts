@@ -30,6 +30,7 @@ import { isDeaconGloballyPausedSync } from '../overdeck/control-settings.js';
 import { resolveAutomaticSwarmPolicy, resolveSwarmMaxSlots } from '../swarm-policy.js';
 import type { SwarmInferCompletionMode } from './config.js';
 import {
+  countRunningAgents,
   countRunningSwarmSlotsForIssue,
   getConcurrencyLimits,
   releaseSwarmSlot,
@@ -146,7 +147,7 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   clearSlotAssignment,
   runGitCommand: (command, cwd) => execAsync(command, { cwd }),
   registeredSlotCapacityAvailable: (issueId, selectedCount) => registeredSlotCapacityAvailable(issueId, selectedCount),
-  tryReserveSwarmSlot,
+  tryReserveSwarmSlot: async () => tryReserveSwarmSlot(await countRunningAgents()),
   releaseSwarmSlot,
   spawnRun,
   getIssueHold: defaultGetIssueHold,
@@ -882,7 +883,7 @@ export async function dispatchNextWave(
       break;
     }
 
-    if (!deps.tryReserveSwarmSlot()) {
+    if (!await deps.tryReserveSwarmSlot()) {
       actions.push(`[swarm] deferred ${item.id} for ${issueId}: swarm dispatch budget exhausted`);
       continue;
     }

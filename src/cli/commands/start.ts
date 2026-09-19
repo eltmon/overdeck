@@ -834,7 +834,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       if (overflowConfig?.enabled && overflowConfig.overflow_to_remote) {
         const { getConcurrencyLimits, countRunningAgents } = await import('../../lib/cloister/concurrency.js');
         const limits = getConcurrencyLimits();
-        const counts = countRunningAgents();
+        const counts = await countRunningAgents();
         if (counts.work >= limits.maxWorkAgents) {
           overflowToRemote = true;
           console.log(chalk.cyan(

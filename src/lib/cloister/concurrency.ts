@@ -24,6 +24,7 @@ import {
 } from '../agents.js';
 import { getCachedMemoryVerdict } from './memory-verdict-cache.js';
 import { isIdle } from '../agents/liveness.js';
+import { listLiveAgentIds } from '../terminal-backends/inventory.js';
 import { isTerminalSwarmSlotAgent } from './swarm-slot-lifecycle.js';
 
 const DEFAULT_MAX_WORK_AGENTS = 6;
@@ -106,11 +107,11 @@ export function describeRunningAgents(): string {
  * derived from status='running' rows grouped by role; the deacon's event-driven
  * updates keep status in sync with tmux liveness.
  */
-/** Count tmux-alive swarm-slot work agents (agent-<issue>-slot-N) — PAN-2212. */
-function countRunningSwarmSlots(): { total: number; active: number } {
-  const slots = listRunningAgentsSync().filter(
-    a => a.tmuxActive && a.role === 'work' && SWARM_SLOT_ID.test(a.id),
-  );
+/** Count live swarm-slot work agents (agent-<issue>-slot-N) — PAN-2212. */
+function countRunningSwarmSlots(
+  agents: ReturnType<typeof listRunningAgentsSync>,
+): { total: number; active: number } {
+  const slots = agents.filter(a => a.role === 'work' && SWARM_SLOT_ID.test(a.id));
   return {
     total: slots.length,
     active: slots.filter(agent => !isTerminalSwarmSlotAgent(agent)).length,
@@ -165,13 +166,21 @@ export function countWarmIdleAdvancingAgents(
  * PAN-3917: this used to count rows in the overdeck.db mirror, which the boot
  * backfill reconciled against tmux. The mirror is gone and nothing corrects a
  * crashed agent's state file, so the ceiling would count stale `running` files
- * forever and starve dispatch. listRunningAgentsSync derives liveness from the
- * tmux census per call, which is what the contract below already assumed.
+ * forever and starve dispatch — liveness has to come from somewhere live.
+ *
+ * That somewhere is the SELECTED terminal backend's inventory, not a tmux
+ * census: under Herdr no agent has a tmux session, so a tmux census would
+ * report the box empty and dispatch would never stop. An unreadable inventory
+ * fails open (every `running` state file counts), because the ceiling's job is
+ * to hold work back, and holding back on incomplete evidence is the safe side.
  */
-export function countRunningAgents(): RunningCounts {
+export async function countRunningAgents(): Promise<RunningCounts> {
+  const liveIds = await listLiveAgentIds();
+  const live = listRunningAgentsSync().filter(
+    agent => agent.status === 'running' && (liveIds === null || liveIds.has(agent.id)),
+  );
   const counts: Record<string, number> = {};
-  for (const agent of listRunningAgentsSync()) {
-    if (agent.status !== 'running' || !agent.tmuxActive) continue;
+  for (const agent of live) {
     counts[agent.role] = (counts[agent.role] ?? 0) + 1;
   }
   const workTotal = counts['work'] ?? 0;
@@ -182,12 +191,12 @@ export function countRunningAgents(): RunningCounts {
   // Swarm slots are work-role sessions but draw from the dedicated swarm reserve,
   // so subtract them from `work` (PAN-2212): the swarm neither starves nor is
   // starved by the work/advancing ceiling.
-  const swarmSlots = countRunningSwarmSlots();
+  const swarmSlots = countRunningSwarmSlots(live);
   const swarm = swarmSlots.active;
   const work = Math.max(0, workTotal - swarmSlots.total);
   // PAN-2579: warm-idle advancing sessions (verdict terminal, kept alive for the
   // next cycle) do not occupy the ceiling.
-  const advancing = Math.max(0, advancingTotal - countWarmIdleAdvancingAgents());
+  const advancing = Math.max(0, advancingTotal - countWarmIdleAdvancingAgents(live));
   return { work, advancing, swarm, total: work + advancing };
 }
 
@@ -234,7 +243,7 @@ export function memoryDrivenWorkSlots(runningWork: number): number | null {
  * the fixed count cap.
  */
 export function workResumeSlotsAvailable(
-  counts: RunningCounts = countRunningAgents(),
+  counts: RunningCounts,
   limits: ConcurrencyLimits = getConcurrencyLimits(),
 ): number {
   const memSlots = memoryDrivenWorkSlots(counts.work);
@@ -250,7 +259,7 @@ export function workResumeSlotsAvailable(
  * when the cached band is 'ok' (or no patrol has assessed memory yet).
  */
 export function canDispatchAdvancing(
-  counts: RunningCounts = countRunningAgents(),
+  counts: RunningCounts,
   limits: ConcurrencyLimits = getConcurrencyLimits(),
 ): boolean {
   const verdict = getCachedMemoryVerdict();
@@ -286,7 +295,7 @@ export function resetPatrolDispatchBudget(): void {
  * tmux-alive agents and advancing dispatches already reserved this patrol.
  */
 export function tryReserveAdvancingSlot(
-  counts: RunningCounts = countRunningAgents(),
+  counts: RunningCounts,
   limits: ConcurrencyLimits = getConcurrencyLimits(),
 ): boolean {
   const verdict = getCachedMemoryVerdict();
@@ -308,7 +317,7 @@ export function releaseAdvancingSlot(): void {
  * DEFERS (leave the item unclaimed so a later patrol retries), never fails.
  */
 export function tryReserveSwarmSlot(
-  counts: RunningCounts = countRunningAgents(),
+  counts: RunningCounts,
   limits: ConcurrencyLimits = getConcurrencyLimits(),
 ): boolean {
   if (counts.swarm + swarmReservedThisPatrol >= limits.reservedSwarmSlots) return false;

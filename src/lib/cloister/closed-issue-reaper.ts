@@ -1,18 +1,16 @@
 import { Effect } from 'effect';
-import { exec } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { promisify } from 'node:util';
 
 import { listRunningAgents, stopAgent } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { AGENTS_DIR } from '../paths.js';
 import { listProjectsSync } from '../projects.js';
 import { resolveProjectForIssue } from '../overdeck/issue-projects.js';
-import { listSessionNames } from '../tmux.js';
+import { listLiveAgentIds } from '../terminal-backends/inventory.js';
 import { isIssueClosed } from './issue-closed.js';
 import { reapIssueResidue } from './reap-issue-residue.js';
-import { getPrFacts } from './pr-facts.js';
+import { listFeatureDevnetIssueIds } from './merged-docker-reconcile.js';
 
 // Sessions reaped by NAME as a backstop: inspect sessions never have agent
 // state, and strike sessions can outlive their state entry (e.g. state already
@@ -32,28 +30,7 @@ function issueIdFromAgentDir(entryName: string): string | null {
   return match ? match[1].toUpperCase() : null;
 }
 
-const execAsync = promisify(exec);
 const DEVNET_CLOSURE_CHECK_CONCURRENCY = 4;
-
-// Leaked `_devnet` networks are a residue source of their own: a closed issue
-// whose sessions, workspace, and agent dirs are already gone can still hold a
-// bridge network, and Docker's default address pools support only ~31 of them.
-async function listFeatureDevnetIssueIds(): Promise<string[] | null> {
-  try {
-    const { stdout } = await execAsync(`docker network ls --format '{{.Name}}'`, {
-      encoding: 'utf-8',
-      timeout: 30000,
-    });
-    const issueIds = new Set<string>();
-    for (const name of stdout.trim().split('\n')) {
-      const match = name.match(/-feature-([a-z]+-\d+)_devnet$/i);
-      if (match) issueIds.add(match[1].toUpperCase());
-    }
-    return [...issueIds];
-  } catch {
-    return null;
-  }
-}
 
 async function isClosedIssue(
   issueId: string,
@@ -149,7 +126,9 @@ export async function handleIssueStatusChangedClosed(issueId: string): Promise<s
   }
 
   // Stop stateless inspect/strike sessions for this issue.
-  const sessionNames = await Effect.runPromise(listSessionNames());
+  // PAN-3917: the by-name backstop reads the SELECTED backend's inventory; a
+  // tmux census sees nothing under Herdr. An unreadable inventory skips it.
+  const sessionNames = (await listLiveAgentIds()) ?? [];
   for (const sessionName of sessionNames) {
     if (reapedAgentIds.has(sessionName)) continue;
     const sessionIssueId = issueIdFromStatelessSession(sessionName);
@@ -188,7 +167,9 @@ export async function reconcileClosedIssueAgents(): Promise<string[]> {
     closedIssueIds.add(issueId);
   }
 
-  const sessionNames = await Effect.runPromise(listSessionNames());
+  // PAN-3917: the by-name backstop reads the SELECTED backend's inventory; a
+  // tmux census sees nothing under Herdr. An unreadable inventory skips it.
+  const sessionNames = (await listLiveAgentIds()) ?? [];
   for (const sessionName of sessionNames) {
     if (reapedAgentIds.has(sessionName)) continue;
 
@@ -223,8 +204,10 @@ export async function reconcileClosedIssueAgents(): Promise<string[]> {
     await reapResolvedIssueResidue(issueId, actions, reapedIssueKeys);
   }
 
+  // PAN-3917 FR-11: the reaper's trigger is the tracker saying "closed". The
+  // merged-PR half of the devnet sweep is host hygiene on a Docker resource and
+  // runs on its own interval in hygiene-scheduler.ts (merged-docker-reconcile.ts).
   const devnetIssueIds = await listFeatureDevnetIssueIds();
-  const openDevnetIssueIds: string[] = [];
   if (devnetIssueIds) {
     for (let offset = 0; offset < devnetIssueIds.length; offset += DEVNET_CLOSURE_CHECK_CONCURRENCY) {
       const batch = devnetIssueIds.slice(offset, offset + DEVNET_CLOSURE_CHECK_CONCURRENCY);
@@ -234,30 +217,7 @@ export async function reconcileClosedIssueAgents(): Promise<string[]> {
       })));
       for (const { issueId, closed } of closureResults) {
         if (closed) await reapResolvedIssueResidue(issueId, actions, reapedIssueKeys);
-        else openDevnetIssueIds.push(issueId);
       }
-    }
-  }
-
-  let mergedIssueIds: string[] | null = devnetIssueIds ? [] : null;
-  if (openDevnetIssueIds.length > 0) {
-    try {
-      const merged = await Promise.all(openDevnetIssueIds.map(async (issueId) => ({
-        issueId,
-        merged: (await getPrFacts(issueId)).merged,
-      })));
-      mergedIssueIds = merged.filter((entry) => entry.merged).map((entry) => entry.issueId);
-    } catch (error) {
-      mergedIssueIds = null;
-      actions.push(`Failed to resolve merged-issue Docker cleanup status: ${error}`);
-    }
-  }
-  if (mergedIssueIds) {
-    try {
-      const { reconcileMergedDockerCleanupQueue } = await import('./merged-docker-cleanup-worker.js');
-      actions.push(...reconcileMergedDockerCleanupQueue(mergedIssueIds));
-    } catch (error) {
-      actions.push(`Failed to reconcile merged-issue Docker cleanup queue: ${error}`);
     }
   }
 

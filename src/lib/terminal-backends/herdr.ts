@@ -207,6 +207,57 @@ export async function findHerdrAgent(
   }
 }
 
+/** One live Herdr agent, keyed by the Overdeck agent id bound with `agent.rename`. */
+export interface HerdrLiveAgent {
+  readonly agentId: string;
+  readonly paneId: string;
+  readonly terminalId: string;
+  readonly state: AgentState;
+  readonly tokens: Partial<PaneTokens>;
+}
+
+/**
+ * Every live Herdr agent, as the backend-aware inventory reads it.
+ *
+ * `BackendAgentSnapshot` carries no agent name, and on Herdr the Overdeck agent
+ * id is the *live agent name* (`agent.rename`), not the `w1:p1` pane id — so
+ * the inventory needs this narrower read. Agents Herdr detected but Overdeck
+ * never named are skipped: nothing can address them by agent id.
+ */
+export async function listHerdrAgents(
+  api: HerdrApiClient = getHerdrApiClient(),
+): Promise<readonly HerdrLiveAgent[]> {
+  const listed = await api.call<{ agents?: HerdrPaneInfo[] }>('agent.list', {});
+  const agents: HerdrLiveAgent[] = [];
+  for (const agent of listed.agents ?? []) {
+    const agentId = agent.name?.trim();
+    if (!agentId) continue;
+    agents.push({
+      agentId,
+      paneId: agent.pane_id,
+      terminalId: agent.terminal_id,
+      state: toAgentState(agent.agent_status),
+      tokens: (agent.tokens ?? {}) as Partial<PaneTokens>,
+    });
+  }
+  return agents;
+}
+
+/** The recent terminal text of a Herdr pane — the backend's `capture-pane`. */
+export async function readHerdrPaneText(
+  paneId: string,
+  lines: number,
+  api: HerdrApiClient = getHerdrApiClient(),
+): Promise<string> {
+  const result = await api.call<{ text?: string }>('pane.read', {
+    pane_id: paneId,
+    source: 'recent',
+    lines,
+    strip_ansi: true,
+  });
+  return result.text ?? '';
+}
+
 export class HerdrBackend implements TerminalBackend {
   readonly name = BACKEND;
 
