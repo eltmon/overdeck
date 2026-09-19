@@ -33,16 +33,24 @@
 - Inline SVG icons use `currentColor` + a color map (see
   `components/chat/ProviderIcons.tsx` for the existing pattern).
 
-## Planning artifacts (xBRIEF v0.8, PAN-1124)
-- PRD drafts: `${OVERDECK_HOME}/state/<project>/drafts/<issue>.md` (human-mutable narrative).
-- Spec: `${OVERDECK_HOME}/state/<project>/specs/<date>-<ISSUE>-<slug>.xbrief.json` — immutable after planning except `plan.status` via `updateSpecStatus()`.
-- Project continue state: `${OVERDECK_HOME}/state/<project>/continues/<issue>.xbrief.json`.
-- Workspace continue state: `<workspace>/.overdeck/continue.json` (gitignored); item status changes go to its `statusOverrides`, never the spec.
-- `pan task` reads and updates the xBRIEF item checklist through the canonical state door.
+## Planning artifacts (xBRIEF v0.8; post-cut layout, PAN-3917)
+- Everything lives under `.pan/` in the project repo (the plan home) and is TRACKED:
+  PRD drafts `.pan/drafts/<issue-lowercase>.md`, specs
+  `.pan/specs/<date>-<ISSUE>-<slug>.xbrief.json` (immutable after planning except
+  `plan.status`), item state `.pan/continues/<issue>.xbrief.json`, plus orders,
+  notes, and `backlog/sequence.md`. No daemon commits them: whoever writes a
+  planning artifact commits it on the feature branch.
+- Workspace working copies (`<workspace>/.overdeck/spec.vbrief.json`,
+  `<workspace>/.overdeck/continue.json`) are gitignored; `pan plan finalize`
+  promotes them.
+- Codebase map: `<projectRoot>/.overdeck/context/codebase/` (tracked).
+  `.pan/context/` is the legacy location — read fallback only, gitignored since
+  PAN-3930; never write there.
+- `pan task` reads and updates the xBRIEF item checklist in `.pan/continues/`.
 
 ## Testing
 - Vitest, unit tests under `tests/unit/**` mirroring `src/`, plus co-located
   `__tests__/` in some lib dirs (e.g. `src/lib/cloister/__tests__/`).
 - Frontend tests co-located under `components/**/__tests__/`.
 
-<!-- last-verified: 2026-06-12 -->
+<!-- last-verified: 2026-09-19 -->

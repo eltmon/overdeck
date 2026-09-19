@@ -1,6 +1,6 @@
 # Concerns / hazards
 
-Live landmines a change in this repo can step on. Verified 2026-07-26.
+Live landmines a change in this repo can step on. Verified 2026-09-19.
 
 - **ToS policy gate** — `canUseHarnessSync()` (`src/lib/harness-policy.ts:69`) blocks
   Pi + Anthropic + subscription auth. Every harness resolution path must end by
@@ -87,15 +87,17 @@ Live landmines a change in this repo can step on. Verified 2026-07-26.
 - **Dead UI code** — `components/Settings/Provider/` (ProviderCard, ProviderPanel,
   ThinkingLevelSlider) is entirely unimported (references the Material Symbols
   font removed in a37f8c890). Slated for deletion in PAN-1787.
-- **`pipeline.updatedAt` conflates write-recency with verdict-truth** (PAN-3092) —
-  `projectPipeline()` (`src/lib/pan-dir/records.ts:109`) stamps it on EVERY status
-  write, verdict or not, and every newer-wins comparison (`pickNewerPipeline`,
-  the verdict-fallback drain's supersede check) inherits the conflation: a
-  newer-but-verdict-free write makes the drain DELETE a fallback unlanded and
-  makes `pickNewerPipeline` silently drop a verdict fold while reporting success.
-  Any change touching record merges must stay verdict-aware (terminal verdicts
-  survive same-cycle verdict-free writes; only a newer `reviewSpawnedAt` or a
-  newer terminal verdict supersedes).
+- **Retired with the state layer (PAN-3917)** — the per-issue record files,
+  `src/lib/pan-dir/records.ts`, and the verdict-aware record merge are gone.
+  `scripts/guard-no-state-layer.sh` (in `npm run lint`) fails on their
+  identifiers reappearing under `src/`.
+- **Worker threads spawned from `.ts` sources** — `dashboard/server/services/
+  dashboard-db-task.ts`, `lib/memory/checkpoint-client.ts`, and `lib/memory/fts-db.ts`
+  spawn sibling worker files. Under a source run (Vitest, tsx) a raw `.ts` worker entry
+  dies with ERR_MODULE_NOT_FOUND: Node's type stripping does not rewrite the worker's
+  `.js` specifiers, and a `--import tsx` execArgv does not attach to it. Spawn through
+  an in-thread tsx `register()` + `import()` bootstrap (PAN-3930) or mock
+  `node:worker_threads`.
 - **Per-workspace `.venv`** (TLDR) can be ~7.5GB each — don't copy/back up
   workspaces blindly.
 - **Fly Machine rootfs resets on every start** — the rootfs is rebuilt from the
@@ -105,4 +107,4 @@ Live landmines a change in this repo can step on. Verified 2026-07-26.
   `/workspace`. Never run durable work without verifying the volume mount
   (PAN-1845).
 
-<!-- last-verified: 2026-07-28 -->
+<!-- last-verified: 2026-09-19 -->
