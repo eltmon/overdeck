@@ -169,7 +169,6 @@ describe('POST /api/issues/:id/close-out', () => {
         status: 'Verifying on Main',
         state: 'verifying_on_main',
         canonicalStatus: 'verifying_on_main',
-        mergeStatus: 'merged',
         labels: ['bug', 'verifying-on-main', 'needs-close-out'],
       },
     ]);
@@ -208,7 +207,6 @@ describe('POST /api/issues/:id/close-out', () => {
       state: 'done',
       canonicalStatus: 'done',
       targetCanonicalState: 'done',
-      mergeStatus: undefined,
       labels: ['bug', 'closed-out'],
     });
     expect(result.appendedEvents).toEqual([
@@ -263,7 +261,6 @@ describe('POST /api/issues/:id/close-out', () => {
       status: 'Verifying on Main',
       state: 'verifying_on_main',
       canonicalStatus: 'verifying_on_main',
-      mergeStatus: 'merged',
       labels: ['bug', 'verifying-on-main', 'needs-close-out'],
     };
     issueDataServiceMock.getIssues.mockReturnValue([cachedIssue]);

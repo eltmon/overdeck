@@ -16,7 +16,6 @@ const MOCK_ISSUES = [
     hasState: true,
     isShadow: false,
     isRally: false,
-    readyForMerge: true,
     resourceSources: ['beads', 'docker', 'tmux', 'tracker', 'vbrief', 'workspace'],
     resourceDetails: {
       hasWorkspace: true,
@@ -42,7 +41,6 @@ const MOCK_ISSUES = [
     hasState: true,
     isShadow: false,
     isRally: false,
-    readyForMerge: false,
     resourceSources: ['beads', 'docker', 'tmux', 'tracker', 'vbrief', 'workspace'],
     resourceDetails: {
       hasWorkspace: true,
@@ -68,7 +66,6 @@ const MOCK_ISSUES = [
     hasState: false,
     isShadow: false,
     isRally: false,
-    readyForMerge: false,
     resourceSources: ['vbrief'],
     resourceDetails: {
       hasWorkspace: false,

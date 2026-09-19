@@ -20,16 +20,6 @@ const mocks = vi.hoisted(() => ({
   mergeRun: null as { phase: string } | null,
 }));
 
-// PAN-3917: several survivors still transitively import the record plane W3 is
-// deleting (config-yaml → tier-table; git-activity → overdeck/infra;
-// agents → agent-record-sync). `pan-dir/auto-commit` is the module whose own
-// import of the removed `state-read-home` breaks the load, so stubbing it cuts
-// every one of those chains at the single point that is actually gone.
-// The record plane itself: W3 deletes `pan-dir/record*` and `pan-dir/auto-commit`,
-// and `auto-commit` already imports the removed `state-read-home`, so the module
-// graph cannot load at all. Stubbing the deleted modules cuts every chain that
-// still reaches them (workspaces/resolver → overdeck/infra, agents →
-// agent-record-sync, git-activity → overdeck/git-activity) at their real end.
 vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperationsSync: vi.fn(() => []) }));
 vi.mock('../../../../../lib/agents.js', () => ({
   getAgentState: vi.fn(),

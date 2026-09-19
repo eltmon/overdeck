@@ -19,7 +19,6 @@ const PROJECTS_RESPONSE = [
         hasPrd: true,
         hasState: true,
         isShadow: false,
-        readyForMerge: false,
         sessions: [],
       },
     ],

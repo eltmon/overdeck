@@ -1,10 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 
-// The record plane itself: W3 deletes `pan-dir/record*` and `pan-dir/auto-commit`,
-// and `auto-commit` already imports the removed `state-read-home`, so the module
-// graph cannot load at all. Stubbing the deleted modules cuts every chain that
-// still reaches them (workspaces/resolver → overdeck/infra, agents →
-// agent-record-sync, git-activity → overdeck/git-activity) at their real end.
 // merge-ops imports routes/specialists for `_serverManagedMerges`, which drags
 // in the whole cloister/deacon tree (W4 replaces it with deacon-lite), and
 // routes/workspaces reaches agents/spawn, which imports the removed
@@ -28,9 +23,9 @@ vi.mock('../../../../../lib/agents/tier-table.js', () => ({
 import { shouldBlockApproveForDirtyStatus } from '../merge-ops.js';
 
 describe('shouldBlockApproveForDirtyStatus', () => {
-  it('returns false when approve sees only state-plane paths', () => {
+  it('returns false when approve sees only Overdeck-owned workspace paths', () => {
     const status = [
-      'MM .pan/records/pan-2167.json',
+      'MM .pan/specs/pan-2167.xbrief.json',
       ' M .pan/test/result.json',
     ].join('\n');
 
@@ -50,9 +45,9 @@ describe('shouldBlockApproveForDirtyStatus', () => {
     expect(shouldBlockApproveForDirtyStatus(' M src/foo.ts\n')).toBe(true);
   });
 
-  it('returns true for mixed state-plane and source dirt', () => {
+  it('returns true for mixed Overdeck-owned and source dirt', () => {
     const status = [
-      'MM .pan/records/pan-2167.json',
+      'MM .pan/specs/pan-2167.xbrief.json',
       ' M src/foo.ts',
     ].join('\n');
 

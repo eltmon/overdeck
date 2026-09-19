@@ -88,10 +88,12 @@ function gitFixture(): string {
   writeFileSync(join(root, 'migration-complete.json'), JSON.stringify({ seededAt: at }), 'utf8');
   git(['add', 'migration-complete.json'], root);
   git(['commit', '-m', 'seed'], root);
-  git(['branch', '-M', 'overdeck-state'], root);
+  // PAN-3917: order books live in the project's own `.pan/`, on its own
+  // branch — there is no state branch to seed.
+  git(['branch', '-M', 'main'], root);
   execFileSync('git', ['init', '--bare', origin], { encoding: 'utf8' });
   git(['remote', 'add', 'origin', origin], root);
-  git(['push', '-u', 'origin', 'overdeck-state'], root);
+  git(['push', '-u', 'origin', 'main'], root);
   return root;
 }
 

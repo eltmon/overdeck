@@ -21,11 +21,6 @@ const mocks = vi.hoisted(() => ({
 
 // PAN-3917: config-yaml's defaults import lib/agents/tier-table, which still
 // reaches the record plane W3 is deleting. Stub the one constant it needs.
-// The record plane itself: W3 deletes `pan-dir/record*` and `pan-dir/auto-commit`,
-// and `auto-commit` already imports the removed `state-read-home`, so the module
-// graph cannot load at all. Stubbing the deleted modules cuts every chain that
-// still reaches them (workspaces/resolver → overdeck/infra, agents →
-// agent-record-sync, git-activity → overdeck/git-activity) at their real end.
 vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperationsSync: vi.fn(() => []) }));
 vi.mock('../../../../../lib/agents/tier-table.js', () => ({
   DEFAULT_TIERED_EXECUTION_CONFIG: { enabled: false, tiers: [], subscription: 'all' },

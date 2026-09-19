@@ -14,7 +14,6 @@ interface ResourceIssue {
   hasPrd: boolean;
   hasState: boolean;
   isShadow: boolean;
-  readyForMerge: boolean;
   rawTrackerState?: string;
   resourceSources: string[];
   resourceDetails: {
@@ -61,7 +60,6 @@ const RESOURCE_ISSUES: ResourceIssue[] = [
     hasPrd: true,
     hasState: true,
     isShadow: false,
-    readyForMerge: false,
     resourceSources: ['workspace', 'branch', 'tmux', 'vbrief', 'tasks', 'pr', 'docker'],
     resourceDetails: {
       hasWorkspace: true,
@@ -99,7 +97,6 @@ const RESOURCE_ISSUES: ResourceIssue[] = [
     hasPrd: false,
     hasState: false,
     isShadow: false,
-    readyForMerge: false,
     rawTrackerState: 'closed',
     resourceSources: ['workspace', 'branch'],
     resourceDetails: {

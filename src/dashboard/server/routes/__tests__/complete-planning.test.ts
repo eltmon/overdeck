@@ -369,7 +369,7 @@ describe('completePlanningArtifacts', () => {
     expect(existsSync(join(projectPath, '.pan', 'specs')) ? readdirSync(join(projectPath, '.pan', 'specs')) : []).toEqual([]);
   });
 
-  // PAN-3917: item progress was a `statusOverrides` map on the issue record.
+  // PAN-3917: item progress was a status-override map on the issue record.
   // There is no record and no overlay — re-finalization rewrites the one spec
   // in place, which is what this asserts.
   it('re-finalizes an active plan in place', async () => {
