@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3924",
   "created": "2026-09-19T13:26:25.608Z",
-  "updated": "2026-09-19T13:34:12.263Z",
+  "updated": "2026-09-19T13:34:17.132Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-3924",
       "claimedAt": "2026-09-19T13:31:16.153Z",
       "doneAt": "2026-09-19T13:34:12.263Z"
+    },
+    "tracker-issue-id-lib": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3924",
+      "claimedAt": "2026-09-19T13:34:17.132Z"
     }
   }
 }
