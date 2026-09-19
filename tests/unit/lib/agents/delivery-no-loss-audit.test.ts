@@ -44,7 +44,7 @@ const KNOWN_CALL_SITES = new Set([
   'dashboard/server/routes/workspaces/merge-strike.ts|assertDelivered(agentId, await messageAgent(agentId, rebaseMsg));',
   'dashboard/server/services/agent-spawner.ts|await messageAgent(agentId, msg);',
   'lib/cloister/ci-failure-feedback.ts|await messageAgent(agentId, message);',
-  'lib/cloister/deacon-api-recovery.ts|await deliverAgentMessage(sessionName, CONTINUE_MSG, \'deacon-lite:checkApiErrorAgents\');',
+  'lib/cloister/deacon-api-recovery.ts|await deliverAgentMessage(pane.agentId, CONTINUE_MSG, \'deacon-lite:checkApiErrorAgents\');',
   'lib/cloister/deacon-lite.ts|await deliverAgentMessage(',
   'lib/cloister/deacon-strike-landing.ts|deliverRecovery: (agentId, message, dedupKey) => messageAgent(agentId, message, \'deacon-strike-landing\', { owesRework: true, dedupKey }),',
   'lib/cloister/deacon-swarm-completion.ts|await messageAgent(',

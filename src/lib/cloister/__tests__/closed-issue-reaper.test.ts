@@ -6,13 +6,12 @@ import { join } from 'node:path';
 
 const mocks = vi.hoisted(() => ({
   emitActivityEntrySync: vi.fn(),
-  reconcileMergedDockerCleanupQueue: vi.fn(),
   exec: vi.fn(),
   getPrFacts: vi.fn(),
   isIssueClosed: vi.fn(),
   listRunningAgents: vi.fn(),
   listProjectsSync: vi.fn(),
-  listSessionNames: vi.fn(),
+  listLiveAgentIds: vi.fn(),
   reapIssueResidue: vi.fn(),
   resolveProjectForIssue: vi.fn(),
   stopAgent: vi.fn(),
@@ -35,7 +34,8 @@ vi.mock('../../activity-logger.js', () => ({
   emitActivityEntrySync: mocks.emitActivityEntrySync,
 }));
 
-vi.mock('../../paths.js', () => ({
+vi.mock('../../paths.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../paths.js')>()),
   get AGENTS_DIR() {
     return `${process.env.OVERDECK_HOME ?? '/tmp'}/agents`;
   },
@@ -49,8 +49,10 @@ vi.mock('../../overdeck/issue-projects.js', () => ({
   resolveProjectForIssue: mocks.resolveProjectForIssue,
 }));
 
-vi.mock('../../tmux.js', () => ({
-  listSessionNames: mocks.listSessionNames,
+// PAN-3917: the by-name backstop sweeps the SELECTED backend's inventory, not
+// a tmux census — under Herdr there is no tmux session to list.
+vi.mock('../../terminal-backends/inventory.js', () => ({
+  listLiveAgentIds: mocks.listLiveAgentIds,
 }));
 
 vi.mock('../issue-closed.js', () => ({
@@ -66,10 +68,6 @@ vi.mock('../pr-facts.js', () => ({
   getPrFacts: mocks.getPrFacts,
 }));
 
-vi.mock('../merged-docker-cleanup-worker.js', () => ({
-  reconcileMergedDockerCleanupQueue: mocks.reconcileMergedDockerCleanupQueue,
-}));
-
 import { reconcileClosedIssueAgents } from '../closed-issue-reaper.js';
 
 describe('reconcileClosedIssueAgents', () => {
@@ -82,14 +80,11 @@ describe('reconcileClosedIssueAgents', () => {
     delete process.env.OVERDECK_NO_RESUME;
     mocks.listRunningAgents.mockReturnValue(Effect.succeed([]));
     mocks.listProjectsSync.mockReturnValue([]);
-    mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
+    mocks.listLiveAgentIds.mockResolvedValue(new Set<string>());
     mocks.getPrFacts.mockResolvedValue({ merged: false });
     mocks.reapIssueResidue.mockResolvedValue([]);
     mocks.resolveProjectForIssue.mockReturnValue(null);
     mocks.stopAgent.mockReturnValue(Effect.succeed(undefined));
-    mocks.reconcileMergedDockerCleanupQueue.mockImplementation(
-      (issueIds: string[]) => issueIds.map((issueId) => `Queued merged-issue Docker cleanup for ${issueId}`),
-    );
     mocks.isIssueClosed.mockResolvedValue(false);
     mocks.exec.mockImplementation((_command: string, opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
       const cb = typeof opts === 'function' ? opts : callback;
@@ -160,7 +155,7 @@ describe('reconcileClosedIssueAgents', () => {
     expect(mocks.stopAgent).toHaveBeenCalledTimes(2);
 
     vi.clearAllMocks();
-    mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
+    mocks.listLiveAgentIds.mockResolvedValue(new Set<string>());
     mocks.stopAgent.mockReturnValue(Effect.succeed(undefined));
     mocks.isIssueClosed.mockResolvedValue(true);
 
@@ -169,8 +164,8 @@ describe('reconcileClosedIssueAgents', () => {
     expect(mocks.stopAgent).not.toHaveBeenCalled();
   });
 
-  it('stops inspect-shaped tmux sessions whose parent issue is closed', async () => {
-    mocks.listSessionNames.mockReturnValue(Effect.succeed([
+  it('stops inspect-shaped backend panes whose parent issue is closed', async () => {
+    mocks.listLiveAgentIds.mockResolvedValue(new Set([
       'inspect-pan-1613-workspace-rn3ha',
       'inspect-pan-1614-workspace-b95lw',
       'agent-pan-1613',
@@ -187,8 +182,8 @@ describe('reconcileClosedIssueAgents', () => {
     expect(mocks.isIssueClosed).toHaveBeenCalledWith('PAN-1614');
   });
 
-  it('stops strike-shaped tmux sessions whose parent issue is closed (PAN-1721)', async () => {
-    mocks.listSessionNames.mockReturnValue(Effect.succeed([
+  it('stops strike-shaped backend panes whose parent issue is closed (PAN-1721)', async () => {
+    mocks.listLiveAgentIds.mockResolvedValue(new Set([
       'strike-pan-1716',
       'strike-pan-1717',
       'agent-pan-1716',
@@ -208,7 +203,7 @@ describe('reconcileClosedIssueAgents', () => {
     mocks.listRunningAgents.mockReturnValue(Effect.succeed([
       { id: 'agent-pan-1613', issueId: 'PAN-1613', role: 'work', status: 'running' },
     ]));
-    mocks.listSessionNames.mockReturnValue(Effect.succeed(['inspect-pan-1613-workspace-rn3ha']));
+    mocks.listLiveAgentIds.mockResolvedValue(new Set(['inspect-pan-1613-workspace-rn3ha']));
     mocks.isIssueClosed.mockResolvedValue(true);
 
     await expect(reconcileClosedIssueAgents()).resolves.toEqual([
@@ -217,7 +212,7 @@ describe('reconcileClosedIssueAgents', () => {
     ]);
 
     expect(mocks.listRunningAgents).toHaveBeenCalledTimes(1);
-    expect(mocks.listSessionNames).toHaveBeenCalledTimes(1);
+    expect(mocks.listLiveAgentIds).toHaveBeenCalledTimes(1);
     expect(mocks.isIssueClosed).toHaveBeenCalledWith('PAN-1613');
     expect(mocks.stopAgent).toHaveBeenCalledWith('agent-pan-1613');
     expect(mocks.stopAgent).toHaveBeenCalledWith('inspect-pan-1613-workspace-rn3ha');
@@ -305,57 +300,6 @@ describe('reconcileClosedIssueAgents', () => {
 
     await expect(reconciliation).resolves.toEqual([]);
     expect(maxActive).toBe(4);
-  });
-
-  it('queues merged Docker cleanup without blocking patrol or reaping non-Docker state', async () => {
-    mocks.exec.mockImplementation((command: string, opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
-      const cb = typeof opts === 'function' ? opts : callback;
-      const stdout = String(command).includes('docker network ls')
-        ? 'overdeck-feature-pan-5559_devnet\nbridge\n'
-        : '';
-      cb?.(null, { stdout, stderr: '' });
-      return { on: vi.fn() };
-    });
-    mocks.getPrFacts.mockResolvedValue({ merged: true });
-
-    await expect(reconcileClosedIssueAgents()).resolves.toEqual([
-      'Queued merged-issue Docker cleanup for PAN-5559',
-    ]);
-
-    expect(mocks.getPrFacts).toHaveBeenCalledWith('PAN-5559');
-    expect(mocks.reconcileMergedDockerCleanupQueue).toHaveBeenCalledWith(['PAN-5559']);
-    expect(mocks.reapIssueResidue).not.toHaveBeenCalled();
-    expect(mocks.stopAgent).not.toHaveBeenCalled();
-  });
-
-  it('ignores leaked devnets whose PR the forge does not call merged', async () => {
-    mocks.exec.mockImplementation((command: string, opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
-      const cb = typeof opts === 'function' ? opts : callback;
-      const stdout = String(command).includes('docker network ls')
-        ? 'overdeck-feature-pan-5559_devnet\nbridge\n'
-        : '';
-      cb?.(null, { stdout, stderr: '' });
-      return { on: vi.fn() };
-    });
-
-    await expect(reconcileClosedIssueAgents()).resolves.toEqual([]);
-
-    expect(mocks.getPrFacts).toHaveBeenCalledWith('PAN-5559');
-    expect(mocks.reconcileMergedDockerCleanupQueue).toHaveBeenCalledWith([]);
-    expect(mocks.reapIssueResidue).not.toHaveBeenCalled();
-    expect(mocks.stopAgent).not.toHaveBeenCalled();
-  });
-
-  it('preserves queued cleanup when Docker network discovery is unavailable', async () => {
-    mocks.exec.mockImplementation((_command: string, opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
-      const cb = typeof opts === 'function' ? opts : callback;
-      cb?.(new Error('docker unavailable'), { stdout: '', stderr: '' });
-      return { on: vi.fn() };
-    });
-
-    await expect(reconcileClosedIssueAgents()).resolves.toEqual([]);
-
-    expect(mocks.reconcileMergedDockerCleanupQueue).not.toHaveBeenCalled();
   });
 
   it('preserves open pure-disk residue', async () => {
