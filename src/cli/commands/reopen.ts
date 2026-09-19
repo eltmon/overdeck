@@ -576,33 +576,15 @@ export async function resetWorkspaceState(
     }
   }
 
-  const resetSpinner = ora('Resetting canonical pipeline state...').start();
+  const resetSpinner = ora('Clearing cached issue state...').start();
   const result = await Effect.runPromise(reopenWorkspaceState(id, workspacePath, {
     reason: options.reason,
     trackerContext,
   }));
-  resetSpinner.succeed('Canonical pipeline state reset');
+  resetSpinner.succeed('Cached issue state cleared');
 
   console.log('');
   console.log(chalk.bold('Reset summary:'));
-  if (result.previousReviewStatus) {
-    console.log(`  Review: ${chalk.yellow(result.previousReviewStatus)} → ${chalk.green('pending')}`);
-  }
-  if (result.previousTestStatus) {
-    console.log(`  Test:   ${chalk.yellow(result.previousTestStatus)} → ${chalk.green('pending')}`);
-  }
-  if (result.previousMergeStatus) {
-    console.log(`  Merge:  ${chalk.yellow(result.previousMergeStatus)} → ${chalk.green('pending')}`);
-  }
-
-  const queueEntries = Object.entries(result.queueItemsRemoved);
-  if (queueEntries.length > 0) {
-    console.log(`  Queue items removed:`);
-    for (const [specialist, count] of queueEntries) {
-      console.log(`    ${specialist}: ${count} item(s)`);
-    }
-  }
-
   if (result.continueFileUpdated) {
     console.log(`  Continue file updated with reopen breadcrumb`);
   } else {

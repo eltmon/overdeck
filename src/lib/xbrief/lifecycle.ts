@@ -1,7 +1,7 @@
 /**
  * xBRIEF Lifecycle Foundation
  *
- * Canonical xBRIEF documents live in `specs/` on `overdeck-state`, with
+ * Canonical xBRIEF documents live in the plan home's `.pan/specs/`, with
  * lifecycle represented by `plan.status`. The `./vbrief/` directory helpers
  * below remain only for legacy lifecycle compatibility:
  *

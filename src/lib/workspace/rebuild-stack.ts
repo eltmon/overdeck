@@ -167,23 +167,21 @@ export const rebuildWorkspaceStack = (
 
   return Effect.gen(function* () {
     const closed = yield* Effect.promise(() => isIssueClosed(issueId));
-    const reviewStatus = closed
-      ? null
+    const merged = closed
+      ? true
       : yield* Effect.promise(async () => {
-          const { getReviewStatusSync } = await import('../review-status.js');
-          return getReviewStatusSync(issueId);
+          const { getPrFacts } = await import('../cloister/pr-facts.js');
+          return (await getPrFacts(issueId)).merged;
         });
-    if (closed || reviewStatus?.mergeStatus === 'merged') {
+    if (closed || merged) {
       return {
         success: false,
         error: 'Issue is terminal (closed/merged) — skipping stack rebuild',
       } satisfies RebuildWorkspaceStackResult;
     }
-    // PAN-3917: this used to also fail closed when the canonical-status
-    // resolver was unregistered (a wiring gap distinct from "no status yet").
-    // getReviewStatusSync is a direct DB read with no registration step — it
-    // either returns the issue's status (possibly null for a fresh issue,
-    // which is not terminal) or throws, which Effect.promise surfaces above.
+    // PAN-3917: terminality is the forge's answer, not a stored row — a
+    // closed issue or a merged PR is terminal, and a forge lookup failure
+    // surfaces through Effect.promise above rather than failing open.
 
     // Pre-render name: the workspace's current devcontainer state, if any.
     // Resolves the fallback cleanly when nothing is declared yet (matching

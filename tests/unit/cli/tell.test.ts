@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   resolveAgentTargetSync: vi.fn(),
   getAgentStateSync: vi.fn(),
   messageAgent: vi.fn(),
-  issueOwesReworkSync: vi.fn(),
+  issueOwesRework: vi.fn(),
   loadRemoteAgentState: vi.fn(),
   sendToRemoteAgent: vi.fn(),
   exitCli: vi.fn(async (_code: number) => undefined as never),
@@ -17,7 +17,7 @@ vi.mock('../../../src/lib/agents.js', () => ({
 }));
 
 vi.mock('../../../src/lib/work-agent-lifecycle.js', () => ({
-  issueOwesReworkSync: mocks.issueOwesReworkSync,
+  issueOwesRework: mocks.issueOwesRework,
 }));
 
 vi.mock('../../../src/lib/remote/index.js', () => ({
@@ -39,16 +39,16 @@ describe('pan tell', () => {
     mocks.resolveAgentTargetSync.mockReturnValue('agent-pan-3846');
     mocks.loadRemoteAgentState.mockReturnValue(null);
     mocks.getAgentStateSync.mockReturnValue({ id: 'agent-pan-3846', issueId: 'PAN-3846' });
-    mocks.issueOwesReworkSync.mockReturnValue(false);
+    mocks.issueOwesRework.mockResolvedValue(false);
     mocks.messageAgent.mockResolvedValue({ delivered: true, queuedToMail: true, confirmed: true });
   });
 
   it('passes owesRework from the canonical row to messageAgent (PAN-3846 W3)', async () => {
-    mocks.issueOwesReworkSync.mockReturnValue(true);
+    mocks.issueOwesRework.mockResolvedValue(true);
 
     await tellCommand('PAN-3846', 'fix the UAT failure');
 
-    expect(mocks.issueOwesReworkSync).toHaveBeenCalledWith('PAN-3846');
+    expect(mocks.issueOwesRework).toHaveBeenCalledWith('PAN-3846');
     expect(mocks.messageAgent).toHaveBeenCalledWith('agent-pan-3846', 'fix the UAT failure', 'pan-tell', {
       owesRework: true,
     });

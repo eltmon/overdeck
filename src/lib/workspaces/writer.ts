@@ -212,7 +212,7 @@ export async function relocateWorkspace(id: string, path: string, options: Reloc
  * transcripts or the memory home (memory purge is a separate explicit flag
  * on the CLI destroy verb).
  *
- * PAN-3917: this used to also unmirror each pin's committed overdeck-state
+ * PAN-3917: this used to also unmirror each pin's committed state-branch
  * descriptor (FR-10/FR-11) before the SQLite rows were touched, so a failed
  * state-door commit couldn't strand a pin a recovery-from-state could later
  * resurrect. That branch and mirror are gone — the pinned_docs table is the
@@ -235,7 +235,7 @@ export async function deleteWorkspace(id: string): Promise<void> {
 }
 
 // ─── Pinned docs ───────────────────────────────────────────────────────────
-// PAN-3917: pins used to also mirror onto the project's overdeck-state
+// PAN-3917: pins used to also mirror onto the project's deleted state
 // branch (memory/state-mirror.ts's mirrorPin/unmirrorPin) as a durability
 // convenience keyed by the classic projects.yaml key. That branch is gone —
 // the pinned_docs table below is the only copy now.

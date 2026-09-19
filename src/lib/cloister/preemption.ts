@@ -69,7 +69,7 @@ export interface YieldCandidate {
   /** Already paused (operator pause or a prior yield) — not a fresh victim. */
   paused: boolean;
   /**
-   * The agent's own issue is blocked on the pipeline (reviewStatus pending or
+   * The agent's own issue is blocked on the pipeline (review pending or
    * reviewing) — it is waiting anyway, so prefer it as a victim (FR-2a).
    */
   reviewBlocked: boolean;

@@ -57,7 +57,7 @@ function repo(repoKey: string, patch: Partial<MergeSetRepoState> = {}): MergeSet
     repoReview: 'passed',
     repoTests: 'passed',
     rebaseStatus: 'pending',
-    verificationStatus: 'pending',
+    repoVerification: 'pending',
     repoMerge: 'pending',
     mergeOrder: 0,
     required: true,
@@ -107,7 +107,7 @@ describe('merge-set sync accessors', () => {
         repo('api', {
           repoMerge: 'merging',
           rebaseStatus: 'passed',
-          verificationStatus: 'passed',
+          repoVerification: 'passed',
         }),
       ],
     }));
@@ -125,7 +125,7 @@ describe('merge-set sync accessors', () => {
     expect(loaded.repos.find((entry) => entry.repoKey === 'api')).toEqual(expect.objectContaining({
       repoMerge: 'merging',
       rebaseStatus: 'passed',
-      verificationStatus: 'passed',
+      repoVerification: 'passed',
     }));
   });
 

@@ -1,7 +1,7 @@
 /**
  * Is this issue's PR eligible to be auto-merged? (PAN-1691, re-pointed by PAN-3917.)
  *
- * Before the cut this gate started from `readyForMerge` on the `review_status`
+ * Before the cut this gate started from a merge-ready flag on the `review_status`
  * row and then asked GitHub whether it agreed. The stored flag is gone; the gate
  * now computes the ready set directly — approved, checks green, forge
  * `mergeable` — through `pr-facts`, and then applies the two policy layers that

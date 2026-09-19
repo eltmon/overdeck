@@ -2,12 +2,7 @@ import { join } from 'node:path';
 
 import { Effect } from 'effect';
 
-import {
-  listAllAgentsSync,
-  removeAgentRecordSync,
-  RETAINED_TRANSCRIPTS_PHASE,
-  tombstoneAgentRecordSync,
-} from '../overdeck/agents.js';
+import { listAgentStatesSync } from '../agents/agent-state.js';
 import { getOverdeckHome } from '../paths.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import {
@@ -78,8 +73,6 @@ export interface AgentGcDeps {
   hasRetainedMarker: (dirPath: string) => Promise<boolean>;
   markRetained: (dirPath: string) => Promise<void>;
   emitPruneEvent: (agent: AgentGcRow, entry: AgentGcPruneEntry) => void;
-  removeRecord: (id: string) => void;
-  tombstoneRecord: (id: string) => void;
   isTerminalAgent: (agent: AgentGcRow) => AgentGcTerminalityResult | Promise<AgentGcTerminalityResult>;
   log?: (message: string) => void;
 }
@@ -126,7 +119,7 @@ async function hasOpenChangeRequest(agent: AgentGcRow): Promise<boolean> {
  * issue is live. That is the fact; the status row was a copy of it.
  */
 function hasInFlightReviewOrTest(agent: AgentGcRow): boolean {
-  return listAllAgentsSync().some((candidate) =>
+  return listAgentStatesSync().some((candidate) =>
     candidate.issueId.toUpperCase() === agent.issueId.toUpperCase()
     && (candidate.role === 'review' || candidate.role === 'test')
     && ['starting', 'running', 'waiting', 'idle'].includes(candidate.status));
@@ -223,8 +216,6 @@ function defaultAgentGcDeps(): AgentGcDeps {
     hasRetainedMarker: hasRetainedTranscriptsMarker,
     markRetained: markRetainedTranscripts,
     emitPruneEvent: emitAgentGcPruneEvent,
-    removeRecord: removeAgentRecordSync,
-    tombstoneRecord: tombstoneAgentRecordSync,
     isTerminalAgent: (agent) => resolveLiveAgentTerminalityEvidence(agent),
     log: (message) => console.warn(message),
   };
@@ -264,11 +255,9 @@ export async function pruneAgentRowsAfterTranscriptCleanup(
       const result = await deps.cleanStateDir(agentDir, deps.agentsDir);
       if (!result.removedDir) {
         await deps.markRetained(agentDir);
-        deps.tombstoneRecord(agent.id);
         preserved.push(agent.id);
         continue;
       }
-      deps.removeRecord(agent.id);
       removed.push(agent.id);
     } catch (error) {
       deps.log?.(
@@ -288,7 +277,7 @@ export async function pruneAgentRowsAfterTranscriptCleanup(
  */
 export async function pruneStoppedAgentsForIssue(
   issueId: string,
-  agents: AgentGcRow[] = listAllAgentsSync(),
+  agents: AgentGcRow[] = listAgentStatesSync(),
   deps: AgentGcDeps = defaultAgentGcDeps(),
 ): Promise<AgentGcResult> {
   const issue = issueId.toUpperCase();
@@ -300,14 +289,20 @@ export async function pruneStoppedAgentsForIssue(
 }
 
 export async function pruneTerminalStoppedAgents(
-  agents: AgentGcRow[] = listAllAgentsSync(),
+  agents: AgentGcRow[] = listAgentStatesSync(),
   deps: AgentGcDeps = defaultAgentGcDeps(),
   options: { dryRun?: boolean } = {},
 ): Promise<AgentGcResult> {
-  const candidates = agents.filter((agent) =>
-    agent.phase !== RETAINED_TRANSCRIPTS_PHASE
-    && agent.status === 'stopped'
-    && Boolean(agent.workspace));
+  // PAN-3465/PAN-3917: an already-retired agent must not draw a live tracker or
+  // forge probe. Its evidence used to be a tombstone phase on the row; with the
+  // row gone it is the retained-transcripts marker on the directory.
+  const stopped = agents.filter((agent) =>
+    agent.status === 'stopped' && Boolean(agent.workspace));
+  const candidates: AgentGcRow[] = [];
+  for (const agent of stopped) {
+    if (await deps.hasRetainedMarker(join(deps.agentsDir, agent.id))) continue;
+    candidates.push(agent);
+  }
   const terminal: AgentGcRow[] = [];
   const evidenceByAgent = new Map<string, AgentGcTerminalityEvidence>();
   const preserved: string[] = [];

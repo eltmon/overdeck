@@ -22,7 +22,6 @@ import {
   stopAgentSync,
   getAgentRuntimeStateSync,
 } from '../agents.js';
-import { countAgentsByStatus } from '../overdeck/agents.js';
 import { getCachedMemoryVerdict } from './memory-verdict-cache.js';
 import { isIdle } from '../agents/liveness.js';
 import { isTerminalSwarmSlotAgent } from './swarm-slot-lifecycle.js';
@@ -162,8 +161,19 @@ export function countWarmIdleAdvancingAgents(
   return warmIdle;
 }
 
+/**
+ * PAN-3917: this used to count rows in the overdeck.db mirror, which the boot
+ * backfill reconciled against tmux. The mirror is gone and nothing corrects a
+ * crashed agent's state file, so the ceiling would count stale `running` files
+ * forever and starve dispatch. listRunningAgentsSync derives liveness from the
+ * tmux census per call, which is what the contract below already assumed.
+ */
 export function countRunningAgents(): RunningCounts {
-  const counts = countAgentsByStatus('running');
+  const counts: Record<string, number> = {};
+  for (const agent of listRunningAgentsSync()) {
+    if (agent.status !== 'running' || !agent.tmuxActive) continue;
+    counts[agent.role] = (counts[agent.role] ?? 0) + 1;
+  }
   const workTotal = counts['work'] ?? 0;
   let advancingTotal = 0;
   for (const role of ADVANCING_ROLES) {

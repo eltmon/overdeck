@@ -1,6 +1,6 @@
 /** Cloister status and health snapshot seam. */
 import type { CloisterConfig } from './config.js';
-import { getDeaconStatus, assessDeaconPatrolFreshness } from './deacon.js';
+import { getDeaconLiteStatus, type DeaconLiteStatus } from './deacon-lite.js';
 import {
   getAgentHealth,
   generateHealthSummary,
@@ -20,10 +20,8 @@ export interface CloisterStatus {
   config: CloisterConfig;
   summary: HealthSummary;
   agentsNeedingAttention: string[];
-  patrol: ReturnType<typeof assessDeaconPatrolFreshness> & {
-    loopRunning: boolean;
-    patrolIntervalMs: number;
-  };
+  /** PAN-3917: deacon-lite's own loop state — there is no patrol ledger left. */
+  patrol: DeaconLiteStatus;
 }
 
 export interface StatusHost {
@@ -64,12 +62,7 @@ export function getStatus(host: StatusHost): CloisterStatus {
   const summary = generateHealthSummary(agentHealths);
   const needsAttention = getAgentsNeedingAttention(agentHealths).map((h) => h.agentId);
 
-  const deaconStatus = getDeaconStatus();
-  const patrol = assessDeaconPatrolFreshness({
-    isRunning: deaconStatus.isRunning,
-    lastPatrol: deaconStatus.state.lastPatrol,
-    patrolIntervalMs: deaconStatus.config.patrolIntervalMs,
-  });
+  const patrol = getDeaconLiteStatus();
 
   const status: CloisterStatus = {
     running: host.isRunning(),
@@ -77,11 +70,7 @@ export function getStatus(host: StatusHost): CloisterStatus {
     config: host.config,
     summary,
     agentsNeedingAttention: needsAttention,
-    patrol: {
-      ...patrol,
-      loopRunning: deaconStatus.isRunning,
-      patrolIntervalMs: deaconStatus.config.patrolIntervalMs,
-    },
+    patrol,
   };
 
   host.statusCache = status;

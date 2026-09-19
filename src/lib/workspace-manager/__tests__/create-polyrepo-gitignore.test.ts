@@ -36,7 +36,6 @@ describe('ensurePolyrepoWorkspaceGitignoreSync', () => {
     expect(result.added).toEqual(['api/', 'fe/', 'docs/', 'infra/', '.overdeck/', '.devcontainer/', 'dev']);
     expect(result.removed).toEqual([]);
     const content = readFileSync(join(workspacePath, '.gitignore'), 'utf-8');
-    expect(content).not.toContain('.pan/records/');
     expect(content).toContain('api/');
     expect(content).toContain('fe/');
     expect(content).toContain('docs/');
@@ -92,7 +91,6 @@ describe('ensurePolyrepoWorkspaceGitignoreSync', () => {
     expect(result.removed).toEqual([]);
     const content = readFileSync(join(workspacePath, '.gitignore'), 'utf-8');
     const lines = content.split('\n');
-    expect(lines.filter(l => l === '.pan/records/')).toHaveLength(0);
     expect(lines.filter(l => l === 'api/')).toHaveLength(1);
     expect(lines.filter(l => l === 'fe/')).toHaveLength(1);
     expect(lines.filter(l => l === 'docs/')).toHaveLength(1);
@@ -132,25 +130,6 @@ describe('ensurePolyrepoWorkspaceGitignoreSync', () => {
     expect(result.removed).toEqual([]);
   });
 
-  it('removes stale .pan/records ignores so durable records stay trackable', () => {
-    writeFileSync(join(workspacePath, '.gitignore'), [
-      '.pan/records/',
-      'api/',
-      '.pan/records',
-      '.overdeck/',
-      '.devcontainer/',
-      'dev',
-      '',
-    ].join('\n'));
-
-    const result = ensurePolyrepoWorkspaceGitignoreSync(workspacePath, [{ name: 'api' }]);
-
-    expect(result.added).toEqual([]);
-    expect(result.removed).toEqual(['.pan/records/', '.pan/records']);
-    const content = readFileSync(join(workspacePath, '.gitignore'), 'utf-8');
-    expect(content).not.toContain('.pan/records');
-    expect(content).toContain('api/');
-  });
 });
 
 describe('commitPolyrepoWorkspaceGitignoreAsync', () => {

@@ -20,7 +20,7 @@ import {
   mergeReadySlots,
   type ClassifiedSwarmSlot,
 } from '../../lib/cloister/deacon-swarm.js';
-import { reconcileSlotState } from '../../lib/agents/slot-reconcile.js';
+import { reconcileSlotState } from '../../lib/cloister/swarm-slot-reconcile.js';
 
 type ConsoleLike = Pick<typeof console, 'log' | 'error'>;
 
@@ -165,10 +165,7 @@ export async function swarmMergeCommand(
   const doc = Object.keys(itemStatuses).length > 0
     ? applyItemStatuses(loaded.doc, itemStatuses)
     : loaded.doc;
-  // NOTE (PAN-3917 W9): the option key below belongs to slot-reconcile.ts, which is
-  // on the delete list (src/lib/agents/slot-reconcile.ts); the key goes with it. The
-  // values are item statuses read from .pan/continues/, not from a record.
-  const reconciled = await deps.reconcileSlotState(issue, workspacePath, doc, { statusOverrides: itemStatuses });
+  const reconciled = await deps.reconcileSlotState(issue, workspacePath, doc, { itemStatuses });
   const slot = reconciled.inFlight.find(candidate => candidate.slotIndex === slotIndex);
   if (!slot) {
     deps.console.error(chalk.red(`No in-flight swarm slot ${slotIndex} exists for ${issue}.`));

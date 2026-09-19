@@ -13,10 +13,7 @@ vi.mock('../../../../src/lib/cloister/config.js', () => ({
   loadCloisterConfigSync: () => ({ concurrency: concurrencyConfig }),
 }));
 
-// countAgentsByStatus / agents.js are pulled transitively — stub the minimum.
-vi.mock('../../../../src/lib/overdeck/agents.js', () => ({
-  countAgentsByStatus: () => ({}),
-}));
+// agents.js is pulled transitively — stub the minimum.
 vi.mock('../../../../src/lib/agents.js', () => ({
   listRunningAgentsSync: () => [],
   stopAgentSync: vi.fn(),

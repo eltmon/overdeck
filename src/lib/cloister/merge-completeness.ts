@@ -211,7 +211,7 @@ export async function assessMergeCompleteness(
  * discovering a missing review artifact from the forge on the way.
  *
  * PAN-3917: this used to write its findings back into the merge-set's per-repo
- * `mergeStatus` and then read those same fields to decide what to re-check —
+ * the merge verdict and then read those same fields to decide what to re-check —
  * the drift loop this issue removes. The forge and git now answer every
  * question at read time; the merge set contributes only plan data (which repos,
  * which branches, which are required). The returned merge set carries the

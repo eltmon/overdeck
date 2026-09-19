@@ -211,7 +211,7 @@ async function resolveWorkspaceForIssue(issueId: string): Promise<string | null>
   // long-merged issue still carrying its lifecycle state (e.g.
   // `verifying-on-main`) would otherwise re-trigger a ship dispatch for a
   // branch that merged weeks ago. There used to be two guards here: one read
-  // `mergeStatus` off the row, the other asked GitHub because the row could be
+  // the merge verdict off the row, the other asked GitHub because the row could be
   // wrong. With the row gone there is one question and one asker.
   const mergedGuard = await shouldSkipDispatchAsMerged(normalizedIssueId);
   if (mergedGuard.skip) {
@@ -286,7 +286,7 @@ async function resolveWorkspaceForIssue(issueId: string): Promise<string | null>
         const message = `${normalizedIssueId}: ${decision.reason}`;
         console.log(`[cloister] ${message}`);
         // PAN-3917: the warn above IS the dead-end signal. It used to also
-        // increment a `recoveryTrips` counter on the record so a later patrol
+        // increment a recovery-trip counter on the record so a later patrol
         // could decide when to raise needs-you; the counter and the patrol are
         // both gone.
         emitActivityEntrySync({ source: 'cloister', level: 'warn', message, issueId: normalizedIssueId });
@@ -408,7 +408,7 @@ async function handleCloisterDomainEventPromise(event: CloisterDomainEventLike):
   }
   // PAN-3917: `agent.heartbeat_dead` and `review.coordinator.died` used to run
   // deacon handlers that rewrote review rows — a dead coordinator reset
-  // `reviewStatus` to pending so a patrol would re-dispatch it. The verdict
+  // the review verdict to pending so a patrol would re-dispatch it. The verdict
   // lives on the pull request now, so a dead coordinator is simply a review
   // that has not been posted: the next dispatch pass sees no review on the PR
   // and no live session, and spawns one. `work.completed` falls through to the

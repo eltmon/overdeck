@@ -254,7 +254,7 @@ export async function handleAgentCrash(host: CrashHost, agentId: string): Promis
     // PAN-2007: a one-shot review/test session that vanished BEFORE recording a
     // terminal verdict died prematurely — e.g. before it could run
     // `pan specialists done`. Masking that as a normal "one-shot completion" and
-    // skipping restart strands the issue at reviewStatus=reviewing forever (the
+    // skipping restart strands the issue mid-review forever (the
     // exact PAN-1832 symptom). Recover it instead: resume so it can finish and
     // signal. Only a terminal verdict (or a missing session) is a genuine
     // non-restartable completion.

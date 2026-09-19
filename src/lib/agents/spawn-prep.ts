@@ -13,7 +13,7 @@ import { createTrackerFromConfig, createTracker } from '../tracker/factory.js';
 import type { IssueState } from '../tracker/interface.js';
 import { findProjectByPathSync, getIssuePrefix, resolveProjectFromIssueSync } from '../projects.js';
 import { getWorkspaceStackHealth } from '../workspace/stack-health.js';
-import { getReviewStatusSync } from '../review-status.js';
+import { getPrFacts } from '../cloister/pr-facts.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
 import type { ModelId } from '../settings.js';
@@ -1065,13 +1065,12 @@ export async function assertWorkspaceStackHealthyForSpawn(
     }
   };
 
-  // A blocked or failed review means the work agent is explicitly being
+  // A review that requested changes means the work agent is explicitly being
   // restarted to repair known-broken code. Rebuilding its container stack would
   // compile the same broken branch and can only delay that repair, so work from
-  // the host instead.
-  const reviewStatus = role === 'work' ? getReviewStatusSync(normalizedIssue)?.reviewStatus : undefined;
-  if (reviewStatus === 'blocked' || reviewStatus === 'failed') {
-    fallbackToHost(`review is ${reviewStatus}; rework must repair the branch before its stack can build`);
+  // the host instead. PAN-3917: the verdict is the PR's, not a stored row.
+  if (role === 'work' && (await getPrFacts(normalizedIssue)).changesRequested) {
+    fallbackToHost('the pull request has changes requested; rework must repair the branch before its stack can build');
     return;
   }
 

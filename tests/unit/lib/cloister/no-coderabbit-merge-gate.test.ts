@@ -6,10 +6,10 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const GATE_FILES = [
-  'src/lib/review-status.ts',
   'src/lib/cloister/verification-runner.ts',
-  'src/lib/cloister/deacon-merge.ts',
   'src/lib/cloister/auto-merge-eligibility.ts',
+  'src/lib/cloister/merge-ready-set.ts',
+  'src/lib/cloister/pr-facts.ts',
   'src/lib/flywheel-merge-order.ts',
 ];
 
@@ -32,6 +32,6 @@ describe('no-coderabbit-merge-gate guard', () => {
     const lower = await readSource(INGESTION_FILE);
     expect(lower).not.toContain('setreviewstatus');
     expect(lower).not.toContain('blockerreasons');
-    expect(lower).not.toContain('readyformerge');
+    expect(lower).not.toContain('evaluatemergereadiness');
   });
 });

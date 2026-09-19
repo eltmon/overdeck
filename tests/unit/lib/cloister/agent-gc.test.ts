@@ -7,7 +7,6 @@ import {
   type AgentGcDeps,
   type AgentGcTerminalityDeps,
 } from '../../../../src/lib/cloister/agent-gc.js';
-import { RETAINED_TRANSCRIPTS_PHASE } from '../../../../src/lib/overdeck/agents.js';
 import type { AgentState } from '../../../../src/lib/agents/agent-state.js';
 
 const agent = (id: string, status: AgentState['status'], role: AgentState['role']): AgentState => ({
@@ -40,8 +39,6 @@ function gcDeps(overrides: Partial<AgentGcDeps> = {}): AgentGcDeps {
     hasRetainedMarker: vi.fn(async () => false),
     markRetained: vi.fn(async () => {}),
     emitPruneEvent: vi.fn(),
-    removeRecord: vi.fn(),
-    tombstoneRecord: vi.fn(),
     isTerminalAgent: vi.fn(() => true),
     log: vi.fn(),
     ...overrides,
@@ -50,7 +47,6 @@ function gcDeps(overrides: Partial<AgentGcDeps> = {}): AgentGcDeps {
 
 describe('PAN-2543 event-driven agent row GC', () => {
   it('prunes stopped rows only after their transcript-preserving cleanup is complete', async () => {
-    const removeRecord = vi.fn();
     const cleanStateDir = vi.fn(async () => ({
       removedFiles: 1,
       preservedTranscripts: 0,
@@ -61,20 +57,16 @@ describe('PAN-2543 event-driven agent row GC', () => {
       agent('planning-pan-2503', 'stopped', 'plan'),
       agent('agent-pan-2503-review', 'running', 'review'),
       { ...agent('agent-pan-9999', 'stopped', 'work'), issueId: 'PAN-9999' },
-    ], gcDeps({
-      cleanStateDir,
-      removeRecord,
-    }));
+    ], gcDeps({ cleanStateDir }));
 
     expect(result).toEqual({ removed: ['agent-pan-2503', 'planning-pan-2503'], preserved: ['agent-pan-2503-review'] });
-    expect(removeRecord.mock.calls.map(call => call[0])).toEqual(result.removed);
   });
 
-  it('excludes retained-transcript tombstones before terminal issue resolution', async () => {
+  it('excludes already-retired agents before terminal issue resolution', async () => {
     const isTerminalAgent = vi.fn(() => true);
     const cleanStateDir = vi.fn();
     const result = await pruneTerminalStoppedAgents([
-      { ...agent('agent-pan-2503', 'stopped', 'work'), phase: RETAINED_TRANSCRIPTS_PHASE },
+      agent('agent-pan-2503', 'stopped', 'work'),
     ], gcDeps({
       cleanStateDir,
       hasRetainedMarker: vi.fn(async () => true),
@@ -160,7 +152,6 @@ describe('PAN-3513 live terminality confirmation', () => {
     expect(result).toEqual({ removed: ['agent-pan-2503'], preserved: [] });
     expect(deps.emitPruneEvent).not.toHaveBeenCalled();
     expect(deps.cleanStateDir).not.toHaveBeenCalled();
-    expect(deps.removeRecord).not.toHaveBeenCalled();
   });
 
   // PAN-3917: the GC used to push a durable tombstone to the agent plane on the
@@ -180,12 +171,10 @@ describe('PAN-3513 live terminality confirmation', () => {
         removedDir: true,
       };
     });
-    const removeRecord = vi.fn();
     const result = await pruneTerminalStoppedAgents([candidate], gcDeps({
       cleanStateDir,
       listFilesToRemove: vi.fn(async () => ['session.id', 'runtime.json']),
       emitPruneEvent,
-      removeRecord,
       isTerminalAgent: (row) => resolveLiveAgentTerminalityEvidence(row, deps),
     }));
 
@@ -203,6 +192,5 @@ describe('PAN-3513 live terminality confirmation', () => {
       filesRemoved: ['session.id', 'runtime.json'],
     }));
     expect(cleanStateDir).toHaveBeenCalledWith('/agents/agent-pan-2503', '/agents');
-    expect(removeRecord).toHaveBeenCalledWith('agent-pan-2503');
   });
 });

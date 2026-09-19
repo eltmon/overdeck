@@ -20,7 +20,7 @@ import * as NodeChildProcessSpawner from '@effect/platform-node/NodeChildProcess
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
 import * as NodePath from '@effect/platform-node/NodePath'
 import { CheckpointError, GitError, InvalidAgentIdError, VcsError } from '../errors.js'
-import { STATE_BRANCH_PATHS } from '../state-plane.js'
+import { PAN_RUNTIME_SUBDIRS } from '../state-plane.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -69,7 +69,7 @@ function noteCheckpointCaptureFailure(cwd: string, cause: unknown): void {
 export function checkpointStateExclusions(): string[] {
   return [
     '.overdeck',
-    ...STATE_BRANCH_PATHS.map((path) => `.pan/${path.slice(0, -1)}`),
+    ...PAN_RUNTIME_SUBDIRS.map((path) => `.pan/${path.slice(0, -1)}`),
     '.pan/continue.json',
     '.pan/spec.vbrief.json',
   ]

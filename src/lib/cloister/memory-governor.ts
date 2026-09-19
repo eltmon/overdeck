@@ -341,7 +341,7 @@ export function computeLearnedFootprintBytes(stacks: readonly ResourceStack[], p
  */
 export async function estimateFootprint(role: FootprintRole, projectKey: string): Promise<number> {
   const containers = getDockerStatsCollector().getStats() as unknown as StackContainerResource[];
-  const stacks = getResourceStacks(containers);
+  const stacks = await getResourceStacks(containers);
   const learned = computeLearnedFootprintBytes(stacks, projectKey);
   return learned ?? coldStartFootprintBytes(role);
 }
@@ -382,7 +382,7 @@ export interface ShedAgentLike {
 /**
  * Pure core: which merged/closed stacks are safe to stop.
  *
- * This mirrors reclaim.ts's isClosedStack (stack.phase === 'merged') + live-
+ * This mirrors reclaim.ts's isClosedStack (stack.state === 'merged') + live-
  * issue exclusion exactly, rather than importing buildReclaimPayload directly:
  * the root tsconfig.json excludes src/dashboard/**, so any import from
  * reclaim.ts pulls its unrelated deleteResourceVenvEffect (a pre-existing,
@@ -403,7 +403,7 @@ export function selectStackShedCandidates(
       .filter((issueId): issueId is string => Boolean(issueId)),
   );
   return stacks.filter(
-    (stack) => stack.issueId && stack.phase === 'merged' && !liveIssueIds.has(stack.issueId.toUpperCase()),
+    (stack) => stack.issueId && stack.state === 'merged' && !liveIssueIds.has(stack.issueId.toUpperCase()),
   );
 }
 
@@ -445,7 +445,7 @@ export async function shed(): Promise<ShedResult> {
   const result: ShedResult = { stoppedStacks: [], pausedAgents: [] };
 
   const containers = getDockerStatsCollector().getStats() as unknown as StackContainerResource[];
-  const stacks = getResourceStacks(containers);
+  const stacks = await getResourceStacks(containers);
   const runningAgents = listRunningAgentsSync().filter((a) => a.tmuxActive);
   const agentsLike: ShedAgentLike[] = runningAgents.map((a) => ({ issueId: a.issueId, hasLiveTmuxSession: a.tmuxActive }));
 
@@ -467,7 +467,6 @@ export async function shed(): Promise<ShedResult> {
     const { listSessionNames, killSession } = await import('../tmux.js');
     const { selectIdleAdvancingSessions } = await import('./reap-terminal-sessions.js');
     const { isIdle } = await import('../agents/liveness.js');
-    const { markAdvancingSessionStopped } = await import('./advancing-selfheal.js');
     const { Effect } = await import('effect');
     const aliveSessions = await Effect.runPromise(listSessionNames());
     const warmIdle = selectIdleAdvancingSessions([...aliveSessions], (agentId) => isIdle(agentId));
@@ -475,7 +474,6 @@ export async function shed(): Promise<ShedResult> {
       if (verdict.band !== 'hard') break;
       try {
         await Effect.runPromise(killSession(session));
-        markAdvancingSessionStopped(session);
         result.pausedAgents.push(session);
         console.log(`[memory-governor] Shed warm-idle advancing session ${session} under HARD pressure (PAN-2579; resumable with context)`);
       } catch (err) {

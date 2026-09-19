@@ -9,7 +9,7 @@
  * every other worktree — after which the whole repo fails every push with
  * "unable to get credential storage lock ... No such file or directory".
  *
- * That is how the `overdeck-state` branch silently accumulated 144 unpushed
+ * That is how the old state branch silently accumulated 144 unpushed
  * commits behind a reaped `feature-pan-3320-strike` worktree (2026-07-30). One
  * file per repo, outside every git dir, keeps the path valid for the life of
  * the repo no matter which workspaces come and go.

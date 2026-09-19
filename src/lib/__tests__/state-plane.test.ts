@@ -10,14 +10,13 @@ import {
   isStatePlaneOnlyDiff,
   isStatePlaneOnlyStatus,
   parsePorcelainStatusPaths,
-  STATE_BRANCH_PATHS,
+  PAN_RUNTIME_SUBDIRS,
   STATE_PLANE_PATHS,
 } from '../state-plane.js';
 
-describe('STATE_BRANCH_PATHS', () => {
-  it('enumerates exactly the eleven flat overdeck-state root directories', () => {
-    expect(STATE_BRANCH_PATHS).toEqual([
-      'records/',
+describe('PAN_RUNTIME_SUBDIRS', () => {
+  it('enumerates exactly the pipeline-owned .pan/ subdirectories', () => {
+    expect(PAN_RUNTIME_SUBDIRS).toEqual([
       'continues/',
       'specs/',
       'drafts/',
@@ -33,7 +32,7 @@ describe('STATE_BRANCH_PATHS', () => {
 
   it('keeps workspace-local continue.json in legacy diff classification only', () => {
     expect(STATE_PLANE_PATHS).toContain('.pan/continue.json');
-    expect(STATE_BRANCH_PATHS).not.toContain('.pan/continue.json' as never);
+    expect(PAN_RUNTIME_SUBDIRS).not.toContain('.pan/continue.json' as never);
   });
 });
 
@@ -79,17 +78,17 @@ describe('isStatePlaneOnlyDiff', () => {
   });
 
   it('returns true when the diff touches only state-plane paths', async () => {
-    mkdirSync(join(root, '.pan', 'records'), { recursive: true });
-    writeFileSync(join(root, '.pan', 'records', 'pan-2375.json'), '{}\n');
+    mkdirSync(join(root, '.pan', 'review'), { recursive: true });
+    writeFileSync(join(root, '.pan', 'review', 'pan-2375.json'), '{}\n');
     const tip = commitAll(root, 'state only');
 
     await expect(isStatePlaneOnlyDiff(base, tip, root)).resolves.toBe(true);
   });
 
   it('returns false when any non-state path changes', async () => {
-    mkdirSync(join(root, '.pan', 'records'), { recursive: true });
+    mkdirSync(join(root, '.pan', 'review'), { recursive: true });
     mkdirSync(join(root, 'src'), { recursive: true });
-    writeFileSync(join(root, '.pan', 'records', 'pan-2375.json'), '{}\n');
+    writeFileSync(join(root, '.pan', 'review', 'pan-2375.json'), '{}\n');
     writeFileSync(join(root, 'src', 'feature.ts'), 'export const feature = true;\n');
     const tip = commitAll(root, 'mixed state and source');
 
@@ -117,13 +116,13 @@ describe('parsePorcelainStatusPaths', () => {
 
   it('extracts paths from staged, unstaged, and untracked state-plane status lines', () => {
     const porcelain = [
-      'MM .pan/records/pan-1982.json',
+      'MM .pan/review/pan-1982.json',
       ' M .pan/test/result.json',
       '?? .pan/feedback/review.json',
     ].join('\n');
 
     expect(parsePorcelainStatusPaths(porcelain)).toEqual([
-      '.pan/records/pan-1982.json',
+      '.pan/review/pan-1982.json',
       '.pan/test/result.json',
       '.pan/feedback/review.json',
     ]);
@@ -132,7 +131,7 @@ describe('parsePorcelainStatusPaths', () => {
 
   it('returns false when any porcelain status path is outside the state plane', () => {
     const porcelain = [
-      ' M .pan/records/pan-1982.json',
+      ' M .pan/review/pan-1982.json',
       ' M src/foo.ts',
     ].join('\n');
 
@@ -140,31 +139,31 @@ describe('parsePorcelainStatusPaths', () => {
   });
 
   it('uses both paths for state-plane renames', () => {
-    const porcelain = 'R  .pan/records/a.json -> .pan/records/b.json';
+    const porcelain = 'R  .pan/review/a.json -> .pan/review/b.json';
 
     expect(parsePorcelainStatusPaths(porcelain)).toEqual([
-      '.pan/records/a.json',
-      '.pan/records/b.json',
+      '.pan/review/a.json',
+      '.pan/review/b.json',
     ]);
     expect(isStatePlaneOnlyStatus(porcelain)).toBe(true);
   });
 
   it('returns false for a rename with either path outside the state plane', () => {
-    const porcelain = 'R  .pan/records/a.json -> src/a.json';
+    const porcelain = 'R  .pan/review/a.json -> src/a.json';
 
     expect(parsePorcelainStatusPaths(porcelain)).toEqual([
-      '.pan/records/a.json',
+      '.pan/review/a.json',
       'src/a.json',
     ]);
     expect(isStatePlaneOnlyStatus(porcelain)).toBe(false);
   });
 
   it('returns false for a source-to-state rename', () => {
-    const porcelain = 'R  src/foo.ts -> .pan/records/foo.ts';
+    const porcelain = 'R  src/foo.ts -> .pan/review/foo.ts';
 
     expect(parsePorcelainStatusPaths(porcelain)).toEqual([
       'src/foo.ts',
-      '.pan/records/foo.ts',
+      '.pan/review/foo.ts',
     ]);
     expect(isStatePlaneOnlyStatus(porcelain)).toBe(false);
   });
@@ -178,12 +177,12 @@ describe('parsePorcelainStatusPaths', () => {
 
   it('unquotes git C-quoted porcelain paths', () => {
     const porcelain = [
-      ' M ".pan/records/pan\\040quoted.json"',
+      ' M ".pan/review/pan\\040quoted.json"',
       '?? ".pan/test/result\\011copy.json"',
     ].join('\n');
 
     expect(parsePorcelainStatusPaths(porcelain)).toEqual([
-      '.pan/records/pan quoted.json',
+      '.pan/review/pan quoted.json',
       '.pan/test/result\tcopy.json',
     ]);
     expect(isStatePlaneOnlyStatus(porcelain)).toBe(true);

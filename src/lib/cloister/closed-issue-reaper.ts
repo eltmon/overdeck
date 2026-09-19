@@ -8,14 +8,11 @@ import { listRunningAgents, stopAgent } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { AGENTS_DIR } from '../paths.js';
 import { listProjectsSync } from '../projects.js';
-import { readJournalStatus } from '../overdeck/review-status-record-sync.js';
-import { resolveProjectForIssue } from '../pan-dir/record.js';
-import { setReviewStatusSync } from '../review-status.js';
-import type { ReviewStatus } from '../review-status-reconcile.js';
+import { resolveProjectForIssue } from '../overdeck/issue-projects.js';
 import { listSessionNames } from '../tmux.js';
-import { isIssueClosed, isTrackerIssueClosed } from './issue-closed.js';
+import { isIssueClosed } from './issue-closed.js';
 import { reapIssueResidue } from './reap-issue-residue.js';
-import { listPipelineStatuses } from '../overdeck/pipeline-view.js';
+import { getPrFacts } from './pr-facts.js';
 
 // Sessions reaped by NAME as a backstop: inspect sessions never have agent
 // state, and strike sessions can outlive their state entry (e.g. state already
@@ -37,7 +34,6 @@ function issueIdFromAgentDir(entryName: string): string | null {
 
 const execAsync = promisify(exec);
 const DEVNET_CLOSURE_CHECK_CONCURRENCY = 4;
-export const REVIEW_REQUEST_CLOSURE_CHECK_CONCURRENCY = 4;
 
 // Leaked `_devnet` networks are a residue source of their own: a closed issue
 // whose sessions, workspace, and agent dirs are already gone can still hold a
@@ -69,70 +65,6 @@ async function isClosedIssue(
     closedChecks.set(issueId, promise);
   }
   return promise;
-}
-
-async function isTrackerClosedIssue(
-  issueId: string,
-  trackerClosedChecks: Map<string, Promise<boolean>>,
-): Promise<boolean> {
-  let promise = trackerClosedChecks.get(issueId);
-  if (!promise) {
-    promise = isTrackerIssueClosed(issueId);
-    trackerClosedChecks.set(issueId, promise);
-  }
-  return promise;
-}
-
-function hasUnservicedReviewRequest(status: ReviewStatus): boolean {
-  if (status.reviewStatus !== 'pending' || !status.reviewRequestedAt) return false;
-  return !status.reviewSpawnedAt ||
-    new Date(status.reviewRequestedAt).getTime() > new Date(status.reviewSpawnedAt).getTime();
-}
-
-export async function reapClosedIssueReviewRequests(
-  trackerClosedChecks: Map<string, Promise<boolean>>,
-): Promise<string[]> {
-  const actions: string[] = [];
-  const pendingStatuses = Object.entries(listPipelineStatuses())
-    .filter(([, status]) => status.reviewStatus === 'pending');
-
-  for (let offset = 0; offset < pendingStatuses.length; offset += REVIEW_REQUEST_CLOSURE_CHECK_CONCURRENCY) {
-    const batch = pendingStatuses.slice(offset, offset + REVIEW_REQUEST_CLOSURE_CHECK_CONCURRENCY);
-    const candidates = (await Promise.all(batch.map(async ([issueId, dbStatus]) => {
-      const journal = await readJournalStatus(issueId);
-      const existing = {
-        ...dbStatus,
-        ...(journal?.durable ?? {}),
-        issueId,
-      } as ReviewStatus;
-      for (const field of journal?.clearedFields ?? []) {
-        delete (existing as unknown as Record<string, unknown>)[field];
-      }
-      return hasUnservicedReviewRequest(existing) ? [issueId, existing] as const : null;
-    }))).filter((candidate): candidate is readonly [string, ReviewStatus] => candidate !== null);
-
-    const trackerClosedCandidates = (await Promise.all(candidates.map(async ([issueId, existing]) => (
-      await isTrackerClosedIssue(issueId, trackerClosedChecks) ? [issueId, existing] as const : null
-    )))).filter((candidate): candidate is readonly [string, ReviewStatus] => candidate !== null);
-
-    for (const [issueId, existing] of trackerClosedCandidates) {
-      setReviewStatusSync(issueId, {
-        reviewRequestedAt: undefined,
-        reviewSpawnedAt: undefined,
-      }, existing);
-      const action = `Cleared unserviced review request for ${issueId} — parent issue is closed`;
-      actions.push(action);
-      console.log(`[deacon] ${action}`);
-      emitActivityEntrySync({
-        source: 'cloister',
-        level: 'info',
-        issueId,
-        message: `[deacon] cleared unserviced review request for ${issueId} — parent issue is closed`,
-      });
-    }
-  }
-
-  return actions;
 }
 
 async function reapClosedIssueResidue(
@@ -238,7 +170,6 @@ export async function handleIssueStatusChangedClosed(issueId: string): Promise<s
 export async function reconcileClosedIssueAgents(): Promise<string[]> {
   const actions: string[] = [];
   const closedChecks = new Map<string, Promise<boolean>>();
-  const trackerClosedChecks = new Map<string, Promise<boolean>>();
   const reapedAgentIds = new Set<string>();
   const closedIssueIds = new Set<string>();
   const reapedIssueKeys = new Set<string>();
@@ -311,11 +242,11 @@ export async function reconcileClosedIssueAgents(): Promise<string[]> {
   let mergedIssueIds: string[] | null = devnetIssueIds ? [] : null;
   if (openDevnetIssueIds.length > 0) {
     try {
-      const { listPipelineStatusesForIssues } = await import('../overdeck/pipeline-view.js');
-      const statuses = listPipelineStatusesForIssues(openDevnetIssueIds);
-      mergedIssueIds = openDevnetIssueIds.filter(
-        (issueId) => statuses[issueId]?.mergeStatus === 'merged',
-      );
+      const merged = await Promise.all(openDevnetIssueIds.map(async (issueId) => ({
+        issueId,
+        merged: (await getPrFacts(issueId)).merged,
+      })));
+      mergedIssueIds = merged.filter((entry) => entry.merged).map((entry) => entry.issueId);
     } catch (error) {
       mergedIssueIds = null;
       actions.push(`Failed to resolve merged-issue Docker cleanup status: ${error}`);
@@ -330,6 +261,5 @@ export async function reconcileClosedIssueAgents(): Promise<string[]> {
     }
   }
 
-  actions.push(...await reapClosedIssueReviewRequests(trackerClosedChecks));
   return actions;
 }

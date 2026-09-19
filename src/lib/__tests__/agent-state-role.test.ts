@@ -44,7 +44,7 @@ describe('AgentState role persistence', () => {
     vi.doUnmock('../tmux.js');
     vi.doUnmock('../workspace/stack-health.js');
     vi.doUnmock('../workspace/rebuild-stack.js');
-    vi.doUnmock('../cloister/review-status-source.js');
+    vi.doUnmock('../cloister/pr-facts.js');
     vi.doUnmock('../tasks-query.js');
     vi.doUnmock('../activity-logger.js');
     vi.doUnmock('../cloister/work-agent-prompt.js');
@@ -640,7 +640,7 @@ describe('AgentState role persistence', () => {
     expect(emitActivityEntry).not.toHaveBeenCalled();
   });
 
-  it.each(['blocked', 'failed'] as const)('PAN-3591: starts rework for a review-%s branch on the host without rebuilding its broken stack', async (reviewStatus) => {
+  it('PAN-3591: starts rework for a changes-requested PR on the host without rebuilding its broken stack', async () => {
     const emitActivityEntry = vi.fn();
     const rebuildWorkspaceStack = vi.fn(() => Effect.succeed({ success: false, error: 'branch does not compile' }));
     vi.doMock('../workspace/stack-health.js', () => ({
@@ -651,8 +651,8 @@ describe('AgentState role persistence', () => {
       })),
     }));
     vi.doMock('../workspace/rebuild-stack.js', () => ({ rebuildWorkspaceStack }));
-    vi.doMock('../cloister/review-status-source.js', () => ({
-      resolveCanonicalReviewStatus: vi.fn(() => ({ available: true, status: { reviewStatus } })),
+    vi.doMock('../cloister/pr-facts.js', () => ({
+      getPrFacts: vi.fn(async () => ({ changesRequested: true })),
     }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
@@ -667,7 +667,7 @@ describe('AgentState role persistence', () => {
     expect(emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
       level: 'warn',
       message: 'agent-spawn-host-fallback: PAN-3591',
-      details: expect.stringContaining(`review is ${reviewStatus}`),
+      details: expect.stringContaining('the pull request has changes requested'),
     }));
   });
 

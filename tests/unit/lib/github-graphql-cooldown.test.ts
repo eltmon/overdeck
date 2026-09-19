@@ -66,19 +66,6 @@ describe('github GraphQL cooldown', () => {
     expect(isInGraphQLCooldown()).toBe(false);
   });
 
-  it('skips refreshMergeStateFromGitHub gh fallback while cooldown is active', async () => {
-    const { noteGraphQLRateLimit } = await import('../../../src/lib/github-graphql-cooldown.js');
-    const { refreshMergeStateFromGitHub } = await import('../../../src/lib/webhook-handlers.js');
-
-    noteGraphQLRateLimit(new Error('GraphQL: API rate limit already exceeded for user ID 678719'));
-
-    await refreshMergeStateFromGitHub('PAN-1', 'test-owner/test-repo', 42);
-
-    expect(mockExecFile).not.toHaveBeenCalled();
-    expect(mockGetReviewStatus).not.toHaveBeenCalled();
-    expect(mockSetReviewStatus).not.toHaveBeenCalled();
-  });
-
   it('does not enter cooldown for unrelated errors', async () => {
     const { noteGraphQLRateLimit, isInGraphQLCooldown } = await import('../../../src/lib/github-graphql-cooldown.js');
 
@@ -87,18 +74,4 @@ describe('github GraphQL cooldown', () => {
     expect(isInGraphQLCooldown()).toBe(false);
   });
 
-  it('notes GraphQL rate-limit errors thrown by the gh fallback', async () => {
-    const { isInGraphQLCooldown } = await import('../../../src/lib/github-graphql-cooldown.js');
-    const { refreshMergeStateFromGitHub } = await import('../../../src/lib/webhook-handlers.js');
-    const error = new Error('GraphQL: API rate limit already exceeded for user ID 678719');
-    mockExecFile.mockImplementation((...args: unknown[]) => {
-      const cb = args[args.length - 1] as (err: Error) => void;
-      cb(error);
-    });
-
-    await refreshMergeStateFromGitHub('PAN-2', 'test-owner/test-repo', 42);
-
-    expect(mockExecFile).toHaveBeenCalled();
-    expect(isInGraphQLCooldown()).toBe(true);
-  });
 });

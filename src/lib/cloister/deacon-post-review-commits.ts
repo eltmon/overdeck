@@ -4,7 +4,7 @@
  * This module used to be a reset engine: it compared a `reviewedAtCommit`
  * anchor stored on the review row against the workspace HEAD, then rewrote the
  * row — clearing the verdict, stamping `reviewStaleSince`, dropping
- * `readyForMerge`, resetting retry counters — and re-dispatched a convoy. Most
+ * merge readiness, resetting retry counters — and re-dispatched a convoy. Most
  * of it existed to keep a stored verdict honest as commits landed under it,
  * and the rest existed to stop the reset from looping when the two anchor
  * producers disagreed.

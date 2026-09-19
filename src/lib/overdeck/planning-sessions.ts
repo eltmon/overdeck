@@ -10,7 +10,6 @@ import { HttpServerResponse } from 'effect/unstable/http';
 
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { invalidateAgentsCache } from '../../dashboard/server/routes/agents.js';
-import { clearReviewStatus } from '../../dashboard/server/review-status.js';
 import { getSharedIssueService } from '../../dashboard/server/services/issue-service-singleton.js';
 import { getGitHubConfig } from '../../dashboard/server/services/tracker-config.js';
 import { cleanupAgentStateDirs } from './workspace-hygiene.js';
@@ -740,10 +739,7 @@ export function restartFromPlan(options: {
       return jsonResponse({ success: false, error: errMsg }, { status: 400 });
     }
 
-    // 4. Reset specialist pipeline states
-    clearReviewStatus(id.toUpperCase());
-
-    // 5. Append restart entry to continue file (lifecycle-aware)
+    // 4. Append restart entry to continue file (lifecycle-aware)
     yield* Effect.promise(async () => {
       const upperId = id.toUpperCase();
       try {

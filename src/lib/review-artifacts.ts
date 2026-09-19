@@ -113,7 +113,7 @@ async function repoHasChanges(repoWorkspacePath: string, targetBranch: string): 
         repoReview: 'skipped',
         repoTests: 'skipped',
         rebaseStatus: 'skipped',
-        verificationStatus: 'skipped',
+        repoVerification: 'skipped',
         repoMerge: 'skipped',
       });
       artifacts.push({ repoKey: repo.repoKey, created: false, skipped: true });
@@ -137,7 +137,7 @@ async function repoHasChanges(repoWorkspacePath: string, targetBranch: string): 
       repoReview: 'pending',
       repoTests: 'pending',
       rebaseStatus: 'pending',
-      verificationStatus: 'pending',
+      repoVerification: 'pending',
       repoMerge: 'pending',
     });
     if (artifact.created) {

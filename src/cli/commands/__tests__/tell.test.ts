@@ -36,7 +36,7 @@ vi.mock('../../../lib/agents.js', () => ({
 }));
 
 vi.mock('../../../lib/work-agent-lifecycle.js', () => ({
-  issueOwesReworkSync: vi.fn(() => false),
+  issueOwesRework: vi.fn(async () => false),
 }));
 
 // W4 (PAN-3846): tellCommand now ends through exitCli on success and failure —

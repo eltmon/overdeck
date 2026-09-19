@@ -238,12 +238,11 @@ function writeReviewManifest(workspace: string): string {
 }
 
 describe('review mode resolution', () => {
-  it('defaults to quick when neither the issue record nor config sets review mode', () => {
+  // PAN-3917: there is no per-issue record to override the config — review mode
+  // is config only.
+  it('defaults to quick when config sets no review mode', () => {
     expect(resolveReviewMode('PAN-1982')).toBe('quick');
     expect(isExtendedReviewEnabled('PAN-1982')).toBe(false);
-
-    expect(mockResolveProjectForIssue).toHaveBeenCalledWith('PAN-1982');
-    expect(mockReadIssueRecordSync).toHaveBeenCalledWith({ name: 'test', path: '/tmp/project' }, 'PAN-1982');
     expect(mockLoadConfigSync).toHaveBeenCalled();
   });
 
@@ -256,17 +255,6 @@ describe('review mode resolution', () => {
     expect(isExtendedReviewEnabled('PAN-1982')).toBe(true);
   });
 
-  it('uses per-issue reviewMode over merged project and global config', () => {
-    mockLoadConfigSync.mockReturnValue({
-      config: { roles: { review: { model: 'workhorse:expensive', mode: 'quick' } } },
-    });
-    mockReadIssueRecordSync.mockReturnValue({ reviewMode: 'full' });
-
-    expect(resolveReviewMode('PAN-1982')).toBe('full');
-    expect(isExtendedReviewEnabled('PAN-1982')).toBe(true);
-    expect(mockLoadConfigSync).not.toHaveBeenCalled();
-  });
-
   it("resolves mode 'none' from merged config (PAN-1862 FR-13)", () => {
     mockLoadConfigSync.mockReturnValue({
       config: { roles: { review: { model: 'workhorse:expensive', mode: 'none' } } },
@@ -276,14 +264,6 @@ describe('review mode resolution', () => {
     expect(isExtendedReviewEnabled('PAN-1982')).toBe(false);
   });
 
-  it("resolves per-issue reviewMode 'none' over config", () => {
-    mockLoadConfigSync.mockReturnValue({
-      config: { roles: { review: { model: 'workhorse:expensive', mode: 'full' } } },
-    });
-    mockReadIssueRecordSync.mockReturnValue({ reviewMode: 'none' });
-
-    expect(resolveReviewMode('PAN-1982')).toBe('none');
-  });
 });
 
 // ── killAllReviewSessions ─────────────────────────────────────────────────────

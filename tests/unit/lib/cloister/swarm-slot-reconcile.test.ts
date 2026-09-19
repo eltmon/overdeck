@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  listSlotAgents,
   reconcileSlotState,
   type ReconciledSlotAgent,
   type ReconciledSlotAssignment,
@@ -213,20 +212,5 @@ describe('reconcileSlotState', () => {
       },
     ]);
     expect(result.pending).toEqual([]);
-  });
-});
-
-describe('listSlotAgents', () => {
-  it('excludes tombstoned retained-transcripts rows from slot occupancy (PAN-3465)', () => {
-    vi.mocked(listAgentStates).mockReturnValue([
-      { id: 'agent-pan-1762-slot-1', status: 'stopped', phase: 'retained-transcripts' },
-      { id: 'agent-pan-1762-slot-2', status: 'running' },
-    ] as never);
-
-    const agents = listSlotAgents('PAN-1762');
-
-    expect(agents).toEqual([
-      { slotIndex: 2, agentId: 'agent-pan-1762-slot-2', status: 'running' },
-    ]);
   });
 });

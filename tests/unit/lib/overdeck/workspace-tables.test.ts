@@ -33,12 +33,6 @@ describe('workspace tables top-up (PAN-1990)', () => {
     const conversationColumns = db.prepare('PRAGMA table_info(conversations)').all() as Array<{ name: string }>;
     expect(conversationColumns.map((c) => c.name)).toContain('workspace_id');
 
-    // PAN-1990 AC-1/FR-4: agents.workspace_id must exist on both a fresh
-    // database (drizzle/overdeck/0000_overdeck_init.sql) and an upgraded one
-    // (this runtime top-up) — see agent-discovery-columns.test.ts for the
-    // codec/DDL parity check.
-    const agentColumns = db.prepare('PRAGMA table_info(agents)').all() as Array<{ name: string }>;
-    expect(agentColumns.map((c) => c.name)).toContain('workspace_id');
   });
 
   it('rejects a workspace kind outside main/issue/scratch via the CHECK constraint', () => {

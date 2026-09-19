@@ -2,7 +2,7 @@
  * Operator-gate residue on terminal issues (PAN-3727, re-pointed by PAN-3917).
  *
  * The original sweep read every project's per-issue records, called an issue
- * terminal when the record said `closedOut` or `mergeStatus === 'merged'`, and
+ * terminal when the record said `closedOut` or carried a merged verdict, and
  * then acknowledged open "recovery trips" — a stored copy of a stored copy. The
  * records and the trip ledger are gone.
  *

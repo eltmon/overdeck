@@ -4,7 +4,7 @@
  * `pan swarm` stays in the tree but is not wired into the default work path.
  * Its slot bookkeeping — which slot holds which item, which slot reported done,
  * which blocked slot was released — used to live in the `swarm` block of a
- * per-issue record on the `overdeck-state` branch. That branch is no longer a
+ * per-issue record on the deleted state branch. That branch is no longer a
  * data plane, so the same document now sits beside the issue's continue file:
  *
  *   `<workspace>/.pan/continues/<ISSUE>.slots.json`

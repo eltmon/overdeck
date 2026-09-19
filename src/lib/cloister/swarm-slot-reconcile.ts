@@ -15,7 +15,6 @@ import { analyzeSwarmReadiness } from '../xbrief/swarm-readiness.js';
 import type { XBriefDocument } from '../xbrief/types.js';
 import { listAgentStates } from '../agents/queries.js';
 import type { AgentState } from '../agents/agent-state.js';
-import { RETAINED_TRANSCRIPTS_PHASE } from '../overdeck/agents.js';
 import { readSwarmSlotState } from './swarm-slot-store.js';
 import type { SwarmSlotCompletion, SwarmSupersededAttempt } from './swarm-slot-store.js';
 
@@ -161,10 +160,10 @@ export function listSlotAgents(issueId: string): ReconciledSlotAgent[] {
   const pattern = new RegExp(`^agent-${escapeRegExp(issueLower)}-slot-(\\d+)$`);
   return listAgentStates({ role: 'work' })
     .map(agent => {
-      // PAN-3465: tombstoned rows (removeAgent keeps them for transcript
-      // linkage) are not live slot occupants — counting them wedged dispatch
-      // with "all slot indexes occupied" after a swarm reset.
-      if (agent.phase === RETAINED_TRANSCRIPTS_PHASE) return null;
+      // PAN-3465/PAN-3917: a retired slot agent is not a live occupant —
+      // counting one wedged dispatch with "all slot indexes occupied" after a
+      // swarm reset. removeAgent deletes its state file, so it no longer
+      // appears here at all; there is no tombstone phase left to skip.
       const match = pattern.exec(agent.id);
       if (!match) return null;
       const entry: ReconciledSlotAgent = {

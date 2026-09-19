@@ -5,16 +5,13 @@ import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import { Effect } from 'effect';
 
-import {
-  registerCanonicalReviewStatusResolver,
-  registerReviewStatusMapReader,
-} from '../../cloister/review-status-source.js';
 import { composeProjectNameForWorkspace, rebuildWorkspaceStack } from '../rebuild-stack.js';
 
 const mocks = vi.hoisted(() => ({
   isIssueClosed: vi.fn(),
   resolveProjectFromIssueSync: vi.fn(),
   getProjectSync: vi.fn(),
+  getPrFacts: vi.fn(),
   ensureDevcontainerSync: vi.fn(),
   collectDockerContainerLifecycleSnapshot: vi.fn(() => []),
   recordDockerContainerLifecycleSnapshot: vi.fn(),
@@ -23,6 +20,11 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../cloister/issue-closed.js', () => ({
   isIssueClosed: mocks.isIssueClosed,
+}));
+
+// PAN-3917: "did this issue's PR merge?" is the forge's answer.
+vi.mock('../../cloister/pr-facts.js', () => ({
+  getPrFacts: mocks.getPrFacts,
 }));
 
 vi.mock('../../projects.js', () => ({
@@ -89,8 +91,7 @@ describe('composeProjectNameForWorkspace', () => {
 describe('rebuildWorkspaceStack terminal-state guard (PAN-2510)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    registerReviewStatusMapReader(() => ({}));
-    registerCanonicalReviewStatusResolver(() => null);
+    mocks.getPrFacts.mockResolvedValue({ merged: false });
   });
 
   function setupProject(workspacePath: string) {
@@ -123,12 +124,11 @@ describe('rebuildWorkspaceStack terminal-state guard (PAN-2510)', () => {
     expect(mocks.ensureDevcontainerSync).not.toHaveBeenCalled();
   });
 
-  it('blocks a durable merged issue when the raw status cache is stale', async () => {
+  it('blocks an open issue whose PR the forge reports merged', async () => {
     const workspacePath = makeWorkspace(null);
     setupProject(workspacePath);
     mocks.isIssueClosed.mockResolvedValue(false);
-    registerReviewStatusMapReader(() => ({ 'MIN-831': { mergeStatus: 'failed' } }));
-    registerCanonicalReviewStatusResolver(() => ({ mergeStatus: 'merged' }));
+    mocks.getPrFacts.mockResolvedValue({ merged: true });
 
     const result = await Effect.runPromise(rebuildWorkspaceStack('MIN-831'));
 
@@ -137,26 +137,10 @@ describe('rebuildWorkspaceStack terminal-state guard (PAN-2510)', () => {
     expect(mocks.ensureDevcontainerSync).not.toHaveBeenCalled();
   });
 
-  it('skips rebuild when canonical terminal status is unavailable', async () => {
+  it('proceeds past the guard when neither the issue nor its PR is terminal', async () => {
     const workspacePath = makeWorkspace(null);
     setupProject(workspacePath);
     mocks.isIssueClosed.mockResolvedValue(false);
-    registerCanonicalReviewStatusResolver(() => {
-      throw new Error('canonical resolver unavailable');
-    });
-
-    const result = await Effect.runPromise(rebuildWorkspaceStack('MIN-831'));
-
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('status is unavailable');
-    expect(mocks.ensureDevcontainerSync).not.toHaveBeenCalled();
-  });
-
-  it('proceeds past the guard when the issue is not terminal', async () => {
-    const workspacePath = makeWorkspace(null);
-    setupProject(workspacePath);
-    mocks.isIssueClosed.mockResolvedValue(false);
-    registerCanonicalReviewStatusResolver(() => ({ mergeStatus: 'failed' }));
     mocks.ensureDevcontainerSync.mockReturnValue({
       step: { success: true },
     });

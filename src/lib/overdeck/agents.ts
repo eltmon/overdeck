@@ -1,45 +1,16 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { execFileSync } from 'node:child_process';
 
 import { Context, Effect, Layer, Schema } from 'effect';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
-import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
-import { Db, EventBus, Records, Tmux, getOverdeckDatabaseSync } from './infra.js';
+import { Db, Tmux, getOverdeckDatabaseSync } from './infra.js';
 import { IssueId, type Stage } from './issues.js';
 import { getOverdeckHome } from '../paths.js';
-import { logAgentLifecycleSync } from '../persistent-logger.js';
-import type { AgentState } from '../agents.js';
+import { listAgentStatesSync, type AgentState } from '../agents/agent-state.js';
 
 // ── Local table definitions (mirrors overdeck-schema.ts — no FK/index annotations here) ─
-
-const overdeckAgents = sqliteTable('agents', {
-  id: text('id').primaryKey(),
-  issueId: text('issue_id').notNull(),
-  role: text('role').notNull(),
-  status: text('status').notNull(),
-  workspace: text('workspace').notNull(),
-  sessionId: text('session_id'),
-  harness: text('harness').notNull(),
-  model: text('model').notNull(),
-  hostOverride: text('host_override'),
-  deliveryMethod: text('delivery_method'),
-  startedAt: integer('started_at', { mode: 'timestamp_ms' }),
-  lastResumeAt: integer('last_resume_at', { mode: 'timestamp_ms' }),
-  stoppedByUser: integer('stopped_by_user', { mode: 'boolean' }),
-  kickoffDelivered: integer('kickoff_delivered', { mode: 'boolean' }),
-  paused: integer('paused', { mode: 'boolean' }),
-  pausedReason: text('paused_reason'),
-  troubled: integer('troubled', { mode: 'boolean' }),
-  channelsEnabled: integer('channels_enabled', { mode: 'boolean' }),
-  phase: text('phase'),
-  consecutiveFailures: integer('consecutive_failures').default(0),
-  firstFailureInRunAt: integer('first_failure_in_run_at', { mode: 'timestamp_ms' }),
-  lastFailureNextRetryAt: integer('last_failure_next_retry_at', { mode: 'timestamp_ms' }),
-  updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
-});
 
 /**
  * PAN-3917: issue-stage-sync.ts (Appendix A.3 mirror sync) is deleted, but
@@ -58,47 +29,6 @@ const TERMINAL_ISSUE_STAGES = new Set<Stage>(['verifying_on_main', 'closed', 'ca
 
 export function isTerminalIssueStage(stage: string | null): boolean {
   return TERMINAL_ISSUE_STAGES.has(stage as Stage);
-}
-
-export const RETAINED_TRANSCRIPTS_PHASE = 'retained-transcripts';
-
-export interface AgentTombstoneIdentity {
-  id: string;
-  issueId: string;
-  role: string;
-  workspace: string;
-  harness: string;
-  model: string;
-}
-
-// PAN-3479: tombstones keep session_id — it IS the transcript linkage; resume
-// safety comes from the retained-transcripts phase gate in deacon-auto-resume.
-export function tombstoneAgentRecordSync(agentId: string): void {
-  try {
-    getOverdeckDatabaseSync().prepare(`
-      UPDATE agents
-      SET status = 'stopped', phase = ?, updated_at = ?
-      WHERE id = ?
-    `).run(RETAINED_TRANSCRIPTS_PHASE, Date.now(), agentId);
-  } catch { /* agents table missing */ }
-}
-
-export function ensureAgentTombstoneSync(identity: AgentTombstoneIdentity): void {
-  getOverdeckDatabaseSync().prepare(`
-    INSERT INTO agents (id, issue_id, role, status, workspace, harness, model, phase, updated_at)
-    VALUES (?, ?, ?, 'stopped', ?, ?, ?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET
-      status = 'stopped', phase = excluded.phase, updated_at = excluded.updated_at
-  `).run(
-    identity.id,
-    identity.issueId,
-    identity.role,
-    identity.workspace,
-    identity.harness,
-    identity.model,
-    RETAINED_TRANSCRIPTS_PHASE,
-    Date.now(),
-  );
 }
 
 const overdeckHealthEvents = sqliteTable('health_events', {
@@ -180,33 +110,10 @@ export const HealthEvent = Schema.Struct({
 });
 export type HealthEvent = typeof HealthEvent.Type;
 
-export const SpawnOpts = Schema.Struct({
-  issueId: IssueId,
-  role: Role,
-  harness: Schema.String,
-  model: Schema.String,
-  workspace: Schema.String,
-  hostOverride: Schema.optional(Schema.NullOr(Schema.String)),
-});
-export type SpawnOpts = typeof SpawnOpts.Type;
-
-export const ResumeOpts = Schema.Struct({
-  force: Schema.optional(Schema.Boolean),
-});
-export type ResumeOpts = typeof ResumeOpts.Type;
-
 // ── Errors — tagged, in the E channel ─────────────────────────────────────────
 
 export class AgentNotFound extends Schema.TaggedErrorClass<AgentNotFound>()(
   'AgentNotFound', { id: AgentId },
-) {}
-
-export class AgentNotResumable extends Schema.TaggedErrorClass<AgentNotResumable>()(
-  'AgentNotResumable', { id: AgentId, reason: Schema.String },
-) {}
-
-export class InvalidModel extends Schema.TaggedErrorClass<InvalidModel>()(
-  'InvalidModel', { model: Schema.String },
 ) {}
 
 // ── Helper ────────────────────────────────────────────────────────────────────
@@ -234,6 +141,46 @@ const decodeAgentRow = (row: unknown): Agent =>
 // boot-critical read, so it skips+logs rows it can't decode instead of throwing;
 // PAN-1979 widened the Role enum reactively, but the enum always lags whatever a
 // branch invents. `get(id)` stays strict to surface a genuine decode bug.
+/** ISO timestamp → Date, or null when absent or unparsable. */
+function toDate(iso: string | null | undefined): Date | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * PAN-3917: `~/.overdeck/agents/<id>/state.json` is the only copy of an agent's
+ * state — the overdeck.db `agents` mirror is dropped on every boot. Project one
+ * state file into the shape the `Agent` entity decodes, so the read door keeps
+ * its contract while its source moves from a table to the files.
+ */
+function agentStateToEntityInput(state: AgentState): Record<string, unknown> {
+  return {
+    id: state.id,
+    issueId: state.issueId,
+    role: state.role,
+    status: state.status,
+    workspace: state.workspace ?? '',
+    sessionId: state.sessionId ?? null,
+    harness: state.harness ?? '',
+    model: state.model ?? '',
+    hostOverride: typeof state.hostOverride === 'string' ? state.hostOverride : null,
+    deliveryMethod: state.deliveryMethod ?? null,
+    startedAt: toDate(state.startedAt),
+    lastResumeAt: toDate(state.lastResumeAt),
+    stoppedByUser: state.stoppedByUser ?? null,
+    kickoffDelivered: state.kickoffDelivered ?? null,
+    paused: state.paused ?? null,
+    pausedReason: state.pausedReason ?? null,
+    troubled: state.troubled ?? null,
+    channelsEnabled: state.channelsEnabled ?? null,
+    consecutiveFailures: state.consecutiveFailures ?? 0,
+    firstFailureInRunAt: toDate(state.firstFailureInRunAt),
+    lastFailureNextRetryAt: toDate(state.lastFailureNextRetryAt),
+    updatedAt: toDate(state.lastActivity) ?? toDate(state.startedAt) ?? new Date(),
+  };
+}
+
 const warnedUndecodableAgentRows = new Set<string>();
 export const decodeAgentRowsLenient = (rows: readonly unknown[]): Agent[] => {
   const out: Agent[] = [];
@@ -256,11 +203,6 @@ export const decodeAgentRowsLenient = (rows: readonly unknown[]): Agent[] => {
   return out;
 };
 
-const validateModel = (model: string): Effect.Effect<string, InvalidModel> =>
-  model.trim().length > 0
-    ? Effect.succeed(model.trim())
-    : Effect.fail(new InvalidModel({ model }));
-
 // ── AgentsResolver — the read door ────────────────────────────────────────────
 
 export class AgentsResolver extends Context.Service<AgentsResolver, {
@@ -279,30 +221,22 @@ export const AgentsResolverLive = Layer.effect(
 
     const get = (id: AgentId) =>
       Effect.gen(function* () {
-        const [row] = yield* Effect.promise(() =>
-          db.q.select().from(overdeckAgents).where(eq(overdeckAgents.id, id)),
-        );
-        if (!row) {
+        const state = yield* Effect.sync(() =>
+          listAgentStatesSync().find((candidate) => candidate.id === id));
+        if (!state) {
           return yield* Effect.fail(new AgentNotFound({ id }));
         }
-        return decodeAgentRow(row);
+        return decodeAgentRow(agentStateToEntityInput(state));
       });
 
     const list = (f: AgentFilter) =>
       Effect.gen(function* () {
-        const conditions = [
-          f.issueId !== undefined ? eq(overdeckAgents.issueId, f.issueId) : undefined,
-          f.role !== undefined ? eq(overdeckAgents.role, f.role) : undefined,
-          f.status !== undefined ? eq(overdeckAgents.status, f.status) : undefined,
-        ].filter((c): c is NonNullable<typeof c> => c !== undefined);
-
-        const rows = yield* Effect.promise(() =>
-          conditions.length > 0
-            ? db.q.select().from(overdeckAgents).where(and(...conditions))
-            : db.q.select().from(overdeckAgents),
-        );
-
-        return decodeAgentRowsLenient(rows);
+        const states = yield* Effect.sync(() => listAgentStatesSync());
+        const matching = states.filter((state) =>
+          (f.issueId === undefined || state.issueId === f.issueId)
+          && (f.role === undefined || state.role === f.role)
+          && (f.status === undefined || state.status === f.status));
+        return decodeAgentRowsLenient(matching.map(agentStateToEntityInput));
       });
 
     const isAlive = (id: AgentId) => tmux.sessionExists(id);
@@ -329,828 +263,18 @@ export const AgentsResolverLive = Layer.effect(
   }),
 );
 
-// ── AgentWriter — the write door ──────────────────────────────────────────────
-
-export interface AgentWriterServiceShape {
-  readonly spawn:             (opts: SpawnOpts) => Effect.Effect<Agent, InvalidModel>;
-  readonly switchModel:       (id: AgentId, model: string) => Effect.Effect<Agent, AgentNotFound | InvalidModel, AgentsResolver>;
-  readonly stop:              (id: AgentId, opts?: { suspend?: boolean }) => Effect.Effect<Agent, AgentNotFound, AgentsResolver>;
-  readonly resume:            (id: AgentId, opts?: ResumeOpts) => Effect.Effect<Agent, AgentNotFound | AgentNotResumable, AgentsResolver>;
-  readonly setStatus:         (id: AgentId, status: Status) => Effect.Effect<Agent, AgentNotFound, AgentsResolver>;
-  readonly setDeliveryMethod: (id: AgentId, method: DeliveryMethod) => Effect.Effect<Agent, AgentNotFound, AgentsResolver>;
-  readonly pause:             (id: AgentId, reason?: string) => Effect.Effect<Agent, AgentNotFound, AgentsResolver>;
-  readonly unpause:           (id: AgentId) => Effect.Effect<Agent, AgentNotFound, AgentsResolver>;
-  readonly markTroubled:       (id: AgentId) => Effect.Effect<Agent, AgentNotFound, AgentsResolver>;
-  readonly clearTroubled:      (id: AgentId) => Effect.Effect<Agent, AgentNotFound, AgentsResolver>;
-  readonly setChannelsEnabled: (id: AgentId, enabled: boolean) => Effect.Effect<Agent, AgentNotFound, AgentsResolver>;
-  readonly recordFailure:      (id: AgentId, reason: string) => Effect.Effect<Agent, AgentNotFound, AgentsResolver>;
-  readonly recordHealth:      (id: AgentId, ev: HealthEvent) => Effect.Effect<void>;
-}
-
-export class AgentWriter extends Context.Service<AgentWriter, AgentWriterServiceShape>()('overdeck/AgentWriter') {}
-
-export const AgentWriterLive = Layer.effect(
-  AgentWriter,
-  Effect.gen(function* () {
-    const db = yield* Db;
-    const records = yield* Records;
-    const bus = yield* EventBus;
-    const tmux = yield* Tmux;
-    const now = () => new Date();
-
-    // ── SOURCE-FIRST verbs — harness/model git record is authoritative ─────────
-
-    const spawn: AgentWriterServiceShape['spawn'] = (opts) =>
-      Effect.gen(function* () {
-        const model = yield* validateModel(opts.model);
-        yield* records.writeAgentIdentity(opts.issueId, { harness: opts.harness, model });
-        // Process spawning is handled by the existing infra layer (pan start / process-services).
-        // The writer owns the DB row and the records mirror; process lifecycle lives elsewhere.
-        const agent: Agent = decodeAgent({
-          id: `agent-${opts.issueId.toLowerCase()}` as AgentId,
-          issueId: opts.issueId,
-          role: opts.role,
-          status: 'starting',
-          workspace: opts.workspace,
-          sessionId: null,
-          harness: opts.harness,
-          model,
-          hostOverride: opts.hostOverride ?? null,
-          deliveryMethod: null,
-          startedAt: now(),
-          lastResumeAt: null,
-          stoppedByUser: null,
-          kickoffDelivered: null,
-          paused: null,
-          pausedReason: null,
-          troubled: null,
-          channelsEnabled: null,
-          consecutiveFailures: 0,
-          firstFailureInRunAt: null,
-          lastFailureNextRetryAt: null,
-          updatedAt: now(),
-        });
-        yield* Effect.promise(() =>
-          db.q.insert(overdeckAgents).values({
-            id: agent.id,
-            issueId: agent.issueId,
-            role: agent.role,
-            status: agent.status,
-            workspace: agent.workspace,
-            harness: agent.harness,
-            model: agent.model,
-            updatedAt: agent.updatedAt,
-          }).run(),
-        );
-        yield* bus.emit({ type: 'agent.spawned', payload: { id: agent.id, issueId: opts.issueId } });
-        return agent;
-      });
-
-    // AC2 — source-first: record → kill session → update DB → emit
-    const switchModel: AgentWriterServiceShape['switchModel'] = (id, model) =>
-      Effect.gen(function* () {
-        const resolver = yield* AgentsResolver;
-        const agent = yield* resolver.get(id);
-        const valid = yield* validateModel(model);
-        // 1. SOURCE FIRST: rewrite model in the git record.
-        yield* records.writeAgentIdentity(agent.issueId, { harness: agent.harness, model: valid });
-        // 2. Stop + clear session.
-        yield* tmux.killSession(String(id));
-        const next: Agent = { ...agent, model: valid, sessionId: null, status: 'stopped', updatedAt: now() };
-        // 3. Mirror the column.
-        yield* Effect.promise(() =>
-          db.q.update(overdeckAgents)
-            .set({ model: valid, sessionId: null, status: 'stopped', updatedAt: next.updatedAt })
-            .where(eq(overdeckAgents.id, id))
-            .run(),
-        );
-        yield* bus.emit({ type: 'agent.model_switched', payload: { id, model: valid } });
-        return next;
-      });
-
-    // ── PURE-CACHE verbs — the cache write is the whole write ─────────────────
-
-    const stop: AgentWriterServiceShape['stop'] = (id, opts) =>
-      Effect.gen(function* () {
-        const resolver = yield* AgentsResolver;
-        const agent = yield* resolver.get(id);
-        const suspend = opts?.suspend ?? false;
-        yield* tmux.killSession(String(id));
-        const next: Agent = {
-          ...agent,
-          status: suspend ? 'stopped' : 'stopped',
-          stoppedByUser: true,
-          sessionId: null,
-          updatedAt: now(),
-        };
-        yield* Effect.promise(() =>
-          db.q.update(overdeckAgents)
-            .set({ status: 'stopped', stoppedByUser: true, sessionId: null, updatedAt: next.updatedAt })
-            .where(eq(overdeckAgents.id, id))
-            .run(),
-        );
-        yield* bus.emit({ type: 'agent.stopped', payload: { id, suspend } });
-        return next;
-      });
-
-    const resume: AgentWriterServiceShape['resume'] = (id, opts) =>
-      Effect.gen(function* () {
-        const resolver = yield* AgentsResolver;
-        const agent = yield* resolver.get(id);
-        if (agent.paused && !opts?.force) {
-          return yield* Effect.fail(new AgentNotResumable({ id, reason: 'paused' }));
-        }
-        if (agent.troubled && !opts?.force) {
-          return yield* Effect.fail(new AgentNotResumable({ id, reason: 'troubled' }));
-        }
-        const next: Agent = {
-          ...agent,
-          status: 'starting',
-          stoppedByUser: false,
-          lastResumeAt: now(),
-          updatedAt: now(),
-        };
-        yield* Effect.promise(() =>
-          db.q.update(overdeckAgents)
-            .set({ status: 'starting', stoppedByUser: false, phase: null, lastResumeAt: next.lastResumeAt, updatedAt: next.updatedAt })
-            .where(eq(overdeckAgents.id, id))
-            .run(),
-        );
-        yield* bus.emit({ type: 'agent.resumed', payload: { id } });
-        return next;
-      });
-
-    const setStatus: AgentWriterServiceShape['setStatus'] = (id, status) =>
-      Effect.gen(function* () {
-        const resolver = yield* AgentsResolver;
-        const agent = yield* resolver.get(id);
-        const next: Agent = { ...agent, status, updatedAt: now() };
-        yield* Effect.promise(() =>
-          db.q.update(overdeckAgents)
-            .set({ status, updatedAt: next.updatedAt })
-            .where(eq(overdeckAgents.id, id))
-            .run(),
-        );
-        yield* bus.emit({ type: 'agent.status_set', payload: { id, status } });
-        return next;
-      });
-
-    const setDeliveryMethod: AgentWriterServiceShape['setDeliveryMethod'] = (id, method) =>
-      Effect.gen(function* () {
-        const resolver = yield* AgentsResolver;
-        const agent = yield* resolver.get(id);
-        const next: Agent = { ...agent, deliveryMethod: method, updatedAt: now() };
-        yield* Effect.promise(() =>
-          db.q.update(overdeckAgents)
-            .set({ deliveryMethod: method, updatedAt: next.updatedAt })
-            .where(eq(overdeckAgents.id, id))
-            .run(),
-        );
-        yield* bus.emit({ type: 'agent.delivery_method_set', payload: { id, method } });
-        return next;
-      });
-
-    const pause: AgentWriterServiceShape['pause'] = (id, reason) =>
-      Effect.gen(function* () {
-        const resolver = yield* AgentsResolver;
-        const agent = yield* resolver.get(id);
-        const wasLive = yield* resolver.isAlive(id);
-        if (wasLive) {
-          yield* tmux.killSession(String(id));
-        }
-        const next: Agent = {
-          ...agent,
-          paused: true,
-          pausedReason: reason ?? null,
-          stoppedByUser: wasLive ? true : agent.stoppedByUser,
-          status: wasLive ? 'stopped' : agent.status,
-          updatedAt: now(),
-        };
-        yield* Effect.promise(() =>
-          db.q.update(overdeckAgents)
-            .set({
-              paused: true,
-              pausedReason: reason ?? null,
-              stoppedByUser: next.stoppedByUser,
-              status: next.status,
-              updatedAt: next.updatedAt,
-            })
-            .where(eq(overdeckAgents.id, id))
-            .run(),
-        );
-        yield* bus.emit({ type: 'agent.paused', payload: { id, reason } });
-        return next;
-      });
-
-    const unpause: AgentWriterServiceShape['unpause'] = (id) =>
-      Effect.gen(function* () {
-        const resolver = yield* AgentsResolver;
-        const agent = yield* resolver.get(id);
-        const next: Agent = {
-          ...agent,
-          paused: false,
-          pausedReason: null,
-          stoppedByUser: false,
-          updatedAt: now(),
-        };
-        yield* Effect.promise(() =>
-          db.q.update(overdeckAgents)
-            .set({ paused: false, pausedReason: null, stoppedByUser: false, updatedAt: next.updatedAt })
-            .where(eq(overdeckAgents.id, id))
-            .run(),
-        );
-        yield* bus.emit({ type: 'agent.unpaused', payload: { id } });
-        return next;
-      });
-
-    const markTroubled: AgentWriterServiceShape['markTroubled'] = (id) =>
-      Effect.gen(function* () {
-        const resolver = yield* AgentsResolver;
-        const agent = yield* resolver.get(id);
-        const next: Agent = { ...agent, troubled: true, updatedAt: now() };
-        yield* Effect.promise(() =>
-          db.q.update(overdeckAgents)
-            .set({ troubled: true, updatedAt: next.updatedAt })
-            .where(eq(overdeckAgents.id, id))
-            .run(),
-        );
-        yield* bus.emit({ type: 'agent.troubled', payload: { id } });
-        return next;
-      });
-
-    const clearTroubled: AgentWriterServiceShape['clearTroubled'] = (id) =>
-      Effect.gen(function* () {
-        const resolver = yield* AgentsResolver;
-        const agent = yield* resolver.get(id);
-        const next: Agent = {
-          ...agent,
-          troubled: false,
-          consecutiveFailures: 0,
-          firstFailureInRunAt: null,
-          lastFailureNextRetryAt: null,
-          updatedAt: now(),
-        };
-        yield* Effect.promise(() =>
-          db.q.update(overdeckAgents)
-            .set({
-              troubled: false,
-              consecutiveFailures: 0,
-              firstFailureInRunAt: null,
-              lastFailureNextRetryAt: null,
-              updatedAt: next.updatedAt,
-            })
-            .where(eq(overdeckAgents.id, id))
-            .run(),
-        );
-        yield* bus.emit({ type: 'agent.untroubled', payload: { id } });
-        return next;
-      });
-
-    const setChannelsEnabled: AgentWriterServiceShape['setChannelsEnabled'] = (id, enabled) =>
-      Effect.gen(function* () {
-        const resolver = yield* AgentsResolver;
-        const agent = yield* resolver.get(id);
-        const next: Agent = { ...agent, channelsEnabled: enabled, updatedAt: now() };
-        yield* Effect.promise(() =>
-          db.q.update(overdeckAgents)
-            .set({ channelsEnabled: enabled, updatedAt: next.updatedAt })
-            .where(eq(overdeckAgents.id, id))
-            .run(),
-        );
-        yield* bus.emit({ type: 'agent.channels_enabled_set', payload: { id, enabled } });
-        return next;
-      });
-
-    const recordFailure: AgentWriterServiceShape['recordFailure'] = (id, reason) =>
-      Effect.gen(function* () {
-        const resolver = yield* AgentsResolver;
-        const agent = yield* resolver.get(id);
-        const newCount = agent.consecutiveFailures + 1;
-        const threshold = 3;
-        const backoffMs = Math.min(Math.pow(2, newCount - 1) * 1000, 60_000);
-        const nextRetry = new Date(Date.now() + backoffMs);
-        const next: Agent = {
-          ...agent,
-          consecutiveFailures: newCount,
-          troubled: newCount >= threshold ? true : agent.troubled,
-          firstFailureInRunAt: agent.firstFailureInRunAt ?? now(),
-          lastFailureNextRetryAt: nextRetry,
-          updatedAt: now(),
-        };
-        yield* Effect.promise(() =>
-          db.q.update(overdeckAgents)
-            .set({
-              consecutiveFailures: next.consecutiveFailures,
-              troubled: next.troubled,
-              firstFailureInRunAt: next.firstFailureInRunAt,
-              lastFailureNextRetryAt: next.lastFailureNextRetryAt,
-              updatedAt: next.updatedAt,
-            })
-            .where(eq(overdeckAgents.id, id))
-            .run(),
-        );
-        yield* bus.emit({ type: 'agent.failure_recorded', payload: { id, reason, count: newCount } });
-        return next;
-      });
-
-    const recordHealth: AgentWriterServiceShape['recordHealth'] = (id, ev) =>
-      Effect.gen(function* () {
-        yield* Effect.promise(() =>
-          db.q.insert(overdeckHealthEvents).values({
-            agentId: id,
-            timestamp: ev.timestamp,
-            state: ev.state,
-            source: ev.source ?? null,
-            metadata: ev.metadata,
-          }).run(),
-        );
-        yield* bus.emit({ type: 'agent.health_recorded', payload: { id, state: ev.state } });
-      });
-
-    return AgentWriter.of({
-      spawn, switchModel, stop, resume, setStatus, setDeliveryMethod,
-      pause, unpause, markTroubled, clearTroubled, setChannelsEnabled, recordFailure, recordHealth,
-    });
-  }),
-);
-
-// ── AgentsApi — the controller ─────────────────────────────────────────────────
-
-export const AgentsApi = HttpApiGroup.make('agents')
-  // reads
-  .add(HttpApiEndpoint.get('list', '/agents', {
-    query: AgentFilter,
-    success: Schema.Array(Agent),
-  }))
-  .add(HttpApiEndpoint.get('get', '/agents/:id', {
-    params: Schema.Struct({ id: AgentId }),
-    success: Agent,
-    error: AgentNotFound,
-  }))
-  .add(HttpApiEndpoint.get('isAlive', '/agents/:id/alive', {
-    params: Schema.Struct({ id: AgentId }),
-    success: Schema.Boolean,
-  }))
-  .add(HttpApiEndpoint.get('runtime', '/agents/:id/runtime', {
-    params: Schema.Struct({ id: AgentId }),
-    success: Schema.Unknown,
-    error: AgentNotFound,
-  }))
-  .add(HttpApiEndpoint.get('health', '/agents/:id/health-history', {
-    params: Schema.Struct({ id: AgentId }),
-    success: Schema.Array(HealthEvent),
-  }))
-  // writes
-  .add(HttpApiEndpoint.post('spawn', '/agents', {
-    payload: SpawnOpts,
-    success: Agent,
-    error: InvalidModel,
-  }))
-  .add(HttpApiEndpoint.post('stop', '/agents/:id/stop', {
-    params: Schema.Struct({ id: AgentId }),
-    payload: Schema.Struct({ suspend: Schema.optional(Schema.Boolean) }),
-    success: Agent,
-    error: AgentNotFound,
-  }))
-  .add(HttpApiEndpoint.post('resume', '/agents/:id/resume', {
-    params: Schema.Struct({ id: AgentId }),
-    payload: ResumeOpts,
-    success: Agent,
-    error: Schema.Union([AgentNotFound, AgentNotResumable]),
-  }))
-  .add(HttpApiEndpoint.post('pause', '/agents/:id/pause', {
-    params: Schema.Struct({ id: AgentId }),
-    payload: Schema.Struct({ reason: Schema.optional(Schema.String) }),
-    success: Agent,
-    error: AgentNotFound,
-  }))
-  .add(HttpApiEndpoint.post('unpause', '/agents/:id/unpause', {
-    params: Schema.Struct({ id: AgentId }),
-    success: Agent,
-    error: AgentNotFound,
-  }))
-  .add(HttpApiEndpoint.post('untroubled', '/agents/:id/untroubled', {
-    params: Schema.Struct({ id: AgentId }),
-    success: Agent,
-    error: AgentNotFound,
-  }))
-  .add(HttpApiEndpoint.post('switchModel', '/agents/:id/switch-model', {
-    params: Schema.Struct({ id: AgentId }),
-    payload: Schema.Struct({ model: Schema.String }),
-    success: Agent,
-    error: Schema.Union([AgentNotFound, InvalidModel]),
-  }))
-  .add(HttpApiEndpoint.post('deliveryMethod', '/agents/:id/delivery-method', {
-    params: Schema.Struct({ id: AgentId }),
-    payload: Schema.Struct({ deliveryMethod: DeliveryMethod }),
-    success: Agent,
-    error: AgentNotFound,
-  }))
-  .add(HttpApiEndpoint.post('heartbeat', '/agents/:id/heartbeat', {
-    params: Schema.Struct({ id: AgentId }),
-    payload: HealthEvent,
-    success: Schema.Void,
-  }));
-
-// ── Layer wiring ───────────────────────────────────────────────────────────────
-
-export const AgentsDomainLayer = Layer.mergeAll(
-  AgentsResolverLive,
-  AgentWriterLive,
-);
-
-// ── Sync helpers (for CLI and reconstruct paths that cannot use Effect) ────────
-
-/** Agent columns matching the init migration; timestamps use ms and booleans use 0/1. */
-const OVERDECK_AGENT_COLUMNS = [
-  'id', 'issue_id', 'role', 'status', 'workspace',
-  'session_id', 'harness', 'model', 'host_override', 'delivery_method',
-  'started_at', 'last_resume_at', 'stopped_by_user', 'kickoff_delivered',
-  'paused', 'paused_reason', 'troubled', 'channels_enabled',
-  'consecutive_failures', 'first_failure_in_run_at', 'last_failure_next_retry_at',
-  'stopped_at', 'paused_at', 'troubled_at', 'last_activity', 'last_failure_reason',
-  'phase', 'role_run_head', 'flywheel_run_id', 'started_by', 'cost_so_far',
-  'review_sub_role', 'review_run_id', 'review_synthesis_agent_id',
-  'review_output_path', 'review_deadline_at', 'review_monitor_signaled',
-  'review_retry_attempt',
-  'review_context_manifest_path',
-  'updated_at',
-] as const;
-
-/** Convert an ISO timestamp string or null → Unix ms INTEGER or null. */
-function toMs(iso: string | null | undefined): number | null {
-  if (!iso) return null;
-  const ms = new Date(iso).getTime();
-  return Number.isFinite(ms) ? ms : null;
-}
-
-/** Convert boolean → 0/1 integer, or null if input is null/undefined. */
-function toBit(v: boolean | null | undefined): number | null {
-  if (v == null) return null;
-  return v ? 1 : 0;
-}
+// ── Sync helpers (for CLI and reconstruct paths that cannot use Effect) ───────
 
 /**
- * Map an AgentState to a parameter array for the overdeck agents INSERT.
- * Column order matches OVERDECK_AGENT_COLUMNS.
- */
-function agentStateToOverdeckRow(state: AgentState): unknown[] {
-  return [
-    state.id,
-    state.issueId,
-    state.role,
-    state.status,
-    state.workspace ?? '',
-    state.sessionId ?? null,
-    state.harness ?? null,
-    state.model ?? null,
-    typeof state.hostOverride === 'string' ? state.hostOverride : null,
-    state.deliveryMethod ?? null,
-    toMs(state.startedAt),
-    toMs(state.lastResumeAt),
-    toBit(state.stoppedByUser),
-    toBit(state.kickoffDelivered),
-    toBit(state.paused),
-    state.pausedReason ?? null,
-    toBit(state.troubled),
-    toBit(state.channelsEnabled),
-    state.consecutiveFailures ?? 0,
-    toMs(state.firstFailureInRunAt),
-    toMs(state.lastFailureNextRetryAt),
-    toMs(state.stoppedAt),
-    toMs(state.pausedAt),
-    toMs(state.troubledAt),
-    toMs(state.lastActivity),
-    state.lastFailureReason ?? null,
-    state.phase ?? null,
-    state.roleRunHead ?? null,
-    state.flywheelRunId ?? null,
-    state.startedBy ?? null,
-    state.costSoFar ?? null,
-    state.reviewSubRole ?? null,
-    state.reviewRunId ?? null,
-    state.reviewSynthesisAgentId ?? null,
-    state.reviewOutputPath ?? null,
-    toMs(state.reviewDeadlineAt),
-    state.reviewMonitorSignaled ?? null,
-    state.reviewRetryAttempt ?? null,
-    state.reviewContextManifestPath ?? null,
-    Date.now(),
-  ];
-}
-
-function getManagedTmuxSocketName(): string {
-  return process.env.OVERDECK_TMUX_SOCKET_NAME ?? 'overdeck';
-}
-
-function listLiveTmuxSessionNamesSync(): Set<string> {
-  try {
-    const output = execFileSync(
-      'tmux',
-      ['-L', getManagedTmuxSocketName(), 'list-sessions', '-F', '#{session_name}'],
-      { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] },
-    );
-    return new Set(
-      output.split('\n').map((l) => l.trim()).filter(Boolean),
-    );
-  } catch {
-    return new Set();
-  }
-}
-
-const VALID_ROLES_SYNC = new Set<string>(['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer', 'knowledge']);
-
-function parseAgentStateJsonSync(content: string, fallbackId: string): AgentState | null {
-  let parsed: Partial<AgentState>;
-  try {
-    parsed = JSON.parse(content) as Partial<AgentState>;
-  } catch {
-    return null;
-  }
-  if (!parsed.role || !VALID_ROLES_SYNC.has(parsed.role)) return null;
-  if (!parsed.id) parsed.id = fallbackId;
-  if (!parsed.status) parsed.status = 'stopped';
-  return parsed as AgentState;
-}
-
-export interface BackfillAgentsSyncOptions {
-  verbose?: boolean;
-  listLiveSessions?: () => Set<string>;
-}
-
-export interface BackfillAgentsSyncResult {
-  processed: number;
-  skipped: number;
-  markedStopped: number;
-  markedStoppedIds: Array<{ id: string; previousStatus: string }>;
-}
-
-/** Rebuild the agents table from state.json and reconcile statuses against live tmux. */
-/**
- * All agent ids matching a prefix — unions the overdeck.db rows and the on-disk state
- * dirs, so it catches both row-only and dir-only orphans (the two can drift apart).
- * Used to enumerate an issue's review fleet, e.g. listAgentIdsByPrefixSync('agent-pan-1866-review').
+ * All agent ids matching a prefix, from the on-disk state dirs — the only copy
+ * since the overdeck.db mirror was dropped. Used to enumerate an issue's review
+ * fleet, e.g. listAgentIdsByPrefixSync('agent-pan-1866-review').
  */
 export function listAgentIdsByPrefixSync(prefix: string): string[] {
-  const ids = new Set<string>();
   try {
-    const rows = getOverdeckDatabaseSync(undefined, { readOnly: true })
-      .prepare(`SELECT id FROM agents WHERE id LIKE ?`)
-      .all(`${prefix}%`) as Array<{ id: string }>;
-    for (const r of rows) ids.add(r.id);
-  } catch { /* agents table missing */ }
-  try {
-    for (const name of readdirSync(join(getOverdeckHome(), 'agents'))) {
-      if (name.startsWith(prefix)) ids.add(name);
-    }
-  } catch { /* agents dir missing */ }
-  return [...ids];
-}
-
-/** Remove one canonical agent registry row without touching its state directory. */
-export function removeAgentRecordSync(agentId: string): void {
-  try {
-    getOverdeckDatabaseSync().prepare(`DELETE FROM agents WHERE id = ?`).run(agentId);
-  } catch { /* agents table missing */ }
-}
-
-
-export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): BackfillAgentsSyncResult {
-  const db = getOverdeckDatabaseSync();
-  const agentsDir = join(getOverdeckHome(), 'agents');
-  const liveSessions = options?.listLiveSessions?.() ?? listLiveTmuxSessionNamesSync();
-
-  let processed = 0;
-  let skipped = 0;
-  const markedStoppedIds: Array<{ id: string; previousStatus: string }> = [];
-
-  let entries: string[] = [];
-  try {
-    entries = readdirSync(agentsDir);
+    return readdirSync(join(getOverdeckHome(), 'agents')).filter((name) => name.startsWith(prefix));
   } catch {
-    return { processed, skipped, markedStopped: 0, markedStoppedIds };
+    return [];
   }
-
-  const cols = OVERDECK_AGENT_COLUMNS.join(', ');
-  const placeholders = OVERDECK_AGENT_COLUMNS.map(() => '?').join(', ');
-  const issueIdIdx = OVERDECK_AGENT_COLUMNS.indexOf('issue_id');
-  // agents.issue_id has a FOREIGN KEY → issues(id). On a fresh overdeck.db
-  // (e.g. immediately after the cutover) the issues table is empty, so ensure
-  // the parent issue row exists before inserting the agent or the insert fails
-  // with "FOREIGN KEY constraint failed" (PAN-1938 cutover fix).
-  const ensureIssue = db.prepare(
-    `INSERT OR IGNORE INTO issues (id, stage, updated_at) VALUES (?, 'working', ?)`,
-  );
-  const upsert = db.prepare(
-    `INSERT OR REPLACE INTO agents (${cols}) VALUES (${placeholders})`,
-  );
-
-  const tx = db.transaction(() => {
-    for (const entry of entries) {
-      const dirPath = join(agentsDir, entry);
-      let statePath: string;
-      try {
-        if (!statSync(dirPath).isDirectory()) continue;
-        statePath = join(dirPath, 'state.json');
-      } catch {
-        continue;
-      }
-
-      let content: string;
-      try {
-        content = readFileSync(statePath, 'utf-8');
-      } catch {
-        skipped++;
-        continue;
-      }
-
-      const state = parseAgentStateJsonSync(content, entry);
-      if (!state) {
-        skipped++;
-        continue;
-      }
-
-      let reconciledStop: { id: string; previousStatus: string } | undefined;
-      if ((state.status === 'running' || state.status === 'starting') && !liveSessions.has(state.id)) {
-        reconciledStop = { id: state.id, previousStatus: state.status };
-        state.status = 'stopped';
-        state.stoppedAt = state.stoppedAt ?? new Date().toISOString();
-      }
-
-      // Per-row resilience (PAN-1972): the disposable agents cache is rebuilt
-      // from N agent state.json files. A single unreconstructable row — e.g. an
-      // incomplete state.json that violates a NOT NULL column such as `harness`
-      // (observed on an `inspect-*` agent whose state lacked a harness) — must NOT
-      // abort the whole transaction and crash the dashboard boot. Skip + log the
-      // bad row; it self-heals on the next reconstruct once its state is complete.
-      try {
-        const row = agentStateToOverdeckRow(state);
-        ensureIssue.run(row[issueIdIdx], Date.now());
-        upsert.run(...row);
-        if (reconciledStop) markedStoppedIds.push(reconciledStop);
-        processed++;
-        if (options?.verbose) {
-          console.log(`[backfill] ${state.id} -> ${state.status}`);
-        }
-      } catch (err) {
-        skipped++;
-        console.warn(`[backfill] Skipped agent ${state.id}: ${(err as Error).message}`);
-      }
-    }
-  });
-
-  tx();
-  for (const { id, previousStatus } of markedStoppedIds) {
-    logAgentLifecycleSync(id, `status changed: ${previousStatus} → stopped (boot backfill reconcile: no live tmux session)`);
-  }
-  return { processed, skipped, markedStopped: markedStoppedIds.length, markedStoppedIds };
 }
 
-/**
- * Count agents by status, grouped by role.
- * Drop-in for countAgentsByStatus() from database/agents-db.ts.
- */
-export function countAgentsByStatus(status: string): Record<string, number> {
-  const db = getOverdeckDatabaseSync(undefined, { readOnly: true });
-  const rows = db.prepare(
-    `SELECT role, COUNT(*) AS n FROM agents WHERE status = ? GROUP BY role`,
-  ).all(status) as Array<{ role: string; n: number }>;
-  const result: Record<string, number> = {};
-  for (const row of rows) {
-    result[row.role] = row.n;
-  }
-  return result;
-}
-
-/**
- * Count agents matching both status and role.
- * Drop-in for countAgentsByStatusRole() from database/agents-db.ts.
- */
-export function countAgentsByStatusRole(status: string, role: string): number {
-  const db = getOverdeckDatabaseSync(undefined, { readOnly: true });
-  const row = db.prepare(
-    `SELECT COUNT(*) AS n FROM agents WHERE status = ? AND role = ?`,
-  ).get(status, role) as { n: number } | undefined;
-  return row?.n ?? 0;
-}
-
-/**
- * List all agents from the overdeck agents table as AgentState-compatible objects.
- * Used as a fallback in reconstruct-cache when listRunningAgents() fails.
- */
-export function listAllAgentsSync(): Array<{
-  id: string;
-  issueId: string;
-  role: string;
-  status: string;
-  workspace: string | null;
-  harness: string | null;
-  model: string | null;
-  branch: null;
-  sessionId: string | null;
-  startedAt: string | null;
-  lastActivity: string | null;
-  lastResumeAt: string | null;
-  stoppedAt: string | null;
-  stoppedByUser: boolean | null;
-  stoppedByPause: null;
-  kickoffDelivered: boolean | null;
-  hostOverride: null;
-  costSoFar: number | null;
-  phase: string | null;
-  workType: null;
-  paused: boolean | null;
-  pausedReason: string | null;
-  pausedAt: string | null;
-  troubled: boolean | null;
-  troubledAt: string | null;
-  consecutiveFailures: number | null;
-  firstFailureInRunAt: string | null;
-  lastFailureAt: null;
-  lastFailureReason: string | null;
-  lastFailureNextRetryAt: string | null;
-  flywheelRunId: string | null;
-  startedBy: string | null;
-  roleRunHead: string | null;
-  reviewSubRole: string | null;
-  reviewRunId: string | null;
-  reviewSynthesisAgentId: null;
-  reviewOutputPath: null;
-  reviewDeadlineAt: null;
-  reviewMonitorSignaled: null;
-  reviewRetryAttempt: null;
-  inspectSubRole: null;
-  deliveryMethod: string | null;
-  supervisorEnabled: null;
-  channelsEnabled: boolean | null;
-  updatedAt: string;
-}> {
-  const db = getOverdeckDatabaseSync(undefined, { readOnly: true });
-  const rows = db.prepare(`
-    SELECT id, issue_id, role, status, workspace, session_id, harness, model,
-           host_override, delivery_method, started_at, last_resume_at,
-           stopped_by_user, kickoff_delivered, paused, paused_reason, troubled,
-           channels_enabled, consecutive_failures, first_failure_in_run_at,
-           last_failure_next_retry_at, stopped_at, paused_at, troubled_at,
-           last_activity, last_failure_reason, phase, role_run_head,
-           flywheel_run_id, started_by, cost_so_far, review_sub_role, review_run_id,
-           updated_at
-    FROM agents
-  `).all() as Array<Record<string, unknown>>;
-
-  /** Convert INTEGER ms timestamp → ISO string or null. */
-  const fromMs = (v: unknown): string | null => {
-    if (v == null) return null;
-    const n = Number(v);
-    return Number.isFinite(n) ? new Date(n).toISOString() : null;
-  };
-  const fromBit = (v: unknown): boolean | null => v == null ? null : v !== 0;
-
-  return rows.map((row) => ({
-    id: row['id'] as string,
-    issueId: row['issue_id'] as string,
-    role: row['role'] as string,
-    status: row['status'] as string,
-    workspace: (row['workspace'] as string | null) ?? null,
-    harness: (row['harness'] as string | null) ?? null,
-    model: (row['model'] as string | null) ?? null,
-    branch: null,
-    sessionId: (row['session_id'] as string | null) ?? null,
-    startedAt: fromMs(row['started_at']),
-    lastActivity: fromMs(row['last_activity']),
-    lastResumeAt: fromMs(row['last_resume_at']),
-    stoppedAt: fromMs(row['stopped_at']),
-    stoppedByUser: fromBit(row['stopped_by_user']),
-    stoppedByPause: null,
-    kickoffDelivered: fromBit(row['kickoff_delivered']),
-    hostOverride: null,
-    costSoFar: (row['cost_so_far'] as number | null) ?? null,
-    phase: (row['phase'] as string | null) ?? null,
-    workType: null,
-    paused: fromBit(row['paused']),
-    pausedReason: (row['paused_reason'] as string | null) ?? null,
-    pausedAt: fromMs(row['paused_at']),
-    troubled: fromBit(row['troubled']),
-    troubledAt: fromMs(row['troubled_at']),
-    consecutiveFailures: (row['consecutive_failures'] as number | null) ?? null,
-    firstFailureInRunAt: fromMs(row['first_failure_in_run_at']),
-    lastFailureAt: null,
-    lastFailureReason: (row['last_failure_reason'] as string | null) ?? null,
-    lastFailureNextRetryAt: fromMs(row['last_failure_next_retry_at']),
-    flywheelRunId: (row['flywheel_run_id'] as string | null) ?? null,
-    startedBy: (row['started_by'] as string | null) ?? null,
-    roleRunHead: (row['role_run_head'] as string | null) ?? null,
-    reviewSubRole: (row['review_sub_role'] as string | null) ?? null,
-    reviewRunId: (row['review_run_id'] as string | null) ?? null,
-    reviewSynthesisAgentId: null,
-    reviewOutputPath: null,
-    reviewDeadlineAt: null,
-    reviewMonitorSignaled: null,
-    reviewRetryAttempt: null,
-    inspectSubRole: null,
-    deliveryMethod: (row['delivery_method'] as string | null) ?? null,
-    supervisorEnabled: null,
-    channelsEnabled: fromBit(row['channels_enabled']),
-    updatedAt: fromMs(row['updated_at']) ?? new Date().toISOString(),
-  }));
-}

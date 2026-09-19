@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { MemoryIdentity, MemoryObservation } from '@overdeck/contracts';
 
 import { getComplianceStatus } from '../../../src/lib/compliance/status.js';
-import { closeDatabase } from '../../../src/lib/database/index.js';
 import { closeMemoryFtsDatabases } from '../../../src/lib/memory/fts-db.js';
 import { writeObservation } from '../../../src/lib/memory/observations.js';
 import { createWorkspace, upsertProjectFromConfig } from '../../../src/lib/workspaces/writer.js';
@@ -36,7 +35,6 @@ beforeEach(async () => {
 
 afterEach(() => {
   closeMemoryFtsDatabases();
-  closeDatabase();
   teardownOverdeckTestDb(odb);
 });
 

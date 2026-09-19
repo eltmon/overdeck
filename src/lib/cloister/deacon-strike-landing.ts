@@ -18,7 +18,7 @@ export interface StrikeMergeRequest {
   kind: 'strike'; markerHead: string; workspacePath: string; branchName: string; recoveryTarget: string;
 }
 
-export interface StrikeMergeResult { success: boolean; mergeStatus?: string; error?: string; transport?: boolean }
+export interface StrikeMergeResult { success: boolean; outcome?: string; error?: string; transport?: boolean }
 type StrikeMergeTrigger = (issueId: string, request: StrikeMergeRequest) => Promise<StrikeMergeResult>;
 
 function internalDashboardUrl(): string {
@@ -394,7 +394,7 @@ async function executeStrikeLanding(issueId: string, head: string, deps: StrikeL
       recoveryTarget: `strike-${issueId.toLowerCase()}`,
     };
     const result = await deps.mergeIssue(issueId, request);
-    if (result.mergeStatus === 'merged' || result.success || result.mergeStatus === 'queued' || result.mergeStatus === 'merging') {
+    if (result.outcome === 'merged' || result.success || result.outcome === 'queued' || result.outcome === 'merging') {
       strikeNextAttemptAt.delete(issueId);
       strikeTransportRetries.delete(issueId);
       return;

@@ -1369,7 +1369,7 @@ if (process.argv.length === 2) {
 }
 
 // Short-lived commands must drain durable state writes before exit (PAN-2692).
-// PAN-3917: durable-write-drain.ts (journal writes + state-worktree
-// auto-commit flush) is gone with the state layer — there is nothing left to
-// drain before exit, so runCliWithTelemetry's drain hook is a no-op.
+// PAN-3917: durable-write-drain.ts (journal writes plus the state worktree's
+// commit flush) is gone with the state layer — there is nothing left to drain
+// before exit, so runCliWithTelemetry's drain hook is a no-op.
 await runCliWithTelemetry(() => program.parseAsync(process.argv, { from: 'node' }), async () => {});

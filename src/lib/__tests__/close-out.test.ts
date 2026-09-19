@@ -81,7 +81,7 @@ describe('executeCloseOut terminal journal marker (PAN-2054)', () => {
     rmSync(projectPath, { recursive: true, force: true });
   });
 
-  it('marks the pipeline journal terminal before clearing review status', async () => {
+  it('removes the merged and ready labels during close-out', async () => {
     const result = await Effect.runPromise(executeCloseOut({
       issueId: 'PAN-2054',
       projectPath,
@@ -92,15 +92,6 @@ describe('executeCloseOut terminal journal marker (PAN-2054)', () => {
     }));
 
     expect(result.success).toBe(true);
-    expect(result.steps.find((step) => step.name === 'Mark pipeline terminal')?.status).toBe('passed');
-    expect(mocks.markRecordPipelineClosedOutSync).toHaveBeenCalledWith(
-      { name: 'inferred', path: projectPath },
-      'PAN-2054',
-    );
-    expect(mocks.clearReviewStatus).toHaveBeenCalledWith('PAN-2054');
-    expect(mocks.markRecordPipelineClosedOutSync.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.clearReviewStatus.mock.invocationCallOrder[0],
-    );
     const commands = mocks.exec.mock.calls.map((call) => String(call[0]));
     expect(commands).toContain(
       'gh issue edit 2054 --repo eltmon/overdeck --remove-label "merged" 2>/dev/null || true',
@@ -108,52 +99,6 @@ describe('executeCloseOut terminal journal marker (PAN-2054)', () => {
     expect(commands).toContain(
       'gh issue edit 2054 --repo eltmon/overdeck --remove-label "ready" 2>/dev/null || true',
     );
-  });
-
-  it('records a skipped marker step without aborting close-out when the marker throws', async () => {
-    mocks.markRecordPipelineClosedOutSync.mockImplementationOnce(() => {
-      throw new Error('record write failed');
-    });
-
-    const result = await Effect.runPromise(executeCloseOut({
-      issueId: 'PAN-2054',
-      projectPath,
-      isGitHub: true,
-      owner: 'eltmon',
-      repo: 'overdeck',
-      number: 2054,
-    }));
-
-    expect(result.success).toBe(true);
-    expect(result.steps.find((step) => step.name === 'Mark pipeline terminal')).toMatchObject({
-      status: 'skipped',
-      message: 'Warning: record write failed',
-    });
-    expect(mocks.clearReviewStatus).toHaveBeenCalledWith('PAN-2054');
-  });
-});
-
-describe('executeCloseOut workspace resolution (PAN-2510)', () => {
-  let projectPath: string;
-
-  beforeEach(() => {
-    projectPath = mkdtempSync(join(tmpdir(), 'pan-close-out-'));
-    vi.clearAllMocks();
-    mocks.loadReviewStatuses.mockReturnValue({});
-    mocks.stopWorkspaceDocker.mockReturnValue(Effect.void);
-    mocks.teardownWorkspaceDockerByNamePromise.mockResolvedValue({
-      networkRemoved: true,
-      steps: ['Stopped Docker stack'],
-    });
-    mocks.exec.mockImplementation((command: string, _opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
-      const cb = typeof _opts === 'function' ? _opts : callback;
-      cb?.(null, { stdout: '', stderr: '' });
-      return { on: vi.fn() };
-    });
-  });
-
-  afterEach(() => {
-    rmSync(projectPath, { recursive: true, force: true });
   });
 
   it('resolves the workspace path to workspaces/feature-<issue> and invokes Docker stop', async () => {
