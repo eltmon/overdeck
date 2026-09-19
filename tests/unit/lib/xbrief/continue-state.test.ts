@@ -150,3 +150,58 @@ describe('markItemDone', () => {
     expect(done.status).toBe('completed');
   });
 });
+
+describe('markItemDone across a polyrepo workspace', () => {
+  let apiRepo: string;
+
+  /** A second repository of the same workspace, with its own remote. */
+  function initRepo(dir: string): void {
+    const bare = `${dir}.git`;
+    mkdirSync(dir, { recursive: true });
+    git(root, 'init', '--bare', '-q', bare);
+    git(dir, 'init', '-q', '-b', 'main');
+    git(dir, 'config', 'user.email', 'test@overdeck.local');
+    git(dir, 'config', 'user.name', 'Overdeck Test');
+    git(dir, 'config', 'commit.gpgsign', 'false');
+    git(dir, 'remote', 'add', 'origin', bare);
+    writeFileSync(join(dir, 'README.md'), 'seed\n', 'utf8');
+    git(dir, 'add', '-A');
+    git(dir, 'commit', '-q', '-m', 'chore: seed');
+    git(dir, 'push', '-q', '-u', 'origin', 'main');
+  }
+
+  beforeEach(() => {
+    apiRepo = join(root, 'api');
+    initRepo(apiRepo);
+  });
+
+  const options = (roots: string[]) => ({
+    requireTrailer: `Item: ${ITEM}`,
+    requirePushed: true,
+    repoRoots: roots,
+  });
+
+  it('accepts a commit in a sibling repository and writes the continue file in the plan home', async () => {
+    commitWithItemTrailer(apiRepo, ITEM, 'handler.ts');
+    git(apiRepo, 'push', '-q', 'origin', 'main');
+
+    const done = await markItemDone(planHome, ISSUE, ITEM, options([planHome, apiRepo]));
+
+    expect(done.status).toBe('completed');
+    expect(continueStatePath(planHome, ISSUE)).toBe(join(planHome, '.pan', 'continues', 'PAN-3917.xbrief.json'));
+    expect(existsSync(continueStatePath(planHome, ISSUE))).toBe(true);
+  });
+
+  it('requires the repository that carries the commit to be pushed, not the plan home', async () => {
+    commitWithItemTrailer(apiRepo, ITEM, 'handler.ts');
+
+    await expect(markItemDone(planHome, ISSUE, ITEM, options([planHome, apiRepo])))
+      .rejects.toThrow(/ahead of its upstream/);
+    expect(existsSync(continueStatePath(planHome, ISSUE))).toBe(false);
+  });
+
+  it('names every repository it searched when no commit carries the trailer', async () => {
+    await expect(markItemDone(planHome, ISSUE, ITEM, options([planHome, apiRepo])))
+      .rejects.toThrow(new RegExp(apiRepo));
+  });
+});

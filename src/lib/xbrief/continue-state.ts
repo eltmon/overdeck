@@ -306,6 +306,12 @@ export interface MarkItemDoneOptions {
   requireTrailer: string;
   /** When true, the branch must not be ahead of its upstream. */
   requirePushed: boolean;
+  /**
+   * Repository roots to search for the corroborating commit. A polyrepo
+   * workspace has one per repo and the item's work may live in any of them;
+   * the plan home alone is the default.
+   */
+  repoRoots?: readonly string[];
 }
 
 export class ItemNotVerifiable extends Error {}
@@ -321,33 +327,40 @@ function escapeRegExp(value: string): string {
  * commit convention puts `Item:` in a paragraph of its own above
  * `Co-Authored-By:`, where `%(trailers:key=Item)` finds nothing.
  */
-async function hasTrailerCommit(planHome: string, trailer: string): Promise<boolean> {
-  const { stdout } = await execFileAsync(
-    'git',
-    ['log', '-n', '1', '--format=%H', '-E', `--grep=^${escapeRegExp(trailer)}[[:space:]]*$`],
-    { cwd: planHome },
-  );
-  return stdout.trim().length > 0;
+async function hasTrailerCommit(repoRoot: string, trailer: string): Promise<boolean> {
+  try {
+    const { stdout } = await execFileAsync(
+      'git',
+      ['log', '-n', '1', '--format=%H', '-E', `--grep=^${escapeRegExp(trailer)}[[:space:]]*$`],
+      { cwd: repoRoot },
+    );
+    return stdout.trim().length > 0;
+  } catch {
+    // Not a git checkout, or an empty one: it corroborates nothing.
+    return false;
+  }
 }
 
 /** Commits on the current branch that the upstream has not seen yet. */
-async function unpushedCommitCount(planHome: string): Promise<number> {
+async function unpushedCommitCount(repoRoot: string): Promise<number> {
   let upstream: string;
   try {
-    const { stdout } = await execFileAsync('git', ['rev-parse', '--abbrev-ref', '@{upstream}'], { cwd: planHome });
+    const { stdout } = await execFileAsync('git', ['rev-parse', '--abbrev-ref', '@{upstream}'], { cwd: repoRoot });
     upstream = stdout.trim();
   } catch {
-    throw new ItemNotVerifiable('the branch has no upstream — push it before completing the item');
+    throw new ItemNotVerifiable(`the branch in ${repoRoot} has no upstream — push it before completing the item`);
   }
-  const { stdout } = await execFileAsync('git', ['rev-list', '--count', `${upstream}..HEAD`], { cwd: planHome });
+  const { stdout } = await execFileAsync('git', ['rev-list', '--count', `${upstream}..HEAD`], { cwd: repoRoot });
   return Number.parseInt(stdout.trim(), 10) || 0;
 }
 
 /**
- * Record an item as done, but only once git corroborates it: a commit on the
- * current branch carries the `Item: <id>` trailer, and (when required) the
- * branch is not ahead of its upstream. Throws {@link ItemNotVerifiable}
- * otherwise and writes nothing.
+ * Record an item as done, but only once git corroborates it: a commit in one of
+ * the issue's repositories carries the `Item: <id>` trailer, and (when
+ * required) THAT repository's branch is not ahead of its upstream. A polyrepo
+ * issue carries its work in whichever repo the item touched, so every repo root
+ * is searched; the continue file is written in the plan home either way. Throws
+ * {@link ItemNotVerifiable} otherwise and writes nothing.
  */
 export async function markItemDone(
   planHome: string,
@@ -355,16 +368,25 @@ export async function markItemDone(
   itemId: string,
   options: MarkItemDoneOptions,
 ): Promise<ContinueItemState> {
-  if (!(await hasTrailerCommit(planHome, options.requireTrailer))) {
+  const repoRoots = options.repoRoots?.length ? [...new Set(options.repoRoots)] : [planHome];
+  let corroborating: string | null = null;
+  for (const root of repoRoots) {
+    if (await hasTrailerCommit(root, options.requireTrailer)) {
+      corroborating = root;
+      break;
+    }
+  }
+  if (!corroborating) {
     throw new ItemNotVerifiable(
-      `no commit on this branch carries the trailer "${options.requireTrailer}" — commit the work for ${itemId} first`,
+      `no commit in ${repoRoots.join(', ')} carries the trailer "${options.requireTrailer}" `
+      + `— commit the work for ${itemId} first`,
     );
   }
   if (options.requirePushed) {
-    const ahead = await unpushedCommitCount(planHome);
+    const ahead = await unpushedCommitCount(corroborating);
     if (ahead > 0) {
       throw new ItemNotVerifiable(
-        `the branch is ${ahead} commit(s) ahead of its upstream — push before completing ${itemId}`,
+        `the branch in ${corroborating} is ${ahead} commit(s) ahead of its upstream — push before completing ${itemId}`,
       );
     }
   }
