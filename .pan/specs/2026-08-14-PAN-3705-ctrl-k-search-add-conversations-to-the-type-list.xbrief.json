@@ -4,17 +4,17 @@
     "created": "2026-08-14T06:27:47Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3705: Ctrl-K search: add Conversations to the type list",
-    "updated": "2026-08-14T06:30:39.739Z"
+    "updated": "2026-09-19T10:59:09.672Z"
   },
   "plan": {
     "id": "pan-3705",
     "title": "Ctrl-K search: add Conversations to the type list",
-    "status": "proposed",
+    "status": "running",
     "uid": "c8dd7f35-a7c5-4f5d-b7df-efdb0aba964d",
     "author": "agent:k3[1m]",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-08-14T06:27:47Z",
-    "updated": "2026-08-14T06:30:39.739Z",
+    "updated": "2026-09-19T10:59:09.672Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3705",
