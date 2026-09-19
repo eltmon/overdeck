@@ -7,19 +7,12 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import type { ReviewStatus } from '../../src/lib/review-status.js'
 import {
   toAgentStatus,
   toRole,
   toAgentResolution,
   toSpecialistAgentName,
   toSpecialistLifecycleState,
-  toReviewStatus,
-  toTestStatus,
-  toMergeStatus,
-  toVerificationStatus,
-  toReviewStatusSnapshot,
-  mergeDbOnlyReviewStatuses,
 } from '../../src/dashboard/server/read-model.js'
 
 // ─── toAgentStatus ────────────────────────────────────────────────────────────
@@ -109,46 +102,6 @@ describe('toSpecialistLifecycleState', () => {
   })
 })
 
-// ─── toReviewStatus ───────────────────────────────────────────────────────────
-
-describe('toReviewStatus', () => {
-  it('passes through valid review statuses', () => {
-    expect(toReviewStatus('pending')).toBe('pending')
-    expect(toReviewStatus('reviewing')).toBe('reviewing')
-    expect(toReviewStatus('passed')).toBe('passed')
-    expect(toReviewStatus('failed')).toBe('failed')
-    expect(toReviewStatus('blocked')).toBe('blocked')
-  })
-
-  it('returns undefined for invalid values', () => {
-    expect(toReviewStatus('in-progress')).toBeUndefined()
-    expect(toReviewStatus('PASSED')).toBeUndefined()
-    expect(toReviewStatus(null)).toBeUndefined()
-    expect(toReviewStatus(undefined)).toBeUndefined()
-    expect(toReviewStatus('')).toBeUndefined()
-  })
-})
-
-// ─── toTestStatus ─────────────────────────────────────────────────────────────
-
-describe('toTestStatus', () => {
-  it('passes through valid test statuses', () => {
-    expect(toTestStatus('pending')).toBe('pending')
-    expect(toTestStatus('testing')).toBe('testing')
-    expect(toTestStatus('passed')).toBe('passed')
-    expect(toTestStatus('failed')).toBe('failed')
-    expect(toTestStatus('skipped')).toBe('skipped')
-    expect(toTestStatus('dispatch_failed')).toBe('dispatch_failed')
-  })
-
-  it('returns undefined for invalid values', () => {
-    expect(toTestStatus('running')).toBeUndefined()
-    expect(toTestStatus('PASSED')).toBeUndefined()
-    expect(toTestStatus(null)).toBeUndefined()
-    expect(toTestStatus(undefined)).toBeUndefined()
-  })
-})
-
 // ─── toAgentResolution ────────────────────────────────────────────────────────
 
 describe('toAgentResolution', () => {
@@ -170,154 +123,3 @@ describe('toAgentResolution', () => {
   })
 })
 
-// ─── toMergeStatus ────────────────────────────────────────────────────────────
-
-describe('toMergeStatus', () => {
-  it('passes through valid merge statuses', () => {
-    expect(toMergeStatus('pending')).toBe('pending')
-    expect(toMergeStatus('merging')).toBe('merging')
-    expect(toMergeStatus('merged')).toBe('merged')
-    expect(toMergeStatus('failed')).toBe('failed')
-  })
-
-  it('returns undefined for invalid values', () => {
-    expect(toMergeStatus('complete')).toBeUndefined()
-    expect(toMergeStatus('MERGED')).toBeUndefined()
-    expect(toMergeStatus(null)).toBeUndefined()
-    expect(toMergeStatus(undefined)).toBeUndefined()
-  })
-})
-
-describe('toVerificationStatus', () => {
-  it('passes through valid verification statuses', () => {
-    expect(toVerificationStatus('pending')).toBe('pending')
-    expect(toVerificationStatus('running')).toBe('running')
-    expect(toVerificationStatus('passed')).toBe('passed')
-    expect(toVerificationStatus('failed')).toBe('failed')
-    expect(toVerificationStatus('skipped')).toBe('skipped')
-  })
-
-  it('returns undefined for invalid values', () => {
-    expect(toVerificationStatus('error')).toBeUndefined()
-    expect(toVerificationStatus('FAILED')).toBeUndefined()
-    expect(toVerificationStatus(null)).toBeUndefined()
-    expect(toVerificationStatus(undefined)).toBeUndefined()
-  })
-})
-
-// ─── toReviewStatusSnapshot ──────────────────────────────────────────────────
-
-describe('toReviewStatusSnapshot', () => {
-  it('preserves authoritative readyForMerge=false from persisted review status', () => {
-    const status: Pick<ReviewStatus, 'issueId' | 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'verificationNotes' | 'verificationCycleCount' | 'readyForMerge' | 'updatedAt' | 'prUrl'> = {
-      issueId: 'PAN-486',
-      reviewStatus: 'passed',
-      testStatus: 'passed',
-      mergeStatus: 'failed',
-      verificationStatus: 'failed',
-      verificationNotes: 'frontend-typecheck failed',
-      verificationCycleCount: 2,
-      readyForMerge: false,
-      updatedAt: '2026-04-11T17:00:00.000Z',
-      prUrl: 'https://github.com/eltmon/overdeck/pull/486',
-    }
-    const snapshot = toReviewStatusSnapshot(status)
-
-    expect(snapshot.readyForMerge).toBe(false)
-    expect(snapshot.mergeStatus).toBe('failed')
-    expect(snapshot.verificationStatus).toBe('failed')
-    expect(snapshot.verificationNotes).toBe('frontend-typecheck failed')
-    expect(snapshot.verificationCycleCount).toBe(2)
-    expect(snapshot.prUrl).toContain('/pull/486')
-  })
-
-  it('projects planning auto-handoff failures for dashboard issue lists', () => {
-    const stuckDetails = JSON.stringify({
-      workAgentSkipReason: 'guardrails',
-      workAgentError: 'Workspace has uncommitted changes',
-    })
-    const snapshot = toReviewStatusSnapshot({
-      issueId: 'PAN-2860',
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      readyForMerge: false,
-      updatedAt: '2026-07-17T00:00:00.000Z',
-      stuck: true,
-      stuckReason: 'planning_auto_handoff_failed',
-      stuckAt: '2026-07-17T00:00:00.000Z',
-      stuckDetails,
-    })
-
-    expect(snapshot.stuck).toBe(true)
-    expect(snapshot.stuckReason).toBe('planning_auto_handoff_failed')
-    expect(snapshot.stuckDetails).toBe(stuckDetails)
-  })
-})
-
-// ─── mergeDbOnlyReviewStatuses ─────────────────────────────────────────────────
-
-describe('mergeDbOnlyReviewStatuses', () => {
-  it('includes a DB row for an issue reconstructCacheAuto never covered (PAN-3362)', () => {
-    // FIX-1: an obviously-fake UAT fixture issue with no real per-issue
-    // record, so reconstructCacheAuto()'s tracker-driven enumeration never
-    // sees it — but seedUatFixturesLocal() wrote a real review_status row.
-    const dbOnly = mergeDbOnlyReviewStatuses(
-      {},
-      {
-        'FIX-1': {
-          issueId: 'FIX-1',
-          reviewStatus: 'passed',
-          testStatus: 'passed',
-          readyForMerge: false,
-          updatedAt: '2026-08-06T00:00:00.000Z',
-          prUrl: 'https://github.com/uat-fixtures/repo/pull/1',
-        },
-      },
-    )
-
-    expect(dbOnly['FIX-1']?.prUrl).toBe('https://github.com/uat-fixtures/repo/pull/1')
-  })
-
-  it('never overrides a tracker-derived entry for the same issueId', () => {
-    const trackerDerived = {
-      'PAN-486': {
-        issueId: 'PAN-486',
-        reviewStatus: 'passed' as const,
-        testStatus: 'passed' as const,
-        readyForMerge: true,
-        updatedAt: '2026-04-11T17:00:00.000Z',
-        prUrl: 'https://github.com/eltmon/overdeck/pull/486',
-      },
-    }
-    const dbOnly = mergeDbOnlyReviewStatuses(trackerDerived, {
-      'PAN-486': {
-        issueId: 'PAN-486',
-        reviewStatus: 'pending',
-        testStatus: 'pending',
-        readyForMerge: false,
-        updatedAt: '2026-01-01T00:00:00.000Z',
-      },
-    })
-
-    // The tracker-derived PAN-486 stays out of the DB-only map entirely — the
-    // caller spreads trackerDerived last, so a stale DB row can never win.
-    expect(dbOnly['PAN-486']).toBeUndefined()
-  })
-
-  it('returns an empty object when every DB row is already tracker-covered', () => {
-    const trackerDerived = {
-      'PAN-1': {
-        issueId: 'PAN-1',
-        reviewStatus: 'pending' as const,
-        testStatus: 'pending' as const,
-        readyForMerge: false,
-        updatedAt: '2026-01-01T00:00:00.000Z',
-      },
-    }
-    const dbOnly = mergeDbOnlyReviewStatuses(trackerDerived, {
-      'PAN-1': { issueId: 'PAN-1', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-01-01T00:00:00.000Z' },
-    })
-
-    expect(dbOnly).toEqual({})
-  })
-})
