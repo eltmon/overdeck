@@ -36,9 +36,18 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
   return {
     ...actual,
-    access: (path: string) => mockExistsSync(path)
-      ? Promise.resolve()
-      : Promise.reject(new Error('ENOENT')),
+    // Routed through mockExistsSync only for the workspace path (PAN-3917
+    // W12): mockExistsSync's `true` fallback also answered the host-backend
+    // probe's herdr-binary/herdr-socket `access()` checks (hostTerminalBackendName,
+    // called from the async isAlive door but never the sync one), making
+    // every host look like it has Herdr and desyncing the async lifecycle
+    // snapshot from the sync one. Anything else falls through to the real
+    // filesystem, where the synthetic test OVERDECK_HOME's herdr socket
+    // genuinely does not exist.
+    access: (path: string, ...rest: unknown[]) =>
+      path === '/tmp/pan-3194-workspace'
+        ? (mockExistsSync(path) ? Promise.resolve() : Promise.reject(new Error('ENOENT')))
+        : (actual.access as (...args: unknown[]) => Promise<void>)(path, ...rest),
   };
 });
 
