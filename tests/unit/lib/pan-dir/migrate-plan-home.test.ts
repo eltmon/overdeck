@@ -1,10 +1,12 @@
 /**
- * PAN-3917 W1 / D8: the state-worktree → `.pan/` migration copies per-issue
- * artifacts for OPEN issues only, always copies the project-wide ones, and is
- * idempotent.
+ * PAN-3917 W1 (w1-plan-home): the state-worktree → `.pan/` migration copies
+ * per-issue artifacts for OPEN issues only, always copies the project-wide
+ * ones, carries `records/` item-status overrides into `.pan/continues/`, and
+ * is idempotent. Ported from `tests/unit/scripts/migrate-pan-home.test.ts`
+ * plus new coverage for item-progress copying and `--dry-run`.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -15,7 +17,7 @@ import {
   issueIdForArtifact,
   migratePanHome,
   readOpenIssuesFile,
-} from '../../../scripts/migrate-pan-home.js';
+} from '../../../../src/lib/pan-dir/migrate-plan-home.js';
 
 let root: string;
 let stateRoot: string;
@@ -27,12 +29,23 @@ function write(base: string, rel: string, content: string): void {
   writeFileSync(path, content, 'utf8');
 }
 
+function writeJson(base: string, rel: string, value: unknown): void {
+  write(base, rel, `${JSON.stringify(value, null, 2)}\n`);
+}
+
 function git(cwd: string, ...args: string[]): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8' });
 }
 
+function initGit(cwd: string): void {
+  git(cwd, 'init', '-q', '-b', 'main');
+  git(cwd, 'config', 'user.email', 'test@overdeck.local');
+  git(cwd, 'config', 'user.name', 'Overdeck Test');
+  git(cwd, 'config', 'commit.gpgsign', 'false');
+}
+
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'migrate-pan-home-'));
+  root = mkdtempSync(join(tmpdir(), 'migrate-plan-home-'));
   stateRoot = join(root, 'state');
   planHome = join(root, 'repo');
   mkdirSync(planHome, { recursive: true });
@@ -42,13 +55,20 @@ beforeEach(() => {
   write(stateRoot, 'specs/2026-01-01-PAN-100-open.xbrief.json', '{"open":true}\n');
   write(stateRoot, 'specs/2026-01-01-PAN-200-closed.xbrief.json', '{"open":false}\n');
   // State-worktree continues carry the legacy lowercase `.vbrief.json` name.
-  write(stateRoot, 'continues/pan-100.vbrief.json', '{"issueId":"PAN-100"}\n');
+  write(stateRoot, 'continues/pan-100.vbrief.json', '{"version":"1","issueId":"PAN-100","created":"2026-01-01T00:00:00.000Z","updated":"2026-01-01T00:00:00.000Z","gitState":{},"decisions":[],"hazards":[],"resumePoint":null,"sessionHistory":[]}\n');
   write(stateRoot, 'continues/pan-200.vbrief.json', '{"issueId":"PAN-200"}\n');
   write(stateRoot, 'orders/index.json', '[]\n');
   write(stateRoot, 'orders/2026-01-01-wave.json', '{"id":"2026-01-01-wave"}\n');
   write(stateRoot, 'notes/retro.md', 'notes\n');
   write(stateRoot, 'backlog/sequence.md', '# Backlog Sequence\n');
-  write(stateRoot, 'records/PAN-100.json', '{"leftBehind":true}\n');
+  writeJson(stateRoot, 'records/pan-100.json', {
+    issueId: 'PAN-100',
+    statusOverrides: { 'item-a': 'completed', 'item-a.ac1': 'completed', 'item-b': 'in_progress' },
+  });
+  writeJson(stateRoot, 'records/pan-200.json', {
+    issueId: 'PAN-200',
+    statusOverrides: { 'item-z': 'completed' },
+  });
 });
 
 afterEach(() => {
@@ -106,6 +126,13 @@ describe('migratePanHome', () => {
     expect(existsSync(join(planHome, '.pan', 'records'))).toBe(false);
   });
 
+  it('skips a dangling symlink instead of copying or erroring', async () => {
+    symlinkSync(join(stateRoot, 'drafts', 'does-not-exist.md'), join(stateRoot, 'drafts', 'pan-101.md'));
+    const result = await migratePanHome({ stateRoot, planHome, openIssues: [...OPEN, 'PAN-101'] });
+    expect(existsSync(join(planHome, '.pan', 'drafts', 'pan-101.md'))).toBe(false);
+    expect(result.remaining).toBe(0);
+  });
+
   it('is idempotent — a second run copies nothing and reports 0 remaining', async () => {
     const first = await migratePanHome({ stateRoot, planHome, openIssues: OPEN });
     expect(first.copied.length).toBeGreaterThan(0);
@@ -114,6 +141,7 @@ describe('migratePanHome', () => {
     expect(second.copied).toEqual([]);
     expect(second.unchanged).toBe(first.copied.length);
     expect(second.remaining).toBe(0);
+    expect(second.progressUpdated).toEqual([]);
   });
 
   it('re-copies a source file that changed after the first run', async () => {
@@ -125,11 +153,71 @@ describe('migratePanHome', () => {
     expect(readFileSync(join(planHome, '.pan/drafts/pan-100.md'), 'utf8')).toBe('# revised\n');
   });
 
+  it('creates the continue file and merges item progress from records/ statusOverrides', async () => {
+    const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN });
+
+    expect(result.progressUpdated).toEqual(['PAN-100']);
+    const dest = JSON.parse(readFileSync(join(planHome, '.pan/continues/PAN-100.xbrief.json'), 'utf8'));
+    // Legacy continue fields carried across from the source file.
+    expect(dest.issueId).toBe('PAN-100');
+    expect(dest.version).toBe('1');
+    // completed -> done, non-completed status passed through, migratedFrom stamped.
+    expect(dest.items['item-a']).toEqual({ status: 'done', migratedFrom: 'records.statusOverrides' });
+    expect(dest.items['item-a.ac1']).toEqual({ status: 'done', migratedFrom: 'records.statusOverrides' });
+    expect(dest.items['item-b']).toEqual({ status: 'in_progress', migratedFrom: 'records.statusOverrides' });
+    // The closed issue's overrides never land, even though its record exists.
+    expect(existsSync(join(planHome, '.pan/continues/PAN-200.xbrief.json'))).toBe(false);
+  });
+
+  it('creates a continue file from records/ overrides alone when there is no source continue file', async () => {
+    rmSync(join(stateRoot, 'continues/pan-100.vbrief.json'));
+    const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN });
+    expect(result.progressUpdated).toEqual(['PAN-100']);
+    const dest = JSON.parse(readFileSync(join(planHome, '.pan/continues/PAN-100.xbrief.json'), 'utf8'));
+    expect(dest.issueId).toBe('PAN-100');
+    expect(dest.items['item-a'].status).toBe('done');
+  });
+
+  it('is idempotent for progress-merged continue files — a second run reports no change', async () => {
+    const first = await migratePanHome({ stateRoot, planHome, openIssues: OPEN });
+    expect(first.progressUpdated).toEqual(['PAN-100']);
+    const firstWrite = readFileSync(join(planHome, '.pan/continues/PAN-100.xbrief.json'), 'utf8');
+
+    const second = await migratePanHome({ stateRoot, planHome, openIssues: OPEN });
+    expect(second.copied).toEqual([]);
+    expect(second.progressUpdated).toEqual([]);
+    expect(second.remaining).toBe(0);
+    // Only volatile `updated` may differ; everything else (including items) is unchanged.
+    const secondWrite = JSON.parse(readFileSync(join(planHome, '.pan/continues/PAN-100.xbrief.json'), 'utf8'));
+    const firstParsed = JSON.parse(firstWrite);
+    expect(secondWrite.items).toEqual(firstParsed.items);
+  });
+
+  it('merges a later status change into the existing items map without clobbering other items', async () => {
+    await migratePanHome({ stateRoot, planHome, openIssues: OPEN });
+    writeJson(stateRoot, 'records/pan-100.json', {
+      issueId: 'PAN-100',
+      statusOverrides: { 'item-b': 'completed' },
+    });
+
+    const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN });
+    expect(result.progressUpdated).toEqual(['PAN-100']);
+    const dest = JSON.parse(readFileSync(join(planHome, '.pan/continues/PAN-100.xbrief.json'), 'utf8'));
+    expect(dest.items['item-a'].status).toBe('done');
+    expect(dest.items['item-b'].status).toBe('done');
+  });
+
+  it('--dry-run reports what would be copied and writes nothing', async () => {
+    const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, dryRun: true });
+
+    expect(result.copied.length).toBeGreaterThan(0);
+    expect(result.progressUpdated).toEqual(['PAN-100']);
+    expect(result.committed).toBe(false);
+    expect(existsSync(join(planHome, '.pan'))).toBe(false);
+  });
+
   it('does not commit without --commit', async () => {
-    git(planHome, 'init', '-q', '-b', 'main');
-    git(planHome, 'config', 'user.email', 'test@overdeck.local');
-    git(planHome, 'config', 'user.name', 'Overdeck Test');
-    git(planHome, 'config', 'commit.gpgsign', 'false');
+    initGit(planHome);
 
     const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN });
     expect(result.committed).toBe(false);
@@ -137,14 +225,19 @@ describe('migratePanHome', () => {
   });
 
   it('commits the copied artifacts with the mandated subject when asked', async () => {
-    git(planHome, 'init', '-q', '-b', 'main');
-    git(planHome, 'config', 'user.email', 'test@overdeck.local');
-    git(planHome, 'config', 'user.name', 'Overdeck Test');
-    git(planHome, 'config', 'commit.gpgsign', 'false');
+    initGit(planHome);
 
     const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, commit: true });
     expect(result.committed).toBe(true);
     expect(git(planHome, 'log', '-1', '--format=%s').trim()).toBe(MIGRATION_COMMIT_SUBJECT);
+    expect(git(planHome, 'status', '--porcelain').trim()).toBe('');
+  });
+
+  it('--commit is a no-op (and never fires) together with --dry-run', async () => {
+    initGit(planHome);
+
+    const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, commit: true, dryRun: true });
+    expect(result.committed).toBe(false);
     expect(git(planHome, 'status', '--porcelain').trim()).toBe('');
   });
 });
