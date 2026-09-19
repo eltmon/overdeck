@@ -40,7 +40,7 @@ vi.mock('../../../../src/lib/agents.js', () => ({
   listRunningAgents: mocks.listRunningAgents,
 }));
 
-vi.mock('../../../../src/lib/cloister/deacon-canonical-state.js', () => ({
+vi.mock('../../../../src/lib/lifecycle/auto-close-out-canonical-state.js', () => ({
   getAutoCloseOutCanonicalState: mocks.getAutoCloseOutCanonicalState,
 }));
 

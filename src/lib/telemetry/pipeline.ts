@@ -22,12 +22,12 @@ export interface PipelineTelemetryContext {
 type PipelineMembershipReader = (issueId: string) => Promise<boolean>;
 
 async function readCanonicalPipelineMembership(issueId: string): Promise<boolean> {
-  const [membershipModule, gatherModule, recordModule] = await Promise.all([
+  const [membershipModule, gatherModule, issueProjectsModule] = await Promise.all([
     import('../pipeline-membership.js'),
     import('../pipeline-membership-gather.js'),
-    import('../pan-dir/record.js'),
+    import('../overdeck/issue-projects.js'),
   ]);
-  const project = recordModule.resolveProjectForIssue(issueId);
+  const project = issueProjectsModule.resolveProjectForIssue(issueId);
   if (!project) return false;
   const signals = await gatherModule.gatherProjectLensSignals(project);
   const issueSignals = signals.find(

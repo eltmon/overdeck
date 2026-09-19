@@ -22,7 +22,7 @@ import {
 import { extractPrefixSync, parseIssueIdSync } from './issue-id.js';
 import { notifyProjectsConfigInvalidated } from './projects-cache-events.js';
 import type { DatabaseConfig, QualityGateConfig, RepoConfig } from './workspace-config.js';
-import type { AutoResumeConfig } from './cloister/auto-resume-config.js';
+import type { AutoResumeConfig } from './agents/auto-resume-config.js';
 
 export const PROJECTS_CONFIG_FILE = join(OVERDECK_HOME, 'projects.yaml');
 

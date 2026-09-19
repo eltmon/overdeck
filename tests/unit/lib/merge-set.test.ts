@@ -54,11 +54,11 @@ function repo(repoKey: string, patch: Partial<MergeSetRepoState> = {}): MergeSet
     targetBranch: 'main',
     artifactUrl: `https://gitlab.com/org/${repoKey}/-/merge_requests/1`,
     artifactId: '1',
-    reviewStatus: 'passed',
-    testStatus: 'passed',
+    repoReview: 'passed',
+    repoTests: 'passed',
     rebaseStatus: 'pending',
     verificationStatus: 'pending',
-    mergeStatus: 'pending',
+    repoMerge: 'pending',
     mergeOrder: 0,
     required: true,
     ...patch,
@@ -105,7 +105,7 @@ describe('merge-set sync accessors', () => {
       repos: [
         observed,
         repo('api', {
-          mergeStatus: 'merging',
+          repoMerge: 'merging',
           rebaseStatus: 'passed',
           verificationStatus: 'passed',
         }),
@@ -115,15 +115,15 @@ describe('merge-set sync accessors', () => {
     const patched = patchMergeSetRepoSync('PAN-399', 'fe', observed, {
       artifactId: '1',
       artifactUrl: observed.artifactUrl,
-      mergeStatus: 'merged',
+      repoMerge: 'merged',
     });
     const loaded = getMergeSetSync('PAN-399')!;
 
     expect(patched).toBe(true);
     expect(loaded.status).toBe('merging');
-    expect(loaded.repos.find((entry) => entry.repoKey === 'fe')?.mergeStatus).toBe('merged');
+    expect(loaded.repos.find((entry) => entry.repoKey === 'fe')?.repoMerge).toBe('merged');
     expect(loaded.repos.find((entry) => entry.repoKey === 'api')).toEqual(expect.objectContaining({
-      mergeStatus: 'merging',
+      repoMerge: 'merging',
       rebaseStatus: 'passed',
       verificationStatus: 'passed',
     }));
@@ -134,12 +134,12 @@ describe('merge-set sync accessors', () => {
     const observed = repo('fe');
     upsertMergeSetSync(makeMergeSet({ repos: [repo('fe', { artifactId: '2' })] }));
 
-    const patched = patchMergeSetRepoSync('PAN-399', 'fe', observed, { mergeStatus: 'merged' });
+    const patched = patchMergeSetRepoSync('PAN-399', 'fe', observed, { repoMerge: 'merged' });
 
     expect(patched).toBe(false);
     expect(getMergeSetSync('PAN-399')?.repos[0]).toEqual(expect.objectContaining({
       artifactId: '2',
-      mergeStatus: 'pending',
+      repoMerge: 'pending',
     }));
   });
 
@@ -152,16 +152,16 @@ describe('merge-set sync accessors', () => {
     }));
 
     const patched = patchMergeSetReposSync('PAN-399', [
-      { repoKey: 'fe', expected: observedFe, patch: { mergeStatus: 'merged' } },
-      { repoKey: 'api', expected: observedApi, patch: { mergeStatus: 'skipped' } },
+      { repoKey: 'fe', expected: observedFe, patch: { repoMerge: 'merged' } },
+      { repoKey: 'api', expected: observedApi, patch: { repoMerge: 'skipped' } },
     ]);
     const loaded = getMergeSetSync('PAN-399')!;
 
     expect(patched).toBe(false);
-    expect(loaded.repos.find((entry) => entry.repoKey === 'fe')?.mergeStatus).toBe('pending');
+    expect(loaded.repos.find((entry) => entry.repoKey === 'fe')?.repoMerge).toBe('pending');
     expect(loaded.repos.find((entry) => entry.repoKey === 'api')).toEqual(expect.objectContaining({
       artifactId: '2',
-      mergeStatus: 'pending',
+      repoMerge: 'pending',
     }));
   });
 });

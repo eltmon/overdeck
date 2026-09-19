@@ -9,8 +9,8 @@
  *
  * These builders perform no I/O — src/lib/uat-fixtures/seed.ts writes the
  * returned values through the canonical write doors (registerProjectSync,
- * CacheService.set, saveOverdeckAgentStateSync, upsertReviewStatusSync,
- * emitActivityEntryDurable) plus a direct file write for the xBRIEF plan.
+ * CacheService.set, saveAgentStateSync, emitActivityEntryDurable) plus a
+ * direct file write for the xBRIEF plan.
  */
 
 import { join } from 'node:path';
@@ -18,7 +18,6 @@ import { join } from 'node:path';
 import { getOverdeckHome } from '../paths.js';
 import type { ProjectConfig } from '../projects.js';
 import type { AgentState, Role } from '../agents/agent-state.js';
-import type { ReviewStatus } from '../review-status.js';
 import type { EmitActivityOptions } from '../activity-logger.js';
 import type { XBriefDocument, XBriefItem, XBriefSubItem } from '../xbrief/types.js';
 import type { ContinueState } from '../xbrief/continue-state.js';
@@ -70,11 +69,6 @@ export const FIXTURE_CANONICAL_STATUS: CanonicalState = 'in_progress';
 export const FIXTURE_BRANCH = 'feature/fix-1';
 /** Fake model identifier used on every fixture agent row. */
 export const FIXTURE_AGENT_MODEL = 'fixture/uat-seed';
-/** Fake PR fields — the repo `uat-fixtures/repo` does not exist. */
-export const FIXTURE_PR_URL = 'https://github.com/uat-fixtures/repo/pull/1';
-export const FIXTURE_PR_NUMBER = 1;
-export const FIXTURE_PR_HEAD_SHA = 'fix7ure0000000000000000000000000000000f';
-
 export const FIXTURE_WORK_AGENT_ID = 'agent-fix-1-work';
 export const REVIEW_SPECIALIST_ROLES = ['security', 'correctness', 'performance', 'requirements'] as const;
 export type ReviewSpecialistRole = (typeof REVIEW_SPECIALIST_ROLES)[number];
@@ -174,20 +168,6 @@ export function fixtureAgentStates(now: string = new Date().toISOString()): Agen
   }));
 
   return [work, ...reviewers];
-}
-
-/** Builds the fixture ReviewStatus row: convoy approved, tests passed, PR present. */
-export function fixtureReviewStatus(now: string = new Date().toISOString()): ReviewStatus {
-  return {
-    issueId: FIXTURE_ISSUE_ID,
-    reviewStatus: 'passed',
-    testStatus: 'passed',
-    updatedAt: now,
-    readyForMerge: true,
-    prUrl: FIXTURE_PR_URL,
-    prNumber: FIXTURE_PR_NUMBER,
-    prHeadSha: FIXTURE_PR_HEAD_SHA,
-  };
 }
 
 /**

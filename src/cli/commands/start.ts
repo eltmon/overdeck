@@ -34,7 +34,7 @@ import {
   printPlanningConnectionError,
   streamPlanningSession,
 } from './planning-stream.js';
-import { createPlanningProgress, createPrepProgress, runStartPrepStep, runStateReconcile, warnSyncMainFailure } from './start-prep-progress.js';
+import { createPlanningProgress, createPrepProgress, runStartPrepStep, warnSyncMainFailure } from './start-prep-progress.js';
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
  */
@@ -91,7 +91,6 @@ import type { SpawnRemoteAgentOptions } from '../../lib/remote/remote-agents.js'
 import { assertCanStartFreshSync, getWorkAgentLifecycleStateSync } from '../../lib/work-agent-lifecycle.js';
 import { normalizeModelOverrideSync } from '../../lib/model-validation.js';
 import { resolvePlanningMode, type PlanningMode } from './planning-mode.js';
-import { requireAutomaticStateMigration } from '../../lib/state-auto-migrate.js';
 import type { IssueOptions } from './start-options.js';
 import { prepareFreshWorkAgentSession } from './start-fresh-session.js';
 
@@ -295,11 +294,6 @@ async function fetchIssueForAutoStart(issueId: string): Promise<AutoSynthesizeIs
   }
 
   return { issueId, title: issueId, body: '' };
-}
-
-/** PAN-3848 (W24): pre-spawn reconcile is the migration only; policy-override record writes moved post-spawn. */
-async function reconcileStartState(resolved: ResolvedProject, signal: AbortSignal): Promise<void> {
-  await requireAutomaticStateMigration(resolved, signal);
 }
 
 /**
@@ -849,16 +843,10 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       }
     }
     const effectiveRemote = isRemote || overflowToRemote || (locationPreference === 'remote' && !workspacePath);
-    if (resolved) {
-      // PAN-3848 (W24, FR-19): only the state migration runs here — the
-      // policy-override record write moved post-spawn so spawning never takes
-      // the record lock.
-      const reconcileState = async (signal: AbortSignal) => {
-        spinner.text = `Reconciling permanent state for ${resolved.projectName}...`;
-        await reconcileStartState(resolved, signal);
-      };
-      await runStateReconcile(prep, spinner, effectiveRemote, reconcileState);
-    }
+    // PAN-3917: the pre-spawn state-worktree migration this used to run here
+    // (reconcileStartState -> state-home.ts/admin/state-migrate.ts) is gone
+    // with the state layer — there is no longer a permanent-state worktree to
+    // reconcile before spawning.
 
     // PAN-2407: route unplanned issues to the start-planning endpoint before
     // any workspace creation or remote provisioning.
@@ -1244,4 +1232,4 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   }
 }
 
-export const __testInternals = { failPostCreateValidation, repairMainBranchWorkspace, resolveExplicitHarnessFlag, runStartPrepStep, reconcileStartState };
+export const __testInternals = { failPostCreateValidation, repairMainBranchWorkspace, resolveExplicitHarnessFlag, runStartPrepStep };

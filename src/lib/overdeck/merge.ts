@@ -30,11 +30,11 @@ const mergeSetRepos = sqliteTable('merge_set_repos', {
   targetBranch:       text('target_branch').notNull(),
   artifactUrl:        text('artifact_url'),
   artifactId:         text('artifact_id'),
-  reviewStatus:       text('review_status').notNull(),
-  testStatus:         text('test_status').notNull(),
+  repoReview:         text('review_status').notNull(),
+  repoTests:          text('test_status').notNull(),
   rebaseStatus:       text('rebase_status').notNull(),
   verificationStatus: text('verification_status').notNull(),
-  mergeStatus:        text('merge_status').notNull(),
+  repoMerge:          text('merge_status').notNull(),
   mergeOrder:         integer('merge_order').notNull(),
   required:           integer('required', { mode: 'boolean' }).notNull(),
 });
@@ -150,11 +150,11 @@ export const MergeSetRepo = Schema.Struct({
   targetBranch:       Schema.String,
   artifactUrl:        Schema.NullOr(Schema.String),
   artifactId:         Schema.NullOr(Schema.String),
-  reviewStatus:       GateStatus,
-  testStatus:         GateStatus,
+  repoReview:         GateStatus,
+  repoTests:          GateStatus,
   rebaseStatus:       RebaseStatus,
   verificationStatus: GateStatus,
-  mergeStatus:        RepoMergeStatus,
+  repoMerge:          RepoMergeStatus,
   mergeOrder:         Schema.Number,
   required:           Schema.Boolean,
 });
@@ -252,9 +252,9 @@ export class MergeSetNotFound extends Schema.TaggedErrorClass<MergeSetNotFound>(
 
 export class NotReadyForMerge extends Schema.TaggedErrorClass<NotReadyForMerge>()(
   'NotReadyForMerge', {
-    issueId:      IssueId,
-    reviewStatus: GateStatus,
-    testStatus:   GateStatus,
+    issueId:    IssueId,
+    repoReview: GateStatus,
+    repoTests:  GateStatus,
   },
 ) {}
 
@@ -282,13 +282,13 @@ export class ForgeMergeFailed extends Schema.TaggedErrorClass<ForgeMergeFailed>(
   },
 ) {}
 
-// ── readyForMerge — exported predicate (AC1: test=skipped counts as passing) ─
+// ── mergeReady — exported predicate (AC1: test=skipped counts as passing) ────
 
-export function readyForMerge(repo: MergeSetRepo): boolean {
+export function mergeReady(repo: MergeSetRepo): boolean {
   return (
     // PAN-1862 (FR-16): review=skipped (mode none) passes like review=passed.
-    (repo.reviewStatus === 'passed' || repo.reviewStatus === 'skipped') &&
-    (repo.testStatus === 'passed' || repo.testStatus === 'skipped')
+    (repo.repoReview === 'passed' || repo.repoReview === 'skipped') &&
+    (repo.repoTests === 'passed' || repo.repoTests === 'skipped')
   );
 }
 
@@ -345,11 +345,11 @@ function buildMergeSet(set: MergeSetRow, repos: MergeSetRepoRow[]): MergeSet {
       targetBranch:       r.targetBranch,
       artifactUrl:        r.artifactUrl        ?? null,
       artifactId:         r.artifactId         ?? null,
-      reviewStatus:       r.reviewStatus       as MergeSetRepo['reviewStatus'],
-      testStatus:         r.testStatus         as MergeSetRepo['testStatus'],
+      repoReview:         r.repoReview         as MergeSetRepo['repoReview'],
+      repoTests:          r.repoTests          as MergeSetRepo['repoTests'],
       rebaseStatus:       r.rebaseStatus       as MergeSetRepo['rebaseStatus'],
       verificationStatus: r.verificationStatus as MergeSetRepo['verificationStatus'],
-      mergeStatus:        r.mergeStatus        as MergeSetRepo['mergeStatus'],
+      repoMerge:          r.repoMerge          as MergeSetRepo['repoMerge'],
       mergeOrder:         r.mergeOrder,
       required:           r.required,
     })),
@@ -543,13 +543,13 @@ export const MergeWriterLive = Layer.effect(
 
         // Gate 1: all required repos must be review-passed AND test-passed-or-skipped (AC1)
         const requiredRepos = set.repos.filter((r) => r.required);
-        const failing = requiredRepos.find((r) => !readyForMerge(r));
+        const failing = requiredRepos.find((r) => !mergeReady(r));
         if (failing)
           return yield* Effect.fail(
             new NotReadyForMerge({
-              issueId:      id,
-              reviewStatus: failing.reviewStatus,
-              testStatus:   failing.testStatus,
+              issueId:    id,
+              repoReview: failing.repoReview,
+              repoTests:  failing.repoTests,
             }),
           );
 

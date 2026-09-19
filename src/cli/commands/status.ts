@@ -4,7 +4,7 @@ import { existsSync, readFileSync, statSync, readdirSync } from 'fs';
 import { join, basename } from 'path';
 import { listRunningAgentsSync, getAgentDir, type AgentState } from '../../lib/agents.js';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
-import { isNoResumeValueEnabled } from '../../lib/cloister/no-resume-mode.js';
+import { isNoResumeValueEnabled } from '../../lib/boot-no-resume.js';
 import { getTldrMetricsSync, getTldrDaemonServiceSync } from '../../lib/tldr-daemon.js';
 import {
   collectDockerContainerLifecycleSnapshot,

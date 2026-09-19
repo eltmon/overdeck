@@ -170,21 +170,20 @@ export const rebuildWorkspaceStack = (
     const reviewStatus = closed
       ? null
       : yield* Effect.promise(async () => {
-          const { resolveCanonicalReviewStatus } = await import('../cloister/review-status-source.js');
-          return resolveCanonicalReviewStatus(issueId);
+          const { getReviewStatusSync } = await import('../review-status.js');
+          return getReviewStatusSync(issueId);
         });
-    if (closed || reviewStatus?.status?.mergeStatus === 'merged') {
+    if (closed || reviewStatus?.mergeStatus === 'merged') {
       return {
         success: false,
         error: 'Issue is terminal (closed/merged) — skipping stack rebuild',
       } satisfies RebuildWorkspaceStackResult;
     }
-    if (!reviewStatus?.available) {
-      return {
-        success: false,
-        error: 'Issue terminal status is unavailable — skipping stack rebuild',
-      } satisfies RebuildWorkspaceStackResult;
-    }
+    // PAN-3917: this used to also fail closed when the canonical-status
+    // resolver was unregistered (a wiring gap distinct from "no status yet").
+    // getReviewStatusSync is a direct DB read with no registration step — it
+    // either returns the issue's status (possibly null for a fresh issue,
+    // which is not terminal) or throws, which Effect.promise surfaces above.
 
     // Pre-render name: the workspace's current devcontainer state, if any.
     // Resolves the fallback cleanly when nothing is declared yet (matching

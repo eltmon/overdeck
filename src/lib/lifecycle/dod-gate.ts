@@ -14,7 +14,7 @@ import {
   resolveProjectForIssue,
 } from '../overdeck/issue-projects.js';
 import type { ProjectConfig } from '../projects.js';
-import { getAutoCloseOutCanonicalState } from '../cloister/deacon-canonical-state.js';
+import { getAutoCloseOutCanonicalState } from './auto-close-out-canonical-state.js';
 import { isTrackerIssueClosed } from '../cloister/issue-closed.js';
 import { readVerificationArtifact, type VerificationArtifact } from '../cloister/verification-artifact.js';
 import {

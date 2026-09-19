@@ -1,6 +1,5 @@
 import { loadConfigSync } from './config-yaml.js';
 import { getProjectSync, resolveProjectFromIssueSync } from './projects.js';
-import { readIssueRecordSync } from './pan-dir/record.js';
 
 export type SwarmMode = 'off' | 'auto' | 'always';
 export interface SwarmPolicyLayer { mode?: SwarmMode; maxSlots?: number; autoAdvance?: boolean }
@@ -29,8 +28,10 @@ export function resolveSwarmPolicy(issueId?: string, cli: SwarmPolicyLayer = {})
   if (!issueId) return resolveSwarmPolicyLayers(global, {}, {}, cli);
   const resolved = resolveProjectFromIssueSync(issueId);
   const project = resolved ? getProjectSync(resolved.projectKey) : undefined;
-  const issue = project ? readIssueRecordSync(project, issueId)?.swarm?.policy : undefined;
-  return resolveSwarmPolicyLayers(global, project?.swarm, issue, cli);
+  // PAN-3917: the per-issue swarm-policy override lived only on the deleted
+  // pipeline record (Appendix A.2) with no live-derivable replacement.
+  // Falls through to the project/global/cli layers below.
+  return resolveSwarmPolicyLayers(global, project?.swarm, {}, cli);
 }
 
 export function resolveAutomaticSwarmPolicy(issueId: string, swarmEligible: boolean, manual = false) {

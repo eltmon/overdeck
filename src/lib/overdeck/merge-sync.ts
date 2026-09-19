@@ -403,11 +403,11 @@ function rowToMergeSetRepos(rows: OverdeckMergeSetRepoRow[]): MergeSetRepoState[
     targetBranch: r.target_branch,
     artifactUrl: r.artifact_url ?? undefined,
     artifactId: r.artifact_id ?? undefined,
-    reviewStatus: r.review_status as MergeSetRepoState['reviewStatus'],
-    testStatus: r.test_status as MergeSetRepoState['testStatus'],
+    repoReview: r.review_status as MergeSetRepoState['repoReview'],
+    repoTests: r.test_status as MergeSetRepoState['repoTests'],
     rebaseStatus: r.rebase_status as MergeSetRepoState['rebaseStatus'],
     verificationStatus: r.verification_status as MergeSetRepoState['verificationStatus'],
-    mergeStatus: r.merge_status as MergeSetRepoState['mergeStatus'],
+    repoMerge: r.merge_status as MergeSetRepoState['repoMerge'],
     mergeOrder: r.merge_order,
     required: r.required === 1,
   }));
@@ -483,11 +483,11 @@ export function upsertMergeSet(mergeSet: MergeSet): void {
         repo.targetBranch,
         repo.artifactUrl ?? null,
         repo.artifactId ?? null,
-        repo.reviewStatus,
-        repo.testStatus,
+        repo.repoReview,
+        repo.repoTests,
         repo.rebaseStatus,
         repo.verificationStatus,
-        repo.mergeStatus,
+        repo.repoMerge,
         repo.mergeOrder,
         repo.required ? 1 : 0,
       );
@@ -500,7 +500,7 @@ export function upsertMergeSet(mergeSet: MergeSet): void {
 export interface MergeSetRepoPatch {
   repoKey: string;
   expected: Pick<MergeSetRepoState, 'sourceBranch' | 'targetBranch' | 'artifactUrl' | 'artifactId'>;
-  patch: Partial<Pick<MergeSetRepoState, 'artifactUrl' | 'artifactId' | 'mergeStatus'>>;
+  patch: Partial<Pick<MergeSetRepoState, 'artifactUrl' | 'artifactId' | 'repoMerge'>>;
 }
 
 const MERGE_SET_REPO_CAS_FAILED = new Error('merge-set-repo-cas-failed');
@@ -517,7 +517,7 @@ export function patchMergeSetRepos(issueId: string, patches: MergeSetRepoPatch[]
         const values: unknown[] = [];
         if (patch.artifactUrl !== undefined) { assignments.push('artifact_url = ?'); values.push(patch.artifactUrl); }
         if (patch.artifactId !== undefined) { assignments.push('artifact_id = ?'); values.push(patch.artifactId); }
-        if (patch.mergeStatus !== undefined) { assignments.push('merge_status = ?'); values.push(patch.mergeStatus); }
+        if (patch.repoMerge !== undefined) { assignments.push('merge_status = ?'); values.push(patch.repoMerge); }
         const result = db.prepare(`
           UPDATE merge_set_repos SET ${assignments.join(', ')}
           WHERE issue_id = ? AND repo_key = ? AND source_branch = ? AND target_branch = ?

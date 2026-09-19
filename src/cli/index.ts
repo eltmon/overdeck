@@ -3,7 +3,7 @@ import { Effect } from 'effect';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { ensureCompatibleNode } from './node-preflight.js'; import { drainPendingDurableWrites } from './durable-write-drain.js';
+import { ensureCompatibleNode } from './node-preflight.js';
 
 // Relaunch under a compatible Node (>=22) before anything else runs. If the
 // current runtime is already Node 22+ this is a no-op; otherwise it re-execs the
@@ -107,7 +107,7 @@ import { planDoneCommand } from './commands/plan-done.js';
 import { registerCavemanCommands } from './commands/caveman.js';
 import { registerReleaseCommands } from './commands/release.js';
 import { registerRolloutCommands } from './commands/rollout.js';
-import { isNoResumeCliOptionEnabled } from '../lib/cloister/no-resume-mode.js';
+import { isNoResumeCliOptionEnabled } from '../lib/boot-no-resume.js';
 import { applyBootGateEnv, formatBootGateState, resolveBootGates } from '../lib/boot-gates.js';
 import { getManagedTmuxSocketName } from '../lib/tmux.js';
 import { registerResourceCommands } from './commands/resources.js';
@@ -1369,4 +1369,7 @@ if (process.argv.length === 2) {
 }
 
 // Short-lived commands must drain durable state writes before exit (PAN-2692).
-await runCliWithTelemetry(() => program.parseAsync(process.argv, { from: 'node' }), drainPendingDurableWrites);
+// PAN-3917: durable-write-drain.ts (journal writes + state-worktree
+// auto-commit flush) is gone with the state layer — there is nothing left to
+// drain before exit, so runCliWithTelemetry's drain hook is a no-op.
+await runCliWithTelemetry(() => program.parseAsync(process.argv, { from: 'node' }), async () => {});

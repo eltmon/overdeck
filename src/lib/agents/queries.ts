@@ -8,8 +8,7 @@ import { getAgentState, isRole, normalizeAgentId } from '../agents.js';
 import { killSession, listSessionsSync } from '../tmux.js';
 import { getRuntimeCensus, getRuntimeCensusSnapshot } from '../runtime-census.js';
 import { AGENTS_DIR } from '../paths.js';
-import { getRollbackAgentStatePath } from '../overdeck/agent-rollback-state.js';
-import { listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
+import { getAgentStateFilePath, listAgentStatesSync } from './agent-state.js';
 import { removeAgentStateDir } from './state-dir-removal.js';
 
 export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[] {
@@ -23,7 +22,7 @@ export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[
     : new Set(listSessionsSync().map((session) => session.name));
   const tmuxUnavailable = census?.tmuxAvailable === false;
 
-  return listOverdeckAgentStatesSync().map((state) => {
+  return listAgentStatesSync().map((state) => {
     const normalizedId = normalizeAgentId(state.id);
     return {
       ...state,
@@ -34,11 +33,12 @@ export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[
 }
 
 /**
- * PAN-1908: list all agents in the SQLite registry with optional filtering.
- * This is the replacement for enumerating ~/.overdeck/agents/ directories.
+ * List all agents (scanned from each ~/.overdeck/agents/<id>/state.json) with
+ * optional filtering. PAN-3917: the SQLite mirror is gone; the per-agent JSON
+ * file is the only copy.
  */
 export function listAgentStates(options?: { status?: AgentStatus; role?: Role }): AgentState[] {
-  return listOverdeckAgentStatesSync()
+  return listAgentStatesSync()
     .filter((state) => {
       if (options?.status && state.status !== options.status) return false;
       if (options?.role && state.role !== options.role) return false;
@@ -49,7 +49,8 @@ export function listAgentStates(options?: { status?: AgentStatus; role?: Role })
 
 export const listRunningAgents = (): Effect.Effect<(AgentState & { tmuxActive: boolean })[], FsError | TmuxError> =>
   Effect.gen(function* () {
-    // PAN-1908: authoritative registry is the SQLite agents table; no directory scan.
+    // PAN-3917: authoritative registry is the per-agent state.json file, scanned
+    // via listAgentStatesSync (no SQLite mirror any more).
     //
     // TRAP — `tmuxActive` reflects whether THIS process can see the agent's tmux
     // session on the `overdeck` socket. A one-off `tsx -e`/CLI process may not;
@@ -64,7 +65,7 @@ export const listRunningAgents = (): Effect.Effect<(AgentState & { tmuxActive: b
     const runtimeCensus = yield* Effect.promise(() => getRuntimeCensus());
     const tmuxNames = runtimeCensus.sessionNames;
 
-    return listOverdeckAgentStatesSync().map((state) => {
+    return listAgentStatesSync().map((state) => {
       const normalizedId = normalizeAgentId(state.id);
       return {
         ...state,
@@ -112,7 +113,7 @@ export async function dropLegacyAgentStatesMissingRoleAsync(): Promise<number> {
       if (!stat.isDirectory()) return;
 
       const agentId = normalizeAgentId(entry);
-      const stateFile = getRollbackAgentStatePath(agentId);
+      const stateFile = getAgentStateFilePath(agentId);
       let raw: { role?: unknown };
       try {
         const contents = await fsp.readFile(stateFile, 'utf8');

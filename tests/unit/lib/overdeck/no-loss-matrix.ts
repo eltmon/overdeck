@@ -685,7 +685,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'pan close <id>',                 kind: 'cli', disposition: 'WRITE',       door: 'IssueWriter.advance("closed","close-out")' },
   { surface: 'pan wipe <id>',                  kind: 'cli', disposition: 'WRITE',       door: 'IssueWriter.advance("todo","wipe") + workspace teardown' },
   { surface: 'pan approve <id>',               kind: 'cli', disposition: 'WRITE',       door: 'IssueWriter.advance("merging")' },
-  { surface: 'pan review pending',             kind: 'cli', disposition: 'READ',        door: 'IssuesResolver.list({readyForMerge})' },
+  { surface: 'pan review pending',             kind: 'cli', disposition: 'READ',        door: 'IssuesResolver.list({mergeReady})' },
   { surface: 'pan review request <id>',        kind: 'cli', disposition: 'WRITE',       door: 'IssueWriter.advance("in_review")' },
   { surface: 'pan review reset <id>',          kind: 'cli', disposition: 'WRITE',       door: 'IssueWriter.advance("working")' },
   { surface: 'pan review abort <id>',          kind: 'cli', disposition: 'RELOCATE',    door: 'AgentWriter.stop (reviewers)' },

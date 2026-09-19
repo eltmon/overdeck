@@ -1,10 +1,40 @@
-import { existsSync, readFileSync, unlinkSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { resolveBareNumericIdSync } from '../issue-id.js';
-import { getOverdeckHome } from '../paths.js';
-import { getRollbackAgentStatePath } from '../overdeck/agent-rollback-state.js';
-import { getOverdeckAgentStateSync, listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
+import { AGENTS_DIR, getOverdeckHome } from '../paths.js';
 import { getAgentRuntimeStateSync } from './runtime-state.js';
+
+function agentStateFilePath(agentId: string): string {
+  return join(AGENTS_DIR, agentId, 'state.json');
+}
+
+/**
+ * Minimal directory scan for {@link resolveAgentTargetSync}'s issueId fallback.
+ * Deliberately does not import agent-state.ts's full parse/typing (that would
+ * close an identity.ts <-> agent-state.ts import cycle — agent-state.ts
+ * already imports normalizeAgentId from here).
+ */
+function listAgentIssueIdsSync(): { id: string; issueId: string }[] {
+  let entries: string[];
+  try {
+    entries = readdirSync(AGENTS_DIR);
+  } catch {
+    return [];
+  }
+  const out: { id: string; issueId: string }[] = [];
+  for (const name of entries) {
+    try {
+      const raw = readFileSync(agentStateFilePath(name), 'utf8');
+      const parsed = JSON.parse(raw) as { id?: unknown; issueId?: unknown };
+      if (typeof parsed.issueId === 'string') {
+        out.push({ id: typeof parsed.id === 'string' ? parsed.id : name, issueId: parsed.issueId });
+      }
+    } catch {
+      // skip unreadable/unparsable state files
+    }
+  }
+  return out;
+}
 
 /** Known agent ID prefixes — IDs with these prefixes are already normalized */
 const AGENT_PREFIXES = ['agent-', 'planning-', 'conv-', 'strike-', 'inspect-'];
@@ -32,7 +62,7 @@ export function isQualifiedAgentId(input: string): boolean {
 }
 
 function agentStateExistsSync(agentId: string): boolean {
-  return Boolean(getOverdeckAgentStateSync(agentId)) || existsSync(getRollbackAgentStatePath(agentId));
+  return existsSync(agentStateFilePath(agentId));
 }
 
 /**
@@ -54,7 +84,7 @@ export function resolveAgentTargetSync(input: string): string | null {
 
   try {
     const wantedIssueId = issueId.toUpperCase();
-    const matches = listOverdeckAgentStatesSync()
+    const matches = listAgentIssueIdsSync()
       .filter((agent) => agent.issueId.toUpperCase() === wantedIssueId)
       .map((agent) => agent.id);
     if (matches.length === 1) return matches[0].toLowerCase();

@@ -9,8 +9,7 @@ import { subItemsOf, type XBriefDocument, type XBriefItem, type XBriefItemStatus
 import {
   getProjectConfigFromWorkspacePath,
   resolveProjectForIssue,
-} from '../pan-dir/record.js';
-import { updateIssueRecord } from '../pan-dir/record-update.js';
+} from '../overdeck/issue-projects.js';
 import { normalizeXBriefEnvelope, serializeXBriefDocument } from './io.js';
 
 export interface WaveItem {

@@ -1,4 +1,4 @@
-import { isNoResumeValueEnabled } from '../cloister/no-resume-mode.js';
+import { isNoResumeValueEnabled } from '../boot-no-resume.js';
 import { spawnSequencerAgent } from './sequencer-agent.js';
 
 /**
