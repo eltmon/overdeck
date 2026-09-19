@@ -1,12 +1,15 @@
 /**
  * Launch path shared by every spawner (PAN-3917 FR-5, W8).
  *
- * `pan start`, `pan spawn`, the review and test specialists, `pan strike`, and
- * `pan handoff --issue` all place their pane in the issue's workspace and stamp
- * the same four metadata tokens: `issue`, `role`, `harness`, `model`. This
- * module is the one place that resolves the backend (D10 selection), finds or
- * creates the workspace, and starts the pane — so a launcher is three lines and
- * cannot forget the tokens.
+ * `pan start`, `pan spawn`, the review and test specialists, and `pan strike`
+ * place their pane in the issue's workspace and stamp the same four metadata
+ * tokens: `issue`, `role`, `harness`, `model`. This module is the one place
+ * that resolves the backend (D10 selection), finds or creates the workspace,
+ * and starts the pane — so a launcher is three lines and cannot forget the
+ * tokens. `pan handoff --issue` does not route through here yet — the forked
+ * conversation still inherits its parent's cwd (or an explicit `--cwd`), not
+ * the issue's workspace; giving it the same pane placement is a post-release
+ * follow-up (docs/THE-CUT.md).
  *
  * Importing it registers both adapters.
  */
