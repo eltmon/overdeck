@@ -1,0 +1,536 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-19T11:49:17Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3929: Skill text still names deleted status fields (readyForMerge, mergeStatus, reviewStatus) in pipeline-status, pipeline-list, pan-recap, pan-rollout, pan-tts",
+    "updated": "2026-09-19T11:55:22.477Z"
+  },
+  "plan": {
+    "id": "pan-3929",
+    "title": "Skill text still names deleted status fields (readyForMerge, mergeStatus, reviewStatus) in pipeline-status, pipeline-list, pan-recap, pan-rollout, pan-tts",
+    "status": "proposed",
+    "uid": "3cacbe93-5e9e-495a-b989-99cdad037600",
+    "author": "agent:claude-fable-5-1",
+    "sequence": 2,
+    "created": "2026-09-19T11:49:17Z",
+    "updated": "2026-09-19T11:55:22.477Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3929",
+        "label": "PAN-3929",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3917",
+        "label": "PAN-3917",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-3929.md",
+        "label": "PRD",
+        "type": "document"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3934",
+        "label": "PAN-3934",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "skills",
+      "docs",
+      "lint-guard",
+      "pan-3917-followup"
+    ],
+    "narratives": {
+      "Problem": "The Cut (PAN-3917) deleted the stored status layer, but five agent-shipped skills still instruct agents to read the deleted fields: pipeline-status queries a review_status SQLite table that no longer exists (verified: the live panopticon.db has no such table, so the skill fails on its first query), pipeline-list branches on readyForMerge/mergeStatus, pan-recap annotates in-flight issues with readyForMerge, pan-rollout names releaseStatus, and pan-tts maps a voice to reviewStatus.passed. scripts/guard-no-state-layer.sh missed all of them because its Markdown pass deliberately omits the field names (header comment lines 22-29) while the code pass includes them. The issue body counts 33 hits; on this branch the full code-pass pattern set finds 17 camelCase occurrences plus snake_case review_status column references, all confined to these five files.",
+      "Proposal": "Rewrite each of the five skills to the derived model (DerivedIssueState in packages/contracts/src/derived-issue-state.ts: state, attention, pr.reviewState, pr.checks, pr.mergeable), sourcing batch state from GET /api/issues/resource-allocated and per-issue attention/PR facts from `pan show <id> --json` only for in-review, changes-requested, and ready members. Widen the guard's Markdown pass to the code pass's full pattern set, rewrite the header paragraph that argued for the narrow set, add the first tests that exercise the Markdown pass (no scan-root argument), and document the widened scan in docs/SKILLS-CONVENTION.md. Six items: one per skill file (independent of each other) and one for the guard, which is blocked by the five because `npm run lint` is red until both halves land. Full detail, before/after snippets, and decisions D1-D9 are in .pan/drafts/pan-3929.md.",
+      "NonGoals": "- No new REST endpoint for batch derived state; skills use /api/issues/resource-allocated plus `pan show --json` (D8).\n- No edits to roles/*.md, docs/KANBAN-MODEL.md, docs/AGENT_TYPES_INDEX.md, or docs/PIPELINE-GATES.md, which also name deleted fields but are outside the guard's Markdown roots and outside this issue; filed as follow-up PAN-3934 (D9).\n- No change to the guard's code pass, its scan roots (src/, src/lib/cloister/prompts/, sync-sources/), or its two by-name exemptions.\n- No change to pipeline-list's --all verifying bucket or its verifying_on_main check.\n- No restyling of skill prose beyond the sentences that name deleted fields or carry the replacement data flow.\n- No changes to pan show, pan rollout, pan tts, or any dashboard route or contract type."
+    },
+    "autoDecisions": [
+      {
+        "summary": "pipeline-status reads batch `state` from /api/issues/resource-allocated and calls `pan show <id> --json` only for in-review / changes-requested / ready members.",
+        "rationale": "No REST route returns the full DerivedIssueState in batch; `pan show` spawns a process and does forge reads per issue, so calling it for all ~40 members would take over a minute. PR columns only carry information for those three states."
+      },
+      {
+        "summary": "pipeline-status columns become STATE, NEEDS, PR-REVIEW, CHECKS, MERGEABLE; the TEST/VERIFY columns and the `*` drift glyph are dropped.",
+        "rationale": "The derived model has no test verdict; pr.checks is the nearest observable. Nothing stored can drift any more, so the PAN-1027 drift flag has no referent."
+      },
+      {
+        "summary": "pipeline-list lifecycle view puts post_merge_limbo membership in Ship and deletes the mergeStatus clause.",
+        "rationale": "Mirrors getPipelineIssuePhase line 96, the frontend's own rule; /api/issues carries no derived state."
+      },
+      {
+        "summary": "pan-tts example key is workAgent.finished.",
+        "rationale": "One of the four LIFECYCLE_EVENT_TYPES in tts-playback.ts and the natural 'work is done' announcement."
+      },
+      {
+        "summary": "The guard's Markdown pass adopts the code pass's full set including auto-commit and recoveryTrips.",
+        "rationale": "Running the full set over sync-sources/ and src/lib/cloister/prompts/ on 2026-09-19 hit only the five files in scope, so there are no false positives to trade off against."
+      },
+      {
+        "summary": "roles/*.md and docs/*.md hits are deferred to follow-up issue PAN-3934.",
+        "rationale": "The issue names five skills and the guard's Markdown roots; roles/ is not scanned by the guard. Filing rather than silently widening scope."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "Six files of prose plus one shell script and one test file; every item is a leaf.",
+      "canonicalFilename": "2026-09-19-PAN-3929-skill-text-still-names-deleted-status-fields-readyformerge-mergestatus-reviewstatus-in-pipeline-status-pipeline-list-pan-recap-pan-rollout-pan-tts.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "pipeline-status-derived",
+        "title": "pipeline-status: derived-state columns, drop the SQLite review_status join",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:49:17Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-3929",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pipeline-status/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -cP 'readyForMerge|mergeStatus|reviewStatus|review_status|sqlite3' sync-sources/skills/pipeline-status/SKILL.md",
+            "bash scripts/guard-no-state-layer.sh 2>&1 | grep -c 'pipeline-status/SKILL.md' || true"
+          ],
+          "expected_outputs": [
+            "the first grep prints 0",
+            "the guard reports no line under sync-sources/skills/pipeline-status/SKILL.md",
+            "the step-1 python block, extracted and run against the live dashboard, prints a header containing STATE  NEEDS  PR-REVIEW  CHECKS  MERGEABLE without a traceback"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W1 exactly (.pan/drafts/pan-3929.md). Update the frontmatter phase list, the output-format example, the cell-semantics table (remove the `*` row), and the Columns table so the five status columns become STATE / NEEDS / PR-REVIEW / CHECKS / MERGEABLE sourced from /api/issues/resource-allocated `.state` and `pan show <id> --json` `.attention` / `.pr.*`. In the step-1 script remove the sqlite3 import, PANO_DB, the db connection, and review_row; add the resource-allocated fetch, the state_by_id map, the PR_STATES set, the derived() helper that shells to `pan show <id> --json` only for in-review / changes-requested / ready, and the checks_cell / mergeable_cell helpers; read `pr` as `(d.get('pr') or {})` because pan show omits it when there is no PR. Rewrite step 2 (Awaiting Merge) to filter resource-allocated rows with state == 'ready' that are pipeline members. Update the Notes section (derived state instead of review status; delete the drift bullet). Do not change the membership fetch, the planning-sessions section, or the sort order."
+        },
+        "items": [
+          {
+            "id": "pipeline-status-derived.ac1",
+            "title": "Given the rewritten file, when `grep -cP 'readyForMerge|mergeStatus|reviewStatus|review_status|sqlite3'` runs on it, then it prints 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-status-derived.ac2",
+            "title": "Given the dashboard is up, when the step-1 script is extracted and run, then it prints a header row containing `STATE  NEEDS  PR-REVIEW  CHECKS  MERGEABLE` and one row per pipeline member, and exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-status-derived.ac3",
+            "title": "Given a member whose resource-allocated `state` is `in-review`, `changes-requested`, or `ready`, when the script runs, then it invokes `pan show <id> --json` for that member and renders its `pr.reviewState`, `pr.checks`, and `pr.mergeable`; for every other member it renders `·` in those cells without invoking pan show.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-status-derived.ac4",
+            "title": "Given the step-2 block, when it runs, then it prints `Awaiting Merge: N issue(s)` counting only pipeline members whose resource-allocated `state` equals `ready`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-status-derived.ac5",
+            "title": "Given the frontmatter and Columns table, when read, then the description names the phase list `agent → state → needs → PR review → checks → mergeable` and the Columns table has no row sourced from a `review-status DB`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipeline-list-lanes",
+        "title": "pipeline-list: lane mapping from the derived state in both views",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:49:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3929",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pipeline-list/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -cP 'readyForMerge|mergeStatus' sync-sources/skills/pipeline-list/SKILL.md",
+            "bash scripts/guard-no-state-layer.sh 2>&1 | grep -c 'pipeline-list/SKILL.md' || true"
+          ],
+          "expected_outputs": [
+            "the first grep prints 0",
+            "the guard reports no line under sync-sources/skills/pipeline-list/SKILL.md",
+            "the python block run with and without --phase prints a `Pipeline (` header and per-lane counts without a traceback"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W2 exactly. In the view table replace the readyForMerge mention with the derived `state: ready`. In the lifecycle phase() delete the mergeStatus clause and insert the post_merge_limbo membership check (mirrors src/dashboard/frontend/src/lib/pipeline-state.ts:96) before the in_review check. In the resource phase() add a module-level LANE dict (planned→plan, working→work, in-review/changes-requested→review, ready/merged/closed→ship), return the lane when `state` is in it, return None for backlog/parked, and keep the existing stateLabel fallback for a null state. Rewrite Notes bullets 1-3 per W2 steps 4-6. Leave the --all verifying bucket alone."
+        },
+        "items": [
+          {
+            "id": "pipeline-list-lanes.ac1",
+            "title": "Given the rewritten file, when `grep -cP 'readyForMerge|mergeStatus'` runs on it, then it prints 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-list-lanes.ac2",
+            "title": "Given a resource-allocated row with `state` equal to `ready`, `merged`, or `closed`, when the default view runs, then that issue renders under Ship; `in-review` and `changes-requested` render under Review; `working` under Work; `planned` under Plan.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-list-lanes.ac3",
+            "title": "Given an /api/issues row whose `pipelineMembership.bucket` is `post_merge_limbo` and `available` is true, when `--phase` runs, then that issue renders under Ship.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-list-lanes.ac4",
+            "title": "Given a resource-allocated row with `state` null, when the default view runs, then the existing stateLabel fallback assigns its lane (no exception, no dropped row).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-recap-ready-marker",
+        "title": "pan-recap: define `ready` in the jargon rule and mark in-flight issues from the derived state",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T11:49:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3929",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-recap/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c readyForMerge sync-sources/skills/pan-recap/SKILL.md",
+            "bash scripts/guard-no-state-layer.sh 2>&1 | grep -c 'pan-recap/SKILL.md' || true"
+          ],
+          "expected_outputs": [
+            "the grep prints 0",
+            "the guard reports no line under sync-sources/skills/pan-recap/SKILL.md",
+            "the step-2 python block run against the live dashboard prints in-flight issues, with `(ready)` only after issues whose derived state is ready"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W3 exactly. Line 63: replace `readyForMerge` in the jargon list with the derived-state definition of \"ready\" (approved PR, green checks, forge reports mergeable). Step 2 script: inside the same try block, fetch /api/issues/resource-allocated, build `state_by_id`, and print `(ready)` when the in-flight issue's derived state is `ready`; drop the `i.get('readyForMerge')` expression. Change nothing else in the skill."
+        },
+        "items": [
+          {
+            "id": "pan-recap-ready-marker.ac1",
+            "title": "Given the rewritten file, when `grep -c readyForMerge` runs on it, then it prints 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-recap-ready-marker.ac2",
+            "title": "Given the jargon rule on line 63, when read, then it defines `ready` as the derived state for an approved PR with green checks that the forge reports mergeable.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-recap-ready-marker.ac3",
+            "title": "Given an in-flight issue whose /api/issues/resource-allocated `state` is `ready`, when the step-2 block runs, then its line ends with `(ready)`; an in-flight issue with any other state prints no suffix.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-recap-ready-marker.ac4",
+            "title": "Given the dashboard is down, when the step-2 block runs, then it exits 0 and prints nothing (the added fetch stays inside the existing try/except).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-rollout-status-vocab",
+        "title": "pan-rollout: describe the release set `status` and its seven values",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T11:49:17Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3929",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-rollout/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c releaseStatus sync-sources/skills/pan-rollout/SKILL.md",
+            "grep -c rolled_back sync-sources/skills/pan-rollout/SKILL.md",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "the first grep prints 0",
+            "the second grep prints 1 or more",
+            "lint-skills exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W4 exactly: replace the sentence at lines 26-27 so it says `pan rollout status` prints the release set's overall `status` (`pending`, `releasing`, `passed`, `failed`, `partial`, `rolled_back`, `skipped`) and each configured component's key, release order, and current status. Values come from src/lib/release-set-types.ts:3. Change nothing else."
+        },
+        "items": [
+          {
+            "id": "pan-rollout-status-vocab.ac1",
+            "title": "Given the rewritten file, when `grep -c releaseStatus` runs on it, then it prints 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-rollout-status-vocab.ac2",
+            "title": "Given the What It Does section, when read, then it lists exactly the seven ReleaseSetStatus values pending, releasing, passed, failed, partial, rolled_back, skipped.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-rollout-status-vocab.ac3",
+            "title": "Given the edited skill, when `bash scripts/lint-skills.sh` runs, then it exits 0 (no pan invocation changed).",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-tts-lifecycle-key",
+        "title": "pan-tts: voice-map example uses an emitted lifecycle event key",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T11:49:17Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3929",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-tts/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c reviewStatus sync-sources/skills/pan-tts/SKILL.md",
+            "grep -c 'workAgent.finished' sync-sources/skills/pan-tts/SKILL.md",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "the first grep prints 0",
+            "the second grep prints 1 or more",
+            "lint-skills exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W5 exactly: change line 147 to `pan tts voices map workAgent.finished \"Vivian Voice\"` and add one sentence after the code block stating that voice-map keys are `activity.tts` `eventType` values and listing the four lifecycle keys planning.started, planning.finalized, workAgent.started, workAgent.finished (src/dashboard/server/services/tts-playback.ts:102-107). Change nothing else."
+        },
+        "items": [
+          {
+            "id": "pan-tts-lifecycle-key.ac1",
+            "title": "Given the rewritten file, when `grep -c reviewStatus` runs on it, then it prints 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-tts-lifecycle-key.ac2",
+            "title": "Given the CLI smoke-test block, when read, then the map example is `pan tts voices map workAgent.finished \"Vivian Voice\"` and the following sentence names the four lifecycle keys.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-tts-lifecycle-key.ac3",
+            "title": "Given the edited skill, when `bash scripts/lint-skills.sh` runs, then it exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "guard-md-full-set",
+        "title": "guard-no-state-layer: Markdown pass uses the full pattern set, with tests and the skills-convention doc",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:49:17Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-3929",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/guard-no-state-layer.sh",
+            "tests/unit/scripts/guard-no-state-layer.test.ts",
+            "docs/SKILLS-CONVENTION.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/scripts/guard-no-state-layer.test.ts",
+            "bash scripts/guard-no-state-layer.sh",
+            "grep -c 'guard-no-state-layer' docs/SKILLS-CONVENTION.md"
+          ],
+          "expected_outputs": [
+            "vitest reports every case passing, including at least four cases under a `Markdown pass` describe block",
+            "the guard prints `guard-no-state-layer passed` and exits 0 (requires the five skill items to have landed)",
+            "the grep prints 1 or more"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD work item W6 exactly. (1) In scripts/guard-no-state-layer.sh extend md_labels and md_patterns (lines 79-95) with recoveryTrips, readyForMerge, the six-field alternation, and auto-commit, keeping label and pattern indexes aligned; keep the six existing entries and the endpoint pattern. (2) Replace the header paragraph at lines 22-29 that defends the narrow set with the paragraph given in W6 step 2 (same set as code; prose explaining deleted fields belongs in docs/). (3) In tests/unit/scripts/guard-no-state-layer.test.ts add a helper that runs the script with NO scan-root argument and cwd = fixture root (the fixture already creates root/src, which the default scan root needs), then a `describe('Markdown pass')` with the four cases in W6 step 3: a sync-sources/skills/x/SKILL.md hit on readyForMerge fails with `sync-sources/skills/x/SKILL.md:1: readyForMerge`; a src/lib/cloister/prompts/p.md hit on mergeStatus fails; the two by-name exempt paths containing the same words pass; a clean skill mentioning `derived state` and `pr.reviewState` passes. (4) Add the paragraph from W6 step 4 to docs/SKILLS-CONVENTION.md between the numbered linter list and `### When the linter trips you up`."
+        },
+        "items": [
+          {
+            "id": "guard-md-full-set.ac1",
+            "title": "Given a fixture sync-sources/skills/x/SKILL.md containing `readyForMerge=true`, when `bash scripts/guard-no-state-layer.sh` runs with no arguments from the fixture root, then it exits 1 and prints `sync-sources/skills/x/SKILL.md:1: readyForMerge`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-md-full-set.ac2",
+            "title": "Given fixture files at sync-sources/rules/protect-overdeck-state-branch.md and sync-sources/skills/pan-admin-migrate-plan-home/SKILL.md containing `overdeck-state` and `readyForMerge`, when the guard runs with no arguments, then it exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-md-full-set.ac3",
+            "title": "Given the updated test file, when `npx vitest run tests/unit/scripts/guard-no-state-layer.test.ts` runs, then every case passes and at least four cases sit under a `Markdown pass` describe block.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-md-full-set.ac4",
+            "title": "Given the script header, when read, then no comment states that the Markdown pass uses a narrower set than the code pass, and the header names PAN-3929 as the reason the sets match.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-md-full-set.ac5",
+            "title": "Given docs/SKILLS-CONVENTION.md, when its Linting section is read, then it names guard-no-state-layer.sh, the sync-sources/ and src/lib/cloister/prompts/ Markdown roots, the deleted field names it rejects, and both exempt files; and `npm run lint:no-state-layer` exits 0 on the branch head.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pipeline-status-derived",
+        "to": "guard-md-full-set",
+        "type": "blocks"
+      },
+      {
+        "from": "pipeline-list-lanes",
+        "to": "guard-md-full-set",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-recap-ready-marker",
+        "to": "guard-md-full-set",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-rollout-status-vocab",
+        "to": "guard-md-full-set",
+        "type": "blocks"
+      },
+      {
+        "from": "pan-tts-lifecycle-key",
+        "to": "guard-md-full-set",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
