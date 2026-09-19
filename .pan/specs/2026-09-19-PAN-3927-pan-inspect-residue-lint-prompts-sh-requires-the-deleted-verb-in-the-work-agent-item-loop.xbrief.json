@@ -1,0 +1,457 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-19T11:46:23.327Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3927: pan inspect residue: lint-prompts.sh requires the deleted verb in the work-agent item loop",
+    "updated": "2026-09-19T11:48:58.072Z"
+  },
+  "plan": {
+    "id": "pan-3927",
+    "title": "pan inspect residue: lint-prompts.sh requires the deleted verb in the work-agent item loop",
+    "status": "proposed",
+    "uid": "6e2d1080-1a37-4fc2-9b29-0b148a9a2dc5",
+    "author": "agent:claude-fable-5-1",
+    "sequence": 2,
+    "created": "2026-09-19T11:46:23.327Z",
+    "updated": "2026-09-19T11:48:58.072Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3927",
+        "label": "PAN-3927",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3917",
+        "label": "PAN-3917 (The Overdeck Cut, FR-14)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-3927.md",
+        "label": "PRD draft",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "cut-residue",
+      "prompts",
+      "lint",
+      "work-role"
+    ],
+    "narratives": {
+      "Problem": "The PAN-3917 cut deleted `pan inspect` and the per-item inspection gate, but `scripts/lint-prompts.sh` (check_item_order_file, lines 38-68) still REQUIRES a `pan inspect` step after `pan task done` in both work-agent item loops, so the prompts could not be cleaned without turning `npm run lint` red. `src/lib/cloister/prompts/work.md:251` and `roles/work.md:68` therefore still tell agents to run a verb that exits 'unknown command' and then wait for a verdict that never arrives. Both loops also instruct `pan task done --reason`, which commander rejects as an unknown option, and neither mentions the `Item: <item-id>` trailer that `pan task done` actually requires on a pushed commit. `src/lib/cloister/prompts/inspect-agent.md` is a dead template with no renderer that still references `pan inspect`, pinned only by two tests and two docs.",
+      "Proposal": "Retarget the lint's item-loop-order check to the surviving invariant (the `git push` step precedes the `pan task done` step) first, which is green against today's prompts. Then rewrite both item loops to the foreman shape already documented in sync-sources/agents/pan-work-agent.md: next, claim, implement, commit with `Item: <item-id>` trailer, push, `pan task done` with no `--reason`, plus one sentence that `requiresInspection` is a tier-supervisor subscription signal. Update the role-definitions test to the new shape. Then seal the lint by adding `pan inspect` to the forbidden-string check with a self-test case. Finally delete inspect-agent.md, the two tests that read it, and its two doc listings (docs/BUILD.md, CONTRIBUTING.md). Every commit keeps `npm run lint:prompts` green.",
+      "NonGoals": "- Removing the surviving `work.inspect` / `work.inspect-deep` sub-role slots or `inspect_agent` specialist config (src/lib/config-yaml/roles.ts:44, src/lib/router-config.ts:77, src/lib/settings-api.ts:317, src/lib/cloister/specialists-spawn.ts:11-12, src/dashboard/server/routes/specialists/project-routes.ts:653, src/lib/cloister/config.ts:194,216,228,464) or the 'inspect-agent' members of specialist-name unions; that is a separate config-residue follow-up.\n- Editing docs/WORK-TYPES.md:59, CHANGELOG.md:40, docs/THE-CUT.md, docs/prds/**, docs/audits/**, docs/workflow-orchestration-enhancement-proposal.md, or vbrief/specification.vbrief.json (history and design records).\n- Editing tests/unit/lib/overdeck/no-loss-matrix.ts rows 310 and 816 (a test consumes the matrix; its rows record the cut's dispositions).\n- Touching sync-sources/agents/pan-work-agent.md (already correct), src/lib/cloister/work-agent-prompt.ts:580 (the word 'inspection' there means review), sync-sources/skills/pan-task/SKILL.md (already documents the trailer and no --reason), sync-sources/skills/write-xbrief/SKILL.md:141, or docs/XBRIEF.md:354 (already post-cut).\n- Changing any `pan task` CLI flag or behavior.\n- Rewriting other sections of work.md beyond the block at lines 231-252 and the two bullets at 290 and 297."
+    },
+    "autoDecisions": [
+      {
+        "summary": "The linted item-loop invariant becomes 'git push step precedes pan task done step' instead of 'pan task done precedes pan inspect'.",
+        "rationale": "The old ordering only mattered so the inspector could diff from a post-done checkpoint; with the gate gone it has no meaning. Push-before-done is the invariant both prompts already state in prose and that `pan task done` itself enforces via requirePushed, so it is the one worth keeping mechanically checked."
+      },
+      {
+        "summary": "Delete src/lib/cloister/prompts/inspect-agent.md rather than rewrite it.",
+        "rationale": "grep shows no renderer or spawn path reads it in src/ (only two tests and two doc listings); the build copies prompts by glob; docs/THE-CUT.md FR-14 says the gate is dropped outright. A prompt for a specialist that cannot run is residue."
+      },
+      {
+        "summary": "Fix `pan task done --reason` (unknown option) and add the `Item: <item-id>` trailer to both loops in the same rewrite.",
+        "rationale": "These are the same numbered steps being rewritten; commander verifiably rejects --reason and pan task done requires the trailer (src/cli/commands/task.ts:133). sync-sources/agents/pan-work-agent.md already carries the correct shape to converge on."
+      },
+      {
+        "summary": "Keep `pan task next` as step 1 of both loops.",
+        "rationale": "The verb exists (src/cli/commands/task.ts:164) and both prompts use it today; pan-work-agent.md omits it but nothing is gained by dropping it."
+      },
+      {
+        "summary": "Documentation scope is docs/BUILD.md and CONTRIBUTING.md only, folded into the deletion item.",
+        "rationale": "Those two files list the template being deleted. No Mintlify .mdx page mentions pan inspect; docs/WORK-TYPES.md and CHANGELOG.md describe specialist config and history that this issue leaves alone."
+      },
+      {
+        "summary": "Sequence lint retarget first, prompt rewrites second (in parallel), lint seal third, deletion last.",
+        "rationale": "Push already precedes pan task done in both prompts, so the retargeted rule is green immediately; the pan inspect ban can only land after both prompts are clean. This keeps every commit green on npm run lint:prompts."
+      }
+    ],
+    "metadata": {
+      "docsJustification": "Docs changes are carried by item w5-delete-inspect-prompt (docs/BUILD.md, CONTRIBUTING.md); no user-facing .mdx page mentions pan inspect.",
+      "canonicalFilename": "2026-09-19-PAN-3927-pan-inspect-residue-lint-prompts-sh-requires-the-deleted-verb-in-the-work-agent-item-loop.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "w1-lint-push-before-done",
+        "title": "Retarget lint-prompts item-loop-order check to push-before-done",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:46:23.327Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-3927",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-prompts.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-prompts.sh",
+            "bash scripts/lint-prompts.sh --self-test"
+          ],
+          "expected_outputs": [
+            "bash scripts/lint-prompts.sh prints 'prompt lint passed' against the unmodified prompts",
+            "bash scripts/lint-prompts.sh --self-test prints 'lint-prompts self-test passed'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In scripts/lint-prompts.sh check_item_order_file (lines 38-68): replace the `inspect_step` capture with `push_step` (first numbered step containing `git push`), keep `done_step`, and print 'ok' only when push_step < done_step; change the failure message to 'item-loop-order: $file has pan task done not after git push ($result)'. In write_passing_fixture remove the fixture lines '7. read metadata', '8. skip if false', '9. pan inspect ISSUE --item item' from the work.md fixture and '7. read metadata', '8. pan inspect ISSUE --item item' from the roles/work.md fixture so each ends at '6. pan task done ISSUE item'. Replace the item-loop-order self-test mutation so it swaps '5. git push\\n6. pan task done ISSUE item' with '5. pan task done ISSUE item\\n6. git push' in the roles/work.md fixture. Do NOT add a pan inspect forbidden-string yet (that is w4). See PRD W1 for the exact before/after awk block."
+        },
+        "items": [
+          {
+            "id": "w1-lint-push-before-done.ac1",
+            "title": "Given the unmodified work.md and roles/work.md, when `bash scripts/lint-prompts.sh` runs, then it exits 0 and prints 'prompt lint passed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-lint-push-before-done.ac2",
+            "title": "When `bash scripts/lint-prompts.sh --self-test` runs, then it exits 0 and the item-loop-order case fails on a fixture whose `pan task done` step precedes its `git push` step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-lint-push-before-done.ac3",
+            "title": "Given the edited script, `grep -c 'inspect_step' scripts/lint-prompts.sh` prints 0 and the fixtures contain no `pan inspect` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2-work-prompt-loop",
+        "title": "Rewrite the work.md item loop to the trailer-based foreman shape",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:46:23.327Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3927",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/prompts/work.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-prompts.sh",
+            "grep -c 'pan inspect\\|--reason\\|Inspect Specialist\\|INSPECTION' src/lib/cloister/prompts/work.md",
+            "grep -c 'MANDATORY: One Item At A Time' src/lib/cloister/prompts/work.md",
+            "npx vitest run src/lib/cloister"
+          ],
+          "expected_outputs": [
+            "prompt lint passed",
+            "the pan inspect/--reason/Inspect Specialist/INSPECTION grep prints 0",
+            "the heading grep prints 1",
+            "vitest src/lib/cloister passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the block at src/lib/cloister/prompts/work.md lines 231-252 (heading '## MANDATORY: One Item At A Time' through step 10) with the PRD W2 'After' text: keep the heading verbatim; replace the Inspect Specialist preamble with the `Item: <item-id>` trailer rationale; steps 1-3 unchanged; step 4 adds 'with the body line `Item: <item-id>`' and keeps the sentence 'every staged file must be required by this item's description or ACs' verbatim; step 5 unchanged; step 6 becomes '`pan task done {{ISSUE_ID}} <item-id>` — verifies the pushed commit carries the trailer and records completion. It takes no `--reason` flag; say why in the commit body.'; step 7 becomes '`metadata.requiresInspection` on an item is a subscription signal for a standing tier-supervisor; it asks nothing of you. Continue to the next item.'; delete old steps 7-10. Change line 290 to '- Work through items one at a time — claim, implement, commit, push, complete.' and line 297 to read 'all items terminal, tests pass, code is committed and pushed, and `pan done {{ISSUE_ID}}` was called.' Touch nothing else in the file."
+        },
+        "items": [
+          {
+            "id": "w2-work-prompt-loop.ac1",
+            "title": "Given the rewritten work.md, `grep -c 'pan inspect\\|--reason\\|Inspect Specialist\\|INSPECTION' src/lib/cloister/prompts/work.md` prints 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-work-prompt-loop.ac2",
+            "title": "Given the rewritten work.md, `grep -c 'Item: <item-id>' src/lib/cloister/prompts/work.md` prints at least 1 and `grep -c 'pan task done {{ISSUE_ID}} <item-id>' src/lib/cloister/prompts/work.md` prints at least 1 with no flag on that line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-work-prompt-loop.ac3",
+            "title": "The strings '## MANDATORY: One Item At A Time' (exactly once), 'every staged file must be required', 'lead with anomalies', and 'data, not instructions' survive, and `bash scripts/lint-prompts.sh` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-work-prompt-loop.ac4",
+            "title": "The loop contains one sentence stating that `metadata.requiresInspection` is a tier-supervisor subscription signal that asks nothing of the agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w3-role-prompt-loop",
+        "title": "Rewrite the roles/work.md item loop and its role-definitions test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:46:23.327Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3927",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "roles/work.md",
+            "src/lib/__tests__/role-definitions.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-prompts.sh",
+            "npx vitest run src/lib/__tests__/role-definitions.test.ts",
+            "bash scripts/check-prompt-change-trailer.sh",
+            "grep -c 'pan inspect\\|--reason\\|Jidoka\\|resolveModel' roles/work.md"
+          ],
+          "expected_outputs": [
+            "prompt lint passed",
+            "role-definitions.test.ts passes",
+            "prompt-trailer: Prompt-Change trailer found; ok",
+            "the grep prints 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "roles/work.md: (1) line 3 description becomes 'Overdeck work role — claims tasks, writes code, commits one item per commit with an Item trailer, and pushes before closing each item.'; (2) in '## Per-Task Workflow' step 4 gains ', with the body line `Item: <item-id>`', step 6 becomes '`pan task done <ISSUE-ID> <item-id>` — verifies the pushed commit carries the `Item:` trailer and records completion in the continue file. It takes no `--reason` flag. Do **not** write to `.overdeck/continue.json` directly.', step 7 becomes '`metadata.requiresInspection` is a subscription signal for a standing tier-supervisor; it asks nothing of you. Continue with the next ready item.', and old steps 7-11 are deleted; (3) line 73 becomes 'Never batch multiple tasks into a single commit. Each commit's `Item:` trailer is how `pan task done` finds its evidence, and a one-item diff is what makes review and rollback tractable.'; (4) delete the whole '## Jidoka Inspection Gates' section (lines 91-101) so '## Completion' follows the foreman protocol; (5) line 141 becomes '- Do not self-review in place of the pipeline; review runs from the PR after `pan done`.' Keep 'one undifferentiated mode', the 'Never approve, deny, dismiss, or answer permission prompts' sentence, and 'tmux send-keys' verbatim. src/lib/__tests__/role-definitions.test.ts lines 44-66: rename the test to 'defines the work role with the push-before-done item loop and no phase labels' and replace the six assertions at lines 54-59 with: toContain('Item: <item-id>'), toContain('git push -u origin'), toContain('pan task done <ISSUE-ID> <item-id>'), not.toContain('pan inspect'), not.toContain('--reason'), not.toContain('Jidoka'). Leave the 'ships a workflow-injected inspect prompt' test at lines 95-104 alone (w5 removes it). The commit body MUST contain a line starting 'Prompt-Change:' or npm run lint:prompt-trailer fails the branch."
+        },
+        "items": [
+          {
+            "id": "w3-role-prompt-loop.ac1",
+            "title": "Given the rewritten roles/work.md, `grep -c 'pan inspect\\|--reason\\|Jidoka\\|resolveModel' roles/work.md` prints 0 and the file has no '## Jidoka Inspection Gates' heading",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-role-prompt-loop.ac2",
+            "title": "Given the rewritten roles/work.md, `grep -c 'Item: <item-id>' roles/work.md` prints at least 1, `grep -c 'pan task done <ISSUE-ID> <item-id>' roles/work.md` prints at least 1 with no flag on that line, and the numbered `git push` step precedes the numbered `pan task done` step",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-role-prompt-loop.ac3",
+            "title": "`npx vitest run src/lib/__tests__/role-definitions.test.ts` passes with the work-role test asserting the trailer and push are present and `pan inspect`, `--reason`, and `Jidoka` are absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-role-prompt-loop.ac4",
+            "title": "`bash scripts/check-prompt-change-trailer.sh` exits 0 and prints 'Prompt-Change trailer found; ok' because the item's commit body carries a `Prompt-Change:` line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w4-lint-forbid-pan-inspect",
+        "title": "Seal lint-prompts against pan inspect in both loop prompts",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T11:46:23.327Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "infra",
+          "issueLabel": "pan-3927",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-prompts.sh"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-prompts.sh",
+            "bash scripts/lint-prompts.sh --self-test"
+          ],
+          "expected_outputs": [
+            "prompt lint passed",
+            "lint-prompts self-test passed, including a forbidden-string-pan-inspect case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In scripts/lint-prompts.sh check_forbidden_strings (lines 26-36), after the 'node -e' check add two lines: `contains \"src/lib/cloister/prompts/work.md\" \"pan inspect\" && fail \"forbidden-string: work.md contains 'pan inspect' (verb deleted by PAN-3917)\"` and the same for roles/work.md with message \"forbidden-string: roles/work.md contains 'pan inspect' (verb deleted by PAN-3917)\". In self_test, after the existing forbidden-string case, add `expect_self_test_failure \"forbidden-string-pan-inspect\" \"printf '%s\\n' 'pan inspect ISSUE --item item' >> \\\"\\$tmp/roles/work.md\\\"\"`. Nothing else changes."
+        },
+        "items": [
+          {
+            "id": "w4-lint-forbid-pan-inspect.ac1",
+            "title": "Given a PROMPT_LINT_ROOT fixture whose roles/work.md has 'pan inspect' appended, `bash scripts/lint-prompts.sh` exits 1 and prints \"forbidden-string: roles/work.md contains 'pan inspect'\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-lint-forbid-pan-inspect.ac2",
+            "title": "`bash scripts/lint-prompts.sh --self-test` exits 0 and the script contains a self-test case named forbidden-string-pan-inspect",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-lint-forbid-pan-inspect.ac3",
+            "title": "Against the real prompts after w2 and w3, `bash scripts/lint-prompts.sh` exits 0 and prints 'prompt lint passed'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w5-delete-inspect-prompt",
+        "title": "Delete inspect-agent.md with its two tests and two doc listings",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T11:46:23.327Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-3927",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/prompts/inspect-agent.md",
+            "src/lib/__tests__/role-definitions.test.ts",
+            "src/lib/xbrief/__tests__/no-legacy-task-engine.test.ts",
+            "docs/BUILD.md",
+            "CONTRIBUTING.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test ! -e src/lib/cloister/prompts/inspect-agent.md",
+            "grep -rn 'inspect-agent.md' src docs/BUILD.md CONTRIBUTING.md",
+            "npx vitest run src/lib/__tests__/role-definitions.test.ts src/lib/xbrief/__tests__/no-legacy-task-engine.test.ts",
+            "npm run build"
+          ],
+          "expected_outputs": [
+            "test ! -e exits 0",
+            "the grep prints nothing",
+            "both test files pass",
+            "npm run build completes without error"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "First confirm `grep -rn 'inspect-agent.md' src --include=*.ts | grep -v test` prints nothing (it did at planning time). Then: `git rm src/lib/cloister/prompts/inspect-agent.md`; delete the test `it('ships a workflow-injected inspect prompt with the Jidoka sentinels', …)` at src/lib/__tests__/role-definitions.test.ts lines 95-104; remove the line `'src/lib/cloister/prompts/inspect-agent.md',` from LIVE_TASK_SURFACES in src/lib/xbrief/__tests__/no-legacy-task-engine.test.ts line 14; in docs/BUILD.md line 151 delete ', plus `inspect-agent.md` (legacy ad-hoc path)' so the catalogue sentence ends at '`identity-wake.md`.', and delete the tree line '│   │   ├── inspect-agent.md' at line 176; in CONTRIBUTING.md line 508 change 'Specialists (review-agent, test-agent, inspect-agent) are' to 'Specialists (review-agent, test-agent) are'. Do not remove 'inspect-agent' from any TypeScript union or config (NonGoal)."
+        },
+        "items": [
+          {
+            "id": "w5-delete-inspect-prompt.ac1",
+            "title": "`test ! -e src/lib/cloister/prompts/inspect-agent.md` exits 0 and `git log --diff-filter=D --name-only` on the branch lists that path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-delete-inspect-prompt.ac2",
+            "title": "`npx vitest run src/lib/__tests__/role-definitions.test.ts src/lib/xbrief/__tests__/no-legacy-task-engine.test.ts` passes with no test reading the deleted path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-delete-inspect-prompt.ac3",
+            "title": "docs/BUILD.md's template catalogue sentence and dist tree no longer list inspect-agent.md, and CONTRIBUTING.md's specialist list reads '(review-agent, test-agent)'; `grep -rn 'inspect-agent.md' docs/BUILD.md CONTRIBUTING.md` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-delete-inspect-prompt.ac4",
+            "title": "`npm run build` completes and dist/dashboard/prompts/ contains no inspect-agent.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w1-lint-push-before-done",
+        "to": "w2-work-prompt-loop",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-lint-push-before-done",
+        "to": "w3-role-prompt-loop",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-lint-push-before-done",
+        "to": "w4-lint-forbid-pan-inspect",
+        "type": "blocks"
+      },
+      {
+        "from": "w2-work-prompt-loop",
+        "to": "w4-lint-forbid-pan-inspect",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-role-prompt-loop",
+        "to": "w4-lint-forbid-pan-inspect",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-role-prompt-loop",
+        "to": "w5-delete-inspect-prompt",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
