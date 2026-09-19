@@ -1,7 +1,8 @@
 # Architecture
 
 Overdeck is a multi-agent orchestrator for AI coding work: a CLI (`pan`), a
-dashboard server, a React frontend, and a fleet of tmux-hosted coding agents.
+dashboard server, a React frontend, and a fleet of coding agents hosted by a terminal
+backend — Herdr by default, tmux when Herdr is absent (PAN-3917 D10).
 
 ## Top-level layout
 
@@ -60,8 +61,15 @@ dashboard server, a React frontend, and a fleet of tmux-hosted coding agents.
 
 Issue → `pan plan` (xBRIEF plan + item checklist) → `pan start` (work agent in a git worktree
 `workspaces/feature-<issue>/`) → verification gate → review convoy → test/UAT →
-server-side rebase/merge → close-out. Spawned agents live in tmux sessions
-(`tmux -L overdeck`), with state in `~/.overdeck/agents/<id>/state.json`.
+server-side rebase/merge → close-out. Spawned agents live in the selected terminal
+backend — a Herdr pane named by agent id, or a tmux session on `tmux -L overdeck` —
+with state in `~/.overdeck/agents/<id>/state.json`. The backend contract is
+`src/lib/terminal-backends/types.ts`; selection is `select.ts` (`hostTerminalBackendName`,
+memoized per process); the live census is `inventory.ts` (`liveAgentInventory`,
+`listLiveAgentIds`, `null` = indeterminate). Liveness and idleness are answered only by
+`src/lib/agents/liveness.ts` (`isAlive`, async, backend-aware; the sync door was retired
+by PAN-3926). The patrol is `cloister/deacon-lite.ts` (60 s, honors the pause toggle);
+host hygiene runs on `cloister/hygiene-scheduler.ts`.
 
 ## Spawn sites (harness decision points)
 
@@ -107,4 +115,4 @@ Work agents can run on Fly.io VMs (`src/lib/remote/remote-agents.ts`,
 `routes/projects.ts` `collectSessionTreeNodes()` (PAN-1775). Remote agents have
 no local tmux session — never assume tmux discovery covers them.
 
-<!-- last-verified: 2026-09-16 -->
+<!-- last-verified: 2026-09-19 -->

@@ -1,6 +1,6 @@
 # Concerns / hazards
 
-Live landmines a change in this repo can step on. Verified 2026-07-26.
+Live landmines a change in this repo can step on. Verified 2026-09-19.
 
 - **ToS policy gate** — `canUseHarnessSync()` (`src/lib/harness-policy.ts:69`) blocks
   Pi + Anthropic + subscription auth. Every harness resolution path must end by
@@ -72,6 +72,16 @@ Live landmines a change in this repo can step on. Verified 2026-07-26.
   or none, rolled back with `checkout -B` to a captured head. Do NOT reintroduce
   rebuild-and-replay: it is O(repos x features²) heavyweight git and can hold the
   project's single-flight reconcile slot for hours.
+- **Agent liveness goes through the backend, never tmux directly** (PAN-3917 D10,
+  PAN-3926) — the host backend is Herdr by default and a Herdr agent has NO tmux
+  session. Any new liveness, count, reap, or GC decision must read
+  `src/lib/agents/liveness.ts` `isAlive` (async) or the inventory in
+  `src/lib/terminal-backends/inventory.ts` (`listLiveAgentIds`, `null` =
+  indeterminate ⇒ skip or fail open). Never filter on the `tmuxActive` row flag
+  from `listRunningAgentsSync`, never call `sessionExistsSync` for liveness, and
+  never add a synchronous liveness door — there is no sync Herdr client and
+  `prefer-async` forbids new sync primitives. `runtime-indeterminate` and a `null`
+  inventory are never death.
 - **Single Deacon invariant** — never mount `~/.overdeck` into workspace
   containers; `OVERDECK_DISABLE_DEACON=1` belt-and-suspenders.
 - **Dashboard runtime** — Node 22 + built `dist/` only (node-pty native addon
@@ -105,4 +115,4 @@ Live landmines a change in this repo can step on. Verified 2026-07-26.
   `/workspace`. Never run durable work without verifying the volume mount
   (PAN-1845).
 
-<!-- last-verified: 2026-07-28 -->
+<!-- last-verified: 2026-09-19 -->
