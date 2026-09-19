@@ -113,6 +113,12 @@ export async function seedUatFixturesLocal(options: SeedUatFixturesOptions = {})
   // now read PR state directly, so there is nothing left for this fixture to
   // seed here.
 
+  // emitActivityEntryOnce() below needs the activity event store provider
+  // registered (activity-logger.ts's setActivityEventStoreProvider); nothing
+  // else in this container-boot path does that for it.
+  const { initEventStore } = await import('../../dashboard/server/event-store.js');
+  await initEventStore();
+
   const activityEntries = fixtureActivityEntries();
   for (const entry of activityEntries) {
     // At-most-once by stable id: a re-seed must not append duplicate visible
