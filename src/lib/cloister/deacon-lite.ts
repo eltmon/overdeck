@@ -8,7 +8,9 @@
  *
  * No heartbeat file, no patrol-result aggregation, no firing budgets, no
  * invariant checker. Status is in-memory only (see getDeaconLiteStatus
- * below) and is lost on process restart by design.
+ * below) and is lost on process restart by design. The forked deacon child
+ * relays each completed tick to its parent through setPatrolRunObserver
+ * (PAN-3922), so the dashboard process can project the child's status.
  */
 import type { AgentState } from '../agents/agent-state.js';
 import { listAgentStates } from '../agents.js';
@@ -176,13 +178,24 @@ export async function runDeaconLite(): Promise<void> {
 // cleanly" (see module docstring).
 // ============================================================================
 
-const DEACON_LITE_INTERVAL_MS = 60_000; // the 60s cadence runScheduledPatrol used
+export const DEACON_LITE_INTERVAL_MS = 60_000; // the 60s cadence runScheduledPatrol used
+
+export interface PatrolRunReport {
+  at: string;
+  error: string | null;
+}
 
 let deaconLiteInterval: ReturnType<typeof setInterval> | null = null;
 let lastRunAt: string | null = null;
 let lastRunError: string | null = null;
+let patrolRunObserver: ((report: PatrolRunReport) => void) | null = null;
 
-async function tick(): Promise<void> {
+/** Registered by the deacon child to relay each completed tick to its parent process (PAN-3922). */
+export function setPatrolRunObserver(fn: ((report: PatrolRunReport) => void) | null): void {
+  patrolRunObserver = fn;
+}
+
+export async function runDeaconLitePatrol(): Promise<void> {
   try {
     await runDeaconLite();
     lastRunAt = new Date().toISOString();
@@ -192,12 +205,20 @@ async function tick(): Promise<void> {
     lastRunError = err instanceof Error ? err.message : String(err);
     console.error('[deacon-lite] run error:', err);
   }
+
+  if (patrolRunObserver) {
+    try {
+      patrolRunObserver({ at: lastRunAt, error: lastRunError });
+    } catch (err) {
+      console.error('[deacon-lite] patrol run observer failed:', err);
+    }
+  }
 }
 
 export function startDeaconLite(): void {
   if (deaconLiteInterval) return;
-  void tick();
-  deaconLiteInterval = setInterval(() => { void tick(); }, DEACON_LITE_INTERVAL_MS);
+  void runDeaconLitePatrol();
+  deaconLiteInterval = setInterval(() => { void runDeaconLitePatrol(); }, DEACON_LITE_INTERVAL_MS);
   deaconLiteInterval.unref?.();
 }
 

@@ -72,6 +72,12 @@ const {
   reconcileAgentLiveness,
   reapClosedIssueAgents,
   runDeaconLite,
+  runDeaconLitePatrol,
+  setPatrolRunObserver,
+  getDeaconLiteStatus,
+  startDeaconLite,
+  stopDeaconLite,
+  DEACON_LITE_INTERVAL_MS,
   setAgentStoppedNotifier,
   __resetStuckWorkAgentCooldownForTests,
 } = await import('../../../../src/lib/cloister/deacon-lite.js');
@@ -105,6 +111,8 @@ describe('deacon-lite', () => {
   });
 
   afterEach(() => {
+    setPatrolRunObserver(null);
+    stopDeaconLite();
     vi.useRealTimers();
   });
 
@@ -255,6 +263,84 @@ describe('deacon-lite', () => {
       expect(mocks.listAgentStates).not.toHaveBeenCalled();
       expect(mocks.liveAgentInventory).not.toHaveBeenCalled();
       expect(mocks.reconcileClosedIssueAgents).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('runDeaconLitePatrol', () => {
+    it('reports a clean run and stamps lastRunAt', async () => {
+      mocks.listAgentStates.mockReturnValue([]);
+      mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+      const observer = vi.fn();
+      setPatrolRunObserver(observer);
+
+      await runDeaconLitePatrol();
+
+      const expectedAt = new Date('2026-09-18T12:00:00.000Z').toISOString();
+      expect(observer).toHaveBeenCalledTimes(1);
+      expect(observer).toHaveBeenCalledWith({ at: expectedAt, error: null });
+      expect(getDeaconLiteStatus().lastRunAt).toBe(expectedAt);
+    });
+
+    it('reports the error text when reconcileClosedIssueAgents rejects', async () => {
+      mocks.listAgentStates.mockReturnValue([]);
+      mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+      mocks.reconcileClosedIssueAgents.mockRejectedValue(new Error('tracker down'));
+      const observer = vi.fn();
+      setPatrolRunObserver(observer);
+
+      await expect(runDeaconLitePatrol()).resolves.toBeUndefined();
+
+      expect(observer).toHaveBeenCalledTimes(1);
+      expect(observer).toHaveBeenCalledWith(expect.objectContaining({ error: 'tracker down' }));
+      expect(getDeaconLiteStatus().lastRunError).toBe('tracker down');
+    });
+
+    it('still reports while globally paused, without running any routine', async () => {
+      mocks.isDeaconGloballyPausedSync.mockReturnValue(true);
+      mocks.listAgentStates.mockReturnValue([workAgent()]);
+      const observer = vi.fn();
+      setPatrolRunObserver(observer);
+
+      await runDeaconLitePatrol();
+
+      expect(mocks.listAgentStates).not.toHaveBeenCalled();
+      expect(mocks.liveAgentInventory).not.toHaveBeenCalled();
+      expect(mocks.reconcileClosedIssueAgents).not.toHaveBeenCalled();
+      expect(observer).toHaveBeenCalledTimes(1);
+      expect(observer).toHaveBeenCalledWith(expect.objectContaining({ error: null }));
+    });
+
+    it('swallows a throwing observer and still resolves and stamps lastRunAt', async () => {
+      mocks.listAgentStates.mockReturnValue([]);
+      mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+      setPatrolRunObserver(() => {
+        throw new Error('observer boom');
+      });
+
+      await expect(runDeaconLitePatrol()).resolves.toBeUndefined();
+
+      expect(getDeaconLiteStatus().lastRunAt).not.toBeNull();
+    });
+  });
+
+  describe('DEACON_LITE_INTERVAL_MS and startDeaconLite', () => {
+    it('exports the 60s interval constant and the runDeaconLitePatrol function', () => {
+      expect(DEACON_LITE_INTERVAL_MS).toBe(60_000);
+      expect(typeof runDeaconLitePatrol).toBe('function');
+    });
+
+    it('runs runDeaconLitePatrol immediately and again on every interval', async () => {
+      mocks.listAgentStates.mockReturnValue([]);
+      mocks.liveAgentInventory.mockResolvedValue(inventory([]));
+      const observer = vi.fn();
+      setPatrolRunObserver(observer);
+
+      startDeaconLite();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(observer).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(DEACON_LITE_INTERVAL_MS);
+      expect(observer).toHaveBeenCalledTimes(2);
     });
   });
 });
