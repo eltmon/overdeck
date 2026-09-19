@@ -3,6 +3,17 @@ import { mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
+// The queue's own logic is the subject; the delivery door and the state door
+// are both injected per call, so neither real module needs to load.
+vi.mock('../../../lib/agents.js', () => ({
+  messageAgent: vi.fn(async () => {}),
+  getAgentState: vi.fn(() => ({ _tag: 'Succeed', value: null })),
+}));
+
+vi.mock('../services/derived-issue-state.js', () => ({
+  getDerivedIssueState: vi.fn(async () => null),
+}));
+
 import {
   enqueuePendingFeedbackDelivery,
   markPendingFeedbackDelivered,
