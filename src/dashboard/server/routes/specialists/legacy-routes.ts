@@ -245,9 +245,9 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       }
     });
 
-    // PAN-3847: the reviewedAtCommit anchor now travels inside the verdict write door
-    // call above — verdict and anchor are one write; the old post-door snapshot write
-    // was a redundant second writer.
+    // PAN-3917 FR-7: there is no reviewedAtCommit anchor and no verdict row. A
+    // review verdict is the PR's own review state, and drift past it is the PR
+    // being re-requested — both read from the forge, never stamped here.
 
     // When the test specialist reports success, emit test.passed so reactive
     // Cloister records the shipping lifecycle phase. Merge readiness itself is
