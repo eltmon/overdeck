@@ -20,6 +20,7 @@ import {
   type SqliteRow,
   type SqliteScalar,
 } from '../database/driver.js';
+import { isPeerDashboardProcess } from '../boot-gates.js';
 import type { ProjectConfig } from '../projects.js';
 import { packageRoot, getOverdeckHome } from '../paths.js';
 import { sessionExists as tmuxSessionExists, killSession as tmuxKillSession, getAgentSessions } from '../tmux.js';
@@ -51,8 +52,8 @@ let overdeckReadOnlyDbSync: { path: string; db: SqliteDatabase } | null = null;
 function runOverdeckMigrationSync(db: SqliteDatabase): void {
   // PAN-3917: the sentinel used to be the `agents` table, but the pipeline-state
   // mirror tables (agents, review_status, ...) are dropped by
-  // dropStateLayerMirrorTablesSync below on every boot. `events` is drizzle-owned
-  // and never dropped, so it stays a valid fresh-vs-existing signal.
+  // dropPipelineStateMirrorTablesSync below. `events` is drizzle-owned and never
+  // dropped, so it stays a valid fresh-vs-existing signal.
   const row = db
     .prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'events'`)
     .get();
@@ -106,25 +107,92 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   // PAN-1577: explicit project assignment override for moving a conversation
   // between projects without relying on cwd-derived grouping.
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `project_key` text');
-  dropPipelineStateMirrorTablesSync(db);
+}
+
+/** `app_settings` key recording that the pipeline-mirror drop already ran. */
+export const PIPELINE_MIRROR_DROPPED_SETTING = 'schema.pipelineMirrorDropped';
+
+/** Child tables first so FK-enforced DROP TABLE succeeds. */
+const PIPELINE_STATE_MIRROR_TABLES = [
+  'review_run_agents',
+  'review_runs',
+  'agents',
+  'issue_policy',
+  'status_history',
+  'review_status',
+] as const;
+
+export interface DropPipelineStateMirrorResult {
+  /** True when this call performed the drop (and wrote the marker). */
+  readonly dropped: boolean;
+  /** Why it did not, when it did not. */
+  readonly skipped?: 'peer' | 'already-dropped';
 }
 
 /**
  * PAN-3917 (W3): drop the overdeck.db tables that mirrored pipeline state an
  * owner elsewhere already holds — agent status/liveness (now the terminal
  * backend), review/test/merge/release status (now PR reviews, check runs, and
- * forge mergeability), and their run-scoped children. Runs on every boot so
- * an existing overdeck.db converges the same way a fresh one does.
- * Costs, conversation search, health history, caches, and the events table
- * are untouched. Child tables first so FK-enforced DROP TABLE succeeds.
+ * forge mergeability), and their run-scoped children. Costs, conversation
+ * search, health history, caches, and the events table are untouched.
+ *
+ * fix10: this used to run from `ensureRuntimeIndexesSync`, i.e. on EVERY open
+ * of the database by ANY process. A throwaway peer boot of the new build
+ * against the real `~/.overdeck` therefore dropped `agents` out from under the
+ * running 0.51.0 dashboard, which crash-looped on "no such table: agents".
+ *
+ * Two gates make that impossible:
+ *   1. **Primary only.** A peer dashboard shares someone else's database and
+ *      must never run a migration that drops or alters tables.
+ *   2. **Exactly once.** A marker in `app_settings` records the drop, so a
+ *      second primary boot is a no-op instead of a live DDL statement.
+ *
+ * It is an explicit boot step (see `src/dashboard/server/main.ts`), not a
+ * side effect of opening the database, so a `pan` CLI invocation — "not peer"
+ * by env, yet sharing the live database — cannot trigger it either.
+ *
+ * Drops and marker commit in one transaction: a partial drop must not leave a
+ * marker that stops the next boot from finishing the job.
  */
-function dropPipelineStateMirrorTablesSync(db: SqliteDatabase): void {
-  runSchemaTopUp(db, 'DROP TABLE IF EXISTS `review_run_agents`');
-  runSchemaTopUp(db, 'DROP TABLE IF EXISTS `review_runs`');
-  runSchemaTopUp(db, 'DROP TABLE IF EXISTS `agents`');
-  runSchemaTopUp(db, 'DROP TABLE IF EXISTS `issue_policy`');
-  runSchemaTopUp(db, 'DROP TABLE IF EXISTS `status_history`');
-  runSchemaTopUp(db, 'DROP TABLE IF EXISTS `review_status`');
+export function dropPipelineStateMirrorTablesSync(
+  db: SqliteDatabase = getOverdeckDatabaseSync(),
+  env: NodeJS.ProcessEnv = process.env,
+): DropPipelineStateMirrorResult {
+  if (isPeerDashboardProcess(env)) return { dropped: false, skipped: 'peer' };
+  if (readPipelineMirrorMarkerSync(db) !== null) return { dropped: false, skipped: 'already-dropped' };
+
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    db.exec(
+      'CREATE TABLE IF NOT EXISTS `app_settings` '
+      + '(`key` text PRIMARY KEY NOT NULL, `value` text, `updated_at` integer)',
+    );
+    for (const table of PIPELINE_STATE_MIRROR_TABLES) {
+      db.exec(`DROP TABLE IF EXISTS \`${table}\``);
+    }
+    db.prepare(
+      `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    ).run(PIPELINE_MIRROR_DROPPED_SETTING, new Date().toISOString(), Date.now());
+    db.exec('COMMIT');
+  } catch (error) {
+    db.exec('ROLLBACK');
+    throw error;
+  }
+  return { dropped: true };
+}
+
+/** The marker value, or null when the drop has not run against this database. */
+export function readPipelineMirrorMarkerSync(db: SqliteDatabase): string | null {
+  try {
+    const row = db
+      .prepare('SELECT value FROM app_settings WHERE key = ?')
+      .get(PIPELINE_MIRROR_DROPPED_SETTING) as { value: string | null } | undefined;
+    return row?.value ?? null;
+  } catch {
+    // No app_settings table yet (a database older than the settings migration).
+    return null;
+  }
 }
 
 /**

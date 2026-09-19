@@ -73,8 +73,9 @@ import { createOverdeckDatabase } from '../../../scripts/create-overdeck-db.js';
 import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
 import { startProjectCiRefillAfterProjectionReady } from './services/project-ci-refill-startup.js';
 import { ProjectsLive } from '../../lib/overdeck/config.js';
-import { RecordsLive, TmuxLive } from '../../lib/overdeck/infra.js';
+import { RecordsLive, TmuxLive, dropPipelineStateMirrorTablesSync } from '../../lib/overdeck/infra.js';
 import { startServerBootTelemetry } from './telemetry.js';
+import { isPeerDashboardProcess } from '../../lib/boot-gates.js';
 import { isSmeeConfiguredSync, startSmeeProcessSync } from '../../lib/smee.js';
 import { listProjectsSync } from '../../lib/projects.js';
 import { backfillIssueWorkspaces, migrateMemoryHomesToWorkspacesOnce, seedProjectsFromYaml } from '../../lib/workspaces/rebuild.js';
@@ -127,6 +128,21 @@ try {
   console.warn('[overdeck] Overdeck db init failed (non-fatal):', err);
 }
 
+// PAN-3917 fix10: the pipeline-state mirror drop is a DESTRUCTIVE migration, so
+// it runs here — once, and only in a primary dashboard. A peer shares another
+// dashboard's overdeck.db; running it there dropped `agents` out from under the
+// live 0.51.0 server, which then crash-looped. See infra.ts for both gates.
+try {
+  const drop = dropPipelineStateMirrorTablesSync();
+  if (drop.dropped) {
+    console.log('[overdeck] Dropped the pipeline-state mirror tables (once; marker written)');
+  } else if (drop.skipped === 'peer') {
+    console.log('[overdeck] Pipeline-state mirror drop SKIPPED — peer dashboard runs no destructive migration');
+  }
+} catch (err) {
+  console.warn('[overdeck] Pipeline-state mirror drop failed (non-fatal):', err);
+}
+
 // Bind the HTTP socket before starting any background service or the Deacon.
 // A bind failure is retried by server.ts and then terminates this process through
 // Effect's Node runtime; no headless orchestrator is allowed to survive it.
@@ -156,7 +172,7 @@ void warnIfAppCannotMerge();
 // container ran its own Linear/GitHub poller against the shared API key — ~17 of them
 // at once exhausted Linear's 2500/hr quota. This mirrors the single-deacon invariant:
 // a peer dashboard is a read/UI peer, never a second orchestrator.
-const isPeerDashboard = process.env.OVERDECK_DISABLE_DEACON === '1';
+const isPeerDashboard = isPeerDashboardProcess();
 if (isPeerDashboard) {
   void startSharedIssueService({ skipPolling: true });
   console.log('[overdeck] IssueDataService started in CACHE-ONLY mode — peer dashboard (OVERDECK_DISABLE_DEACON=1) does not poll trackers (PAN-1817)');
@@ -743,7 +759,7 @@ if (process.env.OVERDECK_DISABLE_AUTO_MERGE === '1') {
 // left none, so the next gate run re-verifies. There is no stored status to
 // reconcile.
 
-if (process.env.OVERDECK_DISABLE_DEACON === '1') {
+if (isPeerDashboard) {
   console.log('[overdeck] Cloister auto-start SKIPPED (OVERDECK_DISABLE_DEACON=1)');
   emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Cloister auto-start skipped via OVERDECK_DISABLE_DEACON — deacon is not running' });
 } else if (shouldAutoStart()) {

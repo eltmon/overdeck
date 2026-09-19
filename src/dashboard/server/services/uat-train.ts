@@ -105,6 +105,8 @@ function projectRoot(): string {
 
 export function canStartUatTrainReconciler(): boolean {
   const identity = getDashboardIdentity();
+  // identity.mode is isPeerDashboardProcess(); keeping the check here means one
+  // answer to "is this a peer" for every spawn-capable starter (fix10).
   return identity.mode === 'primary' && resolve(identity.repoRoot) === projectRoot();
 }
 
