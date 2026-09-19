@@ -15,12 +15,14 @@ export type TerminalBackendName = "herdr" | "tmux"
 export type AgentState = "idle" | "working" | "blocked" | "done" | "exited" | "unknown"
 
 /** Pane role, stamped as a metadata token by every launcher (FR-5). */
-export type AgentRole = "work" | "worker" | "review" | "test" | "uat" | "strike" | "plan"
+export type AgentRole = "work" | "worker" | "review" | "test" | "uat" | "strike" | "plan" | "conversation"
 
 /**
  * Metadata tokens stamped on every agent pane. An operator conversation
- * carries no `issue` token (FR-5), which is also what the prompt guard uses to
- * recognize an operator sender (FR-17).
+ * carries role `conversation` and no `issue` token (FR-5), which is also what
+ * the prompt guard uses to recognize an operator sender (FR-17). An
+ * issue-scoped conversation carries role `conversation` plus the issue; it is
+ * not the issue's work pane.
  */
 export interface PaneTokens {
   /** Issue id (e.g. `PAN-3917`); absent for operator conversations. */
@@ -47,7 +49,7 @@ export interface BackendAgentSnapshot {
 
 export const TERMINAL_BACKEND_NAMES: readonly TerminalBackendName[] = ["herdr", "tmux"]
 
-export const AGENT_ROLES: readonly AgentRole[] = ["work", "worker", "review", "test", "uat", "strike", "plan"]
+export const AGENT_ROLES: readonly AgentRole[] = ["work", "worker", "review", "test", "uat", "strike", "plan", "conversation"]
 
 export function isTerminalBackendName(value: unknown): value is TerminalBackendName {
   return typeof value === "string" && (TERMINAL_BACKEND_NAMES as readonly string[]).includes(value)

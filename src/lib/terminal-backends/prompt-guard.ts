@@ -36,6 +36,7 @@ export function toPaneRole(role: string | undefined): AgentRole {
     case 'plan':
     case 'worker':
     case 'uat':
+    case 'conversation':
       return role;
     case 'ship':
       return 'uat';
