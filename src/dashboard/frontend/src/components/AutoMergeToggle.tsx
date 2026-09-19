@@ -1,11 +1,14 @@
 /**
  * AutoMergeToggle — per-issue auto-merge routing-key control (PAN-1691 / PAN-1692).
  *
- * One shared control, four render sites (slide-out, flywheel roster, pipeline
- * row, Awaiting Merge). Posts to the single endpoint
+ * One shared control, four render sites (slide-out, merge-policy roster,
+ * pipeline row, Awaiting Merge). Posts to the single endpoint
  *   POST /api/workspaces/:id/auto-merge { autoMerge: boolean }
- * and optimistically patches the store (the server also emits status_changed
- * for cross-client sync — see setAutoMerge in review-status.ts).
+ *
+ * PAN-3917: the routing key is operator policy, not derived status, so the
+ * control owns the read as well — it resolves the current value from
+ * GET /api/merge-train/auto-merge and refetches after a write. Callers pass an
+ * issue id and nothing else.
  *
  * Tri-state semantics: `undefined` = follow project default, `true` = auto-merge
  * (fast lane), `false` = hold for UAT (manual lane).
@@ -13,9 +16,8 @@
 import { useState } from 'react';
 import { Zap, Lock } from 'lucide-react';
 import { toast } from 'sonner';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { capture } from '../lib/telemetry';
-import { useDashboardStore } from '../lib/store';
 
 async function postAutoMerge(issueId: string, autoMerge: boolean): Promise<void> {
   const res = await fetch(`/api/workspaces/${encodeURIComponent(issueId)}/auto-merge`, {
@@ -29,19 +31,29 @@ async function postAutoMerge(issueId: string, autoMerge: boolean): Promise<void>
   }
 }
 
-/** Optimistically patch the store so the toggle reflects instantly (mirrors the deacon-ignore pattern). */
-function patchStore(issueId: string, autoMerge: boolean): void {
-  const state = useDashboardStore.getState();
-  const upperKey = issueId.toUpperCase();
-  const currentKey = state.reviewStatusByIssueId[upperKey] ? upperKey : issueId;
-  const current = state.reviewStatusByIssueId[currentKey];
-  if (!current) return;
-  useDashboardStore.setState((s) => ({
-    reviewStatusByIssueId: {
-      ...s.reviewStatusByIssueId,
-      [currentKey]: { ...current, autoMerge },
+const AUTO_MERGE_POLICY_KEY = ['merge-train', 'auto-merge-policy'];
+
+/** Per-issue routing keys, shared across every mounted toggle via react-query. */
+export function useAutoMergePolicyMap(): Record<string, boolean> {
+  const { data } = useQuery({
+    queryKey: AUTO_MERGE_POLICY_KEY,
+    queryFn: async (): Promise<Record<string, boolean>> => {
+      const res = await fetch('/api/merge-train/auto-merge');
+      if (!res.ok) return {};
+      const json = (await res.json()) as { issues?: Array<{ issueId: string; autoMerge: boolean | null }> };
+      return Object.fromEntries(
+        (json.issues ?? [])
+          .filter((entry) => typeof entry.autoMerge === 'boolean')
+          .map((entry) => [entry.issueId.toUpperCase(), entry.autoMerge as boolean]),
+      );
     },
-  }));
+    staleTime: 15_000,
+  });
+  return data ?? {};
+}
+
+export function useAutoMergePolicy(issueId: string): boolean | undefined {
+  return useAutoMergePolicyMap()[issueId.toUpperCase()];
 }
 
 /**
@@ -50,9 +62,9 @@ function patchStore(issueId: string, autoMerge: boolean): void {
  */
 function useRequireUatDefault(): boolean | undefined {
   const { data } = useQuery({
-    queryKey: ['flywheel', 'config', 'require-uat'],
+    queryKey: ['merge-train', 'config', 'require-uat'],
     queryFn: async (): Promise<boolean | undefined> => {
-      const res = await fetch('/api/flywheel/config');
+      const res = await fetch('/api/merge-train/config');
       if (!res.ok) return undefined;
       const json = (await res.json()) as { require_uat_before_merge?: unknown };
       return Boolean(json.require_uat_before_merge);
@@ -64,8 +76,6 @@ function useRequireUatDefault(): boolean | undefined {
 
 export interface AutoMergeToggleProps {
   issueId: string;
-  /** Current routing key. undefined = follow project default. */
-  autoMerge: boolean | undefined;
   /** 'segmented' = Auto/Hold pair (slide-out, Awaiting Merge); 'badge' = single click-to-flip chip (pipeline rows). */
   variant?: 'segmented' | 'badge';
   /** Compact reduces padding/icon size for dense rows. */
@@ -75,12 +85,13 @@ export interface AutoMergeToggleProps {
 
 export function AutoMergeToggle({
   issueId,
-  autoMerge,
   variant = 'segmented',
   compact = false,
   className = '',
 }: AutoMergeToggleProps) {
   const [busy, setBusy] = useState(false);
+  const queryClient = useQueryClient();
+  const autoMerge = useAutoMergePolicy(issueId);
   const requireUatDefault = useRequireUatDefault();
   const defaultResolvesTo =
     requireUatDefault === undefined ? 'the project default'
@@ -92,7 +103,7 @@ export function AutoMergeToggle({
     setBusy(true);
     try {
       await postAutoMerge(issueId, next);
-      patchStore(issueId, next);
+      await queryClient.invalidateQueries({ queryKey: AUTO_MERGE_POLICY_KEY });
       capture('auto_merge_toggled', { auto_merge: next, variant });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to update auto-merge');
@@ -108,9 +119,9 @@ export function AutoMergeToggle({
     const next = !isAuto; // undefined/false → set auto; true → set hold
     const label = isAuto ? 'auto' : autoMerge === false ? 'hold' : 'default';
     const tone = isAuto
-      ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/40'
+      ? 'text-primary bg-primary/[0.08] border-primary/[0.32]'
       : autoMerge === false
-        ? 'text-amber-400 bg-amber-500/10 border-amber-500/40'
+        ? 'text-warning-foreground bg-warning/[0.08] border-warning/[0.32]'
         : 'text-muted-foreground bg-transparent border-border';
     return (
       <button
@@ -147,7 +158,7 @@ export function AutoMergeToggle({
         disabled={busy}
         aria-pressed={autoMerge === true}
         onClick={(e) => { e.stopPropagation(); void set(true); }}
-        className={seg(autoMerge === true, 'text-emerald-400 bg-emerald-500/10')}
+        className={seg(autoMerge === true, 'text-primary bg-primary/[0.08]')}
         title="Auto-merge — ride the train, ship when green"
       >
         <Zap className={iconSize} /> Auto
@@ -157,7 +168,7 @@ export function AutoMergeToggle({
         disabled={busy}
         aria-pressed={autoMerge === false}
         onClick={(e) => { e.stopPropagation(); void set(false); }}
-        className={`border-l border-border ${seg(autoMerge === false, 'text-amber-400 bg-amber-500/10')}`}
+        className={`border-l border-border ${seg(autoMerge === false, 'text-warning-foreground bg-warning/[0.08]')}`}
         title="Hold for UAT — wait for human batch review"
       >
         <Lock className={iconSize} /> Hold

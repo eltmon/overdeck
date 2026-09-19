@@ -1,8 +1,8 @@
 import type { HTMLAttributes, ReactNode } from 'react';
-import { ReviewPolicyControl } from '../ReviewPolicyControl';
+import { IssuePolicyStrip } from '../IssuePolicyStrip';
 import { ShipProgress } from './ShipProgress';
 import { deriveShip } from './derivations';
-import { useReviewStatusQuery } from '../CommandDeck/ZoneCOverviewTabs/queries';
+import { useDerivedIssueState } from '../../lib/store';
 import type { IssueViewDensity } from './inventory';
 import { StartAgentCta } from './StartAgentCta';
 
@@ -28,8 +28,8 @@ export function IssueView({ issueId, density, children, ...rootProps }: IssueVie
   return (
     <div {...rootProps} data-component={typeof dataComponent === 'string' ? dataComponent : 'issue-view'} data-density={density}>
       {(density === 'cockpit' || density === 'console') && (
-        <div data-section={density === 'console' ? 'IssuePolicyStrip / PoliciesControl' : 'ReviewPolicyControl'}>
-          <ReviewPolicyControl issueId={issueId} />
+        <div data-section="IssuePolicyStrip / PoliciesControl">
+          <IssuePolicyStrip issueId={issueId} />
         </div>
       )}
       {density === 'console' && (
@@ -41,8 +41,8 @@ export function IssueView({ issueId, density, children, ...rootProps }: IssueVie
 }
 
 export function RailShipProgress({ issueId, onClick }: { issueId: string; onClick: () => void }) {
-  const { data } = useReviewStatusQuery(issueId);
-  return <ShipProgress ship={deriveShip(data)} compact onClick={onClick} />;
+  const derived = useDerivedIssueState(issueId);
+  return <ShipProgress ship={deriveShip(derived)} compact onClick={onClick} />;
 }
 
 export function IssueViewFullscreenButton({

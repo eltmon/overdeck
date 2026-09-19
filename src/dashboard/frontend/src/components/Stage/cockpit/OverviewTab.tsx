@@ -1,11 +1,10 @@
 import {
   useActivityQuery,
   usePrQuery,
-  useReviewStatusQuery,
-  type ReviewStatusData,
 } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { UatEnvironmentPanel } from '../../CommandDeck/UatEnvironmentPanel'
-import { formatRelativeTime } from '../../../lib/formatRelativeTime'
+import { useDerivedIssueState } from '../../../lib/store'
+import type { DerivedIssueState } from '../../../types'
 import { IssueBlockerSpotlight } from './IssueBlockerSpotlight'
 import { PickupGateCard } from './PickupGateCard'
 import { CrewStage } from './CrewStage'
@@ -18,27 +17,17 @@ import type { SessionNode } from '@overdeck/contracts'
  * kept narrow so this file never imports from IssueMissionControl). */
 export type OverviewNavTab = 'code' | 'timeline'
 
-// PAN-1991 #5: gate dots follow the law — emerald=passing, red=failing,
-// blue=running (a machine is working; was purple), neutral=pending/rest.
-export function statusToTone(status: string | undefined | null): CockpitTone {
-  const normalized = (status ?? '').toLowerCase()
-  if (['passed', 'success', 'completed', 'merged', 'ready'].includes(normalized)) return 'success'
-  if (['failed', 'blocked', 'dispatch_failed', 'timed_out', 'action_required', 'startup_failure', 'failure'].includes(normalized)) return 'destructive'
-  if (['running', 'reviewing', 'testing', 'queued', 'merging', 'verifying', 'in_progress'].includes(normalized)) return 'info'
-  if (['skipped', 'neutral', 'cancelled'].includes(normalized)) return 'muted'
-  return 'warning'
-}
-
-function nextAction(rs: ReviewStatusData | undefined): string {
-  if (!rs) return 'start work'
-  if (rs.mergeStatus === 'merged') return 'merged — close out'
-  if (rs.readyForMerge) return 'merge to main'
-  if (rs.reviewStatus === 'blocked' || rs.reviewStatus === 'failed') return 'work agent fixes → re-review'
-  if (rs.reviewStatus === 'reviewing') return 'review in progress'
-  if (rs.testStatus === 'testing') return 'test in progress'
-  if (rs.testStatus === 'failed' || rs.testStatus === 'dispatch_failed') return 'fix tests → re-run'
-  if (rs.reviewStatus === 'passed' && rs.testStatus !== 'passed' && rs.testStatus !== 'skipped') return 'dispatch test'
-  return 'awaiting pipeline'
+function nextAction(issue: DerivedIssueState | undefined): string {
+  switch (issue?.state) {
+    case 'merged': return 'merged — close out'
+    case 'closed': return 'closed'
+    case 'ready': return 'merge to main'
+    case 'changes-requested': return 'work agent fixes → re-review'
+    case 'in-review': return issue.pr?.checks === 'red' ? 'fix the failing checks' : 'review in progress'
+    case 'working': return 'finish the work, then open the PR'
+    case 'planned': return 'start work'
+    default: return 'plan it'
+  }
 }
 
 const NOW_LABEL: Record<string, string> = {
@@ -57,39 +46,38 @@ const NOW_DOT: Record<CockpitTone, string> = {
 }
 
 interface NowState { tone: CockpitTone; text: string; agentType?: string; agentLabel?: string }
-function deriveNow(rs: ReviewStatusData | undefined, active: { type: string; model?: string } | undefined): NowState {
+export function deriveNow(issue: DerivedIssueState | undefined, active: { type: string; model?: string } | undefined): NowState {
   const label = active ? (NOW_LABEL[active.type] ?? active.type) : ''
   const model = active ? nowModel(active.model) : ''
   const agentLabel = active ? (model ? `${label.toLowerCase()} · ${model}` : label.toLowerCase()) : undefined
-  if (rs?.mergeStatus === 'merged') return { tone: 'success', text: 'Merged — ready to close out' }
-  if (rs?.readyForMerge) return { tone: 'success', text: 'Review & tests passed — ready to merge' }
-  if (rs?.reviewStatus === 'blocked' || rs?.reviewStatus === 'failed') {
+  if (issue?.state === 'merged') return { tone: 'success', text: 'Merged — ready to close out' }
+  if (issue?.state === 'ready') return { tone: 'warning', text: 'Approved and green — waiting on you to merge' }
+  if (issue?.state === 'changes-requested') {
     const onIt = active?.type === 'work'
-    return { tone: 'destructive', text: onIt ? 'Review blocked — work agent is fixing it' : 'Review blocked — awaiting the work agent', agentType: onIt ? 'work' : undefined, agentLabel: onIt ? agentLabel : undefined }
+    return {
+      tone: 'destructive',
+      text: onIt ? 'Changes requested — work agent is fixing it' : 'Changes requested — awaiting the work agent',
+      ...(onIt ? { agentType: 'work', agentLabel } : {}),
+    }
   }
-  if (rs?.testStatus === 'testing') return { tone: 'info', text: 'Tests running' }
-  if (rs?.verificationStatus === 'running') return { tone: 'info', text: 'Verification running' }
+  if (issue?.pr?.checks === 'red') return { tone: 'destructive', text: 'Checks are failing on the PR' }
+  if (issue?.pr?.checks === 'pending') return { tone: 'info', text: 'Checks running' }
   if (active) return { tone: 'info', text: `${label} agent is working`, agentType: active.type, agentLabel }
-  return { tone: 'muted', text: 'Idle — awaiting the pipeline' }
+  return { tone: 'muted', text: 'Idle' }
 }
 
 /** Lean Overview "Now" panel (PAN-1991 #9) — only what the header gates, the
  * Agents lane, and the tasks rail don't already show: what's happening, the next
  * action, the diff size, and the last few status events. No status grid. */
 function NowPanel({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (tab: OverviewNavTab) => void; onOpenAgent: (type: string) => void }) {
-  const review = useReviewStatusQuery(issueId)
+  const issue = useDerivedIssueState(issueId)
   const pr = usePrQuery(issueId)
   const activity = useActivityQuery(issueId)
-  const rs = review.data
   const p = pr.data?.pr
   const sections = activity.data?.sections ?? []
   const active = sections.find((s) => s.status === 'running' || s.status === 'active' || s.status === 'starting')
   const hasWork = sections.some((s) => s.type === 'work')
-  const now = deriveNow(rs, active)
-  const recent = [...(rs?.history ?? [])]
-    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-    .slice(0, 3)
-  const nowDate = new Date()
+  const now = deriveNow(issue, active)
   const lk = 'rounded-[8px] border border-border px-2.5 py-1 text-[11.5px] text-muted-foreground transition-colors hover:bg-accent'
 
   return (
@@ -104,7 +92,7 @@ function NowPanel({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (ta
         )}
       </div>
       <div className="mt-2.5 text-[12.5px]">
-        <span className="text-muted-foreground">Next:</span> {nextAction(rs)}
+        <span className="text-muted-foreground">Next:</span> {nextAction(issue)}
         {p && <> · <span className="text-muted-foreground">diff</span> <span className="text-success-foreground">+{p.additions}</span> <span className="text-destructive-foreground">−{p.deletions}</span> · {p.changedFiles} file{p.changedFiles === 1 ? '' : 's'}</>}
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
@@ -112,21 +100,6 @@ function NowPanel({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (ta
         {p && <button type="button" className={lk} onClick={() => onTab('code')}>Open diff →</button>}
         {p?.url && <a className={lk} href={p.url} target="_blank" rel="noreferrer">Open PR ↗</a>}
       </div>
-      {recent.length > 0 && (
-        <div className="mt-3.5">
-          <div className="mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
-            <span>Recent activity</span>
-            <button type="button" className="text-[10px] normal-case tracking-normal text-muted-foreground hover:text-foreground" onClick={() => onTab('timeline')}>→ Timeline</button>
-          </div>
-          {recent.map((h, i) => (
-            <div key={`${h.type}-${h.timestamp}-${i}`} className="flex items-baseline gap-2.5 py-1 text-[12.5px]">
-              <span className={`mt-1.5 h-[7px] w-[7px] shrink-0 rounded-full ${NOW_DOT[statusToTone(h.status)]}`} />
-              <span className="capitalize">{h.type} {h.status}</span>
-              <span className="ml-auto text-[10.5px] text-muted-foreground">{formatRelativeTime(h.timestamp, nowDate)}</span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }

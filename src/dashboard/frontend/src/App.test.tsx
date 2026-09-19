@@ -35,6 +35,8 @@ const {
     mockDashboardState: {
       agents: [],
       agentsById: {},
+      backendPanesById: {},
+      derivedIssueStateByIssueId: {},
       issues: [{ identifier: 'PAN-123', url: 'https://example.com/issues/PAN-123' }],
       dashboardLifecycle: { active: false },
       channelPermissionRequestsById: {},
@@ -101,7 +103,6 @@ vi.mock('./components/CommandPalette', () => ({ CommandPalette: () => null }));
 vi.mock('./components/ResourcesPanel', () => ({ ResourcesPanel: () => null }));
 vi.mock('./components/GodView', () => ({ GodViewPage: () => null }));
 vi.mock('./components/context/ContextPage', () => ({ ContextPage: () => <div data-testid="context-page" /> }));
-vi.mock('./components/flywheel/FlywheelConversationPane', () => ({ FlywheelConversationPane: () => <div data-testid="flywheel-page" /> }));
 vi.mock('./components/Sidebar', () => ({ Sidebar: () => null }));
 vi.mock('./components/BootstrapGate', () => ({ BootstrapGate: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 vi.mock('./components/skeletons/KanbanSkeleton', () => ({ KanbanSkeleton: () => null }));
@@ -287,12 +288,12 @@ describe('conversation route helpers', () => {
     });
   });
 
-  it('maps the Flywheel and Order Book URLs to their tabs', () => {
-    window.history.replaceState(null, '', '/flywheel');
-    expect(getConversationRouteState()).toMatchObject({ tab: 'flywheel', convId: null });
-
+  it('maps the Order Book URL to its tab and no longer knows /flywheel', () => {
     window.history.replaceState(null, '', '/orders');
     expect(getConversationRouteState()).toMatchObject({ tab: 'orders', convId: null });
+
+    window.history.replaceState(null, '', '/flywheel');
+    expect(getConversationRouteState()).toMatchObject({ tab: 'home', convId: null });
   });
 
   it('resolves Home as the default route, Pipeline as /pipeline, Board as /board, and Context as /context', () => {

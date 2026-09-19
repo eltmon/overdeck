@@ -41,7 +41,8 @@ function orb(id: string, overrides: Partial<ConfluenceOrb> = {}): ConfluenceOrb 
     thinkUntil: 0,
     compactT: 0,
     spend: 0,
-    mergeStatus: null,
+    issueState: null,
+    attention: null,
     parkedOrbit: null,
     parkedMin: null,
     orbitReason: null,
@@ -79,11 +80,11 @@ function effects(): RiverEffectsApi {
 }
 
 describe('Confluence choreography dispatch table', () => {
-  it('holds queued and merging orbs in MERGE until their dwell expires', () => {
-    expect(advanceMergeDwell('MERGE', 'queued', 0, 1)).toEqual({ remaining: 0, shouldStart: false });
-    expect(advanceMergeDwell('MERGE', 'merging', 2, 0.5)).toEqual({ remaining: 1.5, shouldStart: false });
-    expect(advanceMergeDwell('MERGE', 'merging', 1.5, 1.5)).toEqual({ remaining: 0, shouldStart: true });
-    expect(advanceMergeDwell('VERIFY', 'merging', 0, 1)).toEqual({ remaining: 0, shouldStart: false });
+  it('holds ready and merged orbs in MERGE until their dwell expires', () => {
+    expect(advanceMergeDwell('MERGE', 'ready', 0, 1)).toEqual({ remaining: 0, shouldStart: false });
+    expect(advanceMergeDwell('MERGE', 'merged', 2, 0.5)).toEqual({ remaining: 1.5, shouldStart: false });
+    expect(advanceMergeDwell('MERGE', 'merged', 1.5, 1.5)).toEqual({ remaining: 0, shouldStart: true });
+    expect(advanceMergeDwell('REVIEW', 'merged', 0, 1)).toEqual({ remaining: 0, shouldStart: false });
   });
 
   it('recovers a failed merge during or after the portal comet', () => {
@@ -114,7 +115,7 @@ describe('Confluence choreography dispatch table', () => {
       ['PAN-1', orb('PAN-1')],
       ['PAN-2', orb('PAN-2', { state: 'stale', staleMin: 42 })],
       ['PAN-3', orb('PAN-3', { state: 'shelf', yieldReason: 'yield: older' })],
-      ['PAN-4', orb('PAN-4', { mergeStatus: 'queued' })],
+      ['PAN-4', orb('PAN-4', { issueState: 'ready' })],
       ['PAN-5', orb('PAN-5')],
       ['PAN-6', orb('PAN-6')],
       ['PAN-50', orb('PAN-50', { role: 'review', stage: 'REVIEW' })],
@@ -124,9 +125,9 @@ describe('Confluence choreography dispatch table', () => {
       // PAN-2's data says it is ALIVE again (stale → active): the honest thaw.
       ['PAN-2', orb('PAN-2', { state: 'active' })],
       ['PAN-3', orb('PAN-3')],
-      ['PAN-4', orb('PAN-4', { mergeStatus: 'merging' })],
+      ['PAN-4', orb('PAN-4', { issueState: 'merged' })],
       ['PAN-5', orb('PAN-5', { state: 'shelf', yieldReason: 'yield: freeing a slot for PAN-50' })],
-      ['PAN-6', orb('PAN-6', { state: 'failed', mergeStatus: 'failed' })],
+      ['PAN-6', orb('PAN-6', { state: 'failed', attention: 'stuck' })],
       ['PAN-50', orb('PAN-50', { role: 'review', stage: 'REVIEW' })],
       ['PAN-99', orb('PAN-99', { role: 'plan', stage: 'PLAN' })],
     ]);

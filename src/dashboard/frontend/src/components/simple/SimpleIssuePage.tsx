@@ -30,7 +30,8 @@ const S = SIMPLE_STRINGS.issue;
 export function SimpleIssuePage({ issueId }: { issueId: string }) {
   const issuesRaw = useDashboardStore((s) => s.issuesRaw);
   const agentsById = useDashboardStore((s) => s.agentsById);
-  const reviewByIssueId = useDashboardStore((s) => s.reviewStatusByIssueId);
+  const derivedByIssueId = useDashboardStore((s) => s.derivedIssueStateByIssueId);
+  const panesById = useDashboardStore((s) => s.backendPanesById);
   const openDrawer = useDashboardStore((s) => s.openIssue);
   const closeSimpleIssue = useUiMode((s) => s.closeSimpleIssue);
   const actions = useSimpleActions();
@@ -45,8 +46,13 @@ export function SimpleIssuePage({ issueId }: { issueId: string }) {
     const agents = (Object.values(agentsById ?? {}) as AgentSnapshot[]).filter(
       (a) => a.issueId?.toLowerCase() === issue.identifier.toLowerCase(),
     );
-    return deriveSimpleIssue(issue, agents, reviewByIssueId?.[issue.identifier]);
-  }, [issuesRaw, agentsById, reviewByIssueId, issueId]);
+    return deriveSimpleIssue(
+      issue,
+      agents,
+      derivedByIssueId?.[issue.identifier],
+      Object.values(panesById).filter((pane) => pane.issue?.toUpperCase() === issue.identifier.toUpperCase()),
+    );
+  }, [issuesRaw, agentsById, derivedByIssueId, panesById, issueId]);
 
   if (!derivation) {
     return (
@@ -72,7 +78,7 @@ export function SimpleIssuePage({ issueId }: { issueId: string }) {
   // answering. Anything more complex keeps the generic card + composer.
   const richQuestion = questionAgent != null && isRichQuestion(questionAgent);
   const helpUrl = getHelpUrl(d.issue);
-  const busy = actions.tell.isPending || actions.answer.isPending || actions.recover.isPending || actions.unstick.isPending || actions.merge.isPending || actions.startWork.isPending;
+  const busy = actions.tell.isPending || actions.answer.isPending || actions.recover.isPending || actions.merge.isPending || actions.startWork.isPending;
 
   const sendComposer = () => {
     const text = composerText.trim();
@@ -94,16 +100,13 @@ export function SimpleIssuePage({ issueId }: { issueId: string }) {
       case 'Start work':
         return <PrimaryButton disabled={busy} onClick={() => actions.startWork.mutate({ issueId: d.issue.identifier })}>{label}</PrimaryButton>;
       case 'Get it unstuck':
-        // PAN-3073: target the door(s) that actually tripped stuck — the
-        // persistent review-status flag needs unstick; agent recovery alone
-        // cannot clear it and silently no-ops on a healthy agent.
+        // PAN-3917: there is no stuck flag to clear — recovering the agent is
+        // the only door, and the derived attention signal clears itself once
+        // the issue moves again.
         return (
           <PrimaryButton
-            disabled={busy || (!d.reviewStuck && !agent)}
-            onClick={() => {
-              if (d.reviewStuck) actions.unstick.mutate({ issueId: d.issue.identifier });
-              if (d.agentStuck && agent) actions.recover.mutate({ agentId: agent.id });
-            }}
+            disabled={busy || !agent}
+            onClick={() => { if (agent) actions.recover.mutate({ agentId: agent.id }); }}
           >
             {label}
           </PrimaryButton>

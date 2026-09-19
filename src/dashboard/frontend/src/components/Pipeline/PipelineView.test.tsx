@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useDashboardStore } from '../../lib/store';
-import type { Issue } from '../../types';
+import type { DerivedIssueState, Issue } from '../../types';
 import { DialogProvider } from '../DialogProvider';
 import { PipelineView } from './PipelineView';
 
@@ -65,24 +65,31 @@ describe('PipelineView', () => {
         issue({ identifier: 'PAN-4', title: 'Blocked merge', priority: 2, project: { id: 'ops', name: 'Operations', color: '#fff' } }),
         issue({ identifier: 'PAN-5', title: 'Open PR', priority: 2, project: { id: 'ops', name: 'Operations', color: '#fff' } }),
       ],
-      reviewStatusByIssueId: {
-        'PAN-1': { issueId: 'PAN-1', readyForMerge: true, mergeStatus: 'pending', updatedAt: '2026-05-18T01:00:00.000Z' },
+      derivedIssueStateByIssueId: {
+        'PAN-1': {
+          issueId: 'PAN-1',
+          state: 'ready',
+          pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'APPROVED', checks: 'green', mergeable: true },
+        },
+        'PAN-2': { issueId: 'PAN-2', state: 'working' },
+        'PAN-6': { issueId: 'PAN-6', state: 'working' },
+        'PAN-7': { issueId: 'PAN-7', state: 'working' },
+        'PAN-3': { issueId: 'PAN-3', state: 'planned' },
+        // Blocked from merge: approved but the forge reports red checks.
         'PAN-4': {
           issueId: 'PAN-4',
-          readyForMerge: false,
-          mergeStatus: 'pending',
-          reviewStatus: 'passed',
-          testStatus: 'passed',
-          blockerReasons: ['github-checks'],
-          updatedAt: '2026-05-18T01:00:00.000Z',
+          state: 'in-review',
+          pr: { url: 'https://example.com/pr/4', number: 4, reviewState: 'APPROVED', checks: 'red', mergeable: true },
         },
+        // An open PR that is not ready yet.
         'PAN-5': {
           issueId: 'PAN-5',
-          readyForMerge: false,
-          mergeStatus: 'pending',
-          prUrl: 'https://example.com/pr/5',
-          updatedAt: '2026-05-18T01:00:00.000Z',
+          state: 'in-review',
+          pr: { url: 'https://example.com/pr/5', number: 5, reviewState: 'REVIEW_REQUESTED', checks: 'pending', mergeable: true },
         },
+      } satisfies Record<string, DerivedIssueState>,
+      backendPanesById: {
+        'pane-pan-2': { id: 'pane-pan-2', issue: 'PAN-2', role: 'work', harness: 'claude-code', model: 'opus', state: 'working' },
       },
       agentsById: {
         'agent-pan-2': {
@@ -129,7 +136,7 @@ describe('PipelineView', () => {
     expect(within(workPhase).getByText('agent-pan-2')).toBeInTheDocument();
     expect(within(planPhase).getByText('Planned work')).toBeInTheDocument();
     expect(container.querySelector('[data-component="phase-header"]')).toHaveClass('sticky', 'top-0');
-    expect(container.querySelectorAll('[data-component="phase-header"]')).toHaveLength(6);
+    expect(container.querySelectorAll('[data-component="phase-header"]')).toHaveLength(5);
   });
 
   it('renders available post-merge limbo membership in the ship lane', () => {
@@ -140,7 +147,8 @@ describe('PipelineView', () => {
         state: 'in_review',
         pipelineMembership: { available: true, inPipeline: true, bucket: 'post_merge_limbo', labelDrift: null },
       })],
-      reviewStatusByIssueId: {},
+      derivedIssueStateByIssueId: { 'PAN-10': { issueId: 'PAN-10', state: 'merged' } },
+      backendPanesById: {},
       agentsById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
 
@@ -157,7 +165,8 @@ describe('PipelineView', () => {
         state: 'in_progress',
         pipelineMembership: { inPipeline: false, bucket: 'clean_terminal', labelDrift: 'stale_present' },
       })],
-      reviewStatusByIssueId: {},
+      derivedIssueStateByIssueId: { 'PAN-11': { issueId: 'PAN-11', state: 'working' } },
+      backendPanesById: {},
       agentsById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
 
@@ -171,7 +180,8 @@ describe('PipelineView', () => {
   it('excludes completed issues when membership is missing', () => {
     useDashboardStore.setState({
       issuesRaw: [issue({ identifier: 'PAN-14', title: 'Completed without residue', state: 'completed' })],
-      reviewStatusByIssueId: {},
+      derivedIssueStateByIssueId: {},
+      backendPanesById: {},
       agentsById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
 
@@ -194,7 +204,12 @@ describe('PipelineView', () => {
           pipelineMembership: { available: false, inPipeline: false, bucket: 'clean_terminal', labelDrift: null },
         }),
       ],
-      reviewStatusByIssueId: {}, agentsById: {},
+      derivedIssueStateByIssueId: {
+        'PAN-15': { issueId: 'PAN-15', state: 'working' },
+        'PAN-16': { issueId: 'PAN-16', state: 'working' },
+      },
+      backendPanesById: {},
+      agentsById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
 
     renderPipelineView();
@@ -211,7 +226,8 @@ describe('PipelineView', () => {
         labels: ['ready'],
         pipelineMembership: { inPipeline: true, bucket: 'planned_backlog', labelDrift: null },
       })],
-      reviewStatusByIssueId: {},
+      derivedIssueStateByIssueId: {},
+      backendPanesById: {},
       agentsById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
 
@@ -247,16 +263,18 @@ describe('PipelineView', () => {
     const tiles = Array.from(strip.querySelectorAll('[data-component="metric-tile"]'));
     expect(tiles.map((tile) => tile.getAttribute('data-signal'))).toEqual(['info', 'info', 'review', 'success', 'cost']);
     expect(tiles.map((tile) => tile.querySelector('[data-component="metric-tile-value"]')?.textContent)).toEqual([
-      '6',
+      // 7 issues in a non-todo derived state, 1 live work pane, 2 issues in
+      // review (PAN-4 and PAN-5 both have an open PR), 1 ready to merge.
+      '7',
       '1',
-      '1',
+      '2',
       '1',
       '$1.75',
     ]);
     expect(fetch).toHaveBeenCalledWith('/api/costs/stream?limit=500');
   });
 
-  it('does not classify error or unknown work agents as running work', () => {
+  it('derives the lane from the issue state, never from agent status', () => {
     useDashboardStore.setState({
       issuesRaw: [
         issue({ identifier: 'PAN-8', title: 'Errored agent work', hasPlan: true }),
@@ -286,7 +304,11 @@ describe('PipelineView', () => {
           killCount: 0,
         },
       },
-      reviewStatusByIssueId: {},
+      derivedIssueStateByIssueId: {
+        'PAN-8': { issueId: 'PAN-8', state: 'planned' },
+        'PAN-9': { issueId: 'PAN-9', state: 'planned' },
+      },
+      backendPanesById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
 
     const { container } = renderPipelineView();
@@ -492,7 +514,8 @@ describe('PipelineView', () => {
           pendingQuestionCount: 1,
         },
       },
-      reviewStatusByIssueId: {},
+      derivedIssueStateByIssueId: { 'PAN-8': { issueId: 'PAN-8', state: 'working' } },
+      backendPanesById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
 
     const { container } = renderPipelineView();
@@ -522,7 +545,8 @@ describe('PipelineView', () => {
           pendingQuestionPrompt: 'Which path?',
         },
       },
-      reviewStatusByIssueId: {},
+      derivedIssueStateByIssueId: { 'PAN-8b': { issueId: 'PAN-8b', state: 'working' } },
+      backendPanesById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
 
     const { container } = renderPipelineView();
@@ -551,7 +575,8 @@ describe('PipelineView', () => {
           pendingQuestionCount: 0,
         },
       },
-      reviewStatusByIssueId: {},
+      derivedIssueStateByIssueId: { 'PAN-9': { issueId: 'PAN-9', state: 'working' } },
+      backendPanesById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
 
     const { container } = renderPipelineView();

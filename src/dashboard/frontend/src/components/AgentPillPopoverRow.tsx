@@ -10,10 +10,6 @@ export function isRunningAgentStatus(status: Agent['status']): boolean {
 export function describeAgentStop(agent: Agent): string {
   if (agent.pausedReason) return `paused: ${agent.pausedReason}`;
   if (agent.paused) return 'paused';
-  if (agent.troubled) {
-    const failures = agent.consecutiveFailures;
-    return `troubled (${failures} failure${failures === 1 ? '' : 's'})`;
-  }
   if (agent.stoppedByUser) return 'stopped by operator';
   return 'stopped cleanly';
 }

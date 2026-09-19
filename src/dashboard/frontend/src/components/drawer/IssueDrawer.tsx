@@ -25,7 +25,7 @@ export function IssueDrawer() {
   const closeIssue = useDashboardStore((state) => state.closeIssue);
   const setDrawerTab = useDashboardStore((state) => state.setDrawerTab);
   const syncDrawerFromUrl = useDashboardStore((state) => state.syncDrawerFromUrl);
-  const { issue, agents, reviewStatus, tasks } = useDrawerData();
+  const { issue, agents, derived, tasks } = useDrawerData();
 
   useEffect(() => {
     syncDrawerFromUrl();
@@ -134,7 +134,7 @@ export function IssueDrawer() {
           issueId={drawer.issueId}
           density="drawer"
           agents={agents}
-          reviewStatus={reviewStatus}
+          derived={derived}
           tab={drawer.tab}
           onSelectTab={(tab: IssueDetailTabId) => setDrawerTab(tab)}
           tasksBadge={taskBadge(tasks)}

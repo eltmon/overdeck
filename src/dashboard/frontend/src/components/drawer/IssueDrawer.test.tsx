@@ -81,10 +81,6 @@ function mockFetch(workspaceOverride?: Record<string, unknown>) {
       tasksCount: currentIssue?.hasTasks ? 1 : 0,
       planningComplete: currentIssue?.planningComplete ?? currentIssue?.hasPlan ?? false,
     });
-    if (url.includes('/api/review/') && url.endsWith('/status')) {
-      const rs = useDashboardStore.getState().reviewStatusByIssueId['PAN-1'];
-      return Response.json(rs ?? { issueId: 'PAN-1', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: new Date().toISOString() });
-    }
     if (url.includes('/api/workspaces/')) return Response.json({
       exists: true,
       issueId: 'PAN-1',
@@ -162,7 +158,8 @@ describe('IssueDrawer', () => {
       drawer: { issueId: null, tab: 'overview' },
       issuesRaw: [issue],
       agentsById: {},
-      reviewStatusByIssueId: {},
+      derivedIssueStateByIssueId: {},
+      backendPanesById: {},
       recentActivity: [],
       detailedActivity: [],
     } as Parameters<typeof useDashboardStore.setState>[0]);
@@ -607,16 +604,11 @@ describe('IssueDrawer', () => {
   it('renders phase timeline from drawer data with done current and upcoming states', () => {
     useDashboardStore.setState({
       issuesRaw: [{ ...issue, hasPlan: true, status: 'In Progress' }],
-      reviewStatusByIssueId: {
+      derivedIssueStateByIssueId: {
         'PAN-1': {
           issueId: 'PAN-1',
-          reviewStatus: 'passed',
-          testStatus: 'passed',
-          verificationStatus: 'passed',
-          mergeStatus: 'merging',
-          readyForMerge: true,
-          reviewSpawnedAt: '2026-05-18T00:10:00.000Z',
-          updatedAt: '2026-05-18T00:15:00.000Z',
+          state: 'ready',
+          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'APPROVED', checks: 'green', mergeable: true },
         },
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);
@@ -644,19 +636,14 @@ describe('IssueDrawer', () => {
     expect(within(steps[5] as HTMLElement).getByText('—')).toBeInTheDocument();
   });
 
-  it('renders verification gates from drawer data with PRD border tones', async () => {
+  it('renders the PR check-run gate from drawer data with PRD border tones', async () => {
     useDashboardStore.setState({
       issuesRaw: [{ ...issue, workspacePath: '/tmp/pan-1' }],
-      reviewStatusByIssueId: {
+      derivedIssueStateByIssueId: {
         'PAN-1': {
           issueId: 'PAN-1',
-          reviewStatus: 'reviewing',
-          testStatus: 'pending',
-          verificationStatus: 'failed',
-          verificationNotes: 'Verification FAILED at lint (1200ms): lint output',
-          uatStatus: 'testing',
-          readyForMerge: false,
-          updatedAt: '2026-05-18T00:00:00.000Z',
+          state: 'in-review',
+          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'REVIEW_REQUIRED', checks: 'red', mergeable: true },
         },
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);
@@ -664,16 +651,12 @@ describe('IssueDrawer', () => {
 
     renderDrawer();
 
-    await waitFor(() => expect(screen.getByTestId('verification-gate-typecheck')).toHaveAttribute('data-gate-status', 'passed'));
+    await waitFor(() => expect(screen.getByTestId('verification-gate-checks')).toHaveAttribute('data-gate-status', 'failed'));
 
     expect(screen.getByTestId('verification-gates')).toBeInTheDocument();
-    expect(screen.getByTestId('verification-gates').lastElementChild).toHaveClass('grid-cols-4', 'gap-[8px]');
-    expect(screen.getByTestId('verification-gate-typecheck')).toHaveClass('border-success/40', 'bg-success/10', 'text-success-foreground');
-    expect(within(screen.getByTestId('verification-gate-typecheck')).getByText('pass')).toHaveClass('text-[14px]', 'font-medium');
-    expect(screen.getByTestId('verification-gate-lint')).toHaveClass('border-destructive/40', 'bg-destructive/10', 'text-destructive-foreground');
-    expect(within(screen.getByTestId('verification-gate-lint')).getByText('lint')).toHaveClass('font-mono', 'text-[10px]', 'text-muted-foreground');
-    expect(screen.getByTestId('verification-gate-test')).toHaveClass('border-muted', 'text-muted-foreground');
-    expect(screen.getByTestId('verification-gate-uat')).toHaveClass('border-info/40', 'bg-info/10', 'text-info-foreground');
+    expect(screen.getByTestId('verification-gate-checks')).toHaveClass('border-destructive/40', 'bg-destructive/10', 'text-destructive-foreground');
+    expect(within(screen.getByTestId('verification-gate-checks')).getByText('fail')).toHaveClass('text-[14px]', 'font-medium');
+    expect(within(screen.getByTestId('verification-gate-checks')).getByText('checks')).toHaveClass('font-mono', 'text-[10px]', 'text-muted-foreground');
   });
 
   it('renders active agent card without the deleted stream excerpt and sends tell input', async () => {
@@ -725,15 +708,11 @@ describe('IssueDrawer', () => {
   it('renders action bar with the shared primary-strip menu and pinned merge control', async () => {
     useDashboardStore.setState({
       issuesRaw: [{ ...issue, status: 'In Review', state: 'in_review', hasPlan: true, workspacePath: '/tmp/pan-1' }],
-      reviewStatusByIssueId: {
+      derivedIssueStateByIssueId: {
         'PAN-1': {
           issueId: 'PAN-1',
-          reviewStatus: 'passed',
-          testStatus: 'passed',
-          readyForMerge: true,
-          mergeStatus: 'pending',
-          prUrl: 'https://example.com/pr/1',
-          updatedAt: '2026-05-18T00:00:00.000Z',
+          state: 'ready',
+          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'APPROVED', checks: 'green', mergeable: true },
         },
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);
@@ -774,6 +753,10 @@ describe('IssueDrawer', () => {
           killCount: 0,
         },
       },
+      derivedIssueStateByIssueId: { 'PAN-1': { issueId: 'PAN-1', state: 'working' } },
+      backendPanesById: {
+        'pane-work': { id: 'pane-work', issue: 'PAN-1', role: 'work', harness: 'claude-code', model: 'gpt-5.5', state: 'working' },
+      },
     } as Parameters<typeof useDashboardStore.setState>[0]);
     useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
@@ -795,17 +778,14 @@ describe('IssueDrawer', () => {
       drawer: { issueId: null, tab: 'overview' },
       issuesRaw: [{ ...issue, status: 'In Review', state: 'in_review', hasPlan: true, hasBeads: true, workspacePath: '/tmp/pan-1' }],
       agentsById: {},
-      reviewStatusByIssueId: {
+      derivedIssueStateByIssueId: {
         'PAN-1': {
           issueId: 'PAN-1',
-          reviewStatus: 'passed',
-          testStatus: 'passed',
-          readyForMerge: true,
-          mergeStatus: 'pending',
-          prUrl: 'https://example.com/pr/1',
-          updatedAt: '2026-05-18T00:00:00.000Z',
+          state: 'ready',
+          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'APPROVED', checks: 'green', mergeable: true },
         },
       },
+      backendPanesById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
     useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
@@ -818,17 +798,14 @@ describe('IssueDrawer', () => {
       {
         "READY_TO_MERGE": [
           "issue-action-merge",
-          "issue-action-resyncPipelineState",
           "issue-action-syncMain",
           "issue-action-copySettings",
           "issue-action-tasks",
           "issue-action-syncDiscussions",
-          "issue-action-statusReview",
           "issue-action-open",
+          "issue-action-resetIssue",
           "issue-action-wipe",
           "issue-action-destroyWorkspace",
-          "issue-action-resetIssue",
-          "issue-action-resetToPlanned",
           "issue-action-cancel",
           "issue-action-restartFromPlan",
           "issue-action-viewPr",
@@ -836,19 +813,16 @@ describe('IssueDrawer', () => {
         "WORK_RUNNING": [
           "issue-action-tell",
           "issue-action-doneWork",
-          "issue-action-resyncPipelineState",
           "issue-action-syncMain",
           "issue-action-copySettings",
           "issue-action-tasks",
           "issue-action-syncDiscussions",
-          "issue-action-statusReview",
           "issue-action-open",
           "issue-action-stopAgent",
           "issue-action-pause",
+          "issue-action-resetIssue",
           "issue-action-wipe",
           "issue-action-destroyWorkspace",
-          "issue-action-resetIssue",
-          "issue-action-resetToPlanned",
           "issue-action-cancel",
           "issue-action-completeWorkReset",
           "issue-action-restartFromPlan",
@@ -877,12 +851,11 @@ describe('IssueDrawer', () => {
           killCount: 0,
         },
       },
-      reviewStatusByIssueId: {
+      derivedIssueStateByIssueId: {
         'PAN-1': {
           issueId: 'PAN-1',
-          readyForMerge: true,
-          mergeStatus: 'pending',
-          updatedAt: '2026-05-18T00:00:00.000Z',
+          state: 'ready',
+          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'APPROVED', checks: 'green', mergeable: true },
         },
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);
@@ -922,14 +895,7 @@ describe('IssueDrawer', () => {
   it('hides unavailable pinned PR and merge controls', () => {
     useDashboardStore.setState({
       issuesRaw: [{ ...issue, url: '' }],
-      reviewStatusByIssueId: {
-        'PAN-1': {
-          issueId: 'PAN-1',
-          readyForMerge: false,
-          mergeStatus: 'merged',
-          updatedAt: '2026-05-18T00:00:00.000Z',
-        },
-      },
+      derivedIssueStateByIssueId: { 'PAN-1': { issueId: 'PAN-1', state: 'merged' } },
     } as Parameters<typeof useDashboardStore.setState>[0]);
     useDashboardStore.getState().openIssue('PAN-1', 'overview');
 
@@ -959,20 +925,12 @@ describe('IssueDrawer', () => {
 
   it('renders four review specialist rows from drawer data with status dots', () => {
     useDashboardStore.setState({
-      reviewStatusByIssueId: {
-        'PAN-1': {
-          issueId: 'PAN-1',
-          reviewStatus: 'reviewing',
-          testStatus: 'pending',
-          readyForMerge: false,
-          updatedAt: '2026-05-18T00:00:00.000Z',
-          reviewSessionNames: ['agent-pan-1-review-security'],
-          reviewSubStatuses: {
-            security: 'running',
-            correctness: 'done',
-            performance: 'failed',
-          } as never,
-        },
+      derivedIssueStateByIssueId: {
+        'PAN-1': { issueId: 'PAN-1', state: 'in-review' },
+      },
+      agentsById: {
+        'agent-pan-1-review-security': { id: 'agent-pan-1-review-security', issueId: 'PAN-1', status: 'running', role: 'review', model: 'sonnet-5', startedAt: '2026-05-18T00:00:00.000Z' },
+        'agent-pan-1-review-correctness': { id: 'agent-pan-1-review-correctness', issueId: 'PAN-1', status: 'stopped', role: 'review', model: 'sonnet-5', startedAt: '2026-05-18T00:00:00.000Z' },
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);
     useDashboardStore.getState().openIssue('PAN-1', 'overview');
@@ -1064,12 +1022,11 @@ describe('conversation switching (PAN-2908 C-DETAIL)', () => {
         'agent-pan-1-review': switchingAgent('agent-pan-1-review', 'review'),
         'agent-pan-1-review-security': switchingAgent('agent-pan-1-review-security', 'review'),
       },
-      reviewStatusByIssueId: {
+      derivedIssueStateByIssueId: {
         'PAN-1': {
           issueId: 'PAN-1',
-          reviewStatus: 'reviewing',
-          reviewSubStatuses: { security: 'running', correctness: 'done' } as never,
-          updatedAt: '2026-05-18T00:00:00.000Z',
+          state: 'in-review',
+          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'APPROVED', checks: 'green', mergeable: true },
         },
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);

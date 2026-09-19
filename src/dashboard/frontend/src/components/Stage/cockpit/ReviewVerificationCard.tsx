@@ -1,49 +1,9 @@
 import DrawerReviewSpecialists from '../../drawer/DrawerReviewSpecialists'
-import { useReviewStatusQuery, type ReviewStatusData } from '../../CommandDeck/ZoneCOverviewTabs/queries'
+import { useIssueCheckRunsQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/useIssueActions'
+import { useDerivedIssueState } from '../../../lib/store'
+import type { DerivedIssueState } from '../../../types'
 import { CockpitCard, type CockpitTone } from './CockpitCard'
-
-type GateStatus = 'passed' | 'failed' | 'pending' | 'running' | 'skipped'
-const QUALITY_GATES = ['typecheck', 'lint', 'test'] as const
-
-function vToGate(s: string | undefined): GateStatus {
-  if (s === 'passed') return 'passed'
-  if (s === 'failed') return 'failed'
-  if (s === 'running') return 'running'
-  if (s === 'skipped') return 'skipped'
-  return 'pending'
-}
-
-/**
- * Derive the four verification gates (typecheck/lint/test/uat) from the
- * authoritative review-status API — same logic as useDrawerData but sourced
- * from React Query so it stays consistent with the stepper/spotlight and does
- * not depend on Zustand store hydration. UAT has no API field yet → pending.
- */
-function deriveGates(rs: ReviewStatusData | undefined): { id: string; status: GateStatus }[] {
-  const v = rs?.verificationStatus
-  let quality: { id: string; status: GateStatus }[]
-  if (v === 'failed') {
-    const m = rs?.verificationNotes?.match(/Verification FAILED at (typecheck|lint|test)\b/i)
-    const failedIdx = m ? QUALITY_GATES.indexOf(m[1].toLowerCase() as (typeof QUALITY_GATES)[number]) : -1
-    quality = QUALITY_GATES.map((id, i) => ({
-      id,
-      status: failedIdx < 0 ? 'failed' : i < failedIdx ? 'passed' : i === failedIdx ? 'failed' : 'pending',
-    }))
-  } else {
-    const st = vToGate(v)
-    quality = QUALITY_GATES.map((id) => ({ id, status: st }))
-  }
-  return [...quality, { id: 'uat', status: 'pending' as GateStatus }]
-}
-
-const GATE_TONE: Record<GateStatus, { cls: string; label: string }> = {
-  passed: { cls: 'text-success-foreground', label: 'pass' },
-  failed: { cls: 'text-destructive-foreground', label: 'fail' },
-  running: { cls: 'text-info-foreground', label: 'running' },
-  skipped: { cls: 'text-muted-foreground', label: 'skipped' },
-  pending: { cls: 'text-muted-foreground', label: 'pending' },
-}
 
 const DOT: Record<CockpitTone, string> = {
   info: 'bg-info',
@@ -55,37 +15,40 @@ const DOT: Record<CockpitTone, string> = {
   muted: 'bg-muted-foreground',
 }
 
-/** Map a pipeline status string → tone + display label. */
-function statusTone(status: string | undefined): { tone: CockpitTone; label: string } {
-  switch (status) {
-    case 'passed':
-    case 'merged':
-      return { tone: 'success', label: status === 'merged' ? 'Merged' : 'Passed' }
-    case 'blocked':
-      return { tone: 'destructive', label: 'Blocked' }
-    case 'failed':
-    case 'dispatch_failed':
-      return { tone: 'destructive', label: 'Failed' }
-    case 'reviewing':
-    case 'testing':
-    case 'running':
-    case 'merging':
-    case 'verifying':
-    case 'queued':
-      return { tone: 'info', label: status.charAt(0).toUpperCase() + status.slice(1) }
-    case 'skipped':
-      return { tone: 'muted', label: 'Skipped' }
-    default:
-      return { tone: 'muted', label: 'Pending' }
+/**
+ * The PR's review decision, as the forge reports it. The reviewer's verdict is
+ * a PR review (FR-7) — there is no stored review status to read.
+ */
+function reviewStep(issue: DerivedIssueState | undefined): { tone: CockpitTone; label: string } {
+  if (issue?.state === 'changes-requested') return { tone: 'destructive', label: 'Changes requested' }
+  if (issue?.pr?.reviewState === 'APPROVED') return { tone: 'success', label: 'Approved' }
+  if (issue?.state === 'in-review') return { tone: 'warning', label: 'In review' }
+  return { tone: 'muted', label: 'No review' }
+}
+
+/** Check-run rollup on the PR head (FR-8 reports verification as check runs). */
+function checksStep(issue: DerivedIssueState | undefined): { tone: CockpitTone; label: string } {
+  switch (issue?.pr?.checks) {
+    case 'green': return { tone: 'success', label: 'Green' }
+    case 'red': return { tone: 'destructive', label: 'Red' }
+    case 'pending': return { tone: 'info', label: 'Running' }
+    default: return { tone: 'muted', label: 'No checks' }
   }
 }
 
-function Step({ name, status }: { name: string; status: string | undefined }) {
-  const { tone, label } = statusTone(status)
+/** Forge mergeability — the only thing that says whether this can land. */
+function mergeStep(issue: DerivedIssueState | undefined): { tone: CockpitTone; label: string } {
+  if (issue?.state === 'merged') return { tone: 'success', label: 'Merged' }
+  if (issue?.state === 'ready') return { tone: 'warning', label: 'Ready' }
+  if (issue?.pr && issue.pr.mergeable === false) return { tone: 'destructive', label: 'Conflicts' }
+  return { tone: 'muted', label: 'Not ready' }
+}
+
+function Step({ name, tone, label }: { name: string; tone: CockpitTone; label: string }) {
   return (
     <div className="rounded-[12px] border border-border px-2.5 py-2">
       <div className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground">{name}</div>
-      <div className="mt-0.5 flex items-center gap-1.5 text-[12px] font-semibold">
+      <div className="mt-0.5 flex items-center gap-1.5 text-[12px] font-medium">
         <span className={`h-[7px] w-[7px] rounded-full ${DOT[tone]}`} />
         {label}
       </div>
@@ -93,72 +56,66 @@ function Step({ name, status }: { name: string; status: string | undefined }) {
   )
 }
 
+const CHECK_TONE: Record<string, string> = {
+  passed: 'text-success-foreground',
+  failed: 'text-destructive-foreground',
+  running: 'text-info-foreground',
+}
+
 /**
  * ReviewVerificationCard — the cockpit's "where is this in review and why is it
- * stuck" card. Merges what used to be four separate body sections (pipeline
- * stepper + verification gates + reviewer grid + tests) into one, so the figure
- * isn't repeated. (Command Deck remodel S3.)
+ * stuck" card. PAN-3917: every figure comes from an owner — the derived issue
+ * state for the review decision, mergeability and attention, and the forge's
+ * own check runs for the quality gates. Nothing is read back from a record.
  */
 export function ReviewVerificationCard({ issueId }: { issueId: string }) {
-  const rs = useReviewStatusQuery(issueId)
+  const issue = useDerivedIssueState(issueId)
+  const checkRuns = useIssueCheckRunsQuery(issueId)
   const actions = useIssueActions(issueId)
-  const data = rs.data
 
-  const cycle = data?.verificationCycleCount
-  const maxCycle = data?.verificationMaxCycles
-  const finding =
-    data?.reviewStatus === 'blocked' || data?.reviewStatus === 'failed'
-      ? data?.reviewNotes?.trim()
-      : undefined
-
-  const gates = deriveGates(data)
-  const restartReview = actions.all.find((v) => v.action.key === 'restartReview')
-  const recoverReview = actions.all.find((v) => v.action.key === 'recoverReview')
-  const actionButtons = [restartReview, recoverReview].filter(
-    (v): v is IssueActionView => !!v && v.enabled,
+  const review = reviewStep(issue)
+  const checks = checksStep(issue)
+  const merge = mergeStep(issue)
+  const summary = checkRuns.data?.summary
+  const failing = (checkRuns.data?.checkRuns ?? []).filter(
+    (run) => run.conclusion === 'failure' || run.conclusion === 'timed_out',
   )
+
+  const restartReview = actions.all.find((v) => v.action.key === 'restartReview')
+  const actionButtons = [restartReview].filter((v): v is IssueActionView => !!v && v.enabled)
 
   return (
     <CockpitCard
       tone="review"
       title="Review & Verification"
       right={
-        typeof cycle === 'number' ? (
-          <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
-            cycle {cycle}{maxCycle ? `/${maxCycle}` : ''}
+        summary && summary.total > 0 ? (
+          <span className="font-mono text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
+            {summary.passed}/{summary.total} checks
           </span>
         ) : undefined
       }
     >
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Step name="Build gate" status={data?.verificationStatus} />
-        <Step name="Review" status={data?.reviewStatus} />
-        <Step name="Tests" status={data?.testStatus} />
-        <Step name="Merge" status={data?.mergeStatus} />
+      <div className="grid grid-cols-3 gap-2">
+        <Step name="Review" tone={review.tone} label={review.label} />
+        <Step name="Checks" tone={checks.tone} label={checks.label} />
+        <Step name="Merge" tone={merge.tone} label={merge.label} />
       </div>
 
-      <div className="mt-2.5 grid grid-cols-4 gap-2">
-        {gates.map((g) => {
-          const tone = GATE_TONE[g.status]
-          return (
-            <div key={g.id} className="rounded-[12px] border border-border px-2 py-2 text-center">
-              <div className={`text-[11px] font-semibold ${tone.cls}`}>{tone.label}</div>
-              <div className="mt-0.5 text-[9px] uppercase tracking-[0.06em] text-muted-foreground">{g.id}</div>
-            </div>
-          )
-        })}
-      </div>
+      {failing.length > 0 && (
+        <ul className="mt-2.5 grid gap-1">
+          {failing.map((run) => (
+            <li key={run.id} className="flex items-center gap-2 rounded-[12px] border border-border px-2.5 py-1.5 text-[12px]">
+              <span className={`text-[11px] font-medium ${CHECK_TONE.failed}`}>fail</span>
+              <span className="truncate font-mono text-[11px] text-muted-foreground">{run.name}</span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       <div className="mt-3">
         <DrawerReviewSpecialists issueId={issueId} />
       </div>
-
-      {finding && (
-        <div className="mt-3 rounded-r-[10px] border-l-2 border-destructive/60 bg-destructive/[0.06] px-3 py-2 text-[12px] leading-snug">
-          <span className="font-semibold text-destructive-foreground">Blocking finding</span>
-          <span className="text-foreground/85"> — {finding}</span>
-        </div>
-      )}
 
       {actionButtons.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">

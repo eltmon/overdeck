@@ -9,7 +9,7 @@
 import { useMemo, useState } from 'react';
 import { useDashboardStore } from '../../lib/store';
 import { usePendingInputSubjects } from '../../lib/useDecisions';
-import type { Issue } from '../../types';
+import type { BackendPane, Issue } from '../../types';
 import type { AgentSnapshot } from '@overdeck/contracts';
 import { bucketSimpleHome, deriveSimpleIssue, type SimpleIssueDerivation, type NeedsYouKind } from '../../lib/simple/derive';
 import { useSimpleActions } from '../../lib/simple/useSimpleActions';
@@ -41,7 +41,7 @@ function NeedsYouRow({
   const agent = item.primaryAgent;
   const questionAgent = isConversation ? undefined : item.pendingInputAgent;
   const answerTarget = conversationName || questionAgent?.id;
-  const busy = actions.tell.isPending || actions.recover.isPending || actions.unstick.isPending || actions.answer.isPending || actions.startWork.isPending;
+  const busy = actions.tell.isPending || actions.recover.isPending || actions.answer.isPending || actions.startWork.isPending;
   const meta = KIND_META[kind];
 
   return (
@@ -95,11 +95,8 @@ function NeedsYouRow({
         )}
         {kind === 'stuck' && (
           <button
-            disabled={busy || (!item.reviewStuck && !agent)}
-            onClick={() => {
-              if (item.reviewStuck) actions.unstick.mutate({ issueId: item.issue.identifier });
-              if (item.agentStuck && agent) actions.recover.mutate({ agentId: agent.id });
-            }}
+            disabled={busy || !agent}
+            onClick={() => agent && actions.recover.mutate({ agentId: agent.id })}
             className="h-7 rounded-md bg-primary px-2.5 text-[11px] font-medium text-primary-foreground disabled:opacity-40"
           >
             Get it unstuck
@@ -123,7 +120,8 @@ type NeedsYouItem =
 export function NeedsYouStrip({ onOpenIssue }: { onOpenIssue: (id: string) => void }) {
   const issuesRaw = useDashboardStore((s) => s.issuesRaw);
   const agentsById = useDashboardStore((s) => s.agentsById);
-  const reviewByIssueId = useDashboardStore((s) => s.reviewStatusByIssueId);
+  const derivedByIssueId = useDashboardStore((s) => s.derivedIssueStateByIssueId);
+  const panesById = useDashboardStore((s) => s.backendPanesById);
   const pendingSubjects = usePendingInputSubjects();
 
   const { items, questions } = useMemo(() => {
@@ -137,8 +135,25 @@ export function NeedsYouStrip({ onOpenIssue }: { onOpenIssue: (id: string) => vo
       list.push(a);
       agentsByIssue.set(key, list);
     }
+    // The backend's pane inventory is what makes an issue "running" rather
+    // than "waiting on you" — bucket it per issue so each derivation sees its
+    // own panes.
+    const panesByIssue = new Map<string, BackendPane[]>();
+    for (const pane of Object.values(panesById ?? {})) {
+      const key = pane.issue?.toLowerCase();
+      if (!key) continue;
+      const list = panesByIssue.get(key) ?? [];
+      list.push(pane);
+      panesByIssue.set(key, list);
+    }
+    const panesOf = (issue: Issue) => panesByIssue.get(issue.identifier.toLowerCase()) ?? [];
     const derivations = issues.map((issue) =>
-      deriveSimpleIssue(issue, agentsByIssue.get(issue.identifier.toLowerCase()) ?? [], reviewByIssueId?.[issue.identifier]),
+      deriveSimpleIssue(
+        issue,
+        agentsByIssue.get(issue.identifier.toLowerCase()) ?? [],
+        derivedByIssueId?.[issue.identifier],
+        panesOf(issue),
+      ),
     );
     const needs = bucketSimpleHome(derivations).needsYou;
     const questionBySubject = new Map<string, string>();
@@ -152,7 +167,7 @@ export function NeedsYouStrip({ onOpenIssue }: { onOpenIssue: (id: string) => vo
       if (s.pendingAskUserQuestion && s.issueId && !agentsByIssue.has(s.issueId.toLowerCase())) {
         const issue = issues.find((i) => i.identifier.toLowerCase() === s.issueId?.toLowerCase());
         if (issue) {
-          const syntheticDerivation = deriveSimpleIssue(issue, [], reviewByIssueId?.[issue.identifier]);
+          const syntheticDerivation = deriveSimpleIssue(issue, [], derivedByIssueId?.[issue.identifier], panesOf(issue));
           allItems.push({
             source: 'conversation',
             derivation: syntheticDerivation,
@@ -165,7 +180,7 @@ export function NeedsYouStrip({ onOpenIssue }: { onOpenIssue: (id: string) => vo
     }
 
     return { items: allItems, questions: questionBySubject };
-  }, [issuesRaw, agentsById, reviewByIssueId, pendingSubjects]);
+  }, [issuesRaw, agentsById, derivedByIssueId, panesById, pendingSubjects]);
 
   if (items.length === 0) return null;
 

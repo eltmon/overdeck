@@ -77,13 +77,11 @@ export function CockpitPhaseRail({
   pipelineState,
   agents,
   ship,
-  testStatus,
   onSelectPhase,
 }: {
   pipelineState: PipelineState;
   agents: AgentRowModel[];
   ship: IssueShipModel;
-  testStatus?: string;
   onSelectPhase: (phase: Phase, sessionId?: string) => void;
 }) {
   const now = useSharedTick();
@@ -101,26 +99,21 @@ export function CockpitPhaseRail({
         const agent = phaseAgents[phase];
         const duration = agent ? formatDuration(durationSeconds(agent, now.getTime())) : null;
         const startedAt = agent ? formatStartedAt(agent.startedAt) : null;
-        const skipped = phase === 'test' && testStatus === 'skipped';
-        const meta = skipped
-          ? 'Skipped · no suite configured'
-          : agent
-            ? [agent.active ? 'Live' : fallbackMeta(state), duration].filter(Boolean).join(' · ')
-            : fallbackMeta(state);
+        const meta = agent
+          ? [agent.active ? 'Live' : fallbackMeta(state), duration].filter(Boolean).join(' · ')
+          : fallbackMeta(state);
 
         return (
           <div
             key={phase}
             data-phase={phase}
             data-state={state}
-            data-skipped={skipped || undefined}
             className={cn(
               'relative min-w-[132px] px-3 pb-2 pt-2.5',
               index > 0 && 'border-l border-border',
-              skipped && 'border-dashed',
             )}
           >
-            <span className={cn('absolute inset-x-0 top-0 h-0.5', skipped ? 'border-t-2 border-dashed border-muted-foreground/50' : ACCENT[state])} />
+            <span className={cn('absolute inset-x-0 top-0 h-0.5', ACCENT[state])} />
             <button
               type="button"
               onClick={() => onSelectPhase(phase, agent?.sessionId)}
@@ -140,15 +133,7 @@ export function CockpitPhaseRail({
                 </>
               ) : null}
             </button>
-            {skipped ? (
-              <a
-                href="https://overdeck.ai/configuration/projects"
-                className="mt-1 block text-[10px] text-muted-foreground hover:text-foreground hover:underline"
-              >
-                Configure tests
-              </a>
-            ) : null}
-            {phase === 'ship' && ['queued', 'merging', 'verifying'].includes(ship.status) ? (
+            {phase === 'ship' && ship.status === 'ready' ? (
               <div className="mt-1.5"><ShipProgress ship={ship} compact /></div>
             ) : null}
           </div>

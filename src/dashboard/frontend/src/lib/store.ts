@@ -6,6 +6,7 @@
  * Pure reducer functions are shared with the server read model via @overdeck/contracts.
  */
 
+import { useMemo } from 'react'
 import { create } from 'zustand'
 import type {
   AgentSnapshot,
@@ -19,7 +20,6 @@ import type {
   ResetMarker,
   ResourceStats,
   RestartGateSnapshot,
-  ReviewStatusSnapshot,
 } from '@overdeck/contracts'
 import {
   type ReadModelState,
@@ -29,6 +29,7 @@ import {
   applyEvents as applyEventsShared,
 } from '@overdeck/contracts'
 import { saveSnapshotToCache } from './snapshotCache'
+import type { BackendPane, DerivedIssueState } from '../types'
 
 // ─── State shape ──────────────────────────────────────────────────────────────
 
@@ -38,6 +39,15 @@ export type DrawerState = {
 }
 
 export interface DashboardState extends ReadModelState {
+  /**
+   * PAN-3917 — derived issue state, keyed by issue id. The server computes it
+   * per read from the tracker, the PR, checks, git, and the terminal backend;
+   * nothing here is stored or written back. Declared locally until W6's
+   * ReadModelState carries it (see types.ts).
+   */
+  derivedIssueStateByIssueId: Record<string, DerivedIssueState>
+  /** PAN-3917 — terminal-backend panes, keyed by pane id. The backend owns this. */
+  backendPanesById: Record<string, BackendPane>
   drawer: DrawerState
   tasksViewerIssueId: string | null
   prdViewerIssueId: string | null
@@ -98,6 +108,8 @@ function publishDashboardDomainEvents(events: readonly DomainEvent[]): void {
 
 const initialState: DashboardState = {
   ...INITIAL_READ_MODEL_STATE,
+  derivedIssueStateByIssueId: {},
+  backendPanesById: {},
   drawer: { issueId: null, tab: 'overview' },
   tasksViewerIssueId: null,
   prdViewerIssueId: null,
@@ -108,9 +120,47 @@ const initialState: DashboardState = {
 
 // ─── Thin wrappers over shared reducers (add bootstrapComplete flag) ─────────
 
+/** The W6 snapshot carries the derived read model alongside the shared fields. */
+type DerivedSnapshotFields = {
+  derivedIssueStates?: DerivedIssueState[]
+  backendPanes?: BackendPane[]
+}
+
+function byIssueId(states: DerivedIssueState[] | undefined): Record<string, DerivedIssueState> {
+  return Object.fromEntries((states ?? []).map((entry) => [entry.issueId, entry]))
+}
+
+function byPaneId(panes: BackendPane[] | undefined): Record<string, BackendPane> {
+  return Object.fromEntries((panes ?? []).map((pane) => [pane.id, pane]))
+}
+
+function applyDerivedEvent(state: DashboardState, event: DomainEvent): Pick<DashboardState, 'derivedIssueStateByIssueId' | 'backendPanesById'> {
+  const payload = event as unknown as { type: string; issueState?: DerivedIssueState; pane?: BackendPane; paneId?: string }
+  if (payload.type === 'issue_state.changed' && payload.issueState) {
+    return {
+      derivedIssueStateByIssueId: { ...state.derivedIssueStateByIssueId, [payload.issueState.issueId]: payload.issueState },
+      backendPanesById: state.backendPanesById,
+    }
+  }
+  if (payload.type === 'backend_pane.changed' && payload.pane) {
+    return {
+      derivedIssueStateByIssueId: state.derivedIssueStateByIssueId,
+      backendPanesById: { ...state.backendPanesById, [payload.pane.id]: payload.pane },
+    }
+  }
+  if (payload.type === 'backend_pane.removed' && payload.paneId) {
+    const { [payload.paneId]: _removed, ...rest } = state.backendPanesById
+    return { derivedIssueStateByIssueId: state.derivedIssueStateByIssueId, backendPanesById: rest }
+  }
+  return { derivedIssueStateByIssueId: state.derivedIssueStateByIssueId, backendPanesById: state.backendPanesById }
+}
+
 function syncSnapshot(state: DashboardState, snapshot: DashboardSnapshot): DashboardState {
+  const derived = snapshot as DashboardSnapshot & DerivedSnapshotFields
   return {
     ...syncSnapshotShared(state, snapshot),
+    derivedIssueStateByIssueId: byIssueId(derived.derivedIssueStates),
+    backendPanesById: byPaneId(derived.backendPanes),
     drawer: state.drawer,
     tasksViewerIssueId: state.tasksViewerIssueId,
     prdViewerIssueId: state.prdViewerIssueId,
@@ -123,6 +173,7 @@ function syncSnapshot(state: DashboardState, snapshot: DashboardSnapshot): Dashb
 function applyEvent(state: DashboardState, event: DomainEvent): DashboardState {
   return {
     ...applyEventShared(state, event),
+    ...applyDerivedEvent(state, event),
     drawer: state.drawer,
     tasksViewerIssueId: state.tasksViewerIssueId,
     prdViewerIssueId: state.prdViewerIssueId,
@@ -135,6 +186,10 @@ function applyEvent(state: DashboardState, event: DomainEvent): DashboardState {
 function applyEvents(state: DashboardState, events: DomainEvent[]): DashboardState {
   return {
     ...applyEventsShared(state, events),
+    ...events.reduce(
+      (acc, event) => applyDerivedEvent({ ...state, ...acc }, event),
+      { derivedIssueStateByIssueId: state.derivedIssueStateByIssueId, backendPanesById: state.backendPanesById },
+    ),
     drawer: state.drawer,
     tasksViewerIssueId: state.tasksViewerIssueId,
     prdViewerIssueId: state.prdViewerIssueId,
@@ -301,10 +356,36 @@ export const selectAgentsByRole =
   (s: DashboardState): AgentSnapshot[] =>
     Object.values(s.agentsById).filter((a) => a.role === role)
 
-export const selectReviewStatus =
+export const selectDerivedIssueState =
   (issueId: string) =>
-  (s: DashboardState): ReviewStatusSnapshot | undefined =>
-    s.reviewStatusByIssueId[issueId]
+  (s: DashboardState): DerivedIssueState | undefined =>
+    s.derivedIssueStateByIssueId[issueId]
+
+/** React hook form of `selectDerivedIssueState` — the issue read model. */
+export function useDerivedIssueState(issueId: string | null | undefined): DerivedIssueState | undefined {
+  return useDashboardStore((s) => (issueId ? s.derivedIssueStateByIssueId[issueId] : undefined))
+}
+
+/** React hook form of `selectBackendPanes` — the issue's rows in the issue tree. */
+export function useBackendPanes(issueId: string | null | undefined): BackendPane[] {
+  const byId = useDashboardStore((s) => s.backendPanesById)
+  return useMemo(
+    () => (issueId
+      ? Object.values(byId).filter((pane) => pane.issue?.toUpperCase() === issueId.toUpperCase())
+      : EMPTY_PANES),
+    [byId, issueId],
+  )
+}
+
+const EMPTY_PANES: BackendPane[] = []
+
+/** Every backend pane whose `issue` metadata token names this issue. */
+export const selectBackendPanes =
+  (issueId: string) =>
+  (s: DashboardState): BackendPane[] =>
+    Object.values(s.backendPanesById).filter(
+      (pane) => pane.issue?.toUpperCase() === issueId.toUpperCase(),
+    )
 
 export const selectMemoryObservations =
   (issueId: string) =>
@@ -560,56 +641,39 @@ export const selectPendingInputSubjects = deriveMemo<
 )
 
 /**
- * Issues currently awaiting a human merge click — `readyForMerge: true`
- * and not already merged. Sorted oldest-ready first (FIFO) so issues
- * don't age in the queue.
+ * Issues the forge says are mergeable now — approved, checks green, `mergeable`
+ * true (FR-9). Sorted by issue id so the queue reads stably.
  */
-export const selectAwaitingMerge = memoizeArraySelector<DashboardState, 'reviewStatusByIssueId', ReviewStatusSnapshot[]>(
-  'reviewStatusByIssueId',
-  (rsMap) =>
-    Object.values(rsMap)
-      .filter(
-        (rs): rs is ReviewStatusSnapshot =>
-          rs?.readyForMerge === true &&
-          rs.mergeStatus !== 'merged' &&
-          (rs.blockerReasons?.length ?? 0) === 0,
-      )
-      .sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')),
+export const selectAwaitingMerge = memoizeArraySelector<DashboardState, 'derivedIssueStateByIssueId', DerivedIssueState[]>(
+  'derivedIssueStateByIssueId',
+  (byId) =>
+    Object.values(byId)
+      .filter((issue) => issue.state === 'ready')
+      .sort((a, b) => a.issueId.localeCompare(b.issueId)),
 )
 
 /**
- * Issues blocked from merge by GitHub-native blockers.
- * Shows issues with blockerReasons that haven't been merged yet.
+ * Issues with an open PR the forge will not merge — red checks or a conflict.
  */
-export const selectBlockedFromMerge = memoizeArraySelector<DashboardState, 'reviewStatusByIssueId', ReviewStatusSnapshot[]>(
-  'reviewStatusByIssueId',
-  (rsMap) =>
-    Object.values(rsMap)
-      .filter(
-        (rs): rs is ReviewStatusSnapshot =>
-          (rs?.blockerReasons?.length ?? 0) > 0 &&
-          rs.mergeStatus !== 'merged' &&
-          rs.reviewStatus === 'passed' &&
-          (rs.testStatus === 'passed' || rs.testStatus === 'skipped'),
-      )
-      .sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')),
+export const selectBlockedFromMerge = memoizeArraySelector<DashboardState, 'derivedIssueStateByIssueId', DerivedIssueState[]>(
+  'derivedIssueStateByIssueId',
+  (byId) =>
+    Object.values(byId)
+      .filter((issue) => !!issue.pr && issue.state !== 'merged' && issue.state !== 'closed'
+        && (issue.pr.checks === 'red' || issue.pr.mergeable === false))
+      .sort((a, b) => a.issueId.localeCompare(b.issueId)),
 )
 
 /**
- * Open merge requests — PR/MR exists but not yet readyForMerge.
- * Shown on the Awaiting Merge page so the user can approve/review early.
+ * Open pull requests that are not yet ready to merge — shown on the Awaiting
+ * Merge page so the operator can review early.
  */
-export const selectOpenMergeRequests = memoizeArraySelector<DashboardState, 'reviewStatusByIssueId', ReviewStatusSnapshot[]>(
-  'reviewStatusByIssueId',
-  (rsMap) =>
-    Object.values(rsMap)
-      .filter(
-        (rs): rs is ReviewStatusSnapshot =>
-          !!rs?.prUrl &&
-          rs.readyForMerge !== true &&
-          rs.mergeStatus !== 'merged',
-      )
-      .sort((a, b) => (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '')),
+export const selectOpenMergeRequests = memoizeArraySelector<DashboardState, 'derivedIssueStateByIssueId', DerivedIssueState[]>(
+  'derivedIssueStateByIssueId',
+  (byId) =>
+    Object.values(byId)
+      .filter((issue) => !!issue.pr && issue.state !== 'ready' && issue.state !== 'merged' && issue.state !== 'closed')
+      .sort((a, b) => a.issueId.localeCompare(b.issueId)),
 )
 
 const EMPTY_STRING_ARRAY: string[] = []

@@ -1,10 +1,9 @@
 import { useMemo, useRef, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { ReviewStatusSnapshot } from '@overdeck/contracts';
 import { useDashboardStore } from '../../lib/store';
-import { getPipelineIssuePhase, type PipelineIssuePhase } from '../../lib/pipeline-state';
+import { PHASE_BY_DERIVED_STATE, type PipelineIssuePhase } from '../../lib/pipeline-state';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
-import type { Agent, Issue, CanonicalState } from '../../types';
+import type { CanonicalState, DerivedIssueState } from '../../types';
 import {
   type BucketedFeature,
   type IssueCostBreakdown,
@@ -49,23 +48,13 @@ interface ProjectCiError {
   tone: 'bad' | 'warn';
 }
 
-type PipelineClassifierIssue = Pick<Issue, 'state' | 'status' | 'stateType' | 'hasPlan' | 'planningComplete' | 'mergeStatus' | 'labels'>;
-type PipelineClassifierAgent = Pick<Agent, 'role' | 'status' | 'hasPendingQuestion' | 'pendingQuestionCount' | 'pendingQuestionPrompt'>;
-
-function reviewStatusForClassifier(
-  feature: ProjectFeature,
-  reviewStatus: ReviewStatusSnapshot | undefined,
-): ReviewStatusSnapshot | undefined {
-  if (!feature.readyForMerge) return reviewStatus;
-  return {
-    ...(reviewStatus ?? { issueId: feature.issueId }),
-    readyForMerge: reviewStatus?.readyForMerge ?? true,
-  } as ReviewStatusSnapshot;
-}
-
+/**
+ * PAN-3917: the lane comes from the derived issue state. When the server has
+ * not derived one yet, the tracker's own state (an owner, never a record)
+ * places the row so the tree does not collapse every feature into Todo.
+ */
 function featureState(feature: ProjectFeature): CanonicalState | undefined {
   const raw = `${feature.status} ${feature.stateLabel}`.toLowerCase();
-  if (raw.includes('verifying')) return 'verifying_on_main';
   if (raw.includes('close-out')) return 'done';
   if (raw.includes('review')) return 'in_review';
   if (raw.includes('progress') || hasActiveAgentSignal(feature)) return 'in_progress';
@@ -74,121 +63,65 @@ function featureState(feature: ProjectFeature): CanonicalState | undefined {
   return feature.status as CanonicalState | undefined;
 }
 
-function classifierIssue(feature: ProjectFeature, reviewStatus: ReviewStatusSnapshot | undefined): PipelineClassifierIssue {
-  const state = featureState(feature);
-  return {
-    status: feature.status,
-    state,
-    stateType: state === 'done' ? 'completed' : state === 'canceled' ? 'canceled' : undefined,
-    hasPlan: feature.hasPlanning,
-    planningComplete: feature.hasPlanning && !hasWorkSession(feature),
-    mergeStatus: reviewStatus?.mergeStatus,
-    labels: [],
-  };
-}
-
-function classifierAgent(feature: ProjectFeature): PipelineClassifierAgent | null {
-  if (!hasActiveAgentSignal(feature)) return null;
-  return {
-    role: 'work',
-    status: 'running',
-  };
+function trackerPhase(feature: ProjectFeature): PipelineIssuePhase {
+  switch (featureState(feature)) {
+    case 'done':
+    case 'canceled':
+      return 'ship';
+    case 'in_review':
+      return 'review';
+    case 'in_progress':
+      return 'work';
+    default:
+      return feature.hasPlanning && !hasWorkSession(feature) ? 'plan' : 'todo';
+  }
 }
 
 export function bucketFeaturePhase(
   feature: ProjectFeature,
-  reviewStatus: ReviewStatusSnapshot | undefined,
+  derived: DerivedIssueState | undefined,
 ): PipelineIssuePhase {
-  const status = reviewStatusForClassifier(feature, reviewStatus);
-  return getPipelineIssuePhase(classifierIssue(feature, status), status, classifierAgent(feature));
+  return derived ? PHASE_BY_DERIVED_STATE[derived.state] : trackerPhase(feature);
 }
 
-function reviewStatusForFeature(
+function derivedForFeature(
   feature: ProjectFeature,
-  reviewStatusByIssueId: Record<string, ReviewStatusSnapshot>,
+  derivedByIssueId: Record<string, DerivedIssueState>,
 ) {
-  return reviewStatusByIssueId[feature.issueId] ??
-    reviewStatusByIssueId[feature.issueId.toUpperCase()] ??
-    reviewStatusByIssueId[feature.issueId.toLowerCase()];
+  return derivedByIssueId[feature.issueId] ??
+    derivedByIssueId[feature.issueId.toUpperCase()] ??
+    derivedByIssueId[feature.issueId.toLowerCase()];
 }
 
-function hasBlockerType(reviewStatus: ReviewStatusSnapshot | undefined, types: Set<string>): boolean {
-  return (reviewStatus?.blockerReasons ?? []).some((reason) => types.has(reason.type));
-}
-
-const CI_BLOCKER_TYPES = new Set(['failing_checks']);
-const MERGEABILITY_BLOCKER_TYPES = new Set(['merge_conflict', 'not_mergeable', 'draft_pr']);
 const PROJECT_CI_ERROR_LIMIT = 4;
 
-function isCiBlocked(reviewStatus: ReviewStatusSnapshot | undefined): boolean {
-  return Boolean(
-    hasBlockerType(reviewStatus, CI_BLOCKER_TYPES) ||
-      TEST_BLOCKED_STATUSES.has(reviewStatus?.testStatus ?? '') ||
-      VERIFICATION_BLOCKED_STATUSES.has(reviewStatus?.verificationStatus ?? ''),
-  );
+/** The forge says the pull request's checks are failing. */
+function isCiBlocked(derived: DerivedIssueState | undefined): boolean {
+  return derived?.pr?.checks === 'red';
 }
 
-function isMergeabilityBlocked(reviewStatus: ReviewStatusSnapshot | undefined): boolean {
-  return Boolean(
-    hasBlockerType(reviewStatus, MERGEABILITY_BLOCKER_TYPES) ||
-      MERGE_BLOCKED_STATUSES.has(reviewStatus?.mergeStatus ?? ''),
-  );
+/** The forge says the pull request cannot merge (conflict or draft). */
+function isMergeabilityBlocked(derived: DerivedIssueState | undefined): boolean {
+  return derived?.pr !== undefined && derived.pr.mergeable === false;
 }
 
-function ciErrorLabel(type: string): string {
-  switch (type) {
-    case 'failing_checks': return 'Checks';
-    case 'merge_conflict': return 'Merge conflict';
-    case 'not_mergeable': return 'Not mergeable';
-    case 'draft_pr': return 'Draft PR';
-    case 'test_status': return 'Test gate';
-    case 'verification_status': return 'Verification';
-    case 'merge_status': return 'Merge';
-    default: return 'Blocker';
-  }
-}
-
-function ciErrorsForEntry({ feature, reviewStatus }: BucketedFeature): ProjectCiError[] {
+function ciErrorsForEntry({ feature, derived }: BucketedFeature): ProjectCiError[] {
   const errors: ProjectCiError[] = [];
-  for (const reason of reviewStatus?.blockerReasons ?? []) {
-    if (!CI_BLOCKER_TYPES.has(reason.type) && !MERGEABILITY_BLOCKER_TYPES.has(reason.type)) continue;
+  if (isCiBlocked(derived)) {
     errors.push({
       issueId: feature.issueId,
       title: feature.title,
-      label: ciErrorLabel(reason.type),
-      summary: reason.summary,
-      details: reason.details,
-      tone: CI_BLOCKER_TYPES.has(reason.type) ? 'bad' : 'warn',
-    });
-  }
-  if (errors.length > 0) return errors;
-
-  if (TEST_BLOCKED_STATUSES.has(reviewStatus?.testStatus ?? '')) {
-    errors.push({
-      issueId: feature.issueId,
-      title: feature.title,
-      label: ciErrorLabel('test_status'),
-      summary: reviewStatus?.testStatus === 'dispatch_failed' ? 'Test dispatch failed' : 'Test failed',
+      label: 'Checks',
+      summary: `Checks failing on PR #${derived?.pr?.number ?? '—'}`,
       tone: 'bad',
     });
   }
-  if (VERIFICATION_BLOCKED_STATUSES.has(reviewStatus?.verificationStatus ?? '')) {
+  if (isMergeabilityBlocked(derived)) {
     errors.push({
       issueId: feature.issueId,
       title: feature.title,
-      label: ciErrorLabel('verification_status'),
-      summary: 'Verification failed',
-      details: reviewStatus?.verificationNotes,
-      tone: 'bad',
-    });
-  }
-  if (MERGE_BLOCKED_STATUSES.has(reviewStatus?.mergeStatus ?? '')) {
-    errors.push({
-      issueId: feature.issueId,
-      title: feature.title,
-      label: ciErrorLabel('merge_status'),
-      summary: 'Merge failed',
-      details: reviewStatus?.mergeNotes,
+      label: 'Not mergeable',
+      summary: 'The pull request conflicts with main',
       tone: 'warn',
     });
   }
@@ -233,7 +166,7 @@ export function ProjectOverview({
   onNewWorkspace,
 }: ProjectOverviewProps) {
   const openNewWorkspace = onNewWorkspace ?? ((key: string) => { window.history.pushState({ tab: 'workspace-new' }, '', `/workspaces/new?project=${encodeURIComponent(key)}`); window.dispatchEvent(new PopStateEvent('popstate')); });
-  const reviewStatusByIssueId = useDashboardStore(state => state.reviewStatusByIssueId);
+  const derivedByIssueId = useDashboardStore(state => state.derivedIssueStateByIssueId);
   const pipelineRef = useRef<HTMLDivElement>(null);
 
   const totalCost = useMemo(
@@ -270,21 +203,21 @@ export function ProjectOverview({
 
   const bucketedFeatures = useMemo<BucketedFeature[]>(
     () => features.map(feature => {
-      const reviewStatus = reviewStatusForFeature(feature, reviewStatusByIssueId);
+      const derived = derivedForFeature(feature, derivedByIssueId);
       return {
         feature,
-        reviewStatus,
-        phase: bucketFeaturePhase(feature, reviewStatus),
+        derived,
+        phase: bucketFeaturePhase(feature, derived),
       };
     }),
-    [features, reviewStatusByIssueId],
+    [features, derivedByIssueId],
   );
 
   const ciHealth = useMemo<ProjectCiHealth>(() => {
-    const failingChecks = bucketedFeatures.filter(({ reviewStatus }) => isCiBlocked(reviewStatus)).length;
-    const mergeBlocked = bucketedFeatures.filter(({ reviewStatus }) => isMergeabilityBlocked(reviewStatus)).length;
-    const shipReadyClear = bucketedFeatures.filter(({ feature, phase, reviewStatus }) =>
-      phase === 'ship' && (feature.readyForMerge || reviewStatus?.readyForMerge) && !isBlockedFeature(feature, reviewStatus),
+    const failingChecks = bucketedFeatures.filter(({ derived }) => isCiBlocked(derived)).length;
+    const mergeBlocked = bucketedFeatures.filter(({ derived }) => isMergeabilityBlocked(derived)).length;
+    const shipReadyClear = bucketedFeatures.filter(({ feature, derived }) =>
+      derived?.state === 'ready' && !isBlockedFeature(feature, derived),
     ).length;
     const workRunning = bucketedFeatures.filter(({ feature }) => hasActiveAgentSignal(feature)).length;
     const allErrors = bucketedFeatures.flatMap(ciErrorsForEntry);
@@ -300,7 +233,7 @@ export function ProjectOverview({
 
   const metrics = useMemo<HeroMetric[]>(() => {
     const readyToShip = bucketedFeatures.filter(({ phase }) => phase === 'ship').length;
-    const stuck = bucketedFeatures.filter((e) => isBlockedFeature(e.feature, e.reviewStatus)).length;
+    const stuck = bucketedFeatures.filter((e) => isBlockedFeature(e.feature, e.derived)).length;
 
     return [
       { label: 'Active issues', value: features.length, sub: 'in pipeline', tone: 'info', onClick: () => pipelineRef.current?.scrollIntoView({ behavior: 'smooth' }) },
@@ -537,10 +470,6 @@ function HeroBillboard({ metrics }: { metrics: HeroMetric[] }) {
     </div>
   );
 }
-
-const TEST_BLOCKED_STATUSES = new Set(['failed', 'dispatch_failed']);
-const MERGE_BLOCKED_STATUSES = new Set(['failed']);
-const VERIFICATION_BLOCKED_STATUSES = new Set(['failed']);
 
 function formatCost(cost: number): string {
   if (cost >= 100) return `$${cost.toFixed(0)}`;

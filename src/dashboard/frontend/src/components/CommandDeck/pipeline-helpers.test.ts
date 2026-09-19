@@ -23,7 +23,7 @@ function entry(sessions: SessionNode[]): BucketedFeature {
       stateLabel: 'In Progress',
       sessions,
     },
-    reviewStatus: undefined,
+    derived: undefined,
     phase: 'work',
   } as BucketedFeature;
 }

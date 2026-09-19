@@ -7,14 +7,14 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi, afterEach } from 'vitest';
-import type { AgentSnapshot, ReviewStatusSnapshot } from '@overdeck/contracts';
+import type { AgentSnapshot } from '@overdeck/contracts';
 import { INITIAL_READ_MODEL_STATE } from '@overdeck/contracts';
 import { DialogProvider } from '../DialogProvider';
 import { SimpleHomePage } from './SimpleHomePage';
 import { SimpleIssuePage } from './SimpleIssuePage';
 import { useDashboardStore } from '../../lib/store';
 import { useUiMode } from '../../lib/simple/uiMode';
-import type { Issue } from '../../types';
+import type { BackendPane, DerivedIssueState, DerivedIssueStateName, Issue } from '../../types';
 
 // The narrative feed (stream/poll chain) is too heavy for jsdom; the contract
 // these tests prove is that the simple page MOUNTS it once an agent exists and
@@ -43,16 +43,30 @@ function makeAgent(overrides: Partial<AgentSnapshot> = {}): AgentSnapshot {
   return { id: 'agent-pan-1', issueId: 'PAN-1', status: 'running', role: 'work', ...overrides };
 }
 
-function seed({ issues = [], agents = {}, review = {} }: {
+const derived = (state: DerivedIssueStateName, over: Partial<DerivedIssueState> = {}): DerivedIssueState => ({
+  issueId: 'PAN-1',
+  state,
+  ...over,
+});
+
+const OPEN_PR = { url: 'https://example.com/pr/1', number: 1, reviewState: 'APPROVED', checks: 'green' as const, mergeable: true };
+
+const workPane = (state: BackendPane['state'] = 'working'): BackendPane => ({
+  id: 'pane-work', issue: 'PAN-1', role: 'work', harness: 'claude-code', model: 'claude-opus-5', state,
+});
+
+function seed({ issues = [], agents = {}, derivedState, panes = [] }: {
   issues?: Issue[];
   agents?: Record<string, AgentSnapshot>;
-  review?: Record<string, ReviewStatusSnapshot>;
+  derivedState?: DerivedIssueState;
+  panes?: BackendPane[];
 }) {
   useDashboardStore.setState({
     ...INITIAL_READ_MODEL_STATE,
     issuesRaw: issues,
     agentsById: agents,
-    reviewStatusByIssueId: review,
+    derivedIssueStateByIssueId: derivedState ? { 'PAN-1': derivedState } : {},
+    backendPanesById: Object.fromEntries(panes.map((pane) => [pane.id, pane])),
   } as never);
 }
 
@@ -84,6 +98,8 @@ describe('SimpleHomePage (C-SIMPLE)', () => {
     seed({
       issues: [makeIssue({ taskCounts: { completed: 4, total: 13 } })],
       agents: { 'agent-pan-1': makeAgent() },
+      derivedState: derived('working'),
+      panes: [workPane()],
     });
     renderWithProviders(<SimpleHomePage />);
     expect(screen.getByText('Working now')).toBeInTheDocument();
@@ -114,7 +130,7 @@ describe('SimpleHomePage (C-SIMPLE)', () => {
   it('shows ready-to-merge with exactly one primary Merge action', () => {
     seed({
       issues: [makeIssue({ state: 'in_review' })],
-      review: { 'PAN-1': { issueId: 'PAN-1', readyForMerge: true, reviewStatus: 'passed', mergeStatus: 'pending' } as ReviewStatusSnapshot },
+      derivedState: derived('ready', { pr: OPEN_PR }),
     });
     renderWithProviders(<SimpleHomePage />);
     expect(screen.getByText('Ready to merge')).toBeInTheDocument();
@@ -138,6 +154,8 @@ describe('SimpleIssuePage (C-SIMPLE)', () => {
     seed({
       issues: [makeIssue()],
       agents: { 'agent-pan-1': makeAgent() },
+      derivedState: derived('working'),
+      panes: [workPane()],
     });
     renderWithProviders(<SimpleIssuePage issueId="PAN-1" />);
     expect(screen.getByText('The agent is writing the code.')).toBeInTheDocument();
@@ -296,7 +314,7 @@ describe('SimpleIssuePage (C-SIMPLE)', () => {
   it('ready state offers Merge to main as the one primary action', () => {
     seed({
       issues: [makeIssue({ state: 'in_review' })],
-      review: { 'PAN-1': { issueId: 'PAN-1', readyForMerge: true, reviewStatus: 'passed', mergeStatus: 'pending' } as ReviewStatusSnapshot },
+      derivedState: derived('ready', { pr: OPEN_PR }),
     });
     renderWithProviders(<SimpleIssuePage issueId="PAN-1" />);
     expect(screen.getByRole('button', { name: 'Merge to main' })).toBeInTheDocument();
@@ -304,32 +322,18 @@ describe('SimpleIssuePage (C-SIMPLE)', () => {
   });
 
   /**
-   * PAN-3073: the stuck signal can come from the persistent review-status flag
-   * with a perfectly healthy agent. "Get it unstuck" must call the unstick
-   * door in that case — agent recover succeeds as a no-op and clears nothing.
+   * PAN-3917: there is no stuck flag to clear. A stuck attention signal or a
+   * failed agent both route "Get it unstuck" to the one surviving door —
+   * agent recover.
    */
-  it('review-stuck: Get it unstuck calls the workspace unstick door, not agent recover', async () => {
+  it('stuck: Get it unstuck recovers the agent', async () => {
     const fetchMock = vi.fn(async () => Response.json({ success: true }));
     vi.stubGlobal('fetch', fetchMock);
     seed({
       issues: [makeIssue()],
       agents: { 'agent-pan-1': makeAgent() },
-      review: { 'PAN-1': { issueId: 'PAN-1', reviewStatus: 'pending', stuck: true, stuckReason: 'feedback_delivery_needs_you' } as ReviewStatusSnapshot },
-    });
-    renderWithProviders(<SimpleIssuePage issueId="PAN-1" />);
-    fireEvent.click(screen.getByRole('button', { name: 'Get it unstuck' }));
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/workspaces/PAN-1/unstick', expect.objectContaining({ method: 'POST' }));
-    });
-    expect(fetchMock).not.toHaveBeenCalledWith('/api/agents/agent-pan-1/recover', expect.anything());
-  });
-
-  it('agent-stuck: Get it unstuck still recovers the agent', async () => {
-    const fetchMock = vi.fn(async () => Response.json({ success: true }));
-    vi.stubGlobal('fetch', fetchMock);
-    seed({
-      issues: [makeIssue()],
-      agents: { 'agent-pan-1': makeAgent({ troubled: true }) },
+      derivedState: derived('working', { attention: 'stuck' }),
+      panes: [workPane()],
     });
     renderWithProviders(<SimpleIssuePage issueId="PAN-1" />);
     fireEvent.click(screen.getByRole('button', { name: 'Get it unstuck' }));
@@ -345,9 +349,9 @@ describe('SimpleIssuePage (C-SIMPLE)', () => {
    * mapping; a second primary is the bug this exists to catch).
    */
   it('one-button rule: at most one primary action across all 7 display variants', () => {
-    const CASES: Record<string, { agents?: Record<string, AgentSnapshot>; review?: ReviewStatusSnapshot; issue?: Partial<Issue> }> = {
+    const CASES: Record<string, { agents?: Record<string, AgentSnapshot>; derivedState?: DerivedIssueState; panes?: BackendPane[]; issue?: Partial<Issue> }> = {
       'not-started': { issue: { state: 'todo' } },
-      'working': { agents: { 'agent-pan-1': makeAgent() } },
+      'working': { agents: { 'agent-pan-1': makeAgent() }, derivedState: derived('working'), panes: [workPane()] },
       'needs-you / question': {
         agents: {
           'agent-pan-1': makeAgent({
@@ -360,17 +364,13 @@ describe('SimpleIssuePage (C-SIMPLE)', () => {
           }),
         },
       },
-      'needs-you / stuck': { agents: { 'agent-pan-1': makeAgent({ troubled: true }) } },
+      'needs-you / stuck': { agents: { 'agent-pan-1': makeAgent() }, derivedState: derived('working', { attention: 'stuck' }), panes: [workPane()] },
       'needs-you / problems': {
         agents: { 'agent-pan-1': makeAgent() },
-        review: { issueId: 'PAN-1', reviewStatus: 'blocked', updatedAt: new Date().toISOString() } as ReviewStatusSnapshot,
+        derivedState: derived('changes-requested', { pr: { ...OPEN_PR, reviewState: 'CHANGES_REQUESTED', checks: 'red' } }),
       },
-      'ready': {
-        review: { issueId: 'PAN-1', readyForMerge: true, reviewStatus: 'passed', mergeStatus: 'pending' } as ReviewStatusSnapshot,
-      },
-      'done': {
-        review: { issueId: 'PAN-1', readyForMerge: false, reviewStatus: 'passed', mergeStatus: 'merged', prUrl: 'https://example.com/pr/1' } as ReviewStatusSnapshot,
-      },
+      'ready': { derivedState: derived('ready', { pr: OPEN_PR }) },
+      'done': { derivedState: derived('merged', { pr: OPEN_PR }) },
     };
     const labels: Record<string, string | null> = {};
     for (const [name, fixture] of Object.entries(CASES)) {
@@ -379,7 +379,8 @@ describe('SimpleIssuePage (C-SIMPLE)', () => {
       seed({
         issues: [makeIssue(fixture.issue ?? (needsReviewState ? { state: 'in_review' } : {}))],
         agents: fixture.agents ?? {},
-        review: fixture.review ? { 'PAN-1': fixture.review } : {},
+        ...(fixture.derivedState ? { derivedState: fixture.derivedState } : {}),
+        panes: fixture.panes ?? [],
       });
       const { container } = renderWithProviders(<SimpleIssuePage issueId="PAN-1" />);
       const primaries = container.querySelectorAll('[data-slot="primary-action"]');

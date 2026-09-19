@@ -1,12 +1,12 @@
 import { useEffect, useMemo } from 'react';
 
-import { type ReviewStatusSnapshot, type DomainEvent, WS_METHODS } from '@overdeck/contracts';
+import { type DomainEvent, WS_METHODS } from '@overdeck/contracts';
 import { Stream } from 'effect';
 
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
-import { useDashboardStore, selectIssues, selectAgents, selectReviewStatus } from '../../lib/store';
+import { useDashboardStore, selectIssues, selectAgents, selectBackendPanes, selectDerivedIssueState } from '../../lib/store';
 import { useTasksQuery } from '../Stage/cockpit/TasksRail';
-import type { Agent, Issue } from '../../types';
+import type { Agent, BackendPane, DerivedIssueState, Issue } from '../../types';
 
 export type DrawerActivityPhase = 'work' | 'review' | 'ship' | 'done' | 'info';
 
@@ -36,10 +36,10 @@ export type DrawerTaskItem = {
   duration: string;
 };
 
-export type DrawerVerificationGateStatus = 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
+export type DrawerVerificationGateStatus = 'pending' | 'running' | 'passed' | 'failed';
 
 export type DrawerVerificationGate = {
-  id: 'typecheck' | 'lint' | 'test' | 'uat';
+  id: string;
   label: string;
   status: DrawerVerificationGateStatus;
   detail: string;
@@ -99,7 +99,8 @@ export function resetDrawerIssueSubscriptionForTest() {
 export type DrawerData = {
   issue: Issue | null;
   agents: Agent[];
-  reviewStatus?: ReviewStatusSnapshot;
+  derived?: DerivedIssueState;
+  panes: BackendPane[];
   tasks: DrawerTaskItem[];
   reviewSpecialists: DrawerReviewSpecialist[];
   verificationGates: DrawerVerificationGate[];
@@ -109,15 +110,6 @@ export type DrawerData = {
   /** Full activity feed for the Activity tab — same filter, no slice cap. */
   activityFull: DrawerActivityItem[];
 };
-
-const REVIEW_SPECIALIST_ROLES = [
-  'review.security',
-  'review.correctness',
-  'review.performance',
-  'review.requirements',
-] as const;
-
-const QUALITY_GATE_ORDER = ['typecheck', 'lint', 'test'] as const;
 
 function issueMatches(issue: Issue, issueId: string) {
   return issue.identifier.toLowerCase() === issueId.toLowerCase() || issue.id.toLowerCase() === issueId.toLowerCase();
@@ -151,17 +143,15 @@ function activityId(entry: ActivityEntry, index: number) {
   return entry.id ?? `${entry.timestamp ?? 'activity'}-${index}`;
 }
 
-function shortRoleName(role: string) {
-  return role.replace('review.', '');
-}
-
-function specialistStatus(role: string, reviewStatus: ReviewStatusSnapshot | undefined): DrawerReviewSpecialistStatus {
-  const subStatus = reviewStatus?.reviewSubStatuses?.[role];
-  if (subStatus === 'done') return 'done';
-  if (subStatus === 'running') return 'run';
-  if (subStatus === 'failed') return 'fail';
-  if (reviewStatus?.reviewStatus === 'failed' || reviewStatus?.reviewStatus === 'blocked') return 'fail';
-  return 'idle';
+/** PAN-3917: the reviewer roster is the backend's review panes, not a record. */
+function specialistStatus(pane: BackendPane): DrawerReviewSpecialistStatus {
+  switch (pane.state) {
+    case 'working': return 'run';
+    case 'blocked': return 'fail';
+    case 'done': return 'done';
+    case 'exited': return 'done';
+    default: return 'idle';
+  }
 }
 
 function specialistMeta(status: DrawerReviewSpecialistStatus) {
@@ -178,22 +168,19 @@ function specialistMeta(status: DrawerReviewSpecialistStatus) {
   }
 }
 
-function specialistDuration(role: string, reviewStatus: ReviewStatusSnapshot | undefined) {
-  const sessionName = reviewStatus?.reviewSessionNames?.find((name) => name.includes(shortRoleName(role)));
-  return sessionName ? sessionName.replace(/^agent-/, '') : '—';
-}
-
-function reviewSpecialists(reviewStatus: ReviewStatusSnapshot | undefined): DrawerReviewSpecialist[] {
-  return REVIEW_SPECIALIST_ROLES.map((role) => {
-    const status = specialistStatus(role, reviewStatus);
-    return {
-      id: role,
-      name: role,
-      status,
-      meta: specialistMeta(status),
-      duration: specialistDuration(role, reviewStatus),
-    };
-  });
+function reviewSpecialists(panes: readonly BackendPane[]): DrawerReviewSpecialist[] {
+  return panes
+    .filter((pane) => pane.role === 'review')
+    .map((pane) => {
+      const status = specialistStatus(pane);
+      return {
+        id: pane.id,
+        name: pane.model || pane.harness,
+        status,
+        meta: specialistMeta(status),
+        duration: pane.harness,
+      };
+    });
 }
 
 function taskStatus(status: string | undefined): DrawerTaskStatus {
@@ -241,28 +228,6 @@ function normalizeTasks(tasks: TaskTask[] | undefined, issueId: string): DrawerT
   });
 }
 
-function gateStatus(status: string | undefined): DrawerVerificationGateStatus {
-  if (status === 'passed' || status === 'failed' || status === 'pending' || status === 'running' || status === 'skipped') return status;
-  if (status === 'testing') return 'running';
-  if (status === 'dispatch_failed') return 'failed';
-  return 'pending';
-}
-
-function failedQualityGate(notes: string | undefined) {
-  const match = notes?.match(/Verification FAILED at (typecheck|lint|test)\b/i);
-  return match?.[1]?.toLowerCase() as (typeof QUALITY_GATE_ORDER)[number] | undefined;
-}
-
-function qualityGateStatus(gate: (typeof QUALITY_GATE_ORDER)[number], reviewStatus: ReviewStatusSnapshot | undefined): DrawerVerificationGateStatus {
-  const verificationStatus = gateStatus(reviewStatus?.verificationStatus);
-  if (verificationStatus === 'passed' || verificationStatus === 'skipped' || verificationStatus === 'running' || verificationStatus === 'pending') return verificationStatus;
-
-  const failedGate = failedQualityGate(reviewStatus?.verificationNotes);
-  if (!failedGate) return 'passed';
-  if (gate === failedGate) return 'failed';
-  return QUALITY_GATE_ORDER.indexOf(gate) < QUALITY_GATE_ORDER.indexOf(failedGate) ? 'passed' : 'pending';
-}
-
 function gateDetail(status: DrawerVerificationGateStatus) {
   switch (status) {
     case 'passed':
@@ -271,21 +236,18 @@ function gateDetail(status: DrawerVerificationGateStatus) {
       return 'fail';
     case 'running':
       return 'running';
-    case 'skipped':
-      return 'skipped';
     case 'pending':
     default:
       return 'pending';
   }
 }
 
-function verificationGates(reviewStatus: ReviewStatusSnapshot | undefined): DrawerVerificationGate[] {
-  const qualityGates = QUALITY_GATE_ORDER.map((gate) => {
-    const status = qualityGateStatus(gate, reviewStatus);
-    return { id: gate, label: gate, status, detail: gateDetail(status) };
-  });
-  const uatStatus = gateStatus(reviewStatus?.uatStatus);
-  return [...qualityGates, { id: 'uat', label: 'UAT', status: uatStatus, detail: gateDetail(uatStatus) }];
+/** PAN-3917 (FR-8): the PR's check runs are the verification gate. */
+function verificationGates(derived: DerivedIssueState | undefined): DrawerVerificationGate[] {
+  const checks = derived?.pr?.checks;
+  const status: DrawerVerificationGateStatus =
+    checks === 'green' ? 'passed' : checks === 'red' ? 'failed' : checks === 'pending' ? 'running' : 'pending';
+  return [{ id: 'checks', label: 'checks', status, detail: gateDetail(status) }];
 }
 
 function formatWhen(value: string | undefined) {
@@ -295,14 +257,15 @@ function formatWhen(value: string | undefined) {
   return `${String(date.getUTCMonth() + 1).padStart(2, '0')}/${String(date.getUTCDate()).padStart(2, '0')}`;
 }
 
-function phaseTimeline(issue: Issue | null, reviewStatus: ReviewStatusSnapshot | undefined): DrawerPhaseTimelineStep[] {
-  const merged = reviewStatus?.mergeStatus === 'merged' || issue?.state === 'done' || issue?.status?.toLowerCase() === 'done' || Boolean(issue?.completedAt);
-  const shippingCurrent = !merged && (reviewStatus?.mergeStatus === 'queued' || reviewStatus?.mergeStatus === 'merging' || reviewStatus?.mergeStatus === 'verifying' || Boolean(reviewStatus?.readyForMerge));
-  const reviewedDone = merged || shippingCurrent || reviewStatus?.reviewStatus === 'passed';
-  const reviewedCurrent = !reviewedDone && reviewStatus?.reviewStatus === 'reviewing';
-  const implementedDone = reviewedDone || reviewedCurrent || reviewStatus?.verificationStatus === 'passed' || reviewStatus?.testStatus === 'passed';
-  const implementedCurrent = !implementedDone && (reviewStatus?.verificationStatus === 'running' || reviewStatus?.testStatus === 'testing' || issue?.state === 'in_progress' || issue?.status?.toLowerCase() === 'in progress');
-  const plannedDone = implementedDone || implementedCurrent || Boolean(issue?.planningComplete);
+function phaseTimeline(issue: Issue | null, derived: DerivedIssueState | undefined): DrawerPhaseTimelineStep[] {
+  const state = derived?.state;
+  const merged = state === 'merged' || state === 'closed' || issue?.state === 'done' || issue?.status?.toLowerCase() === 'done' || Boolean(issue?.completedAt);
+  const shippingCurrent = !merged && state === 'ready';
+  const reviewedDone = merged || shippingCurrent;
+  const reviewedCurrent = !reviewedDone && (state === 'in-review' || state === 'changes-requested');
+  const implementedDone = reviewedDone || reviewedCurrent;
+  const implementedCurrent = !implementedDone && (state === 'working' || issue?.state === 'in_progress' || issue?.status?.toLowerCase() === 'in progress');
+  const plannedDone = implementedDone || implementedCurrent || state === 'planned' || Boolean(issue?.planningComplete);
   const plannedCurrent = !plannedDone && Boolean(issue?.hasPlan);
   const currentIndex = merged ? -1 : shippingCurrent ? 4 : reviewedCurrent ? 3 : implementedCurrent ? 2 : plannedCurrent ? 1 : 0;
   const done = [Boolean(issue), plannedDone, implementedDone, reviewedDone, merged, merged];
@@ -312,10 +275,10 @@ function phaseTimeline(issue: Issue | null, reviewStatus: ReviewStatusSnapshot |
   const steps = [
     { id: 'triaged' as const, when: formatWhen(issue?.createdAt) },
     { id: 'planned' as const, when: formatWhen(issue?.updatedAt) },
-    { id: 'implemented' as const, when: formatWhen(reviewStatus?.updatedAt) },
-    { id: 'reviewed' as const, when: formatWhen(reviewStatus?.reviewSpawnedAt ?? reviewStatus?.updatedAt) },
-    { id: 'shipping' as const, when: formatWhen(reviewStatus?.updatedAt) },
-    { id: 'merged' as const, when: formatWhen(issue?.completedAt ?? (merged ? reviewStatus?.updatedAt : undefined)) },
+    { id: 'implemented' as const, when: formatWhen(issue?.updatedAt) },
+    { id: 'reviewed' as const, when: formatWhen(issue?.updatedAt) },
+    { id: 'shipping' as const, when: formatWhen(issue?.updatedAt) },
+    { id: 'merged' as const, when: formatWhen(issue?.completedAt) },
   ];
   return steps.map((step, index) => ({
     ...step,
@@ -338,7 +301,8 @@ export function useIssueData(issueIdArg: string | null): DrawerData {
   const agents = useDashboardStore(selectAgents) as Agent[];
   const recentActivity = useDashboardStore((state) => state.recentActivity) as ActivityEntry[];
   const detailedActivity = useDashboardStore((state) => state.detailedActivity) as ActivityEntry[];
-  const reviewStatus = useDashboardStore(selectReviewStatus(drawerIssueId ?? ''));
+  const derived = useDashboardStore(selectDerivedIssueState(drawerIssueId ?? ''));
+  const panes = useDashboardStore(selectBackendPanes(drawerIssueId ?? ''));
   // Live-fetched, not derived from the Issue store snapshot — the server
   // never populates an `issue.tasks` field, so the tab-band badge shares the
   // same `/api/issues/:id/tasks` query TasksRail/TasksPanel already use for
@@ -384,7 +348,7 @@ export function useIssueData(issueIdArg: string | null): DrawerData {
 
   return useMemo(() => {
     if (!drawerIssueId) {
-      return { issue: null, agents: [], reviewStatus: undefined, tasks: [], reviewSpecialists: [], verificationGates: [], phaseTimeline: [], activityRail: [], activityFull: [] };
+      return { issue: null, agents: [], derived: undefined, panes: [], tasks: [], reviewSpecialists: [], verificationGates: [], phaseTimeline: [], activityRail: [], activityFull: [] };
     }
 
     const issue = issues.find((candidate) => issueMatches(candidate, drawerIssueId)) ?? null;
@@ -414,15 +378,16 @@ export function useIssueData(issueIdArg: string | null): DrawerData {
     return {
       issue,
       agents: issueAgents,
-      reviewStatus,
+      derived,
+      panes,
       tasks: normalizeTasks(tasksQuery.data?.tasks, drawerIssueId),
-      reviewSpecialists: reviewSpecialists(reviewStatus),
-      verificationGates: verificationGates(reviewStatus),
-      phaseTimeline: phaseTimeline(issue, reviewStatus),
+      reviewSpecialists: reviewSpecialists(panes),
+      verificationGates: verificationGates(derived),
+      phaseTimeline: phaseTimeline(issue, derived),
       activityRail,
       activityFull,
     };
-  }, [agents, detailedActivity, drawerIssueId, issues, recentActivity, reviewStatus, tasksQuery.data]);
+  }, [agents, detailedActivity, drawerIssueId, issues, recentActivity, derived, panes, tasksQuery.data]);
 }
 
 /**

@@ -1,5 +1,3 @@
-import { isPendingReviewStranded } from './pipeline-state';
-
 export function formatRelativeTime(isoString: string): string {
   const now = Date.now();
   const then = new Date(isoString).getTime();
@@ -17,84 +15,6 @@ export function formatRelativeTime(isoString: string): string {
 
 export function isStale(isoString: string, thresholdMinutes = 30): boolean {
   return Date.now() - new Date(isoString).getTime() > thresholdMinutes * 60 * 1000;
-}
-
-export interface ReviewButtonState {
-  label: string;
-  disabled: boolean;
-  spinning: boolean;
-}
-
-interface ReviewButtonInput {
-  reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked';
-  testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
-  mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
-  verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
-  updatedAt?: string;
-  reviewSpawnedAt?: string;
-  queuePosition?: number | null;
-  activeSpecialist?: string | null;
-  readyForMerge: boolean;
-}
-
-export function shouldForceReviewTrigger(status: ReviewButtonInput | undefined): boolean {
-  if (!status) return false;
-
-  return (
-    isPendingReviewStranded(status) ||
-    status.readyForMerge ||
-    status.reviewStatus === 'passed' ||
-    status.reviewStatus === 'failed' ||
-    status.reviewStatus === 'blocked' ||
-    status.testStatus === 'passed' ||
-    status.testStatus === 'failed' ||
-    status.testStatus === 'dispatch_failed' ||
-    status.mergeStatus === 'failed' ||
-    status.verificationStatus === 'failed'
-  );
-}
-
-function getOrdinalSuffix(n: number): string {
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 13) return 'th';
-  switch (n % 10) {
-    case 1: return 'st';
-    case 2: return 'nd';
-    case 3: return 'rd';
-    default: return 'th';
-  }
-}
-
-export function getReviewButtonState(
-  status: ReviewButtonInput | undefined,
-  mutationPending: boolean
-): ReviewButtonState {
-  if (mutationPending) {
-    return { label: 'Review & Test', disabled: true, spinning: true };
-  }
-  if (!status) {
-    return { label: 'Review & Test', disabled: false, spinning: false };
-  }
-  if (status.reviewStatus === 'reviewing' || (status.queuePosition === 0 && status.activeSpecialist === 'review')) {
-    return { label: 'Reviewing...', disabled: true, spinning: true };
-  }
-  if (status.testStatus === 'testing' || (status.queuePosition === 0 && status.activeSpecialist === 'test')) {
-    return { label: 'Testing...', disabled: true, spinning: true };
-  }
-  if (status.queuePosition != null && status.queuePosition >= 1) {
-    if (status.queuePosition === 1) {
-      return { label: 'Queued', disabled: true, spinning: false };
-    }
-    const n = status.queuePosition;
-    return { label: `Queued (${n}${getOrdinalSuffix(n)})`, disabled: true, spinning: false };
-  }
-  if (isPendingReviewStranded(status)) {
-    return { label: 'Re-request Review', disabled: false, spinning: false };
-  }
-  if (status.readyForMerge || (status.reviewStatus === 'passed' && status.testStatus === 'passed' && status.mergeStatus === 'failed')) {
-    return { label: 'Re-Review', disabled: false, spinning: false };
-  }
-  return { label: 'Review & Test', disabled: false, spinning: false };
 }
 
 export function getFriendlyModelName(fullModel: string | undefined | null): string {

@@ -33,16 +33,12 @@ export const ISSUE_SCOPED_PAN_VERBS = [
   'done',
   'review request',
   'review restart',
-  'review reset',
-  'review resync',
   'kill',
   'pause',
   'unpause',
-  'untroubled',
   'recover',
   'resume',
   'sync-main',
-  'inspect --task',
   'reopen',
   'close',
   'wipe',
@@ -61,18 +57,13 @@ const AUDITED_REGISTRY_KEYS = [
   'doneWork',
   'requestReview',
   'restartReview',
-  'recoverReview',
-  'resyncPipelineState',
-  'purgeReview',
   'stopAgent',
   'pause',
   'unpause',
-  'untroubled',
   'recoverAgent',
   'resumeSession',
   'syncMain',
   'rebuildAndStart',
-  'inspectTask',
   'merge',
   'reopen',
   'closeOut',
@@ -80,7 +71,6 @@ const AUDITED_REGISTRY_KEYS = [
   'destroyWorkspace',
   'open',
   'resetIssue',
-  'resetToPlanned',
   'viewPr',
   'cancel',
   'tasks',
@@ -89,7 +79,6 @@ const AUDITED_REGISTRY_KEYS = [
   'transcripts',
   'upload',
   'syncDiscussions',
-  'statusReview',
   'createWorkspace',
   'copySettings',
   'resetSession',
@@ -104,7 +93,7 @@ export const RETIREMENT_AUDIT = [
   {
     retiredKey: 'reviewTest',
     consumer: 'ReviewVerificationCard',
-    successorKeys: ['restartReview', 'recoverReview'],
+    successorKeys: ['restartReview'],
   },
   {
     retiredKey: 'reviewTest',
@@ -123,12 +112,10 @@ export const RETIREMENT_AUDIT = [
 }>;
 
 const DESTRUCTIVE_ACTION_KEYS = [
-  'purgeReview',
   'closeOut',
+  'resetIssue',
   'wipe',
   'destroyWorkspace',
-  'resetIssue',
-  'resetToPlanned',
   'cancel',
   'resetSession',
   'completeWorkReset',
@@ -151,10 +138,6 @@ function commandFileForPanVerb(panVerb: string) {
       return 'request-review.ts';
     case 'review restart':
       return 'review-restart.ts';
-    case 'review reset':
-      return 'reset-review.ts';
-    case 'review resync':
-      return 'resync-review.ts';
     case 'destroy':
       return 'workspace.ts';
     default:
@@ -192,7 +175,6 @@ function agent(): Agent {
     killCount: 0,
     role: 'work',
     paused: true,
-    troubled: true,
   };
 }
 
@@ -200,8 +182,9 @@ const PHASE_FIXTURES: ReadonlyArray<{ phase: PipelinePhase; state: IssueActionSt
   {
     phase: 'WORK_RUNNING',
     state: {
-      reviewStatus: null,
-      agent: { status: 'running', role: 'work', paused: false, troubled: false },
+      derived: { issueId: 'PAN-1331', state: 'working' },
+      panes: [{ id: 'pane-work', issue: 'PAN-1331', role: 'work', harness: 'claude-code', model: 'claude-opus-5', state: 'working' }],
+      agent: { status: 'running', role: 'work', paused: false },
       lifecycle: null,
       workspace: { exists: true, path: '/tmp/feature-pan-1331', mrUrl: null },
       hasPlan: true,
@@ -220,8 +203,8 @@ const PHASE_FIXTURES: ReadonlyArray<{ phase: PipelinePhase; state: IssueActionSt
   {
     phase: 'STUCK',
     state: {
-      reviewStatus: { reviewStatus: 'blocked', testStatus: 'failed', mergeStatus: 'failed' },
-      agent: { status: 'stuck', role: 'work', paused: true, troubled: true },
+      derived: { issueId: 'PAN-1331', state: 'changes-requested', attention: 'stuck', pr: { url: 'https://example.test/pr/1331', number: 1331, reviewState: 'CHANGES_REQUESTED', checks: 'red', mergeable: false } },
+      agent: { status: 'stuck', role: 'work', paused: true },
       lifecycle: { canResumeSession: true },
       workspace: { exists: true, path: '/tmp/feature-pan-1331', mrUrl: 'https://example.test/pr/1331' },
       hasPlan: true,
@@ -240,8 +223,8 @@ const PHASE_FIXTURES: ReadonlyArray<{ phase: PipelinePhase; state: IssueActionSt
   {
     phase: 'MERGED',
     state: {
-      reviewStatus: { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'merged', readyForMerge: true },
-      agent: { status: 'stopped', role: 'work', paused: false, troubled: false },
+      derived: { issueId: 'PAN-1331', state: 'merged', pr: { url: 'https://example.test/pr/1331', number: 1331, reviewState: 'APPROVED', checks: 'green', mergeable: true } },
+      agent: { status: 'stopped', role: 'work', paused: false },
       lifecycle: { canResumeSession: true },
       workspace: { exists: true, path: '/tmp/feature-pan-1331', mrUrl: 'https://example.test/pr/1331' },
       hasPlan: true,
@@ -249,7 +232,7 @@ const PHASE_FIXTURES: ReadonlyArray<{ phase: PipelinePhase; state: IssueActionSt
       hasInference: true,
       hasTranscripts: true,
       hasDiscussions: true,
-      issueCanonicalState: 'verifying_on_main',
+      issueCanonicalState: 'done',
       isMerged: true,
       hasPr: true,
       prUrl: 'https://example.test/pr/1331',
@@ -366,17 +349,14 @@ describe('issue action CLI ↔ dashboard parity', () => {
     useDashboardStore.setState({
       issuesRaw: [issue()],
       agentsById: { 'agent-pan-1331': agent() },
-      reviewStatusByIssueId: {
+      derivedIssueStateByIssueId: {
         'PAN-1331': {
           issueId: 'PAN-1331',
-          reviewStatus: 'passed',
-          testStatus: 'passed',
-          mergeStatus: 'pending',
-          readyForMerge: true,
-          prUrl: 'https://example.test/pr/1331',
-          updatedAt: '2026-05-23T00:00:00.000Z',
+          state: 'ready',
+          pr: { url: 'https://example.test/pr/1331', number: 1331, reviewState: 'APPROVED', checks: 'green', mergeable: true },
         },
       },
+      backendPanesById: {},
       drawer: { issueId: null, tab: 'overview' },
     } as Parameters<typeof useDashboardStore.setState>[0]);
   });
@@ -443,7 +423,6 @@ describe('issue action CLI ↔ dashboard parity', () => {
       'transcripts',
       'upload',
       'syncDiscussions',
-      'statusReview',
       'createWorkspace',
       'copySettings',
       'resetSession',

@@ -105,7 +105,7 @@ function QuestionCard({ item, subject, onOpen }: { item: SimpleIssueDerivation; 
 function ProblemsCard({ item, kind, onOpen }: { item: SimpleIssueDerivation; kind: NeedsYouKind; onOpen: () => void }) {
   const actions = useSimpleActions();
   const agent = item.primaryAgent;
-  const busy = actions.tell.isPending || actions.recover.isPending || actions.unstick.isPending || actions.startWork.isPending;
+  const busy = actions.tell.isPending || actions.recover.isPending || actions.startWork.isPending;
   const isStuck = kind === 'stuck';
   const isStartWork = kind === 'start-work';
   return (
@@ -122,11 +122,8 @@ function ProblemsCard({ item, kind, onOpen }: { item: SimpleIssueDerivation; kin
           </PrimaryButton>
         ) : isStuck ? (
           <PrimaryButton
-            disabled={busy || (!item.reviewStuck && !agent)}
-            onClick={() => {
-              if (item.reviewStuck) actions.unstick.mutate({ issueId: item.issue.identifier });
-              if (item.agentStuck && agent) actions.recover.mutate({ agentId: agent.id });
-            }}
+            disabled={busy || !agent}
+            onClick={() => { if (agent) actions.recover.mutate({ agentId: agent.id }); }}
           >
             Get it unstuck
           </PrimaryButton>
@@ -187,7 +184,8 @@ function ReadyCard({ item, onOpen }: { item: SimpleIssueDerivation; onOpen: () =
 export function SimpleHomePage() {
   const issuesRaw = useDashboardStore((s) => s.issuesRaw);
   const agentsById = useDashboardStore((s) => s.agentsById);
-  const reviewByIssueId = useDashboardStore((s) => s.reviewStatusByIssueId);
+  const derivedByIssueId = useDashboardStore((s) => s.derivedIssueStateByIssueId);
+  const panesById = useDashboardStore((s) => s.backendPanesById);
   const pendingSubjects = usePendingInputSubjects();
   const openSimpleIssue = useUiMode((s) => s.openSimpleIssue);
 
@@ -203,14 +201,19 @@ export function SimpleHomePage() {
       agentsByIssue.set(key, list);
     }
     const derivations = issues.map((issue) =>
-      deriveSimpleIssue(issue, agentsByIssue.get(issue.identifier.toLowerCase()) ?? [], reviewByIssueId?.[issue.identifier]),
+      deriveSimpleIssue(
+        issue,
+        agentsByIssue.get(issue.identifier.toLowerCase()) ?? [],
+        derivedByIssueId?.[issue.identifier],
+        Object.values(panesById).filter((pane) => pane.issue?.toUpperCase() === issue.identifier.toUpperCase()),
+      ),
     );
     return {
       derivations,
       buckets: bucketSimpleHome(derivations),
       byIdentifier: new Map(derivations.map((d) => [d.issue.identifier.toLowerCase(), d])),
     };
-  }, [issuesRaw, agentsById, reviewByIssueId]);
+  }, [issuesRaw, agentsById, derivedByIssueId, panesById]);
 
   const subjectByIssue = useMemo(() => {
     const map = new Map<string, PendingInputSubject>();

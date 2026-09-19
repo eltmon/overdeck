@@ -357,10 +357,10 @@ describe('CommandPalette newest-first conversation toggle (PAN-3704)', () => {
     renderCommandPalette();
     const actionValues = () => Array.from(document.querySelectorAll('[role="option"]'))
       .map((option) => option.getAttribute('data-value'))
-      .filter((value) => value === 'pan-flywheel' || value === 'start-cloister');
-    expect(actionValues()).toEqual(['pan-flywheel', 'start-cloister']);
+      .filter((value) => value === 'start-cloister');
+    expect(actionValues()).toEqual(['start-cloister']);
     fireEvent.click(screen.getByRole('button', { name: 'Newest first' }));
-    expect(actionValues()).toEqual(['pan-flywheel', 'start-cloister']);
+    expect(actionValues()).toEqual(['start-cloister']);
   });
 });
 
@@ -369,21 +369,13 @@ describe('CommandPalette navigation actions', () => {
     vi.restoreAllMocks();
   });
 
-  it('shows /pan-flywheel action when searching for flywheel and navigates to the Flywheel page', async () => {
+  it('no longer offers a flywheel action — the flywheel is a conversation, not a page', async () => {
     const user = userEvent.setup();
-    const { onNavigate } = renderPalette();
+    renderPalette();
 
     await user.type(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), 'flywheel');
 
-    expect(screen.getByText('Actions')).toBeInTheDocument();
-    const flywheelOption = getOptionByValue('pan-flywheel');
-    expect(flywheelOption).toBeInTheDocument();
-
-    await user.click(flywheelOption);
-
-    await waitFor(() => {
-      expect(onNavigate).toHaveBeenCalledWith('flywheel');
-    });
+    expect(document.querySelector('[role="option"][data-value="pan-flywheel"]')).toBeNull();
   });
 
   it('shows Context navigation and opens the Context page', async () => {
@@ -592,7 +584,7 @@ describe('CommandPalette new-workspace action (PAN-3330 FR-6b)', () => {
   it('omits the action entirely when no handler is supplied', () => {
     render(<CommandPalette isOpen onClose={vi.fn()} onNavigate={vi.fn()} />);
 
-    expect(getOptionByValue('pan-flywheel')).toBeDefined();
+    expect(getOptionByValue('start-cloister')).toBeDefined();
     expect(document.querySelector('[role="option"][data-value="new-workspace"]')).toBeNull();
   });
 });

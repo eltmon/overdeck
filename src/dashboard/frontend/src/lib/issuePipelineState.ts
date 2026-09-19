@@ -1,75 +1,71 @@
-import type { ReviewStatus, WorkspaceInfo } from './workspace-types';
-import type { Agent, WorkAgentLifecycle } from '../types';
+import type { BackendPane, DerivedIssueState } from '../types';
 
-export type PipelineReviewStatus = Pick<Partial<ReviewStatus>, 'reviewStatus' | 'testStatus' | 'mergeStatus' | 'verificationStatus' | 'readyForMerge'>;
-
-export interface PipelineStateInput {
-  reviewStatus?: PipelineReviewStatus | null;
-  agent?: Pick<Agent, 'status' | 'role' | 'agentPhase' | 'git'> | null;
-  lifecycle?: Pick<WorkAgentLifecycle, 'canResumeSession'> | null;
-  workspace?: Pick<WorkspaceInfo, 'exists'> | null;
-  hasPlan: boolean;
-  hasTasks: boolean;
-  issueCanonicalState?: string | null;
-  isMerged?: boolean;
-}
-
+/**
+ * The dashboard's internal lifecycle vocabulary. PAN-3917: every value is a
+ * projection of the derived issue state (FR-6) plus the terminal backend's own
+ * pane inventory — nothing here reads a stored status field. The states that
+ * only a stored field could produce (testing, verification, merging, verifying
+ * on main) are gone with it.
+ */
 export type PipelineState =
   | 'planning_active'
   | 'planning_done_awaiting_work'
   | 'in_progress_work_running'
   | 'in_progress_work_idle'
-  | 'verification_failing'
   | 'in_review_reviewers_running'
   | 'in_review_changes_requested'
   | 'in_review_approved'
-  | 'testing_running'
-  | 'testing_failures'
   | 'ready_to_merge'
-  | 'merging'
-  | 'verifying'
   | 'merged'
   | 'done'
   | 'canceled'
   | 'generic';
+
+export interface PipelineStateInput {
+  derived?: DerivedIssueState | null;
+  /** Backend panes whose `issue` token names this issue. */
+  panes?: readonly BackendPane[];
+  /** Tracker canonical state — the only thing that separates canceled from done. */
+  issueCanonicalState?: string | null;
+}
+
+const LIVE_PANE_STATES = new Set<BackendPane['state']>(['idle', 'working', 'blocked']);
 
 export function normalizeCanonicalState(state?: string | null): string | null {
   if (!state) return null;
   return state.trim().toLowerCase().replace(/[-\s]+/g, '_');
 }
 
-export function isIssueAgentRunning(agent?: Pick<Agent, 'status'> | null): boolean {
-  return !!agent && agent.status !== 'stopped' && agent.status !== 'failed' && agent.status !== 'dead';
+/** A pane the backend still owns — anything but `done`/`exited`/`unknown`. */
+export function isPaneLive(pane: Pick<BackendPane, 'state'>): boolean {
+  return LIVE_PANE_STATES.has(pane.state);
+}
+
+export function hasLivePane(panes: readonly BackendPane[] | undefined, role: BackendPane['role']): boolean {
+  return (panes ?? []).some((pane) => pane.role === role && isPaneLive(pane));
 }
 
 export function derivePipelineState(input: PipelineStateInput): PipelineState {
-  const { reviewStatus, agent } = input;
-  const issueCanonicalState = normalizeCanonicalState(input.issueCanonicalState);
-  const merged = input.isMerged === true || reviewStatus?.mergeStatus === 'merged';
-  const verifying = issueCanonicalState === 'verifying_on_main' || issueCanonicalState === 'verifying';
-  const agentRunning = isIssueAgentRunning(agent);
+  const { derived, panes } = input;
+  if (normalizeCanonicalState(input.issueCanonicalState) === 'canceled') return 'canceled';
+  if (!derived) return 'generic';
 
-  if (issueCanonicalState === 'done') return 'done';
-  if (issueCanonicalState === 'canceled') return 'canceled';
-  if (verifying) return 'verifying';
-  if (merged) return 'merged';
-  if (reviewStatus?.mergeStatus === 'merging' || reviewStatus?.mergeStatus === 'verifying') return 'merging';
-  if (reviewStatus?.readyForMerge) return 'ready_to_merge';
-  if (reviewStatus?.reviewStatus === 'reviewing') return 'in_review_reviewers_running';
-  if (reviewStatus?.reviewStatus === 'failed' || reviewStatus?.reviewStatus === 'blocked') return 'in_review_changes_requested';
-  // PAN-1862: reviewStatus 'skipped' (review mode none) reads as approved for phase display.
-  if (reviewStatus?.reviewStatus === 'passed' || reviewStatus?.reviewStatus === 'skipped') return 'in_review_approved';
-  if (reviewStatus?.testStatus === 'testing') return 'testing_running';
-  if (reviewStatus?.testStatus === 'failed' || reviewStatus?.testStatus === 'dispatch_failed') return 'testing_failures';
-  if (reviewStatus?.verificationStatus === 'failed') return 'verification_failing';
-  // planning_active is derived from the plan agent's DURABLE status (finalize
-  // flips it to stopped), never from process liveness — liveness lives in
-  // hasLiveTmuxSession. A running plan agent is genuinely planning (including
-  // replanning with an existing spec), so hasPlan must NOT downgrade it (D3,
-  // PAN-3338).
-  if (agentRunning && agent?.role === 'plan') return 'planning_active';
-  if (!agentRunning && input.hasPlan && (issueCanonicalState === 'todo' || issueCanonicalState === 'backlog' || issueCanonicalState === 'planned')) return 'planning_done_awaiting_work';
-  if (agentRunning && issueCanonicalState === 'in_progress') return 'in_progress_work_running';
-  if (!agentRunning && issueCanonicalState === 'in_progress') return 'in_progress_work_idle';
-  return 'generic';
+  switch (derived.state) {
+    case 'merged':
+      return 'merged';
+    case 'closed':
+      return 'done';
+    case 'ready':
+      return 'ready_to_merge';
+    case 'changes-requested':
+      return 'in_review_changes_requested';
+    case 'in-review':
+      return derived.pr?.reviewState === 'APPROVED' ? 'in_review_approved' : 'in_review_reviewers_running';
+    case 'working':
+      return hasLivePane(panes, 'work') ? 'in_progress_work_running' : 'in_progress_work_idle';
+    case 'planned':
+      return hasLivePane(panes, 'plan') ? 'planning_active' : 'planning_done_awaiting_work';
+    default:
+      return 'generic';
+  }
 }

@@ -1,23 +1,24 @@
 import { useState } from 'react'
 import { AlertTriangle, CheckCircle2 } from 'lucide-react'
-import { useReviewStatusQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries'
+import { useDerivedIssueState } from '../../../lib/store'
 import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/useIssueActions'
 import { deriveSpotlight } from './spotlight'
 
 /**
  * IssueBlockerSpotlight — the band's hero banner. When the issue is blocked
- * (review/test/verify/merge) it surfaces the *reason* and the unblock actions
- * at the very top of the cockpit; when it's ready to merge it says so in green.
+ * (changes requested, red checks, a conflict, an attention signal) it surfaces
+ * the *reason* and the unblock actions at the very top of the cockpit; when the
+ * forge says it is mergeable it says so.
  * Renders nothing when there's nothing to surface. Action buttons are wired to
  * the real IssueActionMenu registry (no fake buttons) and only shown when the
  * action is currently enabled. (Command Deck remodel S3.)
  */
 export function IssueBlockerSpotlight({ issueId }: { issueId: string }) {
-  const reviewStatus = useReviewStatusQuery(issueId)
+  const issue = useDerivedIssueState(issueId)
   const actions = useIssueActions(issueId)
   const [expanded, setExpanded] = useState(false)
 
-  const spotlight = deriveSpotlight(reviewStatus.data)
+  const spotlight = deriveSpotlight(issue)
   if (!spotlight) return null
 
   const blocked = spotlight.tone === 'blocked'
@@ -26,8 +27,6 @@ export function IssueBlockerSpotlight({ issueId }: { issueId: string }) {
     .filter((v): v is IssueActionView => !!v && v.enabled)
     .slice(0, 3)
 
-  const cycle = reviewStatus.data?.verificationCycleCount
-  const maxCycle = reviewStatus.data?.verificationMaxCycles
   const detail = spotlight.detail?.trim()
   const longDetail = (detail?.length ?? 0) > 160
   const shownDetail = detail && longDetail && !expanded ? `${detail.slice(0, 160)}…` : detail
@@ -46,7 +45,7 @@ export function IssueBlockerSpotlight({ issueId }: { issueId: string }) {
       </div>
 
       <div className="min-w-0 flex-1">
-        <div className={`text-[12.5px] font-semibold ${blocked ? 'text-destructive-foreground' : 'text-success-foreground'}`}>
+        <div className={`text-[12.5px] font-medium ${blocked ? 'text-destructive-foreground' : 'text-success-foreground'}`}>
           {spotlight.title}
         </div>
         {detail && (
@@ -83,12 +82,6 @@ export function IssueBlockerSpotlight({ issueId }: { issueId: string }) {
           </div>
         )}
       </div>
-
-      {typeof cycle === 'number' && (
-        <span className="shrink-0 rounded-[var(--radius-sm)] border border-border bg-muted px-[7px] py-[2px] text-[10px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-          cycle {cycle}{maxCycle ? `/${maxCycle}` : ''}
-        </span>
-      )}
     </div>
   )
 }

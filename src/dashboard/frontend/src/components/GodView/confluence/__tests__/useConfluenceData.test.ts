@@ -63,7 +63,7 @@ beforeEach(() => {
     agentsById: {},
     agentRuntimeById: {},
     issuesRaw: [],
-    reviewStatusByIssueId: {},
+    derivedIssueStateByIssueId: {},
     recentActivity: [],
   });
 });
@@ -105,9 +105,9 @@ describe('useConfluenceOrbs', () => {
         { id: 'PAN-3', identifier: 'PAN-3', title: 'Wreck', labels: [] },
         { id: 'PAN-4', identifier: 'PAN-4', title: 'Testing', labels: [] },
       ],
-      reviewStatusByIssueId: {
-        'PAN-3': { issueId: 'PAN-3', mergeStatus: 'failed' },
-        'PAN-4': { issueId: 'PAN-4', testStatus: 'testing' },
+      derivedIssueStateByIssueId: {
+        'PAN-3': { issueId: 'PAN-3', state: 'working', attention: 'stuck' },
+        'PAN-4': { issueId: 'PAN-4', state: 'in-review' },
       },
     });
 
@@ -144,7 +144,7 @@ describe('useConfluenceOrbs', () => {
     expect(result.current.find((orb) => orb.id === 'PAN-4')).toBe(original);
   });
 
-  it('maps queued work into MERGE and exposes the primary agent harness', () => {
+  it('maps a merge-ready issue into MERGE and exposes the primary agent harness', () => {
     useDashboardStore.setState({
       agentsById: {
         'agent-pan-5': agent({
@@ -154,9 +154,9 @@ describe('useConfluenceOrbs', () => {
           runtime: 'claude-code',
         }),
       },
-      issuesRaw: [{ id: 'PAN-5', identifier: 'PAN-5', title: 'Queued', labels: [] }],
-      reviewStatusByIssueId: {
-        'PAN-5': { issueId: 'PAN-5', mergeStatus: 'queued' },
+      issuesRaw: [{ id: 'PAN-5', identifier: 'PAN-5', title: 'Ready', labels: [] }],
+      derivedIssueStateByIssueId: {
+        'PAN-5': { issueId: 'PAN-5', state: 'ready' },
       },
     });
 
@@ -167,7 +167,7 @@ describe('useConfluenceOrbs', () => {
     expect(result.current[0]).toMatchObject({
       stage: 'MERGE',
       role: 'ship',
-      mergeStatus: 'queued',
+      issueState: 'ready',
       harness: 'claude-code',
     });
   });
@@ -189,7 +189,7 @@ describe('useConfluenceOrbs', () => {
         }),
       },
       issuesRaw: [{ id: 'PAN-6', identifier: 'PAN-6', title: 'Working', labels: [] }],
-      reviewStatusByIssueId: {},
+      derivedIssueStateByIssueId: {},
     });
 
     const client = queryClient();
@@ -217,7 +217,7 @@ describe('useConfluenceOrbs', () => {
         }),
       },
       issuesRaw: [{ id: 'PAN-7', identifier: 'PAN-7', title: 'Parked', labels: [] }],
-      reviewStatusByIssueId: {},
+      derivedIssueStateByIssueId: {},
     });
 
     const client = queryClient();

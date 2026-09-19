@@ -165,7 +165,7 @@ function verbBadgeForAgent(agent: Agent, now: Date, pendingPermissionAgentIds?: 
   if (agent.status === 'unknown' && agent.hasLiveTmuxSession === false) {
     return { variant: 'UNREACHABLE' };
   }
-  if (isAgentProblemStatus(agent.status) || agent.troubled) {
+  if (isAgentProblemStatus(agent.status)) {
     return { variant: 'STUCK · Nh', hours: stuckHours(agent, now) };
   }
   if (isAwaitingInput(agent, pendingPermissionAgentIds)) return { variant: 'INPUT' };
@@ -188,7 +188,7 @@ function verbBadgeForAgent(agent: Agent, now: Date, pendingPermissionAgentIds?: 
 }
 
 function agentPhase(agent: Agent): AgentPhaseFilter {
-  if (isAgentProblemStatus(agent.status) || agent.troubled) return 'stuck';
+  if (isAgentProblemStatus(agent.status)) return 'stuck';
   const role = agentRole(agent);
   if (role === 'test') return 'review';
   if (role === 'flywheel') return 'work';
@@ -330,7 +330,7 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
     agents
       .filter(isFleetAgent)
       .sort((a, b) => {
-        const stuckDelta = Number(isAgentProblemStatus(b.status) || b.troubled) - Number(isAgentProblemStatus(a.status) || a.troubled);
+        const stuckDelta = Number(isAgentProblemStatus(b.status)) - Number(isAgentProblemStatus(a.status));
         if (stuckDelta !== 0) return stuckDelta;
         const roleDelta = ROLE_ORDER[agentRole(a)] - ROLE_ORDER[agentRole(b)];
         if (roleDelta !== 0) return roleDelta;
@@ -367,7 +367,7 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
 
   const metricTiles = useMemo(() => {
     const runningAgents = fleetAgents.filter(isRunningAgent);
-    const stuckAgents = fleetAgents.filter((agent) => isAgentProblemStatus(agent.status) || agent.troubled);
+    const stuckAgents = fleetAgents.filter((agent) => isAgentProblemStatus(agent.status));
     const queuedAgents = fleetAgents.filter((agent) => agent.status === 'starting');
     const avgRuntime = (() => {
       if (runningAgents.length === 0) return 0;
@@ -432,7 +432,7 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
   }
 
   const runningCount = fleetAgents.filter(isRunningAgent).length;
-  const stuckCount = fleetAgents.filter((agent) => isAgentProblemStatus(agent.status) || agent.troubled).length;
+  const stuckCount = fleetAgents.filter((agent) => isAgentProblemStatus(agent.status)).length;
   const cumulativeRuntimeMs = fleetAgents
     .filter(isRunningAgent)
     .reduce((total, agent) => total + Math.max(0, now.getTime() - new Date(agent.startedAt).getTime()), 0);
@@ -495,7 +495,7 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
                 const issue = issuesById.get(issueKey(agent.issueId));
                 const role = agentRole(agent);
                 const output = agentOutputById[agent.id] ?? [];
-                const stuck = isAgentProblemStatus(agent.status) || agent.troubled;
+                const stuck = isAgentProblemStatus(agent.status);
                 const lastHeard = agent.lastActivity ? formatRelativeTime(agent.lastActivity, now) : '—';
                 const runtime = formatDuration(now.getTime() - new Date(agent.startedAt).getTime());
 

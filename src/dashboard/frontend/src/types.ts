@@ -35,7 +35,7 @@ export interface Issue {
   project?: LinearProject;
   source?: IssueSource;
   sourceRepo?: string;
-  state?: CanonicalState;  // Canonical issue state (e.g. 'canceled', 'done', 'verifying_on_main')
+  state?: CanonicalState;  // Canonical issue state (e.g. 'canceled', 'done')
   shadowStatus?: 'open' | 'in_progress' | 'closed';  // Shadow mode status tracking
   targetCanonicalState?: CanonicalState;  // Explicit column placement from drag-drop
   shadowedAt?: string;  // When shadow state was created
@@ -47,7 +47,6 @@ export interface Issue {
   totalChildCount?: number;  // Total children across all columns
   completedChildCount?: number;  // Children in Done state
   inProgressChildCount?: number;  // Children in active work
-  mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';  // From review-status, set by specialist pipeline
   // Planning-state (embedded from /api/issues via filesystem checks)
   hasPlan?: boolean;
   hasTasks?: boolean;
@@ -104,8 +103,6 @@ export interface Agent {
   paused?: boolean;
   pausedReason?: string;
   pausedAt?: string;
-  troubled?: boolean;
-  troubledAt?: string;
   consecutiveFailures: number;
   firstFailureInRunAt?: string;
   lastFailureAt?: string;
@@ -192,7 +189,6 @@ export type CanonicalState =
   | 'todo'
   | 'in_progress'
   | 'in_review'
-  | 'verifying_on_main'
   | 'done'
   | 'canceled';
 
@@ -204,7 +200,6 @@ export const STATUS_ORDER: CanonicalState[] = [
   'todo',
   'in_progress',
   'in_review',
-  'verifying_on_main',
   'done'
 ];
 
@@ -234,11 +229,6 @@ export const STATUS_LABELS: Record<string, CanonicalState> = {
   'QA': 'in_review',
   'Testing': 'in_review',
 
-  // Verifying states
-  'Verifying': 'verifying_on_main',
-  'Verifying On Main': 'verifying_on_main',
-  'verifying-on-main': 'verifying_on_main',
-
   // Done states
   'Done': 'done',
   'Completed': 'done',
@@ -260,7 +250,6 @@ export const STATE_TYPE_MAP: Record<CanonicalState, StateType> = {
   todo: 'unstarted',
   in_progress: 'started',
   in_review: 'started',
-  verifying_on_main: 'started',
   done: 'completed',
   canceled: 'canceled',
 };
@@ -358,7 +347,7 @@ export interface SpawnGateSnapshot {
   }>;
 }
 
-export type ResourceStackPhase = 'merged' | 'ship' | 'review' | 'work' | 'plan' | 'ready' | 'todo' | 'verifying';
+export type ResourceStackPhase = 'merged' | 'ship' | 'review' | 'work' | 'plan' | 'ready' | 'todo';
 
 export interface ResourceStack {
   id: string;
@@ -489,4 +478,58 @@ export interface StateTransitionResult {
   trackerState: string;
   fallbacksUsed: string[];
   warnings: string[];
+}
+
+// ─── Derived read model (PAN-3917 W6/W7) ──────────────────────────────────────
+// TEMPORARY HOME. W6 ships these as `packages/contracts/src/derived-issue-state.ts`
+// and `packages/contracts/src/backend-pane.ts`; the shapes here are identical and
+// the orchestrator swaps every `from '../types'` import for `@overdeck/contracts`
+// at integration. Nothing here is stored — the server computes it at read time
+// from the tracker, the PR, checks, git, and the terminal backend.
+
+export type DerivedIssueStateName =
+  | 'backlog'
+  | 'parked'
+  | 'planned'
+  | 'working'
+  | 'in-review'
+  | 'changes-requested'
+  | 'ready'
+  | 'merged'
+  | 'closed';
+
+export type IssueAttention = 'needs-you' | 'stuck' | 'api-error';
+
+export interface DerivedIssueState {
+  issueId: string;
+  state: DerivedIssueStateName;
+  attention?: IssueAttention;
+  pr?: {
+    url: string;
+    number: number;
+    reviewState: string;
+    checks: 'green' | 'red' | 'pending';
+    mergeable: boolean;
+  };
+  branch?: {
+    name: string;
+    aheadOfMain: number;
+    pushed: boolean;
+  };
+}
+
+export type BackendPaneRole = 'work' | 'worker' | 'review' | 'test' | 'uat' | 'strike' | 'plan';
+
+/** Terminal-backend pane state. The backend owns this; nothing mirrors it. */
+export type BackendPaneState = 'idle' | 'working' | 'blocked' | 'done' | 'exited' | 'unknown';
+
+export interface BackendPane {
+  id: string;
+  issue?: string;
+  role: BackendPaneRole;
+  harness: string;
+  model: string;
+  state: BackendPaneState;
+  terminalId?: string;
+  workspace?: string;
 }

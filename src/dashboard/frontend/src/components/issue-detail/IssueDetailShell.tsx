@@ -10,7 +10,8 @@
  */
 import { useMemo } from 'react';
 import type { Agent, WorkAgentLifecycle } from '../../types';
-import type { ReviewStatusSnapshot, SessionNode } from '@overdeck/contracts';
+import type { SessionNode } from '@overdeck/contracts';
+import type { DerivedIssueState } from '../../types';
 import IssuePhaseRail from './IssuePhaseRail';
 import { SpecialistStrip } from './SpecialistStrip';
 import { agentsToReviewerSessions, deriveSpecialistChips } from './deriveSpecialists';
@@ -21,7 +22,7 @@ const ENDED_STATUSES = new Set(['stopped', 'dead', 'failed']);
 export interface IssueDetailShellProps {
   issueId?: string | null;
   agents: Agent[];
-  reviewStatus?: ReviewStatusSnapshot | undefined;
+  derived?: DerivedIssueState | undefined;
   /** Reviewer sessions from the session tree (cockpit). When absent, chips
    *  derive from the agents list (drawer). */
   reviewerSessions?: SessionNode[];
@@ -48,7 +49,7 @@ function pickPhaseAgent(agents: Agent[], phase: Phase): Agent | undefined {
 export function IssueDetailShell({
   issueId,
   agents,
-  reviewStatus,
+  derived,
   reviewerSessions,
   activeAgentId,
   onOpenAgentConversation,
@@ -56,8 +57,8 @@ export function IssueDetailShell({
   className,
 }: IssueDetailShellProps) {
   const chips = useMemo(
-    () => deriveSpecialistChips(reviewerSessions ?? agentsToReviewerSessions(agents), reviewStatus),
-    [reviewerSessions, agents, reviewStatus],
+    () => deriveSpecialistChips(reviewerSessions ?? agentsToReviewerSessions(agents), derived),
+    [reviewerSessions, agents, derived],
   );
   const activePhase = useMemo<Phase | null>(() => {
     const agent = agents.find((candidate) => candidate.id === activeAgentId);

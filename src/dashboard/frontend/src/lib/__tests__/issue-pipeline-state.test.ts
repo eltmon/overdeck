@@ -1,66 +1,69 @@
 import { describe, expect, it } from 'vitest';
-import { derivePipelineState, type PipelineStateInput } from '../issuePipelineState';
+import { derivePipelineState, hasLivePane, isPaneLive } from '../issuePipelineState';
+import type { BackendPane, DerivedIssueState, DerivedIssueStateName } from '../../types';
 
-function makeInput(overrides: Partial<PipelineStateInput> = {}): PipelineStateInput {
-  return {
-    hasPlan: false,
-    hasTasks: false,
-    ...overrides,
-  };
-}
+const derived = (state: DerivedIssueStateName, over: Partial<DerivedIssueState> = {}): DerivedIssueState => ({
+  issueId: 'PAN-1',
+  state,
+  ...over,
+});
 
-describe('derivePipelineState — plan-agent states (PAN-3338)', () => {
-  it('stopped plan agent + hasPlan + canonical planned → planning_done_awaiting_work', () => {
-    const result = derivePipelineState(makeInput({
-      agent: { status: 'stopped', role: 'plan' },
-      hasPlan: true,
-      issueCanonicalState: 'planned',
-    }));
-    expect(result).toBe('planning_done_awaiting_work');
+const pane = (role: BackendPane['role'], state: BackendPane['state']): BackendPane => ({
+  id: `pane-${role}`,
+  issue: 'PAN-1',
+  role,
+  harness: 'claude-code',
+  model: 'claude-opus-5',
+  state,
+});
+
+describe('isPaneLive / hasLivePane', () => {
+  it('counts idle, working and blocked panes as live', () => {
+    expect(isPaneLive(pane('work', 'idle'))).toBe(true);
+    expect(isPaneLive(pane('work', 'working'))).toBe(true);
+    expect(isPaneLive(pane('work', 'blocked'))).toBe(true);
+    expect(isPaneLive(pane('work', 'done'))).toBe(false);
+    expect(isPaneLive(pane('work', 'exited'))).toBe(false);
+    expect(isPaneLive(pane('work', 'unknown'))).toBe(false);
   });
 
-  it('stopped plan agent + hasPlan + canonical todo → planning_done_awaiting_work', () => {
-    const result = derivePipelineState(makeInput({
-      agent: { status: 'stopped', role: 'plan' },
-      hasPlan: true,
-      issueCanonicalState: 'todo',
-    }));
-    expect(result).toBe('planning_done_awaiting_work');
+  it('matches by role', () => {
+    const panes = [pane('plan', 'working'), pane('work', 'exited')];
+    expect(hasLivePane(panes, 'plan')).toBe(true);
+    expect(hasLivePane(panes, 'work')).toBe(false);
+    expect(hasLivePane(undefined, 'work')).toBe(false);
+  });
+});
+
+describe('derivePipelineState (PAN-3917)', () => {
+  it('planned + a live plan pane → planning_active; without one → awaiting work', () => {
+    expect(derivePipelineState({ derived: derived('planned'), panes: [pane('plan', 'working')] })).toBe('planning_active');
+    expect(derivePipelineState({ derived: derived('planned'), panes: [pane('plan', 'exited')] })).toBe('planning_done_awaiting_work');
+    expect(derivePipelineState({ derived: derived('planned') })).toBe('planning_done_awaiting_work');
   });
 
-  it('stopped plan agent + hasPlan + canonical backlog → planning_done_awaiting_work', () => {
-    const result = derivePipelineState(makeInput({
-      agent: { status: 'stopped', role: 'plan' },
-      hasPlan: true,
-      issueCanonicalState: 'backlog',
-    }));
-    expect(result).toBe('planning_done_awaiting_work');
+  it('working + a live work pane → running; without one → idle', () => {
+    expect(derivePipelineState({ derived: derived('working'), panes: [pane('work', 'working')] })).toBe('in_progress_work_running');
+    expect(derivePipelineState({ derived: derived('working'), panes: [pane('work', 'exited')] })).toBe('in_progress_work_idle');
   });
 
-  it('running plan agent + hasPlan (replan in flight) → planning_active, not downgraded', () => {
-    const result = derivePipelineState(makeInput({
-      agent: { status: 'running', role: 'plan' },
-      hasPlan: true,
-      issueCanonicalState: 'todo',
-    }));
-    expect(result).toBe('planning_active');
+  it('reads the review states off the derived state and the PR review state', () => {
+    expect(derivePipelineState({ derived: derived('in-review') })).toBe('in_review_reviewers_running');
+    expect(derivePipelineState({
+      derived: derived('in-review', { pr: { url: 'u', number: 1, reviewState: 'APPROVED', checks: 'pending', mergeable: true } }),
+    })).toBe('in_review_approved');
+    expect(derivePipelineState({ derived: derived('changes-requested') })).toBe('in_review_changes_requested');
   });
 
-  it('running plan agent + no plan (mid-planning) → planning_active', () => {
-    const result = derivePipelineState(makeInput({
-      agent: { status: 'running', role: 'plan' },
-      hasPlan: false,
-      issueCanonicalState: 'todo',
-    }));
-    expect(result).toBe('planning_active');
+  it('maps the terminal states', () => {
+    expect(derivePipelineState({ derived: derived('ready') })).toBe('ready_to_merge');
+    expect(derivePipelineState({ derived: derived('merged') })).toBe('merged');
+    expect(derivePipelineState({ derived: derived('closed') })).toBe('done');
+    expect(derivePipelineState({ derived: derived('backlog') })).toBe('generic');
+    expect(derivePipelineState({})).toBe('generic');
   });
 
-  it('stopped plan agent + no plan + canonical todo → not planning_done_awaiting_work', () => {
-    const result = derivePipelineState(makeInput({
-      agent: { status: 'stopped', role: 'plan' },
-      hasPlan: false,
-      issueCanonicalState: 'todo',
-    }));
-    expect(result).not.toBe('planning_done_awaiting_work');
+  it('only the tracker separates canceled from done', () => {
+    expect(derivePipelineState({ derived: derived('closed'), issueCanonicalState: 'canceled' })).toBe('canceled');
   });
 });

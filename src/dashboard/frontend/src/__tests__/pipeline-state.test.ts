@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getPendingQuestionTitle, hasActualPendingQuestion, isReviewPipelineStuck } from '../lib/pipeline-state';
+import { getPendingQuestionTitle, hasActualPendingQuestion } from '../lib/pipeline-state';
 
 describe('pipeline-state helpers', () => {
   it('only treats actual queued questions or detected prompts as input-needed', () => {
@@ -18,11 +18,4 @@ describe('pipeline-state helpers', () => {
     })).toBe('Permission prompt: Do you want to proceed?');
   });
 
-  it('treats failed pipeline states as stuck', () => {
-    expect(isReviewPipelineStuck({ mergeStatus: 'failed' })).toBe(true);
-    expect(isReviewPipelineStuck({ verificationStatus: 'failed' })).toBe(true);
-    expect(isReviewPipelineStuck({ reviewStatus: 'blocked' })).toBe(true);
-    expect(isReviewPipelineStuck({ testStatus: 'dispatch_failed' })).toBe(true);
-    expect(isReviewPipelineStuck({ reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'queued' })).toBe(false);
-  });
 });

@@ -1,24 +1,26 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Loader2, GitMerge, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Loader2, GitMerge, CheckCircle } from 'lucide-react';
 import { useAlert, useConfirm } from './DialogProvider';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
+import { useDerivedIssueState } from '../lib/store';
 
 interface MergeButtonProps {
   issueId: string;
-  reviewStatus?: { readyForMerge?: boolean; mergeStatus?: string };
   variant: 'card' | 'inspector';
-  /** Inspector-variant accent. 'success' (green, default) preserves existing
-   * call sites; 'primary' (blue) marks it as the page's primary CTA — used by
-   * the cockpit header restyle (PAN-1991 #3). */
-  tone?: 'success' | 'primary';
-  issueState?: string;
   onClick?: (e: React.MouseEvent) => void;
 }
 
-export function MergeButton({ issueId, reviewStatus, variant, tone = 'success', issueState, onClick }: MergeButtonProps) {
+/**
+ * The human merge click. PAN-3917: it appears exactly when the forge says the
+ * PR is mergeable — approved, checks green, `mergeable` true, which is what the
+ * derived `ready` state means. There is no stored merge progress to render, so
+ * the button is either offered or it is not.
+ */
+export function MergeButton({ issueId, variant, onClick }: MergeButtonProps) {
   const showAlert = useAlert();
   const confirm = useConfirm();
   const queryClient = useQueryClient();
+  const derived = useDerivedIssueState(issueId);
 
   const mergeMutation = useMutation({
     mutationFn: async () => {
@@ -47,21 +49,7 @@ export function MergeButton({ issueId, reviewStatus, variant, tone = 'success', 
     },
   });
 
-  const isBusy =
-    reviewStatus?.mergeStatus === 'queued' ||
-    reviewStatus?.mergeStatus === 'merging' ||
-    reviewStatus?.mergeStatus === 'verifying';
-
-  // Stuck merge detection: if mergeStatus has been 'merging' for > 2 min, enable retry (PAN-490)
-  const STUCK_MERGE_MS = 2 * 60 * 1000;
-  const mergingElapsed = reviewStatus?.mergeStatus === 'merging' && (reviewStatus as Record<string, unknown>)?.updatedAt
-    ? Date.now() - new Date((reviewStatus as Record<string, unknown>).updatedAt as string).getTime()
-    : 0;
-  const isMergeStuck = mergingElapsed > STUCK_MERGE_MS;
-
-  if (issueState === 'verifying_on_main' || !reviewStatus?.readyForMerge || reviewStatus?.mergeStatus === 'merged') {
-    return null;
-  }
+  if (derived?.state !== 'ready') return null;
 
   const handleClick = async (e: React.MouseEvent) => {
     if (variant === 'card') {
@@ -70,7 +58,7 @@ export function MergeButton({ issueId, reviewStatus, variant, tone = 'success', 
     onClick?.(e);
     if (await confirm({
       title: 'Merge to Main',
-      message: `Merge ${issueId} to main?\n\nReview and tests have passed. This will:\n- Merge the feature branch to main\n- Run final verification tests\n- Clean up workspace`,
+      message: `Merge ${issueId} to main?\n\nThe PR is approved with green checks. This will:\n- Merge the feature branch to main\n- Run final verification tests\n- Clean up workspace`,
       confirmLabel: 'Merge',
     })) {
       mergeMutation.mutate();
@@ -82,25 +70,11 @@ export function MergeButton({ issueId, reviewStatus, variant, tone = 'success', 
       <button
         data-testid="merge-btn"
         onClick={handleClick}
-        disabled={mergeMutation.isPending || ((reviewStatus?.mergeStatus === 'merging' || reviewStatus?.mergeStatus === 'verifying' || reviewStatus?.mergeStatus === 'queued') && !isMergeStuck)}
-        className={`flex items-center gap-1 px-2 py-1 text-xs rounded font-medium ${
-          isMergeStuck
-            ? 'bg-warning text-warning-foreground hover:bg-warning/90'
-            : tone === 'primary'
-              ? 'bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50'
-              : 'bg-success text-success-foreground hover:bg-success/90 disabled:opacity-50'
-        }`}
-        title={isMergeStuck ? 'Merge appears stuck — click to retry' : undefined}
+        disabled={mergeMutation.isPending}
+        className="flex items-center gap-1 px-2 py-1 text-xs rounded font-medium bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
       >
-        {mergeMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> :
-         isMergeStuck ? <AlertTriangle className="w-3 h-3" /> :
-         reviewStatus?.mergeStatus === 'verifying' ? <Loader2 className="w-3 h-3 animate-spin" /> :
-         reviewStatus?.mergeStatus === 'merging' ? <Loader2 className="w-3 h-3 animate-spin" /> :
-         <CheckCircle className="w-3 h-3" />}
-        {isMergeStuck ? 'Retry Merge' :
-         reviewStatus?.mergeStatus === 'queued' ? 'Queued' :
-         reviewStatus?.mergeStatus === 'verifying' ? 'Verifying...' :
-         reviewStatus?.mergeStatus === 'merging' ? 'Rebasing...' : 'Merge'}
+        {mergeMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+        Merge
       </button>
     );
   }
@@ -109,18 +83,12 @@ export function MergeButton({ issueId, reviewStatus, variant, tone = 'success', 
   return (
     <button
       onClick={handleClick}
-      disabled={mergeMutation.isPending || isBusy}
-      className="flex items-center gap-1 text-xs text-success hover:text-success/80 transition-colors disabled:opacity-50"
+      disabled={mergeMutation.isPending}
+      className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
       title="Merge"
     >
-      {(mergeMutation.isPending || isBusy) ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <GitMerge className="w-3.5 h-3.5" />}
-      {reviewStatus?.mergeStatus === 'queued'
-        ? 'Queued'
-        : reviewStatus?.mergeStatus === 'verifying'
-          ? 'Verifying'
-          : reviewStatus?.mergeStatus === 'merging'
-            ? 'Merging'
-            : 'Merge'}
+      {mergeMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <GitMerge className="w-3.5 h-3.5" />}
+      Merge
     </button>
   );
 }

@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AgentRuntimeSnapshot, AgentSnapshot, DomainEvent, ReviewStatusSnapshot } from '@overdeck/contracts';
+import type { AgentRuntimeSnapshot, AgentSnapshot, DomainEvent } from '@overdeck/contracts';
 import { useGodViewStore } from '../../../hooks/useGodViewSocket';
 import {
   subscribeDashboardDomainEvents,
   useDashboardStore,
 } from '../../../lib/store';
-import type { Issue } from '../../../types';
+import type { DerivedIssueState, DerivedIssueStateName, IssueAttention, Issue } from '../../../types';
+import { getPipelineIssuePhase, type PipelineIssuePhase } from '../../../lib/pipeline-state';
 import { useWorkspaceStackHealthQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries';
 import {
   HOOK_KEYS,
@@ -56,7 +57,10 @@ export interface ConfluenceOrb {
   thinkUntil: number;
   compactT: number;
   spend: number;
-  mergeStatus: string | null;
+  /** The issue's derived state (FR-6) — the orb's lane and merge choreography. */
+  issueState: DerivedIssueStateName | null;
+  /** The derived attention signal, null when the issue needs nobody. */
+  attention: IssueAttention | null;
   /** PAN-3490: the issue's primary parked orbit (most severe), null when not parked. */
   parkedOrbit: string | null;
   /** Minutes since the park began (parkedAt age), null when not parked. */
@@ -148,7 +152,7 @@ export interface ConfluenceData {
   meta: ConfluenceMeta;
 }
 
-type IssueRecord = Issue & Record<string, unknown>;
+type IssueRow = Issue & Record<string, unknown>;
 type WorkspaceHealthRecord = Record<string, {
   stackHealth?: { healthy?: boolean };
 }>;
@@ -173,7 +177,7 @@ function emptyHookStream(): ConfluenceHookStream {
   };
 }
 
-function issueKey(issue: IssueRecord): string {
+function issueKey(issue: IssueRow): string {
   return String(issue.identifier || issue.id || '').toUpperCase();
 }
 
@@ -228,7 +232,8 @@ function recentlyActive(agent: AgentSnapshot, runtime: AgentRuntimeSnapshot | un
  * (e.g. LEX-1) cannot resurrect an orb. */
 const ALWAYS_LIVE_STATUSES = new Set<string>(['running', 'starting']);
 const CONDITIONAL_LIVE_STATUSES = new Set<string>(['healthy', 'warning', 'stuck', 'stalled']);
-const ACTIVE_MERGE_STATUSES = new Set<string>(['pending', 'queued', 'merging', 'verifying']);
+/** Derived states that keep an orb on the river with no live agent. */
+const MERGE_LANE_STATES = new Set<DerivedIssueStateName>(['ready', 'merged']);
 /** Doldrums emissary cap — mirrors the mockup's "few emissaries of the N frozen" pattern
  * so a large stale population never becomes an unreadable label wall. */
 const STALE_ORB_LIMIT = 14;
@@ -253,7 +258,7 @@ function pauseVoters(agents: readonly AgentSnapshot[]): readonly AgentSnapshot[]
   return live.length > 0 ? live : agents;
 }
 
-function closedIssueState(issue: IssueRecord | undefined): boolean {
+function closedIssueState(issue: IssueRow | undefined): boolean {
   if (!issue) return false;
   const state = String(issue.state ?? issue.status ?? '').toLowerCase();
   return state === 'closed' || state === 'done' || state === 'completed' || state === 'cancelled';
@@ -284,31 +289,33 @@ function convoyMembers(agents: readonly AgentSnapshot[]): ConfluenceConvoyMember
   return [...members.values()].sort((a, b) => order.indexOf(a.role) - order.indexOf(b.role));
 }
 
-function mergedPendingCloseout(issue: IssueRecord | undefined, review: ReviewStatusSnapshot | undefined): boolean {
-  if (review?.mergeStatus !== 'merged') return false;
-  const state = String(issue?.state ?? issue?.status ?? '').toLowerCase();
-  return state !== 'done' && state !== 'closed' && state !== 'completed';
-}
+/**
+ * The lane→column map. getPipelineIssuePhase owns the derived-state→lane
+ * decision; the river only splits its review lane when a test agent is live,
+ * which the backend's own agent inventory answers.
+ */
+const STAGE_BY_PHASE: Record<PipelineIssuePhase, Stage> = {
+  plan: 'PLAN',
+  work: 'WORK',
+  review: 'REVIEW',
+  ship: 'MERGE',
+  ready: 'WORK',
+  todo: 'WORK',
+};
 
-function orbStage(
-  agents: readonly AgentSnapshot[],
-  issue: IssueRecord | undefined,
-  review: ReviewStatusSnapshot | undefined,
-): Stage {
-  const mergeStatus = review?.mergeStatus ?? issue?.mergeStatus;
-  if (mergeStatus === 'queued' || mergeStatus === 'merging') return 'MERGE';
-  if (mergeStatus === 'verifying' || mergedPendingCloseout(issue, review)) return 'VERIFY';
-  if (agents.some((agent) => agent.role === 'test')) return 'TEST';
-  if (agents.some((agent) => agent.role === 'review' || agent.id.includes('-review'))) return 'REVIEW';
-  if (agents.some((agent) => agent.role === 'plan')) return 'PLAN';
-  return 'WORK';
+function orbStage(agents: readonly AgentSnapshot[], derived: DerivedIssueState | undefined): Stage {
+  const stage = STAGE_BY_PHASE[getPipelineIssuePhase(derived ?? null)];
+  if (stage === 'REVIEW' && agents.some((agent) => agent.role === 'test')) return 'TEST';
+  if (stage === 'WORK' && agents.some((agent) => agent.role === 'plan')) return 'PLAN';
+  if (stage === 'WORK' && agents.some((agent) => agent.role === 'review' || agent.id.includes('-review'))) return 'REVIEW';
+  return stage;
 }
 
 function primaryAgent(agents: readonly AgentSnapshot[], stage: Stage): AgentSnapshot {
   const role = stage === 'PLAN' ? 'plan'
     : stage === 'REVIEW' ? 'review'
       : stage === 'TEST' ? 'test'
-        : stage === 'VERIFY' || stage === 'MERGE' ? 'ship'
+        : stage === 'MERGE' ? 'ship'
           : 'work';
   return agents.find((agent) => agent.role === role && activeStatus(agent.status))
     ?? agents.find((agent) => activeStatus(agent.status))
@@ -578,7 +585,7 @@ function parkedPrimaryByIssue(parked: ParkedResponse | null): Map<string, Parked
 }
 
 /** A parked issue with no live agent gets a synthesized Doldrums orb — the graveyard is real cast. */
-function parkedOnlyOrb(row: ParkedRowView, issue: IssueRecord | undefined, now: number): ConfluenceOrb {
+function parkedOnlyOrb(row: ParkedRowView, issue: IssueRow | undefined, now: number): ConfluenceOrb {
   const parkedMs = Math.max(0, now - Date.parse(row.parkedAt));
   const parkedMin = Math.floor(parkedMs / 60_000);
   return {
@@ -605,7 +612,8 @@ function parkedOnlyOrb(row: ParkedRowView, issue: IssueRecord | undefined, now: 
     thinkUntil: 0,
     compactT: 0,
     spend: 0,
-    mergeStatus: null,
+    issueState: null,
+    attention: null,
     parkedOrbit: row.orbit,
     parkedMin,
     orbitReason: row.parkReason,
@@ -618,7 +626,7 @@ export function useConfluenceOrbs(
   const agentsById = useDashboardStore((state) => state.agentsById);
   const agentRuntimeById = useDashboardStore((state) => state.agentRuntimeById);
   const issuesRaw = useDashboardStore((state) => state.issuesRaw);
-  const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
+  const derivedIssueStateByIssueId = useDashboardStore((state) => state.derivedIssueStateByIssueId);
   const parked = useParked();
   const agents = useMemo(() => Object.values(agentsById), [agentsById]);
   const issueIds = useMemo(
@@ -630,7 +638,7 @@ export function useConfluenceOrbs(
   const cache = useRef(new Map<string, { signature: string; orb: ConfluenceOrb }>());
 
   return useMemo(() => {
-    const issues = issuesRaw as IssueRecord[];
+    const issues = issuesRaw as IssueRow[];
     const issuesById = new Map(issues.map((issue) => [issueKey(issue), issue]));
     const parkedByIssue = parkedPrimaryByIssue(parked);
     const agentsByIssue = new Map<string, AgentSnapshot[]>();
@@ -645,7 +653,7 @@ export function useConfluenceOrbs(
     const now = Date.now();
     for (const [id, issueAgents] of agentsByIssue) {
       const issue = issuesById.get(id.toUpperCase());
-      const review = reviewStatusByIssueId[id];
+      const derived = derivedIssueStateByIssueId[id];
       // Membership: an orb exists only for issues the pipeline is actually
       // touching — a live/paused agent or an in-flight merge. Closed-out issues
       // never render, no matter what agent residue remains in the registry.
@@ -653,11 +661,11 @@ export function useConfluenceOrbs(
       const hasLiveAgent = issueAgents.some((agent) =>
         ALWAYS_LIVE_STATUSES.has(String(agent.status))
         || ((CONDITIONAL_LIVE_STATUSES.has(String(agent.status)) || agent.paused === true) && knownOpenIssue));
-      const mergeActive = ACTIVE_MERGE_STATUSES.has(String(review?.mergeStatus ?? issue?.mergeStatus ?? ''));
+      const mergeActive = derived !== undefined && MERGE_LANE_STATES.has(derived.state);
       if (!hasLiveAgent && !mergeActive) continue;
       if (closedIssueState(issue)) continue;
       liveIds.add(id);
-      const stage = orbStage(issueAgents, issue, review);
+      const stage = orbStage(issueAgents, derived);
       const primary = primaryAgent(issueAgents, stage);
       const lastActivity = latestActivity(issueAgents, agentRuntimeById);
       const lastActivityMs = lastActivity ? Date.parse(lastActivity) : Number.NaN;
@@ -667,7 +675,6 @@ export function useConfluenceOrbs(
         (agent as AgentSnapshot & { yieldedByScheduler?: boolean }).yieldedByScheduler === true ||
         agent.pausedReason?.toLowerCase().includes('yield') === true,
       );
-      const mergeStatus = review?.mergeStatus ?? issue?.mergeStatus;
       const micro = aggregateMicroState(issueAgents, microStatesByAgentId);
       const broken = workspaceHealth[id.toUpperCase()]?.stackHealth?.healthy === false
         || (issue?.stackHealth as { healthy?: boolean } | undefined)?.healthy === false;
@@ -676,7 +683,7 @@ export function useConfluenceOrbs(
       const orb: ConfluenceOrb = {
         id,
         project: issueProject(id),
-        role: stage === 'VERIFY' || stage === 'MERGE' ? 'ship' : (primary.role ?? 'work'),
+        role: stage === 'MERGE' ? 'ship' : (primary.role ?? 'work'),
         stage,
         title: issue?.title ?? id,
         heat: Math.min(1, 0.25 + issueAgents.filter((agent) => activeStatus(agent.status)).length * 0.15),
@@ -684,13 +691,13 @@ export function useConfluenceOrbs(
         state: classifyOrb({
           paused: voters.some((agent) => agent.paused === true),
           yieldedByScheduler,
-          mergeStatus,
+          attention: derived?.attention ?? null,
           lastActivity,
         }, now),
         convoy: convoyMembers(issueAgents),
         yieldReason: voters.find((agent) => agent.pausedReason)?.pausedReason ?? null,
         yieldedByScheduler,
-        warn: primary.status === 'error' || primary.troubled ? (primary.lastFailureReason ?? primary.status) : null,
+        warn: primary.status === 'error' ? (primary.lastFailureReason ?? primary.status) : null,
         broken,
         model: primary.model ?? null,
         harness: primary.runtime ?? null,
@@ -702,7 +709,8 @@ export function useConfluenceOrbs(
         thinkUntil: micro.thinkUntil,
         compactT: micro.compactT,
         spend: micro.spend,
-        mergeStatus: typeof mergeStatus === 'string' ? mergeStatus : null,
+        issueState: derived?.state ?? null,
+        attention: derived?.attention ?? null,
         parkedOrbit: parkedRow?.orbit ?? null,
         parkedMin,
         orbitReason: parkedRow?.parkReason ?? null,
@@ -748,7 +756,7 @@ export function useConfluenceOrbs(
     return next
       .filter((orb) => orb.state !== 'stale' || keepStale.has(orb.id))
       .sort((a, b) => a.id.localeCompare(b.id));
-  }, [agents, issuesRaw, microStatesByAgentId, reviewStatusByIssueId, workspaceHealth, parked, agentRuntimeById]);
+  }, [agents, issuesRaw, microStatesByAgentId, derivedIssueStateByIssueId, workspaceHealth, parked, agentRuntimeById]);
 }
 
 type CostSummaryResponse = { today?: { totalTokens?: number } };
@@ -793,7 +801,7 @@ export function useConfluenceMeta(
 ): ConfluenceMeta {
   const agentsById = useDashboardStore((state) => state.agentsById);
   const agentRuntimeById = useDashboardStore((state) => state.agentRuntimeById);
-  const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
+  const derivedIssueStateByIssueId = useDashboardStore((state) => state.derivedIssueStateByIssueId);
   const recentActivity = useDashboardStore((state) => state.recentActivity);
   const system = useGodViewStore((state) => state.systemHealth);
   const { data: costSummary } = useQuery({
@@ -838,8 +846,8 @@ export function useConfluenceMeta(
       costPerMin: costEvents.length > 0
         ? costEvents.reduce((total, event) => total + event.cost, 0)
         : null,
-      mergeQ: Object.values(reviewStatusByIssueId).filter((review) =>
-        review.mergeStatus === 'queued' || review.mergeStatus === 'merging',
+      mergeQ: Object.values(derivedIssueStateByIssueId).filter((issue) =>
+        issue.state === 'ready',
       ).length,
       conversations: liveConversations,
       staleTotal: orbs.filter((orb) => orb.state === 'stale').length,
@@ -859,7 +867,7 @@ export function useConfluenceMeta(
         ? { transitionsPerHour: velocity.transitionsPerHour, byStage: velocity.byStage ?? {} }
         : null,
     };
-  }, [agentsById, agentRuntimeById, conversations, costSummary, hookStream.costEvents, orbs, recentActivity, reviewStatusByIssueId, system, parked, velocity]);
+  }, [agentsById, agentRuntimeById, conversations, costSummary, hookStream.costEvents, orbs, recentActivity, derivedIssueStateByIssueId, system, parked, velocity]);
 }
 
 export function useConfluenceData(): ConfluenceData {
