@@ -602,6 +602,68 @@ export function deleteAutoMergePayload(issueIdParam: string, deps: AutoMergeCanc
   };
 }
 
+/**
+ * The effective auto-merge routing key per in-flight issue (PAN-3917, D3).
+ *
+ * There is no per-issue routing key any more — it was a record field. The
+ * answer is derived: the issue's project default, falling back to the global
+ * `require_uat_before_merge`. `autoMerge: true` means the train may ship it
+ * when green; `false` means hold for UAT.
+ */
+export async function getAutoMergePolicyPayload(): Promise<{
+  issues: Array<{ issueId: string; autoMerge: boolean }>;
+}> {
+  const globalRequireUat = isFlywheelRequireUatBeforeMerge();
+  const { loadIssueStatesForProject } = await import('../services/derived-issue-state.js');
+  const IN_FLIGHT = new Set(['working', 'in-review', 'changes-requested', 'ready']);
+
+  const issues: Array<{ issueId: string; autoMerge: boolean }> = [];
+  for (const { config } of listProjectsSync()) {
+    const projectPath = resolve(config.path);
+    let states;
+    try {
+      states = await loadIssueStatesForProject(projectPath, await listCandidateIssueIds(projectPath));
+    } catch (error) {
+      console.warn(`[merge-train] auto-merge policy for ${config.name} failed: ${error instanceof Error ? error.message : String(error)}`);
+      continue;
+    }
+    for (const [issueId, derived] of states) {
+      if (!IN_FLIGHT.has(derived.state)) continue;
+      const held = shouldHoldForUat(undefined, getProjectAutoMergeDefault(issueId), globalRequireUat);
+      issues.push({ issueId, autoMerge: !held });
+    }
+  }
+  return { issues };
+}
+
+/** Issue ids with an open PR in the project — the only ones the train can route. */
+async function listCandidateIssueIds(projectPath: string): Promise<string[]> {
+  const { listRepoPullRequests, issueIdFromBranch } = await import('../services/derived-issue-state.js');
+  const rows = await listRepoPullRequests(projectPath);
+  return rows.flatMap((row) => {
+    const issueId = issueIdFromBranch(row.headRefName);
+    return issueId ? [issueId] : [];
+  });
+}
+
+const getAutoMergePolicyRoute = HttpRouter.add(
+  'GET',
+  '/api/merge-train/auto-merge',
+  httpHandler(Effect.gen(function* () {
+    return jsonResponse(yield* Effect.promise(() => getAutoMergePolicyPayload()));
+  })),
+);
+
+/** Whether an autonomous merge can actually be performed (GitHub App or gh CLI). */
+const getMergeBackendRoute = HttpRouter.add(
+  'GET',
+  '/api/merge-train/merge-backend',
+  httpHandler(Effect.gen(function* () {
+    const { getMergeBackendStatus } = yield* Effect.promise(() => import('../../../lib/github-app.js'));
+    return jsonResponse(yield* Effect.promise(() => getMergeBackendStatus()));
+  })),
+);
+
 const getMergeTrainConfigRoute = HttpRouter.add(
   'GET',
   '/api/merge-train/config',
@@ -685,6 +747,8 @@ export const mergeTrainRouteLayer = Layer.mergeAll(
   postMergeTrainMergeNextRoute,
   getMergeTrainConfigRoute,
   postMergeTrainConfigRoute,
+  getAutoMergePolicyRoute,
+  getMergeBackendRoute,
   getPendingAutoMergeRoute,
   getAutoMergeProblemsRoute,
   postAutoMergeScheduleRoute,

@@ -283,122 +283,6 @@ const postProjectSpecialistRunTerminateRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: POST /api/specialists/:project/:type/grace/pause ──────────────────
-
-const postProjectSpecialistGracePauseRoute = HttpRouter.add(
-  'POST',
-  '/api/specialists/:project/:type/grace/pause',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const project = params['project'] as string;
-    const type = params['type'] as string;
-
-    if (!validateSpecialistAgentName(type)) {
-      return jsonResponse(
-        { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
-        { status: 400 },
-      );
-    }
-
-    const { pauseGracePeriod } = yield* Effect.promise(() => import('../../../../lib/cloister/specialists.js'));
-    const success = pauseGracePeriod(project, type);
-
-    if (success) {
-      return jsonResponse({ success: true, message: 'Grace period paused' });
-    } else {
-      return jsonResponse(
-        { error: 'No active grace period to pause' },
-        { status: 400 },
-      );
-    }
-  })),
-);
-
-// ─── Route: POST /api/specialists/:project/:type/grace/resume ─────────────────
-
-const postProjectSpecialistGraceResumeRoute = HttpRouter.add(
-  'POST',
-  '/api/specialists/:project/:type/grace/resume',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const project = params['project'] as string;
-    const type = params['type'] as string;
-
-    if (!validateSpecialistAgentName(type)) {
-      return jsonResponse(
-        { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
-        { status: 400 },
-      );
-    }
-
-    const { resumeGracePeriod } = yield* Effect.promise(() => import('../../../../lib/cloister/specialists.js'));
-    const success = resumeGracePeriod(project, type);
-
-    if (success) {
-      return jsonResponse({ success: true, message: 'Grace period resumed' });
-    } else {
-      return jsonResponse(
-        { error: 'No paused grace period to resume' },
-        { status: 400 },
-      );
-    }
-  })),
-);
-
-// ─── Route: POST /api/specialists/:project/:type/grace/exit ───────────────────
-
-const postProjectSpecialistGraceExitRoute = HttpRouter.add(
-  'POST',
-  '/api/specialists/:project/:type/grace/exit',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const project = params['project'] as string;
-    const type = params['type'] as string;
-
-    if (!validateSpecialistAgentName(type)) {
-      return jsonResponse(
-        { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
-        { status: 400 },
-      );
-    }
-
-    const { exitGracePeriod } = yield* Effect.promise(() => import('../../../../lib/cloister/specialists.js'));
-    exitGracePeriod(project, type);
-    return jsonResponse({
-      success: true,
-      message: 'Specialist terminated immediately',
-    });
-  })),
-);
-
-// ─── Route: GET /api/specialists/:project/:type/grace ────────────────────────
-
-const getProjectSpecialistGraceRoute = HttpRouter.add(
-  'GET',
-  '/api/specialists/:project/:type/grace',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const project = params['project'] as string;
-    const type = params['type'] as string;
-
-    if (!validateSpecialistAgentName(type)) {
-      return jsonResponse(
-        { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
-        { status: 400 },
-      );
-    }
-
-    const { getGracePeriodState } = yield* Effect.promise(() => import('../../../../lib/cloister/specialists.js'));
-    const state = getGracePeriodState(project, type);
-
-    if (state) {
-      return jsonResponse(state);
-    } else {
-      return jsonResponse({ error: 'No active grace period' }, { status: 404 });
-    }
-  })),
-);
-
 // ─── Route: GET /api/specialists/:project/:type/context ──────────────────────
 
 const getProjectSpecialistContextRoute = HttpRouter.add(
@@ -798,10 +682,6 @@ export const specialistsProjectRouteLayer = Layer.mergeAll(
   getProjectSpecialistRunStreamRoute,       // /runs/:runId/stream — before /runs/:runId
   getProjectSpecialistRunRoute,             // /runs/:runId
   postProjectSpecialistRunTerminateRoute,   // /runs/:runId/terminate
-  postProjectSpecialistGracePauseRoute,     // /grace/pause
-  postProjectSpecialistGraceResumeRoute,    // /grace/resume
-  postProjectSpecialistGraceExitRoute,      // /grace/exit
-  getProjectSpecialistGraceRoute,           // /grace
   getProjectSpecialistContextRoute,         // /context
   postProjectSpecialistContextRegenerateRoute, // /context/regenerate
   postProjectSpecialistCompleteRoute,       // /complete

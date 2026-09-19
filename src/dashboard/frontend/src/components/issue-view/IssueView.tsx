@@ -1,5 +1,4 @@
 import type { HTMLAttributes, ReactNode } from 'react';
-import { IssuePolicyStrip } from '../IssuePolicyStrip';
 import { ShipProgress } from './ShipProgress';
 import { deriveShip } from './derivations';
 import { useDerivedIssueState } from '../../lib/store';
@@ -27,11 +26,6 @@ export function IssueView({ issueId, density, children, ...rootProps }: IssueVie
   const dataComponent = (rootProps as Record<string, unknown>)['data-component'];
   return (
     <div {...rootProps} data-component={typeof dataComponent === 'string' ? dataComponent : 'issue-view'} data-density={density}>
-      {(density === 'cockpit' || density === 'console') && (
-        <div data-section="IssuePolicyStrip / PoliciesControl">
-          <IssuePolicyStrip issueId={issueId} />
-        </div>
-      )}
       {density === 'console' && (
         <div data-section="StartAgentCta"><StartAgentCta issueId={issueId} density={density} /></div>
       )}

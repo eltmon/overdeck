@@ -33,7 +33,6 @@ import { MaintenanceSection } from './sections/MaintenanceSection';
 import { TelemetrySection } from './sections/TelemetrySection';
 import { ExperimentalSection } from './sections/ExperimentalSection';
 import { MODELS_BY_PROVIDER, type OpenRouterFavoriteModel } from './modelCatalog';
-import { LegacyImportDialog } from './LegacyImportDialog';
 import {
   SettingsLayout,
   SettingsHeader,
@@ -287,12 +286,10 @@ export function SettingsPage() {
     handleEmbeddingModelChange,
     handleSaveConvConfig,
     handleTestEmbeddingConnection,
-    legacyImportOpen,
     loadConvConfig,
     reindexConfirm,
     reindexConfirmBusy,
     reindexProgress,
-    setLegacyImportOpen,
     testingEmbedding,
   } = useConversationSearch({
     formData,
@@ -680,12 +677,10 @@ export function SettingsPage() {
         queryClient={queryClient}
         reloadingTldr={reloadingTldr}
         saveStatus={saveStatus}
-        setLegacyImportOpen={setLegacyImportOpen}
         setReloadingTldr={setReloadingTldr}
         onSettingsChange={applySettings}
       />
 
-      <LegacyImportDialog open={legacyImportOpen} onClose={() => setLegacyImportOpen(false)} />
 
     </SettingsLayout>
   );

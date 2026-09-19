@@ -1,50 +1,30 @@
 /**
- * AutoMergeToggle — per-issue auto-merge routing-key control (PAN-1691 / PAN-1692).
+ * AutoMergeToggle — the issue's auto-merge routing key (PAN-1691 / PAN-1692).
  *
  * One shared control, four render sites (slide-out, merge-policy roster,
- * pipeline row, Awaiting Merge). Posts to the single endpoint
- *   POST /api/workspaces/:id/auto-merge { autoMerge: boolean }
+ * pipeline row, Awaiting Merge).
  *
- * PAN-3917: the routing key is operator policy, not derived status, so the
- * control owns the read as well — it resolves the current value from
- * GET /api/merge-train/auto-merge and refetches after a write. Callers pass an
- * issue id and nothing else.
- *
- * Tri-state semantics: `undefined` = follow project default, `true` = auto-merge
- * (fast lane), `false` = hold for UAT (manual lane).
+ * PAN-3917 (D3): the per-issue routing key was a record field and the record is
+ * gone. The train now gates on the project default plus the global
+ * `require_uat_before_merge`, so this is a READ-ONLY indicator of the effective
+ * key, resolved by GET /api/merge-train/auto-merge. Change the policy on the
+ * project (Settings → project → auto-merge default) or globally.
  */
-import { useState } from 'react';
 import { Zap, Lock } from 'lucide-react';
-import { toast } from 'sonner';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { capture } from '../lib/telemetry';
-
-async function postAutoMerge(issueId: string, autoMerge: boolean): Promise<void> {
-  const res = await fetch(`/api/workspaces/${encodeURIComponent(issueId)}/auto-merge`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ autoMerge }),
-  });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.error ?? res.statusText);
-  }
-}
+import { useQuery } from '@tanstack/react-query';
 
 const AUTO_MERGE_POLICY_KEY = ['merge-train', 'auto-merge-policy'];
 
-/** Per-issue routing keys, shared across every mounted toggle via react-query. */
+/** Effective routing key per in-flight issue, shared across every mounted indicator. */
 export function useAutoMergePolicyMap(): Record<string, boolean> {
   const { data } = useQuery({
     queryKey: AUTO_MERGE_POLICY_KEY,
     queryFn: async (): Promise<Record<string, boolean>> => {
       const res = await fetch('/api/merge-train/auto-merge');
       if (!res.ok) return {};
-      const json = (await res.json()) as { issues?: Array<{ issueId: string; autoMerge: boolean | null }> };
+      const json = (await res.json()) as { issues?: Array<{ issueId: string; autoMerge: boolean }> };
       return Object.fromEntries(
-        (json.issues ?? [])
-          .filter((entry) => typeof entry.autoMerge === 'boolean')
-          .map((entry) => [entry.issueId.toUpperCase(), entry.autoMerge as boolean]),
+        (json.issues ?? []).map((entry) => [entry.issueId.toUpperCase(), entry.autoMerge]),
       );
     },
     staleTime: 15_000,
@@ -56,27 +36,9 @@ export function useAutoMergePolicy(issueId: string): boolean | undefined {
   return useAutoMergePolicyMap()[issueId.toUpperCase()];
 }
 
-/**
- * The global "Require UAT before merge" setting — what the `default` (unset)
- * state resolves to. Cached/shared across every toggle via react-query.
- */
-function useRequireUatDefault(): boolean | undefined {
-  const { data } = useQuery({
-    queryKey: ['merge-train', 'config', 'require-uat'],
-    queryFn: async (): Promise<boolean | undefined> => {
-      const res = await fetch('/api/merge-train/config');
-      if (!res.ok) return undefined;
-      const json = (await res.json()) as { require_uat_before_merge?: unknown };
-      return Boolean(json.require_uat_before_merge);
-    },
-    staleTime: 30_000,
-  });
-  return data;
-}
-
 export interface AutoMergeToggleProps {
   issueId: string;
-  /** 'segmented' = Auto/Hold pair (slide-out, Awaiting Merge); 'badge' = single click-to-flip chip (pipeline rows). */
+  /** 'segmented' = Auto/Hold pair (slide-out, Awaiting Merge); 'badge' = single chip (pipeline rows). */
   variant?: 'segmented' | 'badge';
   /** Compact reduces padding/icon size for dense rows. */
   compact?: boolean;
@@ -89,90 +51,52 @@ export function AutoMergeToggle({
   compact = false,
   className = '',
 }: AutoMergeToggleProps) {
-  const [busy, setBusy] = useState(false);
-  const queryClient = useQueryClient();
   const autoMerge = useAutoMergePolicy(issueId);
-  const requireUatDefault = useRequireUatDefault();
-  const defaultResolvesTo =
-    requireUatDefault === undefined ? 'the project default'
-      : requireUatDefault ? 'hold for UAT'
-        : 'auto-merge';
-
-  const set = async (next: boolean) => {
-    if (busy || autoMerge === next) return;
-    setBusy(true);
-    try {
-      await postAutoMerge(issueId, next);
-      await queryClient.invalidateQueries({ queryKey: AUTO_MERGE_POLICY_KEY });
-      capture('auto_merge_toggled', { auto_merge: next, variant });
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update auto-merge');
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const iconSize = compact ? 'w-3 h-3' : 'w-3.5 h-3.5';
+  const title = autoMerge === undefined
+    ? 'Not routed yet — the issue has no open pull request.'
+    : autoMerge
+      ? 'Auto-merge — the train ships this when it is green. Set by the project default.'
+      : 'Hold for UAT — waits for a human batch review. Set by the project default.';
 
   if (variant === 'badge') {
-    const isAuto = autoMerge === true;
-    const next = !isAuto; // undefined/false → set auto; true → set hold
-    const label = isAuto ? 'auto' : autoMerge === false ? 'hold' : 'default';
-    const tone = isAuto
+    const tone = autoMerge === true
       ? 'text-primary bg-primary/[0.08] border-primary/[0.32]'
       : autoMerge === false
         ? 'text-warning-foreground bg-warning/[0.08] border-warning/[0.32]'
         : 'text-muted-foreground bg-transparent border-border';
     return (
-      <button
-        type="button"
-        disabled={busy}
-        onClick={(e) => { e.stopPropagation(); void set(next); }}
-        title={
-          isAuto ? 'Auto-merge ON — click to hold for UAT'
-            : autoMerge === false ? 'Holding for UAT — click to auto-merge'
-              : `Follows the global default (currently: ${defaultResolvesTo}) — click to set Auto`
-        }
-        className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold transition disabled:opacity-50 hover:brightness-110 ${tone} ${className}`}
+      <span
+        data-testid="auto-merge-badge"
+        title={title}
+        className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold ${tone} ${className}`}
       >
-        {isAuto ? <Zap className={iconSize} /> : <Lock className={iconSize} />}
-        {label}
-      </button>
+        {autoMerge ? <Zap className={iconSize} /> : <Lock className={iconSize} />}
+        {autoMerge === true ? 'auto' : autoMerge === false ? 'hold' : 'default'}
+      </span>
     );
   }
 
-  // segmented
   const seg = (active: boolean, tone: string) =>
-    `inline-flex items-center gap-1.5 ${compact ? 'px-2 py-1' : 'px-2.5 py-1.5'} text-xs font-semibold transition disabled:opacity-50 ` +
-    (active ? tone : 'text-muted-foreground hover:text-foreground hover:bg-accent/40');
+    `inline-flex items-center gap-1.5 ${compact ? 'px-2 py-1' : 'px-2.5 py-1.5'} text-xs font-semibold ` +
+    (active ? tone : 'text-muted-foreground');
 
   return (
     <div
       role="group"
       aria-label="Auto-merge policy"
-      title={autoMerge === undefined ? `Default follows the global setting (currently: ${defaultResolvesTo})` : undefined}
+      title={title}
       className={`inline-flex overflow-hidden rounded-lg border border-border bg-background ${className}`}
     >
-      <button
-        type="button"
-        disabled={busy}
-        aria-pressed={autoMerge === true}
-        onClick={(e) => { e.stopPropagation(); void set(true); }}
-        className={seg(autoMerge === true, 'text-primary bg-primary/[0.08]')}
-        title="Auto-merge — ride the train, ship when green"
-      >
+      <span aria-pressed={autoMerge === true} className={seg(autoMerge === true, 'text-primary bg-primary/[0.08]')}>
         <Zap className={iconSize} /> Auto
-      </button>
-      <button
-        type="button"
-        disabled={busy}
+      </span>
+      <span
         aria-pressed={autoMerge === false}
-        onClick={(e) => { e.stopPropagation(); void set(false); }}
         className={`border-l border-border ${seg(autoMerge === false, 'text-warning-foreground bg-warning/[0.08]')}`}
-        title="Hold for UAT — wait for human batch review"
       >
         <Lock className={iconSize} /> Hold
-      </button>
+      </span>
     </div>
   );
 }

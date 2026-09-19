@@ -67,7 +67,6 @@ export const PAN_COMMANDS: PanCommandEntry[] = [
   { name: 'pan recover [id]', description: 'Re-attach to an orphaned agent tmux session', group: 'Agents', keywords: ['attach', 'orphan'] },
   { name: 'pan sync-main <id>', description: 'Merge latest main into the feature branch for an active workspace', group: 'Agents', keywords: ['rebase', 'merge', 'main'] },
   { name: 'pan done <id>', description: 'Mark work complete and signal the review pipeline', group: 'Agents', keywords: ['complete', 'finish'] },
-  { name: 'pan reset-to-planned <id>', description: 'Return an issue to post-planning while preserving its workspace and branch', group: 'Agents', keywords: ['reset', 'planned', 'restart'] },
   { name: 'pan wipe <id>', description: 'Destructive reset to Todo (removes workspace, branches, tasks, status)', group: 'Agents', keywords: ['destroy', 'reset', 'danger'] },
 
   // Review pipeline

@@ -74,10 +74,8 @@ function jsonlMessage(role: string, text: string): string {
 }
 
 describe('palette conversation search', () => {
-  it('offers reset-to-planned in the command palette', () => {
-    expect(PAN_COMMANDS).toContainEqual(expect.objectContaining({
-      name: 'pan reset-to-planned <id>',
-    }));
+  it('no longer offers the deleted reset-to-planned verb (PAN-3917)', () => {
+    expect(PAN_COMMANDS.some((c) => c.name.startsWith('pan reset-to-planned'))).toBe(false);
   });
 
   beforeEach(() => {

@@ -12,7 +12,6 @@ import { httpHandler } from './http-handler.js';
  *   POST /api/issues/:id/complete-planning
  *   POST /api/issues/:id/abort
  *   POST /api/issues/:id/reset
- *   POST /api/issues/:id/reset-to-planned
  *   POST /api/issues/:id/cancel
  *   POST /api/issues/:id/reopen
  *   POST /api/issues/:id/move-status
@@ -258,36 +257,6 @@ const getIssuesRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: GET /api/issues/:id/ship-log ─────────────────────────────────────
-// PAN-2487: live Ship-phase progress — door steps + quality-gate lines for the
-// cockpit's Ship panel (the merge runs server-side; no agent session to open).
-const getIssueShipLogRoute = HttpRouter.add(
-  'GET',
-  '/api/issues/:id/ship-log',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) {
-      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
-    }
-    return yield* Effect.promise(async () => {
-      const { getShipLog } = await import('../../../lib/cloister/ship-log.js');
-      const { getDerivedIssueState } = await import('../services/derived-issue-state.js');
-      const log = getShipLog(id);
-      // PAN-3917 FR-6: the merge position is derived from the forge, not a
-      // stored mergeStatus. `mergeStep` had no owner and is gone; the door
-      // steps the panel renders come from the ship log itself.
-      const derived = await getDerivedIssueState(id);
-      return jsonResponse({
-        issueId: id.toUpperCase(),
-        state: derived.state,
-        ...(derived.pr ? { pr: derived.pr } : {}),
-        log,
-      });
-    });
-  })),
-);
-
 // ─── Route: GET /api/issues/:id/verification ─────────────────────────────────
 // PAN-2665: the Test/Lint tree node's live view — the per-workspace
 // verification artifact (written incrementally while gates run), polled by the
@@ -442,25 +411,6 @@ const postIssueResetRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
 
     return yield* resetIssueTransition({ id, body, eventStore });
-  })),
-);
-
-const postIssueResetToPlannedRoute = HttpRouter.add(
-  'POST',
-  '/api/issues/:id/reset-to-planned',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const id = params['id'] ?? '';
-    if (!parseIssueIdSync(id)) return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
-    try {
-      const invocation = panCliInvocation(['reset-to-planned', id]);
-      const { stdout } = yield* Effect.promise(() => execFileAsync(invocation.command, invocation.args, { encoding: 'utf8' }));
-      invalidateAgentsCache();
-      return jsonResponse({ success: true, message: stdout.trim() });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return jsonResponse({ error: message }, { status: 500 });
-    }
   })),
 );
 
@@ -905,7 +855,6 @@ const getIssueResourceDetailsRoute = HttpRouter.add(
 
 export const issuesRouteLayer = Layer.mergeAll(
   getIssuesRoute,
-  getIssueShipLogRoute,
   getIssueVerificationRoute,
   postIssueCloseRoute,
   postIssueStartPlanningRoute,
@@ -913,7 +862,6 @@ export const issuesRouteLayer = Layer.mergeAll(
   postIssueCompletePlanningRoute,
   postIssueAbortRoute,
   postIssueResetRoute,
-  postIssueResetToPlannedRoute,
   postIssueCancelRoute,
   postIssueReopenRoute,
   postIssueRestartFromPlanRoute,
