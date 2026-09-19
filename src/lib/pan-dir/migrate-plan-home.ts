@@ -48,9 +48,6 @@ const WHOLE_DIRS = ['orders', 'notes'] as const;
 /** Single files copied wholesale, relative to both roots. */
 const WHOLE_FILES = [join('backlog', 'sequence.md')] as const;
 
-/** Legacy status values mapped onto their `.pan/continues` item-status equivalent. */
-const STATUS_VALUE_MAP: Record<string, string> = { completed: 'done' };
-
 /** An item's migrated state carries where it came from, alongside the shared shape. */
 type MigratedItemState = ContinueItemState & { migratedFrom?: string };
 
@@ -155,10 +152,6 @@ function readRecordStatusOverrides(stateRoot: string, issueId: string): Record<s
   return Object.keys(out).length > 0 ? out : null;
 }
 
-function mapOverrideStatus(status: string): string {
-  return STATUS_VALUE_MAP[status] ?? status;
-}
-
 /** Deep structural equality for plain JSON values (objects/arrays/primitives). */
 function deepEqual(a: unknown, b: unknown): boolean {
   if (a === b) return true;
@@ -191,9 +184,13 @@ function mergeItems(
 ): Record<string, MigratedItemState> {
   const next: Record<string, MigratedItemState> = { ...(base ?? {}) };
   for (const [key, rawStatus] of Object.entries(overrides)) {
+    // The status is carried verbatim: the xBRIEF item-status union is the
+    // destination vocabulary (`completed`, `in_progress`, …), and translating
+    // `completed` to anything else makes the item invisible to the overlay and
+    // the DAG.
     next[key] = {
       ...(base?.[key] ?? {}),
-      status: mapOverrideStatus(rawStatus),
+      status: rawStatus,
       migratedFrom: 'records.statusOverrides',
     };
   }
@@ -306,11 +303,21 @@ export async function migratePanHome(options: MigratePanHomeOptions): Promise<Mi
 
   let committed = false;
   if (options.commit && !dryRun && copied.length > 0) {
+    // Only the copied artifacts: the operator's own staged work stays staged
+    // and stays out of the migration commit.
     const addPaths = copied.map((rel) => join('.pan', rel));
     await execFileAsync('git', ['add', '--', ...addPaths], { cwd: planHome });
-    const { stdout } = await execFileAsync('git', ['diff', '--cached', '--name-only'], { cwd: planHome });
+    const { stdout } = await execFileAsync(
+      'git',
+      ['diff', '--cached', '--name-only', '--', ...addPaths],
+      { cwd: planHome },
+    );
     if (stdout.trim().length > 0) {
-      await execFileAsync('git', ['commit', '-m', MIGRATION_COMMIT_SUBJECT], { cwd: planHome });
+      await execFileAsync(
+        'git',
+        ['commit', '--only', '-m', MIGRATION_COMMIT_SUBJECT, '--', ...addPaths],
+        { cwd: planHome },
+      );
       committed = true;
     }
   }
