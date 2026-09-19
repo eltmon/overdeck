@@ -169,7 +169,6 @@ export function buildRealConflictGateDeps(overrides: RealConflictGateDepsOverrid
         }
       }
 
-      lastResolverDispatchMs.set(input.issueId.toUpperCase(), now().getTime());
       emitActivity({
         source: 'review',
         level: 'info',
@@ -218,6 +217,9 @@ export async function resolveConflictGate(
       blockerSummary,
       reason,
     }) ?? 'dispatched';
+    // The throttle is read here, so it is stamped here — an injected
+    // dispatcher gets the same one-per-window behaviour as the real one.
+    lastResolverDispatchMs.set(issueId.toUpperCase(), checkedAtMs);
   } else {
     resolverDispatchState = 'throttled';
     deps.log?.(`[conflict-gate] ${issueId}: conflict resolver dispatch is throttled`);

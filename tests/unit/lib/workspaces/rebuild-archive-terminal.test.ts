@@ -11,7 +11,6 @@ import { archiveTerminalIssueWorkspaces } from '../../../../src/lib/workspaces/r
 import { resolveTerminalIssueIds } from '../../../../src/lib/overdeck/terminal-issues.js';
 import { getWorkspaceById, listWorkspaces } from '../../../../src/lib/workspaces/resolver.js';
 import { createWorkspace, upsertProjectFromConfig } from '../../../../src/lib/workspaces/writer.js';
-import { closeDatabase } from '../../../../src/lib/database/index.js';
 import { closeMemoryFtsDatabases } from '../../../../src/lib/memory/fts-db.js';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../helpers/overdeck-test-db.js';
 
@@ -41,7 +40,6 @@ beforeEach(() => {
 
 afterEach(() => {
   closeMemoryFtsDatabases();
-  closeDatabase();
   teardownOverdeckTestDb(odb);
   rmSync(workspaceDir, { recursive: true, force: true });
   vi.restoreAllMocks();

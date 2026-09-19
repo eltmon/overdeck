@@ -10,7 +10,7 @@ import {
   type ExecRunner,
   type ResolveConflictGateDeps,
 } from '../../../../src/lib/cloister/conflict-gate.js';
-import type { BlockerReason, ReviewStatus } from '../../../../src/lib/review-status.js';
+import { emptyPrFacts, type PrFacts } from '../../../../src/lib/cloister/pr-facts.js';
 
 function makeRunner(results: Array<{ stdout?: string; stderr?: string } | Error>): ExecRunner {
   return vi.fn(async () => {
@@ -25,45 +25,24 @@ function commandError(message: string, fields: { code?: number; stdout?: string;
   return Object.assign(new Error(message), fields);
 }
 
-const mergeBlocker: BlockerReason = {
-  type: 'merge_conflict',
-  summary: 'Branch has conflicts',
-  detectedAt: '2026-06-11T08:00:00.000Z',
-};
-
-const nonMergeBlocker: BlockerReason = {
-  type: 'failing_checks',
-  summary: 'CI failed',
-  detectedAt: '2026-06-11T08:00:00.000Z',
-};
-
-function makeStatus(overrides: Partial<ReviewStatus> = {}): ReviewStatus {
-  return {
-    issueId: 'PAN-1765',
-    reviewStatus: 'pending',
-    testStatus: 'pending',
-    updatedAt: '2026-06-11T08:00:00.000Z',
-    readyForMerge: false,
-    ...overrides,
-  };
+/** A PR the forge says cannot merge — what the gate now keys off. */
+function blockedFacts(issueId = 'PAN-1765'): PrFacts {
+  return { ...emptyPrFacts(issueId), exists: true, open: true, mergeable: false, mergeableState: 'dirty' };
 }
 
-function makeGateDeps(status: ReviewStatus | null, mergeability: 'clean' | 'conflicts' | 'unknown'): ResolveConflictGateDeps & {
+/** A PR the forge says is fine to merge; the gate must not probe at all. */
+function mergeableFacts(issueId = 'PAN-1765'): PrFacts {
+  return { ...emptyPrFacts(issueId), exists: true, open: true, mergeable: true, checks: 'red' };
+}
+
+function makeGateDeps(facts: PrFacts, mergeability: 'clean' | 'conflicts' | 'unknown'): ResolveConflictGateDeps & {
   probeMergeability: ReturnType<typeof vi.fn>;
   dispatchResolver: ReturnType<typeof vi.fn>;
-  setReviewStatus: ReturnType<typeof vi.fn>;
 } {
   return {
-    getReviewStatus: () => status,
-    setReviewStatus: vi.fn((_issueId: string, update: Partial<ReviewStatus>) => {
-      if (status) Object.assign(status, update);
-      return status ?? makeStatus(update);
-    }),
+    getFacts: () => facts,
     probeMergeability: vi.fn(() => mergeability),
-    dispatchResolver: vi.fn(() => {
-      if (status) status.conflictResolutionDispatchedAt = new Date().toISOString();
-      return 'dispatched';
-    }),
+    dispatchResolver: vi.fn(() => 'dispatched'),
     now: () => new Date(),
   };
 }
@@ -250,9 +229,8 @@ describe('resolveConflictGate', () => {
     __resetConflictGateProbeCacheForTests();
   });
 
-  it('does not gate or probe statuses without merge blockers', async () => {
-    const status = makeStatus({ blockerReasons: [nonMergeBlocker] });
-    const deps = makeGateDeps(status, 'conflicts');
+  it('does not gate or probe a PR the forge calls mergeable', async () => {
+    const deps = makeGateDeps(mergeableFacts(), 'conflicts');
 
     await expect(resolveConflictGate('PAN-1765', '/workspace', 'main', deps)).resolves.toEqual({ gated: false });
 
@@ -260,26 +238,19 @@ describe('resolveConflictGate', () => {
     expect(deps.dispatchResolver).not.toHaveBeenCalled();
   });
 
-  it('clears stale merge blockers when the branch now merges cleanly', async () => {
-    const status = makeStatus({ blockerReasons: [mergeBlocker, nonMergeBlocker] });
-    const deps = makeGateDeps(status, 'clean');
+  it('lets review proceed when a local probe is cleaner than the forge snapshot', async () => {
+    const deps = makeGateDeps(blockedFacts(), 'clean');
 
     await expect(resolveConflictGate('PAN-1765', '/workspace', 'main', deps)).resolves.toEqual({
       gated: false,
       clearedStaleBlocker: true,
     });
 
-    expect(deps.setReviewStatus).toHaveBeenCalledWith(
-      'PAN-1765',
-      { blockerReasons: [nonMergeBlocker] },
-      status,
-    );
     expect(deps.dispatchResolver).not.toHaveBeenCalled();
   });
 
   it('gates and dispatches a resolver once for a real conflict within the throttle window', async () => {
-    const status = makeStatus({ blockerReasons: [mergeBlocker] });
-    const deps = makeGateDeps(status, 'conflicts');
+    const deps = makeGateDeps(blockedFacts(), 'conflicts');
 
     await expect(resolveConflictGate('PAN-1765', '/workspace', 'main', deps)).resolves.toMatchObject({
       gated: true,
@@ -294,25 +265,22 @@ describe('resolveConflictGate', () => {
 
     expect(deps.dispatchResolver).toHaveBeenCalledTimes(1);
   });
-  it('does not let an old dispatch timestamp throttle a newer blocker instance', async () => {
-    const status = makeStatus({
-      blockerReasons: [{ ...mergeBlocker, detectedAt: '2026-06-11T08:20:00.000Z' }],
-      conflictResolutionDispatchedAt: '2026-06-11T08:10:00.000Z',
-    });
-    const deps = makeGateDeps(status, 'conflicts');
+  it('re-arms the dispatch throttle once its window elapses', async () => {
+    const deps = makeGateDeps(blockedFacts(), 'conflicts');
 
+    await resolveConflictGate('PAN-1765', '/workspace', 'main', deps);
+    vi.advanceTimersByTime(31 * 60 * 1000);
+    __resetConflictGateProbeCacheForTests.length; // keep the probe cache API referenced
     await expect(resolveConflictGate('PAN-1765', '/workspace', 'main', deps)).resolves.toMatchObject({
       gated: true,
       resolverDispatchState: 'dispatched',
     });
 
-    expect(deps.dispatchResolver).toHaveBeenCalledTimes(1);
+    expect(deps.dispatchResolver).toHaveBeenCalledTimes(2);
   });
 
-
   it('gates unknown probe results without throwing and still dispatches', async () => {
-    const status = makeStatus({ blockerReasons: [mergeBlocker] });
-    const deps = makeGateDeps(status, 'unknown');
+    const deps = makeGateDeps(blockedFacts(), 'unknown');
 
     await expect(resolveConflictGate('PAN-1765', '/workspace', 'main', deps)).resolves.toMatchObject({
       gated: true,
@@ -324,8 +292,7 @@ describe('resolveConflictGate', () => {
   });
 
   it('caches probe results per issue for about three minutes', async () => {
-    const status = makeStatus({ blockerReasons: [mergeBlocker] });
-    const deps = makeGateDeps(status, 'conflicts');
+    const deps = makeGateDeps(blockedFacts(), 'conflicts');
 
     await resolveConflictGate('PAN-1765', '/workspace', 'main', deps);
     vi.advanceTimersByTime(2 * 60 * 1000);
@@ -337,9 +304,8 @@ describe('resolveConflictGate', () => {
   });
 
   it('deduplicates concurrent probe calls for the same issue', async () => {
-    const status = makeStatus({ blockerReasons: [mergeBlocker] });
     let callCount = 0;
-    const deps = makeGateDeps(status, 'conflicts');
+    const deps = makeGateDeps(blockedFacts(), 'conflicts');
     deps.probeMergeability.mockImplementation(async () => {
       callCount += 1;
       await new Promise<void>((resolve) => setTimeout(resolve, 1000));
@@ -358,12 +324,10 @@ describe('resolveConflictGate', () => {
   });
 
   it('caps the probe cache at 256 entries and evicts oldest first', async () => {
-    const baseStatus = makeStatus({ blockerReasons: [mergeBlocker] });
     let counter = 0;
 
     for (let i = 0; i < 260; i += 1) {
-      const status = { ...baseStatus, issueId: `PAN-${1000 + i}` };
-      const deps = makeGateDeps(status, 'conflicts');
+      const deps = makeGateDeps(blockedFacts(`PAN-${1000 + i}`), 'conflicts');
       deps.probeMergeability.mockImplementation(async () => {
         counter += 1;
         return 'conflicts';
@@ -375,8 +339,7 @@ describe('resolveConflictGate', () => {
     expect(counter).toBe(260);
 
     // Re-probe the oldest issue: cache miss means a new probe.
-    const oldestStatus = { ...baseStatus, issueId: 'PAN-1000' };
-    const oldestDeps = makeGateDeps(oldestStatus, 'conflicts');
+    const oldestDeps = makeGateDeps(blockedFacts('PAN-1000'), 'conflicts');
     let oldestReprobed = false;
     oldestDeps.probeMergeability.mockImplementation(async () => {
       oldestReprobed = true;
@@ -386,8 +349,7 @@ describe('resolveConflictGate', () => {
     expect(oldestReprobed).toBe(true);
 
     // Re-probe the most recent issue within the cache window: cache hit.
-    const newestStatus = { ...baseStatus, issueId: 'PAN-1259' };
-    const newestDeps = makeGateDeps(newestStatus, 'conflicts');
+    const newestDeps = makeGateDeps(blockedFacts('PAN-1259'), 'conflicts');
     let newestReprobed = false;
     newestDeps.probeMergeability.mockImplementation(async () => {
       newestReprobed = true;
@@ -410,20 +372,18 @@ describe('buildRealConflictGateDeps', () => {
 
   it('dispatches a work-role resolver with sanctioned main-sync and review-request instructions', async () => {
     const spawnRun = vi.fn(async () => ({} as never));
-    const setReviewStatus = vi.fn();
     const emitActivityEntry = vi.fn();
     const deps = buildRealConflictGateDeps({
       spawnRun,
-      setReviewStatus,
       emitActivityEntry,
-      getReviewStatus: () => makeStatus({ blockerReasons: [mergeBlocker] }),
+      getFacts: () => blockedFacts(),
     });
 
     await deps.dispatchResolver({
       issueId: 'PAN-1765',
       workspacePath: '/workspace',
       targetBranch: 'main',
-      blockerReasons: [mergeBlocker],
+      blockerSummary: 'forge reports merge state `dirty`',
       reason: 'merge conflict with main must be resolved before review dispatch',
     });
 
@@ -437,11 +397,6 @@ describe('buildRealConflictGateDeps', () => {
     expect(prompt).toContain('pan done or pan review request');
     expect(prompt).not.toContain('Rebase this branch');
     expect(prompt).not.toContain('--force-with-lease');
-    expect(setReviewStatus).toHaveBeenCalledWith(
-      'PAN-1765',
-      { conflictResolutionDispatchedAt: '2026-06-11T08:45:00.000Z' },
-      expect.objectContaining({ issueId: 'PAN-1765' }),
-    );
     expect(emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
       source: 'review',
       message: 'Review deferred — conflict resolver dispatched for PAN-1765',
@@ -453,21 +408,19 @@ describe('buildRealConflictGateDeps', () => {
       throw new Error("Role run agent already running. Use 'pan tell' to message it.");
     });
     const messageAgent = vi.fn().mockResolvedValue(undefined);
-    const setReviewStatus = vi.fn();
     const emitActivityEntry = vi.fn();
     const deps = buildRealConflictGateDeps({
       spawnRun,
       messageAgent,
-      setReviewStatus,
       emitActivityEntry,
-      getReviewStatus: () => makeStatus({ blockerReasons: [mergeBlocker] }),
+      getFacts: () => blockedFacts(),
     });
 
     await expect(deps.dispatchResolver({
       issueId: 'PAN-1765',
       workspacePath: '/workspace',
       targetBranch: 'main',
-      blockerReasons: [mergeBlocker],
+      blockerSummary: 'forge reports merge state `dirty`',
       reason: 'merge conflict with main must be resolved before review dispatch',
     })).resolves.toBe('already_running');
 
@@ -475,11 +428,6 @@ describe('buildRealConflictGateDeps', () => {
       'agent-pan-1765',
       expect.stringContaining('pan sync-main PAN-1765'),
       'conflict-gate',
-    );
-    expect(setReviewStatus).toHaveBeenCalledWith(
-      'PAN-1765',
-      { conflictResolutionDispatchedAt: '2026-06-11T08:45:00.000Z' },
-      expect.objectContaining({ issueId: 'PAN-1765' }),
     );
     expect(emitActivityEntry).toHaveBeenCalledWith(expect.objectContaining({
       source: 'review',
@@ -505,8 +453,7 @@ describe('getCachedConflictGateMergeability', () => {
   });
 
   it('returns the cached result after resolveConflictGate populates the cache', async () => {
-    const status = makeStatus({ blockerReasons: [mergeBlocker] });
-    const deps = makeGateDeps(status, 'conflicts');
+    const deps = makeGateDeps(blockedFacts(), 'conflicts');
 
     await resolveConflictGate('PAN-1765', '/workspace', 'main', deps);
 
@@ -514,8 +461,7 @@ describe('getCachedConflictGateMergeability', () => {
   });
 
   it('returns clean when the cached probe is clean', async () => {
-    const status = makeStatus({ blockerReasons: [mergeBlocker] });
-    const deps = makeGateDeps(status, 'clean');
+    const deps = makeGateDeps(blockedFacts(), 'clean');
 
     await resolveConflictGate('PAN-1765', '/workspace', 'main', deps);
 
@@ -523,8 +469,7 @@ describe('getCachedConflictGateMergeability', () => {
   });
 
   it('returns undefined when the cached probe has expired', async () => {
-    const status = makeStatus({ blockerReasons: [mergeBlocker] });
-    const deps = makeGateDeps(status, 'conflicts');
+    const deps = makeGateDeps(blockedFacts(), 'conflicts');
 
     await resolveConflictGate('PAN-1765', '/workspace', 'main', deps);
     vi.advanceTimersByTime(3 * 60 * 1000 + 1);
@@ -533,8 +478,7 @@ describe('getCachedConflictGateMergeability', () => {
   });
 
   it('is case-insensitive for issue id cache keys', async () => {
-    const status = makeStatus({ blockerReasons: [mergeBlocker] });
-    const deps = makeGateDeps(status, 'conflicts');
+    const deps = makeGateDeps(blockedFacts(), 'conflicts');
 
     await resolveConflictGate('pan-1765', '/workspace', 'main', deps);
 

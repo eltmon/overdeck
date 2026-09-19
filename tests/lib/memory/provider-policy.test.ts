@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { closeDatabase, resetDatabase } from '../../../src/lib/database/index.js';
 import { insertCostEventSync } from '../../../src/lib/overdeck/cost-sync.js';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../helpers/overdeck-test-db.js';
 import {
@@ -31,14 +30,12 @@ let odb: OverdeckTestDb;
 
 beforeEach(async () => {
   originalHome = process.env.OVERDECK_HOME;
-  resetDatabase();
   // setupOverdeckTestDb creates a fresh OVERDECK_HOME with overdeck.db.
   odb = setupOverdeckTestDb();
   tempDir = odb.home;
 });
 
 afterEach(async () => {
-  closeDatabase();
   teardownOverdeckTestDb(odb);
   if (originalHome === undefined) delete process.env.OVERDECK_HOME;
   else process.env.OVERDECK_HOME = originalHome;
