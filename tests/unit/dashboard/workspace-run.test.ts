@@ -57,6 +57,10 @@ vi.mock('../../../src/lib/projects.js', () => ({
 }));
 
 vi.mock('../../../src/lib/tmux.js', () => ({
+  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listPaneValuesSync: () => [],
   createSession: routeMocks.createSession,
   sessionExists: routeMocks.sessionExists,
 }));

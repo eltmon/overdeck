@@ -13,9 +13,16 @@ vi.mock('../../../../../src/lib/projects.js', () => ({
   listProjectsSync: vi.fn(),
   resolveProjectFromIssue: vi.fn(() => ({ projectKey: 'overdeck' })),
   resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'overdeck' })),
+  // PAN-3917 (W6): the derived issue state resolves the owning project from a
+  // path before it asks the forge; unregistered here, so it never asks.
+  findProjectByPathSync: vi.fn(() => null),
 }));
 
 vi.mock('../../../../../src/lib/tmux.js', () => ({
+  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listPaneValuesSync: () => [],
   listSessionNames: vi.fn(),
   capturePane: vi.fn(() => Effect.succeed('')),
 }));
@@ -40,6 +47,12 @@ vi.mock('../../../../../src/lib/cloister/specialists.js', () => ({
 
 vi.mock('../../../../../src/dashboard/server/routes/jsonl-resolver.js', () => ({
   resolveJsonlPath: vi.fn(async () => null),
+}));
+
+// PAN-3917 (W6): the session tree reads each issue's state from the forge,
+// which shells out to gh/git. There is no forge here — answer `working`.
+vi.mock('../../../../../src/dashboard/server/services/derived-issue-state.js', () => ({
+  getDerivedIssueState: vi.fn(async (issueId: string) => ({ issueId, state: 'working' })),
 }));
 
 vi.mock('../../../../../src/dashboard/server/routes/reviewer-tree.js', () => ({
@@ -405,39 +418,9 @@ describe('fetchProjectSessionTree', () => {
     expect(resolveJsonlPath).not.toHaveBeenCalledWith('agent-pan-3020-ship', expect.any(String));
   });
 
-  it('retains a historical ship conversation when its transcript resolves', async () => {
-    (listProjectsSync as any).mockReturnValue([
-      {
-        key: 'overdeck',
-        config: { name: 'overdeck', path: '/tmp/overdeck', workspace: { workspaces_dir: 'workspaces' } },
-      },
-    ]);
-    (listSessionNames as any).mockReturnValue(Effect.succeed([]));
-    mockAgentStates.set('agent-pan-3020-ship', agentState({
-      id: 'agent-pan-3020-ship',
-      issueId: 'PAN-3020',
-      role: 'ship',
-      model: 'claude-sonnet-5',
-      status: 'stopped',
-      workspace: '/tmp/overdeck/workspaces/feature-pan-3020',
-    }));
-    (resolveJsonlPath as any).mockImplementation(async (agentId: string) => (
-      agentId === 'agent-pan-3020-ship' ? '/tmp/ship.jsonl' : null
-    ));
-    mockAccess(new Set([
-      '/tmp/overdeck/workspaces',
-      '/tmp/overdeck/workspaces/feature-pan-3020/.overdeck',
-    ]));
-    mockWorkspaceReaddir([{ name: 'feature-pan-3020', isDirectory: () => true, isFile: () => false }]);
-
-    const result = await fetchProjectSessionTree('overdeck');
-
-    const tree = result as { features: Array<{ sessions: Array<{ sessionId: string; type: string; hasJsonl?: boolean }> }> };
-    expect(tree.features[0]?.sessions.find((session) => session.sessionId === 'agent-pan-3020-ship')).toMatchObject({
-      type: 'ship',
-      hasJsonl: true,
-    });
-  });
+  // PAN-3917: a ship node is emitted only for a merge run this process is
+  // executing (the test above). There is no ship record left to resurrect a
+  // historical ship conversation from, so that case is gone with the record.
 
   it('leaves endedAt undefined for a live planning session and marks planningComplete false without a finished spec', async () => {
     (listProjectsSync as any).mockReturnValue([

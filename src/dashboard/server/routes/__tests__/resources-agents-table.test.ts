@@ -24,6 +24,10 @@ vi.mock('../../services/dashboard-poll-snapshots.js', () => ({
 }));
 
 vi.mock('../../../../lib/tmux.js', () => ({
+  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listPaneValuesSync: () => [],
   listSessions: () => Effect.succeed(mockListSessions()),
   listPaneValues: (...args: unknown[]) => Effect.succeed(mockListPaneValues(...args)),
 }));

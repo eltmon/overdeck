@@ -103,7 +103,11 @@ describe('generateConversationName', () => {
 
 describe('conversationSessionAliveFromState', () => {
   it('does not resurrect an ended conversation when its tmux wrapper still exists', () => {
-    expect(conversationSessionAliveFromState({ status: 'ended', forkStatus: null }, true)).toBe(false);
+    expect(conversationSessionAliveFromState({  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listPaneValuesSync: () => [],
+ status: 'ended', forkStatus: null }, true)).toBe(false);
   });
 
   it('keeps active non-fork conversations live when tmux is live', () => {

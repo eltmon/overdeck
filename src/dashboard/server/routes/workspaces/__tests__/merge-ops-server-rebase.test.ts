@@ -112,7 +112,11 @@ vi.mock('../../../services/derived-issue-state.js', () => ({
     pr: { url: PR_URL, number: 3102, reviewState: 'approved', checks: 'green', mergeable: true },
   })),
 }));
-vi.mock('../../../../../lib/tmux.js', () => ({ sessionExists: mocks.sessionExists }));
+vi.mock('../../../../../lib/tmux.js', () => ({  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listPaneValuesSync: () => [],
+ sessionExists: mocks.sessionExists }));
 vi.mock('../../../../../lib/forge.js', () => ({
   getForgeAdapter: vi.fn(() => ({ commentOnArtifact: vi.fn(), mergeReviewArtifact: mocks.mergeReviewArtifact })),
 }));

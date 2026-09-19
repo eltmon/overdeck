@@ -131,7 +131,11 @@ describe('waitForPiTuiReady (PAN-1793)', () => {
   });
 
   it('times out when Pi renders text but never reaches the input prompt', async () => {
-    paneSnapshots.values = Array.from({ length: 8 }, () => 'oh-my-pi starting...\nloading extensions\n');
+    paneSnapshots.values = Array.from({  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listPaneValuesSync: () => [],
+ length: 8 }, () => 'oh-my-pi starting...\nloading extensions\n');
 
     const ready = waitForPiTuiReady('conv-pi', 1000);
     await vi.advanceTimersByTimeAsync(1250);

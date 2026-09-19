@@ -6,7 +6,11 @@ const mockAppendAsync = vi.hoisted(() => vi.fn((_event: unknown) => Promise.reso
 const mockEventStore = { emitOnly: mockEmitOnly, appendAsync: mockAppendAsync }
 
 vi.mock('../../event-store.js', () => ({ getEventStore: () => mockEventStore }))
-vi.mock('../../../../lib/tmux.js', () => ({ capturePane: vi.fn() }))
+vi.mock('../../../../lib/tmux.js', () => ({  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listPaneValuesSync: () => [],
+ capturePane: vi.fn() }))
 vi.mock('../../../../lib/agents.js', () => ({ listRunningAgents: vi.fn() }))
 vi.mock('node:fs/promises', () => ({
   readFile: vi.fn(() => Promise.reject(new Error('no remote state'))),
