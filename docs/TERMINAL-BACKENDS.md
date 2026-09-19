@@ -451,3 +451,16 @@ starts on Herdr: the pane stays open, carries its identity, runs its real transp
 live agent everywhere Overdeck asks. The kickoff prompt is unaffected by the instant return —
 `deliverInitialPromptWithRetry` waits for `waitForCodexAppServerReady` (the socket plus token) before
 it delivers, exactly as on tmux.
+
+**Second run (final code), same session:** the same launcher in workspace `wK` alongside a
+deliberately exiting pane (`true`, agent id `agent-fix14-exits`):
+
+```
+agent-pan-3705-review  liveness {"kind":"alive","paneId":"wK:p2","state":"unknown"}
+                       findHerdrAgent → paneBound true
+agent-fix14-exits      liveness {"kind":"exited","paneId":"wK:p3"}   ← shell back at its prompt
+                       findHerdrAgent → null                          ← a respawn is not blocked
+                       inventory      → still listed (census stops at pane existence, by design)
+```
+
+Teardown: both panes closed, `workspace.close wK` → `{ok:true}`, no app-server host survived.
