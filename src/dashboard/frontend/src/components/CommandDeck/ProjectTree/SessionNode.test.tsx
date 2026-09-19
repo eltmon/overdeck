@@ -132,32 +132,9 @@ function makeSession(overrides?: Partial<SessionNodeType>): SessionNodeType {
   };
 }
 
-describe('SessionNode paused gate (PAN-1779)', () => {
-  it('renders paused status, reason line, and unpause control for a paused session', () => {
-    const onUnpauseSession = vi.fn();
-    render(
-      <SessionNode
-        session={makeSession({
-          sessionId: 'agent-pan-1642',
-          status: 'stopped',
-          presence: 'ended',
-          paused: true,
-          pausedReason: 'Operator drain 2026-06-10',
-          pausedAt: '2026-05-06T09:00:00.000Z',
-        })}
-        issueId="PAN-1642"
-        onUnpauseSession={onUnpauseSession}
-      />,
-    );
-
-    // No 'paused' pill — the amber icon tile + reason line + Unpause carry it.
-    expect(screen.queryByText('paused')).toBeNull();
-    expect(screen.getByText('Work').closest('button')?.querySelector('.sessionIconPaused')).toBeTruthy();
-    expect(screen.getByTestId('session-paused-reason').textContent).toContain('Operator drain 2026-06-10');
-    screen.getByTestId('session-unpause').click();
-    expect(onUnpauseSession).toHaveBeenCalledWith('agent-pan-1642');
-  });
-
+// PAN-3917: the pause gate lived on the agent record. A SessionNode is a
+// backend pane now and carries no paused state, so the row renders none.
+describe('SessionNode pause gate is gone (PAN-3917)', () => {
   it('does not render unpause control for unpaused sessions', () => {
     render(
       <SessionNode

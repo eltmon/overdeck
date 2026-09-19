@@ -141,7 +141,6 @@ export const AGENT_ROW_SECTIONS = [
   'agent-row-cost',
   'agent-row-verdict',
   'agent-row-context-menu',
-  'agent-row-paused-reason',
 ] as const;
 
 export type AgentRowSection = (typeof AGENT_ROW_SECTIONS)[number];

@@ -30,7 +30,7 @@ function findMissingMappings(commands: readonly { label: string; insert: string 
 
 describe('slash command no-loss audit', () => {
   it('maps every pre-adapter command to its portable equivalent', () => {
-    expect(PRE_ADAPTER_COMMANDS).toHaveLength(260);
+    expect(PRE_ADAPTER_COMMANDS).toHaveLength(259);
     expect(findMissingMappings(SLASH_COMMANDS)).toEqual([]);
   });
 

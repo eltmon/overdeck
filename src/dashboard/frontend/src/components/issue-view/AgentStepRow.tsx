@@ -65,7 +65,6 @@ const SECTIONS = {
   cost: AGENT_ROW_SECTIONS[6],
   verdict: AGENT_ROW_SECTIONS[7],
   contextMenu: AGENT_ROW_SECTIONS[8],
-  pausedReason: AGENT_ROW_SECTIONS[9],
 };
 
 export type AgentStepDensity = 'rail' | 'cockpit';

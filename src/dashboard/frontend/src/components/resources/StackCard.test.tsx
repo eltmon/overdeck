@@ -16,7 +16,7 @@ describe('StacksSection', () => {
 
   it('uses the same review chip label and classes as pipelineChipFor', () => {
     const expected = pipelineChipFor({ phase: 'review', feature: { id: 'PAN-1', title: 'Review stack' } as any, derived: undefined });
-    render(<StacksSection stacks={[stack('PAN-1', { phase: 'review' })]} filter="" groupBy="workspace" />);
+    render(<StacksSection stacks={[stack('PAN-1', { state: 'in-review' })]} filter="" groupBy="workspace" />);
 
     const chip = screen.getByText(expected.label);
     expect(chip).toHaveClass(expected.textClass);
@@ -63,7 +63,7 @@ function stack(issueId: string, overrides: Partial<ResourceStack> & { memoryByte
       memoryBytes,
       diskBytes: 2 * 1024 ** 3,
     },
-    phase: 'work',
+    state: 'working',
     ...overrides,
   };
 }

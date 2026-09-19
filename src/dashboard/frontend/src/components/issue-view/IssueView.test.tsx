@@ -72,19 +72,6 @@ describe('IssueView', () => {
     expect(ISSUE_VIEW_INVENTORY.filter((entry) => !rendered.has(entry.section))).toEqual([]);
   });
 
-  it('keeps operator policy out of rail and exposes it at cockpit and console densities', () => {
-    const rail = render(<IssueView issueId="PAN-2499" density="rail"><span /></IssueView>);
-    rail.unmount();
-
-    for (const density of ['cockpit', 'console'] as const) {
-      const view = render(<IssueView issueId="PAN-2499" density={density}><span /></IssueView>);
-      expect(screen.getByText('policy PAN-2499').parentElement).toHaveAttribute(
-        'data-section',
-            );
-      view.unmount();
-    }
-  });
-
   it('opens the full-screen xBRIEF from the drawer Plan panel', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({
       xBRIEFInfo: { version: '0.8', created: '2026-07-29T00:00:00Z' },

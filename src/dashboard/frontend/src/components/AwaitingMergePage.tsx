@@ -16,7 +16,6 @@ import { useDashboardStore, selectAwaitingMerge, selectBlockedFromMerge, selectO
 import { useConfirm } from './DialogProvider';
 import { AutoMergeToggle } from './AutoMergeToggle';
 import { MergePolicySection } from './merge-train/MergePolicySection';
-import { MergeQueueCard } from './merge-train/MergeQueueCard';
 import { MergeTrainSection } from './merge-train/MergeTrainSection';
 import { UatStackStatus } from './CommandDeck/UatStackStatus';
 import { fetchUatContext, fetchWorkspace, forgeApprove, forgeMerge, mergeIssue, rebuildStack, type UatContext, type WorkspaceInfo } from './awaitingMergeApi';
@@ -89,8 +88,6 @@ export function AwaitingMergePage() {
         </header>
 
         <MergeTrainSection />
-
-        <MergeQueueCard />
 
         <MergePolicySection />
 

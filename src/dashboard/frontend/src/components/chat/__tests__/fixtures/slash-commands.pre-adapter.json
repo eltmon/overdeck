@@ -148,10 +148,6 @@
     "insert": "pan kill "
   },
   {
-    "label": "pan reset-to-planned",
-    "insert": "pan reset-to-planned "
-  },
-  {
     "label": "pan pause",
     "insert": "pan pause "
   },
