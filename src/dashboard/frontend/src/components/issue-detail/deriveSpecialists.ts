@@ -87,11 +87,11 @@ export function deriveSpecialistChips(
         model: session?.model,
         hasConversation: true,
       };
-    } else if (prReviewState === 'APPROVED') {
+    } else if (prReviewState === 'approved') {
       // The convoy finished before we saw a per-role node — reflect the PR's
       // own verdict, never a phantom "queued".
       chip = { id: role, name: `review.${role}`, status: 'done', verdict: 'APPROVED', lastLine: 'approved · convoy complete', hasConversation: false };
-    } else if (prReviewState === 'CHANGES_REQUESTED') {
+    } else if (prReviewState === 'changes-requested') {
       chip = { id: role, name: `review.${role}`, status: 'failed', verdict: 'CHANGES_REQUESTED', lastLine: 'changes requested · convoy complete', hasConversation: false };
     } else {
       chip = { id: role, name: `review.${role}`, status: 'queued', verdict: null, lastLine: 'starts when the convoy slot frees', hasConversation: false };

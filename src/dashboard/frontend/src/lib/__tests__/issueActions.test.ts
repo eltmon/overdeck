@@ -97,7 +97,7 @@ function derivedState(
   return { issueId: 'PAN-1331', state, ...overrides };
 }
 
-const OPEN_PR = { url: 'https://example.test/pr/1', number: 1, reviewState: 'REVIEW_REQUIRED', checks: 'pending' as const, mergeable: true };
+const OPEN_PR = { url: 'https://example.test/pr/1', number: 1, reviewState: 'review-requested', checks: 'pending' as const, mergeable: true };
 
 const LIVE_PLAN_PANE = [{
   id: 'pane-plan', issue: 'PAN-1331', role: 'plan' as const, harness: 'claude-code', model: 'claude-opus-5', state: 'working' as const,

@@ -115,16 +115,6 @@ const COSTS_RESPONSE = {
   },
 };
 
-const REVIEW_STATUS_RESPONSE = {
-  issueId: ISSUE_ID,
-  reviewStatus: 'failed',
-  testStatus: 'failed',
-  mergeStatus: 'failed',
-  verificationStatus: 'failed',
-  readyForMerge: false,
-  updatedAt: new Date().toISOString(),
-};
-
 const WORKSPACE_RESPONSE = {
   exists: true,
   issueId: ISSUE_ID,
@@ -175,7 +165,6 @@ test.describe('PAN-865 command deck overview', () => {
     await page.route('**/api/command-deck/planning/*', route => route.fulfill({ json: PLANNING_RESPONSE }));
     await page.route('**/api/command-deck/activity/*', route => route.fulfill({ json: ACTIVITY_RESPONSE }));
     await page.route('**/api/issues/*/costs', route => route.fulfill({ json: COSTS_RESPONSE }));
-    await page.route('**/api/review/*/status', route => route.fulfill({ json: REVIEW_STATUS_RESPONSE }));
     await page.route('**/api/workspaces/*', route => route.fulfill({ json: WORKSPACE_RESPONSE }));
     await page.route('**/api/issues/*/pr/details', route => route.fulfill({ json: { ...PR_RESPONSE, diff: PR_DIFF_RESPONSE.diff } }));
     await page.route('**/api/issues/*/pr', route => route.fulfill({ json: PR_RESPONSE }));

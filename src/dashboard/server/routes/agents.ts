@@ -50,7 +50,6 @@ import {
   postAgentSuspendRoute,
   postAgentPauseRoute,
   postAgentUnpauseRoute,
-  postAgentUntroubledRoute,
 } from './agents/lifecycle-stop.js';
 import {
   postAgentResumeRoute,
@@ -127,7 +126,6 @@ export const agentsRouteLayer = Layer.mergeAll(
   postAgentSuspendRoute,
   postAgentPauseRoute,
   postAgentUnpauseRoute,
-  postAgentUntroubledRoute,
   postAgentResumeRoute,
   postAgentRecoverRoute,
   postAgentRestartRoute,

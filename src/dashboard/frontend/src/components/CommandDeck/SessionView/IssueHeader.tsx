@@ -14,7 +14,6 @@ import styles from '../styles/command-deck.module.css';
 import { useDerivedIssueState } from '../../../lib/store';
 import type { DerivedIssueState } from '../../../types';
 import { AutoMergeToggle } from '../../AutoMergeToggle';
-import { IssuePolicyStrip } from '../../IssuePolicyStrip';
 
 type PlanningStageData = Pick<PlanningSummaryResponse, 'hasPrd' | 'hasState'>;
 
@@ -266,7 +265,6 @@ export function IssueHeader({ issueId, title, url }: IssueHeaderProps) {
           {resolvedTotalCost !== null && (
             <span className={styles.issueHeaderCost} data-testid="zone-a-cost">{formatCost(resolvedTotalCost)}</span>
           )}
-          <IssuePolicyStrip issueId={issueId} />
           <AutoMergeToggle issueId={issueId} compact />
         </div>
       </div>

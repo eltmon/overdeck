@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import {
   AgentRuntimeSnapshot,
   AgentSnapshot,
-  ReviewStatusSnapshot,
   SystemHealthSnapshot,
   type AgentHealthSnapshot,
   type SpecialistLifecycle,

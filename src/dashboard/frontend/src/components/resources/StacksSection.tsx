@@ -71,7 +71,7 @@ function groupStacks(stacks: ResourceStack[], groupBy: MachineRoomGroupBy) {
   if (groupBy === 'flat') return [{ key: 'flat', label: 'All stacks', stacks }];
   const groups = new Map<string, ResourceStack[]>();
   for (const stack of stacks) {
-    const key = groupBy === 'kind' ? stack.phase : stack.issueId ?? 'unassigned';
+    const key = groupBy === 'kind' ? stack.state ?? 'no issue' : stack.issueId ?? 'unassigned';
     groups.set(key, [...(groups.get(key) ?? []), stack]);
   }
   return [...groups.entries()].map(([key, groupStacks]) => ({ key, label: key, stacks: groupStacks }));
@@ -85,7 +85,7 @@ function matchesStack(stack: ResourceStack, filter: string) {
     stack.issueId ?? '',
     stack.issueTitle,
     stack.composeProject,
-    stack.phase,
+    stack.state ?? '',
     ...stack.services.map((service) => service.name),
   ].some((value) => value.toLowerCase().includes(query));
 }

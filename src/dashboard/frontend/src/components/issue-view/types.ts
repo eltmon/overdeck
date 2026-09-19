@@ -124,7 +124,8 @@ export interface IssueShipModel {
   prUrl?: string;
   prNumber?: number;
   checks?: 'green' | 'red' | 'pending';
-  mergeable?: boolean;
+  /** `null` when the forge has not computed mergeability yet. */
+  mergeable?: boolean | null;
   blockerReason?: string;
 }
 

@@ -1300,39 +1300,11 @@ const postWorkspaceStartRoute = HttpRouter.add(
 // `verification-latest.json` plus a check run (FR-8). Nothing writes a status
 // row, so nothing needs a POST.
 
-// ─── Route: POST /api/review/:issueId/reset ───────────────────────
-
-/** HTTP-contract result from the reset-review endpoint. Exported for unit testing. */
-
-// ─── Route: POST /api/workspaces/:issueId/unstick ────────────────────────
-//
-// Clears the persistent stuck flag set by markWorkspaceStuck() so Deacon
-// resumes normal patrol for this workspace. Does NOT restart the agent —
-// the user should do that separately via the start-agent UI once they have
-// resolved the divergence (e.g. by syncing main and re-approving).
-
-/** HTTP-contract result from the unstick endpoint. Exported for unit testing. */
-
-// ─── Route: POST /api/workspaces/:issueId/deacon-ignore ──────────────────
-
-/**
- * Operator toggle: tell Deacon to stop patrolling this issue. Body:
- *   { ignored: boolean, reason?: string }
- *
- * Idempotent — calling with ignored=true repeatedly refreshes the timestamp
- * but otherwise no-ops. Separate from stuck/unstick: stuck is a system-set
- * failure marker, deaconIgnored is an explicit human "hands off".
- */
-
-// ─── Route: POST /api/workspaces/:issueId/auto-merge ─────────────────────
-
-/**
- * PAN-1691: operator toggle for the per-issue auto-merge routing key. Body:
- *   { autoMerge: boolean | null }
- * `true` = auto-merge (fast lane), `false` = hold for UAT (manual lane),
- * `null` = clear back to the project default. Emits status_changed via the
- * setAutoMerge wrapper so open dashboards reflect the toggle live.
- */
+// PAN-3917: `POST /api/review/:issueId/reset`, `POST /api/workspaces/:issueId/unstick`,
+// `.../deacon-ignore` and `.../auto-merge` are deleted with the flags they wrote.
+// Review cycles, stuck markers, Deacon patrol opt-outs and the per-issue auto-merge
+// routing key were all stored status; the train now gates on the project default and
+// the global require-UAT setting, and a stuck workspace is whatever git and the PR say.
 
 // ─── Route: POST /api/workspaces/:issueId/refresh-token ───────────────────────
 

@@ -97,7 +97,7 @@ export function HappenedFeed({ issueId }: { issueId: string }) {
       })
     }
   }
-  if (issue?.pr?.reviewState === 'APPROVED') lines.push({ at: '', atMs: Number.MAX_SAFE_INTEGER - 2, text: 'The reviewer approved the work ✓', tone: 'ok' })
+  if (issue?.pr?.reviewState === 'approved') lines.push({ at: '', atMs: Number.MAX_SAFE_INTEGER - 2, text: 'The reviewer approved the work ✓', tone: 'ok' })
   if (issue?.state === 'changes-requested') lines.push({ at: '', atMs: Number.MAX_SAFE_INTEGER - 2, text: 'The reviewer asked for changes — the crew is on it', tone: 'bad' })
   if (issue?.pr?.checks === 'green') lines.push({ at: '', atMs: Number.MAX_SAFE_INTEGER - 1, text: 'All checks passed ✓', tone: 'ok' })
   if (issue?.pr?.checks === 'red') lines.push({ at: '', atMs: Number.MAX_SAFE_INTEGER - 1, text: 'Checks are failing on the PR', tone: 'bad' })

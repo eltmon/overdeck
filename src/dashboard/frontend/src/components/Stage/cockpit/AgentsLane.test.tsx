@@ -29,7 +29,7 @@ vi.mock('../../../lib/store', () => ({
   useDerivedIssueState: () => ({
     issueId: 'PAN-2842',
     state: 'in-review',
-    pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'REVIEW_REQUIRED', checks: 'green', mergeable: true },
+    pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'review-requested', checks: 'green', mergeable: true },
   }),
 }))
 

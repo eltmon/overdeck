@@ -112,7 +112,6 @@ function isPlanApprovalPending(feature: ProjectFeature): boolean {
 export function isNeedsYouFeature(feature: ProjectFeature, derived: DerivedIssueState | undefined): boolean {
   if (derived?.attention === 'needs-you') return true;
   if (derived?.state === 'ready') return true;
-  if (feature.sessions?.some(session => session.paused)) return true;
   if (feature.sessions?.some(session => session.type === 'planning' && session.awaitingInput)) return true;
   // The membership resolver distinguishes a real planned backlog from terminal
   // PRD residue and active work whose workspace continue state is unavailable.
@@ -234,7 +233,7 @@ export function sublineFor(entry: BucketedFeature): string {
 
   if (isNeedsYouFeature(feature, derived)) {
     if (derived?.state === 'ready') return 'approved and green — held for your merge';
-    if (feature.sessions?.some(session => session.paused || (session.type === 'planning' && session.awaitingInput))) {
+    if (feature.sessions?.some(session => session.type === 'planning' && session.awaitingInput)) {
       return 'waiting on your answer';
     }
     if (isPlanApprovalPending(feature)) return 'plan approval pending';

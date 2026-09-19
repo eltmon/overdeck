@@ -19,7 +19,6 @@ const mocks = vi.hoisted(() => ({
   listSessionNames: vi.fn(),
   listWorkspaces: vi.fn(),
   listConversations: vi.fn(),
-  loadReadyForMergeFlags: vi.fn(),
   openPullRequests: [] as unknown[],
   readdir: vi.fn(),
   resolveAgentGitInfo: vi.fn(),
@@ -74,6 +73,9 @@ vi.mock('../../../../../src/lib/projects.js', () => ({
 
 vi.mock('../../../../../src/lib/tmux.js', () => ({
   listSessionNames: mocks.listSessionNames,
+  // PAN-3917 FR-12: the backend inventory's tmux fallback probes panes directly.
+  listSessionsSync: () => [],
+  listPaneValuesSync: () => [],
 }));
 
 vi.mock('../../../../../src/lib/workspaces/resolver.js', () => ({
@@ -82,13 +84,6 @@ vi.mock('../../../../../src/lib/workspaces/resolver.js', () => ({
 
 vi.mock('../../../../../src/lib/runtime-census.js', () => ({
   getRuntimeCensus: mocks.getRuntimeCensus,
-}));
-
-vi.mock('../../../../../src/dashboard/server/review-status.js', () => ({
-  loadReadyForMergeFlags: mocks.loadReadyForMergeFlags,
-
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
 }));
 
 vi.mock('../../../../../src/dashboard/server/services/git-info.js', () => ({
@@ -147,7 +142,6 @@ beforeEach(() => {
     lastActivity: '2026-06-27T00:00:00.000Z',
   }));
   mocks.getGitHubConfig.mockReturnValue({ repos: [] });
-  mocks.loadReadyForMergeFlags.mockReturnValue(new Map());
   mocks.listProjectsSync.mockReturnValue([
     { key: 'overdeck', config: { name: 'overdeck', path: '/tmp/overdeck', issue_prefix: 'PAN', github_repo: 'eltmon/overdeck' } },
   ]);
@@ -508,32 +502,6 @@ describe('resource-discovery membership-aware state labels', () => {
     ]);
   });
 
-  it('lets post-merge limbo outrank a stale ready-for-merge flag', async () => {
-    mocks.issueService.getIssues.mockReturnValue([
-      { identifier: 'PAN-3342', title: 'Merged work with stale review state', state: 'in_progress' },
-    ]);
-    mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-3342']));
-    mocks.loadReadyForMergeFlags.mockReturnValue(new Map([['PAN-3342', true]]));
-    mocks.getPipelineMembershipForProjects.mockResolvedValue([{
-      issueId: 'PAN-3342',
-      inPipeline: true,
-      bucket: 'post_merge_limbo',
-      reasons: ['merged but never closed out'],
-      labelDrift: null,
-      lenses: { L1_openPr: false, L2_unmergedBranch: false, L3_issueOpen: false, L4_phaseLabel: 'in_review' },
-    }]);
-
-    await refreshResourceAllocatedProjects([project]);
-
-    await expect(getCachedResourceAllocatedIssues()).resolves.toEqual([
-      expect.objectContaining({
-        issueId: 'PAN-3342',
-        readyForMerge: true,
-        stateLabel: 'Merged — Needs Close-Out',
-      }),
-    ]);
-  });
-
   it('labels tracker-closed clean-terminal residue without tmux as done', async () => {
     mocks.issueService.getIssues.mockReturnValue([
       { identifier: 'PAN-3343', title: 'Closed work with Docker residue', state: 'closed' },
@@ -729,13 +697,10 @@ describe('resource-discovery review-status batching', () => {
 
     const discovered = await discoverResourceAllocatedIssues();
 
-    const activeIds = activeIssues.map((issue) => issue.identifier);
-    expect(mocks.loadReadyForMergeFlags).toHaveBeenCalledTimes(1);
-    expect(mocks.loadReadyForMergeFlags).toHaveBeenCalledWith(activeIds);
     expect(discovered).toEqual([]);
   });
 
-  it('loads ready-for-merge status for a terminal issue that still has an open PR', async () => {
+  it('surfaces a terminal issue that still has an open PR', async () => {
     mocks.getPipelineMembershipForProjects.mockResolvedValue([membership('PAN-2054', 'zombie_pr')]);
     mocks.issueService.getIssues.mockReturnValue([
       {
@@ -757,13 +722,9 @@ describe('resource-discovery review-status batching', () => {
         baseRefName: 'main',
       },
     ];
-    mocks.loadReadyForMergeFlags.mockReturnValue(new Map([['PAN-2054', true]]));
-
     const discovered = await discoverResourceAllocatedIssues();
 
-    expect(mocks.loadReadyForMergeFlags).toHaveBeenCalledWith(['PAN-2054']);
     expect(discovered.map((issue) => issue.issueId)).toEqual(['PAN-2054']);
-    expect(discovered[0]?.readyForMerge).toBe(true);
   });
 });
 

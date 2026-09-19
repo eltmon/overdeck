@@ -120,7 +120,6 @@ const EXPECTED_CONSOLE_SECTIONS = [
   'DrawerPickupSection / PickupGateControls',
   'DrawerWorkspaceSection',
   'UatEnvironmentPanel',
-  'IssuePolicyStrip / PoliciesControl',
   'DrawerActiveAgent',
   'DrawerPausedBanner',
   'DrawerVerificationGates',
@@ -196,12 +195,12 @@ describe('issue-view no-loss inventory (FR-0 surface-lock, PAN-2499)', () => {
     ).toEqual([]);
   });
 
-  it('matches the current independent per-view counts: Console 17, Cockpit 21, Rail 15', () => {
+  it('matches the current independent per-view counts: Console 16, Cockpit 21, Rail 15', () => {
     const byView = (view: string) => ISSUE_VIEW_INVENTORY.filter((entry) => entry.view === view).length;
-    expect(byView('console')).toBe(17);
+    expect(byView('console')).toBe(16);
     expect(byView('cockpit')).toBe(21);
     expect(byView('rail')).toBe(15);
-    expect(ISSUE_VIEW_INVENTORY.length).toBe(53);
+    expect(ISSUE_VIEW_INVENTORY.length).toBe(52);
   });
 
   it('keeps every cockpit density section unchanged and backed by a real visible marker', () => {

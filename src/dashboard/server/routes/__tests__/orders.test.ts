@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -64,14 +65,20 @@ function panPaths(panDir: string) {
 }
 
 const roots: string[] = [];
+let defaultPanHome = '';
 const at = '2026-07-18T12:00:00.000Z';
 
 function git(args: string[], cwd: string): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 }
 
+/**
+ * PAN-3917: every fixture plan home lives under the OS temp dir. These used to
+ * be created inside `process.cwd()`, so a forked run wrote `.pan/orders/` into
+ * the repo root and left it behind.
+ */
 function gitFixture(): string {
-  const root = join(process.cwd(), `.test-orders-routes-${process.pid}-${roots.length}`);
+  const root = mkdtempSync(join(tmpdir(), 'pan-orders-routes-'));
   const origin = `${root}-origin.git`;
   roots.push(root, origin);
   mkdirSync(root, { recursive: true });
@@ -162,9 +169,11 @@ beforeEach(() => {
   mockGetProjectSync.mockReset().mockReturnValue(null);
   mockFindProjectByPathSync.mockReset().mockReturnValue(null);
   mockListProjectsSync.mockReset().mockReturnValue([]);
-  mockGetProjectPanPaths.mockReset();
-  // Delegates to whatever the sync mock is configured to return, so tests only
-  // need to configure one mock regardless of which resolution path they exercise.
+  // Default to a throwaway plan home so an unconfigured resolution path can
+  // never fall through to the repo's own `.pan/`.
+  defaultPanHome = mkdtempSync(join(tmpdir(), 'pan-orders-default-'));
+  roots.push(defaultPanHome);
+  mockGetProjectPanPaths.mockReset().mockReturnValue(panPaths(defaultPanHome));
   mockStartFlywheelRun.mockReset();
 });
 
@@ -502,9 +511,9 @@ describe('/api/orders routes', () => {
     expect(mockStartFlywheelRun).toHaveBeenCalledWith({ cwd: '/fake/other-project', orders: '2026-07-18-cross-start' });
   });
 
-  it('keeps starting from the server cwd when the book is in the default project', async () => {
+  it('keeps starting from the default project root when the book lives there', async () => {
     const defaultRoot = gitFixture();
-    const defaultProject = { path: process.cwd() } as ProjectConfig;
+    const defaultProject = { path: defaultPanHome } as ProjectConfig;
     mockFindProjectByPathSync.mockReturnValue(defaultProject);
     mockListProjectsSync.mockReturnValue([{ key: 'default-project', config: defaultProject }]);
     mockGetProjectPanPaths.mockReturnValue(panPaths(defaultRoot));
@@ -522,6 +531,6 @@ describe('/api/orders routes', () => {
 
     await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-default-start/start', mutation('POST')))
       .resolves.toEqual({ status: 200, body: { ok: true, runId: 'RUN-DEFAULT', warnings: [] } });
-    expect(mockStartFlywheelRun).toHaveBeenCalledWith({ cwd: process.cwd(), orders: '2026-07-18-default-start' });
+    expect(mockStartFlywheelRun).toHaveBeenCalledWith({ cwd: defaultPanHome, orders: '2026-07-18-default-start' });
   });
 });

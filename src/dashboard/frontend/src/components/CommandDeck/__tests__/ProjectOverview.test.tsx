@@ -343,7 +343,7 @@ describe('ProjectOverview', () => {
         'PAN-1': derived({
           issueId: 'PAN-1',
           state: 'in-review',
-          pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'APPROVED', checks: 'red', mergeable: true },
+          pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'approved', checks: 'red', mergeable: true },
         }),
         'PAN-2': derived({ issueId: 'PAN-2', state: 'working', attention: 'api-error' }),
       },
@@ -371,12 +371,12 @@ describe('ProjectOverview', () => {
         'PAN-1': derived({
           issueId: 'PAN-1',
           state: 'in-review',
-          pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'APPROVED', checks: 'red', mergeable: true },
+          pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'approved', checks: 'red', mergeable: true },
         }),
         'PAN-2': derived({
           issueId: 'PAN-2',
           state: 'in-review',
-          pr: { url: 'https://example.com/pr/2', number: 2, reviewState: 'APPROVED', checks: 'green', mergeable: false },
+          pr: { url: 'https://example.com/pr/2', number: 2, reviewState: 'approved', checks: 'green', mergeable: false },
         }),
         'PAN-3': derived({ issueId: 'PAN-3', state: 'ready' }),
       },

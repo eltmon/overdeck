@@ -312,6 +312,39 @@ let cache: BackendPaneCache | null = null;
 let refreshedAt = 0;
 let inFlight: Promise<readonly BackendPane[]> | null = null;
 let eventStreamClose: (() => void) | null = null;
+let paneListener: ((delta: BackendPaneDelta) => void) | null = null;
+
+/** Panes that appeared or changed, and panes that left the inventory. */
+export interface BackendPaneDelta {
+  readonly changed: readonly BackendPane[];
+  readonly removed: readonly string[];
+}
+
+/**
+ * Subscribe to inventory changes (PAN-3917 FR-12). The read model fans these
+ * out as `backend_pane.changed` / `backend_pane.removed`; nothing is stored.
+ */
+export function onBackendPanesChanged(fn: (delta: BackendPaneDelta) => void): void {
+  paneListener = fn;
+}
+
+function publishDelta(previous: BackendPaneCache | null, next: BackendPaneCache): void {
+  if (!paneListener) return;
+  const before = new Map((previous?.list() ?? []).map((pane) => [pane.id, pane]));
+  const changed: BackendPane[] = [];
+  for (const pane of next.list()) {
+    const prior = before.get(pane.id);
+    before.delete(pane.id);
+    if (!prior || JSON.stringify(prior) !== JSON.stringify(pane)) changed.push(pane);
+  }
+  const removed = [...before.keys()];
+  if (changed.length === 0 && removed.length === 0) return;
+  try {
+    paneListener({ changed, removed });
+  } catch (error) {
+    console.warn(`[backend-inventory] pane listener failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
 
 /** How long a snapshot is served before another `list()` is issued. */
 export const INVENTORY_TTL_MS = 5_000;
@@ -328,7 +361,9 @@ export async function getBackendPanes(deps: BackendInventoryDeps = {}): Promise<
   inFlight = (async () => {
     try {
       const panes = await listBackendPanes(deps, cache ?? undefined);
-      cache = new BackendPaneCache(panes);
+      const next = new BackendPaneCache(panes);
+      publishDelta(cache, next);
+      cache = next;
       refreshedAt = now;
       return panes;
     } finally {
@@ -372,7 +407,10 @@ export async function startBackendInventory(deps: BackendInventoryDeps = {}): Pr
   void (async () => {
     try {
       for await (const event of stream.events) {
-        cache?.apply(event);
+        if (!cache) continue;
+        const before = cache.list();
+        cache.apply(event);
+        publishDelta(new BackendPaneCache(before), cache);
       }
     } catch (error) {
       console.warn(`[backend-inventory] event stream ended: ${error instanceof Error ? error.message : String(error)}`);
@@ -391,4 +429,5 @@ export function _resetBackendInventoryForTests(): void {
   refreshedAt = 0;
   inFlight = null;
   eventStreamClose = null;
+  paneListener = null;
 }

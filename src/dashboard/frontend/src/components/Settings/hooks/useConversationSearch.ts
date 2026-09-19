@@ -106,7 +106,6 @@ export function useConversationSearch({
   const [testingEmbedding, setTestingEmbedding] = useState(false);
   const [conversationSearchEstimate, setConversationSearchEstimate] = useState<ConversationSearchCostEstimate | null>(null);
   const [estimatingConversationSearch, setEstimatingConversationSearch] = useState(false);
-  const [legacyImportOpen, setLegacyImportOpen] = useState(false);
   const [reindexConfirm, setReindexConfirm] = useState<ReindexConfirmState | null>(null);
   const [reindexConfirmBusy, setReindexConfirmBusy] = useState(false);
   const [reindexProgress, setReindexProgress] = useState<ReindexProgress | null>(null);
@@ -320,12 +319,10 @@ export function useConversationSearch({
     handleEmbeddingModelChange,
     handleSaveConvConfig,
     handleTestEmbeddingConnection,
-    legacyImportOpen,
     loadConvConfig,
     reindexConfirm,
     reindexConfirmBusy,
     reindexProgress,
-    setLegacyImportOpen,
     testingEmbedding,
   };
 }

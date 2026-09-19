@@ -128,7 +128,7 @@ describe('auto-merge executor', () => {
     expect(transition).not.toHaveBeenCalled();
     expect(mergeIssue).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledWith(
-      '[auto-merge] dashboard deploy queued, deferring 2 merge(s) before preparation',
+      '[auto-merge] deploy in progress, deferring 2 merge(s) before preparation',
     );
 
     deployQueued = false;

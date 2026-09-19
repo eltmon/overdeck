@@ -60,7 +60,7 @@ export function derivePipelineState(input: PipelineStateInput): PipelineState {
     case 'changes-requested':
       return 'in_review_changes_requested';
     case 'in-review':
-      return derived.pr?.reviewState === 'APPROVED' ? 'in_review_approved' : 'in_review_reviewers_running';
+      return derived.pr?.reviewState === 'approved' ? 'in_review_approved' : 'in_review_reviewers_running';
     case 'working':
       return hasLivePane(panes, 'work') ? 'in_progress_work_running' : 'in_progress_work_idle';
     case 'planned':

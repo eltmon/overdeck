@@ -9,9 +9,6 @@ import { DrawerPlanPanel } from '../drawer/DrawerSecondaryPanels';
 import { PlanMapCard } from '../Stage/cockpit/PlanMapCard';
 import { useDashboardStore } from '../../lib/store';
 
-vi.mock('../IssuePolicyStrip', () => ({
-  IssuePolicyStrip: ({ issueId }: { issueId: string }) => <span>policy {issueId}</span>,
-}));
 
 vi.mock('../CommandDeck/ZoneCOverviewTabs/queries', () => ({
 }));
@@ -73,21 +70,6 @@ describe('IssueView', () => {
     const densities: IssueViewDensity[] = ['rail', 'cockpit', 'console'];
     const rendered = new Set(densities.flatMap((density) => DENSITY_SECTIONS[density]));
     expect(ISSUE_VIEW_INVENTORY.filter((entry) => !rendered.has(entry.section))).toEqual([]);
-  });
-
-  it('keeps operator policy out of rail and exposes it at cockpit and console densities', () => {
-    const rail = render(<IssueView issueId="PAN-2499" density="rail"><span /></IssueView>);
-    expect(rail.container.querySelector('[data-section="IssuePolicyStrip / PoliciesControl"]')).not.toBeInTheDocument();
-    rail.unmount();
-
-    for (const density of ['cockpit', 'console'] as const) {
-      const view = render(<IssueView issueId="PAN-2499" density={density}><span /></IssueView>);
-      expect(screen.getByText('policy PAN-2499').parentElement).toHaveAttribute(
-        'data-section',
-        'IssuePolicyStrip / PoliciesControl',
-      );
-      view.unmount();
-    }
   });
 
   it('opens the full-screen xBRIEF from the drawer Plan panel', async () => {

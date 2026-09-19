@@ -10,20 +10,14 @@ export interface CoreServicesProcess {
   memoryBytes: number;
 }
 
+/**
+ * PAN-3917 (FR-11): deacon-lite has four routines and no patrol ledger, so the
+ * row reports the last run, not a patrol cycle with an action list.
+ */
 export interface CoreServicesDeaconStatus {
   isRunning: boolean;
   pid: number | null;
-  state?: {
-    lastPatrol?: string | null;
-    patrolCycle?: number;
-    stuckCount?: number;
-  };
-  lastPatrol?: {
-    cycle: number;
-    timestamp: string;
-    actions: string[];
-    massDeathDetected?: boolean;
-  } | null;
+  deaconLite?: { running: boolean; intervalMs: number; lastRunAt: string | null; lastRunError: string | null };
 }
 
 export interface CoreServicesOptions {
@@ -55,9 +49,7 @@ export interface CoreServiceRow {
   eventLoopP99Ms?: number;
   pid?: number | null;
   lastTickAgeSeconds?: number | null;
-  patrolCycle?: number;
-  patrolSummaryCount?: number;
-  stuckCount?: number;
+  lastRunError?: string | null;
   members?: string[];
 }
 
@@ -94,9 +86,7 @@ export function buildCoreServices(options: CoreServicesOptions = {}): CoreServic
       memberCount: deaconStatus.pid ? 1 : 0,
       pid: deaconStatus.pid,
       lastTickAgeSeconds: getLastTickAgeSeconds(deaconStatus, nowMs),
-      patrolCycle: deaconStatus.lastPatrol?.cycle ?? deaconStatus.state?.patrolCycle ?? 0,
-      patrolSummaryCount: deaconStatus.lastPatrol?.actions.length ?? 0,
-      stuckCount: deaconStatus.state?.stuckCount ?? 0,
+      lastRunError: deaconStatus.deaconLite?.lastRunError ?? null,
       actions: [
         { label: 'Status', href: '/api/deacon/status', method: 'GET' },
         { label: 'Logs', href: '/api/deacon/logs', method: 'GET' },
@@ -155,7 +145,7 @@ function getLastTickAgeSeconds(
   deaconStatus: CoreServicesDeaconStatus,
   nowMs: number,
 ): number | null {
-  const timestamp = deaconStatus.lastPatrol?.timestamp ?? deaconStatus.state?.lastPatrol;
+  const timestamp = deaconStatus.deaconLite?.lastRunAt;
   if (!timestamp) return null;
 
   const tickMs = Date.parse(timestamp);

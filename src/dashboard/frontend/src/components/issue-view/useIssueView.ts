@@ -142,7 +142,7 @@ function deriveIconKey(session: SessionNode): string {
 
 function deriveAgentStatus(session: SessionNode, agent?: AgentSnapshot): string {
   if (session.awaitingInput) return 'waiting';
-  if (agent?.paused || session.paused) return 'paused';
+  if (agent?.paused) return 'paused';
   if (isAgentRunning(session, agent)) return 'running';
   if (session.status === 'error' || agent?.status === 'error') return 'error';
   if (session.status === 'stopped' || session.status === 'unknown') return 'done';
@@ -396,11 +396,11 @@ function deriveOperator(
         reason: session.awaitingInputReason ?? agent?.pendingQuestionReason,
       });
     }
-    if (session.paused || agent?.paused) {
+    if (agent?.paused) {
       items.push({
         kind: 'paused',
         sessionId: session.sessionId,
-        reason: session.pausedReason ?? agent?.pausedReason,
+        reason: agent?.pausedReason,
       });
     }
   }

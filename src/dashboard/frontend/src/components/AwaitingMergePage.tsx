@@ -540,8 +540,8 @@ interface OpenMrRowProps {
  */
 function prBadges(pr: DerivedIssueState['pr']) {
   if (!pr) return [];
-  const reviewApproved = pr.reviewState === 'APPROVED';
-  const changesRequested = pr.reviewState === 'CHANGES_REQUESTED';
+  const reviewApproved = pr.reviewState === 'approved';
+  const changesRequested = pr.reviewState === 'changes-requested';
   return [
     {
       key: 'review',

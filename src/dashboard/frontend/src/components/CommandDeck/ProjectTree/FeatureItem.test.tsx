@@ -359,32 +359,9 @@ describe('FeatureItem', () => {
     expect(container.querySelector('[data-section="OrderBookIssueChip"]')).toBe(chip);
   });
 
-  it('shows paused badge with age + reason and fires unpause (PAN-1779)', () => {
-    const onUnpauseSession = vi.fn();
-    const view = renderFeature(
-      <FeatureItem
-        feature={makeFeature({
-          sessions: [makeSession({
-            sessionId: 'agent-pan-821',
-            status: 'stopped',
-            presence: 'ended',
-            paused: true,
-            pausedReason: 'Operator drain 2026-06-10',
-            pausedAt: new Date(Date.now() - 2 * 3_600_000).toISOString(),
-          })],
-        })}
-        isSelected={false}
-        onSelect={() => {}}
-        onUnpauseSession={onUnpauseSession}
-      />,
-    );
-    const badgeGroup = screen.getByTestId('feature-paused');
-    expect(badgeGroup.textContent).toContain('Paused 2h');
-    screen.getByTestId('feature-unpause').click();
-    expect(onUnpauseSession).toHaveBeenCalledWith('agent-pan-821');
-  });
-
-  it('does not show paused badge for unpaused sessions', () => {
+  // PAN-3917: the pause gate is an agent fact, not a pane fact, so a session
+  // node no longer mirrors it and the feature row shows no paused badge.
+  it('shows no paused badge, because a session node carries no pause gate', () => {
     const view = renderFeature(
       <FeatureItem
         feature={makeFeature({ sessions: [makeSession()] })}

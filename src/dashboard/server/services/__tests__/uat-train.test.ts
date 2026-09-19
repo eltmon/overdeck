@@ -18,7 +18,6 @@ import type { PromoteResult, UatPromoteDeps } from '../../../../lib/cloister/uat
 const mocks = vi.hoisted(() => ({
   findProjectByPathSync: vi.fn(),
   getDashboardIdentity: vi.fn(),
-  readCurrentFlywheelStatusForDashboard: vi.fn(),
   listUatGenerationsSync: vi.fn(),
   probeUatStack: vi.fn(),
   teardownUatStack: vi.fn(),
@@ -26,7 +25,6 @@ const mocks = vi.hoisted(() => ({
   buildUatPromoteGitDeps: vi.fn(),
   buildUatGenerationStore: vi.fn(),
   getUatGenerationSync: vi.fn(),
-  notifyFlywheelOfUatPromote: vi.fn(),
   recordUatPromotionVerdicts: vi.fn(),
   findXBriefByIssue: vi.fn(),
   readXBriefDocument: vi.fn(),
@@ -82,10 +80,6 @@ vi.mock('../../identity.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../flywheel-actions.js', () => ({
-  readCurrentFlywheelStatusForDashboard: mocks.readCurrentFlywheelStatusForDashboard,
-}));
-
 // uat-train.ts now imports listUatGenerationsSync from overdeck/merge-sync (not database/uat-generations-db)
 vi.mock('../../../../lib/overdeck/merge-sync.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../../../lib/overdeck/merge-sync.js')>();
@@ -115,10 +109,6 @@ vi.mock('../../../../lib/cloister/uat-promote.js', async (importOriginal) => {
     buildUatPromoteGitDeps: mocks.buildUatPromoteGitDeps,
   };
 });
-
-vi.mock('../../../../lib/cloister/uat-promote-notify.js', () => ({
-  notifyFlywheelOfUatPromote: mocks.notifyFlywheelOfUatPromote,
-}));
 
 vi.mock('../../../../lib/cloister/uat-promote-verification.js', () => ({
   recordUatPromotionVerdicts: mocks.recordUatPromotionVerdicts,
@@ -342,7 +332,6 @@ describe('getUatGenerationsPayload', () => {
     let activeReads = 0;
     let maxActiveReads = 0;
 
-    mocks.readCurrentFlywheelStatusForDashboard.mockResolvedValue({ runId: 'RUN-1' });
     mocks.listUatGenerationsSync.mockReturnValue([gen(members)]);
     mocks.findXBriefByIssue.mockImplementation((_root: string, issueId: string) => Effect.succeed({
       path: pathByIssue.get(issueId)!,
@@ -440,7 +429,6 @@ describe('postUatGenerationPromotePayload', () => {
     mocks.findProjectByPathSync.mockReturnValue(null);
     mocks.buildUatPromoteGitDeps.mockReturnValue({ git: 'deps' });
     mocks.buildUatGenerationStore.mockReturnValue({ listChain: vi.fn(), update: vi.fn() });
-    mocks.notifyFlywheelOfUatPromote.mockResolvedValue(undefined);
   });
 
   it('wires UAT promotion verdict recording into the promote dependencies', async () => {
@@ -464,22 +452,6 @@ describe('postUatGenerationPromotePayload', () => {
     expect(mocks.recordUatPromotionVerdicts).toHaveBeenCalledWith(generation, 'abc123');
   });
 
-  it('passes the promote result to notifyFlywheelOfUatPromote', async () => {
-    const result: PromoteResult = {
-      success: true,
-      generation: 'uat/pan-cobalt-0703',
-      mergeSha: 'abc123',
-      members: ['PAN-2294'],
-      postMergeStarted: ['PAN-2294'],
-      invalidated: [],
-    };
-    mocks.promoteUatGeneration.mockResolvedValue(result);
-
-    await postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn());
-
-    expect(mocks.notifyFlywheelOfUatPromote).toHaveBeenCalledWith(result);
-  });
-
   it('returns the exact promote result object unchanged for success and failure results', async () => {
     const success: PromoteResult = {
       success: true,
@@ -501,20 +473,6 @@ describe('postUatGenerationPromotePayload', () => {
     await expect(postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn())).resolves.toBe(failure);
   });
 
-  it('still resolves with the promote result when notifyFlywheelOfUatPromote rejects', async () => {
-    const result: PromoteResult = {
-      success: true,
-      generation: 'uat/pan-cobalt-0703',
-      mergeSha: 'abc123',
-      members: ['PAN-2294'],
-      postMergeStarted: ['PAN-2294'],
-      invalidated: [],
-    };
-    mocks.promoteUatGeneration.mockResolvedValue(result);
-    mocks.notifyFlywheelOfUatPromote.mockRejectedValue(new Error('delivery failed'));
-
-    await expect(postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn())).resolves.toBe(result);
-  });
 });
 
 // PAN-3093: polyrepo projects used to be skipped outright by a guard in

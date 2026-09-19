@@ -39,10 +39,18 @@ import {
   type SystemHealthSampler,
 } from '../../../lib/system-health/sampler.js';
 import type { HostMetricSample } from '../../../lib/system-health/types.js';
-import {
-  computeBuildStaleness,
-  type BuildStaleness,
-} from '../../../lib/deploy/staleness.js';
+
+/**
+ * PAN-3917 D1: the deploy patrol and its staleness computation are deleted.
+ * The field survives on the health payload as `null` so the UI stops claiming
+ * the running build is stale when nothing measures it any more.
+ */
+export interface BuildStaleness {
+  readonly stale: boolean;
+  readonly behindBy: number;
+  readonly buildCommit: string | null;
+  readonly headCommit: string | null;
+}
 import { initEventStore } from '../event-store.js';
 import { getDashboardIdentity } from '../identity.js';
 import {
@@ -215,43 +223,9 @@ let eventStorePromise: ReturnType<typeof initEventStore> | null = null;
 let cachedSystemHealthConfig: EffectiveSystemHealthConfig | null = null;
 let resourceConfigLoadedAt = 0;
 let resourceConfigInflight: Promise<void> | null = null;
-let cachedDeployStaleness: BuildStaleness | null = null;
-let hasCachedDeployStaleness = false;
-let deployStalenessCacheExpiresAt = 0;
-let deployStalenessInflight: Promise<BuildStaleness | null> | null = null;
-let computeBuildStalenessFn = computeBuildStaleness;
-const DEPLOY_STALENESS_TTL_MS = 60_000;
 
 export async function getDeployStaleness(): Promise<BuildStaleness | null> {
-  if (hasCachedDeployStaleness && Date.now() < deployStalenessCacheExpiresAt) {
-    return cachedDeployStaleness;
-  }
-
-  if (!deployStalenessInflight) {
-    deployStalenessInflight = computeBuildStalenessFn({
-      repoRoot: getDashboardIdentity().repoRoot,
-      buildCommit: getBuildInfo().buildCommit,
-    }).catch(() => null).then((result) => {
-      cachedDeployStaleness = result;
-      hasCachedDeployStaleness = true;
-      deployStalenessCacheExpiresAt = Date.now() + DEPLOY_STALENESS_TTL_MS;
-      return result;
-    }).finally(() => {
-      deployStalenessInflight = null;
-    });
-  }
-
-  return deployStalenessInflight;
-}
-
-export function _resetDeployStalenessForTests(
-  compute: typeof computeBuildStaleness = computeBuildStaleness,
-): void {
-  cachedDeployStaleness = null;
-  hasCachedDeployStaleness = false;
-  deployStalenessCacheExpiresAt = 0;
-  deployStalenessInflight = null;
-  computeBuildStalenessFn = compute;
+  return null;
 }
 
 function getDockerStatsCollector(): DockerStatsCollector {

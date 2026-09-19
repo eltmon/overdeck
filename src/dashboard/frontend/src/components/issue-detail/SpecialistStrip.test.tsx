@@ -48,11 +48,11 @@ describe('deriveSpecialistChips', () => {
 
   it("a completed convoy with no per-role node falls back to the PR's own review state", () => {
     const pr = { url: 'https://example.test/pr/1', number: 1, checks: 'green' as const, mergeable: true };
-    const passed = deriveSpecialistChips([], { issueId: 'PAN-1', state: 'ready', pr: { ...pr, reviewState: 'APPROVED' } });
+    const passed = deriveSpecialistChips([], { issueId: 'PAN-1', state: 'ready', pr: { ...pr, reviewState: 'approved' } });
     expect(passed.every((c) => c.status === 'done' && c.verdict === 'APPROVED')).toBe(true);
-    const blocked = deriveSpecialistChips([], { issueId: 'PAN-1', state: 'changes-requested', pr: { ...pr, reviewState: 'CHANGES_REQUESTED' } });
+    const blocked = deriveSpecialistChips([], { issueId: 'PAN-1', state: 'changes-requested', pr: { ...pr, reviewState: 'changes-requested' } });
     expect(blocked.every((c) => c.status === 'failed' && c.verdict === 'CHANGES_REQUESTED')).toBe(true);
-    const reviewing = deriveSpecialistChips([], { issueId: 'PAN-1', state: 'in-review', pr: { ...pr, reviewState: 'REVIEW_REQUIRED' } });
+    const reviewing = deriveSpecialistChips([], { issueId: 'PAN-1', state: 'in-review', pr: { ...pr, reviewState: 'review-requested' } });
     expect(reviewing.every((c) => c.status === 'queued')).toBe(true);
   });
 });

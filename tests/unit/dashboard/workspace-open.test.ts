@@ -51,13 +51,6 @@ vi.mock('../../../src/lib/workspaces/git-state.js', () => ({
   pullWorkspaceFastForward: routeMocks.pullWorkspaceFastForward,
 }));
 
-vi.mock('../../../src/lib/review-status.js', () => ({
-  getReviewStatusSync: routeMocks.getReviewStatusSync,
-
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
-}));
-
 vi.mock('../../../src/lib/memory/rollup.js', () => ({
   readCurrentStatus: routeMocks.readCurrentStatus,
   readRecentObservations: routeMocks.readRecentObservations,

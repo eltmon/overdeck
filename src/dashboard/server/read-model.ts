@@ -20,10 +20,7 @@ import {
   isTerminalTurnDiffSummaryStatus,
   trimTurnDiffSummaries,
 } from '@overdeck/contracts';
-import type { AgentSnapshot, AgentStatus, Role, AgentResolution, ReviewStatusSnapshot, ReviewStatusValue, TestStatusValue, UatStatusValue, MergeStatusValue, VerificationStatusValue } from '@overdeck/contracts';
-import type { ReviewStatus } from '../../lib/review-status.js';
-import { listOverdeckAgentStatesSync } from '../../lib/overdeck/agent-state-sync.js';
-import { computeQueuePositionFromStatusSync } from '../../lib/queue-position.js'
+import type { AgentSnapshot, AgentStatus, Role, AgentResolution, BackendPane, DerivedIssueState } from '@overdeck/contracts';
 import { AgentsResolver, type Agent as OverdeckAgent } from '../../lib/overdeck/agents.js';
 
 // ─── Exported async helpers (used by bootstrap Effect + tests) ───────────────
@@ -166,17 +163,11 @@ export function pruneAgentsForReadSource(
   issues: unknown[],
 ): { agentsById: Record<string, AgentSnapshot>; prunedCount: number } {
   const closedIssueIds = getClosedIssueIdsForReadSource(issues);
-  // PAN-1908: authoritative membership is the SQLite agents table, not state.json.
-  const liveAgentIds = new Set(listOverdeckAgentStatesSync().map(a => a.id));
   const nextAgentsById: Record<string, AgentSnapshot> = {};
   let prunedCount = 0;
 
   for (const agent of Object.values(agentsById)) {
     if (closedIssueIds.has(agent.issueId.toUpperCase())) {
-      prunedCount++;
-      continue;
-    }
-    if (!liveAgentIds.has(agent.id)) {
       prunedCount++;
       continue;
     }
@@ -186,39 +177,31 @@ export function pruneAgentsForReadSource(
   return { agentsById: nextAgentsById, prunedCount };
 }
 
-/**
- * Prunes review-status entries for closed issues on every snapshot request —
- * not just at boot (review finding, PAN-3362 UAT cycle 3). mergeDbOnlyReviewStatuses()
- * can hydrate a review_status row for an issue reconstructCacheAuto() never
- * covered (e.g. the FIX-1 UAT fixture, which has no per-issue record). If
- * that issue is later closed, close-out deletes the DB row but emits no
- * read-model removal event, so the in-memory snapshot would otherwise keep
- * showing it as reviewing/ready-to-merge indefinitely. Reusing
- * getClosedIssueIdsForReadSource() here — the same live, per-request signal
- * pruneAgentsForReadSource() already uses — means a mid-session close is
- * caught on the very next snapshot, not only after a restart.
- */
-export function pruneReviewStatusesForReadSource(
-  reviewStatusByIssueId: Record<string, ReviewStatusSnapshot>,
-  issues: unknown[],
-): { reviewStatusByIssueId: Record<string, ReviewStatusSnapshot>; prunedCount: number } {
-  const closedIssueIds = getClosedIssueIdsForReadSource(issues);
-  const nextReviewStatusByIssueId: Record<string, ReviewStatusSnapshot> = {};
-  let prunedCount = 0;
-
-  for (const [issueId, status] of Object.entries(reviewStatusByIssueId)) {
-    if (closedIssueIds.has(issueId.toUpperCase())) {
-      prunedCount++;
-      continue;
-    }
-    nextReviewStatusByIssueId[issueId] = status;
-  }
-
-  return { reviewStatusByIssueId: nextReviewStatusByIssueId, prunedCount };
-}
-
 // ─── Cached event store reference (avoids async dynamic import on each pushUpdated) ──
 let _cachedEventStore: any = null;
+
+/**
+ * Fan a derived read-model event out to live subscribers only (PAN-3917).
+ *
+ * `emitOnly`, never `append`: `issue_state.changed` and `backend_pane.*` carry
+ * facts recomputed from the tracker, the forge and the terminal backend on
+ * every boot. Persisting them would resurrect dead panes and stale pipeline
+ * positions on replay — exactly the stored status this issue deletes.
+ */
+function emitDerivedEvent(event: { type: string; payload: unknown }): void {
+  try {
+    if (!_cachedEventStore) {
+      void import('./event-store.js').then(({ getEventStore }) => {
+        _cachedEventStore = getEventStore();
+        try {
+          _cachedEventStore.emitOnly({ ...event, timestamp: new Date().toISOString() } as any);
+        } catch { /* event store not ready */ }
+      }).catch(() => {});
+      return;
+    }
+    _cachedEventStore.emitOnly({ ...event, timestamp: new Date().toISOString() } as any);
+  } catch { /* event store not ready yet */ }
+}
 
 type Jsonish = null | boolean | number | string | Jsonish[] | { [key: string]: Jsonish };
 
@@ -263,12 +246,6 @@ type SpecialistLifecycleState = 'active' | 'sleeping' | 'uninitialized';
 
 const VALID_SPECIALIST_NAMES = new Set<SpecialistAgentName>(["review-agent", "test-agent", "merge-agent", "inspect-agent", "uat-agent"]);
 const VALID_SPECIALIST_LIFECYCLE_STATES = new Set<SpecialistLifecycleState>(["active", "sleeping", "uninitialized"]);
-const VALID_REVIEW_STATUSES = new Set<ReviewStatusValue>(["pending", "reviewing", "passed", "failed", "blocked", "skipped"]);
-const VALID_TEST_STATUSES = new Set<TestStatusValue>(["pending", "testing", "passed", "failed", "skipped", "dispatch_failed"]);
-const VALID_UAT_STATUSES = new Set<UatStatusValue>(["pending", "testing", "passed", "failed"]);
-const VALID_MERGE_STATUSES = new Set<MergeStatusValue>(["pending", "queued", "merging", "verifying", "merged", "failed"]);
-const VALID_VERIFICATION_STATUSES = new Set<VerificationStatusValue>(["pending", "running", "passed", "failed", "skipped"]);
-
 export function toAgentStatus(v: unknown): AgentStatus {
   return VALID_AGENT_STATUSES.has(v as AgentStatus) ? v as AgentStatus : "unknown";
 }
@@ -286,103 +263,6 @@ export function toSpecialistAgentName(v: unknown): SpecialistAgentName | undefin
 export function toSpecialistLifecycleState(v: unknown): SpecialistLifecycleState {
   return VALID_SPECIALIST_LIFECYCLE_STATES.has(v as SpecialistLifecycleState) ? v as SpecialistLifecycleState : "uninitialized";
 }
-export function toReviewStatus(v: unknown): ReviewStatusValue | undefined {
-  return v && VALID_REVIEW_STATUSES.has(v as ReviewStatusValue) ? v as ReviewStatusValue : undefined;
-}
-export function toTestStatus(v: unknown): TestStatusValue | undefined {
-  return v && VALID_TEST_STATUSES.has(v as TestStatusValue) ? v as TestStatusValue : undefined;
-}
-export function toUatStatus(v: unknown): UatStatusValue | undefined {
-  return v && VALID_UAT_STATUSES.has(v as UatStatusValue) ? v as UatStatusValue : undefined;
-}
-export function toMergeStatus(v: unknown): MergeStatusValue | undefined {
-  return v && VALID_MERGE_STATUSES.has(v as MergeStatusValue) ? v as MergeStatusValue : undefined;
-}
-export function toVerificationStatus(v: unknown): VerificationStatusValue | undefined {
-  return v && VALID_VERIFICATION_STATUSES.has(v as VerificationStatusValue) ? v as VerificationStatusValue : undefined;
-}
-
-export type ReviewStatusSnapshotInput = ReviewStatus & {
-  reviewCoordinatorSessionName?: string;
-  reviewSessionNames?: string[];
-  reviewSubStatuses?: Record<string, 'running' | 'done'>;
-  activeSpecialist?: string;
-};
-
-export function toReviewStatusSnapshot(status: ReviewStatusSnapshotInput): ReviewStatusSnapshot {
-  return {
-    issueId: status.issueId,
-    reviewStatus: toReviewStatus(status.reviewStatus),
-    testStatus: toTestStatus(status.testStatus),
-    uatStatus: toUatStatus(status.uatStatus),
-    uatNotes: status.uatNotes || undefined,
-    mergeStatus: toMergeStatus(status.mergeStatus),
-    releaseStatus: status.releaseStatus ?? undefined,
-    releaseNotes: status.releaseNotes || undefined,
-    verificationStatus: toVerificationStatus(status.verificationStatus),
-    verificationNotes: status.verificationNotes || undefined,
-    verificationCycleCount: typeof status.verificationCycleCount === 'number' ? status.verificationCycleCount : undefined,
-    readyForMerge: !!status.readyForMerge,
-    updatedAt: status.updatedAt,
-    prUrl: status.prUrl || undefined,
-    stuck: !!status.stuck ? true : undefined,
-    stuckReason: status.stuckReason || undefined,
-    stuckAt: status.stuckAt || undefined,
-    stuckDetails: status.stuckDetails || undefined,
-    reviewCycleHistory: status.reviewCycleHistory && status.reviewCycleHistory.length > 0
-      ? status.reviewCycleHistory
-      : undefined,
-    reviewedAtCommit: status.reviewedAtCommit || undefined,
-    reviewSpawnedAt: typeof status.reviewSpawnedAt === 'number'
-      ? new Date(status.reviewSpawnedAt).toISOString()
-      : status.reviewSpawnedAt || undefined,
-    testRetryCount: typeof status.testRetryCount === 'number' ? status.testRetryCount : undefined,
-    reviewRetryCount: typeof status.reviewRetryCount === 'number' ? status.reviewRetryCount : undefined,
-    recoveryStartedAt: status.recoveryStartedAt || undefined,
-    deaconIgnored: !!status.deaconIgnored ? true : undefined,
-    deaconIgnoredAt: status.deaconIgnoredAt || undefined,
-    deaconIgnoredReason: status.deaconIgnoredReason || undefined,
-    // PAN-1691: tri-state routing key — preserve true/false/undefined as-is.
-    autoMerge: status.autoMerge,
-    reviewCoordinatorSessionName: status.reviewCoordinatorSessionName || undefined,
-    reviewSessionNames: status.reviewSessionNames && status.reviewSessionNames.length > 0 ? status.reviewSessionNames : undefined,
-    reviewSubStatuses: status.reviewSubStatuses,
-    queuePosition: computeQueuePositionFromStatusSync(status).queuePosition ?? undefined,
-    activeSpecialist: status.activeSpecialist || undefined,
-    mergeRetryCount: typeof status.mergeRetryCount === 'number' ? status.mergeRetryCount : undefined,
-    mergeNotes: status.mergeNotes || undefined,
-    blockerReasons: status.blockerReasons && status.blockerReasons.length > 0 ? status.blockerReasons : undefined,
-    autoRequeueCount: typeof status.autoRequeueCount === 'number' ? status.autoRequeueCount : undefined,
-  };
-}
-
-/**
- * Layers DB-only review_status rows into a boot snapshot for issues
- * reconstructCacheAuto() didn't already cover (PAN-3362).
- *
- * reconstructCacheAuto() deliberately enumerates only tracker-backed
- * in-flight issues (it reads NO SQLite cache tables — sources of truth
- * only), so an issue with a review_status row but no real per-issue record
- * (e.g. the obviously-fake FIX-1 UAT fixture) is never included in
- * `trackerDerived`. This is a supplementary, additive source — a DB-only
- * row NEVER overrides a tracker-derived entry for the same issueId, the
- * same posture agentsById already takes by layering AgentsResolver's
- * DB-backed list alongside reconstructCacheAuto's result rather than
- * folding it in.
- */
-export function mergeDbOnlyReviewStatuses(
-  trackerDerived: Record<string, ReviewStatusSnapshot>,
-  dbReviewStatuses: Record<string, ReviewStatusSnapshotInput>,
-): Record<string, ReviewStatusSnapshot> {
-  const dbOnly: Record<string, ReviewStatusSnapshot> = {};
-  for (const [issueId, dbStatus] of Object.entries(dbReviewStatuses)) {
-    if (!(issueId in trackerDerived)) {
-      dbOnly[issueId] = toReviewStatusSnapshot(dbStatus);
-    }
-  }
-  return dbOnly;
-}
-
 // ─── ReadModelService ────────────────────────────────────────────────────────
 
 export interface ReadModelServiceShape {
@@ -483,7 +363,11 @@ export const ReadModelServiceLive = Layer.effect(
         // wire format; we always send an empty array and clients derive the
         // same data from agentsById filtered by role.
         specialists: [],
-        reviewStatuses: Object.values(state.reviewStatusByIssueId),
+        // PAN-3917 FR-6 / FR-12 — the two derived read models. Neither is
+        // stored: the snapshot is rebuilt from the tracker, the forge and the
+        // terminal backend on every connect.
+        derivedIssueStates: Object.values(state.derivedIssueStateByIssueId),
+        backendPanes: Object.values(state.backendPanesById),
         agentRuntimeById: state.agentRuntimeById,
         channelPermissionRequests: Object.values(state.channelPermissionRequestsById ?? {}),
         issues: state.issuesRaw,
@@ -548,10 +432,25 @@ export const ReadModelServiceLive = Layer.effect(
         console.log(`[ReadModel] Pruned ${pruned.prunedCount} stale agent${pruned.prunedCount === 1 ? '' : 's'} from read source`);
       }
 
-      const prunedReviewStatuses = pruneReviewStatusesForReadSource(state.reviewStatusByIssueId, state.issuesRaw);
-      if (prunedReviewStatuses.prunedCount > 0) {
-        state = { ...state, reviewStatusByIssueId: prunedReviewStatuses.reviewStatusByIssueId };
-        console.log(`[ReadModel] Pruned ${prunedReviewStatuses.prunedCount} stale review status${prunedReviewStatuses.prunedCount === 1 ? '' : 'es'} from read source`);
+      // PAN-3917: the derived read models are recomputed, never replayed. Seed
+      // both maps from their owners so a fresh connect sees current facts even
+      // before the next change event.
+      try {
+        const [{ getSharedIssueService }, { getBackendPanes }] = yield* Effect.promise(() => Promise.all([
+          import('./services/issue-service-singleton.js'),
+          import('./services/backend-inventory.js'),
+        ]));
+        const derivedIssueStateByIssueId: Record<string, DerivedIssueState> = {};
+        for (const derived of getSharedIssueService().listDerivedStates()) {
+          derivedIssueStateByIssueId[derived.issueId] = derived;
+        }
+        const backendPanesById: Record<string, BackendPane> = {};
+        for (const pane of yield* Effect.promise(() => getBackendPanes())) {
+          backendPanesById[pane.id] = pane;
+        }
+        state = { ...state, derivedIssueStateByIssueId, backendPanesById };
+      } catch (err) {
+        console.error('[ReadModel] Failed to refresh the derived read model for snapshot:', err);
       }
 
       return buildSnapshot();
@@ -576,26 +475,9 @@ export const ReadModelServiceLive = Layer.effect(
     // ── Bootstrap inline during layer construction ───────────────────────────
     const agentsResolver = yield* AgentsResolver;
     yield* Effect.gen(function* () {
-      // Agents come from AgentsResolver; reconstructCache supplies git-backed review status and boot side effects.
-      const { reconstructCacheAuto } = yield* Effect.promise(() =>
-        import('../../lib/reconstruct/reconstruct-cache.js'),
-      );
-
-      const result = yield* Effect.promise(() => reconstructCacheAuto());
+      // Agents come from AgentsResolver. There is no status reconstruction to
+      // do: pipeline position is derived per read (FR-6).
       const overdeckAgents = yield* agentsResolver.list({});
-
-      // See mergeDbOnlyReviewStatuses() doc comment — reconstructCacheAuto()
-      // only enumerates tracker-backed issues, so DB-only review_status rows
-      // (e.g. the FIX-1 UAT fixture, PAN-3362) need a supplementary source.
-      let dbOnlyReviewStatusByIssueId: Record<string, ReviewStatusSnapshot> = {};
-      try {
-        const { getAllReviewStatusesFromDb } = yield* Effect.promise(
-          () => import('../../lib/overdeck/review-status-sync.js'),
-        );
-        dbOnlyReviewStatusByIssueId = mergeDbOnlyReviewStatuses(result.reviewStatusByIssueId, getAllReviewStatusesFromDb());
-      } catch (err) {
-        console.error('[ReadModel] Failed to layer in DB-only review statuses:', err);
-      }
 
       const agentsById: Record<string, AgentSnapshot> = Object.fromEntries(
         overdeckAgents.map((a) => [a.id, agentSnapshotFromOverdeck(a)]),
@@ -621,16 +503,13 @@ export const ReadModelServiceLive = Layer.effect(
         ...INITIAL_READ_MODEL_STATE,
         sequence,
         agentsById,
-        reviewStatusByIssueId: { ...dbOnlyReviewStatusByIssueId, ...result.reviewStatusByIssueId },
         issuesRaw: [],
         recentActivity,
       };
 
       console.log(
         `[ReadModel] Bootstrapped from local database: ` +
-        `${Object.keys(agentsById).length} agents, ` +
-        `${Object.keys(result.reviewStatusByIssueId).length} review statuses, ` +
-        `${result.issuesEnumerated} in-flight issue(s), seq=${sequence}`,
+        `${Object.keys(agentsById).length} agents, seq=${sequence}`,
       );
 
       // ── Checkpoint reconciliation (deferred — non-blocking) ──────────────────
@@ -801,8 +680,42 @@ export const ReadModelServiceLive = Layer.effect(
             triggerDebouncedIncrementalPass(process.cwd());
           }).catch(() => {});
         });
+
+        // PAN-3917 FR-6 — a recomputed pipeline state fans out as
+        // issue_state.changed. emitOnly, never append: replaying a derived
+        // state on the next boot would be storing a status we can derive.
+        issueService.onDerivedStatesChanged((changed) => {
+          const next = { ...state.derivedIssueStateByIssueId };
+          for (const derived of changed) next[derived.issueId] = derived;
+          state = { ...state, derivedIssueStateByIssueId: next };
+          for (const issueState of changed) {
+            emitDerivedEvent({ type: 'issue_state.changed', payload: { issueState } });
+          }
+        });
       } catch {
         console.warn('[ReadModel] IssueDataService not available at bootstrap, starting with empty issues');
+      }
+    });
+
+    // PAN-3917 FR-12 — live pane inventory fans out the same way.
+    yield* Effect.promise(async () => {
+      try {
+        const inventory = await import('./services/backend-inventory.js');
+        inventory.onBackendPanesChanged(({ changed, removed }) => {
+          const next = { ...state.backendPanesById };
+          for (const pane of changed) next[pane.id] = pane;
+          for (const paneId of removed) delete next[paneId];
+          state = { ...state, backendPanesById: next };
+          for (const pane of changed) {
+            emitDerivedEvent({ type: 'backend_pane.changed', payload: { pane } });
+          }
+          for (const paneId of removed) {
+            emitDerivedEvent({ type: 'backend_pane.removed', payload: { paneId } });
+          }
+        });
+        await inventory.startBackendInventory();
+      } catch (err) {
+        console.error('[ReadModel] Backend pane inventory unavailable:', err);
       }
     });
 

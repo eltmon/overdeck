@@ -223,7 +223,7 @@ describe('deriveSimpleIssue', () => {
 
   it('ready → ready with Merge primary action and PR url', () => {
     const d = deriveSimpleIssue(makeIssue({ state: 'in_review' }), [], derived('ready', {
-      pr: { url: 'https://github.com/x/y/pull/1', number: 1, reviewState: 'APPROVED', checks: 'green', mergeable: true },
+      pr: { url: 'https://github.com/x/y/pull/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true },
     }));
     expect(d.display.state).toBe('ready');
     expect(d.display.primaryAction).toBe('Merge to main');

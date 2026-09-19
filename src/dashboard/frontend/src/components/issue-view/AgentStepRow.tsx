@@ -65,7 +65,6 @@ const SECTIONS = {
   cost: AGENT_ROW_SECTIONS[6],
   verdict: AGENT_ROW_SECTIONS[7],
   contextMenu: AGENT_ROW_SECTIONS[8],
-  pausedReason: AGENT_ROW_SECTIONS[9],
 };
 
 export type AgentStepDensity = 'rail' | 'cockpit';
@@ -579,14 +578,15 @@ export function AgentStepRow({
   const lastActivity = runtime?.lastActivity;
   const [isStopping, setIsStopping] = useState(false);
 
-  const isPaused = session.paused === true;
-  const dotStatus = isPaused ? 'waiting' : session.awaitingInput ? 'waiting' : deriveDotStatus(runtime, session.presence);
+  // PAN-3917: a session node is a backend pane. The pause gate is an agent
+  // fact, not a pane fact, so it is no longer mirrored onto the node.
+  const dotStatus = session.awaitingInput ? 'waiting' : deriveDotStatus(runtime, session.presence);
   const activity = effectiveActivity(runtime, session.presence);
   const isLive = session.presence === 'active' || session.presence === 'idle' || session.presence === 'suspended';
-  const displayStatus = (isStopping && isLive) ? 'stopping' : isPaused ? 'paused' : session.awaitingInput ? 'waiting' : (activity ?? session.status);
-  const statusCssKey = (isStopping && isLive) ? 'stopping' : isPaused ? 'paused' : session.awaitingInput ? 'waiting' : (activity ?? session.status);
+  const displayStatus = (isStopping && isLive) ? 'stopping' : session.awaitingInput ? 'waiting' : (activity ?? session.status);
+  const statusCssKey = (isStopping && isLive) ? 'stopping' : session.awaitingInput ? 'waiting' : (activity ?? session.status);
 
-  const isLiveActivity = isLive && !isPaused && (
+  const isLiveActivity = isLive && (
     statusCssKey === 'running' || statusCssKey === 'working' || statusCssKey === 'thinking' || statusCssKey === 'starting'
   );
 
@@ -624,18 +624,14 @@ export function AgentStepRow({
 
   const lastHeardLabel = lastActivity ? formatRelativeTime(lastActivity, new Date()) : undefined;
   const sessionLabelTitle = getSessionLabelTitle(session, defaultModel, lastHeardLabel);
-  const statusTitle = isPaused
-    ? `Paused${session.pausedReason ? `: ${session.pausedReason}` : ''}`
-    : session.awaitingInput
-      ? `Awaiting user input${session.awaitingInputPrompt ? `: ${session.awaitingInputPrompt}` : '.'}`
-      : getSessionStatusTitle({ runtime, presence: session.presence, displayStatus, lastHeardLabel });
+  const statusTitle = session.awaitingInput
+    ? `Awaiting user input${session.awaitingInputPrompt ? `: ${session.awaitingInputPrompt}` : '.'}`
+    : getSessionStatusTitle({ runtime, presence: session.presence, displayStatus, lastHeardLabel });
 
   const flashKey = `${session.sessionId}:${session.presence}:${session.status}`;
   const flashClass = useLiveFlash(flashKey, 'anim-row-flash', 600);
 
-  const railIconClass = isPaused
-    ? railStyles.sessionIconPaused
-    : statusCssKey === 'error'
+  const railIconClass = statusCssKey === 'error'
       ? railStyles.sessionIconError
       : isLiveActivity
         ? (session.type === 'review' || session.type === 'reviewer' ? railStyles.sessionIconReview : railStyles.sessionIconRunning)
@@ -643,7 +639,7 @@ export function AgentStepRow({
 
   const { latestReviewResult } = session.roundMetadata ?? {};
   const verdictTile = latestReviewResult === 'APPROVED' ? 'ok' : latestReviewResult === 'CHANGES_REQUESTED' ? 'bad' : undefined;
-  const cockpitDotStatus: StatusDotStatus = isPaused || session.awaitingInput
+  const cockpitDotStatus: StatusDotStatus = session.awaitingInput
     ? 'waiting'
     : statusCssKey === 'error'
       ? 'error'
@@ -682,9 +678,6 @@ export function AgentStepRow({
       )}
       {canResumeStopped && (
         <ContextMenuItem onSelect={() => onAction('resume')}>Resume session</ContextMenuItem>
-      )}
-      {isPaused && (
-        <ContextMenuItem onSelect={() => onAction('unpause')}>Unpause</ContextMenuItem>
       )}
       {canStop && (
         <ContextMenuItem onSelect={handleStop} disabled={isStopping}>
@@ -763,11 +756,6 @@ export function AgentStepRow({
     const cockpitContent = (
       <div className={cockpitStyles.rowWrap}>
         {cockpitButton}
-        {isPaused && session.pausedReason ? (
-          <div className={cockpitStyles.pausedReason} data-section={SECTIONS.pausedReason} title={session.pausedReason}>
-            {session.pausedReason}
-          </div>
-        ) : null}
       </div>
     );
 
@@ -843,19 +831,6 @@ export function AgentStepRow({
               {displayStatus}
             </span>
           )}
-          {isPaused && (
-            <span
-              role="button"
-              tabIndex={-1}
-              data-testid="session-unpause"
-              className={railStyles.unpauseBtn}
-              title={session.pausedReason ? `Unpause — paused: ${session.pausedReason}` : 'Unpause this agent'}
-              onClick={(e) => { e.stopPropagation(); onAction('unpause'); }}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onAction('unpause'); } }}
-            >
-              ▶ Unpause
-            </span>
-          )}
           {cost && (
             <span className={railStyles.sessionDuration} data-section={SECTIONS.cost}>{cost}</span>
           )}
@@ -864,11 +839,6 @@ export function AgentStepRow({
           )}
         </button>
       </ContextMenuTrigger>
-      {isPaused && session.pausedReason && (
-        <div className={railStyles.sessionPausedReason} data-section={SECTIONS.pausedReason} data-testid="session-paused-reason" title={session.pausedReason}>
-          ⏸ {session.pausedReason}
-        </div>
-      )}
       {showMenu && renderContextMenu()}
     </ContextMenuRoot>
   );

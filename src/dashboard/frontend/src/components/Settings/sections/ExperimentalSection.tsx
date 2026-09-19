@@ -9,7 +9,6 @@ interface ExperimentalSectionProps {
   queryClient: QueryClient;
   reloadingTldr: boolean;
   saveStatus: SaveStatus;
-  setLegacyImportOpen: (open: boolean) => void;
   setReloadingTldr: (reloading: boolean) => void;
   onSettingsChange: (next: SettingsConfig, opts?: { debounce?: boolean }) => void;
 }
@@ -19,7 +18,6 @@ export function ExperimentalSection({
   queryClient,
   reloadingTldr,
   saveStatus,
-  setLegacyImportOpen,
   setReloadingTldr,
   onSettingsChange,
 }: ExperimentalSectionProps) {
@@ -237,24 +235,6 @@ export function ExperimentalSection({
             <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
               formData.experimental?.streamdownRenderer ? 'translate-x-[18px]' : 'translate-x-[3px]'
             }`} />
-          </button>
-        </div>
-        <div className="flex items-center justify-between gap-4 px-4 py-3 rounded-lg hover:bg-muted/30 transition-colors">
-          <div className="min-w-0">
-            <span className="text-sm font-medium text-foreground">Import conversations from old Panopticon</span>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Migrate conversations from your pre-rebrand <span className="font-mono">~/.panopticon/panopticon.db</span> into
-              Overdeck. Titles, cost history, favorites, and JSONL transcript links are preserved.
-              Existing conversations are never overwritten.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setLegacyImportOpen(true)}
-            data-testid="legacy-import-open-button"
-            className="shrink-0 px-3 py-1.5 text-sm rounded-md border border-border text-foreground hover:bg-muted/30 transition-colors"
-          >
-            Import…
           </button>
         </div>
       </div>

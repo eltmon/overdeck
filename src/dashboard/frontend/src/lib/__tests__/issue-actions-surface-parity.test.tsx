@@ -129,7 +129,7 @@ const REGISTRY: ActionRegistry = {
 
 const noop = () => undefined;
 const WORK_PANE = { id: 'pane-work', issue: 'PAN-1610', role: 'work' as const, harness: 'claude-code', model: 'claude-opus-4-8', state: 'working' as const };
-const OPEN_PR = { url: 'https://example.test/pr/1610', number: 1610, reviewState: 'APPROVED', checks: 'green' as const, mergeable: true };
+const OPEN_PR = { url: 'https://example.test/pr/1610', number: 1610, reviewState: 'approved', checks: 'green' as const, mergeable: true };
 
 const BASE_STATE: IssueActionState = {
   derived: null,

@@ -62,7 +62,6 @@ import type { ReviewerRoundMetadata } from './reviewer-tree.js';
 import {
   awaitingInputFromProjection,
   buildSpecialistSessionNodes,
-  readSessionGateFields,
 } from './session-tree-specialists.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, WORKSPACE_RUNTIME_DIRNAME } from '../../../lib/pan-dir/index.js';
 import { isPlanningComplete } from '../../../lib/xbrief/io.js';
@@ -297,7 +296,6 @@ async function collectSessionTreeNodes(
         harness: state.harness,
         deliveryMethod: state.deliveryMethod,
         planningComplete: isPlanning ? planningFinished : undefined,
-        ...await readSessionGateFields(checkId, state),
       });
     } catch {
       // skip malformed state
@@ -417,7 +415,6 @@ async function collectSessionTreeNodes(
         pendingInputKinds: shipSnapshot?.pendingInputKinds ? [...shipSnapshot.pendingInputKinds] : undefined,
         hasJsonl: !!shipJsonlPath,
         tmuxSession: shipIsLive ? shipSessionName : undefined,
-        ...await readSessionGateFields(shipSessionName),
       });
     }
   }

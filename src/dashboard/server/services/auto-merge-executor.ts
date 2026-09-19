@@ -11,7 +11,6 @@ import {
 } from '../../../lib/overdeck/merge-sync.js';
 import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
 import { isMergeTrainEnabled } from '../../../lib/overdeck/control-settings.js';
-import { readPendingDeploy } from '../../../lib/deploy/deploy-queue.js';
 import { getDerivedIssueState } from './derived-issue-state.js';
 
 export const AUTO_MERGE_EXECUTOR_INTERVAL_MS = 30_000;
@@ -123,10 +122,10 @@ export async function tickAutoMergeExecutor(deps: AutoMergeExecutorDeps = {}): P
     log('[auto-merge] merge train disabled, skipping tick');
     return;
   }
-  const hasPendingDeploy = deps.hasPendingDeploy
-    ?? (async () => (await readPendingDeploy()) !== null);
-  if (await hasPendingDeploy()) {
-    log(`[auto-merge] dashboard deploy queued, deferring ${entries.length} merge(s) before preparation`);
+  // PAN-3917 D1: there is no deploy queue to defer to — the post-merge deploy
+  // patrol and its pending-deploy file are gone.
+  if (deps.hasPendingDeploy && await deps.hasPendingDeploy()) {
+    log(`[auto-merge] deploy in progress, deferring ${entries.length} merge(s) before preparation`);
     return;
   }
 

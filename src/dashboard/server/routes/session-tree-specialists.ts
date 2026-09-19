@@ -28,28 +28,6 @@ export function awaitingInputFromProjection(
   };
 }
 
-/**
- * PAN-3917: the paused/troubled gate fields lived on the agent record, which is
- * gone. A session node carries the queued-mail count and nothing else; callers
- * spread the result, so an empty object is a no-op for them.
- */
-export async function readSessionGateFields(
-  sessionId: string,
-  _state: AgentState | null = null,
-): Promise<{ queuedMailCount?: number }> {
-  const queuedMailCount = await countQueuedMail(sessionId);
-  return queuedMailCount > 0 ? { queuedMailCount } : {};
-}
-
-async function countQueuedMail(agentId: string): Promise<number> {
-  try {
-    const entries = await readdir(join(getAgentDir(agentId), 'mail'), { withFileTypes: true });
-    return entries.filter((entry) => entry.isFile() && entry.name.endsWith('.md')).length;
-  } catch {
-    return 0;
-  }
-}
-
 interface BuildSpecialistSessionNodesOptions {
   issueId: string;
   fallbackProjectKey: string;
@@ -137,7 +115,6 @@ export async function buildSpecialistSessionNodes(
       pendingInputKinds: snapshot?.pendingInputKinds ? [...snapshot.pendingInputKinds] : undefined,
       hasJsonl: !!jsonlPath,
       tmuxSession: reviewIsLive ? (reviewPane?.terminalId ?? reviewSessionName) : undefined,
-      ...await readSessionGateFields(reviewSessionName, state),
     });
 
     const reviewerNodes = await buildReviewerNodes({
@@ -185,7 +162,6 @@ export async function buildSpecialistSessionNodes(
       pendingInputKinds: snapshot?.pendingInputKinds ? [...snapshot.pendingInputKinds] : undefined,
       hasJsonl: !!jsonlPath,
       tmuxSession: testIsLive ? (testPane?.terminalId ?? testSessionName) : undefined,
-      ...await readSessionGateFields(testSessionName, state),
     });
   }
 
