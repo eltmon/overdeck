@@ -753,4 +753,71 @@ describe('CommandPalette conversations scope chip (PAN-3705)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Conversations' }));
     expect(conversationValues()).toEqual(['conv-first-1', 'conv-second-2']);
   });
+
+  it('shows scope-aware empty-query copy under the Conversations scope (AC1)', () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      if (method === 'GET' && url.startsWith('/api/palette/search')) {
+        return Response.json({ observations: [], conversations: [], memory: [], summaries: [] });
+      }
+      return undefined;
+    });
+
+    renderCommandPalette();
+    fireEvent.click(screen.getByRole('button', { name: 'Conversations' }));
+
+    expect(screen.getByText('Type to search conversations…')).toBeInTheDocument();
+    expect(screen.queryByText('Start typing…')).toBeNull();
+  });
+
+  it('shows scope-aware loading copy while a conversation search is in flight (AC2)', async () => {
+    let resolveSearch: (response: Response) => void = () => {};
+    const pendingSearch = new Promise<Response>((resolve) => { resolveSearch = resolve; });
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      if (method === 'GET' && url.startsWith('/api/palette/search')) return pendingSearch;
+      return undefined;
+    });
+
+    renderCommandPalette();
+    fireEvent.click(screen.getByRole('button', { name: 'Conversations' }));
+    // Query text matches the fixture issue, so the Issues chip stays available
+    // alongside the pinned Conversations chip while the search is in flight —
+    // otherwise the chip row briefly collapses to one entry and resets to All.
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'Alpha' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+
+    expect(screen.getByText('Searching conversations…')).toBeInTheDocument();
+    expect(screen.queryByText('Searching conversations & memory…')).toBeNull();
+
+    // Resolve the in-flight request so afterEach's assertNoUnexpectedRequests doesn't hang.
+    resolveSearch(Response.json({ observations: [], conversations: [], memory: [], summaries: [] }));
+    await act(async () => { await pendingSearch; });
+  });
+
+  it('falls back to the standard empty state on a 500 and keeps the Conversations scope active (AC3)', async () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      if (method === 'GET' && url.startsWith('/api/palette/search')) return new Response(null, { status: 500 });
+      return undefined;
+    });
+
+    renderCommandPalette();
+    fireEvent.click(screen.getByRole('button', { name: 'Conversations' }));
+    // Matches the fixture issue so the chip row (Issues + Conversations)
+    // survives the reset effect while the failed search settles.
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'Alpha' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+
+    // The Conversations scope excludes the (non-conversation) issue match too.
+    expect(screen.getByText('No results for "Alpha"')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Conversations' }).className).toMatch(/text-primary/);
+  });
 });

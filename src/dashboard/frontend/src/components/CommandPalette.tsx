@@ -978,13 +978,15 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
             {isSearchLoading && query.trim().length >= 2 && (
               <div className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                Searching conversations & memory…
+                {scope === 'conversations' ? 'Searching conversations…' : 'Searching conversations & memory…'}
               </div>
             )}
             {visibleGroups.length === 0 ? (
               isSearchLoading && query.trim().length >= 2 ? null : (
                 <Command.Empty className="py-6 text-center text-sm text-muted-foreground">
-                  {query.trim().length === 0 ? 'Start typing…' : `No results for "${query}"`}
+                  {query.trim().length === 0
+                    ? (scope === 'conversations' ? 'Type to search conversations…' : 'Start typing…')
+                    : `No results for "${query}"`}
                 </Command.Empty>
               )
             ) : (
