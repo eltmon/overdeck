@@ -7,7 +7,6 @@ import {
   type AgentGcDeps,
   type AgentGcTerminalityDeps,
 } from '../../../../src/lib/cloister/agent-gc.js';
-import { RETAINED_TRANSCRIPTS_PHASE } from '../../../../src/lib/overdeck/agents.js';
 import type { AgentState } from '../../../../src/lib/agents/agent-state.js';
 
 const agent = (id: string, status: AgentState['status'], role: AgentState['role']): AgentState => ({
@@ -63,11 +62,11 @@ describe('PAN-2543 event-driven agent row GC', () => {
     expect(result).toEqual({ removed: ['agent-pan-2503', 'planning-pan-2503'], preserved: ['agent-pan-2503-review'] });
   });
 
-  it('excludes retained-transcript tombstones before terminal issue resolution', async () => {
+  it('excludes already-retired agents before terminal issue resolution', async () => {
     const isTerminalAgent = vi.fn(() => true);
     const cleanStateDir = vi.fn();
     const result = await pruneTerminalStoppedAgents([
-      { ...agent('agent-pan-2503', 'stopped', 'work'), phase: RETAINED_TRANSCRIPTS_PHASE },
+      agent('agent-pan-2503', 'stopped', 'work'),
     ], gcDeps({
       cleanStateDir,
       hasRetainedMarker: vi.fn(async () => true),

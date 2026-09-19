@@ -251,8 +251,11 @@ describe('sweepTranscriptRetention', () => {
     const firstGc = await pruneTerminalStoppedAgents([agent], gcDeps);
     const repeatedGc = await pruneTerminalStoppedAgents([agent], gcDeps);
 
+    // The first pass retains the directory (its transcript is still fresh); the
+    // second sees the marker and skips it outright rather than re-probing the
+    // tracker for an agent it already retired (PAN-3917).
     expect(firstGc).toEqual({ removed: [], preserved: ['agent-pan-3357'] });
-    expect(repeatedGc).toEqual({ removed: [], preserved: ['agent-pan-3357'] });
+    expect(repeatedGc).toEqual({ removed: [], preserved: [] });
     expect(cleanStateDir).toHaveBeenCalledTimes(1);
     expect(existsSync(transcriptPath)).toBe(true);
     expect(existsSync(join(agentsDir, 'agent-pan-3357'))).toBe(true);

@@ -2,7 +2,6 @@ import { join } from 'node:path';
 
 import { Effect } from 'effect';
 
-import { RETAINED_TRANSCRIPTS_PHASE } from '../overdeck/agents.js';
 import { listAgentStatesSync } from '../agents/agent-state.js';
 import { getOverdeckHome } from '../paths.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
@@ -294,10 +293,16 @@ export async function pruneTerminalStoppedAgents(
   deps: AgentGcDeps = defaultAgentGcDeps(),
   options: { dryRun?: boolean } = {},
 ): Promise<AgentGcResult> {
-  const candidates = agents.filter((agent) =>
-    agent.phase !== RETAINED_TRANSCRIPTS_PHASE
-    && agent.status === 'stopped'
-    && Boolean(agent.workspace));
+  // PAN-3465/PAN-3917: an already-retired agent must not draw a live tracker or
+  // forge probe. Its evidence used to be a tombstone phase on the row; with the
+  // row gone it is the retained-transcripts marker on the directory.
+  const stopped = agents.filter((agent) =>
+    agent.status === 'stopped' && Boolean(agent.workspace));
+  const candidates: AgentGcRow[] = [];
+  for (const agent of stopped) {
+    if (await deps.hasRetainedMarker(join(deps.agentsDir, agent.id))) continue;
+    candidates.push(agent);
+  }
   const terminal: AgentGcRow[] = [];
   const evidenceByAgent = new Map<string, AgentGcTerminalityEvidence>();
   const preserved: string[] = [];

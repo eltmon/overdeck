@@ -74,21 +74,18 @@ describe('concurrency governor — config + counting', () => {
     expect(limits.exemptOperatorStarted).toBe(true); // defaults to true
   });
 
-  it('counts status=running agents from the agents table, grouped into work vs advancing', async () => {
+  it('counts tmux-alive running agents, grouped into work vs advancing', async () => {
     vi.resetModules();
     vi.doMock('../../../src/lib/agents.js', () => ({
-      listRunningAgentsSync: () => [],
-    }));
-    vi.doMock('../../../src/lib/overdeck/agents.js', () => ({
-      countAgentsByStatus: (status: string) => {
-        if (status !== 'running') return {};
-        return {
-          work: 1,
-          review: 1,
-          ship: 1,
-          plan: 1, // neither work nor advancing
-        };
-      },
+      listRunningAgentsSync: () => [
+        { id: 'agent-pan-1', role: 'work', issueId: 'PAN-1', status: 'running', tmuxActive: true },
+        { id: 'agent-pan-2-review', role: 'review', issueId: 'PAN-2', status: 'running', tmuxActive: true },
+        { id: 'agent-pan-3-ship', role: 'ship', issueId: 'PAN-3', status: 'running', tmuxActive: true },
+        { id: 'planning-pan-4', role: 'plan', issueId: 'PAN-4', status: 'running', tmuxActive: true },
+        // PAN-3917: a crashed agent's state file still says `running` — nothing
+        // rewrites it. Only the tmux census can retire it from the ceiling.
+        { id: 'agent-pan-5', role: 'work', issueId: 'PAN-5', status: 'running', tmuxActive: false },
+      ],
     }));
     const { countRunningAgents } = await import('../../../src/lib/cloister/concurrency.js');
     expect(countRunningAgents()).toEqual({ work: 1, advancing: 2, swarm: 0, total: 3 });
@@ -101,9 +98,6 @@ describe('concurrency governor — config + counting', () => {
         { id: 'agent-pan-1', role: 'work', issueId: 'PAN-1', status: 'running', tmuxActive: true },
         { id: 'agent-pan-2-slot-1', role: 'work', issueId: 'PAN-2', status: 'running', tmuxActive: true },
       ],
-    }));
-    vi.doMock('../../../src/lib/overdeck/agents.js', () => ({
-      countAgentsByStatus: (status: string) => (status === 'running' ? { work: 2 } : {}),
     }));
     vi.doMock('../../../src/lib/cloister/swarm-slot-lifecycle.js', () => ({
       isTerminalSwarmSlotAgent: (agent: { id: string }) => agent.id === 'agent-pan-2-slot-1',
@@ -118,13 +112,11 @@ describe('concurrency governor — config + counting', () => {
     vi.resetModules();
     vi.doMock('../../../src/lib/agents.js', () => ({
       listRunningAgentsSync: () => [
+        { id: 'agent-pan-9', role: 'work', issueId: 'PAN-9', status: 'running', tmuxActive: true },
         { id: 'agent-pan-1-review', role: 'review', issueId: 'PAN-1', status: 'running', tmuxActive: true },
         { id: 'agent-pan-2-review', role: 'review', issueId: 'PAN-2', status: 'running', tmuxActive: true },
         { id: 'agent-pan-3-test', role: 'test', issueId: 'PAN-3', status: 'running', tmuxActive: true },
       ],
-    }));
-    vi.doMock('../../../src/lib/overdeck/agents.js', () => ({
-      countAgentsByStatus: (status: string) => (status === 'running' ? { work: 1, review: 2, test: 1 } : {}),
     }));
     // PAN-3917: warm-idle is the pane's own liveness, not a stored verdict.
     vi.doMock('../../../src/lib/agents/liveness.js', () => ({

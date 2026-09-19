@@ -1,7 +1,6 @@
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import { getAgentStateSync, listAgentStates, resolveAgentTargetSync, setAgentPausedSync, stopAgentSync } from '../../lib/agents.js';
-import { RETAINED_TRANSCRIPTS_PHASE } from '../../lib/overdeck/agents.js';
 import { listSessionNamesSync, sessionExistsSync } from '../../lib/tmux.js';
 import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
 
@@ -64,7 +63,6 @@ function printSwarmPauseGuidance(id: string): boolean {
     // Appendix A.5 reconcilers; the swarm-slot pattern match it did over
     // listAgentStates is inlined here — this is the only caller left.
     for (const agent of listAgentStates({ role: 'work' })) {
-      if (agent.phase === RETAINED_TRANSCRIPTS_PHASE) continue;
       if (slotPattern.test(agent.id)) slotAgentIds.add(agent.id);
     }
   } catch {

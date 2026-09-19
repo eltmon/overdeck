@@ -31,8 +31,6 @@ export function isTerminalIssueStage(stage: string | null): boolean {
   return TERMINAL_ISSUE_STAGES.has(stage as Stage);
 }
 
-export const RETAINED_TRANSCRIPTS_PHASE = 'retained-transcripts';
-
 const overdeckHealthEvents = sqliteTable('health_events', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   agentId: text('agent_id'),
@@ -166,7 +164,7 @@ function agentStateToEntityInput(state: AgentState): Record<string, unknown> {
     sessionId: state.sessionId ?? null,
     harness: state.harness ?? '',
     model: state.model ?? '',
-    hostOverride: null,
+    hostOverride: typeof state.hostOverride === 'string' ? state.hostOverride : null,
     deliveryMethod: state.deliveryMethod ?? null,
     startedAt: toDate(state.startedAt),
     lastResumeAt: toDate(state.lastResumeAt),
@@ -280,12 +278,3 @@ export function listAgentIdsByPrefixSync(prefix: string): string[] {
   }
 }
 
-/** Count the agents in a status, grouped by role. */
-export function countAgentsByStatus(status: string): Record<string, number> {
-  const counts: Record<string, number> = {};
-  for (const state of listAgentStatesSync()) {
-    if (state.status !== status) continue;
-    counts[state.role] = (counts[state.role] ?? 0) + 1;
-  }
-  return counts;
-}
