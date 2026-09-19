@@ -31,7 +31,7 @@ const KNOWN_CALL_SITES = new Set([
   'cli/commands/resume.ts|const result = await resumeAgent(id, undefined, { allowHost: options.host === true, compact: options.compact === true });',
   'cli/commands/tell.ts|const outcome = await messageAgent(agentId, message, \'pan-tell\', {',
   'cli/commands/unpause.ts|const result = await resumeAgent(agentId);',
-  'dashboard/server/pending-feedback.ts|* When the dashboard dies after writing feedback and before messageAgent() completes,',
+  'dashboard/server/pending-feedback.ts|* dies after writing feedback and before messageAgent() completes, startup',
   'dashboard/server/routes/agents/lifecycle-restart.ts|console.log(`[agents/resume] ${id} dispatching resumeAgent() with opts=${JSON.stringify(resumeOpts)}`);',
   'dashboard/server/routes/agents/lifecycle-restart.ts|const result = yield* Effect.promise(() => resumeAgent(id, message, resumeOpts));',
   'dashboard/server/routes/agents/lifecycle-stop.ts|.then(({ resumeAgent }) => resumeAgent(id))',
