@@ -13,7 +13,7 @@ import {
 } from '../uat-train.js';
 import type { UatReconcilerDeps } from '../../../../lib/cloister/uat-reconciler.js';
 import type { UatGeneration } from '../../../../lib/overdeck/merge-types.js';
-import type { PromoteResult, UatPromoteDeps } from '../../../../lib/cloister/uat-promote.js';
+import type { PromoteResult } from '../../../../lib/cloister/uat-promote.js';
 
 const mocks = vi.hoisted(() => ({
   findProjectByPathSync: vi.fn(),
@@ -25,7 +25,6 @@ const mocks = vi.hoisted(() => ({
   buildUatPromoteGitDeps: vi.fn(),
   buildUatGenerationStore: vi.fn(),
   getUatGenerationSync: vi.fn(),
-  recordUatPromotionVerdicts: vi.fn(),
   findXBriefByIssue: vi.fn(),
   readXBriefDocument: vi.fn(),
   reviewRecordEligibility: vi.fn(),
@@ -110,6 +109,16 @@ vi.mock('../../../../lib/cloister/uat-promote.js', async (importOriginal) => {
   };
 });
 
+
+// PAN-3917: the candidate list is the forge's — every open PR that is
+// approved, green, and mergeable — not a record-backed eligibility scan.
+vi.mock('../derived-issue-state.js', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../derived-issue-state.js')>();
+  return {
+    ...original,
+    listReadyIssuesForProject: async () => mocks.listEligibleCandidatesByProject(),
+  };
+});
 
 vi.mock('../../../../lib/flywheel-merge-order.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../../../lib/flywheel-merge-order.js')>();
@@ -428,26 +437,10 @@ describe('postUatGenerationPromotePayload', () => {
     mocks.buildUatGenerationStore.mockReturnValue({ listChain: vi.fn(), update: vi.fn() });
   });
 
-  it('wires UAT promotion verdict recording into the promote dependencies', async () => {
-    const result: PromoteResult = {
-      success: true,
-      generation: 'uat/pan-cobalt-0703',
-      mergeSha: 'abc123',
-      members: ['PAN-2294'],
-      postMergeStarted: ['PAN-2294'],
-      invalidated: [],
-    };
-    const generation = gen([
-      { issueId: 'PAN-2294', title: 'Feature', branch: 'feature/pan-2294', headSha: 'head-sha', mergeOrder: 1 },
-    ]);
-    mocks.promoteUatGeneration.mockResolvedValue(result);
-
-    await postUatGenerationPromotePayload('uat/pan-cobalt-0703', vi.fn());
-
-    const deps = mocks.promoteUatGeneration.mock.calls[0]![2] as UatPromoteDeps;
-    deps.recordVerification?.(generation, 'abc123');
-    expect(mocks.recordUatPromotionVerdicts).toHaveBeenCalledWith(generation, 'abc123');
-  });
+  // PAN-3917: promotion used to stamp a verification verdict onto every
+  // member's record. The merge is the evidence — the generation row carries the
+  // merge sha and readiness is re-derived from each PR — so there is no
+  // recordVerification dependency left to wire.
 
   it('returns the exact promote result object unchanged for success and failure results', async () => {
     const success: PromoteResult = {

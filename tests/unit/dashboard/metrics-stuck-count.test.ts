@@ -110,7 +110,7 @@ function computeStuckCount(opts: {
     opts.agentsNeedingAttention,
     (id) => ({ state: opts.agentIdToHealth[id] ?? 'active' }),
     new Map(Object.entries(opts.agentIdToIssueId).map(([k, v]) => [k, v.toUpperCase()])),
-    Object.fromEntries(opts.persistentStuckIssueIds.map(id => [id, { stuck: true as const, issueId: id }])),
+    new Set(opts.persistentStuckIssueIds),
   );
 }
 
@@ -211,7 +211,7 @@ describe('buildMetricsSummaryPayload', () => {
         topIssues: [],
       },
       runningAgents: [],
-      reviewStatuses: {},
+      stuckIssueIds: new Set<string>(),
       getAgentHealth: () => null,
       eventLoop: {
         p50: 1,
