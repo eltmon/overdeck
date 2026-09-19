@@ -20,8 +20,10 @@ import type { GitOperation } from '../../../src/lib/git-activity.js';
 let TEST_HOME: string;
 
 async function resetDb() {
-  const { resetDatabase } = await import('../../../src/lib/database/index.js');
-  resetDatabase();
+  // PAN-3917: git_operations moved to the overdeck DB; its handle is the one
+  // to close between cases so the next OVERDECK_HOME opens a fresh file.
+  const { closeOverdeckDatabaseSync } = await import('../../../src/lib/overdeck/infra.js');
+  closeOverdeckDatabaseSync();
 }
 
 beforeEach(() => {

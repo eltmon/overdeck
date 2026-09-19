@@ -1,28 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { openDatabase, type SqliteDatabase } from '../../../../src/lib/database/driver.js';
-import { runMigrations } from '../../../../src/lib/database/schema.js';
 
+// PAN-3917: the schema assertion is gone with the panopticon database it read.
+// What is left is the source guard: nothing in the read path may re-introduce
+// the cache.
 describe('projection_cache deletion is locked (PAN-1847)', () => {
-  let db: SqliteDatabase;
-
-  beforeEach(() => {
-    db = openDatabase(':memory:');
-  });
-
-  afterEach(() => {
-    db.close();
-  });
-
-  it('fresh DB built via runMigrations has no projection_cache table', () => {
-    runMigrations(db);
-    const row = db
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='projection_cache'")
-      .get();
-    expect(row).toBeUndefined();
-  });
-
   it('dashboard server source files contain no projection_cache re-introduction patterns', () => {
     const root = join(process.cwd(), 'src/dashboard/server');
     const files = [
