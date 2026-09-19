@@ -16,11 +16,10 @@
 
 import { Effect } from 'effect';
 
-import { loadConfigSync } from '../config-yaml.js';
 import './herdr.js';
 import './tmux.js';
 import { resolveTerminalBackend } from './registry.js';
-import { selectTerminalBackend } from './select.js';
+import { hostTerminalBackendName } from './select.js';
 import {
   isUnsupported,
   type AgentPaneRef,
@@ -34,15 +33,20 @@ export const CONVERSATIONS_WORKSPACE = 'conversations';
 
 /** The backend this host launches into, with both adapters registered. */
 export async function resolveLaunchBackend(): Promise<TerminalBackend> {
-  let configured: { terminal?: { backend?: TerminalBackendName } } = {};
-  try {
-    configured = loadConfigSync() as { terminal?: { backend?: TerminalBackendName } };
-  } catch {
-    // An unreadable config is a selection input, not a launch failure: D10's
-    // probe then decides on the binary and socket alone.
-  }
-  const { backend } = await selectTerminalBackend(configured);
-  return resolveTerminalBackend(backend);
+  return resolveTerminalBackend(await hostTerminalBackendName());
+}
+
+/**
+ * Close a pane a launch already created (PAN-3917 FR-3). `stopAgent` and
+ * `killSession` reach a tmux session; on Herdr there is none, so the pane is
+ * closed through the reference `launchAgentPane` returned. A tmux pane (or a
+ * launch that never got a reference) falls through to the tmux path the caller
+ * already runs.
+ */
+export async function closeBackendPane(pane: AgentPaneRef | null): Promise<void> {
+  if (!pane || pane.backend === 'tmux') return;
+  const { resolveTerminalBackend: resolve } = await import('./registry.js');
+  await Effect.runPromise(resolve(pane.backend).close(pane)).catch(() => {});
 }
 
 export interface LaunchPaneRequest {

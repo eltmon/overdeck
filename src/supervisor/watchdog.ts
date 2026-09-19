@@ -548,17 +548,22 @@ export class SupervisorWatchdog {
       ? config.patrolIntervalMs
       : 60_000;
     const staleAfterMs = interval * 3;
-    const lastPatrol = typeof state.lastPatrol === 'string' ? state.lastPatrol : null;
+    // PAN-3917: deacon-lite keeps no heartbeat file and the dashboard process
+    // only reports a run timestamp when the deacon child has relayed one. A
+    // missing timestamp is therefore not evidence of a dead deacon (the
+    // pre-cut "heartbeat missing" verdict restart-looped the dashboard every
+    // three minutes after the cut). Only a reported-but-stale or invalid
+    // timestamp is a failure; liveness of the child is `isRunning` above.
+    const deaconLite = record.deaconLite && typeof record.deaconLite === 'object'
+      ? record.deaconLite as Record<string, unknown>
+      : {};
+    const lastPatrol = typeof state.lastPatrol === 'string'
+      ? state.lastPatrol
+      : typeof deaconLite.lastRunAt === 'string' ? deaconLite.lastRunAt : null;
 
     if (!lastPatrol) {
-      this.state.patrolUnhealthySince ??= nowMs;
-      const unhealthyForMs = nowMs - this.state.patrolUnhealthySince;
-      return {
-        message: `deacon patrol heartbeat missing for ${Math.floor(unhealthyForMs / 1000)}s`,
-        restartReady: unhealthyForMs > staleAfterMs,
-        reason: `deacon patrol heartbeat missing for >${Math.ceil(staleAfterMs / 1000)}s`,
-        logReason: 'deacon patrol heartbeat missing',
-      };
+      this.state.patrolUnhealthySince = null;
+      return null;
     }
 
     const lastPatrolMs = Date.parse(lastPatrol);

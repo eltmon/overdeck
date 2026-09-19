@@ -32,6 +32,9 @@ import { Effect } from 'effect';
 
 import { listPaneValues, listPaneValuesSync, sessionExists, sessionExistsSync } from '../tmux.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import { hostTerminalBackendName } from '../terminal-backends/select.js';
+import type { HerdrLivenessProbe } from '../terminal-backends/herdr.js';
+import type { TerminalBackendName } from '../terminal-backends/types.js';
 import { getAgentStateSync } from './agent-state.js';
 import { getAgentRuntimeStateSync } from './runtime-state.js';
 import {
@@ -105,6 +108,10 @@ export interface LivenessAsyncDeps {
   listPaneRows?: (agentId: string) => Promise<PaneRow[]>;
   findRuntimePid?: (rootPid: string, harness: RuntimeName) => Promise<RuntimePidProbeResult>;
   readHarness?: (agentId: string) => RuntimeName;
+  /** Terminal backend to probe. Defaults to the host's selection (D10). */
+  backend?: TerminalBackendName;
+  /** Herdr probe seam; defaults to the adapter's `probeHerdrAgentLiveness`. */
+  probeHerdr?: (agentId: string) => Promise<HerdrLivenessProbe>;
 }
 
 /** Test seams for the sync probe (the lifecycle classifier's variant). */
@@ -133,12 +140,59 @@ function listPaneRowsSyncDefault(agentId: string): PaneRow[] {
 }
 
 /**
- * Async liveness verdict: tmux session exists AND a pane is not dead AND the
- * harness process is in a live pane's subtree. The subtree walk covers
- * supervisor-launched agents, whose pane runs
- * `bash launcher.sh → node pty-supervisor.js → <harness>`.
+ * Async liveness verdict for whichever backend this host runs on (PAN-3917
+ * W12). On tmux it is the three-check probe below; on Herdr the backend itself
+ * is the oracle — a Herdr agent has no tmux session at all, so the tmux probe
+ * would answer `no-session` for every healthy agent and the remediators would
+ * reap the fleet.
  */
 export async function isAlive(agentId: string, deps: LivenessAsyncDeps = {}): Promise<LivenessVerdict> {
+  const backend = deps.backend ?? (await hostTerminalBackendName());
+  if (backend === 'herdr') return isAliveOnHerdr(agentId, deps);
+  return isAliveOnTmux(agentId, deps);
+}
+
+/**
+ * Herdr's own agent registry is the oracle. A server that answers "no such
+ * agent" is a confirmed death; a socket that does not answer is
+ * `runtime-indeterminate`, never a death — a Herdr outage must not become a
+ * fleet-wide reap.
+ */
+async function isAliveOnHerdr(agentId: string, deps: LivenessAsyncDeps): Promise<LivenessVerdict> {
+  let probe: (id: string) => Promise<HerdrLivenessProbe>;
+  if (deps.probeHerdr) {
+    probe = deps.probeHerdr;
+  } else {
+    try {
+      const { probeHerdrAgentLiveness } = await import('../terminal-backends/herdr.js');
+      probe = (id) => probeHerdrAgentLiveness(id);
+    } catch {
+      return { alive: false, reason: 'runtime-indeterminate' };
+    }
+  }
+
+  const result = await probe(agentId).catch((): HerdrLivenessProbe => ({
+    kind: 'indeterminate',
+    reason: 'herdr probe threw',
+  }));
+  switch (result.kind) {
+    case 'alive': return { alive: true, paneAlive: true };
+    case 'exited': return { alive: false, reason: 'pane-dead' };
+    case 'absent': return { alive: false, reason: 'no-session' };
+    default: return { alive: false, reason: 'runtime-indeterminate' };
+  }
+}
+
+/**
+ * tmux liveness: the session exists AND a pane is not dead AND the harness
+ * process is in a live pane's subtree. The subtree walk covers
+ * supervisor-launched agents, whose pane runs
+ * `bash launcher.sh → node pty-supervisor.js → <harness>` — a wrapper that
+ * exists only on tmux (see `decideSupervisorForWorkAgent`). Exported so the
+ * tmux backend adapter's inventory keeps probing tmux even on a host whose
+ * selected backend is Herdr.
+ */
+export async function isAliveOnTmux(agentId: string, deps: LivenessAsyncDeps = {}): Promise<LivenessVerdict> {
   const sessionExistsProbe = deps.sessionExists ?? sessionExistsDefault;
   const listPaneRows = deps.listPaneRows ?? listPaneRowsDefault;
   const findRuntimePid = deps.findRuntimePid ?? findAgentRuntimePidInSubtree;

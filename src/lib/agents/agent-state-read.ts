@@ -21,6 +21,7 @@
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import type { RuntimeName } from '../runtimes/types.js';
+import type { TerminalBackendName } from '../terminal-backends/types.js';
 import { getOverdeckHome } from '../paths.js';
 import { normalizeAgentId } from './identity.js';
 import { isRole, type Role } from './role.js';
@@ -136,6 +137,15 @@ export interface AgentState {
   /** True when this work agent was launched through the PTY supervisor wrapper. */
   supervisorEnabled?: boolean;
   /**
+   * Terminal backend the agent's pane lives on, and the backend-native pane
+   * handle, written as soon as the pane exists (PAN-3917 W12). A spawn that
+   * fails AFTER the pane is created must still be addressable — without these
+   * a later stop has nothing to close, and a failed launch left `starting` with
+   * no record of where its pane was.
+   */
+  backend?: TerminalBackendName;
+  paneId?: string;
+  /**
    * Delivery method for agent messages. 'auto' tries supervisor, then channels,
    * then tmux; explicit socket methods are strict (throw on failure); 'tmux'
    * bypasses socket transports entirely.
@@ -226,6 +236,8 @@ export function cleanAgentState(raw: AgentState): AgentState {
     startedBy: raw.startedBy,
     channelsEnabled: raw.channelsEnabled,
     supervisorEnabled: raw.supervisorEnabled,
+    backend: raw.backend,
+    paneId: raw.paneId,
     deliveryMethod: raw.deliveryMethod,
     reviewSubRole: raw.reviewSubRole,
     reviewRunId: raw.reviewRunId,

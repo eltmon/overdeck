@@ -8,6 +8,7 @@ import {
   closeOverdeckDatabaseSync,
   getOverdeckDatabaseSync,
   runSchemaTopUp,
+  dropPipelineStateMirrorTablesSync,
 } from '../infra.js';
 
 let tempDirs: string[] = [];
@@ -73,9 +74,18 @@ describe('overdeck schema top-ups', () => {
     expect(costIndexRows(reopened)).toHaveLength(2);
   });
 
-  it('drops the pipeline-state mirror tables on open (PAN-3917)', () => {
+  it('drops the pipeline-state mirror tables once, from the primary boot step, never on open (PAN-3917)', () => {
     const dbPath = makeDbPath();
     const db = getOverdeckDatabaseSync(dbPath);
+    const beforeDrop = db
+      .prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`)
+      .all<{ name: string }>()
+      .map((row) => row.name);
+    // A plain open never drops anything (fix10: a peer or CLI process sharing
+    // the live DB must not pull tables out from under the running dashboard).
+    expect(beforeDrop).toContain('review_status');
+    expect(dropPipelineStateMirrorTablesSync(db, {})).toMatchObject({ dropped: true });
+    expect(dropPipelineStateMirrorTablesSync(db, {})).toMatchObject({ dropped: false, skipped: 'already-dropped' });
     const tableNames = db
       .prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`)
       .all<{ name: string }>()

@@ -24,12 +24,13 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { writeBridgeTokenSync } from '../bridge-token.js';
 import { exactPaneTarget, sessionExists, setOption } from '../tmux.js';
-import { agentPaneExists, launchAgentPane } from '../terminal-backends/launch.js';
+import { agentPaneExists, closeBackendPane, launchAgentPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
 import { toPaneRole } from '../terminal-backends/tmux.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
 import {
   getAgentDir,
   markAgentRunning,
+  markSpawnFailed,
   recordStartupSessionExit,
   saveAgentState,
   saveAgentStateSync,
@@ -94,20 +95,6 @@ import { buildRegisteredSlotPrompt, ensureRegisteredSlotWorktree } from './regis
 import { launchAndCaptureManagedKimiSession } from '../runtimes/kimi-code.js';
 import { requireManagedKimiDelivery } from './managed-kimi-delivery.js';
 const execAsync = promisify(exec);
-/**
- * PAN-3917 FR-3: close a pane a launch already created. `stopAgent` and
- * `killSession` reach a tmux session; on Herdr there is none, so the pane is
- * closed through the reference `launchAgentPane` returned. A backend that is
- * tmux (or a launch that never got a reference) falls through to the tmux path
- * the caller already runs.
- */
-async function closeBackendPane(
-  pane: Awaited<ReturnType<typeof launchAgentPane>> | null,
-): Promise<void> {
-  if (!pane || pane.backend === 'tmux') return;
-  const { resolveTerminalBackend } = await import('../terminal-backends/registry.js');
-  await Effect.runPromise(resolveTerminalBackend(pane.backend).close(pane)).catch(() => {});
-}
 
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions): Promise<AgentState> {
   if (role !== 'work') return spawnRunWithoutConsentClaim(issueId, role, options);
@@ -711,7 +698,14 @@ async function spawnAgentWithoutConsentClaim(
     flywheelRunId: flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID,
     startedBy,
   };
-  const supervisorLaunch = await prepareSupervisorForFreshLaunch(agentId, options, state);
+  // PAN-3917 W12: one backend answer for both the supervisor decision and the
+  // launch — the PTY supervisor is tmux-only (see decideSupervisorForWorkAgent).
+  const launchBackend = await resolveLaunchBackend();
+  const supervisorLaunch = await prepareSupervisorForFreshLaunch(
+    agentId,
+    { ...options, backend: launchBackend.name },
+    state,
+  );
 
   saveAgentStateSync(state);
   clearSessionResetMarker(agentId);
@@ -882,22 +876,27 @@ async function spawnAgentWithoutConsentClaim(
       harness: resolvedHarness,
       model: selectedModel,
     },
-  }).then((pane) => { launchedPane = pane; });
+  }, launchBackend).then((pane) => {
+    launchedPane = pane;
+    // W12: a failure after this point is still addressable.
+    state.backend = pane.backend;
+    state.paneId = pane.paneId;
+    saveAgentStateSync(state);
+  });
 
-  if (resolvedHarness === 'kimi-code') {
-    try {
-      await launchAndCaptureManagedKimiSession({
-        agentId,
-        workspace: options.workspace,
-        launch: launchWorkSession,
-      });
-    } catch (err) {
-      await closeBackendPane(launchedPane);
-      await Effect.runPromise(stopAgent(agentId)).catch(() => undefined);
-      throw err;
+  // W12: the launch itself can fail — PAN-3705: the backend created the pane and
+  // never detected the harness. Uncaught, that left the state at `starting`.
+  try {
+    if (resolvedHarness === 'kimi-code') {
+      await launchAndCaptureManagedKimiSession({ agentId, workspace: options.workspace, launch: launchWorkSession });
+    } else {
+      await launchWorkSession();
     }
-  } else {
-    await launchWorkSession();
+  } catch (err) {
+    await closeBackendPane(launchedPane);
+    await Effect.runPromise(stopAgent(agentId)).catch(() => undefined);
+    await markSpawnFailed(agentId, `launch failed: ${err instanceof Error ? err.message : String(err)}`);
+    throw err;
   }
   await acceptConsent?.();
   await saveAgentRuntimeState(agentId, {
@@ -933,7 +932,8 @@ async function spawnAgentWithoutConsentClaim(
         await recordKickoffDeliveryFailure(state, options.issueId, role);
       }
       await closeBackendPane(launchedPane);
-      await Effect.runPromise(stopAgent(agentId));
+      await Effect.runPromise(stopAgent(agentId)).catch(() => undefined);
+      await markSpawnFailed(agentId, `kickoff delivery failed: ${message}`);
       throw new Error(`Agent ${agentId} kickoff delivery failed: ${message}`);
     }
   } else if (prompt && resolvedHarness === 'ohmypi') {
@@ -948,7 +948,8 @@ async function spawnAgentWithoutConsentClaim(
       if (tracksKickoffDelivery) {
         await recordKickoffDeliveryFailure(state, options.issueId, role);
         await closeBackendPane(launchedPane);
-        await Effect.runPromise(stopAgent(agentId));
+        await Effect.runPromise(stopAgent(agentId)).catch(() => undefined);
+        await markSpawnFailed(agentId, `kickoff delivery failed: ${err instanceof Error ? err.message : String(err)}`);
         throw new Error(`Agent ${agentId} kickoff delivery failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
@@ -971,6 +972,7 @@ async function spawnAgentWithoutConsentClaim(
         }
         await closeBackendPane(launchedPane);
         await Effect.runPromise(stopAgent(agentId)).catch(() => {});
+        await markSpawnFailed(agentId, `kickoff delivery failed: ${delivery.failure ?? 'unknown error'}`);
       },
     });
     if (delivery.ok) {
@@ -984,7 +986,8 @@ async function spawnAgentWithoutConsentClaim(
       }
       await recordKickoffDeliveryFailure(state, options.issueId, role);
       await closeBackendPane(launchedPane);
-      await Effect.runPromise(stopAgent(agentId));
+      await Effect.runPromise(stopAgent(agentId)).catch(() => undefined);
+      await markSpawnFailed(agentId, `kickoff delivery failed: ${delivery.failure ?? 'unknown error'}`);
       throw new Error(`Agent ${agentId} kickoff delivery failed: ${delivery.failure ?? 'unknown error'}`);
     }
   }
