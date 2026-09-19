@@ -22,7 +22,6 @@ import {
   completePlanningArtifacts,
   completePlanningAutoSpawn,
   completePlanningAutoSpawnAndKill,
-  completePlanningFilesToStage,
   completePlanningWorkspaceGitAddCommands,
   recordPlanningAutoHandoffFailure,
   resolveCompletePlanningTerminalStatus,
@@ -263,24 +262,6 @@ describe('completePlanningArtifacts', () => {
       ['add', '.gitignore'],
     ]);
     expect(commands.flat()).not.toContain('-f');
-  });
-
-  it('includes codebase map changes in the main-side promote commit pathspec', async () => {
-    const issueId = 'PAN-1150';
-    const { projectPath } = makeProject(issueId);
-    await mkdir(join(projectPath, '.pan', 'context', 'codebase'), { recursive: true });
-    writeFileSync(join(projectPath, '.pan', 'context', 'codebase', 'conventions.md'), [
-      '# Conventions',
-      '',
-      'Use project-local patterns.',
-      '<!-- last-verified: 2026-06-12 -->',
-      '',
-    ].join('\n'));
-
-    expect(completePlanningFilesToStage(projectPath, '2026-06-12-PAN-1150-plan.xbrief.json')).toEqual([
-      '.pan/specs/2026-06-12-PAN-1150-plan.xbrief.json',
-      '.pan/context/codebase/',
-    ]);
   });
 
   it('promotes a first-run workspace draft and reports one xBRIEF task per plan item', async () => {

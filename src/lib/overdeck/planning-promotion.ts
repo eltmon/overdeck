@@ -204,16 +204,6 @@ export async function completePlanningArtifacts(options: {
   return { proposed, taskCount: planItemCount, taskWarning: null };
 }
 
-export function completePlanningFilesToStage(root: string, proposedFilename: string): string[] {
-  const filesToStage = [`.pan/specs/${proposedFilename}`];
-  if (existsSync(join(root, '.overdeck', 'context', 'codebase'))) {
-    filesToStage.push('.overdeck/context/codebase/');
-  } else if (existsSync(join(root, '.pan', 'context', 'codebase'))) {
-    filesToStage.push('.pan/context/codebase/');
-  }
-  return filesToStage;
-}
-
 export function completePlanningWorkspaceGitAddCommands(gitRoot: string): string[][] {
   const commands: string[][] = [];
   if (existsSync(join(gitRoot, '.pan'))) {

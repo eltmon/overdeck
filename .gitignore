@@ -233,6 +233,9 @@ __pycache__/
 # workspace working copies are ignored — see the `.pan/` entries above.
 # Records are gone with the state layer; if one is ever written, do not track it.
 .pan/records/
+# PAN-3930: .pan/context/ is a stale artifact of the pre-cut layout; the
+# canonical codebase map is tracked under .overdeck/context/codebase/.
+.pan/context/
 .beads/
 .overdeck/continue.json
 .overdeck/pending-promotion.json
