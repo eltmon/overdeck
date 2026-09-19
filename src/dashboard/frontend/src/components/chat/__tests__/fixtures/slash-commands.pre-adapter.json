@@ -80,28 +80,12 @@
     "insert": "pan open "
   },
   {
-    "label": "pan review pending",
-    "insert": "pan review pending"
-  },
-  {
     "label": "pan review request",
     "insert": "pan review request "
   },
   {
-    "label": "pan review reset",
-    "insert": "pan review reset "
-  },
-  {
-    "label": "pan review resync",
-    "insert": "pan review resync "
-  },
-  {
     "label": "pan review abort",
     "insert": "pan review abort "
-  },
-  {
-    "label": "pan review mode",
-    "insert": "pan review mode "
   },
   {
     "label": "pan review restart",
@@ -114,10 +98,6 @@
   {
     "label": "pan backlog write-sequence",
     "insert": "pan backlog write-sequence "
-  },
-  {
-    "label": "pan backlog forecast",
-    "insert": "pan backlog forecast"
   },
   {
     "label": "pan plan",
@@ -156,10 +136,6 @@
     "insert": "pan unpause "
   },
   {
-    "label": "pan untroubled",
-    "insert": "pan untroubled "
-  },
-  {
     "label": "pan fork",
     "insert": "pan fork "
   },
@@ -188,10 +164,6 @@
     "insert": "pan done "
   },
   {
-    "label": "pan approve",
-    "insert": "pan approve "
-  },
-  {
     "label": "pan reopen",
     "insert": "pan reopen "
   },
@@ -214,10 +186,6 @@
   {
     "label": "pan strike",
     "insert": "pan strike "
-  },
-  {
-    "label": "pan strike-ready",
-    "insert": "pan strike-ready "
   },
   {
     "label": "pan knowledge",
@@ -520,18 +488,6 @@
     "insert": "pan admin commands"
   },
   {
-    "label": "pan admin state migrate",
-    "insert": "pan admin state migrate "
-  },
-  {
-    "label": "pan admin state migrate-xbrief",
-    "insert": "pan admin state migrate-xbrief "
-  },
-  {
-    "label": "pan admin reconcile-labels",
-    "insert": "pan admin reconcile-labels"
-  },
-  {
     "label": "pan admin cloister status",
     "insert": "pan admin cloister status"
   },
@@ -546,18 +502,6 @@
   {
     "label": "pan admin cloister emergency-stop",
     "insert": "pan admin cloister emergency-stop"
-  },
-  {
-    "label": "pan admin cloister brake",
-    "insert": "pan admin cloister brake"
-  },
-  {
-    "label": "pan admin cloister freeze",
-    "insert": "pan admin cloister freeze"
-  },
-  {
-    "label": "pan admin cloister unfreeze",
-    "insert": "pan admin cloister unfreeze"
   },
   {
     "label": "pan admin specialists list",
@@ -624,28 +568,12 @@
     "insert": "pan admin db config "
   },
   {
-    "label": "pan admin db rebuild-agents",
-    "insert": "pan admin db rebuild-agents"
-  },
-  {
     "label": "pan admin db gc-agents",
     "insert": "pan admin db gc-agents"
   },
   {
     "label": "pan admin db rebuild",
     "insert": "pan admin db rebuild"
-  },
-  {
-    "label": "pan admin db backfill-records",
-    "insert": "pan admin db backfill-records"
-  },
-  {
-    "label": "pan admin db restore-verdicts",
-    "insert": "pan admin db restore-verdicts"
-  },
-  {
-    "label": "pan admin db reconcile-merges",
-    "insert": "pan admin db reconcile-merges"
   },
   {
     "label": "pan admin config shadow",
@@ -732,10 +660,6 @@
     "insert": "pan install"
   },
   {
-    "label": "pan inspect",
-    "insert": "pan inspect "
-  },
-  {
     "label": "pan caveman-compress",
     "insert": "pan caveman-compress "
   },
@@ -768,56 +692,16 @@
     "insert": "pan scope restore "
   },
   {
-    "label": "pan flywheel merge-blockers",
-    "insert": "pan flywheel merge-blockers"
-  },
-  {
-    "label": "pan flywheel weights",
-    "insert": "pan flywheel weights"
-  },
-  {
     "label": "pan flywheel start",
     "insert": "pan flywheel start"
-  },
-  {
-    "label": "pan flywheel emit-status",
-    "insert": "pan flywheel emit-status"
-  },
-  {
-    "label": "pan flywheel config",
-    "insert": "pan flywheel config"
   },
   {
     "label": "pan flywheel status",
     "insert": "pan flywheel status"
   },
   {
-    "label": "pan flywheel stats",
-    "insert": "pan flywheel stats"
-  },
-  {
-    "label": "pan flywheel pause",
-    "insert": "pan flywheel pause"
-  },
-  {
-    "label": "pan flywheel resume",
-    "insert": "pan flywheel resume"
-  },
-  {
-    "label": "pan flywheel report",
-    "insert": "pan flywheel report"
-  },
-  {
-    "label": "pan flywheel complete",
-    "insert": "pan flywheel complete"
-  },
-  {
     "label": "pan flywheel stop",
     "insert": "pan flywheel stop"
-  },
-  {
-    "label": "pan flywheel abort",
-    "insert": "pan flywheel abort"
   },
   {
     "label": "pan merge cancel",
@@ -1014,10 +898,6 @@
   {
     "label": "pan plan --auto --auto-start",
     "insert": "pan plan --auto --auto-start "
-  },
-  {
-    "label": "pan review reset --session",
-    "insert": "pan review reset  --session"
   },
   {
     "label": "pan fork --plain",

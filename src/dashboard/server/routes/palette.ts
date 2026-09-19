@@ -62,7 +62,6 @@ export const PAN_COMMANDS: PanCommandEntry[] = [
   { name: 'pan kill <id>', description: 'Stop a running agent (workspace + branch preserved)', group: 'Agents', keywords: ['stop'] },
   { name: 'pan pause <id>', description: 'Persistently pause an agent and stop it if running', group: 'Agents' },
   { name: 'pan unpause <id>', description: 'Clear an agent pause gate without spawning', group: 'Agents' },
-  { name: 'pan untroubled <id>', description: 'Clear an agent troubled gate + failure counters', group: 'Agents' },
   { name: 'pan resume <id>', description: 'Resume a paused or stopped agent', group: 'Agents' },
   { name: 'pan recover [id]', description: 'Re-attach to an orphaned agent tmux session', group: 'Agents', keywords: ['attach', 'orphan'] },
   { name: 'pan sync-main <id>', description: 'Merge latest main into the feature branch for an active workspace', group: 'Agents', keywords: ['rebase', 'merge', 'main'] },
@@ -70,9 +69,7 @@ export const PAN_COMMANDS: PanCommandEntry[] = [
   { name: 'pan wipe <id>', description: 'Destructive reset to Todo (removes workspace, branches, tasks, status)', group: 'Agents', keywords: ['destroy', 'reset', 'danger'] },
 
   // Review pipeline
-  { name: 'pan review pending', description: 'List PRs awaiting review action', group: 'Review' },
   { name: 'pan review request <id>', description: 'Re-request review on an issue', group: 'Review' },
-  { name: 'pan review reset <id>', description: 'Reset review state for an issue', group: 'Review' },
   { name: 'pan review abort <id>', description: 'Abort an in-flight review cycle', group: 'Review' },
   { name: 'pan review restart <id>', description: 'Restart review with optional model override', group: 'Review' },
 
@@ -105,9 +102,8 @@ export const PAN_COMMANDS: PanCommandEntry[] = [
   { name: 'pan release canary', description: 'Cut a canary release', group: 'Release' },
 
   // Flywheel + close-out
-  { name: 'pan flywheel', description: 'Start, pause, resume, inspect Fix-All Flywheel orchestrator', group: 'Flywheel', keywords: ['orchestrator', 'all', 'fixall'] },
+  { name: 'pan flywheel', description: 'Start, stop, and inspect the Fix-All Flywheel orchestrator', group: 'Flywheel', keywords: ['orchestrator', 'all', 'fixall'] },
   { name: 'pan close <id>', description: 'Close-out ceremony for a completed and merged issue', group: 'Flywheel', keywords: ['complete', 'archive'] },
-  { name: 'pan approve <id>', description: 'Approve a reviewed PR for the merge step', group: 'Flywheel' },
   { name: 'pan reopen <id>', description: 'Re-enter the pipeline for a closed/cancelled issue', group: 'Flywheel' },
 
   // Misc
