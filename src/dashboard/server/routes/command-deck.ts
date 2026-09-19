@@ -505,6 +505,11 @@ export async function fetchActivityDataWithContext(
     ['uat', 'ship', `agent-${issueLower}-ship`],
   ] as const) {
     const pane = firstPaneWithRole(role);
+    // PAN-3020: a ship row is a real ship agent — live, or one that ran and
+    // left state behind. Without that check the synthetic `agent-<issue>-ship`
+    // id is probed for a transcript on every read and API-driven merges grow a
+    // phantom conversation row.
+    if (nodeType === 'ship' && !pane && !getAgentStateSync(sessionId)) continue;
     const jsonlPath = await resolveJsonlPath(sessionId, workspacePath);
     if (!pane && !jsonlPath) continue;
     const { status, presence } = nodeStatusFor(pane);

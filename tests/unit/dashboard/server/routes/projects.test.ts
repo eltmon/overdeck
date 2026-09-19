@@ -418,9 +418,39 @@ describe('fetchProjectSessionTree', () => {
     expect(resolveJsonlPath).not.toHaveBeenCalledWith('agent-pan-3020-ship', expect.any(String));
   });
 
-  // PAN-3917: a ship node is emitted only for a merge run this process is
-  // executing (the test above). There is no ship record left to resurrect a
-  // historical ship conversation from, so that case is gone with the record.
+  it('retains a historical ship conversation when its transcript resolves', async () => {
+    (listProjectsSync as any).mockReturnValue([
+      {
+        key: 'overdeck',
+        config: { name: 'overdeck', path: '/tmp/overdeck', workspace: { workspaces_dir: 'workspaces' } },
+      },
+    ]);
+    (listSessionNames as any).mockReturnValue(Effect.succeed([]));
+    mockAgentStates.set('agent-pan-3020-ship', agentState({
+      id: 'agent-pan-3020-ship',
+      issueId: 'PAN-3020',
+      role: 'ship',
+      model: 'claude-sonnet-5',
+      status: 'stopped',
+      workspace: '/tmp/overdeck/workspaces/feature-pan-3020',
+    }));
+    (resolveJsonlPath as any).mockImplementation(async (agentId: string) => (
+      agentId === 'agent-pan-3020-ship' ? '/tmp/ship.jsonl' : null
+    ));
+    mockAccess(new Set([
+      '/tmp/overdeck/workspaces',
+      '/tmp/overdeck/workspaces/feature-pan-3020/.overdeck',
+    ]));
+    mockWorkspaceReaddir([{ name: 'feature-pan-3020', isDirectory: () => true, isFile: () => false }]);
+
+    const result = await fetchProjectSessionTree('overdeck');
+
+    const tree = result as { features: Array<{ sessions: Array<{ sessionId: string; type: string; hasJsonl?: boolean }> }> };
+    expect(tree.features[0]?.sessions.find((session) => session.sessionId === 'agent-pan-3020-ship')).toMatchObject({
+      type: 'ship',
+      hasJsonl: true,
+    });
+  });
 
   it('leaves endedAt undefined for a live planning session and marks planningComplete false without a finished spec', async () => {
     (listProjectsSync as any).mockReturnValue([

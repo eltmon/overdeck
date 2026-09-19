@@ -47,6 +47,9 @@ vi.mock('../../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssueSync: vi.fn(() => ({ projectPath: '/tmp/overdeck' })),
   listProjectsSync: vi.fn(() => []),
   resolveProjectFromIssue: vi.fn(),
+  // PAN-3917 (W6): the derived issue state resolves the owning project from a
+  // path before it asks the forge; unregistered here, so it never asks.
+  findProjectByPathSync: vi.fn(() => null),
 }));
 
 const mockIsPlanningComplete = vi.hoisted(() => vi.fn(() => Effect.succeed(false)));
