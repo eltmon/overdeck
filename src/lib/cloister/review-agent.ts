@@ -48,23 +48,18 @@ import { emitActivityEntrySync } from '../activity-logger.js';
 import { removeAgent } from '../agents/removal.js';
 import { listAgentIdsByPrefixSync } from '../overdeck/agents.js';
 import { getAgentStateSync as getAgentStateFileSync } from '../agents/agent-state.js';
-import { setReviewStatusSync } from '../review-status.js';
-import { clearSupersededReviewInfrastructureFailure } from '../review-verdict-guards.js';
 import { loadConfigSync as loadYamlConfig, type ReviewMode } from '../config-yaml.js';
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveConflictGate } from './conflict-gate.js';
 import { createPromiseCoalescer } from './in-flight-guard.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
-import { evaluateReviewConvoyLiveness } from './review-convoy-liveness.js';
 import { isReviewSessionForIssue } from './specialists-registry.js';
-import { convergeRowFromVerdictOfRecord } from './verdict-restore.js';
 import {
   recoverMissingConvoyReviewers,
   launchConvoyReviewersPromise,
 } from './review-convoy.js';
 import { shouldSkipDispatchAsMerged } from './merge-verification.js';
-import { readIssueRecordSync, resolveProjectForIssue } from '../pan-dir/record.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { AGENTS_DIR, packageRoot, sessionFilePath } from '../paths.js';
 import { getAgentStateSync } from '../agents/agent-state.js';
@@ -275,11 +270,6 @@ async function spawnReviewRoleForIssuePromise(
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean },
 ): Promise<{ success: boolean; message: string; error?: string; gated?: boolean }> {
   const dispatchStartedAtMs = Date.now();
-  if (!opts.model) {
-    const project = resolveProjectForIssue(opts.issueId);
-    const issueModel = project ? readIssueRecordSync(project, opts.issueId)?.reviewModel : undefined;
-    if (issueModel) opts = { ...opts, model: issueModel };
-  }
   const reviewSessionName = `agent-${opts.issueId.toLowerCase()}-review`;
 
   // PAN-2420: GitHub-authoritative guard. Do not waste time on conflict-gate
@@ -297,17 +287,10 @@ async function spawnReviewRoleForIssuePromise(
   // Deacon re-dispatch site all honor it without per-call-site logic. The pre-review
   // verification gate (typecheck/lint/test floor) has already run by the time any
   // caller reaches here — 'none' skips only the AI review, never the quality floor.
-  // reviewSpawnedAt is stamped so the durable reviewRequestedAt intent counts as
-  // serviced (otherwise needsReviewDispatch would re-fire this skip every read).
-  // Setting reviewStatus 'skipped' advances the lifecycle exactly like an approved
-  // review (the setReviewStatusSync write path emits review.approved for it).
+  // PAN-3917: nothing is stamped. Skipping the AI review leaves the PR
+  // unreviewed, which is exactly what the forge then reports.
   if (resolveReviewMode(opts.issueId) === 'none') {
-    setReviewStatusSync(opts.issueId, {
-      reviewStatus: 'skipped',
-      reviewNotes: 'Review mode: none — AI review skipped by configuration; verification gate still enforced',
-      reviewSpawnedAt: new Date().toISOString(),
-    });
-    const message = `Review skipped for ${opts.issueId} (mode=none) — advancing to test`;
+    const message = `Review skipped for ${opts.issueId} (mode=none) — AI review disabled by configuration; the verification gate still applies`;
     console.log(`[review-agent] ${message}`);
     emitActivityEntrySync({ source: 'review', level: 'info', message, issueId: opts.issueId });
     return { success: true, message };
@@ -380,72 +363,30 @@ async function spawnReviewRoleForIssuePromise(
         }
       }
 
-      // PAN-1131 residual + PAN-2579: a runId-matching live pane is only "actively
-      // reviewing" while this cycle's verdict is UNRECORDED. Once the verdict is
-      // terminal, the session is warm-idle (kept alive by the warm-by-default
-      // lifecycle) — a re-dispatch request must NOT be swallowed by the guard, or
-      // the issue jams at a stale verdict with a live-but-finished reviewer. Fall
-      // through to the respawn path below: it kills the convoy tmux and the spawn
-      // machinery resumes the saved session with its context intact (warm reuse).
+      // PAN-1131 residual / PAN-2579, re-pointed by PAN-3917: a runId-matching
+      // live pane is only "actively reviewing" until this run's report lands on
+      // disk. The round artifacts are the verdict of record — once
+      // `.pan/review/<runId>/` holds a report or a synthesis, the session is
+      // warm-idle and a fresh dispatch must fall through to the respawn path,
+      // which kills the convoy tmux and resumes the saved session with its
+      // context intact. There is no stored review row to consult any more.
       let finishedIdle = false;
-      if (!paneDead && !opts.force && !staleRunId) {
+      if (!paneDead && !opts.force && !staleRunId && currentRunId) {
         try {
-          const status = getPipelineStatus(opts.issueId);
-          const terminal = status?.reviewStatus === 'passed'
-            || status?.reviewStatus === 'blocked'
-            || status?.reviewStatus === 'failed';
-          // Warm-reuse ONLY for a genuinely un-serviced newer request (same
-          // ISO-string comparison as needsReviewDispatch). A terminal verdict
-          // with NO newer request means this call is a stale duplicate dispatch
-          // racing the verdict (the PAN-399 shape) — skip below and leave the
-          // verdict alone rather than re-entering 'reviewing'.
-          const newerRequest = !!status?.reviewRequestedAt
-            && (!status.reviewSpawnedAt || Date.parse(status.reviewRequestedAt) > new Date(status.reviewSpawnedAt).getTime());
-          // PAN-2584: a lost verdict leaves the status non-terminal while the
-          // reviewer already wrote its report for this exact HEAD — that session
-          // is finished, not reviewing. Report-on-disk for the current runId is
-          // terminal evidence too; without it a newer request deadlocks behind
-          // the guard forever.
-          let reportWritten = false;
-          if (currentRunId) {
-            try {
-              const reviewDir = join(opts.workspace, PAN_DIRNAME, 'review', currentRunId);
-              reportWritten = existsSync(selfReviewReportPath(reviewDir))
-                || existsSync(reviewSynthesisPath(reviewDir));
-            } catch { /* probe failure — fall back to verdict-only evidence */ }
-          }
-          const reviewAgents = listAgentIdsByPrefixSync(reviewSessionName)
-            .map(id => getAgentStateFileSync(id))
-            .filter(state => state !== null && state !== undefined);
-          const convoyLiveness = evaluateReviewConvoyLiveness(opts.issueId, status ?? {}, reviewAgents);
-          finishedIdle = (terminal || reportWritten || !convoyLiveness.active) && newerRequest;
+          const reviewDir = join(opts.workspace, PAN_DIRNAME, 'review', currentRunId);
+          finishedIdle = existsSync(selfReviewReportPath(reviewDir))
+            || existsSync(reviewSynthesisPath(reviewDir));
           if (finishedIdle) {
             console.log(
-              `[review-agent] ${reviewSessionName} is finished-idle (verdict ${status?.reviewStatus}, newer request pending) — warm-reusing for the new review cycle`,
-            );
-          } else if (terminal) {
-            console.log(
-              `[review-agent] ${reviewSessionName} has a terminal verdict (${status?.reviewStatus}) and no newer request — treating this dispatch as a stale duplicate; leaving the verdict intact`,
+              `[review-agent] ${reviewSessionName} already wrote its report for run ${currentRunId} — warm-reusing for the new review cycle`,
             );
           }
-        } catch (statusErr) {
-          console.warn(`[review-agent] Could not probe review status for finished-idle check on ${opts.issueId}:`, statusErr);
+        } catch (probeErr) {
+          console.warn(`[review-agent] Could not probe review artifacts for ${opts.issueId}:`, probeErr);
         }
       }
 
       if (!paneDead && !opts.force && !staleRunId && !finishedIdle) {
-        const convergence = currentRunId
-          ? await convergeRowFromVerdictOfRecord(opts.issueId, {
-            runId: currentRunId,
-            workspacePath: opts.workspace,
-            writer: 'dispatch-converge',
-          })
-          : { converged: false };
-        if (convergence.converged) {
-          const message = `Review dispatch converged from the verdict of record: ${opts.issueId}`;
-          emitActivityEntrySync({ source: 'review', level: 'info', message, issueId: opts.issueId });
-          return { success: true, message };
-        }
         console.log(`[review-agent] Idempotency guard: ${reviewSessionName} already running for ${opts.issueId} — skipping spawn`);
         return { success: false, message: `Review dispatch skipped — already running: ${reviewSessionName}` };
       }
@@ -487,10 +428,6 @@ async function spawnReviewRoleForIssuePromise(
       ? `merge conflict with ${targetBranch} must be resolved before review dispatch`
       : `mergeability against ${targetBranch} could not be verified; deferring review conservatively`;
     const message = `Review dispatch deferred: ${reason}`;
-    setReviewStatusSync(opts.issueId, {
-      reviewStatus: 'pending',
-      reviewNotes: message,
-    });
     return { success: false, gated: true, message };
   }
 
@@ -502,10 +439,6 @@ async function spawnReviewRoleForIssuePromise(
   );
   if (gate.gated) {
     const message = `Review dispatch deferred: ${gate.reason ?? 'merge conflict must be resolved first'}`;
-    setReviewStatusSync(opts.issueId, {
-      reviewStatus: 'pending',
-      reviewNotes: message,
-    });
     return { success: false, gated: true, message };
   }
 
@@ -523,33 +456,6 @@ async function spawnReviewRoleForIssuePromise(
   // pan review request before reaching here. If callers somehow bypass the
   // gate, uncommitted scratch becomes visible in the review — that's the
   // correct fail-loud behavior, not a reason to silently stash.
-  const convergence = await convergeRowFromVerdictOfRecord(opts.issueId, {
-    runId: getAgentStateSync(reviewSessionName)?.reviewRunId,
-    workspacePath: opts.workspace,
-    writer: 'dispatch-converge',
-  });
-  if (convergence.converged) {
-    const message = `Review dispatch converged from the verdict of record: ${opts.issueId}`;
-    emitActivityEntrySync({ source: 'review', level: 'info', message, issueId: opts.issueId });
-    return { success: true, message };
-  }
-
-  try {
-    const currentStatus = getPipelineStatus(opts.issueId);
-    setReviewStatusSync(opts.issueId, {
-      reviewStatus: 'reviewing',
-      reviewSpawnedAt: new Date().toISOString(),
-      ...clearSupersededReviewInfrastructureFailure(currentStatus),
-    });
-  } catch (err) {
-    console.error(`[review-agent] Failed to set reviewing status for ${opts.issueId}:`, err);
-    return {
-      success: false,
-      message: 'Failed to initialize review status',
-      error: err instanceof Error ? err.message : String(err),
-    };
-  }
-
   try {
     const { notifyPipelineSync } = await import('../pipeline-notifier.js');
     notifyPipelineSync({ type: 'task_queued', specialist: 'review-agent', issueId: opts.issueId });
@@ -731,10 +637,6 @@ async function spawnReviewRoleForIssuePromise(
         await Effect.runPromise(saveAgentState(orphan)).catch(() => {});
       }
     } catch { /* teardown is best-effort; the status write below still lands */ }
-    setReviewStatusSync(opts.issueId, {
-      reviewStatus: 'failed',
-      reviewNotes: `Review role spawn failed: ${err instanceof Error ? err.message : String(err)}`,
-    });
     return {
       success: false,
       message: 'Failed to spawn review role',
@@ -890,7 +792,6 @@ export {
   spawnReviewSubRoleForIssue,
   recoverMissingConvoyReviewers,
 } from './review-convoy.js';
-import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 
 /**
  * Is the issue carrying leftover EXTENDED-review (convoy) sub-reviewer agents from a
@@ -910,15 +811,11 @@ export function isReviewStaleSync(issueId: string): boolean {
   });
 }
 
-export function resolveReviewMode(issueId?: string): ReviewMode {
-  if (issueId) {
-    const project = resolveProjectForIssue(issueId);
-    const issueMode = project ? readIssueRecordSync(project, issueId)?.reviewMode : undefined;
-    if (issueMode === 'quick' || issueMode === 'full' || issueMode === 'none') {
-      return issueMode;
-    }
-  }
-
+/**
+ * PAN-3917: the per-issue record override is gone with the record. Review mode
+ * is project/global configuration; a one-off run passes its own flags.
+ */
+export function resolveReviewMode(_issueId?: string): ReviewMode {
   const configMode = loadYamlConfig().config.roles?.review?.mode;
   return configMode === 'full' || configMode === 'none' ? configMode : 'quick';
 }
@@ -926,8 +823,8 @@ export function resolveReviewMode(issueId?: string): ReviewMode {
 /**
  * Is EXTENDED (convoy) review enabled for this issue?
  *
- * `resolveReviewMode` is the single source of truth: per-issue record override
- * beats merged project/global config, and quick remains the default.
+ * `resolveReviewMode` is the single source of truth: merged project/global
+ * config, with quick as the default.
  */
 export function isExtendedReviewEnabled(issueId?: string): boolean {
   return resolveReviewMode(issueId) === 'full';

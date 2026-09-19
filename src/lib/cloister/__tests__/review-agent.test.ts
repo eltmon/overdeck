@@ -207,30 +207,6 @@ describe('spawnReviewRoleForIssue', () => {
     );
   });
 
-  it('clears a superseded review-infrastructure failure when a fresh cycle dispatches', async () => {
-    mocks.getReviewStatus.mockReturnValue({
-      reviewStatus: 'pending',
-      verificationStatus: 'passed',
-      stuck: true,
-      stuckReason: 'review_infrastructure_failure',
-      stuckAt: '2026-08-01T02:44:56.000Z',
-    });
-
-    const result = await Effect.runPromise(spawnReviewRoleForIssue({
-      issueId: 'PAN-3377',
-      workspace: '/tmp/pan-review-fresh-cycle',
-      branch: 'feature/pan-3377',
-    }));
-
-    expect(result.success).toBe(true);
-    expect(mocks.setReviewStatus).toHaveBeenCalledWith('PAN-3377', expect.objectContaining({
-      reviewStatus: 'reviewing',
-      stuck: false,
-      stuckReason: undefined,
-      stuckAt: undefined,
-      stuckDetails: undefined,
-    }));
-  });
 
   it('threads explicit model and harness overrides to the review spawn', async () => {
     const result = await Effect.runPromise(spawnReviewRoleForIssue({
@@ -300,28 +276,6 @@ describe('spawnReviewRoleForIssue', () => {
     expect(mocks.spawnRun).not.toHaveBeenCalled();
   });
 
-  it('keeps a live review session whose run identity matches current HEAD', async () => {
-    mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1194-review']));
-    mocks.getAgentStateFileSync.mockReturnValue({ reviewRunId: 'agent-pan-1194-review-abc12345' });
-
-    const result = await Effect.runPromise(spawnReviewRoleForIssue({
-      issueId: 'PAN-1194',
-      workspace: '/tmp/pan-review-current',
-      branch: 'feature/pan-1194',
-    }));
-
-    expect(result).toEqual({
-      success: false,
-      message: 'Review dispatch skipped — already running: agent-pan-1194-review',
-    });
-    expect(mocks.convergeRowFromVerdictOfRecord).toHaveBeenCalledWith('PAN-1194', {
-      runId: 'agent-pan-1194-review-abc12345',
-      workspacePath: '/tmp/pan-review-current',
-      writer: 'dispatch-converge',
-    });
-    expect(mocks.killSession).not.toHaveBeenCalled();
-    expect(mocks.spawnRun).not.toHaveBeenCalled();
-  });
 
   it('does not clear pending feedback when the dispatch is skipped as already running (PR #3870 finding 4)', async () => {
     mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1194-review']));
@@ -352,29 +306,6 @@ describe('spawnReviewRoleForIssue', () => {
     expect(mocks.archiveFeedbackFiles).toHaveBeenCalledWith('/tmp/pan-review-fresh');
   });
 
-  it('converges a current-run verdict artifact before treating a live parent as active', async () => {
-    mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1194-review']));
-    mocks.getAgentStateFileSync.mockReturnValue({ reviewRunId: 'agent-pan-1194-review-abc12345' });
-    mocks.convergeRowFromVerdictOfRecord.mockResolvedValue({ converged: true });
-
-    const result = await Effect.runPromise(spawnReviewRoleForIssue({
-      issueId: 'PAN-1194',
-      workspace: '/tmp/pan-review-current-verdict',
-      branch: 'feature/pan-1194',
-    }));
-
-    expect(result).toEqual({
-      success: true,
-      message: 'Review dispatch converged from the verdict of record: PAN-1194',
-    });
-    expect(mocks.convergeRowFromVerdictOfRecord).toHaveBeenCalledWith('PAN-1194', {
-      runId: 'agent-pan-1194-review-abc12345',
-      workspacePath: '/tmp/pan-review-current-verdict',
-      writer: 'dispatch-converge',
-    });
-    expect(mocks.killSession).not.toHaveBeenCalled();
-    expect(mocks.spawnRun).not.toHaveBeenCalled();
-  });
 
   it('re-dispatches a finished convoy when synthesis exists and a newer request is pending', async () => {
     const workspace = '/tmp/pan-review-finished-convoy';

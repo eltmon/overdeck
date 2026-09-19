@@ -21,7 +21,6 @@ import { loadConfigSync as loadYamlConfig, resolveModel } from '../config-yaml.j
 import { formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
-import { readIssueRecordSync, resolveProjectForIssue } from '../pan-dir/record.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { AGENTS_DIR, packageRoot } from '../paths.js';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -388,7 +387,7 @@ export async function recoverMissingConvoyReviewers(
 
   let parent: typeof parentState | null;
   try {
-    const { resolveReviewParentRunState } = await import('./review-run-recovery.js');
+    const { resolveReviewParentRunState } = await import('./review-rounds.js');
     parent = await resolveReviewParentRunState(parentState, { persistCurrent: true });
   } catch (error) {
     return {
@@ -444,13 +443,11 @@ export async function recoverMissingConvoyReviewers(
     return { success: true, message: `Convoy already launched for ${normalized} run ${runId} — no-op` };
   }
 
-  // The per-issue review-model override has to be re-read here: this path is entered from a
-  // signal, not from the parent's spawn opts, so nothing carries `model` in. Read the record
-  // rather than `parent.model` — that is the parent's *resolved* model, and forwarding it
-  // would override each sub-role's own configured model even with no override set.
-  const project = resolveProjectForIssue(normalized);
-  const issueReviewModel = project ? readIssueRecordSync(project, normalized)?.reviewModel : undefined;
-  const reviewModel = opts.model ?? issueReviewModel;
+  // PAN-3917: the per-issue review-model override lived on the record and went
+  // with it. Only an explicit `opts.model` overrides each sub-role's own
+  // configured model — deliberately not `parent.model`, which is the parent's
+  // resolved model and would override every sub-role.
+  const reviewModel = opts.model;
   const results = await launchConvoyReviewersPromise({
     issueId: normalized,
     workspace,

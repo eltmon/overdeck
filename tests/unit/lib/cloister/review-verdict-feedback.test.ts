@@ -9,20 +9,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const {
   mockMessageAgent,
   mockResolveProjectFromIssue,
-  mockGetReviewStatus,
+  mockGetPrFacts,
   mockWriteFeedbackFile,
   mockResolveIssueFeedbackTarget,
   mockSurfaceIssueFeedbackNeedsYou,
-  mockClearFeedbackDeliveryStuck,
 } = vi.hoisted(() => ({
   mockMessageAgent: vi.fn(),
   mockResolveProjectFromIssue: vi.fn(),
-  mockGetReviewStatus: vi.fn(),
+  mockGetPrFacts: vi.fn(),
   mockWriteFeedbackFile: vi.fn(),
   mockResolveIssueFeedbackTarget: vi.fn(),
   mockSurfaceIssueFeedbackNeedsYou: vi.fn(),
-  mockClearFeedbackDeliveryStuck: vi.fn(),
 }));
+
+function prFacts(overrides: Record<string, unknown> = {}) {
+  return {
+    issueId: 'PAN-1059', forge: 'github', url: 'https://github.com/eltmon/overdeck/pull/1059',
+    number: 1059, exists: true, open: true, merged: false, closed: false, draft: false,
+    headSha: 'head-one', headBranch: 'feature/pan-1059', reviewDecision: 'CHANGES_REQUESTED',
+    approved: false, changesRequested: true, mergeable: true, mergeableState: 'mergeable',
+    checks: 'green', ...overrides,
+  };
+}
 
 vi.mock('node:child_process', () => ({
   execFile: vi.fn((cmd, args, options, callback) => callback(null, '', '')),
@@ -45,13 +53,14 @@ vi.mock('../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssueSync: mockResolveProjectFromIssue,
 }));
 
-vi.mock('../../../../src/lib/review-status.js', () => ({
-  getReviewStatus: mockGetReviewStatus,
-  getReviewStatusSync: mockGetReviewStatus,
-  clearFeedbackDeliveryStuck: mockClearFeedbackDeliveryStuck,
+vi.mock('../../../../src/lib/cloister/pr-facts.js', () => ({
+  getPrFacts: mockGetPrFacts,
+}));
 
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
+// PAN-3917: convergence is read from the round artifacts; no rounds on disk in
+// these fixtures means "converging", which is the pre-cut default.
+vi.mock('../../../../src/lib/cloister/review-rounds.js', () => ({
+  assessReviewConvergence: () => ({ converging: true, counts: [], series: '' }),
 }));
 
 vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
@@ -63,7 +72,7 @@ vi.mock('../../../../src/lib/cloister/feedback-target.js', () => ({
   surfaceIssueFeedbackNeedsYou: mockSurfaceIssueFeedbackNeedsYou,
 }));
 
-vi.mock('../../../../src/lib/agents/slot-reconcile.js', () => ({
+vi.mock('../../../../src/lib/cloister/swarm-slot-reconcile.js', () => ({
   listSlotOwnership: vi.fn(() => []),
 }));
 
@@ -72,7 +81,7 @@ describe('deliverReviewVerdictFeedback', () => {
     vi.clearAllMocks();
     mockResolveProjectFromIssue.mockReturnValue(null);
     mockMessageAgent.mockResolvedValue({ delivered: true, queuedToMail: false });
-    mockGetReviewStatus.mockReturnValue({ prUrl: 'https://github.com/eltmon/overdeck/pull/1059' });
+    mockGetPrFacts.mockResolvedValue(prFacts());
     mockWriteFeedbackFile.mockReturnValue(Effect.succeed({
       success: true,
       filePath: '/tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md',
@@ -134,13 +143,10 @@ describe('deliverReviewVerdictFeedback', () => {
     );
   });
 
-  it('keeps one run key stable when the blocked anchor is written after delivery', async () => {
-    mockGetReviewStatus
-      .mockReturnValueOnce({ prUrl: 'https://github.com/eltmon/overdeck/pull/1059' })
-      .mockReturnValueOnce({
-        prUrl: 'https://github.com/eltmon/overdeck/pull/1059',
-        reviewedAtCommit: 'head-one',
-      });
+  it('keeps one run key stable across deliveries for the same run', async () => {
+    mockGetPrFacts
+      .mockResolvedValueOnce(prFacts())
+      .mockResolvedValueOnce(prFacts({ headSha: 'head-two' }));
     mockMessageAgent
       .mockResolvedValueOnce({ delivered: true, queuedToMail: false })
       .mockResolvedValueOnce({ delivered: true, queuedToMail: false, deduplicated: true });
@@ -164,8 +170,8 @@ describe('deliverReviewVerdictFeedback', () => {
     expect(mockSurfaceIssueFeedbackNeedsYou).not.toHaveBeenCalled();
   });
 
-  it('uses a fresh key for a later review run after the anchor resets', async () => {
-    mockGetReviewStatus.mockReturnValue({});
+  it('uses a fresh key for a later review run', async () => {
+    mockGetPrFacts.mockResolvedValue(prFacts({ headSha: null }));
     const { deliverReviewVerdictFeedback } = await import(
       '../../../../src/lib/cloister/review-verdict-feedback.js'
     );
@@ -188,10 +194,10 @@ describe('deliverReviewVerdictFeedback', () => {
     );
   });
 
-  it('uses the reviewed anchor as fallback identity when no run ID exists', async () => {
-    mockGetReviewStatus
-      .mockReturnValueOnce({ reviewedAtCommit: 'head-one' })
-      .mockReturnValueOnce({ reviewedAtCommit: 'head-two' });
+  it('uses the PR head as fallback identity when no run ID exists', async () => {
+    mockGetPrFacts
+      .mockResolvedValueOnce(prFacts({ headSha: 'head-one' }))
+      .mockResolvedValueOnce(prFacts({ headSha: 'head-two' }));
     const { deliverReviewVerdictFeedback } = await import(
       '../../../../src/lib/cloister/review-verdict-feedback.js'
     );
@@ -210,8 +216,8 @@ describe('deliverReviewVerdictFeedback', () => {
     );
   });
 
-  it('delivers unkeyed when neither a run ID nor reviewed anchor exists', async () => {
-    mockGetReviewStatus.mockReturnValue({});
+  it('delivers unkeyed when neither a run ID nor a PR head exists', async () => {
+    mockGetPrFacts.mockResolvedValue(prFacts({ headSha: null }));
     const { deliverReviewVerdictFeedback } = await import(
       '../../../../src/lib/cloister/review-verdict-feedback.js'
     );
@@ -261,7 +267,6 @@ describe('deliverReviewVerdictFeedback', () => {
 
     await Effect.runPromise(deliverReviewVerdictFeedback(options));
     expect(mockSurfaceIssueFeedbackNeedsYou).toHaveBeenCalledOnce();
-    expect(mockClearFeedbackDeliveryStuck).toHaveBeenCalledTimes(1);
   });
 
   it('resets the suppression counter after a fresh delivery for the same key', async () => {
@@ -287,7 +292,6 @@ describe('deliverReviewVerdictFeedback', () => {
     await Effect.runPromise(deliverReviewVerdictFeedback(options));
 
     expect(mockSurfaceIssueFeedbackNeedsYou).toHaveBeenCalledOnce();
-    expect(mockClearFeedbackDeliveryStuck).toHaveBeenCalledTimes(3);
   });
 
   it('falls back to unkeyed delivery when the target transport cannot enforce a key', async () => {
@@ -321,7 +325,7 @@ describe('ambiguous keyed delivery retry (PAN-1837)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockResolveProjectFromIssue.mockReturnValue(null);
-    mockGetReviewStatus.mockReturnValue({ prUrl: 'https://github.com/eltmon/overdeck/pull/1059' });
+    mockGetPrFacts.mockResolvedValue(prFacts());
     mockWriteFeedbackFile.mockReturnValue(Effect.succeed({
       success: true,
       filePath: '/tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md',

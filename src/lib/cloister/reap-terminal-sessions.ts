@@ -18,19 +18,71 @@
  *     close-out and are still reaped).
  */
 
-import {
-  classifyAdvancingSessionLifecycle,
-  isRoleTerminal,
-  type AdvancingRole,
-  type WarmIdleStatusShape,
-} from './review-status-source.js';
+import type { PrFacts } from './pr-facts.js';
 
-export {
-  isRoleTerminal,
-  type AdvancingRole,
-} from './review-status-source.js';
+export type AdvancingRole = 'review' | 'test' | 'ship';
+export type AdvancingSessionLifecycle = 'active' | 'warm' | 'orphaned' | 'unknown';
 
-export type ReapableStatus = WarmIdleStatusShape;
+/**
+ * What the owners of the facts say about an issue's phases (PAN-3917).
+ *
+ * Every field is derived: the forge for the review verdict and the merge, the
+ * workspace's `.pan/test/result.json` for the test verdict. The module keeps
+ * its pure selection logic; only the inputs changed.
+ */
+export interface AdvancingPhase {
+  /** The PR carries a decisive review — approved or changes requested. */
+  reviewSettled?: boolean;
+  /** The test role wrote its verdict artifact. */
+  testSettled?: boolean;
+  /** The PR merged. */
+  merged?: boolean;
+  /** The PR is approved, green, and mergeable — the ship phase is settled. */
+  mergeReady?: boolean;
+}
+
+export type ReapableStatus = AdvancingPhase;
+
+/** Build an {@link AdvancingPhase} from the forge's account of the PR. */
+export function advancingPhaseFromPrFacts(
+  facts: PrFacts,
+  options: { testSettled?: boolean } = {},
+): AdvancingPhase {
+  return {
+    reviewSettled: facts.approved || facts.changesRequested,
+    ...(options.testSettled === undefined ? {} : { testSettled: options.testSettled }),
+    merged: facts.merged,
+    mergeReady: facts.approved && facts.checks === 'green' && facts.mergeable === true,
+  };
+}
+
+/** Has this role finished its phase for the issue? */
+export function isRoleTerminal(role: AdvancingRole, phase: AdvancingPhase): boolean {
+  switch (role) {
+    case 'review':
+      return phase.reviewSettled === true;
+    case 'test':
+      return phase.testSettled === true;
+    case 'ship':
+      return phase.merged === true || phase.mergeReady === true;
+  }
+}
+
+export function classifyAdvancingSessionLifecycle(
+  role: AdvancingRole,
+  phase: AdvancingPhase | null | undefined,
+  tmuxActive: boolean,
+): AdvancingSessionLifecycle {
+  if (!phase || !tmuxActive) return 'unknown';
+  if (phase.merged) return 'orphaned';
+  return isRoleTerminal(role, phase) ? 'warm' : 'active';
+}
+
+export function isAdvancingLifecycleReclaimable(
+  lifecycle: AdvancingSessionLifecycle,
+): boolean {
+  return lifecycle === 'orphaned';
+}
 
 /**
  * Of the alive sessions, the ones belonging to `issueId`'s advancing `role`.
@@ -86,7 +138,7 @@ export function selectTerminalAdvancingSessions(
  * resurrect it. This is the work-role sibling of the advancing reaper above.
  */
 export function isWorkReapable(status: ReapableStatus): boolean {
-  return status.mergeStatus === 'merged';
+  return status.merged === true;
 }
 
 /**
@@ -142,7 +194,7 @@ export function selectNonMergedTerminalAdvancingSessions(
 ): string[] {
   const kill = new Set<string>();
   for (const [issueId, status] of Object.entries(statuses)) {
-    if (status.mergeStatus === 'merged') continue;
+    if (status.merged) continue;
     for (const role of ['review', 'test', 'ship'] as const) {
       if (!isRoleTerminal(role, status)) continue;
       for (const session of sessionsToReapForRole(issueId, role, aliveSessions)) {
@@ -187,7 +239,7 @@ export function isIdlePastThreshold(
  * `needsFix` gate has to be free to bring it back to address the feedback.
  */
 export function isAwaitingTestReapable(status: ReapableStatus): boolean {
-  return status.reviewStatus === 'passed' && status.testStatus === 'pending';
+  return status.reviewSettled === true && status.testSettled !== true;
 }
 
 /**
@@ -209,4 +261,21 @@ export function selectAwaitingTestWorkSessions(
     if (alive.has(session)) candidates.push(session);
   }
   return candidates;
+}
+
+/**
+ * Alive advancing-role sessions that have stopped working (PAN-3917).
+ *
+ * The warm-idle shed list used to be "every session whose stored verdict is
+ * terminal". Idleness is the same set without the stored verdict: a reviewer
+ * that finished is idle, and an idle advancing pane is by definition not doing
+ * the work its slot is reserved for. Sessions are matched by the canonical
+ * advancing naming (`agent-<issue>-<role>`, plus the review convoy children).
+ */
+export function selectIdleAdvancingSessions(
+  aliveSessions: readonly string[],
+  isIdle: (agentId: string) => boolean,
+): string[] {
+  const advancing = /^agent-[a-z0-9]+-\d+-(review|test|ship)(?:-|$)/;
+  return aliveSessions.filter((session) => advancing.test(session) && isIdle(session));
 }

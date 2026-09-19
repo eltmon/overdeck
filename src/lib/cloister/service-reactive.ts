@@ -4,7 +4,7 @@ import { getAgentState } from '../agents.js';
 import type { Role } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import { capturePane, sessionExists, killSession } from '../tmux.js';
+import { sessionExists, killSession } from '../tmux.js';
 import {
   decideAutonomousPlanDispatch,
   gatherAutonomousPlanDispatchInput,
@@ -13,27 +13,8 @@ import {
   decideAutonomousWorkDispatch,
   gatherAutonomousWorkDispatchInput,
 } from './autonomous-work-dispatch.js';
-import { recordDeadEndNeedsYou } from './dead-end-trip.js';
 import { isIssueClosed } from './issue-closed.js';
 import { shouldSkipDispatchAsMerged } from './merge-verification.js';
-
-/** Return issues orphaned in reviewStatus='reviewing' with no active reviewer. */
-export function identifyOrphanedReviewingIssues(
-  statuses: Record<string, { reviewStatus: string; history?: Array<{ type: string; status: string }> }>,
-  activeReviewIssues: Set<string>,
-): string[] {
-  const orphaned: string[] = [];
-  for (const [issueId, status] of Object.entries(statuses)) {
-    if (status.reviewStatus !== 'reviewing') continue;
-    const hasPassedReview = status.history?.some(
-      (h) => h.type === 'review' && h.status === 'passed',
-    );
-    if (hasPassedReview) continue;
-    if (activeReviewIssues.has(issueId.toUpperCase())) continue;
-    orphaned.push(issueId);
-  }
-  return orphaned;
-}
 
 export function parseSpecialistAgentSession(name: string): {
   projectKey: string;
@@ -224,23 +205,14 @@ async function resolveWorkspaceForIssue(issueId: string): Promise<string | null>
     return;
   }
 
-  // PAN-1746: a merged issue is terminal — never re-dispatch an advancing role
-  // for work that already landed. Boot reconciliation replays issue-state-change
-  // events on restart, and a long-merged issue still carrying its lifecycle
-  // state (e.g. `verifying-on-main`) would otherwise re-trigger a ship dispatch
-  // for a branch that merged weeks ago. Mirror the isIssueClosed gate above:
-  // mergeStatus='merged' is the same terminal signal closed-state is.
-  const { getPipelineStatus } = await import('../overdeck/pipeline-view.js');
-  if (getPipelineStatus(normalizedIssueId)?.mergeStatus === 'merged') {
-    const message = `${normalizedIssueId}: skipping ${role} dispatch — merge already landed (merge_status='merged' is terminal)`;
-    console.log(`[cloister] ${message}`);
-    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
-    return;
-  }
-
-  // PAN-2420: GitHub-authoritative guard. Even when merge_status is not yet
-  // 'merged' (e.g. a permission failure left it as 'failed'), do not respawn
-  // advancing roles against a PR that GitHub already reports merged.
+  // PAN-1746 + PAN-2420, collapsed by PAN-3917: a merged issue is terminal —
+  // never re-dispatch an advancing role for work that already landed. Boot
+  // reconciliation replays issue-state-change events on restart, and a
+  // long-merged issue still carrying its lifecycle state (e.g.
+  // `verifying-on-main`) would otherwise re-trigger a ship dispatch for a
+  // branch that merged weeks ago. There used to be two guards here: one read
+  // `mergeStatus` off the row, the other asked GitHub because the row could be
+  // wrong. With the row gone there is one question and one asker.
   const mergedGuard = await shouldSkipDispatchAsMerged(normalizedIssueId);
   if (mergedGuard.skip) {
     const message = `${normalizedIssueId}: skipping ${role} dispatch — ${mergedGuard.reason}`;
@@ -313,13 +285,11 @@ async function resolveWorkspaceForIssue(issueId: string): Promise<string | null>
       if (!decision.allow) {
         const message = `${normalizedIssueId}: ${decision.reason}`;
         console.log(`[cloister] ${message}`);
+        // PAN-3917: the warn above IS the dead-end signal. It used to also
+        // increment a `recoveryTrips` counter on the record so a later patrol
+        // could decide when to raise needs-you; the counter and the patrol are
+        // both gone.
         emitActivityEntrySync({ source: 'cloister', level: 'warn', message, issueId: normalizedIssueId });
-        await recordDeadEndNeedsYou(
-          normalizedIssueId,
-          'autonomous-plan-dispatch',
-          newState,
-          message,
-        );
         return;
       }
       const run = await spawnRun(normalizedIssueId, 'plan', {
@@ -342,12 +312,6 @@ async function resolveWorkspaceForIssue(issueId: string): Promise<string | null>
         const message = `${normalizedIssueId}: ${decision.reason}`;
         console.log(`[cloister] ${message}`);
         emitActivityEntrySync({ source: 'cloister', level: 'warn', message, issueId: normalizedIssueId });
-        await recordDeadEndNeedsYou(
-          normalizedIssueId,
-          'reactive-work-dispatch-pickup-gate',
-          newState,
-          message,
-        );
         return;
       }
       autoSpawnConsentRequired = decision.releaseSource === 'planning-consent';
@@ -413,65 +377,27 @@ export function issueStateChangeFromDomainEvent(event: CloisterDomainEventLike):
 }
 
 async function handleCloisterDomainEventPromise(event: CloisterDomainEventLike): Promise<void> {
-  if (event.type === 'agent.activity_changed') {
-    const payload = payloadRecord(event);
-    const agentId = typeof payload['agentId'] === 'string' ? payload['agentId'] : undefined;
-    if (agentId && payload['hookName'] === 'PostCompact' && !agentId.startsWith('conv-')) {
-      try {
-        const { continueCompactedAgentAfterHook } = await import('./compaction-continuation.js');
-        const { findLastCompactBoundary } = await import(
-          '../../dashboard/server/services/conversation-service.js'
-        );
-        const { deliverAgentMessage, getAgentStateSync } = await import('../agents.js');
-        const continued = await continueCompactedAgentAfterHook({
-          agentId,
-          capturePane: (target) => Effect.runPromise(capturePane(target, 80)),
-          send: (target, message) => deliverAgentMessage(target, message, 'hook:post-compact-continuation'),
-          findBoundary: findLastCompactBoundary,
-        });
-        if (continued) {
-          console.log(`[cloister] ${continued}`);
-          emitActivityEntrySync({
-            source: 'cloister',
-            level: 'warn',
-            message: `${agentId} stopped after a context compaction — continued from PostCompact`,
-            issueId: getAgentStateSync(agentId)?.issueId,
-          });
-        }
-      } catch (error) {
-        console.error(`[cloister] PostCompact continuation failed for ${agentId}:`, error);
-      }
-    }
-    return;
-  }
-
-  if (event.type === 'linear_mcp_auth.healthy') {
-    const { processLinearMcpAuthWake } = await import('../linear-mcp-auth.js');
-    await processLinearMcpAuthWake();
-    return;
-  }
-
   // PAN-1908: reactive agent liveness — deacon handles agent.stopped and
   // agent.heartbeat_dead events instead of scanning agent directories.
   if (event.type === 'agent.stopped') {
     const payload = event.payload as { agentId?: string } | undefined;
     const agentId = payload?.agentId;
     if (agentId) {
-      const { handleAgentStoppedEvent, handleAgentStoppedForOrphanReviewerSessions } = await import('./deacon.js');
+      // PAN-3917: a stopped agent frees its idle stack and tells its swarm
+      // parent. The auto-resume ladder and the orphan-reviewer sweep it also
+      // used to trigger are deleted patrols — a stopped agent that still has
+      // work is re-dispatched by the ordinary dispatch pass, from the PR and
+      // the backend inventory.
       const { handleAgentLifecycleEventForIdleStack } = await import('./idle-stack-reaper.js');
       handleAgentLifecycleEventForIdleStack(agentId);
       const slotMatch = /^agent-(.+)-slot-\d+$/.exec(agentId);
-      await Promise.all([
-        handleAgentStoppedEvent(agentId),
-        handleAgentStoppedForOrphanReviewerSessions(agentId),
-        slotMatch
-          ? (await import('../agents/messaging.js')).messageAgent(
-              `agent-${slotMatch[1]!.toLowerCase()}`,
-              `[swarm-event] ${agentId} stopped; run pan swarm status ${slotMatch[1]!.toUpperCase()} --json`,
-              'reactive:swarm-event',
-            )
-          : Promise.resolve(),
-      ]);
+      if (slotMatch) {
+        await (await import('../agents/messaging.js')).messageAgent(
+          `agent-${slotMatch[1]!.toLowerCase()}`,
+          `[swarm-event] ${agentId} stopped; run pan swarm status ${slotMatch[1]!.toUpperCase()} --json`,
+          'reactive:swarm-event',
+        );
+      }
     }
     return;
   }
@@ -480,36 +406,13 @@ async function handleCloisterDomainEventPromise(event: CloisterDomainEventLike):
     if (agentId) (await import('./idle-stack-reaper.js')).handleAgentLifecycleEventForIdleStack(agentId);
     return;
   }
-  if (event.type === 'agent.heartbeat_dead') {
-    const payload = event.payload as { agentId?: string } | undefined;
-    const agentId = payload?.agentId;
-    if (agentId) {
-      const { handleAgentHeartbeatDeadEvent } = await import('./deacon.js');
-      await handleAgentHeartbeatDeadEvent(agentId, 'event');
-    }
-    return;
-  }
-
-  // PAN-1908: reactive review-status handlers — deacon handles review lifecycle
-  // events instead of scanning directories / the review-status DB.
-  if (event.type === 'review.coordinator.died') {
-    const payload = event.payload as { issueId?: string; sessionName?: string; reason?: string } | undefined;
-    const issueId = payload?.issueId;
-    if (issueId) {
-      const { handleReviewCoordinatorDied } = await import('./deacon.js');
-      await handleReviewCoordinatorDied(issueId, payload?.sessionName ?? '', payload?.reason ?? '');
-    }
-    return;
-  }
-  if (event.type === 'work.completed') {
-    const payload = event.payload as { issueId?: string } | undefined;
-    const issueId = payload?.issueId;
-    if (issueId) {
-      const { handleWorkCompleted } = await import('./deacon.js');
-      await handleWorkCompleted(issueId);
-    }
-    // Fall through to onIssueStateChange for in_review dispatch.
-  }
+  // PAN-3917: `agent.heartbeat_dead` and `review.coordinator.died` used to run
+  // deacon handlers that rewrote review rows — a dead coordinator reset
+  // `reviewStatus` to pending so a patrol would re-dispatch it. The verdict
+  // lives on the pull request now, so a dead coordinator is simply a review
+  // that has not been posted: the next dispatch pass sees no review on the PR
+  // and no live session, and spawns one. `work.completed` falls through to the
+  // ordinary in_review dispatch below.
 
   // PAN-1908: reactive reconcilers — deacon handles issue.statusChanged events
   // for closed issues and proposed specs instead of patrol scans.
@@ -523,11 +426,6 @@ async function handleCloisterDomainEventPromise(event: CloisterDomainEventLike):
         const { handleIssueStatusChangedClosed } = await import('./closed-issue-reaper.js');
         await handleIssueStatusChangedClosed(issueId);
         return;
-      }
-      if (canonicalStatus === 'todo' || status === 'planned' || status === 'todo') {
-        const { handleOrphanProposedSpec } = await import('./orphan-proposed-reconciler.js');
-        await handleOrphanProposedSpec(issueId);
-        // Fall through to onIssueStateChange in case it drives role dispatch.
       }
     }
   }

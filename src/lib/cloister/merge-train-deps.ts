@@ -11,7 +11,6 @@
 import { join } from 'path';
 import { promisify } from 'util';
 import { exec } from 'child_process';
-import { listPipelineStatuses } from '../overdeck/pipeline-view.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { spawnRun } from '../agents.js';
 import type { ReconcileDeps, RebaseStatus } from './merge-train-reconciler.js';
@@ -26,16 +25,12 @@ function workspacePathFor(issueId: string): string | null {
 
 export function buildRealReconcileDeps(): ReconcileDeps {
   return {
-    getReadySiblings: (mergedIssueId) => {
+    // PAN-3917: the ready set is the forge's, not a stored flag. An issue is a
+    // rebase candidate when its own PR is approved, green, and mergeable.
+    getReadySiblings: async (mergedIssueId) => {
       const merged = mergedIssueId.toUpperCase();
-      return Object.values(listPipelineStatuses())
-        .filter(
-          (rs) =>
-            rs.readyForMerge === true &&
-            rs.mergeStatus !== 'merged' &&
-            rs.issueId.toUpperCase() !== merged,
-        )
-        .map((rs) => rs.issueId);
+      const [{ getMergeReadyIssues }] = await Promise.all([import('./merge-ready-set.js')]);
+      return (await getMergeReadyIssues()).filter((issueId) => issueId.toUpperCase() !== merged);
     },
 
     rebaseSibling: async (issueId): Promise<{ status: RebaseStatus }> => {

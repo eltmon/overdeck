@@ -59,7 +59,6 @@ vi.mock('../../../../src/lib/project-repos.js', () => ({
 
 import {
   assessMergeCompleteness,
-  observeForgeMergeState,
   reconcileStrandedRepos,
 } from '../../../../src/lib/cloister/merge-completeness.js';
 
@@ -74,7 +73,6 @@ describe('merge completeness forge error propagation', () => {
         forge: 'github',
         sourceBranch: 'feature/min-857',
         targetBranch: 'main',
-        mergeStatus: 'pending',
         required: true,
       }],
     });
@@ -107,24 +105,6 @@ describe('merge completeness forge error propagation', () => {
     );
   });
 
-  it('does not write merge-set state when forge observation is unverifiable', async () => {
-    const result = await observeForgeMergeState('MIN-857');
-
-    expect(result.complete).toBe(false);
-    expect(result.hasPositiveMergedEvidence).toBe(false);
-    expect(result.repos).toEqual([
-      expect.objectContaining({
-        repoKey: 'api',
-        state: 'unverifiable',
-        reason: expect.stringContaining('gh authentication failed'),
-      }),
-    ]);
-    expect(patchMergeSetRepoMock).not.toHaveBeenCalled();
-    expect(patchMergeSetReposMock).not.toHaveBeenCalled();
-    expect(withRepoStateMock).not.toHaveBeenCalled();
-    expect(upsertMergeSetMock).not.toHaveBeenCalled();
-  });
-
   it('returns an unverifiable blocker and writes nothing when stranded merge lookup fails', async () => {
     const initial = {
       repos: [{
@@ -134,7 +114,6 @@ describe('merge completeness forge error propagation', () => {
         sourceBranch: 'feature/min-857',
         targetBranch: 'main',
         artifactUrl: 'https://github.com/org/api/pull/56',
-        mergeStatus: 'failed',
         required: true,
       }],
     };

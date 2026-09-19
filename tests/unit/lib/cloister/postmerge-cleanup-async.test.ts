@@ -247,7 +247,7 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
   });
 
   it('runs post-merge cleanup while the release engine is still pending', async () => {
-    const lifecyclePromise = postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true });
+    const lifecyclePromise = postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH);
 
     // Wait for the release engine to have started but NOT resolve it yet.
     // The release path begins behind several dynamic imports. Under the full
@@ -275,24 +275,16 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
     releaseResolve!();
 
     await lifecyclePromise;
-    expect(mockSetReviewStatusSync).toHaveBeenLastCalledWith(
-      ISSUE_ID,
-      expect.objectContaining({ mergeStatus: 'merged', mergeStep: 'merged' }),
-    );
   }, 30_000);
 
   it('runs name-based teardown before a verifying-on-main tracker transition fails', async () => {
     mockTransitionState.shouldFail = true;
 
     await expect(
-      postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true }),
+      postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH),
     ).rejects.toThrow('tracker transition failed');
 
     expect(mockTeardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith(ISSUE_ID.toLowerCase());
-    expect(mockSetReviewStatusSync).toHaveBeenCalledWith(
-      ISSUE_ID,
-      expect.objectContaining({ mergeStatus: 'merged', mergeStep: 'post-merge-cleanup' }),
-    );
   });
 
   it('queues retry ownership when teardown and tracker transition both fail', async () => {
@@ -303,32 +295,10 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
     });
 
     await expect(
-      postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true }),
+      postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH),
     ).rejects.toThrow('tracker transition failed');
 
     expect(mockEnqueueMergedDockerCleanup).toHaveBeenCalledWith(ISSUE_ID, { mergeVerified: true });
-    expect(mockSetReviewStatusSync).toHaveBeenCalledWith(
-      ISSUE_ID,
-      expect.objectContaining({ mergeStatus: 'merged', mergeStep: 'post-merge-cleanup' }),
-    );
-  });
-
-  it('preserves verified retry ownership when the initial merged-status write fails', async () => {
-    mockSetReviewStatusSync.mockImplementationOnce(() => {
-      throw new Error('status write failed');
-    });
-    mockTeardownWorkspaceDockerByNamePromise.mockRejectedValueOnce(
-      new Error('network teardown failed'),
-    );
-
-    await expect(
-      postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true }),
-    ).resolves.toBeUndefined();
-
-    expect(mockEnqueueMergedDockerCleanup).toHaveBeenCalledWith(
-      ISSUE_ID,
-      { mergeVerified: true },
-    );
   });
 
   it('continues post-merge cleanup when Docker network teardown fails', async () => {
@@ -337,7 +307,7 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     try {
-      await expect(postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true })).resolves.toBeUndefined();
+      await expect(postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH)).resolves.toBeUndefined();
 
       expect(mockTeardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith(ISSUE_ID.toLowerCase());
       expect(mockEnqueueMergedDockerCleanup).toHaveBeenCalledWith(ISSUE_ID, { mergeVerified: true });

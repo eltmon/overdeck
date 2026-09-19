@@ -35,10 +35,9 @@ vi.mock('../../agents/liveness.js', () => ({
 vi.mock('../../projects.js', () => ({
   resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'test', projectPath: '/repo' })),
   getProjectSync: vi.fn(() => null),
-}));
-vi.mock('../../pan-dir/record.js', () => ({
-  readIssueRecordSync: vi.fn(() => null),
-  writeIssueRecordSync: vi.fn(),
+  // PAN-3917: resolvePlanHome() asks projects.ts which repo owns `.pan/`.
+  findProjectByPathSync: vi.fn(() => null),
+  resolveInfraRepo: (_project: unknown, checkoutRoot: string) => ({ repoPath: checkoutRoot }),
 }));
 
 const agentState = vi.hoisted(() => ({
@@ -62,21 +61,11 @@ vi.mock('../work-agent-start.js', () => ({
   spawnWorkAgentThroughAgentsEndpoint: spawn.workAgent,
 }));
 
-// PAN-3511: surfaceIssueFeedbackNeedsYou dynamically imports review-status for
-// the stuck mark, and the artifact restore writes through the same module.
-const reviewStatus = vi.hoisted(() => ({
-  markWorkspaceStuck: vi.fn(),
-  setReviewStatusSync: vi.fn(),
-  getReviewStatusSync: vi.fn(() => ({ reviewStatus: 'reviewing' })),
-}));
-vi.mock('../../review-status.js', () => ({
-  markWorkspaceStuck: reviewStatus.markWorkspaceStuck,
-  setReviewStatusSync: reviewStatus.setReviewStatusSync,
-  getReviewStatusSync: reviewStatus.getReviewStatusSync,
-  FEEDBACK_DELIVERY_STUCK_REASON: 'feedback_delivery_needs_you',
-
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
+// PAN-3917: surfaceIssueFeedbackNeedsYou announces on the activity stream —
+// there is no stuck flag and no verdict to restore.
+const activity = vi.hoisted(() => ({ emitActivityEntrySync: vi.fn() }));
+vi.mock('../../activity-logger.js', () => ({
+  emitActivityEntrySync: activity.emitActivityEntrySync,
 }));
 
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -209,90 +198,39 @@ describe('resolveIssueFeedbackTarget — resurrection-first delivery (PAN-2209 +
   });
 });
 
-describe('surfaceIssueFeedbackNeedsYou — the artifact gets a say before the stuck mark (PAN-3511)', () => {
+describe('surfaceIssueFeedbackNeedsYou (PAN-3917: an announcement, not a flag)', () => {
   const ISSUE = 'PAN-9999';
-  let projectPath: string;
-  let workspacePath: string;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    filesystem.existingPaths.clear();
-    reviewStatus.getReviewStatusSync.mockReturnValue({ reviewStatus: 'reviewing' });
-    projectPath = mkdtempSync(join(tmpdir(), 'pan3511-feedback-'));
-    workspacePath = join(projectPath, 'workspaces', `feature-${ISSUE.toLowerCase()}`);
-    vi.mocked(resolveProjectFromIssueSync).mockReturnValue({ projectKey: 'test', projectPath } as never);
   });
 
-  afterEach(() => {
-    rmSync(projectPath, { recursive: true, force: true });
-  });
-
-  /** Write a real artifact and register it with the suite's existsSync mock. */
-  function writeArtifact(filename: string, body: string): void {
-    const runDir = join(workspacePath, '.pan', 'review', 'run-1');
-    mkdirSync(runDir, { recursive: true });
-    const path = join(runDir, filename);
-    writeFileSync(path, body, 'utf-8');
-    filesystem.existingPaths.add(path);
-  }
-
-  // Both shapes are workspace evidence, not verdict authority. The canonical
-  // review done signal alone can change a terminal review status.
-  it.each(VERDICT_REPORT_FILENAMES)(
-    'marks delivery failure when an untrusted %s artifact claims approval',
-    async (filename) => {
-      writeArtifact(filename, '## Verdict: APPROVED\n\n## Summary\nEverything checks out cleanly.\n');
-
-      await surfaceIssueFeedbackNeedsYou(ISSUE, 'no live feedback target', { agentId: 'agent-pan-9999' });
-
-      expect(reviewStatus.setReviewStatusSync).not.toHaveBeenCalled();
-      expect(reviewStatus.markWorkspaceStuck).toHaveBeenCalledWith(
-        ISSUE,
-        'feedback_delivery_needs_you',
-        { reason: 'no live feedback target', agentId: 'agent-pan-9999' },
-      );
-    },
-  );
-
-  it('marks stuck with the unchanged details payload when no artifact exists (ac3)', async () => {
+  it('announces the reason and the issue on the activity stream', async () => {
     await surfaceIssueFeedbackNeedsYou(ISSUE, 'no live feedback target', { agentId: 'agent-pan-9999' });
 
-    expect(reviewStatus.setReviewStatusSync).not.toHaveBeenCalled();
-    expect(reviewStatus.markWorkspaceStuck).toHaveBeenCalledTimes(1);
-    expect(reviewStatus.markWorkspaceStuck).toHaveBeenCalledWith(
-      ISSUE,
-      'feedback_delivery_needs_you',
-      { reason: 'no live feedback target', agentId: 'agent-pan-9999' },
+    expect(activity.emitActivityEntrySync).toHaveBeenCalledTimes(1);
+    expect(activity.emitActivityEntrySync).toHaveBeenCalledWith({
+      source: 'cloister',
+      level: 'warn',
+      issueId: ISSUE,
+      message: `${ISSUE} needs you: no live feedback target`,
+      details: JSON.stringify({ agentId: 'agent-pan-9999' }),
+    });
+  });
+
+  it('omits the details payload when there is nothing to attach', async () => {
+    await surfaceIssueFeedbackNeedsYou(ISSUE, 'no live feedback target');
+
+    expect(activity.emitActivityEntrySync).toHaveBeenCalledWith(
+      expect.objectContaining({ issueId: ISSUE, details: undefined }),
     );
   });
 
-  it('still marks stuck when the artifact consult throws (ac4)', async () => {
-    // The consult must fail TOWARD the flag that protects delivery today.
-    reviewStatus.getReviewStatusSync.mockImplementation(() => { throw new Error('db locked'); });
-    writeArtifact('synthesis.md', '## Verdict: APPROVED\n');
+  it('never throws when the announcement itself fails', async () => {
+    activity.emitActivityEntrySync.mockImplementationOnce(() => { throw new Error('feed unavailable'); });
 
     await expect(
-      surfaceIssueFeedbackNeedsYou(ISSUE, 'no live feedback target', { agentId: 'agent-pan-9999' }),
+      surfaceIssueFeedbackNeedsYou(ISSUE, 'no live feedback target', {}),
     ).resolves.toBeUndefined();
-
-    expect(reviewStatus.markWorkspaceStuck).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not let a mismatched artifact head bypass the feedback-delivery stuck mark', async () => {
-    const runDir = join(workspacePath, '.pan', 'review', 'run-1');
-    mkdirSync(runDir, { recursive: true });
-    const path = join(runDir, 'synthesis.md');
-    writeFileSync(path, '## Verdict: APPROVED\n', 'utf-8');
-    filesystem.existingPaths.add(path);
-    writeFileSync(join(runDir, 'context.json'), JSON.stringify({ headSha: 'aaaaaaa1' }), 'utf-8');
-
-    await surfaceIssueFeedbackNeedsYou(ISSUE, 'no live feedback target', {});
-
-    expect(reviewStatus.setReviewStatusSync).not.toHaveBeenCalled();
-    expect(reviewStatus.markWorkspaceStuck).toHaveBeenCalledWith(
-      ISSUE,
-      'feedback_delivery_needs_you',
-      { reason: 'no live feedback target' },
-    );
   });
 });

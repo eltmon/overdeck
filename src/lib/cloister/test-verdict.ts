@@ -4,7 +4,7 @@
  * The test role narrates "tests pass" but the agent (often Haiku 4.5) sometimes
  * never POSTs the verdict, stranding the issue at test=pending. To make the
  * verdict recoverable the test role writes a small work-product artifact at
- * `.pan/test/result.json` BEFORE it POSTs testStatus — symmetric with how the
+ * `.pan/test/result.json` BEFORE it signals its verdict — symmetric with how the
  * review convoy reviewers write report files / the synthesis agent writes
  * `synthesis.md`, which `checkCompletedButUnsignaledReviews` already reads.
  *
@@ -151,20 +151,27 @@ export function decideUnsignaledTestAction(input: {
 /**
  * PAN-3092: surface an `escalate` decision to the operator, once per test
  * dispatch generation. Returns the needs-you line to log, or undefined when this
- * generation already tripped. Never touches the verdict itself (D6) — a
+ * generation already escalated. Never touches the verdict itself (D6) — a
  * pane-only verdict is a human's call to read and apply.
  */
+const escalatedTestGenerations = new Set<string>();
+
+/** Test hook: forget which dispatch generations have already escalated. */
+export function resetUnsignaledTestEscalationsForTests(): void {
+  escalatedTestGenerations.clear();
+}
+
 export async function recordUnsignaledTestEscalation(
-  workspacePath: string,
+  _workspacePath: string,
   issueId: string,
   testSession: string,
   generation: string,
 ): Promise<string | undefined> {
-  const { recordRecoveryFailure } = await import('./recovery-trip.js');
-  const { emitNeedsYou } = await recordRecoveryFailure(
-    workspacePath, issueId, 'unsignaled-test-verdict', generation, 1,
-  );
-  if (!emitNeedsYou) return undefined;
+  // PAN-3917: once per dispatch generation, held in process memory. The trip
+  // ledger this used to write was a stored counter for a message.
+  const key = `${issueId.toUpperCase()}:${generation}`;
+  if (escalatedTestGenerations.has(key)) return undefined;
+  escalatedTestGenerations.add(key);
   return (
     `needs-you ${issueId}: the test agent (${testSession}) is alive but has not responded to a verdict ` +
     `nudge, and it wrote no .pan/test/result.json — its verdict may exist only in the agent's pane, where ` +

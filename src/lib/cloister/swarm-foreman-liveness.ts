@@ -1,5 +1,5 @@
 import { emitActivityEntrySync } from '../activity-logger.js';
-import { listSlotAssignments, type SlotReconcileResult } from '../agents/slot-reconcile.js';
+import { listSlotAssignments, type SlotReconcileResult } from './swarm-slot-reconcile.js';
 import { readSwarmHold, writeSwarmHold } from './deacon-swarm-record.js';
 import { workResumeSlotsAvailable } from './concurrency.js';
 import { ensureSwarmForeman } from './swarm-foreman.js';

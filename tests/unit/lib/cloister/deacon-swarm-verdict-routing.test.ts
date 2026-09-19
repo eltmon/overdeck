@@ -23,6 +23,11 @@ const {
 
 vi.mock('node:child_process', () => ({
   execFile: vi.fn((_cmd, _args, _options, callback) => callback(null, '', '')),
+  // PAN-3917: the forge read door shells out through promisified exec.
+  exec: vi.fn((_cmd: string, _options: unknown, callback: (e: Error | null, stdout: string, stderr: string) => void) => {
+    callback(null, '', '');
+    return {} as never;
+  }),
 }));
 
 vi.mock('../../../../src/lib/agents.js', () => ({
@@ -38,6 +43,8 @@ vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
+  // PAN-3917: resolvePlanHome() asks projects.ts which repo owns `.pan/`.
+  resolveInfraRepo: (_project: unknown, checkoutRoot: string) => ({ repoPath: checkoutRoot }),
   resolveProjectFromIssueSync: vi.fn(() => null),
 }));
 
@@ -52,7 +59,7 @@ vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
   writeFeedbackFile: mockWriteFeedbackFile,
 }));
 
-vi.mock('../../../../src/lib/agents/slot-reconcile.js', () => ({
+vi.mock('../../../../src/lib/cloister/swarm-slot-reconcile.js', () => ({
   listSlotOwnership: mockListSlotOwnership,
 }));
 

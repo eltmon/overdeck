@@ -8,16 +8,8 @@ import {
   RETAINED_TRANSCRIPTS_PHASE,
   tombstoneAgentRecordSync,
 } from '../overdeck/agents.js';
-import {
-  appendAgentPlaneLifecycle,
-  flushAgentPlaneWrites,
-  type AgentPlaneLifecycleEntry,
-  type AgentPlaneTombstonePredicate,
-} from '../pan-dir/agents.js';
-import { readIssueRecordForWorkspaceSync } from '../pan-dir/record.js';
 import { getOverdeckHome } from '../paths.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
-import { getAgentStateSync } from '../agents/agent-state.js';
 import {
   hasRetainedTranscriptsMarker,
   listAgentStateFilesForRemoval,
@@ -31,7 +23,6 @@ import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { resolveProjectReposForIssueSync } from '../project-repos.js';
 import { listOpenPullRequestsSnapshot } from '../pipeline-membership-gather.js';
 import { listOpenGitLabMergeRequests } from '../gitlab-merge-requests.js';
-import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 
 export interface AgentGcResult { removed: string[]; preserved: string[] }
 export interface AgentGcRow {
@@ -44,6 +35,31 @@ export interface AgentGcRow {
   branch?: string | null;
 }
 
+/**
+ * Why the GC decided an agent was terminal (PAN-3917).
+ *
+ * This used to be `AgentGcTerminalityEvidence` from the durable agent plane
+ * on the state branch: the GC wrote a tombstone there and pushed it before it
+ * was allowed to delete local agent state. The state branch is gone, so the
+ * evidence has no durable home and needs none — it is the reason line on the
+ * prune event, which is what an operator reads afterwards either way.
+ */
+export interface AgentGcTerminalityEvidence {
+  closedOutFlag: boolean;
+  trackerState: string;
+  liveTmux: boolean | null;
+  openChangeRequest: boolean | null;
+  inFlightReviewOrTest: boolean | null;
+}
+
+/** What the GC reports when it prunes an agent's local state. */
+export interface AgentGcPruneEntry {
+  at: string;
+  event: 'tombstoned';
+  predicate?: AgentGcTerminalityEvidence;
+  filesRemoved?: string[];
+}
+
 export interface AgentGcTerminalityDeps {
   hasClosedOutFlag: (agent: AgentGcRow) => boolean;
   readTrackerState: (issueId: string) => Promise<LiveTrackerIssueState>;
@@ -53,7 +69,7 @@ export interface AgentGcTerminalityDeps {
   log: (message: string) => void;
 }
 
-export type AgentGcTerminalityResult = boolean | AgentPlaneTombstonePredicate | null;
+export type AgentGcTerminalityResult = boolean | AgentGcTerminalityEvidence | null;
 
 export interface AgentGcDeps {
   agentsDir: string;
@@ -61,8 +77,7 @@ export interface AgentGcDeps {
   listFilesToRemove: (dirPath: string, agentsDir: string) => Promise<string[]>;
   hasRetainedMarker: (dirPath: string) => Promise<boolean>;
   markRetained: (dirPath: string) => Promise<void>;
-  writeTombstone: (agent: AgentGcRow, entry: AgentPlaneLifecycleEntry) => Promise<void>;
-  emitPruneEvent: (agent: AgentGcRow, entry: AgentPlaneLifecycleEntry) => void;
+  emitPruneEvent: (agent: AgentGcRow, entry: AgentGcPruneEntry) => void;
   removeRecord: (id: string) => void;
   tombstoneRecord: (id: string) => void;
   isTerminalAgent: (agent: AgentGcRow) => AgentGcTerminalityResult | Promise<AgentGcTerminalityResult>;
@@ -106,15 +121,11 @@ async function hasOpenChangeRequest(agent: AgentGcRow): Promise<boolean> {
   return false;
 }
 
+/**
+ * PAN-3917: a review or test is in flight when a review or test agent for the
+ * issue is live. That is the fact; the status row was a copy of it.
+ */
 function hasInFlightReviewOrTest(agent: AgentGcRow): boolean {
-  const status = getPipelineStatus(agent.issueId);
-  if (
-    status?.reviewStatus === 'reviewing'
-    || status?.testStatus === 'testing'
-    || status?.verificationStatus === 'running'
-    || (status?.reviewStatus === 'pending' && Boolean(status.reviewRequestedAt))
-  ) return true;
-
   return listAllAgentsSync().some((candidate) =>
     candidate.issueId.toUpperCase() === agent.issueId.toUpperCase()
     && (candidate.role === 'review' || candidate.role === 'test')
@@ -123,8 +134,9 @@ function hasInFlightReviewOrTest(agent: AgentGcRow): boolean {
 
 function defaultTerminalityDeps(): AgentGcTerminalityDeps {
   return {
-    hasClosedOutFlag: (agent) => Boolean(agent.workspace
-      && readIssueRecordForWorkspaceSync(agent.workspace, agent.issueId)?.pipeline?.closedOut === true),
+    // PAN-3917: close-out is the tracker closing the issue, read by
+    // readTrackerState below. There is no separate closedOut flag.
+    hasClosedOutFlag: () => false,
     readTrackerState: readLiveTrackerIssueState,
     hasLiveTmuxSession: (agentId) => Effect.runPromise(sessionExists(agentId)),
     hasOpenChangeRequest,
@@ -141,7 +153,7 @@ function defaultTerminalityDeps(): AgentGcTerminalityDeps {
 export async function resolveLiveAgentTerminalityEvidence(
   agent: AgentGcRow,
   deps: AgentGcTerminalityDeps = defaultTerminalityDeps(),
-): Promise<AgentPlaneTombstonePredicate | null> {
+): Promise<AgentGcTerminalityEvidence | null> {
   if (agent.status !== 'stopped' || !agent.workspace) return null;
   const closedOutFlag = deps.hasClosedOutFlag(agent);
   if (!closedOutFlag) {
@@ -186,32 +198,9 @@ export async function confirmLiveAgentTerminality(
   return (await resolveLiveAgentTerminalityEvidence(agent, deps)) !== null;
 }
 
-async function persistAgentGcTombstone(
-  agent: AgentGcRow,
-  entry: AgentPlaneLifecycleEntry,
-): Promise<void> {
-  const state = getAgentStateSync(agent.id);
-  if (!state) {
-    throw new Error(`local agent state is unavailable for durable tombstone ${agent.id}`);
-  }
-  // The GC owns the durability boundary below. Keep this concrete mutation in
-  // the queue until its explicit flush can reconcile a concurrent remote
-  // advance while the desired tombstone is still available.
-  const written = await appendAgentPlaneLifecycle(state, entry, { deferCommit: true });
-  if (!written) {
-    throw new Error(`durable agent plane is unavailable for tombstone ${agent.id}`);
-  }
-  const flush = await flushAgentPlaneWrites(agent.issueId, agent.id);
-  if (!flush || flush.errored || flush.pushed !== true) {
-    throw new Error(
-      `durable tombstone push failed for ${agent.id}: ${flush?.reason ?? 'no confirmed state-branch push'}`,
-    );
-  }
-}
-
 function emitAgentGcPruneEvent(
   agent: AgentGcRow,
-  entry: AgentPlaneLifecycleEntry,
+  entry: AgentGcPruneEntry,
 ): void {
   emitActivityEntrySync({
     source: 'cloister',
@@ -233,7 +222,6 @@ function defaultAgentGcDeps(): AgentGcDeps {
     listFilesToRemove: listAgentStateFilesForRemoval,
     hasRetainedMarker: hasRetainedTranscriptsMarker,
     markRetained: markRetainedTranscripts,
-    writeTombstone: persistAgentGcTombstone,
     emitPruneEvent: emitAgentGcPruneEvent,
     removeRecord: removeAgentRecordSync,
     tombstoneRecord: tombstoneAgentRecordSync,
@@ -242,7 +230,7 @@ function defaultAgentGcDeps(): AgentGcDeps {
   };
 }
 
-function preverifiedCloseOutPredicate(): AgentPlaneTombstonePredicate {
+function preverifiedCloseOutPredicate(): AgentGcTerminalityEvidence {
   return {
     closedOutFlag: true,
     trackerState: 'closed-preverified-by-close-out',
@@ -255,7 +243,7 @@ function preverifiedCloseOutPredicate(): AgentPlaneTombstonePredicate {
 export async function pruneAgentRowsAfterTranscriptCleanup(
   agents: readonly AgentGcRow[],
   deps: AgentGcDeps = defaultAgentGcDeps(),
-  evidenceByAgent: ReadonlyMap<string, AgentPlaneTombstonePredicate> = new Map(),
+  evidenceByAgent: ReadonlyMap<string, AgentGcTerminalityEvidence> = new Map(),
 ): Promise<AgentGcResult> {
   const removed: string[] = [];
   const preserved: string[] = [];
@@ -266,13 +254,12 @@ export async function pruneAgentRowsAfterTranscriptCleanup(
         preserved.push(agent.id);
         continue;
       }
-      const entry: AgentPlaneLifecycleEntry = {
+      const entry: AgentGcPruneEntry = {
         at: new Date().toISOString(),
         event: 'tombstoned',
         predicate: evidenceByAgent.get(agent.id) ?? preverifiedCloseOutPredicate(),
         filesRemoved: await deps.listFilesToRemove(agentDir, deps.agentsDir),
       };
-      await deps.writeTombstone(agent, entry);
       deps.emitPruneEvent(agent, entry);
       const result = await deps.cleanStateDir(agentDir, deps.agentsDir);
       if (!result.removedDir) {
@@ -322,7 +309,7 @@ export async function pruneTerminalStoppedAgents(
     && agent.status === 'stopped'
     && Boolean(agent.workspace));
   const terminal: AgentGcRow[] = [];
-  const evidenceByAgent = new Map<string, AgentPlaneTombstonePredicate>();
+  const evidenceByAgent = new Map<string, AgentGcTerminalityEvidence>();
   const preserved: string[] = [];
 
   for (const agent of candidates) {

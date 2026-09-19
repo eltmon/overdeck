@@ -34,7 +34,7 @@ import {
   spawnTierSupervisor,
   supervisorAgentId,
 } from '../agents/tier-supervisor.js';
-import { listSlotAssignments } from '../agents/slot-reconcile.js';
+import { listSlotAssignments } from './swarm-slot-reconcile.js';
 import type { XBriefDocument, XBriefItem } from '../xbrief/types.js';
 
 const execAsync = promisify(exec);

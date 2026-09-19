@@ -55,14 +55,16 @@ fi
 require_reference src/dashboard/server/services/resource-discovery.ts 'readPipelineMembershipSnapshotsForProjects' 'resource discovery'
 require_reference src/dashboard/frontend/src/lib/pipeline-state.ts 'pipelineMembership' 'frontend pipeline state'
 require_reference src/lib/reconstruct/enumerate-in-flight.ts 'resolvePipelineMembership' 'in-flight reconstruction'
-require_reference src/lib/cloister/flywheel.ts 'resolvePipelineMembership' 'flywheel'
+# PAN-3917 D12: the flywheel's cohort machinery is deleted; the cloister's
+# membership consumer is now the merge-eligibility read, which the gate follows.
+require_reference src/lib/cloister/merge-eligibility.ts 'resolvePipelineMembership' 'merge eligibility'
 require_reference sync-sources/skills/pipeline-status/SKILL.md '/api/pipeline/membership' 'pipeline-status skill'
 
 # Named legacy predicates from the six pre-PAN-1966 membership views.
 ban_pattern src/dashboard/server/services/resource-discovery.ts 'filter\(\(issue\) => !isTerminalTrackerState' 'resource discovery'
 ban_pattern src/dashboard/frontend/src/lib/pipeline-state.ts "stateType.*in_progress.*in_review" 'frontend pipeline state'
 ban_pattern src/lib/reconstruct/enumerate-in-flight.ts 'openIssueIds|FEATURE_DIR_RE' 'in-flight reconstruction'
-ban_pattern src/lib/cloister/flywheel.ts 'workspacesDir.*feature-' 'flywheel'
+ban_pattern src/lib/cloister/merge-eligibility.ts 'workspacesDir.*feature-' 'merge eligibility'
 ban_pattern sync-sources/skills/pipeline-status/SKILL.md "in_progress','in_review" 'pipeline-status skill'
 
 # The resolver and gatherer are durable-lens code. Disposable L5 state may not

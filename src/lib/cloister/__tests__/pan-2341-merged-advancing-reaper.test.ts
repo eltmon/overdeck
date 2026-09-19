@@ -6,12 +6,7 @@ import {
 } from '../reap-terminal-sessions.js';
 
 function mergedStatus(): ReapableStatus {
-  return {
-    reviewStatus: 'passed',
-    testStatus: 'passed',
-    mergeStatus: 'merged',
-    readyForMerge: false,
-  };
+  return { reviewSettled: true, testSettled: true, merged: true, mergeReady: false };
 }
 
 describe('PAN-2341 merged advancing reaper', () => {
@@ -34,7 +29,7 @@ describe('PAN-2341 merged advancing reaper', () => {
 
   it('does not select advancing sessions for non-merged issues', () => {
     expect(selectMergedAdvancingSessions({
-      'PAN-3001': { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'pending' },
+      'PAN-3001': { reviewSettled: true, testSettled: true, merged: false },
     }, ['agent-pan-3001-review'])).toEqual([]);
   });
 

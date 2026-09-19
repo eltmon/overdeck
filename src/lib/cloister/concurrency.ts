@@ -24,8 +24,7 @@ import {
 } from '../agents.js';
 import { countAgentsByStatus } from '../overdeck/agents.js';
 import { getCachedMemoryVerdict } from './memory-verdict-cache.js';
-import { isRoleTerminal, type AdvancingRole } from './reap-terminal-sessions.js';
-import { readReviewStatusMap } from './review-status-source.js';
+import { isIdle } from '../agents/liveness.js';
 import { isTerminalSwarmSlotAgent } from './swarm-slot-lifecycle.js';
 
 const DEFAULT_MAX_WORK_AGENTS = 6;
@@ -145,22 +144,20 @@ export function countRunningSwarmSlotsForIssue(
  * the warm-by-default lifecycle. They are free capacity, not load: excluding
  * them from the ceiling is what lets warm sessions persist without recreating
  * the PAN-1716 livelock (completed reviewers starving every new dispatch).
- * Best-effort: if the review-status source is unregistered or unreadable,
- * count nothing as warm-idle (the ceiling stays conservative). The status map
- * is read through the cycle-free review-status-source leaf, registered by
- * review-status.ts at module load.
+ * PAN-3917: warm-idle used to mean "the stored verdict for this role is
+ * terminal". It now means what it always described: the pane has stopped
+ * working. `isIdle` is the same liveness oracle every other surface uses, so a
+ * reviewer that finished (or a reviewer that was never busy) frees its slot
+ * without anything needing to have written a verdict down first.
  */
 export function countWarmIdleAdvancingAgents(
   agents: ReturnType<typeof listRunningAgentsSync> = listRunningAgentsSync(),
 ): number {
   const advancingRows = agents.filter(a => a.role && ADVANCING_ROLES.has(a.role) && a.issueId);
   if (advancingRows.length === 0) return 0;
-  const statuses = readReviewStatusMap();
-  if (!statuses) return 0;
   let warmIdle = 0;
   for (const row of advancingRows) {
-    const status = statuses[row.issueId!.toUpperCase()];
-    if (status && isRoleTerminal(row.role as AdvancingRole, status)) warmIdle++;
+    if (isIdle(row.id)) warmIdle++;
   }
   return warmIdle;
 }

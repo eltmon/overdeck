@@ -1,7 +1,14 @@
+/**
+ * Which issues the current order book covers (PAN-3917 D12).
+ *
+ * The book used to be named by the active flywheel run's launch metadata, read
+ * back from a run record. Run records are deleted; the order-book queue in the
+ * repo's plan home answers the question by itself.
+ */
 import type { OrderBook } from '@overdeck/contracts';
 import { describe, expect, it, vi } from 'vitest';
 
-import { activeOrderBookIssues } from '../../../../src/lib/cloister/flywheel.js';
+import { activeOrderBookIssues, currentOrderBook } from '../../../../src/lib/cloister/flywheel.js';
 
 const at = '2026-07-18T12:00:00.000Z';
 
@@ -25,47 +32,44 @@ function book(id: string, status: OrderBook['status'], issues: string[]): OrderB
   };
 }
 
-describe('activeOrderBookIssues', () => {
-  it('returns only the book named by the active run when other draft and ready books exist', async () => {
-    const books = new Map([
-      ['running', book('running', 'running', ['PAN-20'])],
-      ['draft', book('draft', 'draft', ['PAN-10'])],
-      ['ready', book('ready', 'ready', ['PAN-30'])],
-    ]);
-    const getBook = vi.fn((_root: string, id: string) => books.get(id) ?? null);
-
-    await expect(activeOrderBookIssues('/project', undefined, {
-      activeRunId: () => 'RUN-7',
-      readLaunch: async () => ({
-        version: 1,
-        runId: 'RUN-7',
-        workspace: '/project',
-        briefPath: '/project/docs/flywheel-brief.md',
-        briefDisplayPath: 'docs/flywheel-brief.md',
-        orders: { bookId: 'running' },
-      }),
-      stateRoot: () => '/state',
-      getBook,
-    })).resolves.toEqual(new Set(['PAN-20']));
-    expect(getBook).toHaveBeenCalledOnce();
-    expect(getBook).toHaveBeenCalledWith('/state', 'running');
+describe('currentOrderBook', () => {
+  it('prefers the running book over draft and ready siblings', () => {
+    expect(currentOrderBook([
+      book('draft', 'draft', ['PAN-10']),
+      book('running', 'running', ['PAN-20']),
+      book('ready', 'ready', ['PAN-30']),
+    ])?.id).toBe('running');
   });
 
-  it('returns no released membership for a bookless run even when books exist', async () => {
-    const getBook = vi.fn(() => book('ready', 'ready', ['PAN-30']));
+  it('falls back to the next ready book when nothing is running', () => {
+    expect(currentOrderBook([
+      book('draft', 'draft', ['PAN-10']),
+      book('ready', 'ready', ['PAN-30']),
+    ])?.id).toBe('ready');
+  });
 
-    await expect(activeOrderBookIssues('/project', undefined, {
-      activeRunId: () => 'RUN-8',
-      readLaunch: async () => ({
-        version: 1,
-        runId: 'RUN-8',
-        workspace: '/project',
-        briefPath: '/project/docs/flywheel-brief.md',
-        briefDisplayPath: 'docs/flywheel-brief.md',
-      }),
-      stateRoot: () => '/state',
-      getBook,
+  it('never picks a draft book — a draft is not dispatchable', () => {
+    expect(currentOrderBook([book('draft', 'draft', ['PAN-10'])])).toBeNull();
+  });
+});
+
+describe('activeOrderBookIssues', () => {
+  it('returns the issues of the running book, read from the plan home', async () => {
+    const listBooks = vi.fn(() => [
+      book('draft', 'draft', ['PAN-10']),
+      book('running', 'running', ['PAN-20']),
+      book('ready', 'ready', ['PAN-30']),
+    ]);
+
+    await expect(activeOrderBookIssues('/project', { planHome: () => '/plan-home', listBooks }))
+      .resolves.toEqual(new Set(['PAN-20']));
+    expect(listBooks).toHaveBeenCalledWith('/plan-home');
+  });
+
+  it('returns no membership when the queue holds nothing dispatchable', async () => {
+    await expect(activeOrderBookIssues('/project', {
+      planHome: () => '/plan-home',
+      listBooks: () => [book('draft', 'draft', ['PAN-10'])],
     })).resolves.toEqual(new Set());
-    expect(getBook).not.toHaveBeenCalled();
   });
 });

@@ -13,8 +13,7 @@ import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
-import { markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
-import { MERGED_VERIFICATION_REASON } from '../review-status-reconcile.js';
+import { emitActivityEntrySync } from '../activity-logger.js';
 import { runQualityGates, DEFAULT_GATES } from './validation.js';
 import {
   readVerificationArtifact,
@@ -28,8 +27,10 @@ import {
   markVerificationWorkerAdmissionPhase,
   runSupervisedVerification,
 } from './verification-worker-supervisor.js';
-import { INTERRUPTED_VERIFICATION_NOTE, type VerificationRunnerOptions, type VerificationRunnerOutcome, type WorkspaceInfo } from './verification-types.js';
-import { readReviewStatusMap } from './review-status-source.js';
+import type { VerificationRunnerOptions, VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
+import { readVerificationCycleState, type VerificationCycleState } from './verification-cycles.js';
+import { postVerificationCheckRun } from './verification-check-run.js';
+import { getPrFacts } from './pr-facts.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 import { clearAgentPaused, getAgentStateSync, messageAgent, setAgentPaused, stopAgent } from '../agents.js';
@@ -42,7 +43,6 @@ import { checkIncompletePlanItemsPromise } from '../work/done-preflight.js';
 import { capturePipelineStageForIssue } from '../telemetry/pipeline.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
 import { parseCompositeSnapshot, snapshotWorkspaceHeadsPromise, type HeadAnchor } from '../git-utils.js';
-import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 
 const execAsync = promisify(exec);
 
@@ -51,17 +51,19 @@ const NO_PROGRESS_REPEAT_THRESHOLD = 2;
 
 export type { VerificationRunnerOptions, VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
 
-function skipMergedVerification(
+export const MERGED_VERIFICATION_REASON =
+  'The pull request already merged; pre-merge verification no longer applies.';
+
+/**
+ * PAN-3917: the forge says whether the PR merged. Nothing is stamped when it
+ * has — a merged PR is the merge state, for every reader.
+ */
+async function skipMergedVerification(
   issueId: string,
   logPrefix: string,
-  status = getPipelineStatus(issueId),
-): VerificationRunnerOutcome | null {
-  if (status?.mergeStatus !== 'merged') return null;
-
-  setReviewStatusSync(issueId, {
-    verificationStatus: 'skipped',
-    verificationNotes: MERGED_VERIFICATION_REASON,
-  });
+): Promise<VerificationRunnerOutcome | null> {
+  const facts = await getPrFacts(issueId);
+  if (!facts.merged) return null;
   console.log(`[${logPrefix}] Skipping pre-merge verification for ${issueId}: ${MERGED_VERIFICATION_REASON}`);
   return { outcome: 'skipped', reason: MERGED_VERIFICATION_REASON };
 }
@@ -81,47 +83,35 @@ function isFinalVerificationAttempt(cycleCount: number): boolean {
   return cycleCount >= VERIFICATION_MAX_CYCLES;
 }
 
-function isRepeatFailedCheck(
-  status: ReturnType<typeof getPipelineStatus> | null | undefined,
-  failedCheck: string,
-): boolean {
-  return (
-    status?.verificationStatus === 'failed' &&
-    status.verificationNotes?.startsWith(`Verification FAILED at ${failedCheck} `) === true
-  );
-}
-
+/**
+ * PAN-3917: "no progress" is read from the per-run verification artifacts at
+ * the current HEAD, not from a stored cycle counter and its notes string.
+ */
 function shouldEscalateVerificationFailure(
-  status: ReturnType<typeof getPipelineStatus> | null | undefined,
+  cycles: VerificationCycleState,
   failedCheck: string,
   cycleCount: number,
 ): boolean {
   if (isFinalVerificationAttempt(cycleCount)) return true;
-  return cycleCount >= NO_PROGRESS_REPEAT_THRESHOLD && isRepeatFailedCheck(status, failedCheck);
+  return cycleCount >= NO_PROGRESS_REPEAT_THRESHOLD && cycles.lastFailedCheck === failedCheck;
 }
 
-function setStateDerivedVerificationFailure(
-  issueId: string,
-  failedCheck: string,
-  summary: string,
-  cycleCount: number,
-  currentStatus: ReturnType<typeof getPipelineStatus> | null | undefined,
-): void {
-  setReviewStatusSync(issueId, {
-    verificationStatus: 'failed',
-    verificationNotes: summary,
-    verificationCycleCount: cycleCount,
-    verificationMaxCycles: VERIFICATION_MAX_CYCLES,
-  });
-
-  if (currentStatus?.reviewStatus !== 'passed') return;
-
-  markWorkspaceStuck(issueId, 'state_derived_verification_hold', {
-    failedCheck,
-    summary,
-    reviewStatus: currentStatus.reviewStatus,
-  });
-  console.warn(`[verification-runner] ${issueId} review is passed but held by state-derived gate ${failedCheck}: ${summary}`);
+/**
+ * Announce a verification failure the gates themselves could not record (an
+ * incomplete checklist, an empty changeset). The artifact holds the gate runs;
+ * this puts the state-derived failure on the activity stream, where it used to
+ * go as a `stuck` flag on the review row.
+ */
+function announceVerificationFailure(issueId: string, failedCheck: string, summary: string): void {
+  try {
+    emitActivityEntrySync({
+      source: 'cloister',
+      level: 'warn',
+      message: `Verification failed for ${issueId} at ${failedCheck}`,
+      issueId,
+      details: summary,
+    });
+  } catch { /* announcement is best-effort */ }
 }
 
 async function escalateVerificationStuck(
@@ -131,101 +121,20 @@ async function escalateVerificationStuck(
   summary: string,
   logPrefix: string,
 ): Promise<void> {
-  if (skipMergedVerification(issueId, logPrefix)) return;
+  if (await skipMergedVerification(issueId, logPrefix)) return;
 
   const agentId = `agent-${issueId.toLowerCase()}`;
   const reason = `needs-you: verification stuck after ${cycleCount}/${VERIFICATION_MAX_CYCLES} attempts (${failedCheck})`;
 
-  markWorkspaceStuck(issueId, 'verification_stuck', {
-    failedCheck,
-    cycleCount,
-    maxCycles: VERIFICATION_MAX_CYCLES,
-    summary,
-  });
+  announceVerificationFailure(issueId, failedCheck, `${reason}\n\n${summary}`);
 
   try {
     await Effect.runPromise(setAgentPaused(agentId, reason, true));
     await Effect.runPromise(stopAgent(agentId));
-    console.log(`[${logPrefix}] Verification stuck for ${issueId} — paused ${agentId} and marked workspace stuck`);
+    console.log(`[${logPrefix}] Verification stuck for ${issueId} — paused ${agentId}; the pause is the operator signal`);
   } catch (err: any) {
     console.error(`[${logPrefix}] Failed to pause ${agentId} after verification stuck:`, err);
   }
-}
-
-/**
- * Boot reconciliation for verifications no worker owns. Live supervised workers
- * survive dashboard restarts and retain ownership of their running status.
- * A running status without a live worker is orphaned, so reset it to pending
- * and finalize the artifact rather than leaving the issue wedged forever.
- *
- * PAN-3339: `pending` on an already-merged issue is the other ownerless shape.
- * "Verification re-runs on the next cycle" is true only while the review
- * pipeline can still dispatch one; after merge there is no next cycle, so the
- * verdict sits at `pending` and DoD row 3 blocks close-out forever. The write
- * door settles this at the merge write going forward — this sweep heals rows
- * that were already stranded before that guard existed.
- */
-export function reconcileInterruptedVerifications(logPrefix = 'boot-reconciliation'): number {
-  let reset = 0;
-  try {
-    const statuses = readReviewStatusMap() ?? {};
-    for (const [issueId, status] of Object.entries(statuses)) {
-      const verificationStatus = (status as { verificationStatus?: string }).verificationStatus;
-      if (
-        verificationStatus === 'pending' &&
-        (status as { mergeStatus?: string }).mergeStatus === 'merged'
-      ) {
-        setReviewStatusSync(issueId, {
-          verificationStatus: 'skipped',
-          verificationNotes: MERGED_VERIFICATION_REASON,
-        });
-        console.log(`[${logPrefix}] settled ownerless pending verification for merged ${issueId} (PAN-3339)`);
-        continue;
-      }
-      if (verificationStatus !== 'running') continue;
-      if (isVerificationWorkerActive(issueId)) {
-        console.log(`[${logPrefix}] preserved live supervised verification for ${issueId}`);
-        continue;
-      }
-      setReviewStatusSync(issueId, {
-        verificationStatus: 'pending',
-        verificationNotes: INTERRUPTED_VERIFICATION_NOTE,
-        lastVerifiedCommit: undefined,
-      });
-      reset += 1;
-      try {
-        const resolved = resolveProjectFromIssueSync(issueId);
-        const workspacePath = resolved
-          ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`)
-          : null;
-        const artifact = workspacePath ? readVerificationArtifact(workspacePath) : null;
-        if (workspacePath && artifact?.outcome === 'running') {
-          writeVerificationArtifact(workspacePath, issueId, [
-            ...artifact.gates.map((gate) => ({
-              name: gate.name,
-              passed: gate.passed,
-              required: gate.required,
-              output: gate.output ?? '',
-              durationMs: gate.durationMs,
-              ...(gate.error ? { error: gate.error } : {}),
-            })),
-            {
-              name: artifact.currentGate ?? 'interrupted',
-              passed: false,
-              required: true,
-              output: 'The supervised verification worker stopped unexpectedly before this gate finished.',
-              durationMs: 0,
-              error: 'supervised verification worker stopped unexpectedly',
-            },
-          ]);
-        }
-      } catch { /* artifact finalization is best-effort */ }
-      console.log(`[${logPrefix}] reset stale running verification for ${issueId} (PAN-2669)`);
-    }
-  } catch (err) {
-    console.warn(`[${logPrefix}] interrupted-verification sweep failed: ${err instanceof Error ? err.message : String(err)}`);
-  }
-  return reset;
 }
 
 /** Exported for focused delivery-outcome tests (PR #3874 review). */
@@ -235,10 +144,10 @@ export async function deliverVerificationFeedback(
   details: Record<string, unknown>,
   logPrefix: string,
 ): Promise<void> {
-  if (skipMergedVerification(issueId, logPrefix)) return;
+  if (await skipMergedVerification(issueId, logPrefix)) return;
 
   const target = await resolveIssueFeedbackTarget(issueId);
-  if (skipMergedVerification(issueId, logPrefix)) return;
+  if (await skipMergedVerification(issueId, logPrefix)) return;
 
   if ('agentId' in target) {
     // PAN-2668: verification feedback owes rework — a stopped-by-user agent
@@ -414,6 +323,43 @@ export async function workspaceChangesetHasContent(
   return diffFailed ? undefined : false;
 }
 
+/** The workspace's current HEAD, eight chars, or undefined when git cannot say. */
+async function readWorkspaceHeadShort(workspacePath: string): Promise<string | undefined> {
+  try {
+    const { stdout } = await execAsync('git rev-parse --short=8 HEAD', { cwd: workspacePath, encoding: 'utf-8', timeout: 10_000 });
+    return stdout.trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * FR-8: report the run as an `overdeck/verification` check run where the GitHub
+ * App is installed. Non-fatal — the workspace artifact is the primary record.
+ */
+async function reportVerificationCheckRun(
+  workspacePath: string,
+  issueId: string,
+  headShort: string | undefined,
+  conclusion: 'success' | 'failure',
+  title: string,
+  summary: string,
+  logPrefix: string,
+): Promise<void> {
+  try {
+    const project = findProjectByPathSync(workspacePath);
+    const repo = project?.github_repo;
+    if (!repo || !repo.includes('/')) return;
+    const [owner, name] = repo.split('/');
+    const { stdout } = await execAsync('git rev-parse HEAD', { cwd: workspacePath, encoding: 'utf-8', timeout: 10_000 });
+    const headSha = stdout.trim();
+    if (!headSha) return;
+    await postVerificationCheckRun({ owner: owner!, repo: name!, headSha, conclusion, title, summary });
+  } catch (err: any) {
+    console.warn(`[${logPrefix}] Could not post the verification check run for ${issueId}${headShort ? ` (${headShort})` : ''}: ${err?.message ?? err}`);
+  }
+}
+
 async function runVerificationForIssuePromise(
   issueId: string,
   workspacePath: string,
@@ -421,20 +367,21 @@ async function runVerificationForIssuePromise(
   logPrefix: string,
   options: VerificationRunnerOptions = {},
 ): Promise<VerificationRunnerOutcome> {
-  const currentStatus = getPipelineStatus(issueId);
-  const mergedOutcome = skipMergedVerification(issueId, logPrefix, currentStatus);
+  const mergedOutcome = await skipMergedVerification(issueId, logPrefix);
   if (mergedOutcome) return mergedOutcome;
 
-  const currentCycles = currentStatus?.verificationCycleCount ?? 0;
+  // PAN-3917: how many failed runs are already recorded against this exact
+  // HEAD. A new commit resets the breaker by construction.
+  const headShort = await readWorkspaceHeadShort(workspacePath);
+  const cycles = readVerificationCycleState(workspacePath, headShort);
+  const currentCycles = cycles.cycleCount;
 
   if (currentCycles >= VERIFICATION_MAX_CYCLES) {
-    const reason = `Circuit breaker: ${currentCycles}/${VERIFICATION_MAX_CYCLES} cycles exceeded — skipping verification`;
+    const reason = `Circuit breaker: ${currentCycles}/${VERIFICATION_MAX_CYCLES} cycles exceeded on this commit — skipping verification`;
     console.log(`[${logPrefix}] ${reason} for ${issueId}`);
-    setReviewStatusSync(issueId, { verificationStatus: 'skipped' });
     return { outcome: 'skipped', reason };
   }
 
-  setReviewStatusSync(issueId, { verificationStatus: 'running' });
   // PAN-3847 (FR-11): the run timestamp is captured once here and names the
   // immutable per-run artifact written when the run terminates.
   const runStartedAt = new Date().toISOString();
@@ -463,7 +410,7 @@ async function runVerificationForIssuePromise(
           syncResults.push(await syncSingleRepo(root.dir, root.targetBranch));
         }
 
-        const postSyncMergedOutcome = skipMergedVerification(issueId, logPrefix);
+        const postSyncMergedOutcome = await skipMergedVerification(issueId, logPrefix);
         if (postSyncMergedOutcome) return postSyncMergedOutcome;
 
         const failures = syncResults.filter(r => !r.success);
@@ -473,15 +420,9 @@ async function runVerificationForIssuePromise(
           const failedCheck = 'sync-target-branch';
           const { summary, feedbackBody } = buildSyncFailureFeedback(issueId, failures, isPolyrepo, newCycleCount);
 
-          setReviewStatusSync(issueId, {
-            reviewStatus: 'pending',
-            verificationStatus: 'failed',
-            verificationNotes: summary,
-            verificationCycleCount: newCycleCount,
-            verificationMaxCycles: VERIFICATION_MAX_CYCLES,
-          });
+          announceVerificationFailure(issueId, failedCheck, summary);
 
-          if (shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)) {
+          if (shouldEscalateVerificationFailure(cycles, failedCheck, newCycleCount)) {
             await escalateVerificationStuck(issueId, failedCheck, newCycleCount, summary, logPrefix);
           }
 
@@ -497,7 +438,7 @@ async function runVerificationForIssuePromise(
             if (fileResult.success) {
               const hasConflicts = failures.some(f => f.hasConflicts);
               const repoList = isPolyrepo ? failures.map(f => f.repoName).join(', ') : basename(workspacePath);
-              const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
+              const msg = shouldEscalateVerificationFailure(cycles, failedCheck, newCycleCount)
                 ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck}${hasConflicts ? ' — merge conflicts' : ''} in ${repoList} after repeated attempts.\n\nMUST READ: ${fileResult.filePath}\n\nFix every reported failure, commit and push the corrections, then run pan done ${issueId} -c "<summary>" to reset verification and return the latest commit to the normal pipeline.`
                 : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck}${hasConflicts ? ' — merge conflicts' : ''} in ${repoList}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, fix the sync issues, commit and push every change, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
               await deliverVerificationFeedback(issueId, msg, {
@@ -525,7 +466,7 @@ async function runVerificationForIssuePromise(
       console.log(`[${logPrefix}] Skipping target-branch sync for ${issueId}; verifying current workspace state`);
     }
 
-    const postSyncMergedOutcome = skipMergedVerification(issueId, logPrefix);
+    const postSyncMergedOutcome = await skipMergedVerification(issueId, logPrefix);
     if (postSyncMergedOutcome) return postSyncMergedOutcome;
 
     // Load project-specific gates or fall back to defaults
@@ -664,7 +605,7 @@ async function runVerificationForIssuePromise(
       ? [{ name: 'test-skip', passed: true, required: true, output: testSkip.evidence, durationMs: Date.now() - testSkipStart }, ...rawGateResults]
       : rawGateResults;
 
-    const postGateMergedOutcome = skipMergedVerification(issueId, logPrefix);
+    const postGateMergedOutcome = await skipMergedVerification(issueId, logPrefix);
     if (postGateMergedOutcome) return postGateMergedOutcome;
 
     const failedGate = gateResults.find(r => !r.passed && r.required !== false);
@@ -679,10 +620,11 @@ async function runVerificationForIssuePromise(
         writeVerificationArtifact(workspacePath, issueId, gateResults);
       } catch { /* best-effort */ }
       console.warn(`[${logPrefix}] Gate "${failedGate.name}" could not run for ${issueId}: ${failedGate.error} — triggering workspace stack rebuild, attempt NOT counted (${currentCycles}/${VERIFICATION_MAX_CYCLES} used)`);
-      setReviewStatusSync(issueId, {
-        verificationStatus: 'pending',
-        verificationNotes: `Verification deferred: ${failedGate.error}. Workspace stack rebuild triggered; verification re-runs on the next cycle.`,
-      });
+      announceVerificationFailure(
+        issueId,
+        failedGate.name,
+        `Verification deferred: ${failedGate.error}. Workspace stack rebuild triggered; verification re-runs on the next cycle.`,
+      );
       try {
         const { rebuildWorkspaceStack } = await import('../workspace/rebuild-stack.js');
         const rebuildResult = await Effect.runPromise(rebuildWorkspaceStack(issueId, {
@@ -723,15 +665,10 @@ async function runVerificationForIssuePromise(
       const fullOutputPath = runArtifactPath ?? verificationArtifactPath(workspacePath);
       const summary = `Verification FAILED at ${failedCheck} (${failedGate.durationMs}ms).\n\nFull gate output: ${fullOutputPath}`;
 
-      setReviewStatusSync(issueId, {
-        reviewStatus: 'pending',
-        verificationStatus: 'failed',
-        verificationNotes: summary,
-        verificationCycleCount: newCycleCount,
-        verificationMaxCycles: VERIFICATION_MAX_CYCLES,
-      });
+      announceVerificationFailure(issueId, failedCheck, summary);
+      await reportVerificationCheckRun(workspacePath, issueId, headShort, 'failure', `verification failed at ${failedCheck}`, summary, logPrefix);
 
-      const shouldEscalate = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount);
+      const shouldEscalate = shouldEscalateVerificationFailure(cycles, failedCheck, newCycleCount);
 
       if (shouldEscalate) {
         await escalateVerificationStuck(issueId, failedCheck, newCycleCount, summary, logPrefix);
@@ -777,11 +714,11 @@ async function runVerificationForIssuePromise(
         const newCycleCount = currentCycles + 1;
         const failedCheck = 'vbrief-conflicts';
         const summary = `xBRIEF spec has unresolved git merge conflict markers. Resolve all conflict markers in the spec file and commit before resubmitting.`;
-        setStateDerivedVerificationFailure(issueId, failedCheck, summary, newCycleCount, currentStatus);
-        if (shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)) {
+        announceVerificationFailure(issueId, failedCheck, summary);
+        if (shouldEscalateVerificationFailure(cycles, failedCheck, newCycleCount)) {
           await escalateVerificationStuck(issueId, failedCheck, newCycleCount, summary, logPrefix);
         }
-        const feedbackBody = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
+        const feedbackBody = shouldEscalateVerificationFailure(cycles, failedCheck, newCycleCount)
           ? `VERIFICATION STUCK for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n${buildFinalFailureInstructions(issueId)}`
           : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix merge conflicts in xBRIEF spec BEFORE resubmitting\n\n1. Open the xBRIEF spec (on main in .pan/specs/)\n2. Find and resolve all <<<<<<< HEAD / ======= / >>>>>>> conflict markers\n3. Ensure the file is valid JSON (only keep ONE version of each conflicted block)\n4. Commit the fixed file on main\n5. ONLY THEN resubmit: pan review request ${issueId} -m "Resolved spec merge conflict"\n\nDo NOT resubmit until the spec parses cleanly.`;
         try {
@@ -794,7 +731,7 @@ async function runVerificationForIssuePromise(
             markdownBody: feedbackBody,
           }));
           if (fileResult.success) {
-            const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
+            const msg = shouldEscalateVerificationFailure(cycles, failedCheck, newCycleCount)
               ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after repeated attempts.\n\nMUST READ: ${fileResult.filePath}\n\nFix every reported failure, commit and push the corrections, then run pan done ${issueId} -c "<summary>" to reset verification and return the latest commit to the normal pipeline.`
               : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — the xBRIEF document has merge conflict markers.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, resolve the merge conflict markers, commit and push the fix, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
             await deliverVerificationFeedback(issueId, msg, {
@@ -824,12 +761,12 @@ async function runVerificationForIssuePromise(
         .join('\n\n');
       const summary = `Acceptance criteria check FAILED — ${acStatus.totalPending}/${acStatus.totalCount} AC incomplete:\n\n${incompleteList}`;
 
-      setStateDerivedVerificationFailure(issueId, failedCheck, summary, newCycleCount, currentStatus);
-      if (shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)) {
+      announceVerificationFailure(issueId, failedCheck, summary);
+      if (shouldEscalateVerificationFailure(cycles, failedCheck, newCycleCount)) {
         await escalateVerificationStuck(issueId, failedCheck, newCycleCount, summary, logPrefix);
       }
 
-      const feedbackBody = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
+      const feedbackBody = shouldEscalateVerificationFailure(cycles, failedCheck, newCycleCount)
         ? `VERIFICATION STUCK for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n${buildFinalFailureInstructions(issueId)}`
         : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Complete all acceptance criteria BEFORE resubmitting\n\n1. Review the incomplete AC above\n2. Implement the missing requirements and write tests\n3. Close every completed task with \`pan task close\` — the canonical writer publishes the close and AC statuses sync automatically; never hand-edit spec files\n4. Commit and push ALL changes\n5. ONLY THEN resubmit: pan review request ${issueId} -m "Completed acceptance criteria"\n\nDo NOT resubmit until all AC are completed.`;
 
@@ -843,7 +780,7 @@ async function runVerificationForIssuePromise(
           markdownBody: feedbackBody,
         }));
         if (fileResult.success) {
-          const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
+          const msg = shouldEscalateVerificationFailure(cycles, failedCheck, newCycleCount)
             ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after repeated attempts.\n\nMUST READ: ${fileResult.filePath}\n\nFix every reported failure, commit and push the corrections, then run pan done ${issueId} -c "<summary>" to reset verification and return the latest commit to the normal pipeline.`
             : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — ${acStatus.totalPending} AC incomplete.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, complete all pending acceptance criteria, commit and push every change, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
           await deliverVerificationFeedback(issueId, msg, {
@@ -861,7 +798,7 @@ async function runVerificationForIssuePromise(
     const taskBlockers = options.skipPlanChecklist
       ? []
       : await checkIncompletePlanItemsPromise(workspacePath, issueId);
-    const postChecklistMergedOutcome = skipMergedVerification(issueId, logPrefix);
+    const postChecklistMergedOutcome = await skipMergedVerification(issueId, logPrefix);
     if (postChecklistMergedOutcome) return postChecklistMergedOutcome;
 
     if (taskBlockers.length > 0) {
@@ -872,12 +809,12 @@ async function runVerificationForIssuePromise(
         .filter((id): id is string => Boolean(id));
       const summary = `Checklist completion check FAILED — ${itemIds.length} incomplete item(s) remain:\n\n${taskBlockers.join('\n')}`;
 
-      setStateDerivedVerificationFailure(issueId, failedCheck, summary, newCycleCount, currentStatus);
-      if (shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)) {
+      announceVerificationFailure(issueId, failedCheck, summary);
+      if (shouldEscalateVerificationFailure(cycles, failedCheck, newCycleCount)) {
         await escalateVerificationStuck(issueId, failedCheck, newCycleCount, summary, logPrefix);
       }
 
-      const feedbackBody = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
+      const feedbackBody = shouldEscalateVerificationFailure(cycles, failedCheck, newCycleCount)
         ? `VERIFICATION STUCK for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n${buildFinalFailureInstructions(issueId)}`
         : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\nComplete each listed item with \`pan task done ${issueId} <item>\` after committing and pushing its implementation, then resubmit the review request.`;
 
@@ -891,7 +828,7 @@ async function runVerificationForIssuePromise(
           markdownBody: feedbackBody,
         }));
         if (fileResult.success) {
-          const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
+          const msg = shouldEscalateVerificationFailure(cycles, failedCheck, newCycleCount)
             ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after repeated attempts.\n\nMUST READ: ${fileResult.filePath}\n\nFix every reported failure, commit and push the corrections, then run pan done ${issueId} -c "<summary>" to reset verification and return the latest commit to the normal pipeline.`
             : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — ${itemIds.length} incomplete item(s) remain.\n\nMUST READ: ${fileResult.filePath}\n\nRead the file, complete every listed item with pan task after committing and pushing, then request a new review with pan review request.`;
           await deliverVerificationFeedback(issueId, msg, {
@@ -912,7 +849,7 @@ async function runVerificationForIssuePromise(
     // lint/test/build and the AC gate all pass trivially on no code, so without
     // this guard the empty "completion" silently advances. Bounce it back.
     const changesetHasContent = await workspaceChangesetHasContent(issueId, workspacePath);
-    const postDiffMergedOutcome = skipMergedVerification(issueId, logPrefix);
+    const postDiffMergedOutcome = await skipMergedVerification(issueId, logPrefix);
     if (postDiffMergedOutcome) return postDiffMergedOutcome;
 
     if (changesetHasContent === false) {
@@ -920,18 +857,12 @@ async function runVerificationForIssuePromise(
       const failedCheck = 'empty-changeset';
       const comparedTargets = repoRoots.map(root => `${root.repoKey}:origin/${root.targetBranch}`).join(', ');
       const summary = `Branch has no implementation — only pipeline artifacts (.pan/xBRIEF task state) changed across workspace repos vs ${comparedTargets}. The work agent produced no code (likely a kickoff-delivery zombie — PAN-2179).`;
-      setReviewStatusSync(issueId, {
-        reviewStatus: 'pending',
-        verificationStatus: 'failed',
-        verificationNotes: summary,
-        verificationCycleCount: newCycleCount,
-        verificationMaxCycles: VERIFICATION_MAX_CYCLES,
-      });
-      if (shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)) {
+      announceVerificationFailure(issueId, failedCheck, summary);
+      if (shouldEscalateVerificationFailure(cycles, failedCheck, newCycleCount)) {
         await escalateVerificationStuck(issueId, failedCheck, newCycleCount, summary, logPrefix);
       }
       try {
-        const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
+        const msg = shouldEscalateVerificationFailure(cycles, failedCheck, newCycleCount)
           ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts — branch still has no implementation.\n\n${buildFinalFailureInstructions(issueId)}`
           : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — your branch contains NO code (only .pan/xBRIEF task state changed across ${comparedTargets}).\n\nYou must actually implement the issue: read the plan (.pan/spec.vbrief.json + the issue body), write and commit the code, push, then run pan review request. Do NOT stop at the prompt — keep working until pan review request completes.`;
         await deliverVerificationFeedback(issueId, msg, {
@@ -958,49 +889,21 @@ async function runVerificationForIssuePromise(
       lastVerifiedCommit = await snapshotWorkspaceHeadsPromise(issueId, workspacePath);
     } catch { /* non-fatal — skip optimization if we can't get HEAD */ }
 
-    const prePassMergedOutcome = skipMergedVerification(issueId, logPrefix);
+    const prePassMergedOutcome = await skipMergedVerification(issueId, logPrefix);
     if (prePassMergedOutcome) return prePassMergedOutcome;
 
-    setReviewStatusSync(issueId, {
-      verificationStatus: 'passed',
-      verificationNotes: undefined,
-      ...(lastVerifiedCommit ? { lastVerifiedCommit } : {}),
-    });
-    // PAN-3847 (FR-10): a verification pass clears a verification_stuck flag and
-    // lifts the pause that escalateVerificationStuck set — the gate that created
-    // the stuck state is the gate that clears it. PR #3872 finding 7: unpause
-    // FIRST through the dedicated clear API (setAgentPaused always SETS paused —
-    // passing undefined never unpauses). If the unpause fails, keep the
-    // consistent paused+stuck pair; then clear the marker with one retry so a
-    // transient write failure cannot strand the pair unpaused+stuck.
-    const stuckRow = getPipelineStatus(issueId);
-    if (stuckRow?.stuck && stuckRow.stuckReason === 'verification_stuck') {
-      const stuckAgentId = `agent-${issueId.toLowerCase()}`;
-      const agentState = getAgentStateSync(stuckAgentId);
-      let unpaused = true;
-      if (agentState?.pausedReason?.startsWith('needs-you: verification stuck')) {
-        try {
-          await Effect.runPromise(clearAgentPaused(stuckAgentId));
-          console.log(`[${logPrefix}] Lifted verification-stuck pause for ${stuckAgentId}`);
-        } catch (err: any) {
-          unpaused = false;
-          console.error(`[${logPrefix}] Failed to lift verification-stuck pause for ${stuckAgentId} — keeping the verification_stuck marker so the pair stays consistent: ${err?.message ?? err}`);
-        }
-      }
-      if (unpaused) {
-        const { clearWorkspaceStuck } = await import('../overdeck/review-status-sync.js');
-        try {
-          clearWorkspaceStuck(issueId);
-          console.log(`[${logPrefix}] Cleared verification_stuck for ${issueId}: verification passed`);
-        } catch (firstErr: any) {
-          console.warn(`[${logPrefix}] verification_stuck clear failed for ${issueId} — retrying once: ${firstErr?.message ?? firstErr}`);
-          try {
-            clearWorkspaceStuck(issueId);
-            console.log(`[${logPrefix}] Cleared verification_stuck for ${issueId} on retry: verification passed`);
-          } catch (retryErr: any) {
-            console.error(`[${logPrefix}] verification_stuck clear failed twice for ${issueId} — the marker remains and the agent was unpaused; the next verification pass re-attempts the clear: ${retryErr?.message ?? retryErr}`);
-          }
-        }
+    await reportVerificationCheckRun(workspacePath, issueId, headShort, 'success', 'verification gate passed', 'Every required gate passed (changed-file scope).', logPrefix);
+    // PAN-3847 (FR-10), re-pointed by PAN-3917: a verification pass lifts the
+    // pause escalateVerificationStuck set. There is no stuck flag left to clear
+    // — the pause IS the state, and the gate that set it clears it.
+    const stuckAgentId = `agent-${issueId.toLowerCase()}`;
+    const agentState = getAgentStateSync(stuckAgentId);
+    if (agentState?.pausedReason?.startsWith('needs-you: verification stuck')) {
+      try {
+        await Effect.runPromise(clearAgentPaused(stuckAgentId));
+        console.log(`[${logPrefix}] Lifted verification-stuck pause for ${stuckAgentId}`);
+      } catch (err: any) {
+        console.error(`[${logPrefix}] Failed to lift verification-stuck pause for ${stuckAgentId}: ${err?.message ?? err}`);
       }
     }
     void capturePipelineStageForIssue(issueId, 'verification_passed');
@@ -1033,14 +936,10 @@ async function runVerificationForIssuePromise(
     return { outcome: 'passed' };
 
   } catch (verifyErr: any) {
-    const errorMergedOutcome = skipMergedVerification(issueId, logPrefix);
+    const errorMergedOutcome = await skipMergedVerification(issueId, logPrefix);
     if (errorMergedOutcome) return errorMergedOutcome;
 
-    setReviewStatusSync(issueId, {
-      reviewStatus: 'pending',
-      verificationStatus: 'failed',
-      verificationNotes: `Verification infrastructure error: ${verifyErr.message}`,
-    });
+    announceVerificationFailure(issueId, 'infrastructure', `Verification infrastructure error: ${verifyErr.message}`);
     console.error(`[${logPrefix}] Verification infrastructure error for ${issueId}:`, verifyErr);
     return { outcome: 'error', message: verifyErr.message };
   }

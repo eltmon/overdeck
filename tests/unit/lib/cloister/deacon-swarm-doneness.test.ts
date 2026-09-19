@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Effect } from 'effect';
 import type { XBriefDocument } from '../../../../src/lib/xbrief/types.js';
 import type { CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
-import { applyStatusOverrides } from '../../../../src/lib/xbrief/io.js';
+import { applyItemStatuses } from '../../../../src/lib/xbrief/io.js';
 import { getDispatchableItems } from '../../../../src/lib/xbrief/dag.js';
 
 const mocks = vi.hoisted(() => ({
@@ -24,13 +24,15 @@ vi.mock('../../../../src/lib/pan-dir/auto-commit.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
+  // PAN-3917: resolvePlanHome() asks projects.ts which repo owns `.pan/`.
+  resolveInfraRepo: (_project: unknown, checkoutRoot: string) => ({ repoPath: checkoutRoot }),
   listProjectsSync: mocks.listProjectsSync,
   findProjectByPathSync: () => null,
   getProjectSwarmHotspots: () => [],
-  // PAN-2372 WI-2: getIssueRecordPathForWorkspace now routes through project
-  // resolution. These coordination tests keep records at the workspace
-  // .pan/records/ fixture path, so treat every issue as unregistered and let
-  // the workspace-door fallback resolve it.
+  getProjectSync: () => null,
+  // PAN-3917: these coordination tests fixture the continue file and slot
+  // ledger under the temp project root, so every issue resolves as
+  // unregistered and the plan home is the project root itself.
   resolveProjectFromIssueSync: () => null,
 }));
 
@@ -57,10 +59,9 @@ let tempRoot: string;
 beforeEach(async () => {
   tempRoot = await mkdtemp(join(tmpdir(), 'overdeck-swarm-doneness-'));
   mocks.listProjectsSync.mockReset();
-  // PAN-2372: resolveStateReadHomeSync (WI-0) and getIssueRecordPathForWorkspace
-  // (WI-2) both consult listProjectsSync(). Production always returns an array;
-  // seed a valid default so an unseeded mock never yields undefined and throws.
-  // Tests that need a registered project override this with mockReturnValue.
+  // resolvePlanHome() consults listProjectsSync(). Production always returns an
+  // array; seed a valid default so an unseeded mock never yields undefined and
+  // throws. Tests that need a registered project override this.
   mocks.listProjectsSync.mockReturnValue([]);
   mocks.getReviewStatusSync.mockReset();
   mocks.setReviewStatusSync.mockReset();
@@ -166,7 +167,7 @@ function makeCoordinateDeps(
     releaseSwarmSlot: vi.fn(),
     spawnRun: vi.fn(async () => null),
     getIssueHold: vi.fn(() => null),
-    readStatusOverrides: vi.fn(() => undefined),
+    readItemStatuses: vi.fn(() => ({})),
     getFinalizedAt: vi.fn(() => undefined),
     setFinalizedAt: vi.fn(),
     shouldDispatch: vi.fn(() => true),
@@ -176,26 +177,39 @@ function makeCoordinateDeps(
   };
 }
 
-describe('swarm item done-ness survives slot gc (statusOverrides overlay)', () => {
+/**
+ * PAN-3917: item progress lives in the issue's continue file, under the plan
+ * home — the project root here, since these fixtures register no project.
+ */
+function writeRecordOverrides(projectPath: string, issueLower: string, overrides: Record<string, string>): void {
+  const continuesDir = join(projectPath, '.pan', 'continues');
+  mkdirSync(continuesDir, { recursive: true });
+  const items = Object.fromEntries(Object.entries(overrides).map(([id, status]) => [id, { status }]));
+  writeFileSync(join(continuesDir, `${issueLower.toUpperCase()}.xbrief.json`), JSON.stringify({
+    version: '1',
+    issueId: issueLower.toUpperCase(),
+    created: '2026-01-01T00:00:00.000Z',
+    updated: '2026-01-01T00:00:00.000Z',
+    gitState: {},
+    decisions: [],
+    hazards: [],
+    resumePoint: null,
+    sessionHistory: [],
+    items,
+  }, null, 2));
+}
+
+
+describe('swarm item done-ness survives slot gc (continue-file item statuses)', () => {
   it('pure mechanism: a completed override removes the item from dispatchable set', () => {
     const doc = makeDoc('PAN-900', 3);
-    const merged = applyStatusOverrides(doc, { 'wi-1': 'completed' });
+    const merged = applyItemStatuses(doc, { 'wi-1': 'completed' });
 
     const dispatchable = getDispatchableItems(merged, new Set()).map(item => item.id);
     expect(dispatchable).toEqual(['wi-2', 'wi-3']);
     // The overlay must not mutate the source document.
     expect(doc.plan.items[0].status).toBe('pending');
   });
-
-  function writeRecordOverrides(projectPath: string, issueLower: string, overrides: Record<string, string>): void {
-    const recordsDir = join(projectPath, 'workspaces', `feature-${issueLower}`, '.pan', 'records');
-    mkdirSync(recordsDir, { recursive: true });
-    writeFileSync(join(recordsDir, `${issueLower}.json`), JSON.stringify({
-      issueId: issueLower.toUpperCase(),
-      schemaVersion: 1,
-      statusOverrides: overrides,
-    }, null, 2));
-  }
 
   it('leaves issue-level finalization to the foreman when all items are override-completed', async () => {
     const { execFileSync } = await import('node:child_process');
@@ -300,17 +314,14 @@ describe('swarm endgame: merge/cleanup still runs when dispatch is no longer eli
     git('commit', '--allow-empty', '-m', 'base');
     git('branch', 'feature/pan-902-slot-1');
 
-    const recordsDir = join(workspacePath, '.pan', 'records');
-    mkdirSync(recordsDir, { recursive: true });
-    writeFileSync(join(recordsDir, 'pan-902.json'), JSON.stringify({
+    // PAN-3917: item progress is the issue's continue file and slot state is
+    // the slot ledger beside it — both under the plan home, both in the repo.
+    writeRecordOverrides(projectPath, 'pan-902', { 'wi-1': 'completed', 'wi-2': 'completed' });
+    writeFileSync(join(projectPath, '.pan', 'continues', 'PAN-902.slots.json'), JSON.stringify({
       issueId: 'PAN-902',
-      schemaVersion: 1,
-      statusOverrides: { 'wi-1': 'completed', 'wi-2': 'completed' },
-      swarm: {
-        slotAssignments: [
-          { slotIndex: 1, itemId: 'wi-1', agentId: 'agent-pan-902-slot-1', branch: 'feature/pan-902-slot-1', assignedAt: '2026-07-02T00:00:00.000Z' },
-        ],
-      },
+      slotAssignments: [
+        { slotIndex: 1, itemId: 'wi-1', agentId: 'agent-pan-902-slot-1', branch: 'feature/pan-902-slot-1', assignedAt: '2026-07-02T00:00:00.000Z' },
+      ],
     }, null, 2));
 
     const actions = await coordinateSwarmSlots({ manual: true });
@@ -334,7 +345,7 @@ describe('swarm tail dispatch: an in-progress swarm may finish its last item', (
     writeFileSync(join(recordsDir, 'pan-904.json'), JSON.stringify({
       issueId: 'PAN-904',
       schemaVersion: 1,
-      statusOverrides: { 'wi-1': 'completed' },
+      items: { 'wi-1': { status: 'completed' } },
     }, null, 2));
     mocks.listProjectsSync.mockReturnValue([{ config: { path: projectPath } }]);
 
@@ -353,36 +364,6 @@ describe('swarm tail dispatch: an in-progress swarm may finish its last item', (
     const actions = await coordinateSwarmSlots({ manual: true });
 
     expect(actions).not.toContain('[swarm] considered PAN-905: swarm eligible');
-  });
-});
-
-describe('PAN-2372 WI-4 unreadable record surfacing (FR-7, AC5)', () => {
-  it('warns naming the issue and treats a corrupt record as no overrides instead of silently absent', async () => {
-    const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
-    const projectPath = join(tempRoot, 'project');
-    const workspacePath = join(projectPath, 'workspaces', 'feature-pan-910');
-    mkdirSync(workspacePath, { recursive: true });
-    writeSpec(projectPath, 'PAN-910', makeDoc('PAN-910', 2));
-    // Corrupt record: the file EXISTS but is not parseable JSON.
-    // readIssueRecordForWorkspaceSync returns null for the parse failure, and the
-    // existsSync check in defaultReadStatusOverrides distinguishes that from a
-    // genuinely absent record — surfacing it as a warning instead of silent undefined.
-    const recordsDir = join(workspacePath, '.pan', 'records');
-    mkdirSync(recordsDir, { recursive: true });
-    writeFileSync(join(recordsDir, 'pan-910.json'), '{ this is not valid json');
-    mocks.listProjectsSync.mockReturnValue([{ config: { path: projectPath } }]);
-
-    // coordinateSwarmSlots() with no deps uses defaultDeps, whose readStatusOverrides
-    // IS the real defaultReadStatusOverrides under test.
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const actions = await coordinateSwarmSlots({ manual: true });
-
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[swarm] record unreadable for PAN-910'));
-    // Did not throw, and without readable overrides the plan's two pending items are
-    // still dispatch-eligible — the corrupt record did not falsely mark anything done.
-    expect(actions).toContain('[swarm] considered PAN-910: swarm eligible');
-    expect(actions).not.toContain(expect.stringContaining('finalized PAN-910'));
-    warnSpy.mockRestore();
   });
 });
 
@@ -442,7 +423,7 @@ describe('PAN-3695: an uncleared merged slot holds finalization and dependent di
         branches: [],
         agents: [],
       })),
-      readStatusOverrides: vi.fn(() => ({ 'wi-1': 'completed' })),
+      readItemStatuses: vi.fn(() => ({ 'wi-1': 'completed' })),
       runGitCommand,
       slotWorktreeExists: vi.fn((path: string) => path === slotWorkspace),
       registeredSlotCapacityAvailable: vi.fn(() => true),
@@ -481,11 +462,11 @@ describe('PAN-3695: an uncleared merged slot holds finalization and dependent di
   });
 });
 
-describe('PAN-2372 WI-6 state-plane-aware worktree clean predicate (FR-9)', () => {  // defaultIsSlotWorktreeClean now classifies `git status --porcelain` output through the
-  // shared isStatePlaneOnlyStatus classifier: state-plane-only dirt (.pan/continue.json,
-  // .pan/records/...) reads clean, any source file reads dirty, empty porcelain reads clean.
-  // These are real-git tests so the porcelain flows through the actual `git status` the
-  // predicate runs — proving the wiring, not just the classifier in isolation.
+describe('PAN-2372 WI-6 worktree clean predicate (FR-9, re-pointed by PAN-3917)', () => {
+  // defaultIsSlotWorktreeClean classifies `git status --porcelain` output: only
+  // the gitignored workspace runtime directory reads clean. `.pan/` is tracked
+  // plan content in the repo now, so a change there is real work and reads dirty
+  // — the old state-plane exemption is gone with the state plane.
 
   async function setupRepo(name: string): Promise<{ repo: string; git: (...args: string[]) => void }> {
     const { execFileSync } = await import('node:child_process');
@@ -499,17 +480,14 @@ describe('PAN-2372 WI-6 state-plane-aware worktree clean predicate (FR-9)', () =
     return { repo, git };
   }
 
-  it('AC1: porcelain listing only a state-plane path (.pan/continue.json) reads clean', async () => {
+  it('AC1: porcelain listing only the workspace runtime dir reads clean', async () => {
     const { defaultIsSlotWorktreeClean } = await import('../../../../src/lib/cloister/deacon-swarm-completion.js');
-    const { repo, git } = await setupRepo('clean-state-plane');
-    // Track a sibling under .pan/ so git lists the untracked continue.json as an individual
-    // state-plane path (a fully-untracked .pan/ would collapse to '?? .pan/'). This models the
-    // realistic workspace where .pan/ holds tracked state-plane infrastructure.
-    mkdirSync(join(repo, '.pan', 'records'), { recursive: true });
-    writeFileSync(join(repo, '.pan', 'records', 'pan-2372.json'), '{"v":1}');
-    git('add', '--force', '.pan/records/pan-2372.json');
-    git('commit', '-m', 'track state-plane');
-    writeFileSync(join(repo, '.pan', 'continue.json'), '{}');
+    const { repo, git } = await setupRepo('clean-runtime');
+    mkdirSync(join(repo, '.overdeck'), { recursive: true });
+    writeFileSync(join(repo, '.overdeck', 'continue.json'), '{"v":1}');
+    git('add', '--force', '.overdeck/continue.json');
+    git('commit', '-m', 'track runtime');
+    writeFileSync(join(repo, '.overdeck', 'continue.json'), '{"v":2}');
 
     await expect(defaultIsSlotWorktreeClean(repo)).resolves.toBe(true);
   });
@@ -526,13 +504,22 @@ describe('PAN-2372 WI-6 state-plane-aware worktree clean predicate (FR-9)', () =
     await expect(defaultIsSlotWorktreeClean(repo)).resolves.toBe(false);
   });
 
-  it('AC3: an empty worktree reads clean via the shared state-plane classifier', async () => {
+  it('AC3: an uncommitted plan change under .pan/ reads dirty (PAN-3917)', async () => {
+    const { defaultIsSlotWorktreeClean } = await import('../../../../src/lib/cloister/deacon-swarm-completion.js');
+    const { repo, git } = await setupRepo('dirty-plan');
+    mkdirSync(join(repo, '.pan', 'continues'), { recursive: true });
+    writeFileSync(join(repo, '.pan', 'continues', 'PAN-1.xbrief.json'), '{"version":"1"}');
+    git('add', '--force', '.pan/continues/PAN-1.xbrief.json');
+    git('commit', '-m', 'track plan');
+    writeFileSync(join(repo, '.pan', 'continues', 'PAN-1.xbrief.json'), '{"version":"1","items":{}}');
+
+    await expect(defaultIsSlotWorktreeClean(repo)).resolves.toBe(false);
+  });
+
+  it('AC4: an empty worktree reads clean', async () => {
     const { defaultIsSlotWorktreeClean } = await import('../../../../src/lib/cloister/deacon-swarm-completion.js');
     const { repo } = await setupRepo('empty-clean');
 
-    // Empty porcelain ⇒ isStatePlaneOnlyStatus is vacuously true ⇒ clean. AC1 (state-plane
-    // path ⇒ clean) + AC2 (source path ⇒ dirty) + this empty case together prove the shared
-    // classifier is wired, with no local path list introduced.
     await expect(defaultIsSlotWorktreeClean(repo)).resolves.toBe(true);
   });
 });

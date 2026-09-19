@@ -9,10 +9,10 @@ const TEN_MINUTES_MS = 10 * 60 * 1000;
 
 function status(fields: Partial<ReapableStatus> = {}): ReapableStatus {
   return {
-    reviewStatus: 'passed',
-    testStatus: 'pending',
-    mergeStatus: 'pending',
-    readyForMerge: false,
+    reviewSettled: true,
+    testSettled: false,
+    merged: false,
+    mergeReady: false,
     ...fields,
   };
 }
@@ -29,7 +29,7 @@ describe('PAN-2341 idle terminal advancing reaper', () => {
 
   it('selects non-merged terminal advancing sessions and the idle gate admits panes idle >= 10m', () => {
     const sessions = selectNonMergedTerminalAdvancingSessions({
-      'PAN-3001': status({ reviewStatus: 'passed' }),
+      'PAN-3001': status({ reviewSettled: true }),
     }, ['agent-pan-3001-review']);
 
     expect(sessions).toEqual(['agent-pan-3001-review']);
@@ -48,8 +48,8 @@ describe('PAN-2341 idle terminal advancing reaper', () => {
 
   it('does not select non-terminal or merged advancing sessions', () => {
     const sessions = selectNonMergedTerminalAdvancingSessions({
-      'PAN-3001': status({ reviewStatus: 'reviewing' }),
-      'PAN-3002': status({ reviewStatus: 'passed', mergeStatus: 'merged' }),
+      'PAN-3001': status({ reviewSettled: false }),
+      'PAN-3002': status({ reviewSettled: true, merged: true }),
     }, [
       'agent-pan-3001-review',
       'agent-pan-3002-review',

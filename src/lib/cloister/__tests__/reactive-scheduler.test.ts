@@ -37,10 +37,6 @@ vi.mock('../autonomous-work-dispatch.js', () => ({
   decideAutonomousWorkDispatch: vi.fn(() => autonomousWorkMock.decision),
 }));
 
-vi.mock('../dead-end-trip.js', () => ({
-  recordDeadEndNeedsYou: vi.fn(async () => undefined),
-}));
-
 const postCompactContinuationMock = vi.hoisted(() => vi.fn(async () => null as string | null));
 vi.mock('../compaction-continuation.js', () => ({
   continueCompactedAgentAfterHook: postCompactContinuationMock,
@@ -269,11 +265,11 @@ vi.mock('../../tmux.js', async () => {
 import { emitActivityEntrySync } from '../../activity-logger.js';
 import { listRunningAgentsSync, listRunningAgents, spawnRun, getAgentState, getAgentStateSync, resumeAgent } from '../../agents.js';
 import { sessionExists, killSession, sessionExistsSync } from '../../tmux.js';
-import { recordDeadEndNeedsYou } from '../dead-end-trip.js';
 import { spawnReviewRoleForIssue } from '../review-agent.js';
 import { dispatchTestAgentAndNotify } from '../test-agent-queue.js';
 import { isIssueClosed } from '../issue-closed.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../../review-status.js';
+import { shouldSkipDispatchAsMerged } from '../merge-verification.js';
 import {
   handleCloisterDomainEvent,
   issueStateChangeFromDomainEvent,
@@ -296,6 +292,7 @@ describe('reactive Cloister scheduler', () => {
     vi.mocked(killSession).mockResolvedValue(undefined);
     vi.mocked(isIssueClosed).mockResolvedValue(false);
     vi.mocked(getReviewStatusSync).mockReturnValue(undefined as any);
+    vi.mocked(shouldSkipDispatchAsMerged).mockResolvedValue({ skip: false, reason: 'open' });
     postCompactContinuationMock.mockResolvedValue(null);
     autonomousPlanMock.autoPickupBacklog = false;
     autonomousPlanMock.labels = ['released'];
@@ -336,12 +333,6 @@ describe('reactive Cloister scheduler', () => {
       message: expect.stringContaining(refusalText),
       issueId: 'PAN-503',
     });
-    expect(recordDeadEndNeedsYou).toHaveBeenCalledWith(
-      'PAN-503',
-      'autonomous-plan-dispatch',
-      'in_planning',
-      expect.stringContaining(refusalText),
-    );
 
     logSpy.mockRestore();
   });
@@ -387,12 +378,6 @@ describe('reactive Cloister scheduler', () => {
       message,
       issueId: 'PAN-503',
     });
-    expect(recordDeadEndNeedsYou).toHaveBeenCalledWith(
-      'PAN-503',
-      'reactive-work-dispatch-pickup-gate',
-      'in_progress',
-      message,
-    );
 
     logSpy.mockRestore();
   });
@@ -407,12 +392,6 @@ describe('reactive Cloister scheduler', () => {
     await Effect.runPromise(onIssueStateChange('PAN-503', 'in_progress'));
 
     expect(spawnRun).not.toHaveBeenCalled();
-    expect(recordDeadEndNeedsYou).toHaveBeenCalledWith(
-      'PAN-503',
-      'reactive-work-dispatch-pickup-gate',
-      'in_progress',
-      expect.stringContaining('no active implementation plan'),
-    );
   });
 
   it('preserves reactive work spawning when the pickup gate allows dispatch', async () => {
@@ -427,7 +406,6 @@ describe('reactive Cloister scheduler', () => {
       startedBy: 'reactive-lifecycle',
       autoSpawnConsentRequired: false,
     });
-    expect(recordDeadEndNeedsYou).not.toHaveBeenCalled();
   });
 
   it('requires a consent claim when planning consent authorized reactive work', async () => {
@@ -477,12 +455,13 @@ describe('reactive Cloister scheduler', () => {
   ] as const)('skips %s dispatch when the merge already landed (PAN-1746)', async (state) => {
     // Boot reconciliation replays state-change events on restart; a long-merged
     // issue still carrying its lifecycle state must NOT re-dispatch an advancing
-    // role. mergeStatus='merged' is the same terminal signal a closed issue is.
-    vi.mocked(getReviewStatusSync).mockReturnValue({ mergeStatus: 'merged' } as any);
+    // role. PAN-3917: the forge answers "did this merge?", not a stored
+    // mergeStatus — a merged PR is the same terminal signal a closed issue is.
+    vi.mocked(shouldSkipDispatchAsMerged).mockResolvedValue({ skip: true, reason: 'PR #42 is merged' });
 
     await Effect.runPromise(onIssueStateChange('PAN-503', state));
 
-    expect(getReviewStatusSync).toHaveBeenCalledWith('PAN-503');
+    expect(shouldSkipDispatchAsMerged).toHaveBeenCalledWith('PAN-503');
     expect(spawnReviewRoleForIssue).not.toHaveBeenCalled();
     expect(dispatchTestAgentAndNotify).not.toHaveBeenCalled();
     expect(spawnRun).not.toHaveBeenCalled();
@@ -495,7 +474,7 @@ describe('reactive Cloister scheduler', () => {
 
     expect(logSpy).toHaveBeenCalledWith("[cloister] PAN-503: no role for issue state 'shipping'");
     expect(isIssueClosed).not.toHaveBeenCalled();
-    expect(getReviewStatusSync).not.toHaveBeenCalled();
+    expect(shouldSkipDispatchAsMerged).not.toHaveBeenCalled();
     expect(listRunningAgents).not.toHaveBeenCalled();
     expect(sessionExists).not.toHaveBeenCalled();
     expect(spawnReviewRoleForIssue).not.toHaveBeenCalled();
@@ -597,54 +576,7 @@ describe('reactive Cloister scheduler', () => {
     })).toEqual({ issueId: 'PAN-503', state: 'in_review' });
   });
 
-  it('routes PostCompact activity directly to the compaction continuation hook', async () => {
-    postCompactContinuationMock.mockResolvedValue('Compaction continuation: nudged agent-pan-503');
-    vi.mocked(getAgentStateSync).mockReturnValue({ issueId: 'PAN-503' } as any);
 
-    await Effect.runPromise(handleCloisterDomainEvent({
-      type: 'agent.activity_changed',
-      payload: { agentId: 'agent-pan-503', hookName: 'PostCompact', activity: 'idle' },
-    }));
-
-    expect(postCompactContinuationMock).toHaveBeenCalledWith(expect.objectContaining({
-      agentId: 'agent-pan-503',
-      capturePane: expect.any(Function),
-      send: expect.any(Function),
-      findBoundary: expect.any(Function),
-    }));
-    expect(emitActivityEntrySync).toHaveBeenCalledWith(expect.objectContaining({
-      issueId: 'PAN-503',
-      message: expect.stringContaining('continued from PostCompact'),
-    }));
-  });
-
-  it('routes agent.stopped events to the deacon resume handler', async () => {
-    vi.mocked(getAgentStateSync).mockReturnValue({
-      id: 'agent-pan-503',
-      issueId: 'PAN-503',
-      workspace: '/tmp/workspace',
-      harness: 'claude-code',
-      role: 'work',
-      model: 'claude-sonnet-4-6',
-      status: 'stopped',
-      startedAt: new Date().toISOString(),
-    } as any);
-    vi.mocked(getReviewStatusSync).mockReturnValue({
-      issueId: 'PAN-503',
-      reviewStatus: 'blocked',
-      testStatus: 'pending',
-      verificationStatus: 'pending',
-      readyForMerge: false,
-    } as any);
-    vi.mocked(sessionExists).mockResolvedValue(false);
-
-    await Effect.runPromise(handleCloisterDomainEvent({
-      type: 'agent.stopped',
-      payload: { agentId: 'agent-pan-503', issueId: 'PAN-503' },
-    }));
-
-    expect(resumeAgent).toHaveBeenCalledWith('agent-pan-503', undefined, { startedBy: 'deacon:auto-resume' });
-  });
 
   it('routes agent.heartbeat_dead events to the deacon orphan handler', async () => {
     vi.mocked(getAgentStateSync).mockReturnValue({
@@ -667,40 +599,7 @@ describe('reactive Cloister scheduler', () => {
     expect(killSession).not.toHaveBeenCalled();
   });
 
-  it('routes review.coordinator.died events to the deacon review recovery handler', async () => {
-    vi.mocked(getReviewStatusSync).mockReturnValue({
-      issueId: 'PAN-503',
-      reviewStatus: 'reviewing',
-      testStatus: 'pending',
-      reviewRetryCount: 0,
-    } as any);
-    vi.mocked(getAgentStateSync).mockReturnValue({
-      id: 'agent-pan-503',
-      issueId: 'PAN-503',
-      workspace: '/tmp/workspace',
-    } as any);
-    vi.mocked(sessionExists).mockResolvedValue(false);
-    vi.mocked(sessionExistsSync).mockReturnValue(false);
 
-    await Effect.runPromise(handleCloisterDomainEvent({
-      type: 'review.coordinator.died',
-      payload: { issueId: 'PAN-503', sessionName: 'agent-pan-503-review', reason: 'pane dead' },
-    }));
-
-    expect(setReviewStatusSync).toHaveBeenCalledWith('PAN-503', expect.objectContaining({ reviewStatus: 'pending' }));
-  });
-
-  it('routes work.completed events to the missing review-status handler', async () => {
-    vi.mocked(getReviewStatusSync).mockReturnValue(undefined as any);
-
-    await Effect.runPromise(handleCloisterDomainEvent({
-      type: 'work.completed',
-      payload: { issueId: 'PAN-503' },
-    }));
-
-    expect(setReviewStatusSync).toHaveBeenCalledWith('PAN-503', expect.objectContaining({ reviewStatus: 'pending', testStatus: 'pending' }));
-    expect(spawnReviewRoleForIssue).toHaveBeenCalledWith(expect.objectContaining({ issueId: 'PAN-503' }));
-  });
 
   it('routes issue.statusChanged(closed) to the closed-issue reaper handler', async () => {
     await Effect.runPromise(handleCloisterDomainEvent({
@@ -712,15 +611,6 @@ describe('reactive Cloister scheduler', () => {
     expect(orphanProposedMock.handleOrphanProposedSpec).not.toHaveBeenCalled();
   });
 
-  it('routes issue.statusChanged(planned) to the orphan-proposed handler', async () => {
-    await Effect.runPromise(handleCloisterDomainEvent({
-      type: 'issue.statusChanged',
-      payload: { issueId: 'PAN-503', status: 'Planned', canonicalStatus: 'todo' },
-    }));
-
-    expect(orphanProposedMock.handleOrphanProposedSpec).toHaveBeenCalledWith('PAN-503');
-    expect(closedIssueReaperMock.handleIssueStatusChangedClosed).not.toHaveBeenCalled();
-  });
 
   it('routes agent.started to the idle-stack grace-clock reset', async () => {
     await Effect.runPromise(handleCloisterDomainEvent({
