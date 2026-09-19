@@ -261,11 +261,15 @@ async function handlePullRequestPromise(payload: WebhookPayload): Promise<void> 
   // by hand never called it, so the convoy never started. Start the same
   // pipeline here; `requestReviewPipeline.isInFlight` coalesces the two callers
   // and the whole path is best-effort — a webhook must never throw.
+  // The pipeline verifies, pushes and reviews `feature/<issue>` — the branch the
+  // workspace is on. A strike or bypass PR names the same issue but a different
+  // branch, so starting here would review something the PR does not contain.
   if (
     (payload.action === 'opened' || payload.action === 'ready_for_review')
     && pr.draft !== true
     && pr.merged !== true
     && (pr.state ?? 'open') !== 'closed'
+    && pr.head.ref.toLowerCase().startsWith('feature/')
   ) {
     try {
       const { getRequestReviewStarter } = await import('./cloister/request-review-pipeline.js');

@@ -345,6 +345,19 @@ describe('handlePullRequest → review pipeline (PAN-3917 W12)', () => {
     expect(startReview).not.toHaveBeenCalled();
   });
 
+  it('does not start review for a strike or bypass PR — the pipeline reviews feature/<issue>', async () => {
+    await Effect.runPromise(handlePullRequest(makePayload({
+      action: 'opened',
+      pull_request: { number: 9, head: { ref: 'bypass/pan-123', sha: 'abc' } },
+    })));
+    await Effect.runPromise(handlePullRequest(makePayload({
+      action: 'opened',
+      pull_request: { number: 9, head: { ref: 'strike/pan-123', sha: 'abc' } },
+    })));
+
+    expect(startReview).not.toHaveBeenCalled();
+  });
+
   it('does not start review for an untracked repo or a branch with no issue', async () => {
     await Effect.runPromise(handlePullRequest({
       action: 'opened',
