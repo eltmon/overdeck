@@ -16,6 +16,20 @@ vi.mock('../../../../src/dashboard/server/services/derived-issue-state.js', () =
   listReadyIssuesForProject: async () => [],
 }));
 
+// PAN-3917 (W6): the stack's state is derived per project, so the issue must
+// resolve to one. The real registry has no MIN project in this environment.
+vi.mock('../../../../src/lib/projects.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/projects.js')>();
+  return {
+    ...actual,
+    resolveProjectFromIssueSync: (issueId: string) => (
+      issueId.toUpperCase().startsWith('MIN-')
+        ? { projectKey: 'myn', projectPath: '/repos/myn' }
+        : actual.resolveProjectFromIssueSync(issueId)
+    ),
+  };
+});
+
 vi.mock('../../../../src/dashboard/server/services/backend-inventory.js', () => ({
   getBackendPanes: async () => [],
   getBackendPanesForIssue: async () => [],
