@@ -324,7 +324,12 @@ export function getAgentStateSync(agentId: string): AgentState | null {
 export function listAgentStatesSync(): AgentState[] {
   let entries: string[];
   try {
-    entries = readdirSync(AGENTS_DIR);
+    // getOverdeckHome() reads process.env.OVERDECK_HOME at call time; the
+    // AGENTS_DIR export is frozen at module import, before a test (or a
+    // later env change) can override it. getAgentStateSync/saveAgentStateSync
+    // already resolve dynamically — this must match or a scan taken after
+    // OVERDECK_HOME changes silently sees the wrong (or no) directory.
+    entries = readdirSync(join(getOverdeckHome(), 'agents'));
   } catch {
     return [];
   }
