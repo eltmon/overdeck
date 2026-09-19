@@ -14,6 +14,25 @@
 # shapes for migration/no-loss tests). Everything else under the scan root is
 # checked, including test files: no test may construct an IssueRecord either.
 #
+# A second pass scans the Markdown that SHIPS TO AGENTS — the runtime prompts
+# under src/lib/cloister/prompts/ and everything under sync-sources/ (rules,
+# skills, agent definitions). A prompt telling an agent to write a
+# statusOverride or push to overdeck-state resurrects the mirror just as surely
+# as code does, and the code pass never saw those files (PAN-3917 finding 17).
+# The Markdown pass uses a narrower pattern set than the code pass: it looks for
+# the things that unambiguously name the deleted plane (the records/ directory,
+# statusOverrides, IssueRecord, the task door, the overdeck-state branch, the
+# deleted /api/review/:id/status endpoint). The six status FIELD names are left
+# to the code pass — in prose "reviewStatus" is as often vocabulary a doc is
+# explaining as a field a doc is telling an agent to read, and a guard that
+# cannot tell the two apart teaches people to route around it.
+#
+# Two files legitimately name the deleted plane and are exempt by name:
+# sync-sources/rules/protect-overdeck-state-branch.md (the rule that forbids
+# deleting the archived branch) and
+# sync-sources/skills/pan-admin-migrate-plan-home/SKILL.md (the doc for the
+# migration bridge that reads it), matching the migrate-plan-home.ts exemption.
+#
 # Usage: bash scripts/guard-no-state-layer.sh [scan-root]
 #
 # Expected to fail on this branch until every worker's re-point lands
@@ -56,7 +75,37 @@ patterns=(
   '\bIssueRecord\b'
 )
 
+# Agent-facing Markdown: the deleted plane by name, plus the deleted endpoint.
+md_labels=(
+  'records/'
+  'statusOverrides'
+  'overdeck-state'
+  'task-door'
+  'IssueRecord'
+  '/api/review/:id/status'
+)
+md_patterns=(
+  '(?<![A-Za-z0-9_-])records/'
+  '\bstatusOverrides\b'
+  'overdeck-state'
+  '\btask-door\b'
+  '\bIssueRecord\b'
+  '/api/review/[^/\s]+/status'
+)
+
 hit_count=0
+
+report_md_hits() {
+  local file="$1" rel_file i lineno _rest
+  rel_file=$(realpath --relative-to="$PWD" -- "$file")
+  for i in "${!md_patterns[@]}"; do
+    while IFS=: read -r lineno _rest; do
+      [[ -z "$lineno" ]] && continue
+      echo "${rel_file}:${lineno}: ${md_labels[$i]}"
+      hit_count=$((hit_count + 1))
+    done < <(grep -nP -- "${md_patterns[$i]}" "$file" 2>/dev/null || true)
+  done
+}
 
 while IFS= read -r -d '' file; do
   # Report paths relative to the invoking directory (matches the other
@@ -75,6 +124,21 @@ done < <(find "$scan_root" -type f \
   -not -path '*/__fixtures__/*' \
   -not -name 'migrate-plan-home.ts' \
   -print0)
+
+# Markdown that ships to agents. Only scanned when the caller did not narrow the
+# code scan root, so `guard-no-state-layer.sh <some-dir>` stays a code-only scan.
+if [[ $# -eq 0 ]]; then
+  for md_root in src/lib/cloister/prompts sync-sources; do
+    [[ -d "$md_root" ]] || continue
+    while IFS= read -r -d '' file; do
+      report_md_hits "$file"
+    done < <(find "$md_root" -type f -name '*.md' \
+      -not -path '*/__fixtures__/*' \
+      -not -path '*/protect-overdeck-state-branch.md' \
+      -not -path '*/pan-admin-migrate-plan-home/*' \
+      -print0)
+  done
+fi
 
 if [[ "$hit_count" -gt 0 ]]; then
   echo "✗ guard-no-state-layer: ${hit_count} state-layer reference(s) found under ${scan_root}" >&2
