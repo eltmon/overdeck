@@ -6,7 +6,6 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { AGENTS_DIR, getOverdeckHome } from '../paths.js';
 import { FsError } from '../errors.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
-import { resolveAutoResumeConfigForIssue } from './auto-resume-config.js';
 import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 import { normalizeAgentId } from './identity.js';
@@ -686,14 +685,22 @@ export function clearAgentOperatorGatesForIssueSync(issueId: string): string[] {
   return clearAgentOperatorGatesForIssuesSync(new Set([normalized])).get(normalized) ?? [];
 }
 
+/**
+ * Failure-escalation constants. PAN-3917: the per-project `autoResume` config
+ * override went with the deleted auto-resume escalation; the failure/backoff
+ * bookkeeping below stays because `troubled` still gates resume and codex-auth.
+ */
+const TROUBLED_WINDOW_MS = 10 * 60 * 1000;
+const MAX_CONSECUTIVE_FAILURES = 3;
+const FAILURE_BACKOFF_SECONDS = [5, 30, 120];
+
 function applyAgentFailure(state: AgentState, reason: string): void {
-  const config = resolveAutoResumeConfigForIssue(state.issueId);
   const nowMs = Date.now();
   const now = new Date(nowMs).toISOString();
   const firstFailureMs = Date.parse(state.firstFailureInRunAt ?? '');
   const hasValidFirstFailure = Number.isFinite(firstFailureMs);
   const windowElapsed = hasValidFirstFailure
-    && nowMs - firstFailureMs > config.troubledWindowMs;
+    && nowMs - firstFailureMs > TROUBLED_WINDOW_MS;
 
   if (windowElapsed || !hasValidFirstFailure) {
     state.consecutiveFailures = 1;
@@ -702,17 +709,17 @@ function applyAgentFailure(state: AgentState, reason: string): void {
     state.consecutiveFailures = (state.consecutiveFailures ?? 0) + 1;
   }
 
-  const backoffSeconds = config.failureBackoffSchedule[
-    Math.min(state.consecutiveFailures - 1, config.failureBackoffSchedule.length - 1)
-  ];
+  const backoffSeconds = FAILURE_BACKOFF_SECONDS[
+    Math.min(state.consecutiveFailures - 1, FAILURE_BACKOFF_SECONDS.length - 1)
+  ] ?? 120;
   state.lastFailureAt = now;
   state.lastFailureReason = reason;
   state.lastFailureNextRetryAt = new Date(nowMs + backoffSeconds * 1000).toISOString();
 
   const firstFailureInRunMs = Date.parse(state.firstFailureInRunAt ?? '');
-  const shouldMarkTroubled = state.consecutiveFailures >= config.maxConsecutiveFailures
+  const shouldMarkTroubled = state.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES
     && Number.isFinite(firstFailureInRunMs)
-    && nowMs - firstFailureInRunMs <= config.troubledWindowMs;
+    && nowMs - firstFailureInRunMs <= TROUBLED_WINDOW_MS;
 
   if (shouldMarkTroubled) {
     if (!state.troubled) {

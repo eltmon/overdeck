@@ -22,7 +22,6 @@ import {
 import { extractPrefixSync, parseIssueIdSync } from './issue-id.js';
 import { notifyProjectsConfigInvalidated } from './projects-cache-events.js';
 import type { DatabaseConfig, QualityGateConfig, RepoConfig } from './workspace-config.js';
-import type { AutoResumeConfig } from './agents/auto-resume-config.js';
 
 export const PROJECTS_CONFIG_FILE = join(OVERDECK_HOME, 'projects.yaml');
 
@@ -338,8 +337,6 @@ export interface ProjectConfig {
   rally_project?: string;
   /** Specialist agent configuration */
   specialists?: SpecialistConfig;
-  /** Per-project auto-resume failure tracking and backoff overrides */
-  autoResume?: Partial<AutoResumeConfig>;
   /** Path to the project's OKF knowledge bundle. Relative paths resolve from the project path. */
   knowledge_repo?: string;
   /** Per-project foreman/swarm settings. */
