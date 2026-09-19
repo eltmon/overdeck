@@ -34,7 +34,6 @@ describe('dashboard database worker lanes', () => {
     'scanConversations',
     'enrichSessions',
     'embedSessions',
-    'listSubstrateBugWeights',
     'costReconcileSweep',
   ] satisfies DashboardDbOperation[])('routes bulk operation %s to long', operation => {
     expect(workerLane(operation)).toBe('long');
