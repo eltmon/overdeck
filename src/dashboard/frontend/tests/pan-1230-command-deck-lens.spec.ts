@@ -91,7 +91,6 @@ test.describe('PAN-1230 command deck lens', () => {
     await page.route('**/api/command-deck/planning/*', route => route.fulfill({ json: { prd: '', state: '', inference: '' } }));
     await page.route('**/api/command-deck/activity/*', route => route.fulfill({ json: { issueId: ISSUE_ID, totalCost: 0, sections: [] } }));
     await page.route('**/api/issues/*/costs', route => route.fulfill({ json: { issueId: ISSUE_ID, totalCost: 0, totalTokens: 0, sessions: [], byModel: {}, byStage: {} } }));
-    await page.route('**/api/review/*/status', route => route.fulfill({ json: { issueId: ISSUE_ID, reviewStatus: 'failed', testStatus: 'failed', mergeStatus: 'failed', verificationStatus: 'failed', readyForMerge: false, updatedAt: new Date().toISOString() } }));
     await page.route('**/api/workspaces/*', route => route.fulfill({ json: { exists: true, issueId: ISSUE_ID, path: '/tmp/pan-1230', frontendUrl: '', apiUrl: '', hasAgent: false, services: [], containers: [], hasDocker: false, canContainerize: false, location: 'local' } }));
     await page.route('**/api/issues/*/pr/details', route => route.fulfill({ json: { issueId: ISSUE_ID, pr: null } }));
     await page.route('**/api/issues/*/pr', route => route.fulfill({ json: { issueId: ISSUE_ID, pr: null } }));

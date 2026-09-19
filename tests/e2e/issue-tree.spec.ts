@@ -158,8 +158,8 @@ const snapshot = {
   agents: [],
   specialists: [],
   agentRuntimeById: {},
-  // W6 still ships `reviewStatuses` on the wire; it carries nothing now.
-  reviewStatuses: [],
+  derivedIssueStates: [],
+  backendPanes: [],
   derivedIssueStates: [{
     issueId: ISSUE,
     state: 'in-review',
