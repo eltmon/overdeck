@@ -18,19 +18,18 @@ import type { TriggerDetection } from './triggers.js';
 import type { HandoffResult } from './handoff.js';
 import { getCostSummary, type CostAlert } from './cost-monitor.js';
 import type { SessionRotationResult } from './session-rotation.js';
-import {
-  isDeaconRunning,
-  getDeaconStatus,
-  getLastPatrolResult,
-  getDeaconLogs,
-  runPatrol,
-  type PatrolResult,
-  type DeaconLogEntry,
-} from './deacon.js';
 // PAN-3917 W4: deacon.ts (~60 patrol routines, record-plane writes) is
 // deleted. Its patrol loop is replaced by deacon-lite's four
-// observe-and-nudge routines plus the host-hygiene scheduler.
-import { startDeaconLite, stopDeaconLite } from './deacon-lite.js';
+// observe-and-nudge routines plus the host-hygiene scheduler, and the status
+// surface shrinks to what deacon-lite actually knows: is the loop running,
+// when did it last run, and did it error.
+import {
+  getDeaconLiteStatus,
+  isDeaconLiteRunning,
+  startDeaconLite,
+  stopDeaconLite,
+  type DeaconLiteStatus,
+} from './deacon-lite.js';
 import { startHygieneScheduler, stopHygieneScheduler } from './hygiene-scheduler.js';
 import { OVERDECK_HOME } from '../paths.js';
 import { existsSync, writeFileSync, unlinkSync, readFileSync, readdirSync } from 'fs';
@@ -695,39 +694,14 @@ export class CloisterService {
     return getAllAgentHealthWithHost(this.statusHost());
   }
 
-  /**
-   * Get deacon (specialist health monitor) status
-   */
-  getDeaconStatus() {
-    return getDeaconStatus();
+  /** Deacon-lite loop status: running, interval, last run, last error. */
+  getDeaconStatus(): DeaconLiteStatus {
+    return getDeaconLiteStatus();
   }
 
-  /**
-   * Get the most recent patrol result (actions, cycle, timestamp)
-   */
-  getLastPatrolResult(): PatrolResult | null {
-    return getLastPatrolResult();
-  }
-
-  /**
-   * Get recent deacon log entries
-   */
-  getDeaconLogs(limit = 100): DeaconLogEntry[] {
-    return getDeaconLogs(limit);
-  }
-
-  /**
-   * Run a manual deacon patrol
-   */
-  async runDeaconPatrol(): Promise<PatrolResult> {
-    return runPatrol();
-  }
-
-  /**
-   * Check if deacon is running
-   */
+  /** Check if the deacon-lite loop is running */
   isDeaconRunning(): boolean {
-    return isDeaconRunning();
+    return isDeaconLiteRunning();
   }
 
   /**
