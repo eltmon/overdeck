@@ -33,16 +33,24 @@
 - Inline SVG icons use `currentColor` + a color map (see
   `components/chat/ProviderIcons.tsx` for the existing pattern).
 
-## Planning artifacts (xBRIEF v0.8, PAN-1124)
-- PRD drafts: `${OVERDECK_HOME}/state/<project>/drafts/<issue>.md` (human-mutable narrative).
-- Spec: `${OVERDECK_HOME}/state/<project>/specs/<date>-<ISSUE>-<slug>.xbrief.json` — immutable after planning except `plan.status` via `updateSpecStatus()`.
-- Project continue state: `${OVERDECK_HOME}/state/<project>/continues/<issue>.xbrief.json`.
-- Workspace continue state: `<workspace>/.overdeck/continue.json` (gitignored); item status changes go to its `statusOverrides`, never the spec.
-- `pan task` reads and updates the xBRIEF item checklist through the canonical state door.
+## Planning artifacts (xBRIEF v0.8, PAN-1124; paths moved by PAN-3917)
+- PRD drafts: `.pan/drafts/<issue>.md` in the project repo (or the configured
+  plan-home repo for polyrepo projects), committed on the feature branch.
+- Spec: `.pan/specs/<date>-<ISSUE>-<slug>.xbrief.json` — immutable after
+  planning except `plan.status`.
+- Project continue state: `.pan/continues/<issue>.xbrief.json`, written by `pan task`.
+- Workspace continue state: `<workspace>/.overdeck/continue.json` (gitignored).
+- **No stored status.** The Cut (PAN-3917) deleted the record plane, the
+  `review_status` rows, and the status-mirror fields. Pipeline position is
+  `DerivedIssueState` (`packages/contracts/src/derived-issue-state.ts`:
+  `state`, `attention`, `pr.reviewState`, `pr.checks`), computed at read time.
+  `scripts/guard-no-state-layer.sh` (in `npm run lint`) fails on any reference
+  to the deleted names in `src/` and in agent-shipped Markdown under
+  `sync-sources/` and `src/lib/cloister/prompts/`.
 
 ## Testing
 - Vitest, unit tests under `tests/unit/**` mirroring `src/`, plus co-located
   `__tests__/` in some lib dirs (e.g. `src/lib/cloister/__tests__/`).
 - Frontend tests co-located under `components/**/__tests__/`.
 
-<!-- last-verified: 2026-06-12 -->
+<!-- last-verified: 2026-09-19 -->
