@@ -19,8 +19,6 @@ const mocks = vi.hoisted(() => ({
   getConversationByName: vi.fn(),
   captureTranscriptUserRecordSnapshot: vi.fn(),
   probeTranscriptSince: vi.fn(),
-  getReviewStatusFromDbSync: vi.fn(() => null),
-  clearWorkspaceStuck: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
@@ -118,11 +116,6 @@ vi.mock('../../../../src/lib/activity-logger.js', () => ({
 
 vi.mock('../../../../src/lib/persistent-logger.js', () => ({
   logAgentLifecycleSync: mocks.logAgentLifecycleSync,
-}));
-
-vi.mock('../../../../src/lib/overdeck/review-status-sync.js', () => ({
-  getReviewStatusFromDbSync: mocks.getReviewStatusFromDbSync,
-  clearWorkspaceStuck: mocks.clearWorkspaceStuck,
 }));
 
 vi.mock('../../../../src/lib/providers.js', () => ({
@@ -550,7 +543,6 @@ describe('messageAgent', () => {
     });
 
     it('returns delivered+confirmed when the probe matches on the second poll', async () => {
-      mocks.getReviewStatusFromDbSync.mockReturnValue({ stuck: true, stuckReason: 'feedback_delivery_needs_you' });
       mocks.probeTranscriptSince
         .mockResolvedValueOnce({ matchedUserRecord: false, realAssistantTurnCount: 0 })
         .mockResolvedValue({ matchedUserRecord: true, realAssistantTurnCount: 0 });
@@ -573,30 +565,6 @@ describe('messageAgent', () => {
         'agent-pan-2262',
         expect.stringContaining('messageAgent confirmed turn in session-2262'),
       );
-      // A plain confirmed message is NOT a feedback redelivery: the
-      // escalation flag stays (PR #3870 finding 3).
-      expect(mocks.getReviewStatusFromDbSync).not.toHaveBeenCalled();
-      expect(mocks.clearWorkspaceStuck).not.toHaveBeenCalled();
-    });
-
-    it('clears the escalation flag only for a confirmed feedback redelivery (PR #3870 finding 3)', async () => {
-      mocks.getReviewStatusFromDbSync.mockReturnValue({ stuck: true, stuckReason: 'feedback_delivery_needs_you' });
-      mocks.probeTranscriptSince.mockResolvedValue({ matchedUserRecord: true, realAssistantTurnCount: 0 });
-
-      const promise = messageAgent('agent-pan-2262', 'review feedback', 'internal', { owesRework: true, feedbackRedelivery: true });
-      await vi.advanceTimersByTimeAsync(1_000);
-      await expect(promise).resolves.toEqual({ delivered: true, queuedToMail: true, confirmed: true });
-      expect(mocks.clearWorkspaceStuck).toHaveBeenCalledWith('PAN-2262');
-    });
-
-    it('keeps the escalation flag when the stuck row is unrelated to feedback delivery', async () => {
-      mocks.getReviewStatusFromDbSync.mockReturnValue({ stuck: true, stuckReason: 'review-not-converging' });
-      mocks.probeTranscriptSince.mockResolvedValue({ matchedUserRecord: true, realAssistantTurnCount: 0 });
-
-      const promise = messageAgent('agent-pan-2262', 'review feedback', 'internal', { owesRework: true, feedbackRedelivery: true });
-      await vi.advanceTimersByTimeAsync(1_000);
-      await expect(promise).resolves.toEqual({ delivered: true, queuedToMail: true, confirmed: true });
-      expect(mocks.clearWorkspaceStuck).not.toHaveBeenCalled();
     });
 
     it('returns delivered:false, confirmed:false when no turn appears in either attempt', async () => {
@@ -616,8 +584,6 @@ describe('messageAgent', () => {
         'agent-pan-2262',
         expect.stringContaining('messageAgent NOT confirmed'),
       );
-      // No confirmed turn, no stuck-flag repair.
-      expect(mocks.clearWorkspaceStuck).not.toHaveBeenCalled();
     });
   });
 });

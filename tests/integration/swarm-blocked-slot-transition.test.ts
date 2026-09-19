@@ -6,11 +6,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ensureRegisteredSlotWorktree } from '../../src/lib/agents/registered-slot-spawn.js';
 import { resolveRegisteredSlotSpawn, type SpawnRunOptions } from '../../src/lib/agents/spawn-prep.js';
-import type { SlotReconcileResult } from '../../src/lib/agents/slot-reconcile.js';
+import type { SlotReconcileResult } from '../../src/lib/cloister/swarm-slot-reconcile.js';
 import { defaultIsSlotBranchPushed } from '../../src/lib/cloister/swarm-blocked-slot.js';
-import { clearReleasedBlockedSwarmSlot, createMinimalIssueRecord } from '../../src/lib/cloister/deacon-swarm-record.js';
+import { clearReleasedBlockedSwarmSlot } from '../../src/lib/cloister/deacon-swarm-record.js';
 import { dispatchNextWave, recordSlotAssignment, releaseBlockedSlots } from '../../src/lib/cloister/deacon-swarm.js';
-import { readIssueRecordForWorkspaceSync, writeIssueRecordForWorkspaceSync } from '../../src/lib/pan-dir/record.js';
+import { readSwarmSlotState } from '../../src/lib/cloister/swarm-slot-store.js';
 import { analyzeSwarmReadiness } from '../../src/lib/xbrief/swarm-readiness.js';
 import type { XBriefDocument, XBriefItem } from '../../src/lib/xbrief/types.js';
 import { cleanupGitRecordRoot, initGitRecordRoot, removeGitRecordRemote } from '../helpers/git-record-fixture.js';
@@ -77,25 +77,13 @@ describe('blocked swarm slot release and redispatch', () => {
 
   it('preserves the old remote attempt and starts the reused static agent on a clean attempt branch', async () => {
     fixtureRoot = mkdtempSync(join(tmpdir(), 'pan-blocked-slot-transition-'));
-    workspacePath = join(fixtureRoot, 'feature-pan-2203');
-    mkdirSync(workspacePath);
+    // PAN-3917: swarmSlotStatePath() derives the plan home from
+    // <workspace>/../.., so the fixture must follow the real
+    // <project>/workspaces/feature-<issue> layout, not a flat tmpdir.
+    workspacePath = join(fixtureRoot, 'workspaces', 'feature-pan-2203');
+    mkdirSync(workspacePath, { recursive: true });
     recordRemote = initGitRecordRoot(workspacePath);
 
-    writeIssueRecordForWorkspaceSync(workspacePath, 'PAN-2203', {
-      ...createMinimalIssueRecord('PAN-2203'),
-      statusOverrides: { 'wi-blocked': 'blocked' },
-      swarm: {
-        slotAssignments: [{
-          slotIndex: 1,
-          itemId: 'wi-blocked',
-          agentId: 'agent-pan-2203-slot-1',
-          branch: 'feature/pan-2203-slot-1',
-        }],
-      },
-    });
-    git(workspacePath, 'add', '.');
-    git(workspacePath, 'commit', '-qm', 'seed blocked assignment');
-    git(workspacePath, 'push', '-q');
     git(workspacePath, 'branch', 'feature/pan-2203');
     git(workspacePath, 'push', '-q', '-u', 'origin', 'feature/pan-2203');
 
@@ -134,7 +122,7 @@ describe('blocked swarm slot release and redispatch', () => {
       isSlotWorktreeClean: vi.fn(async () => true),
     });
 
-    const released = readIssueRecordForWorkspaceSync(workspacePath, 'PAN-2203')?.swarm?.releasedBlockedSlots?.['1'];
+    const released = readSwarmSlotState(workspacePath, 'PAN-2203')?.releasedBlockedSlots?.['1'];
     expect(released?.archivedBranch).toMatch(/^feature\/pan-2203-slot-1-blocked-\d+$/);
     expect(released?.replacementBranch).toMatch(/^feature\/pan-2203-slot-1-attempt-\d+$/);
     expect(existsSync(released!.archivedWorktree!)).toBe(true);
@@ -189,8 +177,8 @@ describe('blocked swarm slot release and redispatch', () => {
       workspace: slotWorkspace,
       slotItemId: 'wi-next',
     }));
-    expect(readIssueRecordForWorkspaceSync(workspacePath, 'PAN-2203')?.swarm?.releasedBlockedSlots).toEqual({});
-    expect(readIssueRecordForWorkspaceSync(workspacePath, 'PAN-2203')?.swarm?.slotAssignments).toEqual([
+    expect(readSwarmSlotState(workspacePath, 'PAN-2203')?.releasedBlockedSlots).toEqual({});
+    expect(readSwarmSlotState(workspacePath, 'PAN-2203')?.slotAssignments).toEqual([
       expect.objectContaining({
         agentId: 'agent-pan-2203-slot-1',
         branch: released?.replacementBranch,

@@ -84,11 +84,20 @@ function readPlanFromWorkspace(workspacePath: string): XBriefDocument {
   return readPlanSync(join(workspacePath, '.pan', 'spec.vbrief.json'));
 }
 
-function readRecordStatusOverrides(workspacePath: string): Record<string, string> | undefined {
-  const recordPath = join(workspacePath, '.pan', 'records', 'pan-453.json');
-  if (!existsSync(recordPath)) return undefined;
-  const raw = readFileSync(recordPath, 'utf-8');
-  return (JSON.parse(raw) as { statusOverrides?: Record<string, string> }).statusOverrides;
+// PAN-3917: item status lives in the plan home's continue file
+// (`<planHome>/.pan/continues/<ISSUE>.xbrief.json`, `items[key].status`), not
+// a per-issue record's statusOverrides. The workspace is its own plan home
+// here (no registered project).
+function readContinueStatusOverrides(workspacePath: string): Record<string, string> | undefined {
+  const continuePath = join(workspacePath, '.pan', 'continues', 'PAN-453.xbrief.json');
+  if (!existsSync(continuePath)) return undefined;
+  const raw = readFileSync(continuePath, 'utf-8');
+  const items = (JSON.parse(raw) as { items?: Record<string, { status?: string }> }).items ?? {};
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(items)) {
+    if (value?.status) out[key] = value.status;
+  }
+  return out;
 }
 
 beforeEach(() => {
@@ -181,13 +190,13 @@ describe('XBriefItem created/completed fields', () => {
 
 // ─── updateItemStatus: statusOverrides in continue.json ─────────────────────
 
-describe('updateItemStatus: writes to per-issue record statusOverrides', () => {
-  it('writes status to per-issue record statusOverrides', async () => {
+describe('updateItemStatus: writes to the plan-home continue file', () => {
+  it('writes status to the continue file items map', async () => {
     const doc = makeFullSpecDoc();
     writePlanDoc(TEST_DIR, doc);
 
     updateItemStatus(TEST_DIR, 'update-types', 'running');
-    const overrides = readRecordStatusOverrides(TEST_DIR);
+    const overrides = readContinueStatusOverrides(TEST_DIR);
     expect(overrides?.['update-types']).toBe('running');
   });
 
@@ -239,13 +248,13 @@ describe('updateItemStatus: writes to per-issue record statusOverrides', () => {
 
 // ─── updateSubItemStatus: statusOverrides in continue.json ──────────────────
 
-describe('updateSubItemStatus: writes to per-issue record statusOverrides', () => {
-  it('writes status to per-issue record with dotted key', async () => {
+describe('updateSubItemStatus: writes to the plan-home continue file', () => {
+  it('writes status to the continue file with a dotted key', async () => {
     const doc = makeFullSpecDoc();
     writePlanDoc(TEST_DIR, doc);
 
     updateSubItemStatus(TEST_DIR, 'update-types', 'update-types.ac1', 'completed');
-    const overrides = readRecordStatusOverrides(TEST_DIR);
+    const overrides = readContinueStatusOverrides(TEST_DIR);
     expect(overrides?.['update-types.ac1']).toBe('completed');
   });
 
@@ -290,7 +299,7 @@ describe('updateSubItemStatus: writes to per-issue record statusOverrides', () =
 
     updateItemStatus(TEST_DIR, 'update-types', 'completed');
     updateSubItemStatus(TEST_DIR, 'update-types', 'update-types.ac1', 'completed');
-    const overrides = readRecordStatusOverrides(TEST_DIR);
+    const overrides = readContinueStatusOverrides(TEST_DIR);
     expect(overrides?.['update-types']).toBe('completed');
     expect(overrides?.['update-types.ac1']).toBe('completed');
   });

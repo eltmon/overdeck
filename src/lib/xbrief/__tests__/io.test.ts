@@ -74,9 +74,9 @@ function writeWorkspaceDraft(doc: XBriefDocument, runtimeDir = '.overdeck'): str
   return planPath;
 }
 
-/** Seed item statuses in the plan home's continue file (PAN-3917). */
+/** Seed item statuses in the plan home's continue file (PAN-3917 W9: the workspace). */
 function writeContinueItems(statuses: Record<string, string>): void {
-  const continuesDir = join(PROJECT_ROOT, '.pan', 'continues');
+  const continuesDir = join(WORKSPACE_PATH, '.pan', 'continues');
   mkdirSync(continuesDir, { recursive: true });
   writeFileSync(join(continuesDir, `${ISSUE_ID.toUpperCase()}.xbrief.json`), JSON.stringify({
     version: '1',
@@ -121,22 +121,22 @@ describe('findPlan', () => {
     expect(existsSync(result!)).toBe(true);
   });
 
-  it('resolves the parent project spec (PAN-1124: single spec on main, workspace-first lookup removed)', () => {
-    const projectSpec = writePlanDoc(makePlanDoc([{ id: 'parent-item' }]));
-    // Workspace spec is no longer preferred — verify the canonical project spec wins.
-    writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
+  it('resolves the workspace spec over the main checkout spec (PAN-3917 W9: the workspace owns its plan artifacts)', () => {
+    writePlanDoc(makePlanDoc([{ id: 'parent-item' }]));
+    // The workspace's own .pan/specs is the plan home now — it wins over main.
+    const workspaceSpec = writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
 
-    expect(findPlanSync(WORKSPACE_PATH)).toBe(projectSpec);
-    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('parent-item');
+    expect(findPlanSync(WORKSPACE_PATH)).toBe(workspaceSpec);
+    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('workspace-item');
   });
 
-  it('resolves the parent project spec when the workspace is itself a git worktree', () => {
+  it('resolves the workspace spec when the workspace is itself a git worktree', () => {
     createWorktreeShape();
-    const projectSpec = writePlanDoc(makePlanDoc([{ id: 'parent-item' }]));
-    writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
+    writePlanDoc(makePlanDoc([{ id: 'parent-item' }]));
+    const workspaceSpec = writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
 
-    expect(findPlanSync(WORKSPACE_PATH)).toBe(projectSpec);
-    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('parent-item');
+    expect(findPlanSync(WORKSPACE_PATH)).toBe(workspaceSpec);
+    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('workspace-item');
   });
 
   it('falls back to the matching workspace draft before the canonical spec exists', () => {
@@ -177,10 +177,9 @@ describe('findPlan', () => {
     expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('canonical-draft-item');
   });
 
-  it('resolves post-promotion specs from the main project specs directory, not the workspace specs directory', () => {
+  it('falls back to the main checkout specs directory when the workspace has no spec of its own (an already-merged spec, PAN-3917 W9)', () => {
     createWorktreeShape();
     const projectSpec = writePlanDoc(makePlanDoc([{ id: 'canonical-item' }]));
-    writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
 
     const result = findPlanSync(WORKSPACE_PATH);
 
@@ -428,7 +427,7 @@ describe('updateItemStatus', () => {
     const raw = JSON.parse(readFileSync(specPath, 'utf-8'));
     expect(raw.plan.items[0].status).toBe('pending');
 
-    const continuePath = join(PROJECT_ROOT, '.pan', 'continues', `${ISSUE_ID}.xbrief.json`);
+    const continuePath = join(WORKSPACE_PATH, '.pan', 'continues', `${ISSUE_ID}.xbrief.json`);
     expect(JSON.parse(readFileSync(continuePath, 'utf-8')).items['item-1'].status).toBe('completed');
   });
 });

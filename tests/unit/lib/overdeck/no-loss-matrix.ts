@@ -432,6 +432,17 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/merge-train/assemble',                      kind: 'http', disposition: 'WRITE',       door: 'Forced UAT reconcile for one project or all — supersedes POST /api/flywheel/assemble-uat' },
   { surface: 'POST /api/merge-train/merge-next',                    kind: 'http', disposition: 'WRITE',       door: 'Escape-hatch batch merge from a named project ready set — supersedes POST /api/flywheel/merge-next' },
 
+  // ── merge-train.ts (PAN-3917 W6: the /api/flywheel auto-merge/config surface moved here, no flywheel run) ──
+  { surface: 'GET /api/merge-train/auto-merge',                     kind: 'http', disposition: 'READ',        door: 'getAutoMergePolicyPayload — derived issue state (approvals + green checks + forge mergeability, FR-9/D3), no flywheel run' },
+  { surface: 'GET /api/merge-train/merge-backend',                  kind: 'http', disposition: 'READ',        door: 'getMergeBackendStatus (github-app.js) — whether an autonomous merge can actually be performed' },
+  { surface: 'GET /api/merge-train/config',                         kind: 'http', disposition: 'READ',        door: 'getMergeTrainConfigPayload' },
+  { surface: 'POST /api/merge-train/config',                        kind: 'http', disposition: 'WRITE',       door: 'postMergeTrainConfigPayload' },
+  { surface: 'GET /api/merge-train/auto-merge/pending',              kind: 'http', disposition: 'READ',        door: 'getPendingAutoMergePayload — supersedes GET /api/flywheel/auto-merge/pending' },
+  { surface: 'GET /api/merge-train/auto-merge/problems',             kind: 'http', disposition: 'READ',        door: 'getAutoMergeProblemPayload — supersedes GET /api/flywheel/auto-merge/problems' },
+  { surface: 'POST /api/merge-train/auto-merge/schedule',            kind: 'http', disposition: 'WRITE',       door: 'postAutoMergeSchedulePayload — supersedes POST /api/flywheel/auto-merge/schedule' },
+  { surface: 'DELETE /api/merge-train/auto-merge/:id',                kind: 'http', disposition: 'WRITE',       door: 'deleteAutoMergePayload — supersedes DELETE /api/flywheel/auto-merge/:id' },
+  { surface: 'GET /api/merge-train/merge-blockers',                  kind: 'http', disposition: 'READ',        door: 'getMergeBlockersPayload (lib/cloister/merge-blockers.js) — supersedes GET /api/flywheel/merge-blockers' },
+
   // ── parked.ts (PAN-3485 phase 1) ────────────────────────────────────────────
   { surface: 'GET /api/parked',                                      kind: 'http', disposition: 'READ',        door: 'resolveParkedPopulation (parked resolver over review_status rows ∪ registered agents)' },
 

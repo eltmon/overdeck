@@ -7,29 +7,26 @@ import {
   type ReapableStatus,
 } from '../../../src/lib/cloister/reap-terminal-sessions.js';
 
+// PAN-3917: phases are derived from the forge (review approval/changes-requested,
+// PR merged/mergeable) and the test role's verdict artifact — never a stored
+// reviewStatus/testStatus/readyForMerge/mergeStatus field.
 describe('reap-terminal-sessions — isRoleTerminal', () => {
-  it('treats review passed/failed/blocked as terminal, reviewing/pending as live', () => {
-    expect(isRoleTerminal('review', { reviewStatus: 'passed' })).toBe(true);
-    expect(isRoleTerminal('review', { reviewStatus: 'failed' })).toBe(true);
-    expect(isRoleTerminal('review', { reviewStatus: 'blocked' })).toBe(true);
-    expect(isRoleTerminal('review', { reviewStatus: 'reviewing' })).toBe(false);
-    expect(isRoleTerminal('review', { reviewStatus: 'pending' })).toBe(false);
+  it('treats a settled review (approved or changes-requested) as terminal, an unsettled one as live', () => {
+    expect(isRoleTerminal('review', { reviewSettled: true })).toBe(true);
+    expect(isRoleTerminal('review', { reviewSettled: false })).toBe(false);
     expect(isRoleTerminal('review', {})).toBe(false);
   });
 
-  it('treats test passed/failed as terminal, testing/pending as live', () => {
-    expect(isRoleTerminal('test', { testStatus: 'passed' })).toBe(true);
-    expect(isRoleTerminal('test', { testStatus: 'failed' })).toBe(true);
-    expect(isRoleTerminal('test', { testStatus: 'testing' })).toBe(false);
-    expect(isRoleTerminal('test', { testStatus: 'pending' })).toBe(false);
+  it('treats a written test verdict as terminal, no verdict as live', () => {
+    expect(isRoleTerminal('test', { testSettled: true })).toBe(true);
+    expect(isRoleTerminal('test', { testSettled: false })).toBe(false);
+    expect(isRoleTerminal('test', {})).toBe(false);
   });
 
-  it('treats ship as terminal once pushed (readyForMerge) or merge resolved', () => {
-    expect(isRoleTerminal('ship', { readyForMerge: true })).toBe(true);
-    expect(isRoleTerminal('ship', { mergeStatus: 'merged' })).toBe(true);
-    expect(isRoleTerminal('ship', { mergeStatus: 'failed' })).toBe(true);
-    expect(isRoleTerminal('ship', { readyForMerge: false })).toBe(false);
-    expect(isRoleTerminal('ship', { mergeStatus: 'merging' })).toBe(false);
+  it('treats ship as terminal once merge-ready or merged', () => {
+    expect(isRoleTerminal('ship', { mergeReady: true })).toBe(true);
+    expect(isRoleTerminal('ship', { merged: true })).toBe(true);
+    expect(isRoleTerminal('ship', { mergeReady: false, merged: false })).toBe(false);
     expect(isRoleTerminal('ship', {})).toBe(false);
   });
 });
@@ -74,22 +71,22 @@ describe('reap-terminal-sessions — sessionsToReapForRole', () => {
 describe('reap-terminal-sessions — selectTerminalAdvancingSessions', () => {
   it('reaps every terminal advancing session and leaves live ones alone', () => {
     const statuses: Record<string, ReapableStatus> = {
-      // review passed → reap review (+ convoy); test still live → keep test
-      'PAN-1242': { reviewStatus: 'passed', testStatus: 'testing', readyForMerge: false },
-      // test failed verdict recorded → reap test
-      'PAN-1642': { reviewStatus: 'passed', testStatus: 'failed' },
-      // review blocked → reap review
-      'PAN-1686': { reviewStatus: 'blocked', testStatus: 'pending' },
-      // mid-review → reap nothing
-      'PAN-2000': { reviewStatus: 'reviewing', testStatus: 'pending' },
+      // review settled → reap review (+ convoy); test still live → keep test
+      'PAN-1242': { reviewSettled: true, testSettled: false, mergeReady: false },
+      // test verdict written → reap test
+      'PAN-1642': { reviewSettled: true, testSettled: true },
+      // review settled (changes requested) → reap review
+      'PAN-1686': { reviewSettled: true, testSettled: false },
+      // no decisive review yet → reap nothing
+      'PAN-2000': { reviewSettled: false, testSettled: false },
     };
     const alive = [
       'agent-pan-1242-review',
       'agent-pan-1242-review-synthesis',
-      'agent-pan-1242-test', // testing — must survive
+      'agent-pan-1242-test', // no verdict yet — must survive
       'agent-pan-1642-test',
       'agent-pan-1686-review',
-      'agent-pan-2000-review', // reviewing — must survive
+      'agent-pan-2000-review', // review still open — must survive
     ];
 
     const toKill = selectTerminalAdvancingSessions(statuses, alive).sort();
@@ -103,9 +100,9 @@ describe('reap-terminal-sessions — selectTerminalAdvancingSessions', () => {
     expect(toKill).not.toContain('agent-pan-2000-review');
   });
 
-  it('reaps a ship session once readyForMerge is set, before merge runs', () => {
+  it('reaps a ship session once merge-ready, before merge lands', () => {
     const statuses: Record<string, ReapableStatus> = {
-      'PAN-1500': { reviewStatus: 'passed', testStatus: 'passed', readyForMerge: true, mergeStatus: 'pending' },
+      'PAN-1500': { reviewSettled: true, testSettled: true, mergeReady: true, merged: false },
     };
     const alive = ['agent-pan-1500-ship', 'agent-pan-1500-review', 'agent-pan-1500-test'];
     expect(selectTerminalAdvancingSessions(statuses, alive).sort()).toEqual([
@@ -117,7 +114,7 @@ describe('reap-terminal-sessions — selectTerminalAdvancingSessions', () => {
 
   it('is a no-op when terminal statuses have no alive sessions', () => {
     const statuses: Record<string, ReapableStatus> = {
-      'PAN-1242': { reviewStatus: 'passed', testStatus: 'passed', readyForMerge: true },
+      'PAN-1242': { reviewSettled: true, testSettled: true, mergeReady: true },
     };
     expect(selectTerminalAdvancingSessions(statuses, [])).toEqual([]);
   });

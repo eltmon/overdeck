@@ -25,7 +25,9 @@ describe('io continue overlay', () => {
     }));
     updateItemStatus(ws, 'i1', 'completed');
     updateSubItemStatus(ws, 'i1', 'a', 'completed');
-    const file = JSON.parse(readFileSync(join(root, '.pan', 'continues', 'PAN-100.xbrief.json'), 'utf8'));
+    // PAN-3917 W9: the continue file lives at the plan home — the workspace
+    // itself for an unregistered project — not the main checkout's .pan/.
+    const file = JSON.parse(readFileSync(join(ws, '.pan', 'continues', 'PAN-100.xbrief.json'), 'utf8'));
     expect(file.items).toEqual({ i1: { status: 'completed' }, 'i1.a': { status: 'completed' } });
     const doc = readWorkspacePlanSync(ws)!;
     expect(doc.plan.items[0].status).toBe('completed');
