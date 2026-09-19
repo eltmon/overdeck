@@ -12,7 +12,7 @@ You are reviewing everything the Overdeck pipeline did between {{WINDOW_START}} 
 This conversation is read-only. Do not run pipeline mutations of any kind:
 - no `pan start`, `pan kill`, `pan resume`, `pan done`, `pan tell`, `pan close`, `pan merge`, `pan reset-session`, `pan unstick`, `pan restart`, `pan reload`, or any other `pan` verb that changes state;
 - no `gh issue create`, `gh issue edit`, `gh issue close`, `gh pr merge`, or any other GitHub write;
-- no `git commit`, `git push`, `git stash`, `git checkout`, or any write to a workspace or to the `overdeck-state` branch;
+- no `git commit`, `git push`, `git stash`, `git checkout`, or any write to a workspace;
 - no HTTP POST/DELETE/PATCH to the dashboard.
 Reading files, `grep`, `gh issue list`, `gh issue view`, `gh pr view`, `gh run list`, and `pan show`/`pan memory search` are fine. If you believe an issue should be filed, put it under "Recommended follow-ups" and let the operator file it.
 
