@@ -8,7 +8,9 @@
 # deleted state-branch/door names. It is deliberately broad — a false
 # positive here is cheaper than a resurrected mirror.
 #
-# Excludes __fixtures__ directories (fixtures intentionally exercise legacy
+# Excludes __fixtures__ directories and the migrate-plan-home bridge, whose one
+# job is reading the legacy records/ shape off the archived state branch.
+# (fixtures intentionally exercise legacy
 # shapes for migration/no-loss tests). Everything else under the scan root is
 # checked, including test files: no test may construct an IssueRecord either.
 #
@@ -71,6 +73,7 @@ while IFS= read -r -d '' file; do
 done < <(find "$scan_root" -type f \
   \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' -o -name '*.mjs' -o -name '*.cjs' \) \
   -not -path '*/__fixtures__/*' \
+  -not -name 'migrate-plan-home.ts' \
   -print0)
 
 if [[ "$hit_count" -gt 0 ]]; then
