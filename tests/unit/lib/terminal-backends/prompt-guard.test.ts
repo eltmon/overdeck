@@ -163,7 +163,7 @@ describe('senderFromEnv', () => {
 describe('both adapters run the guard', () => {
   it('tmux: a reviewer is refused and a repeat is dropped', async () => {
     vi.resetModules();
-    vi.doMock('../../../../src/lib/agents/agent-state.js', () => ({
+    vi.doMock('../../../../src/lib/agents/agent-state-read.js', () => ({
       getAgentStateSync: () => ({ id: 'agent-min-1039-item', issueId: 'MIN-1039', role: 'worker', model: 'x', harness: 'claude-code' }),
     }));
     const sent: string[] = [];
@@ -201,7 +201,7 @@ describe('both adapters run the guard', () => {
     expect(repeat).toMatchObject({ dropped: true });
     expect(sent).toHaveLength(1);
     vi.doUnmock('../../../../src/lib/tmux.js');
-    vi.doUnmock('../../../../src/lib/agents/agent-state.js');
+    vi.doUnmock('../../../../src/lib/agents/agent-state-read.js');
     vi.doUnmock('../../../../src/lib/agents/liveness.js');
     vi.resetModules();
   });
