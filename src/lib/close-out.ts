@@ -612,16 +612,13 @@ const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: Clo
     steps.push({ name: 'Apply closed-out label', status: 'skipped', message: `Warning: ${(err as Error).message}` });
   }
 
-  // Step 8: Mark the durable pipeline journal terminal before clearing the DB cache.
-  try {
-    const { markRecordPipelineClosedOutSync } = await import('./pan-dir/records.js');
-    markRecordPipelineClosedOutSync({ name: 'inferred', path: ctx.projectPath }, ctx.issueId.toUpperCase());
-    steps.push({ name: 'Mark pipeline terminal', status: 'passed', message: 'Pipeline journal marked closed-out' });
-  } catch (err) {
-    steps.push({ name: 'Mark pipeline terminal', status: 'skipped', message: `Warning: ${(err as Error).message}` });
-  }
+  // PAN-3917: the durable pipeline journal (pan-dir/records.js, the per-issue
+  // git-tracked record) is permanently deleted — there is no replacement
+  // "mark terminal" write, since terminality is now read live from the
+  // tracker/PR at query time rather than stamped into a record. The former
+  // Step 8 here is gone.
 
-  // Step 9: Clear review status
+  // Step 8: Clear review status
   try {
     // Dynamically import to avoid circular dependency with server
     const { clearReviewStatus } = await import('./review-status.js');
