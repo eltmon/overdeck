@@ -18,10 +18,14 @@ pan task next PAN-123
 pan task show PAN-123 PAN-123-a
 pan task claim PAN-123 PAN-123-a
 pan task done PAN-123 PAN-123-a
-pan task block PAN-123 PAN-123-a --reason "Waiting for API access"
+pan task block PAN-123 PAN-123-a
 pan task unblock PAN-123 PAN-123-a
-pan task cancel PAN-123 PAN-123-a --reason "Removed from scope"
+pan task cancel PAN-123 PAN-123-a
 ```
+
+`block`/`unblock`/`cancel` only flip the item's status in the continue file — there
+is no `--reason` flag or free-text note field. Say why in the issue/PR conversation
+if a reason is worth recording.
 
 `pan task claim` records the claim in the continue file. Commit exactly one xBRIEF item at a time with the commit trailer `Item: <item-id>`, and push the feature branch immediately — before running `pan task done`. An unpushed item can be lost before Overdeck can see it.
 

@@ -1,6 +1,6 @@
 ---
 name: pan-review
-description: "pan review <subcommand> — manage the code review lifecycle: re-request review, set review mode, abort/restart review cycles"
+description: "pan review <subcommand> — manage the code review lifecycle: re-request review, abort/restart review cycles"
 triggers:
   - pan review
   - request review
@@ -25,10 +25,19 @@ changes) — there is no separate pipeline status to list, reset, or resync;
 
 ```
 pan review request <id>                            # Re-request review after fixing feedback
-pan review mode <id> <quick|full>                  # Set this issue's review mode override
 pan review abort <id>                               # Kill all running reviewers, leave worker idle
 pan review restart <id> [--model <m>] [--role <r>]  # Resume review and re-dispatch reviewers missing a report
 ```
+
+Review mode (`quick` vs `full`) has no per-issue override (PAN-3917: the
+per-issue record it lived on is gone). It is project/global configuration —
+`roles.review.mode` in `config.yaml` — resolved once per run by
+`resolveReviewMode()` so manual requests, automatic dispatch, and recovery
+all agree. `quick` runs one combined-pass review agent; `full` runs the
+parent plus the four-lane convoy (security, correctness, performance,
+requirements) in parallel. Edit the project's `config.yaml` and re-run
+`pan review request <id>` (or let the next automatic dispatch pick it up) to
+change it. See `docs/REVIEW-AGENT-ARCHITECTURE.md` "Review modes".
 
 ## What each subcommand does
 
@@ -36,11 +45,6 @@ pan review restart <id> [--model <m>] [--role <r>]  # Resume review and re-dispa
   re-triggers the review pipeline against the current branch state. Use this
   when the worker has committed fixes and you want the existing review pass
   to re-evaluate.
-- **`mode <id> <quick|full>`** — Sets a per-issue review-mode override.
-  `quick` runs the single parent review agent. `full` opts the issue into
-  the convoy review: security, correctness, performance, and requirements
-  sub-reviewers plus synthesis. Use this only when heavier review is worth
-  the extra agent/runtime cost for this one issue.
 - **`abort <id>`** — Kills any currently running reviewer sessions but
   leaves the work agent alone. Use when reviewers are stuck or running
   against the wrong commit and you want to halt without waiting them out.
@@ -60,8 +64,7 @@ pan review restart <id> [--model <m>] [--role <r>]  # Resume review and re-dispa
 | "What's waiting on me?" | `gh pr list --search "review-requested:@me"` |
 | "What's ready to merge?" | `gh pr list --search "review:approved status:success"` |
 | Worker pushed a fix, want re-review | `pan review request <id>` |
-| This issue needs the full review convoy | `pan review mode <id> full` |
-| Return an issue to default quick review | `pan review mode <id> quick` |
+| Project should always run the full convoy | set `roles.review.mode: full` in `config.yaml` |
 | Reviewer is hung, just kill it | `pan review abort <id>` |
 | Reviewer crashed, resume the convoy with a different model | `pan review restart <id> --model gpt-5.4` |
 | Only the security reviewer is broken | `pan review restart <id> --role security` |
