@@ -1,0 +1,634 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-19T11:50:00Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3925: /api/parked and /api/merge-train/auto-merge take 10s+ on the live server",
+    "updated": "2026-09-19T12:02:40.598Z"
+  },
+  "plan": {
+    "id": "pan-3925",
+    "title": "/api/parked and /api/merge-train/auto-merge take 10s+ on the live server",
+    "status": "proposed",
+    "uid": "baff84c1-c538-4851-9583-829fd750e370",
+    "author": "agent:claude-fable-5-1",
+    "sequence": 2,
+    "created": "2026-09-19T11:50:00Z",
+    "updated": "2026-09-19T12:02:40.598Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3925",
+        "label": "PAN-3925",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-3925.md",
+        "label": "PRD draft (.pan/drafts/PAN-3925.md)",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3917",
+        "label": "PAN-3917 (parent: The Overdeck Cut)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "performance",
+      "dashboard-server",
+      "derived-issue-state",
+      "cache",
+      "pan-3917-followup"
+    ],
+    "metadata": {
+      "sizeJustification": "Seven items across lib derivation, the issue service, three routes, and docs (~13 files, 4 subsystems). The routes are independent slices over one new cache door; splitting the door from its consumers into sibling issues would ship an unused module.",
+      "canonicalFilename": "2026-09-19-PAN-3925-api-parked-and-api-merge-train-auto-merge-take-10s-on-the-live-server.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "After the cut, three dashboard routes derive issue state at request time by walking the whole issue universe. Measured live on 2026-09-19 (load avg 17): GET /api/parked 184s cold / 78s warm, GET /api/merge-train/auto-merge 12.9s / 21.8s, GET /api/agents 15.1s / 11.7s. The cost sits inside the batch door loadIssueStatesForProject (src/lib/overdeck/derived-issue-state.ts:662): for every issue without a row in the 200-PR forge listing — nearly all 975 PAN issues — it runs three sequential git execs (readBranchWithGit, line 388) and re-reads the specs directory and parked.md per issue. /api/merge-train/auto-merge additionally runs a serial gh pr list per registered project (13 projects, 0.7s each). /api/agents calls the single-issue door once per stopped agent across 846 registered agent states. IssueDataService already keeps a derivedStatesCache (issue-data-service.ts:303) refreshed off the tracker poll, but the routes do not read it, and a pure cache read would be wrong: the cache only refreshes when a tracker poll reports CHANGED issues (PR-only transitions never refresh it) and it is empty until the first refresh after boot, which would leave the God View's once-per-boot /api/parked fetch empty.",
+      "Proposal": "Four moves, detailed in .pan/drafts/PAN-3925.md. (1) Make the batch door cheap: one `git for-each-ref --format='%(refname) %(objectname) %(ahead-behind:origin/main)'` per project replaces three execs per issue (git 2.43 on the live box; 0.05s for 483 refs), and the specs directory and parked.md are read once per call. (2) Add a TTL read-through door owned by the issue service: `ensureDerivedStates(issueIds)` serves entries younger than 30s (DERIVED_STATE_TTL_MS = PR_CACHE_TTL_MS), recomputes the rest through the batch door grouped by project with single-flight per project, stores them, and emits changes through the existing onDerivedStatesChanged hook. The logic lives in a new module services/derived-state-cache.ts so issue-data-service.ts (allow-listed at 1742 lines) does not grow. (3) Re-point the three routes: /api/parked keeps its candidate universe and calls the door once; /api/merge-train/auto-merge takes candidates from the tracker cache instead of a per-project forge listing (zero forge reads at request time); /api/agents collects every registered agent's issue id, calls the door once, and looks up. (4) Correct the docs and module headers that state the old cost model.",
+      "NonGoals": "- Do not add a fixed-cadence background refresh of the derived-state cache (the read model's staleness on PR-only changes when no route reads happen is a separate issue).\n- Do not fix or preserve listCandidateIssueIds running gh pr list inside GitLab projects; the function is deleted, GitLab auto-merge routing is a separate issue.\n- Do not derive states for issues that have an open PR but no tracker row (untracked projects such as papers-please, orca); after D8 they have no auto-merge row and the toggle renders 'Not routed yet'.\n- Do not touch the other ~20 per-request getDerivedIssueState callers (command-deck.ts, merge-ops.ts, metrics.ts, system-health-service.ts, ...); only the three routes the issue names.\n- Do not change the parked orbit rules, the FR-6 derivation table, or the auto-merge policy rules.\n- Do not change any response shape or any frontend file.\n- Do not call pushSnapshot() from the route-driven ensure path; only the poll-driven refresh keeps it."
+    },
+    "autoDecisions": [
+      {
+        "summary": "TTL read-through over the issue service's derived-state cache, not a pure cache read.",
+        "rationale": "A pure cache read is empty at boot (the God View fetches /api/parked once and refetches only on sweep.scan) and goes stale on PR-only changes because the cache only refreshes when a tracker poll reports changed issues. Read-through fixes both; a miss is bounded by the cheapened batch door."
+      },
+      {
+        "summary": "DERIVED_STATE_TTL_MS equals PR_CACHE_TTL_MS (30s).",
+        "rationale": "A recompute inside the PR-listing TTL re-derives against the same cached forge answer, so a shorter TTL buys nothing."
+      },
+      {
+        "summary": "The cache logic lives in a new module src/dashboard/server/services/derived-state-cache.ts with injected IO; IssueDataService delegates to it.",
+        "rationale": "issue-data-service.ts is pinned at 1742 lines in scripts/file-size-allowlist.txt, and the TTL/single-flight logic needs offline tests with an injected clock."
+      },
+      {
+        "summary": "Branch facts come from one git for-each-ref with %(ahead-behind:origin/main) per project; only local refs/heads/feature/* produce entries; the fallback for git < 2.41 (stderr matches 'unknown field name') is a plain for-each-ref plus per-branch rev-list that drops branches whose rev-list fails; any other failure (including `failed to find 'origin/main'`) means no branch facts for that project.",
+        "rationale": "git 2.43.0 on the live box; measured 0.05s for 483 refs. Today rev-list fails for remote-only branches, so local-only keeps parity. /home/eltmon/Projects/myn is not a git repo, and readBranchWithGit already returns null there."
+      },
+      {
+        "summary": "Seam precedence in the batch door: readBranches wins; else a caller-supplied readBranch keeps the per-issue path; else the git lister.",
+        "rationale": "derived-issue-state-server-facts.test.ts and tests/unit/dashboard/routes/resources-reclaim.test.ts inject readBranch and must keep working unchanged."
+      },
+      {
+        "summary": "/api/merge-train/auto-merge candidates are every issue in getSharedIssueService().getIssues(), not a per-project forge listing.",
+        "rationale": "In-flight states are only derived for open tracked issues, so tracked projects lose nothing and the route issues zero forge reads at request time. The only loss is an open PR in an untracked project, which AutoMergeToggle already renders as 'Not routed yet' for a missing row."
+      },
+      {
+        "summary": "/api/agents keeps its keepStoppedAgentVisible rule unchanged and reads it from the batch result.",
+        "rationale": "The batch door sets apiError: false where the single-issue door reads pane text, but keepStoppedAgentVisible uses only state and pr, so the answer is identical."
+      },
+      {
+        "summary": "ensureDerivedStates emits onDerivedStatesChanged but never calls pushSnapshot(); the poll-driven refresh keeps pushSnapshot on change.",
+        "rationale": "The read model turns onDerivedStatesChanged into issue_state.changed events; a full issues snapshot push on every route read is unnecessary traffic."
+      },
+      {
+        "summary": "One issue with seven items rather than sibling issues.",
+        "rationale": "Four subsystems and ~13 files, under the finalize size lint; the three route slices are independent consumers of one new door and would ship an unused module if split."
+      }
+    ],
+    "items": [
+      {
+        "id": "w1-branch-lister",
+        "title": "Batch door lists feature branches with one git for-each-ref per project",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:50:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3925",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/derived-issue-state.ts",
+            "tests/unit/lib/overdeck/derived-issue-state.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/lib/overdeck/derived-issue-state.test.ts src/dashboard/server/services/__tests__/derived-issue-state-server-facts.test.ts tests/unit/dashboard/routes/resources-reclaim.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "derived-issue-state.test.ts passes including the new 'the batch door lists branches once' block",
+            "derived-issue-state-server-facts.test.ts and resources-reclaim.test.ts still pass (readBranch seam parity)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-5",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1. In src/lib/overdeck/derived-issue-state.ts add `export type FeatureBranchMap = ReadonlyMap<string, DerivedBranchState>`, `export async function listFeatureBranchesWithGit(projectPath)` (one execFileAsync('git', ['for-each-ref', \"--format=%(refname) %(objectname) %(ahead-behind:origin/main)\", 'refs/heads/feature/', 'refs/remotes/origin/feature/'], { cwd, timeout: 15_000, maxBuffer: 16 MiB })), the pure `export function parseFeatureBranchRefs(stdout): FeatureBranchMap` (local refs/heads/feature/x rows become entries { name: 'feature/x', aheadOfMain: parseInt(ahead) || 0, pushed: remoteSha === localSha }; refs/remotes/origin/feature/x rows only supply remoteSha; remote-only branches produce no entry), and `listFeatureBranchesWithoutAheadBehind(projectPath)` (plain --format='%(refname) %(objectname)' then one `rev-list --count origin/main..<name>` per LOCAL branch) used only when the first exec's stderr matches /unknown field name/ (git 2.43 prints `fatal: unknown field name: <atom>` for an unsupported atom; a missing base prints `fatal: failed to find 'origin/main'` and must NOT take the fallback). In the fallback a branch whose rev-list fails is dropped from the map, never emitted with aheadOfMain 0. Any other exec failure returns an empty Map. Extend the batch door's deps type to `BatchLoaderDeps extends IssueStateLoaderDeps { issues?; readBranches?: (projectPath) => Promise<FeatureBranchMap> }` and replace the per-issue `await (deps.readBranch ?? readBranchWithGit)(...)` at line ~694 with: branches = deps.readBranches ? await deps.readBranches(projectPath) : deps.readBranch ? null : await listFeatureBranchesWithGit(projectPath); per PR-less issue branch = branches ? branches.get(featureBranchFor(issueId)) ?? null : await deps.readBranch!(projectPath, featureBranchFor(issueId)). readBranchWithGit stays for loadIssueStateFacts (line 578). No execSync anywhere."
+        },
+        "items": [
+          {
+            "id": "w1-branch-lister.ac1",
+            "title": "Given 50 PR-less issue ids and an injected readBranches spy, loadIssueStatesForProject calls readBranches exactly once and readBranch zero times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-branch-lister.ac2",
+            "title": "parseFeatureBranchRefs returns pushed: true only when the local and origin shas match, pushed: false for a local-only or diverged branch, and produces no entry for a remote-only ref",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-branch-lister.ac3",
+            "title": "Given readBranch and no readBranches, the batch door calls readBranch once per PR-less issue, so derived-issue-state-server-facts.test.ts and resources-reclaim.test.ts pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-branch-lister.ac4",
+            "title": "Given the branch map reports feature/pan-1 with aheadOfMain 2 and PAN-1 has no PR, the batch door returns state working for PAN-1 and returns state backlog for an id absent from the map",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2-batch-reads-once",
+        "title": "Batch door reads the specs directory and parked.md once per call",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T11:50:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3925",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/derived-issue-state.ts",
+            "tests/unit/lib/overdeck/derived-issue-state.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/lib/overdeck/derived-issue-state.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "derived-issue-state.test.ts passes including the once-per-call spec/parked read assertions",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2. In src/lib/overdeck/derived-issue-state.ts add `export function listSpecIssueIds(root): ReadonlySet<string>` (one readdirSync of getProjectPanPaths(root).specsDir; collect parseXBriefFilename(name).issueId upper-cased plus bare `<id>.xbrief.json` names; empty set when the dir is absent), `export function readParkedList(projectPath): string` (readFileSync of <panDir>/parked.md or ''), and `export function parkedListedInText(issueId, text): boolean` (the existing RegExp test). Refactor parkedListedIn to parkedListedInText(issueId, readParkedList(projectPath)). In loadIssueStatesForProject compute `projectSpecs = listSpecIssueIds(projectPath)` and `parkedText = readParkedList(projectPath)` once before the loop, and per issue set parkedListed: parkedListedInText(issueId, parkedText) and specExists: projectSpecs.has(issueId) || specExistsFor(issueId, join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`)) — the per-issue workspace check stays. specExistsFor's signature is unchanged for the single-issue door."
+        },
+        "items": [
+          {
+            "id": "w2-batch-reads-once.ac1",
+            "title": "Given 20 issue ids in a temp project, a vi.spyOn on fs readdirSync observes exactly one read of the project's .pan/specs directory per batch call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-batch-reads-once.ac2",
+            "title": "Given 20 issue ids, readFileSync on .pan/parked.md is observed exactly once per batch call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-batch-reads-once.ac3",
+            "title": "An id with a dated spec file in .pan/specs derives planned; an id listed in parked.md derives parked; parkedListedIn(issueId, projectPath) returns the same answer as before the refactor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w3-derived-state-cache",
+        "title": "DerivedStateCache: TTL read-through with single-flight, owned by IssueDataService",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:50:00Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3925",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "w4-parked-route",
+            "w5-auto-merge-route",
+            "w6-agents-route"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/derived-state-cache.ts",
+            "src/dashboard/server/services/__tests__/derived-state-cache.test.ts",
+            "src/dashboard/server/services/issue-data-service.ts",
+            "src/dashboard/server/services/__tests__/issue-data-service.test.ts",
+            "src/dashboard/server/services/derived-issue-state.ts",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/dashboard/server/services/__tests__/derived-state-cache.test.ts src/dashboard/server/services/__tests__/issue-data-service.test.ts src/dashboard/server/services/__tests__/derived-issue-state-server-facts.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "derived-state-cache.test.ts passes (TTL, single-flight, onChanged, refresh, no-project skip, rejection tolerance)",
+            "issue-data-service.test.ts passes including the ensureDerivedStates case",
+            "typecheck completes without errors",
+            "lint:file-size passes — issue-data-service.ts at or below its allowlist row, or the row updated with # PAN-3925"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-9",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "readinessReason": "Own new module plus a delegation edit in issue-data-service.ts; no other item touches those files, so it runs in its own slot while w1/w2 edit the lib module.",
+          "acJustification": "Six criteria: the cache door has six independently observable behaviors (TTL, single-flight, change emission, refresh/skip/rejection, service delegation, dedupe+parallel)."
+        },
+        "narrative": {
+          "Action": "PRD W3. Create src/dashboard/server/services/derived-state-cache.ts exporting `DERIVED_STATE_TTL_MS = PR_CACHE_TTL_MS`, `DerivedStateCacheDeps { now?; ttlMs?; resolveProject; trackerIssue; panes; loadStates; onChanged? }`, and `class DerivedStateCache` with get(issueId), list(), ensure(issueIds): Promise<Map<string, DerivedIssueState>>, refresh(issueIds): Promise<readonly DerivedIssueState[]>. Entries are { state, computedAt }. ensure: upper-case ids and collapse them to a Set (callers pass duplicates); fresh = now() - computedAt < ttlMs; group stale ids by resolveProject(id).projectPath (ids with no project are skipped); compute stale projects in parallel with Promise.all, single-flight per project; if the project has an in-flight promise await it then re-partition and batch only the still-stale ids; otherwise start computeProject(projectPath, ids), store the promise in inFlight, delete it in finally. computeProject: issues = Object.fromEntries(ids.map(id => [id, trackerIssue(id)])); states = await loadStates(projectPath, ids, { issues, panes: await panes() }); store each with computedAt now(); collect states whose JSON.stringify differs from the previous entry (or had none) and call onChanged(changed) once when non-empty; a thrown loadStates keeps previous entries and resolves. Return a Map of every requested id that has an entry. refresh = ensure with ttl treated as 0, returning the changed list. In issue-data-service.ts replace `derivedStatesCache: Record<...>` with a `DerivedStateCache` instance wired to resolveProjectFromIssueSync, this.getTrackerIssue, getBackendPanes, the LIB loadIssueStatesForProject, and onChanged → this._onDerivedStatesChanged; refreshDerivedStates becomes `const changed = await this.derivedStates.refresh(issueIds); if (changed.length > 0 && this.started) this.pushSnapshot();`; add public `ensureDerivedStates(issueIds)` delegating to ensure (no pushSnapshot); getDerivedState/listDerivedStates delegate. Remove imports the move made unused. If issue-data-service.ts ends above 1742 lines update scripts/file-size-allowlist.txt line 49 to `<lines> src/dashboard/server/services/issue-data-service.ts # PAN-3925` in the same commit. In the server adapter services/derived-issue-state.ts add `export async function ensureDerivedStates(issueIds) { return getSharedIssueService().ensureDerivedStates(issueIds); }` and one header sentence describing it as the 30s TTL read-through routes use. Tests inject now and never wait on real timers."
+        },
+        "items": [
+          {
+            "id": "w3-derived-state-cache.ac1",
+            "title": "Given an injected clock, two ensure calls for the same id 10s apart call loadStates once, and two calls 31s apart call it twice",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-derived-state-cache.ac2",
+            "title": "Given two concurrent ensure calls for ids of one project, loadStates receives exactly one call and both callers resolve with the same states (single-flight per project)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-derived-state-cache.ac3",
+            "title": "onChanged receives a state on first compute, receives nothing when a recompute returns an equal state, and receives the new state when it differs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-derived-state-cache.ac4",
+            "title": "refresh recomputes a 1s-old entry and returns the changed list; an id with no project is absent from the result without a loadStates call; a rejected loadStates preserves the previous entry and ensure still resolves",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-derived-state-cache.ac5",
+            "title": "IssueDataService.ensureDerivedStates returns the batch map on a fresh service with a mocked lib batch door, getDerivedState then answers from memory, and npm run lint:file-size passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-derived-state-cache.ac6",
+            "title": "Given ids ['PAN-1','PAN-1','PAN-2'] ensure passes each id to loadStates exactly once (duplicates collapsed) and computes two stale projects concurrently rather than one after the other",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w4-parked-route",
+        "title": "GET /api/parked reads states through ensureDerivedStates",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:50:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-3925",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/parked.ts",
+            "src/dashboard/server/routes/__tests__/parked.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/dashboard/server/routes/__tests__/parked.test.ts",
+            "npm run typecheck",
+            "grep -c 'per-request resolve is cheap' src/dashboard/server/routes/parked.ts || true"
+          ],
+          "expected_outputs": [
+            "parked.test.ts passes (one ensureStates call, three orbit rows, rejection yields [])",
+            "typecheck completes without errors",
+            "grep prints 0 — the stale header claim is gone"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4. In src/dashboard/server/routes/parked.ts replace `loadStates?: typeof loadIssueStatesForProject` in ResolveParkedDeps with `ensureStates?: typeof ensureDerivedStates`; delete the byProject grouping and the per-project loadStates loop (lines 76–92) and replace with `let derived; try { derived = await (deps.ensureStates ?? ensureDerivedStates)(issueIds); } catch { derived = new Map(); }`. Drop the resolveProjectFromIssueSync and loadIssueStatesForProject imports; import ensureDerivedStates from ../services/derived-issue-state.js. Keep candidateIssueIds and every row rule unchanged. Rewrite header lines 24–26 to: 'The candidate universe is the in-flight one (live panes ∪ tracker issues). States come from `ensureDerivedStates` — the issue service's derived-state cache with a 30s TTL read-through (PAN-3925) — so a request costs no per-issue `git` or forge read. Rows contain no secrets — this route is a GET and mutates nothing.' Add routes/__tests__/parked.test.ts driving resolveDerivedParkedRows with injected panes, issueIds, now, and an ensureStates spy."
+        },
+        "items": [
+          {
+            "id": "w4-parked-route.ac1",
+            "title": "Given panes carrying PAN-1 and issueIds [PAN-2], resolveDerivedParkedRows sends the injected ensureStates exactly one call whose argument contains both PAN-1 and PAN-2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-parked-route.ac2",
+            "title": "A closed state with a live pane produces a zombie-session row, a parked state produces an operator-gate row, and attention stuck with an idle pane produces an idle-running row, sorted oldest first",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-parked-route.ac3",
+            "title": "Given ensureStates rejects, resolveDerivedParkedRows resolves with an empty rows array instead of throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-parked-route.ac4",
+            "title": "parked.ts imports no loadIssueStatesForProject and no resolveProjectFromIssueSync, and its header no longer contains 'per-request resolve is cheap'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w5-auto-merge-route",
+        "title": "GET /api/merge-train/auto-merge derives from tracker issues via ensureDerivedStates, no forge read",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:50:00Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-3925",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/merge-train.ts",
+            "src/dashboard/server/routes/__tests__/merge-train.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/dashboard/server/routes/__tests__/merge-train.test.ts src/dashboard/server/routes/__tests__/merge-train-config-auto-merge.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "merge-train.test.ts passes including the new 'GET /api/merge-train/auto-merge (PAN-3925)' block",
+            "merge-train-config-auto-merge.test.ts still passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5. In src/dashboard/server/routes/merge-train.ts rewrite getAutoMergePolicyPayload(deps: { issueIds?: () => readonly string[]; ensureStates?: typeof ensureDerivedStates } = {}): issueIds = (deps.issueIds ?? trackerIssueIds)(); states = await (deps.ensureStates ?? ensureDerivedStates)(issueIds) inside try/catch that warns and returns { issues: [] }; for each [issueId, derived] with state in IN_FLIGHT push { issueId, autoMerge: !shouldHoldForUat(undefined, getProjectAutoMergeDefault(issueId), globalRequireUat) }. Add `function trackerIssueIds(): string[]` reading getSharedIssueService().getIssues() identifiers upper-cased (empty array on throw). Delete listCandidateIssueIds and both dynamic import('../services/derived-issue-state.js') lines; import ensureDerivedStates statically on line 54's import and getSharedIssueService from ../services/issue-service-singleton.js. Keep the listProjectsSync and resolve imports (used at lines 102, 124, 146, 150, 206, 248). The route at line 649 and the response shape are unchanged."
+        },
+        "items": [
+          {
+            "id": "w5-auto-merge-route.ac1",
+            "title": "Given issueIds PAN-1, PAN-2, PAN-3 and injected states ready, backlog, in-review, the payload lists exactly PAN-1 and PAN-3 with autoMerge computed from the project default and global require_uat",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-auto-merge-route.ac2",
+            "title": "Given the three ids, ensureStates receives exactly one call with them and the module's listRepoPullRequests mock receives zero calls during the request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-auto-merge-route.ac3",
+            "title": "Given ensureStates rejects, getAutoMergePolicyPayload returns { issues: [] } and logs one console.warn instead of throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-auto-merge-route.ac4",
+            "title": "merge-train.ts contains no listCandidateIssueIds function and no dynamic import of ../services/derived-issue-state.js",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w6-agents-route",
+        "title": "GET /api/agents batches stopped-agent visibility through one ensureDerivedStates call",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:50:00Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3925",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/listing.ts",
+            "src/dashboard/server/routes/__tests__/agents-listing-derived-batch.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/dashboard/server/routes/__tests__/agents-listing-derived-batch.test.ts src/dashboard/server/routes/__tests__/agents-listing-health-status.test.ts",
+            "npm run typecheck",
+            "grep -c 'getDerivedIssueState' src/dashboard/server/routes/agents/listing.ts || true"
+          ],
+          "expected_outputs": [
+            "agents-listing-derived-batch.test.ts passes (one ensureDerivedStates call per request; in-play PR agent visible; merged agent dropped)",
+            "typecheck completes without errors",
+            "grep prints 0 — listing.ts no longer references getDerivedIssueState"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6. In src/dashboard/server/routes/agents/listing.ts replace the getDerivedIssueState import (line 22) with ensureDerivedStates. Hoist the issueId expression at lines 87–88 into a local `issueIdOf(state: AgentState): string`. Before the Promise.all at line 82 add `const derivedByIssue = yield* Effect.promise(() => ensureDerivedStates(registeredStates.map(issueIdOf)).catch(() => new Map<string, DerivedIssueState>()));`. Inside the map use `const issueId = issueIdOf(state);` and at line 116 replace `await getDerivedIssueState(issueId).catch(() => null)` with `derivedByIssue.get(issueId) ?? null`. Lines 117–121 (keepStoppedAgentVisible and the 1h rule) stay byte-identical. Add routes/__tests__/agents-listing-derived-batch.test.ts following the agents-restart-projection.test.ts harness: vi.hoisted mocks for listAgentStates/getAgentRuntimeState (../../../../lib/agents.js), getBackendPanes (../../services/backend-inventory.js), readRemoteAgentState/getIssueDataService/agentsCache (../agents/shared.js), and ensureDerivedStates only (../../services/derived-issue-state.js); run getAgentsRoute through HttpRouter/HttpServerRequest from effect/unstable/http; reset agentsCache between cases."
+        },
+        "items": [
+          {
+            "id": "w6-agents-route.ac1",
+            "title": "Given three registered stopped agents (two on PAN-1, one on PAN-2), one request sends the ensureDerivedStates mock exactly one call whose id set contains PAN-1 and PAN-2 and nothing else",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-agents-route.ac2",
+            "title": "Given an agent stopped 2h ago whose issue returns in-review with a pr, the response contains it; given one whose issue returns merged, the response omits it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-agents-route.ac3",
+            "title": "A rejecting ensureDerivedStates still returns 200 with the agents whose stop is younger than 1h present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-agents-route.ac4",
+            "title": "listing.ts contains no reference to getDerivedIssueState",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w7-docs",
+        "title": "Docs state the derived-state cache door and the new cost model",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T11:50:00Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3925",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "docs/GOD-VIEW.md",
+            "docs/THE-CUT.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'ensureDerivedStates' docs/DASHBOARD-ARCHITECTURE.md docs/GOD-VIEW.md docs/THE-CUT.md"
+          ],
+          "expected_outputs": [
+            "each of the three files reports a count of at least 1"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-6",
+            "FR-7",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W7. (1) docs/DASHBOARD-ARCHITECTURE.md: after the `**God View:**` paragraph (line 184) add a `**Derived issue state cache (PAN-3917 FR-6, PAN-3925):**` paragraph saying IssueDataService keeps the last derived state per issue in services/derived-state-cache.ts; the tracker poll refreshes it when issues change; /api/parked, /api/merge-train/auto-merge and /api/agents read it through ensureDerivedStates, a 30-second TTL read-through that recomputes only stale ids grouped by project, one batch per project at a time; a request costs at most one cached gh pr list and one git for-each-ref per project, never a git exec per issue; changes fan out as issue_state.changed; route code must not call getDerivedIssueState in a loop. (2) docs/GOD-VIEW.md lines 88–90: after the sentence ending 'when the parked population changes' add: 'The route answers from the server's derived-state cache (30s TTL read-through, PAN-3925), so the first fetch after boot computes and every later fetch is a memory read.' (3) docs/THE-CUT.md line 213: after 'computed server-side by `cloister/auto-merge-eligibility.ts`' add: 'over the issue service's derived-state cache (`ensureDerivedStates`, PAN-3925) — no forge read at request time; an open PR in a project whose tracker the dashboard does not poll therefore has no row and renders as \"Not routed yet\"'. The codebase map file .overdeck/context/codebase/concerns.md already carries the matching hazard entry from planning."
+        },
+        "items": [
+          {
+            "id": "w7-docs.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a Derived issue state cache paragraph that names ensureDerivedStates, the 30-second TTL, and the rule that route code must not call getDerivedIssueState in a loop",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-docs.ac2",
+            "title": "docs/GOD-VIEW.md contains a sentence stating that /api/parked answers from the derived-state cache with a 30s TTL read-through, so the first fetch after boot computes and later fetches are memory reads",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-docs.ac3",
+            "title": "docs/THE-CUT.md states that the auto-merge policy is computed over the derived-state cache with no forge read at request time and that an untracked-project PR renders as Not routed yet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w1-branch-lister",
+        "to": "w2-batch-reads-once",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-derived-state-cache",
+        "to": "w4-parked-route",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-derived-state-cache",
+        "to": "w5-auto-merge-route",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-derived-state-cache",
+        "to": "w6-agents-route",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-branch-lister",
+        "to": "w4-parked-route",
+        "type": "informs"
+      },
+      {
+        "from": "w2-batch-reads-once",
+        "to": "w4-parked-route",
+        "type": "informs"
+      }
+    ]
+  },
+  "status": "proposed"
+}
