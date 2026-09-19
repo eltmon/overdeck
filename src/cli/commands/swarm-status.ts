@@ -12,7 +12,7 @@ import {
   getFailedMergeBlocks,
   type ClassifiedSwarmSlot,
 } from '../../lib/cloister/deacon-swarm.js';
-import { reconcileSlotState } from '../../lib/agents/slot-reconcile.js';
+import { reconcileSlotState } from '../../lib/cloister/swarm-slot-reconcile.js';
 import { readSwarmHold, readSwarmInterventions } from '../../lib/cloister/deacon-swarm-record.js';
 import { countRunningSwarmSlotsForIssue, getConcurrencyLimits } from '../../lib/cloister/concurrency.js';
 import { listSessionNamesSync } from '../../lib/tmux.js';

@@ -2,27 +2,22 @@
  * PAN-1920: reconstruct the dashboard cache from sources of truth.
  *
  * Rebuilds the agents table from state.json + tmux, enumerates in-flight
- * issues from GitHub + workspaces, derives pipeline phases from the per-issue
- * record + GitHub PR state, and produces the AgentSnapshot / AgentRuntimeSnapshot
+ * issues from GitHub + workspaces, derives each pipeline phase from the
+ * tracker and the PR, and produces the AgentSnapshot / AgentRuntimeSnapshot
  * maps the dashboard bootstrap paths need.
  *
- * Reads NO SQLite cache tables: no events, no projection cache, no review_status.
+ * Reads NO SQLite cache tables: no events, no projection cache. PAN-3917: the
+ * review-status half is gone with the rows it rebuilt.
  */
 
 import { Effect } from 'effect';
 import type {
   AgentRuntimeSnapshot,
   AgentSnapshot,
-  ReviewStatusSnapshot,
 } from '@overdeck/contracts';
 import { backfillAgentsSync, listAllAgentsSync } from '../overdeck/agents.js';
 import { listRunningAgents, type AgentState } from '../agents.js';
 import { listProjectsSync, type ProjectConfig } from '../projects.js';
-import {
-  readIssueRecord,
-  resolveProjectForIssue,
-  type PanIssueRecord,
-} from '../pan-dir/record.js';
 import { enumerateInFlightIssuesFromSources } from './enumerate-in-flight.js';
 import { derivePipelinePhase, type PipelinePhase } from './derive-phase.js';
 
@@ -39,7 +34,6 @@ export interface ReconstructResult {
   phaseCounts: Record<PipelinePhase, number>;
   agentRuntimeById: Record<string, AgentRuntimeSnapshot>;
   agentsById: Record<string, AgentSnapshot>;
-  reviewStatusByIssueId: Record<string, ReviewStatusSnapshot>;
   phaseByIssueId: Record<string, PipelinePhase>;
 }
 
@@ -118,94 +112,6 @@ function toAgentRuntimeSnapshot(state: AgentState): AgentRuntimeSnapshot {
     model: state.model || undefined,
     currentIssue: state.issueId,
     updatedAtSequence: 0,
-  };
-}
-
-function toReviewStatusValue(
-  value: string | undefined,
-): ReviewStatusSnapshot['reviewStatus'] {
-  if (!value) return undefined;
-  if (
-    value === 'pending' ||
-    value === 'reviewing' ||
-    value === 'passed' ||
-    value === 'failed' ||
-    value === 'blocked'
-  ) {
-    return value;
-  }
-  return undefined;
-}
-
-function toTestStatusValue(
-  value: string | undefined,
-): ReviewStatusSnapshot['testStatus'] {
-  if (!value) return undefined;
-  if (
-    value === 'pending' ||
-    value === 'testing' ||
-    value === 'passed' ||
-    value === 'failed' ||
-    value === 'skipped' ||
-    value === 'dispatch_failed'
-  ) {
-    return value;
-  }
-  return undefined;
-}
-
-function toMergeStatusValue(
-  value: string | undefined,
-): ReviewStatusSnapshot['mergeStatus'] {
-  if (!value) return undefined;
-  if (
-    value === 'pending' ||
-    value === 'queued' ||
-    value === 'merging' ||
-    value === 'verifying' ||
-    value === 'merged' ||
-    value === 'failed'
-  ) {
-    return value;
-  }
-  return undefined;
-}
-
-function toVerificationStatusValue(
-  value: string | undefined,
-): ReviewStatusSnapshot['verificationStatus'] {
-  if (!value) return undefined;
-  if (
-    value === 'pending' ||
-    value === 'running' ||
-    value === 'passed' ||
-    value === 'failed' ||
-    value === 'skipped'
-  ) {
-    return value;
-  }
-  return undefined;
-}
-
-function recordToReviewStatusSnapshot(record: PanIssueRecord): ReviewStatusSnapshot {
-  const pipeline = record.pipeline;
-  return {
-    issueId: record.issueId,
-    reviewStatus: toReviewStatusValue(pipeline.reviewStatus),
-    testStatus: toTestStatusValue(pipeline.testStatus),
-    mergeStatus: toMergeStatusValue(pipeline.mergeStatus),
-    verificationStatus: toVerificationStatusValue(pipeline.verificationStatus),
-    readyForMerge: pipeline.readyForMerge ?? false,
-    updatedAt: pipeline.updatedAt,
-    prUrl: pipeline.prUrl,
-    reviewedAtCommit: pipeline.reviewedAtCommit,
-    lastVerifiedCommit: pipeline.lastVerifiedCommit,
-    autoMerge: pipeline.autoMerge,
-    blockerReasons: pipeline.blockerReasons as ReviewStatusSnapshot['blockerReasons'],
-    mergeNotes: pipeline.mergeNotes,
-    reviewRetryCount: undefined,
-    testRetryCount: undefined,
-    mergeRetryCount: undefined,
   };
 }
 
@@ -365,7 +271,7 @@ export async function reconstructCache(
   const projects = listProjectsSync().map(({ config }) => config);
   const inFlight = await loadInFlightIssueIds(projects);
 
-  // 4. Derive phases and review-status snapshots from sources.
+  // 4. Derive phases from the tracker and the PR.
   const phaseCounts: Record<PipelinePhase, number> = {
     work: 0,
     review: 0,
@@ -373,24 +279,12 @@ export async function reconstructCache(
     done: 0,
   };
   const phaseByIssueId: Record<string, PipelinePhase> = {};
-  const reviewStatusByIssueId: Record<string, ReviewStatusSnapshot> = {};
 
   for (const issueId of inFlight) {
-    const project = resolveProjectForIssue(issueId);
-    const record = project ? await readIssueRecord(project, issueId) : null;
     const { hasPr, reviewDecision } = await fetchPrState(issueId);
-    const phase = derivePipelinePhase({
-      issueClosed: false,
-      hasPr,
-      record,
-      reviewDecision,
-    });
+    const phase = derivePipelinePhase({ issueClosed: false, hasPr, reviewDecision });
     phaseCounts[phase]++;
     phaseByIssueId[issueId] = phase;
-
-    if (record) {
-      reviewStatusByIssueId[issueId] = recordToReviewStatusSnapshot(record);
-    }
 
     if (verbose) {
       console.log(`[reconstruct-cache] ${issueId} → ${phase}`);
@@ -404,7 +298,6 @@ export async function reconstructCache(
     phaseCounts,
     agentRuntimeById,
     agentsById,
-    reviewStatusByIssueId,
     phaseByIssueId,
   };
 }
