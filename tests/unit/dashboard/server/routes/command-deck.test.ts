@@ -56,6 +56,8 @@ const mockIsPlanningComplete = vi.hoisted(() => vi.fn(() => Effect.succeed(false
 vi.mock('../../../../../src/lib/xbrief/io.js', () => ({
   isPlanningComplete: mockIsPlanningComplete,
   readWorkspacePlan: vi.fn(),
+  // The FR-6 spec lookup reads the specs directory through this resolver.
+  findSpecByIssueSync: vi.fn(() => null),
 }));
 
 vi.mock('node:fs/promises', async () => {

@@ -19,7 +19,7 @@ import { pingAgent } from '../../lib/health.js';
 import { readAgentCVSync } from '../../lib/cv.js';
 import { getAgentRuntimeStateSync, getAgentStateSync } from '../../lib/agents.js';
 import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
-import { gatherIssueState } from '../../lib/overdeck/derived-issue-state.js';
+import { getDerivedIssueState } from '../../lib/overdeck/derived-issue-state.js';
 
 interface ShowOptions {
   cv?: boolean;
@@ -66,7 +66,7 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
   if (context) return contextCommand('state', agentId, undefined, { json });
   if (health) return healthCommand('ping', issueId, { json });
 
-  const issueState = await gatherIssueState(issueId);
+  const issueState = await getDerivedIssueState(issueId);
   const runtimeState = getAgentRuntimeStateSync(agentId);
   const agentState = getAgentStateSync(agentId);
   const healthData = agentState || runtimeState
@@ -81,7 +81,9 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
       issueId,
       agentId,
       state: issueState.state,
-      attention: issueState.attention,
+      attention: issueState.attention ?? null,
+      pr: issueState.pr,
+      branch: issueState.branch,
       health: healthData,
       cv: cvData,
     }, null, 2));

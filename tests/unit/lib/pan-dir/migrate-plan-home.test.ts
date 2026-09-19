@@ -161,9 +161,10 @@ describe('migratePanHome', () => {
     // Legacy continue fields carried across from the source file.
     expect(dest.issueId).toBe('PAN-100');
     expect(dest.version).toBe('1');
-    // completed -> done, non-completed status passed through, migratedFrom stamped.
-    expect(dest.items['item-a']).toEqual({ status: 'done', migratedFrom: 'records.statusOverrides' });
-    expect(dest.items['item-a.ac1']).toEqual({ status: 'done', migratedFrom: 'records.statusOverrides' });
+    // Statuses are carried verbatim — `completed` is the xBRIEF item-status
+    // value, so translating it would hide the item from the overlay and the DAG.
+    expect(dest.items['item-a']).toEqual({ status: 'completed', migratedFrom: 'records.statusOverrides' });
+    expect(dest.items['item-a.ac1']).toEqual({ status: 'completed', migratedFrom: 'records.statusOverrides' });
     expect(dest.items['item-b']).toEqual({ status: 'in_progress', migratedFrom: 'records.statusOverrides' });
     // The closed issue's overrides never land, even though its record exists.
     expect(existsSync(join(planHome, '.pan/continues/PAN-200.xbrief.json'))).toBe(false);
@@ -175,7 +176,7 @@ describe('migratePanHome', () => {
     expect(result.progressUpdated).toEqual(['PAN-100']);
     const dest = JSON.parse(readFileSync(join(planHome, '.pan/continues/PAN-100.xbrief.json'), 'utf8'));
     expect(dest.issueId).toBe('PAN-100');
-    expect(dest.items['item-a'].status).toBe('done');
+    expect(dest.items['item-a'].status).toBe('completed');
   });
 
   it('reads statusOverrides nested under tasks, falling back from the top-level field', async () => {
@@ -186,7 +187,7 @@ describe('migratePanHome', () => {
     const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN });
     expect(result.progressUpdated).toEqual(['PAN-100']);
     const dest = JSON.parse(readFileSync(join(planHome, '.pan/continues/PAN-100.xbrief.json'), 'utf8'));
-    expect(dest.items['item-c']).toEqual({ status: 'done', migratedFrom: 'records.statusOverrides' });
+    expect(dest.items['item-c']).toEqual({ status: 'completed', migratedFrom: 'records.statusOverrides' });
   });
 
   it('is idempotent for progress-merged continue files — a second run reports no change', async () => {
@@ -214,8 +215,8 @@ describe('migratePanHome', () => {
     const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN });
     expect(result.progressUpdated).toEqual(['PAN-100']);
     const dest = JSON.parse(readFileSync(join(planHome, '.pan/continues/PAN-100.xbrief.json'), 'utf8'));
-    expect(dest.items['item-a'].status).toBe('done');
-    expect(dest.items['item-b'].status).toBe('done');
+    expect(dest.items['item-a'].status).toBe('completed');
+    expect(dest.items['item-b'].status).toBe('completed');
   });
 
   it('--dry-run reports what would be copied and writes nothing', async () => {
@@ -242,6 +243,18 @@ describe('migratePanHome', () => {
     expect(result.committed).toBe(true);
     expect(git(planHome, 'log', '-1', '--format=%s').trim()).toBe(MIGRATION_COMMIT_SUBJECT);
     expect(git(planHome, 'status', '--porcelain').trim()).toBe('');
+  });
+
+  it('--commit leaves a pre-staged unrelated change staged and out of the commit', async () => {
+    initGit(planHome);
+    write(planHome, 'unrelated.txt', 'operator work in progress\n');
+    git(planHome, 'add', '--', 'unrelated.txt');
+
+    const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, commit: true });
+
+    expect(result.committed).toBe(true);
+    expect(git(planHome, 'show', '--name-only', '--format=', 'HEAD')).not.toContain('unrelated.txt');
+    expect(git(planHome, 'diff', '--cached', '--name-only')).toContain('unrelated.txt');
   });
 
   it('--commit is a no-op (and never fires) together with --dry-run', async () => {

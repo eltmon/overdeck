@@ -60,6 +60,10 @@ export async function commitPlanArtifacts(
     const { stdout: sha } = await execFileAsync('git', ['rev-parse', 'HEAD'], { cwd });
     return { committed: true, sha: sha.trim() };
   } catch (cause) {
+    // The staging above is ours; a failed commit must not leave it behind for
+    // the next commit in the repo to pick up. The reset is pathspec-scoped, so
+    // nothing outside the artifacts this call touched is unstaged.
+    await execFileAsync('git', ['reset', '-q', '--', ...pathspecs], { cwd }).catch(() => {});
     const message = cause instanceof Error ? cause.message : String(cause);
     return { committed: false, reason: message.split('\n')[0] };
   }

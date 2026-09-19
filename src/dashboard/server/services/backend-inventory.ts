@@ -21,12 +21,12 @@ import { Effect } from 'effect';
 import type {
   AgentRole,
   AgentState,
-  BackendAgentSnapshot,
   BackendPane,
 } from '@overdeck/contracts';
 import { isUnsupported, type BackendEvent, type TerminalBackend } from '../../../lib/terminal-backends/types.js';
 import { resolveTerminalBackend } from '../../../lib/terminal-backends/registry.js';
 import { selectTerminalBackend, type TerminalBackendConfig } from '../../../lib/terminal-backends/select.js';
+import { paneFromBackendSnapshot } from '../../../lib/overdeck/derived-issue-state.js';
 
 /** How long a pane may sit without output before the tmux fallback calls it idle. */
 export const TMUX_IDLE_THRESHOLD_MS = 5 * 60_000;
@@ -100,33 +100,6 @@ export function parseAgentSessionName(session: string): ParsedSessionName | null
 }
 
 // ─── mapping ─────────────────────────────────────────────────────────────────
-
-function snapshotToPane(
-  snapshot: BackendAgentSnapshot,
-  now: number,
-  previous?: BackendPane,
-): BackendPane {
-  const tokens = snapshot.tokens;
-  const pane: {
-    -readonly [K in keyof BackendPane]: BackendPane[K];
-  } = {
-    id: snapshot.paneId,
-    role: tokens.role ?? 'work',
-    harness: tokens.harness ?? 'unknown',
-    model: tokens.model ?? 'unknown',
-    state: snapshot.state,
-    // A pane that has not changed state keeps the timestamp it entered it —
-    // otherwise every refresh would reset the clock and nothing could ever be
-    // reported `stuck`.
-    stateSince: previous && previous.state === snapshot.state && previous.stateSince !== undefined
-      ? previous.stateSince
-      : now,
-    terminalId: snapshot.terminalId,
-  };
-  if (tokens.issue) pane.issue = tokens.issue;
-  if (snapshot.cwd) pane.workspace = snapshot.cwd;
-  return pane;
-}
 
 function tmuxProbeToPane(
   probe: TmuxPaneProbe,
@@ -219,7 +192,7 @@ export async function listBackendPanes(
       backend.list().pipe(Effect.catch(() => Effect.succeed(null))),
     );
     if (result !== null && !isUnsupported(result)) {
-      return result.map((snapshot) => snapshotToPane(snapshot, now, previous?.get(snapshot.paneId)));
+      return result.map((snapshot) => paneFromBackendSnapshot(snapshot, now, previous?.get(snapshot.paneId)));
     }
   }
 

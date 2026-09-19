@@ -14,6 +14,7 @@ import { Command } from 'commander';
 
 import { resolvePlanHome } from '../../lib/pan-dir/paths.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../../lib/projects.js';
+import { computeWorkspaceRepoRootsSync, resolveProjectReposForIssueSync } from '../../lib/project-repos.js';
 import { getDispatchableItems } from '../../lib/xbrief/dag.js';
 import { readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 import {
@@ -69,7 +70,11 @@ function print(value: unknown, json: boolean | undefined): void {
   }
 }
 
-/** Commit the continue file on the branch that owns it. Never fatal. */
+/**
+ * Commit the continue file on the branch that owns it. A clean tree is not a
+ * failure; anything else is — the continue file IS the item state, and an
+ * uncommitted one is invisible to everyone but this checkout.
+ */
 async function commitContinue(planHome: string, issueId: string): Promise<void> {
   const result = await commitPlanArtifacts({
     cwd: planHome,
@@ -77,7 +82,10 @@ async function commitContinue(planHome: string, issueId: string): Promise<void> 
     message: planArtifactCommitMessage(issueId),
   });
   if (!result.committed && result.reason !== 'nothing to commit') {
-    console.error(`Could not commit the continue file for ${issueId}: ${result.reason}`);
+    throw new Error(
+      `The continue file for ${issueId} was written but could not be committed: ${result.reason}.\n`
+      + `Commit ${join(planHome, '.pan', 'continues')} yourself, then run this again.`,
+    );
   }
 }
 
@@ -106,13 +114,25 @@ export async function runTaskClaim(issue: string, itemId: string, options: TaskO
   print({ itemId, ...state }, options.json);
 }
 
+/**
+ * Every repository root of the issue workspace, plus the plan home. A polyrepo
+ * issue commits its work in whichever repo the item touched, and the plan home
+ * may be none of them, so the corroborating commit is looked for in all of them.
+ */
+export function issueRepoRoots(issueId: string, workspacePath: string, planHome: string): string[] {
+  const repos = resolveProjectReposForIssueSync(issueId);
+  const roots = computeWorkspaceRepoRootsSync(repos, issueId, workspacePath).map((root) => root.dir);
+  return [...new Set([...roots, planHome])];
+}
+
 export async function runTaskDone(issue: string, itemId: string, options: TaskOptions): Promise<void> {
-  const { issueId, planHome } = resolveTaskContext(issue);
+  const { issueId, planHome, workspacePath } = resolveTaskContext(issue);
   let state: ContinueItemState;
   try {
     state = await markItemDone(planHome, issueId, itemId, {
       requireTrailer: `Item: ${itemId}`,
       requirePushed: true,
+      repoRoots: issueRepoRoots(issueId, workspacePath, planHome),
     });
   } catch (error) {
     if (error instanceof ItemNotVerifiable) {

@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   readContinueState: vi.fn(),
   readPlan: vi.fn(),
   commit: vi.fn(),
+  repos: vi.fn(),
+  repoRoots: vi.fn(),
 }));
 
 vi.mock('../../../lib/projects.js', () => ({
@@ -16,6 +18,11 @@ vi.mock('../../../lib/projects.js', () => ({
   getProjectSync: () => ({ name: 'test', path: '/tmp/test' }),
 }));
 vi.mock('../../../lib/pan-dir/paths.js', () => ({ resolvePlanHome: (p: string) => p }));
+vi.mock('../../../lib/project-repos.js', () => ({
+  resolveProjectReposForIssueSync: () => mocks.repos(),
+  computeWorkspaceRepoRootsSync: (_repos: unknown, _issue: string, workspacePath: string) =>
+    mocks.repoRoots().map((dir: string) => ({ dir: dir === '.' ? workspacePath : `${workspacePath}/${dir}` })),
+}));
 vi.mock('../../../lib/xbrief/io.js', () => ({ readWorkspacePlanSync: mocks.readPlan }));
 vi.mock('../../../lib/xbrief/continue-state.js', () => ({
   claimItem: mocks.claimItem,
@@ -50,6 +57,8 @@ describe('pan task CLI', () => {
     mocks.claimItem.mockReturnValue({ status: 'in_progress', claimedBy: 'agent-pan-1' });
     mocks.markItemDone.mockResolvedValue({ status: 'completed', doneAt: 'now' });
     mocks.commit.mockResolvedValue({ committed: true, sha: 'abc' });
+    mocks.repos.mockReturnValue(null);
+    mocks.repoRoots.mockReturnValue(['.']);
   });
 
   it('registers exactly the eight task verbs', () => {
@@ -70,9 +79,51 @@ describe('pan task CLI', () => {
       '/tmp/test/workspaces/feature-pan-1',
       'PAN-1',
       'PAN-1-a',
-      { requireTrailer: 'Item: PAN-1-a', requirePushed: true },
+      {
+        requireTrailer: 'Item: PAN-1-a',
+        requirePushed: true,
+        repoRoots: ['/tmp/test/workspaces/feature-pan-1'],
+      },
     );
     expect(mocks.commit).toHaveBeenCalled();
+  });
+
+  it('done searches every repository root of a polyrepo workspace', async () => {
+    mocks.repoRoots.mockReturnValue(['api', 'web']);
+
+    await program().parseAsync(['node', 'pan', 'task', 'done', 'PAN-1', 'PAN-1-a']);
+
+    expect(mocks.markItemDone).toHaveBeenCalledWith(
+      '/tmp/test/workspaces/feature-pan-1',
+      'PAN-1',
+      'PAN-1-a',
+      expect.objectContaining({
+        repoRoots: [
+          '/tmp/test/workspaces/feature-pan-1/api',
+          '/tmp/test/workspaces/feature-pan-1/web',
+          '/tmp/test/workspaces/feature-pan-1',
+        ],
+      }),
+    );
+  });
+
+  it('done fails loudly when the continue file cannot be committed', async () => {
+    mocks.commit.mockResolvedValue({ committed: false, reason: 'pre-commit hook refused' });
+    const errors: string[] = [];
+    vi.mocked(console.error).mockImplementation((message: unknown) => { errors.push(String(message)); });
+
+    await program().parseAsync(['node', 'pan', 'task', 'done', 'PAN-1', 'PAN-1-a']);
+
+    expect(process.exitCode).toBe(1);
+    expect(errors.join('\n')).toContain('pre-commit hook refused');
+  });
+
+  it('done stays silent when there was nothing to commit', async () => {
+    mocks.commit.mockResolvedValue({ committed: false, reason: 'nothing to commit' });
+
+    await program().parseAsync(['node', 'pan', 'task', 'done', 'PAN-1', 'PAN-1-a']);
+
+    expect(process.exitCode).toBeUndefined();
   });
 
   it('done refuses in plain English and writes nothing when git cannot corroborate it', async () => {

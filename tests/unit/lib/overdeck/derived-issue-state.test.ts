@@ -1,115 +1,146 @@
 /**
- * The FR-6 derivation table (PAN-3917 W9).
+ * The one FR-6 derivation (PAN-3917), shared by `pan show` and the dashboard.
  *
- * Every state here is computed from an owner — the tracker, the pull request,
- * git, the backend — and none of them is ever stored, so the only thing worth
- * pinning is the precedence between the rules.
+ * The nine-row table itself is pinned in
+ * `src/dashboard/server/services/__tests__/derived-issue-state.test.ts`, which
+ * exercises the same exports through the server adapter. What matters here is
+ * the loader contract: who owns each fact, and what an unanswered tracker read
+ * is allowed to mean.
  */
 
-import { describe, expect, it } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
-  deriveIssueAttention,
   deriveIssueState,
-  type IssueStateInputs,
-  type PullRequestFacts,
+  getDerivedIssueState,
+  loadIssueStateFacts,
+  specExistsFor,
+  type IssueStateFacts,
 } from '../../../../src/lib/overdeck/derived-issue-state.js';
 
-const base: IssueStateInputs = {
-  issueOpen: true,
-  parked: false,
-  specExists: false,
-  pr: null,
-  branchAheadOfMain: false,
-  livePanes: 0,
-};
+const NOW = 1_800_000_000_000;
 
-function pr(overrides: Partial<PullRequestFacts> = {}): PullRequestFacts {
+function facts(overrides: Partial<IssueStateFacts> = {}): IssueStateFacts {
   return {
-    state: 'OPEN',
-    isDraft: false,
-    reviewDecision: null,
-    mergeable: 'UNKNOWN',
-    checksGreen: false,
+    issueId: 'PAN-3917',
+    issueOpen: true,
+    labels: [],
+    parkedListed: false,
+    specExists: false,
+    panes: [],
+    prMerged: false,
+    apiError: false,
+    now: NOW,
     ...overrides,
   };
 }
 
-describe('deriveIssueState', () => {
-  it('backlog: open, no spec, no branch, no pane', () => {
-    expect(deriveIssueState(base)).toBe('backlog');
+/** Offline loader deps: nothing here may touch a tracker, a forge, or tmux. */
+const offline = {
+  now: () => NOW,
+  panes: [],
+  readPr: async () => null,
+  readBranch: async () => null,
+  readPaneText: async () => '',
+};
+
+describe('the tracker owns closed', () => {
+  it('a closed issue is closed even with an open pull request', async () => {
+    const derived = await getDerivedIssueState('PAN-3917', {
+      ...offline,
+      readIssue: async () => ({ open: false, labels: [] }),
+      readPr: async () => ({
+        url: 'https://example.test/pr/1', number: 1, reviewState: 'review-requested' as const,
+        checks: 'pending' as const, mergeable: null, merged: false,
+      }),
+    });
+    expect(derived.state).toBe('closed');
   });
 
-  it('parked: the parked list names it and no work has started', () => {
-    expect(deriveIssueState({ ...base, parked: true })).toBe('parked');
+  it('an unresolved tracker read is unknown, never open', async () => {
+    const loaded = await loadIssueStateFacts('PAN-3917', { ...offline, readIssue: async () => null });
+    expect(loaded.issueOpen).toBeNull();
+
+    const derived = await getDerivedIssueState('PAN-3917', { ...offline, readIssue: async () => null });
+    expect(derived.state).not.toBe('closed');
+    expect(derived.trackerUnknown).toBe(true);
   });
 
-  it('planned: a spec file exists', () => {
-    expect(deriveIssueState({ ...base, specExists: true })).toBe('planned');
+  it('carries no unknown flag once a tracker has answered', async () => {
+    const derived = await getDerivedIssueState('PAN-3917', {
+      ...offline,
+      readIssue: async () => ({ open: true, labels: [] }),
+    });
+    expect(derived.trackerUnknown).toBeUndefined();
+    expect(deriveIssueState(facts({ issueOpen: true })).trackerUnknown).toBeUndefined();
   });
 
-  it('working: a live pane carries the issue token', () => {
-    expect(deriveIssueState({ ...base, specExists: true, livePanes: 1 })).toBe('working');
-  });
-
-  it('working: the branch is ahead of main with no pull request', () => {
-    expect(deriveIssueState({ ...base, specExists: true, branchAheadOfMain: true })).toBe('working');
-  });
-
-  it('in review: the pull request is open and not a draft', () => {
-    expect(deriveIssueState({ ...base, pr: pr(), branchAheadOfMain: true })).toBe('in review');
-  });
-
-  it('in review: a draft pull request with a live reviewer pane', () => {
-    expect(deriveIssueState({ ...base, pr: pr({ isDraft: true }), liveReviewPanes: 1 })).toBe('in review');
-  });
-
-  it('changes requested: the latest review state says so', () => {
-    expect(deriveIssueState({ ...base, pr: pr({ reviewDecision: 'CHANGES_REQUESTED' }) })).toBe('changes requested');
-  });
-
-  it('ready: approved, checks green, mergeable', () => {
-    const inputs = { ...base, pr: pr({ reviewDecision: 'APPROVED', checksGreen: true, mergeable: 'MERGEABLE' as const }) };
-    expect(deriveIssueState(inputs)).toBe('ready');
-  });
-
-  it('not ready while the checks are red, even when approved', () => {
-    const inputs = { ...base, pr: pr({ reviewDecision: 'APPROVED', checksGreen: false, mergeable: 'MERGEABLE' as const }) };
-    expect(deriveIssueState(inputs)).toBe('in review');
-  });
-
-  it('not ready while the pull request conflicts, even when approved and green', () => {
-    const inputs = { ...base, pr: pr({ reviewDecision: 'APPROVED', checksGreen: true, mergeable: 'CONFLICTING' as const }) };
-    expect(deriveIssueState(inputs)).toBe('in review');
-  });
-
-  it('merged: the pull request merged, even with a pane still alive', () => {
-    expect(deriveIssueState({ ...base, pr: pr({ state: 'MERGED' }), livePanes: 2 })).toBe('merged');
-  });
-
-  it('closed outranks everything', () => {
-    expect(deriveIssueState({ ...base, issueOpen: false, pr: pr({ state: 'MERGED' }), livePanes: 1 })).toBe('closed');
-  });
-
-  it('a live pane outranks the parked list', () => {
-    expect(deriveIssueState({ ...base, parked: true, livePanes: 1 })).toBe('working');
+  it('only a tracker answer of "closed" closes the issue', () => {
+    expect(deriveIssueState(facts({ issueOpen: false })).state).toBe('closed');
+    expect(deriveIssueState(facts({ issueOpen: null })).state).toBe('backlog');
   });
 });
 
-describe('deriveIssueAttention', () => {
-  it('is nothing when the issue is moving', () => {
-    expect(deriveIssueAttention({ blockedPanes: 0, idleWithUnpushedWork: false, apiError: false })).toBeNull();
+describe('the plan home owns the spec', () => {
+  let projectPath: string;
+
+  beforeEach(() => {
+    projectPath = mkdtempSync(join(tmpdir(), 'derived-issue-state-'));
   });
 
-  it('api error outranks needs you and stuck', () => {
-    expect(deriveIssueAttention({ blockedPanes: 1, idleWithUnpushedWork: true, apiError: true })).toBe('api error');
+  afterEach(() => {
+    rmSync(projectPath, { recursive: true, force: true });
   });
 
-  it('needs you outranks stuck', () => {
-    expect(deriveIssueAttention({ blockedPanes: 1, idleWithUnpushedWork: true, apiError: false })).toBe('needs you');
+  function writeSpec(root: string, name: string): void {
+    const dir = join(root, '.pan', 'specs');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, name), '{}\n', 'utf8');
+  }
+
+  it('finds the promoted, dated spec in the main checkout', () => {
+    writeSpec(projectPath, '2026-07-28-PAN-1-some-feature.xbrief.json');
+    expect(specExistsFor('PAN-1', projectPath)).toBe(true);
   });
 
-  it('stuck: idle with unpushed work', () => {
-    expect(deriveIssueAttention({ blockedPanes: 0, idleWithUnpushedWork: true, apiError: false })).toBe('stuck');
+  it('finds the legacy .vbrief spec name too', () => {
+    writeSpec(projectPath, '2026-01-01-PAN-1-some-feature.vbrief.json');
+    expect(specExistsFor('PAN-1', projectPath)).toBe(true);
+  });
+
+  it('finds the spec the planning agent wrote in the issue workspace', () => {
+    writeSpec(join(projectPath, 'workspaces', 'feature-pan-1'), '2026-07-28-PAN-1-some-feature.xbrief.json');
+    expect(specExistsFor('PAN-1', projectPath)).toBe(true);
+  });
+
+  it('accepts the bare <ISSUE>.xbrief.json name as well', () => {
+    writeSpec(projectPath, 'PAN-1.xbrief.json');
+    expect(specExistsFor('PAN-1', projectPath)).toBe(true);
+  });
+
+  it('reports no spec when neither plan home has one', () => {
+    writeSpec(projectPath, '2026-07-28-PAN-2-another-issue.xbrief.json');
+    expect(specExistsFor('PAN-1', projectPath)).toBe(false);
+  });
+});
+
+describe('the backend owns liveness', () => {
+  it('a live reviewer pane is in review even with no pull request', () => {
+    const pane = {
+      id: 'w1:p2', issue: 'PAN-3917', role: 'review' as const, harness: 'claude-code',
+      model: 'opus', state: 'working' as const, stateSince: NOW, terminalId: 'w1:p2',
+    };
+    expect(deriveIssueState(facts({ panes: [pane] })).state).toBe('in-review');
+  });
+
+  it('a blocked pane is the operator\'s move', () => {
+    const pane = {
+      id: 'w1:p1', issue: 'PAN-3917', role: 'work' as const, harness: 'claude-code',
+      model: 'opus', state: 'blocked' as const, stateSince: NOW, terminalId: 'w1:p1',
+    };
+    expect(deriveIssueState(facts({ panes: [pane] })).attention).toBe('needs-you');
   });
 });
