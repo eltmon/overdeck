@@ -1,4 +1,4 @@
-import type { IssuePipelineMembership } from '@overdeck/contracts';
+import type { IssuePipelineMembership, IssueState as DerivedIssueStateName } from '@overdeck/contracts';
 
 export type {
   AgentHealthSnapshot as AgentHealth,
@@ -347,8 +347,6 @@ export interface SpawnGateSnapshot {
   }>;
 }
 
-export type ResourceStackPhase = 'merged' | 'ship' | 'review' | 'work' | 'plan' | 'ready' | 'todo';
-
 export interface ResourceStack {
   id: string;
   issueId: string | null;
@@ -361,7 +359,8 @@ export interface ResourceStack {
     memoryBytes: number;
     diskBytes: number;
   };
-  phase: ResourceStackPhase;
+  /** The issue's derived state (PAN-3917 FR-6); `null` for a stack with no issue. */
+  state: DerivedIssueStateName | null;
   idleMinutes?: number;
   uatUrl?: string;
 }

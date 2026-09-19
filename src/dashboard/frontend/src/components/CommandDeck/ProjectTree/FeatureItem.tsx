@@ -359,15 +359,6 @@ type AggregateBadge =
   | { key: 'review-error'; label: string; tone: 'error' };
 
 /** Compact age label for the paused badge (PAN-1779): 99h / 3d. */
-function formatPausedAge(pausedAt?: string): string | null {
-  if (!pausedAt) return null;
-  const ms = Date.now() - new Date(pausedAt).getTime();
-  if (Number.isNaN(ms) || ms < 0) return null;
-  const hours = Math.floor(ms / 3_600_000);
-  if (hours < 1) return `${Math.max(1, Math.floor(ms / 60_000))}m`;
-  if (hours < 48) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
-}
 
 function formatRoleList(roles: readonly string[]): string {
   if (roles.length === 0) return '';
@@ -880,7 +871,6 @@ export function derivePipeline(feature: ProjectFeature, sessions: readonly Sessi
     if (isReady && i === 4) return 'done';
     const phaseSessions = byPhase[i];
     if (phaseSessions.length === 0) return 'done';
-    if (phaseSessions.some((s) => s.paused === true)) return 'paused';
     if (phaseSessions.some((s) => s.status === 'error')) return 'error';
     if (phaseSessions.some((s) => s.status === 'running' || s.status === 'starting')) return 'working';
     return 'done';
@@ -970,11 +960,6 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
   // mergeable), never a stored isReadyToMerge flag.
   const isReady = useDerivedIssueState(feature.issueId)?.state === 'ready';
 
-  // PAN-1779: surface the pause gate at the issue level — paused agents are
-  // deliberately parked and must never read as generic "stopped".
-  const pausedSession = feature.sessions?.find((s) => s.paused === true);
-  const pausedAge = formatPausedAge(pausedSession?.pausedAt);
-
   const aggregateSessions = feature.sessions?.filter(isWorkOrSpecialistSession) ?? [];
   const activityState = getAggregateActivityState(aggregateSessions);
   const activitySummary = buildActivitySummary(aggregateSessions);
@@ -994,9 +979,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
   const hasRunningSession = aggregateSessions.some(isRunningSession);
   const edgeClass = (hasErrorSession
     ? styles.featureItemWrapperError
-    : pausedSession
-      ? styles.featureItemWrapperPaused
-      : isReady
+    : isReady
         ? styles.featureItemWrapperReady
         : isDoneState
           ? styles.featureItemWrapperMerged
@@ -1119,29 +1102,6 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               ))}
             </span>
           )}
-          {pausedSession && (
-            <span className={styles.featureBadgeGroup} data-testid="feature-paused">
-              <span
-                className={`${styles.featureBadge} ${styles.featureBadge_paused}`}
-                title={pausedSession.pausedReason ? `Paused: ${pausedSession.pausedReason}` : 'Agent is paused'}
-              >
-                ⏸ Paused{pausedAge ? ` ${pausedAge}` : ''}
-              </span>
-              {onUnpauseSession && (
-                <span
-                  role="button"
-                  tabIndex={-1}
-                  data-testid="feature-unpause"
-                  className={styles.unpauseBtn}
-                  title={pausedSession.pausedReason ? `Unpause — paused: ${pausedSession.pausedReason}` : 'Unpause this agent'}
-                  onClick={(e) => { e.stopPropagation(); onUnpauseSession(pausedSession.sessionId); }}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onUnpauseSession(pausedSession.sessionId); } }}
-                >
-                  ▶ Unpause
-                </span>
-              )}
-            </span>
-          )}
           {feature.isRally && feature.childCount != null && feature.childCount > 0 ? (
             <span className={styles.featureState} title={`${feature.completedCount || 0}/${feature.childCount} stories done${feature.inProgressCount ? `, ${feature.inProgressCount} active` : ''}${progressPct !== null ? ` (${progressPct}% complete)` : ''}`}>
               {feature.completedCount || 0}/{feature.childCount}
@@ -1174,7 +1134,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               {feature.stateLabel}
             </span>
           )}
-          {isReady && !pausedSession && (
+          {isReady && (
             <span
               className={`${styles.featureBadge} ${styles.featureBadge_paused}`}
               data-testid="feature-ready"
