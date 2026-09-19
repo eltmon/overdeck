@@ -5,21 +5,23 @@
 // inventory is read live from Herdr or tmux and matched to issues by the
 // pane's metadata tokens.
 
-import type { AgentRole, AgentState } from "./terminal-backend"
+import { Schema } from "effect"
 
-export interface BackendPane {
+
+export const BackendPane = Schema.Struct({
   /** Stable pane identity: the backend-native pane handle. */
-  readonly id: string
+  id: Schema.String,
   /** Issue the pane belongs to; absent for operator conversations. */
-  readonly issue?: string
-  readonly role: AgentRole
-  readonly harness: string
-  readonly model: string
-  readonly state: AgentState
+  issue: Schema.optional(Schema.String),
+  role: Schema.Literals(["work", "worker", "review", "test", "uat", "strike", "plan"]),
+  harness: Schema.String,
+  model: Schema.String,
+  state: Schema.Literals(["idle", "working", "blocked", "done", "exited", "unknown"]),
   /** Epoch millis the pane entered `state`; drives the `stuck` attention. */
-  readonly stateSince?: number
+  stateSince: Schema.optional(Schema.Number),
   /** Handle the terminal WebSocket attaches to. */
-  readonly terminalId?: string
+  terminalId: Schema.optional(Schema.String),
   /** Working directory of the pane (the issue workspace path). */
-  readonly workspace?: string
-}
+  workspace: Schema.optional(Schema.String),
+})
+export type BackendPane = typeof BackendPane.Type

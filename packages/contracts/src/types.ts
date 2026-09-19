@@ -1,4 +1,6 @@
 import { Schema } from "effect"
+import { BackendPane } from "./backend-pane"
+import { DerivedIssueState } from "./derived-issue-state"
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
@@ -55,24 +57,6 @@ export type Role = typeof Role.Type
 
 export const AgentResolution = Schema.Literals(["working", "done", "needs_input", "stuck", "completed", "unclear", "abandoned", "api_error"])
 export type AgentResolution = typeof AgentResolution.Type
-
-export const ReviewStatusValue = Schema.Literals(["pending", "reviewing", "passed", "failed", "blocked", "skipped"])
-export type ReviewStatusValue = typeof ReviewStatusValue.Type
-
-export const TestStatusValue = Schema.Literals(["pending", "testing", "passed", "failed", "skipped", "dispatch_failed"])
-export type TestStatusValue = typeof TestStatusValue.Type
-
-export const UatStatusValue = Schema.Literals(["pending", "testing", "passed", "failed"])
-export type UatStatusValue = typeof UatStatusValue.Type
-
-export const MergeStatusValue = Schema.Literals(["pending", "queued", "merging", "verifying", "merged", "failed"])
-export type MergeStatusValue = typeof MergeStatusValue.Type
-
-export const ReleaseStatusValue = Schema.Literals(["pending", "releasing", "passed", "failed", "partial", "rolled_back", "skipped"])
-export type ReleaseStatusValue = typeof ReleaseStatusValue.Type
-
-export const VerificationStatusValue = Schema.Literals(["pending", "running", "passed", "failed", "skipped"])
-export type VerificationStatusValue = typeof VerificationStatusValue.Type
 
 // ─── Harness (PAN-636, PAN-1989) ─────────────────────────────────────────────
 // Identifies which coding-agent harness an agent is running under.
@@ -376,82 +360,9 @@ export type AgentSnapshot = typeof AgentSnapshot.Type
 // ─── Review / Pipeline ────────────────────────────────────────────────────────
 
 /** PAN-3151: A recorded cycle in the review convergence tracking series */
-export const ReviewCycleEntry = Schema.Struct({
-  cycle: Schema.Number,
-  runId: Schema.String,
-  atCommit: Schema.optional(Schema.String),
-  blockingCount: Schema.Number,
-  recordedAt: Schema.String,
-})
-export type ReviewCycleEntry = typeof ReviewCycleEntry.Type
 
-export const ReviewStatusSnapshot = Schema.Struct({
-  issueId: IssueId,
-  reviewStatus: Schema.optional(ReviewStatusValue),
-  testStatus: Schema.optional(TestStatusValue),
-  uatStatus: Schema.optional(UatStatusValue),
-  uatNotes: Schema.optional(Schema.String),
-  mergeStatus: Schema.optional(MergeStatusValue),
-  releaseStatus: Schema.optional(ReleaseStatusValue),
-  releaseNotes: Schema.optional(Schema.String),
-  verificationStatus: Schema.optional(VerificationStatusValue),
-  verificationNotes: Schema.optional(Schema.String),
-  verificationCycleCount: Schema.optional(Schema.Number),
-  readyForMerge: Schema.optional(Schema.Boolean),
-  updatedAt: Schema.optional(Schema.String),
-  prUrl: Schema.optional(Schema.String),
-  /** Persistent stuck flag — set by divergence guard, cleared by /unstick */
-  stuck: Schema.optional(Schema.Boolean),
-  stuckReason: Schema.optional(Schema.String),
-  stuckAt: Schema.optional(Schema.String),
-  stuckDetails: Schema.optional(Schema.String),
-  /** PAN-3151: review cycle history for convergence detection */
-  reviewCycleHistory: Schema.optional(Schema.Array(ReviewCycleEntry)),
-  /** Commit SHA at which review passed; deacon uses this to detect new pushes after review */
-  reviewedAtCommit: Schema.optional(Schema.String),
-  /** Commit SHA at which the pre-review verification gate last passed */
-  lastVerifiedCommit: Schema.optional(Schema.String),
-  /** Current merge pipeline step (granular visibility for the merge step tracker) */
-  mergeStep: Schema.optional(Schema.String),
-  /** PAN-699: timestamp when review agents were dispatched */
-  reviewSpawnedAt: Schema.optional(Schema.String),
-  /** PAN-699: number of test-agent dispatch retries */
-  testRetryCount: Schema.optional(Schema.Number),
-  /** PAN-794: parallel-review re-dispatch retry counter (current recovery cycle) */
-  reviewRetryCount: Schema.optional(Schema.Number),
-  /** PAN-796: review auto-requeue count (circuit breaker threshold) */
-  autoRequeueCount: Schema.optional(Schema.Number),
-  /** PAN-794: ISO timestamp marking the start of the current recovery cycle */
-  recoveryStartedAt: Schema.optional(Schema.String),
-  /** Human-requested patrol opt-out — when true, Deacon ignores this issue. */
-  deaconIgnored: Schema.optional(Schema.Boolean),
-  deaconIgnoredAt: Schema.optional(Schema.String),
-  deaconIgnoredReason: Schema.optional(Schema.String),
-  /** PAN-1691: per-issue auto-merge routing key. undefined = project default, true = auto-merge (fast lane), false = hold for UAT. */
-  autoMerge: Schema.optional(Schema.Boolean),
-  /** Active review orchestrator tmux session name (e.g. agent-pan-540-review). */
-  reviewCoordinatorSessionName: Schema.optional(Schema.String),
-  /** Active review sub-role tmux session names (e.g. agent-pan-540-review-correctness). Discovered at emission time. */
-  reviewSessionNames: Schema.optional(Schema.Array(Schema.String)),
-  /** Per-role review completion status (keyed by role: 'correctness' | 'security' | ...) */
-  reviewSubStatuses: Schema.optional(Schema.Record(Schema.String, Schema.Literals(["running", "done"]))),
-  /** PAN-905: queue position in the merge queue */
-  queuePosition: Schema.optional(Schema.Number),
-  /** PAN-905: currently active specialist (e.g. 'merge-agent') */
-  activeSpecialist: Schema.optional(Schema.String),
-  /** PAN-905: number of merge retries attempted */
-  mergeRetryCount: Schema.optional(Schema.Number),
-  /** PAN-905: free-form notes about the merge attempt */
-  mergeNotes: Schema.optional(Schema.String),
-  /** Merge blocker reasons surfaced to operators. */
-  blockerReasons: Schema.optional(Schema.Array(Schema.Struct({
-    type: Schema.Literals(['failing_checks', 'merge_conflict', 'unresolved_conversations', 'changes_requested', 'draft_pr', 'not_mergeable', 'unmerged_sibling_repo']),
-    summary: Schema.String,
-    details: Schema.optional(Schema.String),
-    detectedAt: Schema.String,
-  }))),
-})
-export type ReviewStatusSnapshot = typeof ReviewStatusSnapshot.Type
+
+
 
 // ─── Turn Diff ───────────────────────────────────────────────────────────────
 
@@ -597,7 +508,10 @@ export const DashboardSnapshot = Schema.Struct({
   sequence: SequenceNumber,
   agents: Schema.Array(AgentSnapshot),
   specialists: Schema.Array(Schema.Unknown),
-  reviewStatuses: Schema.Array(ReviewStatusSnapshot),
+  /** PAN-3917 FR-6: the derived pipeline state of every known issue. */
+  derivedIssueStates: Schema.Array(DerivedIssueState),
+  /** PAN-3917 FR-12: every live agent pane the terminal backend reports. */
+  backendPanes: Schema.Array(BackendPane),
   issues: Schema.Array(Schema.Unknown),  // Issues are complex — pass through unvalidated
   recentActivity: Schema.optional(Schema.Array(Schema.Unknown)),
   resources: Schema.optional(Schema.Unknown),

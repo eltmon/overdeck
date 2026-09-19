@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest"
 import { Schema } from "effect"
-import { getHarness, ReleaseStatusValue, ReviewStatusSnapshot } from "./types"
+import { getHarness } from "./types"
+import { DerivedIssueState } from "./derived-issue-state"
+import { BackendPane } from "./backend-pane"
 
-const decodeReleaseStatus = Schema.decodeUnknownSync(ReleaseStatusValue)
-const decodeReviewStatus = Schema.decodeUnknownSync(ReviewStatusSnapshot)
-const encodeReviewStatus = Schema.encodeSync(ReviewStatusSnapshot)
+const decodeDerived = Schema.decodeUnknownSync(DerivedIssueState)
+const encodeDerived = Schema.encodeSync(DerivedIssueState)
+const decodePane = Schema.decodeUnknownSync(BackendPane)
 
 describe("getHarness", () => {
   it("preserves the canonical ACP runtime literal", () => {
@@ -29,37 +31,38 @@ describe("getHarness", () => {
   })
 })
 
-describe("ReleaseStatusValue", () => {
-  it("accepts the allowed release status literals", () => {
-    const values = ["pending", "releasing", "passed", "failed", "partial", "rolled_back", "skipped"] as const
-    for (const value of values) {
-      expect(decodeReleaseStatus(value)).toBe(value)
+describe("DerivedIssueState", () => {
+  it("round-trips a full row", () => {
+    const input = {
+      issueId: "PAN-3917",
+      state: "ready",
+      attention: "needs-you",
+      pr: { url: "https://github.com/o/r/pull/1", number: 1, reviewState: "approved", checks: "green", mergeable: true },
     }
+    const decoded = decodeDerived(input)
+    expect(decoded).toEqual(input)
+    expect(encodeDerived(decoded)).toEqual(input)
   })
 
-  it("rejects any other string", () => {
-    expect(() => decodeReleaseStatus("unknown")).toThrow()
+  it("decodes the minimal row and rejects an unknown state", () => {
+    expect(decodeDerived({ issueId: "PAN-1", state: "backlog" })).toEqual({ issueId: "PAN-1", state: "backlog" })
+    expect(() => decodeDerived({ issueId: "PAN-1", state: "verifying" })).toThrow()
+  })
+
+  it("accepts a null mergeable — the forge has not computed it yet", () => {
+    const input = {
+      issueId: "PAN-2",
+      state: "in-review",
+      pr: { url: "u", number: 2, reviewState: "none", checks: "pending", mergeable: null },
+    }
+    expect(decodeDerived(input)).toEqual(input)
   })
 })
 
-describe("ReviewStatusSnapshot", () => {
-  it("decodes an object carrying releaseStatus and preserves it round-trip", () => {
-    const input = {
-      issueId: "PAN-399",
-      releaseStatus: "releasing",
-    }
-    const decoded = decodeReviewStatus(input)
-    expect(decoded).toEqual(input)
-    expect(encodeReviewStatus(decoded)).toEqual(input)
-  })
-
-  it("decodes when releaseStatus is omitted", () => {
-    const input = {
-      issueId: "PAN-399",
-      mergeStatus: "pending",
-    }
-    const decoded = decodeReviewStatus(input)
-    expect(decoded).toEqual(input)
-    expect(encodeReviewStatus(decoded)).toEqual(input)
+describe("BackendPane", () => {
+  it("decodes a pane and rejects an unknown pane state", () => {
+    const input = { id: "w1:p1", issue: "PAN-3917", role: "work", harness: "claude-code", model: "opus", state: "working" }
+    expect(decodePane(input)).toEqual(input)
+    expect(() => decodePane({ ...input, state: "running" })).toThrow()
   })
 })
