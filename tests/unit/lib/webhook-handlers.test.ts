@@ -10,6 +10,10 @@
 import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
+  getRequestReviewStarter,
+  registerRequestReviewStarter,
+} from '../../../src/lib/cloister/request-review-pipeline.js';
+import {
   handleCheckSuite,
   handleCheckRun,
   handleIssueComment,
@@ -289,6 +293,89 @@ describe('handlePullRequest', () => {
     })));
 
     expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('PAN-123');
+  });
+});
+
+describe('handlePullRequest → review pipeline (PAN-3917 W12)', () => {
+  const startReview = vi.fn(async () => ({ started: true as const }));
+
+  beforeEach(() => {
+    startReview.mockClear();
+    startReview.mockResolvedValue({ started: true as const });
+    registerRequestReviewStarter(startReview);
+  });
+
+  afterEach(() => {
+    registerRequestReviewStarter(null);
+  });
+
+  it('starts the review pipeline when a PR is opened', async () => {
+    await Effect.runPromise(handlePullRequest(makePayload({
+      action: 'opened',
+      pull_request: { number: 9, head: { ref: 'feature/pan-123', sha: 'abc' }, draft: false },
+    })));
+
+    expect(startReview).toHaveBeenCalledTimes(1);
+    expect(startReview.mock.calls[0]![0]).toBe('PAN-123');
+  });
+
+  it('starts the review pipeline when a draft PR is readied', async () => {
+    await Effect.runPromise(handlePullRequest(makePayload({
+      action: 'ready_for_review',
+      pull_request: { number: 9, head: { ref: 'feature/pan-123', sha: 'abc' }, draft: false },
+    })));
+
+    expect(startReview).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not start review for a draft PR, another action, or a merged PR', async () => {
+    await Effect.runPromise(handlePullRequest(makePayload({
+      action: 'opened',
+      pull_request: { number: 9, head: { ref: 'feature/pan-123', sha: 'abc' }, draft: true },
+    })));
+    await Effect.runPromise(handlePullRequest(makePayload({
+      action: 'synchronize',
+      pull_request: { number: 9, head: { ref: 'feature/pan-123', sha: 'abc' } },
+    })));
+    await Effect.runPromise(handlePullRequest(makePayload({
+      action: 'opened',
+      pull_request: { number: 9, head: { ref: 'feature/pan-123', sha: 'abc' }, state: 'closed', merged: true },
+    })));
+
+    expect(startReview).not.toHaveBeenCalled();
+  });
+
+  it('does not start review for an untracked repo or a branch with no issue', async () => {
+    await Effect.runPromise(handlePullRequest({
+      action: 'opened',
+      repository: { full_name: 'someone-else/repo' },
+      pull_request: { number: 9, head: { ref: 'feature/pan-123', sha: 'abc' } },
+    }));
+    await Effect.runPromise(handlePullRequest(makePayload({
+      action: 'opened',
+      pull_request: { number: 9, head: { ref: 'chore/cleanup', sha: 'abc' } },
+    })));
+
+    expect(startReview).not.toHaveBeenCalled();
+  });
+
+  it('a starter that rejects does not fail the webhook', async () => {
+    startReview.mockRejectedValue(new Error('dashboard is mid-restart'));
+
+    await expect(Effect.runPromise(handlePullRequest(makePayload({
+      action: 'opened',
+      pull_request: { number: 9, head: { ref: 'feature/pan-123', sha: 'abc' } },
+    })))).resolves.toBeUndefined();
+  });
+
+  it('no registered starter is not a failure', async () => {
+    registerRequestReviewStarter(null);
+    expect(getRequestReviewStarter()).toBeNull();
+
+    await expect(Effect.runPromise(handlePullRequest(makePayload({
+      action: 'opened',
+      pull_request: { number: 9, head: { ref: 'feature/pan-123', sha: 'abc' } },
+    })))).resolves.toBeUndefined();
   });
 });
 

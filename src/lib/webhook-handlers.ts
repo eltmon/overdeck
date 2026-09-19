@@ -254,6 +254,35 @@ async function handlePullRequestPromise(payload: WebhookPayload): Promise<void> 
     }
   }
 
+  // PAN-3917 (W12): a pull request that is open and not a draft IS the review
+  // request. `pan done` asks the dashboard directly, but a PR opened or readied
+  // by hand never called it, so the convoy never started. Start the same
+  // pipeline here; `requestReviewPipeline.isInFlight` coalesces the two callers
+  // and the whole path is best-effort — a webhook must never throw.
+  if (
+    (payload.action === 'opened' || payload.action === 'ready_for_review')
+    && pr.draft !== true
+    && pr.merged !== true
+    && (pr.state ?? 'open') !== 'closed'
+  ) {
+    try {
+      const { getRequestReviewStarter } = await import('./cloister/request-review-pipeline.js');
+      const startReview = getRequestReviewStarter();
+      if (!startReview) {
+        console.warn(`[webhook] No review starter registered — not starting review for ${issueId}`);
+      } else {
+        const outcome = await startReview(issueId, {
+          note: `PR ${payload.action} on ${repo}#${pr.number} — starting verification`,
+        });
+        if (!outcome.started) {
+          console.log(`[webhook] Review not started for ${issueId}: ${outcome.reason}`);
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[webhook] Failed to start the review pipeline for ${issueId}: ${err?.message ?? err}`);
+    }
+  }
+
   // PAN-1513: fire postMergeLifecycle when GitHub reports the PR closed+merged.
   // Without this, admin-merges (gh pr merge --admin) and any merge that doesn't
   // route through Overdeck's own merge flow leave work agents, strikes, tmux
