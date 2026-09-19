@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { chooseDispatchTier } from '../../src/lib/agents/dispatch-tier.js';
 import { resolveRegisteredSlotSpawn } from '../../src/lib/agents/spawn-prep.js';
 import { verifyAndMergeSlot } from '../../src/lib/agents/slot-merge.js';
-import { reconcileSlotState, type ReconciledSlotAgent, type ReconciledSlotBranch } from '../../src/lib/agents/slot-reconcile.js';
+import { reconcileSlotState, type ReconciledSlotAgent, type ReconciledSlotBranch } from '../../src/lib/cloister/swarm-slot-reconcile.js';
 import { lintPlanQuality } from '../../src/lib/xbrief/quality-lint.js';
 import { analyzeSwarmReadiness } from '../../src/lib/xbrief/swarm-readiness.js';
 import type { XBriefDocument, XBriefItem } from '../../src/lib/xbrief/types.js';
@@ -186,7 +186,7 @@ describe('foreman swarm dogfood', () => {
     const dispatchPath = [
       'src/lib/agents/dispatch-tier.ts',
       'src/lib/agents/spawn-prep.ts',
-      'src/lib/agents/slot-reconcile.ts',
+      'src/lib/cloister/swarm-slot-reconcile.ts',
     ].map(path => stripComments(readFileSync(path, 'utf-8'))).join('\n');
 
     expect(dispatchPath).not.toMatch(/PAN-1791|pan-1791/);
