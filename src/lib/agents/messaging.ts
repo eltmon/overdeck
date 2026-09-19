@@ -213,6 +213,7 @@ async function resumeThenDeliverKeyed(
   return {
     delivered: delivery.ok,
     queuedToMail: false,
+    ...(delivery.failure ? { reason: delivery.failure } : {}),
     ...(delivery.deduplicated ? { deduplicated: true } : {}),
   };
 }
@@ -576,6 +577,7 @@ export async function messageAgent(
     return {
       delivered: delivery.ok,
       queuedToMail: true,
+      ...(delivery.failure ? { reason: delivery.failure } : {}),
       ...(delivery.deduplicated ? { deduplicated: true } : {}),
     };
   }
@@ -725,6 +727,7 @@ export async function messageAgent(
     delivered: delivery.ok,
     queuedToMail: opts.dedupKey === undefined,
     confirmed: false,
+    ...(delivery.failure ? { reason: delivery.failure } : {}),
     ...(delivery.deduplicated ? { deduplicated: true } : {}),
   };
 }
