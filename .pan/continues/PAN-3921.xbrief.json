@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3921",
   "created": "2026-09-19T13:26:44.962Z",
-  "updated": "2026-09-19T13:26:44.962Z",
+  "updated": "2026-09-19T13:33:42.836Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "contracts-conversation-role": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3921",
-      "claimedAt": "2026-09-19T13:26:44.962Z"
+      "claimedAt": "2026-09-19T13:26:44.962Z",
+      "doneAt": "2026-09-19T13:33:42.836Z"
     }
   }
 }
