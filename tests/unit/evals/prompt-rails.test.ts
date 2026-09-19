@@ -62,8 +62,8 @@ describe('prompt load-bearing rails', () => {
     });
   });
 
-  describe('docs/flywheel-brief.md', () => {
-    const prompt = loadPromptFile('docs/flywheel-brief.md');
+  describe('sync-sources/skills/pan-flywheel/SKILL.md', () => {
+    const prompt = loadPromptFile('sync-sources/skills/pan-flywheel/SKILL.md');
 
     it('documents the auto_pickup_backlog switch', () => {
       expect(prompt).toContain('auto_pickup_backlog');

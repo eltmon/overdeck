@@ -10,7 +10,7 @@ Evalite runs every `*.eval.ts` file under `evals/` and stores local run data und
 
 ## Prompt-regression protection
 
-The flywheel soul-degradation incident showed that prompt files are load-bearing safety surfaces with zero mechanical protection. This directory now houses regression coverage for `roles/*.md` and `docs/flywheel-brief.md`.
+The flywheel soul-degradation incident showed that prompt files are load-bearing safety surfaces with zero mechanical protection. This directory now houses regression coverage for `roles/*.md` and `sync-sources/skills/pan-flywheel/SKILL.md`.
 
 ### Deterministic rail tests
 
@@ -44,7 +44,7 @@ OVERDECK_EVAL_MODEL=claude-haiku-4-5-20251001 npm run eval
 
 ### CI prompt gate
 
-A PR that diffs `roles/*.md` or `docs/flywheel-brief.md` must include a `Prompt-Change:` trailer in at least one commit. The gate is enforced by [`scripts/check-prompt-change-trailer.sh`](../scripts/check-prompt-change-trailer.sh), which runs in CI via the `prompt-gate` job and is also wired into `npm run lint` as `lint:prompt-trailer`.
+A PR that diffs `roles/*.md` or `sync-sources/skills/pan-flywheel/SKILL.md` must include a `Prompt-Change:` trailer in at least one commit. The gate is enforced by [`scripts/check-prompt-change-trailer.sh`](../scripts/check-prompt-change-trailer.sh), which runs in CI via the `prompt-gate` job and is also wired into `npm run lint` as `lint:prompt-trailer`.
 
 ## Current Target
 
