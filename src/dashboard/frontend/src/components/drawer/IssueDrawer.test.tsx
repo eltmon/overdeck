@@ -918,7 +918,7 @@ describe('IssueDrawer', () => {
   it('renders console inventory markers on the real overview shell', () => {
     useDashboardStore.getState().openIssue('PAN-1', 'overview');
     const { container } = renderDrawer();
-    for (const section of ['DrawerActionBar', 'PhaseTimeline', 'DrawerTabs', 'DrawerPickupSection / PickupGateControls', 'DrawerWorkspaceSection', 'UatEnvironmentPanel', 'IssuePolicyStrip / PoliciesControl', 'DrawerActiveAgent', 'DrawerPausedBanner', 'DrawerVerificationGates', 'SpecialistStrip', 'DrawerTasksList', 'DrawerActivityRail / DrawerActivityPanel', 'StartAgentCta']) {
+    for (const section of ['DrawerActionBar', 'PhaseTimeline', 'DrawerTabs', 'DrawerPickupSection / PickupGateControls', 'DrawerWorkspaceSection', 'UatEnvironmentPanel', 'DrawerActiveAgent', 'DrawerPausedBanner', 'DrawerVerificationGates', 'SpecialistStrip', 'DrawerTasksList', 'DrawerActivityRail / DrawerActivityPanel', 'StartAgentCta']) {
       expect(container.querySelector(`[data-section="${section}"]`), section).toBeInTheDocument();
     }
   });

@@ -142,10 +142,10 @@ describe('per-reviewer restart route', () => {
     );
 
     expect(result.status).toBe(200);
-    expect(mocks.saveAgentState).toHaveBeenCalledWith(expect.objectContaining({
-      reviewRunId: runId,
-      reviewContextManifestPath: join(reviewDir, 'context.json'),
-    }));
+    // PAN-3917: the repaired run id is read from the workspace artifacts and
+    // used for this dispatch. Nothing writes it back — the directory is the
+    // durable record.
+    expect(mocks.saveAgentState).not.toHaveBeenCalled();
     expect(mocks.spawnReviewSubRoleForIssue).toHaveBeenCalledWith(expect.objectContaining({
       workspace,
       runId,
