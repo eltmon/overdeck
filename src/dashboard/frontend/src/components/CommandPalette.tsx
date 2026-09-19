@@ -230,6 +230,12 @@ const SCOPE_LABEL: Record<PaletteScope, string> = {
   memory: 'Memory',
 };
 
+/** Scopes whose chip is always offered, even with zero results of that type.
+ *  Conversation hits only exist after a typed server search, so without this
+ *  the chip would be invisible on open (and Ctrl-J's initialScope='conversations'
+ *  would have nothing to pin to). */
+const PINNED_SCOPES: Exclude<PaletteScope, 'all'>[] = ['conversations'];
+
 /** Map a result group heading to the scope chip it belongs under. */
 function groupScope(group: string): Exclude<PaletteScope, 'all'> {
   if (group === 'Conversations') return 'conversations';
@@ -884,6 +890,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     // An action may answer to a chip its group does not imply, so the chip has
     // to be offered even when nothing else of that type is listed.
     for (const action of filtered) for (const s of action.alsoScopes ?? []) present.add(s);
+    for (const s of PINNED_SCOPES) present.add(s);
     const ordered = (['actions', 'commands', 'workspaces', 'issues', 'conversations', 'memory'] as const).filter((s) => present.has(s));
     return ordered.length > 1 ? ['all', ...ordered] : [];
   }, [groupOrder, filtered]);
@@ -950,6 +957,10 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
                   key={s}
                   type="button"
                   onClick={() => setScope(s)}
+                  // cmdk's Command root swallows Enter (to select the highlighted
+                  // result row) before the browser's default button-activation
+                  // fires, so a focused chip needs its own stop to be keyboard-activatable.
+                  onKeyDown={(e) => { if (e.key === 'Enter') e.stopPropagation(); }}
                   className={`text-[11px] px-2.5 py-1 rounded-full border whitespace-nowrap transition-colors ${
                     scope === s
                       ? 'bg-primary/15 border-primary/40 text-primary font-medium'
@@ -967,13 +978,15 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
             {isSearchLoading && query.trim().length >= 2 && (
               <div className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                Searching conversations & memory…
+                {scope === 'conversations' ? 'Searching conversations…' : 'Searching conversations & memory…'}
               </div>
             )}
             {visibleGroups.length === 0 ? (
               isSearchLoading && query.trim().length >= 2 ? null : (
                 <Command.Empty className="py-6 text-center text-sm text-muted-foreground">
-                  {query.trim().length === 0 ? 'Start typing…' : `No results for "${query}"`}
+                  {query.trim().length === 0
+                    ? (scope === 'conversations' ? 'Type to search conversations…' : 'Start typing…')
+                    : `No results for "${query}"`}
                 </Command.Empty>
               )
             ) : (

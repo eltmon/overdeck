@@ -588,3 +588,236 @@ describe('CommandPalette new-workspace action (PAN-3330 FR-6b)', () => {
     expect(document.querySelector('[role="option"][data-value="new-workspace"]')).toBeNull();
   });
 });
+
+describe('CommandPalette conversations scope chip (PAN-3705)', () => {
+  const conversation = (id: string, rank: number) => ({
+    sessionId: id,
+    conversationId: id,
+    projectId: 'overdeck',
+    projectKey: 'overdeck',
+    role: 'assistant',
+    ts: '2026-06-02T01:00:00.000Z',
+    byteOffset: rank,
+    displayContent: id,
+    excerpt: id,
+    excerptSegments: [{ text: id, match: true }],
+    rank,
+  });
+
+  const conversationValues = () => Array.from(document.querySelectorAll('[role="option"][data-value]'))
+    .map((option) => option.getAttribute('data-value'));
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    window.history.replaceState(null, '', '/');
+    useDashboardStore.setState({
+      drawer: { issueId: null, tab: 'overview' },
+      issuesRaw: [issue({ identifier: 'PAN-42', title: 'Alpha command issue' })],
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('renders a Conversations chip alongside the other type chips with zero conversation results (AC1)', () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      if (method === 'GET' && url.startsWith('/api/palette/search')) {
+        return Response.json({ observations: [], conversations: [], memory: [], summaries: [] });
+      }
+      return undefined;
+    });
+
+    renderCommandPalette();
+
+    expect(screen.getByRole('button', { name: 'Conversations' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Actions' })).toBeInTheDocument();
+  });
+
+  it('filters to only conversation rows when the Conversations chip is activated by click and by Enter (AC2)', async () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      if (method === 'GET' && url.startsWith('/api/palette/search')) {
+        return Response.json({
+          observations: [],
+          conversations: [conversation('hit-a', 1)],
+          memory: [],
+          summaries: [],
+        });
+      }
+      return undefined;
+    });
+
+    renderCommandPalette();
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'Alpha' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+
+    // Both an issue row and a conversation row are present before scoping.
+    expect(getOptionByValue('issue-PAN-42')).toBeInTheDocument();
+    expect(conversationValues().some((v) => v?.startsWith('conv-'))).toBe(true);
+
+    const chip = screen.getByRole('button', { name: 'Conversations' });
+    fireEvent.click(chip);
+    expect(conversationValues().every((v) => v?.startsWith('conv-'))).toBe(true);
+    expect(document.querySelector('[role="option"][data-value="issue-PAN-42"]')).toBeNull();
+
+    // Reset and repeat via Enter on the focused chip button — user-event
+    // replicates the browser's default "Enter activates a focused button"
+    // behavior, which a plain keydown fireEvent does not. The scope toggle
+    // itself is synchronous state, so switching off fake timers here (the
+    // debounced search above already settled) doesn't change what's asserted.
+    fireEvent.click(screen.getByRole('button', { name: 'All' }));
+    vi.useRealTimers();
+    const user = userEvent.setup();
+    // Re-query: the click above re-rendered the chip row.
+    const chipAgain = screen.getByRole('button', { name: 'Conversations' });
+    chipAgain.focus();
+    await user.keyboard('{Enter}');
+    expect(conversationValues().every((v) => v?.startsWith('conv-'))).toBe(true);
+    expect(document.querySelector('[role="option"][data-value="issue-PAN-42"]')).toBeNull();
+  });
+
+  it('shows every result type again once the All chip is activated (AC3)', async () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      if (method === 'GET' && url.startsWith('/api/palette/search')) {
+        return Response.json({
+          observations: [],
+          conversations: [conversation('hit-a', 1)],
+          memory: [],
+          summaries: [],
+        });
+      }
+      return undefined;
+    });
+
+    renderCommandPalette();
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'Alpha' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Conversations' }));
+    expect(document.querySelector('[role="option"][data-value="issue-PAN-42"]')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'All' }));
+    expect(getOptionByValue('issue-PAN-42')).toBeInTheDocument();
+    expect(conversationValues().some((v) => v?.startsWith('conv-'))).toBe(true);
+  });
+
+  it('keeps the Conversations scope active on open with initialScope, instead of resetting to All (AC4)', () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      if (method === 'GET' && url.startsWith('/api/palette/search')) {
+        return Response.json({ observations: [], conversations: [], memory: [], summaries: [] });
+      }
+      return undefined;
+    });
+
+    render(<CommandPalette isOpen onClose={vi.fn()} onNavigate={vi.fn()} initialScope="conversations" />);
+
+    const chip = screen.getByRole('button', { name: 'Conversations' });
+    expect(chip.className).toMatch(/text-primary/);
+    expect(document.querySelector('[role="option"][data-value="issue-PAN-42"]')).toBeNull();
+  });
+
+  it('renders conversation hits in ascending rank order under the Conversations scope (AC5)', async () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      if (method === 'GET' && url.startsWith('/api/palette/search')) {
+        return Response.json({
+          observations: [],
+          conversations: [conversation('second', 2), conversation('first', 1)],
+          memory: [],
+          summaries: [],
+        });
+      }
+      return undefined;
+    });
+
+    renderCommandPalette();
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'conversation' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Conversations' }));
+    expect(conversationValues()).toEqual(['conv-first-1', 'conv-second-2']);
+  });
+
+  it('shows scope-aware empty-query copy under the Conversations scope (AC1)', () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      if (method === 'GET' && url.startsWith('/api/palette/search')) {
+        return Response.json({ observations: [], conversations: [], memory: [], summaries: [] });
+      }
+      return undefined;
+    });
+
+    renderCommandPalette();
+    fireEvent.click(screen.getByRole('button', { name: 'Conversations' }));
+
+    expect(screen.getByText('Type to search conversations…')).toBeInTheDocument();
+    expect(screen.queryByText('Start typing…')).toBeNull();
+  });
+
+  it('shows scope-aware loading copy while a conversation search is in flight (AC2)', async () => {
+    let resolveSearch: (response: Response) => void = () => {};
+    const pendingSearch = new Promise<Response>((resolve) => { resolveSearch = resolve; });
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      if (method === 'GET' && url.startsWith('/api/palette/search')) return pendingSearch;
+      return undefined;
+    });
+
+    renderCommandPalette();
+    fireEvent.click(screen.getByRole('button', { name: 'Conversations' }));
+    // Query text matches the fixture issue, so the Issues chip stays available
+    // alongside the pinned Conversations chip while the search is in flight —
+    // otherwise the chip row briefly collapses to one entry and resets to All.
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'Alpha' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+
+    expect(screen.getByText('Searching conversations…')).toBeInTheDocument();
+    expect(screen.queryByText('Searching conversations & memory…')).toBeNull();
+
+    // Resolve the in-flight request so afterEach's assertNoUnexpectedRequests doesn't hang.
+    resolveSearch(Response.json({ observations: [], conversations: [], memory: [], summaries: [] }));
+    await act(async () => { await pendingSearch; });
+  });
+
+  it('falls back to the standard empty state on a 500 and keeps the Conversations scope active (AC3)', async () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      if (method === 'GET' && url.startsWith('/api/palette/search')) return new Response(null, { status: 500 });
+      return undefined;
+    });
+
+    renderCommandPalette();
+    fireEvent.click(screen.getByRole('button', { name: 'Conversations' }));
+    // Matches the fixture issue so the chip row (Issues + Conversations)
+    // survives the reset effect while the failed search settles.
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'Alpha' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+
+    // The Conversations scope excludes the (non-conversation) issue match too.
+    expect(screen.getByText('No results for "Alpha"')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Conversations' }).className).toMatch(/text-primary/);
+  });
+});
