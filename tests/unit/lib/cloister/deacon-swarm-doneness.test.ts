@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Effect } from 'effect';
 import type { XBriefDocument } from '../../../../src/lib/xbrief/types.js';
 import type { CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
-import { applyStatusOverrides } from '../../../../src/lib/xbrief/io.js';
+import { applyItemStatuses } from '../../../../src/lib/xbrief/io.js';
 import { getDispatchableItems } from '../../../../src/lib/xbrief/dag.js';
 
 const mocks = vi.hoisted(() => ({
@@ -24,9 +24,12 @@ vi.mock('../../../../src/lib/pan-dir/auto-commit.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
+  // PAN-3917: resolvePlanHome() asks projects.ts which repo owns `.pan/`.
+  resolveInfraRepo: (_project: unknown, checkoutRoot: string) => ({ repoPath: checkoutRoot }),
   listProjectsSync: mocks.listProjectsSync,
   findProjectByPathSync: () => null,
   getProjectSwarmHotspots: () => [],
+  getProjectSync: () => null,
   // PAN-2372 WI-2: getIssueRecordPathForWorkspace now routes through project
   // resolution. These coordination tests keep records at the workspace
   // .pan/records/ fixture path, so treat every issue as unregistered and let
@@ -176,35 +179,39 @@ function makeCoordinateDeps(
   };
 }
 
+/**
+ * PAN-3917: item progress lives in the issue's continue file, under the plan
+ * home — the project root here, since these fixtures register no project.
+ */
+function writeRecordOverrides(projectPath: string, issueLower: string, overrides: Record<string, string>): void {
+  const continuesDir = join(projectPath, '.pan', 'continues');
+  mkdirSync(continuesDir, { recursive: true });
+  const items = Object.fromEntries(Object.entries(overrides).map(([id, status]) => [id, { status }]));
+  writeFileSync(join(continuesDir, `${issueLower.toUpperCase()}.xbrief.json`), JSON.stringify({
+    version: '1',
+    issueId: issueLower.toUpperCase(),
+    created: '2026-01-01T00:00:00.000Z',
+    updated: '2026-01-01T00:00:00.000Z',
+    gitState: {},
+    decisions: [],
+    hazards: [],
+    resumePoint: null,
+    sessionHistory: [],
+    items,
+  }, null, 2));
+}
+
+
 describe('swarm item done-ness survives slot gc (continue-file item statuses)', () => {
   it('pure mechanism: a completed override removes the item from dispatchable set', () => {
     const doc = makeDoc('PAN-900', 3);
-    const merged = applyStatusOverrides(doc, { 'wi-1': 'completed' });
+    const merged = applyItemStatuses(doc, { 'wi-1': 'completed' });
 
     const dispatchable = getDispatchableItems(merged, new Set()).map(item => item.id);
     expect(dispatchable).toEqual(['wi-2', 'wi-3']);
     // The overlay must not mutate the source document.
     expect(doc.plan.items[0].status).toBe('pending');
   });
-
-  /** PAN-3917: item progress lives in the issue's continue file, in the repo. */
-  function writeRecordOverrides(projectPath: string, issueLower: string, overrides: Record<string, string>): void {
-    const continuesDir = join(projectPath, 'workspaces', `feature-${issueLower}`, '.pan', 'continues');
-    mkdirSync(continuesDir, { recursive: true });
-    const items = Object.fromEntries(Object.entries(overrides).map(([id, status]) => [id, { status }]));
-    writeFileSync(join(continuesDir, `${issueLower.toUpperCase()}.xbrief.json`), JSON.stringify({
-      version: '1',
-      issueId: issueLower.toUpperCase(),
-      created: '2026-01-01T00:00:00.000Z',
-      updated: '2026-01-01T00:00:00.000Z',
-      gitState: {},
-      decisions: [],
-      hazards: [],
-      resumePoint: null,
-      sessionHistory: [],
-      items,
-    }, null, 2));
-  }
 
   it('leaves issue-level finalization to the foreman when all items are override-completed', async () => {
     const { execFileSync } = await import('node:child_process');
@@ -309,17 +316,14 @@ describe('swarm endgame: merge/cleanup still runs when dispatch is no longer eli
     git('commit', '--allow-empty', '-m', 'base');
     git('branch', 'feature/pan-902-slot-1');
 
-    const recordsDir = join(workspacePath, '.pan', 'records');
-    mkdirSync(recordsDir, { recursive: true });
-    writeFileSync(join(recordsDir, 'pan-902.json'), JSON.stringify({
+    // PAN-3917: item progress is the issue's continue file and slot state is
+    // the slot ledger beside it — both under the plan home, both in the repo.
+    writeRecordOverrides(projectPath, 'pan-902', { 'wi-1': 'completed', 'wi-2': 'completed' });
+    writeFileSync(join(projectPath, '.pan', 'continues', 'PAN-902.slots.json'), JSON.stringify({
       issueId: 'PAN-902',
-      schemaVersion: 1,
-      items: { 'wi-1': { status: 'completed' }, 'wi-2': { status: 'completed' } },
-      swarm: {
-        slotAssignments: [
-          { slotIndex: 1, itemId: 'wi-1', agentId: 'agent-pan-902-slot-1', branch: 'feature/pan-902-slot-1', assignedAt: '2026-07-02T00:00:00.000Z' },
-        ],
-      },
+      slotAssignments: [
+        { slotIndex: 1, itemId: 'wi-1', agentId: 'agent-pan-902-slot-1', branch: 'feature/pan-902-slot-1', assignedAt: '2026-07-02T00:00:00.000Z' },
+      ],
     }, null, 2));
 
     const actions = await coordinateSwarmSlots({ manual: true });

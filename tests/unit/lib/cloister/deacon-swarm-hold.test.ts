@@ -22,9 +22,11 @@ vi.mock('../../../../src/lib/pan-dir/auto-commit.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
+  // PAN-3917: resolvePlanHome() asks projects.ts which repo owns `.pan/`.
+  resolveInfraRepo: (_project: unknown, checkoutRoot: string) => ({ repoPath: checkoutRoot }),
   listProjectsSync: mocks.listProjectsSync,
   findProjectByPathSync: (projectPath: string) =>
-    mocks.listProjectsSync().find(({ config }: { config: { path: string } }) => config.path === projectPath)?.config ?? null,
+    (mocks.listProjectsSync() ?? []).find(({ config }: { config: { path: string } }) => config.path === projectPath)?.config ?? null,
   // PAN-2372 WI-2: workspace-door record path now resolves the owning project;
   // these tests fixture records at the workspace .pan/records/ path, so treat
   // issues as unregistered and use the workspace-door fallback.
@@ -60,7 +62,6 @@ beforeEach(async () => {
   mocks.listProjectsSync.mockReset();
   mocks.readSwarmHold.mockReset();
   mocks.readSwarmHold.mockReturnValue(undefined);
-  mocks.setReviewStatusSync.mockReset();
   mocks.isDeaconGloballyPausedSync.mockReset();
   mocks.isDeaconGloballyPausedSync.mockReturnValue(false);
 });
@@ -209,6 +210,7 @@ function dispatchDeps(overrides: Partial<DispatchDeps> = {}): DispatchDeps {
     getMaxSlotIndex: vi.fn(() => 5),
     listSlotAssignments: vi.fn(() => []),
     runGitCommand: vi.fn(async () => undefined),
+    readSwarmHold: mocks.readSwarmHold,
     ...overrides,
   };
 }

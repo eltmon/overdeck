@@ -192,9 +192,12 @@ export async function defaultIsSlotWorktreeClean(slotWorkspacePath: string): Pro
 function porcelainPaths(porcelain: string): string[] {
   return porcelain
     .split('\n')
-    .map(line => line.trim())
+    .map(line => line.replace(/\s+$/, ''))
     .filter(Boolean)
     .map(line => {
+      // Porcelain v1 is two status columns plus a space, then the path. Never
+      // trim the leading columns away first: ' M src/foo.ts' would lose its
+      // first characters.
       const path = line.slice(3).trim();
       const renamed = path.split(' -> ');
       return (renamed[1] ?? renamed[0] ?? '').replace(/^"|"$/g, '');

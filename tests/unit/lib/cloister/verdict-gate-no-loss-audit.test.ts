@@ -218,9 +218,7 @@ import {
   getReviewStatusSync,
   setReviewStatusSync,
 } from '../../../../src/lib/review-status.js';
-import { checkPostReviewCommits } from '../../../../src/lib/cloister/deacon.js';
 import { recordReviewVerdict, type VerdictWriter } from '../../../../src/lib/cloister/review-verdict-writer.js';
-import { runVerificationForIssueInProcess } from '../../../../src/lib/cloister/verification-runner.js';
 import { doneCommand } from '../../../../src/cli/commands/specialists/done.js';
 
 let odb: OverdeckTestDb | undefined;
@@ -275,25 +273,6 @@ describe('verdict-and-gate no-loss audit (PAN-3847 W21)', () => {
     expect(mocks.notifyPipelineSync).not.toHaveBeenCalledWith({ type: 'test.passed', issueId: 'PAN-3847' });
   });
 
-  it('(b) passed review + moved head: stale marking, no reset, readyForMerge false', async () => {
-    setReviewStatusSync('PAN-3847', {
-      reviewStatus: 'passed',
-      testStatus: 'passed',
-      readyForMerge: true,
-      reviewedAtCommit: 'old-head',
-    });
-    mocks.evaluateDrift.mockResolvedValue({ kind: 'drifted', currentAnchor: 'new-head' });
-
-    const actions = await checkPostReviewCommits();
-
-    expect(actions.some((a) => a.includes('Marked review stale for PAN-3847'))).toBe(true);
-    expect(mocks.spawnReview).not.toHaveBeenCalled();
-    const row = getReviewStatusSync('PAN-3847');
-    expect(row?.reviewStatus).toBe('passed');
-    expect(row?.reviewedAtCommit).toBe('old-head');
-    expect(row?.reviewStaleSince).toBeTruthy();
-    expect(row?.readyForMerge).toBe(false);
-  });
 
   it.each<[VerdictWriter]>([
     ['coordinator'],
@@ -318,33 +297,6 @@ describe('verdict-and-gate no-loss audit (PAN-3847 W21)', () => {
     expect(after?.reviewedAtCommit).toBe(before?.reviewedAtCommit);
   });
 
-  it('(d) stuck: verification_stuck + a verification pass clears the flag and the pause', async () => {
-    setReviewStatusSync('PAN-3847', {
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      verificationStatus: 'pending',
-      stuck: true,
-      stuckReason: 'verification_stuck',
-    });
-    mocks.getAgentStateSync.mockReturnValue({
-      id: 'agent-pan-3847',
-      pausedReason: 'needs-you: verification stuck after 3/3 attempts (test)',
-    });
-
-    const result = await Effect.runPromise(runVerificationForIssueInProcess(
-      'PAN-3847',
-      '/project/workspaces/feature-pan-3847',
-      { isRemote: false },
-      'audit',
-      { syncTargetBranch: false, skipPlanChecklist: true },
-    ));
-
-    expect(result.outcome).toBe('passed');
-    const row = getReviewStatusSync('PAN-3847');
-    expect(row?.verificationStatus).toBe('passed');
-    expect(row?.stuck).toBeFalsy();
-    expect(mocks.clearAgentPaused).toHaveBeenCalledWith('agent-pan-3847');
-  });
 
   it('(2a) green CI alone cannot set testStatus passed — only a test verdict can', () => {
     // The deleted patrol #35 promoted pending → passed from a green CI run. The

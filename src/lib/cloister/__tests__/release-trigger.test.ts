@@ -1,20 +1,20 @@
+/**
+ * The post-merge release trigger (re-pointed by PAN-3917).
+ *
+ * `releaseStatus` was a row field three writers raced on: the trigger stamped
+ * `releasing`, the release engine stamped `passed`/`failed`, and the guard
+ * against a double release read it back. The guard is the only part that has to
+ * survive, and a merge only happens once per process, so a process-local set of
+ * issue ids does the whole job. The release engine's own output is the record
+ * of what the release did.
+ */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  getReviewStatusSync: vi.fn(),
-  setReviewStatusSync: vi.fn(),
   resolveProjectFromIssueSync: vi.fn(),
   getProjectSync: vi.fn(),
   runRelease: vi.fn(),
-}));
-
-vi.mock('../../review-status.js', () => ({
-  getReviewStatusSync: mocks.getReviewStatusSync,
-  setReviewStatusSync: mocks.setReviewStatusSync,
-  markWorkspaceStuck: vi.fn(),
-
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
+  emitActivityEntrySync: vi.fn(),
 }));
 
 vi.mock('../../projects.js', () => ({
@@ -27,7 +27,7 @@ vi.mock('../../release/release-engine.js', () => ({
 }));
 
 vi.mock('../../activity-logger.js', () => ({
-  emitActivityEntrySync: vi.fn(),
+  emitActivityEntrySync: mocks.emitActivityEntrySync,
   emitActivityTtsSync: vi.fn(),
   emitDashboardLifecycleSync: vi.fn(),
 }));
@@ -45,7 +45,6 @@ import { triggerPostMergeReleaseIfConfigured } from '../merge-agent.js';
 describe('post-merge release trigger', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getReviewStatusSync.mockReturnValue({ releaseStatus: undefined });
     mocks.resolveProjectFromIssueSync.mockReturnValue({ projectKey: 'overdeck', projectPath: '/repo/overdeck' });
     mocks.getProjectSync.mockReturnValue({
       name: 'Overdeck',
@@ -56,40 +55,30 @@ describe('post-merge release trigger', () => {
   });
 
   it('runs release once for a project with release config', async () => {
-    await triggerPostMergeReleaseIfConfigured('PAN-399', '/repo/overdeck');
+    await triggerPostMergeReleaseIfConfigured('PAN-3991', '/repo/overdeck');
 
     expect(mocks.runRelease).toHaveBeenCalledOnce();
-    expect(mocks.runRelease).toHaveBeenCalledWith('PAN-399', '/repo/overdeck');
-    expect(mocks.setReviewStatusSync).not.toHaveBeenCalledWith('PAN-399', expect.objectContaining({ releaseStatus: 'skipped' }));
+    expect(mocks.runRelease).toHaveBeenCalledWith('PAN-3991', '/repo/overdeck');
   });
 
-  it('marks release skipped when no release config exists', async () => {
+  it('does not run release for a project without release config', async () => {
     mocks.getProjectSync.mockReturnValue({ name: 'Overdeck', path: '/repo/overdeck' });
 
-    await triggerPostMergeReleaseIfConfigured('PAN-399', '/repo/overdeck');
+    await triggerPostMergeReleaseIfConfigured('PAN-3992', '/repo/overdeck');
 
     expect(mocks.runRelease).not.toHaveBeenCalled();
-    expect(mocks.setReviewStatusSync).toHaveBeenCalledWith('PAN-399', {
-      releaseStatus: 'skipped',
-      releaseNotes: 'No release config found for project.',
-    });
   });
 
-  it('does not run release again for an already released issue', async () => {
-    mocks.getReviewStatusSync.mockReturnValue({ releaseStatus: 'passed' });
+  it('does not run release twice for the same issue', async () => {
+    await triggerPostMergeReleaseIfConfigured('PAN-3993', '/repo/overdeck');
+    await triggerPostMergeReleaseIfConfigured('PAN-3993', '/repo/overdeck');
 
-    await triggerPostMergeReleaseIfConfigured('PAN-399', '/repo/overdeck');
-
-    expect(mocks.runRelease).not.toHaveBeenCalled();
-    expect(mocks.setReviewStatusSync).not.toHaveBeenCalled();
+    expect(mocks.runRelease).toHaveBeenCalledOnce();
   });
 
-  it('does not run release again while a release is already in progress', async () => {
-    mocks.getReviewStatusSync.mockReturnValue({ releaseStatus: 'releasing' });
+  it('a failing release never throws — the merge already landed', async () => {
+    mocks.runRelease.mockRejectedValue(new Error('registry unreachable'));
 
-    await triggerPostMergeReleaseIfConfigured('PAN-399', '/repo/overdeck');
-
-    expect(mocks.runRelease).not.toHaveBeenCalled();
-    expect(mocks.setReviewStatusSync).not.toHaveBeenCalled();
+    await expect(triggerPostMergeReleaseIfConfigured('PAN-3994', '/repo/overdeck')).resolves.toBeUndefined();
   });
 });

@@ -35,6 +35,9 @@ vi.mock('../../agents/liveness.js', () => ({
 vi.mock('../../projects.js', () => ({
   resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'test', projectPath: '/repo' })),
   getProjectSync: vi.fn(() => null),
+  // PAN-3917: resolvePlanHome() asks projects.ts which repo owns `.pan/`.
+  findProjectByPathSync: vi.fn(() => null),
+  resolveInfraRepo: (_project: unknown, checkoutRoot: string) => ({ repoPath: checkoutRoot }),
 }));
 vi.mock('../../pan-dir/record.js', () => ({
   readIssueRecordSync: vi.fn(() => null),

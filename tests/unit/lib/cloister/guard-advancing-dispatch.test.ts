@@ -11,6 +11,7 @@ const mockGetLatestSessionIdSync = vi.fn();
 const mockSaveAgentState = vi.fn();
 const mockResolveModel = vi.fn();
 const mockEmitActivityEntrySync = vi.fn();
+const mockGetPrFacts = vi.fn();
 
 vi.mock('../../../../src/lib/agents.js', () => ({
   spawnRun: (...args: Parameters<typeof mockSpawnRun>) => mockSpawnRun(...args),
@@ -21,6 +22,10 @@ vi.mock('../../../../src/lib/agents.js', () => ({
   saveAgentState: (...args: Parameters<typeof mockSaveAgentState>) => mockSaveAgentState(...args),
   resumeAgent: vi.fn(async () => ({ success: false })),
   wipeAgentStateDirs: vi.fn(),
+}));
+
+vi.mock('../../../../src/lib/cloister/pr-facts.js', () => ({
+  getPrFacts: (...args: Parameters<typeof mockGetPrFacts>) => mockGetPrFacts(...args),
 }));
 
 vi.mock('../../../../src/lib/cloister/merge-verification.js', () => ({
@@ -94,21 +99,24 @@ describe('guard-advancing-dispatch', () => {
     vi.clearAllMocks();
     mockSessionExists.mockReturnValue(Effect.succeed(false));
   });
+  // PAN-3917 (FR-8): the test role runs against a pull request, so the dispatch
+  // gate is the PR's own state, not a stored merge status.
   it('test-agent-queue Effect variant skips spawnRun when the PR is already merged', async () => {
     mockResolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/project' });
-    mockShouldSkipDispatchAsMerged.mockResolvedValue({ skip: true, reason: 'GitHub PR #2420 is merged' });
+    mockGetPrFacts.mockResolvedValue({ issueId: 'PAN-2420', exists: true, open: false, merged: true });
     mockSpawnRun.mockRejectedValue(new Error('spawnRun should not be called'));
 
     const result = await Effect.runPromise(dispatchTestAgentAndNotify('PAN-2420', '/tmp/workspace', 'feature/pan-2420'));
 
-    expect(mockShouldSkipDispatchAsMerged).toHaveBeenCalledWith('PAN-2420');
+    expect(mockGetPrFacts).toHaveBeenCalledWith('PAN-2420');
     expect(mockSpawnRun).not.toHaveBeenCalled();
     expect(result.delivered).toBe(false);
+    expect(result.reason).toBe('no-open-pr');
   });
 
   it('test-agent-queue Effect variant still dispatches when the PR is open', async () => {
     mockResolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/project' });
-    mockShouldSkipDispatchAsMerged.mockResolvedValue({ skip: false, reason: 'open' });
+    mockGetPrFacts.mockResolvedValue({ issueId: 'PAN-2420', exists: true, open: true, merged: false });
     mockSpawnRun.mockResolvedValue({ id: 'test-run-123' });
 
     const result = await Effect.runPromise(dispatchTestAgentAndNotify('PAN-2420', '/tmp/workspace', 'feature/pan-2420'));

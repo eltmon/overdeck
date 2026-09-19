@@ -62,21 +62,23 @@ function promoteDeps(gen: UatGeneration, order: string[] = []): UatPromoteDeps {
     teardownStack: async () => {},
     firePostMerge: issueId => { order.push(`post:${issueId}`); return true; },
     memberEligibility: () => ({ eligible: true }),
-    recordVerification: () => { order.push('verification'); },
     runShip: async () => { order.push('ship'); },
     log: () => {},
   };
 }
 
 describe('promote ship ordering', () => {
-  it('runs ship once after verification and before the member post-merge fan-out', async () => {
+  // PAN-3917: the promoted batch no longer stamps a verification verdict of its
+  // own — the members' PRs carry their checks. Ship still runs once, ahead of
+  // the per-member post-merge fan-out.
+  it('runs ship once before the member post-merge fan-out', async () => {
     const order: string[] = [];
     const deps = promoteDeps(generation(), order);
 
     const result = await promoteUatGeneration(BATCH, PROJECT_ROOT, deps, { shipVersion: '1.2.3' });
 
     expect(result.success).toBe(true);
-    expect(order).toEqual(['verification', 'ship', 'post:PAN-1', 'post:PAN-2']);
+    expect(order).toEqual(['ship', 'post:PAN-1', 'post:PAN-2']);
     expect(deps.store.get(BATCH)?.repos?.[0]).toMatchObject({
       repoPath: PROJECT_ROOT,
       mergeSha: 'merge-sha',

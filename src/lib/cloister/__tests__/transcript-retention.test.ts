@@ -146,9 +146,11 @@ describe('sweepTranscriptRetention', () => {
       agent,
       { ...agent, id: 'planning-pan-3357' },
     ]);
+    // PAN-3917: terminal means the forge says the PR merged, not a closeOut
+    // flag on a record.
     const isTerminalAgent = vi.fn((candidate) => isTranscriptRetentionTerminalAgent(
       candidate,
-      () => ({ pipeline: { closedOut: true } }),
+      async () => ({ merged: true }),
     ));
 
     const actions = await sweepTranscriptRetention({
@@ -188,7 +190,7 @@ describe('sweepTranscriptRetention', () => {
     }]);
     const isTerminalAgent = vi.fn((agent) => isTranscriptRetentionTerminalAgent(
       agent,
-      () => ({ pipeline: { closedOut: false } }),
+      async () => ({ merged: false }),
     ));
 
     const actions = await sweepTranscriptRetention({

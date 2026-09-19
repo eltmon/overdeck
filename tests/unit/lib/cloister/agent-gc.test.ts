@@ -39,7 +39,6 @@ function gcDeps(overrides: Partial<AgentGcDeps> = {}): AgentGcDeps {
     listFilesToRemove: vi.fn(async () => []),
     hasRetainedMarker: vi.fn(async () => false),
     markRetained: vi.fn(async () => {}),
-    writeTombstone: vi.fn(async () => {}),
     emitPruneEvent: vi.fn(),
     removeRecord: vi.fn(),
     tombstoneRecord: vi.fn(),
@@ -159,16 +158,19 @@ describe('PAN-3513 live terminality confirmation', () => {
     );
 
     expect(result).toEqual({ removed: ['agent-pan-2503'], preserved: [] });
-    expect(deps.writeTombstone).not.toHaveBeenCalled();
+    expect(deps.emitPruneEvent).not.toHaveBeenCalled();
     expect(deps.cleanStateDir).not.toHaveBeenCalled();
     expect(deps.removeRecord).not.toHaveBeenCalled();
   });
 
-  it('writes and emits the live predicate tombstone before cleanup', async () => {
+  // PAN-3917: the GC used to push a durable tombstone to the agent plane on the
+  // state branch before it was allowed to delete local state. The branch is
+  // gone; the prune event on the activity stream carries the same evidence and
+  // is what an operator reads afterwards either way.
+  it('emits the live predicate on the prune event before cleanup', async () => {
     const candidate = agent('agent-pan-2503', 'stopped', 'work');
     const deps = terminalityDeps();
     const order: string[] = [];
-    const writeTombstone = vi.fn(async () => { order.push('tombstone'); });
     const emitPruneEvent = vi.fn(() => { order.push('event'); });
     const cleanStateDir = vi.fn(async () => {
       order.push('cleanup');
@@ -182,15 +184,14 @@ describe('PAN-3513 live terminality confirmation', () => {
     const result = await pruneTerminalStoppedAgents([candidate], gcDeps({
       cleanStateDir,
       listFilesToRemove: vi.fn(async () => ['session.id', 'runtime.json']),
-      writeTombstone,
       emitPruneEvent,
       removeRecord,
       isTerminalAgent: (row) => resolveLiveAgentTerminalityEvidence(row, deps),
     }));
 
     expect(result).toEqual({ removed: ['agent-pan-2503'], preserved: [] });
-    expect(order).toEqual(['tombstone', 'event', 'cleanup']);
-    expect(writeTombstone).toHaveBeenCalledWith(candidate, expect.objectContaining({
+    expect(order).toEqual(['event', 'cleanup']);
+    expect(emitPruneEvent).toHaveBeenCalledWith(candidate, expect.objectContaining({
       event: 'tombstoned',
       predicate: {
         closedOutFlag: true,
@@ -203,21 +204,5 @@ describe('PAN-3513 live terminality confirmation', () => {
     }));
     expect(cleanStateDir).toHaveBeenCalledWith('/agents/agent-pan-2503', '/agents');
     expect(removeRecord).toHaveBeenCalledWith('agent-pan-2503');
-  });
-
-  it('preserves local state when the durable tombstone fails', async () => {
-    const candidate = agent('agent-pan-2503', 'stopped', 'work');
-    const cleanStateDir = vi.fn();
-    const emitPruneEvent = vi.fn();
-    const result = await pruneTerminalStoppedAgents([candidate], gcDeps({
-      cleanStateDir,
-      writeTombstone: vi.fn(async () => { throw new Error('state push failed'); }),
-      emitPruneEvent,
-      isTerminalAgent: vi.fn(() => true),
-    }));
-
-    expect(result).toEqual({ removed: [], preserved: ['agent-pan-2503'] });
-    expect(emitPruneEvent).not.toHaveBeenCalled();
-    expect(cleanStateDir).not.toHaveBeenCalled();
   });
 });

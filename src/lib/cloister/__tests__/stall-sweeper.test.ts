@@ -29,12 +29,11 @@ import {
 } from '../stall-sweeper.js';
 import { writeSweeperRowState, writeSweeperSignature } from '../stall-sweeper-state.js';
 import type { ParkedRow } from '../../parked/resolver.js';
-import type { SynthesisArtifactVerdict } from '../synthesis-verdict.js';
 
 function parkedRow(overrides: Partial<ParkedRow>): ParkedRow {
   return {
     issueId: 'PAN-1',
-    orbit: 'stuck-flag',
+    orbit: 'idle-running',
     parkedAt: new Date(NOW - 5 * HOUR).toISOString(),
     parkReason: 'test park reason',
     unparkCondition: 'test release condition',
@@ -52,14 +51,13 @@ interface Harness {
 
 function harness(
   rows: ParkedRow[],
-  opts: { liveAgents?: string[]; artifact?: SynthesisArtifactVerdict | null } = {},
+  opts: { liveAgents?: string[] } = {},
 ): Harness {
   const calls: Harness['calls'] = { events: [], activity: [] };
   const live = new Set(opts.liveAgents ?? []);
   const deps: StallSweeperDeps = {
     now: NOW,
     resolveRows: async () => rows,
-    readArtifact: () => opts.artifact ?? null,
     isAgentLive: (agentId) => live.has(agentId),
     emitActivity: (entry) => { calls.activity.push(entry); },
     emitEvent: (type, payload) => { calls.events.push({ type, payload }); },
@@ -92,90 +90,6 @@ describe('runStallSweeperPatrol — per-orbit recommendations (observability-onl
     expect(String(recs[0]!.payload.recommendation)).toContain('reap zombie session agent-pan-1');
     expect(actions.join(' ')).toContain('recommended');
     expect(h.calls.activity[0]!.message).toContain('Observability-only: no action taken.');
-  });
-
-  it('merge-failed: recommends a merge re-evaluation', async () => {
-    const h = harness([parkedRow({ orbit: 'merge-failed' })]);
-    await runStallSweeperPatrol(h.deps);
-    const recs = recommendations(h);
-    expect(recs).toHaveLength(1);
-    expect(String(recs[0]!.payload.recommendation)).toContain('merge for re-evaluation');
-  });
-
-  it('uat-failed: recommends starting work after the relay found no live target', async () => {
-    const h = harness([parkedRow({ orbit: 'uat-failed', details: { uatNotes: 'login flow broken' } })]);
-    await runStallSweeperPatrol(h.deps);
-    const recs = recommendations(h);
-    expect(recs).toHaveLength(1);
-    expect(String(recs[0]!.payload.recommendation)).toContain('pan start');
-    expect(String(recs[0]!.payload.recommendation)).toContain('UAT-failure relay found no live target');
-    expect(String(recs[0]!.payload.uatNotes)).toContain('login flow broken');
-  });
-
-  it('stuck-flag review_infrastructure_failure: recommends clear + re-dispatch, never clears', async () => {
-    const h = harness([parkedRow({ orbit: 'stuck-flag', details: { stuckReason: 'review_infrastructure_failure' } })]);
-    await runStallSweeperPatrol(h.deps);
-    const recs = recommendations(h);
-    expect(recs).toHaveLength(1);
-    expect(String(recs[0]!.payload.recommendation)).toContain('re-dispatch the review');
-  });
-
-  it('stuck-flag feedback_delivery_needs_you: recommends a rework resume', async () => {
-    const h = harness([parkedRow({ orbit: 'stuck-flag', details: { stuckReason: 'feedback_delivery_needs_you' } })]);
-    await runStallSweeperPatrol(h.deps);
-    const recs = recommendations(h);
-    expect(recs).toHaveLength(1);
-    expect(String(recs[0]!.payload.recommendation)).toContain('rework');
-  });
-
-  it.each([
-    'review_infrastructure_failure',
-    'feedback_delivery_needs_you',
-    'verification_stuck',
-  ])('stuck-flag %s + fresh PASSED artifact: preserves evidence and awaits the canonical signal', async (stuckReason) => {
-    const artifact = {
-      verdict: 'passed',
-      runId: 'agent-pan-1-review-run-att1',
-      headSha: 'a'.repeat(40),
-      mtimeMs: NOW - 60_000,
-    } as const;
-    const h = harness(
-      [parkedRow({ orbit: 'stuck-flag', details: { stuckReason } })],
-      { artifact },
-    );
-
-    await runStallSweeperPatrol(h.deps);
-
-    const recs = recommendations(h);
-    expect(recs).toHaveLength(1);
-    expect(String(recs[0]!.payload.recommendation)).toContain('preserve PAN-1');
-    expect(String(recs[0]!.payload.recommendation)).toContain('do not re-dispatch or resume rework');
-    expect(recs[0]!.payload).toMatchObject({
-      artifactVerdict: 'passed',
-      artifactRunId: artifact.runId,
-      artifactHead: artifact.headSha,
-    });
-    expect(h.calls.activity[0]!.message).toContain('Observability-only: no action taken.');
-  });
-
-  it('stuck-flag + fresh BLOCKED artifact: recommends rework with the reviewer blocker as evidence', async () => {
-    const artifact = {
-      verdict: 'blocked',
-      runId: 'agent-pan-1-review-run-att1',
-      notes: 'null deref in the parser',
-      mtimeMs: NOW - 60_000,
-    } as const;
-    const h = harness(
-      [parkedRow({ orbit: 'stuck-flag', details: { stuckReason: 'feedback_delivery_needs_you' } })],
-      { artifact },
-    );
-
-    await runStallSweeperPatrol(h.deps);
-
-    const recs = recommendations(h);
-    expect(recs).toHaveLength(1);
-    expect(String(recs[0]!.payload.recommendation)).toContain(`review run ${artifact.runId}`);
-    expect(recs[0]!.payload.reviewNotes).toBe(artifact.notes);
   });
 
   it('idle-running: recommends a nudge, then stopping if nothing moves', async () => {

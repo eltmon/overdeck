@@ -1,4 +1,7 @@
+import { resolve } from 'path';
+
 import type { AgentState } from '../agents/agent-state.js';
+import { resolvePlanHome } from '../pan-dir/paths.js';
 import { readItemStatuses } from '../xbrief/continue-state.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
 import type { XBriefDocument } from '../xbrief/types.js';
@@ -31,7 +34,9 @@ export function isTerminalSwarmSlotAgent(
   // for xBRIEF item progress. The immutable workspace plan can still say
   // `running` after the member-repo branch merged, so the continue file's
   // status wins when the two disagree.
-  const itemStatus = readStatuses(baseWorkspace, agent.issueId)[itemId];
+  // PAN-3917: the continue file lives in the plan home, which for a polyrepo
+  // project is the infra repo rather than the workspace itself.
+  const itemStatus = readStatuses(resolvePlanHome(resolve(baseWorkspace, '..', '..')), agent.issueId)[itemId];
   if (itemStatus === 'completed' || itemStatus === 'cancelled') return true;
 
   const plan = readPlan(baseWorkspace) ?? readPlan(agent.workspace);

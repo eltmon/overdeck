@@ -274,6 +274,7 @@ import { spawnReviewRoleForIssue } from '../review-agent.js';
 import { dispatchTestAgentAndNotify } from '../test-agent-queue.js';
 import { isIssueClosed } from '../issue-closed.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../../review-status.js';
+import { shouldSkipDispatchAsMerged } from '../merge-verification.js';
 import {
   handleCloisterDomainEvent,
   issueStateChangeFromDomainEvent,
@@ -296,6 +297,7 @@ describe('reactive Cloister scheduler', () => {
     vi.mocked(killSession).mockResolvedValue(undefined);
     vi.mocked(isIssueClosed).mockResolvedValue(false);
     vi.mocked(getReviewStatusSync).mockReturnValue(undefined as any);
+    vi.mocked(shouldSkipDispatchAsMerged).mockResolvedValue({ skip: false, reason: 'open' });
     postCompactContinuationMock.mockResolvedValue(null);
     autonomousPlanMock.autoPickupBacklog = false;
     autonomousPlanMock.labels = ['released'];
@@ -477,12 +479,13 @@ describe('reactive Cloister scheduler', () => {
   ] as const)('skips %s dispatch when the merge already landed (PAN-1746)', async (state) => {
     // Boot reconciliation replays state-change events on restart; a long-merged
     // issue still carrying its lifecycle state must NOT re-dispatch an advancing
-    // role. mergeStatus='merged' is the same terminal signal a closed issue is.
-    vi.mocked(getReviewStatusSync).mockReturnValue({ mergeStatus: 'merged' } as any);
+    // role. PAN-3917: the forge answers "did this merge?", not a stored
+    // mergeStatus — a merged PR is the same terminal signal a closed issue is.
+    vi.mocked(shouldSkipDispatchAsMerged).mockResolvedValue({ skip: true, reason: 'PR #42 is merged' });
 
     await Effect.runPromise(onIssueStateChange('PAN-503', state));
 
-    expect(getReviewStatusSync).toHaveBeenCalledWith('PAN-503');
+    expect(shouldSkipDispatchAsMerged).toHaveBeenCalledWith('PAN-503');
     expect(spawnReviewRoleForIssue).not.toHaveBeenCalled();
     expect(dispatchTestAgentAndNotify).not.toHaveBeenCalled();
     expect(spawnRun).not.toHaveBeenCalled();
@@ -495,7 +498,7 @@ describe('reactive Cloister scheduler', () => {
 
     expect(logSpy).toHaveBeenCalledWith("[cloister] PAN-503: no role for issue state 'shipping'");
     expect(isIssueClosed).not.toHaveBeenCalled();
-    expect(getReviewStatusSync).not.toHaveBeenCalled();
+    expect(shouldSkipDispatchAsMerged).not.toHaveBeenCalled();
     expect(listRunningAgents).not.toHaveBeenCalled();
     expect(sessionExists).not.toHaveBeenCalled();
     expect(spawnReviewRoleForIssue).not.toHaveBeenCalled();

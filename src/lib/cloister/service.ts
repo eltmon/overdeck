@@ -52,7 +52,6 @@ import {
 import { checkCompletionMarkers, type CompletionHost } from './service-completion.js';
 import { checkForMassDeaths as checkForMassDeathsWithHost, handleAgentCrash as handleAgentCrashWithHost, killAgent as killAgentWithHost, pauseSpawns as pauseSpawnsWithHost, pokeAgent as pokeAgentWithHost, pokeAgentWithEscalation as pokeAgentWithEscalationWithHost, progressFingerprint as progressFingerprintWithHost, restartAgent as restartAgentWithHost, type CrashEvent, type CrashHost } from './service-crash.js';
 import { getAllAgentHealth as getAllAgentHealthWithHost, getServiceAgentHealth, getStatus as getStatusWithHost, type CloisterStatus, type StatusHost } from './service-status.js';
-export { spawnFlywheel, pauseFlywheel, resumeFlywheel } from './flywheel.js';
 export {
   handleCloisterDomainEvent,
   issueStateChangeFromDomainEvent,

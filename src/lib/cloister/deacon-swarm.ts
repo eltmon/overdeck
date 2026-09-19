@@ -2,7 +2,7 @@ import { exec } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { getAgentRuntimeSnapshot } from '../agent-runtime.js';
 import { messageAgent } from '../agents/messaging.js';
 import { spawnRun } from '../agents/spawn.js';
@@ -22,6 +22,7 @@ import {
   type PersistedTaskOperation,
 } from '../xbrief/dag.js';
 import { readItemStatuses, setItemStatus } from '../xbrief/continue-state.js';
+import { resolvePlanHome } from '../pan-dir/paths.js';
 import { applyItemStatuses } from '../xbrief/io.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../xbrief/swarm-readiness.js';
 import type { XBriefDocument, XBriefItem } from '../xbrief/types.js';
@@ -138,7 +139,7 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   // through. The task door's record read-modify-write is gone.
   applyTaskOperationToPlanFile: async (issueId, operation, workspacePath = '') => {
     if (!workspacePath) return;
-    setItemStatus(workspacePath, issueId, operation.itemId, swarmItemStatusFor(operation.type));
+    setItemStatus(planHomeForWorkspace(workspacePath), issueId, operation.itemId, swarmItemStatusFor(operation.type));
   },
   fireTieredCommitHooks,
   recordSlotAssignment,
@@ -198,10 +199,19 @@ function swarmItemStatusFor(type: PersistedTaskOperation['type']): string {
   }
 }
 
+/**
+ * The plan home that owns a workspace's `.pan/` artifacts (PAN-3917). For a
+ * polyrepo project that is the infra repo, not the workspace itself, so every
+ * continue-file read and write has to resolve it first.
+ */
+function planHomeForWorkspace(workspacePath: string): string {
+  return resolvePlanHome(resolve(workspacePath, '..', '..'));
+}
+
 /** Item id → status, from the issue's continue file. */
 function defaultReadItemStatuses(workspacePath: string, issueId: string): Record<string, string> {
   try {
-    return readItemStatuses(workspacePath, issueId);
+    return readItemStatuses(planHomeForWorkspace(workspacePath), issueId);
   } catch {
     return {};
   }

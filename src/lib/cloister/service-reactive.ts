@@ -206,23 +206,14 @@ async function resolveWorkspaceForIssue(issueId: string): Promise<string | null>
     return;
   }
 
-  // PAN-1746: a merged issue is terminal — never re-dispatch an advancing role
-  // for work that already landed. Boot reconciliation replays issue-state-change
-  // events on restart, and a long-merged issue still carrying its lifecycle
-  // state (e.g. `verifying-on-main`) would otherwise re-trigger a ship dispatch
-  // for a branch that merged weeks ago. Mirror the isIssueClosed gate above:
-  // mergeStatus='merged' is the same terminal signal closed-state is.
-  const { getPrFacts } = await import('./pr-facts.js');
-  if ((await getPrFacts(normalizedIssueId)).merged) {
-    const message = `${normalizedIssueId}: skipping ${role} dispatch — merge already landed (merge_status='merged' is terminal)`;
-    console.log(`[cloister] ${message}`);
-    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
-    return;
-  }
-
-  // PAN-2420: GitHub-authoritative guard. Even when merge_status is not yet
-  // 'merged' (e.g. a permission failure left it as 'failed'), do not respawn
-  // advancing roles against a PR that GitHub already reports merged.
+  // PAN-1746 + PAN-2420, collapsed by PAN-3917: a merged issue is terminal —
+  // never re-dispatch an advancing role for work that already landed. Boot
+  // reconciliation replays issue-state-change events on restart, and a
+  // long-merged issue still carrying its lifecycle state (e.g.
+  // `verifying-on-main`) would otherwise re-trigger a ship dispatch for a
+  // branch that merged weeks ago. There used to be two guards here: one read
+  // `mergeStatus` off the row, the other asked GitHub because the row could be
+  // wrong. With the row gone there is one question and one asker.
   const mergedGuard = await shouldSkipDispatchAsMerged(normalizedIssueId);
   if (mergedGuard.skip) {
     const message = `${normalizedIssueId}: skipping ${role} dispatch — ${mergedGuard.reason}`;

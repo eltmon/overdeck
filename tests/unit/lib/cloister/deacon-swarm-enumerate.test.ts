@@ -18,6 +18,8 @@ vi.mock(import('../../../../src/lib/swarm-policy.js'), async (importOriginal) =>
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
+  // PAN-3917: resolvePlanHome() asks projects.ts which repo owns `.pan/`.
+  resolveInfraRepo: (_project: unknown, checkoutRoot: string) => ({ repoPath: checkoutRoot }),
   listProjectsSync: mocks.listProjectsSync,
   findProjectByPathSync: (projectPath: string) =>
     mocks.listProjectsSync().find(({ config }: { config: { path: string } }) => config.path === projectPath)?.config ?? null,

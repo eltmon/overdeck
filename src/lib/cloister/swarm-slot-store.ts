@@ -14,7 +14,9 @@
  * it just moves into the repo where the rest of the plan lives.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+
+import { resolvePlanHome } from '../pan-dir/paths.js';
 
 export interface SwarmSlotAssignment {
   slotIndex: number;
@@ -81,9 +83,16 @@ export interface SwarmSlotState {
 
 export const SWARM_SLOT_FILENAME_SUFFIX = '.slots.json';
 
-/** `<workspace>/.pan/continues/<ISSUE>.slots.json`. */
+/**
+ * `<planHome>/.pan/continues/<ISSUE>.slots.json` — beside the issue's continue
+ * file, because the slot ledger is the same kind of thing: per-issue progress
+ * the repo owns. Callers hand in a workspace path (the natural handle at every
+ * call site), so the plan home is resolved here; for a polyrepo project that is
+ * the infra repo, not the workspace.
+ */
 export function swarmSlotStatePath(workspacePath: string, issueId: string): string {
-  return join(workspacePath, '.pan', 'continues', `${issueId.toUpperCase()}${SWARM_SLOT_FILENAME_SUFFIX}`);
+  const planHome = resolvePlanHome(resolve(workspacePath, '..', '..'));
+  return join(planHome, '.pan', 'continues', `${issueId.toUpperCase()}${SWARM_SLOT_FILENAME_SUFFIX}`);
 }
 
 export function readSwarmSlotState(workspacePath: string, issueId: string): SwarmSlotState | null {
