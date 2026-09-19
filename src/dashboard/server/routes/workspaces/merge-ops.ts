@@ -482,7 +482,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       console.log(`[merge] Polyrepo detected for ${issueId}, coordinating merge set...`);
       const { getMergeSetSync, ensureMergeSetForIssueSync, upsertMergeSetSync, withRepoStateSync } = await import('../../../../lib/merge-set.js');
       const { runQualityGates } = await import('../../../../lib/cloister/validation.js');
-      const { reconcileStrandedRepos } = await import('../../../../lib/cloister/merge-completeness.js');
+      const { assessRepoMergeCompleteness } = await import('../../../../lib/cloister/merge-completeness.js');
       const { getForgeAdapter } = await import('../../../../lib/forge.js');
       const { messageAgent } = await import('../../../../lib/agents.js');
       let mergeSet = getMergeSetSync(issueId) || ensureMergeSetForIssueSync(issueId);
@@ -493,10 +493,55 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
         return { success: false, statusCode: 400, error };
       }
 
-      const reconciliation = await reconcileStrandedRepos(mergeSet);
-      mergeSet = reconciliation.mergeSet;
-      if (reconciliation.blockers.length > 0) {
-        const error = reconciliation.blockers.map(blocker => blocker.reason).join('; ');
+      // PAN-3917: which repos still need merging is asked of the forge and git
+      // HERE, on every attempt — nothing writes a verdict for a later pass to
+      // read back. A required repo with no review artifact is stranded: the
+      // forge is asked for one, and only a repo that is genuinely ahead with
+      // nothing merged blocks the set.
+      const blockers: string[] = [];
+      const alreadyLanded = new Set<string>();
+      for (const repo of mergeSet.repos) {
+        if (!repo.required) continue;
+        if (!repo.artifactUrl) {
+          try {
+            const discovered = await getForgeAdapter(repo.forge).discoverArtifact({
+              sourceBranch: repo.sourceBranch,
+              cwd: repo.repoPath,
+            });
+            if (discovered?.url) {
+              mergeSet = withRepoStateSync(mergeSet, repo.repoKey, {
+                artifactUrl: discovered.url,
+                artifactId: discovered.id,
+              });
+              continue;
+            }
+          } catch (discoverErr: any) {
+            blockers.push(`${repo.repoKey} artifact discovery is unverifiable: ${discoverErr?.message ?? String(discoverErr)}`);
+            continue;
+          }
+        }
+
+        const assessed = await assessRepoMergeCompleteness({ ...repo, artifactUrl: repo.artifactUrl, artifactId: repo.artifactId });
+        if (assessed.state === 'merged') {
+          alreadyLanded.add(repo.repoKey);
+          mergeSet = withRepoStateSync(mergeSet, repo.repoKey, {
+            repoMerge: 'merged',
+            ...(assessed.artifactUrl ? { artifactUrl: assessed.artifactUrl, artifactId: assessed.artifactId } : {}),
+          });
+        } else if (assessed.state === 'no-changes') {
+          alreadyLanded.add(repo.repoKey);
+          mergeSet = withRepoStateSync(mergeSet, repo.repoKey, { repoMerge: 'skipped' });
+        } else if (!repo.artifactUrl) {
+          // Stranded: ahead of its target with no artifact to merge, or the
+          // forge could not answer. A repo that HAS an artifact is simply not
+          // merged yet — that is what this run is for.
+          blockers.push(assessed.reason);
+        }
+      }
+      upsertMergeSetSync(mergeSet);
+
+      if (blockers.length > 0) {
+        const error = blockers.join('; ');
         mergeSet = { ...mergeSet, status: 'failed', updatedAt: new Date().toISOString() };
         upsertMergeSetSync(mergeSet);
         setStatus(issueId, { phase: 'failed', notes: error });
@@ -505,7 +550,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       }
 
       const activeRepos = mergeSet.repos
-        .filter(repo => repo.repoMerge !== 'skipped' && repo.repoMerge !== 'merged' && !!repo.artifactUrl)
+        .filter(repo => !alreadyLanded.has(repo.repoKey) && !!repo.artifactUrl)
         .sort((a, b) => a.mergeOrder - b.mergeOrder);
 
       if (activeRepos.length === 0) {

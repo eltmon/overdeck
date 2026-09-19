@@ -11,11 +11,10 @@ const {
   mockTransitionTo,
   mockRemoveLabel,
   mockLinearGetIssue,
-  mockGetReviewStatus,
-  mockClearReviewStatus,
   mockFindProjectByTeam,
   mockResolveGitHubIssue,
   mockResetPostMergeState,
+  mockFetchIssuePullRequest,
   mockExecAsync,
 } = vi.hoisted(() => ({
   issueDataServiceMock: {
@@ -27,11 +26,10 @@ const {
   mockTransitionTo: vi.fn(),
   mockRemoveLabel: vi.fn(),
   mockLinearGetIssue: vi.fn(),
-  mockGetReviewStatus: vi.fn(),
-  mockClearReviewStatus: vi.fn(),
   mockFindProjectByTeam: vi.fn(),
   mockResolveGitHubIssue: vi.fn(),
   mockResetPostMergeState: vi.fn(),
+  mockFetchIssuePullRequest: vi.fn(),
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '[]', stderr: '' }),
 }));
 
@@ -74,6 +72,12 @@ vi.mock('../../../../lib/tracker-utils.js', async (importOriginal) => {
 vi.mock('../../../../lib/cloister/merge-agent.js', () => ({
   resetPostMergeState: mockResetPostMergeState,
 }));
+
+// PAN-3917: "already merged" is the pull request's own state, not a stored copy.
+vi.mock('../../../../lib/overdeck/pull-requests.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../lib/overdeck/pull-requests.js')>();
+  return { ...actual, fetchIssuePullRequest: mockFetchIssuePullRequest };
+});
 
 import { issuesRouteLayer } from '../issues.js';
 import { EventStoreService } from '../../services/domain-services.js';
@@ -161,12 +165,12 @@ describe('POST /api/issues/:id/reopen', () => {
     _resetTrustedOriginsForTests();
 
     issueDataServiceMock.getIssueSource.mockReturnValue('github');
-    issueDataServiceMock.getIssues.mockReturnValue([{ identifier: 'PAN-1190', mergeStatus: 'merged' }]);
+    issueDataServiceMock.getIssues.mockReturnValue([{ identifier: 'PAN-1190' }]);
+    mockFetchIssuePullRequest.mockResolvedValue({ pr: { mergedAt: '2026-09-17T00:00:00.000Z' } });
     issueDataServiceMock.invalidateTracker.mockResolvedValue(undefined);
     mockTransitionTo.mockReturnValue(Effect.void);
     mockRemoveLabel.mockReturnValue(Effect.void);
     mockLinearGetIssue.mockReturnValue(Effect.succeed(null));
-    mockGetReviewStatus.mockReturnValue({ issueId: 'PAN-1190', mergeStatus: 'merged' });
     mockFindProjectByTeam.mockReturnValue(null);
     mockResolveGitHubIssue.mockReturnValue({
       isGitHub: true,
