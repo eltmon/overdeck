@@ -301,6 +301,7 @@ export class IssueDataService {
    */
   private derivedStatesCache: Record<string, DerivedIssueState> = {};
   private _onIssuesChanged: ((issues: unknown[]) => void) | null = null;
+  private _onDerivedStatesChanged: ((changed: readonly DerivedIssueState[]) => void) | null = null;
   private planningSnapshotQueued = false;
   private planningRefreshQueue: string[] = [];
   private planningRefreshQueued = new Set<string>();
@@ -1008,11 +1009,15 @@ export class IssueDataService {
     }
 
     let changed = false;
+    const changedStates: DerivedIssueState[] = [];
     for (const [projectPath, ids] of byProject) {
       try {
         const states = await loadIssueStatesForProject(projectPath, ids, { labelsByIssue, closedIssues });
         for (const [issueId, state] of states) {
+          const previous = this.derivedStatesCache[issueId];
           this.derivedStatesCache[issueId] = state;
+          if (previous && JSON.stringify(previous) === JSON.stringify(state)) continue;
+          changedStates.push(state);
           changed = true;
         }
       } catch {
@@ -1020,6 +1025,7 @@ export class IssueDataService {
         // answer rather than blanking every row.
       }
     }
+    if (changedStates.length > 0) this._onDerivedStatesChanged?.(changedStates);
     if (changed && this.started) this.pushSnapshot();
   }
 
@@ -1037,6 +1043,16 @@ export class IssueDataService {
   /** The derived pipeline state for one issue, or null before the first refresh. */
   getDerivedState(identifier: string): DerivedIssueState | null {
     return this.derivedStatesCache[identifier.toUpperCase()] ?? null;
+  }
+
+  /** Every derived pipeline state computed so far. Seeds the dashboard snapshot. */
+  listDerivedStates(): DerivedIssueState[] {
+    return Object.values(this.derivedStatesCache);
+  }
+
+  /** Called with the rows whose derived state actually changed (PAN-3917 FR-6). */
+  onDerivedStatesChanged(fn: (changed: readonly DerivedIssueState[]) => void): void {
+    this._onDerivedStatesChanged = fn;
   }
 
   private pushMeta(): void {
