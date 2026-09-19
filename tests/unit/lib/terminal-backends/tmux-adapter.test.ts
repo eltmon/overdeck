@@ -25,8 +25,10 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
   sessionExists: () => Effect.succeed(true),
 }));
 
+// PAN-3917 W12: the tmux adapter's inventory probes TMUX (isAliveOnTmux), not
+// the host's selected backend — a Herdr host still lists its tmux sessions.
 vi.mock('../../../../src/lib/agents/liveness.js', () => ({
-  isAlive: async () => aliveVerdict,
+  isAliveOnTmux: async () => aliveVerdict,
   isIdle: () => idle,
 }));
 

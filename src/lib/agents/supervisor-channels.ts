@@ -7,6 +7,8 @@ import { emitActivityEntrySync } from '../activity-logger.js';
 import { isClaudeCodeChannelsMcpEnabled, loadConfigSync } from '../config-yaml.js';
 import type { ModelId } from '../settings.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import { hostTerminalBackendName } from '../terminal-backends/select.js';
+import type { TerminalBackendName } from '../terminal-backends/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
 import { getOverdeckHome } from '../paths.js';
@@ -31,6 +33,11 @@ interface SupervisorChannelsSpawnOptions {
   model?: string;
   harness?: RuntimeName;
   allowHost?: boolean;
+  /**
+   * Terminal backend this launch goes to (PAN-3917 W12). Required for the
+   * Herdr ineligibility rule; omitted callers are treated as tmux.
+   */
+  backend?: TerminalBackendName;
 }
 
 export function buildDefaultResumeContinueMessage(issueId: string): string {
@@ -133,11 +140,25 @@ export function decideSupervisorForWorkAgent(
   options: SupervisorChannelsSpawnOptions,
   state: AgentState,
 ): SupervisorDecision {
-  void options;
   const log = (eligible: boolean, reason?: string): void => {
     const tag = eligible ? 'supervisor:eligible' : `supervisor:ineligible:${reason ?? 'unknown'}`;
     console.log(`[${agentId}] ${tag}`);
   };
+
+  // PAN-3917 W12: the PTY supervisor is a TMUX-ONLY delivery mechanism.
+  // node-pty allocates a second pseudo-terminal for the harness, so the pane's
+  // own foreground process stays `node <pty-supervisor.js>` and Herdr's
+  // detector — which reads the pane's foreground process, not its title
+  // (verified live 2026-09-19: the supervisor pane set the correct
+  // `✳ agent-…` terminal title and was still never detected) — never sees
+  // `claude`. `startAgent` then times out and closes the pane, which is how
+  // `pan start PAN-3705` died. Herdr needs none of what the supervisor
+  // provides: `agent.prompt` delivers, `agent.get`/`agent.list` report
+  // liveness, and `terminal.session.observe` streams the terminal.
+  if (options.backend === 'herdr') {
+    log(false, 'herdr-backend');
+    return { eligible: false, reason: 'herdr-backend' };
+  }
 
   if (state.role !== 'work' && state.role !== 'strike') {
     log(false, 'not-a-work-or-strike-agent');
@@ -178,7 +199,8 @@ export async function prepareSupervisorForFreshLaunch(
   options: SupervisorChannelsSpawnOptions,
   state: AgentState,
 ): Promise<{ useSupervisor: boolean; supervisorScriptPath?: string }> {
-  const supervisorDecision = decideSupervisorForWorkAgent(agentId, options, state);
+  const backend = options.backend ?? (await hostTerminalBackendName());
+  const supervisorDecision = decideSupervisorForWorkAgent(agentId, { ...options, backend }, state);
   if (!supervisorDecision.eligible) {
     delete state.supervisorEnabled;
     return { useSupervisor: false };
@@ -210,6 +232,9 @@ export async function prepareSupervisorForRelaunch(
     model,
     harness,
     allowHost: state.hostOverride,
+    // W12: a relaunch re-derives the backend exactly like a fresh spawn, so a
+    // Herdr host never re-wraps the harness and re-breaks its detector.
+    backend: await hostTerminalBackendName(),
   }, relaunchState);
   if (!supervisorDecision.eligible) {
     delete state.supervisorEnabled;
