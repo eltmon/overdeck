@@ -78,17 +78,38 @@ export class GitHubTracker implements IssueTracker {
     filters?: IssueFilters,
   ): Effect.Effect<Issue[], GitHubApiError> {
     const state = this.mapStateToGitHub(filters?.state);
+    const requestState = filters?.includeClosed ? 'all' : state;
+    const limit = filters?.limit;
+    // GitHub caps per_page at 100; a `limit` below that still asks for no
+    // more than it needs on the first page.
+    const perPage = limit !== undefined ? Math.min(limit, 100) : 100;
 
     return Effect.tryPromise({
-      try: () =>
-        this.octokit.issues.listForRepo({
-          owner: this.owner,
-          repo: this.repo,
-          state: filters?.includeClosed ? 'all' : state,
-          labels: filters?.labels?.join(',') || undefined,
-          assignee: filters?.assignee || undefined,
-          per_page: filters?.limit ?? 50,
-        }),
+      try: async () => {
+        const collected: Array<Awaited<ReturnType<typeof this.octokit.issues.listForRepo>>['data'][number]> = [];
+        // `page` stays omitted on the first request so callers/tests that
+        // assert the exact request shape for a single page keep matching;
+        // it only appears once we know there is more to fetch.
+        let page: number | undefined;
+        for (;;) {
+          const params: Record<string, unknown> = {
+            owner: this.owner,
+            repo: this.repo,
+            state: requestState,
+            labels: filters?.labels?.join(',') || undefined,
+            assignee: filters?.assignee || undefined,
+            per_page: perPage,
+          };
+          if (page !== undefined) params.page = page;
+          // eslint-disable-next-line no-await-in-loop -- sequential pagination; each page depends on the last
+          const response = await this.octokit.issues.listForRepo(params as never);
+          collected.push(...response.data);
+          if (limit !== undefined && collected.length >= limit) break;
+          if (response.data.length < perPage) break; // short page: no more results
+          page = (page ?? 1) + 1;
+        }
+        return limit !== undefined ? collected.slice(0, limit) : collected;
+      },
       catch: (cause) => {
         const status = (cause as { status?: number } | undefined)?.status ?? 0;
         const message =
@@ -96,9 +117,9 @@ export class GitHubTracker implements IssueTracker {
         return new GitHubApiError({ operation: 'listIssues', status, message, cause });
       },
     }).pipe(
-      Effect.map((response) => {
+      Effect.map((rawIssues) => {
         // Filter out pull requests (GitHub API returns both)
-        const issues = response.data.filter((item) => !item.pull_request);
+        const issues = rawIssues.filter((item) => !item.pull_request);
         return issues.map((issue) => this.normalizeIssue(issue));
       }),
     );

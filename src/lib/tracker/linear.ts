@@ -19,13 +19,20 @@ import type {
 import { IssueNotFoundError, TrackerAuthError } from './interface.js';
 import { LinearApiError } from '../errors.js';
 
-// Map Linear state types to our normalized states
+// Map Linear state types to our normalized states. Linear's SDK documents
+// `state.type` as one of triage/backlog/unstarted/started/completed/canceled,
+// but live workspaces can add further terminal custom types outside that
+// list (e.g. a "Duplicate" state reporting `type: "duplicate"` — confirmed
+// against the mind-your-now MIN team, PAN-3917 w1-plan-home) — unmapped types
+// default to 'open' below, so a new terminal type silently inflates every
+// open-issue count until it is added here.
 const STATE_MAP: Record<string, IssueState> = {
   backlog: 'open',
   unstarted: 'open',
   started: 'in_progress',
   completed: 'closed',
   canceled: 'closed',
+  duplicate: 'closed',
 };
 
 const UUID_RE =
