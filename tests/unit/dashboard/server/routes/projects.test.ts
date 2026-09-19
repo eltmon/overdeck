@@ -359,7 +359,9 @@ describe('fetchProjectSessionTree', () => {
     expect(tree.features[0]?.title).toBe('Implement Command Deck Session Tree');
   });
 
-  it('returns troubled metadata and queued mail count for troubled agents', async () => {
+  // PAN-3917: a session node carries presence and awaiting-input, never a
+  // stored pause, trouble, failure-count or mail-queue gate.
+  it('carries no troubled, failure-count or mail-queue gate, even for a troubled agent', async () => {
     (listProjectsSync as any).mockReturnValue([
       {
         key: 'overdeck',
@@ -370,89 +372,6 @@ describe('fetchProjectSessionTree', () => {
     (getAgentRuntimeState as any).mockReturnValue(Effect.succeed({ state: 'active' }));
     mockAgentStates.set('agent-pan-539', agentState({
       troubled: true,
-      troubledAt: '2026-02-03T04:05:06Z',
-      consecutiveFailures: 2,
-      lastFailureReason: 'PTY echo-confirm timed out',
-    }));
-    mockAccess(new Set([
-      '/tmp/overdeck/workspaces',
-      join(getOverdeckHome(), 'agents', 'agent-pan-539'),
-      '/tmp/overdeck/workspaces/feature-pan-539/.pan',
-    ]));
-    (readdir as any).mockImplementation((p: string) => {
-      if (p === '/tmp/overdeck/workspaces') return Promise.resolve([FEATURE_PAN_539_DIRENT]);
-      if (p === join(getOverdeckHome(), 'agents')) return Promise.resolve([]);
-      if (p === join(getOverdeckHome(), 'agents', 'agent-pan-539', 'mail')) {
-        return Promise.resolve([
-          { name: '2026-02-03T04-06-00-000Z.md', isDirectory: () => false, isFile: () => true },
-          { name: '2026-02-03T04-07-00-000Z.md', isDirectory: () => false, isFile: () => true },
-          { name: 'ignored.tmp', isDirectory: () => false, isFile: () => true },
-        ]);
-      }
-      const err = new Error('ENOENT');
-      (err as any).code = 'ENOENT';
-      return Promise.reject(err);
-    });
-
-    const result = await fetchProjectSessionTree('overdeck');
-
-    const tree = result as { features: Array<{ issueId: string; sessions: Array<Record<string, unknown>> }> };
-    const session = tree.features.find((feature) => feature.issueId === 'PAN-539')?.sessions[0];
-    expect(session).toMatchObject({
-      troubled: true,
-      troubledReason: 'PTY echo-confirm timed out',
-      troubledAt: '2026-02-03T04:05:06Z',
-      consecutiveFailures: 2,
-      queuedMailCount: 2,
-    });
-  });
-
-  it('returns queuedMailCount 0 for troubled agents with no mail directory', async () => {
-    (listProjectsSync as any).mockReturnValue([
-      {
-        key: 'overdeck',
-        config: { name: 'overdeck', path: '/tmp/overdeck', workspace: { workspaces_dir: 'workspaces' } },
-      },
-    ]);
-    (listSessionNames as any).mockReturnValue(Effect.succeed(['agent-pan-539']));
-    (getAgentRuntimeState as any).mockReturnValue(Effect.succeed({ state: 'active' }));
-    mockAgentStates.set('agent-pan-539', agentState({
-      troubled: true,
-      troubledAt: '2026-02-03T04:05:06Z',
-      consecutiveFailures: 0,
-      lastFailureReason: 'troubled gate set',
-    }));
-    mockAccess(new Set([
-      '/tmp/overdeck/workspaces',
-      join(getOverdeckHome(), 'agents', 'agent-pan-539'),
-      '/tmp/overdeck/workspaces/feature-pan-539/.pan',
-    ]));
-    mockWorkspaceReaddir([FEATURE_PAN_539_DIRENT]);
-
-    const result = await fetchProjectSessionTree('overdeck');
-
-    const tree = result as { features: Array<{ issueId: string; sessions: Array<Record<string, unknown>> }> };
-    const session = tree.features.find((feature) => feature.issueId === 'PAN-539')?.sessions[0];
-    expect(session).toMatchObject({
-      troubled: true,
-      troubledReason: 'troubled gate set',
-      troubledAt: '2026-02-03T04:05:06Z',
-      consecutiveFailures: 0,
-      queuedMailCount: 0,
-    });
-  });
-
-  it('omits troubled-only values for untroubled agents', async () => {
-    (listProjectsSync as any).mockReturnValue([
-      {
-        key: 'overdeck',
-        config: { name: 'overdeck', path: '/tmp/overdeck', workspace: { workspaces_dir: 'workspaces' } },
-      },
-    ]);
-    (listSessionNames as any).mockReturnValue(Effect.succeed(['agent-pan-539']));
-    (getAgentRuntimeState as any).mockReturnValue(Effect.succeed({ state: 'active' }));
-    mockAgentStates.set('agent-pan-539', agentState({
-      troubled: false,
       troubledAt: '2026-02-03T04:05:06Z',
       consecutiveFailures: 3,
       lastFailureReason: 'old failure',
@@ -473,55 +392,6 @@ describe('fetchProjectSessionTree', () => {
     expect(session?.troubledAt).toBeUndefined();
     expect(session?.consecutiveFailures).toBeUndefined();
     expect(session?.queuedMailCount).toBeUndefined();
-  });
-
-  it('returns troubled metadata and queued mail count for review session nodes', async () => {
-    (listProjectsSync as any).mockReturnValue([
-      {
-        key: 'overdeck',
-        config: { name: 'overdeck', path: '/tmp/overdeck', workspace: { workspaces_dir: 'workspaces' } },
-      },
-    ]);
-    (listSessionNames as any).mockReturnValue(Effect.succeed(['agent-pan-539-review']));
-    mockAgentStates.set('agent-pan-539-review', agentState({
-      id: 'agent-pan-539-review',
-      role: 'review',
-      troubled: true,
-      troubledAt: '2026-02-03T04:05:06Z',
-      consecutiveFailures: 1,
-      lastFailureReason: 'review delivery queued',
-    }));
-    mockAccess(new Set([
-      '/tmp/overdeck/workspaces',
-      '/tmp/overdeck/workspaces/feature-pan-539/.pan',
-    ]));
-    (readdir as any).mockImplementation((p: string) => {
-      if (p === '/tmp/overdeck/workspaces') return Promise.resolve([FEATURE_PAN_539_DIRENT]);
-      if (p === join(getOverdeckHome(), 'agents')) return Promise.resolve([]);
-      if (p === join(getOverdeckHome(), 'agents', 'agent-pan-539-review', 'mail')) {
-        return Promise.resolve([
-          { name: '2026-02-03T04-06-00-000Z.md', isDirectory: () => false, isFile: () => true },
-        ]);
-      }
-      const err = new Error('ENOENT');
-      (err as any).code = 'ENOENT';
-      return Promise.reject(err);
-    });
-
-    const result = await fetchProjectSessionTree('overdeck');
-
-    const tree = result as { features: Array<{ issueId: string; sessions: Array<Record<string, unknown>> }> };
-    const session = tree.features
-      .find((feature) => feature.issueId === 'PAN-539')
-      ?.sessions.find((candidate) => candidate.sessionId === 'agent-pan-539-review');
-    expect(session).toMatchObject({
-      type: 'review',
-      troubled: true,
-      troubledReason: 'review delivery queued',
-      troubledAt: '2026-02-03T04:05:06Z',
-      consecutiveFailures: 1,
-      queuedMailCount: 1,
-    });
   });
 
   it('uses merge-door history without probing a synthetic ship conversation', async () => {
