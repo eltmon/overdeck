@@ -177,25 +177,12 @@ vi.mock('os', async (importOriginal) => {
   };
 });
 
-vi.mock('../../review-status.js', () => ({
-  loadReviewStatuses: vi.fn(() => ({})),
-  getReviewStatusSync: vi.fn(() => undefined),
-  setReviewStatus: vi.fn(),
-  setReviewStatusSync: vi.fn(),
-
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
-}));
 
 const closedIssueReaperMock = vi.hoisted(() => ({
   handleIssueStatusChangedClosed: vi.fn(async () => ['reaped-closed']),
+  reconcileClosedIssueAgents: vi.fn(async () => []),
 }));
 vi.mock('../closed-issue-reaper.js', () => closedIssueReaperMock);
-
-const orphanProposedMock = vi.hoisted(() => ({
-  handleOrphanProposedSpec: vi.fn(async () => ['spawned-orphan']),
-}));
-vi.mock('../orphan-proposed-reconciler.js', () => orphanProposedMock);
 
 const idleStackReaperMock = vi.hoisted(() => ({
   handleAgentLifecycleEventForIdleStack: vi.fn(),
@@ -268,7 +255,6 @@ import { sessionExists, killSession, sessionExistsSync } from '../../tmux.js';
 import { spawnReviewRoleForIssue } from '../review-agent.js';
 import { dispatchTestAgentAndNotify } from '../test-agent-queue.js';
 import { isIssueClosed } from '../issue-closed.js';
-import { getReviewStatusSync, setReviewStatusSync } from '../../review-status.js';
 import { shouldSkipDispatchAsMerged } from '../merge-verification.js';
 import {
   handleCloisterDomainEvent,
@@ -291,7 +277,6 @@ describe('reactive Cloister scheduler', () => {
     vi.mocked(sessionExists).mockResolvedValue(false);
     vi.mocked(killSession).mockResolvedValue(undefined);
     vi.mocked(isIssueClosed).mockResolvedValue(false);
-    vi.mocked(getReviewStatusSync).mockReturnValue(undefined as any);
     vi.mocked(shouldSkipDispatchAsMerged).mockResolvedValue({ skip: false, reason: 'open' });
     postCompactContinuationMock.mockResolvedValue(null);
     autonomousPlanMock.autoPickupBacklog = false;
@@ -608,7 +593,6 @@ describe('reactive Cloister scheduler', () => {
     }));
 
     expect(closedIssueReaperMock.handleIssueStatusChangedClosed).toHaveBeenCalledWith('PAN-503');
-    expect(orphanProposedMock.handleOrphanProposedSpec).not.toHaveBeenCalled();
   });
 
 

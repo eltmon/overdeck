@@ -114,7 +114,7 @@ describe('concurrency governor — config + counting', () => {
     expect(countRunningAgents()).toEqual({ work: 1, advancing: 0, swarm: 0, total: 1 });
   });
 
-  it('excludes warm-idle advancing sessions (terminal verdict) from the ceiling (PAN-2579)', async () => {
+  it('excludes warm-idle advancing sessions from the ceiling (PAN-2579, PAN-3917)', async () => {
     vi.resetModules();
     vi.doMock('../../../src/lib/agents.js', () => ({
       listRunningAgentsSync: () => [
@@ -126,11 +126,9 @@ describe('concurrency governor — config + counting', () => {
     vi.doMock('../../../src/lib/overdeck/agents.js', () => ({
       countAgentsByStatus: (status: string) => (status === 'running' ? { work: 1, review: 2, test: 1 } : {}),
     }));
-    const { registerReviewStatusMapReader } = await import('../../../src/lib/cloister/review-status-source.js');
-    registerReviewStatusMapReader(() => ({
-      'PAN-1': { reviewStatus: 'blocked' },   // warm-idle: verdict recorded, session kept for re-review
-      'PAN-2': { reviewStatus: 'reviewing' }, // actively reviewing — counts
-      'PAN-3': { testStatus: 'passed' },      // warm-idle test session
+    // PAN-3917: warm-idle is the pane's own liveness, not a stored verdict.
+    vi.doMock('../../../src/lib/agents/liveness.js', () => ({
+      isIdle: (agentId: string) => agentId !== 'agent-pan-2-review',
     }));
     const { countRunningAgents } = await import('../../../src/lib/cloister/concurrency.js');
     // 3 advancing rows − 2 warm-idle = 1 counted; warm sessions are free capacity.

@@ -163,15 +163,6 @@ describe('unpauseCommand agent targeting (PAN-1760)', () => {
   });
 });
 
-describe('untroubledCommand agent targeting (PAN-1760)', () => {
-  it('clears a troubled inspect session by its full agent ID', async () => {
-    agentMocks.getAgentStateSync.mockReturnValue({ ...STOPPED_STATE, troubled: true });
-    const { untroubledCommand } = await import('../untroubled.js');
-    await untroubledCommand('inspect-pan-1744-workspace-flccb');
-    expect(agentMocks.clearAgentTroubledSync).toHaveBeenCalledWith('inspect-pan-1744-workspace-flccb');
-  });
-});
-
 describe('killCommand agent targeting (PAN-1760)', () => {
   it('kills exactly the named agent for a fully-qualified agent ID', async () => {
     const { killCommand } = await import('../kill.js');
