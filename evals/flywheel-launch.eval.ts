@@ -2,7 +2,7 @@ import { createScorer, evalite } from 'evalite';
 import { extractJsonArray, loadPromptFile, runPromptScenario } from './lib/prompt-harness.js';
 
 const flywheelRole = loadPromptFile('roles/flywheel.md');
-const flywheelBrief = loadPromptFile('docs/flywheel-brief.md');
+const flywheelBrief = loadPromptFile('sync-sources/skills/pan-flywheel/SKILL.md');
 
 const launchActions = new Set(['start', 'resume', 'plan', 'review', 'merge', 'unblock']);
 
