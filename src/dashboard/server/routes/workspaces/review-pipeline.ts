@@ -8,6 +8,10 @@
  * Release read endpoint:
  *   GET  /api/workspaces/:issueId/release
  *
+ * `startRequestReviewPipeline` is the door behind the request route, registered
+ * on `cloister/request-review-pipeline.ts` so the GitHub webhook can start the
+ * same pipeline for a PR opened or readied by hand (PAN-3917 W12).
+ *
  * The cancel routes (purge, abort, pending) live in review-control.ts. Shared
  * singletons (pending-ops cluster, project path, readJsonBody, workspace info,
  * flyExecCmd) stay owned by ../workspaces.js.

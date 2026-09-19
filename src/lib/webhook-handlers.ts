@@ -6,7 +6,9 @@
  * reads it on demand, so nothing is written back here any more. What is left is
  * the work a webhook can do that a read cannot: invalidate the PR-tab cache,
  * record a default-branch CI suite observation, relay a CI failure to the work
- * agent, and fire the post-merge lifecycle for merges that bypassed Overdeck.
+ * agent, start the review pipeline for a PR opened or readied outside
+ * `pan done`, and fire the post-merge lifecycle for merges that bypassed
+ * Overdeck.
  * Shared advisory-check classification keeps CodeRabbit out of merge gates.
  */
 
