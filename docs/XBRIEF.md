@@ -222,7 +222,10 @@ Every xBRIEF has exactly two top-level keys per the xBRIEF spec:
           "verify_commands": ["npm --prefix src/dashboard/frontend test"],
           "expected_outputs": ["BootstrapGate tests pass"],
           "readiness": "ready",
-          "traces": ["FR-1"]
+          "traces": ["FR-1"],
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "foundationFor": []
         },
         "narrative": {
           "Action": "Component that checks selectIsBootstrapped and renders fallback or children"
@@ -348,6 +351,9 @@ The xBRIEF spec supports arbitrary `metadata` on items and child items. Overdeck
 | `metadata.expected_outputs` | items | Observable evidence expected from those commands |
 | `metadata.readiness` | items | Static parallel-safety classification: `ready` can run in its own slot once DAG blockers complete; `sequential` must remain serialized after prerequisites; `needs_refinement` must be split or clarified. Edges control dispatch order. |
 | `metadata.traces` | items | Optional `string[]` of PRD requirement IDs (`FR-1`, `NFR-2`) satisfied by this item |
+| `metadata.requiresInspection` | items | Boolean: does this item's risk warrant a standing tier-supervisor watching its commits (PAN-3917 dropped the blocking `pan inspect` CLI gate; this is now a subscription signal, not a completion blocker). Required on every item — `quality-lint.ts` rejects a plan missing it. |
+| `metadata.inspectionDepth` | items | `"fast"` or `"deep"` — how closely the supervisor should read commits when `requiresInspection` is true |
+| `metadata.foundationFor` | items | `string[]` of downstream item IDs that build on this one; required and non-empty when `requiresInspection` is true (`quality-lint.ts` flags `requiresInspection: true` with no `foundationFor` entries) |
 | `metadata.kind` | child items | `"acceptance_criterion"` — marks a child item as an AC for the verification gate |
 | `metadata.canonicalFilename` | plan | Preserves the immutable filename across re-finalizations |
 
