@@ -8,7 +8,6 @@ import { Effect, Stream } from 'effect';
 import { HttpServerResponse } from 'effect/unstable/http';
 
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
-import { clearReviewStatus } from '../../dashboard/server/review-status.js';
 import { getSharedIssueService } from '../../dashboard/server/services/issue-service-singleton.js';
 import { getGitHubConfig, getRallyConfig } from '../../dashboard/server/services/tracker-config.js';
 import { saveAgentStateAndEmitEvent, saveAgentStateAndEmitEventProgram } from '../../dashboard/server/services/agent-projection.js';
@@ -232,11 +231,6 @@ export async function runDestructiveIssueLifecycle(
   } catch (err) {
     cleanupLog.push(`Reviewer session cleanup failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
   }
-
-  try {
-    clearReviewStatus(id.toUpperCase());
-    cleanupLog.push('Cleared review status');
-  } catch { /* non-fatal */ }
 
   try {
     const { resetPostMergeState } = await import('../cloister/merge-agent.js');
@@ -587,9 +581,6 @@ export function reopenIssueTransition(options: {
           : '';
         if (workspacePath) {
           await Effect.runPromise(reopenWorkspaceState(id.toUpperCase(), workspacePath, { reason: (body as any)?.reason }));
-        } else {
-          // Fallback: no workspace path, just clear review status
-          clearReviewStatus(id.toUpperCase());
         }
       } catch { /* non-fatal */ }
 
