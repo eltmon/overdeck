@@ -1,0 +1,261 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-14T06:27:47Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3705: Ctrl-K search: add Conversations to the type list",
+    "updated": "2026-08-14T06:30:39.739Z"
+  },
+  "plan": {
+    "id": "pan-3705",
+    "title": "Ctrl-K search: add Conversations to the type list",
+    "status": "proposed",
+    "uid": "c8dd7f35-a7c5-4f5d-b7df-efdb0aba964d",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-14T06:27:47Z",
+    "updated": "2026-08-14T06:30:39.739Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3705",
+        "label": "PAN-3705",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "command-palette",
+      "frontend",
+      "search"
+    ],
+    "narratives": {
+      "Problem": "The Ctrl-K palette's scope-chip row only offers a chip for a result type when results of that type are on screen (availableScopes, CommandPalette.tsx:865-873). Conversation hits exist only after a typed server search, so the Conversations chip is invisible until conversation results already exist, and the scope-reset effect (lines 876-878) silently discards the Ctrl-J initialScope='conversations' on open. The scope machinery itself (PaletteScope union, SCOPE_LABEL, groupScope, accent color) already supports 'conversations' — only chip availability is result-derived.",
+      "Proposal": "Pin 'conversations' as a persistent scope in availableScopes via a PINNED_SCOPES constant so the chip renders whenever the chip row renders; make the empty-query hint and loading row copy scope-aware for the conversations scope ('Type to search conversations…' / 'Searching conversations…'); keep the existing swallow-to-empty error convention; document the chip row in docs/DESKTOP-APP.md. No server changes and no ordering changes — scope filtering already preserves upstream rank order, so #3703 (newest-first) and #3704 (ordering toggle) compose on top. Full detail in the PRD at .pan/drafts/PAN-3705.md.",
+      "NonGoals": "- Changing conversation result ordering (owned by #3703)\n- Adding an ordering toggle or any preference persistence (owned by #3704)\n- Pinning a Memory chip or altering Memory scope behavior\n- Any server change, including /api/palette/search parameters\n- Restyling the chip row or adding ARIA pressed-state to the pre-existing chips (parity with existing chips is the requirement)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Pin the Conversations chip unconditionally rather than probing search capability client-side",
+        "rationale": "The issue asks for a first-class type-list entry; the server already returns an empty conversations array when semantic search is unavailable, so a probe would add complexity with no behavior gain."
+      },
+      {
+        "summary": "Make empty/loading copy scope-aware only for the conversations scope",
+        "rationale": "The issue AC requires correct empty/loading states when Conversations is selected; claiming to search 'conversations & memory' while scoped to conversations only would be incorrect, and all other scopes keep the existing strings."
+      },
+      {
+        "summary": "Preserve the swallow-to-EMPTY_SEARCH error convention instead of adding error UI",
+        "rationale": "Every result type already renders the standard no-results empty state on search failure; consistency with existing types outranks a one-off error affordance."
+      },
+      {
+        "summary": "Do not pin the Memory chip",
+        "rationale": "The issue requests Conversations only; symmetric pinning of Memory is unrequested behavior change."
+      },
+      {
+        "summary": "Leave result ordering untouched and guard it with an order-preservation test",
+        "rationale": "#3703 and #3704 own ordering and the toggle; this issue only needs to not conflict, and the test makes the composition contract explicit."
+      }
+    ],
+    "items": [
+      {
+        "id": "pin-conversations-scope-chip",
+        "title": "Pin the Conversations scope chip in the Ctrl-K palette",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-14T06:27:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3705",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandPalette.tsx",
+            "src/dashboard/frontend/src/components/CommandPalette.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandPalette.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "CommandPalette.test.tsx run passes, including the new 'conversations scope chip (PAN-3705)' describe block",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CommandPalette.tsx, add a PINNED_SCOPES constant (['conversations']) near SCOPE_LABEL and add `for (const s of PINNED_SCOPES) present.add(s);` inside the availableScopes memo (lines 865-873), exactly as shown in the PRD's before/after snippet. Do NOT touch the reset effect, the chip renderer, inScope, visibleGroups, result mapping, or the rank sort. Then add a describe('CommandPalette conversations scope chip (PAN-3705)') block to CommandPalette.test.tsx covering the five ACs below, following the file's existing patterns: vi.useFakeTimers with 120ms debounce advance, installStrictFetchMock stubs (empty search payload as at lines 77-79, plus a conversation-hit payload as at lines 152-188), getByRole('button', { name: 'Conversations' }) for the chip (the text also appears as a cmdk group heading — see the disambiguation pattern at lines 206-214), and [role='option'][data-value] queries for rows."
+        },
+        "items": [
+          {
+            "id": "pin-conversations-scope-chip.ac1",
+            "title": "Given the palette is open with an empty query and zero conversation results, when the scope-chip row renders, then it renders a Conversations chip button (getByRole('button', { name: 'Conversations' })) alongside the other type chips",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pin-conversations-scope-chip.ac2",
+            "title": "Given conversation and non-conversation results are present, when the operator activates the Conversations chip by click and (in a second pass) by Enter on the focused chip button, then the result list renders only rows whose data-value carries the conversation (conv-) id prefix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pin-conversations-scope-chip.ac3",
+            "title": "Given the Conversations scope is active, when the operator activates the All chip, then the result list renders every result type again with no scope filter applied",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pin-conversations-scope-chip.ac4",
+            "title": "Given the palette renders with initialScope='conversations' and no conversation results, when the open effects settle, then the Conversations scope survives as the active scope (filtered list stays conversations-scoped) instead of resetting to All",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pin-conversations-scope-chip.ac5",
+            "title": "Given two conversation hits with rank 1 and rank 2, when the Conversations scope is active, then the list renders them in ascending rank order (scope filtering preserves upstream ordering, the composition contract for #3703/#3704)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "scope-aware-conversation-empty-loading",
+        "title": "Scope-aware empty and loading copy for the Conversations scope",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-14T06:27:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3705",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandPalette.tsx",
+            "src/dashboard/frontend/src/components/CommandPalette.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandPalette.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "CommandPalette.test.tsx run passes, including the new empty/loading/error-state tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CommandPalette.tsx, make two strings scope-aware exactly as shown in the PRD before/after snippet: the loading row (lines 951-956) renders 'Searching conversations…' when scope === 'conversations' and keeps 'Searching conversations & memory…' otherwise; the empty-query hint (lines 957-962) renders 'Type to search conversations…' when scope === 'conversations' and keeps 'Start typing…' otherwise. The non-empty-query 'No results for \"…\"' string stays unchanged. Do not add error UI: a failed /api/palette/search continues to fall back to EMPTY_SEARCH (fetchPaletteSearch, lines 288-291). Extend the PAN-3705 describe block in CommandPalette.test.tsx with the three ACs below (in-flight search = fetch promise that never resolves; error = stub returning Response with status 500)."
+        },
+        "items": [
+          {
+            "id": "scope-aware-conversation-empty-loading.ac1",
+            "title": "Given the Conversations scope is active with an empty query, the empty state renders 'Type to search conversations…' instead of 'Start typing…'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-aware-conversation-empty-loading.ac2",
+            "title": "Given the Conversations scope is active while a search is in flight, the loading row renders 'Searching conversations…' instead of 'Searching conversations & memory…'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "scope-aware-conversation-empty-loading.ac3",
+            "title": "Given /api/palette/search responds with HTTP 500 while the Conversations scope is active, the palette falls back to the standard 'No results for \"…\"' empty state and preserves the active Conversations chip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-conversations-type-chip",
+        "title": "Document the scope chips (incl. Conversations) in docs/DESKTOP-APP.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-14T06:27:47Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3705",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DESKTOP-APP.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Conversations' docs/DESKTOP-APP.md",
+            "grep -n 'Ctrl+J\\|Cmd+J' docs/DESKTOP-APP.md"
+          ],
+          "expected_outputs": [
+            "grep prints the new scope-chips subsection naming Conversations inside the 'Cmd+K Command Palette' section",
+            "grep prints the new Ctrl+J mention inside the same section"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "In docs/DESKTOP-APP.md, extend the 'Cmd+K Command Palette' section (lines 103-118) with a short 'Scope chips' subsection: the chip row under the search input filters results by type (All plus Actions, Commands, Workspaces, Issues, Conversations, Memory as available); Conversations is always offered and limits results to conversation search hits; Cmd/Ctrl+J opens the palette already scoped to Conversations. No other doc changes — docs/USAGE.md:709 is a one-line shortcut table entry and stays as-is."
+        },
+        "items": [
+          {
+            "id": "docs-conversations-type-chip.ac1",
+            "title": "grep -n 'Conversations' docs/DESKTOP-APP.md produces a hit inside the 'Cmd+K Command Palette' section that names Conversations as an always-available scope chip limiting results to conversation entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-conversations-type-chip.ac2",
+            "title": "grep -n 'Ctrl+J' docs/DESKTOP-APP.md produces a hit in the same section stating the shortcut opens the palette scoped to Conversations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "pin-conversations-scope-chip",
+        "to": "scope-aware-conversation-empty-loading",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-14-PAN-3705-ctrl-k-search-add-conversations-to-the-type-list.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
