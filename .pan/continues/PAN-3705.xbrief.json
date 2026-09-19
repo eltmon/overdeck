@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3705",
   "created": "2026-09-19T10:59:28.419Z",
-  "updated": "2026-09-19T11:18:00.984Z",
+  "updated": "2026-09-19T11:18:09.655Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-3705",
       "claimedAt": "2026-09-19T11:13:31.229Z",
       "doneAt": "2026-09-19T11:18:00.984Z"
+    },
+    "docs-conversations-type-chip": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3705",
+      "claimedAt": "2026-09-19T11:18:09.655Z"
     }
   }
 }
