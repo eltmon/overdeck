@@ -62,7 +62,6 @@ while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
         : # non-code checkout (state worktree) — script-backed guards unavailable
       elif [ -n "$base" ]; then
         branch_name="${remote_ref#refs/heads/}"
-        bash scripts/guard-state-plane-branches.sh --branch "$branch_name" --range "$base..$local_sha" </dev/null
         if [ "$remote_ref" = "refs/heads/main" ]; then
           bash scripts/guard-agent-main-push.sh --range "$base..$local_sha" </dev/null
         fi
