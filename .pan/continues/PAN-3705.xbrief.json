@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3705",
   "created": "2026-09-19T10:59:28.419Z",
-  "updated": "2026-09-19T11:24:06.866Z",
+  "updated": "2026-09-19T11:24:15.824Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,6 +46,10 @@
     "pin-conversations-scope-chip.ac5": {
       "status": "completed",
       "doneAt": "2026-09-19T11:24:06.865Z"
+    },
+    "scope-aware-conversation-empty-loading.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-19T11:24:15.824Z"
     }
   }
 }
