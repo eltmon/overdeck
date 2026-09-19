@@ -8,7 +8,10 @@ import { getAgentState, isRole, normalizeAgentId } from '../agents.js';
 import { killSession, listSessionsSync } from '../tmux.js';
 import { getRuntimeCensus, getRuntimeCensusSnapshot } from '../runtime-census.js';
 import { AGENTS_DIR } from '../paths.js';
-import { getAgentStateFilePath, listAgentStatesSync } from './agent-state.js';
+// PAN-3917/lint:circular: agent-state.ts's write side chains back to
+// agents.ts (via registry/feature-registry-population.ts); import the
+// read-only leaf so this pure query module doesn't close that cycle.
+import { getAgentStateFilePath, listAgentStatesSync } from './agent-state-read.js';
 import { removeAgentStateDir } from './state-dir-removal.js';
 
 export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[] {

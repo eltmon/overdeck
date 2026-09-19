@@ -18,7 +18,11 @@
 
 import { Effect } from 'effect';
 
-import { getAgentStateSync } from '../agents/agent-state.js';
+// PAN-3917/lint:circular: agent-state.ts's write side chains through
+// registry/feature-registry-population.ts back to agents.ts, which imports
+// this backend transitively — import the read-only leaf instead so a terminal
+// backend computing pane tokens cannot close that cycle.
+import { getAgentStateSync } from '../agents/agent-state-read.js';
 import { isAlive, isIdle } from '../agents/liveness.js';
 import { createSession, killSession, listSessions, sendKeys, sessionExists } from '../tmux.js';
 import { checkPrompt, toPaneRole, tokensFromLaunchMetadata } from './prompt-guard.js';
