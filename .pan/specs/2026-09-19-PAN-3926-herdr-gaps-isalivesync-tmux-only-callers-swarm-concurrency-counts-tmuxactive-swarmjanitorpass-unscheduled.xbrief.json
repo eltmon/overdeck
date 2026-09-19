@@ -1,0 +1,941 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-19T11:57:49Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3926: Herdr gaps: isAliveSync tmux-only callers; swarm concurrency counts tmuxActive; swarmJanitorPass unscheduled",
+    "updated": "2026-09-19T12:02:11.173Z"
+  },
+  "plan": {
+    "id": "pan-3926",
+    "title": "Herdr gaps: isAliveSync tmux-only callers; swarm concurrency counts tmuxActive; swarmJanitorPass unscheduled",
+    "status": "proposed",
+    "uid": "b38f57d5-4b8e-4fcd-a2e8-ba7cfb310365",
+    "author": "agent:claude-fable-5-1",
+    "sequence": 2,
+    "created": "2026-09-19T11:57:49Z",
+    "updated": "2026-09-19T12:02:11.173Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3926",
+        "label": "PAN-3926",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3917",
+        "label": "PAN-3917",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-3926.md",
+        "label": "PRD",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "herdr",
+      "terminal-backend",
+      "liveness",
+      "concurrency",
+      "swarm",
+      "deacon-lite",
+      "cut-followup"
+    ],
+    "metadata": {
+      "sizeJustification": "Three small, independent Herdr-liveness fixes that share one pattern (read the selected backend's inventory instead of tmux). The file count is dominated by porting ~20 existing test files whose mocks name the deleted sync exports; the production diff touches nine source files. Splitting into sibling issues would triple review overhead for a change the parent issue already scoped as one follow-up.",
+      "canonicalFilename": "2026-09-19-PAN-3926-herdr-gaps-isalivesync-tmux-only-callers-swarm-concurrency-counts-tmuxactive-swarmjanitorpass-unscheduled.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "Three places still assume 'alive means has a tmux session', so on a Herdr host (the default since PAN-3917) they are wrong in the direction that matters. (1) isAliveSync in src/lib/agents/liveness.ts is tmux-only; its callers getWorkAgentLifecycleStateSync (work-agent-lifecycle.ts:97) and resolveParkedPopulation (parked/resolver.ts:258) read every healthy Herdr agent as a confirmed no-session death, so pan start/resume/unpause/reset-session, the merge-strike route and the parked sweeper misjudge live agents. (2) countRunningSwarmSlotsForIssue, describeRunningAgents and emergencyBrake in src/lib/cloister/concurrency.ts filter listRunningAgentsSync() rows on tmuxActive, which is false for every live Herdr agent, so swarm dispatch over-admits, diagnostics report an empty box, and the brake trims nothing. (3) swarmJanitorPass (deacon-swarm.ts:353) has had no caller since deacon.ts was deleted, and its default deps are tmux primitives. Swarm is dormant (D11) but the issue requires all three to be backend-aware before it is re-enabled.",
+      "Proposal": "Liveness: there is no synchronous Herdr client and the repo forbids new sync primitives, so the sync door is retired rather than patched. Export getWorkAgentLifecycleStateAsync / assertCanStartFreshAsync / assertCanResumeSessionAsync over the existing async snapshot (which already uses backend-aware isAlive), move the six callers (all already inside async functions) to them, switch the parked sweeper to Promise.all over isAlive, then delete isAliveSync, the sync classifier/guards and findAgentRuntimePidInSubtreeSync as orphans. Counts: countRunningSwarmSlotsForIssue takes liveIds: ReadonlySet<string> | null (null fails open like countRunningAgents), an async countLiveSwarmSlotsForIssue wrapper reads listLiveAgentIds(), registeredSlotCapacityAvailable's dep becomes Promise<boolean>; describeRunningAgents and emergencyBrake go async over the same inventory read (the brake stops via the Effect stopAgent). Janitor: a new src/lib/cloister/swarm-janitor.ts runSwarmJanitor() reads liveAgentInventory() once, overrides listSessionNames/isPaneDead/getPaneExitStatus/getPaneOutputDigest on Herdr (only listSessionNames on tmux) on top of the exported defaultCoordinateSwarmDeps, skips on a null inventory, and runs swarmJanitorPass; deacon-lite runs it as a dynamically-imported fifth routine gated off unless a swarm policy mode other than 'off' is configured globally or on any project. Docs: rewrite the known-gap paragraph in docs/TERMINAL-BACKENDS.md and the deacon.ts row in docs/THE-CUT.md. Full detail with before/after snippets is in .pan/drafts/pan-3926.md.",
+      "NonGoals": "- Renaming the WorkAgentLifecycleState field hasLiveTmuxSession (wired into frontend types and route payloads); its meaning becomes 'the oracle did not confirm death' on either backend.\n- Adding a synchronous Herdr probe or any new sync subprocess primitive (prefer-async, no-execsync-server rules).\n- Other tmuxActive consumers: memory-governor.ts:450, agents/recovery.ts:360, reconstruct/reconstruct-cache.ts:81, agents/health.ts:141, and listRunningAgentsSync's own tmuxActive computation in agents/queries.ts.\n- coordinateSwarmSlots (manual pan swarm) keeping its tmux default deps, and swarm-status.ts's listSessionNamesSync / default classifyInFlightSlots deps — only capacity.used moves to the async count.\n- The useSupervisor: true hardcodes in runtimes/muse.ts, runtimes/kimi-code.ts and overdeck/conversation-runtime.ts named in the same docs paragraph (separate Herdr gap).\n- Stripping gcOrphanedSlots from swarmJanitorPass to avoid the double GC with sweepOrphanedSwarmSlots (accepted as idempotent, D9).\n- Re-enabling swarm: the janitor routine stays dormant under the default policy mode 'off' (D11); no change to pan start's default work path.\n- Any change to the Herdr adapter, the inventory module, or hostTerminalBackendName selection."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Retire the sync liveness door instead of adding a sync Herdr probe.",
+        "rationale": "No sync Herdr client exists; prefer-async forbids new sync functions and no-execsync-server forbids a spawnSync of the herdr CLI in a dashboard route (merge-strike.ts). Every caller of the sync classifier is already inside an async function, so the async door is a drop-in."
+      },
+      {
+        "summary": "Promise variants use the Async suffix; Effect exports keep their names.",
+        "rationale": "getWorkAgentLifecycleState is already the Effect export used by five dashboard routes; sendKeysAsync / dropLegacyAgentStatesMissingRoleAsync establish the suffix convention."
+      },
+      {
+        "summary": "The CLI inherits PAN-3555 owed-rework semantics from the async door.",
+        "rationale": "The async snapshot asks the forge only when handedOff is true and a failed forge call already reads false; a handed-off agent with CHANGES_REQUESTED becoming resumable from pan resume is the documented PAN-3555 intent, previously blocked only by the sync door's inability to await."
+      },
+      {
+        "summary": "emergencyBrake is included although the issue names only two concurrency.ts functions.",
+        "rationale": "It is the third tmuxActive filter in the same file with the same Herdr failure (sees zero work agents, trims nothing); leaving it would ship a known gap in the file the issue exists to fix. It also removes a sync tmux kill from a dashboard route."
+      },
+      {
+        "summary": "The janitor is scheduled from deacon-lite, gated off unless a swarm policy mode other than 'off' is configured.",
+        "rationale": "Foreman respawn and stall events are pipeline behavior, which hygiene-scheduler's contract excludes and which must honor the D7 pause; the policy gate keeps PAN-3917 D11/FR-11 dormancy on a default host at zero cost (config reads only)."
+      },
+      {
+        "summary": "The janitor module is imported dynamically from deacon-lite.",
+        "rationale": "A static edge would pull spawnRun/messageAgent into the patrol module graph; liveness.ts documents the runtimes cycle this pattern (inventory.ts's await import) avoids."
+      },
+      {
+        "summary": "Double orphan-slot GC (janitor + hygiene sweep) is accepted.",
+        "rationale": "gcOrphanedSlots on a clean slot is a no-op and the janitor is inert by default; stripping it would churn the janitor's existing tests for no behavior gain."
+      },
+      {
+        "summary": "Parked-sweeper probes run concurrently via Promise.all.",
+        "rationale": "A Herdr socket outage then costs one 2 s probe timeout instead of 2 s per running agent."
+      },
+      {
+        "summary": "Kept as one plan with sizeJustification rather than sibling issues.",
+        "rationale": "Nine production files; the rest of the surface is porting test mocks that name the deleted sync exports. The parent issue scoped these three gaps as one follow-up."
+      }
+    ],
+    "items": [
+      {
+        "id": "lifecycle-async-door",
+        "title": "Export the async lifecycle classifier and guards",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:57:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3926",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "cli-callers-async-door",
+            "merge-strike-async-door",
+            "delete-sync-liveness-door"
+          ],
+          "files_scope": [
+            "src/lib/work-agent-lifecycle.ts",
+            "tests/unit/lib/work-agent-lifecycle.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/work-agent-lifecycle.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/unit/lib/work-agent-lifecycle.test.ts passes including a describe named getWorkAgentLifecycleStateAsync with four cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W1. In src/lib/work-agent-lifecycle.ts rename the private getWorkAgentLifecycleStateSnapshot (line 197) to the exported getWorkAgentLifecycleStateAsync; add assertCanStartFreshAsync and assertCanResumeSessionAsync with the exact bodies in the PRD (same throw messages as the sync guards); rebuild the Effect exports assertCanStartFresh and assertCanResumeSession with Effect.tryPromise over the async variants and getWorkAgentLifecycleState with Effect.promise over getWorkAgentLifecycleStateAsync. Leave the sync exports in place (deleted by delete-sync-liveness-door). Add the four async test cases described in W1 to tests/unit/lib/work-agent-lifecycle.test.ts, mocking liveness.js isAlive."
+        },
+        "items": [
+          {
+            "id": "lifecycle-async-door.ac1",
+            "title": "Given a running agent whose isAlive mock resolves alive, getWorkAgentLifecycleStateAsync returns hasLiveTmuxSession true, isRunning true and recommendedAction 'none'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-async-door.ac2",
+            "title": "Given isAlive resolves runtime-indeterminate, getWorkAgentLifecycleStateAsync returns hasLiveTmuxSession true (a failed probe never reads as death)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-async-door.ac3",
+            "title": "assertCanResumeSessionAsync rejects with the 'already running' reason for a live running fixture, and assertCanStartFreshAsync resolves for a stopped fixture with no saved session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lifecycle-async-door.ac4",
+            "title": "Each Effect export assertCanStartFresh and assertCanResumeSession fails with a WorkAgentLifecycleViolation whose reason equals the text the matching async guard throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-callers-async-door",
+        "title": "Move the five CLI lifecycle callers to the async door",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:57:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3926",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/start.ts",
+            "src/cli/commands/resume.ts",
+            "src/cli/commands/unpause.ts",
+            "src/cli/commands/reset-session.ts",
+            "src/cli/commands/start-fresh-session.ts",
+            "src/cli/commands/__tests__/start-running-noop.test.ts",
+            "src/cli/commands/__tests__/start-fresh-session.test.ts",
+            "src/cli/commands/__tests__/operator-interventions.test.ts",
+            "src/cli/commands/__tests__/agent-targeting.test.ts",
+            "src/cli/commands/__tests__/bare-numeric-id-resolution.test.ts",
+            "tests/cli/commands/reset-session.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/cli/commands/__tests__/start-running-noop.test.ts src/cli/commands/__tests__/start-fresh-session.test.ts src/cli/commands/__tests__/operator-interventions.test.ts src/cli/commands/__tests__/agent-targeting.test.ts src/cli/commands/__tests__/bare-numeric-id-resolution.test.ts tests/cli/commands/reset-session.test.ts",
+            "grep -n 'getWorkAgentLifecycleStateSync\\|assertCanStartFreshSync\\|assertCanResumeSessionSync' src/cli/commands/start.ts src/cli/commands/resume.ts src/cli/commands/unpause.ts src/cli/commands/reset-session.ts src/cli/commands/start-fresh-session.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the six named test files pass",
+            "the grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W2. Replace each sync lifecycle call with an awaited Async call: start.ts line 802 (getWorkAgentLifecycleStateAsync) and line 938 (assertCanStartFreshAsync inside the existing try), resume.ts lines 37 and 47, unpause.ts line 41, reset-session.ts line 19 (rewrite the .find into a for loop that awaits per target and exits 1 on the first live agent), start-fresh-session.ts (seam type returns Promise<unknown>, default assertCanStartFreshAsync, awaited call at line 84). Update imports to the Async names. Port the six test files: rename mock keys to the Async names and return resolved promises (mockResolvedValue / async mockImplementation that throws for refusal cases). Do not delete the sync exports here."
+        },
+        "items": [
+          {
+            "id": "cli-callers-async-door.ac1",
+            "title": "Given a Herdr-hosted live work agent (mock lifecycle isRunning true), pan start <issue> prints 'already running' and exits 0 without calling the fresh-start guard",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-callers-async-door.ac2",
+            "title": "pan reset-session refuses (exit 1) when any target's async lifecycle reports hasLiveTmuxSession true, and resets when none does",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-callers-async-door.ac3",
+            "title": "prepareFreshWorkAgentSession awaits its assertCanStartFresh seam and returns ok:false with the guard's message when the seam rejects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-callers-async-door.ac4",
+            "title": "None of the five CLI command files references a Sync lifecycle export (grep prints nothing) and all six named test files pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-strike-async-door",
+        "title": "Move the merge-strike route to the async door",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:57:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-3926",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/merge-strike.ts",
+            "src/dashboard/server/routes/workspaces/__tests__/merge-agent-readiness.test.ts",
+            "src/dashboard/server/routes/workspaces/__tests__/merge-ops-server-rebase.test.ts",
+            "src/dashboard/server/routes/workspaces/__tests__/merge-queue-advance.test.ts",
+            "tests/unit/dashboard/server/routes/strike-merge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/routes/workspaces/__tests__/merge-agent-readiness.test.ts src/dashboard/server/routes/workspaces/__tests__/merge-ops-server-rebase.test.ts src/dashboard/server/routes/workspaces/__tests__/merge-queue-advance.test.ts tests/unit/dashboard/server/routes/strike-merge.test.ts",
+            "grep -n 'getWorkAgentLifecycleStateSync' src/dashboard/server/routes/workspaces/merge-strike.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the four named test files pass",
+            "the grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W3. In ensureAgentReadyForMerge (merge-strike.ts lines 319 and 327) replace both getWorkAgentLifecycleStateSync calls with awaited getWorkAgentLifecycleStateAsync calls and update the import on line 14. Port the four named tests: rename the mock key to getWorkAgentLifecycleStateAsync and return promises. This also removes the last synchronous tmux exec reachable from a dashboard route."
+        },
+        "items": [
+          {
+            "id": "merge-strike-async-door.ac1",
+            "title": "Given the async lifecycle reports hasLiveTmuxSession true, ensureAgentReadyForMerge sends the merge-preparation message and returns detail 'Work agent already running' without spawning",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-strike-async-door.ac2",
+            "title": "Given hasLiveTmuxSession false and canStartFresh true with no agent state, ensureAgentReadyForMerge spawns a fresh work agent and returns detail 'Started fresh work agent'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-strike-async-door.ac3",
+            "title": "merge-strike.ts contains no reference to getWorkAgentLifecycleStateSync and the four named test files pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "parked-resolver-async-oracle",
+        "title": "Parked sweeper filters live agents with isAlive concurrently",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:57:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3926",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/parked/resolver.ts",
+            "src/lib/parked/__tests__/resolver.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/parked/__tests__/resolver.test.ts",
+            "grep -n 'isAliveSync' src/lib/parked/resolver.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "src/lib/parked/__tests__/resolver.test.ts passes including a runtime-indeterminate case",
+            "the grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W4. In resolveParkedPopulation (resolver.ts line 258) filter running/starting rows first, run Promise.all over isAlive(row.id), and keep rows whose verdict is not isConfirmedDead. Import isAlive instead of isAliveSync (line 29) and update the PAN-3849 comment. In resolver.test.ts change the liveness.js mock to export an async isAlive with the same tmuxActive-to-verdict mapping, and add a case where isAlive resolves runtime-indeterminate and the agent still counts as live (mints an idle-running row when idle past the threshold)."
+        },
+        "items": [
+          {
+            "id": "parked-resolver-async-oracle.ac1",
+            "title": "Given a running agent whose isAlive resolves alive, resolveParkedPopulation treats it as live and produces the same rows the existing fixtures expect",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parked-resolver-async-oracle.ac2",
+            "title": "Given isAlive resolves runtime-indeterminate for a running agent idle past IDLE_RUNNING_THRESHOLD_MS, resolveParkedPopulation still produces its idle-running row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parked-resolver-async-oracle.ac3",
+            "title": "isAlive is invoked once per running/starting row and all invocations start before any resolves (Promise.all), verified by an invocation-order spy in the test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "delete-sync-liveness-door",
+        "title": "Delete isAliveSync, the sync classifier and guards, and the sync pid probe",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:57:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-3926",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/liveness.ts",
+            "src/lib/work-agent-lifecycle.ts",
+            "src/lib/agents/runtime-pid-probe.ts",
+            "tests/unit/lib/agents/liveness.test.ts",
+            "src/lib/agents/__tests__/runtime-pid-probe.test.ts",
+            "tests/unit/dashboard/server/routes/resume-gate.test.ts",
+            "tests/unit/dashboard/routes/agents-spawn-in-flight.test.ts",
+            "tests/lib/work-agent-lifecycle.test.ts",
+            "tests/unit/lib/work-agent-lifecycle.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/agents/liveness.test.ts src/lib/agents/__tests__/runtime-pid-probe.test.ts tests/unit/dashboard/server/routes/resume-gate.test.ts tests/unit/dashboard/routes/agents-spawn-in-flight.test.ts tests/lib/work-agent-lifecycle.test.ts tests/unit/lib/work-agent-lifecycle.test.ts",
+            "grep -rn 'isAliveSync\\|getWorkAgentLifecycleStateSync\\|assertCanStartFreshSync\\|assertCanResumeSessionSync\\|findAgentRuntimePidInSubtreeSync\\|LivenessSyncDeps' src tests"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes",
+            "the six named test files pass",
+            "the grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W5. In liveness.ts delete LivenessSyncDeps, listPaneRowsSyncDefault and isAliveSync, drop the sessionExistsSync and findAgentRuntimePidInSubtreeSync imports (keep listPaneValuesSync, used at line 262), and rewrite the header's sync mention. In work-agent-lifecycle.ts delete getWorkAgentLifecycleStateSync, assertCanStartFreshSync and assertCanResumeSessionSync and their now-unused sync imports (keep getAgentStateSync). In runtime-pid-probe.ts delete findAgentRuntimePidInSubtreeSync and its describe block in runtime-pid-probe.test.ts. Port the remaining tests to vi.spyOn(liveness, 'isAlive').mockResolvedValue and the awaited Async door. Finish with the FR-5 grep."
+        },
+        "items": [
+          {
+            "id": "delete-sync-liveness-door.ac1",
+            "title": "grep -rn for isAliveSync, getWorkAgentLifecycleStateSync, assertCanStartFreshSync, assertCanResumeSessionSync, findAgentRuntimePidInSubtreeSync and LivenessSyncDeps across src and tests prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-sync-liveness-door.ac2",
+            "title": "liveness.ts exports isAlive, isAliveOnTmux, isConfirmedDead, isIdle, idleAgeMs, getAgentWorkActivityMs, getAgentEffectiveLastActivityMs and registerLivenessHeartbeatLookup unchanged (typecheck passes for every existing importer)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-sync-liveness-door.ac3",
+            "title": "tests/lib/work-agent-lifecycle.test.ts passes and resume-gate.test.ts passes with vi.spyOn(liveness, 'isAlive') replacing the isAliveSync spies and every classifier call awaited",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "delete-sync-liveness-door.ac4",
+            "title": "npm run lint passes (no unused imports left in liveness.ts, work-agent-lifecycle.ts or runtime-pid-probe.ts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "swarm-slot-count-inventory",
+        "title": "Per-issue swarm-slot count reads the backend inventory",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:57:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3926",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/concurrency.ts",
+            "src/lib/cloister/deacon-swarm.ts",
+            "src/lib/cloister/deacon-swarm-types.ts",
+            "src/cli/commands/swarm-status.ts",
+            "tests/unit/lib/cloister/deacon-swarm-dispatch.test.ts",
+            "tests/unit/cli/commands/swarm.test.ts",
+            "tests/unit/cli/commands/swarm-wait.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deacon-swarm-dispatch.test.ts tests/unit/cli/commands/swarm.test.ts tests/unit/cli/commands/swarm-wait.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the three named test files pass including a null-inventory fail-open case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W6. Change countRunningSwarmSlotsForIssue's signature to (issueId, agents, liveIds: ReadonlySet<string> | null, isTerminalSlot = isTerminalSwarmSlotAgent) and its filter to status running, (liveIds === null || liveIds.has(a.id)), role work, slot id pattern, issue prefix, not terminal; add the async countLiveSwarmSlotsForIssue(issueId) that reads listLiveAgentIds(). In deacon-swarm.ts make registeredSlotCapacityAvailable's liveSlotCount a required parameter, make the defaultCoordinate deps entry async over countLiveSwarmSlotsForIssue, and await deps.registeredSlotCapacityAvailable at line 857; in deacon-swarm-types.ts line 72 the type returns Promise<boolean>. In swarm-status.ts the dep returns Promise<number>, defaults to countLiveSwarmSlotsForIssue, and capacity.used is awaited. Port the three test files: agentRow(id) plus per-case liveIds sets, plus a liveIds === null case; the CLI mocks return promises."
+        },
+        "items": [
+          {
+            "id": "swarm-slot-count-inventory.ac1",
+            "title": "Given three running slot rows for the issue and an inventory containing two of them, countRunningSwarmSlotsForIssue returns 2 regardless of the rows' tmuxActive flag",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-slot-count-inventory.ac2",
+            "title": "Given liveIds null, countRunningSwarmSlotsForIssue counts every running non-terminal slot row for the issue (fails open)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-slot-count-inventory.ac3",
+            "title": "registeredSlotCapacityAvailable returns false when liveSlotCount plus selectedCount reaches reservedSwarmSlots and true below it, with liveSlotCount passed explicitly (no default argument)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-slot-count-inventory.ac4",
+            "title": "The CoordinateSwarmSlotsDeps.registeredSlotCapacityAvailable type returns Promise<boolean>, dispatchNextWave awaits it, and pan swarm status reports capacity.used from the awaited count",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "describe-running-agents-inventory",
+        "title": "describeRunningAgents lists inventory-live agents",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T11:57:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3926",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/concurrency.ts",
+            "tests/unit/lib/cloister/concurrency.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/concurrency.test.ts src/lib/cloister/__tests__/reactive-scheduler.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/unit/lib/cloister/concurrency.test.ts passes with a Herdr-style case and a null-inventory case; reactive-scheduler.test.ts still passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W7. Make describeRunningAgents async: read listLiveAgentIds() once, filter listRunningAgentsSync() rows to status running and (liveIds === null || liveIds.has(a.id)), and keep the rest of the string assembly unchanged. It has no production caller; the module mock in src/lib/cloister/__tests__/reactive-scheduler.test.ts keeps working. Add two cases to tests/unit/lib/cloister/concurrency.test.ts mocking ../terminal-backends/inventory.js."
+        },
+        "items": [
+          {
+            "id": "describe-running-agents-inventory.ac1",
+            "title": "Given rows with tmuxActive false that the mocked inventory lists, describeRunningAgents resolves a string whose work=[...] contains those ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "describe-running-agents-inventory.ac2",
+            "title": "Given the mocked inventory returns null, describeRunningAgents counts every running row (fails open)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "emergency-brake-inventory",
+        "title": "emergencyBrake selects inventory-live work agents and stops them asynchronously",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T11:57:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-3926",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/concurrency.ts",
+            "src/dashboard/server/routes/cloister.ts",
+            "tests/lib/cloister/concurrency.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/cloister/concurrency.test.ts",
+            "grep -n 'tmuxActive\\|stopAgentSync' src/lib/cloister/concurrency.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/lib/cloister/concurrency.test.ts passes with the three brake cases awaited",
+            "the grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W8. Make emergencyBrake async: read listLiveAgentIds() once, select rows with status running, role work and (liveIds === null || liveIds.has(a.id)); stop each chosen agent with await Effect.runPromise(stopAgent(agent.id, 'system')) imported from ../agents/termination.js (signature verified: stopAgent(agentId, cause = 'system')); drop the stopAgentSync import if unused. In routes/cloister.ts line 126 replace Effect.try with Effect.tryPromise over emergencyBrake(). Port the three brake cases in tests/lib/cloister/concurrency.test.ts to mock the inventory and the termination module and await the result."
+        },
+        "items": [
+          {
+            "id": "emergency-brake-inventory.ac1",
+            "title": "Given four running work rows the mocked inventory lists and a cap of 2, emergencyBrake resolves stopped with the two idle/stalest ids and remaining 2, calling stopAgent (not stopAgentSync) for each",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emergency-brake-inventory.ac2",
+            "title": "Given rows absent from a non-null inventory, emergencyBrake ignores them: before equals the number of inventory-live work rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emergency-brake-inventory.ac3",
+            "title": "POST /api/cloister/brake awaits the async brake and returns the same success payload shape (before, cap, stopped, remaining)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emergency-brake-inventory.ac4",
+            "title": "concurrency.ts contains no reference to tmuxActive or stopAgentSync",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "swarm-janitor-backend-deps",
+        "title": "runSwarmJanitor wraps swarmJanitorPass with backend-aware deps",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:57:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3926",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/swarm-janitor.ts",
+            "src/lib/cloister/deacon-swarm.ts",
+            "tests/unit/lib/cloister/swarm-janitor.test.ts",
+            "tests/unit/lib/cloister/deacon-swarm-janitor.test.ts",
+            "tests/unit/lib/cloister/deacon-swarm-stall-events.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/swarm-janitor.test.ts tests/unit/lib/cloister/deacon-swarm-janitor.test.ts tests/unit/lib/cloister/deacon-swarm-stall-events.test.ts",
+            "grep -n 'defaultDeps\\b' src/lib/cloister/deacon-swarm.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the three named test files pass, the new one with four cases",
+            "the grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W9. In deacon-swarm.ts rename the module-private defaultDeps to the exported defaultCoordinateSwarmDeps and update every default-parameter reference. Create src/lib/cloister/swarm-janitor.ts exporting runSwarmJanitor(deps = defaultCoordinateSwarmDeps, readInventory = liveAgentInventory) exactly as sketched in the PRD: return [] on a null inventory; build ids and a paneById map; on herdr override listSessionNames, isPaneDead (absent from inventory), getPaneExitStatus (null) and getPaneOutputDigest (captureLiveAgentPaneText 200 lines); on tmux override only listSessionNames; then call swarmJanitorPass with the merged deps. Write tests/unit/lib/cloister/swarm-janitor.test.ts with the four cases in W9 using fake timers."
+        },
+        "items": [
+          {
+            "id": "swarm-janitor-backend-deps.ac1",
+            "title": "Given liveAgentInventory resolves null, runSwarmJanitor resolves [] and never calls listFeatureWorkspaces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-janitor-backend-deps.ac2",
+            "title": "Given a herdr inventory containing the in-flight slot agent, the pass classifies the slot as running (no vanished-session or failed action) and serves its output digest through captureLiveAgentPaneText",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-janitor-backend-deps.ac3",
+            "title": "Given a herdr inventory without the slot agent, the pass records the slot as failed with reason vanished-session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-janitor-backend-deps.ac4",
+            "title": "Given a tmux inventory, runSwarmJanitor overrides only listSessionNames and the passed deps' isPaneDead is still the one invoked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "swarm-janitor-backend-deps.ac5",
+            "title": "deacon-swarm.ts exports defaultCoordinateSwarmDeps and contains no identifier named defaultDeps; the existing janitor and stall-event tests pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deacon-lite-swarm-janitor-routine",
+        "title": "deacon-lite runs the swarm janitor as a policy-gated fifth routine",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T11:57:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3926",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-lite.ts",
+            "tests/unit/lib/cloister/deacon-lite.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/unit/lib/cloister/deacon-lite.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes with no import-cycle finding",
+            "tests/unit/lib/cloister/deacon-lite.test.ts passes with the three gate cases and the renamed five-routines case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W10. Add swarmJanitorEnabled() (true when resolveSwarmPolicy().mode !== 'off' or any listProjectsSync() entry has config.swarm.mode set to a value other than 'off') and runSwarmJanitorRoutine() (returns [] when disabled, otherwise dynamically imports ./swarm-janitor.js and returns runSwarmJanitor()). Append await runSwarmJanitorRoutine() after reapClosedIssueAgents() in runDeaconLite so the D7 pause still short-circuits it. Update the module docstring to five routines. Extend deacon-lite.test.ts with mocks for swarm-policy.js, projects.js and swarm-janitor.js and the three cases in W10."
+        },
+        "items": [
+          {
+            "id": "deacon-lite-swarm-janitor-routine.ac1",
+            "title": "Given the default policy (mode off, no project override), runDeaconLite awaits the four existing routines in order and runSwarmJanitor is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-lite-swarm-janitor-routine.ac2",
+            "title": "Given global swarm mode auto (or one project with swarm.mode always), runDeaconLite calls runSwarmJanitor exactly once after reapClosedIssueAgents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-lite-swarm-janitor-routine.ac3",
+            "title": "Given the deacon is globally paused, runDeaconLite runs none of the five routines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deacon-lite-swarm-janitor-routine.ac4",
+            "title": "deacon-lite.ts imports ./swarm-janitor.js only through a dynamic import inside the routine and npm run lint passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-herdr-liveness-gaps",
+        "title": "Docs: retire the isAliveSync known-gap paragraph and record the fifth deacon-lite routine",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T11:57:49Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3926",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TERMINAL-BACKENDS.md",
+            "docs/THE-CUT.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'isAliveSync' docs/TERMINAL-BACKENDS.md",
+            "grep -n 'swarm janitor' docs/TERMINAL-BACKENDS.md docs/THE-CUT.md",
+            "grep -n 'useSupervisor: true' docs/TERMINAL-BACKENDS.md"
+          ],
+          "expected_outputs": [
+            "the first grep prints nothing",
+            "the second grep prints exactly one line per file",
+            "the third grep still prints the muse/kimi/conversation-runtime sentence"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD W11. In docs/TERMINAL-BACKENDS.md replace the paragraph beginning '**Known gap:** `isAliveSync` is still tmux-only' with a paragraph stating that PAN-3926 retired the synchronous door: the lifecycle classifier and guards (getWorkAgentLifecycleStateAsync, assertCanStartFreshAsync, assertCanResumeSessionAsync) and the parked sweeper go through isAlive; swarm-slot counts, describeRunningAgents and the emergency brake read listLiveAgentIds() and fail open on null; the swarm janitor runs from deacon-lite via runSwarmJanitor and is gated off unless a swarm policy mode other than off is configured. Keep the sentence about runtimes/muse.ts, runtimes/kimi-code.ts and overdeck/conversation-runtime.ts hardcoding useSupervisor: true. In docs/THE-CUT.md line 82 change '4 fixed routines' to '5 fixed routines (the fifth, the swarm janitor, is dormant unless a swarm policy is on — PAN-3926)'."
+        },
+        "items": [
+          {
+            "id": "docs-herdr-liveness-gaps.ac1",
+            "title": "docs/TERMINAL-BACKENDS.md contains no occurrence of isAliveSync and its liveness section states that the classifier, guards and parked sweeper go through isAlive on either backend",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-herdr-liveness-gaps.ac2",
+            "title": "docs/TERMINAL-BACKENDS.md still contains the useSupervisor: true sentence about muse, kimi-code and conversation-runtime",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-herdr-liveness-gaps.ac3",
+            "title": "docs/THE-CUT.md's deacon.ts row contains '5 fixed routines' and names the swarm janitor with its policy gate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "lifecycle-async-door",
+        "to": "cli-callers-async-door",
+        "type": "blocks"
+      },
+      {
+        "from": "lifecycle-async-door",
+        "to": "merge-strike-async-door",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-callers-async-door",
+        "to": "delete-sync-liveness-door",
+        "type": "blocks"
+      },
+      {
+        "from": "merge-strike-async-door",
+        "to": "delete-sync-liveness-door",
+        "type": "blocks"
+      },
+      {
+        "from": "parked-resolver-async-oracle",
+        "to": "delete-sync-liveness-door",
+        "type": "blocks"
+      },
+      {
+        "from": "swarm-slot-count-inventory",
+        "to": "describe-running-agents-inventory",
+        "type": "blocks"
+      },
+      {
+        "from": "describe-running-agents-inventory",
+        "to": "emergency-brake-inventory",
+        "type": "blocks"
+      },
+      {
+        "from": "swarm-janitor-backend-deps",
+        "to": "deacon-lite-swarm-janitor-routine",
+        "type": "blocks"
+      },
+      {
+        "from": "delete-sync-liveness-door",
+        "to": "docs-herdr-liveness-gaps",
+        "type": "informs"
+      },
+      {
+        "from": "deacon-lite-swarm-janitor-routine",
+        "to": "docs-herdr-liveness-gaps",
+        "type": "informs"
+      },
+      {
+        "from": "lifecycle-async-door",
+        "to": "delete-sync-liveness-door",
+        "type": "blocks"
+      },
+      {
+        "from": "swarm-slot-count-inventory",
+        "to": "emergency-brake-inventory",
+        "type": "blocks"
+      },
+      {
+        "from": "swarm-slot-count-inventory",
+        "to": "swarm-janitor-backend-deps",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
