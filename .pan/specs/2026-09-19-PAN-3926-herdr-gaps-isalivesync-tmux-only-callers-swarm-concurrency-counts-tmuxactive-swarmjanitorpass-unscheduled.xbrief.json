@@ -4,17 +4,17 @@
     "created": "2026-09-19T11:57:49Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3926: Herdr gaps: isAliveSync tmux-only callers; swarm concurrency counts tmuxActive; swarmJanitorPass unscheduled",
-    "updated": "2026-09-19T12:02:11.173Z"
+    "updated": "2026-09-19T13:30:14.816Z"
   },
   "plan": {
     "id": "pan-3926",
     "title": "Herdr gaps: isAliveSync tmux-only callers; swarm concurrency counts tmuxActive; swarmJanitorPass unscheduled",
-    "status": "proposed",
+    "status": "running",
     "uid": "b38f57d5-4b8e-4fcd-a2e8-ba7cfb310365",
     "author": "agent:claude-fable-5-1",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-19T11:57:49Z",
-    "updated": "2026-09-19T12:02:11.173Z",
+    "updated": "2026-09-19T13:30:14.816Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3926",
