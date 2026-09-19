@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3930",
   "created": "2026-09-19T13:31:31.437Z",
-  "updated": "2026-09-19T13:34:48.031Z",
+  "updated": "2026-09-19T13:34:57.292Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-3930",
       "claimedAt": "2026-09-19T13:31:31.437Z",
       "doneAt": "2026-09-19T13:34:48.030Z"
+    },
+    "pan-map-canonical-path": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3930",
+      "claimedAt": "2026-09-19T13:34:57.292Z"
     }
   }
 }
