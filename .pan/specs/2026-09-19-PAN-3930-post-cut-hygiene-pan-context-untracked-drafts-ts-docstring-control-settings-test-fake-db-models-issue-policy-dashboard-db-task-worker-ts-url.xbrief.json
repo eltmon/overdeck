@@ -1,0 +1,475 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-19T12:02:03Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3930: Post-cut hygiene: .pan/context untracked; drafts.ts docstring; control-settings test fake db models issue_policy; dashboard-db-task worker .ts URL",
+    "updated": "2026-09-19T12:06:06.034Z"
+  },
+  "plan": {
+    "id": "pan-3930",
+    "title": "Post-cut hygiene: .pan/context untracked; drafts.ts docstring; control-settings test fake db models issue_policy; dashboard-db-task worker .ts URL",
+    "status": "proposed",
+    "uid": "10e12647-35c2-4518-928b-149c2718f1c1",
+    "author": "agent:claude-fable-5-1",
+    "sequence": 2,
+    "created": "2026-09-19T12:02:03Z",
+    "updated": "2026-09-19T12:06:06.034Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3930",
+        "label": "PAN-3930",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3917",
+        "label": "PAN-3917 (The Overdeck Cut)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3935",
+        "label": "PAN-3935 (draft promotion targets the primary checkout; filed during planning, out of scope)",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-3930.md",
+        "label": "PRD draft",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "hygiene",
+      "post-cut",
+      "pan-3917",
+      "tests",
+      "docs",
+      "dashboard-db-worker"
+    ],
+    "narratives": {
+      "Problem": "Four small residues from the Overdeck Cut (PAN-3917). (1) The primary checkout shows `.pan/context/` untracked: a stale August copy of the codebase map that the /pan-map skill still writes to, while the canonical tracked copy lives under `.overdeck/context/codebase/`; the only code that touched the legacy directory (`completePlanningFilesToStage`) is dead. (2) The `promoteWorkspacePrdDraft` docstring in `src/lib/pan-dir/drafts.ts` and a caller comment in `planning-promotion.ts` still say drafts are committed and pushed on the retired state plane. (3) `makeWiredFakeDb` in `tests/unit/lib/overdeck/control-settings.test.ts` still models the dropped `issue_policy` table. (4) `dashboard-db-task.ts` spawns `dashboard-db-worker.ts` as a raw Node worker under a source run; Node's type stripping does not rewrite the worker's `.js` import specifiers, so any test that reaches a polling snapshot with a non-empty agent list and an unmocked `node:worker_threads` rejects with ERR_MODULE_NOT_FOUND for `dashboard-cost-snapshot.js` (reproduced during planning). fix10 hid it by isolating the Herdr session so test agent lists are empty.",
+      "Proposal": "Six leaf items, lowered from the PRD at .pan/drafts/pan-3930.md. Ignore `.pan/context/` in .gitignore and delete the dead staging fallback plus its test (D1); re-point the /pan-map skill and docs/SKILLS-CONVENTION.md at `.overdeck/context/codebase/`; rewrite the two 'state plane' comments to say the draft goes to `.pan/drafts/` under projectRoot, is committed by the planning flow, never pushed, and cite PAN-3935 (D6); strip the issue_policy model from the fake db; in the `.ts` branch of the worker spawn, boot the thread through an eval bootstrap that registers tsx's resolver (resolved via createRequire from the module URL) before importing `dashboard-db-worker.ts`, add `__testInternals.terminateWorkers()`, and prove it with a regression test that spawns the real worker (D3-D5); document the bootstrap in docs/DASHBOARD-ARCHITECTURE.md. The built dist/ path is untouched.",
+      "NonGoals": "- Fixing PAN-3935 (PRD promotion writes to the primary checkout and deletes the feature-branch copy); WI-3 only documents it.\n- The identical `.ts` worker branches in src/lib/memory/checkpoint-client.ts and src/lib/memory/fts-db.ts.\n- Removing the legacy read fallbacks in src/lib/context-layers/layers.ts or the 'Legacy context paths' row in docs/CONTEXT-LAYERS.md.\n- Deleting the operator's untracked /home/eltmon/Projects/overdeck/.pan/context/ or the older untracked drafts in the primary checkout.\n- Routing polling snapshots through the Vitest inline path; dashboard-poll-worker.test.ts pins the opposite.\n- Touching the correct issue_policy mentions in src/lib/overdeck/infra.ts, schema-topups.test.ts, pipeline-mirror-drop.test.ts.\n- Any change to the production (dist/) worker spawn, lane routing, or coalescing.\n- The duplicated 'Project and / Project and' words in src/lib/context-layers/layers.ts:13-14."
+    },
+    "autoDecisions": [
+      {
+        "summary": "`.pan/context/` is ignored, not tracked (D1).",
+        "rationale": "The canonical map is already tracked under `.overdeck/context/codebase/`; tracking the legacy copy would commit a stale duplicate. The dead `completePlanningFilesToStage` fallback goes in the same item because `git add` of an ignored path fails, and it has no callers."
+      },
+      {
+        "summary": "The operator's untracked `.pan/context/` in the primary checkout is left for the operator to remove (D2).",
+        "rationale": "A diff cannot delete an untracked directory in another worktree; once ignored it stops appearing in git status."
+      },
+      {
+        "summary": "The worker fix is a tsx-registered eval bootstrap in the `.ts` branch, not an inline path (D3).",
+        "rationale": "dashboard-poll-worker.test.ts:15-16 deliberately pins that polling snapshots never use the Vitest inline resolver; raw `--import tsx` execArgv was verified not to attach to a raw `.ts` worker entry, while the in-thread register()+import bootstrap answered a real getAgentCostStats job."
+      },
+      {
+        "summary": "tsx is resolved via createRequire(import.meta.url).resolve('tsx/esm/api'), with the bare specifier as the documented fallback (D4).",
+        "rationale": "Keeps the bootstrap independent of process cwd; the resolved .cjs path was verified to expose register as a named export."
+      },
+      {
+        "summary": "Explicit test teardown via `__testInternals.terminateWorkers()` (D5).",
+        "rationale": "dashboard-db-task.ts never unref()s its workers; a real worker would keep the Vitest fork alive. Mirrors the __testInternals pattern in src/lib/memory/fts-db.ts."
+      },
+      {
+        "summary": "Docstring wording is factual about today's behavior and cites PAN-3935 (D6).",
+        "rationale": "The promoted draft currently lands in the primary checkout, not on the feature branch; a docstring claiming otherwise would be wrong in a new way."
+      },
+      {
+        "summary": "PRD filename is lowercase `.pan/drafts/pan-3930.md` (D7).",
+        "rationale": "getIssueDraftPath produces the lowercase canonical name; the PRD gate accepts either case."
+      }
+    ],
+    "items": [
+      {
+        "id": "context-ignore",
+        "title": "Ignore .pan/context/ and delete the dead completePlanningFilesToStage fallback",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T12:02:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-3930",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            ".gitignore",
+            "src/lib/overdeck/planning-promotion.ts",
+            "src/dashboard/server/routes/__tests__/complete-planning.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git check-ignore -v .pan/context/codebase/architecture.md",
+            "! grep -rn completePlanningFilesToStage src tests",
+            "npx vitest run src/dashboard/server/routes/__tests__/complete-planning.test.ts"
+          ],
+          "expected_outputs": [
+            "check-ignore exits 0 and prints the .gitignore rule `.pan/context/`",
+            "grep prints nothing (exit 1)",
+            "complete-planning.test.ts passes with the remaining cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. In .gitignore, directly after the `.pan/records/` line (line 235), add the PAN-3930 comment block and the rule `.pan/context/` (exact text in the PRD). In src/lib/overdeck/planning-promotion.ts delete the whole `completePlanningFilesToStage` function (lines 207-215); keep the existsSync/join imports, they are used elsewhere. In src/dashboard/server/routes/__tests__/complete-planning.test.ts remove `completePlanningFilesToStage` from the import list (line 25) and delete the case 'includes codebase map changes in the main-side promote commit pathspec' (lines 268-283); drop imports only if they became unused."
+        },
+        "items": [
+          {
+            "id": "context-ignore.ac1",
+            "title": "Given the updated .gitignore, when `git check-ignore -v .pan/context/codebase/architecture.md` runs from the checkout root, it exits 0 and prints the `.pan/context/` rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-ignore.ac2",
+            "title": "`grep -rn completePlanningFilesToStage src tests` returns no matches: the function, its import, and its test case are deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "context-ignore.ac3",
+            "title": "`npx vitest run src/dashboard/server/routes/__tests__/complete-planning.test.ts` passes every remaining case",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pan-map-canonical-path",
+        "title": "Point the /pan-map skill and SKILLS-CONVENTION.md at .overdeck/context/codebase/",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T12:02:03Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3930",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-map/SKILL.md",
+            "docs/SKILLS-CONVENTION.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "! grep -rn '\\.pan/context' sync-sources/skills/pan-map docs/SKILLS-CONVENTION.md",
+            "grep -c '\\.overdeck/context/codebase/' sync-sources/skills/pan-map/SKILL.md",
+            "npm run lint:skills"
+          ],
+          "expected_outputs": [
+            "first grep prints nothing (exit 1)",
+            "second grep counts at least 6 lines",
+            "lint:skills passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. In sync-sources/skills/pan-map/SKILL.md replace every `.pan/context/codebase/` with `.overdeck/context/codebase/` (line 8, the four bullets at lines 14-17, workflow step 1 at line 28), wording otherwise unchanged. In docs/SKILLS-CONVENTION.md line 56 change `.pan/context/codebase/` to `.overdeck/context/codebase/`."
+        },
+        "items": [
+          {
+            "id": "pan-map-canonical-path.ac1",
+            "title": "sync-sources/skills/pan-map/SKILL.md names `.overdeck/context/codebase/` for the deliverable, all four map files, and workflow step 1, and contains no `.pan/context` string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-map-canonical-path.ac2",
+            "title": "docs/SKILLS-CONVENTION.md's `pan map` row names `.overdeck/context/codebase/` and the file contains no `.pan/context` string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pan-map-canonical-path.ac3",
+            "title": "`npm run lint:skills` exits 0 after the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drafts-docstring",
+        "title": "Rewrite the two 'state plane' comments on PRD draft promotion",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T12:02:03Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3930",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pan-dir/drafts.ts",
+            "src/lib/overdeck/planning-promotion.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "! grep -n 'state plane' src/lib/pan-dir/drafts.ts src/lib/overdeck/planning-promotion.ts",
+            "grep -n 'PAN-3935' src/lib/pan-dir/drafts.ts",
+            "bash scripts/guard-no-state-layer.sh"
+          ],
+          "expected_outputs": [
+            "first grep prints nothing (exit 1)",
+            "second grep prints the docstring line citing PAN-3935",
+            "guard-no-state-layer exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. Replace the docstring on promoteWorkspacePrdDraft (src/lib/pan-dir/drafts.ts lines 235-249) with the exact text in the PRD: target is `.pan/drafts/` under projectRoot; the planning flow that called it commits the copy and nothing pushes it from here (PAN-3917); the complete-planning route currently passes the primary checkout as projectRoot so the file is not on the feature branch (PAN-3935); keep the PAN-2858 / PAN-3042 history sentences. In src/lib/overdeck/planning-promotion.ts line 619-620 change 'promote it to drafts/ on the state plane so' to 'promote it to the plan home's `.pan/drafts/` so'. Comment-only change; no code lines move."
+        },
+        "items": [
+          {
+            "id": "drafts-docstring.ac1",
+            "title": "`grep -n 'state plane' src/lib/pan-dir/drafts.ts src/lib/overdeck/planning-promotion.ts` prints nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drafts-docstring.ac2",
+            "title": "The promoteWorkspacePrdDraft docstring states the `.pan/drafts/` target under projectRoot, states that the calling planning flow commits the copy and nothing pushes it, and cites PAN-3935 for the primary-checkout target",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drafts-docstring.ac3",
+            "title": "`bash scripts/guard-no-state-layer.sh` exits 0 and `npm run typecheck` still passes (comment-only diff)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "control-settings-fake-db",
+        "title": "Drop the issue_policy model from makeWiredFakeDb",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T12:02:03Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-3930",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/overdeck/control-settings.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "! grep -n 'issue_policy\\|issueId\\|policies' tests/unit/lib/overdeck/control-settings.test.ts",
+            "npx vitest run tests/unit/lib/overdeck/control-settings.test.ts"
+          ],
+          "expected_outputs": [
+            "grep prints nothing (exit 1)",
+            "every pre-existing case in control-settings.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. In tests/unit/lib/overdeck/control-settings.test.ts makeWiredFakeDb (lines 30-155): delete the `policies` map (32-40) and `upsertedPolicies` (45); in the select branch delete `tableIsPolicy` (69), the issue_policy comment and assignment (72-73), and the `if (tableIsPolicy)` block (77-83) so where() reads only from `flags` (rename `table` to `_table` if unused); in the insert branch delete the `else if ('issueId' in vals)` block (104-126); change the return (155) to `{ dbLayer, busLayer, insertedEvents, flags, upsertedKeys }`. Leave every describe/it body unchanged."
+        },
+        "items": [
+          {
+            "id": "control-settings-fake-db.ac1",
+            "title": "makeWiredFakeDb no longer declares `policies`, `upsertedPolicies`, or `tableIsPolicy`: grep for `issue_policy`, `issueId`, or `policies` in the file returns nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "control-settings-fake-db.ac2",
+            "title": "Given the fake db, when select().from(table).where(eq) runs it resolves rows from the app_settings map only, and insert().values().onConflictDoUpdate() records only `key` upserts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "control-settings-fake-db.ac3",
+            "title": "`npx vitest run tests/unit/lib/overdeck/control-settings.test.ts` passes every pre-existing case with no test body edited",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "db-worker-source-bootstrap",
+        "title": "Boot the source-run dashboard db worker through tsx and prove it with a real-worker test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-19T12:02:03Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3930",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/dashboard-db-task.ts",
+            "tests/unit/dashboard/db-task-source-worker.test.ts",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/db-task-source-worker.test.ts src/dashboard/server/services/__tests__/dashboard-poll-worker.test.ts tests/unit/dashboard/db-task-lanes.test.ts tests/unit/dashboard/db-task-instrumentation.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "all four test files pass and the Vitest process exits on its own (no hanging-worker teardown timeout)",
+            "typecheck completes without errors",
+            "lint:file-size passes (add the PAN-3930 allowlist row for dashboard-db-task.ts only if it trips)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5, exact code in the PRD. In src/dashboard/server/services/dashboard-db-task.ts: import createRequire from node:module; replace workerScriptUrl (lines 145-149) with a .js-only version plus workerExecArgv() and spawnWorker(); in spawnWorker, when import.meta.url ends with .ts, resolve tsx via createRequire(import.meta.url).resolve('tsx/esm/api'), build an eval bootstrap string that imports that path, calls register(), then imports the dashboard-db-worker.ts file URL, and construct `new Worker(bootstrap, { eval: true, execArgv })`; otherwise construct the Worker with the ./dashboard-db-worker.js URL exactly as today. Replace the `new Worker(...)` expression in getWorker (lines 201-208) with spawnWorker(). Add terminateWorkers() (terminate + null every lane) and `export const __testInternals = { terminateWorkers }`. Add tests/unit/dashboard/db-task-source-worker.test.ts (PRD text): no worker_threads mock, afterEach calls __testInternals.terminateWorkers(), one case with a 30000 ms timeout that awaits runDashboardDbJob('getAgentCostStats', { agentIds: ['agent-a'], nowMs: Date.now() }) and expects an array. Implementation checkpoint (D4): if the resolved tsx .cjs path fails to import inside the worker, use the bare specifier 'tsx/esm/api' in the eval string; if the spawn fails on an inherited Vitest execArgv flag, pass execArgv: [] in the .ts branch only. Add a scripts/file-size-allowlist.txt row `<lines> src/dashboard/server/services/dashboard-db-task.ts # PAN-3930` only if npm run lint:file-size fails."
+        },
+        "items": [
+          {
+            "id": "db-worker-source-bootstrap.ac1",
+            "title": "Given a source run with node:worker_threads unmocked, when runDashboardDbJob('getAgentCostStats', { agentIds: ['agent-a'], nowMs }) is awaited in tests/unit/dashboard/db-task-source-worker.test.ts, it resolves to an array instead of rejecting with ERR_MODULE_NOT_FOUND for dashboard-cost-snapshot.js",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "db-worker-source-bootstrap.ac2",
+            "title": "When import.meta.url does not end in .ts, the Worker is constructed with the ./dashboard-db-worker.js URL and no eval bootstrap; dashboard-poll-worker.test.ts, db-task-lanes.test.ts, and db-task-instrumentation.test.ts pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "db-worker-source-bootstrap.ac3",
+            "title": "dashboard-db-task.ts exports __testInternals.terminateWorkers(); after it resolves every lane slot is null, and the new test's afterEach calls it so the Vitest fork exits without a hanging-worker timeout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "db-worker-source-bootstrap.ac4",
+            "title": "`npm run typecheck` exits 0 and `npm run lint:file-size` exits 0 after the change (the PAN-3930 allowlist row for dashboard-db-task.ts is added only if the ratchet fails)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-db-worker-source-run",
+        "title": "Document the source-run worker bootstrap in DASHBOARD-ARCHITECTURE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-19T12:02:03Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3930",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'type stripping' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n 'terminateWorkers' docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "expected_outputs": [
+            "prints the new bullet in the 'DB job worker lanes' section",
+            "prints the same bullet's teardown sentence"
+          ],
+          "readiness": "ready",
+          "acJustification": "A single added bullet has two observable properties: it exists in the named section and it names the four required terms.",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-6. In docs/DASHBOARD-ARCHITECTURE.md, 'DB job worker lanes' section, add the PRD's bullet directly after the 'Worker implementations live in `src/dashboard/server/services/dashboard-db-worker.ts`' bullet (lines 129-131): under a source run the .ts module boots the thread through an eval bootstrap that registers tsx's resolver before importing dashboard-db-worker.ts because Node's type stripping does not rewrite the worker's .js specifiers (PAN-3930); the built dist/ path spawns dashboard-db-worker.js directly, unchanged; tests that spawn the real worker call __testInternals.terminateWorkers() in afterEach."
+        },
+        "items": [
+          {
+            "id": "docs-db-worker-source-run.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md 'DB job worker lanes' section renders a bullet, placed after the 'Worker implementations live in' bullet, that mentions type stripping and names dashboard-db-worker.ts and tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-db-worker-source-run.ac2",
+            "title": "The same bullet states that the built dist/ path spawns dashboard-db-worker.js unchanged and that real-worker tests call __testInternals.terminateWorkers() in afterEach",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "context-ignore",
+        "to": "drafts-docstring",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "PAN-3930 is, by the issue's own text, four unrelated one-to-three-file residues of the PAN-3917 cut (a gitignore rule plus a dead helper, two comments, one test fake, one worker spawn); the 8 subsystems are an artifact of those residues living in different directories, not of one large change. Roughly 60 changed lines in total; splitting into four sibling issues would cost four review/test/UAT cycles for changes that each fit in a single commit.",
+      "canonicalFilename": "2026-09-19-PAN-3930-post-cut-hygiene-pan-context-untracked-drafts-ts-docstring-control-settings-test-fake-db-models-issue-policy-dashboard-db-task-worker-ts-url.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
