@@ -213,6 +213,7 @@ async function resumeThenDeliverKeyed(
   return {
     delivered: delivery.ok,
     queuedToMail: false,
+    ...(delivery.failure ? { reason: delivery.failure } : {}),
     ...(delivery.deduplicated ? { deduplicated: true } : {}),
   };
 }
@@ -576,6 +577,7 @@ export async function messageAgent(
     return {
       delivered: delivery.ok,
       queuedToMail: true,
+      ...(delivery.failure ? { reason: delivery.failure } : {}),
       ...(delivery.deduplicated ? { deduplicated: true } : {}),
     };
   }
@@ -667,24 +669,6 @@ export async function messageAgent(
       return { delivered: false, queuedToMail: true, confirmed: false, reason };
     }
     logAgentLifecycleSync(normalizedId, `messageAgent confirmed turn in ${transcriptSessionId} (caller: ${caller})`);
-    if (agentState.issueId && opts.feedbackRedelivery === true) {
-      try {
-        // A confirmed FEEDBACK REDELIVERY repairs the state the retired
-        // retirement patrol used to clear. Any other confirmed message (a
-        // pan tell, a dead-end nudge) leaves the escalation in place — the
-        // feedback file it recorded may still be unread (PR #3870 review).
-        // Lazy import through the DB sync door (not review-status.js, whose
-        // import graph cycles back into agents).
-        const { getReviewStatusFromDbSync, clearWorkspaceStuck } = await import('../overdeck/review-status-sync.js');
-        const row = getReviewStatusFromDbSync(agentState.issueId);
-        if (row?.stuck === true && row.stuckReason === 'feedback_delivery_needs_you') {
-          clearWorkspaceStuck(agentState.issueId);
-          logAgentLifecycleSync(normalizedId, `messageAgent cleared feedback_delivery_needs_you for ${agentState.issueId} after confirmed feedback redelivery`);
-        }
-      } catch (clearError) {
-        console.warn(`[agents] ${normalizedId}: failed to clear feedback-delivery stuck flag for ${agentState.issueId}: ${clearError instanceof Error ? clearError.message : String(clearError)}`);
-      }
-    }
     return { delivered: true, queuedToMail: true, confirmed: true };
   }
 
@@ -725,6 +709,7 @@ export async function messageAgent(
     delivered: delivery.ok,
     queuedToMail: opts.dedupKey === undefined,
     confirmed: false,
+    ...(delivery.failure ? { reason: delivery.failure } : {}),
     ...(delivery.deduplicated ? { deduplicated: true } : {}),
   };
 }

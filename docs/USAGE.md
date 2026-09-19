@@ -735,7 +735,7 @@ This starts the server and opens it in your default browser after 1.5 seconds. U
 
 ## Getting Help
 
-- **Documentation**: [docs/INDEX.md](INDEX.md)
+- **Documentation**: [CLAUDE.md](../CLAUDE.md) topic index
 - **Issues**: [GitHub Issues](https://github.com/eltmon/overdeck/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/eltmon/overdeck/discussions)
 

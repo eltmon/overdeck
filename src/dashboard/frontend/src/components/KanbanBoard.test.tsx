@@ -3,10 +3,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import type { Issue, Agent } from '../types';
+import type { BackendPane, DerivedIssueState, Issue, Agent } from '../types';
 // PAN-1048 — SpecialistAgent retired; specialist-style indicators now come
 // from role-tagged AgentSnapshots passed through the `specialists` prop.
-import { applyReviewStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, IssueCard, KanbanBoard, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, DivergedBadge, FeatureCard, CompactChildCard, DroppableColumn } from './KanbanBoard';
+import { applyDerivedStateToIssue, getPipelineCallToAction, groupByCanceledType, groupByLabels, groupByStatus, IssueCard, KanbanBoard, ListIssueRow, shouldShowAgentDoneBadge, shouldShowReviewReadyBadge, FeatureCard, CompactChildCard, DroppableColumn } from './KanbanBoard';
 import { useDashboardStore } from '../lib/store';
 import { DialogProvider } from './DialogProvider';
 import IssueCardPrimitive from './primitives/IssueCard';
@@ -138,7 +138,7 @@ describe('groupByLabels', () => {
   });
 });
 
-describe('applyReviewStateToIssue', () => {
+describe('applyDerivedStateToIssue', () => {
   const createMockIssue = (overrides: Partial<Issue> = {}): Issue => ({
     id: 'issue-1',
     identifier: 'TEST-123',
@@ -160,40 +160,24 @@ describe('applyReviewStateToIssue', () => {
     ...overrides,
   });
 
-  it('maps merged review status to a done issue immediately', () => {
+  it('moves a merged issue to Done immediately', () => {
     const issue = createMockIssue();
 
-    const result = applyReviewStateToIssue(issue, {
-      mergeStatus: 'merged',
-      readyForMerge: false,
-    });
+    const result = applyDerivedStateToIssue(issue, { issueId: 'TEST-123', state: 'merged' });
 
     expect(result.status).toBe('Done');
-    expect(result.mergeStatus).toBe('merged');
     expect(result.targetCanonicalState).toBe('done');
     expect(result.labels).toContain('merged');
     expect(result.labels.map((label) => label.toLowerCase())).not.toContain('in-review');
     expect(result.labels.map((label) => label.toLowerCase())).not.toContain('review ready');
   });
 
-  it('preserves verifying-on-main issues after merge', () => {
-    const issue = createMockIssue({
-      status: 'Verifying On Main',
-      state: 'verifying_on_main',
-      labels: ['verifying-on-main', 'Review Ready'],
-    });
+  it('leaves an unmerged issue exactly as it found it', () => {
+    const issue = createMockIssue();
 
-    const result = applyReviewStateToIssue(issue, {
-      mergeStatus: 'merged',
-      readyForMerge: false,
-    });
+    const result = applyDerivedStateToIssue(issue, { issueId: 'TEST-123', state: 'in-review' });
 
-    expect(result.status).toBe('Verifying On Main');
-    expect(result.mergeStatus).toBe('merged');
-    expect(result.targetCanonicalState).toBe('verifying_on_main');
-    expect(result.labels).toContain('verifying-on-main');
-    expect(result.labels).toContain('merged');
-    expect(result.labels.map((label) => label.toLowerCase())).not.toContain('review ready');
+    expect(result).toBe(issue);
   });
 });
 
@@ -219,14 +203,15 @@ describe('shouldShowReviewReadyBadge', () => {
     ...overrides,
   });
 
-  it('uses review status as the source of truth when present', () => {
+  it('uses the derived state as the source of truth when present', () => {
     const issue = createMockIssue();
 
-    expect(shouldShowReviewReadyBadge(issue, { readyForMerge: false, mergeStatus: 'failed' })).toBe(false);
-    expect(shouldShowReviewReadyBadge(issue, { readyForMerge: true, mergeStatus: 'failed' })).toBe(true);
+    expect(shouldShowReviewReadyBadge(issue, { issueId: 'TEST-123', state: 'in-review' })).toBe(false);
+    expect(shouldShowReviewReadyBadge(issue, { issueId: 'TEST-123', state: 'ready' })).toBe(true);
+    expect(shouldShowReviewReadyBadge(issue, { issueId: 'TEST-123', state: 'merged' })).toBe(false);
   });
 
-  it('falls back to the review ready label when no review status exists', () => {
+  it('falls back to the review ready label when no derived state exists', () => {
     const issue = createMockIssue();
     expect(shouldShowReviewReadyBadge(issue)).toBe(true);
   });
@@ -255,30 +240,44 @@ describe('shouldShowAgentDoneBadge', () => {
 });
 
 describe('getPipelineCallToAction', () => {
-  it('surfaces Review & Test as the next step after verification failure', () => {
-    expect(getPipelineCallToAction({
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      mergeStatus: 'pending',
-      verificationStatus: 'failed',
-      verificationNotes: 'frontend-typecheck failed',
-    })).toEqual({
-      label: 'Next: Review & Test',
-      detail: 'frontend-typecheck failed',
-      title: 'Verification failed — rerun Review & Test to send the failure back through the pipeline.',
+  it('asks for a fix when the reviewer requested changes', () => {
+    expect(getPipelineCallToAction({ issueId: 'TEST-123', state: 'changes-requested' })).toEqual({
+      label: 'Next: address review',
+      detail: 'The reviewer requested changes.',
+      title: 'The PR has a CHANGES_REQUESTED review — push a fix, then re-request review.',
     });
   });
 
-  it('surfaces Re-Review as the next step after merge failure', () => {
+  it('asks for a check fix when the forge reports red checks', () => {
     expect(getPipelineCallToAction({
-      reviewStatus: 'passed',
-      testStatus: 'passed',
-      mergeStatus: 'failed',
+      issueId: 'TEST-123',
+      state: 'in-review',
+      pr: { url: 'https://x/pull/1', number: 1, reviewState: 'approved', checks: 'red', mergeable: true },
     })).toEqual({
-      label: 'Next: Re-Review',
-      detail: 'Merge did not complete.',
-      title: 'Merge failed after a prior pass — rerun the pipeline before merging again.',
+      label: 'Next: fix checks',
+      detail: 'CI checks are failing.',
+      title: 'The PR has failing checks — fix them before the merge gate will open.',
     });
+  });
+
+  it('asks for a rebase when the forge cannot merge the branch', () => {
+    expect(getPipelineCallToAction({
+      issueId: 'TEST-123',
+      state: 'in-review',
+      pr: { url: 'https://x/pull/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: false },
+    })).toEqual({
+      label: 'Next: rebase',
+      detail: 'The branch cannot merge cleanly.',
+      title: 'The forge cannot merge this branch — rebase it onto main.',
+    });
+  });
+
+  it('asks for nothing when the forge is happy', () => {
+    expect(getPipelineCallToAction({
+      issueId: 'TEST-123',
+      state: 'ready',
+      pr: { url: 'https://x/pull/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true },
+    })).toBeNull();
   });
 });
 
@@ -306,7 +305,7 @@ describe('groupByStatus', () => {
 
   it('places merged issues into the done column', () => {
     const issues: Issue[] = [
-      createMockIssue('1', 'Done', { mergeStatus: 'merged', labels: ['merged'] }),
+      createMockIssue('1', 'Done', { labels: ['merged'] }),
       createMockIssue('2', 'In Review'),
     ];
 
@@ -588,7 +587,8 @@ describe('KanbanBoard drawer wiring', () => {
       drawer: { issueId: null, tab: 'overview' },
       issuesRaw: [createBoardIssue()],
       agentsById: {},
-      reviewStatusByIssueId: {},
+      derivedIssueStateByIssueId: {},
+      backendPanesById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
   });
 
@@ -681,7 +681,8 @@ describe('KanbanBoard j/k card navigation', () => {
         createBoardIssue({ identifier: 'PAN-3', title: 'In progress', status: 'In Progress', state: 'in_progress' }),
       ],
       agentsById: {},
-      reviewStatusByIssueId: {},
+      derivedIssueStateByIssueId: {},
+      backendPanesById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
 
     renderBoard({ selectedIssue: null, onSelectIssue });
@@ -720,7 +721,8 @@ describe('KanbanBoard j/k card navigation', () => {
       drawer: { issueId: null, tab: 'overview' },
       issuesRaw: [createBoardIssue({ identifier: 'PAN-1' })],
       agentsById: {},
-      reviewStatusByIssueId: {},
+      derivedIssueStateByIssueId: {},
+      backendPanesById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
 
     renderBoard({ selectedIssue: null, onSelectIssue: vi.fn(), keyboardShortcutsDisabled: true });
@@ -731,6 +733,29 @@ describe('KanbanBoard j/k card navigation', () => {
     expect(card.className).not.toContain('ring-primary');
   });
 });
+
+const READY_DERIVED: DerivedIssueState = {
+  issueId: 'TEST-123',
+  state: 'ready',
+  pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true },
+};
+
+const CHANGES_REQUESTED_DERIVED: DerivedIssueState = {
+  issueId: 'TEST-123',
+  state: 'changes-requested',
+  pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'changes-requested', checks: 'green', mergeable: true },
+};
+
+const WORKING_DERIVED: DerivedIssueState = { issueId: 'TEST-123', state: 'working' };
+
+const WORK_PANE: BackendPane = {
+  id: 'pane-test-123-work',
+  issue: 'TEST-123',
+  role: 'work',
+  harness: 'claude-code',
+  model: 'claude-opus-5',
+  state: 'working',
+};
 
 describe('IssueCard', () => {
   const createMockIssue = (overrides: Partial<Issue> = {}): Issue => ({
@@ -770,7 +795,8 @@ describe('IssueCard', () => {
     useDashboardStore.setState({
       issuesRaw: [],
       agentsById: {},
-      reviewStatusByIssueId: {},
+      derivedIssueStateByIssueId: {},
+      backendPanesById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
     vi.stubGlobal('fetch', vi.fn((input: string | URL | Request, init?: RequestInit) => {
       const url = input.toString();
@@ -812,11 +838,12 @@ describe('IssueCard', () => {
       defaultProps.planningAgent,
       ...(defaultProps.specialists ?? []),
     ].filter((agent): agent is Agent => !!agent);
-    const currentReviewStatusByIssueId = useDashboardStore.getState().reviewStatusByIssueId;
+    const { derivedIssueStateByIssueId, backendPanesById } = useDashboardStore.getState();
     useDashboardStore.setState({
       issuesRaw: [defaultProps.issue],
       agentsById: Object.fromEntries(cardAgents.map((agent) => [agent.id, agent])),
-      reviewStatusByIssueId: currentReviewStatusByIssueId,
+      derivedIssueStateByIssueId,
+      backendPanesById,
     } as Parameters<typeof useDashboardStore.setState>[0]);
 
     const result = render(
@@ -872,9 +899,8 @@ describe('IssueCard', () => {
 
     unmount();
     useDashboardStore.setState({
-      reviewStatusByIssueId: {
-        'TEST-123': { issueId: 'TEST-123', readyForMerge: true, mergeStatus: 'pending', prUrl: 'https://example.com/pr/1' },
-      },
+      derivedIssueStateByIssueId: { 'TEST-123': READY_DERIVED },
+      backendPanesById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
     renderIssueCard({
       issue: createMockIssue({ status: 'In Review', state: 'in_review' }),
@@ -883,6 +909,10 @@ describe('IssueCard', () => {
   });
 
   it('routes paused-agent Unpause through the primary-strip registry overflow', async () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: { 'TEST-123': WORKING_DERIVED },
+      backendPanesById: { [WORK_PANE.id]: WORK_PANE },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
     const { queryClient } = renderIssueCard({
       workAgent: createMockAgent({
         id: 'agent-test-123',
@@ -921,22 +951,30 @@ describe('IssueCard', () => {
     });
   });
 
-  it('surfaces the troubled gate as a badge on the Board card, with no one-click clear', () => {
+  it('surfaces the derived attention signal as a badge on the Board card', () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: {
+        'TEST-123': { ...WORKING_DERIVED, attention: 'stuck' },
+      },
+      backendPanesById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
     renderIssueCard({
-      workAgent: createMockAgent({
-        id: 'agent-test-123',
-        role: 'work',
-        status: 'stopped',
-        troubled: true,
-        consecutiveFailures: 3,
-      }),
+      workAgent: createMockAgent({ id: 'agent-test-123', role: 'work', status: 'stopped' }),
     });
 
-    const badge = screen.getByTestId('card-troubled-TEST-123');
-    expect(badge).toHaveTextContent('Troubled');
-    expect(badge.getAttribute('title')).toContain('pan untroubled TEST-123');
-    // Unlike Unpause, clearing troubled requires investigation — no card button.
-    expect(screen.queryByTestId('card-untroubled-TEST-123')).toBeNull();
+    expect(screen.getByTestId('card-attention-TEST-123')).toHaveTextContent('Stuck');
+  });
+
+  it('shows no attention badge when the derived state carries none', () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: { 'TEST-123': WORKING_DERIVED },
+      backendPanesById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    renderIssueCard({
+      workAgent: createMockAgent({ id: 'agent-test-123', role: 'work', status: 'stopped' }),
+    });
+
+    expect(screen.queryByTestId('card-attention-TEST-123')).toBeNull();
   });
 
   it('surfaces an INPUT verb badge when an agent has an actual pending question (count > 0)', () => {
@@ -975,6 +1013,10 @@ describe('IssueCard', () => {
   });
 
   it('does not surface INPUT when hasPendingQuestion is true but count is zero and prompt is empty', () => {
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: { 'TEST-123': WORKING_DERIVED },
+      backendPanesById: { [WORK_PANE.id]: WORK_PANE },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
     renderIssueCard({
       issue: createMockIssue({ status: 'In Progress', state: 'in_progress', hasPlan: true, hasBeads: true }),
       workAgent: createMockAgent({
@@ -1014,6 +1056,10 @@ describe('IssueCard', () => {
     actionSets.QUEUED_FOR_PLAN = inlineBoardActionIds();
     cleanup();
 
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: { 'TEST-123': WORKING_DERIVED },
+      backendPanesById: { [WORK_PANE.id]: WORK_PANE },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
     renderIssueCard({
       workAgent: createMockAgent({ id: 'agent-test-123', role: 'work', status: 'running' }),
     });
@@ -1021,9 +1067,8 @@ describe('IssueCard', () => {
     cleanup();
 
     useDashboardStore.setState({
-      reviewStatusByIssueId: {
-        'TEST-123': { issueId: 'TEST-123', reviewStatus: 'blocked', testStatus: 'pending', mergeStatus: 'pending', readyForMerge: false },
-      },
+      derivedIssueStateByIssueId: { 'TEST-123': CHANGES_REQUESTED_DERIVED },
+      backendPanesById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
     renderIssueCard({
       issue: createMockIssue({ status: 'In Review', state: 'in_review', workspacePath: '/tmp/test-123' }),
@@ -1032,9 +1077,8 @@ describe('IssueCard', () => {
     cleanup();
 
     useDashboardStore.setState({
-      reviewStatusByIssueId: {
-        'TEST-123': { issueId: 'TEST-123', readyForMerge: true, mergeStatus: 'pending', prUrl: 'https://example.com/pr/1' },
-      },
+      derivedIssueStateByIssueId: { 'TEST-123': READY_DERIVED },
+      backendPanesById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
     renderIssueCard({
       issue: createMockIssue({ status: 'In Review', state: 'in_review' }),
@@ -1175,10 +1219,8 @@ describe('IssueCard', () => {
   it('uses success tokens for merge-ready cards', () => {
     renderIssueCard({
       issue: createMockIssue({ status: 'In Review' }),
-      // Simulate merge-ready state via review status injection would require
-      // more setup; instead test the primitive directly through the board card
-      // by leveraging the fact that KanbanBoard computes mergeReadyCard from
-      // reviewStatus. We render the primitive directly for a focused assertion.
+      // The board computes mergeReadyCard from the derived issue state; this
+      // test is about the primitive's styling, so render it directly.
     });
 
     // Render the primitive directly for a focused styling test
@@ -1333,119 +1375,6 @@ describe('groupByCanceledType', () => {
     expect(result[1].name).toBe('Duplicate');
     expect(result[2].name).toBe("Won't Do");
     expect(result[3].name).toBe('Other');
-  });
-});
-
-// ─── DivergedBadge ────────────────────────────────────────────────────────────
-
-describe('DivergedBadge', () => {
-  beforeEach(() => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
-    vi.stubGlobal('alert', vi.fn());
-  });
-
-  it('renders "Diverged" text', () => {
-    render(<DivergedBadge issueIdentifier="PAN-1" />);
-    expect(screen.getByText('Diverged')).toBeTruthy();
-  });
-
-  it('renders an "Unstick" button', () => {
-    render(<DivergedBadge issueIdentifier="PAN-1" />);
-    expect(screen.getByRole('button', { name: 'Unstick' })).toBeTruthy();
-  });
-
-  it('shows generic title when no stuckReason', () => {
-    const { container } = render(<DivergedBadge issueIdentifier="PAN-1" />);
-    const span = container.querySelector('span[title]');
-    expect(span?.getAttribute('title')).toContain('divergence from origin/main');
-  });
-
-  it('shows stuckReason in title when provided', () => {
-    const { container } = render(<DivergedBadge issueIdentifier="PAN-1" stuckReason="main advanced by 3 commits" />);
-    const span = container.querySelector('span[title]');
-    expect(span?.getAttribute('title')).toContain('main advanced by 3 commits');
-  });
-
-  it('shows abbreviated localSha and remoteSha from stuckDetails in title', () => {
-    const details = JSON.stringify({ localSha: 'aaa1111aaaa', remoteSha: 'bbb2222bbbb' });
-    const { container } = render(<DivergedBadge issueIdentifier="PAN-1" stuckDetails={details} />);
-    const title = container.querySelector('span[title]')?.getAttribute('title') ?? '';
-    expect(title).toContain('aaa1111'); // first 7 chars of localSha
-    expect(title).toContain('bbb2222'); // first 7 chars of remoteSha
-  });
-
-  it('includes recovery instructions in title', () => {
-    const { container } = render(<DivergedBadge issueIdentifier="PAN-1" />);
-    const title = container.querySelector('span[title]')?.getAttribute('title') ?? '';
-    expect(title).toContain('preserving local work');
-    expect(title).toContain('pushing local-only commits');
-    expect(title).not.toContain('git reset --hard');
-  });
-
-  it('handles malformed stuckDetails gracefully without throwing', () => {
-    const { container } = render(<DivergedBadge issueIdentifier="PAN-1" stuckDetails="not-json" />);
-    const span = container.querySelector('span[title]');
-    // Falls back to the generic message without SHA info
-    expect(span?.getAttribute('title')).toContain('divergence from origin/main');
-  });
-
-  it('POSTs to /api/workspaces/:issueId/unstick when Unstick is clicked', async () => {
-    render(<DivergedBadge issueIdentifier="PAN-42" />);
-    fireEvent.click(screen.getByRole('button', { name: 'Unstick' }));
-    await Promise.resolve(); // flush microtasks
-    expect(fetch).toHaveBeenCalledWith(
-      '/api/workspaces/PAN-42/unstick',
-      { method: 'POST' }
-    );
-  });
-
-  it('URL-encodes the issueIdentifier in the unstick request', async () => {
-    render(<DivergedBadge issueIdentifier="PAN 99" />);
-    fireEvent.click(screen.getByRole('button', { name: 'Unstick' }));
-    await Promise.resolve();
-    expect(fetch).toHaveBeenCalledWith(
-      '/api/workspaces/PAN%2099/unstick',
-      { method: 'POST' }
-    );
-  });
-
-  it('clears stuck flag in store immediately on successful unstick', async () => {
-    useDashboardStore.setState({
-      reviewStatusByIssueId: {
-        'PAN-42': { issueId: 'PAN-42', reviewStatus: 'passed', testStatus: 'passed', stuck: true, stuckReason: 'main_diverged' },
-      },
-    } as Parameters<typeof useDashboardStore.setState>[0]);
-
-    render(<DivergedBadge issueIdentifier="PAN-42" />);
-    fireEvent.click(screen.getByRole('button', { name: 'Unstick' }));
-
-    await waitFor(() => {
-      expect(useDashboardStore.getState().reviewStatusByIssueId['PAN-42']?.stuck).toBeFalsy();
-    });
-  });
-
-  it('resets reviewStatus/testStatus to pending in store after unstick (lifecycle invalidated)', async () => {
-    useDashboardStore.setState({
-      reviewStatusByIssueId: {
-        'PAN-43': { issueId: 'PAN-43', reviewStatus: 'passed', testStatus: 'passed', stuck: true, stuckReason: 'main_diverged' },
-      },
-    } as Parameters<typeof useDashboardStore.setState>[0]);
-
-    render(<DivergedBadge issueIdentifier="PAN-43" />);
-    fireEvent.click(screen.getByRole('button', { name: 'Unstick' }));
-
-    await waitFor(() => {
-      const s = useDashboardStore.getState().reviewStatusByIssueId['PAN-43'];
-      expect(s?.stuck).toBeFalsy();
-      // Lifecycle reset — prior results invalid after project main repair.
-      expect(s?.reviewStatus).toBe('pending');
-      expect(s?.testStatus).toBe('pending');
-      expect(s?.readyForMerge).toBe(false);
-    });
-  });
-
-  afterEach(() => {
-    useDashboardStore.setState({ reviewStatusByIssueId: {} } as Parameters<typeof useDashboardStore.setState>[0]);
   });
 });
 

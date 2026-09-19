@@ -4,13 +4,12 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 
 /**
- * Canonical paths allowed at the root of `overdeck-state` (PAN-2541 D2).
- * This list describes branch content only. Workspace-local runtime paths such
- * as `.pan/continue.json` remain in STATE_PLANE_PATHS for legacy diff
- * classification and must never be added here.
+ * The pipeline-owned subdirectories of a plan home's `.pan/` (PAN-2541 D2,
+ * PAN-3917). Checkpoints exclude them so a turn snapshot never captures
+ * pipeline artifacts as the agent's work. Files directly under `.pan/` such as
+ * `.pan/continue.json` are named individually by the callers.
  */
-export const STATE_BRANCH_PATHS = [
-  'records/',
+export const PAN_RUNTIME_SUBDIRS = [
   'continues/',
   'specs/',
   'drafts/',
@@ -23,10 +22,9 @@ export const STATE_BRANCH_PATHS = [
   'agents/',
 ] as const;
 
-export type StateBranchPath = typeof STATE_BRANCH_PATHS[number];
+export type PanRuntimeSubdir = typeof PAN_RUNTIME_SUBDIRS[number];
 
 export const STATE_PLANE_PATHS = [
-  '.pan/records/',
   '.pan/continues/',
   '.pan/continue.json',
   // The policy path-includes .pan/specs/; callers must still scope this to status-field flips.

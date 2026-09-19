@@ -2,7 +2,7 @@ import { Effect } from 'effect';
 import { messageAgent } from '../agents.js';
 import { getFlywheelActiveRunId, isFlywheelGloballyPaused } from '../overdeck/control-settings.js';
 import { sessionExists } from '../tmux.js';
-import { recordDeaconNudge } from './deacon-nudge-log.js';
+import { emitActivityEntrySync } from '../activity-logger.js';
 import { FLYWHEEL_ORCHESTRATOR_AGENT_ID } from './flywheel.js';
 import type { PromoteResult } from './uat-promote.js';
 
@@ -13,7 +13,7 @@ export interface NotifyDeps {
   isPaused?: typeof isFlywheelGloballyPaused;
   sessionExists?: SessionExists;
   message?: typeof messageAgent;
-  recordNudge?: typeof recordDeaconNudge;
+  recordNudge?: typeof emitActivityEntrySync;
 }
 
 function buildPromoteNudge(result: Extract<PromoteResult, { success: true }>): string {
@@ -41,7 +41,7 @@ export async function notifyFlywheelOfUatPromote(result: PromoteResult, deps: No
     const isPaused = deps.isPaused ?? isFlywheelGloballyPaused;
     const sessionExistsDep = deps.sessionExists ?? ((name: string) => Effect.runPromise(sessionExists(name)));
     const message = deps.message ?? messageAgent;
-    const recordNudge = deps.recordNudge ?? recordDeaconNudge;
+    const recordNudge = deps.recordNudge ?? emitActivityEntrySync;
 
     if (!getActiveRunId()) return;
     if (isPaused()) return;
@@ -56,17 +56,16 @@ export async function notifyFlywheelOfUatPromote(result: PromoteResult, deps: No
     }
 
     recordNudge({
-      patrol: 'uat-promote-notify',
+      source: 'cloister',
+      level: 'info',
       issueId: result.members[0] ?? result.generation,
-      action: 'notified flywheel-orchestrator to re-derive ready set after UAT promote',
-      reason:
-        'operator promoted a UAT batch; flywheel must immediately rebuild to drop merged + regressed members before its next tick',
-      state: {
+      message: 'uat-promote-notify: told flywheel-orchestrator to re-derive its ready set after a UAT promote',
+      details: JSON.stringify({
         generation: result.generation,
         members: result.members,
         mergeSha: result.mergeSha,
         delivered,
-      },
+      }),
     });
   } catch {
     /* best-effort — promote success must never be converted into a notification failure */

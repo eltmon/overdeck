@@ -371,110 +371,6 @@ const getMetricsTasksRoute = HttpRouter.add(
   }),
 );
 
-// ─── Route: POST /api/shadow/:issueId/monitor ────────────────────────────────
-
-const postShadowMonitorRoute = HttpRouter.add(
-  'POST',
-  '/api/shadow/:issueId/monitor',
-  Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const url = new URL(request.url, 'http://localhost');
-    const parts = url.pathname.split('/');
-    // /api/shadow/:issueId/monitor → parts[3] = issueId
-    const issueId = parts[3] || '';
-    const issueLower = issueId.toLowerCase();
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
-
-    return yield* Effect.promise(async () => {
-      try {
-        const projectPath = await getProjectPath(issuePrefix);
-        const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-
-        if (!existsSync(workspacePath)) {
-          return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
-        }
-
-        const {
-          gatherArtifacts,
-          generateBasicInference,
-          updateInferenceDocumentSync,
-        } = await import('../../../../lib/shadow-engineering/index.js');
-
-        const config = { issueId, workspacePath, projectPath };
-        const artifacts = await Effect.runPromise(gatherArtifacts(config));
-        const inference = generateBasicInference(config, artifacts);
-        updateInferenceDocumentSync(workspacePath, inference);
-
-        return jsonResponse({ success: true, inference });
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse(
-          { error: 'Failed to run monitoring agent: ' + msg },
-          { status: 500 },
-        );
-      }
-    })
-  }),
-);
-
-// ─── Route: POST /api/shadow/:issueId/observe ────────────────────────────────
-
-const postShadowObserveRoute = HttpRouter.add(
-  'POST',
-  '/api/shadow/:issueId/observe',
-  Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const url = new URL(request.url, 'http://localhost');
-    const parts = url.pathname.split('/');
-    // /api/shadow/:issueId/observe → parts[3] = issueId
-    const issueId = parts[3] || '';
-    const issueLower = issueId.toLowerCase();
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
-
-    const body = yield* readJsonBody;
-    const { mode } = body as { mode?: string };
-
-    return yield* Effect.promise(async () => {
-      try {
-        const projectPath = await getProjectPath(issuePrefix);
-        const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-
-        if (!existsSync(workspacePath)) {
-          return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
-        }
-
-        const ghConfig = getGitHubConfigShared();
-        if (!ghConfig) {
-          return jsonResponse(
-            { error: 'GitHub not configured - Observer requires GitHub' },
-            { status: 400 },
-          );
-        }
-
-        const { runObserverCycle } = await import('../../../../lib/shadow-engineering/index.js');
-
-        const firstRepo = ghConfig.repos[0];
-        const config = {
-          issueId,
-          workspacePath,
-          projectPath,
-          repo: firstRepo ? `${firstRepo.owner}/${firstRepo.repo}` : '',
-          mode: ((mode || 'watch') as 'watch' | 'propose'),
-        };
-
-        const commentsPosted = await Effect.runPromise(runObserverCycle(config));
-        return jsonResponse({ success: true, commentsPosted });
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        return jsonResponse(
-          { error: 'Failed to run observer: ' + msg },
-          { status: 500 },
-        );
-      }
-    })
-  }),
-);
-
 // ─── Route: POST /api/dev/rebuild ──────────────────────────────────────────────
 // Dev-only: runs `npm run build` in the project root and returns when done.
 
@@ -576,8 +472,6 @@ export const metaRouteLayer = Layer.mergeAll(
   clearCacheRoute,
   getMetricsRuntimesRoute,
   getMetricsTasksRoute,
-  postShadowMonitorRoute,
-  postShadowObserveRoute,
   postDevRebuildRoute,
   postRestartDashboardRoute,
 );

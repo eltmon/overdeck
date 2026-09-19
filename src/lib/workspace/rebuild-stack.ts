@@ -167,24 +167,21 @@ export const rebuildWorkspaceStack = (
 
   return Effect.gen(function* () {
     const closed = yield* Effect.promise(() => isIssueClosed(issueId));
-    const reviewStatus = closed
-      ? null
+    const merged = closed
+      ? true
       : yield* Effect.promise(async () => {
-          const { resolveCanonicalReviewStatus } = await import('../cloister/review-status-source.js');
-          return resolveCanonicalReviewStatus(issueId);
+          const { getPrFacts } = await import('../cloister/pr-facts.js');
+          return (await getPrFacts(issueId)).merged;
         });
-    if (closed || reviewStatus?.status?.mergeStatus === 'merged') {
+    if (closed || merged) {
       return {
         success: false,
         error: 'Issue is terminal (closed/merged) — skipping stack rebuild',
       } satisfies RebuildWorkspaceStackResult;
     }
-    if (!reviewStatus?.available) {
-      return {
-        success: false,
-        error: 'Issue terminal status is unavailable — skipping stack rebuild',
-      } satisfies RebuildWorkspaceStackResult;
-    }
+    // PAN-3917: terminality is the forge's answer, not a stored row — a
+    // closed issue or a merged PR is terminal, and a forge lookup failure
+    // surfaces through Effect.promise above rather than failing open.
 
     // Pre-render name: the workspace's current devcontainer state, if any.
     // Resolves the fallback cleanly when nothing is declared yet (matching

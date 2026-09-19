@@ -4,18 +4,18 @@ import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
-  mockGetReviewStatus,
-  mockMarkWorkspaceStuck,
-  mockSetReviewStatus,
+  mockGetPrFacts,
+  mockEmitActivity,
+  mockPostCheckRun,
   mockRunQualityGates,
   mockWriteFeedbackFile,
   mockVerificationArtifactPath,
   mockWriteVerificationArtifact,
   mockRebuildWorkspaceStack,
 } = vi.hoisted(() => ({
-  mockGetReviewStatus: vi.fn(),
-  mockMarkWorkspaceStuck: vi.fn(),
-  mockSetReviewStatus: vi.fn(),
+  mockGetPrFacts: vi.fn(),
+  mockEmitActivity: vi.fn(),
+  mockPostCheckRun: vi.fn(async () => null),
   mockRunQualityGates: vi.fn(),
   mockWriteFeedbackFile: vi.fn(),
   mockVerificationArtifactPath: vi.fn((workspacePath: string) => `${workspacePath}/.overdeck/verification-latest.json`),
@@ -23,13 +23,18 @@ const {
   mockRebuildWorkspaceStack: vi.fn(),
 }));
 
-vi.mock('../../../../src/lib/review-status.js', () => ({
-  getReviewStatusSync: mockGetReviewStatus,
-  markWorkspaceStuck: mockMarkWorkspaceStuck,
-  setReviewStatusSync: mockSetReviewStatus,
+// PAN-3917: the forge answers "has this merged?", not a stored merge status.
+vi.mock('../../../../src/lib/cloister/pr-facts.js', () => ({
+  getPrFacts: mockGetPrFacts,
+}));
 
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
+vi.mock('../../../../src/lib/cloister/verification-check-run.js', () => ({
+  VERIFICATION_CHECK_RUN_NAME: 'overdeck/verification',
+  postVerificationCheckRun: mockPostCheckRun,
+}));
+
+vi.mock('../../../../src/lib/activity-logger.js', () => ({
+  emitActivityEntrySync: mockEmitActivity,
 }));
 
 vi.mock('../../../../src/lib/cloister/test-skip-gate.js', () => ({
@@ -78,10 +83,18 @@ import { runVerificationForIssueInProcess } from '../../../../src/lib/cloister/v
 const workspacePath = '/tmp/feature-pan-2901-verification-test';
 const workspaceInfo = { isRemote: false };
 
+function prFacts(overrides: Record<string, unknown> = {}) {
+  return {
+    issueId: 'PAN-2901', exists: true, open: true, merged: false, closed: false, draft: false,
+    approved: true, changesRequested: false, checks: 'green', mergeable: true, ...overrides,
+  };
+}
+
 describe('runVerificationForIssueInProcess merged issue guard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRunQualityGates.mockReturnValue([]);
+    mockGetPrFacts.mockResolvedValue(prFacts());
     mockWriteFeedbackFile.mockReturnValue(Effect.succeed({ success: false, error: 'not written' }));
     mockRebuildWorkspaceStack.mockReturnValue(Effect.succeed({ success: true }));
     mkdirSync(`${workspacePath}/repo/.git`, { recursive: true });
@@ -91,14 +104,8 @@ describe('runVerificationForIssueInProcess merged issue guard', () => {
     rmSync(workspacePath, { recursive: true, force: true });
   });
 
-  it('skips pre-merge verification when merge status is already terminal', async () => {
-    mockGetReviewStatus.mockReturnValue({
-      issueId: 'PAN-2901',
-      reviewStatus: 'passed',
-      testStatus: 'passed',
-      mergeStatus: 'merged',
-      verificationStatus: 'pending',
-    });
+  it('skips pre-merge verification when the forge says the PR merged', async () => {
+    mockGetPrFacts.mockResolvedValue(prFacts({ merged: true, open: false }));
 
     const result = await Effect.runPromise(runVerificationForIssueInProcess(
       'PAN-2901',
@@ -110,24 +117,12 @@ describe('runVerificationForIssueInProcess merged issue guard', () => {
 
     expect(result).toEqual({
       outcome: 'skipped',
-      reason: 'Merge already landed; verify-on-main owns post-merge validation.',
+      reason: 'The pull request already merged; pre-merge verification no longer applies.',
     });
     expect(mockRunQualityGates).not.toHaveBeenCalled();
-    expect(mockSetReviewStatus).toHaveBeenCalledTimes(1);
-    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-2901', {
-      verificationStatus: 'skipped',
-      verificationNotes: 'Merge already landed; verify-on-main owns post-merge validation.',
-    });
   });
 
   it('waits for an infrastructure-triggered stack rebuild before returning', async () => {
-    mockGetReviewStatus.mockReturnValue({
-      issueId: 'PAN-2901',
-      reviewStatus: 'passed',
-      testStatus: 'pending',
-      mergeStatus: 'pending',
-      verificationStatus: 'pending',
-    });
     mockRunQualityGates.mockReturnValue([{
       name: 'frontend-lint',
       passed: false,
@@ -169,14 +164,6 @@ describe('runVerificationForIssueInProcess merged issue guard', () => {
   });
 
   it('points failed-gate feedback at the complete verification artifact', async () => {
-    mockGetReviewStatus.mockReturnValue({
-      issueId: 'PAN-2901',
-      reviewStatus: 'passed',
-      testStatus: 'pending',
-      mergeStatus: 'pending',
-      verificationStatus: 'pending',
-      verificationCycleCount: 0,
-    });
     mockRunQualityGates.mockReturnValue([{
       name: 'test',
       passed: false,
@@ -203,8 +190,10 @@ describe('runVerificationForIssueInProcess merged issue guard', () => {
       expect.arrayContaining([expect.objectContaining({ name: 'test', passed: false })]),
       expect.objectContaining({ ranAt: expect.any(String) }),
     );
-    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-2901', expect.objectContaining({
-      verificationNotes: expect.stringContaining(fullOutputPath),
+    // PAN-3917: the failure announcement carries the artifact path; no status row.
+    expect(mockEmitActivity).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'PAN-2901',
+      details: expect.stringContaining(fullOutputPath),
     }));
     expect(mockWriteFeedbackFile).toHaveBeenCalledWith(expect.objectContaining({
       markdownBody: expect.stringContaining(`Read the complete gate output at \`${fullOutputPath}\``),
@@ -212,28 +201,10 @@ describe('runVerificationForIssueInProcess merged issue guard', () => {
   });
 
   it('discards a failing gate verdict when the issue merges during verification', async () => {
-    mockGetReviewStatus
-      .mockReturnValueOnce({
-        issueId: 'PAN-2901',
-        reviewStatus: 'passed',
-        testStatus: 'passed',
-        mergeStatus: 'pending',
-        verificationStatus: 'pending',
-      })
-      .mockReturnValueOnce({
-        issueId: 'PAN-2901',
-        reviewStatus: 'passed',
-        testStatus: 'passed',
-        mergeStatus: 'pending',
-        verificationStatus: 'running',
-      })
-      .mockReturnValue({
-        issueId: 'PAN-2901',
-        reviewStatus: 'passed',
-        testStatus: 'passed',
-        mergeStatus: 'merged',
-        verificationStatus: 'running',
-      });
+    mockGetPrFacts
+      .mockResolvedValueOnce(prFacts())
+      .mockResolvedValueOnce(prFacts())
+      .mockResolvedValue(prFacts({ merged: true, open: false }));
     mockRunQualityGates.mockReturnValue([{
       name: 'test',
       passed: false,
@@ -252,17 +223,8 @@ describe('runVerificationForIssueInProcess merged issue guard', () => {
 
     expect(result).toEqual({
       outcome: 'skipped',
-      reason: 'Merge already landed; verify-on-main owns post-merge validation.',
+      reason: 'The pull request already merged; pre-merge verification no longer applies.',
     });
-    expect(mockSetReviewStatus).not.toHaveBeenCalledWith(
-      'PAN-2901',
-      expect.objectContaining({ reviewStatus: 'pending', verificationStatus: 'failed' }),
-    );
-    expect(mockSetReviewStatus).toHaveBeenLastCalledWith('PAN-2901', {
-      verificationStatus: 'skipped',
-      verificationNotes: 'Merge already landed; verify-on-main owns post-merge validation.',
-    });
-    expect(mockMarkWorkspaceStuck).not.toHaveBeenCalled();
     expect(mockWriteFeedbackFile).not.toHaveBeenCalled();
   });
 });

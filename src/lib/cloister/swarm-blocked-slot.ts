@@ -5,7 +5,7 @@ import { promisify } from 'node:util';
 
 import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
 import { ensureRegisteredSlotWorktree } from '../agents/registered-slot-spawn.js';
-import type { SlotReconcileResult } from '../agents/slot-reconcile.js';
+import type { SlotReconcileResult } from './swarm-slot-reconcile.js';
 import type { XBriefDocument } from '../xbrief/types.js';
 import { releaseBlockedSwarmSlot } from './deacon-swarm-record.js';
 import type { ArchivedBlockedSlot, CoordinateSwarmSlotsDeps } from './deacon-swarm-types.js';

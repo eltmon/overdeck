@@ -1,13 +1,12 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { getProjectPanPaths } from '../pan-dir/paths.js';
-import { getReviewStatusSync } from '../review-status.js';
 import type { ClassifyLookups } from './pickup.js';
 
 /**
  * Build the {@link ClassifyLookups} the shared pickup module needs from live project
  * state: labels (in-memory issue service), planned (readable xBRIEF spec), and
- * in-pipeline (review status / live workspace). Shared by the dashboard forecast
+ * in-pipeline (a live issue workspace on disk). Shared by the dashboard forecast
  * route and the Flywheel run-cohort snapshot so both classify issues identically
  * (PAN-2006 single source of truth). The issue service is lazy-required to avoid a
  * static lib → dashboard layering edge.
@@ -52,10 +51,9 @@ export function buildClassifyLookups(
       const u = id.toUpperCase();
       return specIssues.has(u);
     },
-    isInPipeline: (id) => {
-      const u = id.toUpperCase();
-      const rs = getReviewStatusSync(u);
-      return (rs !== null && rs.reviewStatus !== 'pending') || existsSync(join(workspacesDir, `feature-${id.toLowerCase()}`));
-    },
+    // PAN-3917: an issue is in the pipeline when its workspace exists on disk.
+    // Work, review, test and merge all run inside that workspace, so its
+    // presence is the same fact the review-status row used to mirror.
+    isInPipeline: (id) => existsSync(join(workspacesDir, `feature-${id.toLowerCase()}`)),
   };
 }

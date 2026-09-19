@@ -22,8 +22,7 @@ import {
   type NewOrderBookItem,
 } from '../../../lib/orders/writer.js';
 import { findProjectByPathSync, getProjectSync, listProjectsSync, resolveProjectPath, type ProjectConfig } from '../../../lib/projects.js';
-import { projectKey as resolveCanonicalProjectKey } from '../../../lib/project-key.js';
-import { resolveStateReadHomeAsync, resolveStateReadHomeSync } from '../../../lib/state-read-home.js';
+import { getProjectPanPaths } from '../../../lib/pan-dir/paths.js';
 import { jsonResponse } from '../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { httpHandler } from './http-handler.js';
@@ -66,22 +65,32 @@ interface OrdersStateRoot {
   projectConfig?: ProjectConfig;
 }
 
+/** The registered key for a project config, matched by path. */
+function projectKeyForConfig(config: ProjectConfig): string | undefined {
+  return listProjectsSync().find((entry) => entry.config.path === config.path)?.key;
+}
+
+/**
+ * Order books live under the project's plan directory (PAN-3917 FR-2), the
+ * same `.pan/` the repo tracks. `stateRoot` here is that `panDir`.
+ */
 function resolveOrdersStateRoot(deps: OrdersRouteDeps, projectKey?: string): OrdersStateRoot {
   if (deps.stateRoot) return { stateRoot: deps.stateRoot() };
   if (projectKey !== undefined) {
     const project = getProjectSync(projectKey);
     if (!project) throw new Error(`Unknown project: ${projectKey}`);
     return {
-      stateRoot: resolveStateReadHomeSync(project, projectKey).root,
+      stateRoot: getProjectPanPaths(project.path).panDir,
       project: projectKey,
       projectConfig: project,
     };
   }
   const project = findProjectByPathSync(process.cwd());
   if (!project) throw new Error(`No configured project contains ${process.cwd()}`);
+  const key = projectKeyForConfig(project);
   return {
-    stateRoot: resolveStateReadHomeSync(project).root,
-    project: resolveCanonicalProjectKey(project),
+    stateRoot: getProjectPanPaths(project.path).panDir,
+    ...(key !== undefined ? { project: key } : {}),
     projectConfig: project,
   };
 }
@@ -342,7 +351,7 @@ export async function getOrderPayload(
     // dashboard's shared HTTP/WebSocket event loop.
     for (const { key, config } of listProjectsSync()) {
       if (key === primary.project) continue;
-      const scanRoot = (await resolveStateReadHomeAsync(config, key)).root;
+      const scanRoot = getProjectPanPaths(config.path).panDir;
       const scannedBook = await getBookAsync(scanRoot, bookId);
       if (scannedBook) return enrichedBook(scannedBook, deps, undefined, key);
     }

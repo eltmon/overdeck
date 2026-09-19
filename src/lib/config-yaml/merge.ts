@@ -4,6 +4,7 @@ import type { ModelProvider } from '../model-fallback.js';
 import { resolveModelIdSync } from '../model-capabilities.js';
 import type { ModelId } from '../settings.js';
 import { BACKGROUND_AI_FEATURES } from '../background-ai/registry.js';
+import { isTerminalBackendName } from '@overdeck/contracts';
 import { DEFAULT_TIERED_EXECUTION_CONFIG, TieredExecutionConfigError, validateTieredExecutionConfig } from '../agents/tier-table.js';
 import { DEFAULT_CONFIG } from './defaults.js';
 import { cloneRoles, DEFAULT_ROLES, DEFAULT_WORKHORSES, mergeRoleConfig, validateRoleModelRefs } from './roles.js';
@@ -123,6 +124,19 @@ function warnInvalidClaudePermissionMode(raw: unknown, effective: string): void 
   );
 }
 
+// An unrecognized `terminal.backend` is ignored, once per distinct bad value,
+// so a typo falls back to auto-selection instead of stranding every spawn.
+const warnedInvalidTerminalBackends = new Set<string>();
+function warnInvalidTerminalBackend(raw: unknown): void {
+  const shown = typeof raw === 'string' ? raw : JSON.stringify(raw);
+  if (warnedInvalidTerminalBackends.has(String(shown))) return;
+  warnedInvalidTerminalBackends.add(String(shown));
+  console.error(
+    `[config] terminal.backend "${shown}" is not a valid value — valid values are 'herdr' and 'tmux'. ` +
+    `Ignoring it and auto-selecting the backend.`,
+  );
+}
+
 export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedConfig; explicitlyDisabled: Set<ModelProvider> } {
   const result: NormalizedConfig = {
     ...DEFAULT_CONFIG,
@@ -130,6 +144,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     context: { rules: { ...DEFAULT_CONFIG.context.rules } },
     tmux: {
       ...DEFAULT_CONFIG.tmux,
+    },
+    terminal: {
+      ...DEFAULT_CONFIG.terminal,
     },
     enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
     providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
@@ -410,6 +427,17 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     // Merge tmux configuration
     if (config.tmux?.config_mode) {
       result.tmux.configMode = config.tmux.config_mode;
+    }
+
+    // Merge terminal backend selection (PAN-3917 D10). An unknown value is
+    // ignored with a warning rather than throwing: config load must not throw,
+    // and auto-selection is a safe fallback.
+    if (config.terminal?.backend !== undefined) {
+      if (isTerminalBackendName(config.terminal.backend)) {
+        result.terminal.backend = config.terminal.backend;
+      } else {
+        warnInvalidTerminalBackend(config.terminal.backend);
+      }
     }
 
     // Merge conversation configuration

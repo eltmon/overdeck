@@ -22,11 +22,11 @@ import {
 } from '../../IssueActionMenu';
 import { IssuePeek } from '../../issue-detail/IssuePeek';
 import { useConvoDock } from '../../../lib/convoDock';
+import { useDerivedIssueState } from '../../../lib/store';
 import { PROJECT_TREE_CONTEXT_ACTIONS, type NonIssueActionContext } from '../../../lib/issueActions';
 import { parseContainerServiceName } from '../../../lib/resource-utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { MergeButton } from '../../MergeButton'; import { OrderBookIssueChip } from '../../orders/OrderBookModule';
-import { TroubledBadges } from './TroubledBadges';
+import { MergeButton } from '../../MergeButton'; import { OrderBookIssueChip } from '../../orders/OrderBookIssueChip';
 import { IssueView, IssueViewFullscreenButton, RailShipProgress } from '../../issue-view/IssueView';
 import { StartAgentCta } from '../../issue-view/StartAgentCta';
 import { ExpandableSessionNode } from './ExpandableSessionNode';
@@ -317,9 +317,9 @@ function ResourceStrip({
   );
 }
 
-function StatusIcon({ status, agentStatus, stateLabel, isRally, readyForMerge }: { status: string; agentStatus: string | null; stateLabel: string; isRally?: boolean; readyForMerge?: boolean }) {
+function StatusIcon({ status, agentStatus, stateLabel, isRally, isReady }: { status: string; agentStatus: string | null; stateLabel: string; isRally?: boolean; isReady?: boolean }) {
   // Merge-ready takes precedence — human action needed
-  if (readyForMerge) {
+  if (isReady) {
     return <GitMerge size={14} style={{ color: 'var(--primary)' }} />;
   }
   // Rally feature: layers icon with color based on state
@@ -359,15 +359,6 @@ type AggregateBadge =
   | { key: 'review-error'; label: string; tone: 'error' };
 
 /** Compact age label for the paused badge (PAN-1779): 99h / 3d. */
-function formatPausedAge(pausedAt?: string): string | null {
-  if (!pausedAt) return null;
-  const ms = Date.now() - new Date(pausedAt).getTime();
-  if (Number.isNaN(ms) || ms < 0) return null;
-  const hours = Math.floor(ms / 3_600_000);
-  if (hours < 1) return `${Math.max(1, Math.floor(ms / 60_000))}m`;
-  if (hours < 48) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
-}
 
 function formatRoleList(roles: readonly string[]): string {
   if (roles.length === 0) return '';
@@ -584,7 +575,7 @@ function getAggregateBadgeTitle(badge: AggregateBadge, sessions: readonly Sessio
   return parts.join(' ');
 }
 
-function getFeatureStateTitle(feature: ProjectFeature, aggregateSessions: readonly SessionNodeType[]): string | undefined {
+function getFeatureStateTitle(feature: ProjectFeature, aggregateSessions: readonly SessionNodeType[], isReady: boolean): string | undefined {
   const normalized = feature.stateLabel.trim().toLowerCase();
   const contextParts = [
     feature.hasPrd ? 'PRD' : null,
@@ -600,13 +591,10 @@ function getFeatureStateTitle(feature: ProjectFeature, aggregateSessions: readon
   if (normalized === 'has context') {
     return `Planning artifacts exist for this issue, but active implementation or review has not started yet.${contextSuffix}`;
   }
-  if (normalized === 'verifying' || normalized === 'verifying on main') {
-    return 'The merge has landed and this issue is awaiting main-branch verification and close-out.';
-  }
   if (normalized === 'in review' || normalized === 'review') {
-    return feature.readyForMerge
-      ? 'Implementation has moved into review/test/merge flow and is ready for human merge approval.'
-      : 'Implementation has moved into the review/test/merge pipeline for verification.';
+    return isReady
+      ? 'The pull request is approved, green, and mergeable — awaiting your merge.'
+      : 'Implementation has moved into review.';
   }
   if (normalized === 'in progress' || normalized === 'active') {
     return aggregateSessions.length > 0
@@ -860,7 +848,7 @@ const PIPE_ORDER = ['planning', 'work', 'review', 'test', 'ship'] as const;
 
 /** Per-issue plan→work→review→test→ship strip. Earlier phases read done;
  *  only the live phase carries a signal color (v1.2 color restraint). */
-export function derivePipeline(feature: ProjectFeature, sessions: readonly SessionNodeType[]): PipeSegState[] {
+export function derivePipeline(feature: ProjectFeature, sessions: readonly SessionNodeType[], isReady = false): PipeSegState[] {
   const isDone = feature.stateLabel.toLowerCase().includes('done');
   if (isDone) return ['done', 'done', 'done', 'done', 'merged'];
 
@@ -874,16 +862,15 @@ export function derivePipeline(feature: ProjectFeature, sessions: readonly Sessi
   for (let i = 0; i < byPhase.length; i++) {
     if (byPhase[i].length > 0) lastIdx = i;
   }
-  if (feature.readyForMerge) lastIdx = 4;
+  if (isReady) lastIdx = 4;
 
   return PIPE_ORDER.map((_, i) => {
     if (lastIdx === -1) return 'none';
     if (i < lastIdx) return 'done';
     if (i > lastIdx) return 'none';
-    if (feature.readyForMerge && i === 4) return 'done';
+    if (isReady && i === 4) return 'done';
     const phaseSessions = byPhase[i];
     if (phaseSessions.length === 0) return 'done';
-    if (phaseSessions.some((s) => s.paused === true)) return 'paused';
     if (phaseSessions.some((s) => s.status === 'error')) return 'error';
     if (phaseSessions.some((s) => s.status === 'running' || s.status === 'starting')) return 'working';
     return 'done';
@@ -969,11 +956,9 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
   const workSession = feature.sessions?.find((s) => s.type === 'work');
   const workSessionId = workSession?.sessionId ?? bestSessionId ?? null;
 
-  // PAN-1779: surface the pause gate at the issue level — paused agents are
-  // deliberately parked and must never read as generic "stopped".
-  const pausedSession = feature.sessions?.find((s) => s.paused === true);
-  const pausedAge = formatPausedAge(pausedSession?.pausedAt);
-  const troubledSessions = feature.sessions?.filter((s) => s.troubled === true) ?? [];
+  // PAN-3917: "ready to merge" is derived from the forge (approved, green,
+  // mergeable), never a stored isReadyToMerge flag.
+  const isReady = useDerivedIssueState(feature.issueId)?.state === 'ready';
 
   const aggregateSessions = feature.sessions?.filter(isWorkOrSpecialistSession) ?? [];
   const activityState = getAggregateActivityState(aggregateSessions);
@@ -994,9 +979,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
   const hasRunningSession = aggregateSessions.some(isRunningSession);
   const edgeClass = (hasErrorSession
     ? styles.featureItemWrapperError
-    : pausedSession
-      ? styles.featureItemWrapperPaused
-      : feature.readyForMerge
+    : isReady
         ? styles.featureItemWrapperReady
         : isDoneState
           ? styles.featureItemWrapperMerged
@@ -1005,11 +988,11 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             : '') ?? '';
 
   const pipeline = useMemo(
-    () => derivePipeline(feature, feature.sessions ?? []),
-    [feature],
+    () => derivePipeline(feature, feature.sessions ?? [], isReady),
+    [feature, isReady],
   );
   const trainInfo = useUatTrainMembership().get(feature.issueId.toUpperCase());
-  const shouldShowUatStack = expanded && feature.readyForMerge && Boolean(feature.resourceDetails?.hasWorkspace);
+  const shouldShowUatStack = expanded && isReady && Boolean(feature.resourceDetails?.hasWorkspace);
   // Any expanded row with a workspace queries (not just merge-ready), so
   // FeatureAppLink can render during work phase; collapsed rows never poll.
   const workspaceQuery = useWorkspaceQuery(feature.issueId, {
@@ -1091,7 +1074,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               <span className={styles.featureStatus}><Eye size={14} style={{ color: 'var(--primary)' }} /></span>
             ) : feature.isRally ? (
               <span className={styles.featureStatus}>
-                <StatusIcon status={feature.status} agentStatus={feature.agentStatus} stateLabel={feature.stateLabel} isRally={feature.isRally} readyForMerge={feature.readyForMerge} />
+                <StatusIcon status={feature.status} agentStatus={feature.agentStatus} stateLabel={feature.stateLabel} isRally={feature.isRally} isReady={isReady} />
               </span>
             ) : null}
             <span className={styles.featureId_sidebar} title={activitySummary}>{feature.issueId}</span>
@@ -1117,30 +1100,6 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                   {badge.label}
                 </span>
               ))}
-            </span>
-          )}
-          <TroubledBadges sessions={troubledSessions} />
-          {pausedSession && (
-            <span className={styles.featureBadgeGroup} data-testid="feature-paused">
-              <span
-                className={`${styles.featureBadge} ${styles.featureBadge_paused}`}
-                title={pausedSession.pausedReason ? `Paused: ${pausedSession.pausedReason}` : 'Agent is paused'}
-              >
-                ⏸ Paused{pausedAge ? ` ${pausedAge}` : ''}
-              </span>
-              {onUnpauseSession && (
-                <span
-                  role="button"
-                  tabIndex={-1}
-                  data-testid="feature-unpause"
-                  className={styles.unpauseBtn}
-                  title={pausedSession.pausedReason ? `Unpause — paused: ${pausedSession.pausedReason}` : 'Unpause this agent'}
-                  onClick={(e) => { e.stopPropagation(); onUnpauseSession(pausedSession.sessionId); }}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onUnpauseSession(pausedSession.sessionId); } }}
-                >
-                  ▶ Unpause
-                </span>
-              )}
             </span>
           )}
           {feature.isRally && feature.childCount != null && feature.childCount > 0 ? (
@@ -1170,12 +1129,12 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           ) : (
             <span
               className={`${styles.featureState} ${styles[`featureState_${featureStateTone}` as keyof typeof styles]}`}
-              title={getFeatureStateTitle(feature, aggregateSessions)}
+              title={getFeatureStateTitle(feature, aggregateSessions, isReady)}
             >
               {feature.stateLabel}
             </span>
           )}
-          {feature.readyForMerge && !pausedSession && (
+          {isReady && (
             <span
               className={`${styles.featureBadge} ${styles.featureBadge_paused}`}
               data-testid="feature-ready"
@@ -1184,11 +1143,10 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               Ready · awaiting merge
             </span>
           )}
-          {feature.readyForMerge && (
+          {isReady && (
             <span data-section="MergeButton"><MergeButton
               issueId={feature.issueId}
               variant="card"
-              reviewStatus={{ readyForMerge: true }}
               onClick={(e) => e.stopPropagation()}
             /></span>
           )}
@@ -1203,7 +1161,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           )}
           <FeatureAppLink frontendUrl={workspace?.frontendUrl} summary={uatStackSummary} />
           {/* Merge-ready only — earlier phases have no stack, and a cached workspace query rendered a bogus chip for planning-phase issues (PAN-2996). */}
-          {feature.readyForMerge && <FeatureUatChip summary={uatStackSummary} />}
+          {isReady && <FeatureUatChip summary={uatStackSummary} />}
           <span data-section="Pipeline pips" className={styles.featurePipe} data-testid="feature-pipe" title="plan · work · review · test · ship">
             {pipeline.map((seg, i) => (
               <i key={PIPE_ORDER[i]} className={PIPE_CLASS[seg] ? styles[PIPE_CLASS[seg] as keyof typeof styles] as string : undefined} />

@@ -1,15 +1,16 @@
 import { describe, it, expect } from 'vitest';
 
-import { isPipelineReady, getPipelineIssuePhase } from './pipeline-state';
+import { PHASE_BY_DERIVED_STATE, getPipelineIssuePhase, isIssueStuck, isPipelineReady, issueNeedsYou } from './pipeline-state';
+import type { DerivedIssueState, DerivedIssueStateName } from '../types';
 
-const backlogIssue = (over: Partial<Parameters<typeof getPipelineIssuePhase>[0]> = {}) => ({
-  state: undefined,
-  status: undefined,
-  stateType: undefined,
-  hasPlan: false,
-  planningComplete: false,
-  mergeStatus: undefined,
-  labels: [] as string[],
+const issue = (over: { labels?: string[]; stateType?: string } = {}) => ({
+  labels: over.labels ?? [],
+  stateType: over.stateType,
+});
+
+const derived = (state: DerivedIssueStateName, over: Partial<DerivedIssueState> = {}): DerivedIssueState => ({
+  issueId: 'PAN-1',
+  state,
   ...over,
 });
 
@@ -27,38 +28,48 @@ describe('Definition of Ready (PAN-1966)', () => {
     expect(isPipelineReady({ labels: [], stateType: undefined })).toBe(false);
   });
 
-  it('getPipelineIssuePhase: open issue with the `ready` label → the ready lane', () => {
-    expect(getPipelineIssuePhase(backlogIssue({ labels: ['ready'] }))).toBe('ready');
+  it('a derived-backlog issue with the `ready` label lands in the ready lane', () => {
+    expect(getPipelineIssuePhase(derived('backlog'), issue({ labels: ['ready'] }))).toBe('ready');
   });
 
-  it('getPipelineIssuePhase: open backlog issue with no ready signal → todo (hidden from pipeline)', () => {
-    expect(getPipelineIssuePhase(backlogIssue())).toBe('todo');
+  it('a derived-backlog issue with no ready signal is hidden in todo', () => {
+    expect(getPipelineIssuePhase(derived('backlog'), issue())).toBe('todo');
   });
 
-  it('uses only available post-merge limbo membership as a lane-assignment override', () => {
-    expect(getPipelineIssuePhase(backlogIssue({
-      pipelineMembership: { available: true, inPipeline: true, bucket: 'post_merge_limbo', labelDrift: null },
-    }))).toBe('ship');
+  it('falls back to the Definition of Ready when nothing is derived yet', () => {
+    expect(getPipelineIssuePhase(undefined, issue({ labels: ['ready'] }))).toBe('ready');
+    expect(getPipelineIssuePhase(undefined, issue())).toBe('todo');
+  });
+});
 
-    const readyWithoutMembership = backlogIssue({ labels: ['ready'] });
-    const readyWithCleanMembership = backlogIssue({
-      labels: ['ready'],
-      pipelineMembership: { available: true, inPipeline: false, bucket: 'clean_terminal', labelDrift: 'stale_present' },
-    });
-    expect(getPipelineIssuePhase(readyWithCleanMembership)).toBe(getPipelineIssuePhase(readyWithoutMembership));
-    expect(getPipelineIssuePhase(readyWithCleanMembership)).toBe('ready');
-
-    const unavailableMembership = backlogIssue({
-      pipelineMembership: { available: false, inPipeline: true, bucket: 'post_merge_limbo', labelDrift: null },
-    });
-    expect(getPipelineIssuePhase(unavailableMembership)).toBe(getPipelineIssuePhase(backlogIssue()));
-    expect(getPipelineIssuePhase(unavailableMembership)).toBe('todo');
+describe('derived state → lane (PAN-3917 FR-6)', () => {
+  it('maps every one of the nine derived states to a lane', () => {
+    const states: DerivedIssueStateName[] = [
+      'backlog', 'parked', 'planned', 'working', 'in-review', 'changes-requested', 'ready', 'merged', 'closed',
+    ];
+    for (const state of states) {
+      expect(PHASE_BY_DERIVED_STATE[state]).toBeDefined();
+      expect(getPipelineIssuePhase(derived(state))).toBe(PHASE_BY_DERIVED_STATE[state]);
+    }
   });
 
-  it('preserves in-flight lane assignment when membership is attached', () => {
-    const membership = { inPipeline: true, bucket: 'in_flight' as const, labelDrift: null };
-    expect(getPipelineIssuePhase(backlogIssue({ state: 'in_progress', pipelineMembership: membership }))).toBe('work');
-    expect(getPipelineIssuePhase(backlogIssue({ state: 'in_review', pipelineMembership: membership }))).toBe('review');
-    expect(getPipelineIssuePhase(backlogIssue({ mergeStatus: 'queued', pipelineMembership: membership }))).toBe('ship');
+  it('puts work, review and ship states in their lanes', () => {
+    expect(getPipelineIssuePhase(derived('planned'))).toBe('plan');
+    expect(getPipelineIssuePhase(derived('working'))).toBe('work');
+    expect(getPipelineIssuePhase(derived('in-review'))).toBe('review');
+    expect(getPipelineIssuePhase(derived('changes-requested'))).toBe('review');
+    expect(getPipelineIssuePhase(derived('ready'))).toBe('ship');
+    expect(getPipelineIssuePhase(derived('merged'))).toBe('ship');
+  });
+});
+
+describe('attention signals', () => {
+  it('reads stuck and api-error as stuck, needs-you separately', () => {
+    expect(isIssueStuck(derived('working', { attention: 'stuck' }))).toBe(true);
+    expect(isIssueStuck(derived('working', { attention: 'api-error' }))).toBe(true);
+    expect(isIssueStuck(derived('working', { attention: 'needs-you' }))).toBe(false);
+    expect(isIssueStuck(derived('working'))).toBe(false);
+    expect(issueNeedsYou(derived('working', { attention: 'needs-you' }))).toBe(true);
+    expect(issueNeedsYou(derived('working', { attention: 'stuck' }))).toBe(false);
   });
 });

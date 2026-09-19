@@ -1,34 +1,31 @@
 /**
  * Tests for `pan show <id>` unified observation command.
  *
- * --shadow, --cv, --context, --health each delegate to the full sub-command
- * for detail views. The default path builds a compact combined summary
- * directly from the underlying library functions (no sub-command delegation)
- * so the output stays ≤ 25 lines.
+ * --cv, --context, --health each delegate to the full sub-command for detail
+ * views. The default path builds a compact combined summary directly from
+ * the underlying library functions (no sub-command delegation) so the
+ * output stays ≤ 25 lines. State and attention are derived, never stored
+ * (PAN-3917 FR-6) — `gatherIssueState` is mocked here so the tests stay
+ * deterministic instead of shelling out to `gh`/`git`.
  */
 
 import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
-  shadowMock, cvMock, contextMock, healthMock,
-  getShadowStateMock, pingAgentMock, getAgentCVMock, getAgentRuntimeStateMock, getAgentStateMock, getReviewStatusMock,
+  cvMock, contextMock, healthMock,
+  derivedIssueStateMock, pingAgentMock, getAgentCVMock, getAgentRuntimeStateMock, getAgentStateMock,
 } = vi.hoisted(() => ({
-  shadowMock: vi.fn().mockResolvedValue(undefined),
   cvMock: vi.fn().mockResolvedValue(undefined),
   contextMock: vi.fn().mockResolvedValue(undefined),
   healthMock: vi.fn().mockResolvedValue(undefined),
-  getShadowStateMock: vi.fn(),
+  derivedIssueStateMock: vi.fn(),
   pingAgentMock: vi.fn(),
   getAgentCVMock: vi.fn(),
   getAgentRuntimeStateMock: vi.fn(),
   getAgentStateMock: vi.fn(),
-  getReviewStatusMock: vi.fn(),
 }));
 
-vi.mock('../../../src/cli/commands/shadow.js', () => ({
-  shadowCommand: shadowMock,
-}));
 vi.mock('../../../src/cli/commands/cv.js', () => ({
   cvCommand: cvMock,
 }));
@@ -39,8 +36,8 @@ vi.mock('../../../src/cli/commands/health.js', () => ({
   healthCommand: healthMock,
 }));
 
-vi.mock('../../../src/lib/shadow-state.js', () => ({
-  getShadowState: getShadowStateMock,
+vi.mock('../../../src/lib/overdeck/derived-issue-state.js', () => ({
+  getDerivedIssueState: derivedIssueStateMock,
 }));
 vi.mock('../../../src/lib/health.js', () => ({
   pingAgent: pingAgentMock,
@@ -54,12 +51,6 @@ vi.mock('../../../src/lib/agents.js', () => ({
   getAgentRuntimeState: getAgentRuntimeStateMock,
   getAgentRuntimeStateSync: getAgentRuntimeStateMock,
 }));
-vi.mock('../../../src/lib/review-status.js', () => ({
-  getReviewStatusSync: getReviewStatusMock,
-
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
-}));
 
 import { showCommand } from '../../../src/cli/commands/show.js';
 
@@ -68,7 +59,11 @@ describe('showCommand', () => {
     vi.clearAllMocks();
     // Reasonable defaults for the compact-default-path tests; individual tests
     // can override via mockReturnValue / mockResolvedValue.
-    getShadowStateMock.mockReturnValue(Effect.succeed(null));
+    derivedIssueStateMock.mockResolvedValue({
+      issueId: 'PAN-6',
+      state: 'working',
+      attention: undefined,
+    });
     pingAgentMock.mockReturnValue(Effect.succeed({
       agentId: 'agent-pan-6',
       status: 'healthy',
@@ -96,7 +91,6 @@ describe('showCommand', () => {
       recentWork: [],
     });
     getAgentRuntimeStateMock.mockReturnValue(null);
-    getReviewStatusMock.mockReturnValue(null);
     getAgentStateMock.mockReturnValue({
       id: 'agent-pan-6',
       issueId: 'PAN-6',
@@ -107,18 +101,9 @@ describe('showCommand', () => {
   });
 
   describe('flag delegation', () => {
-    it('--shadow: delegates exclusively to shadowCommand', async () => {
-      await showCommand('PAN-1', { shadow: true });
-      expect(shadowMock).toHaveBeenCalledWith('PAN-1');
-      expect(cvMock).not.toHaveBeenCalled();
-      expect(contextMock).not.toHaveBeenCalled();
-      expect(healthMock).not.toHaveBeenCalled();
-    });
-
     it('--cv: delegates exclusively to cvCommand', async () => {
       await showCommand('PAN-2', { cv: true });
       expect(cvMock).toHaveBeenCalledWith('PAN-2', { json: undefined });
-      expect(shadowMock).not.toHaveBeenCalled();
       expect(contextMock).not.toHaveBeenCalled();
       expect(healthMock).not.toHaveBeenCalled();
     });
@@ -126,7 +111,6 @@ describe('showCommand', () => {
     it('--context: delegates exclusively to contextCommand', async () => {
       await showCommand('PAN-3', { context: true });
       expect(contextMock).toHaveBeenCalledWith('state', 'agent-pan-3', undefined, { json: undefined });
-      expect(shadowMock).not.toHaveBeenCalled();
       expect(cvMock).not.toHaveBeenCalled();
       expect(healthMock).not.toHaveBeenCalled();
     });
@@ -134,7 +118,6 @@ describe('showCommand', () => {
     it('--health: delegates exclusively to healthCommand', async () => {
       await showCommand('PAN-4', { health: true });
       expect(healthMock).toHaveBeenCalledWith('ping', 'PAN-4', { json: undefined });
-      expect(shadowMock).not.toHaveBeenCalled();
       expect(cvMock).not.toHaveBeenCalled();
       expect(contextMock).not.toHaveBeenCalled();
     });
@@ -151,25 +134,28 @@ describe('showCommand', () => {
 
       // The default path must build a compact view directly; calling the
       // full sub-handlers would blow past the 25-line budget.
-      expect(shadowMock).not.toHaveBeenCalled();
       expect(cvMock).not.toHaveBeenCalled();
       expect(contextMock).not.toHaveBeenCalled();
       expect(healthMock).not.toHaveBeenCalled();
     });
 
-    it('reads from the shadow-state, health, and cv lib modules directly', async () => {
+    it('reads derived issue state, health, and cv from the underlying lib modules', async () => {
       await showCommand('PAN-6');
-      expect(getShadowStateMock).toHaveBeenCalledWith('PAN-6');
+      expect(derivedIssueStateMock).toHaveBeenCalledWith('PAN-6');
       expect(getAgentStateMock).toHaveBeenCalledWith('agent-pan-6');
       expect(pingAgentMock).toHaveBeenCalledWith('agent-pan-6');
       expect(getAgentCVMock).toHaveBeenCalledWith('agent-pan-6');
-      expect(getReviewStatusMock).toHaveBeenCalledWith('PAN-6');
     });
 
     it('does not ping health when there is no agent state to read', async () => {
       getAgentStateMock.mockReturnValue(null);
       getAgentRuntimeStateMock.mockReturnValue(null);
       getAgentCVMock.mockReturnValue(null);
+      derivedIssueStateMock.mockResolvedValue({
+        issueId: 'MIN-846',
+        state: 'backlog',
+        attention: undefined,
+      });
 
       const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       await showCommand('MIN-846', { json: true });
@@ -179,22 +165,15 @@ describe('showCommand', () => {
       expect(pingAgentMock).not.toHaveBeenCalled();
       expect(payload.health).toBeNull();
       expect(payload.cv).toBeNull();
-      expect(payload.pipeline).toBeNull();
+      expect(payload.state).toBe('backlog');
+      expect(payload.attention).toBeNull();
     });
 
-    it('shows a refused planning auto-handoff as a blocked pipeline state', async () => {
-      getReviewStatusMock.mockReturnValue({
+    it('shows a "stuck" attention as a needs-you line (derived, not stored)', async () => {
+      derivedIssueStateMock.mockResolvedValue({
         issueId: 'PAN-2860',
-        reviewStatus: 'pending',
-        testStatus: 'pending',
-        updatedAt: '2026-07-17T00:00:00.000Z',
-        readyForMerge: false,
-        stuck: true,
-        stuckReason: 'planning_auto_handoff_failed',
-        stuckDetails: JSON.stringify({
-          workAgentSkipReason: 'guardrails',
-          workAgentError: 'Workspace has uncommitted changes',
-        }),
+        state: 'working',
+        attention: 'stuck',
       });
 
       const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -202,24 +181,19 @@ describe('showCommand', () => {
       const text = logSpy.mock.calls.map(call => String(call[0])).join('\n');
       logSpy.mockRestore();
 
-      expect(text).toContain('pipeline');
-      expect(text).toContain('blocked');
-      expect(text).toContain('planning_auto_handoff_failed');
-      expect(text).toContain('Workspace has uncommitted changes');
+      expect(text).toContain('needs');
+      expect(text).toContain('stuck');
     });
 
     it('output stays at or below 25 lines (PRD compact-summary requirement)', async () => {
-      // Populate every field so the summary is in its longest form — shadow
-      // present + healthy + stats + 3 recent work entries.
+      // Populate every field so the summary is in its longest form —
+      // attention present + healthy + stats + 3 recent work entries.
       const now = new Date().toISOString();
-      getShadowStateMock.mockReturnValue(Effect.succeed({
+      derivedIssueStateMock.mockResolvedValue({
         issueId: 'PAN-6',
-        shadowStatus: 'in_progress',
-        trackerStatus: 'open',
-        trackerStatusUpdatedAt: now,
-        shadowedAt: now,
-        history: [],
-      }));
+        state: 'in-review',
+        attention: 'needs-you',
+      });
       getAgentCVMock.mockReturnValue({
         agentId: 'agent-pan-6',
         createdAt: now,
@@ -250,6 +224,12 @@ describe('showCommand', () => {
     });
 
     it('--json short-circuits to a single JSON payload (no human-formatted lines)', async () => {
+      derivedIssueStateMock.mockResolvedValue({
+        issueId: 'PAN-8',
+        state: 'ready',
+        attention: undefined,
+      });
+
       const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
       await showCommand('PAN-8', { json: true });
@@ -261,10 +241,10 @@ describe('showCommand', () => {
       const payload = JSON.parse(calls[0][0]);
       expect(payload.issueId).toBe('PAN-8');
       expect(payload.agentId).toBe('agent-pan-8');
-      expect(payload).toHaveProperty('shadow');
+      expect(payload.state).toBe('ready');
+      expect(payload).toHaveProperty('attention');
       expect(payload).toHaveProperty('health');
       expect(payload).toHaveProperty('cv');
-      expect(payload).toHaveProperty('pipeline');
     });
 
     it('shows in-progress work with started time instead of never and uses lastActivity instead of lastPing', async () => {

@@ -110,11 +110,11 @@ async function repoHasChanges(repoWorkspacePath: string, targetBranch: string): 
 
     if (!hasChanges) {
       mergeSet = withRepoStateSync(mergeSet, repo.repoKey, {
-        reviewStatus: 'skipped',
-        testStatus: 'skipped',
+        repoReview: 'skipped',
+        repoTests: 'skipped',
         rebaseStatus: 'skipped',
-        verificationStatus: 'skipped',
-        mergeStatus: 'skipped',
+        repoVerification: 'skipped',
+        repoMerge: 'skipped',
       });
       artifacts.push({ repoKey: repo.repoKey, created: false, skipped: true });
       continue;
@@ -134,11 +134,11 @@ async function repoHasChanges(repoWorkspacePath: string, targetBranch: string): 
     }
     mergeSet = withRepoStateSync(mergeSet, repo.repoKey, {
       artifactId: artifact.id,
-      reviewStatus: 'pending',
-      testStatus: 'pending',
+      repoReview: 'pending',
+      repoTests: 'pending',
       rebaseStatus: 'pending',
-      verificationStatus: 'pending',
-      mergeStatus: 'pending',
+      repoVerification: 'pending',
+      repoMerge: 'pending',
     });
     if (artifact.created) {
       const repoSuffix = mergeSet.repos.length > 1 ? ` (${repo.repoKey})` : '';

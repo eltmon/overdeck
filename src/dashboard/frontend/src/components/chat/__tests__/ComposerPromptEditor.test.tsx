@@ -141,14 +141,6 @@ describe('ComposerPromptEditor', () => {
     onChangePluginCallback = null;
   });
 
-  it('offers portable reset-to-planned autocomplete', () => {
-    expect(SLASH_COMMANDS).toContainEqual(expect.objectContaining({
-      id: 'pan-reset-to-planned',
-      label: '/pan reset-to-planned',
-      insert: '/pan reset-to-planned ',
-    }));
-  });
-
   it('selects the portable start command with argument-ready insertion text', () => {
     const start = SLASH_COMMANDS.find(command => command.id === 'pan-start');
     const onSelect = vi.fn();

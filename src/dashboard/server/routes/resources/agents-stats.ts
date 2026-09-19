@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 
-import { listAgentStates, type AgentState } from '../../../../lib/agents.js';
+import { getBackendPanes } from '../../services/backend-inventory.js';
 import type { CostEvent } from '../../../../lib/costs/events.js';
 import type { AgentCostStats } from '../../../../lib/overdeck/cost-sync.js';
 import { getAgentCostStatsSnapshot } from '../../services/dashboard-poll-snapshots.js';
@@ -34,7 +34,7 @@ export interface AgentStatsOptions {
 }
 
 export interface AgentStatsSnapshotDeps {
-  listAgents?: () => MinimalAgentState[];
+  listAgents?: () => Promise<MinimalAgentState[]>;
   listSessionNames?: () => Effect.Effect<readonly string[], unknown, never>;
   listPanePids?: (sessionName: string) => Effect.Effect<readonly number[], unknown, never>;
   readProcessTable?: () => Promise<AgentProcessRecord[]>;
@@ -43,10 +43,36 @@ export interface AgentStatsSnapshotDeps {
   nowMs?: number;
 }
 
-export type MinimalAgentState = Pick<
-  AgentState,
-  'id' | 'issueId' | 'status' | 'role' | 'model' | 'startedAt' | 'lastActivity'
->;
+/**
+ * PAN-3917 FR-12: an agent row is a live backend pane, not a row in an agent
+ * mirror. `status` carries the backend's own agent state.
+ */
+export interface MinimalAgentState {
+  id: string;
+  issueId: string;
+  status: string;
+  role: string;
+  model: string;
+  startedAt?: string;
+  lastActivity?: string;
+}
+
+/** The live inventory, in the shape the stats snapshot reads. */
+export async function listAgentPanes(): Promise<MinimalAgentState[]> {
+  return (await getBackendPanes())
+    .filter((pane) => pane.state !== 'exited')
+    .map((pane) => {
+      const since = pane.stateSince === undefined ? undefined : new Date(pane.stateSince).toISOString();
+      return {
+        id: pane.id,
+        issueId: pane.issue ?? '',
+        status: pane.state,
+        role: pane.role,
+        model: pane.model,
+        ...(since ? { startedAt: since, lastActivity: since } : {}),
+      };
+    });
+}
 
 export interface AgentResourceRow {
   id: string;
@@ -85,7 +111,7 @@ export function buildAgentStatsSnapshot(options: AgentStatsOptions): AgentStatsS
   const nowMs = options.nowMs ?? Date.now();
   const processTotalsByRoot = buildProcessTotalsByRoot(options.sessionRoots, options.processes);
   const rows = options.agents
-    .filter((agent) => agent.status !== 'stopped')
+    .filter((agent) => agent.status !== 'exited')
     .map((agent): AgentResourceRow => {
       const root = options.sessionRoots.find((sessionRoot) => sessionRoot.agentId === agent.id);
       const processTotals = root ? processTotalsByRoot.get(root.rootPid) : undefined;
@@ -137,8 +163,8 @@ export function getAgentStatsSnapshotEffect(
 ): Effect.Effect<AgentStatsSnapshot, never, never> {
   return Effect.gen(function* () {
     const nowMs = deps.nowMs ?? Date.now();
-    const agents = (deps.listAgents ?? listAgentStates)()
-      .filter((agent) => agent.status !== 'stopped');
+    const agents = (yield* Effect.promise(() => (deps.listAgents ?? listAgentPanes)()))
+      .filter((agent) => agent.status !== 'exited');
     if (agents.length === 0) {
       return buildAgentStatsSnapshot({ agents, sessionRoots: [], processes: [], nowMs });
     }

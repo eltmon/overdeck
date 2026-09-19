@@ -28,27 +28,27 @@ describe('readBundledRules', () => {
     const rules = readBundledRules();
     expect(rules.length).toBeGreaterThan(0);
     expect(rules.map((r) => r.name)).toEqual(
-      expect.arrayContaining(['work-agents-via-pan', 'single-deacon-invariant', 'no-destructive-requests']),
+      expect.arrayContaining(['no-destructive-requests', 'no-execsync-server']),
     );
   });
 
-  it('classifies work-agents-via-pan universal and single-deacon-invariant dev', () => {
+  it('classifies no-destructive-requests universal and no-execsync-server dev', () => {
     const rules = readBundledRules();
-    expect(rules.find((r) => r.name === 'work-agents-via-pan')?.scope).toBe('universal');
-    expect(rules.find((r) => r.name === 'single-deacon-invariant')?.scope).toBe('dev');
+    expect(rules.find((r) => r.name === 'no-destructive-requests')?.scope).toBe('universal');
+    expect(rules.find((r) => r.name === 'no-execsync-server')?.scope).toBe('dev');
   });
 });
 
 describe('renderBundledRules', () => {
   it('omits dev-scoped rules when includeDev is false', () => {
     const out = renderBundledRules('claude-code', false);
-    expect(out).toContain('Work agents run through');
-    expect(out).not.toContain('Single Deacon invariant');
+    expect(out).toContain('NEVER send destructive HTTP requests');
+    expect(out).not.toContain('No `execSync` in dashboard server code');
   });
 
   it('includes dev-scoped rules when includeDev is true', () => {
     const out = renderBundledRules('claude-code', true);
-    expect(out).toContain('Single Deacon invariant');
+    expect(out).toContain('No `execSync` in dashboard server code');
   });
 
   it('produces a single Overdeck Engineering Rules section', () => {
@@ -64,7 +64,7 @@ describe('renderBundledRules', () => {
   it('omits a rule named in the disabled set', () => {
     const out = renderBundledRules('claude-code', false, new Set(['ste-writing']));
     expect(out).not.toContain('ASD-STE100');
-    expect(out).toContain('Work agents run through');
+    expect(out).toContain('NEVER send destructive HTTP requests');
   });
 });
 

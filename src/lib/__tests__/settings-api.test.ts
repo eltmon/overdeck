@@ -378,9 +378,9 @@ describe('loadSettingsApi', () => {
         dropInfoWhenFull: false,
         daemonPort: 8787,
         daemonHost: '127.0.0.1',
-        voiceMap: { 'mergeStatus.merged': 'voice-merge' },
+        voiceMap: { 'mergeOutcome.merged': 'voice-merge' },
         mutedSources: ['merge-agent'],
-        utteranceTemplates: { readyForMerge: '{issueId} ready' },
+        utteranceTemplates: { mergeReady: '{issueId} ready' },
         mutedIssues: ['PAN-123'],
       },
     }));
@@ -396,9 +396,9 @@ describe('loadSettingsApi', () => {
       rate: 1.2,
       maxChars: 180,
       dropInfoWhenFull: false,
-      voiceMap: { 'mergeStatus.merged': 'voice-merge' },
+      voiceMap: { 'mergeOutcome.merged': 'voice-merge' },
       mutedSources: ['merge-agent'],
-      utteranceTemplates: { readyForMerge: '{issueId} ready' },
+      utteranceTemplates: { mergeReady: '{issueId} ready' },
       mutedIssues: ['PAN-123'],
     });
   });
@@ -699,9 +699,9 @@ describe('saveSettingsApi', () => {
         rate: 1.1,
         maxChars: 180,
         dropInfoWhenFull: false,
-        voiceMap: { 'reviewStatus.passed': 'voice-review' },
+        voiceMap: { 'reviewOutcome.passed': 'voice-review' },
         mutedSources: ['test-specialist'],
-        utteranceTemplates: { readyForMerge: '{issueId} ready' },
+        utteranceTemplates: { mergeReady: '{issueId} ready' },
         mutedIssues: ['PAN-123'],
       },
     }));
@@ -711,7 +711,7 @@ describe('saveSettingsApi', () => {
     expect(written).toContain('enabled: true');
     expect(written).toContain('voice: voice-main');
     expect(written).toContain('volume: 0.75');
-    expect(written).toContain('reviewStatus.passed: voice-review');
+    expect(written).toContain('reviewOutcome.passed: voice-review');
     expect(written).toContain('mutedSources:');
     expect(written).toContain('PAN-123');
   });

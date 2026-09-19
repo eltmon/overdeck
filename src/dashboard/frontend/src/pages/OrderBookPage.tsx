@@ -189,14 +189,6 @@ export function OrderBookPage() {
     setPreview(payload.brief);
   };
 
-  const openRunReport = async (runId: string) => {
-    const response = await fetch('/api/flywheel/report/open', {
-      method: 'POST', credentials: 'include', headers: await dashboardMutationJsonHeaders(),
-      body: JSON.stringify({ runId }),
-    });
-    if (!response.ok) setActionMessage(await readError(response));
-  };
-
   const startRun = async () => {
     if (!selected) return;
     setStarting(true);
@@ -269,7 +261,7 @@ export function OrderBookPage() {
         )}
         {!loading && !error && !selected && (
           <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-            No order books yet. Create one to assemble a Flywheel campaign.
+            No order books yet. Create one to assemble a campaign.
           </div>
         )}
         {!loading && selected && (
@@ -330,7 +322,7 @@ export function OrderBookPage() {
                 <pre className="overflow-auto whitespace-pre-wrap font-mono text-[11px] text-muted-foreground">{preview}</pre>
               </section>
             )}
-            </> : <ProgressPanel book={selected} onOpenReport={(runId) => void openRunReport(runId)} />}
+            </> : <ProgressPanel book={selected} />}
           </div>
         )}
       </div>

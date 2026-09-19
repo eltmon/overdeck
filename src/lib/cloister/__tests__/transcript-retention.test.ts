@@ -146,9 +146,11 @@ describe('sweepTranscriptRetention', () => {
       agent,
       { ...agent, id: 'planning-pan-3357' },
     ]);
+    // PAN-3917: terminal means the forge says the PR merged, not a closeOut
+    // flag on a record.
     const isTerminalAgent = vi.fn((candidate) => isTranscriptRetentionTerminalAgent(
       candidate,
-      () => ({ pipeline: { closedOut: true } }),
+      async () => ({ merged: true }),
     ));
 
     const actions = await sweepTranscriptRetention({
@@ -158,7 +160,6 @@ describe('sweepTranscriptRetention', () => {
         listSessionNames: vi.fn(async () => []),
         listAgents,
         isTerminalAgent,
-        removeAgentRecord: vi.fn(),
         listConversations: vi.fn(),
         listArchivedConversations: vi.fn(),
         log: vi.fn(),
@@ -188,7 +189,7 @@ describe('sweepTranscriptRetention', () => {
     }]);
     const isTerminalAgent = vi.fn((agent) => isTranscriptRetentionTerminalAgent(
       agent,
-      () => ({ pipeline: { closedOut: false } }),
+      async () => ({ merged: false }),
     ));
 
     const actions = await sweepTranscriptRetention({
@@ -198,7 +199,6 @@ describe('sweepTranscriptRetention', () => {
         listSessionNames: vi.fn(async () => []),
         listAgents,
         isTerminalAgent,
-        removeAgentRecord: vi.fn(),
         listConversations: vi.fn(),
         listArchivedConversations: vi.fn(),
         log: vi.fn(),
@@ -226,14 +226,12 @@ describe('sweepTranscriptRetention', () => {
       workspace: '/tmp/feature-pan-3357',
       paused: true,
     };
-    const removeRecord = vi.fn();
     const retentionDeps = {
       listSessionNames: vi.fn(async () => []),
       listAgents: vi.fn(() => [agent]),
       isTerminalAgent: vi.fn(() => true),
       listConversations: vi.fn(),
       listArchivedConversations: vi.fn(),
-      removeAgentRecord: removeRecord,
       now: () => Date.now(),
       log: vi.fn(),
     };
@@ -246,8 +244,6 @@ describe('sweepTranscriptRetention', () => {
       markRetained: markRetainedTranscripts,
       writeTombstone: vi.fn(async () => {}),
       emitPruneEvent: vi.fn(),
-      removeRecord,
-      tombstoneRecord: vi.fn(),
       isTerminalAgent: vi.fn(() => true),
     };
 
@@ -255,17 +251,20 @@ describe('sweepTranscriptRetention', () => {
     const firstGc = await pruneTerminalStoppedAgents([agent], gcDeps);
     const repeatedGc = await pruneTerminalStoppedAgents([agent], gcDeps);
 
+    // The first pass retains the directory (its transcript is still fresh); the
+    // second sees the marker and skips it outright rather than re-probing the
+    // tracker for an agent it already retired (PAN-3917).
     expect(firstGc).toEqual({ removed: [], preserved: ['agent-pan-3357'] });
-    expect(repeatedGc).toEqual({ removed: [], preserved: ['agent-pan-3357'] });
+    expect(repeatedGc).toEqual({ removed: [], preserved: [] });
     expect(cleanStateDir).toHaveBeenCalledTimes(1);
     expect(existsSync(transcriptPath)).toBe(true);
-    expect(removeRecord).not.toHaveBeenCalled();
+    expect(existsSync(join(agentsDir, 'agent-pan-3357'))).toBe(true);
 
     await vi.advanceTimersByTimeAsync(2 * DAY_MS);
     await sweepTranscriptRetention({ transcriptDays: 2, agentsDir, deps: retentionDeps });
 
     expect(existsSync(transcriptPath)).toBe(false);
-    expect(removeRecord).toHaveBeenCalledWith('agent-pan-3357');
+    expect(existsSync(join(agentsDir, 'agent-pan-3357'))).toBe(false);
   });
 
   it('fails closed when the canonical agent registry cannot be read', async () => {

@@ -8,7 +8,7 @@
  * new fetches.
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useDashboardStore, selectMemoryObservations, selectReviewStatus } from '../../lib/store';
+import { useDashboardStore, selectBackendPanes, selectMemoryObservations, selectDerivedIssueState } from '../../lib/store';
 import type { Issue } from '../../types';
 import type { AgentSnapshot } from '@overdeck/contracts';
 import { derivePipelineState } from '../../lib/issuePipelineState';
@@ -35,7 +35,8 @@ function PeekCard({ issueId, x, y, onPin, pinned, onDock }: {
 }) {
   const issuesRaw = useDashboardStore((s) => s.issuesRaw);
   const agentsById = useDashboardStore((s) => s.agentsById);
-  const reviewStatus = useDashboardStore(selectReviewStatus(issueId));
+  const derived = useDashboardStore(selectDerivedIssueState(issueId));
+  const panes = useDashboardStore(selectBackendPanes(issueId));
   const observations = useDashboardStore(selectMemoryObservations(issueId));
 
   const model = useMemo(() => {
@@ -46,31 +47,29 @@ function PeekCard({ issueId, x, y, onPin, pinned, onDock }: {
     );
     const primary = agents.find((a) => a.status === 'running' || a.status === 'starting') ?? agents[0];
     const pipelineState = derivePipelineState({
-      reviewStatus: reviewStatus ?? null,
-      agent: primary ?? null,
-      hasPlan: issue.hasPlan === true,
-      hasTasks: issue.hasTasks === true,
+      derived: derived ?? null,
+      panes,
       issueCanonicalState: issue.state ?? issue.status ?? null,
-      // Tolerate a lagging review snapshot: the issue record itself carries
-      // merge truth too (fixes peeks showing "Not started" for merged issues).
-      isMerged: reviewStatus?.mergeStatus === 'merged' || issue.mergeStatus === 'merged' || issue.labels?.some((l) => l.toLowerCase() === 'merged'),
     });
     const rail = phaseRailState(pipelineState);
-    const display = userFacingDisplay({ pipelineState, pendingInput: agents.some((a) => !!a.pendingAskUserQuestion || (a.pendingInputCount ?? 0) > 0), stuck: agents.some((a) => a.troubled) });
+    const display = userFacingDisplay({
+      pipelineState,
+      pendingInput: agents.some((a) => !!a.pendingAskUserQuestion || (a.pendingInputCount ?? 0) > 0),
+      stuck: derived?.attention === 'stuck' || derived?.attention === 'api-error',
+    });
     return { issue, primary, rail, display };
-  }, [issuesRaw, agentsById, issueId, reviewStatus]);
+  }, [issuesRaw, agentsById, issueId, derived, panes]);
 
   if (!model) return null;
   const said = lastSaid(observations ?? []);
-  const review = reviewStatus?.reviewStatus;
-  const reviewLine = reviewStatus?.readyForMerge
-    ? 'checks passed — ready to merge'
-    : review === 'reviewing'
+  const reviewLine = derived?.state === 'ready'
+    ? 'approved and green — ready to merge'
+    : derived?.state === 'in-review'
       ? 'being reviewed now'
-      : review === 'passed'
-        ? 'review passed'
-        : review === 'failed' || review === 'blocked'
-          ? 'review found problems'
+      : derived?.state === 'changes-requested'
+        ? 'review requested changes'
+        : derived?.state === 'merged'
+          ? 'merged to main'
           : null;
 
   return (

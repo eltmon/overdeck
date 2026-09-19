@@ -319,21 +319,3 @@ describe('waiverCoversHead (PAN-3906)', () => {
     expect(waiverCoversHead(undefined, 'abc123')).toBe(false);
   });
 });
-
-describe('waiver survives a record rebuild (PAN-3906)', () => {
-  it('projectPipeline carries testSkipWaiver forward from the existing record', async () => {
-    const { projectPipeline } = await import('../../../../src/lib/pan-dir/records.js');
-    const testSkipWaiver = { sha: 'abc123', reason: 'component deleted', at: '2026-09-18T00:00:00.000Z', by: 'conv-7' };
-
-    // The rebuild projects from ReviewStatus, which has no such field — without
-    // an explicit carry-forward the waiver would be erased on the next write.
-    expect(projectPipeline('PAN-1', null, {
-      issueId: 'PAN-1',
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      readyForMerge: false,
-      testSkipWaiver,
-      updatedAt: '2026-09-18T00:00:00.000Z',
-    }).testSkipWaiver).toEqual(testSkipWaiver);
-  });
-});

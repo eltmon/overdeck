@@ -8,10 +8,16 @@
  * Release read endpoint:
  *   GET  /api/workspaces/:issueId/release
  *
- * The cancel/control routes (reset, purge, abort, pending, unstick,
- * deacon-ignore, auto-merge) live in review-control.ts. Shared singletons
- * (review-status wrapper, pending-ops cluster, project path, readJsonBody,
- * workspace info, flyExecCmd) stay owned by ../workspaces.js.
+ * The cancel routes (purge, abort, pending) live in review-control.ts. Shared
+ * singletons (pending-ops cluster, project path, readJsonBody, workspace info,
+ * flyExecCmd) stay owned by ../workspaces.js.
+ *
+ * PAN-3917 (FR-7, FR-8): these routes dispatch; they no longer keep score. A
+ * review verdict is a PR review, so every "has this been reviewed?" question
+ * goes to `services/derived-issue-state.ts` and no handler writes a status
+ * row. Verification writes `verification-latest.json` and a check run; its
+ * failure reason reaches the operator through the pending-operation channel
+ * the dashboard already streams, not through `reviewNotes`.
  */
 
 import { exec } from 'node:child_process';
@@ -21,36 +27,25 @@ import { promisify } from 'node:util';
 import { Effect, Layer, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
+import type { DerivedIssueState } from '@overdeck/contracts';
+
 import { parseIssueIdSync, extractPrefixSync, resolveIssueIdSync } from '../../../../lib/issue-id.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
-import { isOverdeckOwnedOnlyStatus } from '../../../../lib/state-plane.js';
 import { EventStoreService } from '../../services/domain-services.js';
-import {
-  clearFeedbackDeliveryStuck,
-  getReviewStatusSync,
-  registerReviewVerdictFeedbackDelivery,
-  type ReviewStatus,
-} from '../../../../lib/review-status.js';
+import { getDerivedIssueState } from '../../services/derived-issue-state.js';
 import { getReleaseSetSync } from '../../../../lib/release-set.js';
 import { getCachedConflictGateMergeability } from '../../../../lib/cloister/conflict-gate.js';
-import { transitionIssueToInReview, spawnRun } from '../../../../lib/agents.js';
+import { transitionIssueToInReview } from '../../../../lib/agents.js';
 import { runVerificationForIssue } from '../../../../lib/cloister/verification-runner.js';
-import { deliverReviewVerdictFeedbackFromStatus } from '../../../../lib/cloister/review-verdict-feedback.js';
-import { spawnReviewRoleForIssue } from '../../../../lib/cloister/review-agent.js';
 import { pushLocalReviewBranches } from '../../../../lib/cloister/review-branch-push.js';
 import { requestReviewPipeline } from '../../../../lib/cloister/request-review-pipeline.js';
 import { jsonResponse } from '../../http-helpers.js';
-import {
-  pushDashboardReviewBranch,
-  registerDashboardDurableReviewPipeline,
-} from '../../services/durable-review-pipeline.js';
 import { rejectUnsafeDashboardMutationRequest } from '../dashboard-auth.js';
 import { httpHandler } from '../http-handler.js';
 import {
   getProjectPath,
   readJsonBody,
   getWorkspaceInfoForIssue,
-  setReviewStatus,
   setPendingOperation,
   completePendingOperation,
   clearPendingOperation,
@@ -65,12 +60,33 @@ const pushRemoteReviewBranch = async (vmName: string, workspacePath: string, bra
   const command = `cd ${workspacePath} && GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=true SSH_ASKPASS=true git push origin ${branchName}`;
   await execAsync(flyExecCmd(vmName, command), { encoding: 'utf-8', timeout: 30_000 });
 };
-registerReviewVerdictFeedbackDelivery(deliverReviewVerdictFeedbackFromStatus);
-registerDashboardDurableReviewPipeline({
-  getWorkspaceInfo: getWorkspaceInfoForIssue,
-  pushRemote: pushRemoteReviewBranch,
-  dispatchReview: (context) => Effect.runPromise(spawnReviewRoleForIssue(context)),
-});
+
+/** Push the verified branch, wherever the workspace lives. */
+async function pushReviewBranch(
+  issueId: string,
+  workspacePath: string,
+  workspaceInfo: WorkspaceInfo,
+  branchName: string,
+): Promise<void> {
+  if (workspaceInfo.isRemote && workspaceInfo.vmName) {
+    await pushRemoteReviewBranch(workspaceInfo.vmName, workspacePath, branchName);
+    return;
+  }
+  await pushLocalReviewBranches(issueId, workspacePath);
+}
+
+/**
+ * How many times an agent has automatically re-requested review this process.
+ * A circuit breaker against a work agent looping on `/request`; it is a
+ * counter of requests to THIS server, not a status, so it lives in memory and
+ * resets with the process (PAN-3917 — nothing derivable is stored).
+ */
+const autoRequeueCounts = new Map<string, number>();
+
+/** Test seam: forget every re-request count. */
+export function _resetAutoRequeueCountsForTests(): void {
+  autoRequeueCounts.clear();
+}
 /** Safe `.message` read for caught values of unknown shape. */
 const errorMessage = (e: unknown): string | undefined => e instanceof Error ? e.message : undefined;
 
@@ -104,21 +120,26 @@ async function pushFeatureBranches(issueId: string, workspacePath: string): Prom
   await pushLocalReviewBranches(issueId, workspacePath);
 }
 
-function shouldTreatAsRerun(status: Pick<ReviewStatus, 'readyForMerge' | 'reviewStatus' | 'testStatus' | 'mergeStatus'> | null | undefined): boolean {
-  if (!status) return false;
-  return status.readyForMerge === true
-    || status.reviewStatus === 'passed'
-    || status.testStatus === 'passed'
-    || status.mergeStatus === 'failed';
+/**
+ * A forced review request on an already-approved PR is a full rerun (reset the
+ * pipeline and dispatch again) rather than a no-op. PAN-3917: "already made
+ * progress past review" is now visible in the derived state — the PR carries
+ * an approval, or it has moved on to ready/merged.
+ */
+export function shouldTreatAsRerun(derived: DerivedIssueState): boolean {
+  return derived.state === 'ready'
+    || derived.state === 'merged'
+    || derived.pr?.reviewState === 'approved';
 }
 
 export function getDirtyWorkspaceErrorForReviewRequestStatus(
   status: string,
   workspacePath: string,
 ): string | null {
-  // STATE-PLANE-COMMIT-POLICY rules 3/6: pipeline-owned state-plane dirt is
-  // not agent work, and the path list must come from src/lib/state-plane.ts.
-  if (!status.trim() || isOverdeckOwnedOnlyStatus(status)) {
+  // PAN-3917: there is no state plane in the workspace any more — `.pan/` is
+  // tracked repo content the agent commits itself (FR-2). So any dirt is the
+  // agent's uncommitted work, and reviewers only ever see committed HEAD.
+  if (!status.trim()) {
     return null;
   }
 
@@ -145,15 +166,17 @@ async function getDirtyWorkspaceErrorForReviewRequest(
 }
 
 /**
- * PAN-3847 (FR-16): a re-review request is refused when the working tree is
- * dirty (reviewers only see committed HEAD) or when HEAD already equals the
- * last approved anchor and the row is not stale.
+ * PAN-3847 (FR-16), re-pointed for PAN-3917: a re-review request is refused
+ * when the working tree is dirty (reviewers only see committed HEAD), or when
+ * the PR already carries an approval that the forge has not dismissed — the
+ * forge dismisses an approval when new commits land, so a standing approval
+ * means there is nothing new to review.
  */
 export async function reReviewGuardError(
   issueId: string,
   workspacePath: string,
   workspaceInfo: WorkspaceInfo,
-  existingStatus: Pick<ReviewStatus, 'reviewStatus' | 'reviewedAtCommit' | 'reviewStaleSince'> | null | undefined,
+  derived: DerivedIssueState | null | undefined,
 ): Promise<{ error: string; hint: string } | null> {
   const dirtyError = await getDirtyWorkspaceErrorForReviewRequest(workspacePath, workspaceInfo);
   if (dirtyError) {
@@ -162,53 +185,13 @@ export async function reReviewGuardError(
       hint: 'Commit or discard changes, push, then request review again. Reviewers only see committed HEAD.',
     };
   }
-  try {
-    const { snapshotWorkspaceHeadsPromise } = await import('../../../../lib/git-utils.js');
-    const currentHead = await snapshotWorkspaceHeadsPromise(issueId, workspacePath);
-    if (
-      currentHead &&
-      existingStatus?.reviewedAtCommit === currentHead &&
-      existingStatus.reviewStatus === 'passed' &&
-      !existingStatus.reviewStaleSince
-    ) {
-      return {
-        error: 'HEAD already approved',
-        hint: `Review already passed at ${currentHead.slice(0, 8)} and nothing changed.`,
-      };
-    }
-  } catch { /* snapshot unavailable — the dispatch-side runId guard is the backstop */ }
+  if (derived?.pr?.reviewState === 'approved') {
+    return {
+      error: 'HEAD already approved',
+      hint: `PR #${derived.pr.number} is approved at its current head and nothing has changed since.`,
+    };
+  }
   return null;
-}
-/**
- * Reset shapes for the trigger/rerun review paths. PAN-3847 (FR-17): neither
- * carries verificationCycleCount — the counter is per issue and only
- * `pan review reset` (review-control.ts) clears it. Exported for tests.
- */
-export function buildReviewRequestReset(): Record<string, unknown> {
-  return {
-    reviewStatus: 'pending',
-    testStatus: 'pending',
-    autoRequeueCount: 0,
-    verificationStatus: 'pending',
-    verificationNotes: undefined,
-    reviewStaleSince: undefined,
-  };
-}
-
-export function buildReviewRerunReset(): Record<string, unknown> {
-  return {
-    reviewStatus: 'pending',
-    testStatus: 'pending',
-    mergeStatus: 'pending',
-    readyForMerge: false,
-    autoRequeueCount: 0,
-    verificationStatus: 'pending',
-    verificationNotes: undefined,
-    reviewNotes: undefined,
-    testNotes: undefined,
-    mergeNotes: undefined,
-    reviewStaleSince: undefined,
-  };
 }
 
 // ─── Route: POST /api/review/:issueId/trigger ─────────────────────────────
@@ -255,48 +238,32 @@ const postWorkspaceReviewRoute = HttpRouter.add(
     }
     const workspacePath = workspaceInfo.localPath || join(projectPath, 'workspaces', `feature-${numericSuffix}`);
 
-    const existingStatus = getReviewStatusSync(issueId);
+    const derived = yield* Effect.promise(() => getDerivedIssueState(issueId));
 
-    if (existingStatus?.reviewNotes && ['blocked', 'failed'].includes(existingStatus.reviewStatus || '')) {
-      const infraFailurePatterns = [
-        'Failed to send task',
-        "can't find pane",
-        'Command failed: tmux',
-        'Operation timed out',
-        'specialist.*not running',
-        'specialist.*busy',
-        'legacy specialist wake',
-      ];
-      const isInfraFailure = infraFailurePatterns.some(pattern =>
-        new RegExp(pattern, 'i').test(existingStatus.reviewNotes || '')
-      );
-
-      if (!isInfraFailure && !forceReview) {
-        return jsonResponse({
-          success: false,
-          alreadyReviewed: true,
-          message: `Review already completed with status: ${existingStatus.reviewStatus}`,
-          reviewNotes: existingStatus.reviewNotes,
-          hint: 'Address the review feedback before requesting another review, or use force=true to override',
-        });
-      }
-
-      console.log(
-        `[review] Re-triggering review for ${issueId} (${isInfraFailure ? 'infrastructure failure' : 'forced'})`
-      );
+    // A reviewer asked for changes: the PR carries the feedback. Re-triggering
+    // before addressing it just burns a review cycle.
+    if (derived.state === 'changes-requested' && !forceReview) {
+      return jsonResponse({
+        success: false,
+        alreadyReviewed: true,
+        message: `Review requested changes on ${issueId}`,
+        prUrl: derived.pr?.url,
+        hint: 'Address the review feedback on the PR before requesting another review, or use force=true to override',
+      });
     }
 
-    if (existingStatus?.reviewStatus === 'passed' && !forceReview) {
-      console.log(`[review] Skipping ${issueId}: already passed review`);
+    if (derived.pr?.reviewState === 'approved' && !forceReview) {
+      console.log(`[review] Skipping ${issueId}: PR already approved`);
       return jsonResponse({
         success: false,
         alreadyReviewed: true,
         message: `Review already passed for ${issueId}`,
+        prUrl: derived.pr.url,
         hint: 'Issue already passed review — proceed to testing or merge',
       });
     }
 
-    if (existingStatus?.mergeStatus === 'merged') {
+    if (derived.state === 'merged') {
       console.log(`[review] Skipping ${issueId}: already merged`);
       return jsonResponse({
         success: false,
@@ -312,34 +279,20 @@ const postWorkspaceReviewRoute = HttpRouter.add(
     // PAN-3847 (FR-16): refuse a re-review on a dirty tree or an unchanged,
     // already-approved HEAD — before any status reset or pending operation.
     const reReviewGuard = yield* Effect.promise(() =>
-      reReviewGuardError(issueId, workspacePath, workspaceInfo, existingStatus));
+      reReviewGuardError(issueId, workspacePath, workspaceInfo, forceReview ? null : derived));
     if (reReviewGuard) {
       console.log(`[review] Rejecting re-review for ${issueId}: ${reReviewGuard.error}`);
       return jsonResponse({ success: false, error: reReviewGuard.error, hint: reReviewGuard.hint }, { status: 409 });
     }
 
-    const reviewModeProject = requestedReviewMode.mode === undefined
-      ? null
-      : yield* Effect.promise(async () => {
-          const { resolveProjectForIssue } = await import('../../../../lib/pan-dir/record.js');
-          return resolveProjectForIssue(issueId);
-        });
-    if (requestedReviewMode.mode !== undefined && !reviewModeProject) {
+    if (requestedReviewMode.mode !== undefined && !resolveProjectFromIssueSync(issueId)) {
       return jsonResponse({ error: `No project configured for ${issueId}` }, { status: 500 });
     }
 
-    // Reset review status — keep 'pending' until dispatch succeeds (PAN-511 atomicity fix).
-    // reviewStatus is set to 'reviewing' only after the specialist is successfully dispatched
-    // or queued, not before. This prevents stuck 'reviewing' state if Cloister crashes mid-dispatch.
+    // PAN-3917: nothing to reset. There is no status row to move back to
+    // `pending` — the PR is the record, and the pending-operation entry is
+    // what the dashboard watches while the dispatch runs.
     setPendingOperation(issueId, 'review');
-    const reviewReset: Record<string, unknown> = buildReviewRequestReset();
-    if (forceReview) {
-      reviewReset.readyForMerge = false;
-      reviewReset.mergeStatus = 'pending';
-      reviewReset.reviewNotes = undefined;
-      reviewReset.testNotes = undefined;
-    }
-    setReviewStatus(issueId, reviewReset);
 
     // PAN-1765: short-circuit conflict-gated dispatches before responding so the
     // HTTP client gets a 409 with the deferral message instead of a false 200.
@@ -352,7 +305,6 @@ const postWorkspaceReviewRoute = HttpRouter.add(
       const message = cachedMergeability === 'conflicts'
         ? `Review deferred: merge conflict with main must be resolved before review dispatch`
         : `Review deferred: mergeability against main could not be verified; deferring review conservatively`;
-      setReviewStatus(issueId, { reviewStatus: 'pending', reviewNotes: message });
       completePendingOperation(issueId, message);
       return jsonResponse({
         success: false,
@@ -360,25 +312,6 @@ const postWorkspaceReviewRoute = HttpRouter.add(
         message,
         pipeline: 'deferred',
       }, { status: 409 });
-    }
-
-    if (requestedReviewMode.mode !== undefined && reviewModeProject) {
-      const persistenceError = yield* Effect.promise(async () => {
-        const { updateIssueRecord } = await import('../../../../lib/pan-dir/record-update.js');
-        await updateIssueRecord(reviewModeProject, issueId, (record) => {
-          record.reviewMode = requestedReviewMode.mode;
-        });
-      }).pipe(Effect.match({
-        onFailure: (error) => errorMessage(error) ?? String(error),
-        onSuccess: () => null,
-      }));
-
-      if (persistenceError !== null) {
-        const message = `Failed to persist review mode: ${persistenceError}`;
-        completePendingOperation(issueId, message);
-        setReviewStatus(issueId, { reviewStatus: 'pending', reviewNotes: message });
-        return jsonResponse({ error: message }, { status: 500 });
-      }
     }
 
     // Respond immediately
@@ -397,13 +330,14 @@ const postWorkspaceReviewRoute = HttpRouter.add(
 
 	            // Ensure review artifacts exist so review/test agents have stable URLs.
 	            let reviewTargetBranch: string | undefined;
+	            let artifactUrl: string | undefined;
 	            try {
 	              const { createReviewArtifactsForIssue } = await import('../../../../lib/review-artifacts.js');
 	              const artifactResult = await Effect.runPromise(createReviewArtifactsForIssue(issueId, workspacePath));
 	              const primaryArtifact = artifactResult.mergeSet?.repos.find(repo => !!repo.artifactUrl);
-	              reviewTargetBranch = artifactResult.mergeSet?.repos.find(repo => repo.mergeStatus !== 'skipped')?.targetBranch;
+	              reviewTargetBranch = artifactResult.mergeSet?.repos.find(repo => repo.repoMerge !== 'skipped')?.targetBranch;
 	              if (primaryArtifact?.artifactUrl) {
-	                setReviewStatus(issueId, { prUrl: primaryArtifact.artifactUrl });
+	                artifactUrl = primaryArtifact.artifactUrl;
 	                console.log(`[review] Review artifact ready for ${issueId}: ${primaryArtifact.artifactUrl}`);
 	              } else {
 	                console.warn(`[review] No review artifact URL available for ${issueId}`);
@@ -427,24 +361,13 @@ const postWorkspaceReviewRoute = HttpRouter.add(
               'review'
             ));
             if (verifyOutcome.outcome === 'failed') {
+              // FR-8: the failure is already in `verification-latest.json` and
+              // its check run. The operator sees it through the pending
+              // operation; the per-item tier escalation is deleted (FR-14).
               completePendingOperation(
                 issueId,
                 `Verification failed at ${verifyOutcome.failedCheck}`
               );
-              setReviewStatus(issueId, {
-                reviewStatus: 'failed',
-                reviewNotes: `Verification failed at ${verifyOutcome.failedCheck}`,
-              });
-              try {
-                const { reportTieredVerificationFailureEscalation } = await import('../tiered-inspect-escalation.js');
-                await reportTieredVerificationFailureEscalation(
-                  issueId,
-                  workspacePath,
-                  `verification failed at ${verifyOutcome.failedCheck}`,
-                );
-              } catch (escalationErr: unknown) {
-                console.warn(`[review] Tier escalation handling failed for ${issueId}: ${errorMessage(escalationErr)}`);
-              }
               try {
                 (await Effect.runPromise(eventStore.append({
                   type: 'pipeline.verification-failed',
@@ -459,10 +382,6 @@ const postWorkspaceReviewRoute = HttpRouter.add(
                 issueId,
                 `Verification infrastructure error: ${verifyOutcome.message}`
               );
-              setReviewStatus(issueId, {
-                reviewStatus: 'failed',
-                reviewNotes: `Verification error: ${verifyOutcome.message}`,
-              });
               try {
                 (await Effect.runPromise(eventStore.append({
                   type: 'pipeline.verification-failed',
@@ -485,12 +404,11 @@ const postWorkspaceReviewRoute = HttpRouter.add(
             // pipeline event) but the review itself is no longer a detached
             // `pan review run` coordinator process.
             const { spawnReviewRoleForIssue } = await import('../../../../lib/cloister/review-agent.js');
-            const prUrl = getReviewStatusSync(issueId)?.prUrl;
             const reviewResult = await Effect.runPromise(spawnReviewRoleForIssue({
               issueId,
               branch: branchName,
               workspace: workspacePath,
-              prUrl,
+              ...(artifactUrl ? { prUrl: artifactUrl } : {}),
               force: forceReview,
             }));
 
@@ -498,10 +416,6 @@ const postWorkspaceReviewRoute = HttpRouter.add(
               if (reviewResult.gated) {
                 console.log(`[review] review dispatch deferred for ${issueId}: ${reviewResult.message}`);
                 completePendingOperation(issueId, reviewResult.message);
-                setReviewStatus(issueId, {
-                  reviewStatus: 'pending',
-                  reviewNotes: reviewResult.message,
-                });
                 return;
               }
 
@@ -509,19 +423,10 @@ const postWorkspaceReviewRoute = HttpRouter.add(
                 `[review] review dispatch failed: ${reviewResult.message}`
               );
               completePendingOperation(issueId, `Failed to start review: ${reviewResult.message}`);
-              setReviewStatus(issueId, {
-                reviewStatus: 'pending',
-                reviewNotes: reviewResult.message,
-              });
               return;
             }
 
             console.log(`[review] Parallel review dispatched for ${issueId}`);
-            // PAN-511's "set 'reviewing' only after dispatch succeeds" invariant now lives
-            // inside spawnReviewRoleForIssue (it writes reviewing + reviewSpawnedAt right
-            // before spawning). PAN-2578: do NOT repeat a bare 'reviewing' write here — a
-            // fast review agent may have already recorded its verdict by the time this line
-            // runs, and the redundant write clobbered PAN-399's BLOCKED verdict.
             completePendingOperation(issueId, null);
             try {
               (await Effect.runPromise(eventStore.append({
@@ -533,7 +438,6 @@ const postWorkspaceReviewRoute = HttpRouter.add(
           } catch (error: unknown) {
             console.error(`[review] Error starting review:`, error);
             completePendingOperation(issueId, errorMessage(error));
-            setReviewStatus(issueId, { reviewStatus: 'pending', reviewNotes: errorMessage(error) });
           }
         })();
 
@@ -570,27 +474,28 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       (Option.isSome(urlOpt) && urlOpt.value.searchParams.get('nudge') === 'true') ||
       (body as { nudge?: unknown })?.nudge === true;
 
-    const existingStatus = getReviewStatusSync(issueId);
+    const derived = yield* Effect.promise(() => getDerivedIssueState(canonicalIssueId));
 
-    if (existingStatus?.mergeStatus === 'merged') {
+    if (derived.state === 'merged') {
       console.log(`[request-review] Rejecting ${issueId}: already merged`);
       return jsonResponse({
         success: false,
         alreadyMerged: true,
-        message: `${issueId} is already merged. Use Reopen or Reset Reviews first.`,
+        message: `${issueId} is already merged. Reopen the issue first.`,
       });
     }
 
-    if (existingStatus?.reviewStatus === 'passed') {
+    if (derived.pr?.reviewState === 'approved') {
       if (forceReview) {
         console.log(`[request-review] FORCE: full reset requested by operator for ${canonicalIssueId}`);
       } else if (nudgeReview) {
-        if (existingStatus.testStatus !== 'passed') {
+        // FR-8: "tests passed" is the PR's check state.
+        if (derived.pr?.checks !== 'green') {
           return jsonResponse(
             {
               success: false,
-              error: 'Cannot nudge — tests have not passed',
-              hint: 'Use ?force=true for a full re-review or wait for tests to complete',
+              error: 'Cannot nudge — checks are not green',
+              hint: 'Use ?force=true for a full re-review or wait for checks to complete',
             },
             { status: 400 },
           );
@@ -609,7 +514,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         });
       }
 
-      if (forceReview && shouldTreatAsRerun(existingStatus)) {
+      if (forceReview && shouldTreatAsRerun(derived)) {
         const issueLowerRerun = canonicalIssueId.toLowerCase();
         const issuePrefixRerun = extractPrefixSync(canonicalIssueId) ?? canonicalIssueId.split('-')[0];
         const projectPathRerun = getProjectPath(undefined, issuePrefixRerun);
@@ -633,15 +538,14 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         // PAN-3847 (FR-16): a forced re-review is still refused when HEAD already
         // equals the approved anchor — nothing new to review.
         const rerunGuard = yield* Effect.promise(() =>
-          reReviewGuardError(canonicalIssueId, workspacePathRerun, wsInfoRerun, existingStatus));
+          reReviewGuardError(canonicalIssueId, workspacePathRerun, wsInfoRerun, null));
         if (rerunGuard) {
           console.log(`[request-review] Rejecting ${issueId}: ${rerunGuard.error} on rerun path`);
           return jsonResponse({ success: false, error: rerunGuard.error, hint: rerunGuard.hint }, { status: 409 });
         }
 
-        console.log(`[request-review] ${issueId}: forcing full review/test rerun from passed state`);
+        console.log(`[request-review] ${issueId}: forcing full review/test rerun from an approved PR`);
         setPendingOperation(issueId, 'review');
-        setReviewStatus(issueId, buildReviewRerunReset());
 
         (async () => {
           try {
@@ -659,34 +563,30 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
               console.log(`[request-review] Feature branch push note: ${errorMessage(pushErr)}`);
             }
 
-            const prUrl = getReviewStatusSync(issueId)?.prUrl;
             const { spawnReviewRoleForIssue } = await import('../../../../lib/cloister/review-agent.js');
             const result = await Effect.runPromise(spawnReviewRoleForIssue({
               issueId,
               workspace: workspacePathRerun,
               branch: branchNameRerun,
-              prUrl,
+              ...(derived.pr?.url ? { prUrl: derived.pr.url } : {}),
               force: true,
             }));
 
             if (result.success) {
-              // reviewStatus transitions ('reviewing' → passed/blocked/failed) are
-              // managed by the review role itself via /api/review/:id/status.
+              // FR-7: the verdict lands as a PR review; nothing to record here.
               console.log(`[request-review] Review role spawned for ${issueId}`);
+              completePendingOperation(issueId, null);
             } else if (result.gated) {
               console.log(`[request-review] Review deferred for ${issueId}: ${result.message}`);
-              setReviewStatus(issueId, { reviewStatus: 'pending', reviewNotes: result.message });
+              completePendingOperation(issueId, result.message);
             } else {
               const errorMsg = result.error || result.message || 'Failed to dispatch review';
               console.error(`[request-review] Dispatch failed for ${issueId}: ${errorMsg}`);
-              setReviewStatus(issueId, { reviewStatus: 'pending', reviewNotes: errorMsg });
+              completePendingOperation(issueId, errorMsg);
             }
           } catch (error: unknown) {
             console.error(`[request-review] Error:`, error);
-            setReviewStatus(issueId, {
-              reviewStatus: 'pending',
-              reviewNotes: errorMessage(error) || 'Unknown error',
-            });
+            completePendingOperation(issueId, errorMessage(error) || 'Unknown error');
           }
         })();
 
@@ -697,11 +597,10 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         });
       }
 
-      if (existingStatus.testStatus === 'failed' || existingStatus.testStatus === 'pending' || existingStatus.testStatus === 'dispatch_failed') {
+      if (derived.pr?.checks !== 'green') {
         console.log(
-          `[request-review] ${issueId}: review passed but tests ${existingStatus.testStatus} — dispatching test role`
+          `[request-review] ${issueId}: PR approved but checks ${derived.pr?.checks ?? 'unknown'} — dispatching test role`
         );
-        setReviewStatus(issueId, { testStatus: 'pending' });
 
         try {
           const resolved = resolveProjectFromIssueSync(issueId);
@@ -709,29 +608,21 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
             console.error(
               `[request-review] No project configured for ${issueId} — cannot spawn test role`
             );
-            setReviewStatus(issueId, {
-              testStatus: 'dispatch_failed',
-              testNotes: 'No project configured',
-            });
           } else {
             const workspacePath = join(
               resolved.projectPath,
               'workspaces',
               `feature-${issueId.toLowerCase()}`
             );
-            // PAN-1048 R1: spawn the test role via the role primitive instead
-            // of the legacy spawnEphemeralSpecialist machinery. Reactive
-            // Cloister normally drives this on lifecycle transitions; this
-            // path is a manual re-dispatch for already-approved reviews.
-            // PAN-2579: set 'testing' only AFTER the spawn succeeds — a pre-set
-            // non-terminal status would make spawnRun's warm-idle reaper treat a
-            // leftover warm test session as active and refuse the dispatch.
+            // PAN-1048 R1: spawn the test role via the role primitive. Reactive
+            // Cloister normally drives this on lifecycle transitions; this path
+            // is a manual re-dispatch for an already-approved PR.
             const { spawnRun } = yield* Effect.promise(() => import('../../../../lib/agents.js'));
             try {
               const testRun = yield* Effect.promise(() => spawnRun(issueId, 'test', {
                 workspace: workspacePath,
+                startedBy: 'dashboard:review-pipeline',
               }));
-              setReviewStatus(issueId, { testStatus: 'testing' });
               console.log(
                 `[request-review] Test role spawned for ${issueId} as ${testRun.id}`
               );
@@ -740,10 +631,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
               console.error(
                 `[request-review] Test role spawn failed for ${issueId}: ${msg}`
               );
-              setReviewStatus(issueId, {
-                testStatus: 'dispatch_failed',
-                testNotes: `Test dispatch failed: ${msg}`,
-              });
+              completePendingOperation(issueId, `Test dispatch failed: ${msg}`);
             }
           }
         } catch (err: unknown) {
@@ -754,7 +642,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         return jsonResponse({
           success: true,
           requeued: true,
-          message: `Tests re-queued for ${issueId} (review already passed)`,
+          message: `Tests re-queued for ${issueId} (PR already approved)`,
         });
       }
       console.log(
@@ -767,7 +655,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       });
     }
 
-    const currentCount = existingStatus?.autoRequeueCount || 0;
+    const currentCount = autoRequeueCounts.get(canonicalIssueId) ?? 0;
 
     if (currentCount >= MAX_AUTO_REQUEUE) {
       console.log(
@@ -838,20 +726,10 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     });
 
     const newCount = currentCount + 1;
-    const reviewNotes = message
+    const requestNote = message
       ? `Agent re-review request (${newCount}/${MAX_AUTO_REQUEUE}): ${message}`
-      : undefined;
-
-    setReviewStatus(issueId, {
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      verificationStatus: 'pending',
-      reviewNotes,
-    });
-
-    // PAN-3074: a re-review request is mechanical proof the agent received and
-    // acted on the feedback — retire a stale feedback_delivery_needs_you flag.
-    clearFeedbackDeliveryStuck(canonicalIssueId);
+      : `Agent re-review request (${newCount}/${MAX_AUTO_REQUEUE})`;
+    console.log(`[request-review] ${canonicalIssueId}: ${requestNote}`);
 
     const started = requestReviewPipeline.start(canonicalIssueId, {
       verify: () => Effect.runPromise(runVerificationForIssue(
@@ -861,41 +739,23 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         'request-review'
       )),
       onVerificationFailed: (outcome) => {
+        // FR-8: the detail is in `verification-latest.json` and the check run.
         console.log(`[request-review] Verification failed for ${issueId} at ${outcome.failedCheck}`);
-        setReviewStatus(issueId, {
-          reviewStatus: 'pending',
-          reviewNotes: `Verification failed at ${outcome.failedCheck} — fix and resubmit`,
-          autoRequeueCount: currentCount,
-        });
+        completePendingOperation(issueId, `Verification failed at ${outcome.failedCheck} — fix and resubmit`);
       },
       onVerificationError: (outcome) => {
         console.error(`[request-review] Verification infrastructure error for ${issueId}: ${outcome.message}`);
-        setReviewStatus(issueId, {
-          reviewStatus: 'pending',
-          reviewNotes: `Verification infrastructure error: ${outcome.message}`,
-          autoRequeueCount: currentCount,
-        });
+        completePendingOperation(issueId, `Verification infrastructure error: ${outcome.message}`);
       },
       onVerificationDeferred: (outcome) => {
         console.log(`[request-review] Verification deferred for ${issueId}: ${outcome.reason}`);
         completePendingOperation(issueId, outcome.reason);
       },
       pushBranch: async () => {
-        await pushDashboardReviewBranch(
-          { issueId, workspacePath, workspaceInfo, branchName },
-          { pushRemote: pushRemoteReviewBranch },
-        );
+        await pushReviewBranch(issueId, workspacePath, workspaceInfo, branchName);
         console.log(`[request-review] Pushed verified branch ${branchName} for ${issueId}`);
       },
       dispatchReview: async () => {
-        // PAN-511: keep reviewStatus='pending' until dispatch succeeds. The review
-        // role flips it to 'reviewing' immediately before spawning.
-        setReviewStatus(issueId, {
-          reviewStatus: 'pending',
-          testStatus: 'pending',
-          reviewNotes,
-        });
-
         const { spawnReviewRoleForIssue } = await import('../../../../lib/cloister/review-agent.js');
         const result = await Effect.runPromise(spawnReviewRoleForIssue({
           issueId,
@@ -906,9 +766,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
         if (result.success) {
           console.log(`[request-review] Review role spawned for ${issueId}`);
-          // PAN-2578: do not repeat a bare 'reviewing' write here — a fast review
-          // agent may already have recorded its terminal verdict.
-          setReviewStatus(issueId, { autoRequeueCount: newCount });
+          autoRequeueCounts.set(canonicalIssueId, newCount);
           try {
             await Effect.runPromise(eventStore.append({
               type: 'pipeline.review-started',
@@ -921,30 +779,18 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
         if (result.gated) {
           console.log(`[request-review] Review deferred for ${issueId}: ${result.message}`);
-          setReviewStatus(issueId, {
-            reviewStatus: 'pending',
-            reviewNotes: result.message,
-            autoRequeueCount: currentCount,
-          });
+          completePendingOperation(issueId, result.message);
           return;
         }
 
         const dispatchError = result.error || result.message || 'Failed to dispatch review';
         console.warn(`[request-review] Dispatch failed for ${issueId}: ${dispatchError}`);
-        setReviewStatus(issueId, {
-          reviewStatus: 'pending',
-          reviewNotes: `Dispatch failed: ${dispatchError}`,
-          autoRequeueCount: currentCount,
-        });
+        completePendingOperation(issueId, `Dispatch failed: ${dispatchError}`);
       },
       onError: (error) => {
         const detail = errorMessage(error) || String(error);
         console.error(`[request-review] Background pipeline failed for ${issueId}: ${detail}`);
-        setReviewStatus(issueId, {
-          reviewStatus: 'pending',
-          reviewNotes: `Review pipeline error: ${detail}`,
-          autoRequeueCount: currentCount,
-        });
+        completePendingOperation(issueId, `Review pipeline error: ${detail}`);
       },
     });
 

@@ -2,30 +2,26 @@ import { Effect } from 'effect';
 /**
  * pan show <id> — unified observation command
  *
- * Default: compact summary (shadow state, health, recent CV entries) —
+ * Default: compact summary (derived issue state, health, recent CV entries) —
  * guaranteed to fit in ≤ 25 lines so it stays skimmable.
  *
  * Flags scope the output to specific views (full detail):
- *   --shadow    Shadow state details
  *   --cv        Agent work history (CV)
  *   --context   Context engineering state
  *   --health    Health + heartbeat only
  */
 
 import chalk from 'chalk';
-import { shadowCommand } from './shadow.js';
 import { cvCommand } from './cv.js';
 import { contextCommand } from './context.js';
 import { healthCommand } from './health.js';
-import { getShadowState } from '../../lib/shadow-state.js';
 import { pingAgent } from '../../lib/health.js';
 import { readAgentCVSync } from '../../lib/cv.js';
 import { getAgentRuntimeStateSync, getAgentStateSync } from '../../lib/agents.js';
 import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
-import { getReviewStatusSync } from '../../lib/review-status.js';
+import { getDerivedIssueState } from '../../lib/overdeck/derived-issue-state.js';
 
 interface ShowOptions {
-  shadow?: boolean;
   cv?: boolean;
   context?: boolean;
   health?: boolean;
@@ -47,7 +43,7 @@ function relativeTime(iso: string | null | undefined): string {
 }
 
 export async function showCommand(id: string, options: ShowOptions = {}): Promise<void> {
-  const { shadow, cv, context, health, json } = options;
+  const { cv, context, health, json } = options;
 
   // Normalize input: accept bare numbers (1148), prefixed issue IDs (PAN-1148),
   // and prefixed agent IDs (agent-pan-1148). Bare numbers are resolved by probing
@@ -66,12 +62,11 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
   const agentId = `agent-${normalizedId}`;
 
   // Scoped views delegate to the full sub-commands
-  if (shadow) return shadowCommand(issueId);
   if (cv) return cvCommand(issueId, { json });
   if (context) return contextCommand('state', agentId, undefined, { json });
   if (health) return healthCommand('ping', issueId, { json });
 
-  const shadowState = await Effect.runPromise(getShadowState(issueId));
+  const issueState = await getDerivedIssueState(issueId);
   const runtimeState = getAgentRuntimeStateSync(agentId);
   const agentState = getAgentStateSync(agentId);
   const healthData = agentState || runtimeState
@@ -80,16 +75,17 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
     )
     : null;
   const cvData = readAgentCVSync(agentId);
-  const pipelineStatus = getReviewStatusSync(issueId);
 
   if (json) {
     console.log(JSON.stringify({
       issueId,
       agentId,
-      shadow: shadowState,
+      state: issueState.state,
+      attention: issueState.attention ?? null,
+      pr: issueState.pr,
+      branch: issueState.branch,
       health: healthData,
       cv: cvData,
-      pipeline: pipelineStatus,
     }, null, 2));
     return;
   }
@@ -97,34 +93,11 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
   console.log('');
   console.log(chalk.bold.cyan(issueId));
 
-  // Shadow line
-  if (shadowState) {
-    const driftMarker = shadowState.shadowStatus !== shadowState.trackerStatus
-      ? chalk.yellow(` (tracker: ${shadowState.trackerStatus})`)
-      : '';
-    console.log(`  ${chalk.dim('shadow')}   ${shadowState.shadowStatus}${driftMarker}  ${chalk.dim('·')} shadowed ${relativeTime(shadowState.shadowedAt)}`);
-  } else {
-    console.log(`  ${chalk.dim('shadow')}   ${chalk.dim('(not shadowed)')}`);
-  }
-
-  if (pipelineStatus?.stuck) {
-    let detail = '';
-    try {
-      const parsed = JSON.parse(pipelineStatus.stuckDetails ?? '{}') as { workAgentError?: unknown; counts?: number[] };
-      if (typeof parsed.workAgentError === 'string') detail = `  ${chalk.dim('·')} ${parsed.workAgentError}`;
-      // PAN-3151: show review convergence series if available
-      if (pipelineStatus.stuckReason === 'review-not-converging' && Array.isArray(parsed.counts)) {
-        const series = parsed.counts.join(' → ');
-        detail = `  ${chalk.dim('·')} cycles: ${series}`;
-      }
-    } catch { /* malformed legacy details are non-fatal */ }
-    console.log(`  ${chalk.dim('pipeline')} ${chalk.red('blocked')}  ${chalk.dim('·')} ${pipelineStatus.stuckReason ?? 'stuck'}${detail}`);
-  }
-
-  // PAN-3151: show review cycle series even if not stuck yet
-  if (pipelineStatus?.reviewCycleHistory && pipelineStatus.reviewCycleHistory.length > 0 && !pipelineStatus.stuck) {
-    const series = pipelineStatus.reviewCycleHistory.map(e => e.blockingCount).join(' → ');
-    console.log(`  ${chalk.dim('pipeline')} ${chalk.dim('review-cycles')}  ${chalk.dim('·')} ${series}`);
+  // Derived state — nothing here is stored; it is read from the tracker, the
+  // pull request, git, and agent liveness every time (FR-6).
+  console.log(`  ${chalk.dim('state')}    ${chalk.cyan(issueState.state)}`);
+  if (issueState.attention) {
+    console.log(`  ${chalk.dim('needs')}    ${chalk.yellow(issueState.attention)}`);
   }
 
   // Health line
@@ -184,6 +157,6 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
   }
 
   console.log('');
-  console.log(chalk.dim(`  use --shadow, --cv, --health, or --context for full detail`));
+  console.log(chalk.dim('  use --cv, --health, or --context for full detail'));
   console.log('');
 }

@@ -5,40 +5,34 @@
  *   - getConversationByName() → 404 if null
  *   - setFavorite() / removeFavorite() → success path
  *
- * Tests verify both paths with a real in-memory DB (same pattern as other route tests).
+ * Tests verify both paths against a real overdeck DB (same pattern as other route tests).
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { openDatabase, type SqliteDatabase } from '../../../../../src/lib/database/driver.js';
-import { initSchema } from '../../../../../src/lib/database/schema.js';
-
-// ============== In-memory DB injection ==============
-
-let testDb: SqliteDatabase;
-
-vi.mock('../../../../../src/lib/database/index.js', () => ({
-  getDatabase: () => testDb,
-}));
-
-beforeEach(() => {
-  testDb = openDatabase(':memory:');
-  testDb.pragma('foreign_keys = ON');
-  initSchema(testDb);
-});
-
-afterEach(() => {
-  testDb.close();
-});
-
-// ============== Imports (after mock is set up) ==============
-
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import {
+  setupOverdeckTestDb,
+  teardownOverdeckTestDb,
+  type OverdeckTestDb,
+} from '../../../../helpers/overdeck-test-db.js';
 import {
   getConversationByName,
   createConversation,
   listFavoritedIds,
   setFavorite,
   removeFavorite,
-} from '../../../../../src/lib/database/conversations-db.js';
+} from '../../../../../src/lib/overdeck/conversations.js';
+
+// PAN-3917: conversations and favourites live in the overdeck DB — the
+// panopticon schema that backed conversations-db is gone.
+let testDb: OverdeckTestDb;
+
+beforeEach(() => {
+  testDb = setupOverdeckTestDb();
+});
+
+afterEach(() => {
+  teardownOverdeckTestDb(testDb);
+});
 
 // ============== Helpers ==============
 

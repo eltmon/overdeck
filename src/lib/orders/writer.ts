@@ -22,8 +22,8 @@ function timestamp(value?: string): string {
   return value ?? new Date().toISOString();
 }
 
-function requireBook(stateRoot: string, bookId: string): OrderBook {
-  const book = getBook(stateRoot, bookId);
+function requireBook(panDir: string, bookId: string): OrderBook {
+  const book = getBook(panDir, bookId);
   if (!book) throw new Error(`Order book not found: ${bookId}`);
   return book;
 }
@@ -40,10 +40,10 @@ function updated(book: OrderBook, changes: Partial<OrderBook>, at?: string): Ord
 
 /** The sole order-book write door. */
 export async function createBook(
-  stateRoot: string,
+  panDir: string,
   input: CreateOrderBookInput,
 ): Promise<OrderBook> {
-  if (getBook(stateRoot, input.id)) throw new Error(`Order book already exists: ${input.id}`);
+  if (getBook(panDir, input.id)) throw new Error(`Order book already exists: ${input.id}`);
   const at = timestamp(input.createdAt);
   const settings: OrderBookSettings = {
     laneAConcurrency: input.settings?.laneAConcurrency ?? 1,
@@ -56,7 +56,7 @@ export async function createBook(
   if (!Number.isInteger(settings.laneAConcurrency) || settings.laneAConcurrency < 1) {
     throw new Error('laneAConcurrency must be a positive integer');
   }
-  return writeOrderBookState(stateRoot, {
+  return writeOrderBookState(panDir, {
     id: input.id,
     name: input.name,
     status: 'draft',
@@ -68,30 +68,30 @@ export async function createBook(
 }
 
 export async function renameBook(
-  stateRoot: string,
+  panDir: string,
   bookId: string,
   name: string,
   at?: string,
 ): Promise<OrderBook> {
   if (!name.trim()) throw new Error('Order book name cannot be empty');
-  const book = requireBook(stateRoot, bookId);
-  return writeOrderBookState(stateRoot, updated(book, { name: name.trim() }, at));
+  const book = requireBook(panDir, bookId);
+  return writeOrderBookState(panDir, updated(book, { name: name.trim() }, at));
 }
 
 export async function addItems(
-  stateRoot: string,
+  panDir: string,
   bookId: string,
   items: readonly NewOrderBookItem[],
   actor: string,
   at?: string,
 ): Promise<OrderBook> {
-  const book = requireBook(stateRoot, bookId);
+  const book = requireBook(panDir, bookId);
   const existing = new Set(book.items.map((item) => item.issue.toUpperCase()));
-  const assigned = membership(stateRoot);
+  const assigned = membership(panDir);
   const addedAt = timestamp(at);
   const additions: OrderBookItem[] = [];
   for (const item of items) {
-    const issue = normalizeOrderIssueId(stateRoot, item.issue).toUpperCase();
+    const issue = normalizeOrderIssueId(panDir, item.issue).toUpperCase();
     if (existing.has(issue) || additions.some((candidate) => candidate.issue.toUpperCase() === issue)) {
       throw new Error(`Issue ${issue} is already in order book ${bookId}`);
     }
@@ -102,40 +102,40 @@ export async function addItems(
     additions.push({
       ...item,
       issue,
-      prereqs: item.prereqs.map((prereq) => normalizeOrderIssueId(stateRoot, prereq).toUpperCase()),
+      prereqs: item.prereqs.map((prereq) => normalizeOrderIssueId(panDir, prereq).toUpperCase()),
       addedAt: item.addedAt ?? addedAt,
       addedBy: item.addedBy ?? actor,
     });
   }
   const nextItems = normalizeLaneOrder([...book.items, ...additions]);
-  return writeOrderBookState(stateRoot, updated(book, { items: nextItems }, at));
+  return writeOrderBookState(panDir, updated(book, { items: nextItems }, at));
 }
 
 export async function removeItem(
-  stateRoot: string,
+  panDir: string,
   bookId: string,
   issueId: string,
   at?: string,
 ): Promise<OrderBook> {
-  const book = requireBook(stateRoot, bookId);
-  const issue = normalizeOrderIssueId(stateRoot, issueId).toUpperCase();
+  const book = requireBook(panDir, bookId);
+  const issue = normalizeOrderIssueId(panDir, issueId).toUpperCase();
   if (!book.items.some((item) => item.issue.toUpperCase() === issue)) {
     throw new Error(`Issue ${issue} is not in order book ${bookId}`);
   }
   const items = normalizeLaneOrder(book.items.filter((item) => item.issue.toUpperCase() !== issue));
-  return writeOrderBookState(stateRoot, updated(book, { items }, at));
+  return writeOrderBookState(panDir, updated(book, { items }, at));
 }
 
 export async function moveItem(
-  stateRoot: string,
+  panDir: string,
   bookId: string,
   issueId: string,
   lane: OrderBookLane,
   order: number,
   at?: string,
 ): Promise<OrderBook> {
-  const book = requireBook(stateRoot, bookId);
-  const issue = normalizeOrderIssueId(stateRoot, issueId).toUpperCase();
+  const book = requireBook(panDir, bookId);
+  const issue = normalizeOrderIssueId(panDir, issueId).toUpperCase();
   const moving = book.items.find((item) => item.issue.toUpperCase() === issue);
   if (!moving) throw new Error(`Issue ${issue} is not in order book ${bookId}`);
   if (!Number.isInteger(order) || order < 1) throw new Error('Order must be a positive integer');
@@ -145,18 +145,18 @@ export async function moveItem(
   targetLane.splice(Math.min(order - 1, targetLane.length), 0, { ...moving, lane, order });
   const otherLane = remaining.filter((item) => item.lane !== lane).sort((a, b) => a.order - b.order);
   const items = normalizeLaneOrder([...targetLane, ...otherLane]);
-  return writeOrderBookState(stateRoot, updated(book, { items }, at));
+  return writeOrderBookState(panDir, updated(book, { items }, at));
 }
 
 export async function setItemRequirements(
-  stateRoot: string,
+  panDir: string,
   bookId: string,
   issueId: string,
   requirements: { prereqs?: readonly string[]; reVerify?: boolean; planAtPickup?: boolean },
   at?: string,
 ): Promise<OrderBook> {
-  const book = requireBook(stateRoot, bookId);
-  const issue = normalizeOrderIssueId(stateRoot, issueId).toUpperCase();
+  const book = requireBook(panDir, bookId);
+  const issue = normalizeOrderIssueId(panDir, issueId).toUpperCase();
   let found = false;
   const items = book.items.map((item) => {
     if (item.issue.toUpperCase() !== issue) return item;
@@ -165,52 +165,52 @@ export async function setItemRequirements(
       ...item,
       prereqs: requirements.prereqs === undefined
         ? item.prereqs
-        : [...new Set(requirements.prereqs.map((prereq) => normalizeOrderIssueId(stateRoot, prereq).toUpperCase()))],
+        : [...new Set(requirements.prereqs.map((prereq) => normalizeOrderIssueId(panDir, prereq).toUpperCase()))],
       reVerify: requirements.reVerify ?? item.reVerify,
       planAtPickup: requirements.planAtPickup ?? item.planAtPickup,
     };
   });
   if (!found) throw new Error(`Issue ${issue} is not in order book ${bookId}`);
-  return writeOrderBookState(stateRoot, updated(book, { items }, at));
+  return writeOrderBookState(panDir, updated(book, { items }, at));
 }
 
 export async function setSettings(
-  stateRoot: string,
+  panDir: string,
   bookId: string,
   settings: Partial<OrderBookSettings>,
   at?: string,
 ): Promise<OrderBook> {
-  const book = requireBook(stateRoot, bookId);
+  const book = requireBook(panDir, bookId);
   const next = { ...book.settings, ...settings };
   if (!Number.isInteger(next.laneAConcurrency) || next.laneAConcurrency < 1) {
     throw new Error('laneAConcurrency must be a positive integer');
   }
-  return writeOrderBookState(stateRoot, updated(book, { settings: next }, at));
+  return writeOrderBookState(panDir, updated(book, { settings: next }, at));
 }
 
 export async function setStatus(
-  stateRoot: string,
+  panDir: string,
   bookId: string,
   status: OrderBookStatus,
   options: { runId?: string | null; at?: string } = {},
 ): Promise<OrderBook> {
-  const book = requireBook(stateRoot, bookId);
+  const book = requireBook(panDir, bookId);
   if (status === 'running') {
-    const running = listBooks(stateRoot).find((candidate) => candidate.status === 'running' && candidate.id !== bookId);
+    const running = listBooks(panDir).find((candidate) => candidate.status === 'running' && candidate.id !== bookId);
     if (running) throw new Error(`Order book ${running.id} is already running`);
   }
   const runId = options.runId === undefined ? book.runId : options.runId ?? undefined;
-  return writeOrderBookState(stateRoot, updated(book, { status, runId }, options.at));
+  return writeOrderBookState(panDir, updated(book, { status, runId }, options.at));
 }
 
 export async function advanceQueue(
-  stateRoot: string,
+  panDir: string,
   completedBookId: string,
   at?: string,
 ): Promise<OrderBook | null> {
-  const current = requireBook(stateRoot, completedBookId);
+  const current = requireBook(panDir, completedBookId);
   if (current.status !== 'complete') {
-    await setStatus(stateRoot, completedBookId, 'complete', { at });
+    await setStatus(panDir, completedBookId, 'complete', { at });
   }
-  return firstReadyBookInQueue(stateRoot);
+  return firstReadyBookInQueue(panDir);
 }

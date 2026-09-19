@@ -246,7 +246,7 @@ After completing your analysis, write the SequenceDoc JSON to a temp file and su
   pan backlog write-sequence /tmp/sequence-result.json
 
 The \`pan backlog write-sequence\` command validates the JSON, writes the formatted
-\`.pan/backlog/sequence.md\`, and queues an auto-commit — so DO NOT write the file
+\`.pan/backlog/sequence.md\`, and commits it — so DO NOT write the file
 directly with the Write tool. Always go through this command.
 
 The SequenceDoc JSON must conform to the schema:

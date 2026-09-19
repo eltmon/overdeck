@@ -1,4 +1,4 @@
-import type { IssuePipelineMembership } from '@overdeck/contracts';
+import type { IssuePipelineMembership, IssueState as DerivedIssueStateName } from '@overdeck/contracts';
 
 export type {
   AgentHealthSnapshot as AgentHealth,
@@ -35,7 +35,7 @@ export interface Issue {
   project?: LinearProject;
   source?: IssueSource;
   sourceRepo?: string;
-  state?: CanonicalState;  // Canonical issue state (e.g. 'canceled', 'done', 'verifying_on_main')
+  state?: CanonicalState;  // Canonical issue state (e.g. 'canceled', 'done')
   shadowStatus?: 'open' | 'in_progress' | 'closed';  // Shadow mode status tracking
   targetCanonicalState?: CanonicalState;  // Explicit column placement from drag-drop
   shadowedAt?: string;  // When shadow state was created
@@ -47,7 +47,6 @@ export interface Issue {
   totalChildCount?: number;  // Total children across all columns
   completedChildCount?: number;  // Children in Done state
   inProgressChildCount?: number;  // Children in active work
-  mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';  // From review-status, set by specialist pipeline
   // Planning-state (embedded from /api/issues via filesystem checks)
   hasPlan?: boolean;
   hasTasks?: boolean;
@@ -104,8 +103,6 @@ export interface Agent {
   paused?: boolean;
   pausedReason?: string;
   pausedAt?: string;
-  troubled?: boolean;
-  troubledAt?: string;
   consecutiveFailures: number;
   firstFailureInRunAt?: string;
   lastFailureAt?: string;
@@ -192,7 +189,6 @@ export type CanonicalState =
   | 'todo'
   | 'in_progress'
   | 'in_review'
-  | 'verifying_on_main'
   | 'done'
   | 'canceled';
 
@@ -204,7 +200,6 @@ export const STATUS_ORDER: CanonicalState[] = [
   'todo',
   'in_progress',
   'in_review',
-  'verifying_on_main',
   'done'
 ];
 
@@ -234,11 +229,6 @@ export const STATUS_LABELS: Record<string, CanonicalState> = {
   'QA': 'in_review',
   'Testing': 'in_review',
 
-  // Verifying states
-  'Verifying': 'verifying_on_main',
-  'Verifying On Main': 'verifying_on_main',
-  'verifying-on-main': 'verifying_on_main',
-
   // Done states
   'Done': 'done',
   'Completed': 'done',
@@ -260,7 +250,6 @@ export const STATE_TYPE_MAP: Record<CanonicalState, StateType> = {
   todo: 'unstarted',
   in_progress: 'started',
   in_review: 'started',
-  verifying_on_main: 'started',
   done: 'completed',
   canceled: 'canceled',
 };
@@ -358,8 +347,6 @@ export interface SpawnGateSnapshot {
   }>;
 }
 
-export type ResourceStackPhase = 'merged' | 'ship' | 'review' | 'work' | 'plan' | 'ready' | 'todo' | 'verifying';
-
 export interface ResourceStack {
   id: string;
   issueId: string | null;
@@ -372,7 +359,8 @@ export interface ResourceStack {
     memoryBytes: number;
     diskBytes: number;
   };
-  phase: ResourceStackPhase;
+  /** The issue's derived state (PAN-3917 FR-6); `null` for a stack with no issue. */
+  state: DerivedIssueStateName | null;
   idleMinutes?: number;
   uatUrl?: string;
 }
@@ -490,3 +478,17 @@ export interface StateTransitionResult {
   fallbacksUsed: string[];
   warnings: string[];
 }
+
+// ─── Derived read model (PAN-3917 FR-6, FR-12) ───────────────────────────────
+// Defined once in packages/contracts. Nothing here is stored — the server
+// computes both from the tracker, the PR, checks, git and the terminal backend
+// on every read. The aliases keep the frontend's call-site spelling.
+
+export type {
+  BackendPane,
+  DerivedIssueState,
+  IssueAttention,
+  IssueState as DerivedIssueStateName,
+  AgentRole as BackendPaneRole,
+  AgentState as BackendPaneState,
+} from '@overdeck/contracts';

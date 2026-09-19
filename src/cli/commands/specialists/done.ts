@@ -1,34 +1,40 @@
-import { exitCli } from '../../exit.js';
-import { Effect } from 'effect';
 /**
- * Specialist Done Command
+ * `pan admin specialists done <role> <issue> --status <passed|failed|blocked>`
  *
- * Deterministic way for specialist agents to signal completion.
- * No output parsing needed - just run this command.
+ * PAN-3917: a specialist verdict is posted where the forge owns it — an
+ * approval or a review comment on the pull/merge request — and nowhere else.
+ * There is no review-status row and no stored verdict field: the ready set is
+ * derived from approvals, checks and forge mergeability (FR-7, FR-9).
  *
- * Usage:
- *   pan specialists done review MIN-665 --status passed --notes "Code looks good" --run-id "agent-min-665-review-abc12345"
- *   pan specialists done review MIN-665 --status blocked --notes "Changes requested" --run-id "agent-min-665-review-abc12345"
- *   pan specialists done test PAN-97 --status failed --notes "3 tests failing"
- *   pan specialists done merge PAN-83 --status passed
+ * Roles: `review`, `test`, `uat`. The `inspect` role went with the per-item
+ * inspection gate (FR-14); `merge` and `ship` went with the stored merge
+ * verdict — a merged PR is the fact those two used to record.
  */
 
+import { exitCli } from '../../exit.js';
+import { execFile } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
+
 import chalk from 'chalk';
+import { Effect } from 'effect';
+
 import {
-  setReviewStatusSync,
-  getReviewStatusSync,
-  type ReviewStatus,
-  type ReviewStatusUpdate,
-} from '../../../lib/review-status.js';
-import type { HeadAnchor } from '../../../lib/git-utils.js';
-import { rehydrateHeadAnchor } from '../../../lib/git-utils.js';
-import { recordReviewVerdict } from '../../../lib/cloister/review-verdict-writer.js';
-import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../../lib/internal-token.js';
+  commentOnArtifact,
+  discoverArtifact,
+  type ForgeType,
+} from '../../../lib/forge.js';
+import { getPrFacts } from '../../../lib/cloister/pr-facts.js';
+import { postReviewVerdict } from '../../../lib/cloister/pr-review-verdict.js';
+import { getIssueWorkspacePath } from '../../../lib/overdeck/issue-projects.js';
+
+const execFileAsync = promisify(execFile);
+
+export type SpecialistRole = 'review' | 'test' | 'uat';
 
 interface DoneOptions {
   status: 'passed' | 'failed' | 'blocked';
-  /** xBRIEF item receiving an inspect verdict. Required for inspect. */
-  item?: string;
   /** Review cycle identity used to deduplicate blocked feedback delivery. */
   runId?: string;
   notes?: string;
@@ -38,8 +44,7 @@ interface DoneOptions {
 
 // PAN-3642: this advisory deadline covers the PR comment, a stopped Claude
 // agent's summary-resume path, and all four same-key supervisor attempts plus
-// their retry sleeps. The previous 30s deadline expired during a valid retry
-// sequence and killed the specialist process before delivery could settle.
+// their retry sleeps.
 export const FEEDBACK_DELIVERY_TIMEOUT_MS = 120_000;
 
 class FeedbackDeliveryTimeoutError extends Error {
@@ -49,18 +54,44 @@ class FeedbackDeliveryTimeoutError extends Error {
   }
 }
 
+/** The forge that owns a workspace's review artifact, read from its origin remote. */
+export async function forgeForWorkspace(cwd: string): Promise<ForgeType> {
+  try {
+    const { stdout } = await execFileAsync('git', ['remote', 'get-url', 'origin'], { cwd });
+    return /gitlab/i.test(stdout) ? 'gitlab' : 'github';
+  } catch {
+    return 'github';
+  }
+}
+
+/** The verdict body posted to the PR — the durable record of a specialist run. */
+export function formatVerdictBody(
+  role: SpecialistRole,
+  status: DoneOptions['status'],
+  notes?: string,
+  uat?: { status?: string; notes?: string },
+): string {
+  const heading = `**${role} verdict: ${status}**`;
+  const lines = [heading];
+  if (notes) lines.push('', notes);
+  if (uat?.status) lines.push('', `**browser UAT: ${uat.status}**`);
+  if (uat?.notes) lines.push('', uat.notes);
+  return lines.join('\n');
+}
+
 export async function doneCommand(
   specialist: string,
   issueId: string,
-  options: DoneOptions
+  options: DoneOptions,
 ): Promise<void> {
-  const validSpecialists = ['review', 'test', 'merge', 'inspect', 'uat', 'ship'];
+  const validSpecialists: SpecialistRole[] = ['review', 'test', 'uat'];
 
-  if (!validSpecialists.includes(specialist)) {
+  if (!validSpecialists.includes(specialist as SpecialistRole)) {
     console.error(chalk.red(`Invalid specialist: ${specialist}`));
     console.error(chalk.dim(`Valid options: ${validSpecialists.join(', ')}`));
     return exitCli(1);
   }
+  const role = specialist as SpecialistRole;
 
   if (!options.status) {
     console.error(chalk.red('--status is required'));
@@ -68,234 +99,99 @@ export async function doneCommand(
   }
 
   const normalizedIssueId = issueId.toUpperCase();
-  const validStatuses = specialist === 'review'
-    ? ['passed', 'failed', 'blocked']
-    : ['passed', 'failed'];
+  const validStatuses = role === 'review' ? ['passed', 'failed', 'blocked'] : ['passed', 'failed'];
 
   if (!validStatuses.includes(options.status)) {
     console.error(chalk.red(`Invalid status: ${options.status}`));
-    console.error(chalk.dim(`Valid options for ${specialist}: ${validStatuses.join(', ')}`));
+    console.error(chalk.dim(`Valid options for ${role}: ${validStatuses.join(', ')}`));
     return exitCli(1);
   }
 
-  if (options.uatStatus && (specialist !== 'test' || !['passed', 'failed'].includes(options.uatStatus))) {
+  if (options.uatStatus && (role !== 'test' || !['passed', 'failed'].includes(options.uatStatus))) {
     console.error(chalk.red('--uat-status applies only to test verdicts and must be passed or failed'));
     return exitCli(1);
   }
 
-  if (specialist === 'inspect') {
-    if (!options.item) throw new Error('--item is required for inspect verdicts');
-
-    const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
-    const { readWorkspacePlanSync } = await import('../../../lib/xbrief/io.js');
-    const { join } = await import('node:path');
-    const project = resolveProjectFromIssueSync(normalizedIssueId);
-    const workspacePath = project && join(project.projectPath, 'workspaces', `feature-${normalizedIssueId.toLowerCase()}`);
-    const plan = workspacePath ? readWorkspacePlanSync(workspacePath) : undefined;
-    if (!plan?.plan.items.some(item => item.id === options.item)) {
-      throw new Error(`Item "${options.item}" does not exist in the xBRIEF for ${normalizedIssueId}`);
-    }
-
-    const baseUrl = (process.env.OVERDECK_DASHBOARD_URL || process.env.DASHBOARD_URL || 'http://localhost:3011').replace(/\/$/, '');
-    const internalToken = getInternalTokenSync();
-    const response = await fetch(`${baseUrl}/api/specialists/done`, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        ...(internalToken ? { [INTERNAL_TOKEN_HEADER]: internalToken } : {}),
-      },
-      body: JSON.stringify({
-        specialist,
-        issueId: normalizedIssueId,
-        itemId: options.item,
-        status: options.status,
-        notes: options.notes,
-      }),
-    });
-    if (!response.ok) {
-      throw new Error(`Could not record inspect verdict (${response.status}): ${await response.text()}`);
-    }
-    console.log(chalk.green(`✓ Inspection ${options.status} for ${normalizedIssueId} item ${options.item}`));
-    return;
+  const workspacePath = getIssueWorkspacePath(normalizedIssueId);
+  if (!workspacePath || !existsSync(workspacePath)) {
+    console.error(chalk.red(`No workspace for ${normalizedIssueId}; cannot reach its review artifact.`));
+    return exitCli(1);
   }
 
-  // Build the atomic update — setReviewStatus handles history, SQLite,
-  // computed readyForMerge, and JSON persistence in one call.
-  // This eliminates the read-modify-write race that caused duplicate
-  // specialist runs to overwrite each other's results.
-  const update: ReviewStatusUpdate = {};
-
-  switch (specialist) {
-    case 'review':
-      update.reviewStatus = options.status as ReviewStatus['reviewStatus'];
-      if (options.notes) update.reviewNotes = options.notes;
-      // Snapshot the workspace HEAD — the same way the /api/specialists/done HTTP
-      // route does. The synthesis agent signals via this CLI path, so without this
-      // the snapshot never happens: the deacon's post-review-commit drift detection
-      // goes blind, jamming the issue at passed-but-no-anchor. PAN-3847: the verdict
-      // write door refuses anchorless terminal verdicts, so the head is snapshotted
-      // for passed, blocked and failed verdicts and travels in the same write — the
-      // verdict and its anchor are one write (PAN-2524, PAN-3148).
-      if (options.status === 'passed' || options.status === 'blocked' || options.status === 'failed') {
-        let workspaceHead: HeadAnchor | undefined;
-        try {
-          const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
-          const { existsSync } = await import('node:fs');
-          const { join } = await import('node:path');
-          const project = resolveProjectFromIssueSync(normalizedIssueId);
-          if (project) {
-            const workspacePath = join(
-              project.projectPath,
-              'workspaces',
-              `feature-${normalizedIssueId.toLowerCase()}`,
-            );
-            if (existsSync(workspacePath)) {
-              // PAN-2948: polyrepo-aware — snapshots sub-repo heads, not the wrapper.
-              const { snapshotWorkspaceHeadsPromise } = await import('../../../lib/git-utils.js');
-              const snapshot = await snapshotWorkspaceHeadsPromise(normalizedIssueId, workspacePath);
-              if (snapshot) workspaceHead = snapshot;
-            }
-          }
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          console.warn(chalk.yellow(`  ⚠ Could not snapshot workspace HEAD: ${message}`));
-        }
-        if (!workspaceHead) {
-          console.error(chalk.red('Cannot record a review verdict without the workspace head; check the workspace and retry'));
-          return exitCli(1);
-        }
-        update.reviewedAtCommit = workspaceHead;
-      }
-      // PAN-3847 (FR-10): a review verdict never writes verificationStatus — the
-      // verification gate alone owns that field.
-      break;
-
-    case 'test':
-      update.testStatus = options.status as ReviewStatus['testStatus'];
-      if (options.notes) update.testNotes = options.notes;
-      if (options.uatStatus) update.uatStatus = options.uatStatus;
-      if (options.uatNotes) update.uatNotes = options.uatNotes;
-      if (options.status === 'passed') {
-        console.log(chalk.green(`✓ Tests ${options.status} for ${normalizedIssueId}`));
-        // readyForMerge is set only by the ship role after rebase/verify/push (PAN-1048).
-      } else {
-        console.log(chalk.yellow(`✗ Tests ${options.status} for ${normalizedIssueId}`));
-      }
-      break;
-
-    case 'merge':
-      update.mergeStatus = (options.status === 'passed' ? 'merged' : 'failed') as ReviewStatus['mergeStatus'];
-      if (options.status === 'passed') {
-        update.readyForMerge = false;
-        console.log(chalk.green(`✓ Merge completed for ${normalizedIssueId}`));
-      } else {
-        console.log(chalk.red(`✗ Merge failed for ${normalizedIssueId}`));
-      }
-      break;
-
-    case 'inspect':
-      update.inspectStatus = options.status as ReviewStatus['inspectStatus'];
-      if (options.notes) update.inspectNotes = options.notes;
-      if (options.status === 'passed') {
-        console.log(chalk.green(`✓ Inspection passed for ${normalizedIssueId}`));
-        console.log(chalk.dim('  Agent can proceed to the next xBRIEF task'));
-      } else {
-        console.log(chalk.yellow(`✗ Inspection blocked for ${normalizedIssueId}`));
-        console.log(chalk.dim('  Agent must fix issues and re-request inspection'));
-      }
-      break;
-
-    case 'uat':
-      update.uatStatus = options.status as ReviewStatus['uatStatus'];
-      if (options.notes) update.uatNotes = options.notes;
-      if (options.status === 'passed') {
-        console.log(chalk.green(`✓ UAT passed for ${normalizedIssueId}`));
-        console.log(chalk.dim('  Ready for merge'));
-      } else {
-        console.log(chalk.yellow(`✗ UAT blocked for ${normalizedIssueId}`));
-        console.log(chalk.dim('  Agent must fix issues — visual/functional verification failed'));
-      }
-      break;
-
-    case 'ship':
-      if (options.status === 'passed') {
-        update.readyForMerge = true;
-        console.log(chalk.green(`✓ Ship completed for ${normalizedIssueId}`));
-        console.log(chalk.dim('  Ready for merge'));
-      } else {
-        console.log(chalk.yellow(`✗ Ship failed for ${normalizedIssueId}`));
-      }
-      break;
+  const forge = await forgeForWorkspace(workspacePath);
+  const sourceBranch = `feature/${normalizedIssueId.toLowerCase()}`;
+  const artifact = await Effect.runPromise(
+    discoverArtifact(forge, { sourceBranch, cwd: workspacePath }),
+  );
+  if (!artifact?.url) {
+    console.error(chalk.red(
+      `No open review artifact for ${sourceBranch}; run \`pan done ${normalizedIssueId}\` to open one before recording a verdict.`,
+    ));
+    return exitCli(1);
   }
 
-  let status = getReviewStatusSync(normalizedIssueId) || ({} as ReviewStatus);
+  const body = formatVerdictBody(role, options.status, options.notes, {
+    status: options.uatStatus,
+    notes: options.uatNotes,
+  });
 
-  // Route every terminal review verdict through the verdict write door (PAN-3512).
-  if (specialist === 'review' && (options.status === 'passed' || options.status === 'blocked' || options.status === 'failed')) {
-    const evidenceHead = update.reviewedAtCommit
-      ? rehydrateHeadAnchor(update.reviewedAtCommit)
-      : undefined;
-
-    const verdictOutcome = await recordReviewVerdict(normalizedIssueId, {
-      verdict: options.status as ReviewStatus['reviewStatus'] & ('passed' | 'blocked' | 'failed'),
-      notes: options.notes,
-      evidenceHead,
-      extra: {
-        ...(update.verificationStatus !== undefined
-          ? { verificationStatus: update.verificationStatus }
-          : {}),
-        ...(update.verificationNotes !== undefined
-          ? { verificationNotes: update.verificationNotes }
-          : {}),
-      },
-      runId: options.runId,
-      writer: 'quick-signal',
+  // FR-7: the reviewer's verdict IS the forge's review decision. A pass is an
+  // approval; a blocked or failed verdict is `REQUEST_CHANGES`, not a comment —
+  // a comment leaves `reviewDecision` untouched, so the merge-ready set would
+  // keep reading the branch as merely unapproved and every reader that keys off
+  // `CHANGES_REQUESTED` (rework delivery, the review-stale gate) sees nothing.
+  // Completion fails when the post fails: an unrecorded verdict is not done.
+  if (role === 'review') {
+    const result = await postReviewVerdict({
+      issueId: normalizedIssueId,
+      verdict: options.status === 'passed' ? 'approve' : 'request-changes',
+      body,
     });
-
-    if (!verdictOutcome.landed) {
-      // Verdict was rejected (stale evidence) — report it and exit non-zero
-      console.error(chalk.red(`Review verdict rejected: ${verdictOutcome.reason}`));
+    if (!result.posted) {
+      console.error(chalk.red(
+        `Could not post the review verdict on ${artifact.url}: ${result.reason}`,
+      ));
       return exitCli(1);
     }
-
-    const updatedStatus = getReviewStatusSync(normalizedIssueId);
-    if (updatedStatus) status = updatedStatus;
-
-    if (options.status === 'passed') {
-      console.log(chalk.green(`✓ Review passed for ${normalizedIssueId}`));
-      console.log(chalk.dim('  Test agent can now proceed'));
-    } else if (options.status === 'blocked') {
-      console.log(chalk.yellow(`✗ Review blocked for ${normalizedIssueId}`));
-    } else {
-      console.log(chalk.red(`✗ Review failed for ${normalizedIssueId}`));
-    }
-  } else if (specialist === 'review') {
-    // No evidence head (skipped verdict) — use setReviewStatusSync
-    status = setReviewStatusSync(normalizedIssueId, update);
-    if (options.status === 'passed') {
-      console.log(chalk.green(`✓ Review passed for ${normalizedIssueId}`));
-      console.log(chalk.dim('  Test agent can now proceed'));
-    }
+    const tint = options.status === 'passed' ? chalk.green : chalk.yellow;
+    console.log(tint(
+      `${options.status === 'passed' ? '✓' : '✗'} review ${options.status} — ${result.verdict} posted on ${artifact.url}`,
+    ));
   } else {
-    status = setReviewStatusSync(normalizedIssueId, update);
+    await Effect.runPromise(
+      commentOnArtifact(forge, { forge, url: artifact.url, body, cwd: workspacePath }),
+    );
+    const tint = options.status === 'passed' ? chalk.green : chalk.yellow;
+    console.log(tint(`${options.status === 'passed' ? '✓' : '✗'} ${role} ${options.status} — recorded on ${artifact.url}`));
   }
 
-  if (specialist === 'review' && (options.status === 'blocked' || options.status === 'failed')) {
-    // PAN-2518: the verdict is already durable (recordReviewVerdict or setReviewStatusSync above).
-    // Feedback delivery (PR comment, agent messaging, needs-you surfacing) is advisory and
-    // shells out to network + tmux, any of which can STALL. `pan admin specialists
-    // done` is run from inside the review agent's own session, so a hung delivery
-    // leaves that agent waiting on a never-returning command and the issue stalls
-    // in-review. Bound the whole step in wall-clock time so the CLI always exits;
-    // if that outer deadline is exhausted, persist a retryable stuck state before
-    // the specialist process exits instead of relying on an invisible warning.
+  if (role === 'review' && (options.status === 'blocked' || options.status === 'failed')) {
+    // Drive the work agent only once the FORGE reports the rejection — a fresh
+    // read, not the caller's own claim about what it just posted. GitHub says
+    // so with `CHANGES_REQUESTED`; GitLab has no request-changes primitive at
+    // all (pr-facts maps a rejected MR to REVIEW_REQUIRED), so there the fact
+    // is an open MR that the note left unapproved.
+    const facts = await getPrFacts(normalizedIssueId);
+    const rejectionVisible = facts.changesRequested
+      || (facts.forge === 'gitlab' && facts.open && !facts.approved);
+    if (!rejectionVisible) {
+      console.warn(chalk.yellow(
+        `${artifact.url} does not report the rejection yet — not driving the work agent. `
+        + 'Re-run this verdict once the forge reflects it.',
+      ));
+      return;
+    }
+    // PAN-2518: the verdict is already on the PR. Feedback delivery (agent
+    // messaging, needs-you surfacing) is advisory and shells out to network +
+    // tmux, either of which can STALL — and this runs inside the reviewer's own
+    // session, so a hung delivery leaves that agent waiting forever. Bound it.
     try {
       const { deliverReviewVerdictFeedback } = await import('../../../lib/cloister/review-verdict-feedback.js');
       const delivery = Effect.runPromise(deliverReviewVerdictFeedback({
         issueId: normalizedIssueId,
-        verdict: options.status as 'blocked' | 'failed',
+        verdict: options.status,
         notes: options.notes,
-        prUrl: status?.prUrl || undefined,
+        prUrl: artifact.url,
         ...(options.runId ? { runId: options.runId } : {}),
       }));
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -316,7 +212,7 @@ export async function doneCommand(
         const { surfaceIssueFeedbackNeedsYou } = await import('../../../lib/cloister/feedback-target.js');
         await surfaceIssueFeedbackNeedsYou(
           normalizedIssueId,
-          `Review feedback delivery exceeded the ${err.timeoutMs}ms advisory deadline before the keyed retry contract settled; retry remains required.`,
+          `Review feedback delivery exceeded the ${err.timeoutMs}ms advisory deadline before the keyed retry contract settled; the verdict is on ${artifact.url} and retry remains required.`,
           {
             specialist: 'review-agent',
             retryable: true,
@@ -329,84 +225,17 @@ export async function doneCommand(
     }
   }
 
-  if (specialist === 'test' && status.readyForMerge) {
-    console.log(chalk.green('✓ Ready for merge!'));
-  }
-
-  if (options.notes) {
-    console.log(chalk.dim(`  Notes: ${options.notes}`));
-  }
-
-  // Print current status summary
-  console.log('');
-  console.log(chalk.bold('Current Status:'));
-  if (status.inspectStatus) {
-    console.log(`  Inspect: ${formatStatus(status.inspectStatus)}`);
-  }
-  console.log(`  Review: ${formatStatus(status.reviewStatus)}`);
-  console.log(`  Test:   ${formatStatus(status.testStatus)}`);
-  if (status.uatStatus) {
-    console.log(`  UAT:    ${formatStatus(status.uatStatus)}`);
-  }
-  if (status.mergeStatus) {
-    console.log(`  Merge:  ${formatStatus(status.mergeStatus)}`);
-  }
-  console.log(`  Ready:  ${status.readyForMerge ? chalk.green('Yes') : chalk.dim('No')}`);
-
-  // PAN-2579 (warm-by-default lifecycle): the PAN-1716 reap-on-verdict step that
-  // used to run here is GONE. The session stays alive so the next cycle resumes
-  // it with its context intact (fast re-review). Warm-idle advancing sessions no
-  // longer count against the PAN-1665 ceiling (countRunningAgents excludes them)
-  // and the memory governor sheds them first under HARD pressure — eviction is
-  // the governor's job, never a side effect of recording a verdict.
+  // PAN-2579 (warm-by-default lifecycle): the session stays alive so the next
+  // cycle resumes it with its context intact. Eviction is the memory
+  // governor's job, never a side effect of recording a verdict.
 }
 
-/** CLI boundary: durable work finishes before forcing exit past stray open handles. */
+/** CLI boundary: the verdict is durable on the forge before the process exits. */
 export async function doneAndExitCommand(
   specialist: string,
   issueId: string,
   options: DoneOptions,
 ): Promise<never> {
   await doneCommand(specialist, issueId, options);
-  // PAN-2689: setReviewStatusSync's journal write is fire-and-forget; in this
-  // short-lived process an immediate exit kills it — and in a sandbox (readonly
-  // DB) that write is the ONLY durable copy of the verdict. Drain it first.
-  const {
-    flushReviewStatusJournalWrites,
-    readWorkspaceVerdictFallbackSync,
-    workspaceVerdictFallbackPath,
-  } = await import('../../../lib/overdeck/review-status-record-sync.js');
-  await flushReviewStatusJournalWrites();
-  // PAN-3092: the flush waited out the verdict-write backoff. A fallback that
-  // still exists means the record lock is contended, NOT that the verdict was
-  // lost — MIN-902's reviewer re-ran this command for an hour at ~$5/hr because
-  // nothing said so. Say it plainly, once.
-  const normalized = issueId.toUpperCase();
-  if (readWorkspaceVerdictFallbackSync(normalized)) {
-    const path = workspaceVerdictFallbackPath(normalized) ?? 'the workspace fallback file';
-    console.log(chalk.yellow(
-      `\n⚠ The journal write is contended — the verdict is already durable at ${path}.\n` +
-      `  The host folds it into the canonical record automatically (the fallback drain\n` +
-      `  plus the deacon's stranded-fallback sweep). Do NOT re-run this signal: repeated\n` +
-      `  signals add lock pressure and burn tokens without making the verdict any safer.`,
-    ));
-  }
   return exitCli(0);
-}
-
-function formatStatus(status: string): string {
-  switch (status) {
-    case 'passed':
-      return chalk.green(status);
-    case 'failed':
-      return chalk.red(status);
-    case 'pending':
-      return chalk.dim(status);
-    case 'reviewing':
-    case 'testing':
-    case 'merging':
-      return chalk.yellow(status);
-    default:
-      return status;
-  }
 }

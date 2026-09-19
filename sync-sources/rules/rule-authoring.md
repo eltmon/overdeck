@@ -34,7 +34,5 @@ bundled rule in the overdeck repo:
 **"project rule"** and **"machine rule"** requests are NOT bundled rules — they
 edit the code-owned project layer (`<root>/.overdeck/context/project.md`) or global layer
 (`~/.overdeck/context/global.md`) directly; no overdeck checkout
-involved. Permanent state is separate: migrated projects use `overdeck-state`
-(on disk at `${OVERDECK_HOME}/state/<project>/`), while unmigrated projects
-temporarily retain their legacy `<projectRoot>/.pan/` state paths. See the
-context-nomenclature rule for the full routing table.
+involved. Permanent planning state is separate: it lives under `.pan/` in the
+project repo. See the context-nomenclature rule for the full routing table.

@@ -33,7 +33,8 @@ function seed(issues: Issue[]) {
     ...INITIAL_READ_MODEL_STATE,
     issuesRaw: issues,
     agentsById: {},
-    reviewStatusByIssueId: {},
+    derivedIssueStateByIssueId: {},
+    backendPanesById: {},
   } as never);
 }
 

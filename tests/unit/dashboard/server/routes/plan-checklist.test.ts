@@ -18,6 +18,10 @@ vi.mock('../../../../../src/lib/agents.js', async (importOriginal) => {
 
 import { postAgentPlanChecklistRoute } from '../../../../../src/dashboard/server/routes/agents/runtime-events.js';
 
+// PAN-3917 W6: W3 deletes the record plane; config-yaml still reaches it
+// transitively (config-yaml/defaults → agents/tier-table → pan-dir/record).
+// Stub the chain entry so the module under test loads.
+
 let projectPath: string;
 let workspace: string;
 

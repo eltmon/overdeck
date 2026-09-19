@@ -13,7 +13,7 @@ allowed-tools: []
 
 This compatibility stub preserves the former skill name. Use `/pan-plan` to start issue planning.
 
-PRDs are written to `drafts/<issue>.md` on `overdeck-state` following the `prd-authoring` rule; the `docs/prds/` directories are retired.
+PRDs are written to `<planHome>/.pan/drafts/<issue>.md` following the `prd-authoring` rule; the `docs/prds/` directories are retired.
 
 If this skill is invoked, stop reading this file and invoke `/pan-plan` so the current planning flow, xBRIEF schema, and finalization guidance load.
 

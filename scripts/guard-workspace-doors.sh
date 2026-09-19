@@ -20,6 +20,7 @@ ALLOWED=(
   ':!**/__tests__/**'
   ':!**/*.test.ts'
   ':!tests/**'
+  ':!**/__fixtures__/**'
 )
 
 # Phase-2 filter: drop comment lines from git-grep output (mirrors lint-state-writes.sh).

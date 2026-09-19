@@ -68,7 +68,6 @@ describe('overdeck test fixture', () => {
       troubledAt: '2026-06-17T00:45:00.000Z',
       lastActivity: '2026-06-17T00:50:00.000Z',
       lastFailureReason: 'boom',
-      phase: 'review-response',
       roleRunHead: 'abc123',
       flywheelRunId: 'fw-1',
       costSoFar: 1.2345,
@@ -82,7 +81,11 @@ describe('overdeck test fixture', () => {
     expect(got?.troubledAt).toBe('2026-06-17T00:45:00.000Z');
     expect(got?.lastActivity).toBe('2026-06-17T00:50:00.000Z');
     expect(got?.lastFailureReason).toBe('boom');
-    expect(got?.phase).toBe('review-response');
+    // `phase` is a legacy field: cleanAgentState strips it on every save/read
+    // normalize pass (PAN-1048 derives the role label instead — see
+    // src/dashboard/server/routes/agents/lifecycle-stop.ts), so it must not
+    // round-trip here even though the AgentState type still declares it.
+    expect(got?.phase).toBeUndefined();
     expect(got?.roleRunHead).toBe('abc123');
     expect(got?.flywheelRunId).toBe('fw-1');
     expect(got?.costSoFar).toBeCloseTo(1.2345);

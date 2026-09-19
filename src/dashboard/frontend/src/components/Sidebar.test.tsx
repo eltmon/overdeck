@@ -15,7 +15,7 @@ vi.mock('../hooks/useTheme', () => ({
   useTheme: () => ({ theme: 'dark', toggleTheme: vi.fn() }),
 }));
 
-function renderSidebar(options: { activeTab?: Tab; runs?: Array<{ id: string; status: string }>; experimentalFeatures?: boolean; onOpenUpdater?: () => void } = {}) {
+function renderSidebar(options: { activeTab?: Tab; experimentalFeatures?: boolean; onOpenUpdater?: () => void } = {}) {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -24,14 +24,10 @@ function renderSidebar(options: { activeTab?: Tab; runs?: Array<{ id: string; st
   });
   const onTabChange = vi.fn();
   const onSearchOpen = vi.fn();
-  const runs = options.runs ?? [];
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url === '/api/version') {
       return Response.json({ version: '0.5.0', isDev: false });
-    }
-    if (url === '/api/flywheel/runs?limit=10') {
-      return Response.json(runs);
     }
     if (url === '/api/conversations' || url === '/api/registered-projects') {
       return Response.json([]);
@@ -79,14 +75,16 @@ describe('Sidebar navigation', () => {
     }));
   });
 
-  it('shows Home and Flywheel as the primary rail, with other views under More (PAN-1561)', () => {
+  it('shows Home and Order Book as the primary rail, with other views under More (PAN-1561)', () => {
     const { container, onTabChange } = renderSidebar({ activeTab: 'command-deck' });
 
-    // Primary rail: the first two nav buttons are Home and Flywheel.
+    // Primary rail: the first two nav buttons are Home and Order Book. The
+    // Flywheel page went with the state layer (PAN-3917).
     const navButtons = Array.from(container.querySelectorAll('nav button[data-testid^="sidebar-"]'));
     const labels = navButtons.map((button) => button.textContent?.trim());
     expect(labels[0]).toBe('Home');
-    expect(labels[1]).toBe('Flywheel');
+    expect(labels[1]).toBe('Order Book');
+    expect(labels).not.toContain('Flywheel');
 
     // Secondary views are relocated into the "More" section but still reachable.
     expect(screen.getByTestId('sidebar-more')).toBeInTheDocument();
@@ -193,7 +191,11 @@ describe('Sidebar pipeline filter groups', () => {
         issue({ identifier: 'PAN-3', status: 'Done', stateType: 'completed' }),
       ],
       agentsById: {},
-      reviewStatusByIssueId: {},
+      derivedIssueStateByIssueId: {
+        'PAN-1': { issueId: 'PAN-1', state: 'working' },
+        'PAN-2': { issueId: 'PAN-2', state: 'backlog' },
+      },
+      backendPanesById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
   });
 

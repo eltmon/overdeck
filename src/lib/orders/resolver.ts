@@ -1,33 +1,23 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { basename, dirname, join } from 'node:path';
 import type { OrderBook } from '@overdeck/contracts';
 import type { SequenceNode } from '../backlog/types.js';
 import { parseSequenceMd } from '../backlog/sequence-io.js';
 import { LEGACY_PARKED_LABELS, PARKED_LABEL } from '../backlog/pickup.js';
-import { getOverdeckHome } from '../paths.js';
-import { findProjectByPathSync, getProjectSync } from '../projects.js';
+import { findProjectByPathSync } from '../projects.js';
 import { backlogSequencePath, listOrderBookIds, readOrderBook, readOrderBookAsync, readOrderBookIndex } from './io.js';
 import type { OrderBookProgress, OrderIssueLookup, OrderIssueState } from './types.js';
 
 const COMPLETE_STATUS = 'complete';
 
 /**
- * The issue prefix (e.g. "PAN") of the project that owns an orders state root,
- * or null when it cannot be determined. Migrated roots are
- * `<overdeckHome>/state/<projectKey>` — the basename is the projects.yaml key.
- * Legacy roots live inside the project checkout, where path containment is the
- * authoritative match (a checkout dir name can collide with another project's
- * yaml key, so the basename key lookup runs only for true migrated roots).
+ * The issue prefix (e.g. "PAN") of the project that owns an orders directory,
+ * or null when it cannot be determined. `panDir` is `<planHome>/.pan`, which
+ * lives inside a registered checkout, so path containment is the match.
  */
-export function issuePrefixForStateRoot(stateRoot: string): string | null {
+export function issuePrefixForStateRoot(panDir: string): string | null {
   try {
-    const byPath = findProjectByPathSync(stateRoot);
-    if (byPath?.issue_prefix) return byPath.issue_prefix.toUpperCase();
-    if (dirname(stateRoot) === join(getOverdeckHome(), 'state')) {
-      const byKey = getProjectSync(basename(stateRoot));
-      if (byKey?.issue_prefix) return byKey.issue_prefix.toUpperCase();
-    }
-    return null;
+    const byPath = findProjectByPathSync(panDir);
+    return byPath?.issue_prefix ? byPath.issue_prefix.toUpperCase() : null;
   } catch {
     return null;
   }
@@ -40,18 +30,18 @@ export function issuePrefixForStateRoot(stateRoot: string): string | null {
  * bare numbers; every read-side consumer (validation, progress, membership,
  * dispatch) resolves them through this.
  */
-export function normalizeOrderIssueId(stateRoot: string, issueId: string): string {
+export function normalizeOrderIssueId(panDir: string, issueId: string): string {
   if (!/^\d+$/.test(issueId)) return issueId;
-  const prefix = issuePrefixForStateRoot(stateRoot);
+  const prefix = issuePrefixForStateRoot(panDir);
   return prefix ? `${prefix}-${issueId}` : issueId;
 }
 
-function normalizeBookIssues(stateRoot: string, book: OrderBook): OrderBook {
+function normalizeBookIssues(panDir: string, book: OrderBook): OrderBook {
   const hasBare = book.items.some(
     (item) => /^\d+$/.test(item.issue) || item.prereqs.some((prereq) => /^\d+$/.test(prereq)),
   );
   if (!hasBare) return book;
-  const prefix = issuePrefixForStateRoot(stateRoot);
+  const prefix = issuePrefixForStateRoot(panDir);
   if (!prefix) return book;
   const expand = (id: string): string => (/^\d+$/.test(id) ? `${prefix}-${id}` : id);
   return {
@@ -151,35 +141,35 @@ export function orderIssueStoreStatus(): { started: boolean; issueCount: number 
 }
 
 /** The sole order-book read door. */
-export function listBooks(stateRoot: string): OrderBook[] {
-  return listOrderBookIds(stateRoot).map((id) => {
-    const book = readOrderBook(stateRoot, id);
+export function listBooks(panDir: string): OrderBook[] {
+  return listOrderBookIds(panDir).map((id) => {
+    const book = readOrderBook(panDir, id);
     if (!book) throw new Error(`Order book index references missing book ${id}`);
-    return normalizeBookIssues(stateRoot, book);
+    return normalizeBookIssues(panDir, book);
   });
 }
 
-export function getBook(stateRoot: string, bookId: string): OrderBook | null {
-  const book = readOrderBook(stateRoot, bookId);
-  return book ? normalizeBookIssues(stateRoot, book) : null;
+export function getBook(panDir: string, bookId: string): OrderBook | null {
+  const book = readOrderBook(panDir, bookId);
+  return book ? normalizeBookIssues(panDir, book) : null;
 }
 
-export function getBookAsync(stateRoot: string, bookId: string): Promise<OrderBook | null> {
-  return readOrderBookAsync(stateRoot, bookId).then((book) => (book ? normalizeBookIssues(stateRoot, book) : null));
+export function getBookAsync(panDir: string, bookId: string): Promise<OrderBook | null> {
+  return readOrderBookAsync(panDir, bookId).then((book) => (book ? normalizeBookIssues(panDir, book) : null));
 }
 
 /** The first 'ready' book in index.json queue order, or null if none is ready. */
-export function firstReadyBookInQueue(stateRoot: string): OrderBook | null {
-  for (const entry of readOrderBookIndex(stateRoot)) {
-    const book = getBook(stateRoot, entry.id);
+export function firstReadyBookInQueue(panDir: string): OrderBook | null {
+  for (const entry of readOrderBookIndex(panDir)) {
+    const book = getBook(panDir, entry.id);
     if (book?.status === 'ready') return book;
   }
   return null;
 }
 
-export function membership(stateRoot: string): Map<string, string> {
+export function membership(panDir: string): Map<string, string> {
   const result = new Map<string, string>();
-  for (const book of listBooks(stateRoot)) {
+  for (const book of listBooks(panDir)) {
     if (book.status === COMPLETE_STATUS) continue;
     for (const item of book.items) {
       const issue = item.issue.toUpperCase();
@@ -193,14 +183,14 @@ export function membership(stateRoot: string): Map<string, string> {
   return result;
 }
 
-export function backlogCandidates(stateRoot: string, limit: number): SequenceNode[] {
+export function backlogCandidates(panDir: string, limit: number): SequenceNode[] {
   if (limit <= 0) return [];
-  const path = backlogSequencePath(stateRoot);
+  const path = backlogSequencePath(panDir);
   if (!existsSync(path)) return [];
   const parsed = parseSequenceMd(readFileSync(path, 'utf8'));
   if (!parsed.ok) throw new Error(`Could not parse backlog sequence: ${parsed.error}`);
 
-  const assigned = membership(stateRoot);
+  const assigned = membership(panDir);
   return [...parsed.doc.nodes]
     .sort((a, b) => a.rank - b.rank)
     .filter((node) => !assigned.has(node.issue.toUpperCase()))

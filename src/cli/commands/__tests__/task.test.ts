@@ -2,18 +2,39 @@ import { Command } from 'commander';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  apply: vi.fn(),
-  readRecord: vi.fn(),
+  ItemNotVerifiable: class ItemNotVerifiable extends Error {},
+  claimItem: vi.fn(),
+  markItemDone: vi.fn(),
+  setItemStatus: vi.fn(),
+  readContinueState: vi.fn(),
   readPlan: vi.fn(),
+  commit: vi.fn(),
+  repos: vi.fn(),
+  repoRoots: vi.fn(),
 }));
 
-vi.mock('../../../lib/pan-dir/task-door.js', () => ({ applyTaskStatusChange: mocks.apply }));
-vi.mock('../../../lib/pan-dir/record.js', () => ({ readIssueRecordSync: mocks.readRecord }));
 vi.mock('../../../lib/projects.js', () => ({
   resolveProjectFromIssueSync: () => ({ projectKey: 'test', projectPath: '/tmp/test' }),
   getProjectSync: () => ({ name: 'test', path: '/tmp/test' }),
 }));
+vi.mock('../../../lib/pan-dir/paths.js', () => ({ resolvePlanHome: (p: string) => p }));
+vi.mock('../../../lib/project-repos.js', () => ({
+  resolveProjectReposForIssueSync: () => mocks.repos(),
+  computeWorkspaceRepoRootsSync: (_repos: unknown, _issue: string, workspacePath: string) =>
+    mocks.repoRoots().map((dir: string) => ({ dir: dir === '.' ? workspacePath : `${workspacePath}/${dir}` })),
+}));
 vi.mock('../../../lib/xbrief/io.js', () => ({ readWorkspacePlanSync: mocks.readPlan }));
+vi.mock('../../../lib/xbrief/continue-state.js', () => ({
+  claimItem: mocks.claimItem,
+  markItemDone: mocks.markItemDone,
+  setItemStatus: mocks.setItemStatus,
+  readContinueState: mocks.readContinueState,
+  ItemNotVerifiable: mocks.ItemNotVerifiable,
+}));
+vi.mock('../../../lib/overdeck/plan-artifact-commit.js', () => ({
+  commitPlanArtifacts: mocks.commit,
+  planArtifactCommitMessage: (id: string) => `chore(workspace): plan artifacts for ${id}`,
+}));
 
 import { registerTaskCommands } from '../task.js';
 
@@ -29,9 +50,15 @@ describe('pan task CLI', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    process.exitCode = undefined;
     mocks.readPlan.mockReturnValue({ plan: { id: 'PAN-1', items: [item], edges: [] } });
-    mocks.readRecord.mockReturnValue({ tasks: { sequence: 0, claims: {} } });
-    mocks.apply.mockImplementation(async (_project, issueId, operation) => ({ issueId, itemId: operation.itemId, status: 'running', sequence: 1 }));
+    mocks.readContinueState.mockReturnValue({ items: {} });
+    mocks.claimItem.mockReturnValue({ status: 'in_progress', claimedBy: 'agent-pan-1' });
+    mocks.markItemDone.mockResolvedValue({ status: 'completed', doneAt: 'now' });
+    mocks.commit.mockResolvedValue({ committed: true, sha: 'abc' });
+    mocks.repos.mockReturnValue(null);
+    mocks.repoRoots.mockReturnValue(['.']);
   });
 
   it('registers exactly the eight task verbs', () => {
@@ -40,27 +67,93 @@ describe('pan task CLI', () => {
     ]);
   });
 
+  it('claim records the claim in the continue file and commits it', async () => {
+    await program().parseAsync(['node', 'pan', 'task', 'claim', 'PAN-1', 'PAN-1-a']);
+    expect(mocks.claimItem).toHaveBeenCalledWith('/tmp/test/workspaces/feature-pan-1', 'PAN-1', 'PAN-1-a', expect.any(String));
+    expect(mocks.commit).toHaveBeenCalledWith(expect.objectContaining({ cwd: '/tmp/test/workspaces/feature-pan-1' }));
+  });
+
+  it('done requires the Item trailer and a pushed branch', async () => {
+    await program().parseAsync(['node', 'pan', 'task', 'done', 'PAN-1', 'PAN-1-a']);
+    expect(mocks.markItemDone).toHaveBeenCalledWith(
+      '/tmp/test/workspaces/feature-pan-1',
+      'PAN-1',
+      'PAN-1-a',
+      {
+        requireTrailer: 'Item: PAN-1-a',
+        requirePushed: true,
+        repoRoots: ['/tmp/test/workspaces/feature-pan-1'],
+      },
+    );
+    expect(mocks.commit).toHaveBeenCalled();
+  });
+
+  it('done searches every repository root of a polyrepo workspace', async () => {
+    mocks.repoRoots.mockReturnValue(['api', 'web']);
+
+    await program().parseAsync(['node', 'pan', 'task', 'done', 'PAN-1', 'PAN-1-a']);
+
+    expect(mocks.markItemDone).toHaveBeenCalledWith(
+      '/tmp/test/workspaces/feature-pan-1',
+      'PAN-1',
+      'PAN-1-a',
+      expect.objectContaining({
+        repoRoots: [
+          '/tmp/test/workspaces/feature-pan-1/api',
+          '/tmp/test/workspaces/feature-pan-1/web',
+          '/tmp/test/workspaces/feature-pan-1',
+        ],
+      }),
+    );
+  });
+
+  it('done fails loudly when the continue file cannot be committed', async () => {
+    mocks.commit.mockResolvedValue({ committed: false, reason: 'pre-commit hook refused' });
+    const errors: string[] = [];
+    vi.mocked(console.error).mockImplementation((message: unknown) => { errors.push(String(message)); });
+
+    await program().parseAsync(['node', 'pan', 'task', 'done', 'PAN-1', 'PAN-1-a']);
+
+    expect(process.exitCode).toBe(1);
+    expect(errors.join('\n')).toContain('pre-commit hook refused');
+  });
+
+  it('done stays silent when there was nothing to commit', async () => {
+    mocks.commit.mockResolvedValue({ committed: false, reason: 'nothing to commit' });
+
+    await program().parseAsync(['node', 'pan', 'task', 'done', 'PAN-1', 'PAN-1-a']);
+
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it('done refuses in plain English and writes nothing when git cannot corroborate it', async () => {
+    mocks.markItemDone.mockRejectedValue(new mocks.ItemNotVerifiable('the branch is 2 commit(s) ahead of its upstream'));
+    const errors: string[] = [];
+    vi.mocked(console.error).mockImplementation((message: unknown) => { errors.push(String(message)); });
+
+    await program().parseAsync(['node', 'pan', 'task', 'done', 'PAN-1', 'PAN-1-a']);
+
+    expect(process.exitCode).toBe(1);
+    expect(errors.join('\n')).toContain('is not done yet');
+    expect(errors.join('\n')).toContain('Item: PAN-1-a');
+    expect(mocks.commit).not.toHaveBeenCalled();
+  });
+
   it.each([
-    ['claim', []],
-    ['done', []],
-    ['block', ['--reason', 'waiting']],
-    ['unblock', []],
-    ['reopen', ['--reason', 'falsely completed']],
-    ['cancel', ['--reason', 'removed']],
-  ])('routes %s through the task write door', async (verb, flags) => {
-    await program().parseAsync(['node', 'pan', 'task', verb, 'PAN-1', 'PAN-1-a', ...flags]);
-    expect(mocks.apply).toHaveBeenCalledWith(expect.anything(), 'PAN-1', expect.objectContaining({ type: verb, itemId: 'PAN-1-a' }));
+    ['block', 'blocked'],
+    ['unblock', 'pending'],
+    ['reopen', 'pending'],
+    ['cancel', 'cancelled'],
+  ])('%s writes the item status into the continue file', async (verb, status) => {
+    await program().parseAsync(['node', 'pan', 'task', verb, 'PAN-1', 'PAN-1-a']);
+    expect(mocks.setItemStatus).toHaveBeenCalledWith(expect.any(String), 'PAN-1', 'PAN-1-a', status);
   });
 
-  it('passes CAS and force options to the write door', async () => {
-    await program().parseAsync(['node', 'pan', 'task', 'done', 'PAN-1', 'PAN-1-a', '--expected-sequence', '3', '--force', '--reason', 'recovery']);
-    expect(mocks.apply).toHaveBeenCalledWith(expect.anything(), 'PAN-1', expect.objectContaining({ expectedSequence: 3, force: true, reason: 'recovery' }));
-  });
-
-  it('reads next and show without calling the write door', async () => {
-    await program().parseAsync(['node', 'pan', 'task', 'next', 'PAN-1', '--json']);
-    await program().parseAsync(['node', 'pan', 'task', 'show', 'PAN-1', 'PAN-1-a', '--json']);
-    expect(mocks.apply).not.toHaveBeenCalled();
-    expect(console.log).toHaveBeenCalledTimes(2);
+  it('reads next and show without writing', async () => {
+    await program().parseAsync(['node', 'pan', 'task', 'next', 'PAN-1']);
+    await program().parseAsync(['node', 'pan', 'task', 'show', 'PAN-1', 'PAN-1-a']);
+    expect(mocks.claimItem).not.toHaveBeenCalled();
+    expect(mocks.markItemDone).not.toHaveBeenCalled();
+    expect(mocks.setItemStatus).not.toHaveBeenCalled();
   });
 });

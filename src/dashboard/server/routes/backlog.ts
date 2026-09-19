@@ -7,6 +7,7 @@ import { httpHandler } from './http-handler.js';
 import { jsonResponse } from '../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { parseSequenceMd, writeSequenceMd } from '../../../lib/backlog/sequence-io.js';
+import type { SequenceNode } from '../../../lib/backlog/types.js';
 import {
   applyIssueVetoedLabel, removeIssueVetoedLabel,
   applyIssueReadyLabel, removeIssueReadyLabel,
@@ -22,8 +23,7 @@ import {
 } from '../../../lib/backlog/pickup.js';
 import { buildClassifyLookups } from '../../../lib/backlog/lookups.js';
 import { getProjectPanPaths } from '../../../lib/pan-dir/paths.js';
-import { getReviewStatusSync } from '../../../lib/review-status.js';
-import { getBacklogSequenceForRoot, clearBacklogSequence } from '../../../lib/overdeck/backlog.js';
+import { loadIssueStatesForProject } from '../services/derived-issue-state.js';
 import { isFlywheelAutoPickupBacklog } from '../../../lib/overdeck/control-settings.js';
 import { SEQUENCER_AGENT_ID } from '../../../lib/backlog/sequencer-agent.js';
 import { resolvePiSessionPath } from './jsonl-resolver.js';
@@ -44,6 +44,28 @@ const readJsonBody = Effect.gen(function* () {
   }
 });
 
+/**
+ * The ranked backlog, straight out of `.pan/backlog/sequence.md` (PAN-3917).
+ *
+ * `issue` is spelled `issueId` here because that is what the route's callers
+ * and the editor drawer read.
+ */
+function readBacklogSequence(projectRoot: string): {
+  nodes: Array<SequenceNode & { issueId: string }>;
+  edges: Array<{ from: string; to: string; type: string }>;
+} {
+  const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
+  if (!existsSync(seqPath)) return { nodes: [], edges: [] };
+  const parsed = parseSequenceMd(readFileSync(seqPath, 'utf-8'));
+  if (!parsed.ok) return { nodes: [], edges: [] };
+  return {
+    nodes: [...parsed.doc.nodes]
+      .sort((a, b) => a.rank - b.rank)
+      .map((node) => ({ ...node, issueId: node.issue })),
+    edges: parsed.doc.edges.map((e) => ({ from: e.from, to: e.to, type: e.type })),
+  };
+}
+
 // ─── Route: GET /api/backlog/sequence ────────────────────────────────────────
 
 const getBacklogSequenceRoute = HttpRouter.add(
@@ -54,9 +76,10 @@ const getBacklogSequenceRoute = HttpRouter.add(
       try: async () => {
         const projectRoot = process.cwd();
 
-        // Read nodes from cache (primary path), seeding it from sequence.md if needed.
-        // Falls back to stale cache rows when sequence.md is absent/unparseable.
-        const { nodes: cachedNodes, edges } = getBacklogSequenceForRoot(projectRoot);
+        // PAN-3917: sequence.md IS the sequence. The SQLite mirror it used to
+        // be read through is gone, so an unparseable or absent file means an
+        // empty sequence — never a stale cached ranking.
+        const { nodes: cachedNodes, edges } = readBacklogSequence(projectRoot);
 
         if (cachedNodes.length === 0) {
           return jsonResponse({ nodes: [], edges: [] });
@@ -102,11 +125,19 @@ const getBacklogSequenceRoute = HttpRouter.add(
         // event loop with per-workspace process calls.
         const lookups = buildClassifyLookups(projectRoot);
 
+        // PAN-3917 FR-6: "the pipeline owns this issue" is derived — one batched
+        // forge + inventory read for the whole sequence, never a stored status.
+        const derivedStates = await loadIssueStatesForProject(
+          projectRoot,
+          cachedNodes.map((r) => r.issueId),
+        );
+        const PIPELINE_OWNED = new Set(['working', 'in-review', 'changes-requested', 'ready', 'merged']);
+
         const nodes = cachedNodes.map((r) => {
           const issueUpper = r.issueId.toUpperCase();
-          const reviewStatus = getReviewStatusSync(issueUpper);
+          const derived = derivedStates.get(issueUpper);
           const inPipeline =
-            (reviewStatus !== null && reviewStatus.reviewStatus !== 'pending') ||
+            (derived !== undefined && PIPELINE_OWNED.has(derived.state)) ||
             existsSync(join(workspacesDir, `feature-${r.issueId.toLowerCase()}`));
           const hasPrd = prdFiles.has(issueUpper);
           const ready = specIssues.has(issueUpper);
@@ -128,6 +159,7 @@ const getBacklogSequenceRoute = HttpRouter.add(
             hasPrd,
             ready,
             state,
+            pipelineState: derived?.state ?? null,
           };
         });
 
@@ -442,11 +474,7 @@ const postBacklogClearRoute = HttpRouter.add(
         const projectRoot = process.cwd();
         const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
         // Clear the cache under the project key recorded in the md (if parseable).
-        if (existsSync(seqPath)) {
-          const parsed = parseSequenceMd(readFileSync(seqPath, 'utf-8'));
-          if (parsed.ok) clearBacklogSequence(parsed.doc.project);
-          rmSync(seqPath, { force: true });
-        }
+        rmSync(seqPath, { force: true });
         return jsonResponse({ status: 'ok', cleared: true });
       },
       catch: (err) => new Error(String(err)),

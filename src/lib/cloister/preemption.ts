@@ -25,6 +25,8 @@
 
 import { Effect } from 'effect';
 
+import { getPrFacts, isAwaitingReview, type PrFacts } from './pr-facts.js';
+
 import {
   clearYieldForResumeSync,
   listAgentStates,
@@ -34,14 +36,13 @@ import {
   stopAgent,
   type AgentState,
 } from '../agents.js';
-import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 import { listSessions } from '../tmux.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { loadCloisterConfigSync } from './config.js';
 import { isIdle } from '../agents/liveness.js';
 import { assessMemoryPressure } from './memory-governor.js';
-import { tryReserveAdvancingSlot } from './concurrency.js';
+import { countRunningAgents, tryReserveAdvancingSlot } from './concurrency.js';
 
 /** RSS settle window after a resume before the next memory re-assessment (mirrors deacon-auto-resume). */
 const RSS_SETTLE_MS = 2000;
@@ -68,7 +69,7 @@ export interface YieldCandidate {
   /** Already paused (operator pause or a prior yield) — not a fresh victim. */
   paused: boolean;
   /**
-   * The agent's own issue is blocked on the pipeline (reviewStatus pending or
+   * The agent's own issue is blocked on the pipeline (review pending or
    * reviewing) — it is waiting anyway, so prefer it as a victim (FR-2a).
    */
   reviewBlocked: boolean;
@@ -110,11 +111,14 @@ export function selectYieldVictim(
   return ordered[0];
 }
 
-function reviewBlockedFor(issueId: string): boolean {
-  const status = getPipelineStatus(issueId)?.reviewStatus;
-  // PAN-2507 (FR-2a): the enum has no `in_progress`; the faithful "waiting on
-  // its own review" states are `pending` (queued) and `reviewing` (running).
-  return status === 'pending' || status === 'reviewing';
+/**
+ * PAN-2507 (FR-2a), re-pointed by PAN-3917: a work agent is "waiting on its own
+ * review" when its pull request is open and the forge shows no verdict yet —
+ * neither approved nor changes-requested. That is the same set the review row's
+ * `pending`/`reviewing` used to name.
+ */
+async function reviewBlockedFor(issueId: string): Promise<boolean> {
+  return isAwaitingReview(await getPrFacts(issueId));
 }
 
 function parseMs(iso: string | undefined): number | null {
@@ -127,18 +131,18 @@ async function buildCandidates(): Promise<YieldCandidate[]> {
   const sessions = await Effect.runPromise(listSessions());
   const attached = new Set(sessions.filter((s) => s.attached).map((s) => s.name));
 
-  return listRunningAgentsSync()
+  return Promise.all(listRunningAgentsSync()
     .filter((s) => s.role === 'work' && s.status === 'running')
-    .map((s) => ({
+    .map(async (s) => ({
       id: s.id,
       issueId: s.issueId,
       idle: isIdle(s.id),
       attached: attached.has(s.id),
       paused: s.paused === true,
-      reviewBlocked: reviewBlockedFor(s.issueId),
+      reviewBlocked: await reviewBlockedFor(s.issueId),
       lastActivityMs: parseMs(s.lastActivity),
       lastYieldResumeMs: parseMs(s.lastYieldResumeAt),
-    }));
+    })));
 }
 
 function countYielded(): number {
@@ -205,12 +209,12 @@ export async function tryYieldForAdvancingDispatch(role: AdvancingRole, issueId:
   if (!outcome.yielded) return false;
 
   // Count-gated: the killed session already dropped the running count.
-  if (tryReserveAdvancingSlot()) return true;
+  if (tryReserveAdvancingSlot(await countRunningAgents())) return true;
 
   // Memory-gated: settle freed RSS, refresh the cached verdict, retry once.
   await new Promise((r) => setTimeout(r, RSS_SETTLE_MS));
   await assessMemoryPressure();
-  if (tryReserveAdvancingSlot()) return true;
+  if (tryReserveAdvancingSlot(await countRunningAgents())) return true;
 
   // FR-6c: the yield freed no usable capacity — put the victim back immediately.
   if (outcome.victimId) await resumeYieldedVictim(outcome.victimId);
@@ -278,4 +282,34 @@ export async function resumeYieldedAgents(maxToResume: number): Promise<string[]
     }
   }
   return resumed;
+}
+
+/**
+ * Is this idle agent waiting on the pipeline rather than stalled? (PAN-2581,
+ * re-pointed by PAN-3917.)
+ *
+ * The health check's poke loop must never ask "are you stuck?" of an agent
+ * that is legitimately waiting: a work agent that has opened its PR and is
+ * waiting on review, or a review/test agent between phases. A poke there spends
+ * tokens re-explaining the wait, and the idle-alive pause that follows it
+ * manufactures the paused-delivery-target deadlock PAN-2461 exists to undo.
+ *
+ * This used to read the issue's review row — `reviewing`, `passed`, or
+ * `pending` with a `reviewRequestedAt` stamp, plus the owed-rework states. The
+ * pull request says the same thing without a row: a work/review/test agent
+ * whose issue has a PR at all is inside the pipeline, and the pipeline, not a
+ * poke, is what moves it. Roles outside work/review/test keep their ordinary
+ * idleness semantics.
+ */
+export async function shouldSkipIdlePokeForAgent(
+  agent: Pick<AgentState, 'id' | 'issueId' | 'role'> | null,
+  readFacts: (issueId: string) => Promise<PrFacts> = getPrFacts,
+): Promise<boolean> {
+  if (!agent) return false;
+  if (agent.role !== 'work' && agent.role !== 'review' && agent.role !== 'test') return false;
+  const issueId = (agent.issueId
+    || agent.id.replace(/^agent-/, '').replace(/-(review|test|ship)(-.*)?$/, '').replace(/-slot-\d+$/, '')
+  ).toUpperCase();
+  const facts = await readFacts(issueId).catch(() => null);
+  return facts?.exists === true && !facts.merged;
 }

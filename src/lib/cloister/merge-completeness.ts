@@ -4,8 +4,6 @@ import { getForgeAdapter, type ForgeType } from '../forge.js';
 import {
   ensureMergeSetForIssueSync,
   getMergeSetSync,
-  patchMergeSetRepoSync,
-  patchMergeSetReposSync,
   type MergeSet,
 } from '../merge-set.js';
 import { resolveProjectReposForIssueSync } from '../project-repos.js';
@@ -208,154 +206,67 @@ export async function assessMergeCompleteness(
   return { complete, repos, summary: buildSummary(repos, complete) };
 }
 
-export async function observeForgeMergeState(
-  issueId: string,
-  labels: string[] = [],
-): Promise<ForgeMergeObservationResult> {
-  const resolved = resolveRepos(issueId, labels);
-  if (!resolved.repos || resolved.repos.length === 0) {
-    const repos: MergeCompletenessRepoResult[] = [];
-    return {
-      complete: false,
-      hasPositiveMergedEvidence: false,
-      mergeSet: resolved.mergeSet,
-      repos,
-      summary: buildSummary(repos, false),
-    };
-  }
-
-  const repos = await Promise.all(resolved.repos.map(assessRepoMergeCompleteness));
-  let mergeSet = resolved.mergeSet;
-
-  if (mergeSet && !repos.some((repo) => repo.state === 'unverifiable')) {
-    for (let index = 0; index < repos.length; index += 1) {
-      const result = repos[index]!;
-      if (result.state !== 'merged' || !result.artifactUrl) continue;
-      const observed = mergeSet.repos.find((repo) => repo.repoKey === result.repoKey);
-      const artifactMatches = observed?.artifactUrl === result.artifactUrl
-        && (result.artifactId === undefined || observed.artifactId === result.artifactId);
-      if (observed?.mergeStatus === 'merged' && artifactMatches) continue;
-      const patched = observed && patchMergeSetRepoSync(issueId, result.repoKey, observed, {
-        artifactId: result.artifactId,
-        artifactUrl: result.artifactUrl,
-        mergeStatus: 'merged',
-      });
-      if (!patched) {
-        repos[index] = {
-          ...result,
-          state: 'unverifiable',
-          reason: `${result.repoKey} merge-set row changed during forge observation; retrying on the next patrol`,
-        };
-      }
-    }
-    mergeSet = getMergeSetSync(issueId) ?? mergeSet;
-  }
-
-  const complete = repos.every((repo) => repo.state === 'merged' || repo.state === 'no-changes');
-  return {
-    complete,
-    hasPositiveMergedEvidence: hasPositiveMergedEvidence(repos),
-    mergeSet,
-    repos,
-    summary: buildSummary(repos, complete),
-  };
-}
-
+/**
+ * Find every required repo of a polyrepo issue whose merge cannot be proven,
+ * discovering a missing review artifact from the forge on the way.
+ *
+ * PAN-3917: this used to write its findings back into the merge-set's per-repo
+ * the merge verdict and then read those same fields to decide what to re-check —
+ * the drift loop this issue removes. The forge and git now answer every
+ * question at read time; the merge set contributes only plan data (which repos,
+ * which branches, which are required). The returned merge set carries the
+ * artifact URLs discovered during this pass, in memory, for the caller's use.
+ */
 export async function reconcileStrandedRepos(
   initialMergeSet: MergeSet,
 ): Promise<StrandedRepoReconciliationResult> {
   const issueId = initialMergeSet.issueId;
   let mergeSet = getMergeSetSync(issueId) ?? initialMergeSet;
   const blockers: MergeCompletenessRepoResult[] = [];
-  const plannedPatches = new Map<string, Parameters<typeof patchMergeSetReposSync>[1][number]>();
 
-  const planPatch = (
-    observed: MergeSet['repos'][number],
-    patch: Parameters<typeof patchMergeSetRepoSync>[3],
-  ): void => {
-    const existing = plannedPatches.get(observed.repoKey);
-    plannedPatches.set(observed.repoKey, existing
-      ? { ...existing, patch: { ...existing.patch, ...patch } }
-      : { repoKey: observed.repoKey, expected: observed, patch });
+  const withArtifact = (repoKey: string, artifactUrl?: string, artifactId?: string): void => {
     mergeSet = {
       ...mergeSet,
       repos: mergeSet.repos.map((repo) => (
-        repo.repoKey === observed.repoKey ? { ...repo, ...patch } : repo
+        repo.repoKey === repoKey ? { ...repo, artifactUrl, artifactId } : repo
       )),
     };
   };
 
-  const stranded = mergeSet.repos.filter(
-    (repo) => repo.required && repo.mergeStatus !== 'skipped' && !repo.artifactUrl,
-  );
+  for (const repo of mergeSet.repos.filter((candidate) => candidate.required)) {
+    const artifactUrl = repo.artifactUrl;
+    const artifactId = repo.artifactId;
 
-  for (const repo of stranded) {
-    try {
-      const discovered = await getForgeAdapter(repo.forge).discoverArtifact({
-        sourceBranch: repo.sourceBranch,
-        cwd: repo.repoPath,
-      });
-      if (discovered?.url) {
-        planPatch(repo, { artifactUrl: discovered.url, artifactId: discovered.id });
+    if (!artifactUrl) {
+      try {
+        const discovered = await getForgeAdapter(repo.forge).discoverArtifact({
+          sourceBranch: repo.sourceBranch,
+          cwd: repo.repoPath,
+        });
+        if (discovered?.url) {
+          // The strand was a missing review artifact, and the forge has one:
+          // the repo is no longer stranded and merges on the normal path.
+          withArtifact(repo.repoKey, discovered.url, discovered.id);
+          continue;
+        }
+      } catch (error) {
+        blockers.push({
+          repoKey: repo.repoKey,
+          state: 'unverifiable',
+          aheadCount: 0,
+          reason: `${repo.repoKey} artifact discovery is unverifiable: ${errorMessage(error)}`,
+        });
         continue;
       }
-    } catch (error) {
-      blockers.push({
-        repoKey: repo.repoKey,
-        state: 'unverifiable',
-        aheadCount: 0,
-        reason: `${repo.repoKey} artifact discovery is unverifiable: ${errorMessage(error)}`,
-      });
-      continue;
     }
 
-    const result = await assessRepoMergeCompleteness(repo);
-    if (result.state === 'no-changes') {
-      planPatch(repo, { mergeStatus: 'skipped' });
-    } else if (result.state === 'merged' && result.artifactUrl) {
-      planPatch(repo, {
-        artifactId: result.artifactId,
-        artifactUrl: result.artifactUrl,
-        mergeStatus: 'merged',
-      });
+    const result = await assessRepoMergeCompleteness({ ...repo, artifactUrl, artifactId });
+    if (result.state === 'merged' && result.artifactUrl) {
+      withArtifact(repo.repoKey, result.artifactUrl, result.artifactId);
     } else if (result.state === 'unmerged' || result.state === 'unverifiable') {
       blockers.push(result);
     }
   }
 
-  const candidates = mergeSet.repos.filter(
-    (repo) => repo.required
-      && repo.mergeStatus !== 'skipped'
-      && Boolean(repo.artifactUrl)
-      && (repo.mergeStatus === 'pending' || repo.mergeStatus === 'failed' || repo.mergeStatus === 'merging'),
-  );
-
-  for (const repo of candidates) {
-    const result = await assessRepoMergeCompleteness(repo);
-    if (result.state === 'merged' && result.artifactUrl) {
-      planPatch(repo, {
-        artifactId: result.artifactId,
-        artifactUrl: result.artifactUrl,
-        mergeStatus: 'merged',
-      });
-    } else if (result.state === 'unverifiable') {
-      blockers.push(result);
-    }
-  }
-
-  if (blockers.some((blocker) => blocker.state === 'unverifiable')) {
-    return { mergeSet: getMergeSetSync(issueId) ?? initialMergeSet, blockers };
-  }
-
-  const patches = [...plannedPatches.values()];
-  if (patches.length > 0 && !patchMergeSetReposSync(issueId, patches)) {
-    blockers.push({
-      repoKey: patches.map((entry) => entry.repoKey).join(', '),
-      state: 'unverifiable',
-      aheadCount: 0,
-      reason: 'Merge-set rows changed during merge reconciliation; retry the merge',
-    });
-  }
-
-  return { mergeSet: getMergeSetSync(issueId) ?? mergeSet, blockers };
+  return { mergeSet, blockers };
 }

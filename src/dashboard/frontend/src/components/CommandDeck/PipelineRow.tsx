@@ -20,10 +20,10 @@ export interface PipelineRowProps {
 }
 
 export function PipelineRow({ entry, issueCosts, onSelectFeature }: PipelineRowProps) {
-  const { feature, reviewStatus } = entry;
+  const { feature, derived } = entry;
   const chip = pipelineChipFor(entry);
   const cost = issueCosts[feature.issueId];
-  const needsYou = isNeedsYouFeature(feature, reviewStatus);
+  const needsYou = isNeedsYouFeature(feature, derived);
   const primaryModel = feature.sessions?.find(session => session.presence === 'active')?.model
     ?? feature.sessions?.[0]?.model;
   const avatar = initialsFor(primaryModel ?? feature.issueId);
@@ -39,7 +39,7 @@ export function PipelineRow({ entry, issueCosts, onSelectFeature }: PipelineRowP
       onClick={() => onSelectFeature(feature)}
       className={cn(
         'group grid cursor-pointer items-center gap-3 rounded-[10px] border bg-card/40 px-3 py-2.5 transition-colors hover:border-[#2c3547] hover:bg-accent/40',
-        needsYou ? 'border-amber-500/40' : 'border-border',
+        needsYou ? 'border-warning/[0.32]' : 'border-border',
       )}
       style={{ gridTemplateColumns: '78px 1fr 74px 34px' }}
     >
@@ -50,9 +50,10 @@ export function PipelineRow({ entry, issueCosts, onSelectFeature }: PipelineRowP
         <span className="mt-[3px] flex min-w-0 items-center gap-1.5 overflow-hidden text-[10.5px] text-muted-foreground">
           <span
             className={cn(
-              'inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px]',
+              'inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-0.5 text-[10px]',
               chip.bgClass,
               chip.textClass,
+              chip.ringClass,
             )}
           >
             <span className={cn('h-[7px] w-[7px] shrink-0 rounded-full', chip.dotClass, chip.animate && 'animate-pulse')} />

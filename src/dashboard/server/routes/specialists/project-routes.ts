@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -13,13 +13,14 @@ import { loadConfigSync, resolveModel } from '../../../../lib/config-yaml.js';
 import { encodeClaudeProjectDir } from '../../../../lib/paths.js';
 import { resolvePrimaryWorkspaceRepoDirSync, resolveWorkspaceRepoRootsSync } from '../../../../lib/project-repos.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
-import { getReviewStatusSync } from '../../../../lib/review-status.js';
 import { getAgentCommandSync } from '../../../../lib/settings.js';
 import { killSession } from '../../../../lib/tmux.js';
 import { getAgentStateSync, saveAgentRuntimeState } from '../../../../lib/agents.js';
+import type { AgentState } from '../../../../lib/agents/agent-state.js';
+import { PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from '../../../../lib/cloister/review-monitor.js';
-import { resolveReviewParentRunState } from '../../../../lib/cloister/review-run-recovery.js';
 import { jsonResponse } from '../../http-helpers.js';
+import { getDerivedIssueState } from '../../services/derived-issue-state.js';
 import { httpHandler } from '../http-handler.js';
 import { execAsync, readJsonBody, validateSpecialistAgentName } from './shared.js';
 
@@ -282,122 +283,6 @@ const postProjectSpecialistRunTerminateRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: POST /api/specialists/:project/:type/grace/pause ──────────────────
-
-const postProjectSpecialistGracePauseRoute = HttpRouter.add(
-  'POST',
-  '/api/specialists/:project/:type/grace/pause',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const project = params['project'] as string;
-    const type = params['type'] as string;
-
-    if (!validateSpecialistAgentName(type)) {
-      return jsonResponse(
-        { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
-        { status: 400 },
-      );
-    }
-
-    const { pauseGracePeriod } = yield* Effect.promise(() => import('../../../../lib/cloister/specialists.js'));
-    const success = pauseGracePeriod(project, type);
-
-    if (success) {
-      return jsonResponse({ success: true, message: 'Grace period paused' });
-    } else {
-      return jsonResponse(
-        { error: 'No active grace period to pause' },
-        { status: 400 },
-      );
-    }
-  })),
-);
-
-// ─── Route: POST /api/specialists/:project/:type/grace/resume ─────────────────
-
-const postProjectSpecialistGraceResumeRoute = HttpRouter.add(
-  'POST',
-  '/api/specialists/:project/:type/grace/resume',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const project = params['project'] as string;
-    const type = params['type'] as string;
-
-    if (!validateSpecialistAgentName(type)) {
-      return jsonResponse(
-        { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
-        { status: 400 },
-      );
-    }
-
-    const { resumeGracePeriod } = yield* Effect.promise(() => import('../../../../lib/cloister/specialists.js'));
-    const success = resumeGracePeriod(project, type);
-
-    if (success) {
-      return jsonResponse({ success: true, message: 'Grace period resumed' });
-    } else {
-      return jsonResponse(
-        { error: 'No paused grace period to resume' },
-        { status: 400 },
-      );
-    }
-  })),
-);
-
-// ─── Route: POST /api/specialists/:project/:type/grace/exit ───────────────────
-
-const postProjectSpecialistGraceExitRoute = HttpRouter.add(
-  'POST',
-  '/api/specialists/:project/:type/grace/exit',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const project = params['project'] as string;
-    const type = params['type'] as string;
-
-    if (!validateSpecialistAgentName(type)) {
-      return jsonResponse(
-        { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
-        { status: 400 },
-      );
-    }
-
-    const { exitGracePeriod } = yield* Effect.promise(() => import('../../../../lib/cloister/specialists.js'));
-    exitGracePeriod(project, type);
-    return jsonResponse({
-      success: true,
-      message: 'Specialist terminated immediately',
-    });
-  })),
-);
-
-// ─── Route: GET /api/specialists/:project/:type/grace ────────────────────────
-
-const getProjectSpecialistGraceRoute = HttpRouter.add(
-  'GET',
-  '/api/specialists/:project/:type/grace',
-  httpHandler(Effect.gen(function* () {
-    const params = yield* HttpRouter.params;
-    const project = params['project'] as string;
-    const type = params['type'] as string;
-
-    if (!validateSpecialistAgentName(type)) {
-      return jsonResponse(
-        { error: 'Invalid specialist type. Must be review-agent, test-agent, or merge-agent' },
-        { status: 400 },
-      );
-    }
-
-    const { getGracePeriodState } = yield* Effect.promise(() => import('../../../../lib/cloister/specialists.js'));
-    const state = getGracePeriodState(project, type);
-
-    if (state) {
-      return jsonResponse(state);
-    } else {
-      return jsonResponse({ error: 'No active grace period' }, { status: 404 });
-    }
-  })),
-);
-
 // ─── Route: GET /api/specialists/:project/:type/context ──────────────────────
 
 const getProjectSpecialistContextRoute = HttpRouter.add(
@@ -607,7 +492,8 @@ const postProjectReviewRestartRoute = HttpRouter.add(
     const { spawnReviewRoleForIssue } = yield* Effect.promise(
       () => import('../../../../lib/cloister/review-agent.js'),
     );
-    const prUrl = getReviewStatusSync(issueId)?.prUrl;
+    // PAN-3917: the PR is the forge's, read through the derived issue state.
+    const prUrl = (yield* Effect.promise(() => getDerivedIssueState(issueId))).pr?.url;
     const result = yield* spawnReviewRoleForIssue({
       issueId,
       workspace: workspacePath,
@@ -639,6 +525,50 @@ const postProjectReviewRestartRoute = HttpRouter.add(
     });
   })),
 );
+
+/**
+ * The review parent's active run, recovered from its workspace artifacts.
+ *
+ * PAN-3917 (FR-7): review rounds are files under `<workspace>/.pan/review/<runId>/`,
+ * so the run id is recoverable from disk when the runtime registry lost it.
+ * Fail-closed: recovery only fires when exactly one run directory postdates the
+ * parent's start, and it never writes anything back.
+ */
+async function resolveReviewParentRunState(
+  parent: AgentState,
+): Promise<(AgentState & { reviewRunId?: string }) | null> {
+  if (!parent.workspace) return null;
+  if (parent.reviewRunId) return parent;
+
+  const startedAt = Date.parse(parent.startedAt);
+  if (!Number.isFinite(startedAt)) return null;
+
+  const reviewRoot = join(parent.workspace, PAN_DIRNAME, 'review');
+  let entries;
+  try {
+    entries = await readdir(reviewRoot, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+
+  const candidates: string[] = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !entry.name.startsWith(`${parent.id}-`)) continue;
+    try {
+      const runStat = await stat(join(reviewRoot, entry.name));
+      if (runStat.mtimeMs >= startedAt) candidates.push(entry.name);
+    } catch { /* raced away */ }
+  }
+  if (candidates.length !== 1) return null;
+
+  const runId = candidates[0]!;
+  const contextManifestPath = join(reviewRoot, runId, 'context.json');
+  return {
+    ...parent,
+    reviewRunId: runId,
+    ...(existsSync(contextManifestPath) ? { reviewContextManifestPath: contextManifestPath } : {}),
+  };
+}
 
 // ─── Route: POST /api/specialists/:project/:issueId/reviewer/:role/restart ───
 //
@@ -752,10 +682,6 @@ export const specialistsProjectRouteLayer = Layer.mergeAll(
   getProjectSpecialistRunStreamRoute,       // /runs/:runId/stream — before /runs/:runId
   getProjectSpecialistRunRoute,             // /runs/:runId
   postProjectSpecialistRunTerminateRoute,   // /runs/:runId/terminate
-  postProjectSpecialistGracePauseRoute,     // /grace/pause
-  postProjectSpecialistGraceResumeRoute,    // /grace/resume
-  postProjectSpecialistGraceExitRoute,      // /grace/exit
-  getProjectSpecialistGraceRoute,           // /grace
   getProjectSpecialistContextRoute,         // /context
   postProjectSpecialistContextRegenerateRoute, // /context/regenerate
   postProjectSpecialistCompleteRoute,       // /complete

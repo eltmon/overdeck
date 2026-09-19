@@ -16,53 +16,48 @@ import {
 } from '../overdeck/control-settings.js';
 import type { TriggerDetection } from './triggers.js';
 import type { HandoffResult } from './handoff.js';
-import type { FPPViolation } from './fpp-violations.js';
 import { getCostSummary, type CostAlert } from './cost-monitor.js';
 import type { SessionRotationResult } from './session-rotation.js';
+// PAN-3917 W4: deacon.ts (~60 patrol routines, record-plane writes) is
+// deleted. Its patrol loop is replaced by deacon-lite's four
+// observe-and-nudge routines plus the host-hygiene scheduler, and the status
+// surface shrinks to what deacon-lite actually knows: is the loop running,
+// when did it last run, and did it error.
 import {
-  startDeacon,
-  stopDeacon,
-  isDeaconRunning,
-  getDeaconStatus,
-  getLastPatrolResult,
-  getDeaconLogs,
-  runPatrol,
-  type PatrolResult,
-  type DeaconLogEntry,
-} from './deacon.js';
+  getDeaconLiteStatus,
+  isDeaconLiteRunning,
+  startDeaconLite,
+  stopDeaconLite,
+  type DeaconLiteStatus,
+} from './deacon-lite.js';
+import { startHygieneScheduler, stopHygieneScheduler } from './hygiene-scheduler.js';
 import { OVERDECK_HOME } from '../paths.js';
 import { existsSync, writeFileSync, unlinkSync, readFileSync, readdirSync } from 'fs';
 import { rm } from 'fs/promises';
 import { join } from 'path';
 import { AGENTS_DIR } from '../paths.js';
-import { setReviewStatusSync } from '../review-status.js';
 import { sessionExists } from '../tmux.js';
 import { Effect } from 'effect';
 import { emitActivityEntrySync } from '../activity-logger.js';
-import { handleCloisterDomainEvent, identifyOrphanedReviewingIssues, parseSpecialistAgentSession } from './service-reactive.js';
+import { handleCloisterDomainEvent, parseSpecialistAgentSession } from './service-reactive.js';
 import {
   checkHandoffTriggers,
   checkCostAlerts,
-  checkFPPViolations,
   checkSpecialistRotations,
   mapHeartbeatSource,
   performHealthCheck,
   recordHealthEvent,
   type HealthEvent, type HealthHost,
 } from './service-health.js';
-import { checkCompletionMarkers, type CompletionHost } from './service-completion.js';
 import { checkForMassDeaths as checkForMassDeathsWithHost, handleAgentCrash as handleAgentCrashWithHost, killAgent as killAgentWithHost, pauseSpawns as pauseSpawnsWithHost, pokeAgent as pokeAgentWithHost, pokeAgentWithEscalation as pokeAgentWithEscalationWithHost, progressFingerprint as progressFingerprintWithHost, restartAgent as restartAgentWithHost, type CrashEvent, type CrashHost } from './service-crash.js';
 import { getAllAgentHealth as getAllAgentHealthWithHost, getServiceAgentHealth, getStatus as getStatusWithHost, type CloisterStatus, type StatusHost } from './service-status.js';
-export { spawnFlywheel, pauseFlywheel, resumeFlywheel } from './flywheel.js';
 export {
   handleCloisterDomainEvent,
-  identifyOrphanedReviewingIssues,
   issueStateChangeFromDomainEvent,
   onIssueStateChange,
   parseSpecialistAgentSession,
   stateToRole,
 } from './service-reactive.js';
-import { listPipelineStatuses } from '../overdeck/pipeline-view.js';
 export type { CloisterDomainEventLike, ReactiveIssueState } from './service-reactive.js';
 export type { CloisterStatus } from './service-status.js';
 export { nonRestartableReason } from './service-crash.js';
@@ -154,9 +149,6 @@ export type CloisterEvent =
   | { type: 'mass_death_detected'; deathCount: number; windowSeconds: number }
   | { type: 'spawn_paused'; reason: string }
   | { type: 'spawn_resumed' }
-  | { type: 'fpp_violation_detected'; agentId: string; violation: FPPViolation }
-  | { type: 'fpp_nudge_sent'; agentId: string; nudgeCount: number }
-  | { type: 'fpp_max_nudges_exceeded'; agentId: string; violation: FPPViolation }
   | { type: 'cost_alert'; alert: CostAlert }
   | { type: 'session_rotated'; specialistName: string; result: SessionRotationResult }
   | { type: 'handoff_triggered'; agentId: string; trigger: TriggerDetection }
@@ -186,7 +178,6 @@ export class CloisterService {
   private previousRunningAgents: Set<string> = new Set();
   private deathTimestamps: Date[] = []; // Rolling window of agent death times
   private spawnsPaused: boolean = false;
-  private processedCompletions: Map<string, number> = new Map(); // Track completion marker retry counts (Infinity = done)
   private healthCheckCount: number = 0;
   private lastPokeTimestamps: Map<string, number> = new Map(); // agentId → last poke timestamp (ms)
   // PAN-2452 (idle-alive): progress fingerprint at last poke → consecutive
@@ -223,24 +214,14 @@ export class CloisterService {
       get previousStates() { return service.previousStates; },
       get activeCostAlertKeys() { return service.activeCostAlertKeys; },
       handleAgentCrash: (agentId: string) => service.handleAgentCrash(agentId),
-      checkCompletionMarkers: () => service.checkCompletionMarkers(),
       recordHealthEvent: (health: AgentHealth) => service.recordHealthEvent(health),
       emit: (event: HealthEvent) => service.emit(event),
       pokeAgent: (agentId: string) => service.pokeAgent(agentId),
       killAgent: (agentId: string) => service.killAgent(agentId),
       checkHandoffTriggers: (agentHealths: AgentHealth[]) => service.checkHandoffTriggers(agentHealths),
-      checkFPPViolations: (agentIds: string[]) => service.checkFPPViolations(agentIds),
       checkCostAlerts: (agentIds: string[]) => service.checkCostAlerts(agentIds),
       checkSpecialistRotations: () => service.checkSpecialistRotations(),
       mapHeartbeatSource: (source: string) => service.mapHeartbeatSource(source),
-    };
-  }
-
-  private completionHost(): CompletionHost {
-    const service = this;
-    return {
-      get processedCompletions() { return service.processedCompletions; },
-      getDashboardApiUrl: () => service.getDashboardApiUrl(),
     };
   }
 
@@ -306,26 +287,13 @@ export class CloisterService {
       console.error('  ✗ Failed to remove legacy specialists directory:', error);
     }
 
-    // PAN-493: Reset orphaned verificationStatus === 'running' states.
-    // If Cloister dies mid-verification, the status is left stuck at 'running' and the
-    // pipeline halts indefinitely. On startup, reset any such states to 'pending' so
-    // verification reruns automatically. Verification is idempotent — this is always safe.
-    let resetVerificationCount = 0;
-    try {
-      const statuses = listPipelineStatuses();
-      for (const [issueId, status] of Object.entries(statuses)) {
-        if (status.verificationStatus === 'running') {
-          setReviewStatusSync(issueId, { verificationStatus: 'pending' });
-          console.log(`  ✓ Reset orphaned verification 'running' → 'pending' for ${issueId}`);
-          resetVerificationCount++;
-        }
-      }
-      if (resetVerificationCount > 0) {
-        emitActivityEntrySync({ source: 'cloister', level: 'warn', message: `Reset ${resetVerificationCount} orphaned verification 'running' → 'pending' on startup` });
-      }
-    } catch (error) {
-      console.error('  ✗ Failed to reset orphaned verification states:', error);
-    }
+    // PAN-493 / PAN-511 (removed by PAN-3917): startup used to reset orphaned
+    // in-flight verification rows and re-dispatch orphaned reviewing
+    // issues. Both existed only because a crash
+    // could leave a stored status describing work no process was doing. Nothing
+    // stores those statuses now — a verification that died simply is not
+    // running, and a review with no live reviewer is re-requested by `pan done`
+    // or `pan review request`.
 
     // PAN-511: Clear stale currentIssue from specialist agents that are not actually running.
     // If Cloister dies while a specialist is between tasks or mid-run, the specialist's
@@ -377,113 +345,21 @@ export class CloisterService {
       console.error('  ✗ Failed to clear stale specialist states:', error);
     }
 
-    // PAN-511: Startup recovery for orphaned reviewStatus='reviewing' issues.
-    // If Cloister crashes after reviewStatus was set to 'reviewing' but before the specialist
-    // completes, the issue is stuck. On startup, find such issues and re-dispatch directly.
-    try {
-      const reviewStatuses = listPipelineStatuses();
-      const { resolveProjectFromIssueSync } = await import('../projects.js');
-      const { getTmuxSessionName, getAllProjectSpecialistStatuses } = await import('./specialists.js');
-
-      // Build set of issue IDs actively being reviewed by a running specialist
-      const activeReviewIssues = new Set<string>();
-      try {
-        const projSpecs = await getAllProjectSpecialistStatuses();
-        for (const ps of projSpecs) {
-          if (ps.specialistType !== 'review-agent' || !ps.isRunning) continue;
-          const rs = getAgentRuntimeStateSync(ps.tmuxSession);
-          if (rs?.state === 'active' && rs.currentIssue) {
-            activeReviewIssues.add(rs.currentIssue.toUpperCase());
-          }
-        }
-        // Also check global review-agent session
-        const globalSession = getTmuxSessionName('review-agent');
-        const globalRs = getAgentRuntimeStateSync(globalSession);
-        if (globalRs?.state === 'active' && globalRs.currentIssue) {
-          activeReviewIssues.add(globalRs.currentIssue.toUpperCase());
-        }
-
-        // PAN-1048 R5: detect role-primitive review runs (agent-<id>-review).
-        // Replaces the legacy getActiveParallelReviewIssues helper that scanned
-        // tmux for dispatchParallelReview's coordinator session naming pattern.
-        const { listRunningAgents } = await import('../agents.js');
-        const agents = await Effect.runPromise(listRunningAgents());
-        for (const agent of agents) {
-          if (agent.status === 'stopped' || agent.status === 'error') continue;
-          const role = agent.role ?? (agent.id.endsWith('-review') ? 'review' : null);
-          if (role !== 'review') continue;
-          const issueId = (agent.issueId ?? '').trim().toUpperCase();
-          if (issueId) activeReviewIssues.add(issueId);
-        }
-      } catch {
-        // Non-fatal: if we can't check active sessions, re-dispatch all orphaned
-      }
-
-      const orphanedReviewing = identifyOrphanedReviewingIssues(reviewStatuses, activeReviewIssues);
-
-      if (orphanedReviewing.length > 0) {
-        console.log(`  ⚠ Found ${orphanedReviewing.length} issue(s) with orphaned reviewStatus='reviewing'`);
-        emitActivityEntrySync({ source: 'cloister', level: 'warn', message: `Found ${orphanedReviewing.length} orphaned reviewStatus='reviewing' issue(s) on startup`, details: orphanedReviewing.join(', ') });
-
-        for (const issueId of orphanedReviewing) {
-
-          const agentId = `agent-${issueId.toLowerCase()}`;
-          const agentState = getAgentStateSync(agentId);
-          const workspace = agentState?.workspace;
-
-          if (!workspace) {
-            console.log(`  ⚠ ${issueId}: orphaned reviewing but no workspace found — resetting to pending`);
-            setReviewStatusSync(issueId, { reviewStatus: 'pending' });
-            emitActivityEntrySync({ source: 'cloister', level: 'warn', message: `${issueId} orphaned reviewing reset to pending — no workspace found`, issueId });
-            continue;
-          }
-
-          const resolved = resolveProjectFromIssueSync(issueId);
-          if (!resolved) {
-            console.log(`  ⚠ ${issueId}: orphaned reviewing but no project configured — resetting to pending`);
-            setReviewStatusSync(issueId, { reviewStatus: 'pending' });
-            emitActivityEntrySync({ source: 'cloister', level: 'warn', message: `${issueId} orphaned reviewing reset to pending — no project configured`, issueId });
-            continue;
-          }
-
-          const branch = `feature/${issueId.toLowerCase()}`;
-          // PAN-1048 R4: startup recovery now spawns the review role primitive
-          // (loads roles/review.md → Agent tool fans out to convoy reviewers)
-          // instead of the legacy `pan review run` coordinator.
-          const { spawnReviewRoleForIssue } = await import('./review-agent.js');
-          const dispatchResult = await Effect.runPromise(spawnReviewRoleForIssue({ issueId, workspace, branch }));
-          if (dispatchResult.gated) {
-            console.log(`  → Deferred recovery review for ${issueId}: ${dispatchResult.message}`);
-            emitActivityEntrySync({ source: 'cloister', level: 'info', message: `Deferred recovery review for ${issueId}: ${dispatchResult.message}`, issueId });
-            continue;
-          }
-          if (!dispatchResult.success) {
-            console.log(`  ⚠ Failed to re-dispatch recovery review for ${issueId}: ${dispatchResult.error || dispatchResult.message}`);
-            emitActivityEntrySync({ source: 'cloister', level: 'warn', message: `Failed to re-dispatch recovery review for ${issueId}: ${dispatchResult.error || dispatchResult.message}`, issueId });
-            continue;
-          }
-          // spawnReviewRoleForIssue sets reviewStatus='reviewing' internally
-          console.log(`  ✓ Re-dispatched recovery review for ${issueId}`);
-          emitActivityEntrySync({ source: 'cloister', level: 'info', message: `Re-dispatched recovery review for ${issueId}`, issueId });
-        }
-      }
-    } catch (error) {
-      console.error('  ✗ Failed to recover orphaned reviewing issues:', error);
-    }
 
     // PAN-378: Global specialists removed — per-project ephemeral specialists handle all work.
     // No initialization needed; specialists are spawned on-demand via spawnEphemeralSpecialist().
     console.log('  → Specialists: per-project ephemeral mode (no global pool)');
 
-    // Start deacon health monitor for specialists
+    // Start deacon-lite (patrol loop) and the host-hygiene scheduler
     try {
-      console.log('  → Starting deacon health monitor...');
-      startDeacon();
-      console.log('  ✓ Deacon started');
-      emitActivityEntrySync({ source: 'cloister', level: 'info', message: 'Deacon health monitor started' });
+      console.log('  → Starting deacon-lite + hygiene scheduler...');
+      startDeaconLite();
+      startHygieneScheduler();
+      console.log('  ✓ Deacon-lite started');
+      emitActivityEntrySync({ source: 'cloister', level: 'info', message: 'Deacon-lite and hygiene scheduler started' });
     } catch (error) {
-      console.error('  ✗ Failed to start deacon:', error);
-      emitActivityEntrySync({ source: 'cloister', level: 'error', message: `Failed to start deacon: ${error instanceof Error ? error.message : String(error)}` });
+      console.error('  ✗ Failed to start deacon-lite:', error);
+      emitActivityEntrySync({ source: 'cloister', level: 'error', message: `Failed to start deacon-lite: ${error instanceof Error ? error.message : String(error)}` });
     }
 
     this.running = true;
@@ -581,12 +457,13 @@ export class CloisterService {
       this.domainEventUnsubscribe = null;
     }
 
-    // Stop deacon health monitor
+    // Stop deacon-lite and the host-hygiene scheduler
     try {
-      stopDeacon();
-      console.log('  ✓ Deacon stopped');
+      stopDeaconLite();
+      stopHygieneScheduler();
+      console.log('  ✓ Deacon-lite stopped');
     } catch (error) {
-      console.error('Failed to stop deacon:', error);
+      console.error('Failed to stop deacon-lite:', error);
     }
 
     this.emit({ type: 'stopped' });
@@ -658,11 +535,6 @@ export class CloisterService {
    */
   private async performHealthCheck(): Promise<void> {
     return performHealthCheck(this.healthHost());
-  }
-
-  /** Fallback scan for completion markers when `pan done` did not reach the dashboard. */
-  private async checkCompletionMarkers(): Promise<void> {
-    return checkCompletionMarkers(this.completionHost());
   }
 
   /**
@@ -752,13 +624,6 @@ export class CloisterService {
   }
 
   /**
-   * Check for FPP violations and send nudges
-   */
-  private checkFPPViolations(agentIds: string[]): void {
-    return checkFPPViolations(this.healthHost(), agentIds);
-  }
-
-  /**
    * Check for cost limit alerts
    */
   private checkCostAlerts(agentIds: string[]): void {
@@ -829,39 +694,14 @@ export class CloisterService {
     return getAllAgentHealthWithHost(this.statusHost());
   }
 
-  /**
-   * Get deacon (specialist health monitor) status
-   */
-  getDeaconStatus() {
-    return getDeaconStatus();
+  /** Deacon-lite loop status: running, interval, last run, last error. */
+  getDeaconStatus(): DeaconLiteStatus {
+    return getDeaconLiteStatus();
   }
 
-  /**
-   * Get the most recent patrol result (actions, cycle, timestamp)
-   */
-  getLastPatrolResult(): PatrolResult | null {
-    return getLastPatrolResult();
-  }
-
-  /**
-   * Get recent deacon log entries
-   */
-  getDeaconLogs(limit = 100): DeaconLogEntry[] {
-    return getDeaconLogs(limit);
-  }
-
-  /**
-   * Run a manual deacon patrol
-   */
-  async runDeaconPatrol(): Promise<PatrolResult> {
-    return runPatrol();
-  }
-
-  /**
-   * Check if deacon is running
-   */
+  /** Check if the deacon-lite loop is running */
   isDeaconRunning(): boolean {
-    return isDeaconRunning();
+    return isDeaconLiteRunning();
   }
 
   /**

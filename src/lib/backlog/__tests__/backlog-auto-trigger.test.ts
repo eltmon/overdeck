@@ -24,11 +24,13 @@ describe('backlog-auto-trigger', () => {
     vi.useFakeTimers();
     vi.clearAllMocks();
     delete process.env.OVERDECK_NO_RESUME;
+    delete process.env.OVERDECK_DISABLE_DEACON;
   });
   afterEach(() => {
     stopPeriodicReviewPass();
     vi.useRealTimers();
     delete process.env.OVERDECK_NO_RESUME;
+    delete process.env.OVERDECK_DISABLE_DEACON;
   });
 
   it('calls spawnSequencerAgent after debounce', async () => {
@@ -56,6 +58,22 @@ describe('backlog-auto-trigger', () => {
 
   it('suppresses the periodic review pass when OVERDECK_NO_RESUME is set', async () => {
     process.env.OVERDECK_NO_RESUME = '1';
+    startPeriodicReviewPass('/tmp/proj', 60_000);
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(spawnSequencerAgent).not.toHaveBeenCalled();
+  });
+
+  // fix10: a peer dashboard is a read/UI peer, never an orchestrator. One ran
+  // this trigger and spawned a real Opus sequencer-runner into the live session.
+  it('suppresses the incremental pass in a peer dashboard', async () => {
+    process.env.OVERDECK_DISABLE_DEACON = '1';
+    triggerDebouncedIncrementalPass('/tmp/proj');
+    await vi.runAllTimersAsync();
+    expect(spawnSequencerAgent).not.toHaveBeenCalled();
+  });
+
+  it('suppresses the periodic review pass in a peer dashboard', async () => {
+    process.env.OVERDECK_DISABLE_DEACON = 'true';
     startPeriodicReviewPass('/tmp/proj', 60_000);
     await vi.advanceTimersByTimeAsync(120_000);
     expect(spawnSequencerAgent).not.toHaveBeenCalled();

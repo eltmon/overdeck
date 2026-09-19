@@ -289,6 +289,7 @@ have the following destinations; the old template generator is no longer called.
 | Investigation, isolation, tmux, and completion guidance | Existing bundled rules and role prompts remain explicit launch inputs |
 | Mandatory `Co-Authored-By` example and blanket `git add -A` | Retired; current repository commit rules and the commit skill govern commits |
 
-The directory guide formerly named `docs/AGENTS.md` is now
-`docs/AGENT-DIRECTORIES.md`, with its contents preserved. It is documentation,
-so it should not implicitly become instructions for agents editing `docs/`.
+The directory guide formerly named `docs/AGENTS.md` and later
+`docs/AGENT-DIRECTORIES.md` was retired in the PAN-3917 cut (see
+[`docs/THE-CUT.md`](THE-CUT.md)); it is history, not a live instruction
+source for agents editing `docs/`.

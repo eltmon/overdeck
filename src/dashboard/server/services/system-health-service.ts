@@ -15,17 +15,14 @@ import {
 import { Effect } from 'effect';
 import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 
-import { getRuntimeSnapshot } from '../../../lib/agent-runtime-mirror.js';
-import { listRunningAgents, getAgentRuntimeState, type AgentState } from '../../../lib/agents.js';
+import type { BackendPane } from '@overdeck/contracts';
+import { getBackendPanes } from './backend-inventory.js';
+import { getDerivedIssueState } from './derived-issue-state.js';
 import { classifyAgentHealth } from '../../../lib/agents/health.js';
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { isSmeeConfiguredSync, isSmeeProcessRunningSync } from '../../../lib/smee.js';
 import { descendantPidsForSession, getRuntimeCensus } from '../../../lib/runtime-census.js';
 import { DockerStatsCollector, type ContainerStats } from '../../../lib/docker-stats.js';
-import {
-  readReviewStatusMap,
-  type WarmIdleStatusShape,
-} from '../../../lib/cloister/review-status-source.js';
 import { getBuildInfo } from '../../../lib/deploy/build-info.js';
 import {
   SYSTEM_HEALTH_DEFAULTS,
@@ -42,15 +39,22 @@ import {
   type SystemHealthSampler,
 } from '../../../lib/system-health/sampler.js';
 import type { HostMetricSample } from '../../../lib/system-health/types.js';
-import {
-  computeBuildStaleness,
-  type BuildStaleness,
-} from '../../../lib/deploy/staleness.js';
+
+/**
+ * PAN-3917 D1: the deploy patrol and its staleness computation are deleted.
+ * The field survives on the health payload as `null` so the UI stops claiming
+ * the running build is stale when nothing measures it any more.
+ */
+export interface BuildStaleness {
+  readonly stale: boolean;
+  readonly behindBy: number;
+  readonly buildCommit: string | null;
+  readonly headCommit: string | null;
+}
 import { initEventStore } from '../event-store.js';
 import { getDashboardIdentity } from '../identity.js';
 import {
   acceptedReasons,
-  agentLifecycle,
   hostMetrics,
   overallHealthState,
   runtimeHealthState,
@@ -104,7 +108,8 @@ export interface HealthAgentProcess {
   issueId: string;
   role?: string;
   kind: 'work' | 'planning' | 'specialist' | 'other';
-  status: AgentState['status'];
+  /** The terminal backend's agent state (FR-12), not a persisted mirror. */
+  status: BackendPane['state'];
   lifecycle: SpecialistLifecycle;
   tmuxActive: boolean;
   memoryBytes: number;
@@ -114,7 +119,7 @@ export interface HealthAgentProcess {
 
 export interface AgentAdmissionCandidate {
   role?: string;
-  status: AgentState['status'];
+  status: BackendPane['state'];
   startedAt?: string;
   tmuxActive: boolean;
 }
@@ -218,43 +223,9 @@ let eventStorePromise: ReturnType<typeof initEventStore> | null = null;
 let cachedSystemHealthConfig: EffectiveSystemHealthConfig | null = null;
 let resourceConfigLoadedAt = 0;
 let resourceConfigInflight: Promise<void> | null = null;
-let cachedDeployStaleness: BuildStaleness | null = null;
-let hasCachedDeployStaleness = false;
-let deployStalenessCacheExpiresAt = 0;
-let deployStalenessInflight: Promise<BuildStaleness | null> | null = null;
-let computeBuildStalenessFn = computeBuildStaleness;
-const DEPLOY_STALENESS_TTL_MS = 60_000;
 
 export async function getDeployStaleness(): Promise<BuildStaleness | null> {
-  if (hasCachedDeployStaleness && Date.now() < deployStalenessCacheExpiresAt) {
-    return cachedDeployStaleness;
-  }
-
-  if (!deployStalenessInflight) {
-    deployStalenessInflight = computeBuildStalenessFn({
-      repoRoot: getDashboardIdentity().repoRoot,
-      buildCommit: getBuildInfo().buildCommit,
-    }).catch(() => null).then((result) => {
-      cachedDeployStaleness = result;
-      hasCachedDeployStaleness = true;
-      deployStalenessCacheExpiresAt = Date.now() + DEPLOY_STALENESS_TTL_MS;
-      return result;
-    }).finally(() => {
-      deployStalenessInflight = null;
-    });
-  }
-
-  return deployStalenessInflight;
-}
-
-export function _resetDeployStalenessForTests(
-  compute: typeof computeBuildStaleness = computeBuildStaleness,
-): void {
-  cachedDeployStaleness = null;
-  hasCachedDeployStaleness = false;
-  deployStalenessCacheExpiresAt = 0;
-  deployStalenessInflight = null;
-  computeBuildStalenessFn = compute;
+  return null;
 }
 
 function getDockerStatsCollector(): DockerStatsCollector {
@@ -284,9 +255,11 @@ export function countAdmittedWorkAgents(
 ): number {
   return agents.filter((agent) => {
     if (agent.role !== 'work') return false;
-    if (agent.status !== 'running' && agent.status !== 'starting') return false;
+    // `unknown` is a pane whose agent has not reported yet — the state the old
+    // mirror called `starting`.
+    if (agent.status === 'exited' || agent.status === 'done') return false;
     if (agent.tmuxActive) return true;
-    if (agent.status !== 'starting' || !agent.startedAt) return false;
+    if (agent.status !== 'unknown' || !agent.startedAt) return false;
 
     const startedAtMs = Date.parse(agent.startedAt);
     const ageMs = nowMs - startedAtMs;
@@ -571,8 +544,54 @@ function collectSmeeRelayHealth(): SmeeRelayHealth {
   }
 }
 
-function reviewStatusMap(): ReadonlyMap<string, WarmIdleStatusShape> {
-  return new Map(Object.entries(readReviewStatusMap() ?? {}));
+/**
+ * PAN-3917 FR-11: a specialist session is leaked when it is still live after
+ * its issue's work is over. That used to be read off the review-status row's
+ * verdict; it is now derived — the issue's state is `merged` or `closed` while
+ * the pane is still running.
+ */
+async function specialistLifecycles(
+  panes: readonly BackendPane[],
+): Promise<ReadonlyMap<string, SpecialistLifecycle>> {
+  const specialistRoles = new Set(['review', 'test', 'uat']);
+  const issueIds = [...new Set(
+    panes
+      .filter((pane) => specialistRoles.has(pane.role) && pane.issue)
+      .map((pane) => pane.issue as string),
+  )];
+  const finished = new Set<string>();
+  const derived = await Promise.allSettled(issueIds.map((issueId) => getDerivedIssueState(issueId)));
+  for (const outcome of derived) {
+    if (outcome.status !== 'fulfilled') continue;
+    if (outcome.value.state === 'merged' || outcome.value.state === 'closed') {
+      finished.add(outcome.value.issueId.toUpperCase());
+    }
+  }
+
+  const lifecycles = new Map<string, SpecialistLifecycle>();
+  for (const pane of panes) {
+    if (!specialistRoles.has(pane.role) || !pane.issue) {
+      lifecycles.set(pane.id, 'unknown');
+      continue;
+    }
+    lifecycles.set(pane.id, finished.has(pane.issue.toUpperCase()) ? 'orphaned' : 'warm');
+  }
+  return lifecycles;
+}
+
+/** The live inventory, in the shape this service's helpers read. */
+function paneAsAgent(pane: BackendPane) {
+  const since = pane.stateSince === undefined ? undefined : new Date(pane.stateSince).toISOString();
+  return {
+    id: pane.id,
+    issueId: pane.issue ?? '',
+    role: pane.role,
+    model: pane.model,
+    status: pane.state,
+    tmuxActive: pane.state !== 'exited',
+    startedAt: since,
+    lastActivity: since,
+  };
 }
 
 async function collectAgentProcesses(): Promise<{
@@ -580,33 +599,25 @@ async function collectAgentProcesses(): Promise<{
   healthAgents: AgentHealthSnapshot[];
   admittedWorkAgentCount: number;
 }> {
-  const registeredAgents = await Effect.runPromise(listRunningAgents());
+  const panes = await getBackendPanes();
+  const registeredAgents = panes.map(paneAsAgent);
   const nowMs = Date.now();
   const admittedWorkAgentCount = countAdmittedWorkAgents(registeredAgents, nowMs);
-  const activeAgents = registeredAgents.filter((agent) => agent.status !== 'stopped');
+  const activeAgents = registeredAgents.filter((agent) => agent.status !== 'exited');
   const liveSessions = new Set(
     registeredAgents.filter((agent) => agent.tmuxActive).map((agent) => agent.id),
   );
   const runtimeCensus = await getRuntimeCensus();
-  const reviewStatuses = reviewStatusMap();
+  const lifecycles = await specialistLifecycles(panes);
 
   const collected = await Promise.all(
     activeAgents.map(async (agent) => {
-      const [runtimeState, runtimeSnapshot] = await Promise.all([
-        Effect.runPromise(getAgentRuntimeState(agent.id)).catch(() => null),
-        Effect.runPromise(getRuntimeSnapshot(agent.id)).catch(() => null),
-      ]);
       const descendants = descendantPidsForSession(runtimeCensus, agent.id);
       const memoryBytes = [...descendants].reduce(
         (sum, pid) => sum + (runtimeCensus.processesByPid.get(pid)?.rssBytes ?? 0),
         0,
       );
-      const lifecycle = agentLifecycle(
-        agent.role,
-        agent.issueId,
-        agent.tmuxActive,
-        reviewStatuses,
-      );
+      const lifecycle = lifecycles.get(agent.id) ?? 'unknown';
       const process = {
         id: agent.id,
         issueId: agent.issueId,
@@ -617,7 +628,7 @@ async function collectAgentProcesses(): Promise<{
         tmuxActive: agent.tmuxActive,
         memoryBytes,
         memoryGb: bytesToGb(memoryBytes),
-        currentIssue: runtimeState?.currentIssue,
+        currentIssue: agent.issueId || undefined,
       } satisfies HealthAgentProcess;
       const health = classifyAgentHealth({
         agentId: agent.id,
@@ -630,14 +641,9 @@ async function collectAgentProcesses(): Promise<{
             status: agent.status,
             startedAt: agent.startedAt,
             lastActivity: agent.lastActivity,
-            kickoffDelivered: agent.kickoffDelivered,
-            paused: agent.paused,
-            stoppedByUser: agent.stoppedByUser,
-            stoppedByPause: agent.stoppedByPause,
-            consecutiveFailures: agent.consecutiveFailures,
           },
         },
-        runtime: runtimeHealthState(runtimeSnapshot),
+        runtime: null,
         liveSessions,
         reviewLifecycle: lifecycle,
         nowMs,
@@ -649,7 +655,7 @@ async function collectAgentProcesses(): Promise<{
           ...health,
           memoryBytes,
           memoryGb: bytesToGb(memoryBytes),
-          ...(runtimeState?.currentIssue ? { currentIssue: runtimeState.currentIssue } : {}),
+          ...(agent.issueId ? { currentIssue: agent.issueId } : {}),
         } satisfies AgentHealthSnapshot,
       };
     }),

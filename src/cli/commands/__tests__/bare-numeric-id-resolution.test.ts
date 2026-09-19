@@ -318,15 +318,6 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
     expect(agentMocks.clearAgentPausedSync).toHaveBeenCalledWith('agent-pan-9999');
   });
 
-  it('resolves bare numeric input before pan untroubled clears the troubled gate', async () => {
-    const { untroubledCommand } = await import('../untroubled.js');
-
-    await untroubledCommand('9999');
-
-    expect(issueIdMocks.resolveBareNumericIdSync).toHaveBeenCalledWith('9999');
-    expect(agentMocks.clearAgentTroubledSync).toHaveBeenCalledWith('agent-pan-9999');
-  });
-
   it('resolves bare numeric input before pan reopen resolves the tracker', async () => {
     const { reopenCommand } = await import('../reopen.js');
 
@@ -347,16 +338,6 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
       expect.objectContaining({ issueId: 'PAN-9999' }),
       expect.objectContaining({ dodAcceptedRows: [] }),
     );
-  });
-
-  it('resolves bare numeric input before pan inspect resolves the project', async () => {
-    const { inspectCommand } = await import('../inspect.js');
-
-    await inspectCommand('9999', { item: 'workspace-abc' });
-
-    expect(issueIdMocks.resolveBareNumericIdSync).toHaveBeenCalledWith('9999');
-    expect(projectMocks.resolveProjectFromIssueSync).toHaveBeenCalledWith('PAN-9999');
-    expect(inspectMocks.spawnInspectAgent).toHaveBeenCalledWith(expect.objectContaining({ issueId: 'PAN-9999' }), { deep: false });
   });
 
   it('resolves bare numeric input before pan open resolves the project', async () => {

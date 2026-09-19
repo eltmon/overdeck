@@ -3,8 +3,8 @@ scope: universal
 ---
 ### NEVER delete the `overdeck-state` branch
 
-**Never delete the `overdeck-state` branch — not the local ref, not the remote.** This applies to every project, every harness, every role. Forbidden in all forms: `git branch -d/-D overdeck-state`, `git push origin --delete overdeck-state`, `git push origin :overdeck-state`, deleting it through the GitHub UI/API, and removing the state worktree at `${OVERDECK_HOME}/state/<project>/` to get the branch "unlocked" for deletion.
+**Never delete the `overdeck-state` branch — not the local ref, not the remote.** This applies to every project, every harness, every role. Forbidden in all forms: `git branch -d/-D overdeck-state`, `git push origin --delete overdeck-state`, `git push origin :overdeck-state`, and deleting it through the GitHub UI/API.
 
-`overdeck-state` is the same-repo orphan branch holding the project's permanent pipeline state (PAN-2541): `records/`, `specs/`, `continues/`, `drafts/`, and the migration-complete marker. It shares no history with `main` — deleting it destroys the canonical state plane, and no code branch can restore it. The branches also never merge in either direction; guards enforce that mechanically, so never bypass them with `--no-verify` or `--allow-unrelated-histories`.
+The branch is archived, tagged `state-final`, and kept as history. Overdeck no longer reads or writes it — planning artifacts, specs, and task state now live under `.pan/` in the project repo. Deleting the archived branch would still destroy that history for no operational benefit.
 
-If an operation seems to require deleting or recreating `overdeck-state`, stop and surface to the operator — there is no agent-side exception.
+If an operation seems to require deleting `overdeck-state`, stop and surface to the operator — there is no agent-side exception.

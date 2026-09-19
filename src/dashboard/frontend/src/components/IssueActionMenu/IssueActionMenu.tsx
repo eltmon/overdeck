@@ -45,7 +45,6 @@ const AGENT_SCOPE_ACTION_KEYS = new Set<IssueActionKey>([
   'stopAgent',
   'pause',
   'unpause',
-  'untroubled',
   'recoverAgent',
   'resumeSession',
 ]);
@@ -300,12 +299,6 @@ function OverflowButton({
   );
 }
 
-type TaskTask = {
-  id: string;
-  title: string;
-  status: string;
-};
-
 type ActionDialogFrameProps = {
   label: string;
   onClose: () => void;
@@ -370,79 +363,7 @@ function NewOrderBookDialog({ actions, onClose }: { actions: UseIssueActionsResu
   );
 }
 
-function InspectTaskDialog({ issueId, actions, onClose }: { issueId: string; actions: UseIssueActionsResult; onClose: () => void }) {
-  const action = actions.activeDialog?.action;
-  const [tasks, setTasks] = useState<TaskTask[]>([]);
-  const [selectedTaskId, setSelectedTaskId] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    fetch(`/api/issues/${encodeURIComponent(issueId)}/tasks`, { credentials: 'include' })
-      .then(async (response) => {
-        if (!response.ok) throw new Error('Failed to load tasks');
-        return response.json() as Promise<{ tasks?: TaskTask[] }>;
-      })
-      .then((data) => {
-        if (cancelled) return;
-        const nextTasks = data.tasks ?? [];
-        setTasks(nextTasks);
-        setSelectedTaskId(nextTasks[0]?.id ?? '');
-      })
-      .catch((err: Error) => {
-        if (!cancelled) setError(err.message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, [issueId]);
-
-  if (!action) return null;
-
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!selectedTaskId) return;
-    actions.submitDialogAction(action, undefined, selectedTaskId);
-    onClose();
-  };
-
-  return (
-    <ActionDialogFrame label={action.label} onClose={onClose}>
-      <form className="space-y-3" onSubmit={onSubmit}>
-        {loading ? <p className="text-xs text-muted-foreground">Loading tasks…</p> : null}
-        {error ? <p className="text-xs text-destructive">{error}</p> : null}
-        {!loading && !error && tasks.length === 0 ? <p className="text-xs text-muted-foreground">No tasks are available for inspection.</p> : null}
-        {tasks.length > 0 ? (
-          <label className="block space-y-1 text-xs text-muted-foreground">
-            <span>Task</span>
-            <select
-              value={selectedTaskId}
-              onChange={(event) => setSelectedTaskId(event.target.value)}
-              aria-label="Task to inspect"
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
-            >
-              {tasks.map((task) => (
-                <option key={task.id} value={task.id}>{task.id} — {task.title}</option>
-              ))}
-            </select>
-          </label>
-        ) : null}
-        <div className="flex justify-end gap-2">
-          <button type="button" className="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground" onClick={onClose}>Cancel</button>
-          <button type="submit" disabled={!selectedTaskId || actions.isActionPending(action.key)} className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
-            {actions.isActionPending(action.key) ? 'Starting…' : 'Inspect task'}
-          </button>
-        </div>
-      </form>
-    </ActionDialogFrame>
-  );
-}
-
-export function IssueActionDialogHost({ issueId, actions, onAfterClose }: { issueId: string; actions: UseIssueActionsResult; onAfterClose?: () => void }) {
+export function IssueActionDialogHost({ actions, onAfterClose }: { issueId?: string; actions: UseIssueActionsResult; onAfterClose?: () => void }) {
   const { activeDialog, issue, workspace, closeDialog } = actions;
   const handleClose = () => {
     const restoreFocus = activeDialog?.key === 'open';
@@ -487,10 +408,6 @@ export function IssueActionDialogHost({ issueId, actions, onAfterClose }: { issu
         />
       </ActionDialogFrame>
     );
-  }
-
-  if (activeDialog.key === 'inspectTask') {
-    return <InspectTaskDialog issueId={issueId} actions={actions} onClose={handleClose} />;
   }
 
   if (activeDialog.key === 'addToOrderBook') {

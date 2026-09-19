@@ -6,18 +6,15 @@ import { join } from 'node:path';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { getAgentState, getAgentRuntimeState, messageAgent, saveAgentRuntimeState, transitionIssueToInProgress } from '../../../../lib/agents.js';
+import { getAgentState, getAgentRuntimeState, messageAgent, transitionIssueToInProgress } from '../../../../lib/agents.js';
 import { getUnblockedItemsSync } from '../../../../lib/cloister/task-readiness.js';
-import { recordReviewVerdict } from '../../../../lib/cloister/review-verdict-writer.js';
-import type { HeadAnchor } from '../../../../lib/git-utils.js';
+import { commentOnArtifact, parseArtifactRef } from '../../../../lib/forge.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
-import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync as setReviewStatusBase, type ReviewStatus, type ReviewStatusUpdate } from '../../../../lib/review-status.js';
-import { readWorkspacePlanSync } from '../../../../lib/xbrief/io.js';
 import { jsonResponse } from '../../http-helpers.js';
+import { getDerivedIssueState } from '../../services/derived-issue-state.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { validateAgentRuntimeEventAuth } from '../agents.js';
 import { httpHandler } from '../http-handler.js';
-import { reportTieredInspectFailureEscalation } from '../tiered-inspect-escalation.js';
 import { killSession } from '../../../../lib/tmux.js';
 import {
   _serverManagedMerges,
@@ -85,26 +82,13 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
       results.push({ name, killed, sessionCleared: false, queueCleared: true });
     }
 
-    // Reset any "reviewing" statuses to "pending" — use per-issue atomic updates
-    // to avoid the read-all/write-all race that saveReviewStatuses() would reintroduce.
-    let reviewStatusesReset = 0;
-    try {
-      const statuses = loadReviewStatuses();
-      for (const key of Object.keys(statuses)) {
-        if (statuses[key].reviewStatus === 'reviewing') {
-          setReviewStatusBase(key, { reviewStatus: 'pending' });
-          reviewStatusesReset++;
-        }
-      }
-    } catch (e) {
-      console.error('Failed to reset review statuses:', e);
-    }
-
+    // PAN-3917: there are no review-status rows to reset. A review in flight is
+    // a live reviewer pane plus the PR's own review state; killing the pane
+    // above is the whole reset.
     return jsonResponse({
       success: true,
-      message: `Reset ${results.length} specialists, reset ${reviewStatusesReset} review statuses`,
+      message: `Reset ${results.length} specialists`,
       results,
-      reviewStatusesReset,
     });
   })),
 );
@@ -133,7 +117,8 @@ const postSpecialistsDoneRoute = HttpRouter.add(
     };
 
     // Validate specialist type
-    const validSpecialists = ['review', 'test', 'merge', 'inspect', 'uat', 'ship'];
+    // PAN-3917 FR-14: the per-item inspection gate and `pan inspect` are gone.
+    const validSpecialists = ['review', 'test', 'merge', 'uat', 'ship'];
     if (!validSpecialists.includes(specialist)) {
       return jsonResponse(
         { error: `Invalid specialist: ${specialist}. Valid: ${validSpecialists.join(', ')}` },
@@ -156,17 +141,6 @@ const postSpecialistsDoneRoute = HttpRouter.add(
 
     const normalizedIssueId = issueId.toUpperCase();
 
-    if (specialist === 'inspect' && status === 'passed') {
-      if (!itemId) {
-        return jsonResponse({ error: 'itemId is required for a passed inspect verdict' }, { status: 400 });
-      }
-      const project = resolveProjectFromIssueSync(normalizedIssueId);
-      const workspacePath = project && join(project.projectPath, 'workspaces', `feature-${normalizedIssueId.toLowerCase()}`);
-      const plan = workspacePath ? readWorkspacePlanSync(workspacePath) : undefined;
-      if (!plan?.plan.items.some(item => item.id === itemId)) {
-        return jsonResponse({ error: `Item "${itemId}" does not exist in the xBRIEF for ${normalizedIssueId}` }, { status: 400 });
-      }
-    }
     console.log(`[specialists/done] ${specialist} signaling ${status} for ${normalizedIssueId}`);
 
     // Resolve any pending specialist completion waiters (PAN-632: event-driven completion).
@@ -196,119 +170,35 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       });
     }
 
-    // Build the update based on specialist type
-    const update: ReviewStatusUpdate = {};
-    let reviewEvidenceHead: HeadAnchor | undefined;
+    // PAN-3917 FR-7: a review verdict is a PR review, not a status row. The
+    // work agent and the dashboard both read the PR, so posting the verdict
+    // there is the whole write. Nothing else is recorded.
+    const derived = yield* Effect.promise(() => getDerivedIssueState(normalizedIssueId));
+    const prUrl = derived.pr?.url;
 
-    switch (specialist) {
-      case 'review':
-        // Terminal verdicts need the current workspace head for the write-door check.
-        // PAN-3847: the door refuses anchorless verdicts, so the anchor is snapshotted
-        // for passed, blocked and failed (HTTP review prompt reports changes-requested
-        // as failed) and travels in the same write as the verdict.
-        if (status === 'passed' || status === 'blocked' || status === 'failed') {
-          yield* Effect.promise(async () => {
-            try {
-              const project = resolveProjectFromIssueSync(normalizedIssueId);
-              if (project) {
-                const workspacePath = join(
-                  project.projectPath,
-                  'workspaces',
-                  `feature-${normalizedIssueId.toLowerCase()}`,
-                );
-                if (existsSync(workspacePath)) {
-                  const { snapshotWorkspaceHeadsPromise } = await import('../../../../lib/git-utils.js');
-                  reviewEvidenceHead = await snapshotWorkspaceHeadsPromise(normalizedIssueId, workspacePath);
-                }
-              }
-            } catch {
-              // Non-fatal; recordReviewVerdict refuses the verdict without an evidence head
-            }
-          });
-        }
-        update.reviewStatus = status === 'passed' ? 'passed' : 'blocked';
-        if (notes) update.reviewNotes = notes;
-        break;
-
-      case 'test':
-        update.testStatus = status as typeof update.testStatus;
-        if (notes) update.testNotes = notes;
-        break;
-
-      case 'merge':
-        update.mergeStatus = status === 'passed' ? 'merged' : 'failed';
-        break;
-
-      case 'inspect':
-        update.inspectStatus = status as typeof update.inspectStatus;
-        if (notes) update.inspectNotes = notes;
-        break;
-
-      case 'uat':
-        update.uatStatus = status as typeof update.uatStatus;
-        if (notes) update.uatNotes = notes;
-        if (status === 'passed') {
-          update.readyForMerge = true;
-        }
-        break;
-
-      case 'ship':
-        if (status === 'passed') {
-          update.readyForMerge = true;
-        }
-        break;
-    }
-
-    // Apply the update (triggers side effects like idle state, queue processing)
-    // For review verdicts, route through recordReviewVerdict (PAN-3512)
-    let updatedStatus: ReviewStatus;
-    if (specialist === 'review' && (status === 'passed' || status === 'blocked' || status === 'failed')) {
-      const verdictOutcome = yield* Effect.promise(() => recordReviewVerdict(normalizedIssueId, {
-        verdict: status === 'passed' ? 'passed' : 'blocked',
-        notes,
-        evidenceHead: reviewEvidenceHead,
-        writer: 'coordinator',
-      }));
-      if (!verdictOutcome.landed) {
-        // Verdict was rejected (stale evidence) — return error
+    if (specialist === 'review') {
+      if (!prUrl) {
         return jsonResponse(
-          { error: `Verdict rejected: ${verdictOutcome.reason}` },
-          { status: 400 },
+          { error: `No pull request for ${normalizedIssueId} — a review verdict needs one` },
+          { status: 422 },
         );
       }
-      updatedStatus = getReviewStatusSync(normalizedIssueId) || ({} as ReviewStatus);
-    } else {
-      updatedStatus = setReviewStatusBase(normalizedIssueId, update);
-    }
-    if (specialist === 'inspect' && status === 'failed') {
-      yield* Effect.promise(() => reportTieredInspectFailureEscalation(normalizedIssueId, notes));
-      // PAN-3078: a blocked verdict must reach the work agent, or it keeps
-      // building on rejected work. itemId comes from the supervisor's
-      // `pan admin specialists done --item`; legacy ephemeral inspectors omit
-      // it, so fall back to the inspectBeadId stamped when inspection started.
-      yield* Effect.promise(async () => {
-        try {
-          const failedItemId = itemId ?? getReviewStatusSync(normalizedIssueId)?.inspectBeadId ?? undefined;
-          const project = resolveProjectFromIssueSync(normalizedIssueId);
-          if (project && failedItemId) {
-            const workspacePath = join(
-              project.projectPath,
-              'workspaces',
-              `feature-${normalizedIssueId.toLowerCase()}`,
-            );
-            if (existsSync(workspacePath)) {
-              const { onInspectComplete } = await import('../../../../lib/cloister/inspect-agent.js');
-              await Effect.runPromise(onInspectComplete(project.projectKey, normalizedIssueId, failedItemId, 'failed', workspacePath, notes));
-            }
-          }
-        } catch (err) {
-          console.error(`[specialists/done] Error delivering failed inspect verdict for ${normalizedIssueId}:`, err);
-        }
-      });
+      const artifactRef = parseArtifactRef(prUrl);
+      if (!artifactRef) {
+        return jsonResponse({ error: `Pull request URL for ${normalizedIssueId} is not a recognized forge artifact` }, { status: 422 });
+      }
+      const heading = status === 'passed' ? 'Review passed' : 'Changes requested';
+      yield* commentOnArtifact(artifactRef.forge, {
+        ...artifactRef,
+        body: `## ${heading}\n\n${notes ?? (status === 'passed' ? 'No blocking findings.' : 'See the review artifacts for details.')}`,
+      }).pipe(Effect.catch((error) => Effect.sync(() => {
+        console.warn(`[specialists/done] Could not post the review verdict to ${prUrl}: ${String(error)}`);
+      })));
     }
 
-    // Set specialist state to idle and clear registry write-scope.
-    // CRITICAL: No `await` between the mergeStatus write above and the guard check below.
+    // Clear the registry write-scope so the next specialist can claim the
+    // workspace. The pane's own state is the backend's (PAN-3917 FR-12), so
+    // nothing writes an 'idle' runtime row here any more.
     yield* Effect.promise(async () => {
       try {
         const { getTmuxSessionName, updateRunMetadata, makeSpecialistRegistryKey } =
@@ -318,12 +208,6 @@ const postSpecialistsDoneRoute = HttpRouter.add(
         const tmuxSession = projectKey
           ? getTmuxSessionName(`${specialist}-agent` as SpecialistAgentName, projectKey, normalizedIssueId)
           : getTmuxSessionName(`${specialist}-agent` as SpecialistAgentName);
-        saveAgentRuntimeState(tmuxSession, {
-          state: 'idle',
-          lastActivity: new Date().toISOString(),
-        });
-        console.log(`[specialists/done] Set ${tmuxSession} to idle`);
-
         // PAN-2579 (warm-by-default lifecycle): the verdict is recorded; the session
         // stays ALIVE so the next review/test cycle resumes it with context intact.
         // Warm-idle sessions no longer count against the advancing ceiling
@@ -361,38 +245,14 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       }
     });
 
-    // PAN-3847: the reviewedAtCommit anchor now travels inside the verdict write door
-    // call above — verdict and anchor are one write; the old post-door snapshot write
-    // was a redundant second writer.
+    // PAN-3917 FR-7: there is no reviewedAtCommit anchor and no verdict row. A
+    // review verdict is the PR's own review state, and drift past it is the PR
+    // being re-requested — both read from the forge, never stamped here.
 
-    // When inspect specialist reports success, save checkpoint
-    if (specialist === 'inspect' && status === 'passed') {
-      yield* Effect.promise(async () => {
-        try {
-          const { onInspectComplete } = await import('../../../../lib/cloister/inspect-agent.js');
-          // Resolve project to get workspace path
-          const project = resolveProjectFromIssueSync(normalizedIssueId);
-          if (project) {
-            const workspacePath = join(
-              project.projectPath,
-              'workspaces',
-              `feature-${normalizedIssueId.toLowerCase()}`,
-            );
-            if (existsSync(workspacePath)) {
-              await Effect.runPromise(onInspectComplete(project.projectKey, normalizedIssueId, itemId!, 'passed', workspacePath, notes));
-
-            }
-          }
-        } catch (err) {
-          console.error(`[specialists/done] Error saving inspect checkpoint:`, err);
-        }
-      });
-    }
-
-    // When the test specialist reports success, persist testStatus and emit
-    // test.passed so reactive Cloister records the shipping lifecycle phase.
-    // PAN-1650 derives readyForMerge from review/test gate state server-side;
-    // no ship role is spawned.
+    // When the test specialist reports success, emit test.passed so reactive
+    // Cloister records the shipping lifecycle phase. Merge readiness itself is
+    // derived from the PR (approvals, checks, mergeability) — no status is
+    // written here.
     if (specialist === 'test' && status === 'passed') {
       yield* Effect.promise(async () => {
         try {
@@ -404,7 +264,6 @@ const postSpecialistsDoneRoute = HttpRouter.add(
               `feature-${normalizedIssueId.toLowerCase()}`,
             );
             if (existsSync(workspacePath)) {
-              setReviewStatusBase(normalizedIssueId, { testStatus: 'passed' });
               const { initEventStore } = await import('../../event-store.js');
               const store = await initEventStore();
               await store.appendAsync({
@@ -422,19 +281,14 @@ const postSpecialistsDoneRoute = HttpRouter.add(
     }
 
     // When merge specialist reports success, run post-merge lifecycle ONCE.
-    // Use firePostMergeLifecycle directly rather than onMergeComplete: onMergeComplete
-    // has a guard that checks mergeStatus !== 'merged', but setReviewStatusBase above
-    // already set mergeStatus='merged' — that guard would always fire and the lifecycle
-    // would never run. firePostMergeLifecycle skips that guard and uses the
-    // in-flight guard (postMergeGuard, concurrency) + postMergeLifecycle's
-    // _completedPostMerge (defense-in-depth).
+    // firePostMergeLifecycle's in-flight guard (postMergeGuard, concurrency) is
+    // what makes it at-most-once per merge.
     if (specialist === 'merge' && status === 'passed') {
       firePostMergeLifecycle(normalizedIssueId);
     }
 
-    // When any specialist reports failure, transition issue back to In Progress
-    // (inspect failures don't change Linear status — they're mid-implementation gates).
-    if (status === 'failed' && specialist !== 'inspect') {
+    // When any specialist reports failure, transition the issue back to In Progress.
+    if (status === 'failed') {
       try {
         const project = resolveProjectFromIssueSync(normalizedIssueId);
         if (project) {
@@ -466,8 +320,6 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       yield* Effect.promise(async () => {
         try {
           // Post comment on the PR
-          const reviewStatus = loadReviewStatuses()[normalizedIssueId];
-          const prUrl = reviewStatus?.prUrl;
           if (prUrl) {
             // Extract owner/repo#number from PR URL
             const prMatch = prUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
@@ -528,7 +380,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
             verdict: status === 'failed' ? 'failed' : 'blocked',
             notes,
             workspacePath,
-            prUrl: updatedStatus.prUrl,
+            ...(prUrl ? { prUrl } : {}),
             ...(runId ? { runId } : {}),
           }));
           console.log(
@@ -565,7 +417,9 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       issueId: normalizedIssueId,
       status,
       notes,
-      currentStatus: updatedStatus,
+      // `currentStatus` used to be the whole review-status row. The issue's
+      // position is derived now (PAN-3917 FR-6).
+      state: (yield* Effect.promise(() => getDerivedIssueState(normalizedIssueId))).state,
     });
   })),
 );
@@ -695,16 +549,6 @@ const postSpecialistReportStatusRoute = HttpRouter.add(
 
     console.log(`[specialists] ${name} reported status for ${issueId}: ${status}`);
 
-    // When specialist reports completion (passed/blocked/failed), set state to idle
-    if (['passed', 'blocked', 'failed'].includes(status)) {
-      const { getTmuxSessionName } = yield* Effect.promise(() => import('../../../../lib/cloister/specialists.js'));
-      const tmuxSession = getTmuxSessionName(name as SpecialistAgentName);
-      saveAgentRuntimeState(tmuxSession, {
-        state: 'idle',
-        lastActivity: new Date().toISOString(),
-      });
-    }
-
     // Emit domain event based on status
     const eventRole = specialistEventRole(name);
     if (eventRole && status === 'passed') {
@@ -760,61 +604,20 @@ const postSpecialistAutoCompleteRoute = HttpRouter.add(
 
     const issueId = requestIssueId!;
     const status = requestStatus!;
-    const completingAgentId = agentId!;
 
     console.log(`[specialists] Auto-detected completion for ${name}: ${issueId} -> ${status}`);
 
-    yield* Effect.promise(() => saveAgentRuntimeState(completingAgentId, {
-      state: 'idle',
-      lastActivity: new Date().toISOString(),
-      currentIssue: undefined,
-    }));
-
-    // Update review/test status based on specialist type
-    const existingStatus = getReviewStatusSync(issueId);
-
-    if (name === 'review-agent') {
-      const alreadyReported =
-        existingStatus?.reviewNotes &&
-        !existingStatus.reviewNotes.startsWith('Auto-detected:');
-      if (alreadyReported) {
-        console.log(
-          `[specialists] Skipping auto-detect for ${name}/${issueId}: specialist already reported (${existingStatus!.reviewStatus})`,
-        );
-      } else {
-        setReviewStatusBase(issueId, {
-          reviewStatus: status === 'passed' ? 'passed' : 'blocked',
-          reviewNotes: `Auto-detected: ${status}`,
-        });
-      }
-
-      if ((alreadyReported ? existingStatus!.reviewStatus : status === 'passed' ? 'passed' : 'blocked') === 'passed') {
-        console.log(`[specialists] ${issueId} review approved; reactive Cloister will dispatch the test role`);
-      }
-    } else if (name === 'test-agent') {
-      const alreadyReported =
-        existingStatus?.testNotes && !existingStatus.testNotes.startsWith('Auto-detected:');
-      if (alreadyReported) {
-        console.log(
-          `[specialists] Skipping auto-detect for ${name}/${issueId}: specialist already reported (${existingStatus!.testStatus})`,
-        );
-      } else {
-        const testPassed = status === 'passed';
-        setReviewStatusBase(issueId, {
-          testStatus: testPassed ? 'passed' : 'failed',
-          testNotes: `Auto-detected: ${status}`,
-        });
-        if (testPassed) {
-          // Emit test.passed so reactive Cloister records the shipping
-          // lifecycle phase; readyForMerge is derived server-side.
-          yield* eventStore.append({
-            type: 'test.passed',
-            timestamp: new Date().toISOString(),
-            payload: { issueId },
-          });
-          console.log(`[specialists] ${issueId} emitted test.passed after auto-detected test pass`);
-        }
-      }
+    // PAN-3917: auto-detected completion emits the domain event and nothing
+    // else. The verdict itself lives on the PR (FR-7), the pane's state is the
+    // backend's (FR-12), and merge readiness is derived from the forge (FR-9) —
+    // there is no review/test status row left to write here.
+    if (name === 'test-agent' && status === 'passed') {
+      yield* eventStore.append({
+        type: 'test.passed',
+        timestamp: new Date().toISOString(),
+        payload: { issueId },
+      });
+      console.log(`[specialists] ${issueId} emitted test.passed after auto-detected test pass`);
     }
 
     const eventRole = specialistEventRole(name);

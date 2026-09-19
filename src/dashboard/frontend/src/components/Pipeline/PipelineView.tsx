@@ -1,12 +1,11 @@
 import { useMemo, useRef, useState, useEffect } from 'react';
-import type { ReviewStatusSnapshot } from '@overdeck/contracts';
 
 import { useCostStream, type CostEvent } from '../../hooks/useCostStream';
 import { useDashboardStore, selectAgents, selectIssues } from '../../lib/store';
 import { getPipelineIssuePhase, hasActualPendingQuestion, isAgentRunningStatus, type PipelineIssuePhase } from '../../lib/pipeline-state';
 import { useSharedTick } from '../../lib/useSharedTick';
 import { cn } from '../../lib/utils';
-import type { Agent, Issue } from '../../types';
+import type { Agent, DerivedIssueState, Issue } from '../../types';
 import MetricStrip from '../primitives/MetricStrip';
 import PhaseHeader from '../primitives/PhaseHeader';
 import IssueRow, { type IssueRowPriority } from '../primitives/IssueRow';
@@ -18,7 +17,7 @@ import { IssueActionMenu } from '../IssueActionMenu';
 // 'todo' (raw backlog) is intentionally excluded from the rendered phases — only
 // Definition-of-Ready issues surface, in the 'ready' lane (PAN-1966). Backlog is
 // still grouped (see groupedIssues) but never shown.
-const PHASES: PipelineIssuePhase[] = ['ship', 'review', 'verifying', 'work', 'plan', 'ready'];
+const PHASES: PipelineIssuePhase[] = ['ship', 'review', 'work', 'plan', 'ready'];
 const PHASE_FILTERS: Array<PipelineIssuePhase | 'all'> = ['all', ...PHASES];
 
 const PRIORITY_MAP: Record<number, IssueRowPriority> = {
@@ -47,8 +46,8 @@ function costEventsTotal(eventsByIssue: Record<string, CostEvent[]>) {
   );
 }
 
-function reviewStatusForIssue(reviewStatusByIssueId: Record<string, ReviewStatusSnapshot>, issue: Issue) {
-  return reviewStatusByIssueId[issue.identifier] ?? reviewStatusByIssueId[issue.identifier.toUpperCase()];
+function derivedForIssue(derivedByIssueId: Record<string, DerivedIssueState>, issue: Issue) {
+  return derivedByIssueId[issue.identifier] ?? derivedByIssueId[issue.identifier.toUpperCase()];
 }
 
 function priorityForIssue(priority: number): IssueRowPriority {
@@ -136,24 +135,25 @@ function projectOptionForIssue(issue: Issue): ProjectOption | null {
   return { id: issue.project.id || issue.project.name, name: issue.project.name };
 }
 
-function isBlockedFromMerge(reviewStatus?: ReviewStatusSnapshot | null) {
+/** The forge refuses this PR — red checks or a conflict. */
+function isBlockedFromMerge(derived?: DerivedIssueState | null) {
   return Boolean(
-    reviewStatus &&
-      (reviewStatus.blockerReasons?.length ?? 0) > 0 &&
-      reviewStatus.mergeStatus !== 'merged' &&
-      reviewStatus.reviewStatus === 'passed' &&
-      (reviewStatus.testStatus === 'passed' || reviewStatus.testStatus === 'skipped'),
+    derived?.pr &&
+      derived.state !== 'merged' &&
+      derived.state !== 'closed' &&
+      (derived.pr.checks === 'red' || derived.pr.mergeable === false),
   );
 }
 
-function isOpenMergeRequest(reviewStatus?: ReviewStatusSnapshot | null) {
-  return Boolean(reviewStatus?.prUrl && reviewStatus.readyForMerge !== true && reviewStatus.mergeStatus !== 'merged');
+/** An open PR that is not yet ready to merge. */
+function isOpenMergeRequest(derived?: DerivedIssueState | null) {
+  return Boolean(derived?.pr && derived.state !== 'ready' && derived.state !== 'merged' && derived.state !== 'closed');
 }
 
-function filterMatchesShipModifier(filter: PipelineFilterState, reviewStatus?: ReviewStatusSnapshot | null) {
+function filterMatchesShipModifier(filter: PipelineFilterState, derived?: DerivedIssueState | null) {
   if (filter.phase !== 'ship') return true;
-  if (filter.blocked && !isBlockedFromMerge(reviewStatus)) return false;
-  if (filter.noPr && !isOpenMergeRequest(reviewStatus)) return false;
+  if (filter.blocked && !isBlockedFromMerge(derived)) return false;
+  if (filter.noPr && !isOpenMergeRequest(derived)) return false;
   return true;
 }
 
@@ -185,7 +185,6 @@ function MetricIcon({ label }: { label: string }) {
 function verbBadgeForPhase(phase: PipelineIssuePhase) {
   if (phase === 'ship') return <VerbBadge variant="READY TO MERGE" />;
   if (phase === 'review') return <VerbBadge variant="REVIEW RUNNING" />;
-  if (phase === 'verifying') return <VerbBadge variant="MERGED" />;
   if (phase === 'work') return <VerbBadge variant="WORK RUNNING" />;
   if (phase === 'plan') return <VerbBadge variant="PLANNING" />;
   if (phase === 'ready') return <VerbBadge variant="READY" />;
@@ -212,10 +211,6 @@ type PipelineIssueRowProps = {
 
 function PipelineIssueRow({ issue, phase, agent, costEvents, now, onOpen, focused = false }: PipelineIssueRowProps) {
   const [openSignal, setOpenSignal] = useState(0);
-  // PAN-1692: per-issue auto-merge policy badge, read from the store snapshot.
-  const autoMerge = useDashboardStore(
-    (s) => (s.reviewStatusByIssueId[issue.identifier] ?? s.reviewStatusByIssueId[issue.identifier.toUpperCase()])?.autoMerge,
-  );
   const costSum = costEvents?.reduce((sum, event) => sum + event.cost, 0) ?? 0;
   const ledger = {
     runtime: agent?.startedAt
@@ -244,14 +239,14 @@ function PipelineIssueRow({ issue, phase, agent, costEvents, now, onOpen, focuse
       onContextMenu={() => setOpenSignal((value) => value + 1)}
       peek
       actionMenu={<IssueActionMenu issueId={issue.identifier} mode="overflow-only" className="inline-flex" openSignal={openSignal} />}
-      trailingBadge={<AutoMergeToggle issueId={issue.identifier} autoMerge={autoMerge} variant="badge" compact />}
+      trailingBadge={<AutoMergeToggle issueId={issue.identifier} variant="badge" compact />}
     />
   );
 }
 
 export function PipelineView({ onSearchOpen, onTabChange, keyboardShortcutsDisabled = false }: PipelineViewProps = {}) {
   const issues = useDashboardStore(selectIssues) as Issue[];
-  const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
+  const derivedByIssueId = useDashboardStore((state) => state.derivedIssueStateByIssueId);
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
   const openIssue = useDashboardStore((state) => state.openIssue);
   const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
@@ -263,7 +258,6 @@ export function PipelineView({ onSearchOpen, onTabChange, keyboardShortcutsDisab
   const phaseRefs = useRef<Record<PipelineIssuePhase, HTMLElement | null>>({
     ship: null,
     review: null,
-    verifying: null,
     work: null,
     plan: null,
     ready: null,
@@ -315,7 +309,6 @@ export function PipelineView({ onSearchOpen, onTabChange, keyboardShortcutsDisab
     const groups: Record<PipelineIssuePhase, Issue[]> = {
       ship: [],
       review: [],
-      verifying: [],
       work: [],
       plan: [],
       ready: [],
@@ -330,11 +323,10 @@ export function PipelineView({ onSearchOpen, onTabChange, keyboardShortcutsDisab
         continue;
       }
 
-      const agent = agentByIssueId.get(issue.identifier.toLowerCase()) ?? null;
-      const reviewStatus = reviewStatusForIssue(reviewStatusByIssueId, issue);
-      let phase = getPipelineIssuePhase(issue, reviewStatus, agent);
+      const derived = derivedForIssue(derivedByIssueId, issue);
+      let phase = getPipelineIssuePhase(derived, issue);
 
-      if (filter.phase === 'ship' && (isBlockedFromMerge(reviewStatus) || isOpenMergeRequest(reviewStatus))) {
+      if (filter.phase === 'ship' && (isBlockedFromMerge(derived) || isOpenMergeRequest(derived))) {
         phase = 'ship';
       }
 
@@ -342,7 +334,7 @@ export function PipelineView({ onSearchOpen, onTabChange, keyboardShortcutsDisab
         continue;
       }
 
-      if (!filterMatchesShipModifier(filter, reviewStatus)) {
+      if (!filterMatchesShipModifier(filter, derived)) {
         continue;
       }
 
@@ -354,7 +346,7 @@ export function PipelineView({ onSearchOpen, onTabChange, keyboardShortcutsDisab
     }
 
     return groups;
-  }, [agentByIssueId, filter, issues, reviewStatusByIssueId]);
+  }, [filter, issues, derivedByIssueId]);
 
   const visiblePhases = filter.phase === 'all' ? PHASES : [filter.phase];
 
@@ -426,9 +418,7 @@ export function PipelineView({ onSearchOpen, onTabChange, keyboardShortcutsDisab
       // Active issues = the pipeline set (the rendered lanes), NOT all open
       // issues — raw backlog ('todo') is excluded so the header matches the
       // Definition-of-Ready lanes below (PAN-1966).
-      const agent = agentByIssueId.get(issue.identifier.toLowerCase()) ?? null;
-      const reviewStatus = reviewStatusForIssue(reviewStatusByIssueId, issue);
-      return getPipelineIssuePhase(issue, reviewStatus, agent) !== 'todo';
+      return getPipelineIssuePhase(derivedForIssue(derivedByIssueId, issue), issue) !== 'todo';
     }).length;
     const workRunning = agents.filter((agent) => agent.role === 'work' && isRunningAgent(agent)).length;
     const reviewIssueIds = new Set<string>();
@@ -439,19 +429,13 @@ export function PipelineView({ onSearchOpen, onTabChange, keyboardShortcutsDisab
       }
     }
 
-    for (const status of Object.values(reviewStatusByIssueId)) {
-      if (
-        status.reviewStatus === 'reviewing' ||
-        status.testStatus === 'testing' ||
-        status.verificationStatus === 'running'
-      ) {
-        reviewIssueIds.add(status.issueId);
+    for (const derived of Object.values(derivedByIssueId)) {
+      if (derived.state === 'in-review' || derived.state === 'changes-requested') {
+        reviewIssueIds.add(derived.issueId);
       }
     }
 
-    const readyToShip = Object.values(reviewStatusByIssueId).filter(
-      (status) => status.readyForMerge === true && status.mergeStatus !== 'merged',
-    ).length;
+    const readyToShip = Object.values(derivedByIssueId).filter((derived) => derived.state === 'ready').length;
     const spend = costEventsTotal(eventsByIssue);
 
     return [
@@ -461,7 +445,7 @@ export function PipelineView({ onSearchOpen, onTabChange, keyboardShortcutsDisab
       { id: 'ship', eyebrow: 'Ship', value: readyToShip, sub: 'ready to merge', icon: <MetricIcon label="↑" />, signal: 'success' as const },
       { id: 'spend', eyebrow: 'Spend', value: formatCost(spend), sub: '24h spend', icon: <MetricIcon label="$" />, signal: 'cost' as const },
     ];
-  }, [agents, agentByIssueId, eventsByIssue, issues, reviewStatusByIssueId]);
+  }, [agents, eventsByIssue, issues, derivedByIssueId]);
 
   function updateFilter(next: PipelineFilterState, scrollToPhase?: PipelineIssuePhase) {
     setFilter(next);

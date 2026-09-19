@@ -20,7 +20,6 @@ import {
 } from './paths.js';
 import { findPrdAtStatusSync, canonicalPrdSubdirSync } from './prd-locations.js';
 import { killSession, sessionExistsSync, listSessionNames } from './tmux.js';
-import { loadReviewStatuses } from './review-status.js';
 import { getLinearApiKey } from './lifecycle/types.js';
 import { POST_MERGE_RESIDUE_LABELS, WORKFLOW_LABELS } from './lifecycle/close-issue.js';
 import { findWorkspacePath } from './lifecycle/archive-planning.js';
@@ -92,35 +91,13 @@ async function isSquashMergedViaPr(
  *
  * Uses `git merge-base --is-ancestor` for regular merges, plus a
  * code-diff fallback to detect squash merges where the branch still exists.
- * Also checks review-status.json as authoritative — the merge specialist
- * validates the merge before setting mergeStatus to 'merged'.
+ * PAN-3917: git is the only authority — the merge-status row that used to be
+ * consulted as a hint is gone.
  */
 export async function isBranchMerged(
   branchName: string,
   projectPath: string,
 ): Promise<{ status: 'merged' | 'unmerged' | 'no-branch'; message: string }> {
-  // Check review-status as a hint — but NEVER trust it over the live git state.
-  // An issue that merged once can be re-activated and accumulate new unmerged
-  // commits; honoring a stale mergeStatus here would let close-out tear down a
-  // workspace with un-landed work. Only honor it when the branch has nothing
-  // beyond main; otherwise fall through to the robust git checks below (which
-  // still recognise squash-merges via the code-diff check).
-  try {
-    const issueId = branchName.replace('feature/', '').toUpperCase();
-    const statuses = loadReviewStatuses();
-    if (statuses[issueId]?.mergeStatus === 'merged') {
-      const { stdout: aheadOfMain } = await execAsync(
-        `git log main..${branchName} --oneline 2>/dev/null || true`,
-        { cwd: projectPath, encoding: 'utf-8' },
-      );
-      if (!aheadOfMain.trim()) {
-        return { status: 'merged', message: 'Merge specialist confirmed merge completed' };
-      }
-    }
-  } catch {
-    // review-status.json may not exist, continue with git checks
-  }
-
   // Check if branch exists locally
   const { stdout: branchExists } = await execAsync(
     `git branch --list "${branchName}" 2>/dev/null || true`,
@@ -612,40 +589,11 @@ const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: Clo
     steps.push({ name: 'Apply closed-out label', status: 'skipped', message: `Warning: ${(err as Error).message}` });
   }
 
-  // Step 8: Mark the durable pipeline journal terminal before clearing the DB cache.
-  try {
-    const { markRecordPipelineClosedOutSync } = await import('./pan-dir/records.js');
-    markRecordPipelineClosedOutSync({ name: 'inferred', path: ctx.projectPath }, ctx.issueId.toUpperCase());
-    steps.push({ name: 'Mark pipeline terminal', status: 'passed', message: 'Pipeline journal marked closed-out' });
-  } catch (err) {
-    steps.push({ name: 'Mark pipeline terminal', status: 'skipped', message: `Warning: ${(err as Error).message}` });
-  }
-
-  // Step 9: Clear review status
-  try {
-    // Dynamically import to avoid circular dependency with server
-    const { clearReviewStatus } = await import('./review-status.js');
-    clearReviewStatus(ctx.issueId.toUpperCase());
-    steps.push({ name: 'Clear review status', status: 'passed', message: 'Review status cleared' });
-  } catch {
-    // review-status module may not be available in CLI context
-    // Try cleaning the file directly
-    try {
-      const statusFile = join(OVERDECK_HOME, 'review-status.json');
-      if (existsSync(statusFile)) {
-        const data = JSON.parse(readFileSync(statusFile, 'utf-8'));
-        const upperKey = ctx.issueId.toUpperCase();
-        if (data[upperKey]) {
-          delete data[upperKey];
-          const { writeFileSync } = await import('fs');
-          writeFileSync(statusFile, JSON.stringify(data, null, 2));
-        }
-      }
-      steps.push({ name: 'Clear review status', status: 'passed', message: 'Review status cleared (direct)' });
-    } catch (innerErr) {
-      steps.push({ name: 'Clear review status', status: 'skipped', message: `Warning: ${(innerErr as Error).message}` });
-    }
-  }
+  // PAN-3917: the durable pipeline journal (pan-dir/records.js, the per-issue
+  // git-tracked record) is permanently deleted — there is no replacement
+  // "mark terminal" write, since terminality is now read live from the
+  // tracker/PR at query time rather than stamped into a record. The former
+  // Step 8 here is gone.
 
   return { success: true, issueId: ctx.issueId, steps };
 }

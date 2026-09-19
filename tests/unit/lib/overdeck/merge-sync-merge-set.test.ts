@@ -50,11 +50,11 @@ function makeMergeSet(overrides: Partial<MergeSet> = {}): MergeSet {
         forge: 'github',
         sourceBranch: 'feature/pan-632',
         targetBranch: 'main',
-        reviewStatus: 'pending',
-        testStatus: 'pending',
+        repoReview: 'pending',
+        repoTests: 'pending',
         rebaseStatus: 'pending',
-        verificationStatus: 'pending',
-        mergeStatus: 'pending',
+        repoVerification: 'pending',
+        repoMerge: 'pending',
         mergeOrder: 0,
         required: true,
       },
@@ -64,11 +64,11 @@ function makeMergeSet(overrides: Partial<MergeSet> = {}): MergeSet {
         forge: 'gitlab',
         sourceBranch: 'feature/pan-632',
         targetBranch: 'qa',
-        reviewStatus: 'passed',
-        testStatus: 'pending',
+        repoReview: 'passed',
+        repoTests: 'pending',
         rebaseStatus: 'pending',
-        verificationStatus: 'pending',
-        mergeStatus: 'pending',
+        repoVerification: 'pending',
+        repoMerge: 'pending',
         mergeOrder: 1,
         required: true,
       },
@@ -115,11 +115,11 @@ describe('merge-sync merge sets', () => {
           forge: 'github',
           sourceBranch: 'feature/pan-632',
           targetBranch: 'main',
-          reviewStatus: 'passed',
-          testStatus: 'passed',
+          repoReview: 'passed',
+          repoTests: 'passed',
           rebaseStatus: 'pending',
-          verificationStatus: 'pending',
-          mergeStatus: 'ready',
+          repoVerification: 'pending',
+          repoMerge: 'ready',
           mergeOrder: 0,
           required: true,
         },
@@ -129,7 +129,7 @@ describe('merge-sync merge sets', () => {
     const result = getMergeSetFromDb('PAN-632');
     expect(result?.status).toBe('ready');
     expect(result?.repos).toHaveLength(1);
-    expect(result?.repos[0].mergeStatus).toBe('ready');
+    expect(result?.repos[0].repoMerge).toBe('ready');
   });
 
   it('lists all merge sets and filters by project', () => {

@@ -1,193 +1,42 @@
+import { mkdirSync, writeFileSync } from 'fs';
 import { readdir, writeFile as writeFileAsync, mkdir as mkdirAsync } from 'fs/promises';
 import { join } from 'path';
 import { Effect } from 'effect';
-import type { RuntimeName } from '../runtimes/types.js';
 import { AGENTS_DIR, getOverdeckHome } from '../paths.js';
 import { FsError } from '../errors.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
-import { resolveAutoResumeConfigForIssue } from '../cloister/auto-resume-config.js';
-import { getRollbackAgentStatePath, readRollbackAgentStateSync, writeRollbackAgentStateSync } from '../overdeck/agent-rollback-state.js';
-import { getOverdeckAgentStateSync, saveOverdeckAgentStateSync, listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
-import { readAgentHarnessModelRecordSync, writeAgentHarnessModelRecordSync } from '../overdeck/agent-record-sync.js';
 import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
-import { appendAgentPlaneLifecycle } from '../pan-dir/agents.js';
 import { normalizeAgentId } from './identity.js';
 import { removeAgentStateDir } from './state-dir-removal.js';
 import { registerPipelineTelemetryAgentReader } from '../telemetry/pipeline-agent-reader.js';
-import { isRole } from './role.js';
+import {
+  registerActiveReviewArtifactContextReader,
+  registerFeedbackAgentStateReader,
+} from './agent-state-source.js';
 import type { Role } from './role.js';
+import {
+  type AgentState,
+  type AgentStopCause,
+  getAgentDir,
+  getAgentStateFilePath,
+  getAgentStateSync,
+  listAgentStatesSync,
+  cleanAgentState,
+} from './agent-state-read.js';
 
 export type { Role } from './role.js';
+// PAN-3917: AgentState/AgentStopCause and the pure reads (getAgentDir,
+// getAgentStateFilePath, getAgentStateSync, listAgentStatesSync) moved to
+// agent-state-read.ts (lint:circular fixup — see that file's header). This
+// keeps every existing `from './agent-state.js'` import working unchanged.
+export type { AgentState, AgentStopCause } from './agent-state-read.js';
+export { getAgentDir, getAgentStateFilePath, getAgentStateSync, listAgentStatesSync } from './agent-state-read.js';
 
 export const SESSION_EXITED_BEFORE_KICKOFF = 'session-exited-before-kickoff';
 
-/**
- * Why an agent transitioned to `stopped` (PAN-3324).
- *
- * `'operator'` means a human asked for the stop — `pan kill`, `pan pause`, a
- * dashboard stop/pause action, or an explicit flywheel stop/pause/abort. Only
- * that cause sets `stoppedByUser`, and therefore only that cause engages the
- * operator-stop gate that suppresses autonomous re-drive.
- *
- * `'system'` covers every machinery-initiated stop: memory shedding, health
- * force-kills, stalled-review-parent reaping, corruption recovery, close-out,
- * and reconciliation of a process the OOM killer already took. These stops are
- * transient resource or liveness events, so autonomous recovery must stay
- * eligible. It is the default precisely so a caller that omits the cause can
- * never accidentally manufacture a permanent stall.
- */
-export type AgentStopCause = 'operator' | 'system';
-
-export interface AgentState {
-  id: string;
-  issueId: string;
-  workspace: string;
-  /**
-   * The projects/workspaces registry row this agent belongs to (PAN-1990
-   * AC-1/FR-4). Resolved from `issueId` at persistence time
-   * (agent-state-sync.ts) when not set explicitly — undefined only when no
-   * workspace row exists for the issue yet.
-   */
-  workspaceId?: string;
-  /** Coding-agent harness this agent runs under (PAN-636). */
-  harness?: RuntimeName;
-  /** Unified role primitive (PAN-1048). */
-  role: Role;
-  /** Parent work agent that owns a swarm's gated orchestration loop. */
-  foreman?: boolean;
-  model: string;
-  /**
-   * The exact spawn key fed to the weighted-distribution model picker at spawn
-   * (`${role}:${issueId}`), persisted so the dashboard MODEL inspector (PAN-2053)
-   * can show the faithful FNV-1a derivation without re-guessing the key's form.
-   * Undefined for scalar-role agents and for agents spawned before PAN-2053.
-   */
-  modelSpawnKey?: string;
-  status: 'starting' | 'running' | 'stopped' | 'error';
-  startedAt: string;
-  lastActivity?: string;
-  lastResumeAt?: string;
-  /**
-   * Tri-state kickoff delivery signal for work-agent lifecycle monitoring:
-   * undefined = legacy/pre-feature agent or non-applicable role;
-   * false = spawned but kickoff delivery not yet confirmed;
-   * true = kickoff delivery confirmed.
-   */
-  kickoffDelivered?: boolean;
-  stoppedAt?: string;
-  /** True when the agent was stopped with `cause: 'operator'` — `pan kill`,
-   *  `pan pause`, or a dashboard stop/pause action. Cleared on resume. Read by
-   *  deacon's autoResumeStoppedWorkAgents to distinguish a deliberate operator
-   *  stop from a crash/orphan. PAN-3324: machinery-initiated stops (memory
-   *  shedding, health force-kills, stalled-parent reaping, OOM reconciliation)
-   *  pass `cause: 'system'` and must never set this — doing so latches the
-   *  operator-stop gate and permanently suppresses autonomous recovery. */
-  stoppedByUser?: boolean;
-  stoppedByPause?: boolean;
-  paused?: boolean;
-  pausedReason?: string;
-  pausedAt?: string;
-  /**
-   * PAN-2507: true when this work agent was paused by the preemptive scheduler
-   * (yielded to free capacity for an advancing dispatch), as distinct from an
-   * operator pause. Reuses `paused: true` so every existing no-resume gate
-   * protects the yielded agent; this flag lets the deacon resume yielded agents
-   * oldest-first and lets `pan unpause` self-clear the yield attribution.
-   */
-  yieldedByScheduler?: boolean;
-  /** PAN-2507: ISO timestamp of the yield (oldest-first resume ordering). */
-  yieldedAt?: string;
-  /**
-   * PAN-2507: ISO timestamp of the most recent resume-from-yield. Enforces the
-   * re-yield cooldown (an agent just resumed from a yield may not be re-yielded
-   * until `yield_cooldown_secs` elapse). Survives unpause (it is a cooldown
-   * tracker, not a pause field).
-   */
-  lastYieldResumeAt?: string;
-  troubled?: boolean;
-  troubledAt?: string;
-  consecutiveFailures?: number;
-  firstFailureInRunAt?: string;
-  lastFailureAt?: string;
-  lastFailureReason?: string;
-  lastFailureNextRetryAt?: string;
-  branch?: string; // Git branch name for this agent
-  costSoFar?: number;
-  sessionId?: string; // For resuming sessions after handoff
-
-  // Work type system (PAN-118). 'retained-transcripts' is the tombstone phase
-  // (PAN-3465): removeAgent keeps the row for transcript linkage after the
-  // state dir is retired — such rows are not live agents.
-  phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning' | 'synthesis' | 'retained-transcripts';
-  workType?: string; // Current work type ID
-
-  /**
-   * Whether this work agent was launched with the experimental Claude Code
-   * Channels prompt-delivery path enabled. Set at launch time after the
-   * eligibility check; never mutated after. Read by deliverAgentMessage to
-   * decide whether to attempt the bridge socket before falling back to
-   * sendKeysAsync. Absent or false means tmux-only delivery (current default).
-   */
-  channelsEnabled?: boolean;
-  /** True when this work agent was launched through the PTY supervisor wrapper. */
-  supervisorEnabled?: boolean;
-  /**
-   * Delivery method for agent messages. 'auto' tries supervisor, then channels,
-   * then tmux; explicit socket methods are strict (throw on failure); 'tmux'
-   * bypasses socket transports entirely.
-   */
-  deliveryMethod?: 'auto' | 'supervisor' | 'channels' | 'tmux';
-
-  /**
-   * Short HEAD sha (8 chars) of the workspace at the moment this role run was
-   * spawned. Used by the reactive scheduler's activeRoleRunExists() to detect a
-   * stale/zombie role session: if the workspace HEAD has advanced past this
-   * marker, the existing session ran against old code and must not block a
-   * fresh re-dispatch for the new HEAD. Set for non-work roles in spawnRun.
-   */
-  roleRunHead?: string;
-
-  /** Flywheel run that spawned this agent, if any. Absent for operator-started agents (PAN-1812). */
-  flywheelRunId?: string;
-  /** Origin token identifying the command or autonomous path that started this agent. */
-  startedBy?: string;
-
-  /** True when a planning session was launched with `pan plan --auto`. */
-  auto?: boolean;
-
-  /** Review-convoy metadata for server-side reviewer lifecycle monitoring. */
-  reviewSubRole?: string;
-  reviewRunId?: string;
-  reviewOutputPath?: string;
-  reviewSynthesisAgentId?: string;
-  reviewDeadlineAt?: string;
-  reviewMonitorSignaled?: 'ready' | 'failed' | 'timeout';
-  /** Number of times Deacon has respawned this convoy reviewer (PAN-1806). */
-  reviewRetryAttempt?: number;
-  /** Path to the run's context manifest, used by missing-reviewer recovery. */
-  reviewContextManifestPath?: string;
-  hostOverride?: boolean;
-
-  /** Inspect sub-role for inspect-* agents (PAN-1834). */
-  inspectSubRole?: string;
-
-  /** Registered swarm slot index for per-item work agents. */
-  slotIndex?: number;
-  /** xBRIEF item id explicitly assigned to this registered swarm slot. */
-  slotItemId?: string;
-}
-
 const toAgentFsError = (operation: string, path: string, cause: unknown): FsError =>
   new FsError({ operation, path, cause });
-
-export function getAgentDir(agentId: string): string {
-  return join(getOverdeckHome(), 'agents', agentId);
-}
-
-export function getAgentStateFilePath(agentId: string): string {
-  return getRollbackAgentStatePath(agentId);
-}
 
 /**
  * PAN-1985: wipe agent state directories for an issue, optionally scoped to
@@ -241,95 +90,17 @@ export async function wipeAgentStateDirs(
 
 export { isRole } from './role.js';
 
-function cleanAgentState(raw: AgentState): AgentState {
-  return {
-    id: raw.id,
-    issueId: raw.issueId,
-    workspace: raw.workspace,
-    harness: raw.harness,
-    role: raw.role,
-    model: raw.model,
-    status: raw.status,
-    startedAt: raw.startedAt,
-    lastActivity: raw.lastActivity,
-    lastResumeAt: raw.lastResumeAt,
-    kickoffDelivered: raw.kickoffDelivered,
-    stoppedAt: raw.stoppedAt,
-    stoppedByUser: raw.stoppedByUser,
-    stoppedByPause: raw.stoppedByPause,
-    paused: raw.paused,
-    pausedReason: raw.pausedReason,
-    pausedAt: raw.pausedAt,
-    yieldedByScheduler: raw.yieldedByScheduler,
-    yieldedAt: raw.yieldedAt,
-    lastYieldResumeAt: raw.lastYieldResumeAt,
-    troubled: raw.troubled,
-    troubledAt: raw.troubledAt,
-    consecutiveFailures: raw.consecutiveFailures,
-    firstFailureInRunAt: raw.firstFailureInRunAt,
-    lastFailureAt: raw.lastFailureAt,
-    lastFailureReason: raw.lastFailureReason,
-    lastFailureNextRetryAt: raw.lastFailureNextRetryAt,
-    branch: raw.branch,
-    costSoFar: raw.costSoFar,
-    sessionId: raw.sessionId,
-    roleRunHead: raw.roleRunHead,
-    flywheelRunId: raw.flywheelRunId,
-    startedBy: raw.startedBy,
-    channelsEnabled: raw.channelsEnabled,
-    supervisorEnabled: raw.supervisorEnabled,
-    deliveryMethod: raw.deliveryMethod,
-    reviewSubRole: raw.reviewSubRole,
-    reviewRunId: raw.reviewRunId,
-    reviewOutputPath: raw.reviewOutputPath,
-    reviewSynthesisAgentId: raw.reviewSynthesisAgentId,
-    reviewDeadlineAt: raw.reviewDeadlineAt,
-    reviewMonitorSignaled: raw.reviewMonitorSignaled,
-    reviewRetryAttempt: raw.reviewRetryAttempt,
-    reviewContextManifestPath: raw.reviewContextManifestPath,
-    hostOverride: raw.hostOverride,
-    inspectSubRole: raw.inspectSubRole,
-    slotIndex: raw.slotIndex,
-    slotItemId: raw.slotItemId,
-  };
-}
-
-function parseAgentState(content: string, normalizedId: string): AgentState | null {
-  try {
-    const state = JSON.parse(content) as Partial<AgentState>;
-    if (!isRole(state.role)) {
-      // Roleless states are invisible to getAgentState; cleanup is handled
-      // by warnOnBareNumericIssueIds / dropLegacyAgentStatesMissingRoleAsync.
-      return null;
-    }
-    if (!state.id) state.id = normalizedId;
-    return cleanAgentState(state as AgentState);
-  } catch {
-    return null;
-  }
-}
-
-export function getAgentStateSync(agentId: string): AgentState | null {
-  const normalizedId = normalizeAgentId(agentId);
-
-  const overdeckState = getOverdeckAgentStateSync(normalizedId);
-  if (overdeckState) return cleanAgentState(overdeckState);
-
-  const state = readRollbackAgentStateSync(normalizedId, parseAgentState);
-  if (!state) return null;
-
-  // PAN-1919: harness/model are no longer sourced from state.json. Merge from
-  // the per-issue git-tracked record so cross-machine pickup works.
-  if (state.issueId) {
-    const record = readAgentHarnessModelRecordSync(state.issueId);
-    if (record?.harness) state.harness = record.harness;
-    if (record?.model) state.model = record.model;
-  }
-
-  return state;
-}
-
 registerPipelineTelemetryAgentReader(getAgentStateSync);
+registerFeedbackAgentStateReader(listAgentStatesSync);
+registerActiveReviewArtifactContextReader((issueId) => {
+  const state = getAgentStateSync(`agent-${issueId.toLowerCase()}-review`);
+  if (!state?.reviewRunId) return null;
+  return {
+    runId: state.reviewRunId,
+    ...(state.roleRunHead ? { roleRunHead: state.roleRunHead } : {}),
+    ...(state.workspace ? { workspacePath: state.workspace } : {}),
+  };
+});
 
 export const getAgentState = (agentId: string): Effect.Effect<AgentState | null, FsError> => {
   return Effect.try({
@@ -347,26 +118,10 @@ function prepareAgentStateForSave(state: AgentState): AgentState {
   return state;
 }
 
-async function recordDurableStoppedTransition(
-  state: AgentState,
-  oldStatus: AgentState['status'] | undefined,
-): Promise<void> {
-  if (state.status !== 'stopped' || oldStatus === 'stopped') return;
-  try {
-    await appendAgentPlaneLifecycle(state, {
-      at: state.stoppedAt ?? new Date().toISOString(),
-      event: 'stopped',
-    });
-  } catch (error) {
-    console.warn(
-      `[agents] Could not append durable stopped lifecycle for ${state.id}: `
-      + `${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-}
-
 export function writeAgentStateJsonSync(state: AgentState): void {
-  writeRollbackAgentStateSync(state, (clean) => JSON.stringify(cleanAgentState(clean), null, 2));
+  const stateFile = getAgentStateFilePath(state.id);
+  mkdirSync(join(getOverdeckHome(), 'agents', state.id), { recursive: true });
+  writeFileSync(stateFile, JSON.stringify(cleanAgentState(state), null, 2));
 }
 
 export function saveAgentStateSync(state: AgentState): void {
@@ -376,21 +131,8 @@ export function saveAgentStateSync(state: AgentState): void {
 
   prepareAgentStateForSave(state);
 
-  saveOverdeckAgentStateSync(state);
   writeAgentStateJsonSync(state);
 
-  // PAN-1919: mirror harness/model into the per-issue git-tracked record so
-  // they travel with the branch. Done synchronously at save time; auto-commit
-  // is suppressed here because spawn paths explicitly queue the commit.
-  if (state.issueId && state.harness && state.model) {
-    try {
-      writeAgentHarnessModelRecordSync(state.issueId, state.harness, state.model);
-    } catch (err) {
-      console.warn(`[agents] Failed to mirror harness/model to record for ${state.issueId}: ${(err as Error).message}`);
-    }
-  }
-
-  void recordDurableStoppedTransition(state, oldStatus);
   if (oldStatus && oldStatus !== state.status) {
     logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentState)`);
   }
@@ -411,22 +153,13 @@ export function recordAgentActivitySync(
   if (activity.costSoFar !== undefined && Number.isFinite(activity.costSoFar)) {
     state.costSoFar = activity.costSoFar;
   }
-  // An activity write is telemetry — it must never take down the caller. On
-  // 2026-08-13 an unhandled SQLITE_BUSY here crashed the PAN-3668 review
-  // orchestrator's app-server host mid-synthesis. The JSON mirror still runs
-  // when the DB write fails.
-  try {
-    saveOverdeckAgentStateSync(state);
-  } catch (err) {
-    console.warn(`[agents] activity DB write failed for ${agentId} (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
-  }
   writeAgentStateJsonSync(state);
   return true;
 }
 
 export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> => {
   const dir = getAgentDir(state.id);
-  const stateFile = getRollbackAgentStatePath(state.id);
+  const stateFile = getAgentStateFilePath(state.id);
 
   return Effect.gen(function* () {
     yield* Effect.tryPromise({
@@ -443,26 +176,12 @@ export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> 
       state.stoppedAt = new Date().toISOString();
     }
 
-    yield* Effect.try({
-      try: () => saveOverdeckAgentStateSync(state),
-      catch: (cause) => toAgentFsError('write', `agents-db:${state.id}`, cause),
-    });
-
     yield* Effect.tryPromise({
       try: () => writeFileAsync(stateFile, JSON.stringify(cleanAgentState(state), null, 2)),
       catch: (cause) => toAgentFsError('write', stateFile, cause),
     });
     recordFeatureRegistryAgentState(state);
 
-    // PAN-1919: mirror harness/model into the per-issue git-tracked record.
-    if (state.harness && state.model) {
-      yield* Effect.try({
-        try: () => writeAgentHarnessModelRecordSync(state.issueId, state.harness!, state.model!),
-        catch: (cause) => toAgentFsError('write', `record:${state.issueId}`, cause),
-      });
-    }
-
-    yield* Effect.promise(() => recordDurableStoppedTransition(state, oldStatus));
     if (oldStatus && oldStatus !== state.status) {
       logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentStateProgram)`);
     }
@@ -677,7 +396,7 @@ export const clearAgentTroubled = (agentId: string): Effect.Effect<AgentState | 
  * scheduling decision, not operator residue, and a live agent's gates are not
  * this issue's to clear.
  *
- * Batched (one `listOverdeckAgentStatesSync()` scan for every issueId in the
+ * Batched (one `listAgentStatesSync()` scan for every issueId in the
  * set) so the recurring residue patrol does not perform one full agent-table
  * scan per terminal issue (review finding, PAN-3727) — cost scales with the
  * agent table once per patrol run, not with the number of terminal issues.
@@ -686,7 +405,7 @@ export function clearAgentOperatorGatesForIssuesSync(issueIds: ReadonlySet<strin
   const mutated = new Map<string, string[]>();
   if (issueIds.size === 0) return mutated;
 
-  for (const state of listOverdeckAgentStatesSync()) {
+  for (const state of listAgentStatesSync()) {
     if (state.status !== 'stopped') continue;
     const normalized = state.issueId?.toUpperCase();
     if (!normalized || !issueIds.has(normalized)) continue;
@@ -720,14 +439,22 @@ export function clearAgentOperatorGatesForIssueSync(issueId: string): string[] {
   return clearAgentOperatorGatesForIssuesSync(new Set([normalized])).get(normalized) ?? [];
 }
 
+/**
+ * Failure-escalation constants. PAN-3917: the per-project `autoResume` config
+ * override went with the deleted auto-resume escalation; the failure/backoff
+ * bookkeeping below stays because `troubled` still gates resume and codex-auth.
+ */
+const TROUBLED_WINDOW_MS = 10 * 60 * 1000;
+const MAX_CONSECUTIVE_FAILURES = 3;
+const FAILURE_BACKOFF_SECONDS = [5, 30, 120];
+
 function applyAgentFailure(state: AgentState, reason: string): void {
-  const config = resolveAutoResumeConfigForIssue(state.issueId);
   const nowMs = Date.now();
   const now = new Date(nowMs).toISOString();
   const firstFailureMs = Date.parse(state.firstFailureInRunAt ?? '');
   const hasValidFirstFailure = Number.isFinite(firstFailureMs);
   const windowElapsed = hasValidFirstFailure
-    && nowMs - firstFailureMs > config.troubledWindowMs;
+    && nowMs - firstFailureMs > TROUBLED_WINDOW_MS;
 
   if (windowElapsed || !hasValidFirstFailure) {
     state.consecutiveFailures = 1;
@@ -736,17 +463,17 @@ function applyAgentFailure(state: AgentState, reason: string): void {
     state.consecutiveFailures = (state.consecutiveFailures ?? 0) + 1;
   }
 
-  const backoffSeconds = config.failureBackoffSchedule[
-    Math.min(state.consecutiveFailures - 1, config.failureBackoffSchedule.length - 1)
-  ];
+  const backoffSeconds = FAILURE_BACKOFF_SECONDS[
+    Math.min(state.consecutiveFailures - 1, FAILURE_BACKOFF_SECONDS.length - 1)
+  ] ?? 120;
   state.lastFailureAt = now;
   state.lastFailureReason = reason;
   state.lastFailureNextRetryAt = new Date(nowMs + backoffSeconds * 1000).toISOString();
 
   const firstFailureInRunMs = Date.parse(state.firstFailureInRunAt ?? '');
-  const shouldMarkTroubled = state.consecutiveFailures >= config.maxConsecutiveFailures
+  const shouldMarkTroubled = state.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES
     && Number.isFinite(firstFailureInRunMs)
-    && nowMs - firstFailureInRunMs <= config.troubledWindowMs;
+    && nowMs - firstFailureInRunMs <= TROUBLED_WINDOW_MS;
 
   if (shouldMarkTroubled) {
     if (!state.troubled) {

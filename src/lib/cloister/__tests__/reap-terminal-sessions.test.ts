@@ -10,21 +10,21 @@ import {
 
 describe('isWorkReapable (PAN-1726)', () => {
   it('is reapable once the issue has merged', () => {
-    expect(isWorkReapable({ mergeStatus: 'merged' })).toBe(true);
+    expect(isWorkReapable({ merged: true })).toBe(true);
   });
 
   it('is NOT reapable while work is still in flight', () => {
     expect(isWorkReapable({})).toBe(false);
-    expect(isWorkReapable({ reviewStatus: 'passed' })).toBe(false);
-    expect(isWorkReapable({ testStatus: 'passed', readyForMerge: true })).toBe(false);
-    expect(isWorkReapable({ mergeStatus: 'failed' })).toBe(false);
+    expect(isWorkReapable({ reviewSettled: true })).toBe(false);
+    expect(isWorkReapable({ testSettled: true, mergeReady: true })).toBe(false);
+    expect(isWorkReapable({ merged: false })).toBe(false);
   });
 });
 
 describe('selectMergedWorkSessions (PAN-1726)', () => {
   const statuses: Record<string, ReapableStatus> = {
-    'PAN-1455': { mergeStatus: 'merged' },
-    'PAN-1629': { reviewStatus: 'passed' }, // live, not merged
+    'PAN-1455': { merged: true },
+    'PAN-1629': { reviewSettled: true }, // live, not merged
   };
 
   it('reaps the canonical work session of a merged issue when alive', () => {
@@ -55,27 +55,24 @@ describe('selectMergedWorkSessions (PAN-1726)', () => {
 
 describe('isAwaitingTestReapable (PAN-1730)', () => {
   it('is reapable when review passed and test is still pending', () => {
-    expect(isAwaitingTestReapable({ reviewStatus: 'passed', testStatus: 'pending' })).toBe(true);
+    expect(isAwaitingTestReapable({ reviewSettled: true, testSettled: false })).toBe(true);
   });
 
   it('is NOT reapable in any other review/test combination', () => {
     expect(isAwaitingTestReapable({})).toBe(false);
-    expect(isAwaitingTestReapable({ reviewStatus: 'passed' })).toBe(false);
-    expect(isAwaitingTestReapable({ testStatus: 'pending' })).toBe(false);
-    // test already moving/done — not idle awaiting a verdict
-    expect(isAwaitingTestReapable({ reviewStatus: 'passed', testStatus: 'testing' })).toBe(false);
-    expect(isAwaitingTestReapable({ reviewStatus: 'passed', testStatus: 'passed' })).toBe(false);
-    expect(isAwaitingTestReapable({ reviewStatus: 'passed', testStatus: 'failed' })).toBe(false);
-    // review not yet passed — work agent may still be active
-    expect(isAwaitingTestReapable({ reviewStatus: 'blocked', testStatus: 'pending' })).toBe(false);
+    expect(isAwaitingTestReapable({ testSettled: false })).toBe(false);
+    // the test wrote its verdict — not idle awaiting one
+    expect(isAwaitingTestReapable({ reviewSettled: true, testSettled: true })).toBe(false);
+    // no decisive review yet — the work agent may still be active
+    expect(isAwaitingTestReapable({ reviewSettled: false, testSettled: false })).toBe(false);
   });
 });
 
 describe('selectAwaitingTestWorkSessions (PAN-1730)', () => {
   const statuses: Record<string, ReapableStatus> = {
-    'PAN-1629': { reviewStatus: 'passed', testStatus: 'pending' }, // awaiting test
-    'PAN-1641': { reviewStatus: 'passed', testStatus: 'testing' }, // test in flight
-    'PAN-1700': { reviewStatus: 'blocked', testStatus: 'pending' }, // not handed off
+    'PAN-1629': { reviewSettled: true, testSettled: false }, // awaiting test
+    'PAN-1641': { reviewSettled: true, testSettled: true }, // test verdict already written
+    'PAN-1700': { reviewSettled: false, testSettled: false }, // not handed off
   };
 
   it('selects the canonical work session of an awaiting-test issue when alive', () => {
@@ -86,12 +83,17 @@ describe('selectAwaitingTestWorkSessions (PAN-1730)', () => {
     expect(selectAwaitingTestWorkSessions(statuses, ['agent-pan-1641'])).toEqual([]);
   });
 
+  it('PAN-3917: reads the derived phase, never a status field', () => {
+    expect(selectAwaitingTestWorkSessions({ 'PAN-1': { reviewSettled: true } }, ['agent-pan-1']))
+      .toEqual(['agent-pan-1']);
+  });
+
   it('never selects advancing sub-sessions — only the bare agent-<id> work session', () => {
     const alive = ['agent-pan-1629-test', 'agent-pan-1629-review'];
     expect(selectAwaitingTestWorkSessions(statuses, alive)).toEqual([]);
   });
 
-  it('does not select issues whose review has not passed or whose test has moved on', () => {
+  it('does not select issues with no decisive review or an already-written test verdict', () => {
     const alive = ['agent-pan-1641', 'agent-pan-1700'];
     expect(selectAwaitingTestWorkSessions(statuses, alive)).toEqual([]);
   });

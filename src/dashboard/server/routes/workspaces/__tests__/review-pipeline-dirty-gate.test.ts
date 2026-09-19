@@ -1,4 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// W1 deleted src/lib/state-read-home.ts and src/lib/state-home.ts; W3 deletes
+// the record plane and the mirror syncs that import them. They are still on
+// this module's import chain in this tree, so stub the importers rather than
+// loading them. Every entry here disappears once W3 lands.
+vi.mock('../../../../../lib/remote-workspace.js', () => ({}));
+vi.mock('../../../../../lib/remote/remote-agents.js', () => ({}));
+vi.mock('../../../../../lib/overdeck/planning-promotion.js', () => ({}));
+vi.mock('../../../../../lib/overdeck/conversation-retrospective.js', () => ({}));
+vi.mock('../../../../../lib/cloister/flywheel.js', () => ({}));
+vi.mock('../../../../../lib/agents/spawn.js', () => ({ spawnRun: vi.fn(), spawnAgent: vi.fn(), spawnRunPromise: vi.fn() }));
+vi.mock('../../../../../lib/agents.js', () => ({ transitionIssueToInReview: vi.fn(), spawnRun: vi.fn() }));
+
+
 
 import { getDirtyWorkspaceErrorForReviewRequestStatus } from '../review-pipeline.js';
 
@@ -7,52 +21,28 @@ describe('getDirtyWorkspaceErrorForReviewRequestStatus', () => {
 
   it('returns null when status is clean', () => {
     expect(getDirtyWorkspaceErrorForReviewRequestStatus('', workspacePath)).toBeNull();
+    expect(getDirtyWorkspaceErrorForReviewRequestStatus('   \n', workspacePath)).toBeNull();
   });
 
-  it('returns null when status contains only state-plane paths', () => {
+  // PAN-3917: there is no state plane in the workspace any more. `.pan/` is
+  // tracked repo content the agent commits itself, so uncommitted `.pan/`
+  // files are the agent's own work and the reviewer would not see them.
+  it('treats uncommitted .pan/ plan artifacts as dirt', () => {
     const status = [
-      'MM .pan/records/pan-2167.json',
-      ' M .pan/test/result.json',
-      '?? .pan/feedback/review.json',
-    ].join('\n');
-
-    expect(getDirtyWorkspaceErrorForReviewRequestStatus(status, workspacePath)).toBeNull();
-  });
-
-  it('returns null for Overdeck runtime paths outside the state-plane allowlist (PAN-3245)', () => {
-    const status = [
+      ' M .pan/continues/pan-2167.xbrief.json',
       '?? .pan/drafts/min-911.md',
-      '?? .overdeck/continue.json',
-    ].join('\n');
-
-    expect(getDirtyWorkspaceErrorForReviewRequestStatus(status, workspacePath)).toBeNull();
-  });
-
-  it('returns the dirty workspace error when status contains a source file', () => {
-    const status = [
-      'MM .pan/records/pan-2167.json',
-      ' M src/foo.ts',
     ].join('\n');
 
     const error = getDirtyWorkspaceErrorForReviewRequestStatus(status, workspacePath);
+    expect(error).toContain('uncommitted changes');
+    expect(error).toContain(workspacePath);
+  });
 
-    expect(error).toContain('Workspace has uncommitted changes');
-    expect(error).toContain(`cd ${workspacePath}`);
+  it('returns the dirty workspace error when status contains a source file', () => {
+    const status = ' M src/foo.ts';
+
+    const error = getDirtyWorkspaceErrorForReviewRequestStatus(status, workspacePath);
+    expect(error).toContain('uncommitted changes');
     expect(error).toContain('git status');
-  });
-
-  it('returns the dirty workspace error for a source-to-state rename', () => {
-    const error = getDirtyWorkspaceErrorForReviewRequestStatus(
-      'R  src/foo.ts -> .pan/records/foo.ts\n',
-      workspacePath,
-    );
-
-    expect(error).toContain('Workspace has uncommitted changes');
-  });
-
-  it('returns the dirty workspace error for a source deletion', () => {
-    const error = getDirtyWorkspaceErrorForReviewRequestStatus(' D src/foo.ts\n', workspacePath);
-
-    expect(error).toContain('Workspace has uncommitted changes');
   });
 });

@@ -12,14 +12,12 @@ import { Effect } from 'effect';
 import { capturePane, killSession, listSessionNames, sendKeys, sessionExists } from '../tmux.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { loadConfigSync } from '../config-yaml.js';
-import { shouldRestartForPostMerge } from './merge-agent-step0.js'; import { capturePipelineStageForIssue } from '../telemetry/pipeline.js';
+import { capturePipelineStageForIssue } from '../telemetry/pipeline.js';
 import { enqueueMergedDockerCleanup } from './merged-docker-cleanup-worker.js';
-import { withPostMergeLifecycleLock } from './post-merge-lifecycle-lock.js';
 import {
   completedPostMerge as _completedPostMerge,
   postMergeInFlight as _postMergeInFlight,
-  resetPostMergeState,
-} from './post-merge-state.js';
+} from './post-merge-guard.js';
 import {
   ensureSyncGitQuiescent,
   probeGitOperationHeads,
@@ -38,7 +36,7 @@ const SYNC_GIT_COMMIT_TIMEOUT_MS = 60_000;
 const SYNC_GIT_STATUS_TIMEOUT_MS = 30_000;
 
 /**
- * Paths that must never enter a pipeline auto-commit, regardless of gitignore
+ * Paths that must never enter a pipeline pre-sync commit, regardless of gitignore
  * state. These are workspace-local or machine-local state files and sync-target
  * directories; committing them pollutes feature branches and main.
  */
@@ -114,14 +112,14 @@ export async function autoCommitWorkspaceChangesBeforeSync(
     const operationHeads = await probeGitOperationHeads(projectPath, SYNC_GIT_STATUS_TIMEOUT_MS, signal);
     if (!operationHeads.success) return { success: false, committed: false, reason: operationHeads.reason };
     if (operationHeads.present.length > 0) {
-      return { success: false, committed: false, reason: `Refusing to auto-commit while ${operationHeads.present[0]} exists; finish or abort the in-progress Git operation first` };
+      return { success: false, committed: false, reason: `Refusing to pre-sync commit while ${operationHeads.present[0]} exists; finish or abort the in-progress Git operation first` };
     }
 
     try {
       const { stdout: conflictMarkers } = await run("git grep -n -I -E '^(<<<<<<<( |$)|=======$|>>>>>>>( |$))' -- .");
       if (conflictMarkers.trim()) {
         const files = [...new Set(conflictMarkers.trim().split('\n').map((line) => line.split(':', 1)[0]))];
-        return { success: false, committed: false, reason: `Refusing to auto-commit conflict markers in: ${files.join(', ')}` };
+        return { success: false, committed: false, reason: `Refusing to pre-sync commit conflict markers in: ${files.join(', ')}` };
       }
     } catch (error: any) {
       if (error?.code !== 1) return { success: false, committed: false, reason: `Failed to scan for conflict markers: ${error.message}` };
@@ -137,7 +135,7 @@ export async function autoCommitWorkspaceChangesBeforeSync(
     const { stdout: diffStat } = await run('git diff --cached --stat');
     if (!diffStat.trim()) return { success: true, committed: false, reason: 'only excluded/ignored changes remain' };
 
-    const commitMessage = issueId ? `chore: auto-commit before sync with main (${issueId})` : 'chore: auto-commit before sync with main';
+    const commitMessage = issueId ? `chore: pre-sync commit before sync with main (${issueId})` : 'chore: pre-sync commit before sync with main';
     await run(`git commit -m "${commitMessage}"`, SYNC_GIT_COMMIT_TIMEOUT_MS);
     return { success: true, committed: true };
   } catch (error: any) {
@@ -146,7 +144,7 @@ export async function autoCommitWorkspaceChangesBeforeSync(
     }
     const reason = error instanceof SyncGitCommandTimeoutError && error.command.startsWith('git commit ')
       ? `Auto-commit git commit timed out after ${SYNC_GIT_COMMIT_TIMEOUT_MS / 1_000}s`
-      : `Failed to auto-commit: ${error.message}`;
+      : `Failed to pre-sync commit: ${error.message}`;
     return { success: false, committed: false, reason };
   }
 }
@@ -162,11 +160,9 @@ import { runQualityGates } from './validation.js';
 import { loadProjectsConfigSync } from '../projects.js';
 import { cleanupStaleLocks } from '../git-utils.js';
 import { gitPush, MainDivergedError } from '../git/operations.js';
-import { markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
 import { appendGitOperationSync, type GitOperationType } from '../git-activity.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 import { verifyMergedBeforeLifecycle, type PostMergeLifecycleOptions } from './merge-verification.js';
-import { getPipelineStatus } from '../overdeck/pipeline-view.js';
 
 const SPECIALISTS_DIR = join(OVERDECK_HOME, 'specialists');
 const MERGE_HISTORY_DIR = join(SPECIALISTS_DIR, 'merge-agent');
@@ -302,9 +298,9 @@ export async function postMergeLifecycle(
   options?: PostMergeLifecycleOptions,
 ): Promise<void> {
   // PAN-1517: postMergeLifecycle fires only when the issue's main feature branch merges to `main`.
-  // Guard 1: skip if already completed (defense-in-depth against infinite loops)
-  if (_completedPostMerge.has(issueId) || getPipelineStatus(issueId)?.mergeStep === 'merged') {
-    _completedPostMerge.add(issueId);
+  // Guard 1: skip if already completed in this process (PAN-3917: there is no
+  // stored mergeStep to consult and no cross-process lifecycle worker left).
+  if (_completedPostMerge.has(issueId)) {
     console.log(`[merge-agent] postMergeLifecycle already completed for ${issueId}, skipping`);
     return;
   }
@@ -315,16 +311,12 @@ export async function postMergeLifecycle(
     return inFlight;
   }
 
-  const run = withPostMergeLifecycleLock(issueId, async () => {
-    if (_completedPostMerge.has(issueId) || getPipelineStatus(issueId)?.mergeStep === 'merged') {
-      _completedPostMerge.add(issueId); console.log(`[merge-agent] postMergeLifecycle completed while waiting for ${issueId}, skipping`);
-      return;
-    }
+  const run = (async () => {
     // Guard 2: closed-out is TERMINAL. Close-out flips the spec to completed/cancelled,
     // clears review status, and closes the tracker issue.
     // Re-running the handoff after that resurrects the review row and REOPENS
     // the closed issue — observed live on PAN-1190 (2026-06-11): the deacon's
-    // stale-mergeStatus sweep saw the cleared row as "stale" 47 minutes after
+    // stale-merge sweep saw the cleared row as "stale" 47 minutes after
     // close-out and the handoff reopened it into verifying-on-main forever.
     try {
       const { findSpecByIssue } = await import('../pan-dir/specs.js');
@@ -345,17 +337,8 @@ export async function postMergeLifecycle(
     }
     console.log(`[merge-agent] Verified merge before lifecycle for ${issueId}: ${mergeVerification.reason}`);
 
-    // Set mergeStatus='merged' after verifying the branch or PR actually landed.
-    try {
-      setReviewStatusSync(issueId, {
-        mergeStatus: 'merged', mergeStep: 'post-merge-cleanup',
-        readyForMerge: false,
-        ...(options?.markReviewPassed ? { reviewStatus: 'passed' as const } : {}),
-      });
-      console.log(`[merge-agent] ✓ mergeStatus set to 'merged' for ${issueId}`);
-    } catch (err: any) {
-      console.warn(`[merge-agent] Could not set mergeStatus: ${err.message}`);
-    }
+    // PAN-3917: nothing is stamped here. The forge already says the PR merged —
+    // that IS the merge state, and every reader derives it.
     // Eager Docker cleanup must run before any fatal post-merge handoff step.
     let dockerRetryReason: string | null = null;
     try {
@@ -375,49 +358,8 @@ export async function postMergeLifecycle(
       console.warn(`[merge-agent] Docker cleanup queued for retry (non-fatal): ${dockerRetryReason}`);
     }
 
-    // Step 0: restart only when the running build is stale and the deploy window is safe.
-    if (!options?.skipDeploy) {
-      const pendingFile = join(OVERDECK_HOME, 'pending-post-merge.json');
-      let repoRoot = __dirname.includes('/src/')
-        ? __dirname.replace(/\/src\/.*$/, '')
-        : __dirname.replace(/\/dist\/.*$/, '').replace(/\/lib\/.*$/, '');
-      // If running from a workspace (workspaces/feature-*/), resolve to the main repo root.
-      // Without this, the deploy script builds and npm-links from the workspace, hijacking
-      // the global `pan` CLI to point at stale workspace code.
-      const wsMatch = repoRoot.match(/^(.+)\/workspaces\/feature-[^/]+$/);
-      if (wsMatch) {
-        repoRoot = wsMatch[1];
-        console.log(`[merge-agent] Resolved workspace repoRoot to main repo: ${repoRoot}`);
-      }
-      const deployScript = join(repoRoot, 'scripts', 'post-merge-deploy.sh');
-
-      if (await shouldRestartForPostMerge(repoRoot)) try {
-        const pendingData = JSON.stringify({
-          issueId,
-          projectPath,
-          sourceBranch: sourceBranch ?? '',
-          timestamp: Date.now(),
-          reason: 'post-merge',
-          trigger: 'merge-agent',
-        });
-        await writeFile(pendingFile, pendingData, 'utf-8');
-        console.log(`[merge-agent] Wrote pending lifecycle file: ${pendingFile}`);
-
-        // Pass 'post-merge' as the reason to the deploy script so it writes the
-        // restart marker. We spawn detached and return immediately — the deploy script
-        // kills this server. The new server reads the pending file on boot,
-        // emits lifecycle_started, and after processing emits lifecycle_complete/failed.
-        const child = spawn(deployScript, [repoRoot, issueId, projectPath, sourceBranch ?? '', 'post-merge'], {
-          detached: true,
-          stdio: 'ignore',
-        });
-        child.unref();
-        console.log(`[merge-agent] Spawned detached deploy script (pid ${child.pid}) — server will restart with new build`);
-        return;
-      } catch (err: any) {
-        console.warn(`[merge-agent] Failed to spawn deploy script: ${err.message}. Falling through to in-process lifecycle (may fail on stale chunks).`);
-      }
-    }
+    // PAN-3917 (D1): the post-merge deploy loop is gone. `pan reload` is the one
+    // deploy path, run by the flywheel loop after an overdeck merge lands green.
 
     console.log(`[merge-agent] Running post-merge verify handoff for ${issueId}`);
 
@@ -449,22 +391,14 @@ export async function postMergeLifecycle(
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.warn(`[merge-agent] Could not transition issue to verifying_on_main: ${message}`);
-      try {
-        setReviewStatusSync(issueId, {
-          mergeStatus: 'merged', mergeStep: 'post-merge-cleanup',
-          readyForMerge: false,
-          mergeNotes: `Post-merge verifying_on_main transition failed: ${message}`,
-        });
-      } catch (statusErr: any) {
-        console.warn(`[merge-agent] Could not persist verifying_on_main transition failure: ${statusErr?.message ?? statusErr}`);
-      }
       announceMerge('failed', issueId, `Post-merge verifying_on_main transition failed: ${message}`);
       logActivity('merge_failed', `Post-merge verifying_on_main transition failed for ${issueId}: ${message}`);
       throw err;
     }
 
     // Release verification runs asynchronously so post-merge cleanup is not
-    // delayed by a slow external deploy. Status is still reported via review-status.
+    // delayed by a slow external deploy. It reports itself through the release
+    // engine's own output (git tags and GitHub releases, PAN-3917 D6).
     triggerPostMergeReleaseIfConfigured(issueId, projectPath).catch((err) => {
       console.warn(`[merge-agent] Async post-merge release trigger failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
     });
@@ -554,21 +488,29 @@ export async function postMergeLifecycle(
     await notifyTldrDaemon(projectPath, sourceBranch ?? '');
     await maybeSpawnPostMergeKnowledgeRetro(issueId, projectPath);
 
-    setReviewStatusSync(issueId, { mergeStatus: 'merged', mergeStep: 'merged', readyForMerge: false });
     _completedPostMerge.add(issueId); void capturePipelineStageForIssue(issueId, 'merged');
 
     console.log(`[merge-agent] Post-merge handoff completed for ${issueId}. Awaiting close-out (verify on main).`);
     announceMerge('completed', issueId);
     logActivity('merge_complete', `Merged ${issueId}. Awaiting close-out (verify on main).`);
-  }).finally(() => { _postMergeInFlight.delete(issueId); });
+  })().finally(() => { _postMergeInFlight.delete(issueId); });
   _postMergeInFlight.set(issueId, run);
   return run;
 }
 
+/**
+ * Run the project's release after a merge, when one is configured.
+ *
+ * PAN-3917 (D6): ships are git tags plus GitHub releases. There is no
+ * release state to read before starting or to stamp afterwards — a repeat
+ * trigger is suppressed by process memory, and the release engine's own output
+ * on the forge is the record.
+ */
+const _releaseTriggered = new Set<string>();
+
 export async function triggerPostMergeReleaseIfConfigured(issueId: string, projectPath: string): Promise<void> {
-  const currentStatus = getPipelineStatus(issueId)?.releaseStatus;
-  if (currentStatus && currentStatus !== 'pending') {
-    console.log(`[merge-agent] Release already started or completed for ${issueId} (${currentStatus}), skipping`);
+  if (_releaseTriggered.has(issueId)) {
+    console.log(`[merge-agent] Release already triggered for ${issueId} in this process, skipping`);
     return;
   }
 
@@ -577,30 +519,19 @@ export async function triggerPostMergeReleaseIfConfigured(issueId: string, proje
   const project = resolved ? getProjectSync(resolved.projectKey) : null;
 
   if (!project?.release) {
-    setReviewStatusSync(issueId, {
-      releaseStatus: 'skipped',
-      releaseNotes: 'No release config found for project.',
-    });
-    console.log(`[merge-agent] No release config for ${issueId}; marked release skipped`);
+    console.log(`[merge-agent] No release config for ${issueId}; skipping release`);
     return;
   }
 
+  _releaseTriggered.add(issueId);
   const { runRelease } = await import('../release/release-engine.js');
   try {
     await runRelease(issueId, projectPath);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    // Release failures never fail the merge: the merge already landed.
     console.warn(`[merge-agent] Post-merge release trigger failed for ${issueId}: ${message}`);
-    try {
-      setReviewStatusSync(issueId, {
-        releaseStatus: 'failed',
-        releaseNotes: `Post-merge release trigger failed: ${message}`,
-      });
-    } catch (statusErr: any) {
-      console.warn(`[merge-agent] Could not persist release trigger failure: ${statusErr?.message ?? statusErr}`);
-    }
-    // Release failures are surfaced through release status; the merge itself
-    // has already completed and must not be marked failed (review feedback).
+    logActivity('release_failed', `Post-merge release trigger failed for ${issueId}: ${message}`);
   }
 }
 
@@ -714,7 +645,7 @@ async function maybeSpawnPostMergeKnowledgeRetro(issueId: string, projectPath: s
   }
 }
 
-export { resetPostMergeState } from './post-merge-state.js';
+export { resetPostMergeState } from './post-merge-guard.js';
 
 /**
  * Parse result markers from agent output
@@ -997,7 +928,7 @@ function announceMerge(
     priority: status === 'failed' ? 0 : 1,
     issueId,
     source: 'merge-agent',
-    eventType: `mergeStatus.${status === 'completed' ? 'merged' : status === 'started' ? 'merging' : 'failed'}`,
+    eventType: `mergeOutcome.${status === 'completed' ? 'merged' : status === 'started' ? 'merging' : 'failed'}`,
   });
 }
 
@@ -1149,12 +1080,9 @@ export async function salvageStrandedMerge(
       await Effect.runPromise(gitPush(projectPath, 'origin', targetBranch, { issueId }));
     } catch (pushErr: unknown) {
       if (pushErr instanceof MainDivergedError) {
-        // origin has advanced past our local ancestor — a hotfix landed.
-        // Mark stuck so Deacon won't re-trigger, then let the caller handle it.
-        markWorkspaceStuck(issueId, 'main_diverged', {
-          localSha: pushErr.localSha,
-          remoteSha: pushErr.remoteSha,
-        });
+        // origin has advanced past our local ancestor — a hotfix landed. Report
+        // the divergence and let the caller handle it (PAN-3917: no stuck flag
+        // is stored; the diverged branch is visible in git).
         logActivity('merge_salvage_diverged', `Salvage aborted: origin/${targetBranch} diverged (remote ${pushErr.remoteSha.slice(0, 7)} not ancestor of local ${pushErr.localSha.slice(0, 7)})`);
         return { success: false, reason: pushErr.message };
       }
@@ -1234,7 +1162,7 @@ async function syncMainIntoRepo(
     logActivity('sync_main_auto_commit', `Auto-committing uncommitted changes before sync`);
     const autoCommit = await autoCommitWorkspaceChangesBeforeSync(repoDir, issueId, signal);
     if (!autoCommit.success) {
-      const message = autoCommit.reason || 'Failed to auto-commit uncommitted changes';
+      const message = autoCommit.reason || 'Failed to pre-sync commit uncommitted changes';
       console.error(`[sync-main] ${message}`);
       logActivity('sync_main_blocked', message);
       return { success: false, reason: message };
@@ -1246,7 +1174,7 @@ async function syncMainIntoRepo(
       const remainingNonExcluded = postCommitStatus.trim().split('\n')
         .filter((line) => !isAutoCommitExcludedPath(parseStatusPath(line)));
       if (remainingNonExcluded.length > 0) {
-        const message = 'Uncommitted changes remain after auto-commit — aborting sync';
+        const message = 'Uncommitted changes remain after the pre-sync commit — aborting sync';
         console.error(`[sync-main] ${message}`);
         logActivity('sync_main_blocked', message);
         return { success: false, reason: message };

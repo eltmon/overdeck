@@ -11,7 +11,7 @@
 import { Duration, Effect, Exit, Layer, ManagedRuntime, Schedule, Scope, Stream } from 'effect'
 import { RpcClient, RpcSerialization } from 'effect/unstable/rpc'
 import * as Socket from 'effect/unstable/socket/Socket'
-import { PanRpcGroup, WS_METHODS, type FlywheelStatus } from '@overdeck/contracts'
+import { PanRpcGroup } from '@overdeck/contracts'
 
 // ─── Protocol setup ───────────────────────────────────────────────────────────
 
@@ -292,18 +292,6 @@ export function getTransport(): WsTransport {
     _transport = new WsTransport()
   }
   return _transport
-}
-
-export function subscribeFlywheelStatus(
-  listener: (status: FlywheelStatus | null) => void,
-  options?: SubscribeOptions,
-): () => void {
-  return getTransport().subscribe(
-    (client) =>
-      (client as PanRpcProtocolClient)[WS_METHODS.subscribeFlywheelStatus]({}) as unknown as Stream.Stream<FlywheelStatus | null, Error>,
-    listener,
-    options,
-  )
 }
 
 export function resetTransport(failed?: WsTransport): void {

@@ -87,7 +87,8 @@ the public contract and lists every allowed value.
 
 Raw counts and timings are never sent. Pipeline attribution is emitted only
 after the canonical pipeline-membership resolver confirms that the issue is in
-the pipeline, so stale agent rows cannot supply harness or model metadata.
+the pipeline, so a stale or orphaned agent's on-disk state cannot supply
+harness or model metadata for an issue that already left the pipeline.
 
 ## Local DB job diagnostics
 

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   emitActivityEntrySync: vi.fn(),
-  resolveCanonicalReviewStatus: vi.fn(),
+  getPrFacts: vi.fn(),
   teardownWorkspaceDockerByNamePromise: vi.fn(),
 }));
 
@@ -10,8 +10,8 @@ vi.mock('../../activity-logger.js', () => ({
   emitActivityEntrySync: mocks.emitActivityEntrySync,
 }));
 
-vi.mock('../review-status-source.js', () => ({
-  resolveCanonicalReviewStatus: mocks.resolveCanonicalReviewStatus,
+vi.mock('../pr-facts.js', () => ({
+  getPrFacts: mocks.getPrFacts,
 }));
 
 vi.mock('../../workspace-manager/docker.js', () => ({
@@ -32,10 +32,7 @@ describe('merged Docker cleanup worker', () => {
     vi.setSystemTime(new Date('2026-07-26T12:00:00.000Z'));
     await resetMergedDockerCleanupWorkerForTests();
     vi.clearAllMocks();
-    mocks.resolveCanonicalReviewStatus.mockReturnValue({
-      available: true,
-      status: { mergeStatus: 'merged' },
-    });
+    mocks.getPrFacts.mockResolvedValue({ merged: true });
   });
 
   afterEach(async () => {
@@ -92,8 +89,8 @@ describe('merged Docker cleanup worker', () => {
     expect(getMergedDockerCleanupStateForTests('PAN-5559')).toBeNull();
   });
 
-  it('fails closed when canonical merge status is unavailable', async () => {
-    mocks.resolveCanonicalReviewStatus.mockReturnValue({ available: false, status: null });
+  it('fails closed when the forge cannot answer whether the PR merged', async () => {
+    mocks.getPrFacts.mockResolvedValue({ merged: false, error: 'gh pr view failed' });
 
     enqueueMergedDockerCleanup('PAN-5559');
     await waitForMergedDockerCleanupIdleForTests();
@@ -105,11 +102,8 @@ describe('merged Docker cleanup worker', () => {
     });
   });
 
-  it('uses fresh merge verification when canonical persistence has not caught up', async () => {
-    mocks.resolveCanonicalReviewStatus.mockReturnValue({
-      available: true,
-      status: { mergeStatus: 'failed' },
-    });
+  it('uses the merge-agent\'s fresh verification when the forge has not caught up', async () => {
+    mocks.getPrFacts.mockResolvedValue({ merged: false });
     mocks.teardownWorkspaceDockerByNamePromise.mockResolvedValue({
       networkRemoved: true,
       steps: ['Removed network'],
@@ -144,9 +138,8 @@ describe('merged Docker cleanup worker', () => {
     enqueueMergedDockerCleanup('PAN-5559');
     await waitForMergedDockerCleanupIdleForTests();
     await vi.advanceTimersByTimeAsync(60_000);
-    mocks.resolveCanonicalReviewStatus.mockImplementation((issueId: string) => ({
-      available: true,
-      status: { mergeStatus: issueId === 'PAN-5559' ? 'failed' : 'merged' },
+    mocks.getPrFacts.mockImplementation(async (issueId: string) => ({
+      merged: issueId !== 'PAN-5559',
     }));
 
     enqueueMergedDockerCleanup('PAN-5560');

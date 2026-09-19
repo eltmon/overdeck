@@ -7,7 +7,7 @@ import {
   MergeResolverLive,
   MergeWriter,
   MergeWriterLive,
-  readyForMerge,
+  mergeReady,
   type MergeSetRepo,
   type MergeSet,
   type AutoMergeFilter,
@@ -42,11 +42,11 @@ function makeRepo(overrides: Partial<MergeSetRepo> = {}): MergeSetRepo {
     targetBranch:       'main',
     artifactUrl:        null,
     artifactId:         null,
-    reviewStatus:       'passed',
-    testStatus:         'passed',
+    repoReview:       'passed',
+    repoTests:         'passed',
     rebaseStatus:       'pending',
     verificationStatus: 'pending',
-    mergeStatus:        'pending',
+    repoMerge:        'pending',
     mergeOrder:         1,
     required:           true,
     ...overrides,
@@ -88,11 +88,11 @@ type MergeSetRepoRow = {
   targetBranch: string;
   artifactUrl: string | null;
   artifactId: string | null;
-  reviewStatus: string;
-  testStatus: string;
+  repoReview: string;
+  repoTests: string;
   rebaseStatus: string;
   verificationStatus: string;
-  mergeStatus: string;
+  repoMerge: string;
   mergeOrder: number;
   required: boolean;
 };
@@ -161,11 +161,11 @@ function makeWiredFakeDb(initialMergeSet?: MergeSet) {
         targetBranch:       repo.targetBranch,
         artifactUrl:        repo.artifactUrl,
         artifactId:         repo.artifactId,
-        reviewStatus:       repo.reviewStatus,
-        testStatus:         repo.testStatus,
+        repoReview:       repo.repoReview,
+        repoTests:         repo.repoTests,
         rebaseStatus:       repo.rebaseStatus,
         verificationStatus: repo.verificationStatus,
-        mergeStatus:        repo.mergeStatus,
+        repoMerge:        repo.repoMerge,
         mergeOrder:         repo.mergeOrder ?? i + 1,
         required:           repo.required,
       });
@@ -298,37 +298,37 @@ function makeWiredFakeDb(initialMergeSet?: MergeSet) {
   };
 }
 
-// ── AC1: readyForMerge predicate — test=skipped counts as passing ─────────────
+// ── AC1: mergeReady predicate — test=skipped counts as passing ─────────────
 
-describe('readyForMerge predicate (AC1)', () => {
+describe('mergeReady predicate (AC1)', () => {
   it('returns true when review=passed and test=passed', () => {
-    const repo = makeRepo({ reviewStatus: 'passed', testStatus: 'passed' });
-    expect(readyForMerge(repo)).toBe(true);
+    const repo = makeRepo({ repoReview: 'passed', repoTests: 'passed' });
+    expect(mergeReady(repo)).toBe(true);
   });
 
   it('returns true when review=passed and test=skipped (skipped counts)', () => {
-    const repo = makeRepo({ reviewStatus: 'passed', testStatus: 'skipped' });
-    expect(readyForMerge(repo)).toBe(true);
+    const repo = makeRepo({ repoReview: 'passed', repoTests: 'skipped' });
+    expect(mergeReady(repo)).toBe(true);
   });
 
   it('returns false when review=passed but test=pending', () => {
-    const repo = makeRepo({ reviewStatus: 'passed', testStatus: 'pending' });
-    expect(readyForMerge(repo)).toBe(false);
+    const repo = makeRepo({ repoReview: 'passed', repoTests: 'pending' });
+    expect(mergeReady(repo)).toBe(false);
   });
 
   it('returns false when review=pending (not yet reviewed)', () => {
-    const repo = makeRepo({ reviewStatus: 'pending', testStatus: 'passed' });
-    expect(readyForMerge(repo)).toBe(false);
+    const repo = makeRepo({ repoReview: 'pending', repoTests: 'passed' });
+    expect(mergeReady(repo)).toBe(false);
   });
 
   it('returns false when review=failed', () => {
-    const repo = makeRepo({ reviewStatus: 'failed', testStatus: 'passed' });
-    expect(readyForMerge(repo)).toBe(false);
+    const repo = makeRepo({ repoReview: 'failed', repoTests: 'passed' });
+    expect(mergeReady(repo)).toBe(false);
   });
 
   it('returns false when test=failed even if review=passed', () => {
-    const repo = makeRepo({ reviewStatus: 'passed', testStatus: 'failed' });
-    expect(readyForMerge(repo)).toBe(false);
+    const repo = makeRepo({ repoReview: 'passed', repoTests: 'failed' });
+    expect(mergeReady(repo)).toBe(false);
   });
 });
 
@@ -337,7 +337,7 @@ describe('readyForMerge predicate (AC1)', () => {
 describe('MergeWriter.merge — readiness gate (AC1)', () => {
   it('emits merge.completed when all required repos are ready', async () => {
     const set = makeMergeSet({
-      repos: [makeRepo({ reviewStatus: 'passed', testStatus: 'passed', required: true })],
+      repos: [makeRepo({ repoReview: 'passed', repoTests: 'passed', required: true })],
     });
     const { dbLayer, busLayer, forgeLayer, emittedEvents, mergeSetsStore } =
       makeWiredFakeDb(set);
@@ -357,7 +357,7 @@ describe('MergeWriter.merge — readiness gate (AC1)', () => {
 
   it('allows merge when test=skipped (AC1 skipped rule)', async () => {
     const set = makeMergeSet({
-      repos: [makeRepo({ reviewStatus: 'passed', testStatus: 'skipped', required: true })],
+      repos: [makeRepo({ repoReview: 'passed', repoTests: 'skipped', required: true })],
     });
     const { dbLayer, busLayer, forgeLayer, emittedEvents } = makeWiredFakeDb(set);
 
@@ -376,7 +376,7 @@ describe('MergeWriter.merge — readiness gate (AC1)', () => {
 
   it('fails with NotReadyForMerge when test=failed', async () => {
     const set = makeMergeSet({
-      repos: [makeRepo({ reviewStatus: 'passed', testStatus: 'failed', required: true })],
+      repos: [makeRepo({ repoReview: 'passed', repoTests: 'failed', required: true })],
     });
     const { dbLayer, busLayer, forgeLayer } = makeWiredFakeDb(set);
 

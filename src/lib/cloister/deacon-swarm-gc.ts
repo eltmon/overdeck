@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { Effect } from 'effect';
-import type { ReconciledSlotItem } from '../agents/slot-reconcile.js';
+import type { ReconciledSlotItem } from './swarm-slot-reconcile.js';
 import { getAgentStateSync } from '../agents/agent-state.js';
 import { stopAgent } from '../agents/termination.js';
 import {

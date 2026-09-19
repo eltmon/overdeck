@@ -74,23 +74,21 @@ function writeWorkspaceDraft(doc: XBriefDocument, runtimeDir = '.overdeck'): str
   return planPath;
 }
 
-function writeRecord(statusOverrides: Record<string, string>): void {
-  const recordsDir = join(WORKSPACE_PATH, '.pan', 'records');
-  mkdirSync(recordsDir, { recursive: true });
-  writeFileSync(join(recordsDir, `${ISSUE_ID.toLowerCase()}.json`), JSON.stringify({
+/** Seed item statuses in the plan home's continue file (PAN-3917 W9: the workspace). */
+function writeContinueItems(statuses: Record<string, string>): void {
+  const continuesDir = join(WORKSPACE_PATH, '.pan', 'continues');
+  mkdirSync(continuesDir, { recursive: true });
+  writeFileSync(join(continuesDir, `${ISSUE_ID.toUpperCase()}.xbrief.json`), JSON.stringify({
+    version: '1',
     issueId: ISSUE_ID,
-    schemaVersion: 2,
     created: '2026-01-01T00:00:00Z',
     updated: '2026-01-01T00:00:00Z',
-    pipeline: {
-      issueId: ISSUE_ID,
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      readyForMerge: false,
-      updatedAt: '2026-01-01T00:00:00Z',
-    },
-    closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
-    statusOverrides,
+    gitState: {},
+    decisions: [],
+    hazards: [],
+    resumePoint: null,
+    sessionHistory: [],
+    items: Object.fromEntries(Object.entries(statuses).map(([key, status]) => [key, { status }])),
   }, null, 2));
 }
 
@@ -123,22 +121,22 @@ describe('findPlan', () => {
     expect(existsSync(result!)).toBe(true);
   });
 
-  it('resolves the parent project spec (PAN-1124: single spec on main, workspace-first lookup removed)', () => {
-    const projectSpec = writePlanDoc(makePlanDoc([{ id: 'parent-item' }]));
-    // Workspace spec is no longer preferred — verify the canonical project spec wins.
-    writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
+  it('resolves the workspace spec over the main checkout spec (PAN-3917 W9: the workspace owns its plan artifacts)', () => {
+    writePlanDoc(makePlanDoc([{ id: 'parent-item' }]));
+    // The workspace's own .pan/specs is the plan home now — it wins over main.
+    const workspaceSpec = writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
 
-    expect(findPlanSync(WORKSPACE_PATH)).toBe(projectSpec);
-    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('parent-item');
+    expect(findPlanSync(WORKSPACE_PATH)).toBe(workspaceSpec);
+    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('workspace-item');
   });
 
-  it('resolves the parent project spec when the workspace is itself a git worktree', () => {
+  it('resolves the workspace spec when the workspace is itself a git worktree', () => {
     createWorktreeShape();
-    const projectSpec = writePlanDoc(makePlanDoc([{ id: 'parent-item' }]));
-    writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
+    writePlanDoc(makePlanDoc([{ id: 'parent-item' }]));
+    const workspaceSpec = writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
 
-    expect(findPlanSync(WORKSPACE_PATH)).toBe(projectSpec);
-    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('parent-item');
+    expect(findPlanSync(WORKSPACE_PATH)).toBe(workspaceSpec);
+    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('workspace-item');
   });
 
   it('falls back to the matching workspace draft before the canonical spec exists', () => {
@@ -179,10 +177,9 @@ describe('findPlan', () => {
     expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('canonical-draft-item');
   });
 
-  it('resolves post-promotion specs from the main project specs directory, not the workspace specs directory', () => {
+  it('falls back to the main checkout specs directory when the workspace has no spec of its own (an already-merged spec, PAN-3917 W9)', () => {
     createWorktreeShape();
     const projectSpec = writePlanDoc(makePlanDoc([{ id: 'canonical-item' }]));
-    writeWorkspaceSpec(makePlanDoc([{ id: 'workspace-item' }]));
 
     const result = findPlanSync(WORKSPACE_PATH);
 
@@ -421,14 +418,17 @@ describe('updateItemStatus', () => {
     expect(item2?.status).toBe('in_progress');
   });
 
-  it('writes status to per-issue record statusOverrides (not the spec)', () => {
+  it('writes status to the plan-home continue file, not the spec', () => {
     writePlanDoc(makePlanDoc([{ id: 'item-1' }]));
     updateItemStatus(WORKSPACE_PATH, 'item-1', 'completed');
 
-    // The spec on main should NOT be modified
+    // The canonical spec is immutable after planning.
     const specPath = join(PROJECT_ROOT, '.pan', 'specs', SPEC_FILENAME);
     const raw = JSON.parse(readFileSync(specPath, 'utf-8'));
     expect(raw.plan.items[0].status).toBe('pending');
+
+    const continuePath = join(WORKSPACE_PATH, '.pan', 'continues', `${ISSUE_ID}.xbrief.json`);
+    expect(JSON.parse(readFileSync(continuePath, 'utf-8')).items['item-1'].status).toBe('completed');
   });
 });
 
@@ -443,7 +443,7 @@ describe('tierOverrides', () => {
     mkdirSync(join(WORKSPACE_PATH, '.pan'), { recursive: true });
     writeFileSync(
       legacyPath,
-      JSON.stringify({ statusOverrides: { 'item-2': 'running' } }, null, 2),
+      JSON.stringify({ agentModel: 'claude-legacy' }, null, 2),
     );
     const legacyBefore = readFileSync(legacyPath, 'utf-8');
 
@@ -453,7 +453,7 @@ describe('tierOverrides', () => {
     const canonicalPath = join(WORKSPACE_PATH, '.overdeck', 'continue.json');
     const continueState = JSON.parse(readFileSync(canonicalPath, 'utf-8'));
     expect(readFileSync(legacyPath, 'utf-8')).toBe(legacyBefore);
-    expect(continueState.statusOverrides).toEqual({ 'item-2': 'running' });
+    expect(continueState.agentModel).toBe('claude-legacy');
     expect(continueState.tierOverrides['item-1'].effectiveDifficulty).toBe('complex');
 
     const overrides = readTierOverrides(WORKSPACE_PATH);
@@ -567,7 +567,7 @@ describe('updateSubItemStatus', () => {
   it('applies compact subItem status overrides whose keys equal dotted subItem IDs', () => {
     const doc = makePlanWithSubItems();
     writePlanDoc(doc);
-    writeRecord({ 'item-1.ac1': 'completed' });
+    writeContinueItems({ 'item-1.ac1': 'completed' });
 
     const updated = readWorkspacePlanSync(WORKSPACE_PATH)!;
     const sub = updated.plan.items[0].subItems!.find(s => s.id === 'item-1.ac1');
@@ -577,7 +577,7 @@ describe('updateSubItemStatus', () => {
   it('applies compact status overrides to v0.6 items children', () => {
     const doc = makePlanWithItems();
     writePlanDoc(doc);
-    writeRecord({ 'item-1.ac1': 'completed' });
+    writeContinueItems({ 'item-1.ac1': 'completed' });
 
     const updated = readWorkspacePlanSync(WORKSPACE_PATH)!;
     const sub = subItemsOf(updated.plan.items[0]).find(s => s.id === 'item-1.ac1');
@@ -759,12 +759,11 @@ describe('isPlanningComplete', () => {
   });
 });
 
-// PAN-2401: the plan read door must overlay the per-issue record's
-// statusOverrides — merged tasks read 'completed', never the spec's
-// immutable 'pending'.
-describe('mergeRecordStatusOverrides (PAN-2401)', () => {
-  it('applies record overrides onto a loaded doc', async () => {
-    const { mergeRecordStatusOverrides, applyStatusOverrides } = await import('../io.js');
+// PAN-2401: the plan read door must overlay the continue file's item statuses
+// — completed tasks read 'completed', never the spec's immutable 'pending'.
+describe('mergeContinueItemStatuses (PAN-2401)', () => {
+  it('applies continue-file item statuses onto a loaded doc', async () => {
+    const { mergeContinueItemStatuses, applyItemStatuses } = await import('../io.js');
     const doc = {
       plan: {
         id: 'pan-2401', title: 't', status: 'running',
@@ -775,14 +774,14 @@ describe('mergeRecordStatusOverrides (PAN-2401)', () => {
         edges: [],
       },
     } as never;
-    // applyStatusOverrides is the underlying pure transform — assert the
+    // applyItemStatuses is the underlying pure transform — assert the
     // shape it produces so the route-level wiring has a locked contract.
-    const merged = applyStatusOverrides(doc, { a: 'completed' });
+    const merged = applyItemStatuses(doc, { a: 'completed' });
     expect(merged.plan.items.find((i: { id: string }) => i.id === 'a')!.status).toBe('completed');
     expect(merged.plan.items.find((i: { id: string }) => i.id === 'b')!.status).toBe('pending');
-    // mergeRecordStatusOverrides with a workspace that has no record is a
-    // pass-through (no throw, doc unchanged).
-    const untouched = mergeRecordStatusOverrides(doc, '/nonexistent/workspace-path');
+    // mergeContinueItemStatuses with a workspace that has no continue file is
+    // a pass-through (no throw, doc unchanged).
+    const untouched = mergeContinueItemStatuses(doc, '/nonexistent/workspace-path');
     expect(untouched.plan.items[0]!.status).toBe('pending');
   });
 });

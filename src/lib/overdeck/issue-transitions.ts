@@ -8,8 +8,6 @@ import { Effect, Stream } from 'effect';
 import { HttpServerResponse } from 'effect/unstable/http';
 
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
-import { clearReviewStatus } from '../../dashboard/server/review-status.js';
-import { getReviewStatusSync } from '../../dashboard/server/review-status.js';
 import { getSharedIssueService } from '../../dashboard/server/services/issue-service-singleton.js';
 import { getGitHubConfig, getRallyConfig } from '../../dashboard/server/services/tracker-config.js';
 import { saveAgentStateAndEmitEvent, saveAgentStateAndEmitEventProgram } from '../../dashboard/server/services/agent-projection.js';
@@ -101,10 +99,6 @@ export async function closeIssuePullRequest(issueId: string, reason = 'Canceled 
       ],
       { encoding: 'utf-8', timeout: 15000 },
     );
-    try {
-      const { setReviewStatusSync } = await import('../review-status.js');
-      setReviewStatusSync(issueId.toUpperCase(), { prUrl: undefined });
-    } catch { /* non-fatal — validator catches this downstream */ }
     return [`Closed PR #${prNumber} on ${githubCheck.owner}/${githubCheck.repo}`];
   } catch (err: any) {
     return [`PR close warning: ${err.message}`];
@@ -237,11 +231,6 @@ export async function runDestructiveIssueLifecycle(
   } catch (err) {
     cleanupLog.push(`Reviewer session cleanup failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
   }
-
-  try {
-    clearReviewStatus(id.toUpperCase());
-    cleanupLog.push('Cleared review status');
-  } catch { /* non-fatal */ }
 
   try {
     const { resetPostMergeState } = await import('../cloister/merge-agent.js');
@@ -522,10 +511,16 @@ export function reopenIssueTransition(options: {
     const issueDataService = getIssueDataService();
     const issueSource = issueDataService.getIssueSource(id);
 
-    const reviewStatus = getReviewStatusSync(id.toUpperCase());
-    const cachedIssue = issueDataService.getIssues()
-      .find((issue: any) => String(issue.identifier ?? issue.id ?? '').toUpperCase() === id.toUpperCase());
-    const reopenToVerifying = reviewStatus?.mergeStatus === 'merged' || cachedIssue?.mergeStatus === 'merged';
+    // PAN-3917: "already merged" is the pull request's own state, not a stored copy.
+    const mergedPr = yield* Effect.promise(async () => {
+      try {
+        const { fetchIssuePullRequest } = await import('./pull-requests.js');
+        return Boolean((await fetchIssuePullRequest(id)).pr?.mergedAt);
+      } catch {
+        return false;
+      }
+    });
+    const reopenToVerifying = mergedPr;
     const targetState = reopenToVerifying ? 'verifying_on_main' : 'in_progress';
     const targetCanonicalStatus = targetState;
 
@@ -586,9 +581,6 @@ export function reopenIssueTransition(options: {
           : '';
         if (workspacePath) {
           await Effect.runPromise(reopenWorkspaceState(id.toUpperCase(), workspacePath, { reason: (body as any)?.reason }));
-        } else {
-          // Fallback: no workspace path, just clear review status
-          clearReviewStatus(id.toUpperCase());
         }
       } catch { /* non-fatal */ }
 
@@ -614,20 +606,6 @@ export function reopenIssueTransition(options: {
       type: 'issue.statusChanged',
       timestamp: new Date().toISOString(),
       payload: { issueId: issueIdentifier, status: newState, canonicalStatus: targetCanonicalStatus },
-    });
-    // Emit pipeline reset so frontend read model clears the stale readyForMerge badge
-    yield* eventStore.append({
-      type: 'pipeline.status_changed',
-      timestamp: new Date().toISOString(),
-      payload: {
-        issueId: issueIdentifier,
-        status: {
-          issueId: issueIdentifier,
-          reviewStatus: 'pending',
-          testStatus: 'pending',
-          readyForMerge: false,
-        },
-      },
     });
     try { getIssueDataService().patchIssue(issueIdentifier, { status: newState, canonicalStatus: targetCanonicalStatus }); } catch { /* non-fatal */ }
 

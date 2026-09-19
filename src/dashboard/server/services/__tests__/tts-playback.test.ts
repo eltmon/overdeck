@@ -84,7 +84,7 @@ describe('TtsPlaybackService', () => {
       payload: {
         utterance: 'PAN-829 passed review',
         source: 'review-specialist',
-        eventType: 'reviewStatus.passed',
+        eventType: 'issueState.ready',
         issueId: 'PAN-829',
         priority: 1,
       },
@@ -93,7 +93,7 @@ describe('TtsPlaybackService', () => {
     await vi.waitFor(() => expect(mocks.resolveAndSpeak).toHaveBeenCalledWith({
       text: 'PAN-829 passed review',
       source: 'review-specialist',
-      eventType: 'reviewStatus.passed',
+      eventType: 'issueState.ready',
       issueId: 'PAN-829',
       priority: 1,
     }, { config }));

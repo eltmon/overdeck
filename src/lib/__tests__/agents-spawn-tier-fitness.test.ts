@@ -35,10 +35,6 @@ let ensureLifecycleHooksMock: ReturnType<typeof vi.fn>;
 let deliverAgentMessageMock: ReturnType<typeof vi.fn>;
 let waitForPromptReadyMock: ReturnType<typeof vi.fn>;
 let stopAgentMock: ReturnType<typeof vi.fn>;
-let shouldPreservePipelineVerdictsMock: ReturnType<typeof vi.fn>;
-let resetPipelineVerdictsForWorkStartMock: ReturnType<typeof vi.fn>;
-let setReviewStatusMock: ReturnType<typeof vi.fn>;
-let resetPostMergeStateMock: ReturnType<typeof vi.fn>;
 let capturePaneText: string;
 let planFixture: unknown;
 let tieredFixture: unknown;
@@ -111,13 +107,6 @@ function mockSpawnDependencies(): void {
   deliverAgentMessageMock = vi.fn(async () => ({ ok: true, path: 'acp' }));
   waitForPromptReadyMock = vi.fn(async () => true);
   stopAgentMock = vi.fn(() => Effect.void);
-  shouldPreservePipelineVerdictsMock = vi.fn(async () => ({
-    preserve: false,
-    reason: 'no pipeline verdicts are recorded',
-  }));
-  resetPipelineVerdictsForWorkStartMock = vi.fn(() => null);
-  setReviewStatusMock = vi.fn();
-  resetPostMergeStateMock = vi.fn();
   resolveHarnessMock = vi.fn(async ({ explicit, model }: { explicit?: string; model: string }) => {
     if (explicit) return explicit;
     if (model === 'gpt-5.5') return 'codex';
@@ -219,6 +208,14 @@ function mockSpawnDependencies(): void {
   vi.doMock('../workspace/stack-health.js', () => ({
     getWorkspaceStackHealth: vi.fn(() => Effect.succeed({ healthy: true, reasons: [], lastObserved: null })),
   }));
+  // PAN-3917 FR-5/W8: launchAgentPane auto-selects Herdr when the dev host has
+  // a live `herdr` binary and `overdeck` session socket, which would make this
+  // test drive the real Herdr session instead of the mocked tmux.js path. Force
+  // tmux selection so createSessionMock stays the single source of truth.
+  vi.doMock('../terminal-backends/select.js', async (importOriginal) => ({
+    ...((await importOriginal()) as typeof import('../terminal-backends/select.js')),
+    selectTerminalBackend: vi.fn(async () => ({ backend: 'tmux' as const, diagnostic: 'test: forced tmux backend' })),
+  }));
   vi.doMock('../xbrief/io.js', async (importOriginal) => ({
     ...((await importOriginal()) as typeof import('../xbrief/io.js')),
     readWorkspacePlanSync: vi.fn(() => planFixture),
@@ -226,17 +223,6 @@ function mockSpawnDependencies(): void {
   vi.doMock('../activity-logger.js', () => ({
     emitActivityEntrySync: vi.fn(),
     emitActivityTtsSync: vi.fn(),
-  }));
-  vi.doMock('../cloister/verdict-preservation.js', () => ({
-    shouldPreservePipelineVerdicts: shouldPreservePipelineVerdictsMock,
-  }));
-  vi.doMock('../cloister/work-start-verdicts.js', () => ({
-    refreshWorkStartReviewedAnchor: (issueId: string, anchor: string) =>
-      setReviewStatusMock(issueId, { reviewedAtCommit: anchor }),
-    resetWorkStartPipelineVerdicts: resetPipelineVerdictsForWorkStartMock,
-  }));
-  vi.doMock('../cloister/post-merge-state.js', () => ({
-    resetPostMergeState: resetPostMergeStateMock,
   }));
   vi.doMock('../cloister/work-agent-prompt.js', () => ({
     writeStoryFeatureContext: vi.fn(async () => undefined),
@@ -333,9 +319,9 @@ afterEach(() => {
   vi.doUnmock('../tmux.js');
   vi.doUnmock('../agents/registered-slot-spawn.js');
   vi.doUnmock('../workspace/stack-health.js');
+  vi.doUnmock('../terminal-backends/select.js');
   vi.doUnmock('../xbrief/io.js');
   vi.doUnmock('../activity-logger.js');
-  vi.doUnmock('../cloister/verdict-preservation.js');
   vi.doUnmock('../review-status.js');
   vi.doUnmock('../cloister/merge-agent.js');
   vi.doUnmock('../cloister/work-agent-prompt.js');

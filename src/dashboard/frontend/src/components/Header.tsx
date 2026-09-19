@@ -7,7 +7,6 @@ export type Tab =
   | 'kanban'
   | 'command-deck'
   | 'agents'
-  | 'flywheel'
   | 'orders'
   | 'backlog'
   | 'resources'

@@ -5,9 +5,9 @@ import { Effect } from 'effect';
 
 import { isConversationDirectory } from '../agent-directory-cleanup.js';
 import { RETAINED_TRANSCRIPTS_MARKER } from '../agents/state-dir-removal.js';
-import { listAllAgentsSync, removeAgentRecordSync } from '../overdeck/agents.js';
+import { listAgentStatesSync } from '../agents/agent-state.js';
 import { listArchivedConversations, listConversations } from '../overdeck/conversations.js';
-import { readIssueRecordForWorkspaceSync } from '../pan-dir/record.js';
+import { getPrFacts } from './pr-facts.js';
 import { AGENTS_DIR } from '../paths.js';
 import { listSessionNames } from '../tmux.js';
 
@@ -27,17 +27,17 @@ export interface TranscriptRetentionAgent {
   stoppedByUser?: boolean | null;
 }
 
-type ReadClosedOutRecord = (
-  workspace: string,
-  issueId: string,
-) => { pipeline?: { closedOut?: boolean } } | null;
-
-export function isTranscriptRetentionTerminalAgent(
+/**
+ * PAN-3917: an agent's transcripts age out once its work has landed. "Landed"
+ * used to be a `closedOut` flag on the issue record; it is now the forge saying
+ * the pull request merged.
+ */
+export async function isTranscriptRetentionTerminalAgent(
   agent: TranscriptRetentionAgent,
-  readRecord: ReadClosedOutRecord = readIssueRecordForWorkspaceSync,
-): boolean {
+  readPrFacts: (issueId: string) => Promise<{ merged: boolean }> = getPrFacts,
+): Promise<boolean> {
   if (agent.status !== 'stopped' || !agent.workspace) return false;
-  return readRecord(agent.workspace, agent.issueId)?.pipeline?.closedOut === true;
+  return (await readPrFacts(agent.issueId)).merged;
 }
 
 export interface TranscriptRetentionDeps {
@@ -45,10 +45,9 @@ export interface TranscriptRetentionDeps {
   stat(path: string): Promise<Stats>;
   removeFile(path: string): Promise<void>;
   removeDir(path: string): Promise<void>;
-  removeAgentRecord(agentId: string): void;
   listSessionNames(): Promise<readonly string[]>;
   listAgents(): readonly TranscriptRetentionAgent[];
-  isTerminalAgent(agent: TranscriptRetentionAgent): boolean;
+  isTerminalAgent(agent: TranscriptRetentionAgent): Promise<boolean>;
   listConversations(): readonly TranscriptRetentionConversation[];
   listArchivedConversations(): readonly TranscriptRetentionConversation[];
   now(): number;
@@ -66,9 +65,8 @@ const defaultDeps: TranscriptRetentionDeps = {
   stat,
   removeFile: async (path) => { await rm(path, { force: true }); },
   removeDir: rmdir,
-  removeAgentRecord: removeAgentRecordSync,
   listSessionNames: () => Effect.runPromise(listSessionNames()),
-  listAgents: listAllAgentsSync,
+  listAgents: listAgentStatesSync,
   isTerminalAgent: isTranscriptRetentionTerminalAgent,
   listConversations,
   listArchivedConversations,
@@ -96,7 +94,7 @@ function conversationEligibility(deps: TranscriptRetentionDeps): Map<string, boo
   }
 }
 
-function agentEligibility(deps: TranscriptRetentionDeps): Map<string, boolean> | null {
+async function agentEligibility(deps: TranscriptRetentionDeps): Promise<Map<string, boolean> | null> {
   try {
     const eligible = new Map<string, boolean>();
     const terminalByIssue = new Map<string, boolean>();
@@ -108,7 +106,7 @@ function agentEligibility(deps: TranscriptRetentionDeps): Map<string, boolean> |
       const issueKey = `${agent.workspace}\0${agent.issueId}`;
       let terminal = terminalByIssue.get(issueKey);
       if (terminal === undefined) {
-        terminal = deps.isTerminalAgent(agent);
+        terminal = await deps.isTerminalAgent(agent);
         terminalByIssue.set(issueKey, terminal);
       }
       eligible.set(agent.id, terminal);
@@ -230,8 +228,13 @@ export async function sweepTranscriptRetention(
       const conversationName = entry.name.slice('conv-'.length);
       if (conversationEligibilityMap.get(conversationName) !== true) continue;
     } else {
+      // NFR-4: a transcript is deleted only when the sweep can SAY the work
+      // landed — the agent is stopped and the forge reports its PR merged.
+      // An agent the listing cannot vouch for (a retired dir whose state.json
+      // is gone, an unreadable listing, a forge read that failed) is skipped,
+      // never deleted: the retention gate fails closed.
       if (!agentEligibilityLoaded) {
-        agentEligibilityMap = agentEligibility(deps);
+        agentEligibilityMap = await agentEligibility(deps);
         agentEligibilityLoaded = true;
       }
       if (agentEligibilityMap === null || agentEligibilityMap.get(entry.name) !== true) continue;
@@ -244,19 +247,17 @@ export async function sweepTranscriptRetention(
     prunedDirs += result.prunedDirs;
 
     if (!conversation && result.remainingTranscripts === 0) {
-      let removedDir = result.removedDir;
-      if (!removedDir) {
+      if (!result.removedDir) {
         await deps.removeFile(join(agentDir, RETAINED_TRANSCRIPTS_MARKER));
         try {
           await deps.removeDir(agentDir);
           prunedDirs++;
-          removedDir = true;
         } catch (error) {
-          if (hasErrorCode(error, 'ENOENT')) removedDir = true;
-          else if (!hasErrorCode(error, 'ENOTEMPTY') && !hasErrorCode(error, 'EEXIST')) throw error;
+          if (!hasErrorCode(error, 'ENOENT')
+            && !hasErrorCode(error, 'ENOTEMPTY')
+            && !hasErrorCode(error, 'EEXIST')) throw error;
         }
       }
-      if (removedDir) deps.removeAgentRecord(entry.name);
     }
   }
 

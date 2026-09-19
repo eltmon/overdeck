@@ -30,16 +30,11 @@ describe('resetWorkspaceState', () => {
     mockGetTrackerContext.mockReset();
     mockGetTrackerContext.mockResolvedValue('tracker context');
     mockReopenWorkspaceState.mockReturnValue(Effect.succeed({
-      specialistStatesReset: true,
-      previousReviewStatus: 'passed',
-      previousTestStatus: 'passed',
-      previousMergeStatus: 'merged',
-      queueItemsRemoved: {},
       continueFileUpdated: false,
     }));
   });
 
-  it('runs the canonical pipeline reset when no local feature workspace exists', async () => {
+  it('clears cached issue state when no local feature workspace exists', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
     await resetWorkspaceState('PAN-3795', { force: true }, null);
@@ -48,10 +43,9 @@ describe('resetWorkspaceState', () => {
       reason: undefined,
       trackerContext: undefined,
     });
-    expect(mockSpinnerSucceed).toHaveBeenCalledWith('Canonical pipeline state reset');
+    expect(mockSpinnerSucceed).toHaveBeenCalledWith('Cached issue state cleared');
     const output = log.mock.calls.flat().join('\n');
     expect(output).toContain('Workspace breadcrumb skipped');
-    expect(output).not.toContain('Specialist states were not modified');
     log.mockRestore();
   });
 

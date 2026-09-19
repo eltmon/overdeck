@@ -56,9 +56,10 @@ interface PolyrepoWorkspaceRepoRef {
  * PAN-2386: ensure a polyrepo scaffold workspace has a .gitignore that excludes
  * sub-repository directories. The scaffold repo is separate from the sub-repos;
  * without these entries, git status shows hundreds of untracked files and blocks
- * agent auto-start. Durable Overdeck records must stay trackable.
+ * agent auto-start.
  *
- * Returns the entries that were added or removed (empty arrays if nothing changed).
+ * Returns the entries that were added (the `removed` half is kept in the return
+ * shape for callers that still report it; nothing is removed any more).
  */
 export function ensurePolyrepoWorkspaceGitignoreSync(
   workspacePath: string,
@@ -67,17 +68,6 @@ export function ensurePolyrepoWorkspaceGitignoreSync(
   const gitignorePath = join(workspacePath, '.gitignore');
   let content = existsSync(gitignorePath) ? readFileSync(gitignorePath, 'utf-8') : '';
   const removed: string[] = [];
-  const filteredLines = content.split('\n').filter(line => {
-    const trimmed = line.trim();
-    if (trimmed === '.pan/records/' || trimmed === '.pan/records') {
-      removed.push(trimmed);
-      return false;
-    }
-    return true;
-  });
-  if (removed.length > 0) {
-    content = filteredLines.join('\n');
-  }
 
   const normalizedLines = content.split('\n').map(l => l.trim()).filter(Boolean);
   const added: string[] = [];
@@ -90,9 +80,8 @@ export function ensurePolyrepoWorkspaceGitignoreSync(
   }
 
   // PAN-2541: the workspace .overdeck/ dir is disposable issue runtime
-  // (continue.json, transcripts, feedback); durable state lives on the
-  // overdeck-state branch. Without this entry the scaffold repo shows
-  // `?? .overdeck/` and agents invent local .git/info/exclude edits.
+  // (continue.json, transcripts, feedback). Without this entry the scaffold
+  // repo shows `?? .overdeck/` and agents invent local .git/info/exclude edits.
   const runtimeEntries: string[] = [];
   if (!normalizedLines.includes('.overdeck/') && !normalizedLines.includes('.overdeck')) {
     runtimeEntries.push('.overdeck/');
@@ -123,7 +112,7 @@ export function ensurePolyrepoWorkspaceGitignoreSync(
     content += added.join('\n') + '\n';
   }
   if (runtimeEntries.length > 0) {
-    content += '\n# Overdeck workspace runtime (PAN-2541: durable state lives on overdeck-state; devcontainer harness is generated)\n';
+    content += '\n# Overdeck workspace runtime (PAN-2541: disposable issue runtime; devcontainer harness is generated)\n';
     content += runtimeEntries.join('\n') + '\n';
     added.push(...runtimeEntries);
   }

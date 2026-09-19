@@ -1,0 +1,360 @@
+{
+  "version": "1",
+  "issueId": "PAN-3668",
+  "created": "2026-09-19T00:29:15.869084Z",
+  "items": {
+    "contracts-harness-literal": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "contracts-harness-literal.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "contracts-harness-literal.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "contracts-behavior-discriminators": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "contracts-behavior-discriminators.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "contracts-behavior-discriminators.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "contracts-prime-behavior-record": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "contracts-prime-behavior-record.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "contracts-prime-behavior-record.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "contracts-prime-behavior-record.ac3": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "contracts-enumerations": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "contracts-enumerations.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "contracts-enumerations.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "cli-harness-flag-help": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "cli-harness-flag-help.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "cli-harness-flag-help.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "config-schema-prime-agent": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "config-schema-prime-agent.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "config-schema-prime-agent.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "provider-map": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "provider-map.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "provider-map.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "provider-map.ac3": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "harness-binary-resolution": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "harness-binary-resolution.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "harness-binary-resolution.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "rpc-framing": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "rpc-framing.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "rpc-framing.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "rpc-framing.ac3": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "rpc-client": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "rpc-client.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "rpc-client.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "rpc-client.ac3": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "rpc-client.ac4": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "doctor-prime-checks": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "doctor-prime-checks.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "doctor-prime-checks.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "runtime-adapter": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "runtime-adapter.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "runtime-adapter.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "runtime-adapter.ac3": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "session-resume-recovery": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "session-resume-recovery.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "session-resume-recovery.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "managed-session-policy": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "managed-session-policy.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "managed-session-policy.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "managed-session-policy.ac3": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "work-agent-launch": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "work-agent-launch.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "work-agent-launch.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "conversation-launch": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "conversation-launch.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "conversation-launch.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "message-delivery": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "message-delivery.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "message-delivery.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "message-delivery.ac3": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "transcript-adapter-prime": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "transcript-adapter-prime.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "transcript-adapter-prime.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "cost-usage-mapping": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "cost-usage-mapping.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "cost-usage-mapping.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "context-renderer-prime": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "context-renderer-prime.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "context-renderer-prime.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "context-renderer-prime.ac3": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "dashboard-api-projection": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "dashboard-api-projection.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "dashboard-api-projection.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "docs-setup-reference": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "docs-setup-reference.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "docs-setup-reference.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "docs-setup-reference.ac3": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "dashboard-frontend": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "dashboard-frontend.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "dashboard-frontend.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "dashboard-frontend.ac3": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "no-loss-audit": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "no-loss-audit.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "no-loss-audit.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "no-loss-audit.ac3": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "verification-gauntlet": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "verification-gauntlet.ac1": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "verification-gauntlet.ac2": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    },
+    "verification-gauntlet.ac3": {
+      "status": "completed",
+      "migratedFrom": "records.statusOverrides"
+    }
+  },
+  "updated": "2026-09-19T00:29:15.869084Z"
+}

@@ -20,7 +20,9 @@ const routeMocks = vi.hoisted(() => ({
   setWorkspaceFavorite: vi.fn(),
   touchWorkspaceAccessed: vi.fn(),
   updateWorkspaceLayout: vi.fn(),
-  getReviewStatusSync: vi.fn(),
+  loadIssueStatesForProject: vi.fn(),
+  getDerivedIssueState: vi.fn(),
+  resolveProjectFromIssueSync: vi.fn(),
   readCurrentStatus: vi.fn(),
   readRecentObservations: vi.fn(),
   rejectUnsafeDashboardMutationRequest: vi.fn(),
@@ -40,11 +42,15 @@ vi.mock('../../../src/lib/workspaces/writer.js', () => ({
   updateWorkspaceLayout: routeMocks.updateWorkspaceLayout,
 }));
 
-vi.mock('../../../src/lib/review-status.js', () => ({
-  getReviewStatusSync: routeMocks.getReviewStatusSync,
+// PAN-3917 FR-6: the pipeline badge is the derived issue state, read per project.
+vi.mock('../../../src/dashboard/server/services/derived-issue-state.js', () => ({
+  loadIssueStatesForProject: routeMocks.loadIssueStatesForProject,
+  getDerivedIssueState: routeMocks.getDerivedIssueState,
+}));
 
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
+vi.mock('../../../src/lib/projects.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../src/lib/projects.js')>(),
+  resolveProjectFromIssueSync: routeMocks.resolveProjectFromIssueSync,
 }));
 
 vi.mock('../../../src/lib/memory/rollup.js', () => ({
@@ -122,7 +128,9 @@ beforeEach(() => {
   routeMocks.rejectUnauthorizedDashboardRequest.mockReturnValue(null);
   routeMocks.readCurrentStatus.mockResolvedValue(undefined);
   routeMocks.readRecentObservations.mockResolvedValue([]);
-  routeMocks.getReviewStatusSync.mockReturnValue(null);
+  routeMocks.loadIssueStatesForProject.mockResolvedValue(new Map());
+  routeMocks.getDerivedIssueState.mockResolvedValue(undefined);
+  routeMocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/repo' });
 });
 
 describe('GET /api/workspace-registry memoryPhase (PAN-3286 FR-12)', () => {
@@ -187,13 +195,9 @@ describe('GET /api/workspace-registry memoryPhase (PAN-3286 FR-12)', () => {
   it('keeps every pre-existing list field alongside the new one (no-loss)', async () => {
     const workspace = baseWorkspace();
     routeMocks.listWorkspaces.mockReturnValue([workspace]);
-    routeMocks.getReviewStatusSync.mockReturnValue({
-      reviewStatus: 'passed',
-      testStatus: 'passed',
-      mergeStatus: 'merged',
-      verificationStatus: 'passed',
-      readyForMerge: true,
-    });
+    routeMocks.loadIssueStatesForProject.mockResolvedValue(new Map([
+      [workspace.issueId!, { issueId: workspace.issueId!, state: 'ready', attention: 'needs-you' }],
+    ]));
 
     const row = (await listRows())[0]!;
 
@@ -205,13 +209,7 @@ describe('GET /api/workspace-registry memoryPhase (PAN-3286 FR-12)', () => {
     const { runCommand: _withheld, ...publicFields } = workspace;
     expect(row).toEqual({
       ...publicFields,
-      pipeline: {
-        reviewStatus: 'passed',
-        testStatus: 'passed',
-        mergeStatus: 'merged',
-        verificationStatus: 'passed',
-        readyForMerge: true,
-      },
+      pipeline: { state: 'ready', attention: 'needs-you' },
       memoryPhase: null,
     });
   });

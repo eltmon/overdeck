@@ -11,7 +11,6 @@ import {
   type UatReconcilerDeps,
 } from '../../../../src/lib/cloister/uat-reconciler.js';
 import type { ReadyFeature } from '../../../../src/lib/cloister/uat-generation-engine.js';
-import { needsReviewDispatch } from '../../../../src/lib/review-dispatch-decision.js';
 import type { UatGeneration, UatGenerationStatus } from '../../../../src/lib/database/uat-generations-db.js';
 import { makeUniqueUatCandidateName } from '../../../../src/lib/cloister/uat-candidate-name.js';
 import { generationFolderName } from '../../../../src/lib/cloister/uat-generation-engine.js';
@@ -266,17 +265,7 @@ describe('growth and invalidation', () => {
 });
 
 describe('PAN-3083 passed and ready review intents', () => {
-  const stalePassedStatus = {
-    reviewStatus: 'passed',
-    testStatus: 'passed',
-    readyForMerge: true,
-    reviewRequestedAt: '2026-07-25T10:01:00.000Z',
-    reviewSpawnedAt: '2026-07-25T10:00:00.000Z',
-  };
-
   it('keeps the generation live when the stale intent does not redispatch review', async () => {
-    expect(needsReviewDispatch(stalePassedStatus)).toBe(false);
-
     const proj = freshProject();
     const current = gen(proj, 'uat/pan-stable-0725', 'ready', {
       members: [{ issueId: 'PAN-1', title: 'First', branch: 'feature/pan-1', headSha: 'h1', mergeOrder: 1 }],

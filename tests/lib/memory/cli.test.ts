@@ -11,7 +11,6 @@ import {
 import { writeObservation } from '../../../src/lib/memory/observations.js';
 import { ensureDir, resolvePendingDir } from '../../../src/lib/memory/paths.js';
 import { getMemoryHealthPath } from '../../../src/lib/memory/health.js';
-import { closeDatabase } from '../../../src/lib/database/index.js';
 import { closeMemoryFtsDatabases, withMemoryFtsDatabase } from '../../../src/lib/memory/fts-db.js';
 import { createWorkspace, upsertProjectFromConfig } from '../../../src/lib/workspaces/writer.js';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../helpers/overdeck-test-db.js';
@@ -52,7 +51,6 @@ beforeEach(async () => {
 
 afterEach(() => {
   closeMemoryFtsDatabases();
-  closeDatabase();
   teardownOverdeckTestDb(odb);
 });
 

@@ -22,7 +22,6 @@ import { enrichSessions, CostThresholdError } from '../../../lib/conversations/e
 import type { EnrichOptions } from '../../../lib/conversations/enrichment/index.js';
 import { embedSessions } from '../../../lib/conversations/embeddings/index.js';
 import type { EmbedSessionsOptions } from '../../../lib/conversations/embeddings/index.js';
-import { listSubstrateBugWeights } from '../../../lib/overdeck/substrate-bug-weights-service.js';
 import { collectCodexCostEvents } from '../../../lib/overdeck/cost.js';
 import { collectPiCostEvents } from '../../../lib/costs/reconciler.js';
 import { parseAcpConversationMessages } from './acp-conversation-parser.js';
@@ -53,7 +52,6 @@ export type DashboardDbOperation =
   | 'getConversationByName'
   | 'getSetting'
   | 'setSetting'
-  | 'listSubstrateBugWeights'
   | 'getArtifactBySlug'
   | 'listArtifactsForWorkspaceOrIssue'
   | 'unshareArtifactBySlug'
@@ -123,7 +121,6 @@ const COALESCED_OPERATIONS = new Set<DashboardDbOperation>([
   'enrichSessions',
   'embedSessions',
   'searchSessionsSemantic',
-  'listSubstrateBugWeights',
   'parseTranscriptSnapshot',
 ]);
 
@@ -318,10 +315,6 @@ async function executeInline(
       const input = payload as { key: string; value: string };
       setSetting(input.key, input.value);
       return null;
-    }
-    case 'listSubstrateBugWeights': {
-      const input = payload as { window: string; limit: number; offset: number };
-      return listSubstrateBugWeights(input.window, { limit: input.limit, offset: input.offset });
     }
     case 'getArtifactBySlug': {
       const { getArtifactBySlugJob } = await import('./artifact-index-jobs.js');

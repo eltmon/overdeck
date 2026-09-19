@@ -22,13 +22,7 @@ import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/type
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataFn } from '../../../../lib/remote/workspace-metadata.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
 import { validateProviderHealth } from '../../../../lib/provider-health.js';
-import { checkActiveOrderDispatch } from '../../../../lib/orders/dispatch-gate.js';
-import { OrderDispatchReservationError, withActiveOrderDispatchReservation } from '../../../../lib/orders/dispatch-reservation.js';
-import type { OrderDispatchEligibility } from '../../../../lib/orders/eligibility.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../../../../lib/projects.js';
-import { clearWorkspaceStuck, getReviewStatusSync } from '../../../../lib/review-status.js';
-import { isStateMigrated } from '../../../../lib/state-home.js';
-import { shouldCommitLegacyWorkspaceArtifacts } from '../../../../lib/state-read-home.js';
 import { isGeneratedGitHookPath, isOverdeckWorkspaceRuntimePath, parsePorcelainStatusPaths } from '../../../../lib/state-plane.js';
 import { assertWorkspaceStackHealthyForSpawn } from '../../../../lib/agents/spawn-prep.js';
 import { getWorkspaceStackHealth } from '../../../../lib/workspace/stack-health.js';
@@ -63,21 +57,6 @@ import {
 } from './shared.js';
 import { claimAgentStart, handleContainerOrchestration, handleRemoteAgentSpawn, releaseAgentStart } from './spawn-helpers.js';
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-export function orderDispatchConflict(decision: OrderDispatchEligibility): {
-  status: 409;
-  body: { error: string; code: string; conditions: OrderDispatchEligibility['conditions'] };
-} | null {
-  if (decision.eligible) return null;
-  return {
-    status: 409,
-    body: {
-      error: decision.message ?? 'Order-book dispatch is blocked.',
-      code: decision.code ?? 'order-dispatch-blocked',
-      conditions: decision.conditions,
-    },
-  };
-}
 
 /**
  * PAN-2386: emit a dashboard activity event when start-agent refuses to spawn
@@ -320,9 +299,9 @@ export const postAgentsRoute = HttpRouter.add(
     const resolvedProject = resolveProjectFromIssueSync(String(issueId));
     const projectConfig = resolvedProject ? getProjectSync(resolvedProject.projectKey) : null;
     const projectPath = projectConfig?.path ?? getProjectPath(projectId, issuePrefix);
-    const orderDispatch = yield* Effect.promise(() => checkActiveOrderDispatch(projectPath, issueId, { offBook }));
-    const orderConflict = orderDispatchConflict(orderDispatch.decision);
-    if (orderConflict) return jsonResponse(orderConflict.body, { status: orderConflict.status });
+    // PAN-3917 D12: the order-book dispatch gate is gone. There is no flywheel
+    // RUN to bind a book to — the flywheel skill decides what to start from the
+    // order books under .pan, so a spawn request is simply honoured.
 
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     if (!existsSync(workspacePath)) {
@@ -549,34 +528,9 @@ export const postAgentsRoute = HttpRouter.add(
       console.warn(`[agents] agent-spawn-host-override: ${issueId.toUpperCase()} (dashboard-confirmed)`);
     }
 
-    const migratedState = projectConfig ? yield* Effect.promise(() => isStateMigrated(projectConfig)) : false;
-    if (shouldCommitLegacyWorkspaceArtifacts(migratedState) && (existsSync(workspacePanContinuePath) || existsSync(workspacePanDir))) {
-      // Commit workspace orchestration artifacts before handing off to the work agent.
-      // The entire block is best-effort — never let git errors abort the agent start.
-      yield* Effect.gen(function* () {
-        const gitRoot = workspacePath;
-        if (existsSync(join(gitRoot, PAN_DIRNAME))) {
-          // PAN-1819: use plain git add (never -f) and exclude workspace-state/sync-target paths.
-          yield* Effect.promise(() => execAsync(`git add .pan/`, { cwd: gitRoot, encoding: 'utf-8' }));
-          yield* Effect.promise(() => execAsync(
-            `git reset HEAD -- .pan/kickoff.md .pan/continue.json .pan/handoff-*.md .pan/spec.vbrief.json`,
-            { cwd: gitRoot, encoding: 'utf-8' },
-          ));
-        }
-        // git diff --cached --quiet exits 1 when there ARE staged changes (normal).
-        // Handle exit-1 in the Promise so it never becomes an Effect failure.
-        const diffResult = yield* Effect.promise(() =>
-          execAsync(`git diff --cached --quiet`, { cwd: gitRoot, encoding: 'utf-8' })
-            .then(() => false)
-            .catch(() => true)
-        );
-        if (diffResult) {
-          yield* Effect.promise(() => execAsync(`git commit -m "chore: planning artifacts for ${issueId} before agent start"`, { cwd: gitRoot, encoding: 'utf-8' }));
-          const pushChild = spawn('git', ['push'], { cwd: gitRoot, detached: true, stdio: 'ignore' });
-          pushChild.unref();
-        }
-      }).pipe(Effect.catch(() => Effect.void));
-    }
+    // PAN-3917: planning artifacts live in the repo's `.pan/` and are committed
+    // by the agent that changes them (FR-2). The dashboard no longer commits and
+    // pushes a workspace copy on the agent's behalf before start.
 
     let gatesCommitted = false;
     const commitClearedGates = async (): Promise<void> => {
@@ -632,31 +586,13 @@ export const postAgentsRoute = HttpRouter.add(
         }
       }
 
-      try {
-        const { appendSessionEntry, getProjectConfigFromWorkspacePath, resolveProjectForIssue } =
-          await import('../../../../lib/pan-dir/record.js');
-        const recordProject = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
-        await appendSessionEntry(recordProject, issueId, {
-          timestamp: new Date().toISOString(),
-          reason: 'start',
-          agentModel: spawnModel,
-        });
-        console.log(`[start-agent] Wrote start session entry to record for ${issueId}`);
-      } catch (continueErr: any) {
-        console.warn(`[start-agent] Failed to write start entry to record (non-fatal): ${continueErr?.message ?? continueErr}`);
-      }
-
-      const pipelineStatus = getReviewStatusSync(issueId);
-      if (pipelineStatus?.stuckReason === 'planning_auto_handoff_failed') {
-        clearWorkspaceStuck(issueId);
-      }
+      // PAN-3917: the record's sessionHistory and the workspace `stuck` flag
+      // are gone. The agent.started event (emitted by the PTY supervisor when
+      // the harness process exists) is the durable record that this agent
+      // started, and a stuck agent is derived — idle with unpushed commits.
     };
     if (isRemote && workspaceMetadata) {
-      const admitted = yield* Effect.promise(() => withActiveOrderDispatchReservation(
-        projectPath,
-        issueId,
-        { offBook, recordOverride: true },
-        () => spawnAfterClearingStartGates({
+      const response = yield* Effect.promise(() => spawnAfterClearingStartGates({
           agentSessionName,
           gate: startGateBlock,
           initialState: initialAgentState,
@@ -672,11 +608,7 @@ export const postAgentsRoute = HttpRouter.add(
             lifecycle,
           })),
           isSuccessful: (remoteResponse) => remoteResponse.status >= 200 && remoteResponse.status < 300,
-        }),
-      ));
-      const admittedConflict = orderDispatchConflict(admitted.check.decision);
-      if (admittedConflict) return jsonResponse(admittedConflict.body, { status: admittedConflict.status });
-      const response = admitted.result!;
+      }));
       if (response.status < 200 || response.status >= 300) return response;
       yield* Effect.promise(commitClearedGates);
       yield* Effect.promise(markWorkStartAccepted);
@@ -787,33 +719,25 @@ export const postAgentsRoute = HttpRouter.add(
 
     // Spawn pan start command
     const spawnPanCommand = async (args: string[], cwd?: string): Promise<string> => {
-      const admitted = await withActiveOrderDispatchReservation(
-        projectPath,
-        issueId,
-        { offBook, recordOverride: false },
-        () => spawnAfterClearingStartGates({
+      const output = await spawnAfterClearingStartGates({
+        agentSessionName,
+        gate: gatesCommitted ? null : startGateBlock,
+        initialState: initialAgentState,
+        spawn: () => spawnPanCommandDetached({
           agentSessionName,
-          gate: gatesCommitted ? null : startGateBlock,
-          initialState: initialAgentState,
-          spawn: () => spawnPanCommandDetached({
-            agentSessionName,
-            issueId,
-            role,
-            workspacePath,
-            args,
-            cwd,
-            env: {
-              OVERDECK_AGENT_STARTED_BY: startedBy,
-              OVERDECK_AUTO_SPAWN_CONSENT_REQUIRED: autoSpawnConsentRequired ? '1' : '0',
-            },
-          }),
+          issueId,
+          role,
+          workspacePath,
+          args,
+          cwd,
+          env: {
+            OVERDECK_AGENT_STARTED_BY: startedBy,
+            OVERDECK_AUTO_SPAWN_CONSENT_REQUIRED: autoSpawnConsentRequired ? '1' : '0',
+          },
         }),
-      );
-      if (!admitted.check.decision.eligible || !admitted.result) {
-        throw new OrderDispatchReservationError(admitted.check);
-      }
+      });
       await commitClearedGates();
-      return admitted.result;
+      return output;
     };
 
     // Use IssueLifecycle service to transition issue to "In Progress" (PAN-449)
@@ -910,10 +834,6 @@ export const postAgentsRoute = HttpRouter.add(
       }));
       invalidateAgentsCache();
 
-      if (error instanceof OrderDispatchReservationError) {
-        const conflict = orderDispatchConflict(error.check.decision)!;
-        return jsonResponse(conflict.body, { status: conflict.status });
-      }
       const output = String(error?.output ?? error?.message ?? '');
       if (output.includes(`Workspace docker stack for ${issueId}`) && output.includes('is not healthy')) {
         const failedStackHealth = yield* getWorkspaceStackHealth(issueId, { projectConfig, workspacePath });

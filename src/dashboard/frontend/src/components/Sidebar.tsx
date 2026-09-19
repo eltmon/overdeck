@@ -14,10 +14,10 @@ import { useConversationMutations } from './CommandDeck/useConversationMutations
 import { FreshnessIndicator } from './FreshnessIndicator';
 import { useTheme } from '../hooks/useTheme';
 import { usePlannedBacklogVisibility } from '../hooks/usePlannedBacklogVisibility';
-import { useDashboardStore, selectIssues, selectAgents } from '../lib/store';
+import { useDashboardStore, selectIssues } from '../lib/store';
 import { getPipelineIssuePhase } from '../lib/pipeline-state';
 import { fetchExperimentalFeaturesEnabled, isExperimentalTab } from '../lib/experimentalFeatures';
-import type { Issue, Agent } from '../types';
+import type { Issue } from '../types';
 import type { Tab } from './Header';
 
 type PipelineIssuePhase = 'ship' | 'review' | 'work' | 'plan' | 'todo';
@@ -59,16 +59,10 @@ function setPipelineFilterUrl(key: 'phase' | 'projects', value: string | null) {
 
 const SIDEBAR_STORAGE_KEY = 'overdeck.ui.sidebarCollapsed';
 
-interface FlywheelRunSummary {
-  id: string;
-  status: 'running' | 'paused' | 'complete' | 'aborted';
-}
-
 interface NavItem {
   id: Tab;
   label: string;
   icon: LucideIcon;
-  badge?: 'flywheel-live';
   title?: string;
 }
 
@@ -77,12 +71,11 @@ interface NavGroup {
   items: NavItem[];
 }
 
-// PAN-1561: the primary rail is Home · Flywheel · Projects. Everything else
+// PAN-1561: the primary rail is Home · Order Book · Projects. Everything else
 // moves into the collapsible "More" section (MORE_GROUPS) below the Projects
 // list — every route stays reachable, no feature is lost.
 const PRIMARY_ITEMS: NavItem[] = [
   { id: 'home' as Tab, label: 'Home', icon: Home },
-  { id: 'flywheel' as Tab, label: 'Flywheel', icon: Loader2, badge: 'flywheel-live' },
   { id: 'orders' as Tab, label: 'Order Book', icon: BookOpen },
 ];
 
@@ -339,8 +332,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
   }, [visibleWorkspaces, projectNameByKey]);
 
   const issues = useDashboardStore(selectIssues) as Issue[];
-  const agents = useDashboardStore(selectAgents) as unknown as Agent[];
-  const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
+  const derivedByIssueId = useDashboardStore((state) => state.derivedIssueStateByIssueId);
 
   // PAN-1990 ac2: issue-kind workspace rows get a pipeline-phase badge derived
   // from getPipelineIssuePhase, the same helper the "Filter phase" group below
@@ -348,20 +340,14 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
   const workspacePhaseByIssueId = useMemo(() => {
     const map = new Map<string, PipelineIssuePhase>();
     if (issues.length === 0) return map;
-    const agentByIssueId = new Map<string, Agent>();
-    for (const agent of agents) {
-      const key = agent.issueId?.toLowerCase();
-      if (key && !agentByIssueId.has(key)) agentByIssueId.set(key, agent);
-    }
     for (const issue of issues) {
       const key = issue.identifier.toLowerCase();
-      const agent = agentByIssueId.get(key) ?? null;
-      const reviewStatus = reviewStatusByIssueId[issue.identifier] ?? reviewStatusByIssueId[issue.identifier.toUpperCase()];
-      const rawPhase = getPipelineIssuePhase(issue, reviewStatus, agent);
-      map.set(key, rawPhase === 'ready' || rawPhase === 'verifying' ? 'work' : rawPhase);
+      const derived = derivedByIssueId[issue.identifier] ?? derivedByIssueId[issue.identifier.toUpperCase()];
+      const rawPhase = getPipelineIssuePhase(derived, issue);
+      map.set(key, rawPhase === 'ready' ? 'work' : rawPhase);
     }
     return map;
-  }, [issues, agents, reviewStatusByIssueId]);
+  }, [issues, derivedByIssueId]);
 
   const [pipelineFilter, setPipelineFilter] = useState(readPipelineFilterState);
 
@@ -374,20 +360,13 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
   const pipelineData = useMemo(() => {
     if (activeTab !== 'pipeline') return { phaseCounts: {} as Record<string, number>, projects: [] as Array<{ id: string; name: string; color: string; prefix: string }> };
 
-    const agentByIssueId = new Map<string, Agent>();
-    for (const agent of agents) {
-      const key = agent.issueId?.toLowerCase();
-      if (key && !agentByIssueId.has(key)) agentByIssueId.set(key, agent);
-    }
-
     const phaseCounts: Record<string, number> = { ship: 0, review: 0, work: 0, plan: 0, todo: 0 };
     const projectMap = new Map<string, { name: string; color: string; prefix: string }>();
 
     for (const issue of issues) {
       if (isClosedIssue(issue)) continue;
-      const agent = agentByIssueId.get(issue.identifier.toLowerCase()) ?? null;
-      const reviewStatus = reviewStatusByIssueId[issue.identifier] ?? reviewStatusByIssueId[issue.identifier.toUpperCase()];
-      const phase = getPipelineIssuePhase(issue, reviewStatus, agent);
+      const derived = derivedByIssueId[issue.identifier] ?? derivedByIssueId[issue.identifier.toUpperCase()];
+      const phase = getPipelineIssuePhase(derived, issue);
       phaseCounts[phase] = (phaseCounts[phase] ?? 0) + 1;
       if (issue.project) {
         const id = issue.project.id || issue.project.name;
@@ -403,7 +382,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
       .sort((a, b) => a.name.localeCompare(b.name));
 
     return { phaseCounts, projects };
-  }, [activeTab, issues, agents, reviewStatusByIssueId]);
+  }, [activeTab, issues, derivedByIssueId]);
   const { data: versionData } = useQuery({
     queryKey: ['version'],
     queryFn: async () => {
@@ -416,17 +395,6 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
 
   const isDev = versionData?.isDev ?? false;
 
-  const { data: flywheelRunsRaw } = useQuery({
-    queryKey: ['flywheel-runs'],
-    queryFn: async () => {
-      const res = await fetch('/api/flywheel/runs?limit=10');
-      if (!res.ok) return [];
-      return res.json() as Promise<FlywheelRunSummary[]>;
-    },
-    refetchInterval: 5000,
-  });
-  const flywheelRuns = Array.isArray(flywheelRunsRaw) ? flywheelRunsRaw : [];
-  const hasActiveFlywheelRun = flywheelRuns.some((run) => run.status === 'running');
   const { data: experimentalFeaturesEnabled = false } = useQuery({
     queryKey: ['settings', 'experimental-features'],
     queryFn: fetchExperimentalFeaturesEnabled,
@@ -470,9 +438,8 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [toggleCollapsed]);
 
-  const renderNavItem = ({ id, label, icon: Icon, badge, title }: NavItem) => {
+  const renderNavItem = ({ id, label, icon: Icon, title }: NavItem) => {
     const isActive = activeTab === id;
-    const liveBadge = badge === 'flywheel-live' && hasActiveFlywheelRun;
     return (
       <button
         key={id}
@@ -490,11 +457,6 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
       >
         <Icon className="shrink-0 w-4 h-4" />
         {!collapsed && <span className="truncate">{label}</span>}
-        {!collapsed && liveBadge && (
-          <span className="ml-auto rounded-full border border-success/30 bg-success/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-success">
-            live
-          </span>
-        )}
       </button>
     );
   };
@@ -597,7 +559,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
           )}
         </div>
 
-        {/* ─── Nav: Home · Flywheel · Projects · More (PAN-1561) ─── */}
+        {/* ─── Nav: Home · Order Book · Projects · More (PAN-1561) ─── */}
         <nav className="flex-1 overflow-y-auto overflow-x-hidden py-2 scrollbar-hide">
           {/* Primary rail */}
           <div className={collapsed ? 'mb-2' : 'mb-1'}>

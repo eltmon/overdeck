@@ -1,5 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, mkdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,180 +6,147 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RETAINED_TRANSCRIPTS_MARKER } from '../../../../src/lib/agents/state-dir-removal.js';
 import { sweepTranscriptRetention } from '../../../../src/lib/cloister/transcript-retention.js';
 import { removeAgent } from '../../../../src/lib/agents/removal.js';
-import { listAllAgentsSync } from '../../../../src/lib/overdeck/agents.js';
-import {
-  closeOverdeckDatabaseSync,
-  getOverdeckDatabaseSync,
-} from '../../../../src/lib/overdeck/infra.js';
+import { listAgentStatesSync } from '../../../../src/lib/agents/agent-state.js';
+
+// paths.ts resolves AGENTS_DIR once at module load, so the home has to be
+// pointed at a scratch directory before the subject's imports are evaluated.
+const testHome = vi.hoisted(() => {
+  const { mkdtempSync } = require('node:fs') as typeof import('node:fs');
+  const { tmpdir } = require('node:os') as typeof import('node:os');
+  const { join: joinPath } = require('node:path') as typeof import('node:path');
+  const home = mkdtempSync(joinPath(tmpdir(), 'agent-removal-'));
+  process.env.OVERDECK_HOME = home;
+  return home;
+});
 
 const NOW = new Date('2026-07-31T12:00:00.000Z');
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * PAN-3917: transcript linkage used to be a stopped tombstone row in
+ * overdeck.db. The row is gone — the state directory plus its
+ * retained-transcripts marker carries the linkage on its own — so these cases
+ * assert the on-disk facts the sweep actually reads.
+ */
 describe('canonical agent removal with retained transcripts', () => {
-  const originalOverdeckHome = process.env.OVERDECK_HOME;
-  let testHome: string;
-
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
-    testHome = mkdtempSync(join(tmpdir(), 'agent-removal-'));
-    process.env.OVERDECK_HOME = testHome;
-    closeOverdeckDatabaseSync();
+    rmSync(join(testHome, 'agents'), { recursive: true, force: true });
+    mkdirSync(join(testHome, 'agents'), { recursive: true });
   });
 
   afterEach(() => {
     vi.useRealTimers();
-    closeOverdeckDatabaseSync();
-    if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
-    else process.env.OVERDECK_HOME = originalOverdeckHome;
-    rmSync(testHome, { recursive: true, force: true });
+    rmSync(join(testHome, 'agents'), { recursive: true, force: true });
   });
 
-  it('keeps a stopped linkage row until configured retention expires the nested JSONL', async () => {
-    const agentId = 'agent-pan-3357-review-correctness';
-    const agentsDir = join(testHome, 'agents');
-    const agentDir = join(agentsDir, agentId);
-    const transcriptPath = join(agentDir, 'sessions', 'review.jsonl');
+  function seedAgent(agentId: string, issueId: string, extra: Record<string, unknown> = {}): string {
+    const agentDir = join(testHome, 'agents', agentId);
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, 'state.json'), JSON.stringify({
+      id: agentId,
+      issueId,
+      role: 'review',
+      status: 'running',
+      workspace: `/workspaces/feature-${issueId.toLowerCase()}`,
+      harness: 'claude-code',
+      model: 'claude',
+      startedAt: NOW.toISOString(),
+      ...extra,
+    }));
+    return agentDir;
+  }
+
+  function seedAgedTranscript(agentDir: string, name = 'review.jsonl'): string {
+    const transcriptPath = join(agentDir, 'sessions', name);
     mkdirSync(join(agentDir, 'sessions'), { recursive: true });
     writeFileSync(transcriptPath, '{}\n');
     const oldTime = new Date(NOW.getTime() - 30 * DAY_MS);
     utimesSync(transcriptPath, oldTime, oldTime);
-    const db = getOverdeckDatabaseSync();
-    db.prepare(`
-      INSERT INTO issues (id, stage, updated_at)
-      VALUES (?, ?, ?)
-    `).run('PAN-3357', 'working', Date.now());
-    db.prepare(`
-      INSERT INTO agents (id, issue_id, role, status, workspace, harness, model, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      agentId,
-      'PAN-3357',
-      'review',
-      'running',
-      '/workspaces/feature-pan-3357',
-      'claude-code',
-      'claude',
-      Date.now(),
-    );
+    return transcriptPath;
+  }
 
-    const cleanup = await removeAgent(agentId);
-
-    expect(cleanup.removedDir).toBe(false);
-    expect(existsSync(transcriptPath)).toBe(true);
-    expect(existsSync(join(agentDir, RETAINED_TRANSCRIPTS_MARKER))).toBe(true);
-    expect(listAllAgentsSync()).toEqual([
-      expect.objectContaining({
-        id: agentId,
-        issueId: 'PAN-3357',
-        status: 'stopped',
-        phase: 'retained-transcripts',
-      }),
-    ]);
-
-    await sweepTranscriptRetention({
+  function sweep(agentsDir: string, listAgents = listAgentStatesSync): Promise<string[]> {
+    return sweepTranscriptRetention({
       transcriptDays: 2,
       agentsDir,
       deps: {
         listSessionNames: vi.fn(async () => []),
-        listAgents: listAllAgentsSync,
-        isTerminalAgent: vi.fn(() => true),
-        listConversations: vi.fn(),
-        listArchivedConversations: vi.fn(),
+        listAgents,
+        isTerminalAgent: vi.fn(async () => true),
+        listConversations: vi.fn(() => []),
+        listArchivedConversations: vi.fn(() => []),
         now: () => Date.now(),
         log: vi.fn(),
       },
     });
+  }
 
-    expect(existsSync(agentDir)).toBe(false);
-    expect(listAllAgentsSync()).toEqual([]);
-  });
-
-  it('preserves session_id on the tombstone row — it is the transcript linkage (PAN-3479)', async () => {
-    const agentId = 'agent-pan-3479-slot-1';
+  it('retains the transcript and its linkage, and the sweep keeps what it cannot vouch for', async () => {
+    const agentId = 'agent-pan-3357-review-correctness';
     const agentsDir = join(testHome, 'agents');
-    const agentDir = join(agentsDir, agentId);
-    const transcriptPath = join(agentDir, 'sessions', 'work.jsonl');
-    mkdirSync(join(agentDir, 'sessions'), { recursive: true });
-    writeFileSync(transcriptPath, '{}\n');
-    const db = getOverdeckDatabaseSync();
-    db.prepare(`
-      INSERT INTO issues (id, stage, updated_at)
-      VALUES (?, ?, ?)
-    `).run('PAN-3479', 'working', Date.now());
-    db.prepare(`
-      INSERT INTO agents (id, issue_id, role, status, workspace, harness, model, session_id, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      agentId,
-      'PAN-3479',
-      'work',
-      'stopped',
-      '/workspaces/feature-pan-3479-slot-1',
-      'claude-code',
-      'gpt-5.6-sol',
-      'c825f47b-2379-417e-9045-5597f9df7690',
-      Date.now(),
-    );
+    const agentDir = seedAgent(agentId, 'PAN-3357');
+    const transcriptPath = seedAgedTranscript(agentDir);
 
     const cleanup = await removeAgent(agentId);
 
+    // The nested transcript blocks the directory removal, so the marker stands
+    // in for the tombstone row: the directory is retained, not live.
     expect(cleanup.removedDir).toBe(false);
-    expect(listAllAgentsSync()).toEqual([
-      expect.objectContaining({
-        id: agentId,
-        status: 'stopped',
-        phase: 'retained-transcripts',
-        sessionId: 'c825f47b-2379-417e-9045-5597f9df7690',
-      }),
-    ]);
+    expect(existsSync(transcriptPath)).toBe(true);
+    expect(existsSync(join(agentDir, RETAINED_TRANSCRIPTS_MARKER))).toBe(true);
+
+    await sweep(agentsDir);
+
+    // NFR-4: removeAgent took state.json, so no listing can say this agent
+    // stopped with its work landed. The retention gate fails closed — the
+    // marker is linkage, never a licence to delete.
+    expect(existsSync(agentDir)).toBe(true);
+    expect(existsSync(transcriptPath)).toBe(true);
+    expect(listAgentStatesSync()).toEqual([]);
   });
 
-  it('reconstructs a disk-only review tombstone before deleting state.json', async () => {
-    const agentId = 'agent-pan-3357-review-security';
-    const agentDir = join(testHome, 'agents', agentId);
-    const transcriptPath = join(agentDir, 'sessions', 'review.jsonl');
-    mkdirSync(join(agentDir, 'sessions'), { recursive: true });
-    writeFileSync(transcriptPath, '{}\n');
-    writeFileSync(join(agentDir, 'state.json'), JSON.stringify({
-      id: agentId,
-      issueId: 'PAN-3357',
-      role: 'review',
-      status: 'stopped',
-      workspace: '/workspaces/feature-pan-3357',
-      harness: 'claude-code',
-      model: 'claude',
-    }));
-    getOverdeckDatabaseSync().prepare(`
-      INSERT INTO issues (id, stage, updated_at)
-      VALUES (?, ?, ?)
-    `).run('PAN-3357', 'working', Date.now());
+  it('expires an aged transcript the listing CAN vouch for', async () => {
+    const agentId = 'agent-pan-3357-review-landed';
+    const agentsDir = join(testHome, 'agents');
+    const agentDir = seedAgent(agentId, 'PAN-3357', { status: 'stopped' });
+    const transcriptPath = seedAgedTranscript(agentDir);
+
+    await sweep(agentsDir);
+
+    // The listing says stopped and the forge says the work landed, so the
+    // expired transcript and its sessions/ directory go. state.json is the
+    // listing's own evidence and is removeAgent's job, not the sweep's.
+    expect(existsSync(transcriptPath)).toBe(false);
+    expect(existsSync(join(agentDir, 'sessions'))).toBe(false);
+    expect(existsSync(join(agentDir, 'state.json'))).toBe(true);
+  });
+
+  it('retires the runtime residue but never the session transcript (PAN-3479)', async () => {
+    const agentId = 'agent-pan-3479-slot-1';
+    const agentDir = seedAgent(agentId, 'PAN-3479', { sessionId: 'sess-3479' });
+    const transcriptPath = seedAgedTranscript(agentDir, 'slot.jsonl');
 
     const cleanup = await removeAgent(agentId);
 
+    // state.json is the runtime residue and goes; the JSONL under sessions/ is
+    // the transcript linkage and stays, marked so no reader treats it as live.
     expect(cleanup.removedDir).toBe(false);
     expect(existsSync(join(agentDir, 'state.json'))).toBe(false);
     expect(existsSync(transcriptPath)).toBe(true);
-    expect(listAllAgentsSync()).toEqual([
-      expect.objectContaining({
-        id: agentId,
-        issueId: 'PAN-3357',
-        status: 'stopped',
-        phase: 'retained-transcripts',
-      }),
-    ]);
+    expect(existsSync(join(agentDir, RETAINED_TRANSCRIPTS_MARKER))).toBe(true);
+    expect(listAgentStatesSync()).toEqual([]);
   });
 
-  it('fails closed before cleanup when a disk-only directory has no recoverable identity', async () => {
-    const agentId = 'agent-pan-3357-review-performance';
-    const agentDir = join(testHome, 'agents', agentId);
-    mkdirSync(agentDir, { recursive: true });
-    writeFileSync(join(agentDir, 'state.json'), '{}');
-    writeFileSync(join(agentDir, 'review.jsonl'), '{}\n');
+  it('removes the directory outright when no transcript survives it', async () => {
+    const agentId = 'agent-pan-3917-review-security';
+    const agentDir = seedAgent(agentId, 'PAN-3917');
 
-    await expect(removeAgent(agentId)).rejects.toThrow('cannot preserve transcript linkage');
+    const cleanup = await removeAgent(agentId);
 
-    expect(existsSync(join(agentDir, 'state.json'))).toBe(true);
-    expect(existsSync(join(agentDir, 'review.jsonl'))).toBe(true);
+    expect(cleanup.removedDir).toBe(true);
+    expect(existsSync(agentDir)).toBe(false);
+    expect(listAgentStatesSync()).toEqual([]);
   });
 });

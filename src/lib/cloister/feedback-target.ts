@@ -4,10 +4,9 @@ import { Effect } from 'effect';
 
 import { readFeedbackAgentStates } from '../agents/agent-state-source.js';
 import { getReadableWorkspacePanPaths } from '../pan-dir/continue.js';
-import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
-import { readIssueRecordSync, type PanIssueRecord } from '../pan-dir/record.js';
-import { updateIssueRecord } from '../pan-dir/record-update.js';
+import { resolveProjectFromIssueSync } from '../projects.js';
 import { listSessionNames } from '../tmux.js';
+import { readSwarmSlotAssignments } from './deacon-swarm-record.js';
 import { isAlive, isConfirmedDead } from '../agents/liveness.js';
 
 export type IssueFeedbackTarget =
@@ -50,33 +49,6 @@ async function findLiveUnregisteredSlot(issueId: string): Promise<{ agentId: str
   return null;
 }
 
-function selfHealSlotAssignment(record: PanIssueRecord, agentId: string, slotIndex: number, itemId?: string): PanIssueRecord {
-  const assignments = record.swarm?.slotAssignments ?? [];
-  const existing = assignments.find((assignment) => assignment.slotIndex === slotIndex || assignment.agentId === agentId);
-  const assignedAt = new Date().toISOString();
-  const slotAssignments = existing
-    ? assignments.map((assignment) => assignment === existing
-      ? { ...assignment, agentId, itemId: itemId ?? assignment.itemId, assignedAt: assignment.assignedAt ?? assignedAt }
-      : assignment)
-    : [
-      ...assignments,
-      {
-        slotIndex,
-        itemId: itemId ?? `slot-${slotIndex}`,
-        agentId,
-        assignedAt,
-      },
-    ];
-
-  return {
-    ...record,
-    swarm: {
-      ...record.swarm,
-      slotAssignments,
-    },
-  };
-}
-
 export async function resolveIssueFeedbackTarget(
   issueId: string,
   opts: ResolveIssueFeedbackTargetOptions = {},
@@ -89,10 +61,13 @@ export async function resolveIssueFeedbackTarget(
     return { agentId: wholeIssueAgentId };
   }
 
+  // PAN-3917: slot assignments live in the issue's own `.pan/continues` slot
+  // ledger, read from the feature workspace.
   const resolved = resolveProjectFromIssueSync(normalizedIssue);
-  const project = resolved ? getProjectSync(resolved.projectKey) : null;
-  const record = project ? readIssueRecordSync(project, normalizedIssue) : null;
-  const assignments = record?.swarm?.slotAssignments ?? [];
+  const workspacePath = resolved
+    ? join(resolved.projectPath, 'workspaces', `feature-${issueLower}`)
+    : undefined;
+  const assignments = workspacePath ? readSwarmSlotAssignments(workspacePath, normalizedIssue) : [];
 
   const requestedItemId = opts.itemId?.trim();
   if (requestedItemId) {
@@ -108,13 +83,10 @@ export async function resolveIssueFeedbackTarget(
     if (await isLiveSession(agentId)) return { agentId };
   }
 
-  if (project && record) {
-    const fallback = await findLiveUnregisteredSlot(normalizedIssue);
-    if (fallback) {
-      await updateIssueRecord(project, normalizedIssue, (current) => selfHealSlotAssignment(current, fallback.agentId, fallback.slotIndex, requestedItemId));
-      return { agentId: fallback.agentId };
-    }
-  }
+  // A live slot session that no ledger entry names is still a delivery target:
+  // the pane is the fact. Nothing is written back to make the ledger agree.
+  const fallback = await findLiveUnregisteredSlot(normalizedIssue);
+  if (fallback) return { agentId: fallback.agentId };
 
   const registeredAgents = readFeedbackAgentStates();
   if (registeredAgents) {
@@ -133,9 +105,6 @@ export async function resolveIssueFeedbackTarget(
   // Operator pauses are the one gate never overridden. Escalating to a human (or any
   // mailbox-style deferred delivery, PAN-2255) is strictly the last resort after
   // resurrection of every candidate has failed.
-  const workspacePath = resolved
-    ? join(resolved.projectPath, 'workspaces', `feature-${issueLower}`)
-    : undefined;
   const revive = opts.revivePipelinePausedAgent
     ?? ((agentId, reviveIssueId) => resurrectAgentForFeedback(agentId, reviveIssueId, workspacePath));
   const candidates: string[] = [wholeIssueAgentId];
@@ -264,37 +233,30 @@ async function resurrectAgentForFeedback(
   }
 }
 
+/**
+ * Report that feedback for an issue has no reachable agent and needs a human.
+ *
+ * PAN-3917: this used to write a `stuck` flag onto the issue's `review_status`
+ * row for the dashboard to read back. The flag is gone; the delivery failure is
+ * announced on the activity stream, where the dashboard already listens, and
+ * the feedback file the caller wrote remains on disk as the durable artifact.
+ */
 export async function surfaceIssueFeedbackNeedsYou(
   issueId: string,
   reason: string,
   details: Record<string, unknown> = {},
 ): Promise<void> {
+  const { emitActivityEntrySync } = await import('../activity-logger.js');
   try {
-    const { markWorkspaceStuck, FEEDBACK_DELIVERY_STUCK_REASON } = await import('../review-status.js');
-    // PAN-3511: consult evidence from the host-recorded active review run
-    // before mutating the row. A workspace artifact never authorizes a terminal
-    // verdict; the canonical review done signal owns that transition, so a
-    // delivery failure still receives its protective stuck mark.
-    try {
-      const [{ getAgentStateSync }, { readLatestSynthesisVerdictAsync }] = await Promise.all([
-        import('../agents/agent-state.js'),
-        import('./synthesis-verdict.js'),
-      ]);
-      const state = getAgentStateSync(`agent-${issueId.toLowerCase()}-review`);
-      const artifact = await readLatestSynthesisVerdictAsync(issueId, {
-        runId: state?.reviewRunId,
-        workspacePath: state?.workspace,
-      });
-      if (artifact) console.warn(`[feedback-target] ${issueId}: found fresh ${artifact.verdict} artifact for the active run; awaiting canonical review signal. ${reason}`);
-    } catch (err) {
-      console.warn(`[feedback-target] Artifact consult failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}; proceeding with the stuck mark`);
-    }
-    markWorkspaceStuck(issueId, FEEDBACK_DELIVERY_STUCK_REASON, {
-      reason,
-      ...details,
+    emitActivityEntrySync({
+      source: 'cloister',
+      level: 'warn',
+      message: `${issueId} needs you: ${reason}`,
+      issueId,
+      details: Object.keys(details).length > 0 ? JSON.stringify(details) : undefined,
     });
   } catch (err) {
-    console.warn(`[feedback-target] Failed to mark ${issueId} as needing human attention: ${err instanceof Error ? err.message : String(err)}`);
+    console.warn(`[feedback-target] Failed to announce needs-you for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
   }
   console.warn(`[feedback-target] ${reason}`);
 }

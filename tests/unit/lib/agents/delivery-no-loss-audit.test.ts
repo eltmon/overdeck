@@ -25,62 +25,43 @@ const CALL_SITE_RE = /messageAgent\(|deliverAgentMessage\(|resumeAgent\(/;
 
 /** Snapshot produced with:
  * grep -rn "messageAgent(\|deliverAgentMessage(\|resumeAgent(" src/lib/cloister src/cli src/dashboard/server --include=*.ts | grep -v __tests__
- * at the start of W7 (2026-09-17), normalized to `path|trimmed line`. */
+ * normalized to `path|trimmed line`. Regenerated after the PAN-3917 cut. */
 const KNOWN_CALL_SITES = new Set([
-  'lib/cloister/swarm-foreman.ts|await deps.messageAgent(agentId, options.prompt ?? `Continue managing ${issue} as its swarm foreman. Run pan swarm status ${issue} --json before acting.`, \'pan-swarm\');',
-  'lib/cloister/deacon-review-signals.ts|await messageAgent(state.id, message);',
-  'lib/cloister/deacon-review-signals.ts|await messageAgent(state.reviewSynthesisAgentId, message);',
-  'lib/cloister/review-verdict-feedback.ts|deliveryOutcome = await messageAgent(target.agentId, message, \'internal\', {',
-  'lib/cloister/review-verdict-feedback.ts|deliveryOutcome = await messageAgent(',
-  'lib/cloister/deacon-strike-landing.ts|deliverRecovery: (agentId, message, dedupKey) => messageAgent(agentId, message, \'deacon-strike-landing\', { owesRework: true, dedupKey }),',
-  'lib/cloister/stuck-remediation.ts|const result = await resumeAgent(agentId, message);',
-  'lib/cloister/stuck-remediation.ts|await messageAgent(agentId, message);',
-  'lib/cloister/stuck-remediation.ts|message: (id, msg) => messageAgent(id, msg),',
-  'lib/cloister/stuck-remediation.ts|resume: (id, msg) => resumeAgent(id, msg),',
-  'lib/cloister/deacon-swarm-completion.ts|await messageAgent(',
-  'lib/cloister/deacon-auto-resume.ts|await messageAgent(agentId, message);',
-  'lib/cloister/deacon-auto-resume.ts|const result = await resumeAgent(agentId, undefined, { startedBy: \'deacon:auto-resume\' });',
-  'lib/cloister/deacon-review-unsignaled.ts|await messageAgent(reviewSession, nudge);',
-  'lib/cloister/feedback-target.ts|const result = await resumeAgent(agentId);',
-  'lib/cloister/preemption.ts|const result = await resumeAgent(agentId);',
-  'lib/cloister/preemption.ts|const result = await resumeAgent(agent.id);',
-  'lib/cloister/review-agent.ts|const resumeResult = await resumeAgent(reviewAgentId, prompt);',
-  'lib/cloister/deacon-inspect.ts|await messageAgent(`agent-${issueId.toLowerCase()}`, verdict, \'deacon:inspect-watchdog\');',
-  'lib/cloister/review-convoy.ts|const resumeResult = await resumeAgent(reviewerAgent, prompt);',
-  'lib/cloister/review-convoy.ts|await messageAgent(params.synthesisAgentId, `REVIEWER_FAILED ${subRole} ${result.error ?? result.message}`);',
-  'lib/cloister/deacon-swarm.ts|sendStallEvent: (agentId, message) => messageAgent(agentId, message, \'deacon:swarm-stall\'),',
-  'lib/cloister/specialists-feedback.ts|await messageAgent(agentSession, msg);',
-  'lib/cloister/deacon.ts|await messageAgent(testSession, nudge);',
-  'lib/cloister/deacon.ts|const outcome = await messageAgent(agentSessionName, nudgeMessage, \'deacon:dead-end\', { owesRework: true });',
-  'lib/cloister/deacon.ts|await messageAgent(`agent-${issueId.toLowerCase()}`, `[swarm-event] ${agent.id} reported done; run pan swarm status ${issueId} --json`, \'deacon:swarm-event\');',
-  'lib/cloister/ci-failure-feedback.ts|await messageAgent(agentId, message);',
-  'lib/cloister/deacon-api-recovery.ts|send: (target, message) => deliverAgentMessage(target, message, \'deacon:compaction-continuation\'),',
-  'lib/cloister/deacon-api-recovery.ts|// successful resumeAgent({compact:true}) clears the stuck flag (in',
-  'lib/cloister/deacon-api-recovery.ts|// respawn (resumeAgent({compact:true})): the wedged session is',
-  'lib/cloister/deacon-api-recovery.ts|const recovered = await resumeAgent(sessionName, undefined, { compact: true });',
-  'lib/cloister/deacon-api-recovery.ts|const resumeResult = await resumeAgent(sessionName, undefined, { compact: true });',
-  'lib/cloister/verification-runner.ts|outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
-  'lib/cloister/service-reactive.ts|send: (target, message) => deliverAgentMessage(target, message, \'hook:post-compact-continuation\'),',
-  'lib/cloister/service-reactive.ts|? (await import(\'../agents/messaging.js\')).messageAgent(',
-  'lib/cloister/uat-failure-feedback.ts|const outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
   'cli/commands/recover.ts|const result = await resumeAgent(agentId, undefined, {',
+  'cli/commands/resume.ts|const result = await resumeAgent(id, undefined, { allowHost: options.host === true, compact: options.compact === true });',
   'cli/commands/tell.ts|const outcome = await messageAgent(agentId, message, \'pan-tell\', {',
   'cli/commands/unpause.ts|const result = await resumeAgent(agentId);',
-  'cli/commands/resume.ts|const result = await resumeAgent(id, undefined, { allowHost: options.host === true, compact: options.compact === true });',
-  'dashboard/server/pending-feedback.ts|* When the dashboard dies after writing feedback and before messageAgent() completes,',
-  'dashboard/server/routes/agents/lifecycle-stop.ts|.then(({ resumeAgent }) => resumeAgent(id))',
-  'dashboard/server/routes/workspaces.ts|await messageAgent(agentId, message);',
-  'dashboard/server/routes/workspaces.ts|yield* Effect.tryPromise(() => messageAgent(',
-  'dashboard/server/routes/agents/permissions.ts|yield* Effect.promise(() => deliverAgentMessage(id, message, \'ask-user-question-answer\'));',
-  'dashboard/server/routes/specialists/legacy-routes.ts|await messageAgent(workAgentId, rebaseMsg);',
-  'dashboard/server/routes/tiered-callouts.ts|return deliverAgentMessage(',
-  'dashboard/server/routes/workspaces/merge-strike.ts|assertDelivered(agentId, await messageAgent(agentId, rebaseMsg));',
-  'dashboard/server/routes/linear-mcp-auth.ts|yield* Effect.promise(() => messageAgent(',
-  'dashboard/server/routes/agents/messaging.ts|await messageAgent(id, message, \'dashboard:user-message\');',
-  'dashboard/server/routes/agents/messaging.ts|yield* Effect.promise(() => messageAgent(id, pokeMsg));',
+  'dashboard/server/pending-feedback.ts|* dies after writing feedback and before messageAgent() completes, startup',
   'dashboard/server/routes/agents/lifecycle-restart.ts|console.log(`[agents/resume] ${id} dispatching resumeAgent() with opts=${JSON.stringify(resumeOpts)}`);',
   'dashboard/server/routes/agents/lifecycle-restart.ts|const result = yield* Effect.promise(() => resumeAgent(id, message, resumeOpts));',
+  'dashboard/server/routes/agents/lifecycle-stop.ts|.then(({ resumeAgent }) => resumeAgent(id))',
+  'dashboard/server/routes/agents/messaging.ts|await messageAgent(id, message, \'dashboard:user-message\');',
+  'dashboard/server/routes/agents/messaging.ts|yield* Effect.promise(() => messageAgent(id, pokeMsg));',
+  'dashboard/server/routes/agents/permissions.ts|yield* Effect.promise(() => deliverAgentMessage(id, message, \'ask-user-question-answer\'));',
+  'dashboard/server/routes/linear-mcp-auth.ts|yield* Effect.promise(() => messageAgent(',
+  'dashboard/server/routes/specialists/legacy-routes.ts|await messageAgent(workAgentId, rebaseMsg);',
+  'dashboard/server/routes/workspaces.ts|await messageAgent(agentId, message);',
+  'dashboard/server/routes/workspaces/merge-strike.ts|assertDelivered(agentId, await messageAgent(agentId, rebaseMsg));',
   'dashboard/server/services/agent-spawner.ts|await messageAgent(agentId, msg);',
+  'lib/cloister/ci-failure-feedback.ts|await messageAgent(agentId, message);',
+  'lib/cloister/deacon-api-recovery.ts|await deliverAgentMessage(pane.agentId, CONTINUE_MSG, \'deacon-lite:checkApiErrorAgents\');',
+  'lib/cloister/deacon-lite.ts|await deliverAgentMessage(',
+  'lib/cloister/deacon-strike-landing.ts|deliverRecovery: (agentId, message, dedupKey) => messageAgent(agentId, message, \'deacon-strike-landing\', { owesRework: true, dedupKey }),',
+  'lib/cloister/deacon-swarm-completion.ts|await messageAgent(',
+  'lib/cloister/deacon-swarm.ts|sendStallEvent: (agentId, message) => messageAgent(agentId, message, \'deacon:swarm-stall\'),',
+  'lib/cloister/feedback-target.ts|const result = await resumeAgent(agentId);',
+  'lib/cloister/preemption.ts|const result = await resumeAgent(agent.id);',
+  'lib/cloister/preemption.ts|const result = await resumeAgent(agentId);',
+  'lib/cloister/review-agent.ts|const resumeResult = await resumeAgent(reviewAgentId, prompt);',
+  'lib/cloister/review-convoy.ts|await messageAgent(params.synthesisAgentId, `REVIEWER_FAILED ${subRole} ${result.error ?? result.message}`);',
+  'lib/cloister/review-convoy.ts|const resumeResult = await resumeAgent(reviewerAgent, prompt);',
+  'lib/cloister/review-verdict-feedback.ts|deliveryOutcome = await messageAgent(',
+  'lib/cloister/review-verdict-feedback.ts|deliveryOutcome = await messageAgent(target.agentId, message, \'internal\', {',
+  'lib/cloister/service-reactive.ts|await (await import(\'../agents/messaging.js\')).messageAgent(',
+  'lib/cloister/specialists-feedback.ts|await messageAgent(agentSession, msg);',
+  'lib/cloister/swarm-foreman.ts|await deps.messageAgent(agentId, options.prompt ?? `Continue managing ${issue} as its swarm foreman. Run pan swarm status ${issue} --json before acting.`, \'pan-swarm\');',
+  'lib/cloister/uat-failure-feedback.ts|const outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
+  'lib/cloister/verification-runner.ts|outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
 ]);
 
 function* walkTs(dir: string): Generator<string> {
@@ -127,8 +108,6 @@ const mocks = vi.hoisted(() => ({
   getLatestSessionIdSync: vi.fn(),
   captureTranscriptUserRecordSnapshot: vi.fn(),
   probeTranscriptSince: vi.fn(),
-  getReviewStatusFromDbSync: vi.fn(() => null),
-  clearWorkspaceStuck: vi.fn(),
   hasAgentRuntimeInSubtree: vi.fn(),
   surfaceIssueFeedbackNeedsYou: vi.fn(),
   resolveIssueFeedbackTarget: vi.fn(),
@@ -260,10 +239,6 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
   getReviewStatusesSync: () => ({}),
 }));
 
-vi.mock('../../../../src/lib/overdeck/review-status-sync.js', () => ({
-  getReviewStatusFromDbSync: mocks.getReviewStatusFromDbSync,
-  clearWorkspaceStuck: mocks.clearWorkspaceStuck,
-}));
 
 vi.mock('../../../../src/lib/providers.js', () => ({
   clearCredentialFileAuthSync: vi.fn(),
@@ -461,12 +436,13 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
     expect(mocks.resumeAgent).not.toHaveBeenCalled();
   });
 
-  describe('parked-issue fixture: feedback_delivery_needs_you exits on a confirmed delivery (W7 step 3)', () => {
+  describe('parked-issue fixture: a confirmed feedback redelivery is the exit (W7 step 3)', () => {
     beforeEach(() => {
       vi.useFakeTimers();
-      // The eight issues parked as "feedback could not be delivered" in the
-      // review (PAN-3679, 3677, 3685, 3689, 3690, 3740, 3810, 3814) all share
-      // this shape: a stuck feedback-delivery row and a live work session.
+      // PAN-3917: the feedback_delivery_needs_you escalation lived on the
+      // deleted review_status row, so there is no flag left to clear. What the
+      // eight parked issues (PAN-3679, 3677, 3685, 3689, 3690, 3740, 3810,
+      // 3814) needed is what survives: the redelivery itself is confirmed.
       mocks.getAgentStateSync.mockReturnValue({
         id: 'agent-pan-3679',
         issueId: 'PAN-3679',
@@ -481,10 +457,7 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
       vi.useRealTimers();
     });
 
-    it('clears the escalation flag through the review-status door', async () => {
-      mocks.getReviewStatusFromDbSync.mockReturnValue({ stuck: true, stuckReason: 'feedback_delivery_needs_you' });
-      // The parked issues' exit path is a confirmed FEEDBACK redelivery —
-      // the intent flag is what authorizes the clear (PR #3870 finding 3).
+    it('confirms the turn for a feedback redelivery', async () => {
       const promise = messageAgent('agent-pan-3679', 'review feedback', 'internal', { owesRework: true, feedbackRedelivery: true });
       await vi.advanceTimersByTimeAsync(1_000);
       await expect(promise).resolves.toEqual({
@@ -492,7 +465,6 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
         queuedToMail: true,
         confirmed: true,
       });
-      expect(mocks.clearWorkspaceStuck).toHaveBeenCalledWith('PAN-3679');
     });
   });
 });

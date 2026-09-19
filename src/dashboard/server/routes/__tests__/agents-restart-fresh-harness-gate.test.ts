@@ -128,7 +128,11 @@ describe('POST /api/agents/:id/restart-fresh — harness-gate ordering (PAN-1837
     mocks.getAgentState.mockReturnValue(Effect.succeed(agentState as any))
     mocks.getIssueStageSync.mockReturnValue(null)
     mocks.detectPendingOperatorDecision.mockResolvedValue(null)
-    mocks.getWorkAgentLifecycleState.mockReturnValue(Effect.succeed({ hasLiveTmuxSession: false } as any))
+    mocks.getWorkAgentLifecycleState.mockReturnValue(Effect.succeed({  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listPaneValuesSync: () => [],
+ hasLiveTmuxSession: false } as any))
     mocks.killSession.mockReturnValue(Effect.succeed(undefined))
     mocks.wipeAgentStateDirs.mockResolvedValue({ removed: [], path: '/tmp/pan-1837-agent-dir' })
     mocks.getProviderAuthMode.mockResolvedValue('api-key')

@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   getLatestSessionIdSync: vi.fn(),
   hasCompletionMarkerForAgent: vi.fn(),
   claudeSessionTranscriptExists: vi.fn(),
-  getReviewStatusSync: vi.fn(),
+  getPrFacts: vi.fn(),
   sessionExistsSync: vi.fn(),
 }));
 
@@ -29,11 +29,9 @@ vi.mock('../../../src/lib/paths.js', async (importOriginal) => ({
   claudeSessionTranscriptExists: mocks.claudeSessionTranscriptExists,
 }));
 
-vi.mock('../../../src/lib/review-status.js', () => ({
-  getReviewStatusSync: mocks.getReviewStatusSync,
-
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
+// PAN-3917: owed rework is the PR's `CHANGES_REQUESTED`, not a status row.
+vi.mock('../../../src/lib/cloister/pr-facts.js', () => ({
+  getPrFacts: mocks.getPrFacts,
 }));
 
 vi.mock('../../../src/lib/tmux.js', () => ({
@@ -41,28 +39,28 @@ vi.mock('../../../src/lib/tmux.js', () => ({
   sessionExists: vi.fn(),
 }));
 
-import { getWorkAgentLifecycleStateSync, issueOwesReworkSync } from '../../../src/lib/work-agent-lifecycle.js';
+import { getWorkAgentLifecycleStateSync, issueOwesRework } from '../../../src/lib/work-agent-lifecycle.js';
 
-describe('issueOwesReworkSync', () => {
+describe('issueOwesRework', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('returns true for a row whose only failure is uatStatus: failed (PAN-3846)', () => {
-    mocks.getReviewStatusSync.mockReturnValue({ uatStatus: 'failed' });
-    expect(issueOwesReworkSync('PAN-3846')).toBe(true);
+  it('is true when the PR has changes requested', async () => {
+    mocks.getPrFacts.mockResolvedValue({ changesRequested: true });
+    await expect(issueOwesRework('PAN-3846')).resolves.toBe(true);
   });
 
-  it('returns false for a clean row, a missing row, and no issue id', () => {
-    mocks.getReviewStatusSync.mockReturnValue({ uatStatus: 'passed' });
-    expect(issueOwesReworkSync('PAN-3846')).toBe(false);
-    mocks.getReviewStatusSync.mockReturnValue(null);
-    expect(issueOwesReworkSync('PAN-3846')).toBe(false);
-    expect(issueOwesReworkSync(undefined)).toBe(false);
+  it('is false for an approved PR, a forge error, and no issue id', async () => {
+    mocks.getPrFacts.mockResolvedValue({ changesRequested: false });
+    await expect(issueOwesRework('PAN-3846')).resolves.toBe(false);
+    mocks.getPrFacts.mockRejectedValue(new Error('gh exploded'));
+    await expect(issueOwesRework('PAN-3846')).resolves.toBe(false);
+    await expect(issueOwesRework(undefined)).resolves.toBe(false);
   });
 });
 
-describe('getWorkAgentLifecycleStateSync warm-resume after handoff (PAN-3555 + PAN-3846)', () => {
+describe('getWorkAgentLifecycleStateSync after handoff (PAN-3334)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getAgentStateSync.mockReturnValue({
@@ -80,25 +78,22 @@ describe('getWorkAgentLifecycleStateSync warm-resume after handoff (PAN-3555 + P
     mocks.hasCompletionMarkerForAgent.mockReturnValue(true);
   });
 
-  it('recommends the PAN-3555 warm resume when a failed UAT owes rework', () => {
-    mocks.getReviewStatusSync.mockReturnValue({ uatStatus: 'failed' });
-
+  it('reports nothing to resume: this synchronous door cannot ask the forge', () => {
     const state = getWorkAgentLifecycleStateSync('agent-pan-3846');
 
     expect(state.handedOff).toBe(true);
-    expect(state.owesRework).toBe(true);
-    expect(state.recommendedAction).toBe('resume');
-    expect(state.reason).toContain('owes it rework');
-    expect(state.reason).not.toContain('nothing to resume');
+    expect(state.canResumeSession).toBe(false);
+    expect(state.recommendedAction).toBe('none');
+    expect(state.reason).toContain('nothing to resume');
+    expect(mocks.getPrFacts).not.toHaveBeenCalled();
   });
 
-  it('still reports nothing to resume when the row owes no rework', () => {
-    mocks.getReviewStatusSync.mockReturnValue({ uatStatus: 'passed' });
+  it('leaves a non-handed-off stopped agent resumable', () => {
+    mocks.hasCompletionMarkerForAgent.mockReturnValue(false);
 
     const state = getWorkAgentLifecycleStateSync('agent-pan-3846');
 
-    expect(state.owesRework).toBe(false);
-    expect(state.recommendedAction).toBe('none');
-    expect(state.reason).toContain('nothing to resume');
+    expect(state.handedOff).toBe(false);
+    expect(state.canResumeSession).toBe(true);
   });
 });

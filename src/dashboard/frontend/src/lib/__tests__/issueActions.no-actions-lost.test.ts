@@ -23,7 +23,7 @@ const repositoryRoot = resolve(import.meta.dirname, '../../../../../..');
 const legacyCommandDeckIssueActions = [
   { legacyKey: 'merge', registryKey: null, surfaceText: 'Merge', note: 'Human-only MergeButton remains outside ISSUE_ACTIONS per Decision D6.' },
   { legacyKey: 'reviewTest', registryKey: 'requestReview', surfaceText: 'Review & Test' },
-  { legacyKey: 'recover', registryKey: 'recoverReview', surfaceText: 'Recover' },
+  { legacyKey: 'recover', registryKey: 'recoverAgent', surfaceText: 'Recover' },
   { legacyKey: 'stopAgent', registryKey: 'stopAgent', surfaceText: 'Stop Agent' },
   { legacyKey: 'startAgent', registryKey: 'startAgent', surfaceText: 'Start Agent' },
   { legacyKey: 'resumeSession', registryKey: 'resumeSession', surfaceText: 'Resume Session' },
@@ -38,24 +38,19 @@ const legacyCommandDeckIssueActions = [
   { legacyKey: 'upload', registryKey: 'upload', surfaceText: 'Upload' },
   { legacyKey: 'syncDiscussions', registryKey: 'syncDiscussions', surfaceText: 'Sync' },
   { legacyKey: 'syncMain', registryKey: 'syncMain', surfaceText: 'Sync main' },
-  { legacyKey: 'statusReview', registryKey: 'statusReview', surfaceText: 'Status' },
   { legacyKey: 'reopen', registryKey: 'reopen', surfaceText: 'Reopen' },
   { legacyKey: 'restartAgent', registryKey: 'restartAgent', surfaceText: 'Restart agent' },
   { legacyKey: 'restartFromPlan', registryKey: 'restartFromPlan', surfaceText: 'Restart from plan' },
   { legacyKey: 'resetIssue', registryKey: 'resetIssue', surfaceText: 'Reset issue' },
-  { legacyKey: 'resetToPlanned', registryKey: 'resetToPlanned', surfaceText: 'Reset to planned' },
   { legacyKey: 'cancel', registryKey: 'cancel', surfaceText: 'Cancel Issue' },
 ] as const satisfies readonly { legacyKey: string; registryKey: IssueActionKey | null; surfaceText: string; note?: string }[];
 
 const commandDeckGapActions = [
-  'untroubled',
-  'inspectTask',
   'open',
 ] as const satisfies readonly IssueActionKey[];
 
 const badgeBarActions = [
   { surfaceText: 'Tasks', registryKey: 'tasks' },
-  { surfaceText: 'Status', registryKey: 'statusReview' },
   { surfaceText: 'Inference', registryKey: 'inference' },
   { surfaceText: 'Discussions', registryKey: 'discussions' },
   { surfaceText: 'Transcripts', registryKey: 'transcripts' },
@@ -66,7 +61,7 @@ const badgeBarActions = [
 const statusFlowActions = [
   { surfaceText: 'MERGE', registryKey: null, note: 'Human-only MergeButton remains outside ISSUE_ACTIONS per Decision D6.' },
   { surfaceText: 'Review & Test', registryKey: 'requestReview' },
-  { surfaceText: 'Recover', registryKey: 'recoverReview' },
+  { surfaceText: 'Recover', registryKey: 'recoverAgent' },
   { surfaceText: 'Stop Agent', registryKey: 'stopAgent' },
   { surfaceText: 'Start Agent', registryKey: 'startAgent' },
   { surfaceText: 'Resume Session', registryKey: 'resumeSession' },

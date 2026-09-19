@@ -1,220 +1,74 @@
-import { existsSync } from 'fs';
-import { join } from 'path';
-import { Effect } from 'effect';
-import { setReviewStatusSync, type ReviewStatus } from '../review-status.js';
-import { logDeaconEventSync } from '../persistent-logger.js';
-import { isIssueClosed } from './issue-closed.js';
-import {
-  describeRunningAgents,
-  releaseAdvancingSlot,
-  tryReserveAdvancingSlot,
-} from './concurrency.js';
-import { ciRetryMap } from './deacon-merge.js';
-import { tryYieldForAdvancingDispatch } from './preemption.js';
-import { getPipelineStatus, listPipelineStatuses } from '../overdeck/pipeline-view.js';
+/**
+ * Did the branch move since its review? (PAN-3847, re-pointed by PAN-3917.)
+ *
+ * This module used to be a reset engine: it compared a `reviewedAtCommit`
+ * anchor stored on the review row against the workspace HEAD, then rewrote the
+ * row — clearing the verdict, stamping `reviewStaleSince`, dropping
+ * merge readiness, resetting retry counters — and re-dispatched a convoy. Most
+ * of it existed to keep a stored verdict honest as commits landed under it,
+ * and the rest existed to stop the reset from looping when the two anchor
+ * producers disagreed.
+ *
+ * With the verdict living on the pull request, the forge answers the question
+ * directly: the latest review carries the commit it was written against, and
+ * the PR carries its current head. Everything here is a read; nothing resets
+ * anything. A work agent that reworks after `CHANGES_REQUESTED` re-requests
+ * review itself through `pan done` / `pan review request`.
+ */
+import { getLatestPrReview, getPrFacts, type PrFacts } from './pr-facts.js';
 
-const BLOCKED_REVIEW_MISSING_ANCHOR_LOG_INTERVAL_MS = 60 * 60 * 1000;
-const blockedReviewMissingAnchorLogs = new Map<string, number>();
-const blockedReviewDriftObservations = new Map<
-  string,
-  { reviewedAnchor: string; currentAnchor: string }
->();
-// PAN-3254: the current anchor recorded at each issue's most recent reset. A
-// drift verdict against the SAME anchor a second time means the workspace has
-// not moved since we already reset for it — a repeating producer artifact,
-// not a new push (MIN-901: 425 resets, one distinct current anchor).
-const lastResetAnchors = new Map<string, string>();
-const resetLoopEscalated = new Set<string>();
+export type ReviewFreshness =
+  /** No PR, or no decisive review on it yet. */
+  | { kind: 'unreviewed' }
+  /** The latest review was written against the PR's current head. */
+  | { kind: 'current'; state: string; headSha: string }
+  /** Commits landed after the latest review; it no longer describes this code. */
+  | { kind: 'stale'; state: string; reviewedSha: string; headSha: string };
+
+export interface ReviewFreshnessDeps {
+  getFacts?: (issueId: string) => Promise<PrFacts>;
+  getLatestReview?: typeof getLatestPrReview;
+}
 
 /**
- * Detect issues where the agent pushed new commits after a review verdict.
+ * Compare the latest PR review against the PR's current head.
  *
- * Passed reviews are invalidated immediately when the reviewed tree changes.
- * Blocked reviews use the same drift evaluator, but require two consecutive
- * patrols at the same new HEAD before re-dispatching so a work agent that is
- * still pushing per-item commits does not start review mid-rework.
+ * Unknowable inputs (no PR, no review, a forge that does not report the
+ * reviewed commit) report `unreviewed` rather than guessing staleness.
  */
-export async function checkPostReviewCommits(): Promise<string[]> {
+export async function evaluateReviewFreshness(
+  issueId: string,
+  deps: ReviewFreshnessDeps = {},
+): Promise<ReviewFreshness> {
+  const facts = await (deps.getFacts ?? getPrFacts)(issueId);
+  if (!facts.open || !facts.headSha) return { kind: 'unreviewed' };
+
+  const review = await (deps.getLatestReview ?? getLatestPrReview)(facts);
+  if (!review?.commitId) return { kind: 'unreviewed' };
+
+  return review.commitId === facts.headSha
+    ? { kind: 'current', state: review.state, headSha: facts.headSha }
+    : { kind: 'stale', state: review.state, reviewedSha: review.commitId, headSha: facts.headSha };
+}
+
+/**
+ * Report which of the given issues have commits newer than their latest review.
+ *
+ * Report-only by construction: the caller decides what to say about it. No
+ * verdict is cleared, no row is stamped, no convoy is dispatched.
+ */
+export async function checkPostReviewCommits(
+  issueIds: readonly string[],
+  deps: ReviewFreshnessDeps = {},
+): Promise<string[]> {
   const actions: string[] = [];
-
-  try {
-    const statuses = listPipelineStatuses();
-    const { resolveProjectFromIssueSync } = await import('../projects.js');
-
-    for (const [issueId, status] of Object.entries(statuses)) {
-      const isBlocked = status.reviewStatus === 'blocked';
-      if (!isBlocked) blockedReviewDriftObservations.delete(issueId);
-
-      if (status.mergeStatus === 'merged') {
-        blockedReviewDriftObservations.delete(issueId);
-        lastResetAnchors.delete(issueId);
-        resetLoopEscalated.delete(issueId);
-        continue;
-      }
-      if (!isBlocked && status.reviewStatus !== 'passed' && !status.readyForMerge) continue;
-
-      // PAN-3847: a review already marked stale needs no further drift handling —
-      // only `pan done` / `pan review request` clears the marker, and leaving the
-      // row untouched here keeps the PAN-3254 reset-loop guard from misfiring on it.
-      if (status.reviewStaleSince) continue;
-
-      const reviewedAnchor = status.reviewedAtCommit;
-      if (!reviewedAnchor) {
-        blockedReviewDriftObservations.delete(issueId);
-        if (isBlocked) {
-          const now = Date.now();
-          const lastLoggedAt = blockedReviewMissingAnchorLogs.get(issueId) ?? 0;
-          if (now - lastLoggedAt >= BLOCKED_REVIEW_MISSING_ANCHOR_LOG_INTERVAL_MS) {
-            blockedReviewMissingAnchorLogs.set(issueId, now);
-            logDeaconEventSync(
-              `checkPostReviewCommits: ${issueId} blocked without anchor — cannot detect drift`,
-            );
-          }
-        }
-        continue;
-      }
-      if (await isIssueClosed(issueId)) {
-        blockedReviewDriftObservations.delete(issueId);
-        console.log(`[deacon] ${issueId}: skipping review re-dispatch — issue is closed`);
-        continue;
-      }
-
-      const project = resolveProjectFromIssueSync(issueId);
-      if (!project) continue;
-      const workspacePath = join(
-        project.projectPath,
-        'workspaces',
-        `feature-${issueId.toLowerCase()}`,
-      );
-      if (!existsSync(workspacePath)) continue;
-
-      const { formatAnchorShort, rehydrateHeadAnchor } = await import('../git-utils.js');
-      const { evaluateWorkspaceAnchorDrift } = await import('../workspace-anchor-drift.js');
-      const verdict = await evaluateWorkspaceAnchorDrift(
-        issueId,
-        workspacePath,
-        rehydrateHeadAnchor(reviewedAnchor),
-      );
-      if (verdict.kind === 'unreadable' || verdict.kind === 'current') {
-        blockedReviewDriftObservations.delete(issueId);
-        continue;
-      }
-
-      if (verdict.kind === 'benign') {
-        blockedReviewDriftObservations.delete(issueId);
-        setReviewStatusSync(issueId, { reviewedAtCommit: verdict.currentAnchor });
-        console.log(`[deacon] Benign post-review HEAD move for ${issueId}: ${formatAnchorShort(reviewedAnchor)} → ${formatAnchorShort(verdict.currentAnchor)} — review/test preserved`);
-        continue;
-      }
-
-      const currentHead = verdict.currentAnchor;
-
-      // PAN-3254: bound repeat resets. If this exact current anchor already
-      // triggered a reset, the branch has not moved since — re-resetting
-      // produces an identical "unchanged" review cycle every patrol (~100 s)
-      // and never converges. Escalate once instead of looping silently.
-      if (lastResetAnchors.get(issueId) === currentHead) {
-        if (!resetLoopEscalated.has(issueId)) {
-          resetLoopEscalated.add(issueId);
-          const message = `${issueId} — review reset suppressed: drift against ${formatAnchorShort(currentHead)} already caused a reset and the workspace has not moved since. This indicates an anchor-producer disagreement, not new commits; review will not re-dispatch until the workspace head actually changes.`;
-          logDeaconEventSync(`checkPostReviewCommits: ${message}`);
-          const { recordDeadEndNeedsYou } = await import('./dead-end-trip.js');
-          await recordDeadEndNeedsYou(issueId, 'review-reset-loop', currentHead, message);
-        }
-        continue;
-      }
-
-      if (isBlocked) {
-        const priorObservation = blockedReviewDriftObservations.get(issueId);
-        if (
-          !priorObservation
-          || priorObservation.reviewedAnchor !== reviewedAnchor
-          || priorObservation.currentAnchor !== currentHead
-        ) {
-          blockedReviewDriftObservations.set(issueId, {
-            reviewedAnchor,
-            currentAnchor: currentHead,
-          });
-          continue;
-        }
-        blockedReviewDriftObservations.delete(issueId);
-      }
-
-      console.log(
-        `[deacon] Post-review commit detected for ${issueId}: ` +
-        `was ${formatAnchorShort(reviewedAnchor)}, now ${formatAnchorShort(currentHead)} — ${isBlocked ? 'resetting review' : 'marking review stale'}`,
-      );
-      lastResetAnchors.set(issueId, currentHead);
-      resetLoopEscalated.delete(issueId);
-      if (isBlocked) {
-        setReviewStatusSync(issueId, {
-          reviewStatus: 'pending',
-          readyForMerge: false,
-          reviewedAtCommit: undefined,
-          reviewRetryCount: 0,
-          recoveryStartedAt: undefined,
-        });
-      } else {
-        // PAN-3847 (FR-8): a passed review is never reset by a patrol. Drift marks
-        // the row stale; only `pan done` or `pan review request` clears staleness.
-        if (!status.reviewStaleSince) {
-          setReviewStatusSync(issueId, {
-            reviewStaleSince: new Date().toISOString(),
-            readyForMerge: false,
-            mergeNotes: `Review stale: approved ${formatAnchorShort(reviewedAnchor)}, workspace HEAD is ${formatAnchorShort(currentHead)}. Run pan done or pan review request to re-review.`,
-          });
-          actions.push(`Marked review stale for ${issueId}: new commits after review passed (${formatAnchorShort(reviewedAnchor)} → ${formatAnchorShort(currentHead)}); no automatic re-dispatch`);
-        }
-        continue;
-      }
-      // Also clear the CI transient retry counter so the next merge attempt
-      // starts fresh. Without this, ciRetryMap retains count=6 from the previous
-      // CI failure cycle, permanently blocking transient retries for this issue.
-      ciRetryMap.delete(issueId);
-
-      // Redispatch a fresh review convoy. Re-read status to guard against races
-      // with other dispatch paths (HTTP request-review, manual CLI) that may have
-      // already picked up the work between the reset above and now.
-      const freshStatus = getPipelineStatus(issueId);
-      // PAN-2507: also a blocked advancing (review) dispatch — try to yield an
-      // idle work agent before deferring. (This 7th site was not in the PRD's
-      // six-site enumeration but is the same `!tryReserveAdvancingSlot()` shape.)
-      if (freshStatus?.reviewStatus === 'pending' && !tryReserveAdvancingSlot() && !(await tryYieldForAdvancingDispatch('review', issueId))) {
-        // PAN-1665: at the ceiling — status is already reset to pending above, so
-        // the orphan-review path will re-dispatch on a later patrol once a slot frees.
-        actions.push(`Deferred post-review re-dispatch for ${issueId} — advancing-role concurrency ceiling reached`);
-        logDeaconEventSync(`checkPostReviewCommits: deferred review for ${issueId} — advancing ceiling reached (PAN-1665) — ${describeRunningAgents()}`);
-      } else if (freshStatus?.reviewStatus === 'pending') {
-        const { spawnReviewRoleForIssue } = await import('./review-agent.js');
-        const branch = `feature/${issueId.toLowerCase()}`;
-        const dispatchResult = await Effect.runPromise(spawnReviewRoleForIssue({
-          issueId,
-          workspace: workspacePath,
-          branch,
-          // PAN-3847 (FR-16): never force — the runId guard refuses a convoy for
-          // an unchanged head.
-          force: false,
-        }));
-        if (dispatchResult.gated) {
-          releaseAdvancingSlot();
-          actions.push(`Deferred post-review re-dispatch for ${issueId} — ${dispatchResult.message}`);
-          console.log(`[deacon] Deferred post-review re-dispatch for ${issueId}: ${dispatchResult.message}`);
-        } else if (dispatchResult.success) {
-          const action = isBlocked
-            ? `Re-dispatched review for ${issueId}: rework commit after BLOCKED verdict (${formatAnchorShort(reviewedAnchor)} → ${formatAnchorShort(currentHead)})`
-            : `Re-dispatched review for ${issueId}`;
-          actions.push(action);
-          console.log(`[deacon] ${action}`);
-        } else {
-          actions.push(`Failed to re-dispatch review for ${issueId}: ${dispatchResult.error || dispatchResult.message}`);
-          console.error(`[deacon] Failed to re-dispatch review for ${issueId}:`, dispatchResult.error || dispatchResult.message);
-        }
-      }
-    }
-  } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : String(error);
-    console.error('[deacon] Error in checkPostReviewCommits:', msg);
+  for (const issueId of issueIds) {
+    const freshness = await evaluateReviewFreshness(issueId, deps).catch(() => null);
+    if (freshness?.kind !== 'stale') continue;
+    actions.push(
+      `${issueId}: the latest review (${freshness.state}) was written against ${freshness.reviewedSha.slice(0, 8)}, `
+      + `the PR head is now ${freshness.headSha.slice(0, 8)} — re-request review to re-review the new commits`,
+    );
   }
-
   return actions;
 }

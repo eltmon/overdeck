@@ -20,9 +20,7 @@ import { hookCommand } from './fpp-handler.js';
 import { backfillTitlesCommand } from './conversations-handler.js';
 import { listStatesCommand, cleanupStatesCommand } from './tracker-handler.js';
 import { migrateConfigCommand } from '../migrate-config.js';
-import { registerStateMigrationCommand } from './state-migrate.js';
-import { registerReconcileLabelsCommand } from './reconcile-labels.js';
-import { registerMigrateLegacyAgentDirsCommand } from './migrate-legacy-agent-dirs.js';
+import { registerMigratePlanHomeCommand } from './migrate-plan-home.js';
 import { registerSeedUatFixturesCommand } from './seed-uat-fixtures.js';
 import { registerAgentsCommands } from './agents-exited.js';
 
@@ -46,10 +44,8 @@ export function registerAdminCommands(program: Command): void {
       }
     });
 
-  registerStateMigrationCommand(admin);
-  registerReconcileLabelsCommand(admin);
-  registerMigrateLegacyAgentDirsCommand(admin);
   registerSeedUatFixturesCommand(admin);
+  registerMigratePlanHomeCommand(admin);
   registerAgentsCommands(admin);
 
   // pan admin cloister — lifecycle watchdog

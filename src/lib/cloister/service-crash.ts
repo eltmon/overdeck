@@ -8,7 +8,7 @@ import { getAgentRuntimeStateSync, getAgentStateSync, saveAgentStateSync } from 
 import { setCloisterSpawnsPausedSync } from '../overdeck/control-settings.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
 import { exactPaneTarget, getManagedTmuxSocketName } from '../tmux.js';
-import { isRoleTerminal, type AdvancingRole } from './reap-terminal-sessions.js';
+import { advancingPhaseFromPrFacts, isRoleTerminal, type AdvancingRole } from './reap-terminal-sessions.js';
 import type { AgentHealth } from './health.js';
 import type { CloisterConfig } from './config.js';
 
@@ -254,24 +254,28 @@ export async function handleAgentCrash(host: CrashHost, agentId: string): Promis
     // PAN-2007: a one-shot review/test session that vanished BEFORE recording a
     // terminal verdict died prematurely — e.g. before it could run
     // `pan specialists done`. Masking that as a normal "one-shot completion" and
-    // skipping restart strands the issue at reviewStatus=reviewing forever (the
+    // skipping restart strands the issue mid-review forever (the
     // exact PAN-1832 symptom). Recover it instead: resume so it can finish and
     // signal. Only a terminal verdict (or a missing session) is a genuine
     // non-restartable completion.
     let recoverUnfinishedOneShot = false;
     if (ONE_SHOT_ROLES.has(agentState.role) && agentState.sessionId && agentState.issueId) {
       try {
-        const { getPipelineStatus } = await import('../overdeck/pipeline-view.js');
-        const status = getPipelineStatus(agentState.issueId);
-        const verdictTerminal = status
-          ? isRoleTerminal(agentState.role as AdvancingRole, {
-              reviewStatus: status.reviewStatus,
-              testStatus: status.testStatus,
-              readyForMerge: status.readyForMerge,
-              mergeStatus: status.mergeStatus,
-            })
+        // PAN-3917: the forge says whether this role's phase finished. A test
+        // verdict lives in the workspace artifact, read through the same door
+        // the test role writes.
+        const [{ getPrFacts }, { readTestVerdictArtifact }] = await Promise.all([
+          import('./pr-facts.js'),
+          import('./test-verdict.js'),
+        ]);
+        const facts = await getPrFacts(agentState.issueId);
+        const testSettled = agentState.workspace
+          ? Boolean(readTestVerdictArtifact(agentState.workspace))
           : false;
-        recoverUnfinishedOneShot = !verdictTerminal;
+        recoverUnfinishedOneShot = !isRoleTerminal(
+          agentState.role as AdvancingRole,
+          advancingPhaseFromPrFacts(facts, { testSettled }),
+        );
       } catch {
         recoverUnfinishedOneShot = false;
       }

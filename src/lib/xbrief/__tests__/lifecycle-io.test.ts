@@ -169,7 +169,7 @@ describe('updatePlanStatus', () => {
 });
 
 describe('moveXBrief (with durable git write-through)', () => {
-  it('moves and commits through the canonical state writer', async () => {
+  it('moves the spec into .pan/specs and leaves the commit to the agent (PAN-3917)', async () => {
     initGitRepo(TEST_DIR);
     ensureXBriefDirsSync(TEST_DIR);
     const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
@@ -184,12 +184,11 @@ describe('moveXBrief (with durable git write-through)', () => {
 
     const result = await Effect.runPromise(moveXBrief(TEST_DIR, 'PAN-1', 'active'));
     expect(existsSync(result.toPath)).toBe(true);
+    expect(result.toPath).toContain(join('.pan', 'specs'));
 
-    // The move is committed atomically; no staged residue remains.
+    // PAN-3917: the door writes files; the agent commits them on its branch.
     const status = execSync('git status --porcelain', { cwd: TEST_DIR, encoding: 'utf-8' });
-    expect(status).toBe('');
-    expect(execSync('git show --name-only --format= HEAD', { cwd: TEST_DIR, encoding: 'utf-8' }))
-      .toContain('.pan/specs/');
+    expect(status).not.toBe('');
   });
 
   it('throws when issue has no xBRIEF', async () => {
@@ -316,7 +315,7 @@ describe('promoteXBriefToProposed', () => {
 });
 
 describe('transitionXBriefOnMain', () => {
-  it('moves xBRIEF between dirs, updates status, and commits on main', async () => {
+  it('moves xBRIEF between dirs and updates status, without committing', async () => {
     initGitRepo(TEST_DIR);
     ensureXBriefDirsSync(TEST_DIR);
     const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
@@ -340,16 +339,14 @@ describe('transitionXBriefOnMain', () => {
     expect(result.toDir).toBe('active');
     expect(result.moved).toBe(true);
     expect(result.statusUpdated).toBe(true);
-    expect(result.committed).toBe(true);
+    // PAN-3917: the door never commits — the agent does, on its feature branch.
+    expect(result.committed).toBe(false);
     expect(existsSync(result.toPath)).toBe(true);
     expect(existsSync(join(resolveXBriefDir(TEST_DIR, 'proposed'), filename))).toBe(false);
 
     const updatedDoc = JSON.parse(readFileSync(result.toPath, 'utf-8')) as XBriefDocument;
     expect(updatedDoc.plan.status).toBe('approved');
     expect(updatedDoc.plan.sequence).toBe(2);
-
-    const log = execSync('git log -1 --pretty=%s', { cwd: TEST_DIR, encoding: 'utf-8' }).trim();
-    expect(log).toBe('scope: approve PAN-1 xBRIEF');
   });
 
   it('is idempotent once the issue already lives in .pan/specs with the target lifecycle and status', async () => {
@@ -407,7 +404,7 @@ describe('transitionXBriefOnMain', () => {
 
     expect(result.moved).toBe(false);
     expect(result.statusUpdated).toBe(true);
-    expect(result.committed).toBe(true);
+    expect(result.committed).toBe(false);
 
     const doc = JSON.parse(readFileSync(result.toPath, 'utf-8')) as XBriefDocument;
     expect(doc.plan.status).toBe('approved');
@@ -435,7 +432,7 @@ describe('transitionXBriefOnMain', () => {
 
     expect(result.moved).toBe(true);
     expect(result.statusUpdated).toBe(true);
-    expect(result.committed).toBe(true);
+    expect(result.committed).toBe(false);
   });
 
   it('throws when no xBRIEF exists for the issue', async () => {

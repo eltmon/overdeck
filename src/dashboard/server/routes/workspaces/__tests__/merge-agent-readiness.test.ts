@@ -20,6 +20,12 @@ const mocks = vi.hoisted(() => ({
   lifecycle: { hasLiveTmuxSession: false, canResumeSession: true, canStartFresh: true } as Record<string, unknown>,
 }));
 
+// PAN-3917: config-yaml's defaults import lib/agents/tier-table, which still
+// reaches the record plane W3 is deleting. Stub the one constant it needs.
+vi.mock('../../../../../lib/agents/tier-table.js', () => ({
+  DEFAULT_TIERED_EXECUTION_CONFIG: { enabled: false, tiers: [], subscription: 'all' },
+}));
+
 vi.mock('../../../../../lib/agents/agent-state.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../../lib/agents/agent-state.js')>();
   return {

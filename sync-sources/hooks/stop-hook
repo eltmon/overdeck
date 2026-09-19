@@ -3,8 +3,7 @@
 #
 # Fires on Claude Code Stop. Emits agent.activity_changed(idle) — the reducer
 # clears currentTool / thinking / waiting on that transition, so no separate
-# waiting_cleared is needed. Still chains to specialist-stop-hook and
-# work-agent-stop-hook, and still fires the planning auto-completion call.
+# waiting_cleared is needed. Still fires the planning auto-completion call.
 
 set +e
 
@@ -123,18 +122,6 @@ if [ "$API_ERROR_DETECTED" = "true" ]; then
     tmux send-keys -t "$AGENT_ID" C-m 2>/dev/null
     rm -f "$tmpfile"
   fi
-fi
-
-# Chain to specialist-specific hook (auto-completion detection).
-SPECIALIST_HOOK="$HOME/.overdeck/bin/specialist-stop-hook"
-if [ -x "$SPECIALIST_HOOK" ]; then
-  "$SPECIALIST_HOOK" &
-fi
-
-# Chain to work-agent completion detection (nudges agents that forgot `pan work done`).
-WORK_AGENT_HOOK="$HOME/.overdeck/bin/work-agent-stop-hook"
-if [ -x "$WORK_AGENT_HOOK" ]; then
-  "$WORK_AGENT_HOOK" &
 fi
 
 # Auto-mark planning complete when a planning agent finishes.

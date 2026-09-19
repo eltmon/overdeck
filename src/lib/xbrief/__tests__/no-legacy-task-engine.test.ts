@@ -18,7 +18,6 @@ const LIVE_TASK_SURFACES = [
   'src/lib/xbrief/dag.ts',
   'src/lib/xbrief/io.ts',
   'src/lib/xbrief/types.ts',
-  'sync-sources/rules/no-inspection-policy.md',
   'sync-sources/skills/pan-agent-activity/SKILL.md',
   'sync-sources/skills/pan-plan/SKILL.md',
   'sync-sources/skills/plan/SKILL.md',

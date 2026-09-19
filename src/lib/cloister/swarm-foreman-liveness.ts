@@ -1,13 +1,14 @@
 import { emitActivityEntrySync } from '../activity-logger.js';
-import { listSlotAssignments, type SlotReconcileResult } from '../agents/slot-reconcile.js';
+import { listSlotAssignments, type SlotReconcileResult } from './swarm-slot-reconcile.js';
 import { readSwarmHold, writeSwarmHold } from './deacon-swarm-record.js';
-import { workResumeSlotsAvailable } from './concurrency.js';
+import { countRunningAgents, workResumeSlotsAvailable } from './concurrency.js';
 import { ensureSwarmForeman } from './swarm-foreman.js';
 
 export interface SwarmForemanLivenessDeps {
   listSlotAssignments: (issueId: string, workspacePath: string) => Array<{ slotIndex: number }>;
   readSwarmHold: typeof readSwarmHold;
-  workResumeSlotsAvailable: typeof workResumeSlotsAvailable;
+  /** PAN-3917: the running count comes from the backend inventory, so this is async. */
+  workResumeSlotsAvailable: () => Promise<number>;
   ensureSwarmForeman: typeof ensureSwarmForeman;
   writeSwarmHold: typeof writeSwarmHold;
   emitActivityEntry: typeof emitActivityEntrySync;
@@ -16,7 +17,7 @@ export interface SwarmForemanLivenessDeps {
 const defaultDeps: SwarmForemanLivenessDeps = {
   listSlotAssignments,
   readSwarmHold,
-  workResumeSlotsAvailable,
+  workResumeSlotsAvailable: async () => workResumeSlotsAvailable(await countRunningAgents()),
   ensureSwarmForeman,
   writeSwarmHold,
   emitActivityEntry: emitActivityEntrySync,
@@ -46,7 +47,7 @@ export async function maintainSwarmForeman(
     return [];
   }
   if (sessions.includes(`agent-${issueLower}`) || deps.readSwarmHold(workspacePath, issueId)) return [];
-  if (deps.workResumeSlotsAvailable() <= 0) {
+  if (await deps.workResumeSlotsAvailable() <= 0) {
     return [`[swarm-janitor] deferred foreman respawn for ${issueId}: resource governor`];
   }
 

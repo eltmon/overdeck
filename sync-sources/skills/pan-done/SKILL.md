@@ -21,9 +21,11 @@ pan done <issue-id>
 
 ## What It Does
 
-Signals that work on an issue is complete. This triggers the Cloister watchdog to run
-quality gates (typecheck, lint, tests) and, if they pass, hand off to the review agent.
-The agent's tmux session remains alive for follow-up.
+Signals that work on an issue is complete. Runs quality gates (typecheck, lint, tests)
+and, if they pass, opens or updates the pull request and requests review. `pan done`
+writes nothing else — no pipeline record, no status field; the PR and its review state
+are the whole answer to "is this in review." The agent's tmux session remains alive for
+follow-up.
 
 ### Test-requirement gate
 
@@ -52,6 +54,6 @@ pre-flight checks.
 
 ## See Also
 
-- `pan review pending` — see what's queued for review
-- Dashboard MERGE button — merge after review passes
+- `gh pr view <issue-branch>` — see what's queued for review
+- Dashboard MERGE button — merge after approvals and checks are green
 - `pan show <id>` — inspect the current state before signaling done

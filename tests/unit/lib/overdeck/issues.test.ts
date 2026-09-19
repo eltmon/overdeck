@@ -21,8 +21,6 @@ import {
   overdeckIssues,
   type IssueId,
 } from '../../../../src/lib/overdeck/issues.js';
-import type { PanIssueRecord } from '../../../../src/lib/pan-dir/record.js';
-import type { ProjectConfig } from '../../../../src/lib/projects.js';
 
 let tempDirs: string[] = [];
 const DB_INTEGRATION_TIMEOUT_MS = 10_000;
@@ -51,7 +49,10 @@ afterEach(() => {
 });
 
 describe('overdeck Issues vertical slice', () => {
-  it('advances source-first and resolves the updated stage', async () => {
+  // PAN-3917: the issue has no record to derive from anymore — advance()
+  // writes the overdeckIssues cache row directly (the only write), so there
+  // is no cache/record ordering left to prove.
+  it('advances the cache row and resolves the updated stage', async () => {
     const dbPath = makeDbPath();
     const raw = openDatabase(dbPath);
     raw.prepare(`
@@ -67,14 +68,8 @@ describe('overdeck Issues vertical slice', () => {
       VALUES ('PAN-1938', 'todo', 'pending', 'pending', 'pending', '[]', 0)
     `).run();
 
-    const order: string[] = [];
     const recordsLayer = fakeRecordsLayer({
-      writeIssue: (_project: ProjectConfig, _issueId: string, record: PanIssueRecord) =>
-        Effect.sync(() => {
-          const row = raw.prepare('SELECT stage FROM issues WHERE id = ?').get<{ stage: string }>('PAN-1938');
-          order.push(`records-before-cache:${row?.stage}:${record.pipeline.reviewStatus}`);
-          return join(makeTempDir(), 'pan-1938.json');
-        }),
+      writeIssue: () => Effect.succeed(join(makeTempDir(), 'unused.json')),
       readIssue: () => Effect.succeed(null),
       readSpec: () => Effect.succeed(null),
     });
@@ -101,7 +96,7 @@ describe('overdeck Issues vertical slice', () => {
           const resolved = yield* resolver.get('PAN-1938' as IssueId);
           return { advanced, resolved, writer };
         }).pipe(
-          Effect.provide(makeIssueWriterLive({ name: 'test', path: makeTempDir(), issue_prefix: 'PAN' })),
+          Effect.provide(makeIssueWriterLive()),
           Effect.provide(IssuesResolverLive),
           Effect.provide(EventBusLive),
           Effect.provide(recordsLayer),
@@ -109,7 +104,6 @@ describe('overdeck Issues vertical slice', () => {
         ),
       );
 
-      expect(order).toEqual(['records-before-cache:todo:pending']);
       expect(result.advanced.stage).toBe('planning');
       expect(result.resolved.stage).toBe('planning');
       expect(Object.keys(result.writer).sort()).toEqual(['advance', 'setBlockers', 'setPr']);
@@ -142,7 +136,7 @@ describe('overdeck Issues vertical slice', () => {
           }).run(),
         );
         const resolver = yield* IssuesResolver;
-        const ready = yield* resolver.list({ readyForMerge: true });
+        const ready = yield* resolver.list({ mergeReady: true });
         return ready.map((issue) => issue.id);
       }).pipe(
         Effect.provide(IssuesResolverLive),

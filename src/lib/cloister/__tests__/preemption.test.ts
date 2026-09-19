@@ -33,6 +33,7 @@ const mocks = vi.hoisted(() => ({
   emitActivityEntrySync: vi.fn(),
   logDeaconEventSync: vi.fn(),
   tryReserveAdvancingSlot: vi.fn(),
+  countRunningAgents: vi.fn(async () => ({ work: 0, advancing: 0, swarm: 0, total: 0 })),
 }));
 
 vi.mock('../../agents.js', () => ({
@@ -77,6 +78,9 @@ vi.mock('../memory-governor.js', () => ({
 
 vi.mock('../concurrency.js', () => ({
   tryReserveAdvancingSlot: mocks.tryReserveAdvancingSlot,
+  // PAN-3917: the running count is read from the selected backend's inventory,
+  // so it is async and preemption awaits it before reserving.
+  countRunningAgents: mocks.countRunningAgents,
 }));
 
 function candidate(overrides: Partial<YieldCandidate> = {}): YieldCandidate {

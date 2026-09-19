@@ -67,7 +67,7 @@ describe('composer command no-loss audit', () => {
   ];
 
   it('accounts for every frozen legacy entry and handoff alias exactly once', () => {
-    expect(PRE_ADAPTER_COMMANDS).toHaveLength(260);
+    expect(PRE_ADAPTER_COMMANDS).toHaveLength(229);
     expect(new Set(MAPPING_ROWS.map(row => row.legacy)).size).toBe(MAPPING_ROWS.length);
     expect(unaccountedEntries(completeInventory, MAPPING_ROWS)).toEqual([]);
     expect(invalidMappings(MAPPING_ROWS)).toEqual([]);

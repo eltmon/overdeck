@@ -41,6 +41,10 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   tmux: {
     configMode: 'managed',
   },
+  // PAN-3917 D10: unset means auto-select — herdr when its binary and the
+  // 'overdeck' session socket are present, else tmux with a diagnostic
+  // (src/lib/terminal-backends/select.ts).
+  terminal: {},
   enabledProviders: new Set(['anthropic']), // Only Anthropic by default
   // Seeded conversation-model default for brand-new installs (operator
   // decision, 2026-07-12): the new-conversation picker must never be empty.

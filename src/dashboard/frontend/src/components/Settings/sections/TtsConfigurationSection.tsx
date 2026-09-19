@@ -30,24 +30,22 @@ interface TtsConfigurationSectionProps {
   onSettingsChange: (next: SettingsConfig, opts?: { debounce?: boolean }) => void;
 }
 
+/**
+ * PAN-3917: announcements follow the derived issue state (FR-6), not stored
+ * status fields — one key per state the issue can enter, plus the attention
+ * signals that mean a human is wanted.
+ */
 const TTS_EVENT_KEYS = [
-  'reviewStatus.passed',
-  'reviewStatus.failed',
-  'reviewStatus.blocked',
-  'testStatus.testing',
-  'testStatus.passed',
-  'testStatus.failed',
-  'testStatus.skipped',
-  'testStatus.dispatch_failed',
-  'verificationStatus.passed',
-  'verificationStatus.failed',
-  'verificationStatus.skipped',
-  'mergeStatus.queued',
-  'mergeStatus.merging',
-  'mergeStatus.verifying',
-  'mergeStatus.merged',
-  'mergeStatus.failed',
-  'readyForMerge',
+  'issueState.planned',
+  'issueState.working',
+  'issueState.in-review',
+  'issueState.changes-requested',
+  'issueState.ready',
+  'issueState.merged',
+  'issueState.closed',
+  'attention.needs-you',
+  'attention.stuck',
+  'attention.api-error',
 ] as const;
 
 const ACTIVITY_SOURCE_OPTIONS = [

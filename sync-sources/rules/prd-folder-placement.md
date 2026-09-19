@@ -1,14 +1,8 @@
 ---
 scope: dev
 ---
-### Place draft PRDs on the state branch
+### Place draft PRDs under `.pan/drafts/`
 
-Write draft PRDs to `drafts/<issue>.md` on `overdeck-state`, where `<issue>` is
-the lowercase issue ID. On disk, that is
-`${OVERDECK_HOME}/state/<project>/drafts/<issue>.md`. Do not place PRDs in
-ad-hoc locations in the code checkout.
-
-The state worktree is the canonical home for permanent planning artifacts
-(drafts, specs, and continue state). For an unmigrated project only, the legacy
-fallback remains `<projectRoot>/.pan/drafts/<issue>.md` until its migration
-marker lands on `origin/overdeck-state`.
+PRDs live at `<planHome>/.pan/drafts/<issue>.md`, where `<planHome>` is the
+project repo (or the configured plan-home repo for polyrepo projects) and
+`<issue>` is the lowercase issue ID. Commit them on the feature branch.

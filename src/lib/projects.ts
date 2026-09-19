@@ -22,7 +22,6 @@ import {
 import { extractPrefixSync, parseIssueIdSync } from './issue-id.js';
 import { notifyProjectsConfigInvalidated } from './projects-cache-events.js';
 import type { DatabaseConfig, QualityGateConfig, RepoConfig } from './workspace-config.js';
-import type { AutoResumeConfig } from './cloister/auto-resume-config.js';
 
 export const PROJECTS_CONFIG_FILE = join(OVERDECK_HOME, 'projects.yaml');
 
@@ -338,8 +337,6 @@ export interface ProjectConfig {
   rally_project?: string;
   /** Specialist agent configuration */
   specialists?: SpecialistConfig;
-  /** Per-project auto-resume failure tracking and backoff overrides */
-  autoResume?: Partial<AutoResumeConfig>;
   /** Path to the project's OKF knowledge bundle. Relative paths resolve from the project path. */
   knowledge_repo?: string;
   /** Per-project foreman/swarm settings. */
@@ -790,13 +787,17 @@ export function findProjectByPathSync(workspacePath: string): ProjectConfig | nu
  * @returns The resolved path (may differ from project.path based on routing rules)
  */
 /**
- * PAN-1908: resolve the infra-repo checkout path and records subdir for a project.
+ * PAN-1908: resolve the plan-home checkout path and `.pan` subdir for a project.
  *
- * - monorepo / missing pan_records: repoPath = project.path, recordsPath = .pan
+ * - monorepo / missing pan_records: repoPath = root, recordsPath = .pan
  * - polyrepo with pan_records.repo: look up named repo in workspace.repos[]
- * - pan_records.repo = ".": repoPath = project.path
+ * - pan_records.repo = ".": repoPath = root
+ *
+ * `root` defaults to the registered project checkout. Callers that work inside
+ * a worktree pass that worktree so the polyrepo sub-repo resolves relative to
+ * it, and the artifacts land on the branch the agent is committing (PAN-3917).
  */
-export function resolveInfraRepo(project: ProjectConfig): {
+export function resolveInfraRepo(project: ProjectConfig, root: string = project.path): {
   repoPath: string;
   recordsPath: string;
 } {
@@ -804,7 +805,7 @@ export function resolveInfraRepo(project: ProjectConfig): {
   const repoName = project.pan_records?.repo;
 
   if (!repoName || repoName === '.') {
-    return { repoPath: project.path, recordsPath };
+    return { repoPath: root, recordsPath };
   }
 
   const repos = project.workspace?.repos ?? [];
@@ -816,7 +817,7 @@ export function resolveInfraRepo(project: ProjectConfig): {
     );
   }
 
-  return { repoPath: resolve(project.path, matching.path), recordsPath };
+  return { repoPath: resolve(root, matching.path), recordsPath };
 }
 
 export function resolveProjectPath(project: ProjectConfig, labels: string[] = []): string {

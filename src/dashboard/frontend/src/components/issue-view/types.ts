@@ -2,9 +2,9 @@ import type { SessionNode } from '@overdeck/contracts';
 import type {
   ActivityResponse,
   IssueCostData,
-  ReviewStatusData,
   WorkspaceData,
 } from '../CommandDeck/ZoneCOverviewTabs/queries';
+import type { BackendPane, DerivedIssueState } from '../../types';
 
 /**
  * IssueViewModel — the single data model for every density of the unified issue view.
@@ -29,7 +29,7 @@ export interface IssueHeaderModel {
   title?: string;
   branch?: string;
   projectName?: string;
-  /** Canonical pipeline phase (plan | work | review | test | verify | ship | merged | verifying). */
+  /** The issue's derived state (FR-6), e.g. 'working', 'in-review', 'merged'. */
   phase: string;
   /** Resolved total cost formatted for display, e.g. "$1.23". */
   cost?: string;
@@ -68,7 +68,7 @@ export interface PipelineStepModel {
 /**
  * AgentRowModel — one row in the unified agents list.
  *
- * Derived from contracts SessionNode + ReviewStatusData. The icon key is a
+ * Derived from contracts SessionNode + the backend pane inventory. The icon key is a
  * UI-agnostic identifier; the rendering layer maps it to the appropriate icon.
  */
 export interface AgentRowModel {
@@ -100,31 +100,33 @@ export interface AgentRowModel {
   pendingInput: boolean;
 }
 
+/**
+ * PAN-3917 — verification is the PR's check runs (FR-8). Nothing stores a
+ * verification status, so there is one gate and it is the forge's answer.
+ */
 export interface IssueVerificationModel {
-  status: string;
-  cycle?: string;
+  status: 'pending' | 'passed' | 'failed';
   gates: VerificationGateModel[];
 }
 
 export interface VerificationGateModel {
   id: string;
   label: string;
-  status: 'pending' | 'running' | 'passed' | 'failed' | 'skipped' | 'infra-unavailable';
+  status: 'pending' | 'running' | 'passed' | 'failed';
 }
 
-export interface ShipLogModel {
-  startedAt?: string;
-  updatedAt?: string;
-  step?: string;
-  lines: Array<{ ts: string; line: string }>;
-}
-
+/**
+ * PAN-3917 — the merge door writes no record, so ship progress is what the
+ * forge says: is the PR mergeable, are its checks green, has it merged.
+ */
 export interface IssueShipModel {
-  status: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed' | 'ready';
-  readyForMerge: boolean;
-  mergeStep: string | null;
+  status: 'pending' | 'ready' | 'merged';
+  prUrl?: string;
+  prNumber?: number;
+  checks?: 'green' | 'red' | 'pending';
+  /** `null` when the forge has not computed mergeability yet. */
+  mergeable?: boolean | null;
   blockerReason?: string;
-  log?: ShipLogModel | null;
 }
 
 export interface IssueActivityModel {
@@ -149,9 +151,7 @@ export interface OperatorNeedsYou {
   kind:
     | 'awaiting_input'
     | 'stuck'
-    | 'troubled'
     | 'paused'
-    | 'stale_review'
     | 'blocker'
     | 'pickup_gate'
     | 'stopped'
@@ -167,7 +167,8 @@ export interface IssueViewInputs {
   title?: string;
   branch?: string;
   projectName?: string;
-  reviewStatus?: ReviewStatusData;
+  derived?: DerivedIssueState;
+  panes?: readonly BackendPane[];
   costs?: IssueCostData;
   workspace?: WorkspaceData;
   activity?: ActivityResponse;

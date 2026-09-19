@@ -63,8 +63,6 @@ export const HOOK_SCRIPT_NAMES: readonly string[] = [
   'heartbeat-hook',
   'stop-hook',
   'notification-hook',      // PAN-800: Notification — emits agent.waiting_started
-  'specialist-stop-hook',
-  'work-agent-stop-hook',   // PAN-800: chained from stop-hook; emits agent.resolution_changed
   'session-start-hook',          // PAN-800: SessionStart — emits agent.activity_changed(idle) + agent.model_set
   'user-prompt-submit-hook',     // UserPromptSubmit — clears waiting state, records message_received, restarts spinner
   'pre-compact-hook',            // PreCompact — emits activity=working/compact so dashboard shows compacting indicator

@@ -1,10 +1,37 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// PAN-3917: merge-sync, control-settings, and auto-merge-eligibility still reach
+// the record plane W3/W5 are deleting. This suite drives the executor entirely
+// through injected deps, so the module graph is stubbed at those boundaries.
+vi.mock('../../../../lib/overdeck/merge-sync.js', () => ({
+  listDuePendingAutoMerges: vi.fn(() => []),
+  markBlocked: vi.fn(() => true),
+  markFailed: vi.fn(() => true),
+  markMerged: vi.fn(() => true),
+  markMergingBlocked: vi.fn(() => true),
+  requeueToPending: vi.fn(() => true),
+  transitionToMerging: vi.fn(() => true),
+}));
+vi.mock('../../../../lib/overdeck/control-settings.js', () => ({
+  isMergeTrainEnabled: vi.fn(() => true),
+}));
+vi.mock('../../../../lib/cloister/auto-merge-eligibility.js', () => ({
+  isAutoMergeEligible: vi.fn(async () => ({ eligible: true })),
+}));
+vi.mock('../../../../lib/activity-logger.js', () => ({ emitActivityTtsSync: vi.fn() }));
+vi.mock('../derived-issue-state.js', () => ({
+  getDerivedIssueState: vi.fn(async (issueId: string) => ({ issueId, state: 'ready' })),
+}));
+
 import {
   AUTO_MERGE_EXECUTOR_INTERVAL_MS,
+  FAILED_MERGE_MAX_RETRIES,
+  _resetMergeRetryCountsForTests,
   startAutoMergeExecutor,
   stopAutoMergeExecutor,
   tickAutoMergeExecutor,
 } from '../auto-merge-executor.js';
+import type { DerivedIssueState, IssueState } from '@overdeck/contracts';
 import type { PendingAutoMerge } from '../../../../lib/overdeck/merge-types.js';
 
 const NOW = new Date('2026-05-25T10:00:00.000Z');
@@ -49,6 +76,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry({ scheduledMergeAt: '2026-05-25T10:00:01.000Z' })],
       isPaused: () => false,
+      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
       hasPendingDeploy: async () => false,
       transition,
       mergeIssue,
@@ -58,7 +86,7 @@ describe('auto-merge executor', () => {
     expect(mergeIssue).not.toHaveBeenCalled();
   });
 
-  it('skips the whole tick while Flywheel is paused', async () => {
+  it('skips the whole tick while the merge train is disabled', async () => {
     const transition = vi.fn();
     const log = vi.fn();
 
@@ -70,7 +98,7 @@ describe('auto-merge executor', () => {
       log,
     });
 
-    expect(log).toHaveBeenCalledWith('[auto-merge] flywheel paused, skipping tick');
+    expect(log).toHaveBeenCalledWith('[auto-merge] merge train disabled, skipping tick');
     expect(transition).not.toHaveBeenCalled();
   });
 
@@ -78,13 +106,14 @@ describe('auto-merge executor', () => {
     let deployQueued = true;
     const isEligible = vi.fn(async () => ({ eligible: true as const }));
     const transition = vi.fn(() => true);
-    const mergeIssue = vi.fn(async () => ({ success: true, mergeStatus: 'merged' }));
+    const mergeIssue = vi.fn(async () => ({ success: true, outcome: 'merged' }));
     const markMerged = vi.fn();
     const log = vi.fn();
     const deps = {
       now: () => NOW,
       listEntries: () => [pendingEntry(), pendingEntry({ id: 2, issueId: 'PAN-1487' })],
       isPaused: () => false,
+      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
       hasPendingDeploy: async () => deployQueued,
       isEligible,
       transition,
@@ -98,7 +127,7 @@ describe('auto-merge executor', () => {
     expect(transition).not.toHaveBeenCalled();
     expect(mergeIssue).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledWith(
-      '[auto-merge] dashboard deploy queued, deferring 2 merge(s) before preparation',
+      '[auto-merge] deploy in progress, deferring 2 merge(s) before preparation',
     );
 
     deployQueued = false;
@@ -116,6 +145,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
+      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: false, reason: 'CI checks failing on PR HEAD abc123' }),
       markBlocked,
@@ -134,6 +164,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
+      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => false,
@@ -146,7 +177,7 @@ describe('auto-merge executor', () => {
   });
 
   it('marks successful merges as merged after invoking the dashboard merge path', async () => {
-    const mergeIssue = vi.fn().mockResolvedValue({ success: true, statusCode: 200, message: 'Merged', mergeStatus: 'merged' });
+    const mergeIssue = vi.fn().mockResolvedValue({ success: true, statusCode: 200, message: 'Merged', outcome: 'merged' });
     const markMerged = vi.fn();
     const markFailed = vi.fn();
 
@@ -154,6 +185,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
+      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -178,10 +210,11 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
+      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
-      mergeIssue: async () => ({ success: true, statusCode: 200, message: 'Queued for merge', mergeStatus: 'queued' }),
+      mergeIssue: async () => ({ success: true, statusCode: 200, message: 'Queued for merge', outcome: 'queued' }),
       markMerged,
       markFailed,
       announceFailure,
@@ -211,6 +244,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
+      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -219,7 +253,7 @@ describe('auto-merge executor', () => {
         statusCode: 409,
         error: 'Post-rebase verification deferred',
         deferred: true,
-        mergeStatus: 'queued',
+        outcome: 'queued',
       }),
       getMergeRetryCount: () => 2,
       setMergeRetryCount,
@@ -247,6 +281,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
+      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -277,6 +312,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
+      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -305,6 +341,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
+      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -330,6 +367,7 @@ describe('auto-merge executor', () => {
       now: () => NOW,
       listEntries: () => [pendingEntry()],
       isPaused: () => false,
+      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' }),
       hasPendingDeploy: async () => false,
       isEligible: async () => ({ eligible: true }),
       transition: () => true,
@@ -363,5 +401,80 @@ describe('auto-merge executor', () => {
     await vi.advanceTimersByTimeAsync(AUTO_MERGE_EXECUTOR_INTERVAL_MS);
 
     expect(listEntries).not.toHaveBeenCalled();
+  });
+
+  // fix10: a peer dashboard shares the primary's database and forge; it starts
+  // nothing that merges or that a merge sets off.
+  it('does not start in a peer dashboard', async () => {
+    process.env.OVERDECK_DISABLE_DEACON = '1';
+    const listEntries = vi.fn(() => []);
+
+    try {
+      expect(startAutoMergeExecutor({ listEntries })).toBe(false);
+      await vi.advanceTimersByTimeAsync(AUTO_MERGE_EXECUTOR_INTERVAL_MS);
+      expect(listEntries).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.OVERDECK_DISABLE_DEACON;
+    }
+  });
+
+  it('blocks a scheduled merge whose PR stopped being ready (PAN-3917 FR-9)', async () => {
+    const markBlocked = vi.fn(() => true);
+    const transition = vi.fn(() => true);
+    const mergeIssue = vi.fn();
+
+    await tickAutoMergeExecutor({
+      now: () => NOW,
+      listEntries: () => [pendingEntry()],
+      isPaused: () => false,
+      hasPendingDeploy: async () => false,
+      isEligible: async () => ({ eligible: true }),
+      // A push landed between scheduling and the cooldown expiring, so checks
+      // went back to pending — the forge, not a stored row, decides.
+      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({
+        issueId,
+        state: 'in-review',
+        pr: { url: 'u', number: 1486, reviewState: 'approved', checks: 'pending', mergeable: true },
+      }),
+      markBlocked,
+      transition,
+      mergeIssue,
+    });
+
+    expect(markBlocked).toHaveBeenCalledWith(1, 'PAN-1486 is in-review, not ready to merge');
+    expect(transition).not.toHaveBeenCalled();
+    expect(mergeIssue).not.toHaveBeenCalled();
+  });
+
+  it('starts the retry budget over per process rather than persisting it', async () => {
+    const requeueToPending = vi.fn(() => true);
+    const markMergingBlocked = vi.fn(() => true);
+    const base = {
+      now: () => NOW,
+      listEntries: () => [pendingEntry()],
+      isPaused: () => false,
+      hasPendingDeploy: async () => false,
+      isEligible: async () => ({ eligible: true as const }),
+      derivedState: async (issueId: string): Promise<DerivedIssueState> => ({ issueId, state: 'ready' as IssueState }),
+      transition: () => true,
+      mergeIssue: async () => ({ success: false, retryable: true, error: 'transient' }),
+      requeueToPending,
+      markMergingBlocked,
+    };
+
+    _resetMergeRetryCountsForTests();
+    for (let i = 0; i < FAILED_MERGE_MAX_RETRIES; i += 1) await tickAutoMergeExecutor(base);
+    expect(requeueToPending).toHaveBeenCalledTimes(FAILED_MERGE_MAX_RETRIES);
+    expect(markMergingBlocked).not.toHaveBeenCalled();
+
+    await tickAutoMergeExecutor(base);
+    expect(markMergingBlocked).toHaveBeenCalledOnce();
+
+    // A restart forgets the budget: the circuit breaker exists to stop a hot
+    // loop in THIS process, not to permanently condemn the issue.
+    markMergingBlocked.mockClear();
+    _resetMergeRetryCountsForTests();
+    await tickAutoMergeExecutor(base);
+    expect(markMergingBlocked).not.toHaveBeenCalled();
   });
 });

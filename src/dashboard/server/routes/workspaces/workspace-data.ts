@@ -37,10 +37,9 @@ import {
 } from '../../../../lib/workspace/stack-health.js';
 import { listSessionNames, capturePane } from '../../../../lib/tmux.js';
 import { getActiveSessionModelSync } from '../../../../lib/cost-parsers/jsonl-parser.js';
-import { getReviewStatusSync } from '../../../../lib/review-status.js';
 import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import { listStashes, isSalvageableStash } from '../../../../lib/stashes.js';
-import { findPlan, isPlanningComplete, mergeRecordStatusOverrides, readPlan, serializeXBriefDocument } from '../../../../lib/xbrief/io.js';
+import { findPlan, isPlanningComplete, mergeContinueItemStatuses, readPlan, serializeXBriefDocument } from '../../../../lib/xbrief/io.js';
 import { getCostsForIssueSync } from '../../../../lib/costs/index.js';
 import { resolveIssueHeadlineCost } from '../../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../../services/running-agents-cache.js';
@@ -64,7 +63,6 @@ import {
   spawnPanCommand,
   requireTrustedMutationOrigin,
 } from '../workspaces.js';
-import { reconcileGitHubMergeStatus } from './merge-ops.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -126,14 +124,17 @@ async function getMrUrlAsync(issueId: string, workspacePath: string): Promise<st
     const url = stdout.trim();
     if (url) return url;
   } catch {
-    // fall through to the DB fallback below
+    // fall through to the derived read below
   }
-  // `gh pr view` needs a real GitHub-backed remote and workspace checkout —
-  // neither exists for the obviously-fake FIX-1 UAT fixture (PAN-3362), whose
-  // review_status row carries a real prUrl written directly through the
-  // canonical write door. Fall back to it whenever the shell lookup finds
-  // nothing, rather than reporting no PR when a persisted one exists.
-  return getReviewStatusSync(issueId)?.prUrl ?? null;
+  // `gh pr view` needs a real GitHub-backed remote and a workspace checkout to
+  // shell in. When there is neither, ask the derived read door, which resolves
+  // the project itself and caches one `gh pr list` per repo (PAN-3917 FR-6).
+  try {
+    const { getDerivedIssueState } = await import('../../services/derived-issue-state.js');
+    return (await getDerivedIssueState(issueId)).pr?.url ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -228,7 +229,7 @@ async function getIndexStats(workspacePath: string): Promise<{
 function resolvePlanLocation(projectPath: string, issueId: string): Effect.Effect<{ path: string; lifecycleDir: string; doc: XBriefDocument } | null, unknown> {
   return Effect.gen(function* () {
     // PAN-2401: every doc this route returns gets the per-issue record's
-    // statusOverrides applied — merged tasks must read 'completed', not the
+    // continue-file item statuses applied — merged tasks must read 'completed', not the
     // spec's immutable 'pending'.
     const issueLower = issueId.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -239,7 +240,7 @@ function resolvePlanLocation(projectPath: string, issueId: string): Effect.Effec
       return {
         path: found.path,
         lifecycleDir: found.lifecycleDir,
-        doc: mergeRecordStatusOverrides(doc, workspacePath),
+        doc: mergeContinueItemStatuses(doc, workspacePath),
       };
     }
 
@@ -249,7 +250,7 @@ function resolvePlanLocation(projectPath: string, issueId: string): Effect.Effec
     return {
       path: planPath,
       lifecycleDir: 'workspace',
-      doc: mergeRecordStatusOverrides(doc, workspacePath),
+      doc: mergeContinueItemStatuses(doc, workspacePath),
     };
   });
 }
@@ -681,15 +682,10 @@ const getWorkspaceRoute = HttpRouter.add(
 
         const pendingOperation = getPendingOperation(issueId);
         const location = getWorkspaceLocation(issueId);
-        const reviewStatus = getReviewStatusSync(issueId);
-
-        if (
-          pendingOperation?.type === 'merge' &&
-          pendingOperation.status === 'failed' &&
-          reviewStatus?.mergeStatus !== 'merged'
-        ) {
-          yield* Effect.promise(() => reconcileGitHubMergeStatus(issueId, reviewStatus));
-        }
+        // PAN-3917: a failed merge used to trigger a GitHub reconcile that
+        // repaired the stored merge status. There is no stored merge status —
+        // `services/derived-issue-state.ts` reads the PR every time, so a
+        // merge that actually landed shows as `merged` on the next read.
 
         const stashes = yield* listStashes(workspacePath);
         const salvageableStashes = stashes
@@ -972,84 +968,11 @@ const getWorkspaceTldrRoute = HttpRouter.add(
   }))
 );
 
-// ─── Route: PATCH /api/workspaces/:issueId/tiered-execution ──────────────────
-
-const patchWorkspaceTieredExecutionRoute = HttpRouter.add(
-  'PATCH',
-  '/api/workspaces/:issueId/tiered-execution',
-  httpHandler(Effect.gen(function* () {
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const originError = requireTrustedMutationOrigin(request);
-    if (originError) return originError;
-
-    const params = yield* HttpRouter.params;
-    const issueId = params['issueId'] ?? '';
-    if (!parseIssueIdSync(issueId)) {
-      return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
-    }
-
-    const body = yield* readJsonBody;
-    const override = (body as { override?: unknown }).override;
-    if (override !== 'on' && override !== 'off' && override !== null && override !== undefined) {
-      return jsonResponse({ error: 'Invalid tiered-execution override' }, { status: 400 });
-    }
-
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
-    const project = getProjectSync(issuePrefix);
-    if (!project) {
-      return jsonResponse({ error: 'Project not found' }, { status: 404 });
-    }
-
-    // Persist via the record write door
-    yield* Effect.promise(() =>
-      import('../../../../lib/pan-dir/record.js').then(m =>
-        m.writeRecordTieredExecutionOverride(project, issueId, override as 'on' | 'off' | null)
-      )
-    );
-
-    // Return the updated computed tieredExecution block (same shape as read door)
-    const projectPath = project.path;
-    const location = yield* resolvePlanLocation(projectPath, issueId);
-    if (!location) {
-      return jsonResponse(
-        { error: 'No xBRIEF plan found for this workspace' },
-        { status: 404 }
-      );
-    }
-
-    // Compute tieredExecution block using the same logic as the read door
-    const config = loadConfigSync().config;
-    const tieredExecutionConfig = config.tieredExecution;
-    const globalEnabled = tieredExecutionConfig?.enabled ?? false;
-    const planMetadata = location.doc.plan?.metadata;
-
-    // Determine source and effective state with record override precedence
-    let source: 'issue-override' | 'plan-metadata' | 'global';
-    let effective: boolean;
-
-    if (override !== null && override !== undefined) {
-      source = 'issue-override';
-      effective = override === 'on';
-    } else if (planMetadata?.tiered_execution === 'on') {
-      source = 'plan-metadata';
-      effective = true;
-    } else if (planMetadata?.tiered_execution === 'off') {
-      source = 'plan-metadata';
-      effective = false;
-    } else {
-      source = 'global';
-      effective = globalEnabled;
-    }
-
-    const tieredExecution = {
-      effective,
-      source,
-      override: (override as 'on' | 'off' | null) ?? null,
-    };
-
-    return jsonResponse({ ...location.doc, tieredExecution, lifecycleDir: location.lifecycleDir });
-  }))
-);
+// PAN-3917: `PATCH /api/workspaces/:issueId/tiered-execution` is deleted. The
+// per-issue override was a record field (`writeRecordTieredExecutionOverride`)
+// and the record plane is gone. Tiered execution resolves from the plan's
+// `metadata.tiered_execution` and the global config (D11 keeps the swarm
+// machinery in the tree but off the default work path).
 
 export const workspaceDataRouteLayer = Layer.mergeAll(
   getWorkspaceStackHealthBatchRoute,
@@ -1058,7 +981,6 @@ export const workspaceDataRouteLayer = Layer.mergeAll(
   getWorkspacePlanRoute,
   getWorkspaceUatContextRoute,
   patchWorkspacePlanInspectionPolicyRoute,
-  patchWorkspaceTieredExecutionRoute,
   getWorkspaceTldrRoute,
 );
 

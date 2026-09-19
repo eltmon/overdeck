@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const CANONICAL_STATE_PLANE_MODULE = 'src/lib/state-plane.ts';
-const PATH_LIST_ANCHORS = ['.pan/records/', '.pan/review/'];
+const PATH_LIST_ANCHORS = ['.pan/continues/', '.pan/review/'];
 
 describe('state-plane path list has a single source', () => {
   it('keeps the state-plane path-list literal only in src/lib/state-plane.ts', () => {

@@ -6,7 +6,6 @@ import { runRelease } from '../release-engine.js';
 const mocks = vi.hoisted(() => ({
   mergeSet: null as any,
   project: null as any,
-  reviewUpdates: [] as Array<{ issueId: string; update: any }>,
   persistedSets: [] as any[],
 }));
 
@@ -19,22 +18,6 @@ vi.mock('../../projects.js', () => ({
   findProjectByPathSync: vi.fn(() => mocks.project),
 }));
 
-vi.mock('../../review-status.js', () => ({
-  setReviewStatusSync: vi.fn((issueId: string, update: any) => {
-    mocks.reviewUpdates.push({ issueId, update });
-    return {
-      issueId,
-      reviewStatus: 'passed',
-      testStatus: 'passed',
-      updatedAt: new Date().toISOString(),
-      readyForMerge: false,
-      ...update,
-    };
-  }),
-
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
-}));
 
 vi.mock('../../release-set.js', () => ({
   upsertReleaseSetSync: vi.fn((releaseSet: any) => {
@@ -73,7 +56,6 @@ describe('runRelease', () => {
   beforeEach(() => {
     mocks.mergeSet = null;
     mocks.project = null;
-    mocks.reviewUpdates = [];
     mocks.persistedSets = [];
     vi.clearAllMocks();
   });
@@ -112,10 +94,7 @@ describe('runRelease', () => {
       { command: 'npm run smoke:api', timeoutMs: 1234 },
       { command: 'npm run smoke:frontend', timeoutMs: 1234 },
     ]);
-    expect(mocks.reviewUpdates.at(-1)).toMatchObject({
-      issueId: 'PAN-399',
-      update: { releaseStatus: 'passed' },
-    });
+    expect(result?.status).toBe('passed');
   });
 
   it('halts remaining components and marks a later smoke failure partial', async () => {
@@ -153,7 +132,7 @@ describe('runRelease', () => {
       ['worker', 'skipped'],
     ]);
     expect(commands).toEqual(['npm run smoke:api', 'npm run smoke:frontend']);
-    expect(mocks.reviewUpdates.at(-1)?.update.releaseStatus).toBe('partial');
+    expect(result?.status).toBe('partial');
   });
 
   it('executes rollback and marks the release rolled_back when rollback succeeds', async () => {
@@ -182,7 +161,7 @@ describe('runRelease', () => {
       status: 'rolled_back',
       rollbackStatus: 'rolled_back',
     });
-    expect(mocks.reviewUpdates.at(-1)?.update.releaseStatus).toBe('rolled_back');
+    expect(result?.status).toBe('rolled_back');
   });
 
   it('uses async command execution with explicit timeouts and no execSync path', async () => {

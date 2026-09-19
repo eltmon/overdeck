@@ -5,7 +5,6 @@ triggers:
   - pan show
   - show agent
   - agent status
-  - shadow state
   - agent health
   - agent context
   - agent history
@@ -25,7 +24,7 @@ pan show <issue-id>
 ## Usage
 
 ```
-pan show PAN-123           # Summary: shadow state + CV + health
+pan show PAN-123           # Summary: work history + health
 pan show PAN-123 --cv      # Agent work history (conversation view)
 pan show PAN-123 --context # Context engineering state
 pan show PAN-123 --health  # Health + heartbeat only
@@ -34,12 +33,12 @@ pan show PAN-123 --health  # Health + heartbeat only
 ## What It Does
 
 Displays the current state of the agent working on an issue. The bare form shows a combined
-summary of shadow state, work history, and health. Flags narrow to a specific view.
+summary of work history and health. Flags narrow to a specific view.
 
 ## When to Use
 
 - Checking what an agent is currently doing
-- Reviewing work history before approving
+- Reviewing work history before the PR goes up for review
 - Diagnosing a stuck or unresponsive agent
 - Inspecting context window state
 
@@ -47,4 +46,4 @@ summary of shadow state, work history, and health. Flags narrow to a specific vi
 
 - `pan tell <id>` — send a message to the agent
 - `pan kill <id>` — stop the agent
-- `pan approve <id>` — approve and merge the agent's work
+- `gh pr view <issue-branch>` — review and approve the agent's work

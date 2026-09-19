@@ -36,7 +36,7 @@ import { useDragDrop } from './KanbanBoard/hooks/useDragDrop';
 import { KanbanFilterBar } from './KanbanBoard/views';
 import {
   COLUMN_COLORS,
-  applyReviewStateToIssue,
+  applyDerivedStateToIssue,
 
   generateMockRallyData,
   groupByCanceledType,
@@ -47,7 +47,7 @@ import {
 import type { CycleFilter, IssueCost, PlanningState } from './KanbanBoard/types';
 
 export {
-  applyReviewStateToIssue,
+  applyDerivedStateToIssue,
   getPipelineCallToAction,
   groupByCanceledType,
   groupByLabels,
@@ -55,12 +55,6 @@ export {
   shouldShowAgentDoneBadge,
   shouldShowReviewReadyBadge,
 } from './KanbanBoard/kanban-utils';
-
-export {
-  DeaconIgnoreButton,
-  DivergedBadge,
-  ReviewInfraStuckBadge,
-} from './KanbanBoard/badges';
 
 export {
   CompactChildCard,
@@ -190,7 +184,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     ),
     [agents],
   );
-  const reviewStatusByIssueId = useDashboardStore((s) => s.reviewStatusByIssueId);
+  const derivedIssueStateByIssueId = useDashboardStore((s) => s.derivedIssueStateByIssueId);
 
   // Bulk selection state — key based on filters so selection survives data refreshes
   const internalBulkSelection = useBulkSelection(`${cycleFilter}-${includeCompleted}-${Array.from(selectedProjects).sort().join(',')}`);
@@ -259,7 +253,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     for (const agent of agents) {
       if (!agent.issueId || agent.status === 'dead' || agent.status === 'stopped' || agent.status === 'failed') continue;
       const issue = selectedIssueById.get(agent.issueId.toLowerCase());
-      if (agent.paused && issue?.mergeStatus === 'merged') continue;
+      if (agent.paused && derivedIssueStateByIssueId[issue?.identifier ?? '']?.state === 'merged') continue;
       activeAgentIssueIds.add(agent.issueId.toLowerCase());
     }
     return selectedIssues.filter(issue => activeAgentIssueIds.has(issue.identifier.toLowerCase()));
@@ -477,8 +471,8 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   }, [issues, selectedProjects]);
 
   const filteredIssuesWithReviewState = useMemo(() => (
-    filteredIssuesBase.map((issue) => applyReviewStateToIssue(issue, reviewStatusByIssueId[issue.identifier]))
-  ), [filteredIssuesBase, reviewStatusByIssueId]);
+    filteredIssuesBase.map((issue) => applyDerivedStateToIssue(issue, derivedIssueStateByIssueId[issue.identifier]))
+  ), [filteredIssuesBase, derivedIssueStateByIssueId]);
 
   // Inject mock Rally data for visual testing (?mockRally=true)
   const mockRallyEnabled = useMemo(() => {

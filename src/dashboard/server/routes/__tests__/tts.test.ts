@@ -229,7 +229,7 @@ describe('TTS speak route helpers', () => {
     expect(parseSpeakTtsInput({
       text: 'PAN-829 passed review',
       source: 'review-specialist',
-      eventType: 'reviewStatus.passed',
+      eventType: 'issueState.ready',
       issueId: 'PAN-829',
       priority: 1,
       voiceId: 'voice-1',
@@ -237,7 +237,7 @@ describe('TTS speak route helpers', () => {
     })).toEqual({
       text: 'PAN-829 passed review',
       source: 'review-specialist',
-      eventType: 'reviewStatus.passed',
+      eventType: 'issueState.ready',
       issueId: 'PAN-829',
       priority: 1,
       voiceId: 'voice-1',

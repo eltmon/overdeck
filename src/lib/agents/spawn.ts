@@ -16,11 +16,6 @@ import { startWorkSync } from '../cv.js';
 import { generateFixedPointPromptSync, checkHookSync, initHookSync } from '../hooks.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
-import { refreshWorkStartReviewedAnchor, resetWorkStartPipelineVerdicts } from '../cloister/work-start-verdicts.js';
-import { recordAgentPlaneSpawn } from '../pan-dir/agents.js';
-import { shouldPreservePipelineVerdicts } from '../cloister/verdict-preservation.js';
-import { resetPostMergeState } from '../cloister/post-merge-state.js';
-import { isRoleTerminal, resolveCanonicalReviewStatus } from '../cloister/review-status-source.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
 import { assertCodexNativeAuthForSpawn } from '../codex-auth.js';
@@ -28,7 +23,9 @@ import type { ModelId } from '../settings.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { writeBridgeTokenSync } from '../bridge-token.js';
-import { createSession, exactPaneTarget, sessionExists, setOption } from '../tmux.js';
+import { exactPaneTarget, sessionExists, setOption } from '../tmux.js';
+import { agentPaneExists, launchAgentPane } from '../terminal-backends/launch.js';
+import { toPaneRole } from '../terminal-backends/tmux.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
 import {
   getAgentDir,
@@ -78,8 +75,6 @@ import {
 import { getConcurrencyLimits } from '../cloister/concurrency.js';
 import { listAgentStates } from './queries.js';
 import { findProjectByPathSync } from '../projects.js';
-import { isStateMigrated } from '../state-home.js';
-import { shouldCommitLegacyWorkspaceArtifacts } from '../state-read-home.js';
 import {
   decideChannelsForWorkAgent,
   dismissDevChannelsDialog,
@@ -99,6 +94,21 @@ import { buildRegisteredSlotPrompt, ensureRegisteredSlotWorktree } from './regis
 import { launchAndCaptureManagedKimiSession } from '../runtimes/kimi-code.js';
 import { requireManagedKimiDelivery } from './managed-kimi-delivery.js';
 const execAsync = promisify(exec);
+/**
+ * PAN-3917 FR-3: close a pane a launch already created. `stopAgent` and
+ * `killSession` reach a tmux session; on Herdr there is none, so the pane is
+ * closed through the reference `launchAgentPane` returned. A backend that is
+ * tmux (or a launch that never got a reference) falls through to the tmux path
+ * the caller already runs.
+ */
+async function closeBackendPane(
+  pane: Awaited<ReturnType<typeof launchAgentPane>> | null,
+): Promise<void> {
+  if (!pane || pane.backend === 'tmux') return;
+  const { resolveTerminalBackend } = await import('../terminal-backends/registry.js');
+  await Effect.runPromise(resolveTerminalBackend(pane.backend).close(pane)).catch(() => {});
+}
+
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions): Promise<AgentState> {
   if (role !== 'work') return spawnRunWithoutConsentClaim(issueId, role, options);
 
@@ -172,25 +182,18 @@ async function spawnRunWithoutConsentClaim(
   const flywheelEnv = resolveFlywheelSpawnEnv(role, options.flywheelRunId);
   const startedBy = resolveAgentStartedBy(options.startedBy, flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID);
   const agentId = options.agentId ?? runAgentId(issueId, role, options.subRole);
-  if (await Effect.runPromise(sessionExists(agentId))) {
-    // PAN-2579 (warm-by-default lifecycle): advancing-role sessions are no longer
-    // reaped at verdict time, so a session alive at dispatch time may be a
-    // warm-idle leftover from the PREVIOUS cycle rather than an active run. Reap
-    // it here — at the moment its slot is actually needed — when that is provable
-    // (its phase verdict is terminal, or its pane process has exited). A live
-    // session with a non-terminal verdict is genuinely active: keep throwing so
-    // a concurrent duplicate dispatch cannot stomp it. (Review dispatch reuses
-    // its warm session with context via spawnReviewRoleForIssue's resume path
-    // before ever reaching this guard; test/ship runs start fresh by design.)
+  if (await agentPaneExists(agentId)) {
+    // PAN-2579 (warm-by-default lifecycle): a session alive at dispatch time may
+    // be a warm-idle leftover from the PREVIOUS cycle rather than an active run.
+    // Reap it here — at the moment its slot is needed — when that is provable:
+    // the pane process has exited. A live pane is a genuinely active run, so
+    // keep throwing and let the operator message it (PAN-3917 removed the
+    // stored phase verdict that used to be the second signal).
     let reapWarmIdle = false;
-    const advancing = role === 'review' || role === 'test' || role === 'ship';
     try {
       const { isPaneDead } = await import('../tmux.js');
       if (await Effect.runPromise(isPaneDead(agentId))) {
         reapWarmIdle = true;
-      } else if (advancing) {
-        const { status } = resolveCanonicalReviewStatus(issueId);
-        reapWarmIdle = !!status && isRoleTerminal(role as 'review' | 'test' | 'ship', status);
       }
     } catch { /* probe failure → conservative: treat as active */ }
     if (!reapWarmIdle) {
@@ -389,7 +392,6 @@ async function spawnRunWithoutConsentClaim(
       sessionId = rawSessionId;
     }
   }
-  await recordAgentPlaneSpawn(state, rawSessionId);
   // PAN-1557: interactive convoy wiring is already present in the initial
   // AgentState saved before launch, so the Stop-hook can always deliver
   // REVIEWER_READY even if a later running-state cache write is contended.
@@ -435,7 +437,16 @@ async function spawnRunWithoutConsentClaim(
   // only observes the session-start signal from THIS launch.
   clearReadySignal(agentId);
 
-  const launchRoleSession = () => Effect.runPromise(createSession(agentId, workspace, claudeCmd, {
+  // PAN-3917 FR-5: the pane goes into the issue workspace on the selected
+  // terminal backend and carries the `issue`, `role`, `harness`, `model`
+  // tokens. On tmux this is the same `createSession` call as before, with the
+  // same session name, env, and cwd.
+  let launchedPane: Awaited<ReturnType<typeof launchAgentPane>> | null = null;
+  const launchRoleSession = () => launchAgentPane({
+    issueId,
+    cwd: workspace,
+    agentId,
+    argv: ['bash', launcherScript],
     env: {
       ...BLANKED_PROVIDER_ENV,
       TERM: 'xterm-256color',
@@ -448,7 +459,13 @@ async function spawnRunWithoutConsentClaim(
       ...flywheelEnv,
       ...providerEnv,
     },
-  }));
+    tokens: {
+      issue: issueId,
+      role: toPaneRole(role),
+      harness: resolvedHarness,
+      model: selectedModel,
+    },
+  }).then((pane) => { launchedPane = pane; });
   if (resolvedHarness === 'kimi-code') {
     try {
       rawSessionId = await launchAndCaptureManagedKimiSession({
@@ -459,6 +476,7 @@ async function spawnRunWithoutConsentClaim(
       });
       if (shouldRegisterConversation) setConversationClaudeSessionId(agentId, rawSessionId);
     } catch (error) {
+      await closeBackendPane(launchedPane);
       const { killSession } = await import('../tmux.js');
       await Effect.runPromise(killSession(agentId)).catch(() => {});
       throw error;
@@ -475,8 +493,11 @@ async function spawnRunWithoutConsentClaim(
       }),
     });
   }
-  await Effect.runPromise(setOption(agentId, 'destroy-unattached', 'off'));
-  await Effect.runPromise(setOption(exactPaneTarget(agentId), 'remain-on-exit', 'on'));
+  // tmux-only session options: Herdr owns its panes' lifetime itself.
+  if ((launchedPane as { backend?: string } | null)?.backend === 'tmux') {
+    await Effect.runPromise(setOption(agentId, 'destroy-unattached', 'off'));
+    await Effect.runPromise(setOption(exactPaneTarget(agentId), 'remain-on-exit', 'on'));
+  }
 
   if (prompt || resolvedHarness === 'kimi-code') {
     if (shouldDeliverPromptViaAcp) {
@@ -496,6 +517,7 @@ async function spawnRunWithoutConsentClaim(
         if (tracksKickoffDelivery) {
           await recordKickoffDeliveryFailure(state, issueId, role);
         }
+        await closeBackendPane(launchedPane);
         await Effect.runPromise(stopAgent(agentId));
         throw new Error(`Agent ${agentId} kickoff delivery failed: ${message}`);
       }
@@ -522,6 +544,7 @@ async function spawnRunWithoutConsentClaim(
               await recordStartupSessionExit(state, issueId, role);
             }
             await recordKickoffDeliveryFailure(state, issueId, role);
+            await closeBackendPane(launchedPane);
             await Effect.runPromise(stopAgent(agentId)).catch(() => {});
           },
         });
@@ -547,10 +570,12 @@ async function spawnRunWithoutConsentClaim(
               throw new Error(delivery.failure ?? `delivery returned ok=false via ${delivery.path}`);
             }
           } catch (error) {
+            if (resolvedHarness === 'kimi-code') await closeBackendPane(launchedPane);
             if (resolvedHarness === 'kimi-code') await Effect.runPromise(stopAgent(agentId)).catch(() => {});
             throw error;
           }
         } else {
+          if (resolvedHarness === 'kimi-code') await closeBackendPane(launchedPane);
           if (resolvedHarness === 'kimi-code') await Effect.runPromise(stopAgent(agentId)).catch(() => {});
           throw new Error(`[${agentId}] ${getHarnessBehavior(resolvedHarness).displayName} did not become ready within ${timeout}s`);
         }
@@ -615,8 +640,8 @@ async function spawnAgentWithoutConsentClaim(
   const sessionPrefix = role === 'strike' ? 'strike' : 'agent';
   const agentId = options.agentId ?? `${sessionPrefix}-${options.issueId.toLowerCase()}`;
 
-  // Check if already running (scoped to the exact session name, including slot suffix)
-  if (await Effect.runPromise(sessionExists(agentId))) {
+  // Check if already running (scoped to the exact session/pane name, including slot suffix)
+  if (await agentPaneExists(agentId)) {
     throw new Error(`Agent ${agentId} already running. Use 'pan tell' to message it.`);
   }
 
@@ -690,24 +715,10 @@ async function spawnAgentWithoutConsentClaim(
 
   saveAgentStateSync(state);
   clearSessionResetMarker(agentId);
-  await recordAgentPlaneSpawn(state);
   // Transition issue tracker to "in progress" immediately so Linear reflects reality
   // while workspace setup continues. Best-effort, don't block agent spawn.
   // Only for work agents, not planning/specialist agents.
   if (role === 'work') {
-    try {
-      const preservation = await shouldPreservePipelineVerdicts(options.issueId, options.workspace);
-      if (preservation.preserve) {
-        if (preservation.refreshedAnchor) refreshWorkStartReviewedAnchor(options.issueId, preservation.refreshedAnchor);
-        console.log(`[spawn] Preserved pipeline verdicts for ${options.issueId} — ${preservation.reason}`);
-      } else {
-        const resetStatus = resetWorkStartPipelineVerdicts(options.issueId);
-        if (resetStatus) resetPostMergeState(options.issueId);
-      }
-    } catch (err) {
-      console.warn(`[agents] Could not reset stale pipeline verdicts for ${options.issueId}: ${err instanceof Error ? err.message : String(err)}`);
-    }
-
     transitionIssueToInProgress(options.issueId, options.workspace).catch((err) => {
       console.warn(`[agents] Could not transition ${options.issueId} to in_progress: ${err.message}`);
     });
@@ -721,46 +732,6 @@ async function spawnAgentWithoutConsentClaim(
       await writeStoryFeatureContext(options.workspace, options.issueId);
     } catch (ctxErr: any) {
       console.warn(`[agents] Could not write story feature context for ${options.issueId}: ${ctxErr.message}`);
-    }
-  }
-
-  // PAN-1215: One-shot cleanup of tracked workspace-only .pan/ artifacts.
-  // These files are gitignored but may still be tracked on older branches.
-  // If tracked, checkpoint commits and rebases can drop them, breaking the
-  // verification gate. Remove them from the index when the workspace is clean.
-  if (role === 'work') {
-    try {
-      const workspace = options.workspace;
-      const project = findProjectByPathSync(workspace);
-      if (project && !shouldCommitLegacyWorkspaceArtifacts(await isStateMigrated(project))) {
-        console.warn(`[agents] Deferred legacy .pan/ index cleanup for ${options.issueId} — migrated projects use gitignored .overdeck/ runtime files; historical entries retire with the branch`);
-      } else {
-      const { stdout: trackedFiles } = await execAsync(
-        'git ls-files .pan/continue.json .pan/spec.vbrief.json',
-        { cwd: workspace },
-      );
-      if (trackedFiles.trim()) {
-        const { stdout: porcelain } = await execAsync(
-          'git status --porcelain -- .pan/',
-          { cwd: workspace },
-        );
-        if (!porcelain.trim()) {
-          await execAsync(
-            'git rm --cached --ignore-unmatch .pan/continue.json .pan/spec.vbrief.json',
-            { cwd: workspace },
-          );
-          await execAsync(
-            'git commit -m "chore: untrack workspace .pan/ artifacts (PAN-1215)"',
-            { cwd: workspace },
-          );
-          console.log(`[agents] Untracked workspace .pan/ artifacts for ${options.issueId}`);
-        } else {
-          console.warn(`[agents] Skipping .pan/ untrack for ${options.issueId} — .pan/ paths have uncommitted changes`);
-        }
-      }
-      }
-    } catch (err: any) {
-      console.warn(`[agents] .pan/ untrack cleanup failed for ${options.issueId}: ${err.message}`);
     }
   }
 
@@ -885,20 +856,33 @@ async function spawnAgentWithoutConsentClaim(
 
   clearReadySignal(agentId);
 
-  const launchWorkSession = () => Effect.runPromise(createSession(agentId, options.workspace, claudeCmd, {
-      env: {
-        ...BLANKED_PROVIDER_ENV, // Blank stale provider vars inherited by tmux server
-        TERM: 'xterm-256color',
-        OVERDECK_AGENT_ID: agentId,
-        OVERDECK_ISSUE_ID: options.issueId,
-        OVERDECK_SESSION_TYPE: role,
-        OVERDECK_AGENT_STARTED_BY: startedBy,
-        CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false', // Disable suggested prompts for autonomous agents (PAN-251)
-        GIT_SEQUENCE_EDITOR: 'false', // Block interactive rebase / squash (agents forbidden from rewriting history)
-        ...flywheelEnv,
-        ...providerEnv, // Set correct provider env vars (BASE_URL, AUTH_TOKEN, etc.)
-      }
-    }));
+  // PAN-3917 FR-5: same launcher, placed in the issue workspace on the selected
+  // backend and stamped with the four pane tokens.
+  let launchedPane: Awaited<ReturnType<typeof launchAgentPane>> | null = null;
+  const launchWorkSession = () => launchAgentPane({
+    issueId: options.issueId,
+    cwd: options.workspace,
+    agentId,
+    argv: ['bash', launcherScript],
+    env: {
+      ...BLANKED_PROVIDER_ENV, // Blank stale provider vars inherited by tmux server
+      TERM: 'xterm-256color',
+      OVERDECK_AGENT_ID: agentId,
+      OVERDECK_ISSUE_ID: options.issueId,
+      OVERDECK_SESSION_TYPE: role,
+      OVERDECK_AGENT_STARTED_BY: startedBy,
+      CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false', // Disable suggested prompts for autonomous agents (PAN-251)
+      GIT_SEQUENCE_EDITOR: 'false', // Block interactive rebase / squash (agents forbidden from rewriting history)
+      ...flywheelEnv,
+      ...providerEnv, // Set correct provider env vars (BASE_URL, AUTH_TOKEN, etc.)
+    },
+    tokens: {
+      issue: options.issueId,
+      role: toPaneRole(role),
+      harness: resolvedHarness,
+      model: selectedModel,
+    },
+  }).then((pane) => { launchedPane = pane; });
 
   if (resolvedHarness === 'kimi-code') {
     try {
@@ -908,6 +892,7 @@ async function spawnAgentWithoutConsentClaim(
         launch: launchWorkSession,
       });
     } catch (err) {
+      await closeBackendPane(launchedPane);
       await Effect.runPromise(stopAgent(agentId)).catch(() => undefined);
       throw err;
     }
@@ -947,6 +932,7 @@ async function spawnAgentWithoutConsentClaim(
       if (tracksKickoffDelivery) {
         await recordKickoffDeliveryFailure(state, options.issueId, role);
       }
+      await closeBackendPane(launchedPane);
       await Effect.runPromise(stopAgent(agentId));
       throw new Error(`Agent ${agentId} kickoff delivery failed: ${message}`);
     }
@@ -961,6 +947,7 @@ async function spawnAgentWithoutConsentClaim(
       console.error(`[${agentId}] ohmypi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
       if (tracksKickoffDelivery) {
         await recordKickoffDeliveryFailure(state, options.issueId, role);
+        await closeBackendPane(launchedPane);
         await Effect.runPromise(stopAgent(agentId));
         throw new Error(`Agent ${agentId} kickoff delivery failed: ${err instanceof Error ? err.message : String(err)}`);
       }
@@ -982,6 +969,7 @@ async function spawnAgentWithoutConsentClaim(
           }
           await recordKickoffDeliveryFailure(state, options.issueId, role);
         }
+        await closeBackendPane(launchedPane);
         await Effect.runPromise(stopAgent(agentId)).catch(() => {});
       },
     });
@@ -995,6 +983,7 @@ async function spawnAgentWithoutConsentClaim(
         await recordStartupSessionExit(state, options.issueId, role);
       }
       await recordKickoffDeliveryFailure(state, options.issueId, role);
+      await closeBackendPane(launchedPane);
       await Effect.runPromise(stopAgent(agentId));
       throw new Error(`Agent ${agentId} kickoff delivery failed: ${delivery.failure ?? 'unknown error'}`);
     }

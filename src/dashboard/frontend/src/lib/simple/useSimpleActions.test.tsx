@@ -23,7 +23,6 @@ afterEach(() => {
 describe('useSimpleActions exact-agent mutations', () => {
   it.each([
     ['unpause', 'unpause'],
-    ['untroubled', 'untroubled'],
   ] as const)('posts %s to the supplied non-primary agent id', async (actionKey, endpoint) => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ success: true })));
     const { result } = renderHook(() => useSimpleActions(), { wrapper: createWrapper() });

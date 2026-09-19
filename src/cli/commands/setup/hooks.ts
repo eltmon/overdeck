@@ -338,7 +338,7 @@ export async function setupHooksCommand(opts: SetupHooksOptions = {}): Promise<v
     chmodSync(scriptDest, 0o755); // Make executable
   }
 
-  console.log(chalk.green('✓ Installed hook scripts (pre-tool, post-tool, stop, specialist-stop)'));
+  console.log(chalk.green('✓ Installed hook scripts (pre-tool, post-tool, stop)'));
 
   // 4. Read or create Claude Code settings.json
   const claudeDir = join(homedir(), '.claude');

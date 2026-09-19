@@ -90,6 +90,10 @@ vi.mock('../../event-store.js', () => ({
 }));
 
 vi.mock('../../../../lib/tmux.js', () => ({
+  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listPaneValuesSync: () => [],
   sendRawKeystroke: vi.fn(),
   MessageDeliveryFailed: class MessageDeliveryFailed extends Error {},
   capturePane: vi.fn(() => Effect.succeed('')),

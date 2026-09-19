@@ -9,12 +9,16 @@ import { Effect } from 'effect';
  * the route handler. Does NOT duplicate logic in a test helper.
  *
  * Coverage:
- *  1. Spawn succeeds: testStatus='testing', agent notified
+ * Updated for PAN-3917: nothing writes a test status — delivery is the result
+ * this function returns, and the dispatch is gated on the issue having an open
+ * pull request to test.
+ *
+ * Coverage:
+ *  1. Spawn succeeds: delivered, agent notified
  *  2. Existing test role run is treated as successful delivery
- *  3. Spawn failure: testStatus='dispatch_failed', agent NOT notified
- *  4. No project configured: dispatch_failed, agent NOT notified
- *  5. Exception path: catch block sets testStatus='dispatch_failed' and does NOT notify agent
- *  6. Exception + setReviewStatus throws: nested catch prevents outer throw, agent NOT notified
+ *  3. Spawn failure: not delivered, agent NOT notified
+ *  4. No project configured: not delivered, agent NOT notified
+ *  5. No open pull request: not delivered, agent NOT notified
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -41,19 +45,14 @@ vi.mock('../../../src/lib/projects.js', () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Mock review-status (file I/O side effect)
+// PAN-3917 (FR-8): the test role runs against a pull request, so the forge is
+// asked whether there is one before anything is spawned.
 // ---------------------------------------------------------------------------
 
-const mockSetReviewStatus = vi.fn();
+const mockGetPrFacts = vi.fn();
 
-vi.mock('../../../src/lib/review-status.js', () => ({
-  setReviewStatus: (...args: unknown[]) => mockSetReviewStatus(...args),
-  setReviewStatusSync: (...args: unknown[]) => mockSetReviewStatus(...args),
-  getReviewStatus: vi.fn(),
-  getReviewStatusSync: vi.fn(),
-
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
+vi.mock('../../../src/lib/cloister/pr-facts.js', () => ({
+  getPrFacts: (...args: unknown[]) => mockGetPrFacts(...args),
 }));
 
 vi.mock('../../../src/lib/cloister/merge-verification.js', () => ({
@@ -96,9 +95,10 @@ function setupNoProject() {
 describe('dispatchTestAgentAndNotify (PAN-343 + PAN-369)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetPrFacts.mockResolvedValue({ open: true, merged: false });
   });
 
-  it('sets testStatus to testing and notifies agent when spawn succeeds', async () => {
+  it('delivers and notifies the agent when spawn succeeds', async () => {
     setupProjectResolved();
     mockSpawnRun.mockResolvedValue({ id: 'agent-pan-343-test' });
     const notify = makeNotify();
@@ -109,14 +109,13 @@ describe('dispatchTestAgentAndNotify (PAN-343 + PAN-369)', () => {
       workspace: WS,
       prompt: expect.stringContaining(`TEST TASK for ${ISSUE}`),
     }));
-    expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, { testStatus: 'testing' });
     expect(notify).toHaveBeenCalledWith(
       `agent-${ISSUE.toLowerCase()}`,
       expect.stringContaining('REVIEW PASSED'),
     );
   });
 
-  it('sets testStatus to testing and notifies agent when the test role is already running', async () => {
+  it('treats an already-running test role as delivered and notifies the agent', async () => {
     setupProjectResolved();
     mockSpawnRun.mockRejectedValue(new Error('Role run agent-pan-343-test already running'));
     const notify = makeNotify();
@@ -124,65 +123,50 @@ describe('dispatchTestAgentAndNotify (PAN-343 + PAN-369)', () => {
     await Effect.runPromise(dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify));
 
     expect(mockSpawnRun).toHaveBeenCalledTimes(1);
-    expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, { testStatus: 'testing' });
     expect(notify).toHaveBeenCalled();
   });
 
-  it('sets dispatch_failed when spawnRun rejects and does not notify', async () => {
+  it('reports spawn-failed and does not notify when spawnRun rejects', async () => {
     setupProjectResolved();
     mockSpawnRun.mockRejectedValue(new Error('spawn failed'));
     const notify = makeNotify();
 
-    await Effect.runPromise(dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify));
+    const result = await Effect.runPromise(dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify));
 
     expect(mockSpawnRun).toHaveBeenCalledTimes(1);
-    expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, {
-      testStatus: 'dispatch_failed',
-      testNotes: expect.stringContaining('spawn failed'),
-    });
+    expect(result).toMatchObject({ delivered: false, notified: false, reason: 'spawn-failed' });
     expect(notify).not.toHaveBeenCalled();
   });
 
-  it('sets dispatch_failed when no project is configured for the issue', async () => {
+  it('reports no-project and does not spawn when no project is configured', async () => {
     setupNoProject();
     const notify = makeNotify();
 
-    await Effect.runPromise(dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify));
+    const result = await Effect.runPromise(dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify));
 
     expect(mockSpawnRun).not.toHaveBeenCalled();
-    expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, {
-      testStatus: 'dispatch_failed',
-      testNotes: expect.stringContaining('No project configured'),
-    });
+    expect(result).toMatchObject({ delivered: false, notified: false, reason: 'no-project' });
     expect(notify).not.toHaveBeenCalled();
   });
 
-  it('sets testStatus to dispatch_failed and does NOT notify agent when role runner throws', async () => {
+  it('reports no-open-pr and does not spawn when the forge has nothing to test', async () => {
+    setupProjectResolved();
+    mockGetPrFacts.mockResolvedValue({ open: false, merged: true });
+    const notify = makeNotify();
+
+    const result = await Effect.runPromise(dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify));
+
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ delivered: false, notified: false, reason: 'no-open-pr' });
+    expect(notify).not.toHaveBeenCalled();
+  });
+
+  it('does not throw and does not notify the agent when the role runner throws', async () => {
     setupProjectResolved();
     mockSpawnRun.mockRejectedValue(new Error('role runner unavailable'));
     const notify = makeNotify();
 
-    await Effect.runPromise(dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify));
-
-    // Core PAN-343 invariant: exception must NOT advance the pipeline
-    expect(notify).not.toHaveBeenCalled();
-    // PAN-369: exception must set dispatch_failed so deacon can recover
-    expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE, {
-      testStatus: 'dispatch_failed',
-      testNotes: expect.stringContaining('role runner unavailable'),
-    });
-  });
-
-  it('does not throw and does not notify agent when setReviewStatus itself throws in the catch block', async () => {
-    setupProjectResolved();
-    mockSpawnRun.mockRejectedValue(new Error('role runner unavailable'));
-    // setReviewStatus throws when trying to persist dispatch_failed
-    mockSetReviewStatus.mockImplementation(() => {
-      throw new Error('status file write failed');
-    });
-    const notify = makeNotify();
-
-    // The nested catch must prevent this from propagating
+    // Core PAN-343 invariant: an exception must NOT advance the pipeline.
     await expect(Effect.runPromise(dispatchTestAgentAndNotify(ISSUE, WS, BRANCH, notify))).resolves.toMatchObject({
       delivered: false,
       notified: false,

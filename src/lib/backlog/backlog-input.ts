@@ -2,7 +2,6 @@ import { join } from 'node:path';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { getProjectPanPaths } from '../pan-dir/paths.js';
 import type { Issue, IssueState, TrackerType } from '../tracker/interface.js';
-import { getReviewStatusSync } from '../review-status.js';
 import { parseSequenceMd } from './sequence-io.js';
 import type { SequenceDoc } from './types.js';
 
@@ -136,10 +135,11 @@ export async function collectOpenBacklog(
   }
 
   const manifest: BacklogManifestEntry[] = openIssues.map((issue) => {
-    const reviewStatus = getReviewStatusSync(issue.ref);
-    const inPipeline =
-      (reviewStatus !== null && reviewStatus.reviewStatus !== 'pending') ||
-      existsSync(join(workspacesDir, `feature-${issue.ref.toLowerCase()}`));
+    // In the pipeline == the issue has a workspace. An issue whose work has
+    // started has a worktree; one whose work has finished still has it until
+    // close-out archives it. There is no stored pipeline row to consult
+    // (PAN-3917).
+    const inPipeline = existsSync(join(workspacesDir, `feature-${issue.ref.toLowerCase()}`));
 
     const hasPrd = opts?.hasPrdFn
       ? opts.hasPrdFn(issue.ref)

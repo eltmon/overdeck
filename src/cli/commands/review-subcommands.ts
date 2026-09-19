@@ -1,24 +1,13 @@
 import type { Command } from 'commander';
 import { abortReviewCommand } from './abort-review.js';
-import { pendingCommand } from './pending.js';
 import { requestReviewCommand } from './request-review.js';
-import { resetReviewCommand } from './reset-review.js';
-import { resyncReviewCommand } from './resync-review.js';
-import { reviewModeCommand } from './review-mode.js';
 import { reviewRestartCommand } from './review-restart.js';
 import { reviewSpawnReviewerCommand } from './review-spawn-reviewer.js';
 
 export function registerReviewCommands(program: Command): void {
   const review = program
     .command('review')
-    .description('Review-loop management: pending items, request re-review, reset cycles');
-
-  review
-    .command('pending')
-    .description('List completed work awaiting review')
-    .option('--ready', 'List issues ready for merge (review+test green, not merged) regardless of origin')
-    .option('--blocked', 'List issues blocked in review/test/merge from the SQLite review-status store')
-    .action(pendingCommand);
+    .description('Review-loop management: request re-review, abort reviewers, restart a round');
 
   review
     .command('request <id>')
@@ -27,26 +16,9 @@ export function registerReviewCommands(program: Command): void {
     .action(requestReviewCommand);
 
   review
-    .command('reset <id>')
-    .description('Reset review/test/merge cycles (human override)')
-    .option('--session', 'Also clear all saved Claude review-session pointers')
-    .action(resetReviewCommand);
-
-  review
-    .command('resync <id>')
-    .description('Re-emit canonical review status (heal a lost pipeline event)')
-    .action(resyncReviewCommand);
-
-  review
     .command('abort <id>')
     .description('Kill all running reviewer sessions and leave the worker idle')
     .action(abortReviewCommand);
-
-  review
-    .command('mode <id> <mode>')
-    .description('Set per-issue review mode (quick, full, or none)')
-    .action(reviewModeCommand);
-
 
   review
     .command('restart <id>')

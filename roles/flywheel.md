@@ -175,7 +175,7 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
    each such item against current state and adopt it or close it out — never assume the last
    run finished what it started.
 3. `packages/contracts/src/flywheel.ts` — the `FlywheelStatus` schema you emit every tick.
-4. The run brief (default `docs/flywheel-brief.md`) — this run's scope and config
+4. The run brief (default `sync-sources/skills/pan-flywheel/SKILL.md`) — this run's scope and config
    (`scope`, `roles.flywheel.minAgents`/`maxAgents`, `auto_pickup_backlog`,
    `require_uat_before_merge`). Operate only inside `scope`; never exceed `maxAgents`.
 

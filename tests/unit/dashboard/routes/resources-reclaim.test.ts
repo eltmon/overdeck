@@ -6,31 +6,60 @@ vi.mock('../../../../src/dashboard/server/services/dashboard-poll-snapshots.js',
   getAgentCostStatsSnapshot: async () => [],
 }));
 
+// PAN-3917: derived state comes from its owners; stub the door to stay offline.
+const derivedStates = vi.hoisted(() => new Map<string, { issueId: string; state: string }>());
+vi.mock('../../../../src/dashboard/server/services/derived-issue-state.js', () => ({
+  loadIssueStatesForProject: async (_p: string, issueIds: readonly string[]) =>
+    new Map(issueIds.map((id) => [id, derivedStates.get(id) ?? { issueId: id, state: 'working' }])),
+  getDerivedIssueState: async (issueId: string) =>
+    derivedStates.get(issueId) ?? { issueId, state: 'working' },
+  listReadyIssuesForProject: async () => [],
+}));
+
+// PAN-3917 (W6): the stack's state is derived per project, so the issue must
+// resolve to one. The real registry has no MIN project in this environment.
+vi.mock('../../../../src/lib/projects.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../src/lib/projects.js')>();
+  return {
+    ...actual,
+    resolveProjectFromIssueSync: (issueId: string) => (
+      issueId.toUpperCase().startsWith('MIN-')
+        ? { projectKey: 'myn', projectPath: '/repos/myn' }
+        : actual.resolveProjectFromIssueSync(issueId)
+    ),
+  };
+});
+
+vi.mock('../../../../src/dashboard/server/services/backend-inventory.js', () => ({
+  getBackendPanes: async () => [],
+  getBackendPanesForIssue: async () => [],
+  hasLiveBackendPane: async () => false,
+}));
+
 import {
   buildReclaimPayload,
   deleteResourceVenvEffect,
   getResourcesEffect,
   resetCurrentDockerStatsReaderForTests,
   resetReclaimForTests,
-  resetResourceStackReviewStatusReaderForTests,
   resetSpawnGateHealthEvidenceReaderForTests,
   setCurrentDockerStatsReaderForTests,
   setReclaimIssueClosedReaderForTests,
   setReclaimProjectRootForTests,
   setReclaimVenvCandidatesForTests,
   setReclaimVenvDeleteForTests,
-  setResourceStackReviewStatusReaderForTests,
   setSpawnGateHealthEvidenceReaderForTests,
+  listReclaimVenvIssueIds,
+  loadClosedIssueIds,
   type ResourceStack,
 } from '../../../../src/dashboard/server/routes/resources.js';
-import type { ReviewStatus } from '../../../../src/lib/review-status.js';
 import type { SystemHealthSnapshot } from '../../../../src/dashboard/server/services/system-health-service.js';
 
 afterEach(() => {
   resetCurrentDockerStatsReaderForTests();
-  resetResourceStackReviewStatusReaderForTests();
   resetSpawnGateHealthEvidenceReaderForTests();
   resetReclaimForTests();
+  derivedStates.clear();
 });
 
 describe('resources reclaim payload', () => {
@@ -61,12 +90,14 @@ describe('resources reclaim payload', () => {
 
   it('returns venv candidates only for closed issues and deletes only after closure validation', async () => {
     const deleted: string[] = [];
-    setReclaimIssueClosedReaderForTests((issueId) => issueId === 'MIN-857');
+    setReclaimIssueClosedReaderForTests(async (issueId) => issueId === 'MIN-857');
     setReclaimVenvCandidatesForTests([{ issueId: 'MIN-857', path: '/unused/.venv', diskBytes: 2 * 1024 ** 3 }]);
     setReclaimProjectRootForTests('/repo');
     setReclaimVenvDeleteForTests(async (path) => { deleted.push(path); });
 
-    const payload = buildReclaimPayload([], []);
+    const payload = buildReclaimPayload([], [], {
+      closedIssueIds: await loadClosedIssueIds(listReclaimVenvIssueIds()),
+    });
     expect(payload.reclaimCandidates).toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: 'venv', issueId: 'MIN-857', diskBytes: 2 * 1024 ** 3 }),
     ]));
@@ -105,9 +136,7 @@ async function readJsonBody(response: Awaited<ReturnType<typeof Effect.runPromis
 }
 
 function setMergedReviewStatus() {
-  setResourceStackReviewStatusReaderForTests((issueId) => issueId === 'MIN-857'
-    ? reviewStatus({ issueId, mergeStatus: 'merged' })
-    : null);
+  derivedStates.set('MIN-857', { issueId: 'MIN-857', state: 'merged' });
 }
 
 function stack(): ResourceStack {
@@ -119,7 +148,7 @@ function stack(): ResourceStack {
     serviceCount: 1,
     services: [],
     aggregates: { cpuPercent: 1, memoryBytes: 2, diskBytes: 3 },
-    phase: 'merged',
+    state: 'merged',
   };
 }
 
@@ -142,17 +171,6 @@ function container(service: string, overrides: Record<string, unknown> = {}) {
   };
 }
 
-function reviewStatus(overrides: Partial<ReviewStatus>): ReviewStatus {
-  return {
-    issueId: 'MIN-857',
-    reviewStatus: 'pending',
-    testStatus: 'pending',
-    mergeStatus: 'pending',
-    updatedAt: '2026-07-07T12:00:00.000Z',
-    readyForMerge: false,
-    ...overrides,
-  };
-}
 
 function acceptedHealthFixture(): AcceptedSystemHealthSnapshot {
   const gib = 1024 ** 3;

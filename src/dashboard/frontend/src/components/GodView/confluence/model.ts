@@ -1,4 +1,6 @@
-export const STAGES = ['PLAN', 'WORK', 'REVIEW', 'TEST', 'VERIFY', 'MERGE'] as const;
+import type { IssueAttention } from '../../../types';
+
+export const STAGES = ['PLAN', 'WORK', 'REVIEW', 'TEST', 'MERGE'] as const;
 export type Stage = (typeof STAGES)[number];
 
 export const STAGE_COLORS: Record<Stage, string> = {
@@ -6,7 +8,6 @@ export const STAGE_COLORS: Record<Stage, string> = {
   WORK: '#39ff14',
   REVIEW: '#ffb800',
   TEST: '#ff2d7c',
-  VERIFY: '#9d4edd',
   MERGE: '#e8edf8',
 };
 
@@ -126,32 +127,25 @@ export type OrbState = 'active' | 'shelf' | 'stale' | 'failed';
 
 /**
  * Parked-orbit identity (PAN-3485 / PAN-3490). One color per orbit so the
- * Doldrums reads at a glance: amber family = operator-owned, hot colors =
- * mechanical failures the sweeper acts on, ice = stale-but-living, ash =
- * residue to reap. The beam effect is keyed off SWEEP_BEAM_COLOR so the
- * lantern light never collides with the governor tide's amber.
+ * Doldrums reads at a glance: slate = operator-owned, ash = dead session,
+ * ice = alive but not moving. The beam effect is keyed off SWEEP_BEAM_COLOR so
+ * the lantern light never collides with the governor tide's amber. The orbits
+ * are exactly PARKED_ORBITS in src/lib/parked/resolver.ts.
  */
 export const PARKED_ORBIT_COLORS: Record<string, string> = {
-  'stuck-flag': '#ffb800',
-  'needs-you': '#ffd75e',
-  'deacon-ignored': '#5a6478',
   'operator-gate': '#7a8aaa',
-  'uat-failed': '#ff7700',
-  'merge-failed': '#ff2d7c',
-  conflicts: '#9d4edd',
   'zombie-session': '#8a97a8',
   'idle-running': '#bfe3ff',
-  'circuit-breaker': '#ff4444',
 };
 
 export function parkedOrbitColor(orbit: string | null | undefined): string {
   return (orbit && PARKED_ORBIT_COLORS[orbit]) || '#bfe3ff';
 }
 
-/** Short orbit tag for orb labels — "stuck", not "stuck-flag". */
+/** Short orbit tag for orb labels — "zombie", not "zombie-session". */
 export function parkedOrbitTag(orbit: string | null | undefined): string | null {
   if (!orbit) return null;
-  return orbit.replace(/-(flag|failed|session|running|breaker|gate|ignored|you)$/u, '');
+  return orbit.replace(/-(session|running|gate)$/u, '');
 }
 
 export const SWEEP_BEAM_COLOR = '#bfe3ff';
@@ -160,7 +154,8 @@ export const SWEEP_FLARE_COLOR = '#ffd75e';
 export interface RiverOrbInput {
   paused?: boolean | null;
   yieldedByScheduler?: boolean | null;
-  mergeStatus?: string | null;
+  /** The derived issue state's attention signal (FR-6). */
+  attention?: IssueAttention | null;
   lastActivity?: string | number | null;
 }
 
@@ -168,7 +163,7 @@ export const STALE_AFTER_MS = 30 * 60 * 1000;
 
 export function classifyOrb(input: RiverOrbInput, now: number): OrbState {
   if (input.paused === true || input.yieldedByScheduler === true) return 'shelf';
-  if (input.mergeStatus === 'failed') return 'failed';
+  if (input.attention === 'stuck' || input.attention === 'api-error') return 'failed';
 
   const lastActivity = typeof input.lastActivity === 'number'
     ? input.lastActivity

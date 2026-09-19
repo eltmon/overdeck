@@ -1,9 +1,10 @@
 /**
  * xBRIEF Lifecycle IO
  *
- * Canonical scope specs and project-side continue files live in `specs/` and
- * `continues/` on `overdeck-state`. Legacy `vbrief/<lifecycle>/` directories
- * remain a read-only fallback for legacy spec files.
+ * Canonical specs and per-issue continue files live in `<planHome>/.pan/specs/`
+ * and `<planHome>/.pan/continues/` and are committed by the agent that changes
+ * them (PAN-3917). Legacy `vbrief/<lifecycle>/` directories remain a read-only
+ * fallback for legacy spec files.
  */
 
 import { basename, join } from 'path';
@@ -28,15 +29,9 @@ import { invalidateXBriefIndex } from './xbrief-index.js';
 import type { XBriefDocument } from './types.js';
 import { getProjectPanPaths, updateSpecStatus } from '../pan-dir/specs.js';
 import type { PanSpecDocument, PanSpecEntry, PanSpecStatus } from '../pan-dir/types.js';
-import {
-  appendFeedbackEntrySync as appendFeedbackEntryToRecord,
-  appendSessionEntrySync as appendSessionEntryToRecord,
-  clearRecordFeedbackSync,
-  readRecordContinueViewSync,
-} from '../pan-dir/record.js';
-import type { ProjectConfig } from '../projects.js';
+import { resolvePlanHome } from '../pan-dir/paths.js';
+import { readContinueState, updateContinueState, writeContinueState } from './continue-state.js';
 import { FsError } from '../errors.js';
-import { flushAutoCommits, queueAutoCommit } from '../pan-dir/auto-commit.js';
 
 // PAN-1249: pan-dir/specs.ts migrated `findSpecByIssue`, `writeSpecForIssue`,
 // and `updateSpecStatus` to return Effects. The sync surface in this module
@@ -254,18 +249,8 @@ async function moveXBriefPromise(
     throw new Error(`Failed to update pan spec status for ${issueId}`);
   }
 
-  const stagePaths = [updatedSpec.path];
-  if (ensured.removedLegacyPath) stagePaths.push(ensured.removedLegacyPath);
-  queueAutoCommit({
-    projectRoot,
-    paths: stagePaths,
-    subject: `chore(state): move ${issueId.toUpperCase()} spec to ${targetDir}`,
-  });
-  const flushed = await Effect.runPromise(flushAutoCommits(projectRoot));
-  if (flushed.pushed === false) {
-    throw new Error(flushed.reason ?? `Spec move for ${issueId} was committed but not pushed`);
-  }
-
+  // PAN-3917: the spec is a tracked file in the plan home; the agent that
+  // changed it commits it on its feature branch.
   invalidateXBriefIndex(projectRoot);
   return {
     from: found,
@@ -315,17 +300,9 @@ async function transitionXBriefOnMainPromise(
 
   const changed = ensured.createdPanSpec || needsMove || needsStatus;
 
-  let committed = false;
-  if (changed) {
-    const stageList: string[] = [toPath];
-    if (ensured.removedLegacyPath) stageList.push(ensured.removedLegacyPath);
-    queueAutoCommit({ projectRoot, paths: stageList, subject: commitMessage });
-    const flushed = await Effect.runPromise(flushAutoCommits(projectRoot));
-    committed = flushed.committed;
-    if (flushed.pushed === false) {
-      throw new Error(flushed.reason ?? `Spec transition for ${issueId} was committed but not pushed`);
-    }
-  }
+  // PAN-3917: the caller's agent commits the spec on its feature branch, so a
+  // transition never commits by itself. `committed` stays false.
+  const committed = false;
 
   if (changed) {
     invalidateXBriefIndex(projectRoot);
@@ -381,17 +358,15 @@ export function readContinueStateForIssue(
   projectRoot: string,
   issueId: string,
 ): ContinueState | null {
-  const project: ProjectConfig = { name: 'inferred', path: projectRoot };
-  // Cast: RecordContinueView is a structural subset of ContinueState — callers only access feedback/decisions/etc.
-  return readRecordContinueViewSync(project, issueId) as unknown as ContinueState | null;
+  return readContinueState(resolvePlanHome(projectRoot), issueId);
 }
 
 export function writeContinueStateForIssue(
-  _projectRoot: string,
-  _issueId: string,
-  _state: ContinueState,
+  projectRoot: string,
+  issueId: string,
+  state: ContinueState,
 ): void {
-  // PAN-1919: continue writes go to the per-issue record. No direct continue writes.
+  writeContinueState(resolvePlanHome(projectRoot), issueId, state);
 }
 
 export function appendContinueSessionEntryForIssue(
@@ -399,28 +374,42 @@ export function appendContinueSessionEntryForIssue(
   issueId: string,
   entry: Omit<ContinueSessionEntry, 'timestamp'> & { timestamp?: string },
 ): void {
-  const project: ProjectConfig = { name: 'inferred', path: projectRoot };
-  appendSessionEntryToRecord(project, issueId, {
+  const timestamped: ContinueSessionEntry = {
     ...entry,
     timestamp: entry.timestamp ?? new Date().toISOString(),
-  });
+  };
+  updateContinueState(resolvePlanHome(projectRoot), issueId, (current) => ({
+    ...current,
+    sessionHistory: [...current.sessionHistory, timestamped],
+    ...(timestamped.agentModel ? { agentModel: timestamped.agentModel } : {}),
+  }));
 }
 
+/**
+ * Append specialist feedback, skipping an entry identical to the last one — a
+ * specialist that re-delivers the same verdict must not double the list.
+ */
 export function appendFeedbackEntryForIssue(
   projectRoot: string,
   issueId: string,
   entry: ContinueFeedbackEntry,
 ): void {
-  const project: ProjectConfig = { name: 'inferred', path: projectRoot };
-  appendFeedbackEntryToRecord(project, issueId, entry);
+  updateContinueState(resolvePlanHome(projectRoot), issueId, (current) => {
+    const feedback = current.feedback ?? [];
+    const last = feedback[feedback.length - 1];
+    if (last && JSON.stringify(last) === JSON.stringify(entry)) return current;
+    return { ...current, feedback: [...feedback, entry] };
+  });
 }
 
 export function clearFeedbackForIssue(
   projectRoot: string,
   issueId: string,
 ): void {
-  const project: ProjectConfig = { name: 'inferred', path: projectRoot };
-  clearRecordFeedbackSync(project, issueId);
+  updateContinueState(resolvePlanHome(projectRoot), issueId, (current) => ({
+    ...current,
+    feedback: [],
+  }));
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────

@@ -46,6 +46,10 @@ import { INTERNAL_TOKEN_HEADER, _resetInternalTokenCacheForTests } from '../../.
 import { DASHBOARD_CSRF_HEADER, DASHBOARD_SESSION_COOKIE, _resetDashboardSessionTokenForTests, dashboardCsrfToken } from '../dashboard-auth.js';
 import { _resetTrustedOriginsForTests } from '../origin-validation.js';
 
+// PAN-3917 W6: the record plane is deleted by W3; these route trees still reach
+// it transitively (config-yaml → tier-table → record, workspaces/resolver →
+// overdeck/infra → record). Stub the chain entry so the route under test loads.
+
 const originalApiPort = process.env.API_PORT;
 const originalPort = process.env.PORT;
 const originalDashboardUrl = process.env.DASHBOARD_URL;
@@ -165,7 +169,6 @@ describe('POST /api/issues/:id/close-out', () => {
         status: 'Verifying on Main',
         state: 'verifying_on_main',
         canonicalStatus: 'verifying_on_main',
-        mergeStatus: 'merged',
         labels: ['bug', 'verifying-on-main', 'needs-close-out'],
       },
     ]);
@@ -204,7 +207,6 @@ describe('POST /api/issues/:id/close-out', () => {
       state: 'done',
       canonicalStatus: 'done',
       targetCanonicalState: 'done',
-      mergeStatus: undefined,
       labels: ['bug', 'closed-out'],
     });
     expect(result.appendedEvents).toEqual([
@@ -259,7 +261,6 @@ describe('POST /api/issues/:id/close-out', () => {
       status: 'Verifying on Main',
       state: 'verifying_on_main',
       canonicalStatus: 'verifying_on_main',
-      mergeStatus: 'merged',
       labels: ['bug', 'verifying-on-main', 'needs-close-out'],
     };
     issueDataServiceMock.getIssues.mockReturnValue([cachedIssue]);

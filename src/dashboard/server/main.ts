@@ -13,8 +13,6 @@ import { ServerConfigLayer } from './config.js';
 import { runServer } from './server.js';
 import { startSharedIssueService, getSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
-import { startMergeBlockerReconcileService } from './services/merge-blocker-reconcile-service.js';
-import { startReviewStatusReconcileService } from './services/review-status-reconcile-service.js';
 import { startResourceRefreshTriggers } from './services/resource-refresh-triggers.js';
 import {
   enqueueProjectsResourceRefresh,
@@ -24,15 +22,9 @@ import {
   whenProjectResourceRefreshIdle,
 } from './services/project-resource-refresh-queue.js';
 import { whenDashboardListening } from './dashboard-listening.js';
-import {
-  shouldStartStaleCheckRetriggerService,
-  startStaleCheckRetriggerService,
-  stopStaleCheckRetriggerService,
-} from './services/stale-check-retrigger-service.js';
 import { startAgentOutputService, stopAgentOutputService } from './services/agent-output-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
 import { startRestartAnnouncer, stopRestartAnnouncer } from './services/restart-announcer.js';
-import { startSubstrateBugPoller, stopSubstrateBugPoller } from './services/substrate-bug-poller.js';
 import { startUatTrainReconciler, stopUatTrainReconciler } from './services/uat-train.js';
 import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer.js';
 import { startTtsPlayback, stopTtsPlayback } from './services/tts-playback.js';
@@ -43,14 +35,11 @@ import { processPendingFeedbackDeliveries } from './pending-feedback.js';
 import { initRestartGate } from './services/restart-gate.js';
 import { setPipelineHandlerSync } from '../../lib/pipeline-notifier.js';
 import { ensureInternalTokenSync } from '../../lib/internal-token.js';
-import { clearStuckMergeStatuses, fixStuckReadyForMerge, fixStuckCommentedReviews, getReviewStatusSync, loadReviewStatuses, clearReviewStatus } from '../../lib/review-status.js';
-import { reconcileStaleGitHubBlockers } from '../../lib/webhook-handlers.js';
 import { recoverStuckForks, waitForInFlightForkPipelines } from '../../lib/overdeck/conversation-forks.js';
 import { getEventStore, initEventStore } from './event-store.js';
-import { emitReviewStatusChanged } from './review-status-emit.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
 import { shouldAutoStart } from '../../lib/cloister/config.js';
-import { applyBootReconciliationDecision, setAgentStoppedNotifier, setAgentStatusChangedNotifier, setMergeReadyNotifier } from '../../lib/cloister/deacon.js';
+import { setAgentStoppedNotifier, setAgentStatusChangedNotifier } from '../../lib/cloister/deacon-lite.js';
 import { getAgentState, type AgentState } from '../../lib/agents.js';
 import { saveAgentStateAndEmitEvent } from './services/agent-projection.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
@@ -75,7 +64,6 @@ import { startCostReconcileService, stopCostReconcileService } from './services/
 import { startEventLoopMonitor, stopEventLoopMonitor } from './services/event-loop-monitor.js';
 import { formatBootGateState, resolveBootGates } from '../../lib/boot-gates.js';
 import { setLastCleanShutdownAt } from '../../lib/overdeck/control-settings.js';
-import { startBootReconciliation } from '../../lib/cloister/boot-reconciliation.js';
 import { startDeaconChild, stopDeaconChild } from './services/deacon-supervisor.js';
 import { stopAllKnowledgeViewers } from './services/knowledge-viewer.js';
 import { existsSync } from 'node:fs';
@@ -85,13 +73,12 @@ import { createOverdeckDatabase } from '../../../scripts/create-overdeck-db.js';
 import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
 import { startProjectCiRefillAfterProjectionReady } from './services/project-ci-refill-startup.js';
 import { ProjectsLive } from '../../lib/overdeck/config.js';
-import { RecordsLive, TmuxLive } from '../../lib/overdeck/infra.js';
+import { RecordsLive, TmuxLive, dropPipelineStateMirrorTablesSync } from '../../lib/overdeck/infra.js';
 import { startServerBootTelemetry } from './telemetry.js';
+import { isPeerDashboardProcess } from '../../lib/boot-gates.js';
 import { isSmeeConfiguredSync, startSmeeProcessSync } from '../../lib/smee.js';
-import { flushAllPendingAutoCommits } from '../../lib/pan-dir/auto-commit.js';
 import { listProjectsSync } from '../../lib/projects.js';
 import { backfillIssueWorkspaces, migrateMemoryHomesToWorkspacesOnce, seedProjectsFromYaml } from '../../lib/workspaces/rebuild.js';
-import { ensureAutomaticStateMigration, decideDeaconBootGate } from '../../lib/state-auto-migrate.js';
 import { broadcastServerRestarting } from './ws-terminal.js';
 
 declare const Bun: unknown;
@@ -141,6 +128,21 @@ try {
   console.warn('[overdeck] Overdeck db init failed (non-fatal):', err);
 }
 
+// PAN-3917 fix10: the pipeline-state mirror drop is a DESTRUCTIVE migration, so
+// it runs here — once, and only in a primary dashboard. A peer shares another
+// dashboard's overdeck.db; running it there dropped `agents` out from under the
+// live 0.51.0 server, which then crash-looped. See infra.ts for both gates.
+try {
+  const drop = dropPipelineStateMirrorTablesSync();
+  if (drop.dropped) {
+    console.log('[overdeck] Dropped the pipeline-state mirror tables (once; marker written)');
+  } else if (drop.skipped === 'peer') {
+    console.log('[overdeck] Pipeline-state mirror drop SKIPPED — peer dashboard runs no destructive migration');
+  }
+} catch (err) {
+  console.warn('[overdeck] Pipeline-state mirror drop failed (non-fatal):', err);
+}
+
 // Bind the HTTP socket before starting any background service or the Deacon.
 // A bind failure is retried by server.ts and then terminates this process through
 // Effect's Node runtime; no headless orchestrator is allowed to survive it.
@@ -170,23 +172,15 @@ void warnIfAppCannotMerge();
 // container ran its own Linear/GitHub poller against the shared API key — ~17 of them
 // at once exhausted Linear's 2500/hr quota. This mirrors the single-deacon invariant:
 // a peer dashboard is a read/UI peer, never a second orchestrator.
-const isPeerDashboard = process.env.OVERDECK_DISABLE_DEACON === '1';
+const isPeerDashboard = isPeerDashboardProcess();
 if (isPeerDashboard) {
   void startSharedIssueService({ skipPolling: true });
   console.log('[overdeck] IssueDataService started in CACHE-ONLY mode — peer dashboard (OVERDECK_DISABLE_DEACON=1) does not poll trackers (PAN-1817)');
 } else {
   void startSharedIssueService().then(() => {
     console.log('[overdeck] IssueDataService background fetch complete');
-    // Once the issue cache is warm, prune review-status rows for issues that
-    // are CLOSED on the tracker. Without this, manually-closed issues
-    // (`gh issue close` instead of `pan close`) leave stale review-state
-    // behind, and the deacon keeps auto-resuming agents and re-dispatching
-    // test specialists for them every patrol — observed on PAN-951 / PAN-512 /
-    // PAN-714. Runs once per boot as a sweep; the canonical close-out flow
-    // already calls clearReviewStatus on its own path.
-    void pruneClosedIssueReviewStatuses().catch((err) => {
-      console.warn('[overdeck] pruneClosedIssueReviewStatuses failed:', err?.message ?? err);
-    });
+    // PAN-3917: there are no review-status rows to prune. A manually-closed
+    // issue derives to `closed` on the next read, so nothing stale survives it.
     void Effect.runPromise(cleanupClosedIssueAgentDirectories({
       issues: getSharedIssueService().getIssues({ cycle: 'all', includeCompleted: true }),
       force: true,
@@ -214,22 +208,10 @@ console.log('[overdeck] AgentEnrichmentService started');
 startAgentOutputService();
 console.log('[overdeck] AgentOutputService started');
 
-// Start merge-blocker reconcile poller (PAN-1620) — proactively refreshes GitHub
-// mergeability for readyForMerge PRs so a stale/conflicting one drops out of the
-// Awaiting-Merge queue (and its live MERGE button) before any click.
-startMergeBlockerReconcileService();
-console.log('[overdeck] MergeBlockerReconcileService started');
-
-if (startReviewStatusReconcileService()) {
-  console.log('[overdeck] ReviewStatusReconcileService started');
-} else {
-  console.log('[overdeck] ReviewStatusReconcileService skipped — non-primary dashboard process');
-}
-
-if (shouldStartStaleCheckRetriggerService()) {
-  startStaleCheckRetriggerService();
-  console.log('[overdeck] StaleCheckRetriggerService started');
-}
+// PAN-3917: the merge-blocker, review-status, and stale-check reconcilers are
+// gone. Mergeability, review state, and check state are read from the forge at
+// request time through services/derived-issue-state.ts — there is no stored
+// copy left for a poller to reconcile.
 
 // Desktop installs never run `pan install`, so provision the Claude Code hook
 // bundle (auto-approve, heartbeat, cost, lifecycle) at boot (PAN-2595).
@@ -253,24 +235,11 @@ if (process.env.OVERDECK_MODE === 'desktop') {
   })();
 }
 
-// Wire up pipeline notifier → domain events.
-// Library code (review-status.ts) calls notifyPipeline() on every status change.
-// This handler converts those into domain events so the frontend Zustand store updates.
+// Wire up pipeline notifier → domain events, so the frontend Zustand store
+// updates on review and test outcomes. PAN-3917: there is no `status_changed`
+// variant — nothing stores a status to change.
 setPipelineHandlerSync((event) => {
   switch (event.type) {
-    case 'status_changed': {
-      try {
-        emitReviewStatusChanged(
-          (domainEvent) => getEventStore().append(domainEvent as any),
-          event.issueId,
-          event.status,
-        );
-      } catch (err) {
-        console.error('[pipeline] Failed to append status_changed event:', err);
-      }
-      return;
-    }
-
     case 'review.approved':
     case 'test.passed': {
       try {
@@ -478,36 +447,17 @@ setAgentStatusChangedNotifier((state, previousStatus, hasLiveTmuxSession) => {
 });
 console.log('[overdeck] Agent stopped/status notifiers → domain events wired');
 
-// Wire deacon merge-ready reminder → domain events so the frontend re-reads the
-// Awaiting Merge list when deacon fires its 1h staleness reminder.
-setMergeReadyNotifier((issueId) => {
-  const status = getReviewStatusSync(issueId);
-  if (!status) return;
-  try {
-    emitReviewStatusChanged(
-      (domainEvent) => getEventStore().append(domainEvent as any),
-      issueId,
-      status,
-    );
-  } catch (err) {
-    console.error('[pipeline] Failed to append merge-ready event:', err);
-  }
-});
-console.log('[overdeck] Merge-ready notifier → domain events wired');
+// PAN-3917: the deacon's 1h merge-ready staleness reminder is gone — deacon-lite
+// runs four routines (FR-11) and this is not one of them. The Awaiting Merge
+// list is derived on read, so it has nothing to be reminded about.
 
 // Start background conversation lifecycle polling (10s interval)
 startConversationLifecycleService();
 console.log('[overdeck] ConversationLifecycleService started');
 
-if (isPeerDashboard) {
-  console.log('[overdeck] SubstrateBugPoller skipped — peer dashboard does not poll trackers');
-} else {
-  startSubstrateBugPoller();
-}
-
 // PAN-1737 UAT batch trains: keep one assembled, testable batch ready at all
-// times (gated per-tick on flywheel.merge_train_enabled; no-op without an
-// active flywheel run).
+// times. Gated per-tick on the merge-train setting; there is no flywheel run
+// to wait for (PAN-3917 D12).
 if (startUatTrainReconciler()) {
   console.log('[overdeck] UAT batch-train reconciler started');
 } else {
@@ -692,7 +642,6 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopAgentEnrichmentService();
   stopAgentOutputService();
   stopConversationLifecycleService();
-  stopSubstrateBugPoller();
   stopUatTrainReconciler();
   stopTtsSummarizer();
   stopTtsPlayback();
@@ -700,7 +649,6 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopEventLoopMonitor();
   stopTranscriptPoller();
   stopCostReconcileService();
-  stopStaleCheckRetriggerService();
   stopRestartAnnouncer();
   await stopAllKnowledgeViewers().catch((err) => console.warn('[knowledge-viewer] shutdown failed:', err?.message ?? err));
   await stopDeaconChild().catch((err) => console.warn('[deacon-supervisor] child shutdown failed:', err?.message ?? err));
@@ -714,7 +662,6 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   } catch (err) {
     console.warn('[overdeck] gate process reap failed:', err);
   }
-  await Effect.runPromise(flushAllPendingAutoCommits()).catch((err) => console.warn('[pan-dir/auto-commit] shutdown flush failed:', err));
   await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
   await stopConversationRescanScheduler();
   closeConversationSearchService();
@@ -731,9 +678,11 @@ process.once('SIGHUP', () => void handleShutdownSignal('SIGHUP'));
 startRestartAnnouncer();
 console.log('[overdeck] Restart announcer started');
 
-// Clear any mergeStatus stuck at 'merging'/'verifying' from before the restart (PAN-490).
-clearStuckMergeStatuses();
-emitActivityEntrySync({ source: 'dashboard', level: 'info', message: 'Cleared stuck merge statuses on startup' });
+// PAN-3917: the four boot repairs that lived here — clearing a stuck merge
+// status (PAN-490), restoring merge readiness, restoring a review status
+// mis-marked from a COMMENTED review (PAN-869), and re-deriving GitHub-native
+// blockers after missed webhooks (PAN-1771) — all repaired a stored copy of a
+// fact the forge owns. There is no copy left to repair.
 // Resume recoverable in-progress forks after boot services settle (PAN-1744).
 setTimeout(() => {
   void recoverStuckForks()
@@ -748,21 +697,6 @@ setTimeout(() => {
       emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Failed to recover stuck forks on startup' });
     });
 }, 1000);
-// Restore readyForMerge for issues where review+test passed but readyForMerge is stuck false.
-await fixStuckReadyForMerge();
-// PAN-869: restore reviewStatus='passed' for issues with COMMENTED reviews that were incorrectly marked 'failed'
-fixStuckCommentedReviews();
-// PAN-1771: re-derive GitHub-native blockers from live PR state. Webhooks missed
-// while the server was down otherwise leave stale blockers pinning readyForMerge=false.
-void reconcileStaleGitHubBlockers()
-  .then((n) => {
-    if (n > 0) {
-      console.log(`[overdeck] Reconciled GitHub-native blockers for ${n} issue(s) on startup`);
-      emitActivityEntrySync({ source: 'dashboard', level: 'info', message: `Reconciled GitHub-native blockers for ${n} issue(s) on startup` });
-    }
-  })
-  .catch((err: any) => console.warn(`[overdeck] Startup blocker reconciliation failed: ${err.message}`));
-
 // PAN-3537: seed the per-project CI chip before the first webhook arrives, and
 // repair it every 15 minutes so a dropped webhook delivery cannot leave a
 // long-running dashboard showing an indefinitely stale CI state. The Effect
@@ -772,28 +706,38 @@ await startProjectCiRefillAfterProjectionReady(15 * 60 * 1000);
 
 // Reset stuck merge queue entries (PAN-632): any 'processing' entries were
 // in-flight when the server died — reset to 'queued' so they resume.
-try {
-  const { resetProcessingToQueued, requeueOrphanedMergingAutoMerges } = await import('../../lib/overdeck/merge-sync.js');
-  const resetCount = resetProcessingToQueued();
-  if (resetCount > 0) {
-    console.log(`[overdeck] Reset ${resetCount} stuck merge queue entries to queued`);
-    emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Reset ${resetCount} stuck merge queue entries to queued on startup` });
+//
+// fix10: every step below writes to state the primary owns or sets work going
+// that spawns agents (resumeQueuedMerges → merge → post-merge lifecycle →
+// `pan knowledge --retro`; processPendingLifecycle does the same directly;
+// processPendingFeedbackDeliveries writes into the primary's live agent panes).
+// A peer dashboard is a read/UI peer and starts none of it.
+if (isPeerDashboard) {
+  console.log('[overdeck] Merge-queue repair, post-merge lifecycle and feedback replay SKIPPED — peer dashboard spawns nothing');
+} else {
+  try {
+    const { resetProcessingToQueued, requeueOrphanedMergingAutoMerges } = await import('../../lib/overdeck/merge-sync.js');
+    const resetCount = resetProcessingToQueued();
+    if (resetCount > 0) {
+      console.log(`[overdeck] Reset ${resetCount} stuck merge queue entries to queued`);
+      emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Reset ${resetCount} stuck merge queue entries to queued on startup` });
+    }
+    // PAN-3328: an auto-merge row left in 'merging' by a crash is invisible to the
+    // problems endpoint and to the deacon reconciler — requeue it so it is retried.
+    const requeuedAutoMerges = requeueOrphanedMergingAutoMerges();
+    if (requeuedAutoMerges > 0) {
+      console.log(`[overdeck] Requeued ${requeuedAutoMerges} orphaned auto-merge row(s) from merging to pending`);
+      emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Requeued ${requeuedAutoMerges} orphaned auto-merge row(s) stuck in merging on startup` });
+    }
+    await resumeQueuedMerges();
+  } catch (err: any) {
+    console.warn(`[overdeck] Failed to reset merge queue: ${err.message}`);
   }
-  // PAN-3328: an auto-merge row left in 'merging' by a crash is invisible to the
-  // problems endpoint and to the deacon reconciler — requeue it so it is retried.
-  const requeuedAutoMerges = requeueOrphanedMergingAutoMerges();
-  if (requeuedAutoMerges > 0) {
-    console.log(`[overdeck] Requeued ${requeuedAutoMerges} orphaned auto-merge row(s) from merging to pending`);
-    emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Requeued ${requeuedAutoMerges} orphaned auto-merge row(s) stuck in merging on startup` });
-  }
-  await resumeQueuedMerges();
-} catch (err: any) {
-  console.warn(`[overdeck] Failed to reset merge queue: ${err.message}`);
-}
 
-// Pending post-merge lifecycle hook (PAN-444) — see pending-lifecycle.ts for details
-await processPendingLifecycle();
-await processPendingFeedbackDeliveries();
+  // Pending post-merge lifecycle hook (PAN-444) — see pending-lifecycle.ts for details
+  await processPendingLifecycle();
+  await processPendingFeedbackDeliveries();
+}
 
 // Restart gate (PAN-3729): if the previous server died to perform an approved
 // restart, this boot IS that restart completing — mark the epoch's requesters
@@ -813,108 +757,31 @@ await initRestartGate().catch((err: unknown) => {
 // HTTP server from accepting connections (the "Bad Gateway after pan up"
 // failure mode). The dashboard comes up clean; start cloister manually from
 // the UI once the workspace backlog is cleaned up.
-if (process.env.OVERDECK_DISABLE_AUTO_MERGE === '1') {
-  console.log('[overdeck] Auto-merge executor SKIPPED (OVERDECK_DISABLE_AUTO_MERGE=1)');
-} else {
-  startAutoMergeExecutor();
+if (startAutoMergeExecutor()) {
   console.log('[overdeck] Auto-merge executor started');
+} else if (isPeerDashboard) {
+  console.log('[overdeck] Auto-merge executor SKIPPED — peer dashboard spawns nothing');
+} else {
+  console.log('[overdeck] Auto-merge executor SKIPPED (OVERDECK_DISABLE_AUTO_MERGE=1)');
 }
 
-try {
-  // Preserve running statuses backed by a live supervised worker. Reset only
-  // orphaned runs whose worker died without recording a terminal result.
-  const { reconcileInterruptedVerifications } = await import('../../lib/cloister/verification-runner.js');
-  const interrupted = reconcileInterruptedVerifications();
-  if (interrupted > 0) console.log(`[overdeck] recovered ${interrupted} orphaned verification worker(s)`);
-} catch (err) {
-  console.warn('[overdeck] interrupted-verification reconciliation failed:', err);
-}
+// PAN-3917: boot used to reset verification runs left `running` by a worker
+// that died. A verification result IS its artifact — an interrupted run simply
+// left none, so the next gate run re-verifies. There is no stored status to
+// reconcile.
 
-if (process.env.OVERDECK_DISABLE_DEACON === '1') {
+if (isPeerDashboard) {
   console.log('[overdeck] Cloister auto-start SKIPPED (OVERDECK_DISABLE_DEACON=1)');
   emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Cloister auto-start skipped via OVERDECK_DISABLE_DEACON — deacon is not running' });
 } else if (shouldAutoStart()) {
-  // Per-project state-migration gate (PAN-2676). One blocked project — a dirty
-  // operator checkout, a dirty state worktree — must NOT take the whole Deacon
-  // down. The Deacon starts whenever at least one project is usable; blocked
-  // projects are already kept out of NEW pipeline work by the state write door
-  // (requireAutomaticStateMigration at `pan start`), so here we only decide
-  // Deacon start and report the excluded projects loudly.
-  const migrations = [];
-  for (const { key, config } of listProjectsSync()) {
-    if (!existsSync(config.path)) continue;
-    migrations.push(await ensureAutomaticStateMigration(key, config));
-  }
-  const gate = decideDeaconBootGate(migrations);
-
-  // Name each blocked project WITH its human-readable prerequisite.
-  for (const blocked of gate.blockedProjects) {
-    console.error(`[state-migration] ${blocked.notice}`);
-    emitActivityEntrySync({ source: 'dashboard', level: 'error', message: blocked.notice });
-  }
-
-  if (gate.startDeacon) {
-    if (gate.blockedProjects.length > 0) {
-      const excluded = gate.blockedProjects.map((b) => b.projectKey).join(', ');
-      const summary = `Deacon is starting for ${gate.usableProjects.length} usable project(s) (${gate.usableProjects.join(', ')}). `
-        + `${gate.blockedProjects.length} project(s) are EXCLUDED from orchestration until fixed: ${excluded}. `
-        + 'Each excluded project has an unavailable permanent-state plane, so Overdeck will not spawn or write new pipeline work for it; the Deacon runs normally for the usable projects. '
-        + 'Resolve each prerequisite listed above, then run "pan sync".';
-      console.error(`[overdeck] ${summary}`);
-      emitActivityEntrySync({ source: 'dashboard', level: 'error', message: summary });
-    }
-    const reconciliation = startBootReconciliation({ onGraceExpired: async () => { await applyBootReconciliationDecision(); } });
-    if (reconciliation.decision !== 'pending') {
-      void applyBootReconciliationDecision();
-    }
-    startDeaconChild().catch((err) => {
-      console.error('[overdeck] Cloister auto-start failed:', err);
-      emitActivityEntrySync({ source: 'dashboard', level: 'error', message: `Cloister auto-start failed: ${err instanceof Error ? err.message : String(err)}` });
-    });
-    console.log('[overdeck] Cloister auto-starting (startup.auto_start=true)');
-    emitActivityEntrySync({ source: 'dashboard', level: 'info', message: 'Cloister auto-starting on dashboard boot' });
-  } else {
-    // All projects blocked: refuse to start, as before.
-    const excluded = gate.blockedProjects.map((b) => b.projectKey).join(', ');
-    const summary = `Deacon auto-start refused: all ${gate.blockedProjects.length} project(s) have an unavailable permanent-state plane (${excluded}). `
-      + 'No pipeline work can run until at least one project\'s prerequisite (listed above) is resolved; then run "pan sync".';
-    console.error(`[overdeck] ${summary}`);
-    emitActivityEntrySync({ source: 'dashboard', level: 'error', message: summary });
-  }
+  // PAN-3917: there is no state plane left to migrate, so nothing gates the
+  // Deacon's boot any more — deacon-lite reads the forge and the terminal
+  // backend and writes no status.
+  startDeaconChild().catch((err) => {
+    console.error('[overdeck] Cloister auto-start failed:', err);
+    emitActivityEntrySync({ source: 'dashboard', level: 'error', message: `Cloister auto-start failed: ${err instanceof Error ? err.message : String(err)}` });
+  });
+  console.log('[overdeck] Cloister auto-starting (startup.auto_start=true)');
+  emitActivityEntrySync({ source: 'dashboard', level: 'info', message: 'Cloister auto-starting on dashboard boot' });
 }
 
-/**
- * Drop review-status rows for issues that are CLOSED on the tracker. Runs once
- * after the IssueDataService warm-fetch so closed issues don't keep waking the
- * deacon's orphan-recovery and feedback-redelivery loops.
- */
-async function pruneClosedIssueReviewStatuses(): Promise<void> {
-  const issues = getSharedIssueService().getIssues();
-  const closed = new Set<string>();
-  for (const issue of issues) {
-    const id = (issue?.identifier ?? '').toString().toUpperCase();
-    if (!id) continue;
-    const state = (issue?.state ?? '').toString().toUpperCase();
-    const status = (issue?.status ?? '').toString().toLowerCase();
-    if (state === 'CLOSED' || status === 'done' || status === 'closed' || status === 'cancelled') {
-      closed.add(id);
-    }
-  }
-  if (closed.size === 0) return;
-
-  const statuses = loadReviewStatuses();
-  let removed = 0;
-  for (const issueId of Object.keys(statuses)) {
-    if (closed.has(issueId.toUpperCase())) {
-      try {
-        clearReviewStatus(issueId.toUpperCase());
-        removed++;
-      } catch {
-        // Non-fatal — next boot will retry.
-      }
-    }
-  }
-  if (removed > 0) {
-    console.log(`[overdeck] Pruned ${removed} stale review-status entr${removed === 1 ? 'y' : 'ies'} for closed issues`);
-  }
-}

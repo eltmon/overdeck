@@ -38,7 +38,7 @@ import {
   getPendingQuestions as getPendingQuestionsShared,
   getAgentPendingQuestions as getAgentPendingQuestionsShared,
 } from '../../../../lib/agent-enrichment.js';
-import { issueOwesReworkSync, type WorkAgentLifecycleState, type WorkAgentRecommendedAction } from '../../../../lib/work-agent-lifecycle.js';
+import type { WorkAgentLifecycleState, WorkAgentRecommendedAction } from '../../../../lib/work-agent-lifecycle.js';
 import { hasCompletionMarkerForAgent } from '../../../../lib/agents/supervisor-channels.js';
 import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
 import { getResourceConfig, type HealthLeakedSpecialist, type SystemHealthSnapshot } from '../../services/system-health-service.js';
@@ -306,9 +306,11 @@ function buildStoppedAgentLifecycle(
   const handedOff = typeof state.id === 'string' && state.id.length > 0
     ? hasCompletionMarkerForAgent(state as AgentState)
     : false;
-  // PAN-3555: an owed-rework handoff is resumable again — mirror the canonical door.
-  const owesRework = handedOff && issueOwesReworkSync(state.issueId);
-  const canWarmResumeAfterHandoff = owesRework && hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed);
+  // PAN-3917: whether the pipeline owes this handoff rework is the PR's answer
+  // and costs a forge call, which this synchronous listing cannot make. It
+  // mirrors the synchronous canonical door: a handed-off agent is not resumable
+  // here; the async door (getWorkAgentLifecycleState) asks the forge and lifts
+  // the gate for an owed-rework handoff (PAN-3555).
   const isOrphaned = !hasLiveTmuxSession && (
     (hasSavedSession && !hasResumableBackingState)
     || (hasAgentState && !hasWorkspace)
@@ -323,9 +325,6 @@ function buildStoppedAgentLifecycle(
     reason = hasSavedSession
       ? `Agent ${agentId} has stale/orphaned session metadata without a resumable workspace-backed agent state. Start Agent should create a fresh session.`
       : `Agent ${agentId} is an orphaned placeholder/stale record. Start Agent should create a fresh session.`;
-  } else if (canWarmResumeAfterHandoff) {
-    recommendedAction = 'resume';
-    reason = `Agent ${agentId} handed off its work but the pipeline now owes it rework (failed verification, blocked/failed review, or failed test). Use 'pan resume ${agentOrIssueId}' to continue its warm session with the pending feedback (PAN-3555).`;
   } else if (handedOff) {
     // PAN-3334: mirror getWorkAgentLifecycleState — a handed-off agent is never
     // offered a plain resume; there is nothing to continue.
@@ -356,11 +355,10 @@ function buildStoppedAgentLifecycle(
     isCompleted,
     isCrashed,
     handedOff,
-    owesRework,
     runtimeState: runtime,
     agentStatus,
     canStartFresh: !requiresSessionResetBeforeFreshStart || isOrphaned,
-    canResumeSession: hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed) && (!handedOff || owesRework),
+    canResumeSession: !handedOff && hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed),
     canRestartWithContext: hasAgentState && hasWorkspace,
     canResetSession: hasSavedSession && hasResumableTranscript && hasResumableBackingState,
     requiresSessionResetBeforeFreshStart,

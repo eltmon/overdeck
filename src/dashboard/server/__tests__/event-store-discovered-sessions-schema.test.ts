@@ -13,7 +13,6 @@ import {
   upsertDiscoveredSession,
 } from '../../../lib/overdeck/discovered-sessions.js';
 import { openDatabase } from '../../../lib/database/driver.js';
-import { runMigrations } from '../../../lib/database/schema.js';
 import { closeOverdeckDatabaseSync, getOverdeckDatabaseSync } from '../../../lib/overdeck/infra.js';
 
 let TEST_HOME: string;
@@ -64,29 +63,6 @@ describe('event-store database startup schema', () => {
     expect(columns.map((column) => column.name)).toContain('harness');
   });
 
-  it('migrates v57 discovered_sessions rows by adding and backfilling harness idempotently', () => {
-    const db = openDatabase(':memory:');
-    try {
-      runMigrations(db);
-      db.exec(`
-        ALTER TABLE discovered_sessions DROP COLUMN harness;
-        INSERT INTO discovered_sessions (jsonl_path, scanned_at)
-        VALUES ('/legacy/claude.jsonl', '2026-07-02T00:00:00.000Z');
-        PRAGMA user_version = 57;
-      `);
-
-      runMigrations(db);
-      runMigrations(db);
-
-      const row = db
-        .prepare(`SELECT harness FROM discovered_sessions WHERE jsonl_path = ?`)
-        .get('/legacy/claude.jsonl') as { harness: string };
-      expect(row.harness).toBe('claude-code');
-    } finally {
-      db.close();
-    }
-  });
-
   it('round-trips discovered session harness through the overdeck data layer', () => {
     const inserted = upsertDiscoveredSession({
       jsonlPath: '/sessions/ohmypi.jsonl',
@@ -105,8 +81,9 @@ describe('event-store database startup schema', () => {
     const seedDb = openDatabase(dbPath);
     try {
       seedDb.exec(`
-        CREATE TABLE agents (id TEXT PRIMARY KEY);
-        CREATE TABLE cost_events (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT);
+        -- PAN-3917: events is the fresh-vs-existing sentinel now that the
+        -- state-layer mirror tables (agents, review_status, ...) are dropped.
+        CREATE TABLE events (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT);
         CREATE TABLE discovered_sessions (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           jsonl_path TEXT NOT NULL UNIQUE,

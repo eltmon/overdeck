@@ -6,8 +6,6 @@ import type { ModelProvider } from '../model-fallback.js';
 import { resolveModelIdSync } from '../model-capabilities.js';
 import { getProviderForModelSync, PROVIDERS } from '../providers.js';
 import { canUseHarnessSync } from '../harness-policy.js';
-import { readIssueRecordSync } from '../pan-dir/record.js';
-import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 
 export const TIERED_EXECUTION_DIFFICULTIES: readonly XBriefDifficulty[] = ['trivial', 'simple', 'medium', 'complex', 'expert'] as const;
 export const TIERED_EXECUTION_SUBSCRIPTIONS = ['all', 'flagged', 'sampled'] as const;
@@ -194,29 +192,18 @@ export function resolveTieredExecutionEnabled(
 
 /**
  * Issue-aware wrapper for resolveTieredExecutionEnabled (PAN-2383 foundation).
- * Reads the per-issue record to extract the record override, applies precedence:
- * record override > plan.metadata.tiered_execution > config.enabled.
+ * PAN-3917: the per-issue record override this used to read
+ * is gone with the record plane and had no surviving writer — precedence
+ * collapses to plan.metadata.tiered_execution > config.enabled. `issueId`
+ * stays in the signature so call sites (spawn-prep.ts) do not need to branch
+ * on whether an issue is known.
  */
 export function resolveTieredExecutionEnabledForIssue(
   config: Pick<TieredExecutionConfig, 'enabled'>,
-  issueId: string,
+  _issueId: string,
   planMetadata?: { [key: string]: unknown },
 ): boolean {
-  const resolved = resolveProjectFromIssueSync(issueId);
-  if (!resolved) {
-    // Fallback to plan/config if project cannot be resolved
-    return resolveTieredExecutionEnabled(config, planMetadata);
-  }
-
-  const project = getProjectSync(resolved.projectKey);
-  if (!project) {
-    return resolveTieredExecutionEnabled(config, planMetadata);
-  }
-
-  const record = readIssueRecordSync(project, issueId);
-  const recordOverride = record?.tieredExecutionOverride;
-
-  return resolveTieredExecutionEnabled(config, planMetadata, recordOverride);
+  return resolveTieredExecutionEnabled(config, planMetadata);
 }
 
 function isRuntimeName(value: string): value is RuntimeName {

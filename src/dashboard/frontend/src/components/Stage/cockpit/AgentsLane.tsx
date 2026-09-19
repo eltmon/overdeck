@@ -3,7 +3,8 @@ import {
   ChevronRight, ChevronDown, GitPullRequest, GitBranch,
   Loader2,
 } from 'lucide-react'
-import { useIssueCostsQuery, useReviewStatusQuery, useWorkspaceQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries'
+import { useIssueCostsQuery, useWorkspaceQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries'
+import { useDerivedIssueState } from '../../../lib/store'
 import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/useIssueActions'
 import { UatStackStatus, getUatStackSummary } from '../../CommandDeck/UatStackStatus'
 import type { ProjectFeature } from '../../CommandDeck/ProjectTree/ProjectNode'
@@ -23,22 +24,13 @@ import styles from './agentsLane.module.css'
 
 type Tone = 'info' | 'ok' | 'bad' | 'muted'
 
-const VERIFICATION_TONE: Record<string, { label: string; tone: Tone }> = {
-  pending: { label: 'not run', tone: 'muted' },
-  running: { label: 'running', tone: 'info' },
-  passed: { label: 'passed', tone: 'ok' },
-  failed: { label: 'failed', tone: 'bad' },
-  skipped: { label: 'skipped', tone: 'muted' },
+/** The forge's check-run rollup on the PR head — the only verification signal. */
+const CHECKS_TONE: Record<string, { label: string; tone: Tone }> = {
+  green: { label: 'green', tone: 'ok' },
+  red: { label: 'red', tone: 'bad' },
+  pending: { label: 'running', tone: 'info' },
 }
-
-const TEST_TONE: Record<string, { label: string; tone: Tone }> = {
-  pending: { label: 'not run', tone: 'muted' },
-  testing: { label: 'running', tone: 'info' },
-  passed: { label: 'passed', tone: 'ok' },
-  failed: { label: 'failed', tone: 'bad' },
-  dispatch_failed: { label: 'failed', tone: 'bad' },
-  skipped: { label: 'skipped', tone: 'muted' },
-}
+const NO_CHECKS: { label: string; tone: Tone } = { label: 'no checks', tone: 'muted' }
 
 function sessionStatus(session: SessionNode): { label: string; tone: Tone } {
   const RUNNING = new Set(['running', 'starting', 'working', 'thinking'])
@@ -272,8 +264,7 @@ export function AgentsLane({
 }) {
   const [reviewExpanded, setReviewExpanded] = useState(true)
   const [verExpanded, setVerExpanded] = useState(true)
-  const review = useReviewStatusQuery(issueId)
-  const rs = review.data
+  const issue = useDerivedIssueState(issueId)
 
   const costOf = useSessionCostLookup(issueId)
   const plan = sessions.find((s) => s.type === 'planning' || s.type === 'legacy')
@@ -284,11 +275,12 @@ export function AgentsLane({
   const testSession = sessions.find((s) => s.type === 'test')
   const ships = sessions.filter((s) => s.type === 'ship' || s.type === 'merge')
 
-  const verState = VERIFICATION_TONE[rs?.verificationStatus ?? 'pending'] ?? VERIFICATION_TONE.pending
-  const verFailed = rs?.verificationStatus === 'failed'
+  const checks = issue?.pr?.checks
+  const verState = (checks && CHECKS_TONE[checks]) ?? NO_CHECKS
+  const verFailed = checks === 'red'
 
-  // count = real agent rows + verification step (+ synthetic test if no session)
-  const count = [plan, ...works, ...knowledges, reviewParent, testSession, ...ships].filter(Boolean).length + 1 + (testSession ? 0 : 1)
+  // count = real agent rows + the checks step
+  const count = [plan, ...works, ...knowledges, reviewParent, testSession, ...ships].filter(Boolean).length + 1
   const activeCount = sessions.filter((session) => session.presence === 'active').length
 
   return (
@@ -368,16 +360,15 @@ export function AgentsLane({
         </div>
       ) : null}
 
-      {/* Verification — a step, not a session. Aggregate status; on failure expands to the gates. */}
+      {/* Checks — a step, not a session. The PR's rollup; red expands to the gates. */}
       <InfoRow
-        name="Verification" status={verState} model="build gate"
-        sub={rs?.verificationCycleCount ? `cycle ${rs.verificationCycleCount}${rs.verificationMaxCycles ? `/${rs.verificationMaxCycles}` : ''}` : undefined}
+        name="Checks" status={verState} model="pull request"
         expandable={verFailed} expanded={verExpanded} onToggle={() => setVerExpanded((v) => !v)}
         onClick={onOpenVerification} />
       {verFailed && verExpanded && <VerificationGates issueId={issueId} />}
 
-      {/* Test — its session if dispatched (click → its terminal/output), else a synthetic step. */}
-      {testSession ? (
+      {/* Test — rendered only when a test pane exists; there is no synthetic step. */}
+      {testSession && (
         <AgentStepRow
           session={testSession}
           issueId={issueId}
@@ -387,9 +378,6 @@ export function AgentsLane({
           showMenu={false}
           onAction={() => {}}
         />
-      ) : (
-        <InfoRow name="Test" status={TEST_TONE[rs?.testStatus ?? 'pending'] ?? TEST_TONE.pending}
-          model="pipeline" onClick={onOpenVerification} />
       )}
 
         {ships.map((s) => (

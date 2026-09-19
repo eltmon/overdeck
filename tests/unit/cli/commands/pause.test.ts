@@ -5,15 +5,14 @@ const agentMocks = vi.hoisted(() => ({
   getAgentStateSync: vi.fn(),
   setAgentPausedSync: vi.fn(),
   stopAgentSync: vi.fn(),
+  // PAN-3917: agents/slot-reconcile.ts (listSlotAgents) is gone; pause.ts
+  // inlines the swarm-slot pattern match over listAgentStates instead.
+  listAgentStates: vi.fn((): Array<{ id: string }> => []),
 }));
 
 const tmuxMocks = vi.hoisted(() => ({
   sessionExistsSync: vi.fn(() => false),
   listSessionNamesSync: vi.fn((): string[] => []),
-}));
-
-const slotMocks = vi.hoisted(() => ({
-  listSlotAgents: vi.fn((): Array<{ agentId: string; slotIndex: number }> => []),
 }));
 
 const interventionMocks = vi.hoisted(() => ({
@@ -34,11 +33,6 @@ vi.mock('../../../../src/lib/tmux.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../../../../src/lib/agents/slot-reconcile.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../src/lib/agents/slot-reconcile.js')>();
-  return { ...actual, listSlotAgents: slotMocks.listSlotAgents };
-});
-
 vi.mock('../../../../src/lib/operator-interventions.js', () => ({
   appendOperatorInterventionEvent: interventionMocks.appendOperatorInterventionEvent,
 }));
@@ -47,7 +41,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   tmuxMocks.sessionExistsSync.mockReturnValue(false);
   tmuxMocks.listSessionNamesSync.mockReturnValue([]);
-  slotMocks.listSlotAgents.mockReturnValue([]);
+  agentMocks.listAgentStates.mockReturnValue([]);
   vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
     throw new Error(`process.exit:${code}`);
   }) as never);
@@ -63,9 +57,9 @@ describe('pan pause on a swarm issue (PAN-2214)', () => {
   it('exits non-zero and names pan swarm stop and pan swarm freeze when slot agents exist', async () => {
     agentMocks.resolveAgentTargetSync.mockReturnValue('agent-pan-1791');
     agentMocks.getAgentStateSync.mockReturnValue(null);
-    slotMocks.listSlotAgents.mockReturnValue([
-      { agentId: 'agent-pan-1791-slot-1', slotIndex: 1 },
-      { agentId: 'agent-pan-1791-slot-2', slotIndex: 2 },
+    agentMocks.listAgentStates.mockReturnValue([
+      { id: 'agent-pan-1791-slot-1' },
+      { id: 'agent-pan-1791-slot-2' },
     ]);
 
     const { pauseCommand } = await import('../../../../src/cli/commands/pause.js');

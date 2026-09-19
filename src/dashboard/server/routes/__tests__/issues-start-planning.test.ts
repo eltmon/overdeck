@@ -6,6 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect, Layer, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
+// PAN-3917 W6: the record plane is deleted by W3; these route trees still reach
+// it transitively (config-yaml → tier-table → record, workspaces/resolver →
+// overdeck/infra → record). Stub the chain entry so the route under test loads.
+
 const {
   issueDataServiceMock,
   mockResolveProjectFromIssue,
@@ -79,6 +83,10 @@ vi.mock('../../services/issue-service-singleton.js', () => ({
 }));
 
 vi.mock('../../../../lib/tmux.js', () => ({
+  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listPaneValuesSync: () => [],
   listSessionNames: mockListSessionNames,
   killSession: vi.fn(() => Effect.void),
   sessionExists: vi.fn(() => Effect.succeed(false)),

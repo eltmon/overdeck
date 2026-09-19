@@ -8,27 +8,22 @@ import type { CanonicalState } from '../../core/state-mapping.js';
 import { Effect } from 'effect';
 import { listRunningAgents, type AgentState } from '../agents.js';
 import { getDashboardApiUrlSync } from '../config.js';
-import { rehydrateHeadAnchor } from '../git-utils.js';
-import { getReviewStatus, setReviewStatusSync, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
-import type { StrikeLandingStatus } from '../strike-landing.js';
 import {
+  getIssueWorkspacePath,
   getProjectConfigFromWorkspacePath,
-  readIssueRecord,
   resolveProjectForIssue,
-  type PanIssuePipelineRecord,
-  type PanIssueShipRecord,
-} from '../pan-dir/record.js';
+} from '../overdeck/issue-projects.js';
 import type { ProjectConfig } from '../projects.js';
-import { getAutoCloseOutCanonicalState } from '../cloister/deacon-canonical-state.js';
-import { aggregateGenerationShipStatus, loadShipRecords } from '../cloister/ship-status.js';
+import { getAutoCloseOutCanonicalState } from './auto-close-out-canonical-state.js';
 import { isTrackerIssueClosed } from '../cloister/issue-closed.js';
+import { readVerificationArtifact, type VerificationArtifact } from '../cloister/verification-artifact.js';
 import {
   fetchCommitCheckRuns,
   fetchIssuePullRequest,
   fetchRequiredStatusChecks,
   type CommitCheckRuns,
+  type IssuePullRequestData,
 } from '../overdeck/pull-requests.js';
-import { listUatGenerationsSync, type UatGeneration } from '../overdeck/merge-sync.js';
 import { getForgeAdapter } from '../forge.js';
 import { resolveProjectReposForIssueSync } from '../project-repos.js';
 import {
@@ -44,20 +39,26 @@ import {
   type DodRowId,
   type DodRowResult,
 } from './dod.js';
-import { loadContainedStrikeStatus, NEGATIVE_STRIKE_VERDICTS } from './contained-strike-status.js';
 import type { LifecycleContext, StepResult } from './types.js';
 
 const execFileAsync = promisify(execFile);
 
-type StatusSource =
-  | { source: 'live'; status: ReviewStatus }
-  | { source: 'journal'; status: PanIssuePipelineRecord }
-  | null;
 type Awaitable<T> = T | Promise<T>;
 
+/**
+ * PAN-3917: the verdict rows read their owners, not a stored copy. Review is the
+ * PR's review decision, tests are the PR's check-run rollup, and verification is
+ * the workspace's `verification-latest.json` artifact (FR-8).
+ */
 export interface DodStatusRowDeps {
-  getReviewStatus: (issueId: string) => Awaitable<ReviewStatus | null>;
-  getJournalStatus: (issueId: string) => Awaitable<PanIssuePipelineRecord | null>;
+  readPullRequest: (issueId: string) => Awaitable<IssuePullRequestData | null>;
+  readVerification: (issueId: string) => Awaitable<VerificationArtifact | null>;
+}
+
+/** Landing evidence the verdict rows need; `checkMergedRow` computes it from git and the forge. */
+export interface LandingEvidence {
+  /** The work reached main through `strike/<id>` rather than a PR. */
+  strikeLanded: boolean;
 }
 
 export interface MergedDodRowResult extends DodRowResult {
@@ -81,7 +82,6 @@ interface MergedRowDeps {
     mergedAt?: string;
     mergeCommit?: { oid?: string } | string | null;
   }>;
-  readDurableMerges?: (ctx: LifecycleContext) => Promise<string[]>;
   readMergedForgeArtifacts?: (ctx: LifecycleContext) => Promise<MergedForgeArtifact[]>;
   readBranchContainment?: (ctx: LifecycleContext) => Promise<IssueBranchContainment>;
 }
@@ -99,10 +99,6 @@ const defaultMergedRowDeps: MergedRowDeps = {
     const response = await fetchIssuePullRequest(ctx.issueId);
     if (response.error) throw new Error(response.error);
     return response.pr ?? {};
-  },
-  readDurableMerges: async ctx => {
-    const project = resolveProjectForIssue(ctx.issueId) ?? getProjectConfigFromWorkspacePath(ctx.projectPath);
-    return (await readIssueRecord(project, ctx.issueId))?.closeOut.merges ?? [];
   },
   readMergedForgeArtifacts: async ctx => {
     const repos = resolveProjectReposForIssueSync(ctx.issueId)?.filter(repo => repo.required) ?? [];
@@ -122,19 +118,16 @@ const defaultMergedRowDeps: MergedRowDeps = {
 
 interface PostMergeRowDeps {
   readCanonicalState: (ctx: LifecycleContext) => Promise<CanonicalState | null>;
-  readMergeStatus: (issueId: string) => Awaitable<string | undefined>;
+  /** The PR's own merge timestamp — the forge owns "merged", not a record. */
+  readMergedAt: (issueId: string) => Awaitable<string | undefined>;
   listAgents: () => Awaitable<Array<Pick<AgentState, 'id' | 'issueId' | 'role' | 'status'>>>;
-  readStrikeLanded?: (issueId: string) => Awaitable<boolean>;
 }
 
 const defaultPostMergeRowDeps: PostMergeRowDeps = {
-  readStrikeLanded: async issueId => strikeLanded((await loadStatus(issueId, defaultDeps))?.status),
   readCanonicalState: async ctx => {
     return getAutoCloseOutCanonicalState(ctx.issueId) as Promise<CanonicalState | null>;
   },
-  // PAN-3025: same live→journal fallback as the verdict rows — after close-out
-  // clears live status, the durable record is the only place mergeStatus survives.
-  readMergeStatus: async issueId => (await loadStatus(issueId, defaultDeps))?.status.mergeStatus,
+  readMergedAt: async issueId => (await defaultDeps.readPullRequest(issueId))?.mergedAt,
   listAgents: async () => Effect.runPromise(listRunningAgents()),
 };
 
@@ -189,28 +182,42 @@ const defaultMainVerifyRowDeps: MainVerifyRowDeps = {
   readContainingDefaultBranchCommits,
 };
 
+/**
+ * PAN-3917 (D6): a ship is a git tag plus the version strings it propagated.
+ * `readShippedVersion` is the newest release tag reachable from `origin/main`;
+ * `readExpectPath` is a declared `version_sync.expect` file read at that same
+ * commit. Nothing is stored: the row re-derives from the repo every time.
+ */
 interface ShipRowDeps {
   readProject: (ctx: LifecycleContext) => ProjectConfig | null;
-  readPipeline: (ctx: LifecycleContext) => Promise<PanIssuePipelineRecord | null>;
-  findPromotedBatch: (ctx: LifecycleContext) => UatGeneration | null;
-  readBatchShip: (project: ProjectConfig, generation: UatGeneration) => Promise<PanIssueShipRecord | null>;
+  readShippedVersion: (ctx: LifecycleContext) => Promise<string | null>;
+  readExpectPath: (ctx: LifecycleContext, path: string) => Promise<string | null>;
 }
+
+const gitOptions = (cwd: string) => ({ cwd, encoding: 'utf-8' as const, timeout: 10000, maxBuffer: 8 * 1024 * 1024 });
 
 const defaultShipRowDeps: ShipRowDeps = {
   readProject: ctx => resolveProjectForIssue(ctx.issueId) ?? getProjectConfigFromWorkspacePath(ctx.projectPath),
-  readPipeline: async ctx => {
-    const project = resolveProjectForIssue(ctx.issueId) ?? getProjectConfigFromWorkspacePath(ctx.projectPath);
-    return (await readIssueRecord(project, ctx.issueId))?.pipeline ?? null;
+  readShippedVersion: async ctx => {
+    try {
+      const { stdout } = await execFileAsync(
+        'git',
+        ['describe', '--tags', '--abbrev=0', '--match', 'v*', 'origin/main'],
+        gitOptions(ctx.projectPath),
+      );
+      return stdout.trim().replace(/^v/, '') || null;
+    } catch {
+      return null;
+    }
   },
-  findPromotedBatch: ctx => {
-    const project = resolveProjectForIssue(ctx.issueId) ?? getProjectConfigFromWorkspacePath(ctx.projectPath);
-    return listUatGenerationsSync({ projectRoot: resolve(project.path), statuses: ['promoted'] })
-      .find(generation => generation.members.some(member => member.issueId.toUpperCase() === ctx.issueId.toUpperCase())) ?? null;
+  readExpectPath: async (ctx, path) => {
+    try {
+      const { stdout } = await execFileAsync('git', ['show', `origin/main:${path}`], gitOptions(ctx.projectPath));
+      return stdout;
+    } catch {
+      return null;
+    }
   },
-  readBatchShip: async (project, generation) => aggregateGenerationShipStatus(
-    generation,
-    await loadShipRecords(project, [generation]),
-  ),
 };
 
 interface DeployRowDeps {
@@ -226,9 +233,9 @@ export interface TerminalVerdictSettlement {
 }
 
 export interface EvaluateDodGateDeps {
-  review: (issueId: string, settlement?: TerminalVerdictSettlement) => DodRowResult | Promise<DodRowResult>;
-  tests: (issueId: string, settlement?: TerminalVerdictSettlement) => DodRowResult | Promise<DodRowResult>;
-  verification: (issueId: string, settlement?: TerminalVerdictSettlement) => DodRowResult | Promise<DodRowResult>;
+  review: (issueId: string, settlement?: TerminalVerdictSettlement, landing?: LandingEvidence) => DodRowResult | Promise<DodRowResult>;
+  tests: (issueId: string, settlement?: TerminalVerdictSettlement, landing?: LandingEvidence) => DodRowResult | Promise<DodRowResult>;
+  verification: (issueId: string, settlement?: TerminalVerdictSettlement, landing?: LandingEvidence) => DodRowResult | Promise<DodRowResult>;
   merged: (ctx: LifecycleContext) => MergedDodRowResult | Promise<MergedDodRowResult>;
   postMerge: (ctx: LifecycleContext, merged?: MergedDodRowResult) => DodRowResult | Promise<DodRowResult>;
   mainVerify: (ctx: LifecycleContext, mergeCommit?: string) => DodRowResult | Promise<DodRowResult>;
@@ -240,21 +247,19 @@ export interface EvaluateDodGateDeps {
     mainVerifyRowStatus?: DodRowResult['status'];
   }) => DodRowResult | Promise<DodRowResult>;
   trackerClosed?: (issueId: string) => Awaitable<boolean>;
-  reconcileContainedStrike?: (ctx: LifecycleContext, merged: MergedDodRowResult) => Awaitable<void>;
   now: () => string;
 }
 
 const defaultEvaluateDodGateDeps: EvaluateDodGateDeps = {
-  review: (issueId, settlement) => checkReviewRow(issueId, defaultDeps, settlement),
-  tests: (issueId, settlement) => checkTestsRow(issueId, defaultDeps, settlement),
-  verification: (issueId, settlement) => checkVerificationRow(issueId, defaultDeps, settlement),
+  review: (issueId, settlement, landing) => checkReviewRow(issueId, defaultDeps, settlement, landing),
+  tests: (issueId, settlement, landing) => checkTestsRow(issueId, defaultDeps, settlement, landing),
+  verification: (issueId, settlement, landing) => checkVerificationRow(issueId, defaultDeps, settlement, landing),
   merged: checkMergedRow,
   postMerge: checkPostMergeRow,
   mainVerify: checkMainVerifyRow,
   ship: checkShipRow,
   deploy: checkDeployRow,
   trackerClosed: isTrackerIssueClosed,
-  reconcileContainedStrike,
   now: () => new Date().toISOString(),
 };
 
@@ -280,10 +285,13 @@ const defaultDeployRowDeps: DeployRowDeps = {
 };
 
 const defaultDeps: DodStatusRowDeps = {
-  getReviewStatus: issueId => Effect.runPromise(getReviewStatus(issueId)),
-  getJournalStatus: async issueId => {
-    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(process.cwd());
-    return (await readIssueRecord(project, issueId))?.pipeline ?? null;
+  readPullRequest: async issueId => {
+    const response = await fetchIssuePullRequest(issueId);
+    return response.error ? null : response.pr;
+  },
+  readVerification: issueId => {
+    const workspacePath = getIssueWorkspacePath(issueId);
+    return workspacePath ? readVerificationArtifact(workspacePath) : null;
   },
 };
 
@@ -298,27 +306,17 @@ function result(id: DodRowId, status: DodRowResult['status'], observed: string):
   return { id, num: row.num, title: row.title, expected: row.expected, observed, status };
 }
 
-async function loadStatus(issueId: string, deps: DodStatusRowDeps): Promise<StatusSource> {
-  try {
-    const live = await deps.getReviewStatus(issueId);
-    if (live) return { source: 'live', status: live };
-    const journal = await deps.getJournalStatus(issueId);
-    return journal ? { source: 'journal', status: journal } : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * PAN-3180: `landed` is the strike path's own durable statement that this issue's
- * work reached main through `strike/<id>`. It is written by the server merge door
- * (`mergeCompletionStatus` in `merge-strike.ts`) and mirrored into the per-issue
- * record's `pipeline` block, so it outlives review-status clearing. Every earlier
- * landing state (`ready`/`landing`/`recovering`/`needs_you`) is a strike still in
- * flight and earns no waiver.
- */
-function strikeLanded(status: StrikeLandingStatus | null | undefined): boolean {
-  return status?.strikeLandingState === 'landed';
+/** The PR's check-run rollup, collapsed to the one question row 2 asks. */
+function checksOutcome(pr: IssuePullRequestData): { state: 'green' | 'red' | 'pending' | 'none'; detail: string } {
+  const runs = pr.statusCheckRollup ?? [];
+  if (runs.length === 0) return { state: 'none', detail: 'no checks reported on the pull request' };
+  const verdict = (run: { conclusion?: string | null; status?: string | null; state?: string | null }) =>
+    (run.conclusion ?? run.state ?? run.status ?? '').toUpperCase();
+  const failed = runs.filter(run => ['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED'].includes(verdict(run)));
+  if (failed.length > 0) return { state: 'red', detail: `${failed.length} of ${runs.length} check(s) not green` };
+  const pending = runs.filter(run => !['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(verdict(run)));
+  if (pending.length > 0) return { state: 'pending', detail: `${pending.length} of ${runs.length} check(s) still running` };
+  return { state: 'green', detail: `all ${runs.length} check(s) green` };
 }
 
 /**
@@ -372,77 +370,92 @@ function terminalVerdictSettlement(
 async function checkVerdict(
   issueId: string,
   id: 'review' | 'tests',
-  field: 'reviewStatus' | 'testStatus',
   deps: DodStatusRowDeps,
   settlement?: TerminalVerdictSettlement,
+  landing?: LandingEvidence,
 ): Promise<DodRowResult> {
-  const loaded = await loadStatus(issueId, deps);
-  if (!loaded) return result(id, 'miss', 'no review status or journal record found');
+  // A door that throws synchronously must read as "no evidence", not as a gate
+  // crash: `Promise.resolve(fn())` never sees a throw from `fn` itself.
+  const pr = await (async () => deps.readPullRequest(issueId))().catch(() => null);
 
-  const value = loaded.status[field];
-  const source = loaded.source === 'journal' ? ' from pipeline journal' : '';
-  const policy = value === 'skipped' ? ' (skipped per issue policy)' : '';
-  const observed = `${field}: ${value ?? 'missing'}${source}${policy}`;
-  if (value === 'passed' || value === 'skipped') return result(id, 'pass', observed);
-  if (strikeLanded(loaded.status) && !NEGATIVE_VERDICTS.has(value ?? '')) {
-    return result(
-      id,
-      'skip',
-      `${observed}; skipped by the strike path (strikeLandingState: landed) — ${STRIKE_BYPASS_NOTE[id]}`,
-    );
+  if (!pr) {
+    const observed = 'no pull request found on the forge for this issue';
+    if (landing?.strikeLanded) {
+      return result(id, 'skip', `${observed}; skipped by the strike path — ${STRIKE_BYPASS_NOTE[id]}`);
+    }
+    return terminalVerdictSettlement(id, undefined, observed, settlement) ?? result(id, 'miss', observed);
   }
-  return terminalVerdictSettlement(id, value, observed, settlement) ?? result(id, 'miss', observed);
+
+  if (id === 'review') {
+    const decision = pr.reviewDecision ?? 'none';
+    const observed = `PR #${pr.number} reviewDecision: ${decision}`;
+    if (decision === 'APPROVED') return result('review', 'pass', observed);
+    if (landing?.strikeLanded && decision !== 'CHANGES_REQUESTED') {
+      return result('review', 'skip', `${observed}; skipped by the strike path — ${STRIKE_BYPASS_NOTE.review}`);
+    }
+    const negative = decision === 'CHANGES_REQUESTED' ? 'failed' : undefined;
+    return terminalVerdictSettlement('review', negative, observed, settlement) ?? result('review', 'miss', observed);
+  }
+
+  const checks = checksOutcome(pr);
+  const observed = `PR #${pr.number} checks: ${checks.detail}`;
+  if (checks.state === 'green') return result('tests', 'pass', observed);
+  if (landing?.strikeLanded && checks.state !== 'red') {
+    return result('tests', 'skip', `${observed}; skipped by the strike path — ${STRIKE_BYPASS_NOTE.tests}`);
+  }
+  const negative = checks.state === 'red' ? 'failed' : undefined;
+  return terminalVerdictSettlement('tests', negative, observed, settlement) ?? result('tests', 'miss', observed);
 }
 
 export function checkReviewRow(
   issueId: string,
   deps: DodStatusRowDeps = defaultDeps,
   settlement?: TerminalVerdictSettlement,
+  landing?: LandingEvidence,
 ): Promise<DodRowResult> {
-  return checkVerdict(issueId, 'review', 'reviewStatus', deps, settlement);
+  return checkVerdict(issueId, 'review', deps, settlement, landing);
 }
 
 export function checkTestsRow(
   issueId: string,
   deps: DodStatusRowDeps = defaultDeps,
   settlement?: TerminalVerdictSettlement,
+  landing?: LandingEvidence,
 ): Promise<DodRowResult> {
-  return checkVerdict(issueId, 'tests', 'testStatus', deps, settlement);
+  return checkVerdict(issueId, 'tests', deps, settlement, landing);
 }
 
+/**
+ * Row 3 reads the verification artifact the runner writes into the workspace
+ * (FR-8). A missing artifact is a real miss: nothing ran, or the workspace is
+ * already gone — in which case a landed, green main settles the row below.
+ */
 export async function checkVerificationRow(
   issueId: string,
   deps: DodStatusRowDeps = defaultDeps,
   settlement?: TerminalVerdictSettlement,
+  landing?: LandingEvidence,
 ): Promise<DodRowResult> {
-  const loaded = await loadStatus(issueId, deps);
-  if (!loaded) return result('verification', 'miss', 'no review status or journal record found');
+  const artifact = await (async () => deps.readVerification(issueId))().catch(() => null);
+  const outcome = artifact?.outcome;
+  const observed = artifact
+    ? `verification artifact: ${outcome}${artifact.ranAt ? ` at ${artifact.ranAt}` : ''}${
+        artifact.failedCheck ? ` (${artifact.failedCheck})` : ''
+      }`
+    : 'no verification artifact in the workspace';
 
-  // PAN-3067: the verdict alone decides this row, exactly like rows 1 and 2.
-  // `lastVerifiedCommit` is a best-effort optimization anchor — verification-runner.ts
-  // snapshots it inside a try/catch and spreads the field conditionally, and a
-  // `skipped` verdict never has one at all — so its absence says nothing about
-  // whether verification ran. Requiring it made every issue whose anchor was
-  // never written un-closable. The observed string always names the anchor's
-  // presence or absence so a reader can never mistake it for a hidden condition.
-  const value = loaded.status.verificationStatus;
-  const commit = loaded.status.lastVerifiedCommit;
-  const accepted = value === 'passed' || value === 'skipped';
-  const notes: string[] = [];
-  if (loaded.source === 'journal') notes.push('from pipeline journal');
-  if (value === 'skipped') notes.push('skipped per issue policy');
-  if (accepted && !commit) notes.push('no lastVerifiedCommit recorded');
-  const observed = `verificationStatus: ${value ?? 'missing'}${commit ? ` at ${commit}` : ''}${
-    notes.length > 0 ? ` (${notes.join('; ')})` : ''
-  }`;
-  if (accepted) return result('verification', 'pass', observed);
+  if (outcome === 'passed') return result('verification', 'pass', observed);
+  if (landing?.strikeLanded && outcome !== 'failed') {
+    return result('verification', 'skip', `${observed}; no verification gate runs on the strike path`);
+  }
   // An out-of-band merge never enters merge-ops, so the CI-green skip cannot
   // record its normal verification verdict. Once rows 4 and 6 prove the landed
   // work and main CI green, that evidence satisfies row 3 without an override.
-  if (value === undefined && settlement?.landedWork && settlement.mainVerifyStatus === 'pass') {
+  if (!artifact && settlement?.landedWork && settlement.mainVerifyStatus === 'pass') {
     return result('verification', 'pass', `${observed}; verification satisfied by green main CI after landing`);
   }
-  return terminalVerdictSettlement('verification', value, observed, settlement) ??
+  const negative = outcome === 'failed' ? 'failed' : undefined;
+  return terminalVerdictSettlement('verification', negative, observed, settlement) ??
     result('verification', 'miss', observed);
 }
 
@@ -460,16 +473,9 @@ export async function checkMergedRow(
   const observed = detail || verified.error || (verified.skipped ? 'issue already closed on forge' : 'merge not verified');
   const merged = result('merged', verified.success || verified.skipped ? 'pass' : 'miss', observed) as MergedDodRowResult;
   const branchAbsent = verified.error === BRANCH_ABSENT_MERGE_ERROR;
-  let durableMerges: string[] = [];
   let forgeArtifacts: MergedForgeArtifact[] = [];
 
   if (branchAbsent) {
-    try {
-      durableMerges = await (deps.readDurableMerges ?? defaultMergedRowDeps.readDurableMerges!)(ctx);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      merged.observed = `${merged.observed}; durable merge evidence unavailable: ${message}`;
-    }
     if (!ctx.github && deps.readMergedForgeArtifacts) {
       try {
         forgeArtifacts = await deps.readMergedForgeArtifacts(ctx);
@@ -509,13 +515,10 @@ export async function checkMergedRow(
 
   if (branchAbsent) {
     const forgeMerged = pullRequestState?.toUpperCase() === 'MERGED';
-    if (durableMerges.length > 0 || forgeMerged || forgeArtifacts.length > 0) {
+    if (forgeMerged || forgeArtifacts.length > 0) {
       merged.status = 'pass';
-      if (durableMerges.length > 0) {
-        merged.observed = `${merged.observed}; durable close-out record contains ${durableMerges.length} merge artifact(s)`;
-      }
     } else {
-      merged.observed = `${merged.observed}; no merged forge artifact or durable close-out merge record found`;
+      merged.observed = `${merged.observed}; no merged forge artifact found`;
     }
   }
 
@@ -546,45 +549,6 @@ export async function checkMergedRow(
   return merged;
 }
 
-/**
- * Reconcile an out-of-band strike landing only when its durable ready marker
- * names the exact strike tip proven contained in main. This is the evidence a
- * normal merge-door landing consumes before it clears the marker.
- */
-export async function reconcileContainedStrike(
-  ctx: LifecycleContext,
-  merged: MergedDodRowResult,
-  deps: {
-    getStatus?: (issueId: string) => Awaitable<ReviewStatus | null>;
-    getJournalStatus?: (issueId: string) => Awaitable<PanIssuePipelineRecord | null>;
-    setStatus?: typeof setReviewStatusSync;
-  } = {},
-): Promise<void> {
-  const head = merged.evidence === 'branch-containment' ? merged.containedStrikeHead : undefined;
-  if (!head) return;
-  const current = await loadContainedStrikeStatus(ctx.issueId, {
-    getReviewStatus: deps.getStatus ?? defaultDeps.getReviewStatus,
-    getJournalStatus: deps.getJournalStatus ?? defaultDeps.getJournalStatus,
-  });
-  if (!current || current.strikeReadyHead !== head) return;
-
-  const update: ReviewStatusUpdate = {};
-  if (!NEGATIVE_STRIKE_VERDICTS.has(current.reviewStatus)) update.reviewStatus = 'passed';
-  if (!NEGATIVE_STRIKE_VERDICTS.has(current.testStatus)) update.testStatus = 'passed';
-  if (!NEGATIVE_STRIKE_VERDICTS.has(current.verificationStatus ?? '')) {
-    update.verificationStatus = 'passed';
-    update.verificationNotes = `Contained strike ${head} matched durable strike readiness evidence`;
-    update.lastVerifiedCommit = rehydrateHeadAnchor(head);
-  }
-  update.mergeStatus = 'merged';
-  update.strikeLandingState = 'landed';
-  update.strikeReadyHead = undefined;
-  update.strikeReadyAt = undefined;
-
-  const changed = Object.entries(update).some(([key, value]) => current[key as keyof ReviewStatus] !== value);
-  if (changed) (deps.setStatus ?? setReviewStatusSync)(ctx.issueId, update);
-}
-
 export async function checkPostMergeRow(
   ctx: LifecycleContext,
   merged?: MergedDodRowResult,
@@ -592,7 +556,7 @@ export async function checkPostMergeRow(
 ): Promise<DodRowResult> {
   try {
     const canonicalState = await deps.readCanonicalState(ctx);
-    const mergeStatus = await deps.readMergeStatus(ctx.issueId);
+    const mergedAt = await deps.readMergedAt(ctx.issueId);
     const issueId = ctx.issueId.toUpperCase();
     const runningAgents = (await deps.listAgents()).filter(agent =>
       agent.issueId.toUpperCase() === issueId &&
@@ -601,7 +565,7 @@ export async function checkPostMergeRow(
     );
     const stateObserved = canonicalState
       ? `canonical state: ${canonicalState}`
-      : `canonical state unavailable; mergeStatus: ${mergeStatus ?? 'missing'}`;
+      : `canonical state unavailable; PR mergedAt: ${mergedAt ?? 'not merged'}`;
     const agentsObserved = runningAgents.length > 0
       ? `running agents: ${runningAgents.map(agent => agent.id).join(', ')}`
       : 'no running work/planning agents';
@@ -624,18 +588,18 @@ export async function checkPostMergeRow(
         `terminal canonical state: canceled — post-merge lifecycle not applicable; ${agentsObserved}`,
       );
     }
-    const lifecycleObserved = canonicalState === 'verifying_on_main' || mergeStatus === 'merged';
+    const lifecycleObserved = canonicalState === 'verifying_on_main' || Boolean(mergedAt);
     // PAN-3180: `postMergeLifecycle()` is the work-agent handoff — it pauses the
     // work/planning agents, stops the workspace stack, and applies
     // `verifying-on-main`. A strike has no work agent to pause and its landing is
     // owned by the Deacon's merge door, so the marker this row looks for is never
     // written and its absence proves nothing. What a strike does still owe is
     // quiescence, so a live work/planning agent remains a real miss.
-    if (!lifecycleObserved && await (deps.readStrikeLanded ?? defaultPostMergeRowDeps.readStrikeLanded!)(ctx.issueId)) {
+    if (!lifecycleObserved && merged?.containedStrikeHead) {
       return result(
         'post-merge',
         runningAgents.length === 0 ? 'skip' : 'miss',
-        `strike landing (strikeLandingState: landed) — the work-agent post-merge handoff is not the strike path's lifecycle; ${stateObserved}; ${agentsObserved}`,
+        `strike landing (strike/${ctx.issueId.toLowerCase()} contained in main) — the work-agent post-merge handoff is not the strike path's lifecycle; ${stateObserved}; ${agentsObserved}`,
       );
     }
     if (!lifecycleObserved && merged?.evidence === 'branch-containment') {
@@ -774,50 +738,44 @@ export async function checkShipRow(
   deps: ShipRowDeps = defaultShipRowDeps,
 ): Promise<DodRowResult> {
   const project = deps.readProject(ctx);
+  const expect = project?.version_sync?.expect ?? [];
   if (!project?.version_sync) {
     return result('ship', 'skip', 'project declares no version_sync; ship step not applicable');
   }
+  if (expect.length === 0) {
+    return result('ship', 'skip', 'version_sync declares no expect paths; nothing to verify');
+  }
 
-  const promotedBatch = deps.findPromotedBatch(ctx);
-  const ship = promotedBatch
-    ? await deps.readBatchShip(project, promotedBatch)
-    : (await deps.readPipeline(ctx))?.ship;
-  if (!ship) {
-    if (promotedBatch) {
-      return result(
-        'ship',
-        'miss',
-        `batch ${promotedBatch.name} includes this issue but no durable ship settlement was recorded`,
-      );
+  const version = await deps.readShippedVersion(ctx);
+  if (!version) {
+    return result('ship', 'miss', 'no release tag reachable from origin/main \u2014 run `pan release stable --version <x.y.z>`');
+  }
+
+  const majorMinor = version.split('.').slice(0, 2).join('.');
+  const failing: string[] = [];
+  for (const entry of expect) {
+    const content = await deps.readExpectPath(ctx, entry.path);
+    if (content === null) {
+      failing.push(`${entry.path} (unreadable at origin/main)`);
+      continue;
     }
-    return result('ship', 'skip', 'merged outside a batch; ship is batch-scoped');
+    const pattern = entry.pattern
+      .replace(/\{version\}/g, version.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+      .replace(/\{majorMinor\}/g, majorMinor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    try {
+      if (!new RegExp(pattern, 'm').test(content)) failing.push(entry.path);
+    } catch {
+      failing.push(`${entry.path} (invalid expect pattern)`);
+    }
   }
-  if (ship.status === 'passed') {
-    return result(
-      'ship',
-      'pass',
-      `version ${ship.version ?? 'unknown'} shipped for batch ${ship.batch}; ${ship.paths?.length ?? 0} path(s) verified`,
-    );
-  }
-  if (ship.status === 'pending') {
-    return result(
-      'ship',
-      'miss',
-      `batch ${ship.batch} merged but no version was shipped — use the Ship version action on the batch card for ${ship.batch}`,
-    );
-  }
-  if (ship.status === 'partial') {
-    const failing = ship.paths?.filter(path => !path.ok).map(path => path.path) ?? [];
-    return result(
-      'ship',
-      'miss',
-      `batch ${ship.batch} partially propagated version ${ship.version ?? 'unknown'}; failing paths: ${failing.join(', ') || 'unknown'}`,
-    );
+
+  if (failing.length === 0) {
+    return result('ship', 'pass', `version ${version} present in all ${expect.length} declared version_sync path(s) on origin/main`);
   }
   return result(
     'ship',
     'miss',
-    `batch ${ship.batch} version ship failed (${ship.errorCode ?? 'unknown-failure'}): ${ship.error ?? ship.reason ?? 'inspect the local dashboard log'}`,
+    `version ${version} not propagated to ${failing.length} of ${expect.length} declared path(s): ${failing.join(', ')}`,
   );
 }
 
@@ -924,7 +882,6 @@ export async function evaluateDodGate(
   const merged = opts.verifyMerged
     ? await checkMergedRow(ctx, { ...defaultMergedRowDeps, verifyMerged: opts.verifyMerged })
     : await deps.merged(ctx);
-  await (deps.reconcileContainedStrike ?? defaultEvaluateDodGateDeps.reconcileContainedStrike!)(ctx, merged);
   // Main-verify computes before deploy because deploy's no-merge-commit
   // branch keys on main-verify's outcome (PAN-3188: row 7 skips when row 6
   // skips — both mean "no durable anchor" for this landing class). The verdict
@@ -936,10 +893,13 @@ export async function evaluateDodGate(
     landedWork: merged.status === 'pass',
     mainVerifyStatus: mainVerify.status,
   };
+  // PAN-3917: "this landed as a strike" is derived from branch containment on
+  // row 4, not from a stored strikeLandingState.
+  const landing: LandingEvidence = { strikeLanded: Boolean(merged.containedStrikeHead) };
   const [review, tests, verification, postMerge, ship, deploy] = await Promise.all([
-    deps.review(ctx.issueId, settlement),
-    deps.tests(ctx.issueId, settlement),
-    deps.verification(ctx.issueId, settlement),
+    deps.review(ctx.issueId, settlement, landing),
+    deps.tests(ctx.issueId, settlement, landing),
+    deps.verification(ctx.issueId, settlement, landing),
     deps.postMerge(ctx, merged),
     deps.ship(ctx),
     deps.deploy(ctx, {
@@ -966,22 +926,35 @@ export async function evaluateDodGate(
 }
 
 /**
- * PAN-3025: completion witness for the close-out ceremony. Returns closedOutAt
- * only when the journal is terminal AND the live row is gone (the ceremony's
- * final mutating step). closedOut with live status present means a prior run
- * aborted mid-ceremony and must fall through to complete it.
+ * Completion witness for the close-out ceremony (PAN-3917). The ceremony's
+ * terminal act is closing the tracker issue and stamping the `closed-out`
+ * label; that label on a closed issue IS the witness. Nothing is stored.
  */
 export async function readCompletedCloseOut(issueId: string, projectPath: string): Promise<string | null> {
+  void projectPath;
   try {
-    const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(projectPath);
-    const record = await readIssueRecord(project, issueId.toUpperCase());
-    if (!record?.pipeline.closedOut) return null;
-    // Fail closed: a read error means we cannot confirm absence, so return null (incomplete)
-    const live = await Effect.runPromise(getReviewStatus(issueId)).catch(() => 'unknown');
-    if (live === 'unknown') return null; // Reject the idempotent path on any read failure
-    return live ? null : (record.pipeline.closedOutAt ?? 'unknown');
+    const { resolveGitHubIssueSync } = await import('../tracker-utils.js');
+    const gh = resolveGitHubIssueSync(issueId);
+    if (!gh.isGitHub || !gh.number) return null;
+    const { stdout } = await execFileAsync(
+      'gh',
+      [
+        'issue', 'view', String(gh.number),
+        '--repo', `${gh.owner}/${gh.repo}`,
+        '--json', 'state,closedAt,labels',
+      ],
+      { encoding: 'utf-8', timeout: 15000 },
+    );
+    const issue = JSON.parse(stdout) as {
+      state?: string;
+      closedAt?: string;
+      labels?: Array<{ name?: string }>;
+    };
+    if ((issue.state ?? '').toUpperCase() !== 'CLOSED') return null;
+    const closedOut = (issue.labels ?? []).some(label => label.name?.toLowerCase() === 'closed-out');
+    return closedOut ? (issue.closedAt ?? 'unknown') : null;
   } catch {
-    // On any error (record read, etc.), fail closed
+    // Fail closed: a read error means we cannot confirm close-out.
     return null;
   }
 }

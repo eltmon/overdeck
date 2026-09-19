@@ -13,7 +13,6 @@ fail=0
 LIVENESS_MODULE="src/lib/agents/liveness.ts"
 
 CONSUMERS=(
-  src/lib/cloister/deacon-auto-resume.ts
   src/lib/parked/resolver.ts
   src/lib/cloister/feedback-target.ts
   src/lib/work-agent-lifecycle.ts
@@ -90,4 +89,4 @@ if (( fail )); then
   exit 1
 fi
 
-echo "✓ liveness boundary passed: five consumers delegate through src/lib/agents/liveness.ts and no private predicates remain"
+echo "✓ liveness boundary passed: four consumers delegate through src/lib/agents/liveness.ts and no private predicates remain"

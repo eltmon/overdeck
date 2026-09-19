@@ -20,10 +20,6 @@ let deliverAgentMessageMock: ReturnType<typeof vi.fn>;
 let deliverInitialPromptWithRetryMock: ReturnType<typeof vi.fn>;
 let waitForPromptReadyMock: ReturnType<typeof vi.fn>;
 let stopAgentMock: ReturnType<typeof vi.fn>;
-let shouldPreservePipelineVerdictsMock: ReturnType<typeof vi.fn>;
-let resetPipelineVerdictsForWorkStartMock: ReturnType<typeof vi.fn>;
-let setReviewStatusMock: ReturnType<typeof vi.fn>;
-let resetPostMergeStateMock: ReturnType<typeof vi.fn>;
 let capturePaneText: string;
 let channelsMcpEnabled: boolean;
 let activeFlywheelRunId: string | null;
@@ -59,13 +55,6 @@ function mockSpawnDependencies(): void {
   deliverInitialPromptWithRetryMock = vi.fn(async () => ({ ok: true, path: 'supervisor' }));
   waitForPromptReadyMock = vi.fn(async () => true);
   stopAgentMock = vi.fn(() => Effect.void);
-  shouldPreservePipelineVerdictsMock = vi.fn(async () => ({
-    preserve: false,
-    reason: 'no pipeline verdicts are recorded',
-  }));
-  resetPipelineVerdictsForWorkStartMock = vi.fn(() => null);
-  setReviewStatusMock = vi.fn();
-  resetPostMergeStateMock = vi.fn();
   resolveHarnessMock = vi.fn(async ({ explicit, model }: { explicit?: string; model: string }) => {
     if (explicit) return explicit;
     if (model === 'gpt-5.5') return 'codex';
@@ -157,6 +146,14 @@ function mockSpawnDependencies(): void {
   vi.doMock('../workspace/stack-health.js', () => ({
     getWorkspaceStackHealth: vi.fn(() => Effect.succeed({ healthy: true, reasons: [], lastObserved: null })),
   }));
+  // PAN-3917 FR-5/W8: launchAgentPane auto-selects Herdr when the dev host has
+  // a live `herdr` binary and `overdeck` session socket, which would make this
+  // test drive the real Herdr session instead of the mocked tmux.js path. Force
+  // tmux selection so createSessionMock stays the single source of truth.
+  vi.doMock('../terminal-backends/select.js', async (importOriginal) => ({
+    ...((await importOriginal()) as typeof import('../terminal-backends/select.js')),
+    selectTerminalBackend: vi.fn(async () => ({ backend: 'tmux' as const, diagnostic: 'test: forced tmux backend' })),
+  }));
   vi.doMock('../xbrief/io.js', async (importOriginal) => ({
     ...((await importOriginal()) as typeof import('../xbrief/io.js')),
     readWorkspacePlanSync: vi.fn(() => ({ plan: { items: [{ id: 'item-1' }] } })),
@@ -164,17 +161,6 @@ function mockSpawnDependencies(): void {
   vi.doMock('../activity-logger.js', () => ({
     emitActivityEntrySync: vi.fn(),
     emitActivityTtsSync: vi.fn(),
-  }));
-  vi.doMock('../cloister/verdict-preservation.js', () => ({
-    shouldPreservePipelineVerdicts: shouldPreservePipelineVerdictsMock,
-  }));
-  vi.doMock('../cloister/work-start-verdicts.js', () => ({
-    refreshWorkStartReviewedAnchor: (issueId: string, anchor: string) =>
-      setReviewStatusMock(issueId, { reviewedAtCommit: anchor }),
-    resetWorkStartPipelineVerdicts: resetPipelineVerdictsForWorkStartMock,
-  }));
-  vi.doMock('../cloister/post-merge-state.js', () => ({
-    resetPostMergeState: resetPostMergeStateMock,
   }));
   vi.doMock('../cloister/work-agent-prompt.js', () => ({
     writeStoryFeatureContext: vi.fn(async () => undefined),
@@ -237,6 +223,9 @@ beforeEach(() => {
   createOverdeckDatabase({ dbPath: join(tmpHome, 'overdeck.db') });
   closeOverdeckDatabaseSync();
   process.env.OVERDECK_HOME = tmpHome;
+  // fix10: this suite drives the real spawn path. Pin tmux so no selection
+  // can reach a Herdr session and start a live agent in it.
+  process.env.OVERDECK_TERMINAL_BACKEND = 'tmux';
   process.env.OVERDECK_AGENT_STARTED_BY = 'test:agents-spawn-supervisor';
   capturePaneText = 'Claude Code';
   channelsMcpEnabled = false;
@@ -261,9 +250,9 @@ afterEach(() => {
   vi.doUnmock('../paths.js');
   vi.doUnmock('../tmux.js');
   vi.doUnmock('../workspace/stack-health.js');
+  vi.doUnmock('../terminal-backends/select.js');
   vi.doUnmock('../xbrief/io.js');
   vi.doUnmock('../activity-logger.js');
-  vi.doUnmock('../cloister/verdict-preservation.js');
   vi.doUnmock('../review-status.js');
   vi.doUnmock('../cloister/merge-agent.js');
   vi.doUnmock('../cloister/work-agent-prompt.js');
@@ -444,91 +433,6 @@ describe('spawnAgent PTY supervisor wiring', () => {
 
     expect(createSessionMock).toHaveBeenCalledOnce();
     expect(readAutoSpawnOnFinalizeFlag('PAN-1405')).toBe(false);
-  });
-
-  it('preserves pipeline verdicts and post-merge state when the reviewed anchor is current', async () => {
-    writeSupervisorArtifact();
-    shouldPreservePipelineVerdictsMock.mockResolvedValue({
-      preserve: true,
-      reason: 'workspace HEAD matches the reviewed commit anchor',
-    });
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const { spawnAgent } = await import('../agents.js');
-
-    try {
-      await spawnAgent({
-        issueId: 'PAN-3110',
-        workspace,
-        role: 'work',
-        model: 'claude-sonnet-4-6',
-      });
-
-      expect(shouldPreservePipelineVerdictsMock).toHaveBeenCalledWith('PAN-3110', workspace);
-      expect(resetPipelineVerdictsForWorkStartMock).not.toHaveBeenCalled();
-      expect(setReviewStatusMock).not.toHaveBeenCalled();
-      expect(resetPostMergeStateMock).not.toHaveBeenCalled();
-      expect(logSpy).toHaveBeenCalledWith(
-        '[spawn] Preserved pipeline verdicts for PAN-3110 — workspace HEAD matches the reviewed commit anchor',
-      );
-    } finally {
-      logSpy.mockRestore();
-    }
-  });
-
-  it('refreshes the reviewed anchor while preserving verdicts after benign drift', async () => {
-    writeSupervisorArtifact();
-    const refreshedAnchor = 'b'.repeat(40);
-    shouldPreservePipelineVerdictsMock.mockResolvedValue({
-      preserve: true,
-      reason: 'workspace HEAD moved without changing the reviewed code',
-      refreshedAnchor,
-    });
-    const { spawnAgent } = await import('../agents.js');
-
-    await spawnAgent({
-      issueId: 'PAN-3110',
-      workspace,
-      role: 'work',
-      model: 'claude-sonnet-4-6',
-    });
-
-    expect(setReviewStatusMock).toHaveBeenCalledWith('PAN-3110', {
-      reviewedAtCommit: refreshedAnchor,
-    });
-    expect(resetPipelineVerdictsForWorkStartMock).not.toHaveBeenCalled();
-    expect(resetPostMergeStateMock).not.toHaveBeenCalled();
-  });
-
-  it('resets pipeline and post-merge state when reviewed code drifted', async () => {
-    writeSupervisorArtifact();
-    shouldPreservePipelineVerdictsMock.mockResolvedValue({
-      preserve: false,
-      reason: 'workspace code changed after review',
-    });
-    resetPipelineVerdictsForWorkStartMock.mockReturnValue({ issueId: 'PAN-3110' });
-    const { spawnAgent } = await import('../agents.js');
-
-    await spawnAgent({
-      issueId: 'PAN-3110',
-      workspace,
-      role: 'work',
-      model: 'claude-sonnet-4-6',
-    });
-
-    expect(resetPipelineVerdictsForWorkStartMock).toHaveBeenCalledWith('PAN-3110');
-    expect(resetPostMergeStateMock).toHaveBeenCalledWith('PAN-3110');
-  });
-
-  it('does not evaluate work-verdict preservation for non-work role spawns', async () => {
-    const { spawnRun } = await import('../agents.js');
-
-    await spawnRun('PAN-3110', 'review', {
-      workspace,
-      model: 'gpt-5.5',
-    });
-
-    expect(shouldPreservePipelineVerdictsMock).not.toHaveBeenCalled();
-    expect(resetPipelineVerdictsForWorkStartMock).not.toHaveBeenCalled();
   });
 
   it('pins and persists a fresh Claude work-agent session before hooks run', async () => {

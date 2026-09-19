@@ -3,6 +3,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockExecFile = vi.hoisted(() =>
   vi.fn<[string, string[], any?], Promise<{ stdout: string; stderr: string }>>());
 
+// PAN-3917: the record plane (`pan-dir/record*`, `records`, `agents`,
+// `auto-commit`) is being deleted by W3, and `auto-commit` already imports the
+// removed `state-read-home`, so merge-ops' module graph cannot load. Stub the
+// deleted modules and the boundaries that still reach them.
+vi.mock('../../../../../src/lib/agents/spawn.js', () => ({
+  spawnAgent: vi.fn(), spawnRun: vi.fn(), postAgentsRoute: vi.fn(),
+}));
+vi.mock('../../../../../src/lib/agents/tier-table.js', () => ({
+  DEFAULT_TIERED_EXECUTION_CONFIG: { enabled: false, tiers: [], subscription: 'all' },
+}));
+vi.mock('../../../../../src/lib/git-activity.js', () => ({ listGitOperationsSync: vi.fn(() => []) }));
+vi.mock('../../../../../src/dashboard/server/routes/specialists.js', () => ({ _serverManagedMerges: new Set<string>() }));
+
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>();
   const kCustom = Symbol.for('nodejs.util.promisify.custom');

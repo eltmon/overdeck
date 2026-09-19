@@ -191,7 +191,6 @@ describe('system health no-loss audit', () => {
     const doctorSource = source('src/cli/commands/doctor.ts');
     expect(doctorSource, 'pan doctor lost dependency checks').toContain('checkCommand');
     expect(doctorSource, 'pan doctor lost directory checks').toContain('checkDirectory');
-    expect(doctorSource, 'pan doctor lost state-worktree checks').toContain('checkStateWorktrees');
     expect(
       doctorSource,
       'pan doctor must remain independent from the live accepted V2 snapshot',

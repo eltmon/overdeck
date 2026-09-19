@@ -1,70 +1,99 @@
+/**
+ * The swarm's slot ledger door (PAN-3917, D11).
+ *
+ * Same function surface as before; the storage underneath moved from the
+ * per-issue record on the deleted state branch to `<workspace>/.pan/continues/
+ * <ISSUE>.slots.json`. Every read and write goes through this door so the swarm
+ * modules never touch the file directly.
+ */
 import {
-  readIssueRecordForWorkspaceSync,
-  type PanIssueRecord,
-  type PanIssueSwarmRecord,
-  type PanIssueSwarmSlotCompletion,
-} from '../pan-dir/record.js';
-import { updateIssueRecordForWorkspace } from '../pan-dir/record-update.js';
+  readSwarmSlotState,
+  updateSwarmSlotState,
+  type SwarmFailedMergeBlock,
+  type SwarmSlotAssignment,
+  type SwarmSlotCompletion,
+  type SwarmSlotState,
+  type SwarmSupersededAttempt,
+} from './swarm-slot-store.js';
 
-export function createMinimalIssueRecord(issueId: string): PanIssueRecord {
-  const now = new Date().toISOString();
-  return {
-    issueId,
-    schemaVersion: 2,
-    created: now,
-    updated: now,
-    feedback: [],
-    pipeline: {
-      issueId,
-      reviewStatus: 'pending',
-      testStatus: 'pending',
-      mergeStatus: 'pending',
-      readyForMerge: false,
-      updatedAt: now,
-    },
-    closeOut: {
-      usage: {
-        byStage: {},
-        totals: {},
-      },
-      merges: [],
-      ranOn: '',
-    },
-  };
+export { readSwarmSlotState } from './swarm-slot-store.js';
+
+export type {
+  SwarmFailedMergeBlock,
+  SwarmSlotAssignment,
+  SwarmSlotCompletion,
+  SwarmSlotState,
+  SwarmSupersededAttempt,
+};
+
+export function readSwarmSupersededAttempts(workspacePath: string, issueId: string): SwarmSupersededAttempt[] {
+  return readSwarmSlotState(workspacePath, issueId)?.supersededAttempts ?? [];
 }
 
-export async function writeSwarmFinalizedAt(workspacePath: string, issueId: string, finalizedAt: string): Promise<void> {
-  const normalizedIssueId = issueId.toUpperCase();
-  await updateIssueRecordForWorkspace(workspacePath, normalizedIssueId, (record) => ({
-    ...record,
-    swarm: {
-      ...(record.swarm ?? {}),
-      finalizedAt,
-    },
+export async function writeSwarmSupersededAttempt(
+  workspacePath: string,
+  issueId: string,
+  attempt: SwarmSupersededAttempt,
+): Promise<void> {
+  await updateSwarmSlotState(workspacePath, issueId, (state) => ({
+    ...state,
+    supersededAttempts: [...(state.supersededAttempts ?? []), attempt],
   }));
 }
 
-export function readSwarmHold(workspacePath: string, issueId: string): PanIssueSwarmRecord['hold'] {
-  return readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase())?.swarm?.hold;
+export function readSwarmFailedMergeBlocks(
+  workspacePath: string,
+  issueId: string,
+): NonNullable<SwarmSlotState['failedMergeBlocks']> {
+  return readSwarmSlotState(workspacePath, issueId)?.failedMergeBlocks ?? {};
+}
+
+export async function writeSwarmFailedMergeBlock(
+  workspacePath: string,
+  issueId: string,
+  block: SwarmFailedMergeBlock,
+): Promise<void> {
+  await updateSwarmSlotState(workspacePath, issueId, (state) => ({
+    ...state,
+    failedMergeBlocks: { ...(state.failedMergeBlocks ?? {}), [String(block.slotIndex)]: block },
+  }));
+}
+
+export async function clearSwarmFailedMergeBlock(
+  workspacePath: string,
+  issueId: string,
+  slotIndex: number,
+): Promise<void> {
+  await updateSwarmSlotState(workspacePath, issueId, (state) => {
+    if (!state.failedMergeBlocks?.[String(slotIndex)]) return state;
+    const failedMergeBlocks = { ...state.failedMergeBlocks };
+    delete failedMergeBlocks[String(slotIndex)];
+    return { ...state, failedMergeBlocks };
+  });
+}
+
+export async function writeSwarmFinalizedAt(workspacePath: string, issueId: string, finalizedAt: string): Promise<void> {
+  await updateSwarmSlotState(workspacePath, issueId, (state) => ({ ...state, finalizedAt }));
+}
+
+export function readSwarmHold(workspacePath: string, issueId: string): SwarmSlotState['hold'] {
+  return readSwarmSlotState(workspacePath, issueId)?.hold;
 }
 
 export async function writeSwarmHold(
   workspacePath: string,
   issueId: string,
-  hold: NonNullable<PanIssueSwarmRecord['hold']>,
+  hold: NonNullable<SwarmSlotState['hold']>,
 ): Promise<void> {
-  await updateIssueRecordForWorkspace(workspacePath, issueId.toUpperCase(), (record) => ({
-    ...record,
-    swarm: { ...(record.swarm ?? {}), hold },
-  }));
+  await updateSwarmSlotState(workspacePath, issueId, (state) => ({ ...state, hold }));
 }
 
 export async function clearSwarmHold(workspacePath: string, issueId: string): Promise<void> {
-  await updateIssueRecordForWorkspace(workspacePath, issueId.toUpperCase(), (record) => {
-    if (!record.swarm?.hold) return record;
-    const swarm = { ...record.swarm };
-    delete swarm.hold;
-    return { ...record, swarm };
+  await updateSwarmSlotState(workspacePath, issueId, (state) => {
+    if (!state.hold) return state;
+    const next = { ...state };
+    delete next.hold;
+    return next;
   });
 }
 
@@ -74,41 +103,33 @@ export function readSwarmInterventionCount(
   slotIndex: number,
   failureClass: string,
 ): number {
-  return readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase())
-    ?.swarm?.interventions?.[String(slotIndex)]?.[failureClass] ?? 0;
+  return readSwarmSlotState(workspacePath, issueId)?.interventions?.[String(slotIndex)]?.[failureClass] ?? 0;
 }
 
 export function readSwarmInterventions(
   workspacePath: string,
   issueId: string,
-): NonNullable<PanIssueSwarmRecord['interventions']> {
-  return readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase())?.swarm?.interventions ?? {};
+): NonNullable<SwarmSlotState['interventions']> {
+  return readSwarmSlotState(workspacePath, issueId)?.interventions ?? {};
 }
 
 export function readSwarmCompletionObservation(
   workspacePath: string,
   issueId: string,
   progressKey: string,
-): NonNullable<PanIssueSwarmRecord['completionObservations']>[string] | undefined {
-  return readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase())
-    ?.swarm?.completionObservations?.[progressKey];
+): NonNullable<SwarmSlotState['completionObservations']>[string] | undefined {
+  return readSwarmSlotState(workspacePath, issueId)?.completionObservations?.[progressKey];
 }
 
 export async function writeSwarmCompletionObservation(
   workspacePath: string,
   issueId: string,
   progressKey: string,
-  observation: NonNullable<PanIssueSwarmRecord['completionObservations']>[string],
+  observation: NonNullable<SwarmSlotState['completionObservations']>[string],
 ): Promise<void> {
-  await updateIssueRecordForWorkspace(workspacePath, issueId.toUpperCase(), record => ({
-    ...record,
-    swarm: {
-      ...(record.swarm ?? {}),
-      completionObservations: {
-        ...(record.swarm?.completionObservations ?? {}),
-        [progressKey]: observation,
-      },
-    },
+  await updateSwarmSlotState(workspacePath, issueId, (state) => ({
+    ...state,
+    completionObservations: { ...(state.completionObservations ?? {}), [progressKey]: observation },
   }));
 }
 
@@ -117,12 +138,11 @@ export async function clearSwarmCompletionObservationRecord(
   issueId: string,
   progressKey: string,
 ): Promise<void> {
-  await updateIssueRecordForWorkspace(workspacePath, issueId.toUpperCase(), record => {
-    const existing = record.swarm?.completionObservations;
-    if (!existing?.[progressKey]) return record;
-    const completionObservations = { ...existing };
+  await updateSwarmSlotState(workspacePath, issueId, (state) => {
+    if (!state.completionObservations?.[progressKey]) return state;
+    const completionObservations = { ...state.completionObservations };
     delete completionObservations[progressKey];
-    return { ...record, swarm: { ...(record.swarm ?? {}), completionObservations } };
+    return { ...state, completionObservations };
   });
 }
 
@@ -132,14 +152,11 @@ export async function writeSwarmForemanTakeover(
   itemId: string,
   slotIndex: number,
 ): Promise<void> {
-  await updateIssueRecordForWorkspace(workspacePath, issueId.toUpperCase(), record => ({
-    ...record,
-    swarm: {
-      ...(record.swarm ?? {}),
-      reclaimedItems: {
-        ...(record.swarm?.reclaimedItems ?? {}),
-        [itemId]: { slotIndex, reclaimedAt: new Date().toISOString() },
-      },
+  await updateSwarmSlotState(workspacePath, issueId, (state) => ({
+    ...state,
+    reclaimedItems: {
+      ...(state.reclaimedItems ?? {}),
+      [itemId]: { slotIndex, reclaimedAt: new Date().toISOString() },
     },
   }));
 }
@@ -152,21 +169,18 @@ export async function writeSwarmIntervention(
   options: { operator?: boolean } = {},
 ): Promise<number | null> {
   let count: number | null = null;
-  await updateIssueRecordForWorkspace(workspacePath, issueId.toUpperCase(), (record) => {
+  await updateSwarmSlotState(workspacePath, issueId, (state) => {
     const slotKey = String(slotIndex);
-    const interventions = record.swarm?.interventions ?? {};
+    const interventions = state.interventions ?? {};
     const slotInterventions = interventions[slotKey] ?? {};
     const current = slotInterventions[failureClass] ?? 0;
-    if (current >= 3 && !options.operator) return record;
+    if (current >= 3 && !options.operator) return state;
     count = current + 1;
     return {
-      ...record,
-      swarm: {
-        ...(record.swarm ?? {}),
-        interventions: {
-          ...interventions,
-          [slotKey]: { ...slotInterventions, [failureClass]: count as number },
-        },
+      ...state,
+      interventions: {
+        ...interventions,
+        [slotKey]: { ...slotInterventions, [failureClass]: count as number },
       },
     };
   });
@@ -175,76 +189,88 @@ export async function writeSwarmIntervention(
 
 /**
  * PAN-3459: persist the issue-level swarm policy mode. An explicit
- * `pan swarm <id>` start opts the issue into ongoing Deacon coordination;
- * without a persisted issue-level mode, a global `swarm.mode: off` (the
- * default) makes every subsequent patrol skip the issue entirely — wave 1
- * dispatches and the swarm orphans: completed slot branches never merge and
- * remaining items never dispatch.
+ * `pan swarm <id>` start opts the issue into ongoing coordination; without an
+ * issue-level mode, a global `swarm.mode: off` (the default) makes every
+ * subsequent patrol skip the issue entirely and the swarm orphans.
  */
 export async function writeSwarmPolicyMode(
   workspacePath: string,
   issueId: string,
   mode: 'off' | 'auto' | 'always',
 ): Promise<void> {
-  const normalizedIssueId = issueId.toUpperCase();
-  await updateIssueRecordForWorkspace(workspacePath, normalizedIssueId, (record) => ({
-    ...record,
-    swarm: {
-      ...(record.swarm ?? {}),
-      policy: {
-        ...(record.swarm?.policy ?? {}),
-        mode,
-      },
-    },
+  await updateSwarmSlotState(workspacePath, issueId, (state) => ({
+    ...state,
+    policy: { ...(state.policy ?? {}), mode },
   }));
 }
 
-/**
- * PAN-2372 WI-3 / FR-4: persist a durable per-slot completion marker keyed by
- * `String(slotIndex)`. Read-modify-write preserves every other record field
- * (statusOverrides, slotAssignments, etc.) — see the byte-identical
- * preservation test in deacon-swarm-slot-completion.test.ts.
- */
-export async function writeSwarmSlotCompletion(
+export function readSwarmSlotAssignments(workspacePath: string, issueId: string): SwarmSlotAssignment[] {
+  return readSwarmSlotState(workspacePath, issueId)?.slotAssignments ?? [];
+}
+
+export async function writeSwarmSlotAssignment(
   workspacePath: string,
   issueId: string,
-  completion: PanIssueSwarmSlotCompletion,
+  assignment: SwarmSlotAssignment,
 ): Promise<void> {
-  const normalizedIssueId = issueId.toUpperCase();
-  await updateIssueRecordForWorkspace(workspacePath, normalizedIssueId, (record) => ({
-    ...record,
-    swarm: {
-      ...(record.swarm ?? {}),
-      slotCompletions: {
-        ...(record.swarm?.slotCompletions ?? {}),
-        [String(completion.slotIndex)]: completion,
-      },
-    },
-  }));
-}
-
-/**
- * PAN-2372 WI-3 / FR-6: clear a slot's completion marker once the coordinator
- * (WI-4) has consumed it (merge/requeue). No-op when no marker exists for the
- * slot, so callers can clear unconditionally on the terminal transition.
- */
-export async function clearSwarmSlotCompletion(workspacePath: string, issueId: string, slotIndex: number): Promise<void> {
-  const normalizedIssueId = issueId.toUpperCase();
-  const current = readIssueRecordForWorkspaceSync(workspacePath, normalizedIssueId);
-  if (!current?.swarm?.slotCompletions || !(String(slotIndex) in current.swarm.slotCompletions)) return;
-  await updateIssueRecordForWorkspace(workspacePath, normalizedIssueId, (record) => {
-    const existing = record.swarm?.slotCompletions;
-    if (!existing || !(String(slotIndex) in existing)) return record;
-    const next: Record<string, PanIssueSwarmSlotCompletion> = { ...existing };
-    delete next[String(slotIndex)];
-    return { ...record, swarm: { ...record.swarm, slotCompletions: next } };
+  await updateSwarmSlotState(workspacePath, issueId, (state) => {
+    const assignments = state.slotAssignments ?? [];
+    const existing = assignments.find((entry) => entry.slotIndex === assignment.slotIndex);
+    const assignedAt = assignment.assignedAt ?? new Date().toISOString();
+    return {
+      ...state,
+      slotAssignments: existing
+        ? assignments.map((entry) => (entry.slotIndex === assignment.slotIndex
+          ? { ...entry, ...assignment, assignedAt: entry.assignedAt ?? assignedAt }
+          : entry))
+        : [...assignments, { ...assignment, assignedAt }],
+    };
   });
 }
 
 /**
- * Consume all durable ownership for a slot in one record update. Merged-slot
- * GC uses this after it removes the worktree and branch so a completion marker
- * cannot outlive the assignment and keep the freed index occupied.
+ * PAN-2372 WI-3 / FR-4: persist a per-slot completion marker keyed by
+ * `String(slotIndex)`. Read-modify-write preserves every other field.
+ */
+export async function writeSwarmSlotCompletion(
+  workspacePath: string,
+  issueId: string,
+  completion: SwarmSlotCompletion,
+): Promise<void> {
+  await updateSwarmSlotState(workspacePath, issueId, (state) => ({
+    ...state,
+    slotCompletions: {
+      ...(state.slotCompletions ?? {}),
+      [String(completion.slotIndex)]: completion,
+    },
+  }));
+}
+
+export function readSwarmSlotCompletion(
+  workspacePath: string,
+  issueId: string,
+  slotIndex: number,
+): SwarmSlotCompletion | undefined {
+  return readSwarmSlotState(workspacePath, issueId)?.slotCompletions?.[String(slotIndex)];
+}
+
+/**
+ * PAN-2372 WI-3 / FR-6: clear a slot's completion marker once the coordinator
+ * has consumed it (merge/requeue). No-op when no marker exists.
+ */
+export async function clearSwarmSlotCompletion(workspacePath: string, issueId: string, slotIndex: number): Promise<void> {
+  await updateSwarmSlotState(workspacePath, issueId, (state) => {
+    if (!state.slotCompletions?.[String(slotIndex)]) return state;
+    const slotCompletions = { ...state.slotCompletions };
+    delete slotCompletions[String(slotIndex)];
+    return { ...state, slotCompletions };
+  });
+}
+
+/**
+ * Consume all ownership for a slot in one update. Merged-slot GC uses this
+ * after it removes the worktree and branch, so a completion marker cannot
+ * outlive the assignment and keep the freed index occupied.
  */
 export async function clearSwarmSlotOwnership(
   workspacePath: string,
@@ -252,15 +278,14 @@ export async function clearSwarmSlotOwnership(
   slotIndex: number,
   _itemId?: string,
 ): Promise<void> {
-  const normalizedIssueId = issueId.toUpperCase();
-  await updateIssueRecordForWorkspace(workspacePath, normalizedIssueId, (record) => {
-    const swarm = record.swarm ?? {};
-    const slotAssignments = (swarm.slotAssignments ?? []).filter(
-      assignment => assignment.slotIndex !== slotIndex,
-    );
-    const slotCompletions = { ...(swarm.slotCompletions ?? {}) };
+  await updateSwarmSlotState(workspacePath, issueId, (state) => {
+    const slotCompletions = { ...(state.slotCompletions ?? {}) };
     delete slotCompletions[String(slotIndex)];
-    return { ...record, swarm: { ...swarm, slotAssignments, slotCompletions } };
+    return {
+      ...state,
+      slotAssignments: (state.slotAssignments ?? []).filter((entry) => entry.slotIndex !== slotIndex),
+      slotCompletions,
+    };
   });
 }
 
@@ -272,29 +297,21 @@ export async function releaseBlockedSwarmSlot(
   branch?: string,
   archived?: { archivedBranch: string; archivedWorktree: string; replacementBranch: string; releasedAt: string },
 ): Promise<void> {
-  const normalizedIssueId = issueId.toUpperCase();
-  await updateIssueRecordForWorkspace(workspacePath, normalizedIssueId, (record) => {
-    const swarm = record.swarm ?? {};
-    const slotAssignments = (swarm.slotAssignments ?? []).filter(
-      assignment => assignment.slotIndex !== slotIndex,
-    );
-    const slotCompletions = { ...(swarm.slotCompletions ?? {}) };
+  await updateSwarmSlotState(workspacePath, issueId, (state) => {
+    const slotCompletions = { ...(state.slotCompletions ?? {}) };
     delete slotCompletions[String(slotIndex)];
     return {
-      ...record,
-      swarm: {
-        ...swarm,
-        slotAssignments,
-        slotCompletions,
-        releasedBlockedSlots: {
-          ...(swarm.releasedBlockedSlots ?? {}),
-          [String(slotIndex)]: {
-            slotIndex,
-            itemId,
-            branch,
-            ...archived,
-            releasedAt: archived?.releasedAt ?? new Date().toISOString(),
-          },
+      ...state,
+      slotAssignments: (state.slotAssignments ?? []).filter((entry) => entry.slotIndex !== slotIndex),
+      slotCompletions,
+      releasedBlockedSlots: {
+        ...(state.releasedBlockedSlots ?? {}),
+        [String(slotIndex)]: {
+          slotIndex,
+          itemId,
+          branch,
+          ...archived,
+          releasedAt: archived?.releasedAt ?? new Date().toISOString(),
         },
       },
     };
@@ -306,49 +323,36 @@ export async function clearReleasedBlockedSwarmSlot(
   issueId: string,
   slotIndex: number,
 ): Promise<void> {
-  await updateIssueRecordForWorkspace(workspacePath, issueId.toUpperCase(), record => {
-    const releasedBlockedSlots = { ...(record.swarm?.releasedBlockedSlots ?? {}) };
+  await updateSwarmSlotState(workspacePath, issueId, (state) => {
+    if (!state.releasedBlockedSlots?.[String(slotIndex)]) return state;
+    const releasedBlockedSlots = { ...state.releasedBlockedSlots };
     delete releasedBlockedSlots[String(slotIndex)];
-    return { ...record, swarm: { ...(record.swarm ?? {}), releasedBlockedSlots } };
+    return { ...state, releasedBlockedSlots };
   });
 }
 
 /**
- * Drop every superseded-attempt record (PAN-3694). A work-preserving swarm
- * reset removes all slot worktrees and branches, so the slot indexes the
- * superseded attempts occupied are genuinely free — but
- * `applySupersededSlotHighWater` kept reserving indexes 1..high-water,
- * leaving a fresh swarm able to dispatch only high-water+1. The archived
- * branches remain on origin; only the index-blocking record is cleared.
+ * Drop every superseded-attempt entry (PAN-3694). A work-preserving swarm reset
+ * removes all slot worktrees and branches, so the indexes those attempts
+ * occupied are genuinely free; the archived branches remain on origin.
  */
 export async function clearSupersededSwarmAttempts(workspacePath: string, issueId: string): Promise<void> {
-  const normalizedIssueId = issueId.toUpperCase();
-  await updateIssueRecordForWorkspace(workspacePath, normalizedIssueId, (record) => ({
-    ...record,
-    swarm: {
-      ...(record.swarm ?? {}),
-      supersededAttempts: [],
-    },
-  }));
+  await updateSwarmSlotState(workspacePath, issueId, (state) => ({ ...state, supersededAttempts: [] }));
 }
 
 /**
- * PAN-2372 WI-3 / FR-4, FR-5: write the durable slot-completion marker and read
- * it straight back to confirm it persisted. Returns true only when the keyed
- * marker exists on disk with a matching agentId. The slot `pan done` caller MUST
- * refuse to mark the slot done when this returns false — that is the whole point
- * of the issue: a slot used to finish without durably recording completion, so
- * the coordinator could not observe it. Keeping the write+verify here (not inline
- * in the CLI command) keeps the god-file done.ts from growing and co-locates the
- * swarm-record mechanics with the other slot-completion door functions.
+ * PAN-2372 WI-3 / FR-4, FR-5: write the slot-completion marker and read it
+ * straight back. Returns true only when the marker exists on disk with a
+ * matching agentId. The slot `pan done` caller MUST refuse to mark the slot
+ * done when this returns false — that is the whole point: a slot used to finish
+ * without recording completion, so the coordinator could not observe it.
  */
 export async function persistAndVerifySwarmSlotCompletion(
   workspacePath: string,
   issueId: string,
-  completion: PanIssueSwarmSlotCompletion,
+  completion: SwarmSlotCompletion,
 ): Promise<boolean> {
   await writeSwarmSlotCompletion(workspacePath, issueId, completion);
-  const reread = readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase());
-  const persisted = reread?.swarm?.slotCompletions?.[String(completion.slotIndex)];
+  const persisted = readSwarmSlotCompletion(workspacePath, issueId, completion.slotIndex);
   return Boolean(persisted && persisted.agentId === completion.agentId);
 }

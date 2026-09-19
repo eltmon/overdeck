@@ -17,7 +17,6 @@ const routeMocks = vi.hoisted(() => ({
   setWorkspaceRunCommand: vi.fn(),
   touchWorkspaceAccessed: vi.fn(),
   updateWorkspaceLayout: vi.fn(),
-  getReviewStatusSync: vi.fn(),
   readCurrentStatus: vi.fn(),
   readRecentObservations: vi.fn(),
   rejectUnsafeDashboardMutationRequest: vi.fn(),
@@ -48,13 +47,6 @@ vi.mock('../../../src/lib/workspaces/git-state.js', () => ({
   pullWorkspaceFastForward: routeMocks.pullWorkspaceFastForward,
 }));
 
-vi.mock('../../../src/lib/review-status.js', () => ({
-  getReviewStatusSync: routeMocks.getReviewStatusSync,
-
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
-}));
-
 vi.mock('../../../src/lib/memory/rollup.js', () => ({
   readCurrentStatus: routeMocks.readCurrentStatus,
   readRecentObservations: routeMocks.readRecentObservations,
@@ -65,6 +57,10 @@ vi.mock('../../../src/lib/projects.js', () => ({
 }));
 
 vi.mock('../../../src/lib/tmux.js', () => ({
+  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listPaneValuesSync: () => [],
   createSession: routeMocks.createSession,
   sessionExists: routeMocks.sessionExists,
 }));
@@ -126,7 +122,6 @@ beforeEach(() => {
   routeMocks.rejectUnauthorizedDashboardRequest.mockReturnValue(null);
   routeMocks.readCurrentStatus.mockResolvedValue(undefined);
   routeMocks.readRecentObservations.mockResolvedValue([]);
-  routeMocks.getReviewStatusSync.mockReturnValue(null);
   routeMocks.getProjectSync.mockReturnValue(null);
   routeMocks.sessionExists.mockReturnValue(Effect.succeed(false));
   routeMocks.createSession.mockReturnValue(Effect.succeed(undefined));

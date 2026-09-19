@@ -409,9 +409,9 @@ describe('tts daemon configuration', () => {
         daemonPort: 8788,
         daemonHost: 'localhost',
         daemon: { autoStart: true },
-        voiceMap: { 'mergeStatus.merged': 'voice-merge' },
+        voiceMap: { 'mergeOutcome.merged': 'voice-merge' },
         mutedSources: ['merge-agent'],
-        utteranceTemplates: { readyForMerge: '{issueId} can merge' },
+        utteranceTemplates: { mergeReady: '{issueId} can merge' },
         mutedIssues: ['PAN-123'],
       },
     });
@@ -428,9 +428,9 @@ describe('tts daemon configuration', () => {
       daemonPort: 8788,
       daemonHost: 'localhost',
       daemonAutoStart: true,
-      voiceMap: { 'mergeStatus.merged': 'voice-merge' },
+      voiceMap: { 'mergeOutcome.merged': 'voice-merge' },
       mutedSources: ['merge-agent'],
-      utteranceTemplates: { readyForMerge: '{issueId} can merge' },
+      utteranceTemplates: { mergeReady: '{issueId} can merge' },
       mutedIssues: ['PAN-123'],
     });
   });

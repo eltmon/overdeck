@@ -24,10 +24,11 @@ const reviewer: AgentRowModel = {
 };
 
 const ship: IssueShipModel = {
-  status: 'merging',
-  readyForMerge: false,
-  mergeStep: 'rebasing',
-  log: null,
+  status: 'ready',
+  prUrl: 'https://github.com/eltmon/overdeck/pull/42',
+  prNumber: 42,
+  checks: 'green',
+  mergeable: true,
 };
 
 describe('CockpitPhaseRail', () => {
@@ -63,23 +64,17 @@ describe('CockpitPhaseRail', () => {
     expect(onSelectPhase).toHaveBeenCalledWith('review', reviewer.sessionId);
   });
 
-  it('renders skipped-test guidance, embedded ship progress, and phase navigation', () => {
+  it('embeds ship progress once the forge says the PR can merge, and navigates by phase', () => {
     const onSelectPhase = vi.fn();
     const { container } = render(
       <CockpitPhaseRail
-        pipelineState="in_review_reviewers_running"
+        pipelineState="ready_to_merge"
         agents={[reviewer]}
         ship={ship}
-        testStatus="skipped"
         onSelectPhase={onSelectPhase}
       />,
     );
 
-    expect(screen.getByRole('link', { name: 'Configure tests' })).toHaveAttribute(
-      'href',
-      'https://overdeck.ai/configuration/projects',
-    );
-    expect(container.querySelector('[data-phase="test"]')).toHaveAttribute('data-skipped', 'true');
     expect(container.querySelector('[data-section="ship-progress-compact"]')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Plan/ }));

@@ -150,19 +150,6 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     expect(divergedErr!.localSha).toBe('localABC');
     expect(divergedErr!.remoteSha).toBe('remoteXYZ');
 
-    // Step 2: mark workspace stuck (simulating what the approve handler does)
-    const { markWorkspaceStuck } = await import('../../review-status.js');
-    markWorkspaceStuck('PAN-FLOW', 'main_diverged', {
-      localSha: divergedErr!.localSha,
-      remoteSha: divergedErr!.remoteSha,
-    });
-
-    // Step 3: verify stuck flag is persisted
-    const { getReviewStatusSync } = await import('../../review-status.js');
-    const status = getReviewStatusSync('PAN-FLOW');
-    expect(status?.stuck).toBe(true);
-    expect(status?.stuckReason).toBe('main_diverged');
-
     // Step 4: main_diverged event was written to git_operations
     const { listGitOperationsSync } = await import('../../../lib/git-activity.js');
     const ops = listGitOperationsSync({ issueId: 'PAN-FLOW', operation: 'main_diverged' });
@@ -171,19 +158,10 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     expect(ops[0].beforeSha).toBe('localABC');
     expect(ops[0].remoteSha).toBe('remoteXYZ');
 
-    // Step 5: simulate dashboard restart — reset DB singleton, reconnect
+    // The main_diverged record survives a dashboard restart.
     await resetDb();
-
-    // After restart, stuck state is still persisted in SQLite
-    const statusAfterRestart = getReviewStatusSync('PAN-FLOW');
-    expect(statusAfterRestart?.stuck).toBe(true);
-
-    // Step 6: unstick clears the flag
-    const { clearWorkspaceStuck } = await import('../../review-status.js');
-    clearWorkspaceStuck('PAN-FLOW');
-
-    const statusAfterUnstick = getReviewStatusSync('PAN-FLOW');
-    expect(statusAfterUnstick?.stuck).toBeFalsy();
+    const opsAfterRestart = listGitOperationsSync({ issueId: 'PAN-FLOW', operation: 'main_diverged' });
+    expect(opsAfterRestart.length).toBeGreaterThan(0);
   });
 
   it('git_operations records all events in the push flow: rev_parse, fetch, main_diverged', async () => {

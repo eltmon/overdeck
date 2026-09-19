@@ -14,7 +14,9 @@ import type { XBriefDifficulty } from '../xbrief/types.js';
 import type { AgentState } from '../agents.js';
 import { renderPrompt } from './prompts.js';
 import type { ContinueState } from '../xbrief/continue-state.js';
-import { getProjectConfigFromWorkspacePath, readRecordContinueViewSync, resolveProjectForIssue } from '../pan-dir/record.js';
+import { getProjectConfigFromWorkspacePath, resolveProjectForIssue } from '../overdeck/issue-projects.js';
+import { resolvePlanHome } from '../pan-dir/paths.js';
+import { readContinueState } from '../xbrief/continue-state.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
 
 const execAsync = promisify(exec);
@@ -113,13 +115,11 @@ async function captureFiles(
   issueId: string,
 ): Promise<void> {
   try {
-    // Read continue context from the per-issue record (PAN-1919).
+    // Read continue context from the plan home's continue file (PAN-3917).
     try {
       const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspace);
-      const recordView = readRecordContinueViewSync(project, issueId);
-      if (recordView) {
-        context.continueState = recordView as unknown as ContinueState;
-      }
+      const state = readContinueState(resolvePlanHome(project.path), issueId.toUpperCase());
+      if (state) context.continueState = state;
     } catch { /* ignore */ }
 
     // Read CLAUDE.md if it exists

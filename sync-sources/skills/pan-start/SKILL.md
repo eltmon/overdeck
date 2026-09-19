@@ -30,8 +30,7 @@ pan start PAN-123 --host   # Break-glass: bypass workspace Docker stack-health g
 pan reset-session PAN-123  # Clear mutable saved-session pointers before a fresh start
 pan start PAN-123 --fresh  # Start fresh only when no resumable session remains
 pan start PAN-123 --harness codex  # Explicitly use the Codex harness
-pan start PAN-123 --model gpt-5.6-sol --swarm off --review-mode full
-pan start PAN-123 --review-model gpt-5.6-sol  # Pin the convoy review model
+pan start PAN-123 --model gpt-5.6-sol --effort high  # Pin the work model and Claude Code effort
 pan start PAN-123 --plan-model k3 --model k3  # Auto-plan AND work on Kimi k3
 pan start PAN-123 --remote --tier durable  # Remote Fly.io workspace with persistent volume
 pan start PAN-123 --remote --tier ephemeral  # Remote Fly.io workspace that winds down on stale heartbeat
@@ -62,12 +61,13 @@ The default planning mode comes from `planning.default_mode` in `~/.overdeck/con
 the shipped default is `auto`. The legacy `--auto` flag is deprecated and is now an alias
 for `--plan skip`.
 
-Start-time policy flags are persisted on the issue before planning or work begins. `--model`
-sets the durable work-model override used by later respawns, `--swarm` accepts `off`, `auto`,
-or `always`, `--review-mode` accepts `quick`, `full`, or `none`, and `--review-model` pins the
-model used by the review convoy. Omitted flags leave existing and inherited policy untouched.
-Swarm mode controls automatic foreman creation, not Deacon slot dispatch. `off` keeps serial work,
-while `auto` and `always` allow a readiness-eligible foreman loop.
+`--model` and `--harness` apply to this run only (PAN-3917: the per-issue policy
+record they used to persist to is gone — nothing is derivable from it and it had
+no other home, so there is no durable per-issue override anymore). A respawn or
+`pan recover` without `--model` falls back to the project/global config default,
+not to whatever a previous `pan start` passed. Swarm policy (foreman vs. serial
+work) and review mode (`quick`/`full`/`none`) are likewise project/global
+`config.yaml` settings now, not per-issue overrides or `pan start` flags.
 When this start also kicks off planning (no plan exists yet), `--plan-model <model>` overrides
 the planning agent's model for that session only — it is a one-shot override, not persisted
 policy, and it never changes the work agent's model (`--model`).

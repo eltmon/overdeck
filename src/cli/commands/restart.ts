@@ -40,7 +40,6 @@ import {
 } from '../../lib/restart-gate-client.js';
 import { writeRestartStatus, type RestartPhase } from '../../lib/restart-status.js';
 import { applyBootGateEnv, formatBootGateState, resolveBootGates, type BootGateOptions } from '../../lib/boot-gates.js';
-import { agentRestartBlockReason } from '../../lib/deploy/agent-restart-gate.js';
 import { readActiveDashboardBundleSync, type ActiveDashboardBundle } from '../../lib/deploy/active-dashboard-bundle.js';
 import { dashboardServerBootFailure } from '../../lib/deploy/dashboard-bundle-integrity.js';
 
@@ -577,15 +576,6 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
     if (await runRestartNowBypass(scope, { reloadHandoffOnly: true }) === 'handed-off') return;
   }
   if (needsRestartLock && restartInitiator) {
-    const restartBlock = await agentRestartBlockReason({
-      initiator: restartInitiator,
-      force: options.force === true,
-    });
-    if (restartBlock) {
-      console.error(restartBlock);
-      process.exitCode = 1;
-      return;
-    }
     console.log(chalk.yellow(
       '  This agent-issued restart will disconnect every live conversation and terminal until clients reconnect.',
     ));

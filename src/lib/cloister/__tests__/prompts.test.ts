@@ -320,7 +320,6 @@ optional:
             BASELINE_COMMANDS: 'git checkout main && npm test',
             TEST_CONFIG_SUMMARY: 'default test suite',
             TIMEOUT_MS: 600000,
-            API_URL: 'http://localhost:3011',
             FEATURE_NAME: 'pan-611',
             DOCKER_PS_FORMAT: '{{.Names}}',
             MEMORY_CONTEXT: memoryContext,
@@ -427,7 +426,6 @@ optional:
           BASELINE_COMMANDS: 'git checkout main && npm test',
           TEST_CONFIG_SUMMARY: 'default test suite',
           TIMEOUT_MS: 600000,
-          API_URL: 'http://localhost:3011',
           FEATURE_NAME: 'pan-611',
           DOCKER_PS_FORMAT: '{{.Names}}',
         };

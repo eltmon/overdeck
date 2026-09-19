@@ -1,23 +1,54 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { DerivedIssueState, IssueState } from '@overdeck/contracts';
 
-import { advanceMergeQueue, type MergeQueueAdvanceDeps } from '../merge-strike.js';
-import type { ReviewStatus } from '../../../../../lib/review-status.js';
+// merge-strike pulls in lib/agents for the rebase-escalation path, which still
+// reaches the record plane W3 is deleting. These tests exercise the queue walk
+// only, so the agent surface is stubbed rather than loaded.
+vi.mock('../../../../../lib/agents.js', () => ({
+  getAgentState: vi.fn(),
+  messageAgent: vi.fn(),
+  spawnAgent: vi.fn(),
+}));
+vi.mock('../../../../../lib/agents/agent-state.js', () => ({
+  clearYieldForResumeSync: vi.fn(),
+  decideResumeGate: vi.fn(() => ({ decision: 'proceed' })),
+  getAgentResumeGateBlockReason: vi.fn(() => null),
+  getAgentStateSync: vi.fn(() => null),
+  saveAgentStateSync: vi.fn(),
+}));
+// config-yaml's defaults pull tier-table, which still imports the record plane
+// W3 is deleting. Only the default tiered-execution block is needed here.
+vi.mock('../../../../../lib/agents/tier-table.js', () => ({
+  DEFAULT_TIERED_EXECUTION_CONFIG: { enabled: false, tiers: [], subscription: 'all' },
+}));
+vi.mock('../../../../../lib/work-agent-lifecycle.js', () => ({
+  getWorkAgentLifecycleStateSync: vi.fn(() => ({ hasLiveTmuxSession: false, canResumeSession: false, canStartFresh: false })),
+}));
+
+const { advanceMergeQueue } = await import('../merge-strike.js');
+type MergeQueueAdvanceDeps = Parameters<typeof advanceMergeQueue>[0];
 
 /**
  * PAN-3328: the merge queue must not be able to wedge behind an entry that
  * `triggerMerge()` would bounce before it claims the queue. These tests lock the
  * drain: unstartable heads are removed, the first startable entry is triggered,
  * and the walk always terminates.
+ *
+ * PAN-3917: startability is now the forge's answer — `DerivedIssueState.state`
+ * is `ready` only when the PR is approved, green, and mergeable.
  */
 
-function reviewStatus(overrides: Partial<ReviewStatus> = {}): ReviewStatus {
-  return { issueId: 'PAN-1', ...overrides } as ReviewStatus;
+function derived(issueId: string, state: IssueState): DerivedIssueState {
+  return state === 'ready'
+    ? { issueId, state, pr: { url: `https://github.com/o/r/pull/1`, number: 1, reviewState: 'approved', checks: 'green', mergeable: true } }
+    : { issueId, state };
 }
 
 /** Build deps over an in-memory queue that behaves like dequeueMerge(). */
 function harness(
   queue: string[],
-  statuses: Record<string, ReviewStatus | null>,
+  states: Record<string, IssueState>,
+  strikeHeads: Record<string, string> = {},
 ): { deps: MergeQueueAdvanceDeps; queue: string[]; triggered: Array<[string, unknown]>; warnings: string[] } {
   const triggered: Array<[string, unknown]> = [];
   const warnings: string[] = [];
@@ -29,8 +60,9 @@ function harness(
       }
       return queue[0] ?? null;
     },
-    getReviewStatus: (issueId) => statuses[issueId] ?? null,
+    getDerivedState: async (issueId) => derived(issueId, states[issueId] ?? 'backlog'),
     getProjectPath: () => '/projects/overdeck',
+    getStrikeHead: async (issueId) => strikeHeads[issueId] ?? null,
     triggerMerge: async (issueId, request) => {
       triggered.push([issueId, request]);
       return { success: true };
@@ -42,19 +74,19 @@ function harness(
 }
 
 describe('advanceMergeQueue', () => {
-  it('drops heads that triggerMerge would reject and starts the first startable entry', () => {
+  it('drops heads the forge would reject and starts the first ready entry', async () => {
     const { deps, queue, triggered, warnings } = harness(
       ['PAN-100', 'PAN-200', 'PAN-300'],
       {
-        // No review-status record at all — exactly the shape of the 12 rows that
-        // wedged the real queue for 26 days.
-        'PAN-100': null,
-        'PAN-200': reviewStatus({ readyForMerge: true, mergeStatus: 'merged' }),
-        'PAN-300': reviewStatus({ readyForMerge: true }),
+        // No PR at all — exactly the shape of the 12 rows that wedged the real
+        // queue for 26 days.
+        'PAN-100': 'planned',
+        'PAN-200': 'merged',
+        'PAN-300': 'ready',
       },
     );
 
-    advanceMergeQueue(deps, 'pan');
+    await advanceMergeQueue(deps, 'pan');
 
     expect(triggered).toEqual([['PAN-300', undefined]]);
     expect(queue).toEqual(['PAN-300']);
@@ -62,41 +94,46 @@ describe('advanceMergeQueue', () => {
     expect(warnings.join('\n')).toContain('Dropped PAN-200 from the pan merge queue');
   });
 
-  it('removes the completed issue before choosing the next entry', () => {
+  it('names the missing forge condition when it drops a head', async () => {
+    const { deps, warnings } = harness(['PAN-100'], { 'PAN-100': 'in-review' });
+    await advanceMergeQueue(deps, 'pan');
+    expect(warnings.join('\n')).toContain('no open pull request for this issue');
+  });
+
+  it('removes the completed issue before choosing the next entry', async () => {
     const { deps, queue, triggered } = harness(
       ['PAN-100', 'PAN-200'],
-      { 'PAN-100': reviewStatus({ readyForMerge: true }), 'PAN-200': reviewStatus({ readyForMerge: true }) },
+      { 'PAN-100': 'ready', 'PAN-200': 'ready' },
     );
 
-    advanceMergeQueue(deps, 'pan', 'PAN-100');
+    await advanceMergeQueue(deps, 'pan', 'PAN-100');
 
     expect(queue).toEqual(['PAN-200']);
     expect(triggered).toEqual([['PAN-200', undefined]]);
   });
 
-  it('empties a queue in which nothing can start, instead of stopping on the head', () => {
+  it('empties a queue in which nothing can start, instead of stopping on the head', async () => {
     const { deps, queue, triggered } = harness(
       ['PAN-100', 'PAN-200'],
-      { 'PAN-100': null, 'PAN-200': null },
+      { 'PAN-100': 'planned', 'PAN-200': 'planned' },
     );
 
-    advanceMergeQueue(deps, 'pan');
+    await advanceMergeQueue(deps, 'pan');
 
     expect(queue).toEqual([]);
     expect(triggered).toEqual([]);
   });
 
-  it('passes a strike request through without consulting normal merge eligibility', () => {
+  it('passes a strike request through without consulting normal merge eligibility', async () => {
     const { deps, triggered } = harness(
       ['PAN-400'],
-      {
-        // A ready strike has readyForMerge=false — the strike path validates the
-        // marker instead, so it must not be treated as an unstartable head.
-        'PAN-400': reviewStatus({ readyForMerge: false, strikeLandingState: 'ready', strikeReadyHead: 'abc123' }),
-      },
+      // A strike landing is never `ready` on its own PR — git's pushed
+      // strike branch is the signal, so it must not be dropped as unstartable.
+      { 'PAN-400': 'working' },
+      { 'PAN-400': 'abc123' },
     );
 
-    advanceMergeQueue(deps, 'pan');
+    await advanceMergeQueue(deps, 'pan');
 
     expect(triggered).toEqual([[
       'PAN-400',
@@ -110,13 +147,14 @@ describe('advanceMergeQueue', () => {
     ]]);
   });
 
-  it('terminates when the queue keeps handing back the same unstartable entry', () => {
+  it('terminates when the queue keeps handing back the same unstartable entry', async () => {
     const dequeue = vi.fn(() => 'PAN-100');
-    advanceMergeQueue(
+    await advanceMergeQueue(
       {
         dequeue,
-        getReviewStatus: () => null,
+        getDerivedState: async (issueId) => derived(issueId, 'planned'),
         getProjectPath: () => '/projects/overdeck',
+        getStrikeHead: async () => null,
         triggerMerge: async () => ({}),
         log: () => {},
         warn: () => {},

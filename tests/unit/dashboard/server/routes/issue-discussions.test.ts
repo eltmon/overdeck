@@ -91,10 +91,6 @@ vi.mock('../../../../../src/lib/agents.js', () => ({
   getAgentStateAsync: vi.fn(),
   normalizeAgentId: vi.fn((s: string) => s),
 }));
-vi.mock('../../../../../src/lib/database/index.js', () => ({
-  getDatabase: vi.fn(() => ({ prepare: vi.fn(() => ({ run: vi.fn(), get: vi.fn(), all: vi.fn() })) })),
-  resetDatabase: vi.fn(),
-}));
 vi.mock('../../../../../src/dashboard/server/services/issue-service-singleton.js', () => ({
   getSharedIssueService: vi.fn(),
 }));

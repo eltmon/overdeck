@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { DerivedIssueState, IssueState } from '@overdeck/contracts';
 import type { GitHubPullRequestState } from '../../../../../lib/github-app.js';
-import { INTERRUPTED_VERIFICATION_NOTE } from '../../../../../lib/cloister/verification-types.js';
 
 const PR_URL = 'https://github.com/eltmon/overdeck/pull/3102';
 const HEAD_SHA = 'a'.repeat(40);
@@ -14,13 +14,22 @@ const mocks = vi.hoisted(() => ({
   getPullRequestState: vi.fn(),
   mergeReviewArtifact: vi.fn(),
   postMergeLifecycle: vi.fn(),
-  recordCiGreenVerificationVerdict: vi.fn(),
-  reviewStatus: {} as Record<string, unknown> & {
-    verificationStatus?: string;
-    verificationNotes?: string;
-  },
+  derivedState: 'ready' as IssueState,
   runVerificationForIssue: vi.fn(),
-  setReviewStatus: vi.fn(),
+  setMergeRun: vi.fn(),
+  mergeRun: null as { phase: string } | null,
+}));
+
+vi.mock('../../../../../lib/git-activity.js', () => ({ listGitOperationsSync: vi.fn(() => []) }));
+vi.mock('../../../../../lib/agents.js', () => ({
+  getAgentState: vi.fn(),
+  messageAgent: vi.fn(),
+  spawnAgent: vi.fn(),
+}));
+// config-yaml's defaults import lib/agents/tier-table, which still
+// reaches the record plane W3 is deleting. Stub the one constant it needs.
+vi.mock('../../../../../lib/agents/tier-table.js', () => ({
+  DEFAULT_TIERED_EXECUTION_CONFIG: { enabled: false, tiers: [], subscription: 'all' },
 }));
 
 vi.mock('node:child_process', () => {
@@ -94,16 +103,20 @@ vi.mock('../../../../../lib/projects.js', () => ({
   findProjectByTeamSync: vi.fn(() => ({ workspace: { type: 'monorepo' }, quality_gates: {} })),
 }));
 
-vi.mock('../../../../../lib/review-status.js', () => ({
-  getReviewStatusSync: vi.fn(() => mocks.reviewStatus),
-  markWorkspaceStuck: vi.fn(),
-  setReviewStatusSync: vi.fn(),
-
-  // PAN-3903: the pipeline read door's bulk read; falls back to the cache map.
-  getReviewStatusesSync: () => ({}),
+// PAN-3917: readiness is derived from the forge, not read off a record.
+vi.mock('../../../services/derived-issue-state.js', () => ({
+  getDerivedIssueState: vi.fn(async (issueId: string): Promise<DerivedIssueState> => ({
+    issueId,
+    state: mocks.derivedState,
+    pr: { url: PR_URL, number: 3102, reviewState: 'approved', checks: 'green', mergeable: true },
+  })),
 }));
 
 vi.mock('../../../../../lib/tmux.js', () => ({
+  // PAN-3917 (W6): the backend inventory's tmux fallback reads the pane list
+  // synchronously; these tests have no tmux server, so it reads as empty.
+  listSessionsSync: () => [],
+  listPaneValuesSync: () => [],
   sessionExists: vi.fn(() => Effect.succeed(false)),
 }));
 
@@ -121,19 +134,15 @@ vi.mock('../../workspaces.js', () => ({
   getWorkspaceInfoForIssue: vi.fn(() => ({ isRemote: false, localPath: '/workspace/feature-pan-3110' })),
   readJsonBody: vi.fn(),
   setPendingOperation: vi.fn(),
-  setReviewStatus: (issueId: string, patch: Record<string, unknown>) => {
-    mocks.reviewStatus = { ...mocks.reviewStatus, ...patch };
-    mocks.setReviewStatus(issueId, patch);
-  },
 }));
 
 vi.mock('../merge-strike.js', () => ({
   activeStrikeMerge: vi.fn(() => false),
-  advanceMergeQueue: vi.fn(),
+  advanceMergeQueue: vi.fn(async () => {}),
   ensureAgentReadyForMerge: mocks.ensureAgentReadyForMerge,
-  mergeCompletionStatus: vi.fn(() => ({})),
   mergeVerificationOptions: vi.fn(() => ({})),
   normalMergeEligibility: vi.fn(() => null),
+  readStrikeHead: vi.fn(async () => null),
   rebaseWithAgentFallback: vi.fn(async () => {
     try {
       await mocks.ensureAgentReadyForMerge();
@@ -142,12 +151,16 @@ vi.mock('../merge-strike.js', () => ({
       return { success: false, reason: error instanceof Error ? error.message : String(error), retryable: true };
     }
   }),
-  recordCiGreenVerificationVerdict: mocks.recordCiGreenVerificationVerdict,
   validateStrikeMergeRequest: vi.fn(() => null),
 }));
 
 vi.mock('../../specialists.js', () => ({ _serverManagedMerges: new Set<string>() }));
-vi.mock('../../../services/merge-queue-service.js', () => ({ setMergeQueueAdvanceHandler: vi.fn() }));
+vi.mock('../../../services/merge-queue-service.js', () => ({
+  setMergeQueueAdvanceHandler: vi.fn(),
+  setMergeRun: (issueId: string, patch: Record<string, unknown>) => mocks.setMergeRun(issueId, patch),
+  getMergeRun: () => mocks.mergeRun,
+  clearMergeRun: vi.fn(),
+}));
 
 import { triggerMerge } from '../merge-ops.js';
 
@@ -173,14 +186,8 @@ function pullRequestState(overrides: Partial<GitHubPullRequestState> = {}): GitH
 describe('triggerMerge clean PR direct merge', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.reviewStatus = {
-      issueId: 'PAN-3110',
-      reviewStatus: 'passed',
-      testStatus: 'passed',
-      verificationStatus: 'passed',
-      mergeStatus: 'pending',
-      readyForMerge: true,
-    };
+    mocks.derivedState = 'ready';
+    mocks.mergeRun = null;
     mocks.runVerificationForIssue.mockReturnValue(Effect.succeed({ outcome: 'passed' }));
     mocks.getPullRequestState.mockReturnValue(Effect.succeed(pullRequestState()));
     mocks.mergeReviewArtifact.mockResolvedValue(undefined);
@@ -201,7 +208,7 @@ describe('triggerMerge clean PR direct merge', () => {
   it('merges a clean PR without a work agent or rebase probe', async () => {
     const result = await triggerMerge('PAN-3110');
 
-    expect(result).toEqual(expect.objectContaining({ success: true, mergeStatus: 'merged' }));
+    expect(result).toEqual(expect.objectContaining({ success: true, outcome: 'merged' }));
     expect(mocks.ensureAgentReadyForMerge).not.toHaveBeenCalled();
     expect(mocks.execFile).not.toHaveBeenCalledWith(
       'git',
@@ -211,25 +218,6 @@ describe('triggerMerge clean PR direct merge', () => {
     expect(mocks.mergeReviewArtifact).toHaveBeenCalledWith(expect.objectContaining({
       url: PR_URL,
       method: 'squash',
-    }));
-  });
-
-  it('does not merge from CI when an interrupted worker has no fresh terminal result', async () => {
-    mocks.reviewStatus.verificationStatus = 'pending';
-    mocks.reviewStatus.verificationNotes = INTERRUPTED_VERIFICATION_NOTE;
-    mocks.runVerificationForIssue.mockReturnValue(Effect.succeed({
-      outcome: 'error',
-      message: 'replacement worker exited before writing a result',
-    }));
-
-    const result = await triggerMerge('PAN-3110');
-
-    expect(mocks.runVerificationForIssue).toHaveBeenCalledOnce();
-    expect(mocks.recordCiGreenVerificationVerdict).not.toHaveBeenCalled();
-    expect(mocks.mergeReviewArtifact).not.toHaveBeenCalled();
-    expect(result).toEqual(expect.objectContaining({
-      success: false,
-      error: expect.stringContaining('Fresh terminal verification required'),
     }));
   });
 

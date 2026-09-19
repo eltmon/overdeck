@@ -40,10 +40,6 @@ describe('AgentPillPopoverRow', () => {
     expect(describeAgentStop(agent({ pausedReason: 'awaiting close-out', paused: true })))
       .toBe('paused: awaiting close-out');
     expect(describeAgentStop(agent({ paused: true }))).toBe('paused');
-    expect(describeAgentStop(agent({ troubled: true, consecutiveFailures: 2 })))
-      .toBe('troubled (2 failures)');
-    expect(describeAgentStop(agent({ troubled: true, consecutiveFailures: 1 })))
-      .toBe('troubled (1 failure)');
     expect(describeAgentStop(agent({ stoppedByUser: true }))).toBe('stopped by operator');
     expect(describeAgentStop(agent())).toBe('stopped cleanly');
   });

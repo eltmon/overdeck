@@ -1,10 +1,15 @@
 /**
  * Shared overdeck test fixture (PAN-1938).
  *
- * The migrated product code serves agent-state / conversations / costs from a
- * real `overdeck.db` resolved from `OVERDECK_HOME` — the SYNC accessors
- * (`getOverdeckDatabaseSync`, `getOverdeckAgentStateSync`, …) resolve the path
- * at CALL time, so they honour a `OVERDECK_HOME` set in `beforeEach`.
+ * The product code serves conversations/costs/events from a real
+ * `overdeck.db` resolved from `OVERDECK_HOME` — the SYNC accessors
+ * (`getOverdeckDatabaseSync`, …) resolve the path at CALL time, so they
+ * honour a `OVERDECK_HOME` set in `beforeEach`. PAN-3917: agent state is no
+ * longer in this DB — `getOverdeckAgentStateSync`/`listOverdeckAgentStatesSync`/
+ * `saveOverdeckAgentStateSync` below are compatibility names re-exported from
+ * agents/agent-state.ts's state.json-backed door, which resolves
+ * `~/.overdeck/agents/<id>/state.json` under the same `OVERDECK_HOME` at call
+ * time — so existing callers keep working unchanged.
  *
  * This helper gives a test a fresh, real, schema-applied `overdeck.db` under a
  * throwaway temp home, and — critically — resets the cached sync handle so one
@@ -101,11 +106,13 @@ export function teardownOverdeckTestDb(db: OverdeckTestDb): void {
   }
 }
 
-// Re-export the production sync writers so tests seed through the real path
-// rather than hand-rolling INSERTs that can drift from the schema.
+// PAN-3917: the DB-backed agent mirror (overdeck/agent-state-sync.ts) is
+// gone — agent state lives only in each agent's ~/.overdeck/agents/<id>/state.json
+// now. Re-export the production sync writers/readers from there instead, so
+// tests still seed through the real path rather than hand-rolling JSON writes.
 export {
-  getOverdeckAgentStateSync,
-  listOverdeckAgentStatesSync,
-  saveOverdeckAgentStateSync,
-} from '../../src/lib/overdeck/agent-state-sync.js';
+  getAgentStateSync as getOverdeckAgentStateSync,
+  listAgentStatesSync as listOverdeckAgentStatesSync,
+  saveAgentStateSync as saveOverdeckAgentStateSync,
+} from '../../src/lib/agents/agent-state.js';
 export { getOverdeckDatabasePath };

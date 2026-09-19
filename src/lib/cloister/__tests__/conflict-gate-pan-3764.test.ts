@@ -3,35 +3,19 @@ import {
   buildRealConflictGateDeps,
   resolveConflictGate,
 } from '../conflict-gate.js';
-import type { ReviewStatus } from '../../review-status.js';
+import { emptyPrFacts, type PrFacts } from '../pr-facts.js';
 
-function status(fields: Partial<ReviewStatus> = {}): ReviewStatus {
-  return {
-    issueId: 'PAN-3668',
-    reviewStatus: 'passed',
-    testStatus: 'passed',
-    mergeStatus: 'pending',
-    readyForMerge: false,
-    updatedAt: '2026-08-22T00:00:00.000Z',
-    ...fields,
-  } as ReviewStatus;
+function facts(fields: Partial<PrFacts> = {}): PrFacts {
+  return { ...emptyPrFacts('PAN-3668'), exists: true, open: true, mergeable: true, ...fields };
 }
 
 describe('PAN-3764 conflict gate', () => {
-  it('does not dispatch conflict recovery for failed checks on a clean branch', async () => {
-    const failing = status({
-      blockerReasons: [{
-        type: 'failing_checks',
-        summary: 'Required checks are failing',
-        detectedAt: '2026-08-22T00:00:00.000Z',
-      }],
-    });
+  it('does not dispatch conflict recovery for failed checks on a mergeable branch', async () => {
     const dispatchResolver = vi.fn();
     const probeMergeability = vi.fn(async () => 'clean' as const);
 
     await expect(resolveConflictGate('PAN-3668', '/workspace', 'main', {
-      getReviewStatus: vi.fn(() => failing),
-      setReviewStatus: vi.fn(),
+      getFacts: vi.fn(() => facts({ checks: 'red' })),
       probeMergeability,
       dispatchResolver,
     })).resolves.toEqual({ gated: false });
@@ -44,8 +28,7 @@ describe('PAN-3764 conflict gate', () => {
     const spawnRun = vi.fn(async () => ({ sessionName: 'agent-pan-3668' })) as never;
     const deps = buildRealConflictGateDeps({
       spawnRun,
-      getReviewStatus: vi.fn(() => status()),
-      setReviewStatus: vi.fn((_, update) => status(update)),
+      getFacts: vi.fn(() => facts({ mergeable: false, mergeableState: 'dirty' })),
       emitActivityEntry: vi.fn(),
     });
 
@@ -53,11 +36,7 @@ describe('PAN-3764 conflict gate', () => {
       issueId: 'PAN-3668',
       workspacePath: '/workspace',
       targetBranch: 'main',
-      blockerReasons: [{
-        type: 'merge_conflict',
-        summary: 'Branch conflicts with main',
-        detectedAt: '2026-08-22T00:00:00.000Z',
-      }],
+      blockerSummary: 'forge reports merge state `dirty`',
       reason: 'merge conflict with main must be resolved before review dispatch',
     });
 

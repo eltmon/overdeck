@@ -32,24 +32,17 @@ import { extractNumberSync, extractPrefixSync } from '../issue-id.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 import { getForgeAdapter } from '../forge.js';
 import { resolveProjectReposForIssueSync } from '../project-repos.js';
-import {
-  getProjectConfigFromWorkspacePath,
-  markRecordPipelineClosedOutSync,
-  markRecordPipelineResidueClosedOutSync,
-  writeCloseOutDodGate,
-} from '../pan-dir/record.js';
 import { pruneStoppedAgentsForIssue } from '../cloister/agent-gc.js';
 import { isTrackerIssueClosed } from '../cloister/issue-closed.js';
-import { acknowledgeAllOpenRecoveryTrips } from '../cloister/recovery-trip.js';
 import { clearAgentOperatorGatesForIssueSync } from '../agents/agent-state.js';
 import { evaluateDodGate, readCompletedCloseOut } from './dod-gate.js';
-import { closeResidueConventionPrs, extractGitHubCoordinates, extractGitLabProject } from './residue.js';
+import { closeResidueConventionPrs, extractGitHubCoordinates, extractGitLabProject } from './pr-residue.js';
 import {
   capturePipelineStage,
   resolvePipelineTelemetryContext,
   type PipelineTelemetryContext,
 } from '../telemetry/pipeline.js';
-import { acceptFlagFor, BRANCH_ABSENT_MERGE_ERROR, buildAbandonedDodGate, buildResidueDodGate, DOD_ROWS, type DodGateResult, type DodRowId } from './dod.js';
+import { acceptFlagFor, BRANCH_ABSENT_MERGE_ERROR, buildAbandonedDodGate, buildResidueDodGate, DOD_ROWS, type DodGateResult, type DodRowId, type DodRowResult } from './dod.js';
 
 const execAsync = promisify(exec);
 
@@ -116,10 +109,6 @@ export function approve(
     const teardownSteps = yield* teardownWorkspace(ctx, { deleteBranches: true });
     allSteps.push(...teardownSteps);
 
-    // 5. Clear review status
-    const clearResult = yield* clearReviewStatusStep(ctx.issueId);
-    allSteps.push(clearResult);
-
     return buildResult('approve', ctx.issueId, allSteps, start);
   });
 }
@@ -148,9 +137,6 @@ export function close(
     allSteps.push(...teardownSteps);
 
     // 3. Clear review status
-    const clearResult = yield* clearReviewStatusStep(ctx.issueId);
-    allSteps.push(clearResult);
-
     return buildResult('close', ctx.issueId, allSteps, start);
   });
 }
@@ -190,25 +176,6 @@ export function closeOut(
       return buildResult('close-out', ctx.issueId, allSteps, start);
     }
 
-    // Recover UAT-promotion evidence before the gate reads the verification verdict.
-    const uatEvidenceStep = yield* Effect.promise(async () => {
-      try {
-        const { healUatPromotionVerification } = await import('../cloister/uat-promote-verification.js');
-        const evidence = await healUatPromotionVerification(ctx.issueId);
-        if (!evidence) {
-          return stepSkipped('dod:uat-promotion-evidence', ['No missing UAT-promotion verification evidence found']);
-        }
-        return stepOk('dod:uat-promotion-evidence', [
-          `Recorded verification from ${evidence.generation}`,
-          ...(evidence.mergeSha ? [`Promoted to main at ${evidence.mergeSha.slice(0, 9)}`] : []),
-        ]);
-      } catch (err) {
-        return stepSkipped('dod:uat-promotion-evidence', [
-          `Evidence recovery unavailable: ${err instanceof Error ? err.message : String(err)}`,
-        ]);
-      }
-    });
-    allSteps.push(uatEvidenceStep);
 
     // 1. Collect residue evidence BEFORE building the gate (if residue disposition)
     const abandon = opts.abandonDisposition;
@@ -383,12 +350,24 @@ export function closeOut(
       observed: teardownSteps.flatMap(step => step.details ?? []).join('; ') || 'close-out teardown completed',
     });
 
-    // 6+7. Close issue + apply label
+    // Update the gate with verified residue evidence before it is published.
+    if (residue && residueEvidence.length > 0) {
+      const residueRow = dodGate.rows.find(row => (row.id as string) === 'residue');
+      if (residueRow) residueRow.observed = residueEvidence.join('; ');
+    }
+
+    // 6+7. Close issue + apply label.
+    //
+    // PAN-3917: the Definition-of-Done audit rides the close comment. The
+    // tracker owns the issue, so the audit lives with it — there is no record
+    // to persist it to, and a closed issue carrying an unreadable verdict table
+    // would be the state layer by another name.
+    const closeReason = abandon
+      ? `Closed without landing evidence — disposition recorded: ${abandon.reason}`
+      : ctx.auto ? 'Closed via automatic close-out ceremony' : 'Closed via close-out ceremony';
     const closeSteps = yield* closeIssue(ctx, {
       tracker: opts.tracker,
-      comment: abandon
-        ? `Closed without landing evidence — disposition recorded: ${abandon.reason}`
-        : ctx.auto ? 'Closed via automatic close-out ceremony' : 'Closed via close-out ceremony',
+      comment: `${closeReason}\n\n${formatDodGateComment(dodGate, residue)}`,
       applyLabel: true,
     });
     allSteps.push(...closeSteps);
@@ -397,45 +376,26 @@ export function closeOut(
       return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
     }
 
-    // 8. Mark durable pipeline terminal before clearing the DB cache.
-    const markTerminal = yield* markPipelineClosedOutStep(ctx, residue);
+    // 8. The tracker close IS the terminal marker; the audit went out with it.
+    const markTerminal = stepOk('close-out:mark-pipeline-terminal', [
+      'Tracker issue closed and labelled — the tracker owns terminal state',
+    ]);
     allSteps.push(markTerminal);
-
-    // Update gate with verified residue evidence before recording if a residue row exists
-    if (residue && residueEvidence.length > 0) {
-      const residueRow = dodGate.rows.find(row => (row.id as string) === 'residue');
-      if (residueRow) {
-        residueRow.observed = residueEvidence.join('; ');
-      }
-    }
-
-    const recordDodGate = yield* recordDodGateStep(ctx, dodGate, abandon, residue);
-    allSteps.push(recordDodGate);
-    if (!recordDodGate.success) {
-      allSteps.push(stepFailed('close-out:abort', 'Stopped — Definition-of-Done audit could not be persisted; review status preserved'));
-      return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
-    }
-    if (markTerminal.success) {
+    {
       const pruned = yield* Effect.promise(() => pruneStoppedAgentsForIssue(ctx.issueId));
       allSteps.push(pruned.preserved.length > 0
         ? stepSkipped('close-out:prune-agent-rows', [`Preserved live agents or terminal rows with retained transcripts: ${pruned.preserved.join(', ')}`])
         : stepOk('close-out:prune-agent-rows', [`Pruned ${pruned.removed.length} stopped agent row(s)`]));
 
-      // PAN-3727: acknowledge open recovery trips and clear operator-gate
-      // residue (stoppedByUser/paused/troubled) so a terminal issue's
-      // preserved agent rows and record stop reappearing in the parked
-      // population. The two doors are independent residue — run and catch
-      // each separately (review finding) so a trip-ack failure can never
-      // suppress gate clearing, or vice versa. Non-blocking overall — a
-      // bookkeeping failure must never strand an already-merged close-out.
+      // PAN-3727: clear operator-gate residue (stoppedByUser/paused/troubled)
+      // so a terminal issue's preserved agent rows stop reappearing in the
+      // parked population. Non-blocking — a bookkeeping failure must never
+      // strand an already-merged close-out.
+      // PAN-3917: the open-recovery-trip acknowledgement this also did is
+      // dropped — cloister/recovery-trip.ts (Appendix A.1) and the whole
+      // parked-orbit/recovery-trip patrol concept it served are gone with
+      // the old patrol system (deacon-lite replaces it).
       allSteps.push(yield* Effect.promise(async () => {
-        let trips = 0;
-        let tripsError: string | undefined;
-        try {
-          trips = await acknowledgeAllOpenRecoveryTrips(ctx.issueId);
-        } catch (err) {
-          tripsError = (err as Error).message ?? String(err);
-        }
         let gates: string[] = [];
         let gatesError: string | undefined;
         try {
@@ -443,22 +403,18 @@ export function closeOut(
         } catch (err) {
           gatesError = (err as Error).message ?? String(err);
         }
-        const summary = `Acked ${trips} open trip(s); cleared operator gates on ${gates.length} agent row(s)`;
-        if (!tripsError && !gatesError) {
+        const summary = `Cleared operator gates on ${gates.length} agent row(s)`;
+        if (!gatesError) {
           return stepOk('close-out:ack-parked-residue', [summary]);
         }
         return stepSkipped('close-out:ack-parked-residue', [
           summary,
-          ...(tripsError ? [`trip acknowledgement failed: ${tripsError}`] : []),
-          ...(gatesError ? [`gate clearing failed: ${gatesError}`] : []),
+          `gate clearing failed: ${gatesError}`,
         ]);
       }));
     }
 
     // 9. Clear review status
-    const clearResult = yield* clearReviewStatusStep(ctx.issueId);
-    allSteps.push(clearResult);
-
     yield* Effect.promise(() => resetPostMergeStateForIssue(ctx.issueId));
     yield* Effect.promise(() => recordFeatureRegistryLifecycle({ issueId: ctx.issueId, status: 'archived' }));
 
@@ -468,46 +424,34 @@ export function closeOut(
   });
 }
 
-function markPipelineClosedOutStep(ctx: LifecycleContext, residue?: { reason: string; by: string }): Effect.Effect<StepResult> {
-  const step = 'close-out:mark-pipeline-terminal';
-  return Effect.try({
-    try: () => {
-      const project = getProjectConfigFromWorkspacePath(ctx.projectPath);
-      if (residue) {
-        markRecordPipelineResidueClosedOutSync(project, ctx.issueId.toUpperCase());
-      } else {
-        markRecordPipelineClosedOutSync(project, ctx.issueId.toUpperCase());
-      }
-      return stepOk(step, ['Marked durable pipeline journal closed-out']);
-    },
-    catch: (err) => err,
-  }).pipe(
-    Effect.catch((err) =>
-      Effect.succeed(stepSkipped(step, [`Pipeline terminal marker failed (non-fatal): ${(err as Error).message ?? String(err)}`])),
-    ),
-  );
-}
-
-function recordDodGateStep(ctx: LifecycleContext, dodGate: DodGateResult, abandonDisposition?: { reason: string; by: string }, residueDisposition?: { reason: string; by: string }): Effect.Effect<StepResult> {
-  const step = 'close-out:record-dod-gate';
-  return Effect.tryPromise({
-    try: async () => {
-      const project = getProjectConfigFromWorkspacePath(ctx.projectPath);
-      await writeCloseOutDodGate(project, ctx.issueId.toUpperCase(), {
-        evaluatedAt: new Date().toISOString(),
-        rows: dodGate.rows,
-        accepted: dodGate.accepted,
-        ...(abandonDisposition ? { disposition: abandonDisposition } : {}),
-        ...(residueDisposition ? { disposition: residueDisposition } : {}),
-      });
-      return stepOk(step, ['Recorded Definition-of-Done gate with 8 rows']);
-    },
-    catch: (err) => err,
-  }).pipe(
-    Effect.catch((err) =>
-      Effect.succeed(stepFailed(step, `Definition-of-Done gate record failed: ${(err as Error).message ?? String(err)}`)),
-    ),
-  );
+/**
+ * The Definition-of-Done audit, rendered for the tracker close comment
+ * (PAN-3917). Every row states what was expected and what was observed, so a
+ * reader of the closed issue sees the same eight rows the gate evaluated.
+ */
+function formatDodGateComment(
+  dodGate: DodGateResult,
+  residueDisposition?: { reason: string; by: string },
+): string {
+  const icon = (status: DodRowResult['status']) =>
+    status === 'pass' ? '\u2713' : status === 'skip' ? '\u2013' : '\u2717';
+  const lines = dodGate.rows.map(row => {
+    const accepted = row.acceptedBy ? ` _(accepted by ${row.acceptedBy.by} via ${row.acceptedBy.flag})_` : '';
+    return `| ${row.num} | ${row.title} | ${icon(row.status)} ${row.status} | ${row.observed}${accepted} |`;
+  });
+  const disposition = residueDisposition
+    ? `\n\nResidue disposition: ${residueDisposition.reason} (by ${residueDisposition.by})`
+    : '';
+  return [
+    '<details><summary>Definition of Done</summary>',
+    '',
+    '| # | Row | Status | Observed |',
+    '| --- | --- | --- | --- |',
+    ...lines,
+    '',
+    `Gate: **${dodGate.passed ? 'passed' : 'failed'}**${dodGate.misses.length > 0 ? ` \u2014 misses: ${dodGate.misses.join(', ')}` : ''}${disposition}`,
+    '</details>',
+  ].join('\n');
 }
 
 /**
@@ -579,8 +523,6 @@ function destructiveResetWorkflow(
 
     stepNum = resetIssue ? 4 : 3;
     progress('Clearing review status', 'Removing specialist state');
-    const clearResult = yield* clearReviewStatusStep(ctx.issueId);
-    allSteps.push(clearResult);
     progress('Clearing review status', 'Review status cleared', 'complete');
 
     return buildResult(workflow, ctx.issueId, allSteps, start);
@@ -694,16 +636,15 @@ export async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<Ste
   const defaultRoot: MergeVerificationRoot = { repoKey: issueLower, dir: ctx.projectPath, sourceBranch: `feature/${issueLower}`, targetBranch: 'main', forge: 'github' };
 
   try {
-    // Check review-status first — the merge specialist validates before marking merged
+    // The forge owns "merged": ask it before falling back to git ancestry.
     try {
-      const { loadReviewStatuses } = await import('../review-status.js');
-      const statuses = loadReviewStatuses();
-      const issueKey = ctx.issueId.toUpperCase();
-      if (statuses[issueKey]?.mergeStatus === 'merged') {
-        return stepOk(step, ['Merge specialist confirmed merge completed']);
+      const { fetchIssuePullRequest } = await import('../overdeck/pull-requests.js');
+      const response = await fetchIssuePullRequest(ctx.issueId);
+      if (response.pr?.mergedAt) {
+        return stepOk(step, [`Pull request #${response.pr.number} merged at ${response.pr.mergedAt}`]);
       }
     } catch {
-      // review-status.json may not exist, continue with git checks
+      // Forge unreachable — continue with the local git ancestry checks below.
     }
 
     const resolvedRoots = resolveProjectReposForIssueSync(ctx.issueId)
@@ -1154,42 +1095,6 @@ async function resetPostMergeStateForIssue(issueId: string): Promise<void> {
     resetPostMergeState(issueId.toUpperCase());
   } catch {
     return;
-  }
-}
-
-function clearReviewStatusStep(issueId: string): Effect.Effect<StepResult> {
-  return Effect.tryPromise({
-    try: () => clearReviewStatusStepImpl(issueId),
-    catch: (err) => err,
-  }).pipe(
-    Effect.catch((err) =>
-      Effect.succeed(stepSkipped('clear-review-status', [`Failed to clear review status (non-fatal): ${(err as Error).message}`])),
-    ),
-  );
-}
-
-async function clearReviewStatusStepImpl(issueId: string): Promise<StepResult> {
-  const step = 'clear-review-status';
-  try {
-    const { clearReviewStatus } = await import('../review-status.js');
-    clearReviewStatus(issueId.toUpperCase());
-    return stepOk(step, ['Review status cleared']);
-  } catch {
-    // Fallback: direct file manipulation
-    try {
-      const statusFile = join(OVERDECK_HOME, 'review-status.json');
-      if (existsSync(statusFile)) {
-        const data = JSON.parse(await readFile(statusFile, 'utf-8'));
-        const upperKey = issueId.toUpperCase();
-        if (data[upperKey]) {
-          delete data[upperKey];
-          await writeFile(statusFile, JSON.stringify(data, null, 2));
-        }
-      }
-      return stepOk(step, ['Review status cleared (direct)']);
-    } catch (innerErr) {
-      return stepSkipped(step, [`Failed to clear review status (non-fatal): ${(innerErr as Error).message}`]);
-    }
   }
 }
 

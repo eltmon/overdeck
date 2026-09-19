@@ -122,8 +122,8 @@ describe('resolveAndSpeak', () => {
   it('uses voiceMap and sends clone embeddings', async () => {
     const fetchMock = vi.fn(async () => new Response('{"queued":true}', { status: 202 }));
 
-    await expect(Effect.runPromise(resolveAndSpeak({ text: 'merged', eventType: 'mergeStatus.merged' }, {
-      config: { ...CONFIG, voiceMap: { 'mergeStatus.merged': 'voice-clone' } },
+    await expect(Effect.runPromise(resolveAndSpeak({ text: 'merged', eventType: 'mergeOutcome.merged' }, {
+      config: { ...CONFIG, voiceMap: { 'mergeOutcome.merged': 'voice-clone' } },
       findVoiceById,
       fetch: fetchMock,
     }))).resolves.toBe('spoken');
@@ -228,8 +228,8 @@ describe('resolveAndSpeak', () => {
   it('applies utterance template substitution before speaking', async () => {
     const fetchMock = vi.fn(async () => new Response('{"queued":true}', { status: 202 }));
 
-    await expect(Effect.runPromise(resolveAndSpeak({ text: 'original', eventType: 'reviewStatus.passed', issueId: 'PAN-829' }, {
-      config: { ...CONFIG, utteranceTemplates: { 'reviewStatus.passed': '{issueId} passed review' } },
+    await expect(Effect.runPromise(resolveAndSpeak({ text: 'original', eventType: 'reviewOutcome.passed', issueId: 'PAN-829' }, {
+      config: { ...CONFIG, utteranceTemplates: { 'reviewOutcome.passed': '{issueId} passed review' } },
       findVoiceById,
       fetch: fetchMock,
     }))).resolves.toBe('spoken');

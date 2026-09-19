@@ -39,7 +39,6 @@ const EXPECTED_AGENT_ROUTE_LAYERS = [
   'postAgentSuspendRoute',
   'postAgentPauseRoute',
   'postAgentUnpauseRoute',
-  'postAgentUntroubledRoute',
   'postAgentResumeRoute',
   'postAgentRecoverRoute',
   'postAgentRestartRoute',
@@ -94,11 +93,11 @@ function enumerateMergeAllLayers(source: string): string[] {
 }
 
 describe('PAN-2147 agents route barrel no-loss audit', () => {
-  it('keeps the same 48 agentsRouteLayer entries in the same order', () => {
+  it('keeps the same 47 agentsRouteLayer entries in the same order', () => {
     const liveLayers = enumerateMergeAllLayers(readAgentsRoute());
 
     expect(liveLayers).toEqual(EXPECTED_AGENT_ROUTE_LAYERS);
-    expect(liveLayers).toHaveLength(48);
+    expect(liveLayers).toHaveLength(47);
   });
 
   it('keeps routes/agents.ts as a thin barrel with no handler bodies', () => {

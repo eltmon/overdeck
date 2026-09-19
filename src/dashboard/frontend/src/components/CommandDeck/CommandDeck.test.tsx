@@ -280,7 +280,6 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
               hasPrd: true,
               hasState: true,
               isShadow: false,
-              readyForMerge: false,
               resourceSources: [],
               resourceDetails: {
                 hasWorkspace: false,
@@ -394,16 +393,6 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
             transcripts: [],
             discussions: [],
             notes: [],
-          }),
-        };
-      }
-      if (url.startsWith('/api/review/')) {
-        return {
-          ok: true,
-          json: async () => ({
-            reviewStatus: 'pending',
-            testStatus: 'pending',
-            verificationStatus: 'pending',
           }),
         };
       }

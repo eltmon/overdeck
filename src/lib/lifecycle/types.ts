@@ -43,7 +43,7 @@ export interface CloseOutOptions {
    * PAN-3396: disposition for tracker-closed pre-record-era issues with stale
    * convention PRs/MRs. Closes the lingering PRs/MRs with an honest comment,
    * skips the DoD gate with verified evidence, and marks the issue terminal
-   * without asserting mergeStatus (which is unknowable for recordless work).
+   * without asserting a merge verdict (unknowable for recordless work).
    */
   residueDisposition?: { reason: string; by: string };
 }

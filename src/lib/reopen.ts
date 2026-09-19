@@ -4,25 +4,21 @@
  * Called by both the CLI `pan reopen` command and the dashboard
  * `POST /api/issues/:id/reopen` endpoint to ensure consistent behavior.
  *
+ * PAN-3917: reopening used to rewrite a `review_status` row back to `pending`
+ * across a dozen mirrored fields. Every one of those fields is now derived from
+ * the tracker and the PR, and reopening the tracker issue (plus closing the old
+ * PR) is what changes them. What is left here is the state Overdeck does own:
+ * the issue-closed cache and the scope xBRIEF's continue-file breadcrumb.
+ *
  * All filesystem I/O uses fs/promises so this is safe on the dashboard event loop.
  */
 
-import {
-  getReviewStatusSync,
-  setReviewStatusSync,
-} from './review-status.js';
 import { Data, Effect } from 'effect';
-import { getProjectSync, resolveProjectFromIssueSync } from './projects.js';
 import { appendContinueSessionEntryForIssue } from './xbrief/lifecycle-io.js';
+import { resolveProjectFromIssueSync } from './projects.js';
 import { clearIssueClosedCache } from './cloister/issue-closed.js';
-import { clearRecordPipelineClosedOutSync } from './pan-dir/record-update.js';
 
 export interface ReopenResult {
-  specialistStatesReset: boolean;
-  previousReviewStatus: string | null;
-  previousTestStatus: string | null;
-  previousMergeStatus: string | null;
-  queueItemsRemoved: Record<string, number>;
   /** True when a `reason: 'resume'` entry was appended to the continue file. */
   continueFileUpdated: boolean;
   reason?: string;
@@ -40,96 +36,18 @@ async function reopenWorkspaceStatePromise(
   options: ReopenOptions = {}
 ): Promise<ReopenResult> {
   const result: ReopenResult = {
-    specialistStatesReset: false,
-    previousReviewStatus: null,
-    previousTestStatus: null,
-    previousMergeStatus: null,
-    queueItemsRemoved: {},
     continueFileUpdated: false,
     reason: options.reason,
   };
 
   clearIssueClosedCache(issueId);
 
-  // 1. Reset specialist states — single-row atomic update, no TOCTOU risk.
-  // setReviewStatus() reads only this issue's row and upserts only this issue's row.
-  const existing = getReviewStatusSync(issueId);
-
-  if (existing) {
-    result.previousReviewStatus = existing.reviewStatus;
-    result.previousTestStatus = existing.testStatus;
-    result.previousMergeStatus = existing.mergeStatus ?? null;
-  }
-
   const resolved = resolveProjectFromIssueSync(issueId);
-  if (resolved) {
-    // Clear the terminal close-out marker before publishing the fresh status.
-    // Otherwise this record write can become newer than the reset and restore
-    // its old verdicts during the next canonical read.
-    const project = getProjectSync(resolved.projectKey);
-    if (project) clearRecordPipelineClosedOutSync(project, issueId.toUpperCase());
-  }
-
-  setReviewStatusSync(issueId, {
-    reviewStatus: 'pending',
-    testStatus: 'pending',
-    verificationStatus: 'pending',
-    mergeStatus: 'pending',
-    reviewNotes: `Reopened${options.reason ? `: ${options.reason}` : ''}`,
-    testNotes: undefined,
-    verificationNotes: undefined,
-    // PAN-3847 (FR-17): the verification cycle counter survives reopen — it is
-    // per issue and resets only via `pan review reset`.
-    mergeNotes: undefined,
-    readyForMerge: false,
-    prUrl: existing?.prUrl,
-    autoRequeueCount: 0,
-    reviewRetryCount: 0,
-    testRetryCount: 0,
-    mergeRetryCount: 0,
-    recoveryStartedAt: undefined,
-    reviewRequestedAt: undefined,
-    reviewSpawnedAt: undefined,
-    conflictResolutionDispatchedAt: undefined,
-    blockerReasons: undefined,
-    mergeStep: undefined,
-    retiredAt: undefined,
-    // PAN-653: clear stuck state so Deacon resumes processing this issue.
-    stuck: undefined,
-    stuckReason: undefined,
-    stuckAt: undefined,
-    stuckDetails: undefined,
-    // Start a new evidence cycle while retaining status history and prior
-    // strike-landing attempts.
-    reviewedAtCommit: undefined,
-    reviewStaleSince: undefined,
-    lastVerifiedCommit: undefined,
-    strikeReadyHead: undefined,
-    strikeReadyAt: undefined,
-    strikeLandingState: undefined,
-    strikeRecoveryCount: 0,
-    strikeTransportRetryCount: undefined,
-    strikeNextAttemptAt: undefined,
-  });
-  result.specialistStatesReset = true;
-
-  // 2. Append a reopen breadcrumb to the scope xBRIEF's continue file.
   if (resolved) {
     try {
       const noteParts: string[] = [`Reopened on ${new Date().toISOString().slice(0, 10)}`];
       if (options.reason) noteParts.push(`reason: ${options.reason}`);
-      if (result.previousReviewStatus) {
-        noteParts.push(`review: ${result.previousReviewStatus} → pending`);
-      }
-      if (result.previousTestStatus) {
-        noteParts.push(`test: ${result.previousTestStatus} → pending`);
-      }
-      if (result.previousMergeStatus) {
-        noteParts.push(`merge: ${result.previousMergeStatus} → pending`);
-      }
-      if (options.trackerContext) {
-        noteParts.push('tracker context attached');
-      }
+      if (options.trackerContext) noteParts.push('tracker context attached');
 
       appendContinueSessionEntryForIssue(resolved.projectPath, issueId, {
         reason: 'resume',
@@ -137,7 +55,7 @@ async function reopenWorkspaceStatePromise(
       });
       result.continueFileUpdated = true;
     } catch {
-      // Non-fatal — specialist states were still reset above.
+      // Non-fatal — the issue-closed cache was still cleared above.
     }
   }
 
