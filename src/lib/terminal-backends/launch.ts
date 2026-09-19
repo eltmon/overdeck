@@ -22,6 +22,7 @@ import { resolveTerminalBackend } from './registry.js';
 import { hostTerminalBackendName } from './select.js';
 import {
   isUnsupported,
+  type AgentDetectionPolicy,
   type AgentPaneRef,
   type PaneTokens,
   type TerminalBackend,
@@ -30,6 +31,32 @@ import {
 
 /** Workspace that hosts operator conversations — panes with no `issue` token. */
 export const CONVERSATIONS_WORKSPACE = 'conversations';
+
+/**
+ * Per-harness detection policy (PAN-3917 W12).
+ *
+ * Herdr's agent detector reads the pane's FOREGROUND PROCESS and matches it
+ * against its own agent manifest. That works for `claude-code`, whose launcher
+ * execs the real `claude` binary (proven live: detected in ~2s). It can never
+ * work for a harness Overdeck runs through a host/transport process — the codex
+ * app-server (`node dist/codex-app-server-host.js`), the ACP host, kimi-code,
+ * ohmypi/muse — because the foreground process is node, not the harness. On
+ * 2026-09-19 `agent-pan-3705-review` (codex, gpt-5.6-sol) went
+ * `starting → error` exactly 61s after launch for that reason: the app-server
+ * host had connected fine, and the adapter closed its pane anyway.
+ *
+ * Those harnesses are therefore launched PANE-BOUND: the pane is stamped,
+ * launched and returned immediately, and everything that used to go through
+ * Herdr's agent record (liveness, delivery) goes through the pane and the
+ * harness's own transport instead.
+ *
+ * Codex with `codex.transport: tui` runs the codex TUI, which Herdr could
+ * detect — it is still launched pane-bound, which costs it only `agent.prompt`
+ * (delivery falls through to `codex-exec-resume`, the tmux path).
+ */
+export function detectionPolicyFor(harness: string): AgentDetectionPolicy {
+  return harness === 'claude-code' ? 'required' : 'not-required';
+}
 
 /** The backend this host launches into, with both adapters registered. */
 export async function resolveLaunchBackend(): Promise<TerminalBackend> {
@@ -85,6 +112,7 @@ export async function launchAgentPane(
       tokens: request.tokens,
       name: request.agentId,
       cwd: request.cwd,
+      detection: detectionPolicyFor(request.tokens.harness),
     }),
   );
   if (isUnsupported(pane)) {
