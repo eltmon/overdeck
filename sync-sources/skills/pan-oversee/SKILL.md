@@ -92,7 +92,7 @@ echo "Completed: ${COMPLETED:-NO}"
 # derived state is computed from the tracker, the branch, and the pull request.
 REVIEW_STATE=$(pan show "$ISSUE_ID" --json 2>/dev/null)
 echo "Derived state: $REVIEW_STATE"
-gh pr view --repo "$REPO" --json state,reviewDecision,mergeable,statusCheckRollup 2>/dev/null || true
+(cd "$WS_PATH" && gh pr view --json state,reviewDecision,mergeable,statusCheckRollup) 2>/dev/null || true
 
 # 6b. Branch-portable xBRIEF pipeline mirror (corroborating, not authoritative)
 PIPELINE_MIRROR=""
@@ -249,7 +249,7 @@ curl -s http://localhost:3011/api/specialists | jq '.[] | select(.name == "revie
 tmux -L overdeck capture-pane -t specialist-review-agent -p -S -50 2>/dev/null
 
 # Check review progression on the PR itself
-gh pr view --repo "$REPO" --json reviewDecision,reviews | jq '{reviewDecision, latest: (.reviews | last)}'
+(cd "$WS_PATH" && gh pr view --json reviewDecision,reviews) | jq '{reviewDecision, latest: (.reviews | last)}'
 ```
 
 **Expected outcomes:**
@@ -300,7 +300,7 @@ After review passes, test-agent should run:
 ```bash
 # The test verdict: the artifact the test role writes, then the PR comment
 cat "$WS_PATH/.pan/test/result.json" 2>/dev/null | jq .
-gh pr view --repo "$REPO" --json statusCheckRollup | jq '.statusCheckRollup'
+(cd "$WS_PATH" && gh pr view --json statusCheckRollup) | jq '.statusCheckRollup'
 
 # Watch test agent
 tmux -L overdeck capture-pane -t specialist-test-agent -p -S -50 2>/dev/null
@@ -319,7 +319,7 @@ After tests pass:
 
 ```bash
 # Final check — the forge's own account of the PR
-gh pr view --repo "$REPO" --json reviewDecision,mergeable,statusCheckRollup | jq .
+(cd "$WS_PATH" && gh pr view --json reviewDecision,mergeable,statusCheckRollup) | jq .
 ```
 
 **Expected final state:** the PR is approved, its checks are green, and the
