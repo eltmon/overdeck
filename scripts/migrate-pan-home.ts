@@ -34,7 +34,7 @@ import { parseXBriefFilename } from '../src/lib/xbrief/lifecycle.js';
 
 const execFileAsync = promisify(execFile);
 
-export const MIGRATION_COMMIT_SUBJECT = 'chore(pan): migrate planning artifacts from overdeck-state';
+export const MIGRATION_COMMIT_SUBJECT = 'chore(workspace): migrate planning artifacts from overdeck-state';
 
 /** Per-issue directories: a file is copied only when its issue is open. */
 const PER_ISSUE_DIRS = ['drafts', 'specs', 'continues'] as const;
