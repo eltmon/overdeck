@@ -382,24 +382,24 @@ export async function deliverAgentMessage(
     : null;
   if (herdrAgent) {
     const { herdrBackend } = await import('../terminal-backends/herdr.js');
-    // A backend failure is a delivery result, not a throw: callers branch on
-    // `.ok`, and throwing here would skip the mail-queue path every other
-    // failing tier gets.
-    const result = await Effect.runPromise(
-      herdrBackend.prompt({ paneId: herdrAgent.paneId }, message, { messageId, sender }),
-    ).catch((error: unknown): PromptResult => ({
-      unsupported: true,
-      reason: error instanceof Error ? error.message : String(error),
-    }));
-    if (isUnsupported(result)) return { ok: false, path: 'herdr', failure: result.reason };
+    // A Herdr THROW is a delivery failure; a returned `unsupported` is not — a
+    // pane-bound agent has no Herdr agent record to prompt (PAN-3917 W12), so it
+    // falls through to the harness's own transport below, guard included.
+    let result: PromptResult;
+    try {
+      result = await Effect.runPromise(
+        herdrBackend.prompt({ paneId: herdrAgent.paneId }, message, { messageId, sender }),
+      );
+    } catch (err: unknown) {
+      return { ok: false, path: 'herdr', failure: err instanceof Error ? err.message : String(err) };
+    }
     if (isPromptRefused(result)) return { ok: false, path: 'herdr', failure: `refused: ${result.reason}` };
     if (isPromptDropped(result)) {
       return { ok: true, path: 'herdr', deduplicated: true, failure: `dropped: ${result.reason}` };
     }
-    return { ok: true, path: 'herdr' };
+    if (!isUnsupported(result)) return { ok: true, path: 'herdr' };
   }
-  // Not a Herdr agent (or a tmux host): the cascade below is unchanged, with
-  // the same guard in front of it.
+  // Not a Herdr agent, one Herdr cannot prompt, or a tmux host: same cascade, same guard.
   const guard = checkPrompt({ targetId: normalizedId, targetTokens, sender, messageId });
   if ('refused' in guard) return { ok: false, path: 'tmux', failure: `refused: ${guard.reason}` };
   if ('dropped' in guard) {
