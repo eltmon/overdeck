@@ -12,7 +12,6 @@ import { EventStoreService } from '../../../../../src/dashboard/server/services/
 const mocks = vi.hoisted(() => ({
   resolveProject: vi.fn(),
   readWorkspacePlan: vi.fn(),
-  onInspectComplete: vi.fn(),
 }));
 
 vi.mock('../../../../../src/lib/projects.js', () => ({
@@ -25,9 +24,9 @@ vi.mock('../../../../../src/lib/xbrief/io.js', () => ({
 
 
 vi.mock('../../../../../src/lib/cloister/specialists.js', () => ({
-  getTmuxSessionName: vi.fn(() => 'inspect-agent-test'),
+  getTmuxSessionName: vi.fn(() => 'uat-agent-test'),
   updateRunMetadata: vi.fn(),
-  makeSpecialistRegistryKey: vi.fn(() => 'inspect-agent:PAN-2724'),
+  makeSpecialistRegistryKey: vi.fn(() => 'uat-agent:PAN-2724'),
 }));
 
 vi.mock('../../../../../src/lib/cloister/specialist-handoff-logger.js', () => ({
@@ -74,7 +73,6 @@ beforeEach(async () => {
   _resetInternalTokenCacheForTests();
   mocks.resolveProject.mockReturnValue({ projectPath, projectKey: 'overdeck' });
   mocks.readWorkspacePlan.mockReturnValue({ plan: { items: [{ id: 'issue-view-model' }] } });
-  mocks.onInspectComplete.mockReturnValue(Effect.succeed(undefined));
 });
 
 afterEach(async () => {
@@ -83,7 +81,7 @@ afterEach(async () => {
   await rm(projectPath, { recursive: true, force: true });
 });
 
-describe('POST /api/specialists/done inspect item attribution', () => {
+describe('POST /api/specialists/done', () => {
   it('rejects an unauthenticated failed-UAT verdict before it reaches the status write door', async () => {
     const result = await postDone({
       specialist: 'uat',
@@ -95,63 +93,7 @@ describe('POST /api/specialists/done inspect item attribution', () => {
     expect(result).toEqual({ status: 403, body: { success: false, error: 'forbidden' } });
   });
 
-  it('rejects a passed inspect verdict without itemId', async () => {
-    const result = await postDone({ specialist: 'inspect', issueId: 'PAN-2724', status: 'passed', notes: 'looks good' });
-
-    expect(result).toEqual({ status: 400, body: { error: 'itemId is required for a passed inspect verdict' } });
-  });
-
-  it('rejects an itemId that is not in the issue xBRIEF', async () => {
-    const result = await postDone({ specialist: 'inspect', issueId: 'PAN-2724', itemId: 'by', status: 'passed' });
-
-    expect(result).toEqual({ status: 400, body: { error: 'Item "by" does not exist in the xBRIEF for PAN-2724' } });
-    expect(mocks.readWorkspacePlan).toHaveBeenCalledWith(join(projectPath, 'workspaces', 'feature-pan-2724'));
-  });
-
-  it('checkpoints the exact structured itemId regardless of notes wording', async () => {
-    const result = await postDone({
-      specialist: 'inspect',
-      issueId: 'PAN-2724',
-      itemId: 'issue-view-model',
-      status: 'passed',
-      notes: 'This predates this bead and is correct',
-    });
-
-    expect(result.status).toBe(200);
-    // The itemId argument stays the exact structured id even though the notes
-    // talk about a different bead — attribution comes from the caller's
-    // `--item`, never from notes wording. Notes ride along as the trailing
-    // argument (PAN-3078) so a blocked verdict can carry its finding.
-    expect(mocks.onInspectComplete).toHaveBeenCalledWith(
-      'overdeck',
-      'PAN-2724',
-      'issue-view-model',
-      'passed',
-      join(projectPath, 'workspaces', 'feature-pan-2724'),
-      'This predates this bead and is correct',
-    );
-  });
-
-  it('checkpoints the exact structured itemId on a failed verdict too', async () => {
-    const result = await postDone({
-      specialist: 'inspect',
-      issueId: 'PAN-2724',
-      itemId: 'issue-view-model',
-      status: 'failed',
-      notes: 'This predates this bead and is correct',
-    });
-
-    expect(result.status).toBe(200);
-    // PAN-3086: the failed branch falls back to the stamped inspectBeadId only
-    // when itemId is genuinely absent. An explicit structured itemId always
-    // wins, so the blocked verdict cannot be reattributed to another item.
-    expect(mocks.onInspectComplete).toHaveBeenCalledWith(
-      'overdeck',
-      'PAN-2724',
-      'issue-view-model',
-      'failed',
-      join(projectPath, 'workspaces', 'feature-pan-2724'),
-      'This predates this bead and is correct',
-    );
-  });
+  // PAN-3917: `inspect` is not a specialist any more — the per-item inspection
+  // gate went with the record's item statuses, so the door rejects the role
+  // outright and there is no itemId attribution left to check.
 });
