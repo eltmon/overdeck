@@ -21,11 +21,12 @@ import chalk from 'chalk';
 import { Effect } from 'effect';
 
 import {
-  approveReviewArtifact,
   commentOnArtifact,
   discoverArtifact,
   type ForgeType,
 } from '../../../lib/forge.js';
+import { getPrFacts } from '../../../lib/cloister/pr-facts.js';
+import { postReviewVerdict } from '../../../lib/cloister/pr-review-verdict.js';
 import { getIssueWorkspacePath } from '../../../lib/overdeck/issue-projects.js';
 
 const execFileAsync = promisify(execFile);
@@ -134,9 +135,28 @@ export async function doneCommand(
     notes: options.uatNotes,
   });
 
-  if (role === 'review' && options.status === 'passed') {
-    await Effect.runPromise(approveReviewArtifact(forge, { forge, url: artifact.url, cwd: workspacePath }));
-    console.log(chalk.green(`✓ Review approved on ${artifact.url}`));
+  // FR-7: the reviewer's verdict IS the forge's review decision. A pass is an
+  // approval; a blocked or failed verdict is `REQUEST_CHANGES`, not a comment —
+  // a comment leaves `reviewDecision` untouched, so the merge-ready set would
+  // keep reading the branch as merely unapproved and every reader that keys off
+  // `CHANGES_REQUESTED` (rework delivery, the review-stale gate) sees nothing.
+  // Completion fails when the post fails: an unrecorded verdict is not done.
+  if (role === 'review') {
+    const result = await postReviewVerdict({
+      issueId: normalizedIssueId,
+      verdict: options.status === 'passed' ? 'approve' : 'request-changes',
+      body,
+    });
+    if (!result.posted) {
+      console.error(chalk.red(
+        `Could not post the review verdict on ${artifact.url}: ${result.reason}`,
+      ));
+      return exitCli(1);
+    }
+    const tint = options.status === 'passed' ? chalk.green : chalk.yellow;
+    console.log(tint(
+      `${options.status === 'passed' ? '✓' : '✗'} review ${options.status} — ${result.verdict} posted on ${artifact.url}`,
+    ));
   } else {
     await Effect.runPromise(
       commentOnArtifact(forge, { forge, url: artifact.url, body, cwd: workspacePath }),
@@ -146,6 +166,21 @@ export async function doneCommand(
   }
 
   if (role === 'review' && (options.status === 'blocked' || options.status === 'failed')) {
+    // Drive the work agent only once the FORGE reports the rejection — a fresh
+    // read, not the caller's own claim about what it just posted. GitHub says
+    // so with `CHANGES_REQUESTED`; GitLab has no request-changes primitive at
+    // all (pr-facts maps a rejected MR to REVIEW_REQUIRED), so there the fact
+    // is an open MR that the note left unapproved.
+    const facts = await getPrFacts(normalizedIssueId);
+    const rejectionVisible = facts.changesRequested
+      || (facts.forge === 'gitlab' && facts.open && !facts.approved);
+    if (!rejectionVisible) {
+      console.warn(chalk.yellow(
+        `${artifact.url} does not report the rejection yet — not driving the work agent. `
+        + 'Re-run this verdict once the forge reflects it.',
+      ));
+      return;
+    }
     // PAN-2518: the verdict is already on the PR. Feedback delivery (agent
     // messaging, needs-you surfacing) is advisory and shells out to network +
     // tmux, either of which can STALL — and this runs inside the reviewer's own
