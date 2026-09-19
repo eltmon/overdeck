@@ -25,7 +25,8 @@ import {
   discoverArtifact,
   type ForgeType,
 } from '../../../lib/forge.js';
-import { getPrFacts } from '../../../lib/cloister/pr-facts.js';
+import { getPrFacts, resetPrFactsCache } from '../../../lib/cloister/pr-facts.js';
+import { bumpIssuePrTabCacheGeneration } from '../../../dashboard/server/services/pr-tab-cache.js';
 import { postReviewVerdict } from '../../../lib/cloister/pr-review-verdict.js';
 import { getIssueWorkspacePath } from '../../../lib/overdeck/issue-projects.js';
 
@@ -154,8 +155,11 @@ export async function doneCommand(
       return exitCli(1);
     }
     const tint = options.status === 'passed' ? chalk.green : chalk.yellow;
+    const how = result.via === 'comment'
+      ? 'verdict comment posted (self-review refused by forge)'
+      : 'review posted';
     console.log(tint(
-      `${options.status === 'passed' ? '✓' : '✗'} review ${options.status} — ${result.verdict} posted on ${artifact.url}`,
+      `${options.status === 'passed' ? '✓' : '✗'} review ${options.status} — ${result.verdict}: ${how} on ${artifact.url}`,
     ));
   } else {
     await Effect.runPromise(
@@ -171,6 +175,12 @@ export async function doneCommand(
     // so with `CHANGES_REQUESTED`; GitLab has no request-changes primitive at
     // all (pr-facts maps a rejected MR to REVIEW_REQUIRED), so there the fact
     // is an open MR that the note left unapproved.
+    // `postReviewVerdict` read the forge a moment ago and both read caches
+    // (pr-facts' own 60s TTL and the generation-keyed PR-tab cache) now hold
+    // the PRE-verdict answer. Without dropping them this "fresh read" is a
+    // cache hit that can never see the verdict that was just posted.
+    resetPrFactsCache();
+    bumpIssuePrTabCacheGeneration(normalizedIssueId);
     const facts = await getPrFacts(normalizedIssueId);
     const rejectionVisible = facts.changesRequested
       || (facts.forge === 'gitlab' && facts.open && !facts.approved);
