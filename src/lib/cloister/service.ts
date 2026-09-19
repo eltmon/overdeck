@@ -288,8 +288,8 @@ export class CloisterService {
     }
 
     // PAN-493 / PAN-511 (removed by PAN-3917): startup used to reset orphaned
-    // `verificationStatus: 'running'` rows and re-dispatch orphaned
-    // `reviewStatus: 'reviewing'` issues. Both existed only because a crash
+    // in-flight verification rows and re-dispatch orphaned reviewing
+    // issues. Both existed only because a crash
     // could leave a stored status describing work no process was doing. Nothing
     // stores those statuses now — a verification that died simply is not
     // running, and a review with no live reviewer is re-requested by `pan done`

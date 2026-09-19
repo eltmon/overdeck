@@ -155,20 +155,11 @@ function renderDashboardWorkspaceSection(snapshot: DashboardSnapshot): string[] 
   const pausedAgents = snapshot.agents.filter((agent) => agent.paused);
   const troubledAgents = snapshot.agents.filter((agent) => agent.troubled === true);
   const activeIssues = new Set(snapshot.agents.map((agent) => agent.issueId).filter(Boolean));
-  const failedReviews = snapshot.reviewStatuses.filter((status) =>
-    status.testStatus === 'failed' ||
-    status.uatStatus === 'failed' ||
-    status.verificationStatus === 'failed' ||
-    status.reviewStatus === 'failed' ||
-    (status.blockerReasons?.length ?? 0) > 0,
-  );
-
   const lines = [
     `- Running agents: ${runningAgents.length}`,
     `- Active issues with agents: ${activeIssues.size}`,
     `- Paused gates: ${pausedAgents.length}`,
     `- Troubled agents: ${troubledAgents.length}`,
-    `- Failed verification/review states needing attention: ${failedReviews.length}`,
   ];
 
   const recentStatuses = Object.entries(readStatusByIssue(snapshot))

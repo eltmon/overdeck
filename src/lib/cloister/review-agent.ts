@@ -186,7 +186,7 @@ export function buildReviewRolePrompt(opts: {
     // PAN-2007: do NOT tell the agent to `exit`. The session is kept alive through
     // the pipeline (KEEP_SPECIALIST_SESSIONS_ALIVE) so it can be reused for the next
     // review cycle without a cold re-spawn. Exiting before the signal command is
-    // what stranded reviews at reviewStatus=reviewing.
+    // what stranded reviews mid-convoy.
     'After running the signal command above, STOP and wait — do not exit, do not run',
     'any further commands. The session stays open for the next review cycle.',
     '',
@@ -255,7 +255,7 @@ function buildSelfReviewPrompt(opts: {
     // PAN-2007: do NOT tell the agent to `exit`. The session is kept alive through
     // the pipeline (KEEP_SPECIALIST_SESSIONS_ALIVE) so it can be reused for the next
     // review cycle without a cold re-spawn. Exiting before the signal command is
-    // what stranded reviews at reviewStatus=reviewing.
+    // what stranded reviews mid-convoy.
     'After running the signal command above, STOP and wait — do not exit, do not run',
     'any further commands. The session stays open for the next review cycle.',
     '',

@@ -542,7 +542,6 @@ export interface TaskOperation {
   expectedSequence?: number;
   reason?: string;
   subItemIds?: string[];
-  pipeline?: PlanPipelineMirror;
 }
 
 export interface TaskOperationResult {
@@ -629,27 +628,7 @@ export function applyTaskOperation(doc: XBriefDocument, operation: TaskOperation
   next.plan.sequence = currentSequence + 1;
   next.plan.updated = now;
   next.xBRIEFInfo.updated = now;
-  if (operation.pipeline) setPipelineMirror(next, operation.pipeline);
   return { doc: next, item };
-}
-
-export interface PlanPipelineMirror {
-  issueId: string;
-  reviewStatus?: string;
-  testStatus?: string;
-  mergeStatus?: string;
-  updatedAt: string;
-  [key: string]: unknown;
-}
-
-export function getPipelineMirror(doc: XBriefDocument): PlanPipelineMirror | undefined {
-  return doc.plan.metadata?.pipeline as PlanPipelineMirror | undefined;
-}
-
-/** Write pipeline state into plan.metadata.pipeline for pan-oversee and dashboard readers. */
-export function setPipelineMirror(doc: XBriefDocument, pipeline: PlanPipelineMirror): XBriefDocument {
-  doc.plan.metadata = { ...(doc.plan.metadata ?? {}), pipeline };
-  return doc;
 }
 
 export interface TaskGraphView {
@@ -727,113 +706,6 @@ export interface TaskCommandOptions {
   expectedSequence?: number;
   reason?: string;
   mergedItemIds?: Set<string>;
-}
-
-export type PlanPipelinePhase = 'work' | 'review' | 'test' | 'uat' | 'merge' | 'done';
-
-export interface PlanPipelineHistoryEntry {
-  status?: string;
-  at: string;
-  agentId?: string;
-  notes?: string;
-}
-
-export interface PlanPipelineStageMirror {
-  status?: string;
-  agentId?: string;
-  startedAt?: string;
-  updatedAt?: string;
-  completedAt?: string;
-  notes?: string;
-  history: PlanPipelineHistoryEntry[];
-}
-
-export interface PlanPipelineReviewMirror extends PlanPipelineStageMirror {
-  approval?: 'approved' | 'changes_requested' | 'pending';
-}
-
-export interface PlanPipelineMergeMirror extends PlanPipelineStageMirror {
-  readyForMerge?: boolean;
-  prUrl?: string;
-  mergeCommit?: string;
-  mergedAt?: string;
-}
-
-export interface NestedPlanPipelineMirror {
-  phase: PlanPipelinePhase;
-  issueId: string;
-  sqliteAuthoritative: true;
-  updatedAt: string;
-  work: PlanPipelineStageMirror;
-  verification: PlanPipelineStageMirror;
-  review: PlanPipelineReviewMirror;
-  test: PlanPipelineStageMirror;
-  uat: PlanPipelineStageMirror;
-  merge: PlanPipelineMergeMirror;
-}
-
-function stageFromStatus(status: Record<string, unknown>, key: string, now: string): PlanPipelineStageMirror {
-  const stageStatus = status[`${key}Status`] as string | undefined;
-  const notes = status[`${key}Notes`] as string | undefined;
-  const agentId = (status[`${key}AgentId`] ?? status.agentId) as string | undefined;
-  const startedAt = status[`${key}StartedAt`] as string | undefined;
-  const completedAt = status[`${key}CompletedAt`] as string | undefined;
-  return {
-    status: stageStatus,
-    agentId,
-    startedAt,
-    updatedAt: now,
-    completedAt,
-    notes,
-    history: stageStatus ? [{ status: stageStatus, at: now, agentId, notes }] : [],
-  };
-}
-
-function activePipelineStatus(value: unknown): boolean {
-  return typeof value === 'string' && value.length > 0 && value !== 'pending';
-}
-
-function inferPipelinePhase(status: Record<string, unknown>): PlanPipelinePhase {
-  if (status.mergeCommit || status.mergedAt || status.mergeStatus === 'merged') return 'done';
-  if (activePipelineStatus(status.mergeStatus) || status.readyForMerge === true) return 'merge';
-  if (activePipelineStatus(status.uatStatus)) return 'uat';
-  if (activePipelineStatus(status.testStatus)) return 'test';
-  if (activePipelineStatus(status.reviewStatus)) return 'review';
-  return 'work';
-}
-
-function reviewApproval(reviewStatus: unknown): PlanPipelineReviewMirror['approval'] {
-  if (reviewStatus === 'approved' || reviewStatus === 'APPROVED' || reviewStatus === 'passed') return 'approved';
-  if (
-    reviewStatus === 'changes_requested' ||
-    reviewStatus === 'CHANGES_REQUESTED' ||
-    reviewStatus === 'failed' ||
-    reviewStatus === 'blocked'
-  ) return 'changes_requested';
-  return reviewStatus ? 'pending' : undefined;
-}
-
-export function buildPipelineMirrorFromStatus(issueId: string, status: Record<string, unknown>, now = new Date().toISOString()): NestedPlanPipelineMirror {
-  const review = stageFromStatus(status, 'review', now) as PlanPipelineReviewMirror;
-  review.approval = reviewApproval(status.reviewStatus);
-  return {
-    phase: inferPipelinePhase(status),
-    issueId: issueId.toUpperCase(),
-    sqliteAuthoritative: true,
-    updatedAt: now,
-    work: stageFromStatus(status, 'work', now),
-    verification: stageFromStatus(status, 'verification', now),
-    review,
-    test: stageFromStatus(status, 'test', now),
-    uat: stageFromStatus(status, 'uat', now),
-    merge: {
-      ...stageFromStatus(status, 'merge', now),
-      readyForMerge: status.readyForMerge as boolean | undefined,
-      prUrl: status.prUrl as string | undefined,
-      mergeCommit: status.mergeCommit as string | undefined,
-      mergedAt: status.mergedAt as string | undefined,
-    },
-  };
 }
 
 async function readPlanFileFromDisk(planPath: string): Promise<XBriefDocument> {

@@ -36,7 +36,7 @@ const SYNC_GIT_COMMIT_TIMEOUT_MS = 60_000;
 const SYNC_GIT_STATUS_TIMEOUT_MS = 30_000;
 
 /**
- * Paths that must never enter a pipeline auto-commit, regardless of gitignore
+ * Paths that must never enter a pipeline pre-sync commit, regardless of gitignore
  * state. These are workspace-local or machine-local state files and sync-target
  * directories; committing them pollutes feature branches and main.
  */
@@ -112,14 +112,14 @@ export async function autoCommitWorkspaceChangesBeforeSync(
     const operationHeads = await probeGitOperationHeads(projectPath, SYNC_GIT_STATUS_TIMEOUT_MS, signal);
     if (!operationHeads.success) return { success: false, committed: false, reason: operationHeads.reason };
     if (operationHeads.present.length > 0) {
-      return { success: false, committed: false, reason: `Refusing to auto-commit while ${operationHeads.present[0]} exists; finish or abort the in-progress Git operation first` };
+      return { success: false, committed: false, reason: `Refusing to pre-sync commit while ${operationHeads.present[0]} exists; finish or abort the in-progress Git operation first` };
     }
 
     try {
       const { stdout: conflictMarkers } = await run("git grep -n -I -E '^(<<<<<<<( |$)|=======$|>>>>>>>( |$))' -- .");
       if (conflictMarkers.trim()) {
         const files = [...new Set(conflictMarkers.trim().split('\n').map((line) => line.split(':', 1)[0]))];
-        return { success: false, committed: false, reason: `Refusing to auto-commit conflict markers in: ${files.join(', ')}` };
+        return { success: false, committed: false, reason: `Refusing to pre-sync commit conflict markers in: ${files.join(', ')}` };
       }
     } catch (error: any) {
       if (error?.code !== 1) return { success: false, committed: false, reason: `Failed to scan for conflict markers: ${error.message}` };
@@ -135,7 +135,7 @@ export async function autoCommitWorkspaceChangesBeforeSync(
     const { stdout: diffStat } = await run('git diff --cached --stat');
     if (!diffStat.trim()) return { success: true, committed: false, reason: 'only excluded/ignored changes remain' };
 
-    const commitMessage = issueId ? `chore: auto-commit before sync with main (${issueId})` : 'chore: auto-commit before sync with main';
+    const commitMessage = issueId ? `chore: pre-sync commit before sync with main (${issueId})` : 'chore: pre-sync commit before sync with main';
     await run(`git commit -m "${commitMessage}"`, SYNC_GIT_COMMIT_TIMEOUT_MS);
     return { success: true, committed: true };
   } catch (error: any) {
@@ -144,7 +144,7 @@ export async function autoCommitWorkspaceChangesBeforeSync(
     }
     const reason = error instanceof SyncGitCommandTimeoutError && error.command.startsWith('git commit ')
       ? `Auto-commit git commit timed out after ${SYNC_GIT_COMMIT_TIMEOUT_MS / 1_000}s`
-      : `Failed to auto-commit: ${error.message}`;
+      : `Failed to pre-sync commit: ${error.message}`;
     return { success: false, committed: false, reason };
   }
 }
@@ -316,7 +316,7 @@ export async function postMergeLifecycle(
     // clears review status, and closes the tracker issue.
     // Re-running the handoff after that resurrects the review row and REOPENS
     // the closed issue — observed live on PAN-1190 (2026-06-11): the deacon's
-    // stale-mergeStatus sweep saw the cleared row as "stale" 47 minutes after
+    // stale-merge sweep saw the cleared row as "stale" 47 minutes after
     // close-out and the handoff reopened it into verifying-on-main forever.
     try {
       const { findSpecByIssue } = await import('../pan-dir/specs.js');
@@ -502,7 +502,7 @@ export async function postMergeLifecycle(
  * Run the project's release after a merge, when one is configured.
  *
  * PAN-3917 (D6): ships are git tags plus GitHub releases. There is no
- * `releaseStatus` to read before starting or to stamp afterwards — a repeat
+ * release state to read before starting or to stamp afterwards — a repeat
  * trigger is suppressed by process memory, and the release engine's own output
  * on the forge is the record.
  */
@@ -928,7 +928,7 @@ function announceMerge(
     priority: status === 'failed' ? 0 : 1,
     issueId,
     source: 'merge-agent',
-    eventType: `mergeStatus.${status === 'completed' ? 'merged' : status === 'started' ? 'merging' : 'failed'}`,
+    eventType: `mergeOutcome.${status === 'completed' ? 'merged' : status === 'started' ? 'merging' : 'failed'}`,
   });
 }
 
@@ -1162,7 +1162,7 @@ async function syncMainIntoRepo(
     logActivity('sync_main_auto_commit', `Auto-committing uncommitted changes before sync`);
     const autoCommit = await autoCommitWorkspaceChangesBeforeSync(repoDir, issueId, signal);
     if (!autoCommit.success) {
-      const message = autoCommit.reason || 'Failed to auto-commit uncommitted changes';
+      const message = autoCommit.reason || 'Failed to pre-sync commit uncommitted changes';
       console.error(`[sync-main] ${message}`);
       logActivity('sync_main_blocked', message);
       return { success: false, reason: message };
@@ -1174,7 +1174,7 @@ async function syncMainIntoRepo(
       const remainingNonExcluded = postCommitStatus.trim().split('\n')
         .filter((line) => !isAutoCommitExcludedPath(parseStatusPath(line)));
       if (remainingNonExcluded.length > 0) {
-        const message = 'Uncommitted changes remain after auto-commit — aborting sync';
+        const message = 'Uncommitted changes remain after the pre-sync commit — aborting sync';
         console.error(`[sync-main] ${message}`);
         logActivity('sync_main_blocked', message);
         return { success: false, reason: message };

@@ -223,7 +223,7 @@ export function resolveMergeQueuePrUrl(item: { issueId: string; pr?: number }): 
 /**
  * PAN-1696 ready-set-source: every issue in this project whose PR the forge
  * says is ready to merge right now. PAN-3917: the ready set is the forge's
- * answer (approved + checks green + mergeable), not a stored `readyForMerge`
+ * answer (approved + checks green + mergeable), not a stored merge-ready
  * flag, and the in-flight membership lens supplies the candidate issues.
  */
 export async function listEligibleCandidatesByProject(projectRoot: string): Promise<Array<{ issueId: string; title: string; pr?: number }>> {

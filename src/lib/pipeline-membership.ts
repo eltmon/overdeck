@@ -20,7 +20,7 @@
  *   L2  unmerged branch      · `git merge-tree` vs main (blind to squash — always
  *                              paired with L1-merged, which wins)
  *   L3  issue open           · L4  current-phase label
- *   L6-spec  xBRIEF exists   · durable plan on the `overdeck-state` branch
+ *   L6-spec  xBRIEF exists   · durable plan in the plan home's `.pan/specs/`
  *   L7-record  close-out record  · pipeline.closedOut === true via the record door
  *
  * L5 (agents / DB / state.json) is a *liveness accelerator* only — it can
@@ -60,7 +60,7 @@ export interface IssueLensSignals {
   hasMergedBranchWork: boolean;
   /** L4 — current-phase label (in-review/in-progress/planned/verifying-on-main/…), else null. */
   phaseLabel: string | null;
-  /** L6-spec — a durable xBRIEF spec exists on `overdeck-state`; gather via `findSpecByIssue`, never the DB. */
+  /** L6-spec — a durable xBRIEF spec exists in the plan home; gather via `findSpecByIssue`, never the DB. */
   hasXbriefSpec: boolean;
   /** Durable Definition-of-Ready signal from the issue's `ready` label. */
   explicitlyReady: boolean;

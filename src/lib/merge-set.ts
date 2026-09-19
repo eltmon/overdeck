@@ -29,7 +29,7 @@ export interface MergeSetRepoState {
   repoReview: MergeSetGateStatus;
   repoTests: MergeSetGateStatus;
   rebaseStatus: MergeSetRebaseStatus;
-  verificationStatus: MergeSetGateStatus;
+  repoVerification: MergeSetGateStatus;
   repoMerge: MergeSetRepoMergeStatus;
   mergeOrder: number;
   required: boolean;
@@ -87,7 +87,7 @@ export function buildMergeSetForIssueSync(issueId: string, labels: string[] = []
       repoReview: 'pending',
       repoTests: 'pending',
       rebaseStatus: 'pending',
-      verificationStatus: 'pending',
+      repoVerification: 'pending',
       repoMerge: 'pending',
       mergeOrder: repo.mergeOrder,
       required: repo.required,

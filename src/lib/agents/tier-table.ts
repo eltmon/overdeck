@@ -192,7 +192,7 @@ export function resolveTieredExecutionEnabled(
 
 /**
  * Issue-aware wrapper for resolveTieredExecutionEnabled (PAN-2383 foundation).
- * PAN-3917: the per-issue record override this used to read (`.pan/records/`)
+ * PAN-3917: the per-issue record override this used to read
  * is gone with the record plane and had no surviving writer — precedence
  * collapses to plan.metadata.tiered_execution > config.enabled. `issueId`
  * stays in the signature so call sites (spawn-prep.ts) do not need to branch

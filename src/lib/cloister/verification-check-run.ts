@@ -2,7 +2,7 @@
  * Reporting verification results as a GitHub check run (PAN-3917, FR-8).
  *
  * Verification (typecheck, lint, tests, stub-UI lint, test-skip gate) used to
- * write a `verificationStatus` field that a patrol then had to reconcile. It now
+ * write a verification-verdict field that a patrol then had to reconcile. It now
  * has exactly two outputs, both owned by something else:
  *
  *   1. `<workspace>/.overdeck/verification-latest.json` — the workspace artifact

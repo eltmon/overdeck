@@ -18,7 +18,7 @@
  * instruct the supervisor to land its ack or blocking finding on the EXISTING
  * inspect-status surface (POST /api/specialists/done with specialist
  * "inspect") so the foreman's wait-for-verdict path is reused unchanged:
- * a pass persists inspectStatus + saves the checkpoint via onInspectComplete,
+ * a pass persists the inspection verdict + saves the checkpoint via onInspectComplete,
  * a failure records a blocking finding and never changes tracker status.
  *
  * Sibling slice note: supervisor spawn + subscription policy
@@ -389,7 +389,7 @@ ${event.diff}
 
 Land your verdict on the existing inspect-status surface. Pass the item ID structurally; notes are free-form evidence.
 
-If the diff satisfies the acceptance criteria, post an ack (this persists inspectStatus and saves the bead checkpoint):
+If the diff satisfies the acceptance criteria, post an ack (this persists the inspection verdict and saves the bead checkpoint):
 
 \`\`\`bash
 pan admin specialists done inspect ${event.issueId} --item ${event.itemId} --status passed --notes "<one-line summary>"

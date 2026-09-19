@@ -2,7 +2,7 @@
  * The swarm's slot ledger door (PAN-3917, D11).
  *
  * Same function surface as before; the storage underneath moved from the
- * per-issue record on `overdeck-state` to `<workspace>/.pan/continues/
+ * per-issue record on the deleted state branch to `<workspace>/.pan/continues/
  * <ISSUE>.slots.json`. Every read and write goes through this door so the swarm
  * modules never touch the file directly.
  */

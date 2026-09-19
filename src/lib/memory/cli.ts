@@ -469,7 +469,7 @@ export async function generateDailySummary(input: {
   await writeFile(path, markdown, 'utf8');
   await indexDailySummary(projectId, target, date, observations, markdown);
   // PAN-3917: this used to also mirror the summary onto the project's
-  // overdeck-state branch (memory/state-mirror.ts) as a durability
+  // deleted state branch (memory/state-mirror.ts) as a durability
   // convenience — that branch and its state-door commit path are gone; the
   // memory-home file written above is already the source of truth.
   return { status: 'generated', path, markdown, observationCount: observations.length, previousObservationCount };

@@ -20,7 +20,7 @@ export interface LabelChange { issueId: string; op: 'add' | 'remove'; label: str
 /**
  * PAN-3917: terminality is the tracker's own word — the issue is closed, or it
  * carries `merged` with no in-flight phase label. The old third source, a
- * per-issue record's `closedOut`/`mergeStatus`, is gone; close-out completion is
+ * per-issue record's `closedOut` and merge verdict, is gone; close-out completion is
  * the closed issue itself.
  */
 export function planLabelReconciliation(candidate: LabelReconcileCandidate): LabelChange[] {

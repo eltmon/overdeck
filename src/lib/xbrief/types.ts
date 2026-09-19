@@ -140,7 +140,7 @@ export interface XBriefPlan {
    * filename convention).
    */
   metadata?: {
-    /** Issue-keyed `.xbrief.json` filename used in `specs/` on `overdeck-state`. Set by plan finalization. */
+    /** Issue-keyed `.xbrief.json` filename used in the plan home's `.pan/specs/`. Set by plan finalization. */
     canonicalFilename?: string;
     /** Whether finalization should promote automatically or wait for an explicit operator action. */
     promotionIntent?: 'automatic' | 'manual';

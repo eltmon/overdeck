@@ -1,7 +1,7 @@
 /**
  * The merge-ready set, computed rather than stored (PAN-3917, FR-9).
  *
- * `readyForMerge` used to be a boolean on a `review_status` row that three
+ * Merge readiness used to be a boolean on a `review_status` row that three
  * patrols raced to set and clear. It is now a question with one answer: the
  * forge says the PR is approved, its checks are green, and it is mergeable.
  *
