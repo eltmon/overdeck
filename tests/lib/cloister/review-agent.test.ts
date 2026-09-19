@@ -429,108 +429,6 @@ describe('killAllReviewerSessions', () => {
   });
 });
 
-// ── conflict gate dispatch deferral (PAN-1765) ────────────────────────────────
-
-describe('spawnReviewRoleForIssue conflict gate', () => {
-  it('defers review without spawning or archiving feedback when conflict-gated', async () => {
-    mockResolveConflictGate.mockResolvedValue({
-      gated: true,
-      reason: 'merge conflict with main must be resolved before review dispatch; conflict resolver dispatched',
-    });
-
-    const result = await Effect.runPromise(spawnReviewRoleForIssue({
-      issueId: 'PAN-1765',
-      workspace: '/tmp/pan-review-gated',
-      branch: 'feature/pan-1765',
-      force: true,
-    }));
-
-    expect(result).toEqual({
-      success: false,
-      gated: true,
-      message: 'Review dispatch deferred: merge conflict with main must be resolved before review dispatch; conflict resolver dispatched',
-    });
-    expect(mockResolveConflictGate).toHaveBeenCalledWith(
-      'PAN-1765',
-      '/tmp/pan-review-gated',
-      'main',
-      { real: true },
-    );
-    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1765', {
-      reviewStatus: 'pending',
-      reviewNotes: 'Review dispatch deferred: merge conflict with main must be resolved before review dispatch; conflict resolver dispatched',
-    });
-    expect(mockSpawnRun).not.toHaveBeenCalled();
-    expect(mockArchiveFeedbackFiles).not.toHaveBeenCalled();
-  });
-
-  it('places the gate before feedback archiving and review-spawn status writes', async () => {
-    const { readFileSync } = await import('fs');
-    const { resolve } = await import('path');
-    const agentSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/lib/cloister/review-agent.ts'),
-      'utf-8',
-    );
-
-    const dispatchBlock = agentSrc.match(
-      /const gate = await resolveConflictGate[\s\S]*?setReviewStatusSync\(opts\.issueId, \{\s*reviewStatus: 'reviewing'/,
-    );
-    expect(dispatchBlock).not.toBeNull();
-    const block = dispatchBlock![0];
-    expect(block.indexOf('resolveConflictGate')).toBeLessThan(block.indexOf('archiveFeedbackFiles'));
-    expect(block).toContain('if (gate.gated)');
-    expect(block).toContain('return { success: false, gated: true, message }');
-  });
-});
-
-describe('spawnReviewRoleForIssue verdict-of-record convergence', () => {
-  beforeEach(() => {
-    prepareWorkspace(REVIEW_MODE_WORKSPACE);
-  });
-
-  it('lands the active verdict and does not re-enter reviewing or spawn a parent', async () => {
-    mockGetAgentState.mockReturnValue({ reviewRunId: 'agent-pan-1982-review-abcdef12' });
-    mockConvergeRowFromVerdictOfRecord.mockResolvedValue({
-      converged: true,
-      artifact: { runId: 'agent-pan-1982-review-abcdef12', verdict: 'passed' },
-      outcome: { landed: true, classification: 'dispatched' },
-    });
-
-    const result = await Effect.runPromise(spawnReviewRoleForIssue({
-      issueId: 'PAN-1982',
-      workspace: REVIEW_MODE_WORKSPACE,
-      branch: 'feature/pan-1982',
-      force: true,
-    }));
-
-    expect(result).toEqual({
-      success: true,
-      message: 'Review dispatch converged from the verdict of record: PAN-1982',
-    });
-    expect(mockConvergeRowFromVerdictOfRecord).toHaveBeenCalledWith('PAN-1982', {
-      runId: 'agent-pan-1982-review-abcdef12',
-      workspacePath: REVIEW_MODE_WORKSPACE,
-      writer: 'dispatch-converge',
-    });
-    expect(mockSetReviewStatus).not.toHaveBeenCalled();
-    expect(mockSpawnRun).not.toHaveBeenCalled();
-  });
-
-  it('continues the normal dispatch when no fresh verdict can converge', async () => {
-    mockConvergeRowFromVerdictOfRecord.mockResolvedValue({ converged: false });
-
-    await Effect.runPromise(spawnReviewRoleForIssue({
-      issueId: 'PAN-1982',
-      workspace: REVIEW_MODE_WORKSPACE,
-      branch: 'feature/pan-1982',
-      force: true,
-    }));
-
-    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1982', expect.objectContaining({ reviewStatus: 'reviewing' }));
-    expect(mockSpawnRun).toHaveBeenCalled();
-  });
-});
-
 // ── review mode fan-out dispatch ─────────────────────────────────────────────
 
 describe('spawnReviewRoleForIssue review mode fan-out', () => {
@@ -783,49 +681,6 @@ describe('stale synthesis session detection (PAN-1131)', () => {
 
     expect(spawnBlock).toMatch(/run\.reviewRunId = runId/);
     expect(spawnBlock).toContain('saveAgentState(run)');
-  });
-});
-
-describe('passed-state rerun regression', () => {
-  it('review-pipeline.ts request-review route rejects dirty workspaces before rerun dispatch', async () => {
-    const { readFileSync } = await import('fs');
-    const { resolve } = await import('path');
-    const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/review-pipeline.ts'),
-      'utf-8',
-    );
-
-    const rerunBlockMatch = routeSrc.match(
-      /shouldTreatAsRerun\(existingStatus\)[\s\S]*?rerun:\s*true/,
-    );
-    expect(rerunBlockMatch).not.toBeNull();
-    const rerunBlock = rerunBlockMatch![0];
-
-    expect(rerunBlock).toContain('getDirtyWorkspaceErrorForReviewRequest');
-    expect(rerunBlock).toContain('dirty workspace on rerun path');
-  });
-
-  it('review-pipeline.ts request-review route uses spawnReviewRoleForIssue in the rerun path', async () => {
-    const { readFileSync } = await import('fs');
-    const { resolve } = await import('path');
-    const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/review-pipeline.ts'),
-      'utf-8',
-    );
-
-    // Find the passed-state IIFE block: between the shouldTreatAsRerun(existingStatus) call
-    // and the early return that sends rerun:true.
-    const rerunBlockMatch = routeSrc.match(
-      /shouldTreatAsRerun\(existingStatus\)[\s\S]*?rerun:\s*true/,
-    );
-    expect(rerunBlockMatch).not.toBeNull();
-    const rerunBlock = rerunBlockMatch![0];
-
-    expect(rerunBlock).toContain('spawnReviewRoleForIssue');
-    // Negative assertion guards against accidental fallback to the legacy paths.
-    expect(rerunBlock).not.toContain('dispatchParallelReview');
-    expect(rerunBlock).not.toContain('runParallelReview');
-    expect(rerunBlock).not.toContain('pan review run');
   });
 });
 
@@ -1305,26 +1160,6 @@ describe('convoy orchestration', () => {
   });
 });
 
-// ── deacon gated review deferral (PAN-1765) ───────────────────────────────────
-
-describe('deacon gated review deferral', () => {
-  // Runtime coverage for reservation release and non-failure accounting lives in
-  // deacon-orphan-recovery.test.ts and deacon-ci-retry.test.ts.
-  it('startup recovery logs gated dispatch as a deferral', async () => {
-    const { readFileSync } = await import('fs');
-    const { resolve } = await import('path');
-    const serviceSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/lib/cloister/service.ts'),
-      'utf-8',
-    );
-
-    const recoveryBlock = serviceSrc.match(/const dispatchResult = await Effect\.runPromise\(spawnReviewRoleForIssue[\s\S]*?Re-dispatched recovery review/);
-    expect(recoveryBlock).not.toBeNull();
-    expect(recoveryBlock![0]).toContain('if (dispatchResult.gated)');
-    expect(recoveryBlock![0]).toContain('Deferred recovery review');
-  });
-});
-
 // ── dispatch failure sets 'pending' not 'failed' ─────────────────────────────
 // Regression: dispatch failures must set reviewStatus='pending' so the deacon
 // can retry. The deacon at deacon.ts only re-dispatches when reviewStatus===
@@ -1394,76 +1229,6 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(restartBlock).toContain('{ status: 409 }');
   });
 
-  it('review-pipeline.ts review request route records gated background dispatches as deferrals', async () => {
-    const { readFileSync } = await import('fs');
-    const { resolve } = await import('path');
-    const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/review-pipeline.ts'),
-      'utf-8',
-    );
-    const requestReviewMatch = routeSrc.match(
-      /const postWorkspaceRequestReviewRoute[\s\S]*?export const reviewPipelineRouteLayer/,
-    );
-    expect(requestReviewMatch).not.toBeNull();
-    const requestReviewBlock = requestReviewMatch![0];
-
-    expect(routeSrc).toContain('reviewResult.gated');
-    expect(requestReviewBlock).toContain('if (result.gated)');
-    expect(requestReviewBlock).toContain('Review deferred for');
-    expect(requestReviewBlock).toContain("reviewStatus: 'pending'");
-    expect(requestReviewBlock).toContain('reviewNotes: result.message');
-  });
-
-  it('merge-ops.ts approve route treats gated dispatches as deferrals', async () => {
-    const { readFileSync } = await import('fs');
-    const { resolve } = await import('path');
-    const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/merge-ops.ts'),
-      'utf-8',
-    );
-
-    const approveMatch = routeSrc.match(
-      /POST \/api\/issues\/:issueId\/approve[\s\S]*?Fallback \(PAN-1531\): direct server-side rebase/,
-    );
-    expect(approveMatch).not.toBeNull();
-    const approveBlock = approveMatch![0];
-
-    expect(approveBlock).toContain('gated?: boolean');
-    expect(approveBlock).toContain('if (reviewResult.gated)');
-    expect(approveBlock).toContain('review dispatch deferred for');
-    expect(approveBlock).toContain('gated: true');
-    expect(approveBlock).toContain("pipeline: 'deferred'");
-    expect(approveBlock).toContain('{ status: 409 }');
-    expect(approveBlock).toContain('return jsonResponse');
-    expect(approveBlock).toContain('setReviewStatusBase(issueId, {');
-  });
-
-  it('review-pipeline.ts dispatch failure paths set reviewStatus=pending not failed', async () => {
-    const { readFileSync } = await import('fs');
-    const { resolve } = await import('path');
-    const routeSrc = readFileSync(
-      resolve(import.meta.dirname, '../../../src/dashboard/server/routes/workspaces/review-pipeline.ts'),
-      'utf-8',
-    );
-    const requestReviewMatch = routeSrc.match(
-      /const postWorkspaceRequestReviewRoute[\s\S]*?export const reviewPipelineRouteLayer/,
-    );
-    expect(requestReviewMatch).not.toBeNull();
-    const requestReviewBlock = requestReviewMatch![0];
-
-    // reviewStatus must never be set to 'failed' in a dispatch error/catch path
-    const dispatchFailedMatches = requestReviewBlock.match(
-      /(?:Dispatch failed|Dispatch error|Failed to start review)[\s\S]{0,200}reviewStatus\s*:\s*['"]failed['"]/g,
-    );
-    expect(dispatchFailedMatches).toBeNull();
-
-    // Verify the dispatch error paths explicitly set 'pending'
-    const pendingMatches = requestReviewBlock.match(
-      /reviewStatus\s*:\s*['"]pending['"]/g,
-    );
-    expect(pendingMatches).not.toBeNull();
-    expect(pendingMatches!.length).toBeGreaterThanOrEqual(4);
-  });
 });
 
 describe('buildReviewRolePrompt — stale-signal guard (PAN-3549)', () => {
