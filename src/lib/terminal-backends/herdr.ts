@@ -229,6 +229,40 @@ async function findAgentIdPane(
   ) ?? null;
 }
 
+/**
+ * Does the pane still run something, or has its shell returned to its prompt?
+ *
+ * A Herdr pane OUTLIVES the process typed into it: the launcher runs as a child
+ * of the pane's shell, so a harness that exits leaves the pane sitting at `$`.
+ * "The pane exists" is therefore not liveness — the pane's foreground process
+ * is, exactly as the tmux oracle walks the pane's process subtree.
+ *
+ * Verified live on 2026-09-19 (herdr 0.9.1): an idle pane reports its own shell
+ * (`foreground_processes = [bash]`, `pid === shell_pid`); a pane running a
+ * command reports that command with a different pid and process group. So the
+ * question is whether any foreground process is NOT the shell.
+ */
+async function paneProcessLiveness(
+  paneId: string,
+  api: HerdrApiClient,
+): Promise<'running' | 'exited' | 'indeterminate'> {
+  try {
+    const info = await api.call<{
+      process_info?: { shell_pid?: number | null; foreground_processes?: { pid: number }[] };
+    }>('pane.process_info', { pane_id: paneId }, { timeoutMs: HERDR_PROBE_TIMEOUT_MS });
+    const process_info = info.process_info;
+    if (!process_info) return 'indeterminate';
+    const shellPid = process_info.shell_pid ?? null;
+    const foreground = process_info.foreground_processes ?? [];
+    return foreground.some((process) => process.pid !== shellPid) ? 'running' : 'exited';
+  } catch (cause) {
+    // The server answering (`pane_not_found`) means the pane is gone; only a
+    // transport failure leaves the question open.
+    if (cause instanceof HerdrApiError && !HERDR_TRANSPORT_ERROR_CODES.has(cause.code)) return 'exited';
+    return 'indeterminate';
+  }
+}
+
 /** One Herdr-hosted agent, detected by Herdr or bound to a token-stamped pane. */
 export interface HerdrAgentRef {
   readonly paneId: string;
@@ -278,6 +312,10 @@ export async function findHerdrAgent(
   try {
     const pane = await findAgentIdPane(agentName, api);
     if (!pane) return null;
+    // A pane whose shell is back at its prompt is residue, not an agent: a
+    // caller that treated it as live would block a respawn and paste a message
+    // into a dead shell.
+    if (await paneProcessLiveness(pane.pane_id, api) !== 'running') return null;
     return {
       paneId: pane.pane_id,
       terminalId: pane.terminal_id,
@@ -348,11 +386,15 @@ export async function probeHerdrAgentLiveness(
 }
 
 /**
- * Liveness for an agent Herdr never detected: the pane stamped with its
- * `agentId` token. Alive while the pane exists, `absent` once Herdr's snapshot
- * no longer lists it, and `indeterminate` when the snapshot itself failed — a
- * pane-bound agent must never be reported dead because Herdr holds no agent
- * record for it.
+ * Liveness for an agent Herdr holds no record for: the pane stamped with its
+ * `agentId` token, plus that pane's foreground process.
+ *
+ * `absent` once Herdr's snapshot no longer lists the pane, `exited` when the
+ * pane is back at its shell prompt (the harness or its host died and left the
+ * pane behind), `alive` while a process of its own is running, and
+ * `indeterminate` whenever a probe itself failed — a pane-bound agent must
+ * never be reported dead merely because Herdr holds no agent record for it, and
+ * a detected agent that exits must still be confirmed dead.
  */
 async function probePaneBoundLiveness(
   agentName: string,
@@ -361,6 +403,11 @@ async function probePaneBoundLiveness(
   try {
     const pane = await findAgentIdPane(agentName, api);
     if (!pane) return { kind: 'absent' };
+    const process = await paneProcessLiveness(pane.pane_id, api);
+    if (process === 'exited') return { kind: 'exited', paneId: pane.pane_id };
+    if (process === 'indeterminate') {
+      return { kind: 'indeterminate', reason: `pane ${pane.pane_id} process probe failed` };
+    }
     return { kind: 'alive', paneId: pane.pane_id, state: toAgentState(pane.agent_status) };
   } catch (cause) {
     // Same rule as the agent probe: only a SERVER answer can mean absence.

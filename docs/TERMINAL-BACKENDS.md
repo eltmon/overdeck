@@ -96,11 +96,19 @@ Everything downstream follows the pane instead of the agent record:
 
 - **Inventory** (`listHerdrAgents`) reads `agent.list` *and* the session snapshot's panes, keyed by
   the `agentId` token, so a token-stamped pane with no detected agent is a live agent and a pane
-  Herdr later detects is not counted twice.
+  Herdr later detects is not counted twice. It deliberately stops at "the pane exists" — a census
+  must not fan out one `pane.process_info` per pane; `isAlive` is the oracle that asks.
 - **Liveness** (`probeHerdrAgentLiveness`, used by `isAlive`) falls back to the same token scan when
-  `agent.get` says "no such agent": alive while the pane exists, `absent` only once the snapshot no
-  longer lists it, `indeterminate` whenever the socket itself failed. A pane-bound agent is never
-  reported dead merely because Herdr holds no agent record for it.
+  `agent.get` says "no such agent", and then asks the pane's **foreground process**, because a Herdr
+  pane OUTLIVES the process typed into it: the launcher is a child of the pane's shell, so a harness
+  that exits leaves the pane sitting at `$`. Verified live — an idle pane reports its own shell
+  (`foreground_processes = [bash]`, `pid === shell_pid`), a working one reports the harness or its
+  host with a different pid. So: `absent` when the snapshot no longer lists the pane, `exited` when
+  only the shell is left (a confirmed death, `pane-dead`), `alive` while a process of its own runs,
+  `indeterminate` whenever a probe itself failed. This is the Herdr analog of the tmux oracle's
+  process-subtree walk, and it is what keeps a claude-code agent whose name Herdr released from
+  reading alive forever. `findHerdrAgent` applies the same check, so a dead-shell pane neither
+  blocks a respawn (`agentPaneExists`) nor receives a message.
 - **Delivery** — see "Message delivery routing" below.
 - **Close** is by pane reference (`AgentState.paneId`, recorded the moment `startAgent` returns), so
   a spawn failure cleans up its own pane on either policy.

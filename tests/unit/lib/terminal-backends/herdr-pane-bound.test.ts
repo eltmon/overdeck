@@ -195,12 +195,37 @@ const boundPane = {
   },
 };
 
-function paneBoundApi(log: Call[] = []) {
+/**
+ * A pane running its harness: the foreground process is the app-server host,
+ * not the pane's own shell. Verified live — an idle pane instead reports
+ * `[bash]` with `pid === shell_pid`.
+ */
+const runningProcessInfo = {
+  process_info: {
+    pane_id: 'wE:p2',
+    shell_pid: 1525697,
+    foreground_process_group_id: 1527509,
+    foreground_processes: [{ pid: 1527509, name: 'node', cmdline: 'node dist/codex-app-server-host.js' }],
+  },
+};
+
+/** The same pane after the host exited: the shell is back at its prompt. */
+const idleShellProcessInfo = {
+  process_info: {
+    pane_id: 'wE:p2',
+    shell_pid: 1525697,
+    foreground_process_group_id: 1525697,
+    foreground_processes: [{ pid: 1525697, name: 'bash', cmdline: '/bin/bash' }],
+  },
+};
+
+function paneBoundApi(log: Call[] = [], processInfo: unknown = runningProcessInfo) {
   return fakeApi(({ method }) => {
     if (method === 'agent.get') return new HerdrApiError({ method, code: 'not_found', message: 'no such agent' });
     if (method === 'agent.list') return { agents: [] };
     if (method === 'session.snapshot') return { snapshot: { panes: [boundPane] } };
     if (method === 'pane.get') return { pane: boundPane };
+    if (method === 'pane.process_info') return processInfo;
     return {};
   }, log);
 }
@@ -220,6 +245,11 @@ describe('finding a pane-bound agent', () => {
   it('still answers null for an id nothing on this host carries', async () => {
     const { api } = paneBoundApi();
     await expect(findHerdrAgent('agent-pan-9999', api as never)).resolves.toBeNull();
+  });
+
+  it('answers null for a pane whose process has exited, so a respawn is not blocked', async () => {
+    const { api } = paneBoundApi([], idleShellProcessInfo);
+    await expect(findHerdrAgent('agent-pan-3705-review', api as never)).resolves.toBeNull();
   });
 
   it('lists the token-stamped pane as a live agent', async () => {
@@ -250,10 +280,30 @@ describe('finding a pane-bound agent', () => {
 });
 
 describe('probeHerdrAgentLiveness for a pane-bound agent', () => {
-  it('is alive while the pane exists', async () => {
+  it('is alive while the pane runs a process of its own', async () => {
     const { api } = paneBoundApi();
     await expect(probeHerdrAgentLiveness('agent-pan-3705-review', api as never))
       .resolves.toEqual({ kind: 'alive', paneId: 'wE:p2', state: 'unknown' });
+  });
+
+  it('is EXITED once the pane is back at its shell prompt — the pane outlives the harness', async () => {
+    // A Herdr pane does not close when the process typed into it dies. Reading
+    // "the pane exists" as liveness would make every dead agent — pane-bound or
+    // a claude-code agent whose name Herdr released — immortal, and nothing
+    // would ever be confirmed dead.
+    const { api } = paneBoundApi([], idleShellProcessInfo);
+    await expect(probeHerdrAgentLiveness('agent-pan-3705-review', api as never))
+      .resolves.toEqual({ kind: 'exited', paneId: 'wE:p2' });
+  });
+
+  it('is indeterminate when the process probe itself fails', async () => {
+    const { api } = fakeApi(({ method }) => {
+      if (method === 'agent.get') return new HerdrApiError({ method, code: 'not_found', message: 'no such agent' });
+      if (method === 'session.snapshot') return { snapshot: { panes: [boundPane] } };
+      if (method === 'pane.process_info') return new HerdrApiError({ method, code: 'timeout', message: 'no answer' });
+      return {};
+    });
+    expect((await probeHerdrAgentLiveness('agent-pan-3705-review', api as never)).kind).toBe('indeterminate');
   });
 
   it('is absent once the pane is gone', async () => {
