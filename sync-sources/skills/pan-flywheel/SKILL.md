@@ -93,6 +93,15 @@ Only for an Overdeck merge — not for merges in other projects the loop is
 also driving. Other projects deploy their own way; do not `pan reload` on
 their behalf.
 
+## Policies
+
+- `auto_pickup_backlog` (default OFF). OFF: the operator releases each
+  backlog item individually — the Flywheel picks up only items marked
+  released. ON: blanket release — every ready and planned backlog item is
+  pickable without individual operator release.
+- `require_uat_before_merge` (default ON): a PR may not merge until UAT has
+  passed.
+
 ## Phase 5 — Park what you cannot decide
 
 Some calls are the operator's: ambiguous scope, a design tradeoff with no

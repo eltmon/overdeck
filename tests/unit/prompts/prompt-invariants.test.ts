@@ -25,7 +25,7 @@ function readPrompt(filename: string): string {
 }
 
 const flywheel = readPrompt('roles/flywheel.md');
-const brief = readPrompt('docs/flywheel-brief.md');
+const brief = readPrompt('sync-sources/skills/pan-flywheel/SKILL.md');
 const review = readPrompt('roles/review.md');
 
 const RAIL_MESSAGE =
