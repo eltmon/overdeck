@@ -59,17 +59,16 @@ describe('notifyFlywheelOfUatPromote', () => {
       'uat-promote-notify',
     );
     expect(d.recordNudge).toHaveBeenCalledWith({
-      patrol: 'uat-promote-notify',
+      source: 'cloister',
+      level: 'info',
       issueId: 'PAN-2260',
-      action: 'notified flywheel-orchestrator to re-derive ready set after UAT promote',
-      reason:
-        'operator promoted a UAT batch; flywheel must immediately rebuild to drop merged + regressed members before its next tick',
-      state: {
+      message: 'uat-promote-notify: told flywheel-orchestrator to re-derive its ready set after a UAT promote',
+      details: JSON.stringify({
         generation: 'uat/pan-cobalt-0703',
         members: ['PAN-2260', 'PAN-2294'],
         mergeSha: 'abc123def456',
         delivered: true,
-      },
+      }),
     });
   });
 
@@ -80,7 +79,7 @@ describe('notifyFlywheelOfUatPromote', () => {
 
     expect(d.message).not.toHaveBeenCalled();
     expect(d.recordNudge).toHaveBeenCalledWith(expect.objectContaining({
-      state: expect.objectContaining({ delivered: false }),
+      details: expect.stringContaining('"delivered":false'),
     }));
   });
 
@@ -101,7 +100,7 @@ describe('notifyFlywheelOfUatPromote', () => {
     await expect(notifyFlywheelOfUatPromote(successfulPromote(), d)).resolves.toBeUndefined();
 
     expect(d.recordNudge).toHaveBeenCalledWith(expect.objectContaining({
-      state: expect.objectContaining({ delivered: true }),
+      details: expect.stringContaining('"delivered":true'),
     }));
   });
 });

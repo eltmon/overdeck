@@ -29,11 +29,6 @@ vi.mock('../../../../src/lib/projects.js', () => ({
   listProjectsSync: vi.fn(),
 }));
 
-vi.mock('../../../../src/lib/pan-dir/record.js', () => ({
-  readIssueRecord: vi.fn(),
-  resolveProjectForIssue: vi.fn(),
-}));
-
 vi.mock('../../../../src/lib/reconstruct/enumerate-in-flight.js', () => ({
   enumerateInFlightIssuesFromSources: vi.fn(),
 }));
@@ -50,7 +45,6 @@ vi.mock('../../../../src/lib/overdeck/pull-requests.js', () => ({
 import { listRunningAgents } from '../../../../src/lib/agents.js';
 import { backfillAgentsSync, listAllAgentsSync } from '../../../../src/lib/overdeck/agents.js';
 import { listProjectsSync } from '../../../../src/lib/projects.js';
-import { readIssueRecord, resolveProjectForIssue } from '../../../../src/lib/pan-dir/record.js';
 import { enumerateInFlightIssuesFromSources } from '../../../../src/lib/reconstruct/enumerate-in-flight.js';
 import { getSharedIssueService, startSharedIssueService } from '../../../../src/dashboard/server/services/issue-service-singleton.js';
 import { fetchIssuePullRequest } from '../../../../src/lib/overdeck/pull-requests.js';
@@ -59,8 +53,6 @@ const listRunningAgentsMock = vi.mocked(listRunningAgents);
 const backfillMock = vi.mocked(backfillAgentsSync);
 const listAllAgentsMock = vi.mocked(listAllAgentsSync);
 const listProjectsMock = vi.mocked(listProjectsSync);
-const readRecordMock = vi.mocked(readIssueRecord);
-const resolveProjectMock = vi.mocked(resolveProjectForIssue);
 const enumerateMock = vi.mocked(enumerateInFlightIssuesFromSources);
 const getIssueServiceMock = vi.mocked(getSharedIssueService);
 const startIssueServiceMock = vi.mocked(startSharedIssueService);
@@ -167,45 +159,29 @@ describe('reconstructCache', () => {
     expect(result.agentRuntimeById['agent-pan-1919']?.activity).toBe('stopped');
   });
 
-  it('derives phases from records and PR state', async () => {
+  it('derives a merge phase from an APPROVED PR', async () => {
     listProjectsMock.mockReturnValue([{ key: 'overdeck', config: { name: 'overdeck', path: '/projects/overdeck' } }]);
     getIssueServiceMock.mockReturnValue({
       getIssues: () => [{ identifier: 'PAN-1920', state: 'open', status: 'In Progress' }],
     } as any);
     enumerateMock.mockResolvedValue(new Set(['PAN-1920']));
-    resolveProjectMock.mockReturnValue({ name: 'overdeck', path: '/projects/overdeck' } as any);
-    readRecordMock.mockResolvedValue({
-      issueId: 'PAN-1920',
-      schemaVersion: 2,
-      pipeline: {
-        issueId: 'PAN-1920',
-        reviewStatus: 'passed',
-        testStatus: 'passed',
-        readyForMerge: true,
-        updatedAt: new Date().toISOString(),
-      },
-      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'localhost' },
-    } as any);
     fetchPrMock.mockResolvedValue({ issueId: 'PAN-1920', pr: { reviewDecision: 'APPROVED' } as any });
 
     const result = await reconstructCache(fakeDb());
     expect(result.phaseByIssueId['PAN-1920']).toBe('merge');
     expect(result.phaseCounts).toEqual({ work: 0, review: 0, merge: 1, done: 0 });
-    expect(result.reviewStatusByIssueId['PAN-1920']?.readyForMerge).toBe(true);
   });
 
-  it('falls back to review when no record or approval exists', async () => {
+  it('falls back to review when the PR carries no approval', async () => {
     listProjectsMock.mockReturnValue([{ key: 'overdeck', config: { name: 'overdeck', path: '/projects/overdeck' } }]);
     getIssueServiceMock.mockReturnValue({
       getIssues: () => [{ identifier: 'PAN-1920', state: 'open', status: 'In Progress' }],
     } as any);
     enumerateMock.mockResolvedValue(new Set(['PAN-1920']));
-    resolveProjectMock.mockReturnValue(null);
     fetchPrMock.mockResolvedValue({ issueId: 'PAN-1920', pr: { reviewDecision: 'REVIEW_REQUIRED' } as any });
 
     const result = await reconstructCache(fakeDb());
     expect(result.phaseByIssueId['PAN-1920']).toBe('review');
-    expect(result.reviewStatusByIssueId['PAN-1920']).toBeUndefined();
   });
 
   it('passes verbose and listLiveSessions options through', async () => {
