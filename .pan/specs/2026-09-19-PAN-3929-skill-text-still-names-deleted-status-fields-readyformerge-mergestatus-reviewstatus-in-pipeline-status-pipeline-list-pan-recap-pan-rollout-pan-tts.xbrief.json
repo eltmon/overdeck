@@ -4,17 +4,17 @@
     "created": "2026-09-19T11:49:17Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3929: Skill text still names deleted status fields (readyForMerge, mergeStatus, reviewStatus) in pipeline-status, pipeline-list, pan-recap, pan-rollout, pan-tts",
-    "updated": "2026-09-19T11:55:22.477Z"
+    "updated": "2026-09-19T13:27:54.881Z"
   },
   "plan": {
     "id": "pan-3929",
     "title": "Skill text still names deleted status fields (readyForMerge, mergeStatus, reviewStatus) in pipeline-status, pipeline-list, pan-recap, pan-rollout, pan-tts",
-    "status": "proposed",
+    "status": "running",
     "uid": "3cacbe93-5e9e-495a-b989-99cdad037600",
     "author": "agent:claude-fable-5-1",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-19T11:49:17Z",
-    "updated": "2026-09-19T11:55:22.477Z",
+    "updated": "2026-09-19T13:27:54.881Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3929",
