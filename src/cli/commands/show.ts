@@ -18,8 +18,10 @@ import { healthCommand } from './health.js';
 import { pingAgent } from '../../lib/health.js';
 import { readAgentCVSync } from '../../lib/cv.js';
 import { getAgentRuntimeStateSync, getAgentStateSync } from '../../lib/agents.js';
+import { getAgentEffectiveLastActivityMs, isAlive, type LivenessVerdict } from '../../lib/agents/liveness.js';
 import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 import { getDerivedIssueState } from '../../lib/overdeck/derived-issue-state.js';
+import { hostTerminalBackendName } from '../../lib/terminal-backends/select.js';
 
 interface ShowOptions {
   cv?: boolean;
@@ -40,6 +42,28 @@ function relativeTime(iso: string | null | undefined): string {
   const hr = Math.floor(min / 60);
   if (hr < 48) return `${hr}h ago`;
   return `${Math.floor(hr / 24)}d ago`;
+}
+
+/**
+ * The backend's liveness verdict as a health line. An indeterminate probe is
+ * `unknown`, never `dead` — a backend that did not answer has not reported a
+ * death (the `isConfirmedDead` rule).
+ */
+export function describeLiveness(
+  verdict: LivenessVerdict,
+  agentStatus?: string,
+  runtimeStatus?: string,
+): { status: 'alive' | 'dead' | 'stopped' | 'unknown'; detail: string } {
+  if (agentStatus === 'stopped' || runtimeStatus === 'stopped') {
+    return { status: 'stopped', detail: 'agent was stopped' };
+  }
+  if (verdict.alive) return { status: 'alive', detail: 'running' };
+  switch (verdict.reason) {
+    case 'no-session': return { status: 'dead', detail: 'no agent by that name' };
+    case 'pane-dead': return { status: 'dead', detail: 'the agent exited' };
+    case 'runtime-missing': return { status: 'dead', detail: 'the harness process is gone' };
+    default: return { status: 'unknown', detail: 'liveness probe did not answer' };
+  }
 }
 
 export async function showCommand(id: string, options: ShowOptions = {}): Promise<void> {
@@ -69,10 +93,20 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
   const issueState = await getDerivedIssueState(issueId);
   const runtimeState = getAgentRuntimeStateSync(agentId);
   const agentState = getAgentStateSync(agentId);
-  const healthData = agentState || runtimeState
+  const hasAgent = Boolean(agentState || runtimeState);
+
+  // PAN-3917 (W12): `pingAgent` asks tmux directly — `sessionExists` — so on a
+  // Herdr host it calls every healthy agent dead (and writes that verdict to
+  // health.json). The backend-aware oracle answers instead there; tmux hosts
+  // keep the full health classifier, thresholds and all.
+  const backend = await hostTerminalBackendName();
+  const healthData = hasAgent && backend === 'tmux'
     ? await Effect.runPromise(
       pingAgent(agentId).pipe(Effect.catch(() => Effect.succeed(null))),
     )
+    : null;
+  const liveness = hasAgent && backend !== 'tmux'
+    ? await isAlive(agentId).catch((): LivenessVerdict => ({ alive: false, reason: 'runtime-indeterminate' }))
     : null;
   const cvData = readAgentCVSync(agentId);
 
@@ -85,6 +119,7 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
       pr: issueState.pr,
       branch: issueState.branch,
       health: healthData,
+      liveness: liveness ? { backend, ...liveness } : null,
       cv: cvData,
     }, null, 2));
     return;
@@ -117,6 +152,19 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
       extras.push('waiting on human');
     }
     console.log(`  ${chalk.dim('health')}   ${statusColor(statusText)}  ${chalk.dim('·')} ${extras.join(` ${chalk.dim('·')} `)}`);
+  } else if (liveness) {
+    const { status, detail } = describeLiveness(liveness, agentState?.status, runtimeState?.state);
+    const statusColor = status === 'alive'
+      ? chalk.green
+      : status === 'stopped'
+        ? chalk.gray
+        : status === 'unknown'
+          ? chalk.yellow
+          : chalk.red;
+    const activityMs = getAgentEffectiveLastActivityMs(agentId);
+    const activityText = activityMs !== null ? relativeTime(new Date(activityMs).toISOString()) : 'unknown';
+    const extras = [`${backend}: ${detail}`, `last activity ${activityText}`];
+    console.log(`  ${chalk.dim('health')}   ${statusColor(status)}  ${chalk.dim('·')} ${extras.join(` ${chalk.dim('·')} `)}`);
   } else {
     console.log(`  ${chalk.dim('health')}   ${chalk.dim('(no agent state)')}`);
   }

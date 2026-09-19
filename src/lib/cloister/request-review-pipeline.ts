@@ -54,3 +54,32 @@ export function createRequestReviewPipeline(): RequestReviewPipeline {
 
 /** Shared host-side pipeline so HTTP requests and durable intent recovery coalesce. */
 export const requestReviewPipeline = createRequestReviewPipeline();
+
+/** What a review-pipeline start did, for the caller to report. */
+export type StartRequestReviewOutcome =
+  | { started: true; remoteVmName?: string }
+  | { started: false; reason: 'no-workspace' | 'already-running' | 'no-project' }
+  | { started: false; reason: 'dirty-workspace'; error: string };
+
+export type RequestReviewStarter = (
+  issueId: string,
+  options?: { note?: string; onReviewSpawned?: () => void },
+) => Promise<StartRequestReviewOutcome>;
+
+let requestReviewStarter: RequestReviewStarter | null = null;
+
+/**
+ * The dashboard's review route owns the workspace resolution, the dirty-tree
+ * refusal and the verification continuation, and registers that door here at
+ * module load (the same seam shape as `registerLivenessHeartbeatLookup`). The
+ * GitHub webhook handler lives in `src/lib/` and must not import a dashboard
+ * route — it asks for the registered starter instead, and does nothing when
+ * the process it runs in never loaded the routes.
+ */
+export function registerRequestReviewStarter(starter: RequestReviewStarter | null): void {
+  requestReviewStarter = starter;
+}
+
+export function getRequestReviewStarter(): RequestReviewStarter | null {
+  return requestReviewStarter;
+}
