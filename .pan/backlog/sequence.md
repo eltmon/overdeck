@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-19T10:11:41.156Z · model: claude-opus-5 · open: 907_
+_Last sequenced: 2026-09-19T10:14:44.082Z · model: claude-opus-5 · open: 907_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1222,7 +1222,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-19T10:11:41.156Z",
+  "generatedAt": "2026-09-19T10:14:44.082Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 907,
@@ -3950,6 +3950,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "ok",
       "dependsOn": [],
       "why": "pan start reuses the old agent's recorded model after pan reset-session, so retuned tiers never apply without --fresh",
+      "rationale": "New this run: medium/60 — pan start reuses the old agent's recorded model after pan reset-session, so retuned tiers never apply without --fresh.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5975,6 +5976,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "ok",
       "dependsOn": [],
       "why": "resume-kimi-code test writes a real transcript under ~/.claude; watcher indexes the deleted file and ENOENT sticks in health",
+      "rationale": "New this run: medium/58 — resume-kimi-code test writes a real transcript under ~/.claude; watcher indexes the deleted file and ENOENT sticks in health.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -5987,6 +5989,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "ok",
       "dependsOn": [],
       "why": "Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main)",
+      "rationale": "New this run: medium/58 — Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6227,6 +6230,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "ok",
       "dependsOn": [],
       "why": "opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently",
+      "rationale": "New this run: medium/56 — opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6323,6 +6327,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "ok",
       "dependsOn": [],
       "why": "test-skip gate has no audited exemption for opt-in live suites (skipIf on env/binary); allowlist row with justification",
+      "rationale": "New this run: medium/55 — test-skip gate has no audited exemption for opt-in live suites (skipIf on env/binary); allowlist row with justification.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6335,6 +6340,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "ok",
       "dependsOn": [],
       "why": "Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping",
+      "rationale": "New this run: medium/55 — Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6347,6 +6353,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "ok",
       "dependsOn": [],
       "why": "/agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model",
+      "rationale": "New this run: medium/55 — /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6695,6 +6702,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "/agents shows 183 STRIKE RUNNING for stopped strikes; cut made liveness live-read — re-verify what remains before building",
+      "rationale": "New this run: medium/52 — /agents shows 183 STRIKE RUNNING for stopped strikes; cut made liveness live-read — re-verify what remains before building.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6707,6 +6715,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "ok",
       "dependsOn": [],
       "why": "GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs",
+      "rationale": "New this run: medium/52 — GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6959,6 +6968,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains",
+      "rationale": "New this run: medium/50 — One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6971,6 +6981,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "ok",
       "dependsOn": [],
       "why": "Link pull requests to conversations via branch detection plus an explicit right-click link/unlink override",
+      "rationale": "New this run: medium/50 — Link pull requests to conversations via branch detection plus an explicit right-click link/unlink override.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6983,6 +6994,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "ok",
       "dependsOn": [],
       "why": "ACP conversations drop agent thoughts: no agent_thought_chunk case and no thought role in the transcript schema",
+      "rationale": "New this run: medium/50 — ACP conversations drop agent thoughts: no agent_thought_chunk case and no thought role in the transcript schema.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6995,6 +7007,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "ok",
       "dependsOn": [],
       "why": "Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver)",
+      "rationale": "New this run: medium/50 — Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7007,6 +7020,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "ok",
       "dependsOn": [],
       "why": "/projects/new discards keystrokes typed before the first resolve lands; add a delayed-resolve journey test",
+      "rationale": "New this run: medium/50 — /projects/new discards keystrokes typed before the first resolve lands; add a delayed-resolve journey test.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7139,6 +7153,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items",
+      "rationale": "New this run: medium/48 — Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7151,6 +7166,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "ok",
       "dependsOn": [],
       "why": "Dashboard shows the empty welcome state instead of an error when the harness exits before writing a transcript",
+      "rationale": "New this run: medium/48 — Dashboard shows the empty welcome state instead of an error when the harness exits before writing a transcript.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7504,6 +7520,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "Route pipeline reads through IssuesResolver; the cut deleted the review-status family (readers now use pr-facts) — re-scope",
+      "rationale": "New this run: medium/45 — Route pipeline reads through IssuesResolver; the cut deleted the review-status family (readers now use pr-facts) — re-scope.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7516,6 +7533,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path",
+      "rationale": "New this run: medium/45 — Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7528,6 +7546,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "ok",
       "dependsOn": [],
       "why": "OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model",
+      "rationale": "New this run: medium/45 — OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7542,6 +7561,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
         "PAN-3762"
       ],
       "why": "Orca-style SSH Hosts + Remote Servers onboarding; UX extension of the PAN-3762 federation model, not a competing design",
+      "rationale": "New this run: medium/45 — Orca-style SSH Hosts + Remote Servers onboarding; UX extension of the PAN-3762 federation model, not a competing design.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -7914,6 +7934,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "Attach the native Codex terminal UI to a running app-server thread; no native attach endpoint exists — investigate first",
+      "rationale": "New this run: medium/42 — Attach the native Codex terminal UI to a running app-server thread; no native attach endpoint exists — investigate first.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -8157,6 +8178,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "ok",
       "dependsOn": [],
       "why": "pan restart accepts a stray positional (pan restart status) and files a real restart request; reject excess args",
+      "rationale": "New this run: medium/40 — pan restart accepts a stray positional (pan restart status) and files a real restart request; reject excess args.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9457,6 +9479,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized",
+      "rationale": "New this run: low/25 — Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -10034,6 +10057,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "Image-only report: default view on Windows breaks the model selector; needs a written repro and expected behavior",
+      "rationale": "New this run: low/20 — Image-only report: default view on Windows breaks the model selector; needs a written repro and expected behavior.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -10046,6 +10070,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "needs-refinement",
       "dependsOn": [],
       "why": "Image-only report titled \"pan sync issue\"; needs the command, output text, and expected behavior",
+      "rationale": "New this run: low/20 — Image-only report titled \"pan sync issue\"; needs the command, output text, and expected behavior.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -11313,6 +11338,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "stale",
       "dependsOn": [],
       "why": "Stale: terminal.backend (tmux|herdr) setting and Herdr default landed in the PAN-3917 cut (ca15def); close or re-scope the remainder",
+      "rationale": "New this run but stale on arrival: filed 2026-09-16..18 against a module the PAN-3917 cut deleted; terminal.backend (tmux|herdr) setting and Herdr default landed in the PAN-3917 cut (ca15def); close or re-scope the remainder.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12041,6 +12067,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "stale",
       "dependsOn": [],
       "why": "Stale: deletes patrols from a patrol loop the PAN-3917 cut (ca15def) already replaced with deacon-lite; re-triage or close",
+      "rationale": "New this run but stale on arrival: filed 2026-09-16..18 against a module the PAN-3917 cut deleted; deletes patrols from a patrol loop the PAN-3917 cut (ca15def) already replaced with deacon-lite; re-triage or close.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12053,6 +12080,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "stale",
       "dependsOn": [],
       "why": "Stale: would-fire counters (patrol-would-fire.ts) deleted by the PAN-3917 cut (ca15def); re-triage or close",
+      "rationale": "New this run but stale on arrival: filed 2026-09-16..18 against a module the PAN-3917 cut deleted; would-fire counters (patrol-would-fire.ts) deleted by the PAN-3917 cut (ca15def); re-triage or close.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12065,6 +12093,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "stale",
       "dependsOn": [],
       "why": "Stale: checkOrphanedCompletions / deacon.ts patrol deleted by the PAN-3917 cut (ca15def); re-triage or close",
+      "rationale": "New this run but stale on arrival: filed 2026-09-16..18 against a module the PAN-3917 cut deleted; checkOrphanedCompletions / deacon.ts patrol deleted by the PAN-3917 cut (ca15def); re-triage or close.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12077,6 +12106,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "stale",
       "dependsOn": [],
       "why": "Stale: test-status-green-ci-reconciler.ts deleted by the PAN-3917 cut (ca15def); re-file if the symptom recurs on pr-facts",
+      "rationale": "New this run but stale on arrival: filed 2026-09-16..18 against a module the PAN-3917 cut deleted; test-status-green-ci-reconciler.ts deleted by the PAN-3917 cut (ca15def); re-file if the symptom recurs on pr-facts.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12089,6 +12119,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "stale",
       "dependsOn": [],
       "why": "Stale: record lock and pending-work-spawn placeholder deleted by the PAN-3917 cut (ca15def); re-file if handoff spawn still dies",
+      "rationale": "New this run but stale on arrival: filed 2026-09-16..18 against a module the PAN-3917 cut deleted; record lock and pending-work-spawn placeholder deleted by the PAN-3917 cut (ca15def); re-file if handoff spawn still dies.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12101,6 +12132,7 @@ Merge-queue head-of-line zombie — closed PAN-2325 re-triggered on all 294 boot
       "condition": "stale",
       "dependsOn": [],
       "why": "Stale: work-agent-stop-hook was deleted by the PAN-3917 cut (ca15def) (7b953449633); the wrong verb no longer exists",
+      "rationale": "New this run but stale on arrival: filed 2026-09-16..18 against a module the PAN-3917 cut deleted; work-agent-stop-hook was deleted by the PAN-3917 cut (ca15def) (7b953449633); the wrong verb no longer exists.",
       "gate": "auto",
       "planning": "auto"
     },
