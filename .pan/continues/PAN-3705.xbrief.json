@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3705",
   "created": "2026-09-19T10:59:28.419Z",
-  "updated": "2026-09-19T10:59:28.419Z",
+  "updated": "2026-09-19T11:13:03.302Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "pin-conversations-scope-chip": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3705",
-      "claimedAt": "2026-09-19T10:59:28.419Z"
+      "claimedAt": "2026-09-19T10:59:28.419Z",
+      "doneAt": "2026-09-19T11:13:03.301Z"
     }
   }
 }
