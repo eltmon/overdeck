@@ -252,7 +252,7 @@ describe('getPipelineCallToAction', () => {
     expect(getPipelineCallToAction({
       issueId: 'TEST-123',
       state: 'in-review',
-      pr: { url: 'https://x/pull/1', number: 1, reviewState: 'APPROVED', checks: 'red', mergeable: true },
+      pr: { url: 'https://x/pull/1', number: 1, reviewState: 'approved', checks: 'red', mergeable: true },
     })).toEqual({
       label: 'Next: fix checks',
       detail: 'CI checks are failing.',
@@ -264,7 +264,7 @@ describe('getPipelineCallToAction', () => {
     expect(getPipelineCallToAction({
       issueId: 'TEST-123',
       state: 'in-review',
-      pr: { url: 'https://x/pull/1', number: 1, reviewState: 'APPROVED', checks: 'green', mergeable: false },
+      pr: { url: 'https://x/pull/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: false },
     })).toEqual({
       label: 'Next: rebase',
       detail: 'The branch cannot merge cleanly.',
@@ -276,7 +276,7 @@ describe('getPipelineCallToAction', () => {
     expect(getPipelineCallToAction({
       issueId: 'TEST-123',
       state: 'ready',
-      pr: { url: 'https://x/pull/1', number: 1, reviewState: 'APPROVED', checks: 'green', mergeable: true },
+      pr: { url: 'https://x/pull/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true },
     })).toBeNull();
   });
 });
@@ -737,13 +737,13 @@ describe('KanbanBoard j/k card navigation', () => {
 const READY_DERIVED: DerivedIssueState = {
   issueId: 'TEST-123',
   state: 'ready',
-  pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'APPROVED', checks: 'green', mergeable: true },
+  pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true },
 };
 
 const CHANGES_REQUESTED_DERIVED: DerivedIssueState = {
   issueId: 'TEST-123',
   state: 'changes-requested',
-  pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'CHANGES_REQUESTED', checks: 'green', mergeable: true },
+  pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'changes-requested', checks: 'green', mergeable: true },
 };
 
 const WORKING_DERIVED: DerivedIssueState = { issueId: 'TEST-123', state: 'working' };

@@ -80,7 +80,7 @@ describe('NeedsYouSlot', () => {
         issueId: 'PAN-3356',
         state: 'changes-requested',
         attention: 'stuck',
-        pr: { url: 'https://example.test/pr/3356', number: 3356, reviewState: 'CHANGES_REQUESTED', checks: 'red', mergeable: false },
+        pr: { url: 'https://example.test/pr/3356', number: 3356, reviewState: 'changes-requested', checks: 'red', mergeable: false },
       },
       undefined,
       undefined,

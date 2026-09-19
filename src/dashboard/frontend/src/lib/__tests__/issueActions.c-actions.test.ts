@@ -108,7 +108,7 @@ describe('C-ACTIONS · registry hygiene', () => {
 });
 
 const WORK_PANE = [{ id: 'pane-work', issue: 'PAN-1', role: 'work' as const, harness: 'claude-code', model: 'claude-opus-5', state: 'working' as const }];
-const OPEN_PR = { url: 'https://example.test/pr/1', number: 1, reviewState: 'APPROVED', checks: 'green' as const, mergeable: true };
+const OPEN_PR = { url: 'https://example.test/pr/1', number: 1, reviewState: 'approved', checks: 'green' as const, mergeable: true };
 
 function baseState(overrides: Partial<IssueActionState> = {}): IssueActionState {
   return {
@@ -227,8 +227,8 @@ describe('C-ACTIONS · enabled-set snapshot per phase (§3.9 gate)', () => {
       WORK_RUNNING: baseState({ agent: workAgent('running'), hasPlan: true, hasTasks: true, issueCanonicalState: 'in_progress', workspace: ws }),
       WORK_IDLE: baseState({ agent: workAgent('stopped'), hasPlan: true, hasTasks: true, issueCanonicalState: 'in_progress', workspace: ws }),
       WORK_PAUSED: baseState({ agent: workAgent('running', { paused: true }), hasPlan: true, hasTasks: true, issueCanonicalState: 'in_progress', workspace: ws }),
-      REVIEW_RUNNING: baseState({ derived: { issueId: 'PAN-1', state: 'in-review', pr: { ...OPEN_PR, reviewState: 'REVIEW_REQUIRED', checks: 'pending' } }, hasPlan: true, hasTasks: true, issueCanonicalState: 'in_review', workspace: ws }),
-      CHANGES_REQUESTED: baseState({ derived: { issueId: 'PAN-1', state: 'changes-requested', pr: { ...OPEN_PR, reviewState: 'CHANGES_REQUESTED', checks: 'red' } }, hasPlan: true, hasTasks: true, issueCanonicalState: 'in_review', workspace: ws }),
+      REVIEW_RUNNING: baseState({ derived: { issueId: 'PAN-1', state: 'in-review', pr: { ...OPEN_PR, reviewState: 'review-requested', checks: 'pending' } }, hasPlan: true, hasTasks: true, issueCanonicalState: 'in_review', workspace: ws }),
+      CHANGES_REQUESTED: baseState({ derived: { issueId: 'PAN-1', state: 'changes-requested', pr: { ...OPEN_PR, reviewState: 'changes-requested', checks: 'red' } }, hasPlan: true, hasTasks: true, issueCanonicalState: 'in_review', workspace: ws }),
       READY_TO_MERGE: baseState({ derived: { issueId: 'PAN-1', state: 'ready', pr: OPEN_PR }, hasPlan: true, hasTasks: true, issueCanonicalState: 'in_review', workspace: ws }),
       MERGED: baseState({ derived: { issueId: 'PAN-1', state: 'merged' }, isMerged: true, issueCanonicalState: 'done', workspace: ws }),
     };

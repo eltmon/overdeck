@@ -480,56 +480,16 @@ export interface StateTransitionResult {
   warnings: string[];
 }
 
-// ─── Derived read model (PAN-3917 W6/W7) ──────────────────────────────────────
-// TEMPORARY HOME. W6 ships these as `packages/contracts/src/derived-issue-state.ts`
-// and `packages/contracts/src/backend-pane.ts`; the shapes here are identical and
-// the orchestrator swaps every `from '../types'` import for `@overdeck/contracts`
-// at integration. Nothing here is stored — the server computes it at read time
-// from the tracker, the PR, checks, git, and the terminal backend.
+// ─── Derived read model (PAN-3917 FR-6, FR-12) ───────────────────────────────
+// Defined once in packages/contracts. Nothing here is stored — the server
+// computes both from the tracker, the PR, checks, git and the terminal backend
+// on every read. The aliases keep the frontend's call-site spelling.
 
-export type DerivedIssueStateName =
-  | 'backlog'
-  | 'parked'
-  | 'planned'
-  | 'working'
-  | 'in-review'
-  | 'changes-requested'
-  | 'ready'
-  | 'merged'
-  | 'closed';
-
-export type IssueAttention = 'needs-you' | 'stuck' | 'api-error';
-
-export interface DerivedIssueState {
-  issueId: string;
-  state: DerivedIssueStateName;
-  attention?: IssueAttention;
-  pr?: {
-    url: string;
-    number: number;
-    reviewState: string;
-    checks: 'green' | 'red' | 'pending';
-    mergeable: boolean;
-  };
-  branch?: {
-    name: string;
-    aheadOfMain: number;
-    pushed: boolean;
-  };
-}
-
-export type BackendPaneRole = 'work' | 'worker' | 'review' | 'test' | 'uat' | 'strike' | 'plan';
-
-/** Terminal-backend pane state. The backend owns this; nothing mirrors it. */
-export type BackendPaneState = 'idle' | 'working' | 'blocked' | 'done' | 'exited' | 'unknown';
-
-export interface BackendPane {
-  id: string;
-  issue?: string;
-  role: BackendPaneRole;
-  harness: string;
-  model: string;
-  state: BackendPaneState;
-  terminalId?: string;
-  workspace?: string;
-}
+export type {
+  BackendPane,
+  DerivedIssueState,
+  IssueAttention,
+  IssueState as DerivedIssueStateName,
+  AgentRole as BackendPaneRole,
+  AgentState as BackendPaneState,
+} from '@overdeck/contracts';

@@ -50,7 +50,7 @@ describe('derivePipelineState (PAN-3917)', () => {
   it('reads the review states off the derived state and the PR review state', () => {
     expect(derivePipelineState({ derived: derived('in-review') })).toBe('in_review_reviewers_running');
     expect(derivePipelineState({
-      derived: derived('in-review', { pr: { url: 'u', number: 1, reviewState: 'APPROVED', checks: 'pending', mergeable: true } }),
+      derived: derived('in-review', { pr: { url: 'u', number: 1, reviewState: 'approved', checks: 'pending', mergeable: true } }),
     })).toBe('in_review_approved');
     expect(derivePipelineState({ derived: derived('changes-requested') })).toBe('in_review_changes_requested');
   });

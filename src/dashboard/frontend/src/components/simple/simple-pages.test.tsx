@@ -49,7 +49,7 @@ const derived = (state: DerivedIssueStateName, over: Partial<DerivedIssueState> 
   ...over,
 });
 
-const OPEN_PR = { url: 'https://example.com/pr/1', number: 1, reviewState: 'APPROVED', checks: 'green' as const, mergeable: true };
+const OPEN_PR = { url: 'https://example.com/pr/1', number: 1, reviewState: 'approved', checks: 'green' as const, mergeable: true };
 
 const workPane = (state: BackendPane['state'] = 'working'): BackendPane => ({
   id: 'pane-work', issue: 'PAN-1', role: 'work', harness: 'claude-code', model: 'claude-opus-5', state,
@@ -367,7 +367,7 @@ describe('SimpleIssuePage (C-SIMPLE)', () => {
       'needs-you / stuck': { agents: { 'agent-pan-1': makeAgent() }, derivedState: derived('working', { attention: 'stuck' }), panes: [workPane()] },
       'needs-you / problems': {
         agents: { 'agent-pan-1': makeAgent() },
-        derivedState: derived('changes-requested', { pr: { ...OPEN_PR, reviewState: 'CHANGES_REQUESTED', checks: 'red' } }),
+        derivedState: derived('changes-requested', { pr: { ...OPEN_PR, reviewState: 'changes-requested', checks: 'red' } }),
       },
       'ready': { derivedState: derived('ready', { pr: OPEN_PR }) },
       'done': { derivedState: derived('merged', { pr: OPEN_PR }) },

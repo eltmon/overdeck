@@ -274,7 +274,7 @@ describe('pipelineChipFor reads the derived state', () => {
     const chip = pipelineChipFor({
       feature: makeFeature(),
       derived: derivedState('in-review', {
-        pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'APPROVED', checks: 'red', mergeable: true },
+        pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'approved', checks: 'red', mergeable: true },
       }),
       phase: 'review',
     });

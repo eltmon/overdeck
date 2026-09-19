@@ -69,7 +69,7 @@ describe('PipelineView', () => {
         'PAN-1': {
           issueId: 'PAN-1',
           state: 'ready',
-          pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'APPROVED', checks: 'green', mergeable: true },
+          pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true },
         },
         'PAN-2': { issueId: 'PAN-2', state: 'working' },
         'PAN-6': { issueId: 'PAN-6', state: 'working' },
@@ -79,7 +79,7 @@ describe('PipelineView', () => {
         'PAN-4': {
           issueId: 'PAN-4',
           state: 'in-review',
-          pr: { url: 'https://example.com/pr/4', number: 4, reviewState: 'APPROVED', checks: 'red', mergeable: true },
+          pr: { url: 'https://example.com/pr/4', number: 4, reviewState: 'approved', checks: 'red', mergeable: true },
         },
         // An open PR that is not ready yet.
         'PAN-5': {

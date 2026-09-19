@@ -203,7 +203,7 @@ const PHASE_FIXTURES: ReadonlyArray<{ phase: PipelinePhase; state: IssueActionSt
   {
     phase: 'STUCK',
     state: {
-      derived: { issueId: 'PAN-1331', state: 'changes-requested', attention: 'stuck', pr: { url: 'https://example.test/pr/1331', number: 1331, reviewState: 'CHANGES_REQUESTED', checks: 'red', mergeable: false } },
+      derived: { issueId: 'PAN-1331', state: 'changes-requested', attention: 'stuck', pr: { url: 'https://example.test/pr/1331', number: 1331, reviewState: 'changes-requested', checks: 'red', mergeable: false } },
       agent: { status: 'stuck', role: 'work', paused: true },
       lifecycle: { canResumeSession: true },
       workspace: { exists: true, path: '/tmp/feature-pan-1331', mrUrl: 'https://example.test/pr/1331' },
@@ -223,7 +223,7 @@ const PHASE_FIXTURES: ReadonlyArray<{ phase: PipelinePhase; state: IssueActionSt
   {
     phase: 'MERGED',
     state: {
-      derived: { issueId: 'PAN-1331', state: 'merged', pr: { url: 'https://example.test/pr/1331', number: 1331, reviewState: 'APPROVED', checks: 'green', mergeable: true } },
+      derived: { issueId: 'PAN-1331', state: 'merged', pr: { url: 'https://example.test/pr/1331', number: 1331, reviewState: 'approved', checks: 'green', mergeable: true } },
       agent: { status: 'stopped', role: 'work', paused: false },
       lifecycle: { canResumeSession: true },
       workspace: { exists: true, path: '/tmp/feature-pan-1331', mrUrl: 'https://example.test/pr/1331' },
@@ -353,7 +353,7 @@ describe('issue action CLI ↔ dashboard parity', () => {
         'PAN-1331': {
           issueId: 'PAN-1331',
           state: 'ready',
-          pr: { url: 'https://example.test/pr/1331', number: 1331, reviewState: 'APPROVED', checks: 'green', mergeable: true },
+          pr: { url: 'https://example.test/pr/1331', number: 1331, reviewState: 'approved', checks: 'green', mergeable: true },
         },
       },
       backendPanesById: {},

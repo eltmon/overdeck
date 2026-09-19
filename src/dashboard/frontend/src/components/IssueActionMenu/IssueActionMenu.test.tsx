@@ -112,7 +112,7 @@ describe('IssueActionMenu', () => {
         'PAN-1': {
           issueId: 'PAN-1',
           state: 'merged',
-          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'APPROVED', checks: 'green', mergeable: true },
+          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true },
         },
       },
     });
@@ -265,7 +265,7 @@ describe('IssueActionMenu', () => {
         'PAN-1': {
           issueId: 'PAN-1',
           state: 'ready',
-          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'APPROVED', checks: 'green', mergeable: true },
+          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true },
         },
       },
     });

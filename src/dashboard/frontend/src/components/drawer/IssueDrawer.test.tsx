@@ -608,7 +608,7 @@ describe('IssueDrawer', () => {
         'PAN-1': {
           issueId: 'PAN-1',
           state: 'ready',
-          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'APPROVED', checks: 'green', mergeable: true },
+          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true },
         },
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);
@@ -643,7 +643,7 @@ describe('IssueDrawer', () => {
         'PAN-1': {
           issueId: 'PAN-1',
           state: 'in-review',
-          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'REVIEW_REQUIRED', checks: 'red', mergeable: true },
+          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'review-requested', checks: 'red', mergeable: true },
         },
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);
@@ -712,7 +712,7 @@ describe('IssueDrawer', () => {
         'PAN-1': {
           issueId: 'PAN-1',
           state: 'ready',
-          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'APPROVED', checks: 'green', mergeable: true },
+          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true },
         },
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);
@@ -782,7 +782,7 @@ describe('IssueDrawer', () => {
         'PAN-1': {
           issueId: 'PAN-1',
           state: 'ready',
-          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'APPROVED', checks: 'green', mergeable: true },
+          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true },
         },
       },
       backendPanesById: {},
@@ -855,7 +855,7 @@ describe('IssueDrawer', () => {
         'PAN-1': {
           issueId: 'PAN-1',
           state: 'ready',
-          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'APPROVED', checks: 'green', mergeable: true },
+          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true },
         },
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);
@@ -1026,7 +1026,7 @@ describe('conversation switching (PAN-2908 C-DETAIL)', () => {
         'PAN-1': {
           issueId: 'PAN-1',
           state: 'in-review',
-          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'APPROVED', checks: 'green', mergeable: true },
+          pr: { url: 'https://example.test/pr/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true },
         },
       },
     } as Parameters<typeof useDashboardStore.setState>[0]);

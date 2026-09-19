@@ -37,7 +37,7 @@ beforeEach(() => {
       'PAN-1661': {
         issueId: 'PAN-1661',
         state: 'changes-requested',
-        pr: { url: 'https://github.com/eltmon/overdeck/pull/1661', number: 1661, reviewState: 'CHANGES_REQUESTED', checks: 'green', mergeable: true },
+        pr: { url: 'https://github.com/eltmon/overdeck/pull/1661', number: 1661, reviewState: 'changes-requested', checks: 'green', mergeable: true },
       },
     },
   } as Parameters<typeof useDashboardStore.setState>[0])
@@ -817,7 +817,7 @@ describe('IssueMissionControl', () => {
         'PAN-1661': {
           issueId: 'PAN-1661',
           state: 'ready',
-          pr: { url: 'https://github.com/eltmon/overdeck/pull/1661', number: 1661, reviewState: 'APPROVED', checks: 'green', mergeable: true },
+          pr: { url: 'https://github.com/eltmon/overdeck/pull/1661', number: 1661, reviewState: 'approved', checks: 'green', mergeable: true },
         },
       },
     } as Parameters<typeof useDashboardStore.setState>[0])
@@ -860,7 +860,7 @@ describe('IssueMissionControl', () => {
   it('renders the done Overview with an emerald badge and truthful merge metadata', () => {
     useDashboardStore.setState({
       derivedIssueStateByIssueId: {
-        'PAN-1661': { issueId: 'PAN-1661', state: 'merged', pr: { url: 'https://github.com/eltmon/overdeck/pull/1661', number: 1661, reviewState: 'APPROVED', checks: 'green', mergeable: true } },
+        'PAN-1661': { issueId: 'PAN-1661', state: 'merged', pr: { url: 'https://github.com/eltmon/overdeck/pull/1661', number: 1661, reviewState: 'approved', checks: 'green', mergeable: true } },
       },
     } as Parameters<typeof useDashboardStore.setState>[0])
     Object.assign(queryMocks.prQuery.data.pr!, { mergeCommit: { oid: 'mergeabc123' } })

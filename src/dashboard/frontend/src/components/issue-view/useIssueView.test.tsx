@@ -84,7 +84,7 @@ function makeDerived(state: DerivedIssueStateName, overrides: Partial<DerivedIss
   return { issueId: 'PAN-2499', state, ...overrides };
 }
 
-const GREEN_PR = { url: 'https://example.test/pr/2499', number: 2499, reviewState: 'APPROVED', checks: 'green' as const, mergeable: true };
+const GREEN_PR = { url: 'https://example.test/pr/2499', number: 2499, reviewState: 'approved', checks: 'green' as const, mergeable: true };
 
 describe('buildIssueViewModel', () => {
   it('exports the canonical issue-view derivations from the component family', () => {
@@ -329,7 +329,7 @@ describe('buildIssueViewModel', () => {
       undefined,
       undefined,
       undefined,
-      makeDerived('in-review', { pr: { ...GREEN_PR, reviewState: 'REVIEW_REQUIRED', checks: 'pending' } }),
+      makeDerived('in-review', { pr: { ...GREEN_PR, reviewState: 'review-requested', checks: 'pending' } }),
       undefined,
       undefined,
       makeActivity(sessions),
@@ -369,7 +369,7 @@ describe('buildIssueViewModel', () => {
     ];
     const model = buildIssueViewModel(
       'PAN-2499', undefined, undefined, undefined,
-      makeDerived('changes-requested', { pr: { ...GREEN_PR, reviewState: 'CHANGES_REQUESTED', checks: 'red' } }),
+      makeDerived('changes-requested', { pr: { ...GREEN_PR, reviewState: 'changes-requested', checks: 'red' } }),
       undefined, undefined, makeActivity(sessions), {},
     );
 
@@ -383,7 +383,7 @@ describe('buildIssueViewModel', () => {
     ];
     const model = buildIssueViewModel(
       'PAN-2499', undefined, undefined, undefined,
-      makeDerived('in-review', { pr: { ...GREEN_PR, reviewState: 'REVIEW_REQUIRED', checks: 'pending' } }),
+      makeDerived('in-review', { pr: { ...GREEN_PR, reviewState: 'review-requested', checks: 'pending' } }),
       undefined, undefined, makeActivity(sessions), {},
     );
 

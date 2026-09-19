@@ -10,6 +10,8 @@ import { useMemo } from 'react'
 import { create } from 'zustand'
 import type {
   AgentSnapshot,
+  BackendPane,
+  DerivedIssueState,
   ChannelPermissionRequestSnapshot,
   DashboardSnapshot,
   DomainEvent,
@@ -29,7 +31,6 @@ import {
   applyEvents as applyEventsShared,
 } from '@overdeck/contracts'
 import { saveSnapshotToCache } from './snapshotCache'
-import type { BackendPane, DerivedIssueState } from '../types'
 
 // ─── State shape ──────────────────────────────────────────────────────────────
 
@@ -39,15 +40,6 @@ export type DrawerState = {
 }
 
 export interface DashboardState extends ReadModelState {
-  /**
-   * PAN-3917 — derived issue state, keyed by issue id. The server computes it
-   * per read from the tracker, the PR, checks, git, and the terminal backend;
-   * nothing here is stored or written back. Declared locally until W6's
-   * ReadModelState carries it (see types.ts).
-   */
-  derivedIssueStateByIssueId: Record<string, DerivedIssueState>
-  /** PAN-3917 — terminal-backend panes, keyed by pane id. The backend owns this. */
-  backendPanesById: Record<string, BackendPane>
   drawer: DrawerState
   tasksViewerIssueId: string | null
   prdViewerIssueId: string | null
@@ -108,8 +100,6 @@ function publishDashboardDomainEvents(events: readonly DomainEvent[]): void {
 
 const initialState: DashboardState = {
   ...INITIAL_READ_MODEL_STATE,
-  derivedIssueStateByIssueId: {},
-  backendPanesById: {},
   drawer: { issueId: null, tab: 'overview' },
   tasksViewerIssueId: null,
   prdViewerIssueId: null,
@@ -120,47 +110,9 @@ const initialState: DashboardState = {
 
 // ─── Thin wrappers over shared reducers (add bootstrapComplete flag) ─────────
 
-/** The W6 snapshot carries the derived read model alongside the shared fields. */
-type DerivedSnapshotFields = {
-  derivedIssueStates?: DerivedIssueState[]
-  backendPanes?: BackendPane[]
-}
-
-function byIssueId(states: DerivedIssueState[] | undefined): Record<string, DerivedIssueState> {
-  return Object.fromEntries((states ?? []).map((entry) => [entry.issueId, entry]))
-}
-
-function byPaneId(panes: BackendPane[] | undefined): Record<string, BackendPane> {
-  return Object.fromEntries((panes ?? []).map((pane) => [pane.id, pane]))
-}
-
-function applyDerivedEvent(state: DashboardState, event: DomainEvent): Pick<DashboardState, 'derivedIssueStateByIssueId' | 'backendPanesById'> {
-  const payload = event as unknown as { type: string; issueState?: DerivedIssueState; pane?: BackendPane; paneId?: string }
-  if (payload.type === 'issue_state.changed' && payload.issueState) {
-    return {
-      derivedIssueStateByIssueId: { ...state.derivedIssueStateByIssueId, [payload.issueState.issueId]: payload.issueState },
-      backendPanesById: state.backendPanesById,
-    }
-  }
-  if (payload.type === 'backend_pane.changed' && payload.pane) {
-    return {
-      derivedIssueStateByIssueId: state.derivedIssueStateByIssueId,
-      backendPanesById: { ...state.backendPanesById, [payload.pane.id]: payload.pane },
-    }
-  }
-  if (payload.type === 'backend_pane.removed' && payload.paneId) {
-    const { [payload.paneId]: _removed, ...rest } = state.backendPanesById
-    return { derivedIssueStateByIssueId: state.derivedIssueStateByIssueId, backendPanesById: rest }
-  }
-  return { derivedIssueStateByIssueId: state.derivedIssueStateByIssueId, backendPanesById: state.backendPanesById }
-}
-
 function syncSnapshot(state: DashboardState, snapshot: DashboardSnapshot): DashboardState {
-  const derived = snapshot as DashboardSnapshot & DerivedSnapshotFields
   return {
     ...syncSnapshotShared(state, snapshot),
-    derivedIssueStateByIssueId: byIssueId(derived.derivedIssueStates),
-    backendPanesById: byPaneId(derived.backendPanes),
     drawer: state.drawer,
     tasksViewerIssueId: state.tasksViewerIssueId,
     prdViewerIssueId: state.prdViewerIssueId,
@@ -173,7 +125,6 @@ function syncSnapshot(state: DashboardState, snapshot: DashboardSnapshot): Dashb
 function applyEvent(state: DashboardState, event: DomainEvent): DashboardState {
   return {
     ...applyEventShared(state, event),
-    ...applyDerivedEvent(state, event),
     drawer: state.drawer,
     tasksViewerIssueId: state.tasksViewerIssueId,
     prdViewerIssueId: state.prdViewerIssueId,
@@ -186,10 +137,6 @@ function applyEvent(state: DashboardState, event: DomainEvent): DashboardState {
 function applyEvents(state: DashboardState, events: DomainEvent[]): DashboardState {
   return {
     ...applyEventsShared(state, events),
-    ...events.reduce(
-      (acc, event) => applyDerivedEvent({ ...state, ...acc }, event),
-      { derivedIssueStateByIssueId: state.derivedIssueStateByIssueId, backendPanesById: state.backendPanesById },
-    ),
     drawer: state.drawer,
     tasksViewerIssueId: state.tasksViewerIssueId,
     prdViewerIssueId: state.prdViewerIssueId,

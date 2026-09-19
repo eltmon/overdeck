@@ -21,7 +21,7 @@ const DOT: Record<CockpitTone, string> = {
  */
 function reviewStep(issue: DerivedIssueState | undefined): { tone: CockpitTone; label: string } {
   if (issue?.state === 'changes-requested') return { tone: 'destructive', label: 'Changes requested' }
-  if (issue?.pr?.reviewState === 'APPROVED') return { tone: 'success', label: 'Approved' }
+  if (issue?.pr?.reviewState === 'approved') return { tone: 'success', label: 'Approved' }
   if (issue?.state === 'in-review') return { tone: 'warning', label: 'In review' }
   return { tone: 'muted', label: 'No review' }
 }

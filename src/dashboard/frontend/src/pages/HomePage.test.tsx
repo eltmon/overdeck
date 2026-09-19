@@ -149,7 +149,7 @@ describe('HomePage', () => {
         'PAN-1': {
           issueId: 'PAN-1',
           state: 'ready',
-          pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'APPROVED', checks: 'green', mergeable: true },
+          pr: { url: 'https://example.com/pr/1', number: 1, reviewState: 'approved', checks: 'green', mergeable: true },
         },
         'PAN-2': { issueId: 'PAN-2', state: 'merged' },
         'PAN-3': { issueId: 'PAN-3', state: 'working', attention: 'needs-you' },
