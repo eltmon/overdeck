@@ -142,7 +142,7 @@ describe('overdeck Issues vertical slice', () => {
           }).run(),
         );
         const resolver = yield* IssuesResolver;
-        const ready = yield* resolver.list({ readyForMerge: true });
+        const ready = yield* resolver.list({ mergeReady: true });
         return ready.map((issue) => issue.id);
       }).pipe(
         Effect.provide(IssuesResolverLive),

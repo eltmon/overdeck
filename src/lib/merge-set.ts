@@ -26,11 +26,11 @@ export interface MergeSetRepoState {
   targetBranch: string;
   artifactUrl?: string;
   artifactId?: string;
-  reviewStatus: MergeSetGateStatus;
-  testStatus: MergeSetGateStatus;
+  repoReview: MergeSetGateStatus;
+  repoTests: MergeSetGateStatus;
   rebaseStatus: MergeSetRebaseStatus;
   verificationStatus: MergeSetGateStatus;
-  mergeStatus: MergeSetRepoMergeStatus;
+  repoMerge: MergeSetRepoMergeStatus;
   mergeOrder: number;
   required: boolean;
 }
@@ -84,11 +84,11 @@ export function buildMergeSetForIssueSync(issueId: string, labels: string[] = []
       forge: repo.forge,
       sourceBranch: repo.sourceBranch,
       targetBranch: repo.targetBranch,
-      reviewStatus: 'pending',
-      testStatus: 'pending',
+      repoReview: 'pending',
+      repoTests: 'pending',
       rebaseStatus: 'pending',
       verificationStatus: 'pending',
-      mergeStatus: 'pending',
+      repoMerge: 'pending',
       mergeOrder: repo.mergeOrder,
       required: repo.required,
     })),
@@ -143,7 +143,7 @@ export function patchMergeSetRepoSync(
   issueId: string,
   repoKey: string,
   expected: Pick<MergeSetRepoState, 'sourceBranch' | 'targetBranch' | 'artifactUrl' | 'artifactId'>,
-  patch: Partial<Pick<MergeSetRepoState, 'artifactUrl' | 'artifactId' | 'mergeStatus'>>,
+  patch: Partial<Pick<MergeSetRepoState, 'artifactUrl' | 'artifactId' | 'repoMerge'>>,
 ): boolean {
   return dbPatchRepo(resolveIssueIdSync(issueId), repoKey, expected, patch);
 }

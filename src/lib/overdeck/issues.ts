@@ -87,7 +87,7 @@ export type Issue = typeof Issue.Type;
 
 export const IssueFilter = Schema.Struct({
   stage: Schema.optional(Stage),
-  readyForMerge: Schema.optional(Schema.Boolean),
+  mergeReady: Schema.optional(Schema.Boolean),
 });
 export type IssueFilter = typeof IssueFilter.Type;
 
@@ -158,7 +158,7 @@ function rowToIssue(row: IssueRow): Issue {
   });
 }
 
-function readyForMerge(issue: Issue): boolean {
+function mergeReady(issue: Issue): boolean {
   return issue.reviewOutcome === 'passed'
     && (issue.testOutcome === 'passed' || issue.testOutcome === 'skipped')
     && issue.verificationOutcome !== 'failed'
@@ -203,9 +203,9 @@ export const IssuesResolverLive = Layer.effect(
             : db.q.select().from(overdeckIssues),
         );
         const issues = rows.map(rowToIssue);
-        return filter.readyForMerge === undefined
+        return filter.mergeReady === undefined
           ? issues
-          : issues.filter((issue) => readyForMerge(issue) === filter.readyForMerge);
+          : issues.filter((issue) => mergeReady(issue) === filter.mergeReady);
       });
 
     const getPlan = (id: IssueId) =>
