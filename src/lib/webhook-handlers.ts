@@ -6,7 +6,9 @@
  * reads it on demand, so nothing is written back here any more. What is left is
  * the work a webhook can do that a read cannot: invalidate the PR-tab cache,
  * record a default-branch CI suite observation, relay a CI failure to the work
- * agent, and fire the post-merge lifecycle for merges that bypassed Overdeck.
+ * agent, start the review pipeline for a PR opened or readied outside
+ * `pan done`, and fire the post-merge lifecycle for merges that bypassed
+ * Overdeck.
  * Shared advisory-check classification keeps CodeRabbit out of merge gates.
  */
 
@@ -251,6 +253,39 @@ async function handlePullRequestPromise(payload: WebhookPayload): Promise<void> 
       }
     } catch (err: any) {
       console.warn(`[webhook] Failed to enqueue membership refresh for ${issueId}: ${err?.message ?? err}`);
+    }
+  }
+
+  // PAN-3917 (W12): a pull request that is open and not a draft IS the review
+  // request. `pan done` asks the dashboard directly, but a PR opened or readied
+  // by hand never called it, so the convoy never started. Start the same
+  // pipeline here; `requestReviewPipeline.isInFlight` coalesces the two callers
+  // and the whole path is best-effort — a webhook must never throw.
+  // The pipeline verifies, pushes and reviews `feature/<issue>` — the branch the
+  // workspace is on. A strike or bypass PR names the same issue but a different
+  // branch, so starting here would review something the PR does not contain.
+  if (
+    (payload.action === 'opened' || payload.action === 'ready_for_review')
+    && pr.draft !== true
+    && pr.merged !== true
+    && (pr.state ?? 'open') !== 'closed'
+    && pr.head.ref.toLowerCase().startsWith('feature/')
+  ) {
+    try {
+      const { getRequestReviewStarter } = await import('./cloister/request-review-pipeline.js');
+      const startReview = getRequestReviewStarter();
+      if (!startReview) {
+        console.warn(`[webhook] No review starter registered — not starting review for ${issueId}`);
+      } else {
+        const outcome = await startReview(issueId, {
+          note: `PR ${payload.action} on ${repo}#${pr.number} — starting verification`,
+        });
+        if (!outcome.started) {
+          console.log(`[webhook] Review not started for ${issueId}: ${outcome.reason}`);
+        }
+      }
+    } catch (err: any) {
+      console.warn(`[webhook] Failed to start the review pipeline for ${issueId}: ${err?.message ?? err}`);
     }
   }
 
