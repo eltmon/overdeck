@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => ({
   resolveProjectFromIssueSync: vi.fn(),
   getProjectSync: vi.fn(),
   ensureDevcontainerSync: vi.fn(),
+  getReviewStatusSync: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/cloister/issue-closed.js', () => ({
@@ -51,11 +52,15 @@ vi.mock('../../../../src/lib/workspace/ensure-devcontainer.js', () => ({
   ensureDevcontainerSync: mocks.ensureDevcontainerSync,
 }));
 
+// PAN-3917: review-status.ts still imports four cloister modules on the
+// Appendix A.1 delete list (review-status-source.ts among them) — it is not
+// actually loadable at test time. Mock it wholesale rather than let rebuild-stack.ts's
+// dynamic import(review-status.js) reach the real (broken) module.
+vi.mock('../../../../src/lib/review-status.js', () => ({
+  getReviewStatusSync: mocks.getReviewStatusSync,
+}));
+
 import { rebuildWorkspaceStack } from '../../../../src/lib/workspace/rebuild-stack.js';
-import {
-  registerCanonicalReviewStatusResolver,
-  registerReviewStatusMapReader,
-} from '../../../../src/lib/cloister/review-status-source.js';
 
 let tmpRoot: string | null = null;
 
@@ -89,8 +94,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   calls.length = 0;
   responses = {};
-  registerReviewStatusMapReader(() => ({}));
-  registerCanonicalReviewStatusResolver(() => null);
+  mocks.getReviewStatusSync.mockReturnValue(null);
   mocks.isIssueClosed.mockResolvedValue(false);
 });
 
