@@ -247,6 +247,10 @@ export async function listAgentTranscriptCandidates(
   const homes = await codexHomes(agentDir);
   const musePaths = await listMuseSessionPaths(agentId, root);
   for (const entry of entries) {
+    if (entry.path) {
+      indexedPaths.set(transcriptCandidateKey(transcriptCandidateKind(entry.harness ?? currentHarness), entry.sessionId), entry.path);
+      continue;
+    }
     for (const kind of transcriptCandidateKinds(entry.harness, currentHarness)) {
       let path: string | null = null;
       if (kind === 'claude') path = join(projectDir, `${entry.sessionId}.jsonl`);

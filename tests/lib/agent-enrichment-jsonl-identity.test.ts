@@ -163,6 +163,33 @@ describe('getAgentJsonlPath()', () => {
 
     expect(resolved).toBeNull();
   });
+
+  it('resolves via the recorded transcript path even when it differs from the per-harness formula location (PAN-3959)', async () => {
+    const agentId = 'agent-pan-3959-path';
+    const projectDir = getClaudeProjectDir(WORKSPACE);
+    mkdirSync(projectDir, { recursive: true });
+    // Formula location for OWN_SESSION — must not be the resolved path.
+    writeFileSync(join(projectDir, `${OWN_SESSION}.jsonl`), '{"formula":"wrong"}\n');
+    const recordedDir = join(fakeHome, 'recorded');
+    mkdirSync(recordedDir, { recursive: true });
+    const recordedPath = join(recordedDir, `${OWN_SESSION}.jsonl`);
+    writeFileSync(recordedPath, '{"recorded":"right"}\n');
+
+    ownSessionIds.set(agentId, OWN_SESSION);
+    const agentDir = join(process.env.OVERDECK_HOME ?? join(fakeHome, '.overdeck'), 'agents', agentId);
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, 'sessions.json'), `${JSON.stringify({
+      sessionId: OWN_SESSION,
+      at: '2026-07-28T10:00:00.000Z',
+      source: 'test',
+      harness: 'claude-code',
+      path: recordedPath,
+    })}\n`);
+
+    const resolved = await Effect.runPromise(getAgentJsonlPath(agentId));
+
+    expect(resolved).toBe(recordedPath);
+  });
 });
 
 describe('forced fresh-session decision boundary', () => {
