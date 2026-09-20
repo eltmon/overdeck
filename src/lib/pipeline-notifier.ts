@@ -24,7 +24,16 @@ export type PipelineEvent =
   | { type: 'reviewer_completed'; issueId: string; role: string }
   | { type: 'reviewer_timed_out'; issueId: string; role: string; sessionName: string; attempt: number; maxRetries: number; willRetry: boolean }
   | { type: 'coordinator_started'; issueId: string; sessionName: string }
-  | { type: 'coordinator_died'; issueId: string; sessionName: string; reason: string };
+  | { type: 'coordinator_died'; issueId: string; sessionName: string; reason: string }
+  // The append-only per-issue pipeline journal (see cloister/pipeline-journal.ts).
+  // Plain JSON, so the HTTP forward below carries it verbatim from a CLI
+  // process. The entry is typed structurally rather than imported: the journal
+  // module imports THIS one, and an import back would close a cycle.
+  | {
+    type: 'pipeline.entry';
+    issueId: string;
+    entry: { at: string; type: string; issueId: string; source?: string; data?: Record<string, unknown> };
+  };
 
 type Handler = (event: PipelineEvent) => void;
 let handler: Handler | null = null;
