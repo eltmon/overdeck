@@ -80,6 +80,7 @@ describe('session-start-hook compaction repair (PAN-2884)', () => {
       session_id: 'session-2884',
       model: 'gpt-5.6-sol',
       source: 'compact',
+      transcript_path: '/fixture/transcripts/session-2884.jsonl',
     })
 
     const { stdout, code } = await runHook(tempDir, input, {
@@ -122,6 +123,7 @@ describe('session-start-hook compaction repair (PAN-2884)', () => {
       source: 'session-start-hook',
       harness: 'claude-code',
       model: 'gpt-5.6-sol',
+      path: '/fixture/transcripts/session-2884.jsonl',
     })
 
     const curlArgs = readFileSync(curlLog, 'utf-8')
