@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3937",
   "created": "2026-09-20T20:38:35.661Z",
-  "updated": "2026-09-20T20:43:28.308Z",
+  "updated": "2026-09-20T20:43:29.534Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -110,6 +110,11 @@
       "claimedBy": "conv-20260920-4179",
       "claimedAt": "2026-09-20T20:43:17.609Z",
       "doneAt": "2026-09-20T20:43:28.307Z"
+    },
+    "acp-host-permission-watchdog.ac5": {
+      "status": "in_progress",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:43:29.534Z"
     }
   }
 }
