@@ -1,0 +1,754 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-20T12:30:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3959: Record the transcript path in the session index at session start; resolver stops guessing per harness",
+    "updated": "2026-09-20T12:44:32.479Z"
+  },
+  "plan": {
+    "id": "pan-3959",
+    "title": "Record the transcript path in the session index at session start; resolver stops guessing per harness",
+    "status": "proposed",
+    "uid": "2c36f229-cf83-4b68-a612-802167369b81",
+    "author": "agent:k3",
+    "sequence": 2,
+    "created": "2026-09-20T12:30:00.000Z",
+    "updated": "2026-09-20T12:44:32.479Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3959",
+        "label": "PAN-3959",
+        "type": "issue"
+      },
+      {
+        "uri": "drafts/pan-3959.md",
+        "label": "PRD draft",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/pull/3951",
+        "label": "PAN-3950 baseline PR (feature/pan-3950 @ fd42eb98876)",
+        "type": "pr"
+      }
+    ],
+    "tags": [
+      "session-index",
+      "transcript-resolution",
+      "harnesses",
+      "backend"
+    ],
+    "narratives": {
+      "Problem": "Resolving where an agent's transcript lives requires per-harness path formulas applied to session ids, duplicated across two resolver adapters (sync agent-enrichment, async jsonl-resolver) that must stay parity-perfect, plus launcher.sh greps and runtime-state mirrors that exist only because the sessions.json index never recorded the path it already knew at session start.",
+      "Proposal": "Add an optional absolute `path` field to session-index entries; every harness capture point (Claude SessionStart/heartbeat hooks, codex thread capture, kimi session capture, pi/ohmypi extension session_start/turn_end, ACP host, muse spawn) appends it; both resolver adapters short-circuit per-harness formulas for path-carrying entries; then delete the launcherPinned and stateDerived guessing extras. Per-entry formula branches stay untouched as the legacy fallback (PAN-3958 consolidates them). Baseline is origin/feature/pan-3950 @ fd42eb98876 per the operator's planning note.",
+      "NonGoals": "- Consolidating or deleting the per-entry per-harness path formulas (PAN-3958)\n- Touching the legacy fallback branches for pathless entries\n- Instrumenting conversation-launched muse sessions (no capture point exists; they resolve via conversation routes)\n- Changing watchForAgentTranscriptCandidate (it shrinks automatically as candidates become exact)\n- Moving or renaming the exported resolve* helpers in jsonl-resolver.ts (ws-rpc and conversation modules import them)\n- Deleting historical transcripts or rewriting existing sessions.json lines"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Baseline is origin/feature/pan-3950 @ fd42eb98876, not main",
+        "rationale": "Operator planning note on the issue directs planning against the shape PR #3951 lands; the sessions.json index, orderedTranscriptCandidates, and the deleted session.id pointer all come from that branch."
+      },
+      {
+        "summary": "launcherPinned + stateDerived are deleted now; per-entry formula branches are the 'legacy fallback' that stays",
+        "rationale": "Only reading that satisfies all three constraints: issue demands net-negative production lines and that the named tests survive deleting all harness-specific helpers except the legacy fallback; planning note demands the fallback stay untouched for PAN-3958."
+      },
+      {
+        "summary": "Dedupe in parseSessionIndex inherits a displaced entry's path when the newer duplicate is pathless",
+        "rationale": "The server-side observeSessionIndexEvent and the jq-less hook path can append a later pathless entry for the same sessionId; plain newest-wins would erase the recorded path."
+      },
+      {
+        "summary": "Pi/ohmypi record via bounded sessions-dir scan at session_start plus a turn_end sessionLogPath upgrade entry",
+        "rationale": "The extension's SessionStartEvent carries no path field, but TurnEndEvent.sessionLogPath is the harness's own absolute path; dedupe makes the upgraded entry authoritative."
+      },
+      {
+        "summary": "Conversation-launched muse sessions are not instrumented",
+        "rationale": "No post-launch session wait exists on that path; adding a poller is new machinery and conversation transcripts resolve through the conversation route anyway."
+      },
+      {
+        "summary": "plan.metadata.sizeJustification is set for the projected-surface lint",
+        "rationale": "The record shape only has value when all six harness writers land together; splitting per harness would serialize on the same schema and ship a half-instrumented index. Every file is named and each item is small."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One inseparable change: the index record shape only has value when the schema (W1), the resolver fast-path (W3), and all six harness writers (W2, W4-W7) land together — splitting per harness would ship a half-instrumented index and re-create the parity drift this issue removes. Scope is already minimal: no new modules, no consolidation, ~27 named files across 9 items.",
+      "canonicalFilename": "2026-09-20-PAN-3959-record-the-transcript-path-in-the-session-index-at-session-start-resolver-stops-guessing-per-harness.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "w1-index-path-field",
+        "title": "W1: Session index entries carry an optional absolute transcript path",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-09-20T12:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3959",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/session-history.ts",
+            "tests/unit/lib/agents/session-index.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/agents/session-index.test.ts"
+          ],
+          "expected_outputs": [
+            "Given an appended entry carrying metadata.path, then parseSessionIndex returns the entry with path intact.",
+            "Given a pathless re-append of the same sessionId, then parseSessionIndex preserves the earlier entry's path on the kept entry.",
+            "Given an entry whose serialized line exceeds 4095 bytes, then appendSessionIdToHistory throws as before."
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ],
+          "foundationFor": [
+            "w2-claude-hooks-record-path",
+            "w3-resolver-path-fast-path",
+            "w4-codex-writers-record-path",
+            "w5-kimi-capture-records-path",
+            "w6-pi-ohmypi-extensions-record-path",
+            "w7-acp-muse-writers-record-path",
+            "w8-drop-guessing-extras"
+          ],
+          "parallelSafeReason": "Owns session-history.ts and its test alone; every other item consumes the pinned record shape rather than co-editing the file (w8 shares it and is edge-gated)."
+        },
+        "narrative": {
+          "Action": "In src/lib/session-history.ts (baseline origin/feature/pan-3950 @ fd42eb98876): add `path?: string` to SessionIndexEntry (:30-36) with a comment that it is the absolute transcript path recorded at session start; pass it through in normalizeSessionEntry (:100-114) when it is a non-empty trimmed string; extend appendSessionIdToHistory (:205-226) metadata with `path?: string` and spread `...(path ? { path } : {})` into the serialized line (4095-byte guard unchanged); make the parseSessionIndex dedupe loop (:148-153) inherit the displaced entry's path when the newer duplicate is pathless (`!entry.path && prev?.path ? { ...entry, path: prev.path } : entry`); add one line to the module header. Extend tests/unit/lib/agents/session-index.test.ts with the round-trip, inheritance, replacement-wins, reset-clears, and oversize-throws cases from PRD W1."
+        },
+        "items": [
+          {
+            "id": "w1-index-path-field.ac1",
+            "title": "Given an entry appended with metadata.path, when parseSessionIndex reads the file, then the returned entry contains the identical absolute path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-index-path-field.ac2",
+            "title": "Given a path-carrying entry followed by a pathless duplicate of the same sessionId, parseSessionIndex preserves the path on the surviving entry.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-index-path-field.ac3",
+            "title": "Given a duplicate carrying a different path, the newer path wins outright in the parsed output.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w1-index-path-field.ac4",
+            "title": "npx vitest run tests/unit/lib/agents/session-index.test.ts exits 0 and npm run typecheck exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w2-claude-hooks-record-path",
+        "title": "W2: Claude hooks and the model_set observer record transcript_path",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-20T12:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3959",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/hooks/pan-hook-lib.sh",
+            "sync-sources/hooks/*-hook",
+            "src/dashboard/server/services/agent-state-service.ts",
+            "tests/scripts/session-start-hook.test.ts",
+            "tests/unit/dashboard/server/services/agent-state-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/scripts/session-start-hook.test.ts tests/unit/dashboard/server/services/agent-state-service.test.ts"
+          ],
+          "expected_outputs": [
+            "Given a SessionStart payload with transcript_path, then the appended sessions.json line contains that path and the model_set event body carries transcriptPath.",
+            "Given a model_set event with transcriptPath, then observeSessionIndexEvent appends an index entry carrying path."
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ],
+          "parallelSafeReason": "Shell hooks and one server service; no overlap with the TS writer items."
+        },
+        "narrative": {
+          "Action": "pan_append_session_index in sync-sources/hooks/pan-hook-lib.sh (:121-138) gains a seventh positional arg path=\"${7:-}\" and its jq filter becomes `{...} + (if $path == \"\" then {} else {path: $path} end)` with --arg path \"$path\". session-start-hook (:25-29, :46): parse TRANSCRIPT_PATH from .transcript_path, pass it as arg 7 to pan_append_session_index, and add transcriptPath to the model_set BODY builder (:59-61) via --arg tp + the same conditional. heartbeat-hook (:68-70): parse .transcript_path from its payload and pass it as arg 7. In src/dashboard/server/services/agent-state-service.ts observeSessionIndexEvent (:73-84), the payload type gains transcriptPath?: string and the append call passes { model: payload.model, path: payload.transcriptPath } (undefined when empty). Extend tests/scripts/session-start-hook.test.ts to assert the sessions.json line carries the fixture transcript_path, and tests/unit/dashboard/server/services/agent-state-service.test.ts to assert a transcriptPath-carrying model_set event appends an entry with path."
+        },
+        "items": [
+          {
+            "id": "w2-claude-hooks-record-path.ac1",
+            "title": "Given a fixture SessionStart payload containing transcript_path, running session-start-hook produces a sessions.json line that contains that path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-claude-hooks-record-path.ac2",
+            "title": "Given the same payload, the emitted model_set event body contains transcriptPath with the same value.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-claude-hooks-record-path.ac3",
+            "title": "Given a model_set event carrying transcriptPath, observeSessionIndexEvent appends a sessions.json entry that records that path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w2-claude-hooks-record-path.ac4",
+            "title": "Given jq is absent, the hook falls back to writing no new fields and still exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w3-resolver-path-fast-path",
+        "title": "W3: Both resolver adapters prefer recorded paths over per-harness formulas",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-09-20T12:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3959",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agent-enrichment.ts",
+            "src/dashboard/server/routes/jsonl-resolver.ts",
+            "tests/lib/agent-enrichment-jsonl-identity.test.ts",
+            "src/dashboard/server/routes/__tests__/jsonl-resolver.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/agent-enrichment-jsonl-identity.test.ts src/dashboard/server/routes/__tests__/jsonl-resolver.test.ts"
+          ],
+          "expected_outputs": [
+            "Given an index entry carrying path whose file exists, then listAgentTranscriptCandidates returns that path as the entry's only candidate and resolves to it.",
+            "Given an entry without path, then resolution falls back to the per-harness formula exactly as before."
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Owns the two adapters and their two test files; writers append data the adapters only read."
+        },
+        "narrative": {
+          "Action": "Make the identical edit in both entry loops — src/lib/agent-enrichment.ts listAgentTranscriptCandidatesSync (:263-284) and src/dashboard/server/routes/jsonl-resolver.ts listAgentTranscriptCandidates (:234-253): before the per-kind formula, `if (entry.path) { indexedPaths.set(transcriptCandidateKey(transcriptCandidateKind(entry.harness ?? currentHarness), entry.sessionId), entry.path); continue; }`. orderedTranscriptCandidates needs no change. Extend jsonl-resolver.test.ts with: path-carrying entry resolves to the recorded file with no formula-derived candidate for the same entry; missing recorded file falls through to the next older entry; pathless entry still resolves via its formula. Extend tests/lib/agent-enrichment-jsonl-identity.test.ts with the same fast-path coverage through getAgentJsonlPath using sessions.json fixtures whose entries carry path."
+        },
+        "items": [
+          {
+            "id": "w3-resolver-path-fast-path.ac1",
+            "title": "Given an entry with path, both adapters produce exactly one candidate for that entry and resolve to the recorded file when it exists.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-resolver-path-fast-path.ac2",
+            "title": "Given a recorded path whose file is missing, resolution falls back to the next older entry's candidate.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-resolver-path-fast-path.ac3",
+            "title": "Given an entry without path, the per-harness formula branch resolves it identically to before the change.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w3-resolver-path-fast-path.ac4",
+            "title": "npx vitest run tests/lib/agent-enrichment-jsonl-identity.test.ts src/dashboard/server/routes/__tests__/jsonl-resolver.test.ts exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w4-codex-writers-record-path",
+        "title": "W4: Codex capture points record the rollout path",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-20T12:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3959",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/runtimes/codex.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/codex/app-server-host.ts",
+            "src/lib/runtimes/__tests__/codex.test.ts",
+            "src/lib/codex/__tests__/app-server-host.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/runtimes/__tests__/codex.test.ts src/lib/codex/__tests__/app-server-host.test.ts"
+          ],
+          "expected_outputs": [
+            "Given a TUI codex spawn, then sessions.json gains an entry carrying the rollout path for the thread id.",
+            "Given an app-server thread/started notification, then once the rollout file appears the index records an entry with its path."
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ],
+          "parallelSafeReason": "Codex-only files; shares conversation-runtime.ts with w5 and is edge-gated against it."
+        },
+        "narrative": {
+          "Action": "Add exported helper recordCodexRolloutSession(agentId, threadId, rolloutPath) in src/lib/runtimes/codex.ts beside writeThreadId (:213): writeThreadId + appendSessionIdToHistory(agentId, threadId, 'capture', { harness: 'codex', path: rolloutPath }). Replace writeThreadId with it at the TUI spawn (~:832-837, rolloutPath in scope), src/lib/agents/spawn.ts:1014-1019, and src/lib/overdeck/conversation-runtime.ts:829-834. In src/lib/codex/app-server-host.ts (:245) after writeThreadId on thread/started, kick a bounded background capture: void waitForCodexRollout(this.options.codexHome ?? codexHome(), 120_000).then(rollout => rollout && appendSessionIdToHistory(agentId, threadId, 'app-server', { harness: 'codex', path: rollout })).catch(() => {}), importing waitForCodexRollout alongside the existing codex imports (:19). Tests: codex.test.ts covers recordCodexRolloutSession writing both artifacts; app-server-host.test.ts extends the existing thread/started assertion (:224) to assert the sessions.json entry with the rollout path once the fake rollout appears (fake/inject the poll per the fake-timers rule — never a real 120 s wait)."
+        },
+        "items": [
+          {
+            "id": "w4-codex-writers-record-path.ac1",
+            "title": "Given recordCodexRolloutSession runs, then codex-thread-id is written and sessions.json records an entry with the rollout path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-codex-writers-record-path.ac2",
+            "title": "Given a thread/started notification in the app-server host, when the rollout file appears, then sessions.json records an entry carrying its path for that thread id.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w4-codex-writers-record-path.ac3",
+            "title": "npx vitest run src/lib/runtimes/__tests__/codex.test.ts src/lib/codex/__tests__/app-server-host.test.ts exits 0 and npm run typecheck exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w5-kimi-capture-records-path",
+        "title": "W5: Kimi capture points record the wire.jsonl path",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-20T12:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3959",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/runtimes/kimi-code.ts",
+            "src/lib/agents/recovery.ts",
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/runtimes/__tests__/kimi-code.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/runtimes/__tests__/kimi-code.test.ts"
+          ],
+          "expected_outputs": [
+            "Given a fresh kimi capture, then kimi-session-id is written and sessions.json records an entry whose path ends with <sessionId>/agents/main/wire.jsonl.",
+            "Given a resume-branch capture, then the same path shape is recorded."
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ],
+          "parallelSafeReason": "Kimi-only files plus conversation-runtime.ts, which is edge-gated against w4."
+        },
+        "narrative": {
+          "Action": "Add exported helper recordKimiSessionCapture(agentId, sessionId, workspace, opts {kimiHome?, overdeckHome?}) in src/lib/runtimes/kimi-code.ts beside writeKimiSessionId (:257-259): writeKimiSessionId + appendSessionIdToHistory(agentId, sessionId, 'capture', { harness: 'kimi-code', path: join(kimiSessionsRoot(kimiHome, workspace), sessionId, 'agents', 'main', 'wire.jsonl') }) with kimiHome defaulting to join(homedir(), '.kimi-code'). Migrate the six call sites that know the workspace: kimi-code.ts :444 (resume branch) and :461 (fresh branch) with options.workspace; kimi-code.ts :759 via workspaceFor(agentId) (:745-748) — skip only the index append when it returns null; src/lib/agents/recovery.ts :304 and :651 with agentState.workspace; src/lib/overdeck/conversation-runtime.ts :860 with cwd. Extend src/lib/runtimes/__tests__/kimi-code.test.ts: fresh capture writes kimi-session-id and a sessions.json entry whose path ends with <sessionId>/agents/main/wire.jsonl; resume branch records the same shape."
+        },
+        "items": [
+          {
+            "id": "w5-kimi-capture-records-path.ac1",
+            "title": "Given a fresh managed kimi session capture, sessions.json records an entry whose path resolves under kimiSessionsRoot and ends with agents/main/wire.jsonl.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-kimi-capture-records-path.ac2",
+            "title": "Given a resume-branch capture, the recorded entry contains the same path shape for the resumed sessionId.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w5-kimi-capture-records-path.ac3",
+            "title": "npx vitest run src/lib/runtimes/__tests__/kimi-code.test.ts exits 0 and npm run typecheck exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w6-pi-ohmypi-extensions-record-path",
+        "title": "W6: Pi and ohmypi extensions record the session file at start and first turn end",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-20T12:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3959",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/pi-extension/src/index.ts",
+            "packages/ohmypi-extension/src/index.ts",
+            "packages/pi-extension/src/__tests__/index.test.ts",
+            "packages/ohmypi-extension/src/__tests__/index.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run packages/pi-extension/src/__tests__/index.test.ts packages/ohmypi-extension/src/__tests__/index.test.ts"
+          ],
+          "expected_outputs": [
+            "Given a session file matching *_<sessionId>.jsonl exists under the agent sessions dir at session_start, then the index entry records its path.",
+            "Given a turn_end event carrying sessionLogPath, then the extension appends an upgraded entry with that path exactly once."
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ],
+          "parallelSafeReason": "Two extension packages and their tests; disjoint from every other item."
+        },
+        "narrative": {
+          "Action": "Apply the identical change to packages/pi-extension/src/index.ts and packages/ohmypi-extension/src/index.ts (maintained copies): appendSessionIndexEntry (pi :421-424 / ohmypi :428-431) gains an optional transcriptPath parameter spread into the serialized object when set (PIPE_BUF guard unchanged); handleSessionStart (pi :595-612 / ohmypi :616 region) scans join(paths.agentDir, 'sessions') recursively to depth 3, ignoring unreadable dirs, for a file named *_<sessionId>.jsonl or exactly <sessionId>.jsonl and passes the hit; handleTurnEnd, when event.sessionLogPath differs from a new module-level lastRecordedSessionPath, resolves the current id via sessionIdFor(env) (:390) and appends {sessionId, at, source: 'turn-end', harness: 'pi'|'ohmypi', model, path: sessionLogPath}, then updates lastRecordedSessionPath. Dedupe newest-wins makes the upgrade authoritative. Extend each package's src/__tests__/index.test.ts: session_start with a fixture file records path; session_start with no file records no path key; turn_end with sessionLogPath appends the upgrade once and a repeat appends nothing."
+        },
+        "items": [
+          {
+            "id": "w6-pi-ohmypi-extensions-record-path.ac1",
+            "title": "Given a fixture file <sessionsDir>/2026-09-20T10-00-00_<id>.jsonl exists, session_start records an entry containing that absolute path in both packages.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-pi-ohmypi-extensions-record-path.ac2",
+            "title": "Given no matching session file at session_start, the appended entry contains no path key.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-pi-ohmypi-extensions-record-path.ac3",
+            "title": "Given two turn_end events with the same sessionLogPath, exactly one upgraded entry is appended and parseSessionIndex preserves the path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-pi-ohmypi-extensions-record-path.ac4",
+            "title": "npx vitest run packages/pi-extension/src/__tests__/index.test.ts packages/ohmypi-extension/src/__tests__/index.test.ts exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w7-acp-muse-writers-record-path",
+        "title": "W7: ACP host and muse runtime record their fixed/known transcript paths",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-20T12:30:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3959",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/acp/host.ts",
+            "src/lib/runtimes/muse.ts",
+            "src/lib/acp/__tests__/host.test.ts",
+            "src/lib/__tests__/muse-support.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/acp/__tests__/host.test.ts src/lib/__tests__/muse-support.test.ts"
+          ],
+          "expected_outputs": [
+            "Given the ACP host starts a session, then sessions.json records an entry with path <agentDir>/acp-session.jsonl.",
+            "Given MuseRuntime.spawnAgent resolves a session log, then sessions.json records an entry with the muse session id and that path."
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ],
+          "parallelSafeReason": "Two single-file writer edits with their own tests; disjoint from other items. Conversation-launched muse is deliberately not instrumented (D5)."
+        },
+        "narrative": {
+          "Action": "In src/lib/acp/host.ts start(), immediately after the acp-session-id write (:159-160), append: appendSessionIdToHistory(this.options.agentId, started.sessionId, 'acp-host', { harness: 'acp', model: this.options.model, path: this.transcriptPath() }) — appendSessionIdToHistory resolves the agent dir from getOverdeckHome(), which matches the host's overdeckHome default chain (:67-69); tests set OVERDECK_HOME to the fixture dir. In src/lib/runtimes/muse.ts spawnAgent (:75-79), after resolveMuseSessionPath(config.agentId) returns path, append: appendSessionIdToHistory(config.agentId, museSessionId(path), 'launcher', { harness: 'muse', model: config.model, path }). Extend src/lib/acp/__tests__/host.test.ts to assert the entry with the fixed acp-session.jsonl path after a mocked start, and src/lib/__tests__/muse-support.test.ts to assert the entry carries the real session log path."
+        },
+        "items": [
+          {
+            "id": "w7-acp-muse-writers-record-path.ac1",
+            "title": "Given a mocked ACP host start, sessions.json records an entry whose path is the agent dir's acp-session.jsonl.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-acp-muse-writers-record-path.ac2",
+            "title": "Given a muse spawn with a resolved session log, sessions.json records an entry pairing museSessionId(path) with the absolute path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-acp-muse-writers-record-path.ac3",
+            "title": "npx vitest run src/lib/acp/__tests__/host.test.ts src/lib/__tests__/muse-support.test.ts exits 0 and npm run typecheck exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w8-drop-guessing-extras",
+        "title": "W8: Delete launcherPinned and stateDerived candidate sources from both adapters",
+        "status": "pending",
+        "priority": "critical",
+        "created": "2026-09-20T12:30:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-3959",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agent-enrichment.ts",
+            "src/dashboard/server/routes/jsonl-resolver.ts",
+            "src/lib/session-history.ts",
+            "tests/lib/agent-enrichment-jsonl-identity.test.ts",
+            "src/dashboard/server/routes/__tests__/jsonl-resolver.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/lib/agent-enrichment-jsonl-identity.test.ts src/dashboard/server/routes/__tests__/jsonl-resolver.test.ts src/dashboard/server/routes/__tests__/agents-conversation.test.ts",
+            "git diff --stat origin/main...HEAD -- src/ packages/ sync-sources/ ':(exclude)*test*'"
+          ],
+          "expected_outputs": [
+            "Given launcherPinned and stateDerived are deleted from TranscriptCandidateSources and both adapters, then the three named test files exit 0.",
+            "Given the production-only diff stat, then deletions meet or exceed insertions, or the shortfall is posted on the issue before pan done."
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-2",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "Runs after w1 and w3 (shared files, edge-gated); it is the net-negative lever and the AC3 proof."
+        },
+        "narrative": {
+          "Action": "In src/lib/session-history.ts remove launcherPinned and stateDerived from TranscriptCandidateSources (:41-47) and remove both appends from orderedTranscriptCandidates (:74-98), keeping the legacyClaudeFallbacks ordering. In src/dashboard/server/routes/jsonl-resolver.ts delete the launcherPinned block (:255-262) and the whole stateDerived block (:264-286); the exported resolveCodexRolloutPath / resolveAcpTranscriptPath / resolveKimiWirePath / resolvePiSessionPath / readLauncherPinnedSessionId STAY (ws-rpc.ts :24,124-144,859 and conversation modules import them) — only their use inside listAgentTranscriptCandidates goes; update the module header (:1-5) to say candidates come from recorded index paths with per-harness formulas as the legacy fallback. In src/lib/agent-enrichment.ts delete the launcherPinned block (:286-293) and the stateDerived argument (:295-302); the getLatestSessionIdSync import stays (still used at :364); update its module header likewise. Rewrite tests/lib/agent-enrichment-jsonl-identity.test.ts to replace the activity.js mock (:55-58) and ownSessionIds fixtures with real sessions.json writes whose entries carry path pointing at the fixture transcripts; assertions unchanged. Same treatment for jsonl-resolver.test.ts fixtures, keeping pathless-entry cases to pin the formula fallback. Finally measure: git diff --stat of production files must show deletions >= insertions; if not, STOP and post the numbers as a comment on PAN-3959 (the AC may belong to the combined PAN-3959+PAN-3958 change) — do not pad with unrelated deletions."
+        },
+        "items": [
+          {
+            "id": "w8-drop-guessing-extras.ac1",
+            "title": "Given the deletion, listAgentTranscriptCandidates contains no launcher.sh regex read and no resolve* helper call inside its candidate construction.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-drop-guessing-extras.ac2",
+            "title": "npx vitest run tests/lib/agent-enrichment-jsonl-identity.test.ts src/dashboard/server/routes/__tests__/jsonl-resolver.test.ts src/dashboard/server/routes/__tests__/agents-conversation.test.ts exits 0 with the guessing sources deleted.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-drop-guessing-extras.ac3",
+            "title": "grep finds no launcherPinned or stateDerived references in src/lib/session-history.ts, src/lib/agent-enrichment.ts, or src/dashboard/server/routes/jsonl-resolver.ts.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-drop-guessing-extras.ac4",
+            "title": "The production-only git diff --stat shows deletions meeting or exceeding insertions, or a comment on PAN-3959 records the measured shortfall before pan done.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w9-docs-transcript-path-index",
+        "title": "W9: Document the path-carrying session index",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-20T12:30:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3959",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md",
+            "docs/THE-CUT.md",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"path\" docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -n \"PAN-3959\" docs/THE-CUT.md",
+            "grep -n \"sessions.json\" CLAUDE.md"
+          ],
+          "expected_outputs": [
+            "docs/DASHBOARD-ARCHITECTURE.md states that index entries carry the transcript's absolute path and the resolver prefers it.",
+            "docs/THE-CUT.md contains a row recording the launcherPinned/stateDerived deletion attributed to PAN-3959.",
+            "CLAUDE.md Key Invariants extends the sessions.json line with the recorded-path fact."
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ],
+          "parallelSafeReason": "Three markdown files only; module-header lines live inside w1/w8 which own those source files."
+        },
+        "narrative": {
+          "Action": "docs/DASHBOARD-ARCHITECTURE.md (:162-170, the PAN-3950 Issue Session tabs bullet): after the sessions.json sentence, add that entries carry the transcript's absolute path recorded at session start by each harness's capture point and that resolution is a newest-first path lookup with per-harness formulas only for pre-PAN-3959 entries. docs/THE-CUT.md (near :112): add a row — 'Transcript resolution guessing extras | launcherPinned / stateDerived candidate sources | Recovered the current transcript from launcher.sh and runtime mirrors | deleted — sessions.json entries record the absolute transcript path at session start (PAN-3959)'. CLAUDE.md Key Invariants: extend the PAN-3950 sessions.json line with: entries carry the transcript's absolute path, recorded at session start by each harness's capture point; the resolver prefers it over per-harness path formulas."
+        },
+        "items": [
+          {
+            "id": "w9-docs-transcript-path-index.ac1",
+            "title": "docs/DASHBOARD-ARCHITECTURE.md contains a sentence stating that sessions.json entries carry the absolute transcript path and the resolver prefers it over formulas.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-docs-transcript-path-index.ac2",
+            "title": "docs/THE-CUT.md contains a new row that records the launcherPinned/stateDerived deletion and cites PAN-3959.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-docs-transcript-path-index.ac3",
+            "title": "CLAUDE.md Key Invariants' sessions.json line now records that entries carry the absolute transcript path.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w1-index-path-field",
+        "to": "w2-claude-hooks-record-path",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-index-path-field",
+        "to": "w3-resolver-path-fast-path",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-index-path-field",
+        "to": "w4-codex-writers-record-path",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-index-path-field",
+        "to": "w5-kimi-capture-records-path",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-index-path-field",
+        "to": "w6-pi-ohmypi-extensions-record-path",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-index-path-field",
+        "to": "w7-acp-muse-writers-record-path",
+        "type": "blocks"
+      },
+      {
+        "from": "w1-index-path-field",
+        "to": "w8-drop-guessing-extras",
+        "type": "blocks"
+      },
+      {
+        "from": "w3-resolver-path-fast-path",
+        "to": "w8-drop-guessing-extras",
+        "type": "blocks"
+      },
+      {
+        "from": "w4-codex-writers-record-path",
+        "to": "w5-kimi-capture-records-path",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
