@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } fr
 import { join } from 'path';
 import { homedir } from 'os';
 import { Effect } from 'effect';
-import { getAgentDir, getAgentStateSync } from './agent-state.js';
+import { getAgentDir, getAgentStateSync } from './agent-state-read.js';
 import { getAgentRuntimeStateSync } from './runtime-state.js';
 import { encodeClaudeProjectDir } from '../paths.js';
 import { findLatestRollout, extractThreadIdFromRollout } from '../runtimes/codex.js';
