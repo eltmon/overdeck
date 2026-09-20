@@ -28,7 +28,6 @@ import { isFlywheelAutoPickupBacklog } from '../../../lib/overdeck/control-setti
 import { SEQUENCER_AGENT_ID } from '../../../lib/backlog/sequencer-agent.js';
 import { resolvePiSessionPath } from './jsonl-resolver.js';
 import {
-  clearFinishedSequencerRun,
   getSequencerRunStatus,
   spawnSequencerAgent,
 } from '../../../lib/backlog/sequencer-agent.js';
@@ -196,23 +195,24 @@ const postBacklogRegenerateRoute = HttpRouter.add(
       // into tracker `Issue` objects (their human ref is `identifier`, not `ref`).
       const issues = getSharedIssueService().getIssues() as Array<Record<string, unknown>>;
       try {
-        await clearFinishedSequencerRun(projectRoot);
+        // spawnSequencerAgent reaps a finished lingering pass itself before
+        // spawning, so a 409 below means a pass is genuinely still working.
         const agent = await spawnSequencerAgent(pass, { projectRoot, issues });
         return jsonResponse({ status: 'spawned', agentId: agent.id, pass });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        // The sequencer is a singleton: spawnRun refuses if a tmux session named
-        // `sequencer-runner` already exists (running OR stuck/errored). Surface
-        // that as an actionable 409 instead of letting it bubble up as an
-        // unhandled 500 with a raw stack — the operator must stop the existing
-        // pass first. (PAN-1866: a stuck Haiku pass that overflowed its context
-        // blocked every retry with an opaque "HTTP 500".)
+        // The sequencer is a singleton: spawnRun refuses if a pane named
+        // `sequencer-runner` is still live. A finished pass was already reaped
+        // above, so this is an active (or stuck) one. Surface it as an
+        // actionable 409 instead of an unhandled 500 with a raw stack.
+        // (PAN-1866: a stuck Haiku pass that overflowed its context blocked
+        // every retry with an opaque "HTTP 500".)
         if (/already running/i.test(message)) {
           return jsonResponse(
             {
               error:
-                'A sequencer pass is already running (or stuck). Stop it first — use Stop on the ' +
-                'sequencer in the dashboard, or run `pan kill sequencer-runner` — then start a new pass.',
+                'A sequencer pass is still running. Wait for it to finish, or stop it from the ' +
+                'sequencer-runner agent in the dashboard, then start a new pass.',
               code: 'sequencer_already_running',
             },
             { status: 409 },
@@ -497,7 +497,7 @@ const getSequencerStatusRoute = HttpRouter.add(
       // The one-shot sequencer session lingers after it finishes, so "alive" alone
       // would falsely read as running. A pass is done once it writes a fresh
       // sequence.md (mtime >= startedAt) or its runtime is idle.
-      const { running, startedAt } = getSequencerRunStatus(projectRoot);
+      const { running, startedAt } = await getSequencerRunStatus(projectRoot);
 
       let total = 0;
       const manifestPath = join(projectRoot, '.pan', 'backlog', 'manifest.json');

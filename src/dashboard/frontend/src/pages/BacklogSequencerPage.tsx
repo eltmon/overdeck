@@ -18,6 +18,7 @@ interface SequenceResponse {
 }
 
 type View = 'list' | 'dag' | 'forecast';
+type SpawnPass = 'creation' | 'incremental' | 'review';
 type ImportanceFilter = 'all' | 'critical' | 'high' | 'medium' | 'low';
 type ConditionFilter = 'all' | 'ok' | 'needs-refinement' | 'stale';
 
@@ -90,7 +91,7 @@ const DAG_NODE_BUDGET = 150;
 
 export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProps = {}) {
   const queryClient = useQueryClient();
-  const [view, setView] = useState<View>('dag');
+  const [view, setView] = useState<View>('list');
   const [importanceFilter, setImportanceFilter] = useState<ImportanceFilter>('all');
   const [conditionFilter, setConditionFilter] = useState<ConditionFilter>('all');
   const [inPipelineOnly, setInPipelineOnly] = useState(false);
@@ -99,8 +100,7 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
   const [showFilters, setShowFilters] = useState(true);
   const [spawning, setSpawning] = useState(false);
   const [clearing, setClearing] = useState(false);
-  const [spawnPass, setSpawnPass] = useState<'auto' | 'creation' | 'incremental' | 'review'>('incremental');
-  const [showPassPicker, setShowPassPicker] = useState(false);
+  const [spawningPass, setSpawningPass] = useState<SpawnPass | null>(null);
   const [spawnError, setSpawnError] = useState<string | null>(null);
   const [tierFilter, setTierFilter] = useState<string | null>('now');
   const [searchQuery, setSearchQuery] = useState('');
@@ -237,16 +237,16 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
 
   const collapsedCount = filteredNodes.length - dagData.nodes.length;
 
-  async function handleRunPass() {
+  async function handleRunPass(pass: SpawnPass) {
     if (spawning) return;
     setSpawning(true);
+    setSpawningPass(pass);
     setSpawnError(null);
-    setShowPassPicker(false);
     try {
       const res = await fetch('/api/backlog/sequence/regenerate', {
         method: 'POST',
         headers: await dashboardMutationJsonHeaders(),
-        body: JSON.stringify({ pass: spawnPass }),
+        body: JSON.stringify({ pass }),
       });
       if (!res.ok) {
         // Prefer the structured { error } message the backend returns (e.g. the
@@ -266,6 +266,7 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
       setSpawnError(err instanceof Error ? err.message : String(err));
     } finally {
       setSpawning(false);
+      setSpawningPass(null);
     }
   }
 
@@ -411,38 +412,29 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
             onClick={handleClearSequence}
             disabled={clearing || spawning || seqRunning}
             className="px-2.5 py-1.5 text-xs flex items-center gap-1 rounded-md border border-[var(--color-border)] text-[var(--color-fg-muted)] hover:text-[var(--destructive)] hover:border-[color-mix(in_srgb,var(--destructive)_40%,transparent)] disabled:opacity-50"
-            title="Delete the backlog sequencing (sequence.md + cache). Re-sequence regenerates it."
+            title="Delete the backlog sequencing (sequence.md + cache). A creation pass then rebuilds it from scratch."
           >
             <Trash2 className="w-3 h-3" />
             {clearing ? 'Clearing…' : 'Clear'}
           </button>
           <button
-            onClick={handleRunPass}
+            onClick={() => handleRunPass('incremental')}
             disabled={spawning || seqRunning}
             className="px-3 py-1.5 text-xs flex items-center gap-1 rounded-md border border-[var(--color-accent)] text-[var(--color-accent)] hover:bg-[color-mix(in_srgb,var(--color-accent)_10%,transparent)] disabled:opacity-50"
-            title={`Run ${spawnPass} pass`}
+            title="Incremental pass: re-reads only issues changed since the last pass and slots them in. Existing ranks are preserved."
           >
             <Play className="w-3 h-3" />
-            {spawning || seqRunning ? 'Sequencing…' : 'Re-sequence'}
+            {spawningPass === 'incremental' ? 'Updating…' : seqRunning ? 'Sequencing…' : 'Update changed'}
           </button>
           <button
-            onClick={() => setShowPassPicker((p) => !p)}
-            className="px-2 py-1.5 text-xs rounded-md border border-[var(--color-border)] text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]"
-            title="Select pass type"
-          >▾</button>
-          {showPassPicker && (
-            <div className="absolute right-0 top-full mt-1 z-20 bg-[var(--color-surface)] border border-[var(--color-border)] rounded shadow-lg text-xs">
-              {(['auto', 'creation', 'incremental', 'review'] as const).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => { setSpawnPass(p); setShowPassPicker(false); }}
-                  className={`block w-full text-left px-3 py-1.5 hover:bg-[var(--color-surface-hover)] ${spawnPass === p ? 'text-[var(--color-accent)]' : 'text-[var(--color-fg)]'}`}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          )}
+            onClick={() => handleRunPass('review')}
+            disabled={spawning || seqRunning}
+            className="px-3 py-1.5 text-xs flex items-center gap-1 rounded-md border border-[var(--color-border)] text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
+            title="Review pass: re-ranks the whole open backlog. Slower and costlier; use when priorities have shifted, not just when issues changed."
+          >
+            <RefreshCw className="w-3 h-3" />
+            {spawningPass === 'review' ? 'Re-ranking…' : 'Re-rank all'}
+          </button>
         </div>
 
         <button
@@ -678,7 +670,7 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
               <p className="text-sm">No backlog sequence yet.</p>
               <p className="text-xs">Run a creation pass to rank the open backlog.</p>
               <button
-                onClick={() => { setSpawnPass('creation'); void handleRunPass(); }}
+                onClick={() => void handleRunPass('creation')}
                 disabled={spawning}
                 className="px-3 py-1.5 text-xs rounded border border-[var(--color-accent)] text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 disabled:opacity-50 flex items-center gap-1"
               >
