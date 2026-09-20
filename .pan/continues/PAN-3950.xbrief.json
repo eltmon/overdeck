@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3950",
   "created": "2026-09-20T13:53:05.511Z",
-  "updated": "2026-09-20T13:53:05.511Z",
+  "updated": "2026-09-20T14:02:42.520Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "w6-watcher-retry": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3950",
-      "claimedAt": "2026-09-20T13:53:05.511Z"
+      "claimedAt": "2026-09-20T13:53:05.511Z",
+      "doneAt": "2026-09-20T14:02:42.519Z"
     }
   }
 }
