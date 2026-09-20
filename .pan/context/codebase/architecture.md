@@ -11,7 +11,7 @@ merge.
 - `src/lib/` — shared domain logic: agents, planning, cloister (deacon patrols,
   verification gates, merge lifecycle), vbrief, tmux, channels, pan-dir.
 - `src/dashboard/server/` — Effect HTTP server. `main.ts` (entry, dual-runtime),
-  `server.ts` (routes + layers), `routes/*.ts` (12 route modules),
+  `server.ts` (routes + layers), `routes/*.ts` (48 route modules),
   `services/*.ts` (read model, event store, enrichment, resource discovery),
   `read-model.ts` (in-memory snapshot).
 - `src/dashboard/frontend/` — React + Zustand + React Query. Issue cockpit under
@@ -30,9 +30,14 @@ merge.
    on the feature branch (`.beads/` is dead — beads removed, PAN-2648). The
    `overdeck-state` orphan branch is archived (PAN-3917) — Overdeck no longer
    reads or writes it; never delete it.
-2. **Runtime** — SQLite `~/.overdeck/overdeck.db` (`agents` table is the
-   authoritative runtime registry; `state.json` per agent dir is a
-   rebuild source). `getAgentStateSync` returns the DB row.
+2. **Runtime** — `~/.overdeck/agents/<id>/state.json` is the sole per-agent
+   state copy (PAN-3917 W3: the SQLite `agents` mirror, plus `review_runs`,
+   `review_run_agents`, `issue_policy`, `status_history`, and `review_status`,
+   are dropped from `overdeck.db` on primary boot —
+   `dropPipelineStateMirrorTablesSync` in `src/lib/overdeck/infra.ts`).
+   `getAgentStateSync` reads the JSON file directly
+   (`src/lib/agents/agent-state-read.ts`); costs, conversation search, health
+   history, caches, and the events table remain in `overdeck.db`.
 3. **Liveness** — tmux on socket `-L overdeck` (sessions: `agent-<issue>`,
    `planning-<issue>`, `strike-<issue>`, `agent-<issue>-plan` via spawnRun,
    `conv-*`).

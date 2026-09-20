@@ -23,12 +23,16 @@
   Contracts between bash hooks and TS detectors need contract tests that run
   the real hook (PAN-2598 RC-4).
 
-- **Write-only AgentState fields.** Fields added to the state.json codec but
-  not the agents DB table are invisible to `getAgentStateSync` (PAN-1908).
-  Always add DB columns + codec + round-trip test.
+- **AgentState is JSON-only now (PAN-3917).** The SQLite `agents` mirror is
+  dropped on primary boot (`dropPipelineStateMirrorTablesSync`,
+  `src/lib/overdeck/infra.ts`); `state.json` per agent dir
+  (`~/.overdeck/agents/<id>/state.json`) is the sole copy and
+  `getAgentStateSync` reads it directly (`src/lib/agents/agent-state-read.ts`).
+  A new field needs only the codec + a round-trip test — no DB column.
 
-- **postMergeLifecycle re-entrancy.** Guarded by `createInFlightGuard`
-  (`src/lib/cloister/in-flight-guard.ts`) + locked test; keep it green.
+- **postMergeLifecycle re-entrancy.** Guarded by `_completedPostMerge` +
+  `_postMergeInFlight` (`src/lib/cloister/merge-agent.ts`) + locked test;
+  keep it green.
 
 - **Docker network pool exhaustion.** ~31 bridge networks max; merge-time
   Docker cleanup in postMergeLifecycle must never be removed.
@@ -44,14 +48,18 @@
   missing deadlines + sandboxed journal writes (see PAN-2583..2587, all fixed
   2026-07-12); symptoms and tactical unblocks are in project memory.
 
-- **Event log is short-retention forensics.** `events` in `overdeck.db` has
-  7-day retention with startup compaction (`src/dashboard/server/event-store.ts`
-  `compact()`); `review.status_changed` is the only place full verdict-history
-  sequences (with the failure reason in `reviewNotes`/`testNotes`) survive —
-  the `review_status` row is cleared at close-out and the permanent record
-  keeps only the final state. Anything needing verdict history older than a
-  week must snapshot first (PAN-3365/PAN-3367: negative verdicts reset to
-  `pending` then replaced with `passed` with zero commits between).
+- **Review verdicts live on the forge now (PAN-3917 FR-7).** There is no
+  `review_status` row and no `review.status_changed` event — event-store
+  startup purges both types on sight (`src/dashboard/server/event-store.ts`).
+  A verdict is a GitHub PR review (`approve` / `request-changes`, posted as
+  the GitHub App when installed) or, on GitLab / a single-account install, an
+  MR note carrying the `overdeck-verdict` marker `pr-facts` reads back
+  (`src/lib/cloister/pr-review-verdict.ts`). The per-issue pipeline journal
+  (`src/lib/cloister/pipeline-journal.ts`, `<workspace>/.overdeck/pipeline.jsonl`)
+  is an append-only, disposable log of what Overdeck did between actions —
+  never authority; where it disagrees with the PR, the PR wins. `events` in
+  `overdeck.db` still has 7-day retention with startup compaction
+  (`event-store.ts` `compact()`) for other event types.
 
 - **Command-palette text is ambiguous in tests.** Scope-chip labels
   ("Conversations", "Memory", …) also appear as cmdk group headings, so
@@ -61,4 +69,4 @@
   `[role="option"][data-value="<stable-id>"]`, never by visible text
   (`Highlighted` splits text across spans).
 
-<!-- last-verified: 2026-08-14 -->
+<!-- last-verified: 2026-09-20 -->

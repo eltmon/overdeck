@@ -15,8 +15,9 @@
 - Delay/retry tests MUST use `vi.useFakeTimers()` + `advanceTimersByTimeAsync`.
 - Never hardcode a model fallback; fail loudly when a default is unset.
 - Effect.js is used across the server (`Effect.runPromise` at route edges).
-- New AgentState fields need DB columns + codec entries + a round-trip audit
-  test — state.json-only fields are write-only under PAN-1908 (killer pattern).
+- New AgentState fields need only codec entries + a round-trip audit test —
+  the SQLite `agents` mirror is dropped (PAN-3917); `state.json` per agent
+  dir is the sole copy.
 - Additive refactors: never silently drop an existing field/affordance; run a
   no-loss audit (bundled rule).
 
