@@ -631,7 +631,7 @@ describe('Definition-of-Done main-verification row', () => {
     projectPath: '/tmp/overdeck',
     github: { owner: 'eltmon', repo: 'overdeck', number: 2715 },
   };
-  const required = ['test', 'lint', 'build (22)', 'guard'];
+  const required = ['test', 'lint', 'build (22)', 'reject-planning-paths'];
   const runs = (names: string[], successful: string[] = names) => ({
     total: names.length,
     names,
@@ -648,7 +648,7 @@ describe('Definition-of-Done main-verification row', () => {
     });
 
     expect(row).toMatchObject({ status: 'pass' });
-    expect(row.observed).toContain('required checks concluded successfully on abc123: test, lint, build (22), guard');
+    expect(row.observed).toContain('required checks concluded successfully on abc123: test, lint, build (22), reject-planning-paths');
   });
 
   it('misses when a named required check fails', async () => {
@@ -670,7 +670,7 @@ describe('Definition-of-Done main-verification row', () => {
     });
 
     expect(row).toMatchObject({ status: 'miss' });
-    expect(row.observed).toContain('missing required checks on d20c97c4: test, lint, build (22), guard');
+    expect(row.observed).toContain('missing required checks on d20c97c4: test, lint, build (22), reject-planning-paths');
   });
 
   it('keeps the no-merge-commit skip path unchanged', async () => {
