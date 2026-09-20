@@ -354,6 +354,14 @@ export function encodeClaudeProjectDir(cwdPath: string): string {
   return cwdPath.replace(/[^a-zA-Z0-9-]/g, '-');
 }
 
+/** Directory containing Claude Code transcripts for one workspace. */
+export function claudeProjectDir(
+  cwd: string,
+  projectsRoot = join(homedir(), '.claude', 'projects'),
+): string {
+  return join(projectsRoot, encodeClaudeProjectDir(cwd));
+}
+
 /**
  * Compute the deterministic JSONL session file path from cwd + session UUID.
  *
@@ -361,8 +369,7 @@ export function encodeClaudeProjectDir(cwdPath: string): string {
  *   ~/.claude/projects/<encoded-cwd>/<session-id>.jsonl
  */
 export function sessionFilePath(cwd: string, sessionId: string): string {
-  const encodedCwd = encodeClaudeProjectDir(cwd);
-  return join(homedir(), '.claude', 'projects', encodedCwd, `${sessionId}.jsonl`);
+  return join(claudeProjectDir(cwd), `${sessionId}.jsonl`);
 }
 
 /**

@@ -24,9 +24,7 @@ import {
   AGENTS_CACHE_TTL_MS,
   agentsCache,
   buildStoppedAgentLifecycle,
-  filterClosedIssueAgents,
   getGitStatusAsync,
-  getIssueDataService,
   getWorkspaceLocation,
   readRemoteAgentState,
 } from './shared.js';
@@ -218,10 +216,9 @@ export const getAgentsRoute = HttpRouter.add(
             };
           }),
         ))).filter(Boolean);
-        const visibleAgents = filterClosedIssueAgents(allAgents, getIssueDataService().getIssues());
-        agentsCache.data = visibleAgents;
+        agentsCache.data = allAgents;
         agentsCache.timestamp = now;
-        return jsonResponse(visibleAgents);
+        return jsonResponse(allAgents);
   })),
 );
 

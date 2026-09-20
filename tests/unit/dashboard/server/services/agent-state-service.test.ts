@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import type { AgentRuntimeSnapshot } from '@overdeck/contracts';
+import { describe, expect, it, vi } from 'vitest';
+import type { AgentRuntimeSnapshot, DomainEvent } from '@overdeck/contracts';
 import {
   activityForPaneState,
   mergeRuntimeBySequence,
+  observeSessionIndexEvent,
 } from '../../../../../src/dashboard/server/services/agent-state-service.js';
 
 function runtime(activity: AgentRuntimeSnapshot['activity'], sequence: number): AgentRuntimeSnapshot {
@@ -22,6 +23,22 @@ describe('activityForPaneState', () => {
     expect(activityForPaneState('done')).toBe('stopped');
     expect(activityForPaneState('exited')).toBe('stopped');
     expect(activityForPaneState('unknown')).toBe('idle');
+  });
+});
+
+describe('observeSessionIndexEvent', () => {
+  it('contains strict persistence failures so the runtime projection can continue', () => {
+    const failure = new Error('disk full');
+    const log = vi.fn();
+    expect(() => observeSessionIndexEvent({
+      type: 'agent.model_set',
+      timestamp: '2026-09-20T00:00:00.000Z',
+      payload: { agentId: 'agent-pan-3950', model: 'claude-sonnet-4-6', claudeSessionId: 'session-1' },
+    } as DomainEvent, () => { throw failure; }, log)).not.toThrow();
+    expect(log).toHaveBeenCalledWith(
+      '[AgentStateService] Failed to observe session index for agent-pan-3950:',
+      failure,
+    );
   });
 });
 

@@ -227,11 +227,6 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
       error: reason
     };
   }
-  if (sessionResolution.needsPointerRepair) {
-    saveSessionId(normalizedId, sessionId, 'recovered');
-    logAgentLifecycleSync(normalizedId, `resume pointer reconstructed from durable metadata: sessionId=${sessionId}`);
-  }
-
   if (!agentState || !hasWorkspace) {
     const reason = 'Saved Claude session is orphaned because the backing workspace/agent state is missing. Start a fresh agent instead.';
     logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
@@ -399,10 +394,6 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
     if (freshSessionId) {
       saveSessionId(normalizedId, freshSessionId);
       agentState.sessionId = freshSessionId;
-    } else if (!shouldResumeSavedSession) {
-      try {
-        unlinkSync(join(getAgentDir(normalizedId), 'session.id'));
-      } catch { /* absent or already cleared */ }
     }
 
     // Compute the effective message before building the launcher so codex can

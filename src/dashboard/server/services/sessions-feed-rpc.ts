@@ -12,8 +12,9 @@ function optional<T>(value: T | null | undefined): T | undefined {
 }
 
 export function toDiscoveredSessionSnapshot(session: DiscoveredSession) {
+  const { id } = session;
   return {
-    id: session.id, jsonlPath: session.jsonlPath,
+    id, jsonlPath: session.jsonlPath,
     harness: session.harness,
     sessionId: session.sessionId ?? undefined,
     workspacePath: session.workspacePath ?? undefined,

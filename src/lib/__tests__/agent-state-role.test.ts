@@ -4,6 +4,7 @@ import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import type { AgentState } from '../agents.js';
+import { readSessionIndexSync } from '../session-history.js';
 
 // Spawn/resume flows preflight the harness binary; CI runners have no claude/omp
 // installed, so stub the filesystem probes while keeping the pure helpers real.
@@ -797,7 +798,6 @@ describe('AgentState role persistence', () => {
         sessionId: 'missing-session',
       } as any);
       const agentDir = join(tempHome, 'agents', agentId);
-      writeFileSync(join(agentDir, 'session.id'), 'missing-session');
       writeFileSync(join(agentDir, 'sessions.json'), JSON.stringify(['missing-session']));
       writeFileSync(join(agentDir, 'runtime.json'), JSON.stringify({ claudeSessionId: 'missing-session' }));
       writeFileSync(join(agentDir, 'launcher.sh'), "claude --resume 'missing-session'\n");
@@ -816,7 +816,8 @@ describe('AgentState role persistence', () => {
         }),
       );
       expect(deliverInitialPromptWithRetry).toHaveBeenCalled();
-      const freshSessionId = readFileSync(join(agentDir, 'session.id'), 'utf-8').trim();
+      const sessionIndex = readSessionIndexSync(agentId);
+      const freshSessionId = sessionIndex.at(-1)?.sessionId;
       expect(freshSessionId).not.toBe('missing-session');
       const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf-8');
       expect(launcher).not.toContain("--resume 'missing-session'");
@@ -900,7 +901,7 @@ describe('AgentState role persistence', () => {
       status: 'stopped',
       startedAt: '2026-06-23T00:00:00.000Z',
     } as any);
-    writeFileSync(join(tempHome, 'agents', agentId, 'session.id'), 'dead-pi-session');
+    writeFileSync(join(tempHome, 'agents', agentId, 'sessions.json'), JSON.stringify(['dead-pi-session']));
 
     await expect(resumeAgent(agentId, 'continue review')).resolves.toMatchObject({
       success: true,
@@ -915,7 +916,7 @@ describe('AgentState role persistence', () => {
     );
     const launcher = readFileSync(join(tempHome, 'agents', agentId, 'launcher.sh'), 'utf-8');
     expect(launcher).not.toContain('--resume');
-    expect(existsSync(join(tempHome, 'agents', agentId, 'session.id'))).toBe(false);
+    expect(existsSync(join(tempHome, 'agents', agentId, 'sessions.json'))).toBe(true);
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('prior Pi process was dead'));
 
     consoleSpy.mockRestore();
@@ -993,7 +994,7 @@ describe('AgentState role persistence', () => {
       status: 'starting', // <-- the stuck state from the bug report
       startedAt: '2026-06-23T00:00:00.000Z',
     } as any);
-    writeFileSync(join(tempHome, 'agents', agentId, 'session.id'), 'dead-session');
+    writeFileSync(join(tempHome, 'agents', agentId, 'sessions.json'), JSON.stringify(['dead-session']));
 
     const result = await resumeAgent(agentId, 'continue review');
 

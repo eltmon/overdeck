@@ -14,7 +14,7 @@ import { SimpleActivityFeed } from './SimpleActivityFeed';
 // The WS stream needs a live transport; tests run the HTTP-poll path only.
 vi.mock('../chat/useConversationMessagesStream', () => ({
   conversationMessagesQueryKey: (name: string) => ['conversation-messages', name] as const,
-  useConversationMessagesStream: () => false,
+  useConversationMessagesStream: () => ({ enabled: false, receivedFirstPayload: false }),
   shouldStreamConversationMessages: () => false,
 }));
 
@@ -62,6 +62,10 @@ describe('SimpleActivityFeed (PAN-3090)', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
+      // fetchMessages requests the agent-scoped route whenever an agentId is
+      // known (PAN-3950); the conversation-name /messages route stays as a
+      // fallback for callers with no agentId.
+      if (url.includes('/api/agents/') && url.includes('/conversation')) return Response.json(transcriptPayload());
       if (url.includes('/messages')) return Response.json(transcriptPayload());
       return Response.json({});
     }));

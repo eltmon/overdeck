@@ -301,7 +301,8 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
     mocks.waitForAgentIdle.mockResolvedValue(true);
     mocks.deliverAgentMessage.mockResolvedValue({ ok: true });
     mocks.resumeAgent.mockResolvedValue({ success: true, messageDelivered: true });
-    mocks.getLatestSessionIdSync.mockReturnValue(undefined);
+    mocks.getLatestSessionIdSync.mockImplementation((agentId, options) =>
+      options?.getAgentState?.(agentId)?.sessionId);
     mocks.captureTranscriptUserRecordSnapshot.mockResolvedValue({
       sessionFile: '/tmp/session.jsonl',
       userRecordCount: 0,

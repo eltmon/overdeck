@@ -67,11 +67,12 @@ import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
 import { sessionFilePath, getOverdeckHome, resolveOhmypiExtensionPath } from '../paths.js';
 import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
 import { buildResumeContract } from '../resume-contract.js';
+import { readLatestIndexedSessionIdSync } from '../session-history.js';
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import { markRespawnPending } from '../../dashboard/server/services/pending-respawn.js';
 import { cleanupConversationAttachments, cleanupUnreferencedConversationAttachments } from '../../dashboard/server/services/conversation-attachments.js';
-import { resolveCodexRolloutPath } from '../../dashboard/server/routes/jsonl-resolver.js';
+import { resolveCodexRolloutPath } from '../agents/transcript-resolver.js';
 import { sendConversationControlCommand, isPiControlChannelHarness, resolveConversationDeliveryMethod } from './conversation-delivery.js';
 import {
   assertKimiResumeContractResult,
@@ -270,7 +271,6 @@ export function shouldReportUnresolvedLiveSession(
   if (!conv || conv.status !== 'active') return false;
   return getHarnessBehavior(conv.harness).transcriptKind === 'claude-jsonl';
 }
-
 export function conversationSessionAliveFromState(
   conv: Pick<Conversation, 'status' | 'forkStatus'>,
   tmuxSessionAlive: boolean,
@@ -625,7 +625,7 @@ export async function spawnConversationSession(
       await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
       await mkdir(piSessionDir, { recursive: true, mode: 0o700 });
       const storedPiSessionId = resume
-        ? (await readFile(join(paths.agentDir, 'session.id'), 'utf-8').then((s) => s.trim()).catch(() => undefined))
+        ? readLatestIndexedSessionIdSync(tmuxSession) ?? undefined
         : undefined;
       piFields = {
         harness: 'ohmypi',

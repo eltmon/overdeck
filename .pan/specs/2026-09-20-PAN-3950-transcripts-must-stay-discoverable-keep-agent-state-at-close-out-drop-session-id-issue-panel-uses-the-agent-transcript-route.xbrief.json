@@ -1,0 +1,507 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-20T13:34:29Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3950: Transcripts must stay discoverable: keep agent state at close-out, drop session.id, issue panel uses the agent transcript route — round-6 fix pass on feature/pan-3950 (PR #3951)",
+    "updated": "2026-09-20T13:51:12.455Z"
+  },
+  "plan": {
+    "id": "pan-3950",
+    "title": "Transcripts must stay discoverable: keep agent state at close-out, drop session.id, issue panel uses the agent transcript route",
+    "status": "running",
+    "uid": "fe977439-2961-47d9-85af-8db76f5ac72f",
+    "author": "agent:claude-opus-5",
+    "sequence": 3,
+    "created": "2026-09-20T13:34:29Z",
+    "updated": "2026-09-20T13:51:12.455Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3950",
+        "label": "PAN-3950",
+        "type": "issue"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/.pan/drafts/pan-3950.md",
+        "label": "PRD draft (.pan/drafts/pan-3950.md) — see '## Fix pass (round 6)'",
+        "type": "prd"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/pull/3951",
+        "label": "PR #3951 (existing branch feature/pan-3950)",
+        "type": "pr"
+      },
+      {
+        "uri": "/home/eltmon/Projects/overdeck/.tmp/pan-3950-review-round5.md",
+        "label": "Round-5 adversarial review (5 blockers)",
+        "type": "review"
+      }
+    ],
+    "tags": [
+      "transcripts",
+      "agent-state",
+      "dashboard",
+      "cloister",
+      "fix-pass"
+    ],
+    "narratives": {
+      "Problem": "PR #3951 on feature/pan-3950 implements W1–W5 of the PRD (close-out keeps agent state, session.id deleted, issue panel uses the agent transcript route, retention sweeps all agent dirs, docs). Round-5 adversarial review returned DO NOT MERGE with five blockers: (1) a transcript watch root whose fs.watch attachment fails is never retried because the root signature is recorded before watch() and errors are swallowed; (2) markAgentRunning swallows every session-reset unlink error, so a launch can report success while transcript candidates stay blocked; (3) the transcript adapters (summary forks/handoffs) still scan Pi/ACP/Kimi paths themselves, non-recursively, so a nested Pi transcript readable by live APIs fails the summary-fork lookup with HTTP 400; (4) the equal-mtime Pi tie-break test cannot fail (walk order already equals path order under a stable sort) — the review's doubled-path claim itself is wrong; (5) the branch is net +49 production lines against origin/main, violating AC-6/NFR-1. CI was fully green on the same code, so these are design and test-strength gaps.",
+      "Proposal": "Fix pass on the existing branch, no recut. w6: per-root watcher map in ws-rpc.ts that attaches only missing roots, sets rerun only when something new attached, and retries a failed root on the next event from a surviving watcher (no timers). w7: clearSessionResetMarker rethrows non-ENOENT and runs before markAgentRunning mutates status; dead isAgentSessionReset/readSessionIdHistorySync deleted; unterminated-final-record reset test added. w8: pi/acp/kimi adapters delegate resolveSessionFile to the central resolver helpers, deleting both *FromTmux scanners — the largest deletion lever. w9: rewrite the Pi tie-break test so walk order ≠ path order; pi.ts untouched. w10: two doc bullets in docs/DASHBOARD-ARCHITECTURE.md and a '## Review round 5' table on PR #3951. w11: measure AC-11 and draw from the PRD D-7 fallback deletion list until production lines are net negative.",
+      "NonGoals": "- Do not recut the branch from main or reimplement W1–W5; every item is a commit on feature/pan-3950 at e42bb79eb39 or later.\n- Do not remove the session-reset marker or derive reset-in-effect from sessions.json alone (changes resume semantics for ACP/OhMyPi whose ids are observed post-launch; PRD D-3).\n- Do not edit src/lib/runtimes/pi.ts (PRD D-6); the resolver is correct, the test was weak.\n- Do not add any setTimeout/setInterval/polling to transcript discovery; a total watch-attachment failure leaves the stream in 'discovering' until the client re-subscribes (PRD D-2).\n- Do not add a second transcript resolver or any harness path scan outside src/lib/runtimes/* and src/lib/agents/transcript-resolver.ts.\n- Do not touch the *Promise + Effect-wrapper pairs in src/lib/agent-enrichment.ts (PAN-3958).\n- Do not invent deletions beyond the PRD D-7 fallback list to reach net-negative; stop and report instead.\n- Do not delete or truncate anything under ~/.claude/projects.\n- Do not merge PR #3951; do not run the full vitest suite locally (CI does)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep the session-reset marker and make its removal fail loudly (non-ENOENT rethrow) instead of deleting the marker in favour of a sessions.json-derived rule.",
+        "rationale": "The marker also blocks resolveLatestSessionIdSync from resuming acp-session-id / OhMyPi freshest-JSONL sessions after a reset; those ids are observed after launch, so a last-record-is-reset rule would leave those harnesses blocked until an entry is appended. Changing that is a separate design decision the operator did not ask for in this pass."
+      },
+      {
+        "summary": "Watcher retry is per-root bookkeeping with rerun only on a new attachment; the all-fail case stays in 'discovering' with one console.warn and no timer.",
+        "rationale": "The operator's constraint is event-driven discovery only. Any mismatch-triggered rerun would busy-loop on a permanently failing root; a timer fallback would be polling."
+      },
+      {
+        "summary": "Blocker 4 is resolved by strengthening the test, not by changing findPiTranscriptPath.",
+        "rationale": "Verified: the test passes agentsDir (the agents root) as agentsDirOverride and the file passes 43/43; the review's doubled-path claim is wrong. The genuine gap is that a stable name-sorted walk makes tied files come out in path order without the tie-break, so the fixture must place the lexically-later file where it is walked first."
+      },
+      {
+        "summary": "Net-negative production lines is a dedicated final item with an enumerated fallback deletion list (PRD D-7) rather than a global 'delete until negative' instruction.",
+        "rationale": "The projected net after w6–w9 is about +4, so an explicit, bounded fallback list keeps the work agent from inventing risky deletions in hardened code (state-dir-removal.ts, retention)."
+      },
+      {
+        "summary": "Docs surface for the fix pass is docs/DASHBOARD-ARCHITECTURE.md plus the PR #3951 round-5 table and the transcript-adapter module header.",
+        "rationale": "The user-visible behaviour W1–W5 documented earlier is unchanged; what changed is the single-resolver guarantee and the watch-retry semantics, both of which the architecture doc's transcript section describes."
+      }
+    ],
+    "items": [
+      {
+        "id": "w6-watcher-retry",
+        "title": "Retry failed transcript watch roots on the next event (PRD W6)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-20T13:34:29Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3950",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/ws-rpc.ts",
+            "src/dashboard/server/__tests__/ws-rpc-resolved-stream.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/__tests__/ws-rpc-resolved-stream.test.ts",
+            "grep -c 'nearestExistingDirectory' src/dashboard/server/ws-rpc.ts || true",
+            "grep -c 'setInterval\\|setTimeout' src/dashboard/server/ws-rpc.ts"
+          ],
+          "expected_outputs": [
+            "ws-rpc-resolved-stream.test.ts passes with the two new discovery tests present",
+            "nearestExistingDirectory count prints 0",
+            "setInterval/setTimeout count prints 1 (the count at e42bb79eb39)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/ws-rpc.ts watchForAgentTranscriptCandidate (lines 271-343 at e42bb79eb39): replace the joined signature string + close-all/re-attach-all bookkeeping with a Map<string,{close()}> keyed by `${root}:${recursive}`; each pass closes watchers no longer desired and attaches only roots without a live watcher; set rerun=true ONLY when at least one new watcher attached (PRD D-1); when nothing attached and watchers.size===0 and desired.size>0, console.warn once per pass (PRD D-2). Collapse nearestExistingDirectory into nearestExistingWatchRoot(dirname(path))?.path registered with recursive:false (never recursive on the agent dir itself). No timers. Add the two tests described in PRD W6 using the existing `watch` mock shape (ws-rpc-resolved-stream.test.ts:164-171)."
+        },
+        "items": [
+          {
+            "id": "w6-watcher-retry.ac1",
+            "title": "Given a watch root whose first watch() call throws while another root attaches, when the surviving watcher fires an event, then watch() is called again for the failed root and discovery completes after that root's listener fires with the transcript present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-watcher-retry.ac2",
+            "title": "Given a watch root whose watch() always throws and the initial passes have settled, when one event fires on a surviving watcher, then watch() calls for the failing root grow by exactly 1, no further calls occur without another event, and vi.getTimerCount() returns 0 under fake timers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-watcher-retry.ac3",
+            "title": "Given the existing delayed-discovery test, when the stream is unsubscribed, then every attached watcher is closed and the watcher map is empty",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w6-watcher-retry.ac4",
+            "title": "Given the module source, when grepped, then nearestExistingDirectory no longer exists and the setInterval/setTimeout count is unchanged from e42bb79eb39",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w7-reset-marker-fails-loud",
+        "title": "Reset-marker removal fails loudly in markAgentRunning (PRD W7)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-20T13:34:29Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3950",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/session-history.ts",
+            "src/lib/agents/agent-state.ts",
+            "src/lib/agents/session-pointers.ts",
+            "src/lib/agents/__tests__/session-pointers.test.ts",
+            "tests/unit/lib/agents/session-index.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/agents/session-index.test.ts src/lib/agents/__tests__/session-pointers.test.ts tests/unit/lib/agents/agent-state-gate.test.ts",
+            "grep -rn 'isAgentSessionReset\\|readSessionIdHistorySync' src tests || true"
+          ],
+          "expected_outputs": [
+            "all three test files pass, including the directory-at-marker test and the unterminated-final-record reset test",
+            "grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/session-history.ts clearSessionResetMarker (lines 22-28): rethrow any unlink error whose code is not ENOENT (PRD W7 before/after). In src/lib/agents/agent-state.ts markAgentRunning (706-725): move clearSessionResetMarker(state.id) to immediately after assertAgentCanTransitionToRunning(state) so a throw leaves state.status untouched (PRD D-4); shorten its three-line comment to one line. Delete readSessionIdHistorySync (session-history.ts:187-189, zero callers) and isAgentSessionReset (session-pointers.ts:13-15, zero production callers); repoint session-pointers.test.ts:24,59 to isSessionResetMarker from session-history.js. Add the three tests in PRD W7 to tests/unit/lib/agents/session-index.test.ts (directory at the marker path → markAgentRunning throws, status unchanged; no marker → running; reset appended after an unterminated final JSONL record parses to [] with a non-null latestSessionResetTime)."
+        },
+        "items": [
+          {
+            "id": "w7-reset-marker-fails-loud.ac1",
+            "title": "Given a directory occupies <agentDir>/session-reset and state.status is 'stopped', when markAgentRunning(state) is called, then it throws and state.status still equals 'stopped'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-reset-marker-fails-loud.ac2",
+            "title": "Given no session-reset marker exists, when markAgentRunning(state) is called, then it returns normally and state.status equals 'running'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-reset-marker-fails-loud.ac3",
+            "title": "Given sessions.json ends with an unterminated JSONL record, when resetSessionIndex runs, then the raw file matches /\\}\\n\\{\"reset\":true,/ and readSessionIndexSync returns [] and latestSessionResetTime returns a non-null timestamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w7-reset-marker-fails-loud.ac4",
+            "title": "Given the repository source, when grepped for isAgentSessionReset or readSessionIdHistorySync, then no match exists in src or tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w8-adapters-use-resolver",
+        "title": "Transcript adapters delegate Pi/ACP/Kimi resolution to the central resolver (PRD W8)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-20T13:34:29Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-3950",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/conversations/transcript-adapter.ts",
+            "src/lib/conversations/__tests__/transcript-adapter.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/conversations/__tests__/transcript-adapter.test.ts src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts",
+            "grep -n \"readdir\\|homedir\\|getOverdeckHome\\|findKimiWirePathAsync\\|FromTmux\\|from 'node:path'\" src/lib/conversations/transcript-adapter.ts || true"
+          ],
+          "expected_outputs": [
+            "both test files pass including the nested-Pi and parity tests",
+            "grep prints nothing"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9",
+            "NFR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/conversations/transcript-adapter.ts: piAdapter.resolveSessionFile → resolvePiSessionPath(conv.tmuxSession); acpAdapter.resolveSessionFile → resolveAcpTranscriptPath(conv.tmuxSession); kimiAdapter.resolveSessionFile → resolveKimiWirePath(conv.tmuxSession, { workspaceOverride: conv.cwd }) (PRD D-5). Import those three next to resolveCodexRolloutPath from ../agents/transcript-resolver.js. Delete resolvePiSessionFileFromTmux (141-160) and resolveKimiWireFileFromTmux (357-370) with their doc comments and the now-unused imports readdir, homedir, getOverdeckHome, findKimiWirePathAsync, and join from node:path (keep readFile, existsSync, sessionFilePath for the Claude adapter). Rewrite the header sentence at lines 24-26 per PRD W8. Add the three tests in PRD W8 (nested Pi under sessions/<encoded-cwd>/ resolves through getTranscriptAdapter('ohmypi'); pi/acp/kimi adapter results equal the resolver helper results on the same fixture; module source contains no agent-directory scan)."
+        },
+        "items": [
+          {
+            "id": "w8-adapters-use-resolver.ac1",
+            "title": "Given a Pi transcript at agents/<tmux>/sessions/<encoded-cwd>/<ts>_<id>.jsonl, when getTranscriptAdapter('ohmypi').resolveSessionFile(conv) runs, then it returns that nested path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-adapters-use-resolver.ac2",
+            "title": "Given the same fixture, when the pi, acp, and kimi adapters resolve, then each returns exactly what resolvePiSessionPath / resolveAcpTranscriptPath / resolveKimiWirePath(id, { workspaceOverride: conv.cwd }) returns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-adapters-use-resolver.ac3",
+            "title": "Given the module source of transcript-adapter.ts, when read, then it contains no readdir(, no 'sessions' path formula, no kimi-session-id, and no acp-session.jsonl literal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w8-adapters-use-resolver.ac4",
+            "title": "Given conversations-fork-recovery.test.ts and transcript-adapter.test.ts, when run, then both pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w9-pi-tiebreak-test",
+        "title": "Pi equal-mtime test discriminates the path tie-break (PRD W9)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-20T13:34:29Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-3950",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/__tests__/jsonl-resolver.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/jsonl-resolver.test.ts",
+            "git diff --stat origin/main...HEAD -- src/lib/runtimes/pi.ts"
+          ],
+          "expected_outputs": [
+            "43 tests pass",
+            "pi.ts diff stat is identical to e42bb79eb39 (the resolver is not edited)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ],
+          "acJustification": "A test-only rewrite has exactly three observable outcomes: fails without the tie-break, passes with it, resolver untouched."
+        },
+        "narrative": {
+          "Action": "Rewrite the test 'breaks equal-mtime Pi transcript ties deterministically by path' (jsonl-resolver.test.ts:668-680) so walk order differs from path order: sessions/z.jsonl (walked first) and root <agentDir>/a.jsonl (walked second), both utimes to the same instant; expect join(agentDir, 'a.jsonl'). Add a one-line comment explaining the directory split. Do NOT edit src/lib/runtimes/pi.ts (PRD D-6: the review's doubled-path claim is wrong; agentsDir is the agents root). Verification checkpoint: temporarily remove `|| a.path.localeCompare(b.path)` on pi.ts:137, confirm only this test fails, restore with git checkout -- src/lib/runtimes/pi.ts, confirm 43/43."
+        },
+        "items": [
+          {
+            "id": "w9-pi-tiebreak-test.ac1",
+            "title": "Given the tie-break `|| a.path.localeCompare(b.path)` is removed from src/lib/runtimes/pi.ts:137, when the test file runs, then the rewritten equal-mtime test fails",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-pi-tiebreak-test.ac2",
+            "title": "Given pi.ts restored, when the test file runs, then it reports 43 passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w9-pi-tiebreak-test.ac3",
+            "title": "Given the final branch head, when `git diff --stat origin/main...HEAD -- src/lib/runtimes/pi.ts` runs, then the output is identical to the same command at e42bb79eb39",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w10-docs-fix-pass",
+        "title": "Document the single resolver and event-driven watch retry; append the round-5 table to PR #3951 (PRD W10)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-20T13:34:29Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3950",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DASHBOARD-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'transcript-resolver.ts' docs/DASHBOARD-ARCHITECTURE.md",
+            "grep -c 'retried on the next event' docs/DASHBOARD-ARCHITECTURE.md",
+            "gh pr view 3951 --json body --jq .body | grep -c '## Review round 5'"
+          ],
+          "expected_outputs": [
+            "each grep prints 1 or more",
+            "the PR body contains exactly one '## Review round 5' heading and still contains '## Review round 4'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/DASHBOARD-ARCHITECTURE.md, after the `GET /api/agents/:agentId/conversation` bullet (line ~165-169), add the two bullets quoted in PRD W10 (one resolver serves the agent route, the /ws/rpc synthetic stream, enrichment, and the summary-fork/handoff adapters; failed watch roots are retried on the next event from a surviving watcher, no timer or poll, stream stays in discovering if nothing attaches). Then append `## Review round 5` to PR #3951's body in the round-4 resolution-table format (finding → resolved/partially/not resolved → file:line evidence) including the D-6 statement for blocker 4; the blocker-5 row says 'measured in W11' until w11 replaces it with the number: `gh pr view 3951 --json body --jq .body > /tmp/body.md`, append, `gh pr edit 3951 --body-file /tmp/body.md`."
+        },
+        "items": [
+          {
+            "id": "w10-docs-fix-pass.ac1",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, when read, then the 'Conversation loading and delivery' section states that src/lib/agents/transcript-resolver.ts serves the agent route, the /ws/rpc synthetic stream, enrichment, and the summary-fork/handoff adapters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w10-docs-fix-pass.ac2",
+            "title": "Given docs/DASHBOARD-ARCHITECTURE.md, when read, then it states that a watch root whose attachment fails is retried on the next event from a surviving watcher and that no timer or poll exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w10-docs-fix-pass.ac3",
+            "title": "Given PR #3951, when its body is fetched, then it contains a '## Review round 5' table with one row per round-5 finding and still contains the '## Review round 4' section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "w11-net-negative-lines",
+        "title": "Production lines net negative against origin/main (PRD W11 / AC-11)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-20T13:34:29Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-3950",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/session-history.ts",
+            "src/lib/agents/agent-state.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "git diff --numstat origin/main...HEAD | grep -vE '(^|/)(tests?|__tests__)/|\\.test\\.tsx?$|\\.md$|docs/|\\.tmp' | awk '{a+=$1; d+=$2} END {print a-d}'",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "the awk command prints a negative integer",
+            "typecheck completes without new errors",
+            "lint passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "After w6-w9 have landed, run the AC-11 command. If it prints ≥ 0, apply the PRD D-7 fallback list in order — (a) collapse the five-line createFreshSessionIdentity lifecycle log (session-history.ts:250-255) to one line; (b) inline readLegacySessionIdSync into readSessionIndexWithLegacySync (session-history.ts:180-196); (c) trim the comment above clearSessionResetMarker in agent-state.ts to one line if w7 did not already — one commit, re-measure. If still ≥ 0 after all three, stop and report via `pan tell flywheel-orchestrator`; do not invent other deletions. Replace the 'measured in W11' placeholder in the PR #3951 round-5 table (created by w10) with the final negative number, via gh pr view … --jq .body > file; edit; gh pr edit 3951 --body-file file."
+        },
+        "items": [
+          {
+            "id": "w11-net-negative-lines.ac1",
+            "title": "Given the final branch head, when the AC-11 numstat command runs, then it prints a negative integer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w11-net-negative-lines.ac2",
+            "title": "Given the final branch head, when npm run typecheck and npm run lint run, then both pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "w11-net-negative-lines.ac3",
+            "title": "Given the PR #3951 body, when read, then the round-5 table's blocker-5 row quotes the measured negative number",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "w6-watcher-retry",
+        "to": "w11-net-negative-lines",
+        "type": "blocks"
+      },
+      {
+        "from": "w7-reset-marker-fails-loud",
+        "to": "w11-net-negative-lines",
+        "type": "blocks"
+      },
+      {
+        "from": "w8-adapters-use-resolver",
+        "to": "w11-net-negative-lines",
+        "type": "blocks"
+      },
+      {
+        "from": "w9-pi-tiebreak-test",
+        "to": "w11-net-negative-lines",
+        "type": "blocks"
+      },
+      {
+        "from": "w10-docs-fix-pass",
+        "to": "w11-net-negative-lines",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "docsJustification": "w10 (kind: docs) updates docs/DASHBOARD-ARCHITECTURE.md; w8 rewrites the transcript-adapter module header.",
+      "canonicalFilename": "2026-09-20-PAN-3950-transcripts-must-stay-discoverable-keep-agent-state-at-close-out-drop-session-id-issue-panel-uses-the-agent-transcript-route.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}

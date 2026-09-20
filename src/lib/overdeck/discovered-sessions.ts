@@ -480,9 +480,10 @@ function replaceSessionArrayIndex(
 }
 
 function replaceDiscoveredSessionArrayIndexes(session: DiscoveredSession): void {
-  replaceSessionArrayIndex({ table: 'discovered_session_tags', column: 'tag' }, session.id, session.tags);
-  replaceSessionArrayIndex({ table: 'discovered_session_tools', column: 'tool' }, session.id, session.toolsUsed);
-  replaceSessionArrayIndex({ table: 'discovered_session_files', column: 'file_path' }, session.id, session.filesTouched);
+  const { id } = session;
+  replaceSessionArrayIndex({ table: 'discovered_session_tags', column: 'tag' }, id, session.tags);
+  replaceSessionArrayIndex({ table: 'discovered_session_tools', column: 'tool' }, id, session.toolsUsed);
+  replaceSessionArrayIndex({ table: 'discovered_session_files', column: 'file_path' }, id, session.filesTouched);
 }
 
 /**
@@ -560,7 +561,8 @@ export function upsertDiscoveredSession(opts: UpsertDiscoveredSessionOpts): Disc
   const session = rowToSession(row);
   replaceDiscoveredSessionArrayIndexes(session);
   if (oldRow && oldRow.enrichment_level > 0) {
-    replaceFtsRow(session.id, oldRow);
+    const { id } = session;
+    replaceFtsRow(id, oldRow);
   }
   return session;
 }
@@ -681,7 +683,8 @@ function getDiscoveredSessionsByIds(ids: number[]): Map<number, DiscoveredSessio
   ).all(...ids) as Record<string, unknown>[];
   return new Map(rows.map((row) => {
     const session = rowToSession(row);
-    return [session.id, session];
+    const { id } = session;
+    return [id, session];
   }));
 }
 
