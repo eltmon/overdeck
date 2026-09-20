@@ -67,26 +67,6 @@ const CHIP_DOT = {
   neutral: 'bg-[var(--color-fg-muted)]',
 };
 
-const TIER_LABEL: Record<string, string> = {
-  now:     'Now',
-  next:    'Next',
-  later:   'Later',
-  someday: 'Someday',
-};
-const TIER_CLASS: Record<string, string> = {
-  now:     'border border-[color-mix(in_srgb,var(--destructive)_34%,transparent)] bg-[color-mix(in_srgb,var(--destructive)_10%,transparent)] text-[var(--destructive-foreground)]',
-  next:    'border border-[color-mix(in_srgb,var(--warning)_34%,transparent)] bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] text-[var(--warning-foreground)]',
-  later:   'border border-[color-mix(in_srgb,var(--info)_30%,transparent)] bg-[color-mix(in_srgb,var(--info)_9%,transparent)] text-[var(--info-foreground)]',
-  someday: 'border border-[var(--color-border)] bg-[var(--accent)] text-[var(--muted-foreground)]',
-};
-
-function scoreTier(rank: number, total: number): string {
-  if (rank <= Math.min(14, total)) return 'now';
-  if (rank <= Math.min(52, total)) return 'next';
-  if (rank <= Math.min(148, total)) return 'later';
-  return 'someday';
-}
-
 const DAG_NODE_BUDGET = 150;
 
 export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProps = {}) {
@@ -102,7 +82,6 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
   const [clearing, setClearing] = useState(false);
   const [spawningPass, setSpawningPass] = useState<SpawnPass | null>(null);
   const [spawnError, setSpawnError] = useState<string | null>(null);
-  const [tierFilter, setTierFilter] = useState<string | null>('now');
   const [searchQuery, setSearchQuery] = useState('');
   const [hasPrdOnly, setHasPrdOnly] = useState(false);
   const [selectedNode, setSelectedNode] = useState<SequenceNode | null>(null);
@@ -175,23 +154,12 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
   const staleNodes = useMemo(() => allNodes.filter((n) => n.condition === 'stale'), [allNodes]);
   const refineNodes = useMemo(() => allNodes.filter((n) => n.condition === 'needs-refinement'), [allNodes]);
 
-  const tierCounts = useMemo(() => {
-    const total = allNodes.length;
-    const counts = { now: 0, next: 0, later: 0, someday: 0 };
-    allNodes.forEach((n) => {
-      const t = scoreTier(n.rank, total) as keyof typeof counts;
-      counts[t]++;
-    });
-    return counts;
-  }, [allNodes]);
-
   const inPipelineCount = useMemo(() => allNodes.filter((n) => n.inPipeline).length, [allNodes]);
   const readyCount = useMemo(() => allNodes.filter((n) => n.state?.ready ?? false).length, [allNodes]);
   const hasPrdCount = useMemo(() => allNodes.filter((n) => n.hasPrd).length, [allNodes]);
 
   const filteredNodes = useMemo(() => {
     return allNodes.filter((n) => {
-      if (tierFilter && scoreTier(n.rank, allNodes.length) !== tierFilter) return false;
       if (importanceFilter !== 'all' && n.importance !== importanceFilter) return false;
       if (conditionFilter !== 'all' && n.condition !== conditionFilter) return false;
       if (inPipelineOnly && !n.inPipeline) return false;
@@ -205,9 +173,9 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
       }
       return true;
     });
-  }, [allNodes, importanceFilter, conditionFilter, inPipelineOnly, readyOnly, hasPrdOnly, tierFilter, searchQuery]);
+  }, [allNodes, importanceFilter, conditionFilter, inPipelineOnly, readyOnly, hasPrdOnly, searchQuery]);
 
-  // For DAG view: top-tier + neighbors + in-pipeline when too large
+  // For DAG view: top 10% by rank + neighbors + in-pipeline when too large
   const dagData = useMemo((): SequenceResponse => {
     if (!data) return { nodes: [], edges: [] };
     const total = filteredNodes.length;
@@ -358,7 +326,7 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
             </h1>
           </div>
           <p className="mt-1 max-w-2xl text-[13px] leading-5 text-[var(--color-fg-muted)]">
-            Ranked backlog flow with active-tier graphing, dependency context, and operator gates for pickup and planning.
+            Ordered backlog: the sequencer's pickup order with dependency context and operator gates for pickup and planning.
           </p>
         </div>
 
@@ -606,47 +574,6 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
               ⊘ Stale candidates <b className="font-mono font-medium text-[var(--color-fg)]">{staleNodes.length}</b>
             </button>
           )}
-          <button
-            onClick={() => setTierFilter((p) => (p === 'now' ? null : 'now'))}
-            className={`${CHIP_BASE} ${tierFilter === 'now' ? CHIP_ON.danger : CHIP_OFF}`}
-          >
-            <span className={`w-2 h-2 rounded-full shrink-0 ${CHIP_DOT.danger}`} />
-            Tier 1 · Now <b className="font-mono font-medium text-[var(--color-fg)]">{tierCounts.now}</b>
-          </button>
-        </div>
-      )}
-
-      {/* Tier ribbon */}
-      {allNodes.length > 0 && (
-        <div className="flex gap-2 px-6 py-3 border-b border-[var(--color-border)] shrink-0">
-          {([
-            { key: 'now',     emoji: '🔴', label: 'Now',     count: tierCounts.now,     sub: 'act on these first',  accent: 'border-l-[var(--destructive)]', ring: 'ring-[color-mix(in_srgb,var(--destructive)_50%,transparent)]' },
-            { key: 'next',    emoji: '🟠', label: 'Next',    count: tierCounts.next,    sub: 'queued behind Now',   accent: 'border-l-[var(--warning)]',     ring: 'ring-[color-mix(in_srgb,var(--warning)_50%,transparent)]' },
-            { key: 'later',   emoji: '🔵', label: 'Later',   count: tierCounts.later,   sub: 'planned horizon',     accent: 'border-l-[var(--info)]',        ring: 'ring-[color-mix(in_srgb,var(--info)_50%,transparent)]' },
-            { key: 'someday', emoji: '⚪', label: 'Someday', count: tierCounts.someday, sub: 'long tail',           accent: 'border-l-[color-mix(in_srgb,var(--color-fg)_30%,transparent)]', ring: 'ring-[color-mix(in_srgb,var(--color-fg)_30%,transparent)]' },
-          ] as const).map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTierFilter((p) => (p === t.key ? null : t.key))}
-              className={`flex-1 min-w-[140px] flex flex-col gap-0.5 px-3.5 py-2.5 border border-l-4 ${t.accent} rounded-lg bg-[var(--color-surface)] text-left hover:bg-[var(--color-surface-hover)] transition-colors shadow-sm ${tierFilter === t.key ? `ring-1 ${t.ring} border-[var(--color-border)]` : 'border-[var(--color-border)]'}`}
-            >
-              <span className="text-xs text-[var(--color-fg)]">{t.emoji} {t.label}</span>
-              <span className="font-mono text-lg font-medium text-[var(--color-fg)] leading-tight">{t.count}</span>
-              <span className="text-[10px] text-[var(--color-fg-muted)]">{t.sub}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Focus note */}
-      {tierFilter && allNodes.length > 0 && (
-        <div className="flex items-center gap-2 px-5 py-1.5 border-b border-[var(--color-border)] bg-[var(--color-surface)] shrink-0 text-xs text-[var(--color-fg-muted)]">
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-widest bg-[var(--color-accent)] text-[var(--color-fg)]">
-            Showing {TIER_LABEL[tierFilter]}
-          </span>
-          <span>
-            {filteredNodes.length} of {allNodes.length} issues{view === 'dag' ? ' rendered as a graph' : ''} — click the tier again to show all
-          </span>
         </div>
       )}
 
@@ -689,7 +616,6 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
                     <th className="text-right px-3 py-2 font-medium w-8 cursor-help" title="Pickup rank — lower means the Flywheel works it sooner">#</th>
                     <th className="text-left px-2 py-2 font-medium w-6 cursor-help" title="Importance — red = critical, orange = high, gray = medium, dim = low">●</th>
                     <th className="text-left px-2 py-2 font-medium w-28 cursor-help" title="Issue ID. Markers: ▶ in pipeline · ⚠ needs refinement · P has PRD · ✓ planned (spec + tasks)">Issue</th>
-                    <th className="text-center px-2 py-2 font-medium w-16 cursor-help" title="Tier band by rank: Now · Next · Later · Someday">Tier</th>
                     <th className="text-left px-2 py-2 font-medium cursor-help" title="One-line rationale for this ranking (from the sequencer)">Why</th>
                     <th className="text-center px-2 py-2 font-medium w-14 cursor-help" title="Estimated effort: XS / S / M / L / XL">Size</th>
                     <th className="text-center px-2 py-2 font-medium w-24 cursor-help" title="AI condition: ok · needs-refinement (vague spec) · stale (likely close)">Condition</th>
@@ -700,7 +626,6 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
                 </thead>
                 <tbody>
                   {filteredNodes.map((node) => {
-                    const tier = scoreTier(node.rank, allNodes.length);
                     const isStale = node.condition === 'stale';
                     const isRefine = node.condition === 'needs-refinement';
                     const isSelected = selectedNode?.issueId === node.issueId;
@@ -737,11 +662,6 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
                           {node.ready && (
                             <span className="ml-1 text-[9px] text-[var(--success-foreground)] align-top" title="Has spec — ready for work">✓</span>
                           )}
-                        </td>
-                        <td className="px-2 py-2 text-center">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${TIER_CLASS[tier] ?? 'border border-[var(--color-border)] bg-[var(--accent)] text-[var(--muted-foreground)]'}`}>
-                            {TIER_LABEL[tier]}
-                          </span>
                         </td>
                         <td className={`px-2 py-2 text-[var(--color-fg)] max-w-xs truncate ${isStale ? 'line-through' : ''}`}>
                           {node.why}
@@ -810,7 +730,7 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
             <div className="flex-1 flex flex-col min-h-0">
               {collapsedCount > 0 && (
                 <div className="shrink-0 text-xs text-center py-1 bg-[var(--color-surface)] border-b border-[var(--color-border)] text-[var(--color-fg-muted)]">
-                  Showing {dagData.nodes.length} of {filteredNodes.length} issues (top tier + neighbors); {collapsedCount} collapsed
+                  Showing {dagData.nodes.length} of {filteredNodes.length} issues (top 10% by rank + neighbors); {collapsedCount} collapsed
                 </div>
               )}
               <div className="flex-1 min-h-0">
