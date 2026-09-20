@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3937",
   "created": "2026-09-20T20:38:35.661Z",
-  "updated": "2026-09-20T20:41:47.277Z",
+  "updated": "2026-09-20T20:41:56.556Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -58,9 +58,10 @@
       "doneAt": "2026-09-20T20:41:46.166Z"
     },
     "acp-pre-allow-opencode-permission.ac2": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "conv-20260920-4179",
-      "claimedAt": "2026-09-20T20:41:47.277Z"
+      "claimedAt": "2026-09-20T20:41:47.277Z",
+      "doneAt": "2026-09-20T20:41:56.556Z"
     }
   }
 }
