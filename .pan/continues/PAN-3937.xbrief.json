@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3937",
   "created": "2026-09-20T20:38:35.661Z",
-  "updated": "2026-09-20T20:40:34.421Z",
+  "updated": "2026-09-20T20:40:43.700Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -46,9 +46,10 @@
       "doneAt": "2026-09-20T20:40:33.213Z"
     },
     "acp-diagnose-permission-unstick-recipe": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "conv-20260920-4179",
-      "claimedAt": "2026-09-20T20:40:34.421Z"
+      "claimedAt": "2026-09-20T20:40:34.421Z",
+      "doneAt": "2026-09-20T20:40:43.699Z"
     }
   }
 }
