@@ -181,18 +181,13 @@ export function readSessionIndexSync(agentId: string): SessionIndexEntry[] {
 export function readSessionIndexWithLegacySync(agentId: string): SessionIndexEntry[] {
   const file = join(getOverdeckHome(), 'agents', agentId, 'sessions.json');
   if (existsSync(file)) return readSessionIndexSync(agentId);
-  const sessionId = readLegacySessionIdSync(agentId);
-  return sessionId ? [{ sessionId, at: '', source: 'legacy-pointer' }] : [];
-}
-
-export function readLegacySessionIdSync(agentId: string): string | null {
-  const file = join(getOverdeckHome(), 'agents', agentId, 'session.id'); // legacy read-only fallback
+  let sessionId: string | null;
   try {
-    const value = readFileSync(file, 'utf8').trim();
-    return value || null;
+    sessionId = readFileSync(join(getOverdeckHome(), 'agents', agentId, 'session.id'), 'utf8').trim() || null; // legacy read-only fallback
   } catch {
-    return null;
+    sessionId = null;
   }
+  return sessionId ? [{ sessionId, at: '', source: 'legacy-pointer' }] : [];
 }
 
 export function readLatestIndexedSessionIdSync(agentId: string): string | null {
@@ -244,11 +239,7 @@ export function createFreshSessionIdentity(agentId: string, harness: RuntimeName
   const sessionId = randomUUID();
   appendSessionIdToHistory(agentId, sessionId, 'launcher', { harness, model });
   const dir = join(getOverdeckHome(), 'agents', agentId);
-  logAgentLifecycleSync(
-    agentId,
-    `session identity allocated: harness=${harness} sessionId=${sessionId} `
-      + `indexPersisted=${existsSync(join(dir, 'sessions.json'))}`,
-  );
+  logAgentLifecycleSync(agentId, `session identity allocated: harness=${harness} sessionId=${sessionId} indexPersisted=${existsSync(join(dir, 'sessions.json'))}`);
   return sessionId;
 }
 
