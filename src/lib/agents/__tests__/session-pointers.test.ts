@@ -21,21 +21,27 @@ vi.mock('../../agent-runtime.js', () => ({
   emitAgentEvent: mocks.emitAgentEvent,
 }));
 
-import { clearAgentSessionPointers, isAgentSessionReset } from '../session-pointers.js';
+import { isSessionResetMarker } from '../../session-history.js';
+import { clearAgentSessionPointers } from '../session-pointers.js';
 
 describe('clearAgentSessionPointers', () => {
   let root: string;
+  let prevOverdeckHome: string | undefined;
 
   beforeEach(() => {
     vi.clearAllMocks();
     root = mkdtempSync(join(tmpdir(), 'overdeck-session-pointers-'));
-    mocks.agentDir = join(root, 'agent-pan-2895-review');
+    prevOverdeckHome = process.env.OVERDECK_HOME;
+    process.env.OVERDECK_HOME = root;
+    mocks.agentDir = join(root, 'agents', 'agent-pan-2895-review');
     mocks.state = { sessionId: 'dead-session', model: 'claude-sonnet-4-6' };
     mocks.emitAgentEvent.mockReturnValue(Effect.succeed(true));
     mkdirSync(mocks.agentDir, { recursive: true });
   });
 
   afterEach(() => {
+    if (prevOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = prevOverdeckHome;
     rmSync(root, { recursive: true, force: true });
   });
 
@@ -56,7 +62,7 @@ describe('clearAgentSessionPointers', () => {
       expect(existsSync(join(mocks.agentDir, name))).toBe(false);
     }
     expect(readFileSync(join(mocks.agentDir, 'sessions.json'), 'utf8')).toContain('"reset":true');
-    expect(isAgentSessionReset('agent-pan-2895-review')).toBe(true);
+    expect(isSessionResetMarker('agent-pan-2895-review')).toBe(true);
     expect(JSON.parse(readFileSync(join(mocks.agentDir, 'runtime.json'), 'utf-8'))).toEqual({ state: 'stopped' });
     expect(mocks.state?.sessionId).toBeUndefined();
     expect(mocks.saveAgentStateSync).toHaveBeenCalledWith(mocks.state);

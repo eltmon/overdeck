@@ -22,8 +22,9 @@ export function isSessionResetMarker(agentId: string): boolean {
 export function clearSessionResetMarker(agentId: string): void {
   try {
     unlinkSync(join(getOverdeckHome(), 'agents', agentId, SESSION_RESET_MARKER));
-  } catch {
-    // The marker is absent for normal launches.
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return; // absent for normal launches
+    throw error;
   }
 }
 
@@ -182,10 +183,6 @@ export function readSessionIndexWithLegacySync(agentId: string): SessionIndexEnt
   if (existsSync(file)) return readSessionIndexSync(agentId);
   const sessionId = readLegacySessionIdSync(agentId);
   return sessionId ? [{ sessionId, at: '', source: 'legacy-pointer' }] : [];
-}
-
-export function readSessionIdHistorySync(agentId: string): string[] {
-  return readSessionIndexSync(agentId).map((entry) => entry.sessionId);
 }
 
 export function readLegacySessionIdSync(agentId: string): string | null {

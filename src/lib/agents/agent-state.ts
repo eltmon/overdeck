@@ -705,6 +705,8 @@ function assertAgentCanTransitionToRunning(state: AgentState): void {
 
 export function markAgentRunning(state: AgentState, options?: { preserveFailureTracking?: boolean }): void {
   assertAgentCanTransitionToRunning(state);
+  // Clear before any mutation so a throw here leaves state.status untouched.
+  clearSessionResetMarker(state.id);
   const oldStatus = state.status;
   state.status = 'running';
   // Codex activity comes from app-server notifications or rollout JSONL. A
@@ -718,10 +720,6 @@ export function markAgentRunning(state: AgentState, options?: { preserveFailureT
   // this the flag is sticky across the stop→resume→crash sequence and autoResume
   // would permanently skip the agent on any subsequent orphan recovery.
   delete state.stoppedByUser;
-  // Every successful spawn, restart, resume, and recovery converges here.
-  // Once the replacement process is running, transcript resolution may cross
-  // the reset boundary again and wait for the new harness-owned transcript.
-  clearSessionResetMarker(state.id);
   logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → running (markAgentRunning)`);
 }
 

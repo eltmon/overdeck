@@ -10,10 +10,6 @@ export interface ClearedAgentSessionPointers {
   cleared: string[];
 }
 
-export function isAgentSessionReset(agentId: string): boolean {
-  return existsSync(join(getAgentDir(agentId), SESSION_RESET_MARKER));
-}
-
 /**
  * Clear every mutable pointer that can make a later launch resume an old
  * session. Claude JSONL transcripts live outside the agent directory and are

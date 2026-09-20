@@ -21,6 +21,7 @@ import {
   readSessionIndexSync,
   readSessionIndexWithLegacySync,
   resetSessionIndex,
+  SESSION_RESET_MARKER,
   transcriptCandidateKey,
 } from '../../../../src/lib/session-history.js';
 import { listAgentTranscriptCandidates } from '../../../../src/lib/agents/transcript-resolver.js';
@@ -171,6 +172,58 @@ describe('sessions.json index', () => {
     expect(raw).toMatch(/^\["legacy-session"\]\n\{"reset":true,/);
     expect(latestSessionResetTime(raw)).not.toBeNull();
     expect(readSessionIndexSync('agent-pan-3950')).toEqual([]);
+  });
+
+  it('throws without changing status when a directory occupies the reset marker path', () => {
+    const state = {
+      id: 'agent-pan-3950',
+      issueId: 'PAN-3950',
+      workspace: root,
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'stopped',
+      startedAt: '2026-09-20T00:00:00.000Z',
+      startedBy: 'test',
+    } as AgentState;
+    const agentDir = join(process.env.OVERDECK_HOME!, 'agents', state.id);
+    mkdirSync(join(agentDir, SESSION_RESET_MARKER), { recursive: true });
+
+    expect(() => markAgentRunning(state)).toThrow();
+    expect(state.status).toBe('stopped');
+  });
+
+  it('runs normally when no reset marker exists', () => {
+    const state = {
+      id: 'agent-pan-3950',
+      issueId: 'PAN-3950',
+      workspace: root,
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'stopped',
+      startedAt: '2026-09-20T00:00:00.000Z',
+      startedBy: 'test',
+    } as AgentState;
+
+    markAgentRunning(state);
+
+    expect(state.status).toBe('running');
+  });
+
+  it('resets after an unterminated final JSONL record so the raw file stays parseable', async () => {
+    const agentDir = join(process.env.OVERDECK_HOME!, 'agents', 'agent-pan-3950');
+    mkdirSync(agentDir, { recursive: true });
+    const indexPath = join(agentDir, 'sessions.json');
+    // No trailing newline — simulates a crash mid-write of the final record.
+    writeFileSync(indexPath, JSON.stringify({ sessionId: 'unterminated', at: '2026-09-20T00:00:00.000Z', source: 'launcher' }));
+
+    await resetSessionIndex('agent-pan-3950');
+
+    const raw = readFileSync(indexPath, 'utf8');
+    expect(raw).toMatch(/\}\n\{"reset":true,/);
+    expect(readSessionIndexSync('agent-pan-3950')).toEqual([]);
+    expect(latestSessionResetTime(raw)).not.toBeNull();
   });
 
   it('clears the reset marker at the shared successful-launch transition', async () => {
