@@ -251,13 +251,14 @@ describe('buildConversationResponse', () => {
     mockListClaudeTranscriptPaths.mockResolvedValue(paths);
     mockAccess.mockRejectedValue(new Error('ENOENT'));
 
-    await expect(buildAgentConversationResult('agent-PAN-473')).resolves.toEqual({
-      status: 404,
-      body: {
-        error: 'No transcript found for agent-PAN-473.',
-        checked: paths,
-      },
-    });
+    const result = await buildAgentConversationResult('agent-PAN-473');
+    expect(result).toMatchObject({ status: 404, body: { error: 'No transcript found for agent-PAN-473.' } });
+    expect(result.status === 404 ? result.body.checked : []).toEqual(expect.arrayContaining(paths));
+    expect(result.status === 404 ? result.body.checked : []).toEqual(expect.arrayContaining([
+      expect.stringContaining('sessions.json'),
+      expect.stringContaining('session.id'),
+      expect.stringContaining('launcher.sh'),
+    ]));
   });
 
   // ── ohmypi harness (PAN-2012) ─────────────────────────────────────────────────

@@ -133,6 +133,9 @@ function defaultConversationResponse(method: string, url: string): Response | un
   if (method === 'GET' && /^\/api\/conversations\/(test-conv|next-conv|agent-test-stream-[ab])\/diffs$/.test(url)) {
     return Response.json({ summaries: [] });
   }
+  if (method === 'GET' && /^\/api\/agents\/agent-test-stream-[ab]\/conversation$/.test(url)) {
+    return Response.json({ messages: [], workLog: [], streaming: false });
+  }
   // PAN-3113 — the panel polls the shared pending-input feed for pane choice
   // menus; nothing is pending in these fixtures.
   if (method === 'GET' && url.endsWith('/api/conversations/pending-input')) {
@@ -759,6 +762,16 @@ describe('ConversationPanel empty-state gating (workLog-only agent sessions)', (
       'No transcript found for agent-pan-3950. Checked: /transcripts/new.jsonl, /transcripts/old.jsonl',
     )).toBeInTheDocument();
   });
+
+  it('omits the Checked suffix when no candidate path is available', () => {
+    renderPanel(
+      mockConversation,
+      { agentId: 'agent-pan-3950' },
+      { messages: [], workLog: [], streaming: false, error: 'No transcript found for agent-pan-3950.', checked: [] },
+    );
+    expect(screen.getByText('No transcript found for agent-pan-3950.')).toBeInTheDocument();
+    expect(screen.queryByText(/Checked:/)).toBeNull();
+  });
 });
 
 describe('ConversationPanel first stream payload', () => {
@@ -791,14 +804,14 @@ describe('ConversationPanel first stream payload', () => {
   });
 
   it('shows the loading skeleton instead of the greeting before the first payload', () => {
-    renderPanel(streamConversation);
+    renderPanel(streamConversation, { agentId: streamConversation.name });
 
     expect(screen.getByRole('status', { name: 'Loading conversation' })).toBeInTheDocument();
     expect(screen.queryByText('How can I help you?')).toBeNull();
   });
 
   it('shows the greeting after the first payload confirms an empty transcript', () => {
-    renderPanel(streamConversation);
+    renderPanel(streamConversation, { agentId: streamConversation.name });
 
     act(() => {
       streamTransportMock.listeners.get(streamConversation.name)?.({
@@ -814,7 +827,7 @@ describe('ConversationPanel first stream payload', () => {
   });
 
   it('returns to the loading skeleton when switching conversations', () => {
-    const view = renderPanel(streamConversation);
+    const view = renderPanel(streamConversation, { agentId: streamConversation.name });
 
     act(() => {
       streamTransportMock.listeners.get(streamConversation.name)?.({
@@ -838,6 +851,7 @@ describe('ConversationPanel first stream payload', () => {
             }}
             viewMode="conversation"
             onArchived={() => {}}
+            agentId="agent-test-stream-b"
           />
         </QueryClientProvider>
       </DialogProvider>,

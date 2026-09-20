@@ -75,9 +75,9 @@ describe('shouldStreamConversationMessages (PAN-1908 agent streaming)', () => {
     expect(shouldStreamConversationMessages(base({ id: -1, name: 'agent-pan-2', harness: 'codex' }))).toBe(true);
   });
 
-  it('does NOT stream a synthetic claude agent session (stays on poll)', () => {
-    expect(shouldStreamConversationMessages(base({ id: -1, name: 'agent-pan-3', harness: 'claude-code' }))).toBe(false);
-    expect(shouldStreamConversationMessages(base({ id: -1, name: 'agent-pan-3', harness: null }))).toBe(false);
+  it('streams a synthetic claude agent session instead of polling', () => {
+    expect(shouldStreamConversationMessages(base({ id: -1, name: 'agent-pan-3', harness: 'claude-code' }))).toBe(true);
+    expect(shouldStreamConversationMessages(base({ id: -1, name: 'agent-pan-3', harness: null }))).toBe(true);
   });
 
   it('streams planning/specialist ohmypi sessions too', () => {

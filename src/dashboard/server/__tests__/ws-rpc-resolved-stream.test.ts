@@ -12,6 +12,7 @@ const resolverMock = vi.hoisted(() => ({
   resolveCodexRolloutPath: vi.fn(async (): Promise<string | null> => null),
   resolveAcpTranscriptPath: vi.fn(async () => null),
   resolveKimiWirePath: vi.fn(async () => null),
+  resolveJsonlPath: vi.fn(async () => null),
   readLauncherPinnedSessionId: vi.fn(async () => null),
 }));
 vi.mock('../routes/jsonl-resolver.js', () => resolverMock);
@@ -39,6 +40,15 @@ import type { ParseResult } from '../services/conversation-service.js';
 const emptyParse = vi.fn<(file: string) => Promise<ParseResult>>();
 
 describe('streamHarnessFullParseSnapshots — ACP dispatch', () => {
+  it('keeps a WS/RPC stream open for synthetic Claude agent sessions', async () => {
+    const stream = streamHarnessFullParseSnapshots('agent-pan-3950', 'claude-code', null, true);
+    expect(stream).not.toBeNull();
+    const first = await Effect.runPromise(stream!.pipe(Stream.take(1), Stream.runCollect));
+    expect(Array.from(first)).toEqual([
+      { kind: 'messages', messages: [], workLog: [], streaming: false, snapshot: true },
+    ]);
+  });
+
   it('creates a ready stream for an ACP conversation before its transcript exists', async () => {
     const stream = streamHarnessFullParseSnapshots(
       'agent-nonexistent-acp-stream',

@@ -178,7 +178,7 @@ export function ConversationPanel({
   const committingRef = useRef(false);
   const queryClient = useQueryClient();
   const messagesQueryKey = useMemo(() => conversationMessagesQueryKey(conversation.name), [conversation.name]);
-  const { enabled: streamMessagesEnabled, receivedFirstPayload } = useConversationMessagesStream(conversation, Boolean(agentId));
+  const { enabled: streamMessagesEnabled, receivedFirstPayload } = useConversationMessagesStream(conversation);
   // Ref mirrors the latest streaming state so the HTTP queryFn can discard
   // responses that were already in flight when streaming became active.
   const streamActiveRef = useRef(streamMessagesEnabled);
@@ -241,8 +241,8 @@ export function ConversationPanel({
   }, [conversation.name]);
 
   // Query messages at this level so we can drive the header working-spinner.
-  // Live claude-code conversations are pushed through useConversationMessagesStream;
-  // keep the existing polling path for non-claude harnesses and historical views.
+  // Live transcripts are pushed through WS/RPC. HTTP supplies the initial
+  // snapshot/backfill and is the sole read path for stopped history.
   const { data: messagesData, isLoading: messagesLoading } = useQuery({
     queryKey: messagesQueryKey,
     queryFn: async ({ signal }) => {
@@ -260,8 +260,8 @@ export function ConversationPanel({
       }
       return fetched;
     },
-    enabled: !streamMessagesEnabled,
-    refetchInterval: streamMessagesEnabled ? false : (conversation.sessionAlive ? 2000 : false),
+    enabled: true,
+    refetchInterval: streamMessagesEnabled || agentId ? false : (conversation.sessionAlive ? 2000 : false),
   });
   // PAN-2876 — the rail lists the main agent plus every subagent; picking a subagent swaps the body to its transcript.
   const subagents = messagesData?.subagents ?? [];
@@ -1273,7 +1273,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   // PAN-3744: before this subscription emits, the transcript is loading rather
   // than empty. Keep this signal hook-local because query-cache entries survive
   // conversation switches and could flash a stale empty state.
-  const awaitingFirstPayload = streamMessagesEnabled && !receivedFirstPayload && messages.length === 0;
+  const awaitingFirstPayload = streamMessagesEnabled && !receivedFirstPayload && messages.length === 0 && !data?.error;
   const isDiscovering = streamMessagesEnabled && data?.discovering === true && messages.length === 0;
   // Zero chat messages ≠ zero activity for agent sessions (PAN-3544). Since
   // the CLIProxy 7.2 upgrade (2026-08-03) GPT-harness sessions emit only
@@ -1333,7 +1333,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
             ⚠ Session could not be resolved
           </p>
           <p className={styles.conversationEmptyStateSubtitle}>
-            {data.error}{data.checked ? ` Checked: ${data.checked.join(', ')}` : ''}
+            {data.error}{data.checked && data.checked.length > 0 ? ` Checked: ${data.checked.join(', ')}` : ''}
           </p>
         </div>
       ) : messagesFetchFailed ? (

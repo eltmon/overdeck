@@ -17,9 +17,9 @@ import { ReadModelService, type ReadModelServiceShape } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
 import { shouldBroadcastDashboardEvent, streamAgentOutput } from './services/agent-output-stream.js';
 import type { LegacyConversation } from '../../lib/overdeck/conversations.js';
-import { contextUsageFromParseResult, gateSnapshotEmission, parseConversationMessages, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
+import { contextUsageFromParseResult, gateSnapshotEmission, parseConversationMessages, parseEntireConversation, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
 import { isPiSessionFile } from './services/pi-conversation-parser.js';
-import { resolveAgentHarness, resolvePiSessionPath, resolveCodexRolloutPath, resolveAcpTranscriptPath, resolveKimiWirePath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
+import { resolveAgentHarness, resolvePiSessionPath, resolveCodexRolloutPath, resolveAcpTranscriptPath, resolveKimiWirePath, resolveJsonlPath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
 import { sessionFilePath } from '../../lib/paths.js';
 import { getRuntimeCensus } from '../../lib/runtime-census.js';
 import { listProjectsSync } from '../../lib/projects.js';
@@ -140,6 +140,10 @@ export function streamHarnessFullParseSnapshots(
     case 'kimi-wire-jsonl': return streamResolved(
       () => resolveKimiWirePath(sessionName, workspace ? { workspaceOverride: workspace } : {}),
       sharedTranscriptParser('kimi'),
+    );
+    case 'claude-jsonl': return streamResolved(
+      () => resolveJsonlPath(sessionName, workspace ?? ''),
+      parseEntireConversation,
     );
     default: return null;
   }
@@ -656,10 +660,8 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             );
 
             // PAN-1908: synthetic agent sessions (work/planning/specialist panels)
-            // have no conversations-table row. Stream pi/codex work agents by
-            // tailing their transcript and pushing full snapshots. Claude agent
-            // sessions keep the HTTP-poll path — the front-end gate only enables
-            // streaming for pi/codex here.
+            // have no conversations-table row. Resolve their durable agent
+            // transcript and stream snapshots over the same RPC transport.
             if (!conv && /^(agent-|planning-|specialist-|strike-|inspect-)|^(flywheel-orchestrator|conv-flywheel-orchestrator)$/.test(input.conversationName)) {
               const harness = yield* Effect.promise(() => resolveAgentHarness(input.conversationName));
               const stream = streamHarnessFullParseSnapshots(input.conversationName, harness, null, false, null, input.agentId);

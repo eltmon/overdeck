@@ -139,15 +139,14 @@ export function shouldStreamConversationMessages(conversation: Pick<Conversation
     const behavior = getHarnessBehavior(conversation.harness);
     return behavior.supportsConversationStreaming || behavior.supportsPatchProjection;
   }
-  // Synthetic agent sessions (id < 0 — work/planning/specialist SessionPanels)
-  // have no conversations-table row and only stream while their session is live.
-  // Only pi/codex stream here (PAN-1908): the server tails their transcript and
-  // pushes snapshots. Claude work agents stay on the existing HTTP-poll path,
-  // which already works — no need to add a server watcher for them.
+  // Synthetic agent sessions have no conversations-table row, but the RPC
+  // stream resolves them from durable agent state and tails every supported
+  // harness while live. Historical reads remain one-shot HTTP.
   if (!conversation.sessionAlive) return false;
   const name = conversation.name ?? '';
   const isAgentSession = /^(agent-|planning-|specialist-)/.test(name);
-  const streamable = getHarnessBehavior(conversation.harness).supportsConversationStreaming;
+  const behavior = getHarnessBehavior(conversation.harness);
+  const streamable = behavior.supportsConversationStreaming || behavior.supportsPatchProjection;
   return isAgentSession && streamable;
 }
 

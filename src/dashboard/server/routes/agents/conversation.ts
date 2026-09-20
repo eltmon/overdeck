@@ -134,7 +134,8 @@ export async function buildAgentConversationResult(id: string): Promise<AgentCon
 
     if (harness === 'ohmypi') {
       const sessionFile = await resolvePiSessionPath(id);
-      checked.push(sessionFile ?? join(agentDir, 'sessions', '**', '*.jsonl'), join(agentDir, '*.jsonl'));
+      if (sessionFile) checked.push(sessionFile);
+      checked.push(join(agentDir, 'sessions', '**', '*.jsonl'), join(agentDir, '*.jsonl'));
       if (!sessionFile || !(await pathExists(sessionFile))) return missingTranscript(id, checked);
       const result = await parseOhmypiConversationMessages(sessionFile);
       return { status: 200, body: { ...result, streaming: false } };
@@ -142,7 +143,8 @@ export async function buildAgentConversationResult(id: string): Promise<AgentCon
 
     if (harness === 'pi') {
       const sessionFile = await resolvePiSessionPath(id);
-      checked.push(sessionFile ?? join(agentDir, 'sessions', '**', '*.jsonl'), join(agentDir, '*.jsonl'));
+      if (sessionFile) checked.push(sessionFile);
+      checked.push(join(agentDir, 'sessions', '**', '*.jsonl'), join(agentDir, '*.jsonl'));
       if (!sessionFile || !(await pathExists(sessionFile))) return missingTranscript(id, checked);
       const result = await parsePiConversationMessages(sessionFile);
       return { status: 200, body: { ...result, streaming: false } };
@@ -150,7 +152,8 @@ export async function buildAgentConversationResult(id: string): Promise<AgentCon
 
     if (harness === 'codex') {
       const sessionFile = await resolveCodexRolloutPath(id);
-      checked.push(sessionFile ?? join(agentDir, 'codex-home*', 'sessions', '**', 'rollout-*.jsonl'));
+      if (sessionFile) checked.push(sessionFile);
+      checked.push(join(agentDir, 'codex-home*', 'sessions', '**', 'rollout-*.jsonl'));
       if (!sessionFile || !(await pathExists(sessionFile))) return missingTranscript(id, checked);
       const result = await parseCodexConversationMessages(sessionFile);
       return { status: 200, body: { ...result, streaming: false } };
@@ -158,7 +161,8 @@ export async function buildAgentConversationResult(id: string): Promise<AgentCon
 
     if (harness === 'acp' || harness === 'opencode') {
       const sessionFile = await resolveAcpTranscriptPath(id);
-      checked.push(sessionFile ?? join(agentDir, 'acp-transcript.jsonl'));
+      if (sessionFile) checked.push(sessionFile);
+      checked.push(join(agentDir, 'acp-session.jsonl'));
       if (!sessionFile || !(await pathExists(sessionFile))) return missingTranscript(id, checked);
       const result = await parseAcpConversationMessages(sessionFile);
       return { status: 200, body: {
@@ -175,6 +179,11 @@ export async function buildAgentConversationResult(id: string): Promise<AgentCon
     }
 
     // claude-code (default): launcher pin first, then the append-only index.
+    checked.push(
+      join(agentDir, 'sessions.json'),
+      join(agentDir, 'session.id'),
+      join(agentDir, 'launcher.sh'),
+    );
     let jsonlPath: string | null = null;
     const pinnedSessionId = await readLauncherPinnedSessionId(id);
     const workspace = await Effect.runPromise(getAgentWorkspace(id));
