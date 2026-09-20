@@ -29,6 +29,7 @@ import { getPrFacts, resetPrFactsCache } from '../../../lib/cloister/pr-facts.js
 import { bumpIssuePrTabCacheGeneration } from '../../../dashboard/server/services/pr-tab-cache.js';
 import { postReviewVerdict } from '../../../lib/cloister/pr-review-verdict.js';
 import { getIssueWorkspacePath } from '../../../lib/overdeck/issue-projects.js';
+import { appendPipelineEntry } from '../../../lib/cloister/pipeline-journal.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -154,6 +155,19 @@ export async function doneCommand(
       ));
       return exitCli(1);
     }
+    // The verdict is on the forge; record that Overdeck posted it. This runs
+    // in the reviewer's CLI process, so the notifier forwards over HTTP.
+    appendPipelineEntry(workspacePath, {
+      type: 'review.verdict',
+      issueId: normalizedIssueId,
+      source: 'pan-specialists-done',
+      data: {
+        verdict: options.status === 'passed' ? 'APPROVED' : 'CHANGES_REQUESTED',
+        subRole: role,
+        ...(result.via ? { via: result.via } : {}),
+        ...(options.runId ? { runId: options.runId } : {}),
+      },
+    });
     const tint = options.status === 'passed' ? chalk.green : chalk.yellow;
     const how = result.via === 'comment'
       ? 'verdict comment posted (self-review refused by forge)'

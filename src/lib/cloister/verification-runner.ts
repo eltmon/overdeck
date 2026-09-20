@@ -32,6 +32,7 @@ import { readVerificationCycleState, type VerificationCycleState } from './verif
 import { postVerificationCheckRun } from './verification-check-run.js';
 import { getPrFacts } from './pr-facts.js';
 import { writeFeedbackFile } from './feedback-writer.js';
+import { appendPipelineEntry } from './pipeline-journal.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 import { clearAgentPaused, getAgentStateSync, messageAgent, setAgentPaused, stopAgent } from '../agents.js';
 import { findProjectByPathSync, resolveProjectFromIssueSync } from '../projects.js';
@@ -386,6 +387,23 @@ async function runVerificationForIssuePromise(
   // immutable per-run artifact written when the run terminates.
   const runStartedAt = new Date().toISOString();
   console.log(`[${logPrefix}] Running verification gate for ${issueId} (attempt ${currentCycles + 1}/${VERIFICATION_MAX_CYCLES})`);
+  appendPipelineEntry(workspacePath, {
+    type: 'verification.started',
+    issueId,
+    source: logPrefix,
+    data: { head: headShort },
+  });
+
+  /** Journal the failure at the point of the failing return, then return it. */
+  const failedOutcome = (failedCheck: string, cycleCount: number): VerificationRunnerOutcome => {
+    appendPipelineEntry(workspacePath, {
+      type: 'verification.failed',
+      issueId,
+      source: logPrefix,
+      data: { failedCheck, cycleCount },
+    });
+    return { outcome: 'failed', failedCheck, cycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
+  };
 
   try {
     const projectConfig = findProjectByPathSync(workspacePath);
@@ -450,7 +468,7 @@ async function runVerificationForIssuePromise(
             console.error(`[${logPrefix}] Failed to write sync-target feedback for ${issueId}:`, feedbackErr);
           }
 
-          return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
+          return failedOutcome(failedCheck, newCycleCount);
         }
 
         for (const result of syncResults) {
@@ -636,7 +654,7 @@ async function runVerificationForIssuePromise(
       } catch (err) {
         console.warn(`[${logPrefix}] Could not settle stack rebuild for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
       }
-      return { outcome: 'failed', failedCheck: failedGate.name, cycleCount: currentCycles, maxCycles: VERIFICATION_MAX_CYCLES };
+      return failedOutcome(failedGate.name, currentCycles);
     }
 
     // Durable terminal record of this gate run, surfaced by the issue tree's
@@ -700,7 +718,7 @@ async function runVerificationForIssuePromise(
         console.error(`[${logPrefix}] Failed to write verification feedback for ${issueId}:`, feedbackErr);
       }
 
-      return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
+      return failedOutcome(failedCheck, newCycleCount);
     }
 
     // xBRIEF AC gate: check all acceptance criteria are completed (runs after quality gates)
@@ -742,7 +760,7 @@ async function runVerificationForIssuePromise(
         } catch (feedbackErr: any) {
           console.error(`[${logPrefix}] Failed to write xBRIEF conflict feedback for ${issueId}:`, feedbackErr);
         }
-        return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
+        return failedOutcome(failedCheck, newCycleCount);
       }
       throw xbriefErr;
     }
@@ -792,7 +810,7 @@ async function runVerificationForIssuePromise(
         console.error(`[${logPrefix}] Failed to write AC verification feedback for ${issueId}:`, feedbackErr);
       }
 
-      return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
+      return failedOutcome(failedCheck, newCycleCount);
     }
 
     const taskBlockers = options.skipPlanChecklist
@@ -840,7 +858,7 @@ async function runVerificationForIssuePromise(
         console.error(`[${logPrefix}] Failed to write open-task verification feedback for ${issueId}:`, feedbackErr);
       }
 
-      return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
+      return failedOutcome(failedCheck, newCycleCount);
     }
 
     // PAN-2179: reject a plan-only / zombie changeset before it can reach
@@ -873,7 +891,7 @@ async function runVerificationForIssuePromise(
       } catch (feedbackErr: any) {
         console.error(`[${logPrefix}] Failed to send empty-changeset feedback for ${issueId}:`, feedbackErr);
       }
-      return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
+      return failedOutcome(failedCheck, newCycleCount);
     }
     if (changesetHasContent === undefined) {
       console.warn(`[${logPrefix}] empty-changeset guard skipped (one or more repo diffs failed)`);
@@ -909,6 +927,23 @@ async function runVerificationForIssuePromise(
     void capturePipelineStageForIssue(issueId, 'verification_passed');
     console.log(`[${logPrefix}] Verification passed for ${issueId}${lastVerifiedCommit ? ` (HEAD=${lastVerifiedCommit.slice(0, 8)})` : ''} — proceeding to review-agent`);
 
+    // The verified sha. A polyrepo anchor is a COMPOSITE snapshot string, so
+    // slicing it yields garbage — resolve the primary repo's sha out of it,
+    // the same way the `overdeck/tests` stamp below does.
+    const verifiedSha = (() => {
+      if (!lastVerifiedCommit) return undefined;
+      const composite = parseCompositeSnapshot(lastVerifiedCommit);
+      if (composite.size === 0) return lastVerifiedCommit as string;
+      const primary = repoRoots[0]?.repoKey;
+      return (primary && composite.get(primary)) ?? [...composite.values()][0];
+    })();
+    appendPipelineEntry(workspacePath, {
+      type: 'verification.passed',
+      issueId,
+      source: logPrefix,
+      data: { head: verifiedSha?.slice(0, 8) ?? headShort },
+    });
+
     // Post overdeck/test=success for branch protection's required context
     // (Decision 7). PAN-3847: the stamp binds to the anchor snapshotted at pass
     // time (the primary repo's sha for a composite polyrepo anchor), and the
@@ -921,14 +956,7 @@ async function runVerificationForIssuePromise(
         if (!repo || !repo.includes('/')) return;
         const [owner, name] = repo.split('/');
         const { postOverdeckTestsStatus } = await import('../github-app.js');
-        const stampSha = (() => {
-          if (!lastVerifiedCommit) return undefined;
-          const composite = parseCompositeSnapshot(lastVerifiedCommit);
-          if (composite.size === 0) return lastVerifiedCommit as string;
-          const primary = repoRoots[0]?.repoKey;
-          return (primary && composite.get(primary)) ?? [...composite.values()][0];
-        })();
-        await postOverdeckTestsStatus(workspacePath, owner!, name!, 'success', 'Verification gate passed (changed-file scope)', stampSha);
+        await postOverdeckTestsStatus(workspacePath, owner!, name!, 'success', 'Verification gate passed (changed-file scope)', verifiedSha);
       } catch (err: any) {
         console.warn(`[${logPrefix}] Failed to post overdeck/tests status: ${err.message}`);
       }

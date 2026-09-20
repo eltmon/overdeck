@@ -31,6 +31,8 @@ import { isIntegrationPermissionError, verifyAppCanMerge, type GitHubPullRequest
 import { resolveGitHubIssueSync as resolveGitHubIssueShared } from '../../../../lib/tracker-utils.js';
 import { sessionExists } from '../../../../lib/tmux.js';
 import { resolveIssueWorkspaceSyncTarget } from '../../../../lib/workspaces/resolver.js';
+import { appendPipelineEntry } from '../../../../lib/cloister/pipeline-journal.js';
+import { getIssueWorkspacePath } from '../../../../lib/overdeck/issue-projects.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { clearMergeRun, getMergeRun, listMergeRuns, setMergeRun, setMergeQueueAdvanceHandler, type MergeRunPatch } from '../../services/merge-queue-service.js';
@@ -50,7 +52,21 @@ const execFileAsync = promisify(execFile);
  * (PAN-3917 FR-12): the forge owns whether the PR merged, and
  * `services/derived-issue-state.ts` answers that. Nothing here is a status.
  */
-const setStatus = (issueId: string, patch: MergeRunPatch): void => { setMergeRun(issueId, patch); };
+const setStatus = (issueId: string, patch: MergeRunPatch): void => {
+  setMergeRun(issueId, patch);
+  // Every failing exit of `triggerMerge` funnels through here, so this is the
+  // one place a merge failure is known — the merge itself has ~20 refusal and
+  // error returns, and none of them is the outcome on its own.
+  if (patch.phase !== 'failed') return;
+  const workspacePath = getIssueWorkspacePath(issueId);
+  if (!workspacePath) return;
+  appendPipelineEntry(workspacePath, {
+    type: 'merge.failed',
+    issueId: issueId.toUpperCase(),
+    source: 'merge-button',
+    ...(patch.notes ? { data: { reason: patch.notes } } : {}),
+  });
+};
 
 const gitIn = async (args: string[], cwd: string): Promise<string> =>
   (await execFileAsync('git', args, { cwd, encoding: 'utf-8' })).stdout.trim();
@@ -395,6 +411,14 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       ? workspaceInfo.localPath
       : join(projectPath, 'workspaces', `feature-${issueLower}`);
   const workspaceDirName = basename(workspacePath);
+  // The MERGE door: past every eligibility refusal and holding the project's
+  // merge slot, this merge is genuinely starting.
+  appendPipelineEntry(workspacePath, {
+    type: 'merge.attempted',
+    issueId: normalizedId,
+    source: 'merge-button',
+    data: { kind: request.kind },
+  });
   const branchName = request.kind === 'strike'
     ? request.branchName
     : workspaceDirName.startsWith('feature-')

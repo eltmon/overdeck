@@ -65,6 +65,10 @@ export function appendPipelineEntry(
   const stamped: PipelineJournalEntry = { at: new Date().toISOString(), ...entry };
   const path = pipelineJournalPath(workspacePath);
   try {
+    // The journal dies with the workspace. `mkdir -p` on a reaped workspace
+    // would resurrect the tree as an empty ghost, so a missing workspace is a
+    // skip, not a write.
+    if (!existsSync(workspacePath)) throw new Error(`workspace ${workspacePath} no longer exists`);
     mkdirSync(dirname(path), { recursive: true });
     appendFileSync(path, `${JSON.stringify(stamped)}\n`, 'utf-8');
   } catch (err) {

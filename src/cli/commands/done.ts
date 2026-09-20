@@ -278,7 +278,7 @@ export async function startReviewPipeline(
   message?: string,
 ): Promise<{ started: boolean; line: string }> {
   const { requestReviewViaDashboard } = await import('./request-review.js');
-  const response = await requestReviewViaDashboard(issueId, message);
+  const response = await requestReviewViaDashboard(issueId, message, undefined, 'pan-done');
 
   if (response.kind === 'unreachable') {
     return {

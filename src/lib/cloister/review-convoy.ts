@@ -22,6 +22,7 @@ import { formatTier1Summary, type ReviewContextManifest } from './review-context
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
+import { appendPipelineEntry } from './pipeline-journal.js';
 import { AGENTS_DIR, packageRoot } from '../paths.js';
 import type { RuntimeName } from '../runtimes/types.js';
 
@@ -329,6 +330,20 @@ export async function launchConvoyReviewersPromise(params: ConvoyLaunchParams): 
   if (failedReviewers.length > 0) {
     console.warn(`[review-agent] Convoy launched for ${params.issueId}, but ${failedReviewers.length} reviewer(s) failed to spawn`);
   }
+
+  // The moment reviewers exist. `reviewers` carries the agent ids so a later
+  // reader can tell which lanes this run dispatched without re-deriving them.
+  const launchedSubRoles = params.subRoles ?? REVIEW_SUB_ROLES;
+  appendPipelineEntry(params.workspace, {
+    type: 'review.dispatched',
+    issueId: params.issueId.toUpperCase(),
+    source: 'review-convoy',
+    data: {
+      runId: params.runId,
+      reviewers: launchedSubRoles.map((subRole) => reviewerAgentId(params.issueId, subRole)),
+      launched: reviewerResults.filter(r => r.success).length,
+    },
+  });
   return reviewerResults;
 }
 
