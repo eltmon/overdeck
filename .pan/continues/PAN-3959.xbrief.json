@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3959",
   "created": "2026-09-20T22:53:20.505Z",
-  "updated": "2026-09-20T23:25:54.807Z",
+  "updated": "2026-09-20T23:31:55.209Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-09-20T23:25:50.183Z"
     },
     "w6-pi-ohmypi-extensions-record-path": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3959",
-      "claimedAt": "2026-09-20T23:25:54.807Z"
+      "claimedAt": "2026-09-20T23:25:54.807Z",
+      "doneAt": "2026-09-20T23:31:55.209Z"
     }
   }
 }
