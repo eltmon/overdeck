@@ -52,6 +52,11 @@ describe('review-convergence', () => {
       const counts = [5, 5, 4];
       expect(evaluateReviewConvergence(counts)).toBe('converging');
     });
+
+    it('returns converging when the latest round has zero blockers, even on a flat series', () => {
+      expect(evaluateReviewConvergence([0, 0, 0])).toBe('converging');
+      expect(evaluateReviewConvergence([3, 0, 0])).toBe('converging');
+    });
   });
 
   describe('countBlockingFindingsForRun', () => {
@@ -94,6 +99,31 @@ ${headings}
     it('returns 0 for empty dir with no artifacts', () => {
       const result = countBlockingFindingsForRun(tempDir);
       expect(result).toBeNull();
+    });
+
+    it('counts a self-review review.md written in the synthesis layout', () => {
+      const review = `
+# Review — PAN-3705
+
+## Verdict: CHANGES REQUESTED — one blocker
+
+## Blocking Findings
+
+### [correctness / requirements] A pinned scope disappears — CommandPalette.tsx:846
+
+- Severity: MUST
+
+## Non-blocking Findings
+
+### [documentation] stale map
+`;
+      writeFileSync(join(tempDir, 'review.md'), review);
+      expect(countBlockingFindingsForRun(tempDir)).toBe(1);
+    });
+
+    it('counts a self-review with an empty Blocking Findings section as zero', () => {
+      writeFileSync(join(tempDir, 'review.md'), '# Review\n\n## Verdict: APPROVED\n\n## Blocking Findings\n\nNone.\n');
+      expect(countBlockingFindingsForRun(tempDir)).toBe(0);
     });
 
     it('falls back to report sum when no synthesis exists', () => {
