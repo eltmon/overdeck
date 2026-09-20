@@ -32,6 +32,39 @@ subagents, see [ROLES.md](./ROLES.md).
 6. **Review never merges.** Review determines whether code advances to testing;
    the dashboard merge path remains separately human-gated.
 
+### How the verdict reaches the forge
+
+GitHub refuses to record a review on your own pull request
+(`Can not request changes on your own pull request`). On a single-account
+install the PR author and the reviewer are the same account, so every verdict
+was rejected, `reviewDecision` stayed empty, and nothing downstream —
+rework delivery, the review-stale gate, the merge-ready set — ever saw a
+decision. `postReviewVerdict` therefore tries two identities, in order:
+
+1. **The GitHub App.** When `~/.overdeck/github-app/` holds credentials, the
+   `gh pr review` call runs with an installation token in `GH_TOKEN`, so the
+   review is authored by `panopticon-agent[bot]`, which is never the PR author
+   and whose review GitHub accepts.
+2. **A marker comment.** If the forge still refuses a self-review (no app
+   installed, or the bot opened the PR), the verdict is posted as a PR comment
+   whose first line is a machine marker:
+
+   ```
+   <!-- overdeck-verdict: CHANGES_REQUESTED -->
+   ```
+
+   (or `APPROVED`), followed by the verdict body. The result carries
+   `via: 'comment'` so the CLI can say which path was used.
+
+`pr-facts` reads both. A real forge `reviewDecision` always wins; only when the
+forge reached no decision does it take the newest marker comment. An `APPROVED`
+marker older than the PR's head commit does **not** count — a stale approval
+must never merge commits it never saw — while a stale `CHANGES_REQUESTED` still
+counts, because rework stays owed until a newer verdict says otherwise.
+
+GitLab is unchanged: approval is `glab mr approve`, a rejection is an MR note,
+and there is no marker.
+
 ---
 
 ## Review modes

@@ -34,7 +34,7 @@ describe('requestReviewViaDashboard', () => {
     expect(String(fetchMock.mock.calls[0]![0])).toContain('/api/review/PAN-3705/request');
     const init = fetchMock.mock.calls[0]![1] as RequestInit;
     expect(init.method).toBe('POST');
-    expect(JSON.parse(String(init.body))).toEqual({ message: 'work complete' });
+    expect(JSON.parse(String(init.body))).toEqual({ message: 'work complete', source: 'pan-review-request' });
     if (result.kind === 'ok') {
       expect(result.result.message).toContain('Verification started');
     }

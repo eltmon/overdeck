@@ -116,3 +116,85 @@ Auto-resume is intentionally suppressible:
 
 These gates are orthogonal to deacon-lite's own start/stop toggle
 (`pan admin cloister start|stop`).
+
+## The pipeline journal (post-Cut follow-up to PAN-3917)
+
+PAN-3917 deleted the stored per-issue pipeline record. That was right — state
+is what git, the tracker, the PR and the terminal backend say — but it left a
+hole: between "PR opened" and "review posted" nothing on disk said what
+Overdeck was *doing*. `pan show` could only answer `in-review`, a work agent
+told to "confirm the pipeline state change" had nothing to confirm it with and
+polled for ten minutes (PAN-3705), and a dashboard restart mid-convoy lost the
+convoy with nothing left to re-dispatch from.
+
+One piece of stored pipeline state came back, and it is not a status.
+
+**The contract** (`src/lib/cloister/pipeline-journal.ts`):
+
+- **Append-only.** The server writes one entry at the moment it performs an
+  action and never rewrites it. There is no update, no delete, no repair
+  routine, and no API that exports one.
+- **Not authority.** Readers take the last entry plus the PR. If the two
+  disagree, the PR wins and the journal is merely stale. Nothing reconciles it.
+- **Event-based, never polled.** Appending fires `pipeline.entry` on the
+  existing pipeline-notifier. The dashboard projects it as a `pipeline.journal`
+  domain event; a CLI-process append forwards over
+  `POST /api/internal/pipeline/notify`.
+- **Disposable.** It lives at `<workspace>/.overdeck/pipeline.jsonl`, beside
+  `verification-latest.json`, and dies with the workspace. It is never written
+  into a workspace that no longer exists.
+- **Never fatal.** A write failure is logged and swallowed: an unwritable
+  journal must not break the action that produced it.
+
+**Entry types and who writes them**
+
+| Type | Written by |
+| --- | --- |
+| `verification.started` / `.passed` / `.failed` | `cloister/verification-runner.ts`, at the start and at every outcome return |
+| `review.requested` | `startRequestReviewPipeline` — the one door the HTTP route, `pan review request`, `pan done` and the PR webhook all pass through |
+| `review.dispatched` | `cloister/review-convoy.ts` `launchConvoyReviewersPromise`, once reviewers exist |
+| `review.redispatched` | deacon-lite's `recoverStalledReviews` |
+| `review.verdict` | `pan admin specialists done review`, once the verdict reaches the forge |
+| `merge.attempted` | the MERGE door in `routes/workspaces/merge-ops.ts`, once the merge holds the project's merge slot |
+| `merge.failed` | merge-ops' own `setStatus`, the single funnel every failing exit of `triggerMerge` passes through |
+| `merge.completed` | `cloister/merge-agent.ts` `postMergeLifecycle`, right after the forge answers "merged" |
+
+`pan show <id>` prints the last six entries under the derived state; `--json`
+carries the whole journal.
+
+## Deacon-lite: five routines
+
+`runDeaconLite()` runs on a 60s tick and holds five routines, all of which only
+observe and nudge — none reconciles a stored copy of anything:
+
+1. `checkStuckWorkAgents` — one nudge per hour to an idle work agent with
+   unpushed commits.
+2. `checkApiErrorAgents` — nudges an agent wedged on an API error.
+3. `reconcileAgentLiveness` — corrects the dashboard's in-memory cache against
+   the selected backend's inventory.
+4. `reapClosedIssueAgents` — reaps agents for issues the tracker has closed.
+5. `recoverStalledReviews` — the one recovery routine, and the only timer added
+   by the journal work.
+
+`recoverStalledReviews` reads the journal and nothing else — no GitHub call, no
+tracker call. It acts only when an issue's **last** entry is `review.dispatched`,
+`review.redispatched`, or `review.requested`, is at least 15 minutes old, and no
+pane whose id starts with `agent-<issue>-review-` is live. The last-entry rule is
+load-bearing: a `verification.failed` written *after* `review.requested` means
+the work agent owes rework, and re-dispatching there would re-run verification
+every hour forever. Only sub-reviewers count as "live" — the synthesis parent's
+id is exactly `agent-<issue>-review`, and letting it mask four dead lanes is the
+PAN-3939 wedge this routine exists to clear.
+
+It then relaunches the missing lanes against the existing run
+(`recoverMissingConvoyReviewers`), which reuses the parent's own `state.json` and
+so re-verifies nothing; only a parent with no run state at all falls back to the
+full review door. At most one re-dispatch per issue per hour.
+
+**Accepted v1 gaps** (stated in the module, deliberately not built): a convoy
+where some reviewers posted a verdict and one died is not recovered, because the
+last entry is then `review.verdict` — `review.dispatched.data.reviewers` carries
+enough to count verdicts later. A quick-mode review writes no `review.dispatched`
+entry, so a dead quick reviewer is not recovered either. And a server death
+between `verification.started` and its outcome leaves `verification.*` last,
+which the rule above deliberately skips.

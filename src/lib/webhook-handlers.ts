@@ -279,6 +279,7 @@ async function handlePullRequestPromise(payload: WebhookPayload): Promise<void> 
       } else {
         const outcome = await startReview(issueId, {
           note: `PR ${payload.action} on ${repo}#${pr.number} — starting verification`,
+          source: 'webhook',
         });
         if (!outcome.started) {
           console.log(`[webhook] Review not started for ${issueId}: ${outcome.reason}`);

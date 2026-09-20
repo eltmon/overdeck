@@ -473,7 +473,7 @@ optional:
       })
     );
 
-    it.effect('requires observing review request completion after an exec yield', () =>
+    it.effect('tells the agent to end its turn after pan review request exits 0, not to poll', () =>
       Effect.gen(function* () {
         const out = yield* renderPrompt({
           name: 'work',
@@ -493,11 +493,15 @@ optional:
           },
         });
 
-        expect(out).toContain('A yielded exec result');
-        expect(out).toContain('poll that same background terminal until it exits');
-        expect(out).toContain('inspect its real exit code');
-        expect(out).toContain('pan show PAN-611');
-        expect(out).toContain('pan review pending');
+        // PAN-3705: the old wording told the agent to poll `pan show` until it
+        // "confirmed the pipeline state change", which it did for ten minutes.
+        // Every path that starts the review pipeline is fire-and-forget, so
+        // exit 0 IS the confirmation and Overdeck messages the agent after.
+        expect(out).toContain('returns as soon as the request is accepted');
+        expect(out).toContain('end your turn and wait');
+        expect(out).toContain('Do not poll `pan show`, files, or terminals');
+        expect(out).not.toContain('pan review pending');
+        expect(out).not.toContain('poll that same background terminal until it exits');
       })
     );
 

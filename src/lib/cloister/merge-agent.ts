@@ -337,6 +337,24 @@ export async function postMergeLifecycle(
     }
     console.log(`[merge-agent] Verified merge before lifecycle for ${issueId}: ${mergeVerification.reason}`);
 
+    // The one place the merge outcome is known for certain: the forge has been
+    // asked and answered "merged". Every merge path — the MERGE door, an
+    // auto-merge, an admin merge seen by the PR webhook — arrives here, and the
+    // in-flight/completed guards above make it exactly once per issue.
+    try {
+      const { appendPipelineEntry } = await import('./pipeline-journal.js');
+      const { getIssueWorkspacePath } = await import('../overdeck/issue-projects.js');
+      const workspacePath = getIssueWorkspacePath(issueId);
+      if (workspacePath) {
+        appendPipelineEntry(workspacePath, {
+          type: 'merge.completed',
+          issueId: issueId.toUpperCase(),
+          source: 'post-merge-lifecycle',
+          data: { reason: mergeVerification.reason, ...(sourceBranch ? { sourceBranch } : {}) },
+        });
+      }
+    } catch { /* journalling must never block the lifecycle */ }
+
     // PAN-3917: nothing is stamped here. The forge already says the PR merged —
     // that IS the merge state, and every reader derives it.
     // Eager Docker cleanup must run before any fatal post-merge handoff step.

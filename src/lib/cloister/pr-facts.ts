@@ -78,6 +78,29 @@ export interface GitLabMrView {
   pipeline?: { status?: string } | null;
 }
 
+/**
+ * The machine marker a verdict comment carries when the forge refuses a review.
+ *
+ * GitHub will not let an account approve or request changes on its own pull
+ * request, so on a single-account install every `gh pr review` is rejected and
+ * `reviewDecision` stays empty forever. `pr-review-verdict` then posts the
+ * verdict as a PR comment whose first line is this marker, and the GitHub
+ * branch below reads it back. A real forge review decision always wins.
+ */
+export type MarkerVerdict = 'APPROVED' | 'CHANGES_REQUESTED';
+
+export function formatVerdictMarker(verdict: MarkerVerdict): string {
+  return `<!-- overdeck-verdict: ${verdict} -->`;
+}
+
+const VERDICT_MARKER_RE = /^\s*<!--\s*overdeck-verdict:\s*(APPROVED|CHANGES_REQUESTED)\s*-->/i;
+
+/** The verdict a comment body declares in its first line, or null. */
+export function parseVerdictMarker(body: string | null | undefined): MarkerVerdict | null {
+  const match = body?.match(VERDICT_MARKER_RE);
+  return match ? (match[1].toUpperCase() as MarkerVerdict) : null;
+}
+
 export function emptyPrFacts(issueId: string, error?: string): PrFacts {
   return {
     issueId: issueId.toUpperCase(),
@@ -127,11 +150,48 @@ export function summarizeStatusCheckRollup(
   return 'green';
 }
 
+/** Epoch ms of the PR's head commit, used to age out a stale approval marker. */
+function headCommitTime(pr: IssuePullRequestData): number | null {
+  const commits = pr.commits ?? [];
+  if (commits.length === 0) return null;
+  const head = pr.headRefOid ? commits.find((commit) => commit.oid === pr.headRefOid) : undefined;
+  const chosen = head ?? commits[commits.length - 1];
+  const parsed = Date.parse(chosen?.committedDate ?? chosen?.authoredDate ?? '');
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+/**
+ * The verdict declared by the newest marker comment on the PR.
+ *
+ * An APPROVED marker older than the PR's head commit does not count: a stale
+ * approval must never merge commits it never saw. A stale CHANGES_REQUESTED
+ * still counts — rework stays owed until a newer verdict says otherwise.
+ */
+function markerVerdictFromComments(pr: IssuePullRequestData): MarkerVerdict | null {
+  const comments = pr.comments ?? [];
+  for (let index = comments.length - 1; index >= 0; index -= 1) {
+    const verdict = parseVerdictMarker(comments[index]?.body);
+    if (!verdict) continue;
+    if (verdict === 'APPROVED') {
+      const headAt = headCommitTime(pr);
+      const commentAt = Date.parse(comments[index]?.createdAt ?? '');
+      if (headAt !== null && (Number.isNaN(commentAt) || commentAt < headAt)) return null;
+    }
+    return verdict;
+  }
+  return null;
+}
+
 function gitHubFacts(issueId: string, pr: IssuePullRequestData): PrFacts {
   const state = normalize(pr.state);
   const merged = state === 'MERGED' || Boolean(pr.mergedAt);
   const mergeable = normalize(pr.mergeable);
   const decision = normalize(pr.reviewDecision);
+  const forgeDecision = decision === 'APPROVED' || decision === 'CHANGES_REQUESTED' ? decision : null;
+  // Only consult the marker when the forge itself reached no decision.
+  const effective: PrReviewDecision = forgeDecision
+    ?? markerVerdictFromComments(pr)
+    ?? (decision === 'REVIEW_REQUIRED' ? 'REVIEW_REQUIRED' : null);
   return {
     issueId: issueId.toUpperCase(),
     forge: 'github',
@@ -144,11 +204,9 @@ function gitHubFacts(issueId: string, pr: IssuePullRequestData): PrFacts {
     draft: pr.isDraft === true,
     headSha: pr.headRefOid ?? null,
     headBranch: pr.headRefName ?? null,
-    reviewDecision: decision === 'APPROVED' || decision === 'CHANGES_REQUESTED' || decision === 'REVIEW_REQUIRED'
-      ? decision
-      : null,
-    approved: decision === 'APPROVED',
-    changesRequested: decision === 'CHANGES_REQUESTED',
+    reviewDecision: effective,
+    approved: effective === 'APPROVED',
+    changesRequested: effective === 'CHANGES_REQUESTED',
     mergeable: mergeable === 'MERGEABLE' ? true : mergeable === 'CONFLICTING' ? false : null,
     mergeableState: pr.mergeable ? pr.mergeable.toLowerCase() : null,
     checks: summarizeStatusCheckRollup(pr.statusCheckRollup),

@@ -61,9 +61,12 @@ export type StartRequestReviewOutcome =
   | { started: false; reason: 'no-workspace' | 'already-running' | 'no-project' }
   | { started: false; reason: 'dirty-workspace'; error: string };
 
+/** Who asked for the review — journalled as the `review.requested` source. */
+export type RequestReviewSource = 'pan-done' | 'pan-review-request' | 'webhook' | 'deacon-lite' | 'api';
+
 export type RequestReviewStarter = (
   issueId: string,
-  options?: { note?: string; onReviewSpawned?: () => void },
+  options?: { note?: string; source?: RequestReviewSource; onReviewSpawned?: () => void },
 ) => Promise<StartRequestReviewOutcome>;
 
 let requestReviewStarter: RequestReviewStarter | null = null;

@@ -48,6 +48,12 @@ const GH_PR_VIEW_FIELDS = [
   'mergedAt',
   'mergeCommit',
   'body',
+  // PAN-3917 follow-up: on a single-account install GitHub refuses a review on
+  // your own PR, so the verdict arrives as a marker comment and `pr-facts`
+  // reads it back — dated against the head commit so a stale approval cannot
+  // merge newer code. Both fields ride the one `gh pr view` we already run.
+  'comments',
+  'commits',
 ].join(',');
 
 export interface IssuePullRequestData {
@@ -82,6 +88,9 @@ export interface IssuePullRequestData {
   mergedAt?: string;
   mergeCommit?: { oid?: string } | string | null;
   body: string;
+  /** Optional: absent from the many fixtures that predate the verdict marker. */
+  comments?: Array<{ body?: string; createdAt?: string; author?: { login?: string } | null }>;
+  commits?: Array<{ oid?: string; committedDate?: string; authoredDate?: string }>;
 }
 
 export interface CommitCheckRuns {

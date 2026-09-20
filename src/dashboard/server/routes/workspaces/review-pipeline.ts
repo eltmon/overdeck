@@ -45,8 +45,10 @@ import { pushLocalReviewBranches } from '../../../../lib/cloister/review-branch-
 import {
   registerRequestReviewStarter,
   requestReviewPipeline,
+  type RequestReviewSource,
   type StartRequestReviewOutcome,
 } from '../../../../lib/cloister/request-review-pipeline.js';
+import { appendPipelineEntry } from '../../../../lib/cloister/pipeline-journal.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from '../dashboard-auth.js';
 import { httpHandler } from '../http-handler.js';
@@ -216,7 +218,7 @@ export async function reReviewGuardError(
  */
 export async function startRequestReviewPipeline(
   issueId: string,
-  options: { note?: string; onReviewSpawned?: () => void } = {},
+  options: { note?: string; source?: RequestReviewSource; onReviewSpawned?: () => void } = {},
 ): Promise<StartRequestReviewOutcome> {
   const canonicalIssueId = issueId.toUpperCase();
   const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
@@ -247,6 +249,17 @@ export async function startRequestReviewPipeline(
   });
 
   if (options.note) console.log(`[request-review] ${canonicalIssueId}: ${options.note}`);
+
+  // The one door every review request passes through — the HTTP route, the
+  // `pan review request` / `pan done` CLI behind it, and the PR webhook. This
+  // is the moment Overdeck accepts the request, so this is where it is
+  // journalled; nothing downstream re-states it.
+  appendPipelineEntry(workspacePath, {
+    type: 'review.requested',
+    issueId: canonicalIssueId,
+    source: options.source ?? 'api',
+    ...(options.note ? { data: { note: options.note } } : {}),
+  });
 
   const started = requestReviewPipeline.start(canonicalIssueId, {
     verify: () => Effect.runPromise(runVerificationForIssue(
@@ -594,6 +607,11 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const body = yield* readJsonBody;
     const { message } = body as { message?: string };
+    const rawSource = (body as { source?: unknown }).source;
+    const requestSource: RequestReviewSource =
+      rawSource === 'pan-done' || rawSource === 'pan-review-request' || rawSource === 'webhook'
+        ? rawSource
+        : 'api';
     const eventStore = yield* EventStoreService;
 
     const urlOpt = HttpServerRequest.toURL(request);
@@ -810,6 +828,7 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
 
     const outcome = yield* Effect.promise(() => startRequestReviewPipeline(issueId, {
       note: requestNote,
+      source: requestSource,
       onReviewSpawned: () => autoRequeueCounts.set(canonicalIssueId, newCount),
     }));
 

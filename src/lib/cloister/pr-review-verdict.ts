@@ -9,12 +9,28 @@
  * GitLab has no "request changes" primitive. An approval is `glab mr approve`;
  * a rejection is an MR note, and the MR simply stays unapproved — which is what
  * `pr-facts` reports back as `REVIEW_REQUIRED`.
+ *
+ * Two GitHub identities matter here. GitHub refuses any review on your own pull
+ * request, so on a single-account install every verdict was rejected and
+ * `reviewDecision` stayed empty forever — no rework delivery, no merge-ready
+ * set. So: post as the GitHub App when it is installed (the bot is never the
+ * author), and when the forge still refuses, post the verdict as a PR comment
+ * carrying the `overdeck-verdict` marker that `pr-facts` reads back.
  */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
+import { Effect } from 'effect';
+
 import { parseArtifactRef } from '../forge.js';
-import { getPrFacts, parseGitLabProjectPath, type PrFacts } from './pr-facts.js';
+import { generateInstallationToken, isGitHubAppConfigured } from '../github-app.js';
+import {
+  formatVerdictMarker,
+  getPrFacts,
+  parseGitLabProjectPath,
+  type MarkerVerdict,
+  type PrFacts,
+} from './pr-facts.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -29,17 +45,71 @@ export interface PostReviewVerdictInput {
 }
 
 export type PostReviewVerdictResult =
-  | { posted: true; forge: 'github' | 'gitlab'; url: string | null; verdict: ReviewVerdict }
+  | {
+    posted: true;
+    forge: 'github' | 'gitlab';
+    url: string | null;
+    verdict: ReviewVerdict;
+    /** How the verdict reached the forge: a real review, or a marker comment. */
+    via?: 'review' | 'comment';
+  }
   | { posted: false; reason: string };
+
+export interface RunGhOptions {
+  env?: NodeJS.ProcessEnv;
+}
 
 export interface PostReviewVerdictDeps {
   getFacts?: typeof getPrFacts;
-  runGh?: (args: string[]) => Promise<void>;
+  runGh?: (args: string[], options?: RunGhOptions) => Promise<void>;
   runGlab?: (args: string[]) => Promise<void>;
+  isAppConfigured?: () => boolean;
+  getAppToken?: () => Promise<string>;
 }
 
-async function defaultRunGh(args: string[]): Promise<void> {
-  await execFileAsync('gh', args, { encoding: 'utf-8', timeout: 60_000, maxBuffer: 8 * 1024 * 1024 });
+async function defaultRunGh(args: string[], options: RunGhOptions = {}): Promise<void> {
+  await execFileAsync('gh', args, {
+    encoding: 'utf-8',
+    timeout: 60_000,
+    maxBuffer: 8 * 1024 * 1024,
+    ...(options.env ? { env: options.env } : {}),
+  });
+}
+
+async function defaultAppToken(): Promise<string> {
+  const { token } = await Effect.runPromise(generateInstallationToken());
+  return token;
+}
+
+/** `gh` errors carry the forge's refusal on stderr, not always in `message`. */
+function errorText(cause: unknown): string {
+  if (!(cause instanceof Error)) return String(cause);
+  const stderr = (cause as { stderr?: unknown }).stderr;
+  return typeof stderr === 'string' && stderr.trim() ? `${cause.message}\n${stderr}` : cause.message;
+}
+
+/**
+ * Author the verdict as `panopticon-agent[bot]` when the GitHub App is
+ * installed. The bot is never the PR author, so GitHub accepts the review that
+ * it refuses from the operator's own account. A token failure is not a verdict
+ * failure: fall through to the plain `gh` identity and let the marker fallback
+ * catch a refusal.
+ */
+async function appTokenEnv(deps: PostReviewVerdictDeps): Promise<NodeJS.ProcessEnv | undefined> {
+  try {
+    if (!(deps.isAppConfigured ?? isGitHubAppConfigured)()) return undefined;
+    const token = await (deps.getAppToken ?? defaultAppToken)();
+    return token ? { ...process.env, GH_TOKEN: token } : undefined;
+  } catch (cause) {
+    console.warn(`[pr-review-verdict] GitHub App token unavailable, posting as the gh CLI user: ${errorText(cause)}`);
+    return undefined;
+  }
+}
+
+function markerFor(verdict: ReviewVerdict): MarkerVerdict | null {
+  if (verdict === 'approve') return 'APPROVED';
+  if (verdict === 'request-changes') return 'CHANGES_REQUESTED';
+  return null;
 }
 
 async function defaultRunGlab(args: string[]): Promise<void> {
@@ -77,14 +147,36 @@ export async function postReviewVerdict(
       : input.verdict === 'request-changes'
         ? '--request-changes'
         : '--comment';
+    const runGh = deps.runGh ?? defaultRunGh;
+    const env = await appTokenEnv(deps);
+    const options: RunGhOptions = env ? { env } : {};
     try {
-      await (deps.runGh ?? defaultRunGh)([
+      await runGh([
         'pr', 'review', String(ref.number), '--repo', repo, flag, '--body', input.body,
-      ]);
+      ], options);
     } catch (cause) {
-      return { posted: false, reason: `gh pr review failed: ${cause instanceof Error ? cause.message : String(cause)}` };
+      const message = errorText(cause);
+      const marker = markerFor(input.verdict);
+      // GitHub: "Can not request changes on your own pull request". On a
+      // single-account install that is every verdict, so the verdict becomes a
+      // marker comment that `pr-facts` reads back as the review decision.
+      if (!marker || !/own pull request/i.test(message)) {
+        return { posted: false, reason: `gh pr review failed: ${message}` };
+      }
+      try {
+        await runGh([
+          'pr', 'comment', String(ref.number), '--repo', repo,
+          '--body', `${formatVerdictMarker(marker)}\n\n${input.body}`,
+        ], options);
+      } catch (commentCause) {
+        return {
+          posted: false,
+          reason: `gh pr review refused a self-review and the fallback comment failed: ${errorText(commentCause)}`,
+        };
+      }
+      return { posted: true, forge: 'github', url: facts.url, verdict: input.verdict, via: 'comment' };
     }
-    return { posted: true, forge: 'github', url: facts.url, verdict: input.verdict };
+    return { posted: true, forge: 'github', url: facts.url, verdict: input.verdict, via: 'review' };
   }
 
   const projectPath = parseGitLabProjectPath(facts.url);

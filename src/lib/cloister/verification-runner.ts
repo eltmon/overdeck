@@ -32,6 +32,7 @@ import { readVerificationCycleState, type VerificationCycleState } from './verif
 import { postVerificationCheckRun } from './verification-check-run.js';
 import { getPrFacts } from './pr-facts.js';
 import { writeFeedbackFile } from './feedback-writer.js';
+import { appendPipelineEntry } from './pipeline-journal.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 import { clearAgentPaused, getAgentStateSync, messageAgent, setAgentPaused, stopAgent } from '../agents.js';
 import { findProjectByPathSync, resolveProjectFromIssueSync } from '../projects.js';
@@ -177,6 +178,36 @@ export async function deliverVerificationFeedback(
     specialist: 'verification-gate',
     ...details,
   });
+}
+
+/**
+ * Tell the work agent that verification passed (PAN-3705).
+ *
+ * Without this the agent was told to "confirm the pipeline state change" and
+ * had nothing to confirm it with, so it polled `pan show` for ten minutes. A
+ * PASS owes no rework and is never an operator problem: no `owesRework`, no
+ * needs-you, and a failed delivery is a log line, not an escalation.
+ */
+export async function deliverVerificationPass(
+  issueId: string,
+  head8: string | undefined,
+  logPrefix: string,
+): Promise<void> {
+  const message = `VERIFICATION PASSED for ${issueId}${head8 ? ` (HEAD ${head8})` : ''}. The review convoy is starting now.\n`
+    + 'Nothing for you to do: end your turn and wait. You will be messaged only if reviewers request changes.';
+  try {
+    const target = await resolveIssueFeedbackTarget(issueId);
+    if (!('agentId' in target)) {
+      console.log(`[${logPrefix}] No work agent to notify of the ${issueId} verification pass: ${target.reason}`);
+      return;
+    }
+    const outcome = await messageAgent(target.agentId, message, 'internal');
+    console.log(outcome.delivered
+      ? `[${logPrefix}] Told ${target.agentId} that verification passed for ${issueId}`
+      : `[${logPrefix}] Could not tell ${target.agentId} that verification passed for ${issueId}: ${outcome.reason ?? 'delivery was not accepted'}`);
+  } catch (err) {
+    console.log(`[${logPrefix}] Could not tell the work agent that verification passed for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 async function syncSingleRepo(gitDir: string, targetBranch: string): Promise<SyncResult> {
@@ -386,6 +417,23 @@ async function runVerificationForIssuePromise(
   // immutable per-run artifact written when the run terminates.
   const runStartedAt = new Date().toISOString();
   console.log(`[${logPrefix}] Running verification gate for ${issueId} (attempt ${currentCycles + 1}/${VERIFICATION_MAX_CYCLES})`);
+  appendPipelineEntry(workspacePath, {
+    type: 'verification.started',
+    issueId,
+    source: logPrefix,
+    data: { head: headShort },
+  });
+
+  /** Journal the failure at the point of the failing return, then return it. */
+  const failedOutcome = (failedCheck: string, cycleCount: number): VerificationRunnerOutcome => {
+    appendPipelineEntry(workspacePath, {
+      type: 'verification.failed',
+      issueId,
+      source: logPrefix,
+      data: { failedCheck, cycleCount },
+    });
+    return { outcome: 'failed', failedCheck, cycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
+  };
 
   try {
     const projectConfig = findProjectByPathSync(workspacePath);
@@ -450,7 +498,7 @@ async function runVerificationForIssuePromise(
             console.error(`[${logPrefix}] Failed to write sync-target feedback for ${issueId}:`, feedbackErr);
           }
 
-          return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
+          return failedOutcome(failedCheck, newCycleCount);
         }
 
         for (const result of syncResults) {
@@ -636,7 +684,7 @@ async function runVerificationForIssuePromise(
       } catch (err) {
         console.warn(`[${logPrefix}] Could not settle stack rebuild for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
       }
-      return { outcome: 'failed', failedCheck: failedGate.name, cycleCount: currentCycles, maxCycles: VERIFICATION_MAX_CYCLES };
+      return failedOutcome(failedGate.name, currentCycles);
     }
 
     // Durable terminal record of this gate run, surfaced by the issue tree's
@@ -676,7 +724,7 @@ async function runVerificationForIssuePromise(
 
       const feedbackBody = shouldEscalate
         ? `VERIFICATION STUCK for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n${buildFinalFailureInstructions(issueId)}`
-        : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the complete gate output at \`${fullOutputPath}\` carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run \`pan review request ${issueId} -m "Fixed ${failedCheck}"\` for you. NEVER curl \`/api/review/...\` or any dashboard endpoint — \`pan review request\` is the only supported re-entry point.\n\nThe command can run for several minutes. A yielded exec result or background-terminal notice means it is still running, not that it succeeded. Poll the same terminal until it exits, inspect the real exit code, then confirm \`pan show ${issueId}\` or \`pan review pending\` shows the issue re-entered review. Do NOT stop between steps or after pushing; stop only after exit code 0 and the observed pipeline state change.`;
+        : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the complete gate output at \`${fullOutputPath}\` carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for ${issueId} — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run \`pan review request ${issueId} -m "Fixed ${failedCheck}"\` for you. NEVER curl \`/api/review/...\` or any dashboard endpoint — \`pan review request\` is the only supported re-entry point.\n\n\`pan review request\` returns as soon as the request is accepted. When it exits 0 you are done: end your turn and wait. Do not poll \`pan show\`, files, or terminals — Overdeck will message you when verification passes or fails and when reviewers request changes. If it exits non-zero, reconcile the failure and try again.`;
 
       try {
         const fileResult = await Effect.runPromise(writeFeedbackFile({
@@ -690,7 +738,7 @@ async function runVerificationForIssuePromise(
         if (fileResult.success) {
           const msg = shouldEscalate
             ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after repeated attempts.\n\nMUST READ: ${fileResult.filePath}\n\nFix every reported failure, commit and push the corrections, then run pan done ${issueId} -c "<summary>" to reset verification and return the latest commit to the normal pipeline.`
-            : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, fix the failing check, commit every change, and invoke /rebase-and-submit. The skill will push and request a new review with pan review request. If the exec yields to a background terminal, poll that same terminal until it exits; then require exit code 0 and confirm pan show ${issueId} or pan review pending shows re-entry before declaring success.`;
+            : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, fix the failing check, commit every change, and invoke /rebase-and-submit. The skill will push and request a new review with pan review request, which returns as soon as the request is accepted. When it exits 0 you are done: end your turn and wait — do not poll pan show, files, or terminals. Overdeck will message you when verification passes or fails and when reviewers request changes.`;
           await deliverVerificationFeedback(issueId, msg, {
             failedCheck,
             feedbackPath: fileResult.filePath,
@@ -700,7 +748,7 @@ async function runVerificationForIssuePromise(
         console.error(`[${logPrefix}] Failed to write verification feedback for ${issueId}:`, feedbackErr);
       }
 
-      return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
+      return failedOutcome(failedCheck, newCycleCount);
     }
 
     // xBRIEF AC gate: check all acceptance criteria are completed (runs after quality gates)
@@ -742,7 +790,7 @@ async function runVerificationForIssuePromise(
         } catch (feedbackErr: any) {
           console.error(`[${logPrefix}] Failed to write xBRIEF conflict feedback for ${issueId}:`, feedbackErr);
         }
-        return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
+        return failedOutcome(failedCheck, newCycleCount);
       }
       throw xbriefErr;
     }
@@ -792,7 +840,7 @@ async function runVerificationForIssuePromise(
         console.error(`[${logPrefix}] Failed to write AC verification feedback for ${issueId}:`, feedbackErr);
       }
 
-      return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
+      return failedOutcome(failedCheck, newCycleCount);
     }
 
     const taskBlockers = options.skipPlanChecklist
@@ -840,7 +888,7 @@ async function runVerificationForIssuePromise(
         console.error(`[${logPrefix}] Failed to write open-task verification feedback for ${issueId}:`, feedbackErr);
       }
 
-      return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
+      return failedOutcome(failedCheck, newCycleCount);
     }
 
     // PAN-2179: reject a plan-only / zombie changeset before it can reach
@@ -873,7 +921,7 @@ async function runVerificationForIssuePromise(
       } catch (feedbackErr: any) {
         console.error(`[${logPrefix}] Failed to send empty-changeset feedback for ${issueId}:`, feedbackErr);
       }
-      return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
+      return failedOutcome(failedCheck, newCycleCount);
     }
     if (changesetHasContent === undefined) {
       console.warn(`[${logPrefix}] empty-changeset guard skipped (one or more repo diffs failed)`);
@@ -909,6 +957,25 @@ async function runVerificationForIssuePromise(
     void capturePipelineStageForIssue(issueId, 'verification_passed');
     console.log(`[${logPrefix}] Verification passed for ${issueId}${lastVerifiedCommit ? ` (HEAD=${lastVerifiedCommit.slice(0, 8)})` : ''} — proceeding to review-agent`);
 
+    // The verified sha. A polyrepo anchor is a COMPOSITE snapshot string, so
+    // slicing it yields garbage — resolve the primary repo's sha out of it,
+    // the same way the `overdeck/tests` stamp below does.
+    const verifiedSha = (() => {
+      if (!lastVerifiedCommit) return undefined;
+      const composite = parseCompositeSnapshot(lastVerifiedCommit);
+      if (composite.size === 0) return lastVerifiedCommit as string;
+      const primary = repoRoots[0]?.repoKey;
+      return (primary && composite.get(primary)) ?? [...composite.values()][0];
+    })();
+    const passedHead8 = verifiedSha?.slice(0, 8) ?? headShort;
+    appendPipelineEntry(workspacePath, {
+      type: 'verification.passed',
+      issueId,
+      source: logPrefix,
+      data: { head: passedHead8 },
+    });
+    await deliverVerificationPass(issueId, passedHead8, logPrefix);
+
     // Post overdeck/test=success for branch protection's required context
     // (Decision 7). PAN-3847: the stamp binds to the anchor snapshotted at pass
     // time (the primary repo's sha for a composite polyrepo anchor), and the
@@ -921,14 +988,7 @@ async function runVerificationForIssuePromise(
         if (!repo || !repo.includes('/')) return;
         const [owner, name] = repo.split('/');
         const { postOverdeckTestsStatus } = await import('../github-app.js');
-        const stampSha = (() => {
-          if (!lastVerifiedCommit) return undefined;
-          const composite = parseCompositeSnapshot(lastVerifiedCommit);
-          if (composite.size === 0) return lastVerifiedCommit as string;
-          const primary = repoRoots[0]?.repoKey;
-          return (primary && composite.get(primary)) ?? [...composite.values()][0];
-        })();
-        await postOverdeckTestsStatus(workspacePath, owner!, name!, 'success', 'Verification gate passed (changed-file scope)', stampSha);
+        await postOverdeckTestsStatus(workspacePath, owner!, name!, 'success', 'Verification gate passed (changed-file scope)', verifiedSha);
       } catch (err: any) {
         console.warn(`[${logPrefix}] Failed to post overdeck/tests status: ${err.message}`);
       }

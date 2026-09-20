@@ -8,7 +8,6 @@
  *   POST /api/issues/:issueId/forge-merge
  *   POST /api/issues/:issueId/approve
  *   GET  /api/merge-queue
- *   POST /api/internal/pipeline/notify
  *
  * Shared singletons (pending operations, project path, workspace info, readJsonBody)
  * stay owned by ../workspaces.js and are imported here.
@@ -32,6 +31,8 @@ import { isIntegrationPermissionError, verifyAppCanMerge, type GitHubPullRequest
 import { resolveGitHubIssueSync as resolveGitHubIssueShared } from '../../../../lib/tracker-utils.js';
 import { sessionExists } from '../../../../lib/tmux.js';
 import { resolveIssueWorkspaceSyncTarget } from '../../../../lib/workspaces/resolver.js';
+import { appendPipelineEntry } from '../../../../lib/cloister/pipeline-journal.js';
+import { getIssueWorkspacePath } from '../../../../lib/overdeck/issue-projects.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { clearMergeRun, getMergeRun, listMergeRuns, setMergeRun, setMergeQueueAdvanceHandler, type MergeRunPatch } from '../../services/merge-queue-service.js';
@@ -41,6 +42,7 @@ import { _serverManagedMerges } from '../specialists.js';
 import { completePendingOperation, getPendingOperation, getProjectPath, getWorkspaceInfoForIssue, readJsonBody, setPendingOperation } from '../workspaces.js';
 import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
 import { internalStrikeMergeRoute } from './internal-strike-merge.js';
+import { postInternalPipelineNotifyRoute } from './internal-pipeline-notify.js';
 import { activeStrikeMerge, advanceMergeQueue, mergeVerificationOptions, normalMergeEligibility, prepareWorkAgentForRebase, readStrikeHead, rebaseWithAgentFallback, validateStrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -50,7 +52,21 @@ const execFileAsync = promisify(execFile);
  * (PAN-3917 FR-12): the forge owns whether the PR merged, and
  * `services/derived-issue-state.ts` answers that. Nothing here is a status.
  */
-const setStatus = (issueId: string, patch: MergeRunPatch): void => { setMergeRun(issueId, patch); };
+const setStatus = (issueId: string, patch: MergeRunPatch): void => {
+  setMergeRun(issueId, patch);
+  // Every failing exit of `triggerMerge` funnels through here, so this is the
+  // one place a merge failure is known — the merge itself has ~20 refusal and
+  // error returns, and none of them is the outcome on its own.
+  if (patch.phase !== 'failed') return;
+  const workspacePath = getIssueWorkspacePath(issueId);
+  if (!workspacePath) return;
+  appendPipelineEntry(workspacePath, {
+    type: 'merge.failed',
+    issueId: issueId.toUpperCase(),
+    source: 'merge-button',
+    ...(patch.notes ? { data: { reason: patch.notes } } : {}),
+  });
+};
 
 const gitIn = async (args: string[], cwd: string): Promise<string> =>
   (await execFileAsync('git', args, { cwd, encoding: 'utf-8' })).stdout.trim();
@@ -395,6 +411,14 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       ? workspaceInfo.localPath
       : join(projectPath, 'workspaces', `feature-${issueLower}`);
   const workspaceDirName = basename(workspacePath);
+  // The MERGE door: past every eligibility refusal and holding the project's
+  // merge slot, this merge is genuinely starting.
+  appendPipelineEntry(workspacePath, {
+    type: 'merge.attempted',
+    issueId: normalizedId,
+    source: 'merge-button',
+    data: { kind: request.kind },
+  });
   const branchName = request.kind === 'strike'
     ? request.branchName
     : workspaceDirName.startsWith('feature-')
@@ -1754,143 +1778,6 @@ const getMergeQueueRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: POST /api/internal/pipeline/notify ────────────────────────────────
-//
-// Cross-process bridge for `notifyPipeline()` (PAN-891, expanded in PAN-915).
-//
-// `notifyPipeline` is an in-process handler registry; only the dashboard server
-// registers a handler. CLI processes (e.g. `pan review run`) write to shared
-// state and call `notifyPipeline()`, which is a no-op in their own process.
-// This endpoint lets them poke the dashboard so it re-emits the corresponding
-// domain event into the live event stream.
-//
-// Accepted bodies (PAN-915):
-//   { type: 'status_changed', issueId }
-//     — GONE (PAN-3917): it broadcast a review-status record change. Returns 410.
-//   { type: 'review.approved', issueId }
-//   { type: 'test.passed', issueId }
-//   { type: 'task_queued', specialist, issueId }
-//   { type: 'reviewer_started', issueId, role, sessionName }
-//   { type: 'reviewer_completed', issueId, role }
-//   { type: 'reviewer_timed_out', issueId, role, sessionName, attempt, maxRetries, willRetry }
-//   { type: 'coordinator_started', issueId, sessionName }
-//   { type: 'coordinator_died', issueId, sessionName, reason }
-//     — Forwarded verbatim to the in-process handler.
-
-const postInternalPipelineNotifyRoute = HttpRouter.add(
-  'POST',
-  '/api/internal/pipeline/notify',
-  httpHandler(Effect.gen(function* () {
-    // Shared-secret check (PAN-891 review feedback). The dashboard binds 0.0.0.0
-    // by default, so this stateful endpoint must be unreachable without the
-    // server-issued token. Same token is read by CLI senders via getInternalToken().
-    const request = yield* HttpServerRequest.HttpServerRequest;
-    const { INTERNAL_TOKEN_HEADER, getInternalTokenSync } = yield* Effect.promise(() =>
-      import('../../../../lib/internal-token.js'),
-    );
-    const expected = getInternalTokenSync();
-    if (!expected) {
-      return jsonResponse({ ok: false, error: 'internal token not configured' }, 503);
-    }
-    const headers = request.headers as Record<string, string | string[] | undefined>;
-    const raw = headers[INTERNAL_TOKEN_HEADER];
-    const provided = Array.isArray(raw) ? raw[0] : raw;
-    if (!provided || provided !== expected) {
-      return jsonResponse({ ok: false, error: 'forbidden' }, 403);
-    }
-
-    const body = yield* readJsonBody;
-    const event = body as Record<string, unknown>;
-    const type = event.type as string | undefined;
-
-    const { notifyPipelineSync } = yield* Effect.promise(() =>
-      import('../../../../lib/pipeline-notifier.js'),
-    );
-
-    switch (type) {
-      // PAN-3917: `status_changed` broadcast a review-status record change.
-      // There is no record to change; the pipeline reads derived state instead.
-      case 'status_changed':
-        return jsonResponse({ ok: false, error: 'status_changed is gone: issue state is derived, not stored' }, 410);
-      case 'review.approved':
-      case 'test.passed': {
-        const issueId = event.issueId as string | undefined;
-        if (!issueId) {
-          return jsonResponse({ ok: false, error: `${type} requires issueId` }, 400);
-        }
-        // PAN-1988: this MUST be notifyPipelineSync (the imported function). The bare
-        // `notifyPipeline` (the Effect variant) is not imported here, so it threw
-        // "notifyPipeline is not defined" and silently dropped EVERY forwarded review.approved /
-        // test.passed event — breaking the reactive review→test and test→ship handoffs for any
-        // CLI-originated verdict. The in-process dashboard handler routes these to reactive Cloister.
-        notifyPipelineSync({ type, issueId });
-        return jsonResponse({ ok: true });
-      }
-      case 'task_queued': {
-        const issueId = event.issueId as string | undefined;
-        const specialist = event.specialist as string | undefined;
-        if (!issueId || !specialist) {
-          return jsonResponse({ ok: false, error: 'task_queued requires issueId and specialist' }, 400);
-        }
-        notifyPipelineSync({ type: 'task_queued', specialist, issueId });
-        return jsonResponse({ ok: true });
-      }
-      case 'reviewer_started': {
-        const issueId = event.issueId as string | undefined;
-        const role = event.role as string | undefined;
-        const sessionName = event.sessionName as string | undefined;
-        if (!issueId || !role || !sessionName) {
-          return jsonResponse({ ok: false, error: 'reviewer_started requires issueId, role, sessionName' }, 400);
-        }
-        notifyPipelineSync({ type: 'reviewer_started', issueId, role, sessionName });
-        return jsonResponse({ ok: true });
-      }
-      case 'reviewer_completed': {
-        const issueId = event.issueId as string | undefined;
-        const role = event.role as string | undefined;
-        if (!issueId || !role) {
-          return jsonResponse({ ok: false, error: 'reviewer_completed requires issueId, role' }, 400);
-        }
-        notifyPipelineSync({ type: 'reviewer_completed', issueId, role });
-        return jsonResponse({ ok: true });
-      }
-      case 'reviewer_timed_out': {
-        const issueId = event.issueId as string | undefined;
-        const role = event.role as string | undefined;
-        const sessionName = event.sessionName as string | undefined;
-        const attempt = typeof event.attempt === 'number' ? event.attempt : undefined;
-        const maxRetries = typeof event.maxRetries === 'number' ? event.maxRetries : undefined;
-        const willRetry = typeof event.willRetry === 'boolean' ? event.willRetry : undefined;
-        if (!issueId || !role || !sessionName || attempt === undefined || maxRetries === undefined || willRetry === undefined) {
-          return jsonResponse({ ok: false, error: 'reviewer_timed_out requires issueId, role, sessionName, attempt, maxRetries, willRetry' }, 400);
-        }
-        notifyPipelineSync({ type: 'reviewer_timed_out', issueId, role, sessionName, attempt, maxRetries, willRetry });
-        return jsonResponse({ ok: true });
-      }
-      case 'coordinator_started': {
-        const issueId = event.issueId as string | undefined;
-        const sessionName = event.sessionName as string | undefined;
-        if (!issueId || !sessionName) {
-          return jsonResponse({ ok: false, error: 'coordinator_started requires issueId, sessionName' }, 400);
-        }
-        notifyPipelineSync({ type: 'coordinator_started', issueId, sessionName });
-        return jsonResponse({ ok: true });
-      }
-      case 'coordinator_died': {
-        const issueId = event.issueId as string | undefined;
-        const sessionName = event.sessionName as string | undefined;
-        const reason = event.reason as string | undefined;
-        if (!issueId || !sessionName || !reason) {
-          return jsonResponse({ ok: false, error: 'coordinator_died requires issueId, sessionName, reason' }, 400);
-        }
-        notifyPipelineSync({ type: 'coordinator_died', issueId, sessionName, reason });
-        return jsonResponse({ ok: true });
-      }
-      default:
-        return jsonResponse({ ok: false, error: `unknown pipeline event type: ${type}` }, 400);
-    }
-  })),
-);
 
 
 export const mergeOpsRouteLayer = Layer.mergeAll(

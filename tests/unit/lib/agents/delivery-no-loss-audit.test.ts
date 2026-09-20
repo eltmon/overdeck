@@ -62,6 +62,8 @@ const KNOWN_CALL_SITES = new Set([
   'lib/cloister/swarm-foreman.ts|await deps.messageAgent(agentId, options.prompt ?? `Continue managing ${issue} as its swarm foreman. Run pan swarm status ${issue} --json before acting.`, \'pan-swarm\');',
   'lib/cloister/uat-failure-feedback.ts|const outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
   'lib/cloister/verification-runner.ts|outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
+  // PAN-3705 follow-up: verification PASS is told to the work agent (no rework owed, no needs-you).
+  'lib/cloister/verification-runner.ts|const outcome = await messageAgent(target.agentId, message, \'internal\');',
 ]);
 
 function* walkTs(dir: string): Generator<string> {
