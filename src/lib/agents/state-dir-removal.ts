@@ -1,9 +1,3 @@
-/**
- * Agent-directory cleanup has two distinct modes. Close-out calls
- * `pruneAgentStateDir` to remove only regenerable locks, sockets, and Codex
- * caches while preserving state and transcripts. Explicit wipe and garbage
- * collection may still call the destructive removal helpers below.
- */
 import { lstat, readdir, realpath, rm, rmdir, unlink, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
@@ -16,11 +10,7 @@ export interface RemoveAgentStateDirResult {
   removedDir: boolean;
 }
 
-export interface PruneAgentStateDirResult {
-  kept: string[];
-  removed: string[];
-  bytesFreed: number;
-}
+export interface PruneAgentStateDirResult { kept: string[]; removed: string[]; bytesFreed: number }
 
 export const RETAINED_TRANSCRIPTS_MARKER = '.retained-transcripts';
 
@@ -64,11 +54,7 @@ async function listKeptFiles(dirPath: string, root: string): Promise<string[]> {
   return kept;
 }
 
-async function pruneSocketEntries(
-  dirPath: string,
-  root: string,
-  removed: string[],
-): Promise<number> {
+async function pruneSocketEntries(dirPath: string, root: string, removed: string[]): Promise<number> {
   let bytesFreed = 0;
   for (const entry of await readdir(dirPath, { withFileTypes: true })) {
     const entryPath = join(dirPath, entry.name);
@@ -83,10 +69,6 @@ async function pruneSocketEntries(
   return bytesFreed;
 }
 
-/**
- * Prune only regenerable runtime weight from an agent directory.
- * State, session indexes, lifecycle records, and transcripts remain in place.
- */
 export async function pruneAgentStateDir(
   dirPath: string,
   agentsRootPath: string = AGENTS_DIR,
@@ -112,10 +94,7 @@ export async function pruneAgentStateDir(
     throw new Error(`pruneAgentStateDir: expected directory: ${candidate}`);
   }
 
-  const [canonicalRoot, canonicalCandidate] = await Promise.all([
-    realpath(agentsRoot),
-    realpath(candidate),
-  ]);
+  const [canonicalRoot, canonicalCandidate] = await Promise.all([realpath(agentsRoot), realpath(candidate)]);
   assertContained(canonicalRoot, canonicalCandidate);
   if (relative(canonicalRoot, canonicalCandidate).includes(sep)) {
     throw new Error(`pruneAgentStateDir: canonical path is not a direct child of AGENTS_DIR: ${canonicalCandidate}`);
@@ -144,11 +123,7 @@ export async function pruneAgentStateDir(
   }
   bytesFreed += await pruneSocketEntries(candidate, candidate, removed);
 
-  return {
-    kept: (await listKeptFiles(candidate, candidate)).sort(),
-    removed: removed.sort(),
-    bytesFreed,
-  };
+  return { kept: (await listKeptFiles(candidate, candidate)).sort(), removed: removed.sort(), bytesFreed };
 }
 
 async function cleanDirectory(

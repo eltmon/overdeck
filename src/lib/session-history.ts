@@ -20,10 +20,6 @@ export function clearSessionResetMarker(agentId: string): void {
   }
 }
 
-/**
- * Append-only session index. New entries carry their observation time and
- * source; string entries remain readable for compatibility with older files.
- */
 export interface SessionIndexEntry {
   sessionId: string;
   at: string;
@@ -102,7 +98,6 @@ export function readSessionIndexSync(agentId: string): SessionIndexEntry[] {
   }
 }
 
-/** Read the durable index, treating a legacy pointer as one entry only when no index exists. */
 export function readSessionIndexWithLegacySync(agentId: string): SessionIndexEntry[] {
   const file = join(getOverdeckHome(), 'agents', agentId, 'sessions.json');
   if (existsSync(file)) return readSessionIndexSync(agentId);
@@ -149,10 +144,6 @@ export function appendSessionIdToHistory(
   }
 }
 
-/**
- * Allocate and durably record a fresh Claude work-agent UUID before launch.
- * This makes transcript discovery independent of lifecycle hooks and jq.
- */
 export function createFreshSessionIdentity(agentId: string, harness: RuntimeName): string | undefined {
   if (getHarnessBehavior(harness).sessionIdSource !== 'launcher-session-id') return undefined;
   const sessionId = randomUUID();

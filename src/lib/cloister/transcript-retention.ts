@@ -8,11 +8,7 @@ import { listArchivedConversations, listConversations } from '../overdeck/conver
 import { AGENTS_DIR } from '../paths.js';
 import { listLiveAgentIds } from '../terminal-backends/inventory.js';
 
-interface TranscriptRetentionConversation {
-  name: string;
-  status: 'active' | 'ended';
-  archivedAt: string | null;
-}
+interface TranscriptRetentionConversation { name: string; status: 'active' | 'ended'; archivedAt: string | null }
 
 export interface TranscriptRetentionDeps {
   readDir(path: string): Promise<Dirent[]>;
@@ -30,9 +26,7 @@ export interface TranscriptRetentionDeps {
 }
 
 export interface TranscriptRetentionOptions {
-  transcriptDays?: number;
-  agentsDir?: string;
-  deps?: Partial<TranscriptRetentionDeps>;
+  transcriptDays?: number; agentsDir?: string; deps?: Partial<TranscriptRetentionDeps>;
 }
 
 const defaultDeps: TranscriptRetentionDeps = {
@@ -50,9 +44,7 @@ const defaultDeps: TranscriptRetentionDeps = {
   log: (message) => console.log(`[deacon] ${message}`),
 };
 
-function hasErrorCode(error: unknown, code: string): boolean {
-  return (error as NodeJS.ErrnoException).code === code;
-}
+const hasErrorCode = (error: unknown, code: string): boolean => (error as NodeJS.ErrnoException).code === code;
 
 function isContained(root: string, candidate: string, allowRoot = false): boolean {
   const fromRoot = relative(root, candidate);
@@ -64,16 +56,9 @@ function isContained(root: string, candidate: string, allowRoot = false): boolea
   );
 }
 
-async function canonicalTarget(
-  path: string,
-  canonicalRoot: string,
-  deps: TranscriptRetentionDeps,
-  allowRoot = false,
-): Promise<string> {
+async function canonicalTarget(path: string, canonicalRoot: string, deps: TranscriptRetentionDeps, allowRoot = false): Promise<string> {
   const canonical = await deps.realpath(path);
-  if (!isContained(canonicalRoot, canonical, allowRoot)) {
-    throw new Error(`Transcript retention target escapes agent directory: ${path}`);
-  }
+  if (!isContained(canonicalRoot, canonical, allowRoot)) throw new Error(`Transcript retention target escapes agent directory: ${path}`);
   return canonical;
 }
 
@@ -94,10 +79,7 @@ function conversationEligibility(deps: TranscriptRetentionDeps): Map<string, boo
 }
 
 async function pruneTranscriptFiles(
-  dirPath: string,
-  cutoffMs: number,
-  deps: TranscriptRetentionDeps,
-  canonicalAgentDir: string,
+  dirPath: string, cutoffMs: number, deps: TranscriptRetentionDeps, canonicalAgentDir: string,
 ): Promise<{ deletedFiles: number; prunedDirs: number; remainingTranscripts: number; removedDir: boolean }> {
   await canonicalTarget(dirPath, canonicalAgentDir, deps, true);
   let entries: Dirent[];
@@ -156,10 +138,7 @@ async function pruneTranscriptFiles(
 }
 
 async function collectJsonlFiles(
-  dirPath: string,
-  deps: TranscriptRetentionDeps,
-  files: string[],
-  canonicalAgentDir: string,
+  dirPath: string, deps: TranscriptRetentionDeps, files: string[], canonicalAgentDir: string,
 ): Promise<void> {
   try {
     await canonicalTarget(dirPath, canonicalAgentDir, deps, true);
@@ -182,9 +161,7 @@ async function collectJsonlFiles(
 }
 
 async function agentRetentionArtifacts(
-  agentDir: string,
-  deps: TranscriptRetentionDeps,
-  canonicalAgentDir: string,
+  agentDir: string, deps: TranscriptRetentionDeps, canonicalAgentDir: string,
 ): Promise<{ newestMtimeMs: number; rollouts: string[] } | null> {
   let entries: Dirent[];
   try {
@@ -219,13 +196,7 @@ async function agentRetentionArtifacts(
   return Number.isFinite(newestMtimeMs) ? { newestMtimeMs, rollouts } : null;
 }
 
-/**
- * Delete explicitly expired transcript artifacts from ended agent state dirs.
- * Unset, non-finite, zero, or negative retention never traverses the filesystem.
- */
-export async function sweepTranscriptRetention(
-  options: TranscriptRetentionOptions,
-): Promise<string[]> {
+export async function sweepTranscriptRetention(options: TranscriptRetentionOptions): Promise<string[]> {
   const transcriptDays = options.transcriptDays;
   if (transcriptDays === undefined || !Number.isFinite(transcriptDays) || transcriptDays <= 0) {
     return [];
@@ -315,11 +286,7 @@ export async function sweepTranscriptRetention(
       const result = await pruneTranscriptFiles(agentDir, cutoffMs, deps, canonicalAgentDir);
       deletedFiles += result.deletedFiles;
       prunedDirs += result.prunedDirs;
-    } catch {
-      // A path that cannot be revalidated is indeterminate, never deletable.
-      continue;
-    }
-
+    } catch { continue; }
   }
 
   const fileLabel = `transcript file${deletedFiles === 1 ? '' : 's'}`;
