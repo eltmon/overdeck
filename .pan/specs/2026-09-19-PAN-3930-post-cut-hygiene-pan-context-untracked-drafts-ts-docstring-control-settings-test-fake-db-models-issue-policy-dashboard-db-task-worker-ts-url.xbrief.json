@@ -4,17 +4,17 @@
     "created": "2026-09-19T12:02:03Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3930: Post-cut hygiene: .pan/context untracked; drafts.ts docstring; control-settings test fake db models issue_policy; dashboard-db-task worker .ts URL",
-    "updated": "2026-09-19T12:06:06.034Z"
+    "updated": "2026-09-19T13:30:55.082Z"
   },
   "plan": {
     "id": "pan-3930",
     "title": "Post-cut hygiene: .pan/context untracked; drafts.ts docstring; control-settings test fake db models issue_policy; dashboard-db-task worker .ts URL",
-    "status": "proposed",
+    "status": "running",
     "uid": "10e12647-35c2-4518-928b-149c2718f1c1",
     "author": "agent:claude-fable-5-1",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-19T12:02:03Z",
-    "updated": "2026-09-19T12:06:06.034Z",
+    "updated": "2026-09-19T13:30:55.082Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3930",
