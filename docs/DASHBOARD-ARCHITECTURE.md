@@ -166,7 +166,11 @@ door that does not exist; a real record read door would be a separate change.
   `GET /api/agents/:agentId/conversation`. For Claude agents, the route checks the
   durable `sessions.json` index from newest to oldest until it finds an existing
   JSONL. Legacy launcher/runtime/state pointers are eligible only when the index is
-  absent. A 404 names the agent and every path checked.
+  absent. A 404 names the agent and every path checked. Since PAN-3959, each
+  harness's capture point records the transcript's absolute path in the entry it
+  writes at session start, so resolution is a newest-first lookup over recorded
+  paths; per-harness path formulas apply only to pre-PAN-3959 entries that predate
+  that recording.
 - `src/lib/agents/transcript-resolver.ts` is the single resolver: the agent
   conversation route above, the `/ws/rpc` synthetic-agent stream, enrichment, and
   the summary-fork/handoff transcript adapters all call it — no other path re-derives
