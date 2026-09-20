@@ -15,6 +15,7 @@ import { getPricingSync } from '../cost.js';
 import { parseMuseSessionSync } from '../cost-parsers/muse-parser.js';
 import { museSessionId, resolveMuseSessionPath, resolveMuseSessionPathSync } from './muse-session.js';
 import { getRuntimeBehavior } from './behavior.js';
+import { appendSessionIdToHistory } from '../session-history.js';
 import { tmuxCreateSession, tmuxKillSession, tmuxSessionExists } from './tmux-cli.js';
 import type { Agent, AgentRuntimeSync, CostBreakdown, Heartbeat, Session, SpawnConfig } from './types.js';
 
@@ -74,6 +75,7 @@ export class MuseRuntimeSync implements AgentRuntimeSync {
       if (!await waitForPromptReady(config.agentId, 'muse', 60)) throw new Error('Muse startup timed out');
       const path = await resolveMuseSessionPath(config.agentId);
       if (!path) throw new Error('Muse started without a durable session log');
+      appendSessionIdToHistory(config.agentId, museSessionId(path), 'launcher', { harness: 'muse', model: config.model, path });
       if (config.prompt) await this.sendMessage(config.agentId, config.prompt);
       return { id: config.agentId, sessionId: museSessionId(path), runtime: 'muse',
         model: config.model, workspace: config.workspace, startedAt: new Date() };
