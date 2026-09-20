@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3950",
   "created": "2026-09-20T13:53:05.511Z",
-  "updated": "2026-09-20T14:51:24.761Z",
+  "updated": "2026-09-20T14:51:34.986Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -84,6 +84,10 @@
     "w8-adapters-use-resolver.ac2": {
       "status": "completed",
       "doneAt": "2026-09-20T14:51:24.760Z"
+    },
+    "w8-adapters-use-resolver.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:51:34.986Z"
     }
   }
 }
