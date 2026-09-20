@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3959",
   "created": "2026-09-20T22:53:20.505Z",
-  "updated": "2026-09-20T22:59:19.728Z",
+  "updated": "2026-09-20T23:03:41.763Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -14,6 +14,11 @@
       "claimedBy": "agent-pan-3959",
       "claimedAt": "2026-09-20T22:53:20.505Z",
       "doneAt": "2026-09-20T22:59:19.728Z"
+    },
+    "w2-claude-hooks-record-path": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3959",
+      "claimedAt": "2026-09-20T23:03:41.763Z"
     }
   }
 }
