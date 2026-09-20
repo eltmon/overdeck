@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3950",
   "created": "2026-09-20T13:53:05.511Z",
-  "updated": "2026-09-20T14:29:32.808Z",
+  "updated": "2026-09-20T14:41:56.778Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -40,9 +40,10 @@
       "doneAt": "2026-09-20T14:29:27.975Z"
     },
     "w11-net-negative-lines": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3950",
-      "claimedAt": "2026-09-20T14:29:32.808Z"
+      "claimedAt": "2026-09-20T14:29:32.808Z",
+      "doneAt": "2026-09-20T14:41:56.778Z"
     }
   }
 }
