@@ -296,6 +296,7 @@ export async function getCachedMessages(
         contextBoundaryOffset: incremental.contextBoundaryOffset,
         contextActiveBytes: incremental.contextActiveBytes,
         pendingToolUse: incremental.pendingToolUse,
+        subagentNamesByToolUseId: incremental.subagentNamesByToolUseId,
         unresolvedResults: incremental.unresolvedResults,
         lastSequence: incremental.lastSequence,
         mtimeMs: incremental.mtimeMs,
@@ -318,6 +319,7 @@ export async function getCachedMessages(
     byteOffset: parsed.byteOffset,
     parseState: {
       pendingToolUse: parsed.pendingToolUse,
+      subagentNamesByToolUseId: parsed.subagentNamesByToolUseId,
       unresolvedResults: parsed.unresolvedResults,
       lastSequence: parsed.lastSequence,
       planToolUseIds: parsed.planToolUseIds,
@@ -654,7 +656,8 @@ export async function getConversationMessagesRead(
       const subagents = agentId === undefined
         ? isCodexSessionFile(parentSessionFile)
           ? await listCodexSubagents(parentSessionFile, parsed.workLog)
-          : (await listSubagentMetas(parentSessionFile)).map((meta) => ({ ...meta, status: 'done' as const }))
+          : (await listSubagentMetas(parentSessionFile, parsed.subagentNamesByToolUseId))
+              .map((meta) => ({ ...meta, status: 'done' as const }))
         : undefined;
 
       return result({

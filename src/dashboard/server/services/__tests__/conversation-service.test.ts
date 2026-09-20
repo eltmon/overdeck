@@ -403,6 +403,50 @@ describe('parseConversationMessages', () => {
     expect(result.streaming).toBe(false);
   });
 
+  it('captures optional Agent and Task names by spawning tool-use id', async () => {
+    const lines = [
+      {
+        type: 'assistant',
+        timestamp: '2026-09-20T00:00:00.000Z',
+        message: {
+          id: 'msg-agents',
+          role: 'assistant',
+          content: [
+            {
+              type: 'tool_use',
+              id: 'toolu_named_agent',
+              name: 'Agent',
+              input: { name: 'Walter', description: 'Inspect the parser', prompt: 'Inspect it' },
+            },
+            {
+              type: 'tool_use',
+              id: 'toolu_named_task',
+              name: 'Task',
+              input: { name: 'Grace', description: 'Review the result', prompt: 'Review it' },
+            },
+            {
+              type: 'tool_use',
+              id: 'toolu_unnamed_agent',
+              name: 'Agent',
+              input: { description: 'No assigned name', prompt: 'Check it' },
+            },
+          ],
+          stop_reason: 'tool_use',
+        },
+      },
+    ];
+    mockReadFile.mockResolvedValue(makeBuffer(lines));
+
+    const { parseConversationMessages } = await import('../conversation-service.js');
+    const result = await parseConversationMessages('/fake/session.jsonl');
+
+    expect([...(result.subagentNamesByToolUseId ?? [])]).toEqual([
+      ['toolu_named_agent', 'Walter'],
+      ['toolu_named_task', 'Grace'],
+    ]);
+    expect(result.subagentNamesByToolUseId?.has('toolu_unnamed_agent')).toBe(false);
+  });
+
   it('keeps distinct assistant events separate when they reuse the same message.id', async () => {
     const lines = [
       {

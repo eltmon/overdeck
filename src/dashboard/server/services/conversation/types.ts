@@ -23,6 +23,8 @@ export interface ParseResult {
   contextActiveBytes: number;
   /** Unpaired tool_use entries waiting for tool_result (persist across incremental calls). */
   pendingToolUse: Map<string, WorkLogEntry>;
+  /** Human subagent names keyed by the spawning Agent/Task tool_use ID. */
+  subagentNamesByToolUseId?: Map<string, string>;
   /** Pre-arrived tool_result entries waiting for tool_use (persist across incremental calls). */
   unresolvedResults: Map<string, { resultText?: string; isError: boolean; rawContent: unknown }>;
   /** Last sequence number assigned (persist across incremental calls). */
@@ -55,6 +57,8 @@ export interface ParseResult {
 /** State carried across incremental parseConversationMessages calls. */
 export interface ParseState {
   pendingToolUse: Map<string, WorkLogEntry>;
+  /** Human subagent names keyed by the spawning Agent/Task tool_use ID. */
+  subagentNamesByToolUseId?: Map<string, string>;
   unresolvedResults: Map<string, { resultText?: string; isError: boolean; rawContent: unknown }>;
   lastSequence: number;
   planToolUseIds?: Set<string>;

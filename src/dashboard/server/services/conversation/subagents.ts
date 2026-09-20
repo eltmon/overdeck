@@ -57,7 +57,10 @@ async function readMeta(metaPath: string, agentId: string): Promise<SubagentMeta
   }
 }
 
-export async function listSubagentMetas(sessionFile: string): Promise<SubagentMeta[]> {
+export async function listSubagentMetas(
+  sessionFile: string,
+  namesByToolUseId?: ReadonlyMap<string, string>,
+): Promise<SubagentMeta[]> {
   const subagentsDir = subagentsDirFor(sessionFile);
   let entries: string[];
 
@@ -74,7 +77,10 @@ export async function listSubagentMetas(sessionFile: string): Promise<SubagentMe
     if (!match?.[1]) continue;
 
     const meta = await readMeta(join(subagentsDir, entry), match[1]);
-    if (meta) metas.push(meta);
+    if (meta) {
+      const name = namesByToolUseId?.get(meta.toolUseId);
+      metas.push(name ? { ...meta, name } : meta);
+    }
   }
   return metas;
 }
@@ -100,6 +106,7 @@ export async function startSubagentListPolling(
   pendingToolUseIds: () => ReadonlySet<string>,
   emit: (event: ConversationEvent) => void,
   list?: () => Promise<SubagentSummary[]>,
+  namesByToolUseId?: () => ReadonlyMap<string, string>,
 ): Promise<SubagentListPoller> {
   let stopped = false;
   let lastSerialized: string | null = null;
@@ -109,7 +116,7 @@ export async function startSubagentListPolling(
     refreshChain = refreshChain.then(async () => {
       if (stopped) return;
       const pending = pendingToolUseIds();
-      const subagents: SubagentSummary[] = list ? await list() : (await listSubagentMetas(sessionFile)).map((meta) => ({
+      const subagents: SubagentSummary[] = list ? await list() : (await listSubagentMetas(sessionFile, namesByToolUseId?.())).map((meta) => ({
         ...meta,
         status: pending.has(meta.toolUseId) ? 'running' : 'done',
       }));

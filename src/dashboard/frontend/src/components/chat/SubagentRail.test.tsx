@@ -24,6 +24,7 @@ const conversation: Conversation = {
 const subagents: SubagentSummary[] = [
   {
     agentId: 'alpha',
+    name: 'Walter',
     agentType: 'Explore',
     description: 'Trace the conversation parser',
     toolUseId: 'toolu_alpha',
@@ -58,6 +59,7 @@ describe('SubagentRail', () => {
 
     expect(screen.getByText('Main agent')).toBeInTheDocument();
     expect(screen.getByText('xBrief context costs')).toBeInTheDocument();
+    expect(screen.getByText('Walter')).toHaveClass('text-foreground');
     expect(screen.getByText('Explore')).toBeInTheDocument();
     expect(screen.getByText('Trace the conversation parser')).toBeInTheDocument();
     expect(screen.getByText('general-purpose')).toBeInTheDocument();
@@ -74,6 +76,25 @@ describe('SubagentRail', () => {
     expect(done.querySelector('.animate-ping')).not.toBeInTheDocument();
     expect(done.querySelector('.bg-muted-foreground\\/40')).toBeInTheDocument();
     expect(screen.getByRole('complementary', { name: 'Conversation agents' })).toHaveClass('min-w-0');
+  });
+
+  it('uses a subagent name as the primary label and includes it in the accessible name', () => {
+    render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} />);
+
+    expect(screen.getByRole('button', {
+      name: 'Walter, Explore: Trace the conversation parser',
+    })).toBeInTheDocument();
+    expect(screen.getByText('Walter')).toHaveClass('text-xs', 'font-medium', 'text-foreground');
+    expect(screen.getByText('Explore')).toHaveClass('text-[10px]', 'text-muted-foreground');
+  });
+
+  it('keeps the type as the primary label when a subagent has no name', () => {
+    render(<SubagentRail conversation={conversation} subagents={subagents} selectedAgentId={null} />);
+
+    expect(screen.getByRole('button', {
+      name: 'general-purpose: Inspect nested behavior',
+    })).toBeInTheDocument();
+    expect(screen.getByText('general-purpose')).toHaveClass('text-xs', 'font-medium', 'text-foreground');
   });
 
   it('marks the main agent row current while no subagent is selected', () => {

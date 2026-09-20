@@ -49,6 +49,7 @@ export async function parseConversationMessages(
       contextBoundaryOffset: 0,
       contextActiveBytes: 0,
       pendingToolUse: priorState?.pendingToolUse ?? new Map(),
+      subagentNamesByToolUseId: priorState?.subagentNamesByToolUseId ?? new Map(),
       unresolvedResults: priorState?.unresolvedResults ?? new Map(),
       lastSequence: priorState?.lastSequence ?? 0,
       mtimeMs: 0,
@@ -71,6 +72,7 @@ export async function parseConversationMessages(
       contextBoundaryOffset: 0,
       contextActiveBytes: fileStats.size,
       pendingToolUse: priorState?.pendingToolUse ?? new Map(),
+      subagentNamesByToolUseId: priorState?.subagentNamesByToolUseId ?? new Map(),
       unresolvedResults: priorState?.unresolvedResults ?? new Map(),
       lastSequence: priorState?.lastSequence ?? 0,
       mtimeMs: fileStats.mtimeMs,
@@ -146,6 +148,8 @@ export async function parseConversationMessages(
   let pendingAssistant: ChatMessage | null = null;
   // Map tool_use id → WorkLogEntry (waiting for tool_result)
   const pendingToolUse = priorState?.pendingToolUse ?? new Map<string, WorkLogEntry>();
+  // Map spawning Agent/Task tool_use id → optional human name.
+  const subagentNamesByToolUseId = priorState?.subagentNamesByToolUseId ?? new Map<string, string>();
   // Map tool_use id → pre-arrived tool_result (waiting for tool_use)
   const unresolvedResults = priorState?.unresolvedResults ?? new Map<string, { resultText?: string; isError: boolean; rawContent: unknown }>();
   // Monotonic sequence counter per JSONL line
@@ -391,6 +395,10 @@ export async function parseConversationMessages(
               block.input && typeof block.input === 'object' && !Array.isArray(block.input)
                 ? (block.input as Record<string, unknown>)
                 : undefined;
+            if ((block.name === 'Agent' || block.name === 'Task') && typeof inputDict?.name === 'string') {
+              const subagentName = inputDict.name.trim();
+              if (subagentName) subagentNamesByToolUseId.set(block.id, subagentName);
+            }
             const toolEntry: WorkLogEntry = {
               id: block.id,
               createdAt: entry.timestamp ?? new Date().toISOString(),
@@ -647,6 +655,7 @@ export async function parseConversationMessages(
     contextBoundaryOffset,
     contextActiveBytes: Math.max(0, fileStats.size - contextBoundaryOffset),
     pendingToolUse,
+    subagentNamesByToolUseId,
     unresolvedResults,
     lastSequence: sequence,
     mtimeMs: fileStats.mtimeMs,
@@ -680,6 +689,7 @@ export async function parseEntireConversation(
   let offset = 0;
   let priorState: ParseState = {
     pendingToolUse: new Map(),
+    subagentNamesByToolUseId: new Map(),
     unresolvedResults: new Map(),
     lastSequence: 0,
   };
@@ -705,6 +715,7 @@ export async function parseEntireConversation(
     offset = result.byteOffset;
     priorState = {
       pendingToolUse: result.pendingToolUse,
+      subagentNamesByToolUseId: result.subagentNamesByToolUseId,
       unresolvedResults: result.unresolvedResults,
       lastSequence: result.lastSequence,
       planToolUseIds: result.planToolUseIds,

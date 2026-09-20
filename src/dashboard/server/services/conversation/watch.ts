@@ -70,6 +70,7 @@ export function watchConversation(
           byteOffset = fullResult.byteOffset;
           priorState = {
             pendingToolUse: fullResult.pendingToolUse,
+            subagentNamesByToolUseId: fullResult.subagentNamesByToolUseId,
             unresolvedResults: fullResult.unresolvedResults,
             lastSequence: fullResult.lastSequence,
             planToolUseIds: fullResult.planToolUseIds,
@@ -90,6 +91,7 @@ export function watchConversation(
         byteOffset = result.byteOffset;
         priorState = {
           pendingToolUse: result.pendingToolUse,
+          subagentNamesByToolUseId: result.subagentNamesByToolUseId,
           unresolvedResults: result.unresolvedResults,
           lastSequence: result.lastSequence,
           planToolUseIds: result.planToolUseIds,

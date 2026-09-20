@@ -100,12 +100,16 @@ export function SubagentRail({ conversation, subagents, selectedAgentId }: Subag
         {subagents.map((subagent) => (
           <AgentRow
             key={subagent.agentId}
-            label={subagent.agentType}
+            label={subagent.name ?? subagent.agentType}
+            secondaryLabel={subagent.name ? subagent.agentType : undefined}
             description={subagent.description}
             status={subagent.status}
             halo={subagent.status === 'running'}
             depth={subagent.spawnDepth}
             selected={selectedAgentId === subagent.agentId}
+            ariaLabel={subagent.name
+              ? `${subagent.name}, ${subagent.agentType}: ${subagent.description}`
+              : `${subagent.agentType}: ${subagent.description}`}
             onClick={() => select(subagent.agentId)}
           />
         ))}
@@ -116,19 +120,22 @@ export function SubagentRail({ conversation, subagents, selectedAgentId }: Subag
 
 interface AgentRowProps {
   label: string;
+  secondaryLabel?: string;
   description: string;
   status: 'running' | 'done';
   /** Draw the pulsing halo — reserved for real activity (a subagent with a pending tool call). */
   halo?: boolean;
   depth?: number;
   selected: boolean;
+  ariaLabel?: string;
   onClick: () => void;
 }
 
-function AgentRow({ label, description, status, halo = false, depth, selected, onClick }: AgentRowProps) {
+function AgentRow({ label, secondaryLabel, description, status, halo = false, depth, selected, ariaLabel, onClick }: AgentRowProps) {
   return (
     <button
       type="button"
+      aria-label={ariaLabel}
       aria-current={selected ? 'true' : undefined}
       className={`flex w-full items-start gap-2 border-b border-l-2 border-b-border px-3 py-2 text-left transition-colors ${selected ? 'border-l-primary bg-accent' : 'border-l-transparent hover:bg-accent'}`}
       onClick={onClick}
@@ -143,7 +150,12 @@ function AgentRow({ label, description, status, halo = false, depth, selected, o
         />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-xs font-medium text-foreground">{label}</span>
+        <span className="flex min-w-0 items-baseline gap-1.5">
+          <span className="truncate text-xs font-medium text-foreground">{label}</span>
+          {secondaryLabel && (
+            <span className="shrink-0 text-[10px] font-medium text-muted-foreground">{secondaryLabel}</span>
+          )}
+        </span>
         <span className="block truncate text-xs text-muted-foreground">{description}</span>
       </span>
       {depth !== undefined && depth > 1 && (

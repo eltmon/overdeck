@@ -739,6 +739,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                   }
                   const priorState: ParseState = {
                     pendingToolUse: initial.pendingToolUse,
+                    subagentNamesByToolUseId: initial.subagentNamesByToolUseId,
                     unresolvedResults: initial.unresolvedResults,
                     lastSequence: initial.lastSequence,
                     planToolUseIds: initial.planToolUseIds,
@@ -763,7 +764,14 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                     contextUsage: currentContextUsage,
                   });
                   let pendingSubagentToolUseIds = new Set(initial.pendingToolUse.keys());
-                  const subagentPoller = input.agentId ? null : await startSubagentListPolling(sessionFile, () => pendingSubagentToolUseIds, offer);
+                  let subagentNamesByToolUseId = initial.subagentNamesByToolUseId ?? new Map<string, string>();
+                  const subagentPoller = input.agentId ? null : await startSubagentListPolling(
+                    sessionFile,
+                    () => pendingSubagentToolUseIds,
+                    offer,
+                    undefined,
+                    () => subagentNamesByToolUseId,
+                  );
 
                   // Watch only bytes written after the initial full parse. Subsequent
                   // events are deltas; the client merges them into its cache.
@@ -781,6 +789,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
                     currentByteOffset = result.byteOffset;
                     currentContextUsage = contextUsageFromParseResult(result, model);
                     pendingSubagentToolUseIds = new Set(result.pendingToolUse.keys());
+                    subagentNamesByToolUseId = result.subagentNamesByToolUseId ?? new Map<string, string>();
                     void subagentPoller?.refresh();
                     if (gate.suppressedShrink) {
                       console.warn(

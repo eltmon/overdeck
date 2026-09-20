@@ -59,6 +59,7 @@ export interface WorkLogEntry {
 
 export interface SubagentSummary {
   agentId: string;
+  name?: string;
   agentType: string;
   description: string;
   toolUseId: string;

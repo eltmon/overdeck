@@ -60,6 +60,26 @@ describe('conversation subagent discovery', () => {
     ]);
   });
 
+  it('joins parsed transcript names to metadata by tool-use id', async () => {
+    await writeMeta('named', {
+      agentType: 'Explore',
+      description: 'Find the conversation parser',
+      toolUseId: 'toolu_named',
+      spawnDepth: 1,
+    });
+    await writeMeta('unnamed', {
+      agentType: 'general-purpose',
+      description: 'Trace the message stream',
+      toolUseId: 'toolu_unnamed',
+      spawnDepth: 1,
+    });
+
+    await expect(listSubagentMetas(sessionFile, new Map([['toolu_named', 'Walter']]))).resolves.toEqual([
+      expect.objectContaining({ agentId: 'named', name: 'Walter' }),
+      expect.not.objectContaining({ name: expect.anything() }),
+    ]);
+  });
+
   it('returns an empty list for absent and empty subagent directories', async () => {
     await expect(listSubagentMetas(sessionFile)).resolves.toEqual([]);
 

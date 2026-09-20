@@ -174,6 +174,7 @@ export type WorkLogEntry = typeof WorkLogEntry.Type
 
 export const SubagentSummary = Schema.Struct({
   agentId: Schema.String,
+  name: Schema.optional(Schema.String),
   agentType: Schema.String,
   description: Schema.String,
   toolUseId: Schema.String,

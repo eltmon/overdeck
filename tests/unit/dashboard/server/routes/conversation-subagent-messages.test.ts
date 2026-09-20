@@ -129,12 +129,29 @@ describe('conversation subagent list emission', () => {
 
   it('returns a subagent transcript and includes done subagents in the parent response', async () => {
     const name = createConversationRecord();
-    await writeFile(sessionFile, `${JSON.stringify({
-      type: 'user',
-      uuid: 'parent-user',
-      timestamp: '2026-07-18T00:00:00.000Z',
-      message: { content: [{ type: 'text', text: 'Parent transcript' }] },
-    })}\n`);
+    await writeFile(sessionFile, [
+      {
+        type: 'user',
+        uuid: 'parent-user',
+        timestamp: '2026-07-18T00:00:00.000Z',
+        message: { content: [{ type: 'text', text: 'Parent transcript' }] },
+      },
+      {
+        type: 'assistant',
+        uuid: 'parent-assistant',
+        timestamp: '2026-07-18T00:00:01.000Z',
+        message: {
+          role: 'assistant',
+          content: [{
+            type: 'tool_use',
+            id: 'toolu_reader',
+            name: 'Agent',
+            input: { name: 'Walter', description: 'Subagent reader', prompt: 'Read it' },
+          }],
+          stop_reason: 'tool_use',
+        },
+      },
+    ].map((entry) => JSON.stringify(entry)).join('\n') + '\n');
     await writeMeta('reader', 'toolu_reader');
     await writeFile(join(subagentsDirFor(sessionFile), 'agent-reader.jsonl'), `${JSON.stringify({
       type: 'user',
@@ -144,7 +161,9 @@ describe('conversation subagent list emission', () => {
     })}\n`);
 
     const parent = (await readMessages(name)).body as Record<string, unknown>;
-    expect(parent.subagents).toEqual([expect.objectContaining({ agentId: 'reader', status: 'done' })]);
+    expect(parent.subagents).toEqual([
+      expect.objectContaining({ agentId: 'reader', name: 'Walter', status: 'done' }),
+    ]);
 
     const subagent = (await readMessages(name, 'reader')).body as {
       messages: Array<{ text: string }>;
