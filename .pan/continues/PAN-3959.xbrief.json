@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3959",
   "created": "2026-09-20T22:53:20.505Z",
-  "updated": "2026-09-20T23:51:40.163Z",
+  "updated": "2026-09-20T23:58:41.171Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -62,6 +62,10 @@
       "claimedBy": "agent-pan-3959",
       "claimedAt": "2026-09-20T23:50:15.732Z",
       "doneAt": "2026-09-20T23:51:40.163Z"
+    },
+    "w1-index-path-field.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-20T23:58:41.171Z"
     }
   }
 }
