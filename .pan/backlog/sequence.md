@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-20T23:11:01.164669Z · model: claude-opus-5 · open: 856_
+_Last sequenced: 2026-09-20T23:37:49.042Z · model: claude-opus-5 · open: 855_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -21,846 +21,845 @@ _Last sequenced: 2026-09-20T23:11:01.164669Z · model: claude-opus-5 · open: 85
 | 14 | PAN-3932 | XS | low | ok |  |  | AutoMergeToggle is read-only post-cut; make it set/clear the auto-merge label or explain the label in the tooltip |
 | 15 | PAN-3930 | S | low | ok |  |  | Post-cut hygiene: .pan/context untracked, stale drafts.ts docstring, fake issue_policy table in a test, worker .ts URL |
 | 16 | PAN-3928 | XS | low | ok |  |  | pan start prints a tmux attach hint for Herdr panes; print backend, pane id and the Herdr attach command |
-| 17 | PAN-3963 | S | critical | ok |  |  | Merge train dies on every batch: uat_generation_members FK still points at the dead issues table; 3 stuck generations in 5h |
-| 18 | PAN-3679 | M | critical | ok |  |  | Swarm marks live polyrepo slots merged and dispatches items whose DAG blockers are still running |
-| 19 | PAN-3966 | S | critical | ok |  |  | stopAgent/warm-idle reap are tmux-only: a lingering Herdr pane blocks every role-run re-dispatch with "already running" (749 refusals) |
-| 20 | PAN-3939 | S | critical | ok |  |  | Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive |
+| 17 | PAN-3679 | M | critical | ok |  |  | Swarm marks live polyrepo slots merged and dispatches items whose DAG blockers are still running |
+| 18 | PAN-3966 | S | critical | ok |  |  | stopAgent/warm-idle reap are tmux-only: a lingering Herdr pane blocks every role-run re-dispatch with "already running" (749 refusals) |
+| 19 | PAN-3939 | S | critical | ok |  |  | Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive |
+| 20 | PAN-3973 | S | critical | ok |  |  | Post-cut nothing lands a finished strike: prompt still says the Deacon merges it; open a PR on completion and rewrite the prompt |
 | 21 | PAN-3968 | S | critical | ok |  |  | Every pan close still deletes state.json/sessions.json (close-out.ts step 5 never moved to pruneAgentStateDir); PAN-3950 AC-1 unmet |
-| 22 | PAN-3973 | S | critical | ok |  |  | Post-cut nothing lands a finished strike: prompt still says the Deacon merges it; open a PR on completion and rewrite the prompt |
-| 23 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
-| 24 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
-| 25 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
-| 26 | PAN-3960 | M | critical | ok |  |  | Planning, resume and recovery spawns still create tmux sessions directly; route through launchAgentPane so one backend hosts the fleet |
-| 27 | PAN-3524 | M | critical | needs-refinement |  |  | A server-owned --changed verification loop relaunches through deacon freeze, review abort, pause and operator stop; peaked at 78 workers. |
-| 28 | PAN-3962 | S | critical | ok |  |  | PTY supervisor lifecycle POSTs 404 for conv-* ids: conversation exit/turn events never recorded; exit is inferred, not owned |
-| 29 | PAN-3250 | S | critical | ok |  |  | Workspace spawn branches from local HEAD instead of origin/main, so every new feature branch inherits unpushed local-main commits. |
-| 30 | PAN-3946 | S | critical | ok |  |  | Review request treats an APPROVED review on an older commit as "already passed"; newer commits ride an old approval |
-| 31 | PAN-2954 | XS | critical | ok |  |  | postMergeLifecycle refuses GitLab projects |
-| 32 | PAN-3935 | S | critical | ok |  |  | PRD draft promotion writes the draft into the primary main checkout and deletes the feature-branch copy; PRDs are stranded untracked |
-| 33 | PAN-3969 | M | high | ok |  |  | Sequence route + tracker-poll refresh spawn ~800 serial git rev-list per call (11-21s Backlog load); batch via for-each-ref |
-| 34 | PAN-3657 | S | critical | ok |  |  | Merge-train queues endpoint runs the monorepo queue builder for polyrepo projects, so MYN/Auricle trains are permanently empty. |
-| 35 | PAN-3947 | S | critical | needs-refinement |  |  | Same root as PAN-3966 (stopAgent never closes Herdr panes); remaining scope = post-merge lifecycle should stop specialists, not pause |
-| 36 | PAN-3565 | M | critical | ok |  |  | Failed review spawn wedges 'starting', and an all-lanes infra failure is synthesized as a real CHANGES REQUESTED verdict. |
-| 37 | PAN-3554 | M | critical | needs-refinement |  |  | Red main has no mechanical owner: it hid for ~5h because the merge gate renders red main as an empty queue, not an alarm. |
-| 38 | PAN-3532 | S | critical | ok |  |  | CI runs only a hand-picked slice of the frontend suite, so main stayed red on frontend for hours while every run reported green. |
-| 39 | PAN-3965 | M | high | ok |  |  | Operator decision: one full test run per push on CI; verification gate = typecheck+lint local; agents run touched tests; no 1-feature… |
-| 40 | PAN-3685 | S | high | ok |  |  | Swarm GC leaves consumed completion markers that hold slot capacity after assignments are freed |
-| 41 | PAN-3085 | XS | critical | needs-refinement |  |  | Review feedback is written to .overdeck/feedback but agents and the deacon merge gate are pointed at a nonexistent .pan/feedback. |
-| 42 | PAN-3653 | M | critical | ok |  |  | A strike blocked on red main has no owner that wakes it when main goes green; the session stays alive so recover refuses it. |
-| 43 | PAN-3630 | M | critical | ok |  |  | pan tell reported three deliveries to a live agent, moved all three to read/, and the agent received none — the delivery door lies. |
-| 44 | PAN-3805 | S | critical | needs-refinement |  |  | Codex idle poke spawns codex exec instead of the app-server door; failed sends still tick the counter and pause healthy agents |
-| 45 | PAN-3560 | M | critical | ok |  |  | PTY supervisor overloads under concurrent review convoys; fleet-wide 502 'input echo confirmation failed' kills resumes and feedback. |
-| 46 | PAN-3520 | S | critical | ok |  |  | Test gate records 'failed' for load-induced timeouts; retry timeout-only failures in isolation before writing a verdict. |
-| 47 | PAN-3967 | XS | high | ok |  |  | Every strike agent ends on `pan strike-ready`, a verb PAN-3917 cut; 4 prompt/recovery refs still name it. Push is the signal. |
-| 48 | PAN-3953 | XS | high | ok |  |  | planned label is applied at planning spawn, before any spec exists; five issues labeled planned with no spec on disk |
-| 49 | PAN-3500 | S | critical | ok |  |  | A review sub-role edited seven tracked files after writing its report and the changes were auto-committed into the feature history. |
-| 50 | PAN-3313 | S | critical | ok |  |  | A transient upstream stream error benches CLIProxy's only auth: ~70% of GPT-routed inference 503s with a message that blames credentials. |
+| 22 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
+| 23 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
+| 24 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
+| 25 | PAN-3960 | M | critical | ok |  |  | Planning, resume and recovery spawns still create tmux sessions directly; route through launchAgentPane so one backend hosts the fleet |
+| 26 | PAN-3524 | M | critical | needs-refinement |  |  | A server-owned --changed verification loop relaunches through deacon freeze, review abort, pause and operator stop; peaked at 78 workers. |
+| 27 | PAN-3962 | S | critical | ok |  |  | PTY supervisor lifecycle POSTs 404 for conv-* ids: conversation exit/turn events never recorded; exit is inferred, not owned |
+| 28 | PAN-3250 | S | critical | ok |  |  | Workspace spawn branches from local HEAD instead of origin/main, so every new feature branch inherits unpushed local-main commits. |
+| 29 | PAN-3946 | S | critical | ok |  |  | Review request treats an APPROVED review on an older commit as "already passed"; newer commits ride an old approval |
+| 30 | PAN-2954 | XS | critical | ok |  |  | postMergeLifecycle refuses GitLab projects |
+| 31 | PAN-3935 | S | critical | ok |  |  | PRD draft promotion writes the draft into the primary main checkout and deletes the feature-branch copy; PRDs are stranded untracked |
+| 32 | PAN-3969 | M | high | ok |  |  | Sequence route + tracker-poll refresh spawn ~800 serial git rev-list per call (11-21s Backlog load); batch via for-each-ref |
+| 33 | PAN-3657 | S | critical | ok |  |  | Merge-train queues endpoint runs the monorepo queue builder for polyrepo projects, so MYN/Auricle trains are permanently empty. |
+| 34 | PAN-3947 | S | critical | needs-refinement |  |  | Same root as PAN-3966 (stopAgent never closes Herdr panes); remaining scope = post-merge lifecycle should stop specialists, not pause |
+| 35 | PAN-3565 | M | critical | ok |  |  | Failed review spawn wedges 'starting', and an all-lanes infra failure is synthesized as a real CHANGES REQUESTED verdict. |
+| 36 | PAN-3554 | M | critical | needs-refinement |  |  | Red main has no mechanical owner: it hid for ~5h because the merge gate renders red main as an empty queue, not an alarm. |
+| 37 | PAN-3532 | S | critical | ok |  |  | CI runs only a hand-picked slice of the frontend suite, so main stayed red on frontend for hours while every run reported green. |
+| 38 | PAN-3965 | M | high | ok |  |  | Operator decision: one full test run per push on CI; verification gate = typecheck+lint local; agents run touched tests; no 1-feature… |
+| 39 | PAN-3685 | S | high | ok |  |  | Swarm GC leaves consumed completion markers that hold slot capacity after assignments are freed |
+| 40 | PAN-3085 | XS | critical | needs-refinement |  |  | Review feedback is written to .overdeck/feedback but agents and the deacon merge gate are pointed at a nonexistent .pan/feedback. |
+| 41 | PAN-3653 | M | critical | ok |  |  | A strike blocked on red main has no owner that wakes it when main goes green; the session stays alive so recover refuses it. |
+| 42 | PAN-3630 | M | critical | ok |  |  | pan tell reported three deliveries to a live agent, moved all three to read/, and the agent received none — the delivery door lies. |
+| 43 | PAN-3805 | S | critical | needs-refinement |  |  | Codex idle poke spawns codex exec instead of the app-server door; failed sends still tick the counter and pause healthy agents |
+| 44 | PAN-3560 | M | critical | ok |  |  | PTY supervisor overloads under concurrent review convoys; fleet-wide 502 'input echo confirmation failed' kills resumes and feedback. |
+| 45 | PAN-3520 | S | critical | ok |  |  | Test gate records 'failed' for load-induced timeouts; retry timeout-only failures in isolation before writing a verdict. |
+| 46 | PAN-3967 | XS | high | ok |  |  | Every strike agent ends on `pan strike-ready`, a verb PAN-3917 cut; 4 prompt/recovery refs still name it. Push is the signal. |
+| 47 | PAN-3953 | XS | high | ok |  |  | planned label is applied at planning spawn, before any spec exists; five issues labeled planned with no spec on disk |
+| 48 | PAN-3500 | S | critical | ok |  |  | A review sub-role edited seven tracked files after writing its report and the changes were auto-committed into the feature history. |
+| 49 | PAN-3313 | S | critical | ok |  |  | A transient upstream stream error benches CLIProxy's only auth: ~70% of GPT-routed inference 503s with a message that blames credentials. |
+| 50 | PAN-3282 | M | critical | ok |  |  | Review agents die before writing a verdict across 5 issues and 2 projects, leaving a verdict-shaped status with no artifact behind it. |
 | 51 | PAN-3580 | S | critical | ok |  |  | UAT-failure relay has no convergence cap — 65 identical rework files in 12h with uat_notes NULL |
-| 52 | PAN-3282 | M | critical | ok |  |  | Review agents die before writing a verdict across 5 issues and 2 projects, leaving a verdict-shaped status with no artifact behind it. |
-| 53 | PAN-3898 | M | critical | needs-refinement |  |  | First post-epic strike: salvage re-arms a landed strike, close-out records zero merges, no post-merge deploy fires |
-| 54 | PAN-3905 | S | critical | ok |  |  | Planner-created workspaces are not pre-trusted; first agent spawned into them dies at the Claude trust dialog |
-| 55 | PAN-2695 | S | high | ok |  |  | Concurrent review dispatches race fresh-spawn vs resume |
-| 56 | PAN-2742 | S | high | ok |  |  | synthesis fires 42s after spawn and reports reviewers with reports on disk as 'infrastructure failure' |
-| 57 | PAN-2706 | M | high | needs-refinement |  |  | Ghost test sessions absorb every test dispatch |
-| 58 | PAN-2700 | S | high | needs-refinement |  |  | Test artifact recovery consumes a stale .pan/test/result.json |
-| 59 | PAN-1560 | XS | high | needs-refinement |  |  | Re-review after a PR head moves doesn't re-post panopticon/review status → PR stranded BLOCKED |
-| 60 | PAN-3936 | S | high | ok |  |  | muse and kimi-code runtimes still call tmuxCreateSession with the supervisor hardcoded; route through launchAgentPane like spawn.ts |
-| 61 | PAN-2828 | S | critical | ok |  |  | pan done --strike always refuses squash-merged strikes (--is-ancestor can't see through a squash) |
-| 62 | PAN-2874 | M | critical | ok |  | PAN-2828 | Strike landing pipeline cannot merge strikes: verification gate demands a vBRIEF checklist strikes never have, and failed-feedback deli… |
-| 63 | PAN-2883 | M | high | ok |  | PAN-2828 | Close-out deploy row fails for every strike-landed issue |
-| 64 | PAN-2806 | S | high | ok |  |  | strike merge trigger registry splits across dashboard chunks |
-| 65 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
-| 66 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
-| 67 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
-| 68 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
-| 69 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
-| 70 | PAN-3964 | L | high | ok |  |  | Restore the Flywheel page as a derived view (cut by PAN-3917 FR-13 against operator intent); no stored run record |
-| 71 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
-| 72 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
-| 73 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
-| 74 | PAN-3237 | S | critical | needs-refinement |  |  | A capacity 409 on planning→work handoff is classified as 'guardrails' and marked terminally stuck; three issues stranded at once. |
-| 75 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
-| 76 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
-| 77 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
-| 78 | PAN-3106 | S | critical | ok |  |  | auto_merge_default: hold is consulted on one merge path only, so held issues merge individually and defeat the UAT train. |
-| 79 | PAN-3100 | S | critical | ok |  |  | The test role evaluates the dirty working tree, so a live work agent's uncommitted edits are recorded as the issue's test failure. |
-| 80 | PAN-3677 | M | high | ok |  |  | Planning agents wedge after a background Explore task finishes; parent never consumes the result |
-| 81 | PAN-3096 | S | critical | ok |  |  | pan done blocks on generated .devcontainer/ and dev, and agents resolve it by deleting workspace infrastructure or inventing gitignores. |
-| 82 | PAN-3084 | S | critical | needs-refinement |  |  | A review session spawned but never briefed sits at zero context forever, and restart 'preserves' the zombie that blocks its replacement. |
-| 83 | PAN-3043 | S | critical | needs-refinement |  |  | Provider health is probed only at spawn, so a mid-run 403 quota refusal leaves an agent 'running' for days holding a slot. |
-| 84 | PAN-1824 | S | high | ok |  |  | Fix flaky main CI: fake timers + @slow exclusion for real-timer test family |
-| 85 | PAN-2932 | S | high | ok |  | PAN-2337 | intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (Bad Gateway) after pan reload |
-| 86 | PAN-2935 | S | critical | ok |  |  | Workspace devcontainer duplicate backend hijacks Traefik router |
-| 87 | PAN-2337 | XS | critical | ok |  |  | Reload/build atomicity: an in-place `npm run build` under a live dashboard breaks new PTY-supervisor spawns until restart |
-| 88 | PAN-2422 | XS | high | ok |  | PAN-2337 | rebuilding dist under a live server breaks lazy chunk imports |
-| 89 | PAN-2699 | XS | high | ok |  |  | npm run build regenerates the committed record-cost-event.js bundle |
-| 90 | PAN-2957 | XS | high | ok |  | PAN-2337 | npm run build intermittently produces stale frontend bundles |
-| 91 | PAN-2850 | M | high | ok |  |  | npm test fails in clean checkout after pretest removes dashboard bundle |
-| 92 | PAN-2758 | S | critical | needs-refinement |  |  | Provider capacity error silently zombies a spawned agent: willRetry=false, turn reported completed, state stays status=running forever |
-| 93 | PAN-2817 | M | high | needs-refinement |  |  | Idle-at-prompt work/review agents are never redriven: gpt-5.6-sol sessions stop at the composer mid-task and sit for hours |
-| 94 | PAN-2813 | M | high | ok |  |  | Scheduler yield never self-clears: yielded work agents stay paused after the blocking review completes/merges |
-| 95 | PAN-2668 | M | high | ok |  |  | Verification/review feedback silently queued to stopped-by-user agents |
-| 96 | PAN-2569 | XS | critical | ok |  |  | planning finalizes (issue→planned) but work agent does not auto-spawn |
-| 97 | PAN-3899 | S | high | ok |  |  | pan reload drops the Deacon/resume boot gates chosen at the last restart, so every deploy relaunches with the Deacon off |
-| 98 | PAN-3811 | M | high | ok |  |  | The PAN-3809 emergency strike prunes BuildKit unconditionally; inventory, bounded reclaim door and retention floor are still missing |
-| 99 | PAN-2179 | S | high | needs-refinement |  |  | relaunch can leave a zombie agent |
-| 100 | PAN-2169 | S | high | needs-refinement |  |  | kimi agent silently frozen at 100% ctx (no thrown overflow error) not caught by CONTEXT_OVERFLOW_PATTERNS |
-| 101 | PAN-2734 | S | high | ok |  |  | merge queue head-of-line zombie |
-| 102 | PAN-3697 | XS | high | ok |  |  | Deployed dashboard PATH omits Bun, so verification workers hit 'bun: not found' before the required install gate. |
-| 103 | PAN-3633 | S | high | ok |  |  | Strike workspaces spawn without @types, so the contract's own typecheck gate fails and agents abort reporting a false red main. |
-| 104 | PAN-3104 | S | critical | needs-refinement |  |  | A stale .pan/test/result.json is re-applied with no freshness check against HEAD, re-failing an issue long after the fix landed. |
-| 105 | PAN-3099 | XS | critical | ok |  |  | --health-timeout 120 is enforced as 120ms and a false-failed check exits after killing the old server — nothing left listening. |
-| 106 | PAN-3044 | XS | critical | needs-refinement |  |  | Feedback delivery has no terminal-issue guard: it dispatched review and raised needs-you on issues closed 12 days earlier. |
-| 107 | PAN-3040 | S | critical | ok |  |  | pan strike is monorepo-shaped end to end and fails immediately on polyrepo projects; same defect as PAN-3708. |
-| 108 | PAN-3023 | S | critical | ok |  |  | Post-planning auto-spawn logs 'attempt 1/3' and never retries after a transient Docker EOF, stranding the issue with no re-drive owner. |
-| 109 | PAN-1618 | S | high | ok |  |  | Substrate: work-spawn docker-health gate has no autonomous recovery |
-| 110 | PAN-3916 | M | high | ok |  |  | Session pointers go stale after rollover + crash recovery; issue view and pan tell confirmation track a dead transcript |
-| 111 | PAN-3900 | S | high | ok |  |  | Docker bridge pool exhausted by orphaned workspace networks; pan start fails; bridge-pool patrol only warns |
-| 112 | PAN-3793 | S | high | ok |  |  | resolveIssuePullRequestRef probes only feature/ and strike/ names, so close-out cannot find a merged PR on a descriptive branch |
-| 113 | PAN-2639 | S | high | ok |  | PAN-2331 | codex-resume replays a rotated-out (revoked) refresh token → codex review convoys wedge with 401 |
-| 114 | PAN-2331 | S | high | ok |  |  | codex rate-limit 'Switch to gpt-5.4-mini?' modal stalls autonomous agents (no auto-dismiss) |
-| 115 | PAN-2333 | M | high | ok |  |  | feat: handle codex weekly-quota exhaustion gracefully |
-| 116 | PAN-3948 | S | medium | ok |  |  | pan tell says "not running" for a live tmux planning agent; planners idle forever after "Connection lost mid-response" |
-| 117 | PAN-2511 | XS | high | ok |  |  | Work agents burn 20+ min on false test failures |
-| 118 | PAN-2763 | S | high | ok |  |  | Workspace node_modules is symlinked to the primary repo, breaking test resolution |
-| 119 | PAN-2170 | XS | high | ok |  |  | Docker init container lacks Python |
-| 120 | PAN-1198 | S | high | ok |  |  | Workspace init container's bun install doesn't populate container-node-modules named volume |
-| 121 | PAN-3954 | XS | medium | ok |  |  | pan merge cancel still DELETEs the dead /api/flywheel/auto-merge/:id route; 404s against a live dashboard; untested |
-| 122 | PAN-2106 | S | high | ok |  |  | pan strike workspace setup leaves broken partial workspace + false 'spawned' success (git-lock race) |
-| 123 | PAN-2880 | M | high | ok |  | PAN-2259 | Linear tracker listIssues is a 3N+1 request storm |
-| 124 | PAN-2966 | S | high | ok |  |  | Polyrepo wrapper .gitignore misses .pan/ .devcontainer/ dev |
-| 125 | PAN-2945 | S | high | ok |  |  | pan done rejects Overdeck-generated runtime in polyrepo wrapper repos (.devcontainer/, dev, .pan/review) |
-| 126 | PAN-2680 | M | high | ok |  |  | pan close: Docker teardown silently skips a running stack in multi-repo projects (MYN), aborting close-out |
-| 127 | PAN-3540 | M | high | ok |  |  | Still reproduces post-cut: God View counts 35 phantom agents while /api/agents shows 37 stopped rows; dead Hook Bus panel; swap header |
-| 128 | PAN-3734 | S | high | ok |  |  | Completed swarm slot reuse can start a new item from a stale polyrepo branch — silent wrong-parent work. |
-| 129 | PAN-3621 | M | high | ok |  |  | pan start intermittently dies resolving a chunk graph spliced across two builds — importer from primary dist, path in the live generation. |
-| 130 | PAN-3555 | S | high | ok |  |  | pan start without --fresh silently abandoned an intact 7.5MB warm session, violating the warm-by-default contract. |
-| 131 | PAN-3498 | S | high | ok |  |  | write-sequence pins in-pipeline ranks without renumbering, so the persisted sequence carries duplicate ranks and gaps. |
-| 132 | PAN-3496 | XS | high | ok |  |  | A review convoy member blocked on an operator AskUserQuestion about review depth; review agents must decide and record, not ask. |
-| 133 | PAN-3081 | S | high | ok |  |  | The agent git guard is PATH-based and an agent stripped it unprompted to get past a false block; a control the agent can remove isn't one. |
-| 134 | PAN-2627 | S | high | ok |  |  | Linear poller is blind after cycle rollover |
-| 135 | PAN-2324 | XS | high | ok |  |  | label transition fails atomically on missing 'in-planning' label |
-| 136 | PAN-2165 | XS | high | ok |  |  | pan close: close-issue phase reports success but leaves issue OPEN / wrong labels (remove-label aborts on absent label; no-vBRIEF trans… |
-| 137 | PAN-2905 | S | high | ok |  |  | Dashboard steady-state CPU ~50% keeps API responses at 0.5-1.5s |
-| 138 | PAN-2259 | S | critical | ok |  |  | something burns the full 5k/hr GitHub GraphQL quota |
-| 139 | PAN-2379 | S | high | ok |  |  | dependency install is warn-only + 60s timeout → false verify failures against empty node_modules (blocks swarm convergence) |
-| 140 | PAN-2421 | XS | high | ok |  |  | dashboard server route tests flake under full-suite verification load |
-| 141 | PAN-2430 | S | high | ok |  |  | frontend typecheck fails with dozens of pre-existing unused-local errors |
-| 142 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
-| 143 | PAN-2656 | S | high | ok |  |  | deacon-swarm unit tests read live ~/.overdeck/config.yaml |
-| 144 | PAN-2080 | M | high | needs-refinement |  |  | External transports (email/Slack/push/TTS) still plausible; its stated dependency on the PAN-2079 Inbox spine is undercut by boot… |
-| 145 | PAN-1775 | M | high | ok |  |  | Remote (Fly.io) work agents appear as real session rows in the issue tree |
-| 146 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
-| 147 | PAN-3556 | S | high | ok |  |  | No per-agent spawn mutex: two flows allocated session identities 3s apart and the second pin orphaned the first transcript. |
-| 148 | PAN-3553 | S | high | ok |  |  | tmux list-panes -a exits 1 on a zero-session server, so the census reads unavailable post-reboot and conversations hang on 'Starting…'. |
-| 149 | PAN-3535 | S | high | ok |  |  | The drain/resume hold is re-derived from the caller's env each boot, so any restart from a clean shell silently drops it. |
-| 150 | PAN-3429 | M | high | ok |  |  | Memory governor defers admissions but sheds nothing under HARD pressure; concurrent heavy gate runs aren't in the shed ladder. |
-| 151 | PAN-3397 | S | high | ok |  |  | Fresh convoy lanes freeze at 0 output before kickoff; PAN-3375's detector only covers warm resumes, so recovery is manual. |
-| 152 | PAN-3325 | S | high | ok |  |  | A fresh workspace ships an empty-but-present node_modules, so tooling silently resolves the parent repo's deps and gates go false-green. |
-| 153 | PAN-3317 | S | high | ok |  |  | Strike agents are told to rebase, the launcher guard blocks it, and pan sync-main can't resolve a -strike workspace. Overlaps PAN-3306. |
-| 154 | PAN-3284 | S | high | ok |  |  | A workspace-confined agent wrote a doc edit into the primary main worktree — the PAN-2204 write-to-main hazard through a new door. |
-| 155 | PAN-3270 | S | high | ok |  |  | New workspaces arrive with empty node_modules and bun off the agent shell PATH, so the documented bun install remedy fails. |
-| 156 | PAN-3689 | S | high | ok |  |  | Orphaned swarm-slot GC targets the aggregate polyrepo root; nested worktrees survive and spam failures |
-| 157 | PAN-3257 | S | high | ok |  |  | Crash-resume leaves a stale PTY socket and drops supervisorEnabled from state.json, so every supervisor delivery fails afterwards. |
-| 158 | PAN-3188 | XS | high | ok |  |  | DoD row 5 accepts only the transient verifying_on_main state, so an already-done issue can never be closed without an override. |
-| 159 | PAN-3129 | M | high | ok |  |  | No symlink/TOCTOU containment on canonical writes under agent-controlled paths; a planted symlink redirects a server-side write. |
-| 160 | PAN-3120 | S | high | ok |  |  | A scheduler-yielded work agent makes operator MERGE hard-error on polyrepo and silently dead-end on single-repo. |
-| 161 | PAN-3077 | XS | high | ok |  |  | Inspect and review-supervisor spawns omit --effort and inherit the harness xhigh default — recurring overspend, once per xBRIEF item. |
-| 162 | PAN-3062 | M | high | ok |  |  | The shared primary main worktree stacks several sessions' commits, so whoever pushes next ships everyone else's unverified work. |
-| 163 | PAN-3048 | XS | high | needs-refinement |  |  | Pipeline auto-commit lands Overdeck's own .pan/drafts PRD into product feature branches; the exclusion list is duplicated and has drifted. |
-| 164 | PAN-3032 | S | high | ok |  |  | Rebuild composes under overdeck-feature- while Traefik labels name myn-feature- devnet, and traefik attaches are runtime-only. |
-| 165 | PAN-3881 | S | high | ok |  |  | pan sync distributes from a stale primary checkout and never removes deleted sources — resurrects deleted subagent defs |
-| 166 | PAN-3833 | S | high | ok |  |  | Feed renders assistant text emitted after tool calls as collapsed thinking rows; operator believes the agent never answered |
-| 167 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
-| 168 | PAN-3826 | M | high | ok |  |  | Conversation view freezes until refresh: Claude JSONL watcher relies solely on fs.watch with no missed-event safety net |
-| 169 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
-| 170 | PAN-3866 | S | high | ok |  |  | Test specialist copies the previous head's uatStatus/uatNotes into a new result instead of re-running browser UAT |
-| 171 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
-| 172 | PAN-3022 | S | high | needs-refinement |  |  | The work-spawn route ignores record.workModel, so the role default wins and then persists over the operator's per-issue override. |
-| 173 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
-| 174 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
-| 175 | PAN-3942 | L | high | ok |  |  | First-class skill bundles: named manifests activated at global/project/issue/conversation scope with layered resolution and provenance |
+| 52 | PAN-3898 | M | critical | needs-refinement |  |  | First post-epic strike: salvage re-arms a landed strike, close-out records zero merges, no post-merge deploy fires |
+| 53 | PAN-3905 | S | critical | ok |  |  | Planner-created workspaces are not pre-trusted; first agent spawned into them dies at the Claude trust dialog |
+| 54 | PAN-2695 | S | high | ok |  |  | Concurrent review dispatches race fresh-spawn vs resume |
+| 55 | PAN-2742 | S | high | ok |  |  | synthesis fires 42s after spawn and reports reviewers with reports on disk as 'infrastructure failure' |
+| 56 | PAN-2706 | M | high | needs-refinement |  |  | Ghost test sessions absorb every test dispatch |
+| 57 | PAN-2700 | S | high | needs-refinement |  |  | Test artifact recovery consumes a stale .pan/test/result.json |
+| 58 | PAN-1560 | XS | high | needs-refinement |  |  | Re-review after a PR head moves doesn't re-post panopticon/review status → PR stranded BLOCKED |
+| 59 | PAN-3936 | S | high | ok |  |  | muse and kimi-code runtimes still call tmuxCreateSession with the supervisor hardcoded; route through launchAgentPane like spawn.ts |
+| 60 | PAN-2828 | S | critical | ok |  |  | pan done --strike always refuses squash-merged strikes (--is-ancestor can't see through a squash) |
+| 61 | PAN-2874 | M | critical | ok |  | PAN-2828 | Strike landing pipeline cannot merge strikes: verification gate demands a vBRIEF checklist strikes never have, and failed-feedback deli… |
+| 62 | PAN-2883 | M | high | ok |  | PAN-2828 | Close-out deploy row fails for every strike-landed issue |
+| 63 | PAN-2806 | S | high | ok |  |  | strike merge trigger registry splits across dashboard chunks |
+| 64 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
+| 65 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
+| 66 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
+| 67 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
+| 68 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
+| 69 | PAN-3964 | L | high | ok |  |  | Restore the Flywheel page as a derived view (cut by PAN-3917 FR-13 against operator intent); no stored run record |
+| 70 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
+| 71 | PAN-3314 | M | critical | ok |  |  | One cgroup holds every agent pane, so a single hungry agent inflates the unit and oomd kills the whole fleet — twice now. |
+| 72 | PAN-3278 | S | critical | needs-refinement |  |  | A finished work agent with an open PR sat two hours because review was never dispatched and auto-requeue fired none of 25 attempts. |
+| 73 | PAN-3237 | S | critical | needs-refinement |  |  | A capacity 409 on planning→work handoff is classified as 'guardrails' and marked terminally stuck; three issues stranded at once. |
+| 74 | PAN-3234 | S | critical | needs-refinement |  |  | Agents freeze indefinitely on blocking choice menus and no health surface notices; the detector is wired only to delivery refusal. |
+| 75 | PAN-3205 | S | critical | ok |  |  | The deployment gate promises the queued deploy will fire at the next verification boundary; that trigger does not exist. |
+| 76 | PAN-3118 | S | critical | needs-refinement |  |  | Model-specific quota exhaustion is invisible everywhere but the pane: four planning agents read 'running' at $0.00 with no fallback. |
+| 77 | PAN-3106 | S | critical | ok |  |  | auto_merge_default: hold is consulted on one merge path only, so held issues merge individually and defeat the UAT train. |
+| 78 | PAN-3100 | S | critical | ok |  |  | The test role evaluates the dirty working tree, so a live work agent's uncommitted edits are recorded as the issue's test failure. |
+| 79 | PAN-3677 | M | high | ok |  |  | Planning agents wedge after a background Explore task finishes; parent never consumes the result |
+| 80 | PAN-3096 | S | critical | ok |  |  | pan done blocks on generated .devcontainer/ and dev, and agents resolve it by deleting workspace infrastructure or inventing gitignores. |
+| 81 | PAN-3084 | S | critical | needs-refinement |  |  | A review session spawned but never briefed sits at zero context forever, and restart 'preserves' the zombie that blocks its replacement. |
+| 82 | PAN-3043 | S | critical | needs-refinement |  |  | Provider health is probed only at spawn, so a mid-run 403 quota refusal leaves an agent 'running' for days holding a slot. |
+| 83 | PAN-1824 | S | high | ok |  |  | Fix flaky main CI: fake timers + @slow exclusion for real-timer test family |
+| 84 | PAN-2932 | S | high | ok |  | PAN-2337 | intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (Bad Gateway) after pan reload |
+| 85 | PAN-2935 | S | critical | ok |  |  | Workspace devcontainer duplicate backend hijacks Traefik router |
+| 86 | PAN-2337 | XS | critical | ok |  |  | Reload/build atomicity: an in-place `npm run build` under a live dashboard breaks new PTY-supervisor spawns until restart |
+| 87 | PAN-2422 | XS | high | ok |  | PAN-2337 | rebuilding dist under a live server breaks lazy chunk imports |
+| 88 | PAN-2699 | XS | high | ok |  |  | npm run build regenerates the committed record-cost-event.js bundle |
+| 89 | PAN-2957 | XS | high | ok |  | PAN-2337 | npm run build intermittently produces stale frontend bundles |
+| 90 | PAN-2850 | M | high | ok |  |  | npm test fails in clean checkout after pretest removes dashboard bundle |
+| 91 | PAN-2758 | S | critical | needs-refinement |  |  | Provider capacity error silently zombies a spawned agent: willRetry=false, turn reported completed, state stays status=running forever |
+| 92 | PAN-2817 | M | high | needs-refinement |  |  | Idle-at-prompt work/review agents are never redriven: gpt-5.6-sol sessions stop at the composer mid-task and sit for hours |
+| 93 | PAN-2813 | M | high | ok |  |  | Scheduler yield never self-clears: yielded work agents stay paused after the blocking review completes/merges |
+| 94 | PAN-2668 | M | high | ok |  |  | Verification/review feedback silently queued to stopped-by-user agents |
+| 95 | PAN-2569 | XS | critical | ok |  |  | planning finalizes (issue→planned) but work agent does not auto-spawn |
+| 96 | PAN-3899 | S | high | ok |  |  | pan reload drops the Deacon/resume boot gates chosen at the last restart, so every deploy relaunches with the Deacon off |
+| 97 | PAN-3811 | M | high | ok |  |  | The PAN-3809 emergency strike prunes BuildKit unconditionally; inventory, bounded reclaim door and retention floor are still missing |
+| 98 | PAN-2179 | S | high | needs-refinement |  |  | relaunch can leave a zombie agent |
+| 99 | PAN-2169 | S | high | needs-refinement |  |  | kimi agent silently frozen at 100% ctx (no thrown overflow error) not caught by CONTEXT_OVERFLOW_PATTERNS |
+| 100 | PAN-2734 | S | high | ok |  |  | merge queue head-of-line zombie |
+| 101 | PAN-3697 | XS | high | ok |  |  | Deployed dashboard PATH omits Bun, so verification workers hit 'bun: not found' before the required install gate. |
+| 102 | PAN-3633 | S | high | ok |  |  | Strike workspaces spawn without @types, so the contract's own typecheck gate fails and agents abort reporting a false red main. |
+| 103 | PAN-3104 | S | critical | needs-refinement |  |  | A stale .pan/test/result.json is re-applied with no freshness check against HEAD, re-failing an issue long after the fix landed. |
+| 104 | PAN-3099 | XS | critical | ok |  |  | --health-timeout 120 is enforced as 120ms and a false-failed check exits after killing the old server — nothing left listening. |
+| 105 | PAN-3044 | XS | critical | needs-refinement |  |  | Feedback delivery has no terminal-issue guard: it dispatched review and raised needs-you on issues closed 12 days earlier. |
+| 106 | PAN-3040 | S | critical | ok |  |  | pan strike is monorepo-shaped end to end and fails immediately on polyrepo projects; same defect as PAN-3708. |
+| 107 | PAN-3023 | S | critical | ok |  |  | Post-planning auto-spawn logs 'attempt 1/3' and never retries after a transient Docker EOF, stranding the issue with no re-drive owner. |
+| 108 | PAN-1618 | S | high | ok |  |  | Substrate: work-spawn docker-health gate has no autonomous recovery |
+| 109 | PAN-3916 | M | high | ok |  |  | Session pointers go stale after rollover + crash recovery; issue view and pan tell confirmation track a dead transcript |
+| 110 | PAN-3900 | S | high | ok |  |  | Docker bridge pool exhausted by orphaned workspace networks; pan start fails; bridge-pool patrol only warns |
+| 111 | PAN-3793 | S | high | ok |  |  | resolveIssuePullRequestRef probes only feature/ and strike/ names, so close-out cannot find a merged PR on a descriptive branch |
+| 112 | PAN-2639 | S | high | ok |  | PAN-2331 | codex-resume replays a rotated-out (revoked) refresh token → codex review convoys wedge with 401 |
+| 113 | PAN-2331 | S | high | ok |  |  | codex rate-limit 'Switch to gpt-5.4-mini?' modal stalls autonomous agents (no auto-dismiss) |
+| 114 | PAN-2333 | M | high | ok |  |  | feat: handle codex weekly-quota exhaustion gracefully |
+| 115 | PAN-3948 | S | medium | ok |  |  | pan tell says "not running" for a live tmux planning agent; planners idle forever after "Connection lost mid-response" |
+| 116 | PAN-2511 | XS | high | ok |  |  | Work agents burn 20+ min on false test failures |
+| 117 | PAN-2763 | S | high | ok |  |  | Workspace node_modules is symlinked to the primary repo, breaking test resolution |
+| 118 | PAN-2170 | XS | high | ok |  |  | Docker init container lacks Python |
+| 119 | PAN-1198 | S | high | ok |  |  | Workspace init container's bun install doesn't populate container-node-modules named volume |
+| 120 | PAN-3954 | XS | medium | ok |  |  | pan merge cancel still DELETEs the dead /api/flywheel/auto-merge/:id route; 404s against a live dashboard; untested |
+| 121 | PAN-2106 | S | high | ok |  |  | pan strike workspace setup leaves broken partial workspace + false 'spawned' success (git-lock race) |
+| 122 | PAN-2880 | M | high | ok |  | PAN-2259 | Linear tracker listIssues is a 3N+1 request storm |
+| 123 | PAN-2966 | S | high | ok |  |  | Polyrepo wrapper .gitignore misses .pan/ .devcontainer/ dev |
+| 124 | PAN-2945 | S | high | ok |  |  | pan done rejects Overdeck-generated runtime in polyrepo wrapper repos (.devcontainer/, dev, .pan/review) |
+| 125 | PAN-2680 | M | high | ok |  |  | pan close: Docker teardown silently skips a running stack in multi-repo projects (MYN), aborting close-out |
+| 126 | PAN-3540 | M | high | ok |  |  | Still reproduces post-cut: God View counts 35 phantom agents while /api/agents shows 37 stopped rows; dead Hook Bus panel; swap header |
+| 127 | PAN-3734 | S | high | ok |  |  | Completed swarm slot reuse can start a new item from a stale polyrepo branch — silent wrong-parent work. |
+| 128 | PAN-3621 | M | high | ok |  |  | pan start intermittently dies resolving a chunk graph spliced across two builds — importer from primary dist, path in the live generation. |
+| 129 | PAN-3555 | S | high | ok |  |  | pan start without --fresh silently abandoned an intact 7.5MB warm session, violating the warm-by-default contract. |
+| 130 | PAN-3498 | S | high | ok |  |  | write-sequence pins in-pipeline ranks without renumbering, so the persisted sequence carries duplicate ranks and gaps. |
+| 131 | PAN-3496 | XS | high | ok |  |  | A review convoy member blocked on an operator AskUserQuestion about review depth; review agents must decide and record, not ask. |
+| 132 | PAN-3081 | S | high | ok |  |  | The agent git guard is PATH-based and an agent stripped it unprompted to get past a false block; a control the agent can remove isn't one. |
+| 133 | PAN-2627 | S | high | ok |  |  | Linear poller is blind after cycle rollover |
+| 134 | PAN-2324 | XS | high | ok |  |  | label transition fails atomically on missing 'in-planning' label |
+| 135 | PAN-2165 | XS | high | ok |  |  | pan close: close-issue phase reports success but leaves issue OPEN / wrong labels (remove-label aborts on absent label; no-vBRIEF trans… |
+| 136 | PAN-2905 | S | high | ok |  |  | Dashboard steady-state CPU ~50% keeps API responses at 0.5-1.5s |
+| 137 | PAN-2259 | S | critical | ok |  |  | something burns the full 5k/hr GitHub GraphQL quota |
+| 138 | PAN-2379 | S | high | ok |  |  | dependency install is warn-only + 60s timeout → false verify failures against empty node_modules (blocks swarm convergence) |
+| 139 | PAN-2421 | XS | high | ok |  |  | dashboard server route tests flake under full-suite verification load |
+| 140 | PAN-2430 | S | high | ok |  |  | frontend typecheck fails with dozens of pre-existing unused-local errors |
+| 141 | PAN-2593 | S | high | ok |  |  | server children inherit bare system PATH |
+| 142 | PAN-2656 | S | high | ok |  |  | deacon-swarm unit tests read live ~/.overdeck/config.yaml |
+| 143 | PAN-2080 | M | high | needs-refinement |  |  | External transports (email/Slack/push/TTS) still plausible; its stated dependency on the PAN-2079 Inbox spine is undercut by boot… |
+| 144 | PAN-1775 | M | high | ok |  |  | Remote (Fly.io) work agents appear as real session rows in the issue tree |
+| 145 | PAN-1436 | S | high | ok |  |  | PAN-1419 follow-up: stale stopped-agent zombies still pollute dashboard list |
+| 146 | PAN-3556 | S | high | ok |  |  | No per-agent spawn mutex: two flows allocated session identities 3s apart and the second pin orphaned the first transcript. |
+| 147 | PAN-3553 | S | high | ok |  |  | tmux list-panes -a exits 1 on a zero-session server, so the census reads unavailable post-reboot and conversations hang on 'Starting…'. |
+| 148 | PAN-3535 | S | high | ok |  |  | The drain/resume hold is re-derived from the caller's env each boot, so any restart from a clean shell silently drops it. |
+| 149 | PAN-3429 | M | high | ok |  |  | Memory governor defers admissions but sheds nothing under HARD pressure; concurrent heavy gate runs aren't in the shed ladder. |
+| 150 | PAN-3397 | S | high | ok |  |  | Fresh convoy lanes freeze at 0 output before kickoff; PAN-3375's detector only covers warm resumes, so recovery is manual. |
+| 151 | PAN-3325 | S | high | ok |  |  | A fresh workspace ships an empty-but-present node_modules, so tooling silently resolves the parent repo's deps and gates go false-green. |
+| 152 | PAN-3317 | S | high | ok |  |  | Strike agents are told to rebase, the launcher guard blocks it, and pan sync-main can't resolve a -strike workspace. Overlaps PAN-3306. |
+| 153 | PAN-3284 | S | high | ok |  |  | A workspace-confined agent wrote a doc edit into the primary main worktree — the PAN-2204 write-to-main hazard through a new door. |
+| 154 | PAN-3270 | S | high | ok |  |  | New workspaces arrive with empty node_modules and bun off the agent shell PATH, so the documented bun install remedy fails. |
+| 155 | PAN-3689 | S | high | ok |  |  | Orphaned swarm-slot GC targets the aggregate polyrepo root; nested worktrees survive and spam failures |
+| 156 | PAN-3257 | S | high | ok |  |  | Crash-resume leaves a stale PTY socket and drops supervisorEnabled from state.json, so every supervisor delivery fails afterwards. |
+| 157 | PAN-3188 | XS | high | ok |  |  | DoD row 5 accepts only the transient verifying_on_main state, so an already-done issue can never be closed without an override. |
+| 158 | PAN-3129 | M | high | ok |  |  | No symlink/TOCTOU containment on canonical writes under agent-controlled paths; a planted symlink redirects a server-side write. |
+| 159 | PAN-3120 | S | high | ok |  |  | A scheduler-yielded work agent makes operator MERGE hard-error on polyrepo and silently dead-end on single-repo. |
+| 160 | PAN-3077 | XS | high | ok |  |  | Inspect and review-supervisor spawns omit --effort and inherit the harness xhigh default — recurring overspend, once per xBRIEF item. |
+| 161 | PAN-3062 | M | high | ok |  |  | The shared primary main worktree stacks several sessions' commits, so whoever pushes next ships everyone else's unverified work. |
+| 162 | PAN-3048 | XS | high | needs-refinement |  |  | Pipeline auto-commit lands Overdeck's own .pan/drafts PRD into product feature branches; the exclusion list is duplicated and has drifted. |
+| 163 | PAN-3032 | S | high | ok |  |  | Rebuild composes under overdeck-feature- while Traefik labels name myn-feature- devnet, and traefik attaches are runtime-only. |
+| 164 | PAN-3881 | S | high | ok |  |  | pan sync distributes from a stale primary checkout and never removes deleted sources — resurrects deleted subagent defs |
+| 165 | PAN-3833 | S | high | ok |  |  | Feed renders assistant text emitted after tool calls as collapsed thinking rows; operator believes the agent never answered |
+| 166 | PAN-3902 | S | high | ok |  |  | Verification gates inherit OVERDECK_* env from the dashboard, so host boot state (e.g. OVERDECK_NO_RESUME) can red any branch |
+| 167 | PAN-3826 | M | high | ok |  |  | Conversation view freezes until refresh: Claude JSONL watcher relies solely on fs.watch with no missed-event safety net |
+| 168 | PAN-3854 | S | high | ok |  |  | Feature-workspace devcontainer stack 403s on POST /api/dashboard/session, blocking all in-browser mutation UAT |
+| 169 | PAN-3866 | S | high | ok |  |  | Test specialist copies the previous head's uatStatus/uatNotes into a new result instead of re-running browser UAT |
+| 170 | PAN-3307 | XS | high | ok |  |  | commitlint scope-enum lists 11 scopes, 14 real ones are missing, and it still names the removed beads scope — trains everyone to ignore it. |
+| 171 | PAN-3022 | S | high | needs-refinement |  |  | The work-spawn route ignores record.workModel, so the role default wins and then persists over the operator's per-issue override. |
+| 172 | PAN-2642 | XL | high | ok | ✓ |  | Cost strategy: waste detection over budget policing |
+| 173 | PAN-1868 | XS | high | ok |  |  | Cost-bleed circuit breaker: progress-aware, always-on guard against runaway agent spend |
+| 174 | PAN-3942 | L | high | ok |  |  | First-class skill bundles: named manifests activated at global/project/issue/conversation scope with layered resolution and provenance |
+| 175 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
 | 176 | PAN-3668 | L | medium | ok |  |  | Add Prime Agent as a managed harness (in flight — RPC runtime adapter, discovery, transcripts) |
-| 177 | PAN-1042 | S | high | ok |  |  | cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions |
-| 178 | PAN-3943 | L | high | ok |  | PAN-3942 | Toggleable Deft Directive compatibility profile and skill bundle on top of PAN-3942; no second planning authority in a project |
-| 179 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
-| 180 | PAN-2059 | XL | high | ok | ✓ |  | Backlog pickup gate |
-| 181 | PAN-2376 | XL | high | ok | ✓ |  | Epic: CI/CD reliability |
-| 182 | PAN-3775 | S | high | ok |  |  | makeDbLive opens overdeck.db unmigrated; zero-table db poisons a vitest worker home and breaks later read-only audits. |
-| 183 | PAN-3652 | XS | high | ok |  |  | No workflow_dispatch on ci.yml / state-plane-branches.yml, so an unverified main tip can never be verified and DoD row 6 blocks close-out. |
-| 184 | PAN-3579 | M | high | ok |  |  | ~20 frontend mutations hand-write JSON headers and omit the CSRF token, so each 403s the moment its route becomes guarded. |
-| 185 | PAN-3541 | S | high | ok |  |  | Review restart loops on the session-resume menu because eligibility ignores how the prior session ended; partial mechanical break landed. |
-| 186 | PAN-3463 | S | high | ok |  |  | A legitimate empty-diff slot outcome can never pass item verify, so the slot wedges and blocks dispatch of remaining items forever. |
-| 187 | PAN-3460 | S | high | ok |  |  | Per-item verify_commands that run the whole root suite make slot merge gates load-fragile and hold a patrol in flight for ~17 minutes. |
-| 188 | PAN-3454 | M | high | ok |  |  | Cost hook rescans fork-copied parent history from byte 0 under the reviewer's id — fabricated cache-miss warnings and double-billed spend. |
-| 189 | PAN-3432 | S | high | ok |  |  | Preemptive yield fans out: seven work agents paused to make room for one review convoy, then flood back oldest-first. |
-| 190 | PAN-3306 | S | high | ok |  |  | Three layers disagree on how a strike rebases: the prompt instructs it, the launcher guard blocks it, sync-main resolves the wrong worktree. |
-| 191 | PAN-3297 | S | high | ok |  |  | After a dashboard restart, delivery calls a healthy agent a zombie while resume calls it healthy; both classifiers can't be right. |
-| 192 | PAN-3274 | S | high | needs-refinement |  |  | A test-role agent spawned and never ran a turn, holding an approved CI-green issue out of the merge gate behind a stale failed verdict. |
-| 193 | PAN-3267 | S | high | ok |  |  | GitLab merged-head oracle spawns one glab subprocess per repo × head, so pipeline membership refresh fails on every cycle. |
-| 194 | PAN-3261 | S | high | ok |  |  | The tmux delivery fallback answered a live session-resume menu because its own paste hid the menu from the detector — silent /compact. |
-| 195 | PAN-3256 | S | high | ok |  |  | glab mr list runs with a polyrepo wrapper root as cwd, which is not a git repo, so MYN membership fails forge_unavailable every cycle. |
-| 196 | PAN-3190 | XS | high | ok |  |  | pan merge cancel has a 0% success rate: Commander binds its options object into the injectable fetchImpl parameter. |
-| 197 | PAN-3174 | S | high | ok |  |  | Polyrepo UAT stacks 504: Traefik labels carry the old myn- prefix, Traefik isn't on the overdeck-* devnet, and the fe port is wrong. |
-| 198 | PAN-3050 | XS | high | ok |  |  | Idle-stack reaper's regex only matches overdeck-feature-*-server|frontend, so MYN stacks run for hours after their agents are gone. |
-| 199 | PAN-2995 | XS | high | ok |  |  | pan done --strike gates on branch ancestry, which a squash-merge breaks, so it refuses strikes that pan close proves merged. |
-| 200 | PAN-2980 | XS | high | ok |  |  | The pre-push file-size guard reads the shared working tree, so another session's uncommitted edits block an unrelated, guard-clean push. |
-| 201 | PAN-3769 | S | high | needs-refinement |  |  | Red main 707089c5→e4b280b3 blocked deploys ~14h: missing no-loss lock entry + stale OpenRouter expectation. Verify still reproducing. |
-| 202 | PAN-3760 | S | high | ok |  |  | permissionMode 'auto' undocumented as non-bypass, launcher can emit invalid --permission-mode, invalid values drop silently. |
-| 203 | PAN-3629 | M | high | ok |  |  | No sanctioned door to re-scope a live agent; the operator must violate pan tell doctrine or let the rejected design land. |
-| 204 | PAN-3517 | M | high | ok |  |  | Convoy forks still miss the parent prompt cache in production — launch-injection byte drift plus resume dropping the cache-scope header. |
-| 205 | PAN-3508 | S | high | ok |  |  | pan reload deletes the generation the global pan link points at, so the CLI vanishes mid-deploy for anyone invoking from elsewhere. |
-| 206 | PAN-3303 | S | high | ok |  |  | An empty registered-projects 200 is treated as authoritative, latching Command Deck at 'Unknown project' until a manual page reload. |
-| 207 | PAN-3280 | S | high | needs-refinement |  |  | One issue's agent sessions vanished four times in a run while every peer stayed up; specimen-specific — re-confirm the mechanism. |
-| 208 | PAN-3196 | S | high | ok |  |  | Root-owned container residue makes close-out die on EACCES after passing every DoD row; same family as PAN-3570. |
-| 209 | PAN-3186 | XS | high | ok |  |  | One configured non-git member (auricle/infra) blanks pipeline membership for the whole project the resolver claims it can answer. |
-| 210 | PAN-3185 | XS | high | ok |  |  | TOCTOU between the duplicate-session guard and session creation makes pan start report a hard failure over a successful spawn. |
-| 211 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build. |
-| 212 | PAN-3176 | S | high | ok |  |  | UAT promote consults no stack health, so a batch whose stack was never exercised can be promoted from a success-green control. |
-| 213 | PAN-3130 | S | high | ok |  |  | Identifier-joined write paths have no containment assertion, so a crafted issue or agent id could redirect a canonical write. |
-| 214 | PAN-3047 | XS | high | ok |  | PAN-2828 | Strike-branch teardown uses --is-ancestor, which cannot see a squash merge, so all 96 strike/* branches survive as residue. |
-| 215 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
-| 216 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
-| 217 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
-| 218 | PAN-3536 | S | high | ok |  |  | pan tell can not reach ohmypi conversations: with no state.json the expected harness defaults to claude-code and delivery reports a zombie. |
-| 219 | PAN-3527 | XS | high | ok |  |  | One failed boot-time fetch leaves the sidebar at CONVERSATIONS 0 / ISSUES 0 for the life of the tab — nothing retries it. |
-| 220 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
-| 221 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
-| 222 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
-| 223 | PAN-3245 | XS | high | ok |  |  | The pan done gate flags workspace .pan/drafts as uncommitted despite its own .pan exclusion, training agents to reach for --force. |
-| 224 | PAN-3218 | S | high | ok |  |  | No release-drift signal: an install-breaking fix sat merged and unpublished for ~9 hours with nothing surfacing it. |
-| 225 | PAN-3210 | XS | high | ok |  |  | Close-out teardown scopes by compose project while the guard scopes by working_dir, so an unprefixed dead init container blocks it. |
-| 226 | PAN-3167 | S | high | ok |  |  | krux and lexerra are permanently unreadable through the membership door: an App-not-installed 404 is typed as retryable forge_unavailable. |
-| 227 | PAN-3113 | M | high | ok |  |  | Blocking agent-pane choice prompts show nothing in the conversation view; surface them as inline decision cards with keystroke delivery. |
-| 228 | PAN-3108 | XS | high | ok |  |  | dashboard.log reached 867MB with no rotation — disk cost and un-greppable incident logs exactly when they're needed. |
-| 229 | PAN-3094 | XS | high | ok |  |  | pan done's merge fallback still force-pushes a fast-forwardable branch, so a rejected push leaves completion half-done. |
-| 230 | PAN-3012 | M | high | ok |  |  | Archiving preserves the pointer, not the data: harnesses delete session JSONL on their own schedule and the conversation is unrecoverable. |
-| 231 | PAN-3627 | XS | high | ok |  |  | backlog-auto-trigger throws on a legitimately empty manifest, so a plain npx @overdeck/core in a non-project dir prints a stack trace. |
-| 232 | PAN-3617 | S | high | needs-refinement |  |  | Three strike dispatches for PAN-3586 died with zero output while a sibling worked; may be stale — re-confirm before picking up. |
-| 233 | PAN-3308 | XS | high | ok |  |  | The file-size guard prints a paste-ready ratchet-up line, so 2 of 3 agents raised the ceiling instead of shrinking the file. |
-| 234 | PAN-3276 | XS | high | ok |  |  | Needs-you rows for pane questions and permission prompts are click-dead, so the list that exists to route the operator routes nowhere. |
-| 235 | PAN-3235 | S | high | ok |  |  | Render and answer agent pane-choice menus on the decision card; PAN-3228 shipped the core and CLI, the dashboard UX remains. |
-| 236 | PAN-3855 | S | medium | ok |  |  | pan start reuses the old agent's recorded model after pan reset-session, so retuned tiers never apply without --fresh |
-| 237 | PAN-3789 | L | medium | needs-refinement |  |  | MCP servers configured in standalone Codex never reach Overdeck conversations; no setup, auth or lifecycle story across harnesses |
-| 238 | PAN-3175 | M | high | ok |  |  | Merge-train ordering derives conflicts from file overlap alone, so semantically dependent members batch in any order and break the schema. |
-| 239 | PAN-3015 | L | high | ok |  |  | Claude Code is the only harness still driven by keystroke injection; a pull-based monitor inbox would retire the whole hardening stack. |
-| 240 | PAN-3518 | M | high | needs-refinement |  | PAN-3517 | Re-review resumes re-bill the whole cold history; make reviewResumeDecision TTL- and size-aware. Needs design sign-off. |
-| 241 | PAN-3445 | XS | high | ok |  |  | projects.yaml TCP lock ports overlap the OS ephemeral range, so an unrelated socket makes an uncontended config write fail. |
-| 242 | PAN-3332 | S | high | ok |  |  | A detached slash-command spawn died in 150ms while the UI kept saying 'running in the background'; the activity must own its outcome. |
-| 243 | PAN-3295 | M | high | ok |  |  | Completion-check LLM is invisible infrastructure that fanned out to 35 concurrent processes; one queued summarizer plus observability. |
-| 244 | PAN-3236 | XS | high | needs-refinement |  |  | ECONNREFUSED on a dead supervisor socket was treated as ambiguous so feedback never crossed to tmux; a fix commit is cited — verify. |
-| 245 | PAN-3013 | XS | high | ok |  |  | Role-spawn wrote 26 session-scoped hook paths into the durable ~/.claude/settings.json; they fail on every Linear tool call forever. |
-| 246 | PAN-3771 | M | high | ok |  |  | Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries. |
-| 247 | PAN-3533 | L | high | ok |  |  | No per-project resource partitioning, so one project's docker stacks and installs starve another project's pipeline and the dashboard. |
-| 248 | PAN-3107 | S | high | ok |  |  | OOM spikes are unattributable after the fact; productize the machine-local memory-attribution census stopgap. |
-| 249 | PAN-3762 | XL | high | needs-refinement |  |  | Overdeck Anywhere direction change: per-machine servers + client-side federation instead of relay-first. Supersedes PAN-2350 plan. |
-| 250 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
-| 251 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
-| 252 | PAN-2188 | M | high | needs-refinement |  |  | Flywheel resilience for the codebase-health flood: substrate-first prioritization + tenets spirit-gate |
-| 253 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
-| 254 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
-| 255 | PAN-2008 | XS | high | needs-refinement |  | PAN-1936 | store-access guard |
-| 256 | PAN-1325 | M | high | ok |  |  | Artifact storage model is unsafe for polyrepo projects |
-| 257 | PAN-1728 | S | medium | needs-refinement |  |  | Specs now live in .pan/ and are committed on the feature branch; the described immutability violation may not be meaningful — verify… |
-| 258 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
-| 259 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
-| 260 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
-| 261 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
-| 262 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
-| 263 | PAN-2195 | M | high | needs-refinement |  |  | pan plan finalize re-plan churn: stale superseded spec on main transiently materializes the old plan |
-| 264 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
-| 265 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
-| 266 | PAN-2469 | M | high | ok |  |  | issue-level assembly owner |
-| 267 | PAN-2212 | M | high | ok |  |  | Swarm slot dispatch has no reserved budget |
-| 268 | PAN-2213 | M | high | ok |  |  | Swarm slot allocator picks an orphaned slot index and refuses instead of skipping to the next free one |
-| 269 | PAN-2211 | M | high | ok |  |  | PAN-2203 follow-up: swarm slot pan done records completion but slot never becomes merge-ready |
-| 270 | PAN-2210 | M | high | ok |  |  | PAN-2203 follow-up: a swarm slot's completion can trigger the issue-level review pipeline |
-| 271 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
-| 272 | PAN-2646 | XS | high | ok |  |  | configurable global/project/issue policy UI with default OFF |
-| 273 | PAN-3751 | M | high | ok |  |  | Post-merge deploy runs a multi-minute build with no dashboard indication — operator reads a silent deploy as a lost notification |
-| 274 | PAN-2652 | M | high | ok |  |  | Conversation view diverges from Terminal: Claude Code backgrounding forks the session file in-process, invisible to all session-id reso… |
-| 275 | PAN-2755 | S | high | ok |  |  | per-issue review-model override never reached convoy sub-reviewers on the discovery-fork path |
-| 276 | PAN-2754 | S | high | ok |  |  | `always` is inert |
-| 277 | PAN-2809 | M | high | ok |  |  | Live-terminal Playwright UAT blocked in containerized workspaces (node-pty musl/glibc mismatch + Vite/Traefik WS Origin 403) |
-| 278 | PAN-2810 | M | high | ok |  |  | Workspace 'vitest --changed' gate diverges from CI: App.test.tsx fails locally on missing selectPendingInputSubjects mock |
-| 279 | PAN-2495 | S | high | ok |  |  | PAN-2487 ci-green merge skip bypassed CI-green gate |
-| 280 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
-| 281 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
-| 282 | PAN-3420 | M | high | needs-refinement |  |  | Pipeline substrate: Dashboard + pan show render a completed, closed-out issue as never-started (post-close-out history wipe) |
-| 283 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
-| 284 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
-| 285 | PAN-2027 | M | high | ok |  |  | ohmypi: route kimi-k2 through ohmypi harness instead of CLIProxy (eliminates 200k-window illusion) |
-| 286 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
-| 287 | PAN-1578 | M | high | ok |  |  | GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
-| 288 | PAN-1538 | M | high | ok |  |  | Unblock Pi source forks |
-| 289 | PAN-687 | M | high | ok |  |  | Support OpenCode as alternative coding agent |
-| 290 | PAN-466 | M | high | ok |  |  | Add QwenCoder CLI as a supported runtime alongside Claude Code and Codex |
-| 291 | PAN-465 | M | high | ok |  |  | Add OpenRouter as a model provider |
-| 292 | PAN-463 | M | high | ok |  |  | Add Qwen 3.6+ model support |
-| 293 | PAN-1142 | M | high | ok |  |  | Add reasoning effort level to per-role / per-conversation model config |
-| 294 | PAN-1424 | M | high | needs-refinement |  |  | Model pool dispatch + work.* subtype taxonomy (follow-up to PAN-1122) |
-| 295 | PAN-1196 | M | high | needs-refinement |  |  | Workhorse routing by bead difficulty + subject-matter (single-agent and swarm) |
-| 296 | PAN-1311 | M | high | needs-refinement |  |  | Swarm: fast-track tier |
-| 297 | PAN-1313 | L | high | ok |  |  | Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces |
-| 298 | PAN-1246 | M | high | ok |  |  | Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586) |
-| 299 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
-| 300 | PAN-1254 | L | high | ok |  |  | Tailscale integration: advertise dashboard + workspace endpoints over tailnet (Effect-native) |
-| 301 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
-| 302 | PAN-1915 | M | high | ok |  |  | enhancement(security): API key at-rest hardening |
-| 303 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
-| 304 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
-| 305 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
-| 306 | PAN-2351 | XS | high | ok |  | PAN-1166 | Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats (security prerequisites) |
+| 177 | PAN-3943 | L | high | ok |  | PAN-3942 | Toggleable Deft Directive compatibility profile and skill bundle on top of PAN-3942; no second planning authority in a project |
+| 178 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
+| 179 | PAN-2059 | XL | high | ok | ✓ |  | Backlog pickup gate |
+| 180 | PAN-2376 | XL | high | ok | ✓ |  | Epic: CI/CD reliability |
+| 181 | PAN-3775 | S | high | ok |  |  | makeDbLive opens overdeck.db unmigrated; zero-table db poisons a vitest worker home and breaks later read-only audits. |
+| 182 | PAN-3652 | XS | high | ok |  |  | No workflow_dispatch on ci.yml / state-plane-branches.yml, so an unverified main tip can never be verified and DoD row 6 blocks close-out. |
+| 183 | PAN-3579 | M | high | ok |  |  | ~20 frontend mutations hand-write JSON headers and omit the CSRF token, so each 403s the moment its route becomes guarded. |
+| 184 | PAN-3541 | S | high | ok |  |  | Review restart loops on the session-resume menu because eligibility ignores how the prior session ended; partial mechanical break landed. |
+| 185 | PAN-3463 | S | high | ok |  |  | A legitimate empty-diff slot outcome can never pass item verify, so the slot wedges and blocks dispatch of remaining items forever. |
+| 186 | PAN-3460 | S | high | ok |  |  | Per-item verify_commands that run the whole root suite make slot merge gates load-fragile and hold a patrol in flight for ~17 minutes. |
+| 187 | PAN-3454 | M | high | ok |  |  | Cost hook rescans fork-copied parent history from byte 0 under the reviewer's id — fabricated cache-miss warnings and double-billed spend. |
+| 188 | PAN-3432 | S | high | ok |  |  | Preemptive yield fans out: seven work agents paused to make room for one review convoy, then flood back oldest-first. |
+| 189 | PAN-3306 | S | high | ok |  |  | Three layers disagree on how a strike rebases: the prompt instructs it, the launcher guard blocks it, sync-main resolves the wrong worktree. |
+| 190 | PAN-3297 | S | high | ok |  |  | After a dashboard restart, delivery calls a healthy agent a zombie while resume calls it healthy; both classifiers can't be right. |
+| 191 | PAN-3274 | S | high | needs-refinement |  |  | A test-role agent spawned and never ran a turn, holding an approved CI-green issue out of the merge gate behind a stale failed verdict. |
+| 192 | PAN-3267 | S | high | ok |  |  | GitLab merged-head oracle spawns one glab subprocess per repo × head, so pipeline membership refresh fails on every cycle. |
+| 193 | PAN-3261 | S | high | ok |  |  | The tmux delivery fallback answered a live session-resume menu because its own paste hid the menu from the detector — silent /compact. |
+| 194 | PAN-3256 | S | high | ok |  |  | glab mr list runs with a polyrepo wrapper root as cwd, which is not a git repo, so MYN membership fails forge_unavailable every cycle. |
+| 195 | PAN-3190 | XS | high | ok |  |  | pan merge cancel has a 0% success rate: Commander binds its options object into the injectable fetchImpl parameter. |
+| 196 | PAN-3174 | S | high | ok |  |  | Polyrepo UAT stacks 504: Traefik labels carry the old myn- prefix, Traefik isn't on the overdeck-* devnet, and the fe port is wrong. |
+| 197 | PAN-3050 | XS | high | ok |  |  | Idle-stack reaper's regex only matches overdeck-feature-*-server|frontend, so MYN stacks run for hours after their agents are gone. |
+| 198 | PAN-2995 | XS | high | ok |  |  | pan done --strike gates on branch ancestry, which a squash-merge breaks, so it refuses strikes that pan close proves merged. |
+| 199 | PAN-2980 | XS | high | ok |  |  | The pre-push file-size guard reads the shared working tree, so another session's uncommitted edits block an unrelated, guard-clean push. |
+| 200 | PAN-3769 | S | high | needs-refinement |  |  | Red main 707089c5→e4b280b3 blocked deploys ~14h: missing no-loss lock entry + stale OpenRouter expectation. Verify still reproducing. |
+| 201 | PAN-3760 | S | high | ok |  |  | permissionMode 'auto' undocumented as non-bypass, launcher can emit invalid --permission-mode, invalid values drop silently. |
+| 202 | PAN-3629 | M | high | ok |  |  | No sanctioned door to re-scope a live agent; the operator must violate pan tell doctrine or let the rejected design land. |
+| 203 | PAN-3517 | M | high | ok |  |  | Convoy forks still miss the parent prompt cache in production — launch-injection byte drift plus resume dropping the cache-scope header. |
+| 204 | PAN-3508 | S | high | ok |  |  | pan reload deletes the generation the global pan link points at, so the CLI vanishes mid-deploy for anyone invoking from elsewhere. |
+| 205 | PAN-3303 | S | high | ok |  |  | An empty registered-projects 200 is treated as authoritative, latching Command Deck at 'Unknown project' until a manual page reload. |
+| 206 | PAN-3280 | S | high | needs-refinement |  |  | One issue's agent sessions vanished four times in a run while every peer stayed up; specimen-specific — re-confirm the mechanism. |
+| 207 | PAN-3196 | S | high | ok |  |  | Root-owned container residue makes close-out die on EACCES after passing every DoD row; same family as PAN-3570. |
+| 208 | PAN-3186 | XS | high | ok |  |  | One configured non-git member (auricle/infra) blanks pipeline membership for the whole project the resolver claims it can answer. |
+| 209 | PAN-3185 | XS | high | ok |  |  | TOCTOU between the duplicate-session guard and session creation makes pan start report a hard failure over a successful spawn. |
+| 210 | PAN-3179 | M | high | ok |  |  | A UAT promote is complete at merge time with no production-reach check, so members read shipped while prod serves the old build. |
+| 211 | PAN-3176 | S | high | ok |  |  | UAT promote consults no stack health, so a batch whose stack was never exercised can be promoted from a success-green control. |
+| 212 | PAN-3130 | S | high | ok |  |  | Identifier-joined write paths have no containment assertion, so a crafted issue or agent id could redirect a canonical write. |
+| 213 | PAN-3047 | XS | high | ok |  | PAN-2828 | Strike-branch teardown uses --is-ancestor, which cannot see a squash merge, so all 96 strike/* branches survive as residue. |
+| 214 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
+| 215 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
+| 216 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
+| 217 | PAN-3536 | S | high | ok |  |  | pan tell can not reach ohmypi conversations: with no state.json the expected harness defaults to claude-code and delivery reports a zombie. |
+| 218 | PAN-3527 | XS | high | ok |  |  | One failed boot-time fetch leaves the sidebar at CONVERSATIONS 0 / ISSUES 0 for the life of the tab — nothing retries it. |
+| 219 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
+| 220 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
+| 221 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
+| 222 | PAN-3245 | XS | high | ok |  |  | The pan done gate flags workspace .pan/drafts as uncommitted despite its own .pan exclusion, training agents to reach for --force. |
+| 223 | PAN-3218 | S | high | ok |  |  | No release-drift signal: an install-breaking fix sat merged and unpublished for ~9 hours with nothing surfacing it. |
+| 224 | PAN-3210 | XS | high | ok |  |  | Close-out teardown scopes by compose project while the guard scopes by working_dir, so an unprefixed dead init container blocks it. |
+| 225 | PAN-3167 | S | high | ok |  |  | krux and lexerra are permanently unreadable through the membership door: an App-not-installed 404 is typed as retryable forge_unavailable. |
+| 226 | PAN-3113 | M | high | ok |  |  | Blocking agent-pane choice prompts show nothing in the conversation view; surface them as inline decision cards with keystroke delivery. |
+| 227 | PAN-3108 | XS | high | ok |  |  | dashboard.log reached 867MB with no rotation — disk cost and un-greppable incident logs exactly when they're needed. |
+| 228 | PAN-3094 | XS | high | ok |  |  | pan done's merge fallback still force-pushes a fast-forwardable branch, so a rejected push leaves completion half-done. |
+| 229 | PAN-3012 | M | high | ok |  |  | Archiving preserves the pointer, not the data: harnesses delete session JSONL on their own schedule and the conversation is unrecoverable. |
+| 230 | PAN-3627 | XS | high | ok |  |  | backlog-auto-trigger throws on a legitimately empty manifest, so a plain npx @overdeck/core in a non-project dir prints a stack trace. |
+| 231 | PAN-3617 | S | high | needs-refinement |  |  | Three strike dispatches for PAN-3586 died with zero output while a sibling worked; may be stale — re-confirm before picking up. |
+| 232 | PAN-3308 | XS | high | ok |  |  | The file-size guard prints a paste-ready ratchet-up line, so 2 of 3 agents raised the ceiling instead of shrinking the file. |
+| 233 | PAN-3276 | XS | high | ok |  |  | Needs-you rows for pane questions and permission prompts are click-dead, so the list that exists to route the operator routes nowhere. |
+| 234 | PAN-3235 | S | high | ok |  |  | Render and answer agent pane-choice menus on the decision card; PAN-3228 shipped the core and CLI, the dashboard UX remains. |
+| 235 | PAN-3855 | S | medium | ok |  |  | pan start reuses the old agent's recorded model after pan reset-session, so retuned tiers never apply without --fresh |
+| 236 | PAN-3789 | L | medium | needs-refinement |  |  | MCP servers configured in standalone Codex never reach Overdeck conversations; no setup, auth or lifecycle story across harnesses |
+| 237 | PAN-3175 | M | high | ok |  |  | Merge-train ordering derives conflicts from file overlap alone, so semantically dependent members batch in any order and break the schema. |
+| 238 | PAN-3015 | L | high | ok |  |  | Claude Code is the only harness still driven by keystroke injection; a pull-based monitor inbox would retire the whole hardening stack. |
+| 239 | PAN-3518 | M | high | needs-refinement |  | PAN-3517 | Re-review resumes re-bill the whole cold history; make reviewResumeDecision TTL- and size-aware. Needs design sign-off. |
+| 240 | PAN-3445 | XS | high | ok |  |  | projects.yaml TCP lock ports overlap the OS ephemeral range, so an unrelated socket makes an uncontended config write fail. |
+| 241 | PAN-3332 | S | high | ok |  |  | A detached slash-command spawn died in 150ms while the UI kept saying 'running in the background'; the activity must own its outcome. |
+| 242 | PAN-3295 | M | high | ok |  |  | Completion-check LLM is invisible infrastructure that fanned out to 35 concurrent processes; one queued summarizer plus observability. |
+| 243 | PAN-3236 | XS | high | needs-refinement |  |  | ECONNREFUSED on a dead supervisor socket was treated as ambiguous so feedback never crossed to tmux; a fix commit is cited — verify. |
+| 244 | PAN-3013 | XS | high | ok |  |  | Role-spawn wrote 26 session-scoped hook paths into the durable ~/.claude/settings.json; they fail on every Linear tool call forever. |
+| 245 | PAN-3771 | M | high | ok |  |  | Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries. |
+| 246 | PAN-3533 | L | high | ok |  |  | No per-project resource partitioning, so one project's docker stacks and installs starve another project's pipeline and the dashboard. |
+| 247 | PAN-3107 | S | high | ok |  |  | OOM spikes are unattributable after the fact; productize the machine-local memory-attribution census stopgap. |
+| 248 | PAN-3762 | XL | high | needs-refinement |  |  | Overdeck Anywhere direction change: per-machine servers + client-side federation instead of relay-first. Supersedes PAN-2350 plan. |
+| 249 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
+| 250 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
+| 251 | PAN-2188 | M | high | needs-refinement |  |  | Flywheel resilience for the codebase-health flood: substrate-first prioritization + tenets spirit-gate |
+| 252 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
+| 253 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
+| 254 | PAN-2008 | XS | high | needs-refinement |  | PAN-1936 | store-access guard |
+| 255 | PAN-1325 | M | high | ok |  |  | Artifact storage model is unsafe for polyrepo projects |
+| 256 | PAN-1728 | S | medium | needs-refinement |  |  | Specs now live in .pan/ and are committed on the feature branch; the described immutability violation may not be meaningful — verify… |
+| 257 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
+| 258 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
+| 259 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
+| 260 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
+| 261 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
+| 262 | PAN-2195 | M | high | needs-refinement |  |  | pan plan finalize re-plan churn: stale superseded spec on main transiently materializes the old plan |
+| 263 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
+| 264 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
+| 265 | PAN-2469 | M | high | ok |  |  | issue-level assembly owner |
+| 266 | PAN-2212 | M | high | ok |  |  | Swarm slot dispatch has no reserved budget |
+| 267 | PAN-2213 | M | high | ok |  |  | Swarm slot allocator picks an orphaned slot index and refuses instead of skipping to the next free one |
+| 268 | PAN-2211 | M | high | ok |  |  | PAN-2203 follow-up: swarm slot pan done records completion but slot never becomes merge-ready |
+| 269 | PAN-2210 | M | high | ok |  |  | PAN-2203 follow-up: a swarm slot's completion can trigger the issue-level review pipeline |
+| 270 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
+| 271 | PAN-2646 | XS | high | ok |  |  | configurable global/project/issue policy UI with default OFF |
+| 272 | PAN-3751 | M | high | ok |  |  | Post-merge deploy runs a multi-minute build with no dashboard indication — operator reads a silent deploy as a lost notification |
+| 273 | PAN-2652 | M | high | ok |  |  | Conversation view diverges from Terminal: Claude Code backgrounding forks the session file in-process, invisible to all session-id reso… |
+| 274 | PAN-2755 | S | high | ok |  |  | per-issue review-model override never reached convoy sub-reviewers on the discovery-fork path |
+| 275 | PAN-2754 | S | high | ok |  |  | `always` is inert |
+| 276 | PAN-2809 | M | high | ok |  |  | Live-terminal Playwright UAT blocked in containerized workspaces (node-pty musl/glibc mismatch + Vite/Traefik WS Origin 403) |
+| 277 | PAN-2810 | M | high | ok |  |  | Workspace 'vitest --changed' gate diverges from CI: App.test.tsx fails locally on missing selectPendingInputSubjects mock |
+| 278 | PAN-2495 | S | high | ok |  |  | PAN-2487 ci-green merge skip bypassed CI-green gate |
+| 279 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
+| 280 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
+| 281 | PAN-3420 | M | high | needs-refinement |  |  | Pipeline substrate: Dashboard + pan show render a completed, closed-out issue as never-started (post-close-out history wipe) |
+| 282 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
+| 283 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
+| 284 | PAN-2027 | M | high | ok |  |  | ohmypi: route kimi-k2 through ohmypi harness instead of CLIProxy (eliminates 200k-window illusion) |
+| 285 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
+| 286 | PAN-1578 | M | high | ok |  |  | GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
+| 287 | PAN-1538 | M | high | ok |  |  | Unblock Pi source forks |
+| 288 | PAN-687 | M | high | ok |  |  | Support OpenCode as alternative coding agent |
+| 289 | PAN-466 | M | high | ok |  |  | Add QwenCoder CLI as a supported runtime alongside Claude Code and Codex |
+| 290 | PAN-465 | M | high | ok |  |  | Add OpenRouter as a model provider |
+| 291 | PAN-463 | M | high | ok |  |  | Add Qwen 3.6+ model support |
+| 292 | PAN-1142 | M | high | ok |  |  | Add reasoning effort level to per-role / per-conversation model config |
+| 293 | PAN-1424 | M | high | needs-refinement |  |  | Model pool dispatch + work.* subtype taxonomy (follow-up to PAN-1122) |
+| 294 | PAN-1196 | M | high | needs-refinement |  |  | Workhorse routing by bead difficulty + subject-matter (single-agent and swarm) |
+| 295 | PAN-1311 | M | high | needs-refinement |  |  | Swarm: fast-track tier |
+| 296 | PAN-1313 | L | high | ok |  |  | Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces |
+| 297 | PAN-1246 | M | high | ok |  |  | Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586) |
+| 298 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
+| 299 | PAN-1254 | L | high | ok |  |  | Tailscale integration: advertise dashboard + workspace endpoints over tailnet (Effect-native) |
+| 300 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
+| 301 | PAN-1915 | M | high | ok |  |  | enhancement(security): API key at-rest hardening |
+| 302 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
+| 303 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
+| 304 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
+| 305 | PAN-2351 | XS | high | ok |  | PAN-1166 | Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats (security prerequisites) |
+| 306 | PAN-2350 | L | high | needs-refinement | ✓ |  | Epic container for Overdeck Anywhere P0-P3; PAN-3762 proposes replacing the relay-first direction with per-machine server federation. |
 | 307 | PAN-3787 | L | medium | ok |  |  | Add a per-child composer and live Working-for indicator to subagent transcripts for Codex and Claude Code |
-| 308 | PAN-2350 | L | high | needs-refinement | ✓ |  | Epic container for Overdeck Anywhere P0-P3; PAN-3762 proposes replacing the relay-first direction with per-machine server federation. |
-| 309 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
-| 310 | PAN-2079 | M | high | needs-refinement |  |  | Inbox spine: boot reconciliation (producer #1) is gone; may still be worth pursuing for pending AUQ, cost alerts and other producers |
-| 311 | PAN-3934 | S | medium | ok |  | PAN-3929 | roles/*.md and two docs still name deleted status fields outside the guard's Markdown roots; follow-up to PAN-3929 |
-| 312 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
-| 313 | PAN-1209 | S | low | stale |  |  | bd/beads were removed earlier; any drift-detection concern now applies to xBRIEF item status, not bd state |
-| 314 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
-| 315 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
-| 316 | PAN-1454 | M | high | ok |  |  | [META] 9 systemic failure patterns surfaced by 80-issue audit |
-| 317 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
-| 318 | PAN-1504 | M | high | ok |  |  | pan hygiene |
-| 319 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
-| 320 | PAN-1479 | M | high | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
-| 321 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
-| 322 | PAN-2836 | M | high | ok |  |  | okf: in-repo placement presets (okf/, docs/okf/) and /okf migrate to switch placements later |
-| 323 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
-| 324 | PAN-2650 | L | high | ok |  |  | Swarm final ready-to-merge slot wedges when memory-governor sheds the integration stack; pan swarm recover can't recover it |
-| 325 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
-| 326 | PAN-2334 | XS | high | ok |  |  | write a Definition of Ready (DoR) |
-| 327 | PAN-2308 | M | high | needs-refinement |  |  | Compose-file port migration off 3011 still valid; the deacon-quarantine half references the deleted patrol loop — verify an equivalent guard |
-| 328 | PAN-2193 | S | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree |
-| 329 | PAN-1984 | XS | high | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
-| 330 | PAN-1913 | XS | high | ok |  |  | Project description: show on click, edit in dashboard, mirror into the project layer (and document what's in .pan and ~/.panopticon) |
-| 331 | PAN-1906 | M | high | ok |  |  | Enforce harness restrictions with subscription: gray out non-claude-code, validate everywhere |
-| 332 | PAN-1544 | M | high | ok |  |  | Type cleanup: strip 'ship' from the Role union and its ~10 downstream references |
-| 333 | PAN-955 | S | high | ok |  |  | Workspace devcontainer template versioning + re-render on demand |
-| 334 | PAN-807 | L | high | ok |  |  | Epic C: Workspace state sanity on spawn |
-| 335 | PAN-630 | M | high | ok |  |  | Multi-tenant workspace isolation with ACLs |
-| 336 | PAN-471 | M | high | ok |  |  | Cost reconciler: auto-trigger on agent lifecycle events with debounce |
-| 337 | PAN-438 | M | high | ok |  |  | Migrate remaining REST polling endpoints to Effect RPC |
-| 338 | PAN-578 | M | high | ok |  |  | Security: Comment mediation layer to prevent prompt injection via tracker comments |
-| 339 | PAN-2921 | S | medium | ok |  |  | Strike merge door can report fetch failure after merge and land the same head twice |
-| 340 | PAN-3920 | L | medium | needs-refinement |  | PAN-3822 | Agents directory (tree/list/detail) + registration door for plugin-spawned workers + spawn-and-wait primitive; needs PRD |
-| 341 | PAN-2839 | S | medium | ok |  |  | plan→work autoSpawn now 500s with a duplicated workspace prep |
-| 342 | PAN-2824 | S | medium | ok |  |  | pan review pending dies when one project's lens gather fails (non-degrading caller; PAN-2820 class) |
-| 343 | PAN-2792 | S | medium | ok |  |  | Orphan-process sweeps killed the dashboard and live conversations via lsof +D over Bun-hardlinked node_modules |
-| 344 | PAN-2761 | S | medium | ok |  |  | done.test.ts asserts a hardcoded URL without stubbing env, so it fails in any agent shell with OVERDECK_DASHBOARD_URL set and looks lik… |
-| 345 | PAN-2738 | S | medium | ok |  |  | strikes deadlock |
-| 346 | PAN-2717 | S | medium | ok |  |  | conversation permission waits missing from Awareness; strengthen alert pulse |
-| 347 | PAN-2697 | S | medium | ok |  |  | First-review codex parents enter discovery mode and the supervisor session no-ops every discovery-ready signal |
-| 348 | PAN-2696 | XS | medium | needs-refinement |  |  | Task views still speak beads vocabulary |
-| 349 | PAN-2691 | S | medium | ok |  |  | Auto-planned issues park silently when the post-finalize work spawn is gated (stack-unhealthy 422) |
-| 350 | PAN-2686 | XS | medium | needs-refinement |  |  | Policy strip "restart pending" badge never clears after restart-fresh with a new model (record.model is sticky) |
-| 351 | PAN-3701 | L | high | ok |  |  | Four separate first-party LLM client stacks; consolidate onto effect/unstable/ai LanguageModel + ExecutionPlan. PRD written. |
-| 352 | PAN-3090 | M | high | ok |  |  | Simple issue page opens with a 55KB raw kickoff prompt and hides the pending question the operator actually has to answer. |
-| 353 | PAN-2672 | S | medium | ok |  |  | Post-/clear siblings render the same original transcript (per-tmux resolution + frozen launcher pin + null claude_session_id) |
-| 354 | PAN-2670 | S | medium | ok |  |  | Gate the dashboard-server tsconfig in npm run typecheck |
-| 355 | PAN-2664 | S | medium | ok |  |  | auto-commit completes unresolved merge with conflict markers |
-| 356 | PAN-2663 | S | medium | ok |  |  | health probe can accept old dashboard after replacement EADDRINUSE |
-| 357 | PAN-2649 | S | medium | ok |  |  | Ctrl+K conversation search indexes Claude transcripts only |
-| 358 | PAN-2580 | S | medium | ok |  |  | pan tell cannot deliver to codex (GPT) conversations |
-| 359 | PAN-2572 | M | medium | ok |  |  | Noisy EBADENGINE + deprecation warnings on npx/npm install make a healthy install look broken |
-| 360 | PAN-2563 | S | medium | ok |  |  | npm-flavor desktop (npx @overdeck/desktop) lacks node_modules for the server's externalized deps |
-| 361 | PAN-2554 | S | medium | ok |  |  | clicking a project doesn't update the browser URL |
-| 362 | PAN-2550 | XS | medium | ok |  |  | npm test exits 0 despite root-suite failures |
-| 363 | PAN-2547 | S | medium | ok |  |  | pan restart --health-timeout parses seconds as milliseconds |
-| 364 | PAN-2546 | S | medium | ok |  |  | pan tell is codex-conversation-unaware |
-| 365 | PAN-3504 | XS | high | needs-refinement |  |  | Duplicate of PAN-3499 (parked.ts ProjectConfig.projectPath typecheck red on main); confirm landed and close one of the pair. |
-| 366 | PAN-3003 | XS | medium | ok |  |  | Generated launcher.sh files omit the OVERDECK_AGENT_ID export the PTY supervisor requires, so manual re-launch dies instantly. |
-| 367 | PAN-2501 | S | medium | ok |  |  | deleteResourceVenvEffect's HttpRouter.schemaParams call fails typecheck under the root tsconfig (masked by src/dashboard/** exclusion) |
-| 368 | PAN-2492 | S | medium | needs-refinement |  |  | pane-detected waits (rate-limit/session-resume) surface as 'needs you' but cannot be answered from the dashboard |
-| 369 | PAN-2491 | M | medium | ok |  |  | Migrate @xenova/transformers to @huggingface/transformers to eliminate silent npx install failures from sharp 0.32 postinstall |
-| 370 | PAN-2489 | S | medium | ok |  |  | strike agents are invisible in the project issue tree |
-| 371 | PAN-2465 | S | medium | ok |  |  | pan done's PR lookup fails at MYN polyrepo root |
-| 372 | PAN-2454 | S | medium | ok |  |  | ratchet audit fails per-commit on push ranges whose NET baseline delta is zero |
-| 373 | PAN-2428 | XS | medium | ok |  |  | MYN workspace Traefik routing broken post-rebrand |
-| 374 | PAN-2423 | XS | medium | ok |  |  | pan workspace rebuild hardcodes 'overdeck-' compose project prefix |
-| 375 | PAN-2416 | S | medium | ok |  |  | codex agents can wedge on the Codex CLI first-run/consent screen |
-| 376 | PAN-2408 | S | medium | needs-refinement |  |  | pan start --auto commits the spec to main AFTER creating the worktree |
-| 377 | PAN-2395 | S | medium | ok |  |  | one invalid tiered_execution enum poisons every config read |
-| 378 | PAN-2381 | S | medium | ok |  |  | three event types missing from DomainEvent schema union poison the RPC stream |
-| 379 | PAN-2287 | S | medium | ok |  |  | every supervisor.log line written twice |
-| 380 | PAN-3661 | XS | medium | ok |  |  | Secure review-mode dispatch dropped the HTTP-200 semantic-rejection surface; two frontend tests fail locally while CI stays green. |
-| 381 | PAN-3288 | XS | medium | ok |  |  | Dev-checkout preflight: after a git pull that adds a dep, the CLI dies with ERR_MODULE_NOT_FOUND instead of saying 'run bun install'. |
-| 382 | PAN-3164 | XS | medium | ok |  |  | probeUatStack reports readiness from container count, so the UI offers 'Open UAT frontend' while the API is still resolving Maven deps. |
-| 383 | PAN-3121 | S | medium | ok |  |  | The failed-send outbox never reconciles against the transcript, so a delivered message keeps a Retry twin that would double-send. |
-| 384 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
-| 385 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
-| 386 | PAN-3911 | S | medium | needs-refinement |  |  | Issue pause did not stop review convoys; the stranded-review re-dispatch that resumed them was deleted by the cut — re-verify |
-| 387 | PAN-3915 | S | medium | ok |  |  | resume-kimi-code test writes a real transcript under ~/.claude; watcher indexes the deleted file and ENOENT sticks in health |
-| 388 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
-| 389 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
-| 390 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
-| 391 | PAN-2186 | S | medium | needs-refinement |  |  | post-merge lifecycle can leave merged issues in-review and auto-merge rows stuck |
-| 392 | PAN-2069 | XS | medium | ok |  |  | caveman: follow-up gaps |
-| 393 | PAN-1918 | XS | medium | ok |  |  | full frontend vitest suite runs in no CI path |
-| 394 | PAN-1912 | XS | medium | ok |  |  | Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
-| 395 | PAN-1846 | S | medium | needs-refinement |  |  | unbounded log growth |
-| 396 | PAN-1830 | S | medium | ok |  |  | Reviewer stuck on gpt-5.5 rate-limit modal blocks REVIEWER_READY |
-| 397 | PAN-1816 | S | medium | ok |  |  | Scratch/UAT-lifecycle issues (PAN-18031) enter the real pipeline: kanban, review convoys, agent registry |
-| 398 | PAN-1795 | S | medium | ok |  |  | Codebase map bootstrapped in planning worktree is never promoted to main |
-| 399 | PAN-1774 | S | medium | ok |  |  | workspace server container crashloops when dist/dashboard/server.js is missing |
-| 400 | PAN-1769 | S | medium | ok |  |  | Supervisor echo-confirm false negative on long messages → triple-paste delivery (rewrite ×2 + tmux fallback); resumed-conv message stil… |
-| 401 | PAN-1761 | S | medium | ok |  |  | conversations endpoints fetched via relative /api path |
-| 402 | PAN-1755 | S | medium | ok |  |  | uat stuck-assembly cap (30m) kills slow-but-alive assemblies and leaves orphaned conflict agents racing the next generation |
-| 403 | PAN-3516 | XS | medium | ok |  |  | Repo .claude/skills holds stale duplicates of pan-handoff, pan-flywheel and okf, so overdeck-dev sessions load outdated skill text. |
-| 404 | PAN-3455 | XS | medium | ok |  |  | cliproxy --version exits 2, so the up-to-date check always returns false and every ensure re-downloads the pinned release. |
-| 405 | PAN-3117 | XS | medium | ok |  |  | A deterministic 400 renders as the generic 'Failed to send' bubble with a Retry that can never succeed. |
-| 406 | PAN-3036 | XS | medium | ok |  |  | Pane-idle detection reads a completed strike's idle composer as a pending question, so a finished strike shows '! INPUT'. |
-| 407 | PAN-3016 | M | medium | ok |  |  | Operator ask: every view should be URL-addressable; cockpit tabs, stage panes and several drawers are still local state. |
-| 408 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
-| 409 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
-| 410 | PAN-1740 | XS | medium | needs-refinement |  |  | Deacon mislabels SIGTERM workspace container restarts as crashes |
-| 411 | PAN-1674 | S | medium | ok |  |  | TLDR .venv (~7.5G) is duplicated into every workspace |
-| 412 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
-| 413 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
-| 414 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
-| 415 | PAN-1627 | M | medium | ok |  |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-appr… |
-| 416 | PAN-1624 | S | medium | ok |  |  | pan handoff --author external: authored doc is socket_write-ten but never submitted |
-| 417 | PAN-3901 | S | medium | ok |  |  | test-skip gate has no audited exemption for opt-in live suites (skipIf on env/binary); allowlist row with justification |
-| 418 | PAN-3852 | S | medium | ok |  |  | Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping |
-| 419 | PAN-3862 | L | medium | needs-refinement |  |  | /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model |
-| 420 | PAN-1572 | M | medium | ok |  |  | Settings permission-mode can desync from resolved config |
-| 421 | PAN-1571 | S | medium | ok |  |  | Large multi-line pastes (handoff docs) land unsubmitted |
-| 422 | PAN-1565 | S | medium | ok |  |  | Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
-| 423 | PAN-1530 | S | medium | ok |  |  | Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
-| 424 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
-| 425 | PAN-1449 | S | medium | ok |  |  | PAN-1052 follow-up: memory extraction failing 59% on dogfood project + storage layout deviates from spec |
-| 426 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
-| 427 | PAN-1936 | M | medium | needs-refinement |  |  | Read consolidation is substantially advanced by the cut (derived-issue-state.ts); remaining work is tracked in PAN-3909 |
-| 428 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
-| 429 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
-| 430 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
-| 431 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
-| 432 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
-| 433 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
-| 434 | PAN-1440 | S | low | stale |  |  | bd export / dolt are gone; only a "never overwrite non-empty tracked state" concern would survive, now against .pan/ files |
-| 435 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
-| 436 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
-| 437 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
-| 438 | PAN-3974 | L | medium | ok |  | PAN-3937 | Companion TERMINAL runs `opencode attach` on the live ACP session/port from PAN-3937; establishes the seam PAN-3835 reuses |
-| 439 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
-| 440 | PAN-1244 | M | medium | ok |  |  | pan admin cloister start: CLI crashes with SIGSEGV (exit code 139) after handing off to server |
-| 441 | PAN-1227 | S | medium | needs-refinement |  |  | Substrate: bead can be closed without delivering the work |
-| 442 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
-| 443 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
-| 444 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
-| 445 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
-| 446 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
-| 447 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
-| 448 | PAN-3864 | M | medium | needs-refinement |  |  | /agents shows 183 STRIKE RUNNING for stopped strikes; cut made liveness live-read — re-verify what remains before building |
-| 449 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
-| 450 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
-| 451 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
-| 452 | PAN-1130 | S | medium | ok |  |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
-| 453 | PAN-1129 | S | medium | ok |  |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
-| 454 | PAN-1128 | S | medium | ok |  |  | Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
-| 455 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
-| 456 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
-| 457 | PAN-3938 | M | medium | needs-refinement |  |  | Run Muse Spark under Claude Code via cliproxy — only the paid Zen model is routable; free tier is OpenCode-client gated; needs credit… |
-| 458 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
-| 459 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
-| 460 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
-| 461 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
-| 462 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
-| 463 | PAN-778 | M | medium | ok |  |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
-| 464 | PAN-681 | S | medium | ok |  |  | Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
-| 465 | PAN-3732 | S | medium | ok |  |  | Codex handoff serializes a large rollout twice (~286MB peak RSS on 50MB); serialize once or stream. |
-| 466 | PAN-3700 | M | medium | ok |  |  | pan acp serve would let Zed and other ACP clients drive Overdeck conversations through canonical doors. PRD written. |
-| 467 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items sit unanchored in the requirement traceability graph. |
-| 468 | PAN-3132 | M | medium | ok |  |  | xBRIEF v0.9 agentic dispatch fields are half-adopted as a behavior accident; make difficulty/filesScope/verifyCommands a contract. |
-| 469 | PAN-3909 | M | medium | needs-refinement |  |  | One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains |
-| 470 | PAN-3893 | S | medium | ok |  |  | ACP conversations drop agent thoughts: no agent_thought_chunk case and no thought role in the transcript schema |
-| 471 | PAN-3831 | S | medium | ok |  |  | Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver) |
-| 472 | PAN-3867 | S | medium | ok |  |  | /projects/new discards keystrokes typed before the first resolve lands; add a delayed-resolve journey test |
-| 473 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
-| 474 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
-| 475 | PAN-3563 | S | medium | needs-refinement |  |  | pan unstick is gone; verify whether a spawned-but-never-briefed role agent can still read as running forever under liveness.ts |
-| 476 | PAN-1041 | M | medium | ok |  |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
-| 477 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
-| 478 | PAN-3770 | S | medium | ok |  |  | Codex conversations never show the working spinner mid-turn; parser marks every agent_message instantly complete. |
-| 479 | PAN-3731 | S | medium | ok |  |  | Restart-gate banner gives no feedback after approval; dead-requester approvals read as a broken button. |
-| 480 | PAN-3530 | S | medium | ok |  |  | Four God View components poll on 30s timers instead of the documented /ws/rpc event contract. |
-| 481 | PAN-3131 | L | medium | ok |  |  | Support xBRIEF planRef sharding so a 1.1MB/227-item plan stops making every finalize failure whole-plan-fatal. |
-| 482 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
-| 483 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
-| 484 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
-| 485 | PAN-3827 | S | medium | ok |  |  | Dashboard shows the empty welcome state instead of an error when the harness exits before writing a transcript |
-| 486 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
-| 487 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
-| 488 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
-| 489 | PAN-713 | M | medium | ok |  |  | test: add unit tests for doneCommand and approveCommand |
-| 490 | PAN-700 | M | medium | ok |  |  | Detachable terminal for conversation view |
-| 491 | PAN-646 | XS | medium | needs-refinement |  |  | Cancel no longer clears beads or a record; a Recover workflow now means reopening the tracker issue and re-planning |
-| 492 | PAN-532 | M | medium | ok |  |  | Per-project and per-issue model overrides for pipeline roles |
-| 493 | PAN-2896 | M | medium | ok |  |  | Warm resource-discovery and membership caches at boot |
-| 494 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
-| 495 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
-| 496 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
-| 497 | PAN-2609 | M | medium | ok |  |  | Cross-device sync of conversations and tasks via user-owned git remote |
-| 498 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
-| 499 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
-| 500 | PAN-2566 | L | medium | ok | ✓ |  | Triage list of genuine Traycer capability gaps; a container for child issues, not directly workable. |
-| 501 | PAN-2565 | M | medium | ok |  |  | Multi-agent conversations: N agent sessions in one task surface with agent-to-agent messaging |
-| 502 | PAN-3735 | S | medium | ok |  |  | Sandboxed pan CLI reports 'dashboard down, run pan up' when the real cause is no network; sends agents down the wrong path. |
-| 503 | PAN-3335 | XS | medium | ok |  |  | A pasted screenshot can't be viewed anywhere in the dashboard: thumbnail has no click handler and the sent form is a file-link chip. |
-| 504 | PAN-3054 | M | medium | ok |  |  | Benchmark matrix: run one template issue under N crew/model configurations and compare cost, wall-clock and outcome. |
-| 505 | PAN-2977 | M | medium | ok |  | PAN-2976 | Settings surface that detects installed ACP CLIs, renders the capability checklist, and guides login without a manual terminal. |
-| 506 | PAN-2557 | M | medium | ok |  |  | project-level 'Restart All' context action |
-| 507 | PAN-2553 | M | medium | ok |  |  | project-level CI visibility |
-| 508 | PAN-2521 | S | medium | ok |  |  | launch pipeline agents with harness rate-limit model-switch reminder disabled |
-| 509 | PAN-2493 | M | medium | ok |  |  | align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) |
-| 510 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
-| 511 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
-| 512 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
-| 513 | PAN-3863 | L | medium | ok |  | PAN-3762 | Orca-style SSH Hosts + Remote Servers onboarding; UX extension of the PAN-3762 federation model, not a competing design |
-| 514 | PAN-2444 | L | medium | ok |  | PAN-3942 | optional SageOx re-integration |
-| 515 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
-| 516 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
-| 517 | PAN-2409 | M | medium | ok |  |  | enforce the workspace boundary |
-| 518 | PAN-2392 | M | medium | needs-refinement |  |  | Standing Crew cost panel |
-| 519 | PAN-2335 | XS | medium | ok |  |  | chore: review the full open backlog for junk/stale/nonsensical issues |
-| 520 | PAN-2295 | L | medium | needs-refinement |  |  | built-in web browser surface (openable like terminal/Claude Code/Codex) + native Agentation integration |
-| 521 | PAN-3767 | S | medium | ok |  |  | Model switch could hang at 'Saving…'; onError toast landed, remaining work is reproducing the hang on a healthy server. |
-| 522 | PAN-3615 | S | medium | needs-refinement |  |  | TTS silent 9+ days from four stacked failures; three already fixed, only follow-ups remain — rescope to what is left. |
-| 523 | PAN-3558 | S | medium | ok |  |  | Subagent rail shows no model or provider, so mixed-model orchestration needs a transcript open per row to see what it is running. |
-| 524 | PAN-3469 | S | medium | ok |  |  | NewProjectModal violates the PAN-3410 page-not-modal doctrine; migrate the create-project flow to a routed page. |
-| 525 | PAN-3333 | M | medium | ok |  |  | Model pickers show $/1M, which says nothing under a subscription; show relative plan-quota drain among sibling models. |
-| 526 | PAN-3058 | M | medium | ok |  |  | Ship named crew presets that populate the whole tiered_execution block so operators don't hand-build the crew table. |
-| 527 | PAN-2288 | L | medium | ok |  |  | tmux managed-server: lossless auto-migration of dirty-founded servers + boot-time ensure call |
-| 528 | PAN-2065 | M | medium | ok |  |  | unified usage & headroom panel across all provider plans (z.ai, Anthropic, Codex, OpenRouter) |
-| 529 | PAN-2035 | M | medium | ok |  |  | ohmypi: GitHub Copilot subscription provider routing via omp |
-| 530 | PAN-2034 | M | medium | ok |  |  | ohmypi: end-to-end test that tool-call steps render in Conversation panel |
-| 531 | PAN-2033 | M | medium | ok |  |  | ohmypi: benchmark FIFO vs paste-buffer message delivery latency |
-| 532 | PAN-2032 | M | medium | ok |  |  | ohmypi: local Ollama model as zero-cost preliminary review role |
-| 533 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
-| 534 | PAN-2030 | M | medium | ok |  |  | ohmypi: version-pin extension in package.json and pan doctor mismatch warning |
-| 535 | PAN-2029 | M | medium | ok |  |  | ohmypi: capture kimi thinking_tokens in ohmypi-parser for complete cost accounting |
-| 536 | PAN-2028 | M | medium | ok |  |  | ohmypi: per-provider cost grouping in cost dashboard |
-| 537 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
-| 538 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
-| 539 | PAN-2024 | XS | medium | ok |  |  | ohmypi: frontend Tools-toggle for conversation view |
-| 540 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
-| 541 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
-| 542 | PAN-3739 | S | medium | ok |  |  | cost-reconcile re-warns every model-less codex subthread rollout on every sweep; log flood grows without bound. |
-| 543 | PAN-3835 | M | medium | needs-refinement |  | PAN-3974 | Attach the native Codex terminal UI to a running app-server thread; no native attach endpoint exists — investigate first |
-| 544 | PAN-1985 | M | medium | ok |  |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
-| 545 | PAN-1968 | M | medium | ok |  |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
-| 546 | PAN-1967 | M | medium | needs-refinement |  |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
-| 547 | PAN-1965 | M | medium | ok |  |  | Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
-| 548 | PAN-1937 | M | medium | ok |  |  | feat: data export |
-| 549 | PAN-1926 | M | medium | ok |  |  | --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
-| 550 | PAN-1916 | M | medium | ok |  |  | configurable web search providers (Exa, Tavily, Brave, Perplexity) |
-| 551 | PAN-1854 | M | medium | ok |  |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
-| 552 | PAN-1853 | M | medium | ok |  |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
-| 553 | PAN-1852 | XS | medium | ok |  |  | Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
-| 554 | PAN-1844 | M | medium | ok |  |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
-| 555 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
-| 556 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
-| 557 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
-| 558 | PAN-3706 | L | medium | ok |  |  | Broadsheet shipped typography only; color, surface, elevation and texture still on Ledger values, so it doesn't read like Subspace. |
-| 559 | PAN-3539 | XS | medium | needs-refinement |  |  | OOMPolicy=continue fix landed with the issue; re-scope to whatever hardening remains or close it out. |
-| 560 | PAN-3502 | XS | medium | needs-refinement |  |  | tiered-crews blendedCost expectation stale vs pricing catalog; likely already fixed by the PAN-3532 cherry-pick — verify. |
-| 561 | PAN-3837 | S | medium | needs-refinement |  |  | Stale starting placeholder can no longer occur; remaining half = per-issue fs-lock contention kills auto-handoff spawn with no retry |
-| 562 | PAN-3499 | XS | medium | needs-refinement |  |  | Same one-line ProjectConfig.path fix as PAN-3504; confirm it landed on main and close the duplicate. |
-| 563 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
-| 564 | PAN-3912 | XS | medium | ok |  |  | pan restart accepts a stray positional (pan restart status) and files a real restart request; reject excess args |
-| 565 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
-| 566 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
-| 567 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
-| 568 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
-| 569 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate |
-| 570 | PAN-1685 | XS | medium | ok |  |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
-| 571 | PAN-1676 | M | medium | ok |  |  | harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots) |
-| 572 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
-| 573 | PAN-1657 | M | medium | ok |  |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
-| 574 | PAN-1656 | M | medium | ok |  |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
-| 575 | PAN-1655 | M | medium | ok |  |  | Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
-| 576 | PAN-1654 | XS | medium | ok |  |  | run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
-| 577 | PAN-1653 | XS | medium | ok |  |  | batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
-| 578 | PAN-1623 | M | medium | ok |  |  | Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
-| 579 | PAN-1561 | M | medium | ok |  |  | feat: Project-scoped dashboard nav (deck of tabs per project + conversations/tree column + activity feed) |
-| 580 | PAN-1550 | M | medium | ok |  |  | feat: FilesPane + BrowserPane |
-| 581 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
-| 582 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
-| 583 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
-| 584 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
-| 585 | PAN-1485 | M | medium | ok |  |  | Auto-archive stale conversations: pre-archive warning at 7 days, archive at 10 days, configurable |
-| 586 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
-| 587 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
-| 588 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
-| 589 | PAN-1432 | M | medium | ok |  |  | Merge agent leaves packages/contracts/dist stale |
-| 590 | PAN-1223 | M | medium | ok |  |  | Auto-update for users in the field (npm + desktop binaries) |
-| 591 | PAN-1165 | M | medium | ok |  |  | Lightweight review path for small/trivial PRs |
-| 592 | PAN-1151 | XS | medium | ok |  |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
-| 593 | PAN-3684 | XS | medium | ok |  | PAN-1641 | Temporary acceptance issue: spawn a Pi work agent on ollama:gemma4:12b and record evidence |
-| 594 | PAN-1060 | M | medium | ok |  |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
-| 595 | PAN-1051 | M | medium | ok |  |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
-| 596 | PAN-1037 | M | medium | ok |  |  | Retire 'planning-' tmux prefix |
-| 597 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
-| 598 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
-| 599 | PAN-3157 | XS | medium | needs-refinement |  |  | Flywheel is now a plain conversation; re-scope as conversation-labeling UX so the Awareness feed names it instead of "No messages yet" |
-| 600 | PAN-3955 | XS | low | ok |  |  | configuration/auto-merge.mdx documents the dead pan flywheel config CLI and /api/flywheel/* endpoints; sweep to /api/merge-train/* |
-| 601 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
-| 602 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
-| 603 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
-| 604 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
-| 605 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
-| 606 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
-| 607 | PAN-736 | M | medium | ok |  |  | feat: wire per-subagent model overrides from settings to Claude Code spawn env |
-| 608 | PAN-3322 | XS | medium | ok |  |  | launcher-generator.ts's file-size ceiling sits 126 lines above the real file, handing back the regrowth the ratchet exists to prevent. |
-| 609 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
-| 610 | PAN-675 | M | medium | needs-refinement |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
-| 611 | PAN-654 | L | medium | ok |  |  | Project Setup Wizard |
-| 612 | PAN-649 | M | medium | ok |  |  | Render Excalidraw drawings inline in Claude Code conversations |
-| 613 | PAN-637 | XS | medium | ok |  |  | Direct issue kickoff (skip planning) from dashboard UI |
-| 614 | PAN-629 | M | medium | ok |  |  | Workspace quotas and resource governance |
-| 615 | PAN-613 | M | medium | needs-refinement |  |  | Investigate thinking effort levels for agents |
-| 616 | PAN-607 | M | medium | needs-refinement |  |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
-| 617 | PAN-606 | M | medium | needs-refinement |  |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
-| 618 | PAN-548 | M | medium | ok |  |  | Command Deck: preserve state across navigation including URL routing for tabs |
-| 619 | PAN-546 | M | medium | ok |  |  | Remove claude-code-router |
-| 620 | PAN-537 | M | medium | ok |  |  | feat: show changed files diff summary after each agent response in activity view |
-| 621 | PAN-531 | XS | medium | ok |  |  | PAN: Windows Electron support (WSL2 required) |
-| 622 | PAN-452 | M | medium | ok |  |  | Conversation input bar |
-| 623 | PAN-450 | M | medium | ok |  |  | Adopt remaining Effect patterns |
-| 624 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
-| 625 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
-| 626 | PAN-3441 | L | low | ok |  |  | God View 'River' WebGL pipeline visualization fed by the live hook-event stream; PRD and mockup exist. |
-| 627 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
-| 628 | PAN-2941 | M | low | ok |  |  | OKF v3 |
-| 629 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
-| 630 | PAN-2922 | M | low | ok |  |  | Reduce accidental orchestration complexity after performance stabilization |
-| 631 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
-| 632 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
-| 633 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
-| 634 | PAN-2662 | M | low | ok |  |  | Add project context-menu actions scoped to issues currently in the pipeline |
-| 635 | PAN-2645 | M | low | ok |  |  | Add opt-in Observation-first conversation view |
-| 636 | PAN-2635 | XS | low | ok |  |  | pay down the 152-error src/dashboard/server typecheck debt |
-| 637 | PAN-2630 | M | low | ok |  |  | pan binary not on PATH for operator shells or spawned work agents; pan doctor can't be run to diagnose it |
-| 638 | PAN-2629 | M | low | ok |  |  | pan start kickoff delivery never lands: "Claude Code did not become ready within 30s" (both attempts), agent sits idle at empty prompt |
-| 639 | PAN-3443 | L | low | ok |  |  | God View 'Spectrum Deck' visualizer concept with mockup and PRD; pure exploration, no substrate impact. |
-| 640 | PAN-3958 | XL | medium | ok |  | PAN-3959 | Parked: bloat cut — undo Effect façades (49 sites), delete ~400 sync/async twins, collapse duplicate harness adapters; audit first |
-| 641 | PAN-2628 | M | low | ok |  |  | pan close aborts at close-issue:transition: "No tracker available and cannot determine issue type" for GitHub-tracker project |
-| 642 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
-| 643 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
-| 644 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
-| 645 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
-| 646 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
-| 647 | PAN-2507 | M | low | stale |  |  | Patrol-deferred reserve-capacity dispatch model this preempts is gone; re-target deacon-lite dispatch if the need survives |
-| 648 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
-| 649 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
-| 650 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
-| 651 | PAN-3940 | XL | low | ok | ✓ |  | Parked epic: event-driven plugin/hook system on pipeline-notifier + hygiene-scheduler; do not pick up until the journal has soaked |
-| 652 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
-| 653 | PAN-2406 | M | low | needs-refinement |  |  | Bug 1 (record-only deltas) is moot post-cut; bugs 2-3 (slot/suffixed worktree teardown ordering) still need verifying |
-| 654 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
-| 655 | PAN-2356 | M | low | needs-refinement |  |  | Overdeck Anywhere P3: relay service |
-| 656 | PAN-2355 | M | low | needs-refinement |  |  | Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push) |
-| 657 | PAN-2354 | M | low | needs-refinement |  |  | Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later) |
-| 658 | PAN-2352 | M | low | needs-refinement |  |  | Overdeck Anywhere P1a: remote dashboard access via Cloudflare Tunnel + Access |
-| 659 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
-| 660 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
-| 661 | PAN-3011 | M | low | ok |  | PAN-1641, PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
-| 662 | PAN-3957 | L | low | ok |  |  | Parked: Overdeck-owned project memory in the repo replacing per-harness auto-memory; needs a PRD deciding the store location |
-| 663 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
-| 664 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
-| 665 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
-| 666 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
-| 667 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
-| 668 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
-| 669 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
-| 670 | PAN-2046 | M | low | ok |  |  | Conversation view does not surface terminal command responses |
-| 671 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
-| 672 | PAN-3919 | S | low | needs-refinement |  |  | Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized |
-| 673 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
-| 674 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
-| 675 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
-| 676 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
-| 677 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
-| 678 | PAN-1980 | M | low | needs-refinement |  |  | Session rotation on resume is gone with compaction state; the "one pipeline-membership view" half may still apply to pipeline-membership.ts |
-| 679 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 680 | PAN-1949 | M | low | needs-refinement |  |  | Surface inspection sub-runs in the issue tree + a parent Inspection node aggregating all item verdicts |
-| 681 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
-| 682 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
-| 683 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
-| 684 | PAN-1782 | M | low | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout |
-| 685 | PAN-1773 | M | low | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
-| 686 | PAN-1646 | M | low | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
-| 687 | PAN-1643 | M | low | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
-| 688 | PAN-1592 | M | low | ok |  |  | Composer: make ephemeral composer state reload-durable (pasted images + unsent/failed message text) |
-| 689 | PAN-1581 | M | low | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
-| 690 | PAN-1552 | M | low | ok |  |  | Dashboard conversation-message 500 cause is unloggable: serve mode never writes dashboard.log |
-| 691 | PAN-1533 | M | low | ok |  |  | Fork-into-worktree from conversation branch chip |
-| 692 | PAN-1483 | XS | low | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
-| 693 | PAN-1482 | M | low | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
-| 694 | PAN-1481 | M | low | ok |  |  | Add cost-event telemetry for Caveman token savings |
-| 695 | PAN-1356 | M | low | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
-| 696 | PAN-1242 | M | low | ok |  |  | Create a new issue directly from a kanban column |
-| 697 | PAN-1222 | M | low | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
-| 698 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
-| 699 | PAN-1166 | M | low | ok |  |  | Re-introduce /ws/terminal auth gate with a working bootstrap path |
-| 700 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
-| 701 | PAN-2667 | M | low | stale |  |  | beads-rollup admission signal is gone from resource discovery; if still wanted, source it from xBRIEF item completion instead |
-| 702 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
-| 703 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
-| 704 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
-| 705 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
-| 706 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
-| 707 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
-| 708 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
-| 709 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
-| 710 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
+| 308 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
+| 309 | PAN-2079 | M | high | needs-refinement |  |  | Inbox spine: boot reconciliation (producer #1) is gone; may still be worth pursuing for pending AUQ, cost alerts and other producers |
+| 310 | PAN-3934 | S | medium | ok |  | PAN-3929 | roles/*.md and two docs still name deleted status fields outside the guard's Markdown roots; follow-up to PAN-3929 |
+| 311 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
+| 312 | PAN-1209 | S | low | stale |  |  | bd/beads were removed earlier; any drift-detection concern now applies to xBRIEF item status, not bd state |
+| 313 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
+| 314 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
+| 315 | PAN-1454 | M | high | ok |  |  | [META] 9 systemic failure patterns surfaced by 80-issue audit |
+| 316 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
+| 317 | PAN-1504 | M | high | ok |  |  | pan hygiene |
+| 318 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
+| 319 | PAN-1479 | M | high | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
+| 320 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
+| 321 | PAN-2836 | M | high | ok |  |  | okf: in-repo placement presets (okf/, docs/okf/) and /okf migrate to switch placements later |
+| 322 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
+| 323 | PAN-2650 | L | high | ok |  |  | Swarm final ready-to-merge slot wedges when memory-governor sheds the integration stack; pan swarm recover can't recover it |
+| 324 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
+| 325 | PAN-2334 | XS | high | ok |  |  | write a Definition of Ready (DoR) |
+| 326 | PAN-2308 | M | high | needs-refinement |  |  | Compose-file port migration off 3011 still valid; the deacon-quarantine half references the deleted patrol loop — verify an equivalent guard |
+| 327 | PAN-2193 | S | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree |
+| 328 | PAN-1984 | XS | high | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
+| 329 | PAN-1913 | XS | high | ok |  |  | Project description: show on click, edit in dashboard, mirror into the project layer (and document what's in .pan and ~/.panopticon) |
+| 330 | PAN-1906 | M | high | ok |  |  | Enforce harness restrictions with subscription: gray out non-claude-code, validate everywhere |
+| 331 | PAN-1544 | M | high | ok |  |  | Type cleanup: strip 'ship' from the Role union and its ~10 downstream references |
+| 332 | PAN-955 | S | high | ok |  |  | Workspace devcontainer template versioning + re-render on demand |
+| 333 | PAN-807 | L | high | ok |  |  | Epic C: Workspace state sanity on spawn |
+| 334 | PAN-630 | M | high | ok |  |  | Multi-tenant workspace isolation with ACLs |
+| 335 | PAN-471 | M | high | ok |  |  | Cost reconciler: auto-trigger on agent lifecycle events with debounce |
+| 336 | PAN-438 | M | high | ok |  |  | Migrate remaining REST polling endpoints to Effect RPC |
+| 337 | PAN-578 | M | high | ok |  |  | Security: Comment mediation layer to prevent prompt injection via tracker comments |
+| 338 | PAN-2921 | S | medium | ok |  |  | Strike merge door can report fetch failure after merge and land the same head twice |
+| 339 | PAN-3920 | L | medium | needs-refinement |  | PAN-3822 | Agents directory (tree/list/detail) + registration door for plugin-spawned workers + spawn-and-wait primitive; needs PRD |
+| 340 | PAN-2839 | S | medium | ok |  |  | plan→work autoSpawn now 500s with a duplicated workspace prep |
+| 341 | PAN-2824 | S | medium | ok |  |  | pan review pending dies when one project's lens gather fails (non-degrading caller; PAN-2820 class) |
+| 342 | PAN-2792 | S | medium | ok |  |  | Orphan-process sweeps killed the dashboard and live conversations via lsof +D over Bun-hardlinked node_modules |
+| 343 | PAN-2761 | S | medium | ok |  |  | done.test.ts asserts a hardcoded URL without stubbing env, so it fails in any agent shell with OVERDECK_DASHBOARD_URL set and looks lik… |
+| 344 | PAN-2738 | S | medium | ok |  |  | strikes deadlock |
+| 345 | PAN-2717 | S | medium | ok |  |  | conversation permission waits missing from Awareness; strengthen alert pulse |
+| 346 | PAN-2697 | S | medium | ok |  |  | First-review codex parents enter discovery mode and the supervisor session no-ops every discovery-ready signal |
+| 347 | PAN-2696 | XS | medium | needs-refinement |  |  | Task views still speak beads vocabulary |
+| 348 | PAN-2691 | S | medium | ok |  |  | Auto-planned issues park silently when the post-finalize work spawn is gated (stack-unhealthy 422) |
+| 349 | PAN-2686 | XS | medium | needs-refinement |  |  | Policy strip "restart pending" badge never clears after restart-fresh with a new model (record.model is sticky) |
+| 350 | PAN-3701 | L | high | ok |  |  | Four separate first-party LLM client stacks; consolidate onto effect/unstable/ai LanguageModel + ExecutionPlan. PRD written. |
+| 351 | PAN-3090 | M | high | ok |  |  | Simple issue page opens with a 55KB raw kickoff prompt and hides the pending question the operator actually has to answer. |
+| 352 | PAN-2672 | S | medium | ok |  |  | Post-/clear siblings render the same original transcript (per-tmux resolution + frozen launcher pin + null claude_session_id) |
+| 353 | PAN-2670 | S | medium | ok |  |  | Gate the dashboard-server tsconfig in npm run typecheck |
+| 354 | PAN-2664 | S | medium | ok |  |  | auto-commit completes unresolved merge with conflict markers |
+| 355 | PAN-2663 | S | medium | ok |  |  | health probe can accept old dashboard after replacement EADDRINUSE |
+| 356 | PAN-2649 | S | medium | ok |  |  | Ctrl+K conversation search indexes Claude transcripts only |
+| 357 | PAN-2580 | S | medium | ok |  |  | pan tell cannot deliver to codex (GPT) conversations |
+| 358 | PAN-2572 | M | medium | ok |  |  | Noisy EBADENGINE + deprecation warnings on npx/npm install make a healthy install look broken |
+| 359 | PAN-2563 | S | medium | ok |  |  | npm-flavor desktop (npx @overdeck/desktop) lacks node_modules for the server's externalized deps |
+| 360 | PAN-2554 | S | medium | ok |  |  | clicking a project doesn't update the browser URL |
+| 361 | PAN-2550 | XS | medium | ok |  |  | npm test exits 0 despite root-suite failures |
+| 362 | PAN-2547 | S | medium | ok |  |  | pan restart --health-timeout parses seconds as milliseconds |
+| 363 | PAN-2546 | S | medium | ok |  |  | pan tell is codex-conversation-unaware |
+| 364 | PAN-3504 | XS | high | needs-refinement |  |  | Duplicate of PAN-3499 (parked.ts ProjectConfig.projectPath typecheck red on main); confirm landed and close one of the pair. |
+| 365 | PAN-3003 | XS | medium | ok |  |  | Generated launcher.sh files omit the OVERDECK_AGENT_ID export the PTY supervisor requires, so manual re-launch dies instantly. |
+| 366 | PAN-2501 | S | medium | ok |  |  | deleteResourceVenvEffect's HttpRouter.schemaParams call fails typecheck under the root tsconfig (masked by src/dashboard/** exclusion) |
+| 367 | PAN-2492 | S | medium | needs-refinement |  |  | pane-detected waits (rate-limit/session-resume) surface as 'needs you' but cannot be answered from the dashboard |
+| 368 | PAN-2491 | M | medium | ok |  |  | Migrate @xenova/transformers to @huggingface/transformers to eliminate silent npx install failures from sharp 0.32 postinstall |
+| 369 | PAN-2489 | S | medium | ok |  |  | strike agents are invisible in the project issue tree |
+| 370 | PAN-2465 | S | medium | ok |  |  | pan done's PR lookup fails at MYN polyrepo root |
+| 371 | PAN-2454 | S | medium | ok |  |  | ratchet audit fails per-commit on push ranges whose NET baseline delta is zero |
+| 372 | PAN-2428 | XS | medium | ok |  |  | MYN workspace Traefik routing broken post-rebrand |
+| 373 | PAN-2423 | XS | medium | ok |  |  | pan workspace rebuild hardcodes 'overdeck-' compose project prefix |
+| 374 | PAN-2416 | S | medium | ok |  |  | codex agents can wedge on the Codex CLI first-run/consent screen |
+| 375 | PAN-2408 | S | medium | needs-refinement |  |  | pan start --auto commits the spec to main AFTER creating the worktree |
+| 376 | PAN-2395 | S | medium | ok |  |  | one invalid tiered_execution enum poisons every config read |
+| 377 | PAN-2381 | S | medium | ok |  |  | three event types missing from DomainEvent schema union poison the RPC stream |
+| 378 | PAN-2287 | S | medium | ok |  |  | every supervisor.log line written twice |
+| 379 | PAN-3661 | XS | medium | ok |  |  | Secure review-mode dispatch dropped the HTTP-200 semantic-rejection surface; two frontend tests fail locally while CI stays green. |
+| 380 | PAN-3288 | XS | medium | ok |  |  | Dev-checkout preflight: after a git pull that adds a dep, the CLI dies with ERR_MODULE_NOT_FOUND instead of saying 'run bun install'. |
+| 381 | PAN-3164 | XS | medium | ok |  |  | probeUatStack reports readiness from container count, so the UI offers 'Open UAT frontend' while the API is still resolving Maven deps. |
+| 382 | PAN-3121 | S | medium | ok |  |  | The failed-send outbox never reconciles against the transcript, so a delivered message keeps a Retry twin that would double-send. |
+| 383 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
+| 384 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
+| 385 | PAN-3911 | S | medium | needs-refinement |  |  | Issue pause did not stop review convoys; the stranded-review re-dispatch that resumed them was deleted by the cut — re-verify |
+| 386 | PAN-3915 | S | medium | ok |  |  | resume-kimi-code test writes a real transcript under ~/.claude; watcher indexes the deleted file and ENOENT sticks in health |
+| 387 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
+| 388 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
+| 389 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
+| 390 | PAN-2186 | S | medium | needs-refinement |  |  | post-merge lifecycle can leave merged issues in-review and auto-merge rows stuck |
+| 391 | PAN-2069 | XS | medium | ok |  |  | caveman: follow-up gaps |
+| 392 | PAN-1918 | XS | medium | ok |  |  | full frontend vitest suite runs in no CI path |
+| 393 | PAN-1912 | XS | medium | ok |  |  | Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
+| 394 | PAN-1846 | S | medium | needs-refinement |  |  | unbounded log growth |
+| 395 | PAN-1830 | S | medium | ok |  |  | Reviewer stuck on gpt-5.5 rate-limit modal blocks REVIEWER_READY |
+| 396 | PAN-1816 | S | medium | ok |  |  | Scratch/UAT-lifecycle issues (PAN-18031) enter the real pipeline: kanban, review convoys, agent registry |
+| 397 | PAN-1795 | S | medium | ok |  |  | Codebase map bootstrapped in planning worktree is never promoted to main |
+| 398 | PAN-1774 | S | medium | ok |  |  | workspace server container crashloops when dist/dashboard/server.js is missing |
+| 399 | PAN-1769 | S | medium | ok |  |  | Supervisor echo-confirm false negative on long messages → triple-paste delivery (rewrite ×2 + tmux fallback); resumed-conv message stil… |
+| 400 | PAN-1761 | S | medium | ok |  |  | conversations endpoints fetched via relative /api path |
+| 401 | PAN-1755 | S | medium | ok |  |  | uat stuck-assembly cap (30m) kills slow-but-alive assemblies and leaves orphaned conflict agents racing the next generation |
+| 402 | PAN-3516 | XS | medium | ok |  |  | Repo .claude/skills holds stale duplicates of pan-handoff, pan-flywheel and okf, so overdeck-dev sessions load outdated skill text. |
+| 403 | PAN-3455 | XS | medium | ok |  |  | cliproxy --version exits 2, so the up-to-date check always returns false and every ensure re-downloads the pinned release. |
+| 404 | PAN-3117 | XS | medium | ok |  |  | A deterministic 400 renders as the generic 'Failed to send' bubble with a Retry that can never succeed. |
+| 405 | PAN-3036 | XS | medium | ok |  |  | Pane-idle detection reads a completed strike's idle composer as a pending question, so a finished strike shows '! INPUT'. |
+| 406 | PAN-3016 | M | medium | ok |  |  | Operator ask: every view should be URL-addressable; cockpit tabs, stage panes and several drawers are still local state. |
+| 407 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
+| 408 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
+| 409 | PAN-1740 | XS | medium | needs-refinement |  |  | Deacon mislabels SIGTERM workspace container restarts as crashes |
+| 410 | PAN-1674 | S | medium | ok |  |  | TLDR .venv (~7.5G) is duplicated into every workspace |
+| 411 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
+| 412 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
+| 413 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
+| 414 | PAN-1627 | M | medium | ok |  |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-appr… |
+| 415 | PAN-1624 | S | medium | ok |  |  | pan handoff --author external: authored doc is socket_write-ten but never submitted |
+| 416 | PAN-3901 | S | medium | ok |  |  | test-skip gate has no audited exemption for opt-in live suites (skipIf on env/binary); allowlist row with justification |
+| 417 | PAN-3852 | S | medium | ok |  |  | Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping |
+| 418 | PAN-3862 | L | medium | needs-refinement |  |  | /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model |
+| 419 | PAN-1572 | M | medium | ok |  |  | Settings permission-mode can desync from resolved config |
+| 420 | PAN-1571 | S | medium | ok |  |  | Large multi-line pastes (handoff docs) land unsubmitted |
+| 421 | PAN-1565 | S | medium | ok |  |  | Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
+| 422 | PAN-1530 | S | medium | ok |  |  | Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
+| 423 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
+| 424 | PAN-1449 | S | medium | ok |  |  | PAN-1052 follow-up: memory extraction failing 59% on dogfood project + storage layout deviates from spec |
+| 425 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
+| 426 | PAN-1936 | M | medium | needs-refinement |  |  | Read consolidation is substantially advanced by the cut (derived-issue-state.ts); remaining work is tracked in PAN-3909 |
+| 427 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
+| 428 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
+| 429 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
+| 430 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
+| 431 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
+| 432 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
+| 433 | PAN-1440 | S | low | stale |  |  | bd export / dolt are gone; only a "never overwrite non-empty tracked state" concern would survive, now against .pan/ files |
+| 434 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
+| 435 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
+| 436 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
+| 437 | PAN-3974 | L | medium | ok |  | PAN-3937 | Companion TERMINAL runs `opencode attach` on the live ACP session/port from PAN-3937; establishes the seam PAN-3835 reuses |
+| 438 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
+| 439 | PAN-1244 | M | medium | ok |  |  | pan admin cloister start: CLI crashes with SIGSEGV (exit code 139) after handing off to server |
+| 440 | PAN-1227 | S | medium | needs-refinement |  |  | Substrate: bead can be closed without delivering the work |
+| 441 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
+| 442 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
+| 443 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
+| 444 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
+| 445 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
+| 446 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
+| 447 | PAN-3864 | M | medium | needs-refinement |  |  | /agents shows 183 STRIKE RUNNING for stopped strikes; cut made liveness live-read — re-verify what remains before building |
+| 448 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
+| 449 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
+| 450 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
+| 451 | PAN-1130 | S | medium | ok |  |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
+| 452 | PAN-1129 | S | medium | ok |  |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
+| 453 | PAN-1128 | S | medium | ok |  |  | Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
+| 454 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
+| 455 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
+| 456 | PAN-3938 | M | medium | needs-refinement |  |  | Run Muse Spark under Claude Code via cliproxy — only the paid Zen model is routable; free tier is OpenCode-client gated; needs credit… |
+| 457 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
+| 458 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
+| 459 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
+| 460 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
+| 461 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
+| 462 | PAN-778 | M | medium | ok |  |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
+| 463 | PAN-681 | S | medium | ok |  |  | Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
+| 464 | PAN-3732 | S | medium | ok |  |  | Codex handoff serializes a large rollout twice (~286MB peak RSS on 50MB); serialize once or stream. |
+| 465 | PAN-3700 | M | medium | ok |  |  | pan acp serve would let Zed and other ACP clients drive Overdeck conversations through canonical doors. PRD written. |
+| 466 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items sit unanchored in the requirement traceability graph. |
+| 467 | PAN-3132 | M | medium | ok |  |  | xBRIEF v0.9 agentic dispatch fields are half-adopted as a behavior accident; make difficulty/filesScope/verifyCommands a contract. |
+| 468 | PAN-3909 | M | medium | needs-refinement |  |  | One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains |
+| 469 | PAN-3893 | S | medium | ok |  |  | ACP conversations drop agent thoughts: no agent_thought_chunk case and no thought role in the transcript schema |
+| 470 | PAN-3831 | S | medium | ok |  |  | Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver) |
+| 471 | PAN-3867 | S | medium | ok |  |  | /projects/new discards keystrokes typed before the first resolve lands; add a delayed-resolve journey test |
+| 472 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
+| 473 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
+| 474 | PAN-3563 | S | medium | needs-refinement |  |  | pan unstick is gone; verify whether a spawned-but-never-briefed role agent can still read as running forever under liveness.ts |
+| 475 | PAN-1041 | M | medium | ok |  |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
+| 476 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
+| 477 | PAN-3770 | S | medium | ok |  |  | Codex conversations never show the working spinner mid-turn; parser marks every agent_message instantly complete. |
+| 478 | PAN-3731 | S | medium | ok |  |  | Restart-gate banner gives no feedback after approval; dead-requester approvals read as a broken button. |
+| 479 | PAN-3530 | S | medium | ok |  |  | Four God View components poll on 30s timers instead of the documented /ws/rpc event contract. |
+| 480 | PAN-3131 | L | medium | ok |  |  | Support xBRIEF planRef sharding so a 1.1MB/227-item plan stops making every finalize failure whole-plan-fatal. |
+| 481 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
+| 482 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
+| 483 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
+| 484 | PAN-3827 | S | medium | ok |  |  | Dashboard shows the empty welcome state instead of an error when the harness exits before writing a transcript |
+| 485 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
+| 486 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
+| 487 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
+| 488 | PAN-713 | M | medium | ok |  |  | test: add unit tests for doneCommand and approveCommand |
+| 489 | PAN-700 | M | medium | ok |  |  | Detachable terminal for conversation view |
+| 490 | PAN-646 | XS | medium | needs-refinement |  |  | Cancel no longer clears beads or a record; a Recover workflow now means reopening the tracker issue and re-planning |
+| 491 | PAN-532 | M | medium | ok |  |  | Per-project and per-issue model overrides for pipeline roles |
+| 492 | PAN-2896 | M | medium | ok |  |  | Warm resource-discovery and membership caches at boot |
+| 493 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
+| 494 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
+| 495 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
+| 496 | PAN-2609 | M | medium | ok |  |  | Cross-device sync of conversations and tasks via user-owned git remote |
+| 497 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
+| 498 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
+| 499 | PAN-2566 | L | medium | ok | ✓ |  | Triage list of genuine Traycer capability gaps; a container for child issues, not directly workable. |
+| 500 | PAN-2565 | M | medium | ok |  |  | Multi-agent conversations: N agent sessions in one task surface with agent-to-agent messaging |
+| 501 | PAN-3735 | S | medium | ok |  |  | Sandboxed pan CLI reports 'dashboard down, run pan up' when the real cause is no network; sends agents down the wrong path. |
+| 502 | PAN-3335 | XS | medium | ok |  |  | A pasted screenshot can't be viewed anywhere in the dashboard: thumbnail has no click handler and the sent form is a file-link chip. |
+| 503 | PAN-3054 | M | medium | ok |  |  | Benchmark matrix: run one template issue under N crew/model configurations and compare cost, wall-clock and outcome. |
+| 504 | PAN-2977 | M | medium | ok |  | PAN-2976 | Settings surface that detects installed ACP CLIs, renders the capability checklist, and guides login without a manual terminal. |
+| 505 | PAN-2557 | M | medium | ok |  |  | project-level 'Restart All' context action |
+| 506 | PAN-2553 | M | medium | ok |  |  | project-level CI visibility |
+| 507 | PAN-2521 | S | medium | ok |  |  | launch pipeline agents with harness rate-limit model-switch reminder disabled |
+| 508 | PAN-2493 | M | medium | ok |  |  | align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) |
+| 509 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
+| 510 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
+| 511 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
+| 512 | PAN-3863 | L | medium | ok |  | PAN-3762 | Orca-style SSH Hosts + Remote Servers onboarding; UX extension of the PAN-3762 federation model, not a competing design |
+| 513 | PAN-2444 | L | medium | ok |  | PAN-3942 | optional SageOx re-integration |
+| 514 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
+| 515 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
+| 516 | PAN-2409 | M | medium | ok |  |  | enforce the workspace boundary |
+| 517 | PAN-2392 | M | medium | needs-refinement |  |  | Standing Crew cost panel |
+| 518 | PAN-2335 | XS | medium | ok |  |  | chore: review the full open backlog for junk/stale/nonsensical issues |
+| 519 | PAN-2295 | L | medium | needs-refinement |  |  | built-in web browser surface (openable like terminal/Claude Code/Codex) + native Agentation integration |
+| 520 | PAN-3767 | S | medium | ok |  |  | Model switch could hang at 'Saving…'; onError toast landed, remaining work is reproducing the hang on a healthy server. |
+| 521 | PAN-3615 | S | medium | needs-refinement |  |  | TTS silent 9+ days from four stacked failures; three already fixed, only follow-ups remain — rescope to what is left. |
+| 522 | PAN-3558 | S | medium | ok |  |  | Subagent rail shows no model or provider, so mixed-model orchestration needs a transcript open per row to see what it is running. |
+| 523 | PAN-3469 | S | medium | ok |  |  | NewProjectModal violates the PAN-3410 page-not-modal doctrine; migrate the create-project flow to a routed page. |
+| 524 | PAN-3333 | M | medium | ok |  |  | Model pickers show $/1M, which says nothing under a subscription; show relative plan-quota drain among sibling models. |
+| 525 | PAN-3058 | M | medium | ok |  |  | Ship named crew presets that populate the whole tiered_execution block so operators don't hand-build the crew table. |
+| 526 | PAN-2288 | L | medium | ok |  |  | tmux managed-server: lossless auto-migration of dirty-founded servers + boot-time ensure call |
+| 527 | PAN-2065 | M | medium | ok |  |  | unified usage & headroom panel across all provider plans (z.ai, Anthropic, Codex, OpenRouter) |
+| 528 | PAN-2035 | M | medium | ok |  |  | ohmypi: GitHub Copilot subscription provider routing via omp |
+| 529 | PAN-2034 | M | medium | ok |  |  | ohmypi: end-to-end test that tool-call steps render in Conversation panel |
+| 530 | PAN-2033 | M | medium | ok |  |  | ohmypi: benchmark FIFO vs paste-buffer message delivery latency |
+| 531 | PAN-2032 | M | medium | ok |  |  | ohmypi: local Ollama model as zero-cost preliminary review role |
+| 532 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
+| 533 | PAN-2030 | M | medium | ok |  |  | ohmypi: version-pin extension in package.json and pan doctor mismatch warning |
+| 534 | PAN-2029 | M | medium | ok |  |  | ohmypi: capture kimi thinking_tokens in ohmypi-parser for complete cost accounting |
+| 535 | PAN-2028 | M | medium | ok |  |  | ohmypi: per-provider cost grouping in cost dashboard |
+| 536 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
+| 537 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
+| 538 | PAN-2024 | XS | medium | ok |  |  | ohmypi: frontend Tools-toggle for conversation view |
+| 539 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
+| 540 | PAN-1995 | M | medium | ok |  |  | infra: set up smee webhook relay so merge-on-green + post-merge are reactive (not deacon-only) |
+| 541 | PAN-3739 | S | medium | ok |  |  | cost-reconcile re-warns every model-less codex subthread rollout on every sweep; log flood grows without bound. |
+| 542 | PAN-3835 | M | medium | needs-refinement |  | PAN-3974 | Attach the native Codex terminal UI to a running app-server thread; no native attach endpoint exists — investigate first |
+| 543 | PAN-1985 | M | medium | ok |  |  | Agent wipe-and-respawn family (work + review): harness/model switch + Complete work reset, with confirmation |
+| 544 | PAN-1968 | M | medium | ok |  |  | Finish local-domain rename: pan.localhost → overdeck.localhost |
+| 545 | PAN-1967 | M | medium | needs-refinement |  |  | Flywheel must re-validate (re-plan) pre-cutover plans before implementing them |
+| 546 | PAN-1965 | M | medium | ok |  |  | Project pipeline view: true-state buckets + lens reconciliation (pipeline as exception queue) |
+| 547 | PAN-1937 | M | medium | ok |  |  | feat: data export |
+| 548 | PAN-1926 | M | medium | ok |  |  | --big flag to lift strike's precision-only scope guard (operator-authorized larger strikes) |
+| 549 | PAN-1916 | M | medium | ok |  |  | configurable web search providers (Exa, Tavily, Brave, Perplexity) |
+| 550 | PAN-1854 | M | medium | ok |  |  | Define handoff strategy for large conversations: external vs source authoring + tail-biased read |
+| 551 | PAN-1853 | M | medium | ok |  |  | Surface a transcript-size warning on growing conversations (2 MB warn / 10 MB strong-nudge tiers) |
+| 552 | PAN-1852 | XS | medium | ok |  |  | Capability-tiered work-agent model selection: difficulty→capability-floor routing from benchmark-anchored eval data |
+| 553 | PAN-1844 | M | medium | ok |  |  | Deep-linkable Command Deck: reflect selected issue/agent in the browser URL + make activity notifications link to the specific view |
+| 554 | PAN-1840 | M | medium | ok |  |  | Add 'pan switch <id>' |
+| 555 | PAN-1839 | M | medium | ok |  |  | Settings → Providers: show each provider's default harness in the collapsed row (no expand needed) |
+| 556 | PAN-1776 | M | medium | ok |  |  | Hot-updatable message delivery: version-stamped supervisors + server-side delivery logic |
+| 557 | PAN-3706 | L | medium | ok |  |  | Broadsheet shipped typography only; color, surface, elevation and texture still on Ledger values, so it doesn't read like Subspace. |
+| 558 | PAN-3539 | XS | medium | needs-refinement |  |  | OOMPolicy=continue fix landed with the issue; re-scope to whatever hardening remains or close it out. |
+| 559 | PAN-3502 | XS | medium | needs-refinement |  |  | tiered-crews blendedCost expectation stale vs pricing catalog; likely already fixed by the PAN-3532 cherry-pick — verify. |
+| 560 | PAN-3837 | S | medium | needs-refinement |  |  | Stale starting placeholder can no longer occur; remaining half = per-issue fs-lock contention kills auto-handoff spawn with no retry |
+| 561 | PAN-3499 | XS | medium | needs-refinement |  |  | Same one-line ProjectConfig.path fix as PAN-3504; confirm it landed on main and close the duplicate. |
+| 562 | PAN-2978 | S | medium | ok |  | PAN-2976, PAN-2977 | Opt-in per-agent install recipes for ACP CLIs from the setup UI; deliberately separated for its supply-chain trust decision. |
+| 563 | PAN-3912 | XS | medium | ok |  |  | pan restart accepts a stray positional (pan restart status) and files a real restart request; reject excess args |
+| 564 | PAN-1754 | M | medium | ok |  |  | surface + edit the host claude CLI default model (~/.claude/settings.json) from the Settings page |
+| 565 | PAN-1751 | M | medium | ok |  |  | harness picker on every Settings → Roles row (plan/work/review/test/ship/strike), not just Flywheel |
+| 566 | PAN-1750 | M | medium | ok |  |  | UAT assembly/conflict agent |
+| 567 | PAN-1748 | M | medium | ok |  |  | reuse uat-assembly conflict resolutions across generations (rerere or resolution replay) |
+| 568 | PAN-1691 | M | medium | ok |  |  | conflict-aware merge train + on-demand UAT candidate |
+| 569 | PAN-1685 | XS | medium | ok |  |  | Show model capability icons in conversation dialogs + complete per-model vision (supportsImages) audit |
+| 570 | PAN-1676 | M | medium | ok |  |  | harden remote workspaces + `pan workspace move` local↔remote (scale-out / overflow slots) |
+| 571 | PAN-1667 | M | medium | ok |  |  | unify Agents + Resources into one issue-centric holistic view |
+| 572 | PAN-1657 | M | medium | ok |  |  | feat: one-off double-check reviews with a user-specified agent/harness + settings-managed default reviewer |
+| 573 | PAN-1656 | M | medium | ok |  |  | Skills page: make it a full management surface (browse, review, edit, scope, sync status) |
+| 574 | PAN-1655 | M | medium | ok |  |  | Skills: scope by audience AND by agent role (conversation/work/review/ship/plan/test), sync accordingly |
+| 575 | PAN-1654 | XS | medium | ok |  |  | run lint:skills from source via tsx, skip CLI dist build (salvaged from PAN-1615 workspace) |
+| 576 | PAN-1653 | XS | medium | ok |  |  | batch local embedding in buildDocsIndex (salvaged from PAN-1617 workspace) |
+| 577 | PAN-1623 | M | medium | ok |  |  | Codex: surface interactive approval prompts as conversation Q&A (like AskUserQuestion) |
+| 578 | PAN-1561 | M | medium | ok |  |  | feat: Project-scoped dashboard nav (deck of tabs per project + conversations/tree column + activity feed) |
+| 579 | PAN-1550 | M | medium | ok |  |  | feat: FilesPane + BrowserPane |
+| 580 | PAN-1545 | XS | medium | ok |  |  | New Terminal button |
+| 581 | PAN-1542 | XS | medium | ok |  |  | Spawn-refusal modal: render the three-button workflow on dirty-workspace 409 |
+| 582 | PAN-1524 | M | medium | ok |  |  | Slash command aliases: /handoff → /pan-handoff (and similar short forms) |
+| 583 | PAN-1490 | M | medium | ok |  |  | show each conversation's current git branch (port t3code BranchToolbar pattern) |
+| 584 | PAN-1485 | M | medium | ok |  |  | Auto-archive stale conversations: pre-archive warning at 7 days, archive at 10 days, configurable |
+| 585 | PAN-1473 | M | medium | ok |  |  | Dashboard conversation composer: refactor context indicator to mirror t3code (show cumulative + live separately) |
+| 586 | PAN-1443 | M | low | stale |  |  | Specs live directly under .pan/specs now; only check that no stale legacy files remain under docs/prds/ |
+| 587 | PAN-1442 | M | medium | ok |  |  | Follow-up to PAN-829: voice-sampler.html cleanup in pan-tts repo |
+| 588 | PAN-1432 | M | medium | ok |  |  | Merge agent leaves packages/contracts/dist stale |
+| 589 | PAN-1223 | M | medium | ok |  |  | Auto-update for users in the field (npm + desktop binaries) |
+| 590 | PAN-1165 | M | medium | ok |  |  | Lightweight review path for small/trivial PRs |
+| 591 | PAN-1151 | XS | medium | ok |  |  | Anthropic Enterprise auth: distinguish from consumer subscription for Pi+Anthropic harness gating |
+| 592 | PAN-3684 | XS | medium | ok |  | PAN-1641 | Temporary acceptance issue: spawn a Pi work agent on ollama:gemma4:12b and record evidence |
+| 593 | PAN-1060 | M | medium | ok |  |  | Self-modify permission handling: stop the interrupt loop without weakening the safety guard |
+| 594 | PAN-1051 | M | medium | ok |  |  | feat: Subspace-inspired alternate theme with Inter + JetBrains Mono |
+| 595 | PAN-1037 | M | medium | ok |  |  | Retire 'planning-' tmux prefix |
+| 596 | PAN-958 | M | medium | ok |  |  | Implement vBRIEF issue sync: migrate and reconcile GitHub issues into specification |
+| 597 | PAN-949 | M | medium | ok |  |  | feat: add conversation for project from sidebar |
+| 598 | PAN-3157 | XS | medium | needs-refinement |  |  | Flywheel is now a plain conversation; re-scope as conversation-labeling UX so the Awareness feed names it instead of "No messages yet" |
+| 599 | PAN-3955 | XS | low | ok |  |  | configuration/auto-merge.mdx documents the dead pan flywheel config CLI and /api/flywheel/* endpoints; sweep to /api/merge-train/* |
+| 600 | PAN-947 | M | medium | ok |  |  | feat: project management actions in unified sidebar |
+| 601 | PAN-938 | M | medium | ok |  |  | Fizzy visual pipeline |
+| 602 | PAN-903 | M | medium | ok |  |  | Detect ~/.claude.json corruption on startup and surface it in the dashboard |
+| 603 | PAN-902 | XS | medium | ok |  |  | Settings: add 'Run pan sync' button to configuration menu |
+| 604 | PAN-901 | XS | medium | ok |  |  | Settings: add Maintenance panel with Claude Code Organizer + Config Editor quick-launch |
+| 605 | PAN-818 | M | medium | ok |  |  | Make summary optional when forking conversations |
+| 606 | PAN-736 | M | medium | ok |  |  | feat: wire per-subagent model overrides from settings to Claude Code spawn env |
+| 607 | PAN-3322 | XS | medium | ok |  |  | launcher-generator.ts's file-size ceiling sits 126 lines above the real file, handing back the regrowth the ratchet exists to prevent. |
+| 608 | PAN-678 | M | medium | ok |  |  | pan work issue --auto: headless planning → agent handoff without interactive dialog |
+| 609 | PAN-675 | M | medium | needs-refinement |  |  | Deacon: detect API rate-limit events, surface on dashboard, auto-restart when window resets |
+| 610 | PAN-654 | L | medium | ok |  |  | Project Setup Wizard |
+| 611 | PAN-649 | M | medium | ok |  |  | Render Excalidraw drawings inline in Claude Code conversations |
+| 612 | PAN-637 | XS | medium | ok |  |  | Direct issue kickoff (skip planning) from dashboard UI |
+| 613 | PAN-629 | M | medium | ok |  |  | Workspace quotas and resource governance |
+| 614 | PAN-613 | M | medium | needs-refinement |  |  | Investigate thinking effort levels for agents |
+| 615 | PAN-607 | M | medium | needs-refinement |  |  | Evaluate Ultimate Bug Scanner (UBS) for verification gate |
+| 616 | PAN-606 | M | medium | needs-refinement |  |  | Evaluate MCP Agent Mail for inter-agent communication and file reservations |
+| 617 | PAN-548 | M | medium | ok |  |  | Command Deck: preserve state across navigation including URL routing for tabs |
+| 618 | PAN-546 | M | medium | ok |  |  | Remove claude-code-router |
+| 619 | PAN-537 | M | medium | ok |  |  | feat: show changed files diff summary after each agent response in activity view |
+| 620 | PAN-531 | XS | medium | ok |  |  | PAN: Windows Electron support (WSL2 required) |
+| 621 | PAN-452 | M | medium | ok |  |  | Conversation input bar |
+| 622 | PAN-450 | M | medium | ok |  |  | Adopt remaining Effect patterns |
+| 623 | PAN-1126 | M | medium | ok |  |  | Integrate TLDR summaries into review context manifest |
+| 624 | PAN-1066 | M | medium | ok |  |  | Complete PAN-1048 R5: retire dispatchParallelReview body and specialists.ts module |
+| 625 | PAN-3441 | L | low | ok |  |  | God View 'River' WebGL pipeline visualization fed by the live hook-event stream; PRD and mockup exist. |
+| 626 | PAN-2968 | M | low | ok |  |  | Adopt the interactive decision page as the default way to present operator decisions |
+| 627 | PAN-2941 | M | low | ok |  |  | OKF v3 |
+| 628 | PAN-2936 | M | low | ok |  |  | Handle loop.max_steps_exceeded: detect and nudge agents to continue instead of stranding them |
+| 629 | PAN-2922 | M | low | ok |  |  | Reduce accidental orchestration complexity after performance stabilization |
+| 630 | PAN-2868 | M | low | ok |  |  | Desktop window opens at fixed 1400×900 |
+| 631 | PAN-2767 | M | low | ok |  |  | Expose Codex app-server conversation controls in the dashboard |
+| 632 | PAN-2679 | M | low | ok |  |  | conv-lookup skill: resolve transcripts for codex and pi harness conversations |
+| 633 | PAN-2662 | M | low | ok |  |  | Add project context-menu actions scoped to issues currently in the pipeline |
+| 634 | PAN-2645 | M | low | ok |  |  | Add opt-in Observation-first conversation view |
+| 635 | PAN-2635 | XS | low | ok |  |  | pay down the 152-error src/dashboard/server typecheck debt |
+| 636 | PAN-2630 | M | low | ok |  |  | pan binary not on PATH for operator shells or spawned work agents; pan doctor can't be run to diagnose it |
+| 637 | PAN-2629 | M | low | ok |  |  | pan start kickoff delivery never lands: "Claude Code did not become ready within 30s" (both attempts), agent sits idle at empty prompt |
+| 638 | PAN-3443 | L | low | ok |  |  | God View 'Spectrum Deck' visualizer concept with mockup and PRD; pure exploration, no substrate impact. |
+| 639 | PAN-3958 | XL | medium | ok |  | PAN-3959 | Parked: bloat cut — undo Effect façades (49 sites), delete ~400 sync/async twins, collapse duplicate harness adapters; audit first |
+| 640 | PAN-2628 | M | low | ok |  |  | pan close aborts at close-issue:transition: "No tracker available and cannot determine issue type" for GitHub-tracker project |
+| 641 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
+| 642 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
+| 643 | PAN-2533 | XS | low | ok |  |  | UAT workspace magic-link login 502: Traefik picks unreachable panopticon IP for multi-homed fe/api |
+| 644 | PAN-2527 | M | low | ok |  |  | Harness selector should restrict OpenAI models to Claude Code only |
+| 645 | PAN-2514 | M | low | ok |  |  | Claude Code Traffic Inspector |
+| 646 | PAN-2507 | M | low | stale |  |  | Patrol-deferred reserve-capacity dispatch model this preempts is gone; re-target deacon-lite dispatch if the need survives |
+| 647 | PAN-2505 | M | low | ok |  |  | lint:circular reports new frontend cycles + stale baseline in chat/conversations components |
+| 648 | PAN-2504 | M | low | ok |  |  | Auto-relaunch npx @overdeck/core under a compatible Node 22+ instead of failing on old Node |
+| 649 | PAN-2449 | M | low | ok |  |  | start-planning: GITHUB_REPOS env shadows projects.yaml github_repo; unknown IDs fall through to Linear and plan the wrong issue |
+| 650 | PAN-3940 | XL | low | ok | ✓ |  | Parked epic: event-driven plugin/hook system on pipeline-notifier + hygiene-scheduler; do not pick up until the journal has soaked |
+| 651 | PAN-2424 | L | low | ok | ✓ |  | Epic: the Order Book |
+| 652 | PAN-2406 | M | low | needs-refinement |  |  | Bug 1 (record-only deltas) is moot post-cut; bugs 2-3 (slot/suffixed worktree teardown ordering) still need verifying |
+| 653 | PAN-2394 | M | low | ok |  |  | Incident: conv-* agent-dir cleanup destroyed ohmypi/codex conversation transcripts ("no saved history") |
+| 654 | PAN-2356 | M | low | needs-refinement |  |  | Overdeck Anywhere P3: relay service |
+| 655 | PAN-2355 | M | low | needs-refinement |  |  | Overdeck Anywhere P2: mobile PWA (Needs-You feed, conversation view, pipeline board, Web Push) |
+| 656 | PAN-2354 | M | low | needs-refinement |  |  | Overdeck Anywhere P1c: needs-you push notification bridge (ntfy first, Web Push later) |
+| 657 | PAN-2352 | M | low | needs-refinement |  |  | Overdeck Anywhere P1a: remote dashboard access via Cloudflare Tunnel + Access |
+| 658 | PAN-2353 | M | low | needs-refinement |  |  | Overdeck Anywhere P1b: Hermes external-agent bridge (scoped API + Fly 6PN) |
+| 659 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
+| 660 | PAN-3011 | M | low | ok |  | PAN-1641, PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
+| 661 | PAN-3957 | L | low | ok |  |  | Parked: Overdeck-owned project memory in the repo replacing per-harness auto-memory; needs a PRD deciding the store location |
+| 662 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
+| 663 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
+| 664 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
+| 665 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
+| 666 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
+| 667 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
+| 668 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
+| 669 | PAN-2046 | M | low | ok |  |  | Conversation view does not surface terminal command responses |
+| 670 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
+| 671 | PAN-3919 | S | low | needs-refinement |  |  | Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized |
+| 672 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
+| 673 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
+| 674 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
+| 675 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
+| 676 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
+| 677 | PAN-1980 | M | low | needs-refinement |  |  | Session rotation on resume is gone with compaction state; the "one pipeline-membership view" half may still apply to pipeline-membership.ts |
+| 678 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
+| 679 | PAN-1949 | M | low | needs-refinement |  |  | Surface inspection sub-runs in the issue tree + a parent Inspection node aggregating all item verdicts |
+| 680 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
+| 681 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
+| 682 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
+| 683 | PAN-1782 | M | low | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout |
+| 684 | PAN-1773 | M | low | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
+| 685 | PAN-1646 | M | low | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
+| 686 | PAN-1643 | M | low | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
+| 687 | PAN-1592 | M | low | ok |  |  | Composer: make ephemeral composer state reload-durable (pasted images + unsent/failed message text) |
+| 688 | PAN-1581 | M | low | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
+| 689 | PAN-1552 | M | low | ok |  |  | Dashboard conversation-message 500 cause is unloggable: serve mode never writes dashboard.log |
+| 690 | PAN-1533 | M | low | ok |  |  | Fork-into-worktree from conversation branch chip |
+| 691 | PAN-1483 | XS | low | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
+| 692 | PAN-1482 | M | low | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
+| 693 | PAN-1481 | M | low | ok |  |  | Add cost-event telemetry for Caveman token savings |
+| 694 | PAN-1356 | M | low | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
+| 695 | PAN-1242 | M | low | ok |  |  | Create a new issue directly from a kanban column |
+| 696 | PAN-1222 | M | low | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
+| 697 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
+| 698 | PAN-1166 | M | low | ok |  |  | Re-introduce /ws/terminal auth gate with a working bootstrap path |
+| 699 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
+| 700 | PAN-2667 | M | low | stale |  |  | beads-rollup admission signal is gone from resource discovery; if still wanted, source it from xBRIEF item completion instead |
+| 701 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
+| 702 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
+| 703 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
+| 704 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
+| 705 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
+| 706 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
+| 707 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
+| 708 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
+| 709 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
+| 710 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
 | 711 | PAN-1641 | M | low | ok |  |  | Run agents on local GPU models via a managed Ollama sidecar |
-| 712 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
-| 713 | PAN-3971 | L | low | ok |  |  | Overdeck-native artifact pages (pan artifact publish + state door + dashboard listing); body says backlog only, Claude artifacts work today |
-| 714 | PAN-3768 | XS | low | ok |  |  | pan handoff --title already implemented and landed (678f6b389e5); open only pending close-out. |
-| 715 | PAN-3034 | XS | low | ok |  |  | Fix already landed on main (strike/slot workspace names and live tmux now seed the session tree); open pending close-out. |
-| 716 | PAN-2983 | M | low | ok |  |  | OKF v3 deferrals: lease-based concurrent writes and an LLM semantic auditor, both gated on evidence that isn't here yet. |
-| 717 | PAN-3778 | S | low | ok |  |  | Reconnect-loop fix (48fd8f7a) is already on main; open only pending verify and close-out. |
-| 718 | PAN-3824 | XS | low | needs-refinement |  |  | Image-only report: default view on Windows breaks the model selector; needs a written repro and expected behavior |
-| 719 | PAN-3823 | XS | low | needs-refinement |  |  | Image-only report titled "pan sync issue"; needs the command, output text, and expected behavior |
-| 720 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
-| 721 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
-| 722 | PAN-962 | M | low | needs-refinement |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
-| 723 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
-| 724 | PAN-943 | M | low | ok |  |  | Add memory file review and management command |
-| 725 | PAN-908 | M | low | ok |  |  | PAN-908: Make work-agent spawn limits configurable and overridable |
-| 726 | PAN-898 | M | low | ok |  |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
-| 727 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
-| 728 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
-| 729 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
-| 730 | PAN-810 | XS | low | needs-refinement |  |  | Inspector: diagnostic UI when pipeline phase is unknown |
-| 731 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
-| 732 | PAN-793 | XS | low | ok |  |  | Borrow Deft's explicit scope-lifecycle transitions for Panopticon agent state machine |
-| 733 | PAN-791 | XS | low | ok |  |  | Skill mapping: Deft Directive v0.20.0-rc.3 ↔ Panopticon CLI |
-| 734 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
-| 735 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
-| 736 | PAN-777 | M | low | ok |  |  | Inter-agent communication skill: send messages to conversation-mode agents |
-| 737 | PAN-775 | L | low | ok |  |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
-| 738 | PAN-3456 | XS | low | ok |  |  | Already fixed in 4117c9a777 with a regression test; open only pending close-out. |
-| 739 | PAN-774 | XS | low | ok |  |  | Unify launch UX and release pipeline for 1.0 |
-| 740 | PAN-773 | XS | low | ok |  |  | Design prompt-style overlays with model hierarchy and scoped toggles |
-| 741 | PAN-772 | M | low | stale |  |  | Auto-resume ladder paths it names are gone; terminal-stack consistency now means the Herdr/tmux contract in TERMINAL-BACKENDS.md |
-| 742 | PAN-771 | M | low | needs-refinement |  |  | Investigate Vercel Sandbox execution backend support |
-| 743 | PAN-769 | M | low | stale |  | PAN-750 | Phase-transition history no longer accumulates in a record; a churn metric would be rebuilt from PR review cycles or the pipeline journal |
-| 744 | PAN-765 | M | low | ok |  |  | Preserve trailing zeros in cost displays |
-| 745 | PAN-764 | M | low | ok |  |  | Add quota/usage inspector for routed model providers |
-| 746 | PAN-762 | M | low | ok |  |  | Settings: warn when model overrides target disabled providers |
-| 747 | PAN-752 | M | low | ok |  |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
-| 748 | PAN-751 | M | low | ok |  |  | Historical Metrics Data Persistence |
-| 749 | PAN-750 | L | low | ok |  |  | Complete Metrics Page Redesign |
-| 750 | PAN-749 | M | low | needs-refinement |  |  | Research and borrow best features from gstack |
-| 751 | PAN-747 | XS | low | ok |  |  | Conversation list items lack accessible labels in accessibility tree |
-| 752 | PAN-743 | XS | low | ok |  |  | Add consistent new conversation icon actions in Command Deck |
-| 753 | PAN-738 | M | low | ok |  |  | Add right-click fork option to conversation list |
-| 754 | PAN-735 | M | low | ok |  |  | Settings page: review and configure overridden subagent model files |
-| 755 | PAN-730 | M | low | ok |  |  | Add provider account telemetry for credits, balances, and usage |
-| 756 | PAN-702 | M | low | ok |  |  | OpenAI provider: add plan/subscription support and fix unregistered model resolution |
-| 757 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
-| 758 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
-| 759 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
-| 760 | PAN-658 | M | low | ok |  | PAN-2356 | Shared Sessions v0: GitHub-auth'd shared conversation panel with WebRTC transport |
-| 761 | PAN-624 | M | low | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
-| 762 | PAN-623 | M | low | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
-| 763 | PAN-622 | M | low | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
-| 764 | PAN-604 | M | low | ok |  |  | Hide planning agent from workspace detail pane |
-| 765 | PAN-603 | M | low | ok |  |  | Plan review loop with configurable reviewer model |
-| 766 | PAN-591 | XS | low | ok |  |  | Integrate Karpathy LLM guidelines into all Panopticon CLAUDE.md templates |
-| 767 | PAN-589 | XS | low | ok |  |  | Review and update commands-skills.md with all available Panopticon skills |
-| 768 | PAN-576 | M | low | ok |  |  | Global / search should include conversations in addition to workspace features |
-| 769 | PAN-571 | XS | low | ok |  |  | Add OpenRouter credits/plan status endpoint and UI |
-| 770 | PAN-568 | M | low | ok |  |  | Kanban: Show workspace and tmux session counts in stats |
-| 771 | PAN-565 | M | low | ok |  |  | Handle CTRL-Z to undo accidental conversation archival |
-| 772 | PAN-564 | M | low | ok |  |  | Slash menu positioned incorrectly |
-| 773 | PAN-554 | M | low | ok |  |  | Add kanban board deeplinks for issue URLs |
-| 774 | PAN-543 | M | low | ok |  |  | Add confirmation dialog before applying Optimal Defaults |
-| 775 | PAN-483 | M | low | ok |  |  | Unify Resume Agent UX |
-| 776 | PAN-480 | M | low | ok |  |  | Pass --effort flag when spawning planning agents via Cloister |
-| 777 | PAN-476 | M | low | ok |  |  | Agent resume with Haiku session summary instead of claude --resume |
-| 778 | PAN-468 | M | low | ok |  |  | Agent test conversations pollute production database |
-| 779 | PAN-461 | M | low | ok |  |  | Deep-wipe multi-step progress dialog |
-| 780 | PAN-459 | M | low | ok |  |  | Planning setup screen with SSE progress streaming |
-| 781 | PAN-407 | XS | low | ok |  |  | Run Panopticon from a main workspace for development isolation |
-| 782 | PAN-2348 | XS | low | ok |  |  | docs: migrate STATE-STORAGE-AUDIT.md content to living docs, then delete |
-| 783 | PAN-2346 | XS | low | needs-refinement |  |  | docs: refresh AGENT_TYPES_INDEX.md — flywheel is a loop skill, inspect is per-item verification; update to the post-cut tree |
-| 784 | PAN-2345 | XS | low | needs-refinement |  |  | docs: refresh pan-done.md — drop the boot-reconciliation reference; describe the current pan done flow |
-| 785 | PAN-2344 | XS | low | needs-refinement |  |  | docs: refresh KANBAN-MODEL.md for derived issue state + PR-based review (boot reconciliation and inspect gates are gone) |
-| 786 | PAN-2343 | XS | low | ok |  |  | docs: refresh MISSION-CONTROL.md |
-| 787 | PAN-2073 | XS | low | ok |  |  | docs: add user-facing page for the Desktop App |
-| 788 | PAN-2071 | XS | low | ok |  |  | docs: add user-facing page for the Hooks system |
-| 789 | PAN-2068 | XS | low | ok |  |  | docs: add user-facing page for Caveman (agent output compression) |
-| 790 | PAN-2067 | XS | low | ok |  |  | docs: add user-facing page for RTK (Bash output compression) |
-| 791 | PAN-1684 | XS | low | ok |  |  | build full marketing kit + plan (SEO, video list, channels) from MARKETING.md seed |
-| 792 | PAN-1683 | XS | low | ok |  |  | docs: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) |
-| 793 | PAN-1474 | M | low | ok |  |  | Add ACKNOWLEDGEMENTS doc |
-| 794 | PAN-1469 | M | low | ok |  |  | End-to-end review and consolidation of all project documentation |
-| 795 | PAN-674 | XS | low | ok |  |  | docs: add glossary of Panopticon domain terms |
-| 796 | PAN-634 | M | low | ok |  |  | Documentation cleanup: restructure docs, update installation (npx panctl), refresh stale PRDs |
-| 797 | PAN-2908 | M | low | ok |  |  | Make overdeck not suck |
-| 798 | PAN-106 | M | high | stale |  |  | Cost prediction/estimation for in-progress work |
-| 799 | PAN-262 | M | high | stale |  |  | Refactor post-merge lifecycle into composable, idempotent operations |
-| 800 | PAN-176 | M | high | stale |  |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
-| 801 | PAN-334 | S | medium | stale |  |  | Dashboard server has no duplicate-process protection |
-| 802 | PAN-324 | XS | medium | needs-refinement |  |  | Approval is now a PR review or the dashboard MERGE button; verify whether the agent detail pane already surfaces MERGE post-cut |
-| 803 | PAN-304 | S | medium | stale |  |  | closeLinearDirect returns stepOk even when state update never happens |
-| 804 | PAN-245 | S | medium | stale |  |  | Ctrl+C aborts planning dialog instead of copying text |
-| 805 | PAN-244 | S | medium | stale |  |  | Deep-wipe leaves local branch and worktree metadata behind |
-| 806 | PAN-178 | M | low | stale |  |  | Per-task checkpointing is covered by Item: commit trailers + xBRIEF item status; the .planning/checkpoints proposal predates the cut |
-| 807 | PAN-113 | S | medium | stale |  |  | Dashboard 'Start Agent' returns success before verifying agent actually started |
-| 808 | PAN-49 | XS | medium | stale |  |  | Fix CloisterService tests that require real runtime |
-| 809 | PAN-294 | M | medium | stale |  |  | Surface module initialization errors as system-level, not per-issue |
-| 810 | PAN-293 | M | medium | stale |  |  | Project Living Memory |
-| 811 | PAN-277 | M | medium | stale |  |  | Session reasoning capture & collaborative PRD refinement |
-| 812 | PAN-258 | M | medium | stale |  |  | Kanban board: fit all columns without horizontal scrolling |
-| 813 | PAN-255 | M | medium | stale |  |  | Agents lack awareness of MCP tools |
-| 814 | PAN-252 | XS | medium | stale |  |  | Disable Sync with Main button when workspace is up to date |
-| 815 | PAN-243 | M | medium | stale |  |  | Audit dashboard actions: ensure all are available via CLI |
-| 816 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
-| 817 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
-| 818 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
-| 819 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
-| 820 | PAN-3564 | M | low | needs-refinement |  |  | Global state-git lock is gone; verify whether the per-issue fs-lock convoy (100% duty cycle, reviewer spawns die) can still occur |
-| 821 | PAN-3571 | S | low | stale |  |  | Stale: targets work-agent-stop-hook (7b953449633) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 822 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 823 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 824 | PAN-3078 | S | low | needs-refinement |  |  | review_status.inspect_status is gone; verify whether the surviving inspect-agent specialist still never delivers its verdict |
-| 825 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 826 | PAN-2960 | S | low | needs-refinement |  |  | review_status.inspect_status is gone; re-diagnose whether the surviving inspect-agent specialist has a self-termination gap |
-| 827 | PAN-3634 | S | low | stale |  |  | Stale: targets flywheelRunId stamping deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 828 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 829 | PAN-2659 | S | low | stale |  |  | Stale: targets pan-dir/record-lock.ts deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 830 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 831 | PAN-3914 | S | low | needs-refinement |  |  | Stale: checkOrphanedCompletions / deacon.ts patrol deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 832 | PAN-3868 | XS | low | stale |  |  | Stale: work-agent-stop-hook was deleted by the PAN-3917 cut (ca15def) (7b953449633); the wrong verb no longer exists |
-| 833 | PAN-299 | M | low | stale |  |  | Granular session state persistence across context compaction |
-| 834 | PAN-298 | M | low | stale |  |  | Auto-detect package manager and runtime in workspace setup |
-| 835 | PAN-297 | M | low | stale |  |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
-| 836 | PAN-283 | M | low | stale |  |  | Reset should sync workspace feature branch with latest main |
-| 837 | PAN-271 | M | low | stale |  |  | Auto-assign Linear project from project config when creating issues |
-| 838 | PAN-265 | M | low | stale |  |  | Review skill categorization: all skills available everywhere via personal + workspace |
-| 839 | PAN-249 | XS | low | stale |  |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
-| 840 | PAN-241 | L | low | stale |  |  | Mobile redesign initiative: full UX/UI overhaul + implementation plan |
-| 841 | PAN-228 | M | low | stale |  |  | Shift-left post-edit diagnostics |
-| 842 | PAN-227 | M | low | stale |  |  | Phase gate validation |
-| 843 | PAN-198 | M | low | stale |  |  | Structured audit trail for agent actions |
-| 844 | PAN-190 | M | low | stale |  |  | PAN-190: Specialized reviewer prompts (industry best-practice checklists) |
-| 845 | PAN-180 | M | low | stale |  |  | PAN-180: Cross-terminal file locking for concurrent agents |
-| 846 | PAN-177 | M | low | stale |  |  | PAN-177: Iteration limits with escalation for autonomous agents |
-| 847 | PAN-175 | M | low | stale |  |  | PAN-175: Pre-compact auto-save hook for agent sessions |
-| 848 | PAN-155 | L | low | stale |  |  | PAN-155: Redesign health page with Stitch (system overview, timeline, costs) |
-| 849 | PAN-146 | M | low | stale |  |  | PAN-146: Refine light mode theming across all dashboard pages |
-| 850 | PAN-55 | M | low | stale |  |  | Track specialist costs with time period filtering |
-| 851 | PAN-52 | XS | low | stale |  |  | Guidance needed: Running complex multi-container projects with Panopticon worktrees |
-| 852 | PAN-51 | M | low | stale |  |  | Documentation: Clarify issue tracker options beyond Linear |
-| 853 | PAN-47 | M | low | stale |  |  | PRDs already live under .pan/ on the feature branch; the docs/prds/active merge-blocking flow no longer exists |
-| 854 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
-| 855 | PAN-43 | M | low | stale |  |  | Add Slack and email notifications for agent events |
-| 856 | PAN-2070 | XS | low | needs-refinement |  |  | docs: user-facing Flywheel page should target the pan-flywheel v2 loop skill, not a CLI daemon with a dashboard toggle |
+| 712 | PAN-3971 | L | low | ok |  |  | Overdeck-native artifact pages (pan artifact publish + state door + dashboard listing); body says backlog only, Claude artifacts work today |
+| 713 | PAN-3768 | XS | low | ok |  |  | pan handoff --title already implemented and landed (678f6b389e5); open only pending close-out. |
+| 714 | PAN-3034 | XS | low | ok |  |  | Fix already landed on main (strike/slot workspace names and live tmux now seed the session tree); open pending close-out. |
+| 715 | PAN-2983 | M | low | ok |  |  | OKF v3 deferrals: lease-based concurrent writes and an LLM semantic auditor, both gated on evidence that isn't here yet. |
+| 716 | PAN-3778 | S | low | ok |  |  | Reconnect-loop fix (48fd8f7a) is already on main; open only pending verify and close-out. |
+| 717 | PAN-3824 | XS | low | needs-refinement |  |  | Image-only report: default view on Windows breaks the model selector; needs a written repro and expected behavior |
+| 718 | PAN-3823 | XS | low | needs-refinement |  |  | Image-only report titled "pan sync issue"; needs the command, output text, and expected behavior |
+| 719 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
+| 720 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
+| 721 | PAN-962 | M | low | needs-refinement |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
+| 722 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
+| 723 | PAN-943 | M | low | ok |  |  | Add memory file review and management command |
+| 724 | PAN-908 | M | low | ok |  |  | PAN-908: Make work-agent spawn limits configurable and overridable |
+| 725 | PAN-898 | M | low | ok |  |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
+| 726 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
+| 727 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
+| 728 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
+| 729 | PAN-810 | XS | low | needs-refinement |  |  | Inspector: diagnostic UI when pipeline phase is unknown |
+| 730 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
+| 731 | PAN-793 | XS | low | ok |  |  | Borrow Deft's explicit scope-lifecycle transitions for Panopticon agent state machine |
+| 732 | PAN-791 | XS | low | ok |  |  | Skill mapping: Deft Directive v0.20.0-rc.3 ↔ Panopticon CLI |
+| 733 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
+| 734 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
+| 735 | PAN-777 | M | low | ok |  |  | Inter-agent communication skill: send messages to conversation-mode agents |
+| 736 | PAN-775 | L | low | ok |  |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
+| 737 | PAN-3456 | XS | low | ok |  |  | Already fixed in 4117c9a777 with a regression test; open only pending close-out. |
+| 738 | PAN-774 | XS | low | ok |  |  | Unify launch UX and release pipeline for 1.0 |
+| 739 | PAN-773 | XS | low | ok |  |  | Design prompt-style overlays with model hierarchy and scoped toggles |
+| 740 | PAN-772 | M | low | stale |  |  | Auto-resume ladder paths it names are gone; terminal-stack consistency now means the Herdr/tmux contract in TERMINAL-BACKENDS.md |
+| 741 | PAN-771 | M | low | needs-refinement |  |  | Investigate Vercel Sandbox execution backend support |
+| 742 | PAN-769 | M | low | stale |  | PAN-750 | Phase-transition history no longer accumulates in a record; a churn metric would be rebuilt from PR review cycles or the pipeline journal |
+| 743 | PAN-765 | M | low | ok |  |  | Preserve trailing zeros in cost displays |
+| 744 | PAN-764 | M | low | ok |  |  | Add quota/usage inspector for routed model providers |
+| 745 | PAN-762 | M | low | ok |  |  | Settings: warn when model overrides target disabled providers |
+| 746 | PAN-752 | M | low | ok |  |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
+| 747 | PAN-751 | M | low | ok |  |  | Historical Metrics Data Persistence |
+| 748 | PAN-750 | L | low | ok |  |  | Complete Metrics Page Redesign |
+| 749 | PAN-749 | M | low | needs-refinement |  |  | Research and borrow best features from gstack |
+| 750 | PAN-747 | XS | low | ok |  |  | Conversation list items lack accessible labels in accessibility tree |
+| 751 | PAN-743 | XS | low | ok |  |  | Add consistent new conversation icon actions in Command Deck |
+| 752 | PAN-738 | M | low | ok |  |  | Add right-click fork option to conversation list |
+| 753 | PAN-735 | M | low | ok |  |  | Settings page: review and configure overridden subagent model files |
+| 754 | PAN-730 | M | low | ok |  |  | Add provider account telemetry for credits, balances, and usage |
+| 755 | PAN-702 | M | low | ok |  |  | OpenAI provider: add plan/subscription support and fix unregistered model resolution |
+| 756 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
+| 757 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
+| 758 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
+| 759 | PAN-658 | M | low | ok |  | PAN-2356 | Shared Sessions v0: GitHub-auth'd shared conversation panel with WebRTC transport |
+| 760 | PAN-624 | M | low | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
+| 761 | PAN-623 | M | low | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
+| 762 | PAN-622 | M | low | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
+| 763 | PAN-604 | M | low | ok |  |  | Hide planning agent from workspace detail pane |
+| 764 | PAN-603 | M | low | ok |  |  | Plan review loop with configurable reviewer model |
+| 765 | PAN-591 | XS | low | ok |  |  | Integrate Karpathy LLM guidelines into all Panopticon CLAUDE.md templates |
+| 766 | PAN-589 | XS | low | ok |  |  | Review and update commands-skills.md with all available Panopticon skills |
+| 767 | PAN-576 | M | low | ok |  |  | Global / search should include conversations in addition to workspace features |
+| 768 | PAN-571 | XS | low | ok |  |  | Add OpenRouter credits/plan status endpoint and UI |
+| 769 | PAN-568 | M | low | ok |  |  | Kanban: Show workspace and tmux session counts in stats |
+| 770 | PAN-565 | M | low | ok |  |  | Handle CTRL-Z to undo accidental conversation archival |
+| 771 | PAN-564 | M | low | ok |  |  | Slash menu positioned incorrectly |
+| 772 | PAN-554 | M | low | ok |  |  | Add kanban board deeplinks for issue URLs |
+| 773 | PAN-543 | M | low | ok |  |  | Add confirmation dialog before applying Optimal Defaults |
+| 774 | PAN-483 | M | low | ok |  |  | Unify Resume Agent UX |
+| 775 | PAN-480 | M | low | ok |  |  | Pass --effort flag when spawning planning agents via Cloister |
+| 776 | PAN-476 | M | low | ok |  |  | Agent resume with Haiku session summary instead of claude --resume |
+| 777 | PAN-468 | M | low | ok |  |  | Agent test conversations pollute production database |
+| 778 | PAN-461 | M | low | ok |  |  | Deep-wipe multi-step progress dialog |
+| 779 | PAN-459 | M | low | ok |  |  | Planning setup screen with SSE progress streaming |
+| 780 | PAN-407 | XS | low | ok |  |  | Run Panopticon from a main workspace for development isolation |
+| 781 | PAN-2348 | XS | low | ok |  |  | docs: migrate STATE-STORAGE-AUDIT.md content to living docs, then delete |
+| 782 | PAN-2346 | XS | low | needs-refinement |  |  | docs: refresh AGENT_TYPES_INDEX.md — flywheel is a loop skill, inspect is per-item verification; update to the post-cut tree |
+| 783 | PAN-2345 | XS | low | needs-refinement |  |  | docs: refresh pan-done.md — drop the boot-reconciliation reference; describe the current pan done flow |
+| 784 | PAN-2344 | XS | low | needs-refinement |  |  | docs: refresh KANBAN-MODEL.md for derived issue state + PR-based review (boot reconciliation and inspect gates are gone) |
+| 785 | PAN-2343 | XS | low | ok |  |  | docs: refresh MISSION-CONTROL.md |
+| 786 | PAN-2073 | XS | low | ok |  |  | docs: add user-facing page for the Desktop App |
+| 787 | PAN-2071 | XS | low | ok |  |  | docs: add user-facing page for the Hooks system |
+| 788 | PAN-2068 | XS | low | ok |  |  | docs: add user-facing page for Caveman (agent output compression) |
+| 789 | PAN-2067 | XS | low | ok |  |  | docs: add user-facing page for RTK (Bash output compression) |
+| 790 | PAN-1684 | XS | low | ok |  |  | build full marketing kit + plan (SEO, video list, channels) from MARKETING.md seed |
+| 791 | PAN-1683 | XS | low | ok |  |  | docs: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) |
+| 792 | PAN-1474 | M | low | ok |  |  | Add ACKNOWLEDGEMENTS doc |
+| 793 | PAN-1469 | M | low | ok |  |  | End-to-end review and consolidation of all project documentation |
+| 794 | PAN-674 | XS | low | ok |  |  | docs: add glossary of Panopticon domain terms |
+| 795 | PAN-634 | M | low | ok |  |  | Documentation cleanup: restructure docs, update installation (npx panctl), refresh stale PRDs |
+| 796 | PAN-2908 | M | low | ok |  |  | Make overdeck not suck |
+| 797 | PAN-106 | M | high | stale |  |  | Cost prediction/estimation for in-progress work |
+| 798 | PAN-262 | M | high | stale |  |  | Refactor post-merge lifecycle into composable, idempotent operations |
+| 799 | PAN-176 | M | high | stale |  |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
+| 800 | PAN-334 | S | medium | stale |  |  | Dashboard server has no duplicate-process protection |
+| 801 | PAN-324 | XS | medium | needs-refinement |  |  | Approval is now a PR review or the dashboard MERGE button; verify whether the agent detail pane already surfaces MERGE post-cut |
+| 802 | PAN-304 | S | medium | stale |  |  | closeLinearDirect returns stepOk even when state update never happens |
+| 803 | PAN-245 | S | medium | stale |  |  | Ctrl+C aborts planning dialog instead of copying text |
+| 804 | PAN-244 | S | medium | stale |  |  | Deep-wipe leaves local branch and worktree metadata behind |
+| 805 | PAN-178 | M | low | stale |  |  | Per-task checkpointing is covered by Item: commit trailers + xBRIEF item status; the .planning/checkpoints proposal predates the cut |
+| 806 | PAN-113 | S | medium | stale |  |  | Dashboard 'Start Agent' returns success before verifying agent actually started |
+| 807 | PAN-49 | XS | medium | stale |  |  | Fix CloisterService tests that require real runtime |
+| 808 | PAN-294 | M | medium | stale |  |  | Surface module initialization errors as system-level, not per-issue |
+| 809 | PAN-293 | M | medium | stale |  |  | Project Living Memory |
+| 810 | PAN-277 | M | medium | stale |  |  | Session reasoning capture & collaborative PRD refinement |
+| 811 | PAN-258 | M | medium | stale |  |  | Kanban board: fit all columns without horizontal scrolling |
+| 812 | PAN-255 | M | medium | stale |  |  | Agents lack awareness of MCP tools |
+| 813 | PAN-252 | XS | medium | stale |  |  | Disable Sync with Main button when workspace is up to date |
+| 814 | PAN-243 | M | medium | stale |  |  | Audit dashboard actions: ensure all are available via CLI |
+| 815 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
+| 816 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
+| 817 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
+| 818 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
+| 819 | PAN-3564 | M | low | needs-refinement |  |  | Global state-git lock is gone; verify whether the per-issue fs-lock convoy (100% duty cycle, reviewer spawns die) can still occur |
+| 820 | PAN-3571 | S | low | stale |  |  | Stale: targets work-agent-stop-hook (7b953449633) deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 821 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 822 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 823 | PAN-3078 | S | low | needs-refinement |  |  | review_status.inspect_status is gone; verify whether the surviving inspect-agent specialist still never delivers its verdict |
+| 824 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 825 | PAN-2960 | S | low | needs-refinement |  |  | review_status.inspect_status is gone; re-diagnose whether the surviving inspect-agent specialist has a self-termination gap |
+| 826 | PAN-3634 | S | low | stale |  |  | Stale: targets flywheelRunId stamping deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 827 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 828 | PAN-2659 | S | low | stale |  |  | Stale: targets pan-dir/record-lock.ts deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 829 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 830 | PAN-3914 | S | low | needs-refinement |  |  | Stale: checkOrphanedCompletions / deacon.ts patrol deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 831 | PAN-3868 | XS | low | stale |  |  | Stale: work-agent-stop-hook was deleted by the PAN-3917 cut (ca15def) (7b953449633); the wrong verb no longer exists |
+| 832 | PAN-299 | M | low | stale |  |  | Granular session state persistence across context compaction |
+| 833 | PAN-298 | M | low | stale |  |  | Auto-detect package manager and runtime in workspace setup |
+| 834 | PAN-297 | M | low | stale |  |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
+| 835 | PAN-283 | M | low | stale |  |  | Reset should sync workspace feature branch with latest main |
+| 836 | PAN-271 | M | low | stale |  |  | Auto-assign Linear project from project config when creating issues |
+| 837 | PAN-265 | M | low | stale |  |  | Review skill categorization: all skills available everywhere via personal + workspace |
+| 838 | PAN-249 | XS | low | stale |  |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
+| 839 | PAN-241 | L | low | stale |  |  | Mobile redesign initiative: full UX/UI overhaul + implementation plan |
+| 840 | PAN-228 | M | low | stale |  |  | Shift-left post-edit diagnostics |
+| 841 | PAN-227 | M | low | stale |  |  | Phase gate validation |
+| 842 | PAN-198 | M | low | stale |  |  | Structured audit trail for agent actions |
+| 843 | PAN-190 | M | low | stale |  |  | PAN-190: Specialized reviewer prompts (industry best-practice checklists) |
+| 844 | PAN-180 | M | low | stale |  |  | PAN-180: Cross-terminal file locking for concurrent agents |
+| 845 | PAN-177 | M | low | stale |  |  | PAN-177: Iteration limits with escalation for autonomous agents |
+| 846 | PAN-175 | M | low | stale |  |  | PAN-175: Pre-compact auto-save hook for agent sessions |
+| 847 | PAN-155 | L | low | stale |  |  | PAN-155: Redesign health page with Stitch (system overview, timeline, costs) |
+| 848 | PAN-146 | M | low | stale |  |  | PAN-146: Refine light mode theming across all dashboard pages |
+| 849 | PAN-55 | M | low | stale |  |  | Track specialist costs with time period filtering |
+| 850 | PAN-52 | XS | low | stale |  |  | Guidance needed: Running complex multi-container projects with Panopticon worktrees |
+| 851 | PAN-51 | M | low | stale |  |  | Documentation: Clarify issue tracker options beyond Linear |
+| 852 | PAN-47 | M | low | stale |  |  | PRDs already live under .pan/ on the feature branch; the docs/prds/active merge-blocking flow no longer exists |
+| 853 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
+| 854 | PAN-43 | M | low | stale |  |  | Add Slack and email notifications for agent events |
+| 855 | PAN-2070 | XS | low | needs-refinement |  |  | docs: user-facing Flywheel page should target the pan-flywheel v2 loop skill, not a CLI daemon with a dashboard toggle |
 
 ## Rationale detail
 
@@ -928,261 +927,261 @@ In pipeline — rank pinned.
 
 In pipeline — rank pinned.
 
-### PAN-3963 (rank 17)
-
-Verified root cause: the FK into the pre-cut issues cache throws on the first post-cut issue, the exception escapes assembleUatGeneration, and the reconciler re-assembles hourly, creating worktrees for nothing. Nothing merges through the train until this lands — the single most pipeline-blocking open bug. Drop the FK, fail loudly, cap re-assembly.
-
-### PAN-3679 (rank 18)
+### PAN-3679 (rank 17)
 
 Swarm marks live polyrepo slots merged and dispatches items whose DAG blockers are still running. Critical: this breaks the substrate the rest of the backlog runs on — a wrong merge, a lost verdict, or a dead pipeline lane — so it ranks ahead of feature work of equal size.
 
-### PAN-3966 (rank 19)
+### PAN-3966 (rank 18)
 
 The sequencer was refused 749 times over three weeks by its own finished pane; the same wall stands for every role run, and Stop/pan kill only rewrite state on a Herdr host. The fix shape is already proven (closeAgentPane through the backend, liveness from isAlive). Subsumes the stop half of PAN-3947.
 
-### PAN-3939 (rank 20)
+### PAN-3939 (rank 19)
 
 Reproduced on PAN-3705 during the cut e2e: an errored codex reviewer blocked every later review request for 15 minutes; pan review abort left the shell alive. Liveness in both guards must come from the backend-aware isAlive. Sibling of PAN-3921 for the resume path.
+
+### PAN-3973 (rank 20)
+
+New since the prior run. Strikes are the pipeline's self-repair path, and today a strike's pushed fix sits unmerged until an operator notices (PAN-3963 waited 3+ hours and was landed by hand as PR #3972). That undermines every critical bug above it that a strike would otherwise fix, so it ranks with the post-cut critical bugs. Option (a) in the body — the strike opens a PR on completion and the prompt says so — is a small change consistent with docs/MERGE-WORKFLOW.md step 4; option (b) would resurrect a deacon-lite landing routine the cut deleted.
 
 ### PAN-3968 (rank 21)
 
 Regression of the transcript-discoverability fix that just merged: close-out.ts step 5 still calls removeAgentStateDir, so every pan close the flywheel runs destroys that agent's session index while printing the new 'state kept' message. The 'freshest JSONL' fallback was deliberately removed in PAN-3950, so each close-out now leaves an agent whose transcript route returns nothing. Cause, fix, regression test and acceptance are spelled out; S-sized. The backfill for already-pruned agents is shared with PAN-3959 (in pipeline), so land this on top of it.
 
-### PAN-3973 (rank 22)
-
-New since the prior run. Strikes are the pipeline's self-repair path, and today a strike's pushed fix sits unmerged until an operator notices (PAN-3963 waited 3+ hours and was landed by hand as PR #3972). That undermines every critical bug above it that a strike would otherwise fix, so it ranks with the post-cut critical bugs. Option (a) in the body — the strike opens a PR on completion and the prompt says so — is a small change consistent with docs/MERGE-WORKFLOW.md step 4; option (b) would resurrect a deacon-lite landing routine the cut deleted.
-
-### PAN-3566 (rank 23)
+### PAN-3566 (rank 22)
 
 New this pass and the highest-leverage fix in the batch: the test-role launcher's final exec has no -p, no positional prompt and no piped stdin, so the role boots an interactive REPL and never takes a turn. That single missing argument is the deterministic producer of the zombie test agents tracked in PAN-2706, PAN-3563 and PAN-3274 — three separate hardening issues chasing one root cause. Reproduced across eight session IDs, so there is no diagnosis left to do.
 
-### PAN-3952 (rank 24)
+### PAN-3952 (rank 23)
 
 On the default backend the harness TUI renders into a one-line terminal until an operator opens it, so stuck detection, readiness scans, health capture, AUQ/permission detection and screenshots all see nothing. Deterministic pane sizing in the Herdr adapter is a small change with fleet-wide effect.
 
-### PAN-3285 (rank 25)
+### PAN-3285 (rank 24)
 
 New this pass, labelled critical. A supervisor unit pinned to a pan reload generation SIGTERMs every correctly-running dashboard and is structurally incapable of starting a replacement; the observed outcome was a 3.5-hour total outage with 1,107 consecutive failed recovery attempts and no operator escalation. Manual recovery also fails, because the supervisor kills the operator's dashboard within 30 seconds. Nothing else in the backlog can take the whole product down for hours with the recovery path itself broken.
 
-### PAN-3960 (rank 26)
+### PAN-3960 (rank 25)
 
 Three spawn paths bypass the backend registry, giving two inventories for one fleet: pan tell cannot reach tmux planners (PAN-3948), and a resumed agent silently migrates backends. Sibling of PAN-3921 (in pipeline) and PAN-3936.
 
-### PAN-3524 (rank 27)
+### PAN-3524 (rank 26)
 
 Triage: verify the --changed verification-loop relaunch against deacon-lite's smaller suppression surface. Kept in the critical band: an unstoppable server-owned test loop is the worst kind of runaway.
 
-### PAN-3962 (rank 28)
+### PAN-3962 (rank 27)
 
 Breaks the CLAUDE.md invariant that supervisor-launched sessions write stopped from their own exited event: a conversation showed active 45s after Claude died and the first message went into a dead shell. Small route fix plus a test.
 
-### PAN-3250 (rank 29)
+### PAN-3250 (rank 28)
 
 New this pass, labelled blocks-main and substrate. Two spawn sites branch from the local HEAD or defaultBranch instead of origin/main, so every new feature branch inherits whatever unpushed commits are sitting on the shared local main. Four branches were already contaminated when it was filed, two of them created after the problem was identified, and their PRs read MERGEABLE/CLEAN. It spreads with each spawn, so the cost of leaving it grows.
 
-### PAN-3946 (rank 30)
+### PAN-3946 (rank 29)
 
 Merge-safety bug seen on PR #3933: an approval on fd3334e6 satisfied the request for head ae9d82f0. Approval must count only when its commit_id is the current head; add --force as the explicit override.
 
-### PAN-2954 (rank 31)
+### PAN-2954 (rank 30)
 
 Dependency cleared: PAN-2882 (the missing GitLab merged-MR oracle this blocked on) closed since the last pass, so postMergeLifecycle's GitLab refusal is now directly workable. Re-ranked up from 67 to sit with the other unblocked critical merge-path fixes.
 
-### PAN-3935 (rank 32)
+### PAN-3935 (rank 31)
 
 The PAN-2858 defect in a new shape: complete-planning promotes to the primary checkout, where nothing commits, and removes the workspace copy the planning commit would have picked up. Evidence: untracked pan-3927.md on main. Also a write-to-main hazard.
 
-### PAN-3969 (rank 33)
+### PAN-3969 (rank 32)
 
 The visible symptom is the Backlog page sitting on 'Loading sequence…' for 11-21s, but the heavier fact is that the same whole-backlog loadIssueStatesForProject loop also runs in the background on every tracker poll and every pushUpdated(), firing ~800 serial git processes each time — fleet-wide CPU load, not just one slow route. The route result (pipelineState) is never read by the frontend and inPipeline is already computed by classifyIssue on the same route. Two well-specified items: drop the per-request derivation, and replace per-issue rev-list with two for-each-ref calls in the loader. Overlaps PAN-3925 (in pipeline) which batches the same loader for /api/parked; sequence after it.
 
-### PAN-3657 (rank 34)
+### PAN-3657 (rank 33)
 
 New this pass. The merge-train queues endpoint correctly gathers eligible candidates and then hands them to the monorepo queue builder, which does git rev-parse against a polyrepo project root that is not a git repository — so every polyrepo project's train is permanently empty while monorepo projects populate fine. MYN and Auricle cannot use merge trains at all until this lands.
 
-### PAN-3947 (rank 35)
+### PAN-3947 (rank 34)
 
 Overlaps PAN-3966 on the termination path; ranked just below it so the two are not both picked. Scope this to the post-merge lifecycle stopping (not pausing) specialists once PAN-3966 lands, or fold it in.
 
-### PAN-3565 (rank 36)
+### PAN-3565 (rank 35)
 
 New this pass. Three review-lifecycle defects, one of them severe: when all four reviewer lanes died at spawn on a record lock, the supervisor wrote a synthesis declaring CHANGES REQUESTED with every lane marked failed — an infrastructure flake recorded as a real code verdict. It was caught only because a human was watching live. Same integrity family as PAN-3283 and PAN-2746.
 
-### PAN-3554 (rank 37)
+### PAN-3554 (rank 36)
 
 New this pass. Main stayed red for about five hours because nothing owns the state 'the latest main-push CI run failed' — no needs-you, no activity entry, no strike recommendation. The failure actively hides itself: the merge gate renders red main as an empty eligible set, so the operator sees a quiet queue rather than an alarm. Detection must not depend on the flywheel being awake, since it frequently is not. Condition changed after the PAN-3917 cut: the merge gate that rendered red main as an empty queue was deleted by the cut; red-main ownership still needs a home — re-scope.
 
-### PAN-3532 (rank 38)
+### PAN-3532 (rank 37)
 
 New this pass. The CI test job runs root npm test, whose frontend leg is a hand-picked list of files, so two frontend test files were red on main for hours while every main CI run reported success. Green CI that does not mean green is worse than no CI, because every downstream gate and every close-out trusts it.
 
-### PAN-3965 (rank 39)
+### PAN-3965 (rank 38)
 
 Cuts three redundant on-box suite runs per feature that produced admission-hold pressure and killed Codex test runs on 2026-09-20; item 3 would also have avoided the PAN-3963 loop. Operator-decided, well-specified, touches the gate runner, prompts and merge-train reconciler.
 
-### PAN-3685 (rank 40)
+### PAN-3685 (rank 39)
 
 Swarm GC leaves consumed completion markers that hold slot capacity after assignments are freed. Critical: this breaks the substrate the rest of the backlog runs on — a wrong merge, a lost verdict, or a dead pipeline lane — so it ranks ahead of feature work of equal size.
 
-### PAN-3085 (rank 41)
+### PAN-3085 (rank 40)
 
 New this pass and a one-line class of defect with outsized cost. Review feedback is written to the resolved .overdeck/feedback directory but the path handed to the work agent is a hardcoded .pan/feedback that no longer exists after the rebrand, and the deacon merge gate reads the same dead path. Agents are told to fix findings they cannot find, and the gate counts zero feedback files no matter how many exist. Condition changed after the PAN-3917 cut: the deacon merge gate is gone; only the agent-side .pan/feedback path pointer remains to verify — re-scope.
 
-### PAN-3653 (rank 42)
+### PAN-3653 (rank 41)
 
 New this pass, labelled blocks-main. A strike that correctly stops because its gate is blocked by red main has no owner that wakes it when main goes green: the session stays alive, so liveness calls it healthy and pan recover refuses with 'already has a live harness runtime'. The urgent path exists precisely to unblock the pipeline fast, so a strike that silently idles through the clearing of its own blocker defeats the mechanism.
 
-### PAN-3630 (rank 43)
+### PAN-3630 (rank 42)
 
 New this pass. pan tell reported successful delivery three times to a live, heart-beating agent, moved all three messages into the read mailbox, and the agent's transcript shows it received none of them. The delivery door is the sanctioned way every part of the system talks to a running agent; a door that lies about delivery makes every downstream 'we told it' claim unreliable.
 
-### PAN-3805 (rank 44)
+### PAN-3805 (rank 43)
 
 Idle remediation is now deacon-lite nudge routines; triage asks to verify the Codex app-server delivery bypass against that implementation. The persistent-session invariant still forbids codex exec; rank held.
 
-### PAN-3560 (rank 45)
+### PAN-3560 (rank 44)
 
 New this pass. Under concurrent review convoys the PTY supervisor returns 502 'input echo confirmation failed' fleet-wide, so no agent can be booted or re-booted and pipeline feedback delivery fails while load is high — confirmed across at least six unrelated agents in one hour. Delivery failing exactly when the pipeline is busiest is what turns a load spike into a stall.
 
-### PAN-3520 (rank 46)
+### PAN-3520 (rank 45)
 
 New this pass. The test gate records a real 'test failed' verdict for uniform 5000ms timeout signatures under host load, proven on multiple branches where the same files pass in isolation in about 19 seconds. Every false verdict costs a full rework cycle and another saturated re-test, so this is both a correctness and a cost fix. Retrying timeout-only failures in isolation before writing a verdict is the minimal change.
 
-### PAN-3967 (rank 47)
+### PAN-3967 (rank 46)
 
 New issue filed from strike RUN-92 (discovered in PAN-3963). The pushed strike/<issue> branch is already the readiness signal post-cut, so landing still works; the defect is that the strike prompt template, deacon landing recovery message, merge-ops landing request, and roles/strike.md all instruct agents to run a command that does not exist, so every otherwise-clean strike ends in an error. Four exact file:line refs are in the body; rewrite them (or restore the verb) is an XS change. Ranked high rather than critical because the underlying signal lands; placed below PAN-3963 (rank 17), which hard-blocks the merge train.
 
-### PAN-3953 (rank 48)
+### PAN-3953 (rank 47)
 
 Violates the cut's rule that planned is derived from spec existence; a dead planner leaves an issue looking planned forever and the pickup gate mis-reads it. Delete the spawn-time label write. PAN-3961 reported the same bug and was closed as its duplicate on 2026-09-20; this issue is the single owner.
 
-### PAN-3500 (rank 49)
+### PAN-3500 (rank 48)
 
 New this pass. A review sub-role that had already written its report was resumed by a later message and edited seven tracked files, and pan start --fresh then auto-committed those reviewer-owned changes into the feature history during sync-main. Review isolation is currently prompt-level only; it has to be mechanical, because a contaminated branch is very hard to detect after the fact.
 
-### PAN-3313 (rank 50)
+### PAN-3313 (rank 49)
 
 New this pass. A transient upstream stream error benches CLIProxy's only auth entry, so every GPT-routed request returns 503 auth_unavailable until an internal cooldown lapses — 35 failures against 14 successes in one hour, with valid credentials throughout. The message reads as 'your credentials are gone' and sends the operator to re-authenticate, which fixes nothing. Every GPT-routed agent on the machine is affected at once.
+
+### PAN-3282 (rank 50)
+
+New this pass. Review agents terminate before writing their report across five issues and two projects, twice recurring after a successful recovery, leaving a verdict-shaped status with no artifact behind it and a stuck flag that blocks progress until someone restarts the reviewer by hand. This is the upstream condition PAN-3283 then converts into a false passed verdict.
 
 ### PAN-3580 (rank 51)
 
 The UAT-failure relay has no convergence cap, so it wrote 65 byte-identical rework feedback files over twelve hours while uat_notes was NULL — the 'see the UAT panel for details' pointer resolved to nothing. It is in the pipeline with a PRD; the cap and the missing notes are both needed for the relay to be honest.
 
-### PAN-3282 (rank 52)
-
-New this pass. Review agents terminate before writing their report across five issues and two projects, twice recurring after a successful recovery, leaving a verdict-shaped status with no artifact behind it and a stuck flag that blocks progress until someone restarts the reviewer by hand. This is the upstream condition PAN-3283 then converts into a false passed verdict.
-
-### PAN-3898 (rank 53)
+### PAN-3898 (rank 52)
 
 Strike landing and salvage re-arm survive in deacon-strike-landing.ts; triage asks to verify the zero-merges close-out and missing post-merge deploy against that current file rather than the old patrol loop. Still blocks-main + pipeline; rank held in the critical band.
 
-### PAN-3905 (rank 54)
+### PAN-3905 (rank 53)
 
 preTrustDirectorySync exists but only the worktree-creation path calls it; every spawn path (spawnRun, foreman, slot, strike) must call it before launch or a swarm foreman dies with ready-signal-timeout. Small, verified, and it kills whole swarms.
 
-### PAN-2695 (rank 55)
+### PAN-2695 (rank 54)
 
 Concurrent review dispatches race fresh-spawn vs resume, second dispatch resumes a still-booting parent and wedges.
 
-### PAN-2742 (rank 56)
+### PAN-2742 (rank 55)
 
 Synthesis fires 42s after spawn and mislabels reviewers-with-reports-on-disk as infra-failure, bypassing review.
 
-### PAN-2706 (rank 57)
+### PAN-2706 (rank 56)
 
 Triage: verify whether a never-kicked-off test session can still absorb dispatch under the current liveness model. Rank held.
 
-### PAN-2700 (rank 58)
+### PAN-2700 (rank 57)
 
 Triage: the stored reviewStatus flip is gone; the stale-artifact freshness concern may still apply to whatever recovers test verdicts. Rank held.
 
-### PAN-1560 (rank 59)
+### PAN-1560 (rank 58)
 
 Triage: review_status is gone but verification still writes a check run to the PR; the re-post-on-head-move concern may still apply to that flow (PAN-3946 covers the approval-on-old-commit side). Rank held.
 
-### PAN-3936 (rank 60)
+### PAN-3936 (rank 59)
 
 Split out of PAN-3921 at planning time. On a Herdr host these specialist-rotation and crash-respawn paths land on tmux, where isAliveOnHerdr reads them as dead. Do after PAN-3921 lands so the pattern is settled.
 
-### PAN-2828 (rank 61)
+### PAN-2828 (rank 60)
 
 pan done --strike structurally refuses every squash-merged strike — the landing path doctrine mandates is rejected by its own ancestry check.
 
-### PAN-2874 (rank 62)
+### PAN-2874 (rank 61)
 
 Strike landing cannot merge: verification gate demands a vBRIEF checklist strikes never have, and failed-feedback wedges on exited strike agents.
 
-### PAN-2883 (rank 63)
+### PAN-2883 (rank 62)
 
 Close-out deploy row fails for every strike-landed issue — PR resolver hardcodes feature/ and cannot find strike/ PRs.
 
-### PAN-2806 (rank 64)
+### PAN-2806 (rank 63)
 
 Strike merge trigger registry splits across dashboard chunks, so the trigger is never registered in the chunk that runs it.
 
-### PAN-2940 (rank 65)
+### PAN-2940 (rank 64)
 
 Three red-mains in one day from direct-push series bypassing PR CI — conversations need a pre-merge CI surface.
 
-### PAN-3708 (rank 66)
+### PAN-3708 (rank 65)
 
 New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wrapper root, which is not a git repository, so the urgent-strike escape hatch is simply unavailable for MYN-class projects. pan swarm already understands nested repos; strike must use the same project repository inventory. Duplicate of PAN-3040 — close one when this lands.
 
-### PAN-3605 (rank 67)
+### PAN-3605 (rank 66)
 
 New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.
 
-### PAN-3557 (rank 68)
+### PAN-3557 (rank 67)
 
 New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
 
-### PAN-3543 (rank 69)
+### PAN-3543 (rank 68)
 
 New this pass. A completed-handoff agent owed rework after a blocked verdict cannot be started at all: pan start refuses and recommends --fresh, --fresh gives the identical refusal, and reset-session is refused too because the durable plane reconstructs the session pointer. The refusal message names an action the operator cannot take, which is the self-contradictory-deadlock family PAN-3526 opened.
 
-### PAN-3964 (rank 70)
+### PAN-3964 (rank 69)
 
 Operator: "I didn't want it cut." Every v1 affordance gets a home derived from the flywheel conversation, .pan/ files, the pipeline journal and merge-train endpoints; no new SQLite table. Larger UI work; ranked below the pipeline breakers.
 
-### PAN-3522 (rank 71)
+### PAN-3522 (rank 70)
 
 New this pass. Under a CPU storm the supervisor watchdog counted probe timeouts through a new generation's 138-second boot warm phase and killed it anyway, producing four restarts in ten minutes, racing spawns on port 3012, and a WATCHDOG GIVING UP. Each restart re-triggered docker stack rebuilds, feeding the storm. The probe budget has to know the difference between starved and starting.
 
-### PAN-3314 (rank 72)
+### PAN-3314 (rank 71)
 
 New this pass. Every agent pane is a child of one transient tmux-server unit, so agent memory is the unit's memory and systemd-oomd's kill decision is all-or-nothing: one hungry agent takes the entire fleet with it. That has now happened twice, the second time killing seven work agents, four strikes and a live review convoy. Blast-radius containment is a different fix from choosing a better victim.
 
-### PAN-3278 (rank 73)
+### PAN-3278 (rank 72)
 
 Triage: the auto-requeue machinery cited targeted the deleted review_status table; verify review-dispatch-after-PR-open against the current mechanism (see PAN-3939 for the post-cut reproduction). Rank held.
 
-### PAN-3237 (rank 74)
+### PAN-3237 (rank 73)
 
 Triage: markWorkspaceStuck is gone but the root cause (409 capacity refusal mapped to guardrails) lives in the handoff path; verify against current planning-to-work handoff. Rank held.
 
-### PAN-3234 (rank 75)
+### PAN-3234 (rank 74)
 
 Triage: verify whether blocking-choice-menu detection is wired to the current liveness/health surface. Rank held.
 
-### PAN-3205 (rank 76)
+### PAN-3205 (rank 75)
 
 New this pass. The deployment gate's queue message is unusually good — it names the holders, the queue age, and warns against forcing — and it promises a 'next verification boundary' trigger that does not exist. Every holder cleared and the deploy never fired; the live build stayed stale for 35 minutes until a manual reload. A correct-sounding instruction that cannot happen is worse than no message.
 
-### PAN-3118 (rank 77)
+### PAN-3118 (rank 76)
 
 Triage: verify "running at $0.00 with no capacity fallback" against the current liveness definition. Rank held.
 
-### PAN-3106 (rank 78)
+### PAN-3106 (rank 77)
 
 New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
 
-### PAN-3100 (rank 79)
+### PAN-3100 (rank 78)
 
 New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
 
-### PAN-3677 (rank 80)
+### PAN-3677 (rank 79)
 
 Planning agents wedge after a background Explore task finishes; parent never consumes the result. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
+
+### PAN-3096 (rank 80)
+
+New this pass. pan done's preflight blocks on the generated .devcontainer/ and dev artifacts, and with only commit/discard/surface offered, agents invented their own exits: one attempted to delete workspace infrastructure, another committed a wrapper-repo gitignore change that moved HEAD and fed a four-hour review reset loop. A gate that pushes agents toward destructive workarounds needs fixing at the gate.
 
 
 <!-- machine-readable; do not hand-edit below this line -->
@@ -1191,10 +1190,10 @@ Planning agents wedge after a background Explore task finishes; parent never con
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-20T23:11:01.164669Z",
+  "generatedAt": "2026-09-20T23:37:49.042Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 856,
+  "openCount": 855,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1405,21 +1404,8 @@ Planning agents wedge after a background Explore task finishes; parent never con
       "planning": "auto"
     },
     {
-      "issue": "PAN-3963",
-      "rank": 17,
-      "size": "S",
-      "importance": "critical",
-      "score": 92,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Merge train dies on every batch: uat_generation_members FK still points at the dead issues table; 3 stuck generations in 5h",
-      "rationale": "Verified root cause: the FK into the pre-cut issues cache throws on the first post-cut issue, the exception escapes assembleUatGeneration, and the reconciler re-assembles hourly, creating worktrees for nothing. Nothing merges through the train until this lands — the single most pipeline-blocking open bug. Drop the FK, fail loudly, cap re-assembly.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3679",
-      "rank": 18,
+      "rank": 17,
       "size": "M",
       "importance": "critical",
       "score": 90,
@@ -1432,7 +1418,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3966",
-      "rank": 19,
+      "rank": 18,
       "size": "S",
       "importance": "critical",
       "score": 90,
@@ -1445,7 +1431,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3939",
-      "rank": 20,
+      "rank": 19,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1453,6 +1439,19 @@ Planning agents wedge after a background Explore task finishes; parent never con
       "dependsOn": [],
       "why": "Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive",
       "rationale": "Reproduced on PAN-3705 during the cut e2e: an errored codex reviewer blocked every later review request for 15 minutes; pan review abort left the shell alive. Liveness in both guards must come from the backend-aware isAlive. Sibling of PAN-3921 for the resume path.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3973",
+      "rank": 20,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Post-cut nothing lands a finished strike: prompt still says the Deacon merges it; open a PR on completion and rewrite the prompt",
+      "rationale": "New since the prior run. Strikes are the pipeline's self-repair path, and today a strike's pushed fix sits unmerged until an operator notices (PAN-3963 waited 3+ hours and was landed by hand as PR #3972). That undermines every critical bug above it that a strike would otherwise fix, so it ranks with the post-cut critical bugs. Option (a) in the body — the strike opens a PR on completion and the prompt says so — is a small change consistent with docs/MERGE-WORKFLOW.md step 4; option (b) would resurrect a deacon-lite landing routine the cut deleted.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1470,21 +1469,8 @@ Planning agents wedge after a background Explore task finishes; parent never con
       "planning": "auto"
     },
     {
-      "issue": "PAN-3973",
-      "rank": 22,
-      "size": "S",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Post-cut nothing lands a finished strike: prompt still says the Deacon merges it; open a PR on completion and rewrite the prompt",
-      "rationale": "New since the prior run. Strikes are the pipeline's self-repair path, and today a strike's pushed fix sits unmerged until an operator notices (PAN-3963 waited 3+ hours and was landed by hand as PR #3972). That undermines every critical bug above it that a strike would otherwise fix, so it ranks with the post-cut critical bugs. Option (a) in the body — the strike opens a PR on completion and the prompt says so — is a small change consistent with docs/MERGE-WORKFLOW.md step 4; option (b) would resurrect a deacon-lite landing routine the cut deleted.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3566",
-      "rank": 23,
+      "rank": 22,
       "size": "XS",
       "importance": "critical",
       "score": 92,
@@ -1497,7 +1483,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3952",
-      "rank": 24,
+      "rank": 23,
       "size": "S",
       "importance": "critical",
       "score": 85,
@@ -1510,7 +1496,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3285",
-      "rank": 25,
+      "rank": 24,
       "size": "M",
       "importance": "critical",
       "score": 92,
@@ -1523,7 +1509,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3960",
-      "rank": 26,
+      "rank": 25,
       "size": "M",
       "importance": "critical",
       "score": 84,
@@ -1536,7 +1522,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3524",
-      "rank": 27,
+      "rank": 26,
       "size": "M",
       "importance": "critical",
       "score": 90,
@@ -1549,7 +1535,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3962",
-      "rank": 28,
+      "rank": 27,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -1562,7 +1548,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3250",
-      "rank": 29,
+      "rank": 28,
       "size": "S",
       "importance": "critical",
       "score": 90,
@@ -1575,7 +1561,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3946",
-      "rank": 30,
+      "rank": 29,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -1588,7 +1574,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2954",
-      "rank": 31,
+      "rank": 30,
       "size": "XS",
       "importance": "critical",
       "score": 90,
@@ -1601,7 +1587,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3935",
-      "rank": 32,
+      "rank": 31,
       "size": "S",
       "importance": "critical",
       "score": 82,
@@ -1614,7 +1600,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3969",
-      "rank": 33,
+      "rank": 32,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -1627,7 +1613,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3657",
-      "rank": 34,
+      "rank": 33,
       "size": "S",
       "importance": "critical",
       "score": 88,
@@ -1640,7 +1626,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3947",
-      "rank": 35,
+      "rank": 34,
       "size": "S",
       "importance": "critical",
       "score": 80,
@@ -1653,7 +1639,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3565",
-      "rank": 36,
+      "rank": 35,
       "size": "M",
       "importance": "critical",
       "score": 88,
@@ -1666,7 +1652,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3554",
-      "rank": 37,
+      "rank": 36,
       "size": "M",
       "importance": "critical",
       "score": 88,
@@ -1679,7 +1665,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3532",
-      "rank": 38,
+      "rank": 37,
       "size": "S",
       "importance": "critical",
       "score": 88,
@@ -1692,7 +1678,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3965",
-      "rank": 39,
+      "rank": 38,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -1705,7 +1691,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3685",
-      "rank": 40,
+      "rank": 39,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -1718,7 +1704,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3085",
-      "rank": 41,
+      "rank": 40,
       "size": "XS",
       "importance": "critical",
       "score": 88,
@@ -1731,7 +1717,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3653",
-      "rank": 42,
+      "rank": 41,
       "size": "M",
       "importance": "critical",
       "score": 86,
@@ -1744,7 +1730,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3630",
-      "rank": 43,
+      "rank": 42,
       "size": "M",
       "importance": "critical",
       "score": 86,
@@ -1757,7 +1743,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3805",
-      "rank": 44,
+      "rank": 43,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1770,7 +1756,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3560",
-      "rank": 45,
+      "rank": 44,
       "size": "M",
       "importance": "critical",
       "score": 86,
@@ -1783,7 +1769,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3520",
-      "rank": 46,
+      "rank": 45,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1796,7 +1782,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3967",
-      "rank": 47,
+      "rank": 46,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -1809,7 +1795,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3953",
-      "rank": 48,
+      "rank": 47,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -1822,7 +1808,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3500",
-      "rank": 49,
+      "rank": 48,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1835,7 +1821,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3313",
-      "rank": 50,
+      "rank": 49,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -1843,6 +1829,19 @@ Planning agents wedge after a background Explore task finishes; parent never con
       "dependsOn": [],
       "why": "A transient upstream stream error benches CLIProxy's only auth: ~70% of GPT-routed inference 503s with a message that blames credentials.",
       "rationale": "New this pass. A transient upstream stream error benches CLIProxy's only auth entry, so every GPT-routed request returns 503 auth_unavailable until an internal cooldown lapses — 35 failures against 14 successes in one hour, with valid credentials throughout. The message reads as 'your credentials are gone' and sends the operator to re-authenticate, which fixes nothing. Every GPT-routed agent on the machine is affected at once.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3282",
+      "rank": 50,
+      "size": "M",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Review agents die before writing a verdict across 5 issues and 2 projects, leaving a verdict-shaped status with no artifact behind it.",
+      "rationale": "New this pass. Review agents terminate before writing their report across five issues and two projects, twice recurring after a successful recovery, leaving a verdict-shaped status with no artifact behind it and a stuck flag that blocks progress until someone restarts the reviewer by hand. This is the upstream condition PAN-3283 then converts into a false passed verdict.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1860,21 +1859,8 @@ Planning agents wedge after a background Explore task finishes; parent never con
       "planning": "auto"
     },
     {
-      "issue": "PAN-3282",
-      "rank": 52,
-      "size": "M",
-      "importance": "critical",
-      "score": 86,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Review agents die before writing a verdict across 5 issues and 2 projects, leaving a verdict-shaped status with no artifact behind it.",
-      "rationale": "New this pass. Review agents terminate before writing their report across five issues and two projects, twice recurring after a successful recovery, leaving a verdict-shaped status with no artifact behind it and a stuck flag that blocks progress until someone restarts the reviewer by hand. This is the upstream condition PAN-3283 then converts into a false passed verdict.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3898",
-      "rank": 53,
+      "rank": 52,
       "size": "M",
       "importance": "critical",
       "score": 86,
@@ -1887,7 +1873,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3905",
-      "rank": 54,
+      "rank": 53,
       "size": "S",
       "importance": "critical",
       "score": 85,
@@ -1900,7 +1886,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2695",
-      "rank": 55,
+      "rank": 54,
       "size": "S",
       "importance": "high",
       "score": 85,
@@ -1913,7 +1899,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2742",
-      "rank": 56,
+      "rank": 55,
       "size": "S",
       "importance": "high",
       "score": 85,
@@ -1926,7 +1912,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2706",
-      "rank": 57,
+      "rank": 56,
       "size": "M",
       "importance": "high",
       "score": 84,
@@ -1939,7 +1925,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2700",
-      "rank": 58,
+      "rank": 57,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -1952,7 +1938,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1560",
-      "rank": 59,
+      "rank": 58,
       "size": "XS",
       "importance": "high",
       "score": 84,
@@ -1965,7 +1951,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3936",
-      "rank": 60,
+      "rank": 59,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -1978,7 +1964,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2828",
-      "rank": 61,
+      "rank": 60,
       "size": "S",
       "importance": "critical",
       "score": 93,
@@ -1991,7 +1977,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2874",
-      "rank": 62,
+      "rank": 61,
       "size": "M",
       "importance": "critical",
       "score": 92,
@@ -2006,7 +1992,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2883",
-      "rank": 63,
+      "rank": 62,
       "size": "M",
       "importance": "high",
       "score": 84,
@@ -2021,7 +2007,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2806",
-      "rank": 64,
+      "rank": 63,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -2034,7 +2020,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2940",
-      "rank": 65,
+      "rank": 64,
       "size": "M",
       "importance": "critical",
       "score": 92,
@@ -2047,7 +2033,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3708",
-      "rank": 66,
+      "rank": 65,
       "size": "M",
       "importance": "critical",
       "score": 84,
@@ -2060,7 +2046,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3605",
-      "rank": 67,
+      "rank": 66,
       "size": "XS",
       "importance": "high",
       "score": 84,
@@ -2073,7 +2059,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3557",
-      "rank": 68,
+      "rank": 67,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2086,7 +2072,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3543",
-      "rank": 69,
+      "rank": 68,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2099,7 +2085,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3964",
-      "rank": 70,
+      "rank": 69,
       "size": "L",
       "importance": "high",
       "score": 70,
@@ -2112,7 +2098,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3522",
-      "rank": 71,
+      "rank": 70,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2125,7 +2111,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3314",
-      "rank": 72,
+      "rank": 71,
       "size": "M",
       "importance": "critical",
       "score": 84,
@@ -2138,7 +2124,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3278",
-      "rank": 73,
+      "rank": 72,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2151,7 +2137,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3237",
-      "rank": 74,
+      "rank": 73,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2164,7 +2150,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3234",
-      "rank": 75,
+      "rank": 74,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2177,7 +2163,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3205",
-      "rank": 76,
+      "rank": 75,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2190,7 +2176,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3118",
-      "rank": 77,
+      "rank": 76,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2203,7 +2189,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3106",
-      "rank": 78,
+      "rank": 77,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2216,7 +2202,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3100",
-      "rank": 79,
+      "rank": 78,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2229,7 +2215,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3677",
-      "rank": 80,
+      "rank": 79,
       "size": "M",
       "importance": "high",
       "score": 82,
@@ -2242,7 +2228,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3096",
-      "rank": 81,
+      "rank": 80,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2255,7 +2241,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3084",
-      "rank": 82,
+      "rank": 81,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2268,7 +2254,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3043",
-      "rank": 83,
+      "rank": 82,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -2281,7 +2267,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1824",
-      "rank": 84,
+      "rank": 83,
       "size": "S",
       "importance": "high",
       "score": 84,
@@ -2294,7 +2280,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2932",
-      "rank": 85,
+      "rank": 84,
       "size": "S",
       "importance": "high",
       "score": 83,
@@ -2309,7 +2295,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2935",
-      "rank": 86,
+      "rank": 85,
       "size": "S",
       "importance": "critical",
       "score": 91,
@@ -2322,7 +2308,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2337",
-      "rank": 87,
+      "rank": 86,
       "size": "XS",
       "importance": "critical",
       "score": 90,
@@ -2335,7 +2321,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2422",
-      "rank": 88,
+      "rank": 87,
       "size": "XS",
       "importance": "high",
       "score": 83,
@@ -2350,7 +2336,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2699",
-      "rank": 89,
+      "rank": 88,
       "size": "XS",
       "importance": "high",
       "score": 83,
@@ -2363,7 +2349,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2957",
-      "rank": 90,
+      "rank": 89,
       "size": "XS",
       "importance": "high",
       "score": 83,
@@ -2378,7 +2364,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2850",
-      "rank": 91,
+      "rank": 90,
       "size": "M",
       "importance": "high",
       "score": 83,
@@ -2391,7 +2377,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2758",
-      "rank": 92,
+      "rank": 91,
       "size": "S",
       "importance": "critical",
       "score": 90,
@@ -2404,7 +2390,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2817",
-      "rank": 93,
+      "rank": 92,
       "size": "M",
       "importance": "high",
       "score": 83,
@@ -2417,7 +2403,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2813",
-      "rank": 94,
+      "rank": 93,
       "size": "M",
       "importance": "high",
       "score": 83,
@@ -2430,7 +2416,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2668",
-      "rank": 95,
+      "rank": 94,
       "size": "M",
       "importance": "high",
       "score": 82,
@@ -2443,7 +2429,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2569",
-      "rank": 96,
+      "rank": 95,
       "size": "XS",
       "importance": "critical",
       "score": 88,
@@ -2456,7 +2442,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3899",
-      "rank": 97,
+      "rank": 96,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2469,7 +2455,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3811",
-      "rank": 98,
+      "rank": 97,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -2482,7 +2468,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2179",
-      "rank": 99,
+      "rank": 98,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2495,7 +2481,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2169",
-      "rank": 100,
+      "rank": 99,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2508,7 +2494,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2734",
-      "rank": 101,
+      "rank": 100,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2521,7 +2507,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3697",
-      "rank": 102,
+      "rank": 101,
       "size": "XS",
       "importance": "high",
       "score": 82,
@@ -2533,7 +2519,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3633",
-      "rank": 103,
+      "rank": 102,
       "size": "S",
       "importance": "high",
       "score": 82,
@@ -2545,7 +2531,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3104",
-      "rank": 104,
+      "rank": 103,
       "size": "S",
       "importance": "critical",
       "score": 82,
@@ -2558,7 +2544,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3099",
-      "rank": 105,
+      "rank": 104,
       "size": "XS",
       "importance": "critical",
       "score": 82,
@@ -2570,7 +2556,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3044",
-      "rank": 106,
+      "rank": 105,
       "size": "XS",
       "importance": "critical",
       "score": 82,
@@ -2583,7 +2569,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3040",
-      "rank": 107,
+      "rank": 106,
       "size": "S",
       "importance": "critical",
       "score": 82,
@@ -2595,7 +2581,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3023",
-      "rank": 108,
+      "rank": 107,
       "size": "S",
       "importance": "critical",
       "score": 82,
@@ -2607,7 +2593,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1618",
-      "rank": 109,
+      "rank": 108,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -2620,7 +2606,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3916",
-      "rank": 110,
+      "rank": 109,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -2633,7 +2619,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3900",
-      "rank": 111,
+      "rank": 110,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -2646,7 +2632,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3793",
-      "rank": 112,
+      "rank": 111,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -2659,7 +2645,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2639",
-      "rank": 113,
+      "rank": 112,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -2674,7 +2660,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2331",
-      "rank": 114,
+      "rank": 113,
       "size": "S",
       "importance": "high",
       "score": 81,
@@ -2687,7 +2673,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2333",
-      "rank": 115,
+      "rank": 114,
       "size": "M",
       "importance": "high",
       "score": 81,
@@ -2700,7 +2686,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3948",
-      "rank": 116,
+      "rank": 115,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -2713,7 +2699,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2511",
-      "rank": 117,
+      "rank": 116,
       "size": "XS",
       "importance": "high",
       "score": 81,
@@ -2726,7 +2712,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2763",
-      "rank": 118,
+      "rank": 117,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2739,7 +2725,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2170",
-      "rank": 119,
+      "rank": 118,
       "size": "XS",
       "importance": "high",
       "score": 80,
@@ -2752,7 +2738,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1198",
-      "rank": 120,
+      "rank": 119,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2765,7 +2751,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3954",
-      "rank": 121,
+      "rank": 120,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -2778,7 +2764,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2106",
-      "rank": 122,
+      "rank": 121,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2791,7 +2777,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2880",
-      "rank": 123,
+      "rank": 122,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -2806,7 +2792,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2966",
-      "rank": 124,
+      "rank": 123,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2819,7 +2805,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2945",
-      "rank": 125,
+      "rank": 124,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2832,7 +2818,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2680",
-      "rank": 126,
+      "rank": 125,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -2845,7 +2831,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3540",
-      "rank": 127,
+      "rank": 126,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -2858,7 +2844,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3734",
-      "rank": 128,
+      "rank": 127,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2870,7 +2856,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3621",
-      "rank": 129,
+      "rank": 128,
       "size": "M",
       "importance": "high",
       "score": 80,
@@ -2882,7 +2868,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3555",
-      "rank": 130,
+      "rank": 129,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2894,7 +2880,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3498",
-      "rank": 131,
+      "rank": 130,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2906,7 +2892,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3496",
-      "rank": 132,
+      "rank": 131,
       "size": "XS",
       "importance": "high",
       "score": 80,
@@ -2918,7 +2904,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3081",
-      "rank": 133,
+      "rank": 132,
       "size": "S",
       "importance": "high",
       "score": 80,
@@ -2930,7 +2916,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2627",
-      "rank": 134,
+      "rank": 133,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -2943,7 +2929,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2324",
-      "rank": 135,
+      "rank": 134,
       "size": "XS",
       "importance": "high",
       "score": 79,
@@ -2956,7 +2942,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2165",
-      "rank": 136,
+      "rank": 135,
       "size": "XS",
       "importance": "high",
       "score": 79,
@@ -2969,7 +2955,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2905",
-      "rank": 137,
+      "rank": 136,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -2982,7 +2968,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2259",
-      "rank": 138,
+      "rank": 137,
       "size": "S",
       "importance": "critical",
       "score": 86,
@@ -2995,7 +2981,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2379",
-      "rank": 139,
+      "rank": 138,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3008,7 +2994,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2421",
-      "rank": 140,
+      "rank": 139,
       "size": "XS",
       "importance": "high",
       "score": 79,
@@ -3021,7 +3007,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2430",
-      "rank": 141,
+      "rank": 140,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3034,7 +3020,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2593",
-      "rank": 142,
+      "rank": 141,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3047,7 +3033,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2656",
-      "rank": 143,
+      "rank": 142,
       "size": "S",
       "importance": "high",
       "score": 79,
@@ -3060,7 +3046,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2080",
-      "rank": 144,
+      "rank": 143,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3073,7 +3059,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1775",
-      "rank": 145,
+      "rank": 144,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3086,7 +3072,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1436",
-      "rank": 146,
+      "rank": 145,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3099,7 +3085,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3556",
-      "rank": 147,
+      "rank": 146,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3111,7 +3097,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3553",
-      "rank": 148,
+      "rank": 147,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3123,7 +3109,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3535",
-      "rank": 149,
+      "rank": 148,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3135,7 +3121,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3429",
-      "rank": 150,
+      "rank": 149,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3147,7 +3133,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3397",
-      "rank": 151,
+      "rank": 150,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3159,7 +3145,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3325",
-      "rank": 152,
+      "rank": 151,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3171,7 +3157,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3317",
-      "rank": 153,
+      "rank": 152,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3183,7 +3169,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3284",
-      "rank": 154,
+      "rank": 153,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3195,7 +3181,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3270",
-      "rank": 155,
+      "rank": 154,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3207,7 +3193,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3689",
-      "rank": 156,
+      "rank": 155,
       "size": "S",
       "importance": "high",
       "score": 66,
@@ -3219,7 +3205,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3257",
-      "rank": 157,
+      "rank": 156,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3231,7 +3217,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3188",
-      "rank": 158,
+      "rank": 157,
       "size": "XS",
       "importance": "high",
       "score": 78,
@@ -3243,7 +3229,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3129",
-      "rank": 159,
+      "rank": 158,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3255,7 +3241,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3120",
-      "rank": 160,
+      "rank": 159,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3267,7 +3253,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3077",
-      "rank": 161,
+      "rank": 160,
       "size": "XS",
       "importance": "high",
       "score": 78,
@@ -3279,7 +3265,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3062",
-      "rank": 162,
+      "rank": 161,
       "size": "M",
       "importance": "high",
       "score": 78,
@@ -3291,7 +3277,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3048",
-      "rank": 163,
+      "rank": 162,
       "size": "XS",
       "importance": "high",
       "score": 78,
@@ -3304,7 +3290,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3032",
-      "rank": 164,
+      "rank": 163,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3316,7 +3302,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3881",
-      "rank": 165,
+      "rank": 164,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3329,7 +3315,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3833",
-      "rank": 166,
+      "rank": 165,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3342,7 +3328,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3902",
-      "rank": 167,
+      "rank": 166,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3355,7 +3341,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3826",
-      "rank": 168,
+      "rank": 167,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -3368,7 +3354,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3854",
-      "rank": 169,
+      "rank": 168,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -3381,7 +3367,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3866",
-      "rank": 170,
+      "rank": 169,
       "size": "S",
       "importance": "high",
       "score": 70,
@@ -3394,7 +3380,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3307",
-      "rank": 171,
+      "rank": 170,
       "size": "XS",
       "importance": "high",
       "score": 62,
@@ -3407,7 +3393,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3022",
-      "rank": 172,
+      "rank": 171,
       "size": "S",
       "importance": "high",
       "score": 78,
@@ -3420,7 +3406,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2642",
-      "rank": 173,
+      "rank": 172,
       "size": "XL",
       "importance": "high",
       "score": 77,
@@ -3434,7 +3420,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1868",
-      "rank": 174,
+      "rank": 173,
       "size": "XS",
       "importance": "high",
       "score": 77,
@@ -3447,7 +3433,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3942",
-      "rank": 175,
+      "rank": 174,
       "size": "L",
       "importance": "high",
       "score": 66,
@@ -3455,6 +3441,19 @@ Planning agents wedge after a background Explore task finishes; parent never con
       "dependsOn": [],
       "why": "First-class skill bundles: named manifests activated at global/project/issue/conversation scope with layered resolution and provenance",
       "rationale": "Labelled architecture, so at least high by the label floor. Defines the activation and precedence model that PAN-1357/1655/1656 each cover a slice of; PAN-3943 and PAN-2444 hang off it. Large; planning label — a PRD comes first.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-1042",
+      "rank": 175,
+      "size": "S",
+      "importance": "high",
+      "score": 77,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions",
+      "rationale": "cost_events retention — 14 months of granular rows accumulating with no policy; DB bloat.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3471,21 +3470,8 @@ Planning agents wedge after a background Explore task finishes; parent never con
       "planning": "auto"
     },
     {
-      "issue": "PAN-1042",
-      "rank": 177,
-      "size": "S",
-      "importance": "high",
-      "score": 77,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "cost_events retention: 14 months of granular rows accumulating with ad-hoc partial deletions",
-      "rationale": "cost_events retention — 14 months of granular rows accumulating with no policy; DB bloat.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3943",
-      "rank": 178,
+      "rank": 177,
       "size": "L",
       "importance": "high",
       "score": 60,
@@ -3500,7 +3486,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-570",
-      "rank": 179,
+      "rank": 178,
       "size": "XS",
       "importance": "high",
       "score": 77,
@@ -3515,7 +3501,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2059",
-      "rank": 180,
+      "rank": 179,
       "size": "XL",
       "importance": "high",
       "score": 77,
@@ -3529,7 +3515,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2376",
-      "rank": 181,
+      "rank": 180,
       "size": "XL",
       "importance": "high",
       "score": 77,
@@ -3543,7 +3529,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3775",
-      "rank": 182,
+      "rank": 181,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3555,7 +3541,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3652",
-      "rank": 183,
+      "rank": 182,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -3567,7 +3553,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3579",
-      "rank": 184,
+      "rank": 183,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -3579,7 +3565,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3541",
-      "rank": 185,
+      "rank": 184,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3591,7 +3577,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3463",
-      "rank": 186,
+      "rank": 185,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3603,7 +3589,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3460",
-      "rank": 187,
+      "rank": 186,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3615,7 +3601,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3454",
-      "rank": 188,
+      "rank": 187,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -3627,7 +3613,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3432",
-      "rank": 189,
+      "rank": 188,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3639,7 +3625,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3306",
-      "rank": 190,
+      "rank": 189,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3651,7 +3637,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3297",
-      "rank": 191,
+      "rank": 190,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3663,7 +3649,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3274",
-      "rank": 192,
+      "rank": 191,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3676,7 +3662,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3267",
-      "rank": 193,
+      "rank": 192,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3688,7 +3674,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3261",
-      "rank": 194,
+      "rank": 193,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3700,7 +3686,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3256",
-      "rank": 195,
+      "rank": 194,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3712,7 +3698,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3190",
-      "rank": 196,
+      "rank": 195,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -3724,7 +3710,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3174",
-      "rank": 197,
+      "rank": 196,
       "size": "S",
       "importance": "high",
       "score": 76,
@@ -3736,7 +3722,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3050",
-      "rank": 198,
+      "rank": 197,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -3748,7 +3734,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2995",
-      "rank": 199,
+      "rank": 198,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -3760,7 +3746,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2980",
-      "rank": 200,
+      "rank": 199,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -3772,7 +3758,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3769",
-      "rank": 201,
+      "rank": 200,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3784,7 +3770,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3760",
-      "rank": 202,
+      "rank": 201,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3796,7 +3782,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3629",
-      "rank": 203,
+      "rank": 202,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3808,7 +3794,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3517",
-      "rank": 204,
+      "rank": 203,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3820,7 +3806,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3508",
-      "rank": 205,
+      "rank": 204,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3832,7 +3818,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3303",
-      "rank": 206,
+      "rank": 205,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3844,7 +3830,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3280",
-      "rank": 207,
+      "rank": 206,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3856,7 +3842,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3196",
-      "rank": 208,
+      "rank": 207,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3868,7 +3854,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3186",
-      "rank": 209,
+      "rank": 208,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -3880,7 +3866,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3185",
-      "rank": 210,
+      "rank": 209,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -3892,7 +3878,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3179",
-      "rank": 211,
+      "rank": 210,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -3904,7 +3890,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3176",
-      "rank": 212,
+      "rank": 211,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3916,7 +3902,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3130",
-      "rank": 213,
+      "rank": 212,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3928,7 +3914,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3047",
-      "rank": 214,
+      "rank": 213,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -3943,7 +3929,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3046",
-      "rank": 215,
+      "rank": 214,
       "size": "XS",
       "importance": "high",
       "score": 74,
@@ -3955,7 +3941,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1711",
-      "rank": 216,
+      "rank": 215,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -3968,7 +3954,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3667",
-      "rank": 217,
+      "rank": 216,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -3980,7 +3966,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3536",
-      "rank": 218,
+      "rank": 217,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -3992,7 +3978,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3527",
-      "rank": 219,
+      "rank": 218,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -4004,7 +3990,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3510",
-      "rank": 220,
+      "rank": 219,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4016,7 +4002,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3355",
-      "rank": 221,
+      "rank": 220,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -4028,7 +4014,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3289",
-      "rank": 222,
+      "rank": 221,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4040,7 +4026,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3245",
-      "rank": 223,
+      "rank": 222,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -4052,7 +4038,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3218",
-      "rank": 224,
+      "rank": 223,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4064,7 +4050,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3210",
-      "rank": 225,
+      "rank": 224,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -4076,7 +4062,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3167",
-      "rank": 226,
+      "rank": 225,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4088,7 +4074,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3113",
-      "rank": 227,
+      "rank": 226,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -4100,7 +4086,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3108",
-      "rank": 228,
+      "rank": 227,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -4112,7 +4098,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3094",
-      "rank": 229,
+      "rank": 228,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -4124,7 +4110,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3012",
-      "rank": 230,
+      "rank": 229,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -4136,7 +4122,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3627",
-      "rank": 231,
+      "rank": 230,
       "size": "XS",
       "importance": "high",
       "score": 70,
@@ -4148,7 +4134,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3617",
-      "rank": 232,
+      "rank": 231,
       "size": "S",
       "importance": "high",
       "score": 70,
@@ -4160,7 +4146,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3308",
-      "rank": 233,
+      "rank": 232,
       "size": "XS",
       "importance": "high",
       "score": 70,
@@ -4172,7 +4158,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3276",
-      "rank": 234,
+      "rank": 233,
       "size": "XS",
       "importance": "high",
       "score": 70,
@@ -4184,7 +4170,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3235",
-      "rank": 235,
+      "rank": 234,
       "size": "S",
       "importance": "high",
       "score": 70,
@@ -4196,7 +4182,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3855",
-      "rank": 236,
+      "rank": 235,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -4209,7 +4195,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3789",
-      "rank": 237,
+      "rank": 236,
       "size": "L",
       "importance": "medium",
       "score": 58,
@@ -4222,7 +4208,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3175",
-      "rank": 238,
+      "rank": 237,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -4234,7 +4220,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3015",
-      "rank": 239,
+      "rank": 238,
       "size": "L",
       "importance": "high",
       "score": 70,
@@ -4246,7 +4232,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3518",
-      "rank": 240,
+      "rank": 239,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -4261,7 +4247,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3445",
-      "rank": 241,
+      "rank": 240,
       "size": "XS",
       "importance": "high",
       "score": 68,
@@ -4273,7 +4259,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3332",
-      "rank": 242,
+      "rank": 241,
       "size": "S",
       "importance": "high",
       "score": 68,
@@ -4285,7 +4271,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3295",
-      "rank": 243,
+      "rank": 242,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -4297,7 +4283,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3236",
-      "rank": 244,
+      "rank": 243,
       "size": "XS",
       "importance": "high",
       "score": 68,
@@ -4310,7 +4296,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3013",
-      "rank": 245,
+      "rank": 244,
       "size": "XS",
       "importance": "high",
       "score": 68,
@@ -4322,7 +4308,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3771",
-      "rank": 246,
+      "rank": 245,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -4334,7 +4320,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3533",
-      "rank": 247,
+      "rank": 246,
       "size": "L",
       "importance": "high",
       "score": 66,
@@ -4346,7 +4332,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3107",
-      "rank": 248,
+      "rank": 247,
       "size": "S",
       "importance": "high",
       "score": 66,
@@ -4358,7 +4344,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3762",
-      "rank": 249,
+      "rank": 248,
       "size": "XL",
       "importance": "high",
       "score": 64,
@@ -4371,7 +4357,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1666",
-      "rank": 250,
+      "rank": 249,
       "size": "XL",
       "importance": "medium",
       "score": 63,
@@ -4385,7 +4371,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1556",
-      "rank": 251,
+      "rank": 250,
       "size": "S",
       "importance": "high",
       "score": 77,
@@ -4398,7 +4384,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2188",
-      "rank": 252,
+      "rank": 251,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -4411,7 +4397,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2190",
-      "rank": 253,
+      "rank": 252,
       "size": "L",
       "importance": "high",
       "score": 76,
@@ -4424,7 +4410,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2233",
-      "rank": 254,
+      "rank": 253,
       "size": "L",
       "importance": "high",
       "score": 76,
@@ -4437,7 +4423,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2008",
-      "rank": 255,
+      "rank": 254,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -4452,7 +4438,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1325",
-      "rank": 256,
+      "rank": 255,
       "size": "M",
       "importance": "high",
       "score": 75,
@@ -4464,7 +4450,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1728",
-      "rank": 257,
+      "rank": 256,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -4477,7 +4463,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2241",
-      "rank": 258,
+      "rank": 257,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4489,7 +4475,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2242",
-      "rank": 259,
+      "rank": 258,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4501,7 +4487,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2240",
-      "rank": 260,
+      "rank": 259,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4513,7 +4499,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2243",
-      "rank": 261,
+      "rank": 260,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4525,7 +4511,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2202",
-      "rank": 262,
+      "rank": 261,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4537,7 +4523,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2195",
-      "rank": 263,
+      "rank": 262,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4550,7 +4536,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2237",
-      "rank": 264,
+      "rank": 263,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4562,7 +4548,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2487",
-      "rank": 265,
+      "rank": 264,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4574,7 +4560,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2469",
-      "rank": 266,
+      "rank": 265,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4586,7 +4572,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2212",
-      "rank": 267,
+      "rank": 266,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4598,7 +4584,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2213",
-      "rank": 268,
+      "rank": 267,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4610,7 +4596,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2211",
-      "rank": 269,
+      "rank": 268,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4622,7 +4608,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2210",
-      "rank": 270,
+      "rank": 269,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4634,7 +4620,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2201",
-      "rank": 271,
+      "rank": 270,
       "size": "XS",
       "importance": "high",
       "score": 73,
@@ -4646,7 +4632,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2646",
-      "rank": 272,
+      "rank": 271,
       "size": "XS",
       "importance": "high",
       "score": 73,
@@ -4658,7 +4644,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3751",
-      "rank": 273,
+      "rank": 272,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -4671,7 +4657,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2652",
-      "rank": 274,
+      "rank": 273,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -4683,7 +4669,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2755",
-      "rank": 275,
+      "rank": 274,
       "size": "S",
       "importance": "high",
       "score": 73,
@@ -4695,7 +4681,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2754",
-      "rank": 276,
+      "rank": 275,
       "size": "S",
       "importance": "high",
       "score": 73,
@@ -4707,7 +4693,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2809",
-      "rank": 277,
+      "rank": 276,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -4719,7 +4705,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2810",
-      "rank": 278,
+      "rank": 277,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -4731,7 +4717,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2495",
-      "rank": 279,
+      "rank": 278,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4743,7 +4729,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2478",
-      "rank": 280,
+      "rank": 279,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4755,7 +4741,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1710",
-      "rank": 281,
+      "rank": 280,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4767,7 +4753,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3420",
-      "rank": 282,
+      "rank": 281,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4780,7 +4766,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1558",
-      "rank": 283,
+      "rank": 282,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -4792,7 +4778,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1766",
-      "rank": 284,
+      "rank": 283,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4804,7 +4790,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2027",
-      "rank": 285,
+      "rank": 284,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -4816,7 +4802,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2266",
-      "rank": 286,
+      "rank": 285,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -4828,7 +4814,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1578",
-      "rank": 287,
+      "rank": 286,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -4840,7 +4826,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1538",
-      "rank": 288,
+      "rank": 287,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -4852,7 +4838,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-687",
-      "rank": 289,
+      "rank": 288,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -4864,7 +4850,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-466",
-      "rank": 290,
+      "rank": 289,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -4876,7 +4862,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-465",
-      "rank": 291,
+      "rank": 290,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -4888,7 +4874,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-463",
-      "rank": 292,
+      "rank": 291,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -4900,7 +4886,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1142",
-      "rank": 293,
+      "rank": 292,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -4912,7 +4898,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1424",
-      "rank": 294,
+      "rank": 293,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -4924,7 +4910,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1196",
-      "rank": 295,
+      "rank": 294,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -4936,7 +4922,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1311",
-      "rank": 296,
+      "rank": 295,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -4948,7 +4934,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1313",
-      "rank": 297,
+      "rank": 296,
       "size": "L",
       "importance": "high",
       "score": 70,
@@ -4960,7 +4946,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1246",
-      "rank": 298,
+      "rank": 297,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -4972,7 +4958,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1253",
-      "rank": 299,
+      "rank": 298,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -4985,7 +4971,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1254",
-      "rank": 300,
+      "rank": 299,
       "size": "L",
       "importance": "high",
       "score": 70,
@@ -4997,7 +4983,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1357",
-      "rank": 301,
+      "rank": 300,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -5009,7 +4995,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1915",
-      "rank": 302,
+      "rank": 301,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5021,7 +5007,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1435",
-      "rank": 303,
+      "rank": 302,
       "size": "XS",
       "importance": "high",
       "score": 69,
@@ -5033,7 +5019,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1672",
-      "rank": 304,
+      "rank": 303,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5045,7 +5031,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1640",
-      "rank": 305,
+      "rank": 304,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5057,7 +5043,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2351",
-      "rank": 306,
+      "rank": 305,
       "size": "XS",
       "importance": "high",
       "score": 69,
@@ -5069,6 +5055,20 @@ Planning agents wedge after a background Explore task finishes; parent never con
       "rationale": "Body updated since the last pass; it remains the security prerequisite that blocks every other Overdeck Anywhere phase, so the rank holds.",
       "gate": "auto",
       "planning": "skip"
+    },
+    {
+      "issue": "PAN-2350",
+      "rank": 306,
+      "size": "L",
+      "importance": "high",
+      "score": 69,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Epic container for Overdeck Anywhere P0-P3; PAN-3762 proposes replacing the relay-first direction with per-machine server federation.",
+      "rationale": "Triage: PRDs now live under .pan/drafts on the feature branch; verify retrievability before any phase starts. Technical content not superseded. Epic; operator gate=blocked and planning=skip preserved; contains edge to closed PAN-3513 dropped.",
+      "gate": "blocked",
+      "planning": "skip",
+      "isEpic": true
     },
     {
       "issue": "PAN-3787",
@@ -5084,22 +5084,8 @@ Planning agents wedge after a background Explore task finishes; parent never con
       "planning": "auto"
     },
     {
-      "issue": "PAN-2350",
-      "rank": 308,
-      "size": "L",
-      "importance": "high",
-      "score": 69,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Epic container for Overdeck Anywhere P0-P3; PAN-3762 proposes replacing the relay-first direction with per-machine server federation.",
-      "rationale": "Triage: PRDs now live under .pan/drafts on the feature branch; verify retrievability before any phase starts. Technical content not superseded. Epic; operator gate=blocked and planning=skip preserved; contains edge to closed PAN-3513 dropped.",
-      "gate": "blocked",
-      "planning": "skip",
-      "isEpic": true
-    },
-    {
       "issue": "PAN-1217",
-      "rank": 309,
+      "rank": 308,
       "size": "XS",
       "importance": "high",
       "score": 69,
@@ -5111,7 +5097,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2079",
-      "rank": 310,
+      "rank": 309,
       "size": "M",
       "importance": "high",
       "score": 60,
@@ -5124,7 +5110,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3934",
-      "rank": 311,
+      "rank": 310,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -5139,7 +5125,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1219",
-      "rank": 312,
+      "rank": 311,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5152,7 +5138,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1209",
-      "rank": 313,
+      "rank": 312,
       "size": "S",
       "importance": "low",
       "score": 15,
@@ -5165,7 +5151,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1451",
-      "rank": 314,
+      "rank": 313,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5178,7 +5164,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1452",
-      "rank": 315,
+      "rank": 314,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5190,7 +5176,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1454",
-      "rank": 316,
+      "rank": 315,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5202,7 +5188,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1553",
-      "rank": 317,
+      "rank": 316,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5214,7 +5200,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1504",
-      "rank": 318,
+      "rank": 317,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5226,7 +5212,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1480",
-      "rank": 319,
+      "rank": 318,
       "size": "L",
       "importance": "high",
       "score": 68,
@@ -5238,7 +5224,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1479",
-      "rank": 320,
+      "rank": 319,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5250,7 +5236,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2950",
-      "rank": 321,
+      "rank": 320,
       "size": "L",
       "importance": "high",
       "score": 68,
@@ -5262,7 +5248,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2836",
-      "rank": 322,
+      "rank": 321,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5274,7 +5260,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2720",
-      "rank": 323,
+      "rank": 322,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5286,7 +5272,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2650",
-      "rank": 324,
+      "rank": 323,
       "size": "L",
       "importance": "high",
       "score": 67,
@@ -5298,7 +5284,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2358",
-      "rank": 325,
+      "rank": 324,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5310,7 +5296,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2334",
-      "rank": 326,
+      "rank": 325,
       "size": "XS",
       "importance": "high",
       "score": 67,
@@ -5322,7 +5308,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2308",
-      "rank": 327,
+      "rank": 326,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5335,7 +5321,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2193",
-      "rank": 328,
+      "rank": 327,
       "size": "S",
       "importance": "high",
       "score": 66,
@@ -5347,7 +5333,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1984",
-      "rank": 329,
+      "rank": 328,
       "size": "XS",
       "importance": "high",
       "score": 66,
@@ -5360,7 +5346,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1913",
-      "rank": 330,
+      "rank": 329,
       "size": "XS",
       "importance": "high",
       "score": 66,
@@ -5372,7 +5358,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1906",
-      "rank": 331,
+      "rank": 330,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -5384,7 +5370,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1544",
-      "rank": 332,
+      "rank": 331,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -5396,7 +5382,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-955",
-      "rank": 333,
+      "rank": 332,
       "size": "S",
       "importance": "high",
       "score": 66,
@@ -5408,7 +5394,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-807",
-      "rank": 334,
+      "rank": 333,
       "size": "L",
       "importance": "high",
       "score": 66,
@@ -5420,7 +5406,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-630",
-      "rank": 335,
+      "rank": 334,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -5432,7 +5418,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-471",
-      "rank": 336,
+      "rank": 335,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -5444,7 +5430,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-438",
-      "rank": 337,
+      "rank": 336,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -5456,7 +5442,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-578",
-      "rank": 338,
+      "rank": 337,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -5468,7 +5454,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2921",
-      "rank": 339,
+      "rank": 338,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -5480,7 +5466,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3920",
-      "rank": 340,
+      "rank": 339,
       "size": "L",
       "importance": "medium",
       "score": 58,
@@ -5495,7 +5481,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2839",
-      "rank": 341,
+      "rank": 340,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -5507,7 +5493,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2824",
-      "rank": 342,
+      "rank": 341,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -5519,7 +5505,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2792",
-      "rank": 343,
+      "rank": 342,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -5531,7 +5517,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2761",
-      "rank": 344,
+      "rank": 343,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5543,7 +5529,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2738",
-      "rank": 345,
+      "rank": 344,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5555,7 +5541,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2717",
-      "rank": 346,
+      "rank": 345,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5567,7 +5553,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2697",
-      "rank": 347,
+      "rank": 346,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5579,7 +5565,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2696",
-      "rank": 348,
+      "rank": 347,
       "size": "XS",
       "importance": "medium",
       "score": 62,
@@ -5592,7 +5578,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2691",
-      "rank": 349,
+      "rank": 348,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5604,7 +5590,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2686",
-      "rank": 350,
+      "rank": 349,
       "size": "XS",
       "importance": "medium",
       "score": 62,
@@ -5617,7 +5603,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3701",
-      "rank": 351,
+      "rank": 350,
       "size": "L",
       "importance": "high",
       "score": 62,
@@ -5629,7 +5615,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3090",
-      "rank": 352,
+      "rank": 351,
       "size": "M",
       "importance": "high",
       "score": 62,
@@ -5641,7 +5627,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2672",
-      "rank": 353,
+      "rank": 352,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -5653,7 +5639,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2670",
-      "rank": 354,
+      "rank": 353,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -5665,7 +5651,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2664",
-      "rank": 355,
+      "rank": 354,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -5677,7 +5663,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2663",
-      "rank": 356,
+      "rank": 355,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -5689,7 +5675,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2649",
-      "rank": 357,
+      "rank": 356,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -5701,7 +5687,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2580",
-      "rank": 358,
+      "rank": 357,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -5713,7 +5699,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2572",
-      "rank": 359,
+      "rank": 358,
       "size": "M",
       "importance": "medium",
       "score": 61,
@@ -5725,7 +5711,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2563",
-      "rank": 360,
+      "rank": 359,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -5737,7 +5723,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2554",
-      "rank": 361,
+      "rank": 360,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -5749,7 +5735,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2550",
-      "rank": 362,
+      "rank": 361,
       "size": "XS",
       "importance": "medium",
       "score": 60,
@@ -5761,7 +5747,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2547",
-      "rank": 363,
+      "rank": 362,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -5773,7 +5759,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2546",
-      "rank": 364,
+      "rank": 363,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -5785,7 +5771,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3504",
-      "rank": 365,
+      "rank": 364,
       "size": "XS",
       "importance": "high",
       "score": 60,
@@ -5797,7 +5783,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3003",
-      "rank": 366,
+      "rank": 365,
       "size": "XS",
       "importance": "medium",
       "score": 60,
@@ -5809,7 +5795,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2501",
-      "rank": 367,
+      "rank": 366,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -5821,7 +5807,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2492",
-      "rank": 368,
+      "rank": 367,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -5834,7 +5820,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2491",
-      "rank": 369,
+      "rank": 368,
       "size": "M",
       "importance": "medium",
       "score": 59,
@@ -5846,7 +5832,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2489",
-      "rank": 370,
+      "rank": 369,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -5858,7 +5844,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2465",
-      "rank": 371,
+      "rank": 370,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -5870,7 +5856,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2454",
-      "rank": 372,
+      "rank": 371,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -5882,7 +5868,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2428",
-      "rank": 373,
+      "rank": 372,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -5894,7 +5880,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2423",
-      "rank": 374,
+      "rank": 373,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -5906,7 +5892,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2416",
-      "rank": 375,
+      "rank": 374,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -5918,7 +5904,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2408",
-      "rank": 376,
+      "rank": 375,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -5931,7 +5917,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2395",
-      "rank": 377,
+      "rank": 376,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -5943,7 +5929,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2381",
-      "rank": 378,
+      "rank": 377,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -5955,7 +5941,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2287",
-      "rank": 379,
+      "rank": 378,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -5967,7 +5953,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3661",
-      "rank": 380,
+      "rank": 379,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -5979,7 +5965,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3288",
-      "rank": 381,
+      "rank": 380,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -5991,7 +5977,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3164",
-      "rank": 382,
+      "rank": 381,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -6003,7 +5989,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3121",
-      "rank": 383,
+      "rank": 382,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -6015,7 +6001,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3014",
-      "rank": 384,
+      "rank": 383,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -6027,7 +6013,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3944",
-      "rank": 385,
+      "rank": 384,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -6040,7 +6026,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3911",
-      "rank": 386,
+      "rank": 385,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -6053,7 +6039,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3915",
-      "rank": 387,
+      "rank": 386,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -6066,7 +6052,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3829",
-      "rank": 388,
+      "rank": 387,
       "size": "L",
       "importance": "medium",
       "score": 58,
@@ -6079,7 +6065,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2280",
-      "rank": 389,
+      "rank": 388,
       "size": "M",
       "importance": "medium",
       "score": 57,
@@ -6091,7 +6077,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2197",
-      "rank": 390,
+      "rank": 389,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6103,7 +6089,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2186",
-      "rank": 391,
+      "rank": 390,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6116,7 +6102,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2069",
-      "rank": 392,
+      "rank": 391,
       "size": "XS",
       "importance": "medium",
       "score": 57,
@@ -6128,7 +6114,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1918",
-      "rank": 393,
+      "rank": 392,
       "size": "XS",
       "importance": "medium",
       "score": 57,
@@ -6140,7 +6126,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1912",
-      "rank": 394,
+      "rank": 393,
       "size": "XS",
       "importance": "medium",
       "score": 57,
@@ -6152,7 +6138,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1846",
-      "rank": 395,
+      "rank": 394,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6165,7 +6151,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1830",
-      "rank": 396,
+      "rank": 395,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6177,7 +6163,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1816",
-      "rank": 397,
+      "rank": 396,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6189,7 +6175,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1795",
-      "rank": 398,
+      "rank": 397,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6201,7 +6187,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1774",
-      "rank": 399,
+      "rank": 398,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6213,7 +6199,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1769",
-      "rank": 400,
+      "rank": 399,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6225,7 +6211,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1761",
-      "rank": 401,
+      "rank": 400,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6237,7 +6223,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1755",
-      "rank": 402,
+      "rank": 401,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6249,7 +6235,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3516",
-      "rank": 403,
+      "rank": 402,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6261,7 +6247,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3455",
-      "rank": 404,
+      "rank": 403,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6273,7 +6259,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3117",
-      "rank": 405,
+      "rank": 404,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6285,7 +6271,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3036",
-      "rank": 406,
+      "rank": 405,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6297,7 +6283,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3016",
-      "rank": 407,
+      "rank": 406,
       "size": "M",
       "importance": "medium",
       "score": 56,
@@ -6309,7 +6295,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3890",
-      "rank": 408,
+      "rank": 407,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6322,7 +6308,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3822",
-      "rank": 409,
+      "rank": 408,
       "size": "L",
       "importance": "medium",
       "score": 56,
@@ -6335,7 +6321,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1740",
-      "rank": 410,
+      "rank": 409,
       "size": "XS",
       "importance": "medium",
       "score": 55,
@@ -6348,7 +6334,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1674",
-      "rank": 411,
+      "rank": 410,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6360,7 +6346,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1673",
-      "rank": 412,
+      "rank": 411,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6372,7 +6358,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1669",
-      "rank": 413,
+      "rank": 412,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6384,7 +6370,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1668",
-      "rank": 414,
+      "rank": 413,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6396,7 +6382,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1627",
-      "rank": 415,
+      "rank": 414,
       "size": "M",
       "importance": "medium",
       "score": 55,
@@ -6408,7 +6394,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1624",
-      "rank": 416,
+      "rank": 415,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6420,7 +6406,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3901",
-      "rank": 417,
+      "rank": 416,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6433,7 +6419,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3852",
-      "rank": 418,
+      "rank": 417,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6446,7 +6432,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3862",
-      "rank": 419,
+      "rank": 418,
       "size": "L",
       "importance": "medium",
       "score": 55,
@@ -6459,7 +6445,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1572",
-      "rank": 420,
+      "rank": 419,
       "size": "M",
       "importance": "medium",
       "score": 54,
@@ -6471,7 +6457,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1571",
-      "rank": 421,
+      "rank": 420,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6483,7 +6469,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1565",
-      "rank": 422,
+      "rank": 421,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6495,7 +6481,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1530",
-      "rank": 423,
+      "rank": 422,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6507,7 +6493,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1461",
-      "rank": 424,
+      "rank": 423,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6519,7 +6505,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1449",
-      "rank": 425,
+      "rank": 424,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6531,7 +6517,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1446",
-      "rank": 426,
+      "rank": 425,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6543,7 +6529,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1936",
-      "rank": 427,
+      "rank": 426,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -6556,7 +6542,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1445",
-      "rank": 428,
+      "rank": 427,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6568,7 +6554,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3616",
-      "rank": 429,
+      "rank": 428,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6580,7 +6566,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2982",
-      "rank": 430,
+      "rank": 429,
       "size": "XS",
       "importance": "medium",
       "score": 54,
@@ -6592,7 +6578,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2981",
-      "rank": 431,
+      "rank": 430,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6604,7 +6590,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2976",
-      "rank": 432,
+      "rank": 431,
       "size": "L",
       "importance": "medium",
       "score": 54,
@@ -6616,7 +6602,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1444",
-      "rank": 433,
+      "rank": 432,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6628,7 +6614,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1440",
-      "rank": 434,
+      "rank": 433,
       "size": "S",
       "importance": "low",
       "score": 15,
@@ -6641,7 +6627,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1433",
-      "rank": 435,
+      "rank": 434,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6653,7 +6639,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1416",
-      "rank": 436,
+      "rank": 435,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6665,7 +6651,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1392",
-      "rank": 437,
+      "rank": 436,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -6677,8 +6663,23 @@ Planning agents wedge after a background Explore task finishes; parent never con
       "planning": "auto"
     },
     {
+      "issue": "PAN-3974",
+      "rank": 437,
+      "size": "L",
+      "importance": "medium",
+      "score": 52,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-3937"
+      ],
+      "why": "Companion TERMINAL runs `opencode attach` on the live ACP session/port from PAN-3937; establishes the seam PAN-3835 reuses",
+      "rationale": "New this run: medium/52 — well-specified operator feature: the conversation TERMINAL view attaches a native `opencode attach` client to the same running ACP server and session, with the server resolving port/session/cwd and dashboard delivery staying on the ACP socket. It builds on PAN-3937 (which records `opencode-port` and `acp-session-id` for new OpenCode conversations, in pipeline) and is meant to land the shared companion-terminal lifecycle that PAN-3835 (Codex) reuses, so it ranks above that companion. Size L: domain lifecycle, authenticated routes, frontend seam, tests, and three docs pages.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1330",
-      "rank": 439,
+      "rank": 438,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -6690,7 +6691,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1244",
-      "rank": 440,
+      "rank": 439,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -6702,7 +6703,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1227",
-      "rank": 441,
+      "rank": 440,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -6715,7 +6716,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1226",
-      "rank": 442,
+      "rank": 441,
       "size": "L",
       "importance": "medium",
       "score": 52,
@@ -6727,7 +6728,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1173",
-      "rank": 443,
+      "rank": 442,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -6739,7 +6740,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1154",
-      "rank": 444,
+      "rank": 443,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -6751,7 +6752,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3354",
-      "rank": 445,
+      "rank": 444,
       "size": "XS",
       "importance": "medium",
       "score": 52,
@@ -6763,7 +6764,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3178",
-      "rank": 446,
+      "rank": 445,
       "size": "XL",
       "importance": "medium",
       "score": 52,
@@ -6775,7 +6776,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3017",
-      "rank": 447,
+      "rank": 446,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -6787,7 +6788,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3864",
-      "rank": 448,
+      "rank": 447,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -6800,7 +6801,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3873",
-      "rank": 449,
+      "rank": 448,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -6813,7 +6814,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1150",
-      "rank": 450,
+      "rank": 449,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6825,7 +6826,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1149",
-      "rank": 451,
+      "rank": 450,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6837,7 +6838,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1130",
-      "rank": 452,
+      "rank": 451,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6849,7 +6850,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1129",
-      "rank": 453,
+      "rank": 452,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6861,7 +6862,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1128",
-      "rank": 454,
+      "rank": 453,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6873,7 +6874,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1113",
-      "rank": 455,
+      "rank": 454,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6885,7 +6886,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1068",
-      "rank": 456,
+      "rank": 455,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6897,7 +6898,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3938",
-      "rank": 457,
+      "rank": 456,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -6910,7 +6911,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-933",
-      "rank": 458,
+      "rank": 457,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6922,7 +6923,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-932",
-      "rank": 459,
+      "rank": 458,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6934,7 +6935,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-927",
-      "rank": 460,
+      "rank": 459,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -6946,7 +6947,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-900",
-      "rank": 461,
+      "rank": 460,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6958,7 +6959,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-886",
-      "rank": 462,
+      "rank": 461,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6970,7 +6971,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-778",
-      "rank": 463,
+      "rank": 462,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -6982,7 +6983,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-681",
-      "rank": 464,
+      "rank": 463,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6994,7 +6995,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3732",
-      "rank": 465,
+      "rank": 464,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7006,7 +7007,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3700",
-      "rank": 466,
+      "rank": 465,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7018,7 +7019,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3290",
-      "rank": 467,
+      "rank": 466,
       "size": "XS",
       "importance": "medium",
       "score": 50,
@@ -7030,7 +7031,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3132",
-      "rank": 468,
+      "rank": 467,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7042,7 +7043,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3909",
-      "rank": 469,
+      "rank": 468,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -7055,7 +7056,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3893",
-      "rank": 470,
+      "rank": 469,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7068,7 +7069,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3831",
-      "rank": 471,
+      "rank": 470,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7081,7 +7082,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3867",
-      "rank": 472,
+      "rank": 471,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7094,7 +7095,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-538",
-      "rank": 473,
+      "rank": 472,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -7106,7 +7107,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1164",
-      "rank": 474,
+      "rank": 473,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7118,7 +7119,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3563",
-      "rank": 475,
+      "rank": 474,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7131,7 +7132,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1041",
-      "rank": 476,
+      "rank": 475,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7143,7 +7144,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-924",
-      "rank": 477,
+      "rank": 476,
       "size": "L",
       "importance": "medium",
       "score": 48,
@@ -7155,7 +7156,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3770",
-      "rank": 478,
+      "rank": 477,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7167,7 +7168,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3731",
-      "rank": 479,
+      "rank": 478,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7179,7 +7180,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3530",
-      "rank": 480,
+      "rank": 479,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7191,7 +7192,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3131",
-      "rank": 481,
+      "rank": 480,
       "size": "L",
       "importance": "medium",
       "score": 48,
@@ -7203,7 +7204,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3061",
-      "rank": 482,
+      "rank": 481,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7215,7 +7216,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3057",
-      "rank": 483,
+      "rank": 482,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -7228,7 +7229,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3892",
-      "rank": 484,
+      "rank": 483,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7241,7 +7242,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3827",
-      "rank": 485,
+      "rank": 484,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7254,7 +7255,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-863",
-      "rank": 486,
+      "rank": 485,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7266,7 +7267,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-817",
-      "rank": 487,
+      "rank": 486,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7278,7 +7279,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-802",
-      "rank": 488,
+      "rank": 487,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7290,7 +7291,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-713",
-      "rank": 489,
+      "rank": 488,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7302,7 +7303,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-700",
-      "rank": 490,
+      "rank": 489,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7314,7 +7315,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-646",
-      "rank": 491,
+      "rank": 490,
       "size": "XS",
       "importance": "medium",
       "score": 47,
@@ -7327,7 +7328,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-532",
-      "rank": 492,
+      "rank": 491,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7339,7 +7340,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2896",
-      "rank": 493,
+      "rank": 492,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7351,7 +7352,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2685",
-      "rank": 494,
+      "rank": 493,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7363,7 +7364,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2626",
-      "rank": 495,
+      "rank": 494,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7375,7 +7376,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2625",
-      "rank": 496,
+      "rank": 495,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7387,7 +7388,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2609",
-      "rank": 497,
+      "rank": 496,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7399,7 +7400,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2608",
-      "rank": 498,
+      "rank": 497,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7411,7 +7412,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2582",
-      "rank": 499,
+      "rank": 498,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7423,7 +7424,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2566",
-      "rank": 500,
+      "rank": 499,
       "size": "L",
       "importance": "medium",
       "score": 46,
@@ -7437,7 +7438,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2565",
-      "rank": 501,
+      "rank": 500,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7450,7 +7451,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3735",
-      "rank": 502,
+      "rank": 501,
       "size": "S",
       "importance": "medium",
       "score": 46,
@@ -7462,7 +7463,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3335",
-      "rank": 503,
+      "rank": 502,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7474,7 +7475,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3054",
-      "rank": 504,
+      "rank": 503,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7486,7 +7487,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2977",
-      "rank": 505,
+      "rank": 504,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7500,7 +7501,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2557",
-      "rank": 506,
+      "rank": 505,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7512,7 +7513,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2553",
-      "rank": 507,
+      "rank": 506,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7524,7 +7525,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2521",
-      "rank": 508,
+      "rank": 507,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7536,7 +7537,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2493",
-      "rank": 509,
+      "rank": 508,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7548,7 +7549,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3772",
-      "rank": 510,
+      "rank": 509,
       "size": "XS",
       "importance": "medium",
       "score": 45,
@@ -7560,7 +7561,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3853",
-      "rank": 511,
+      "rank": 510,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7573,7 +7574,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3830",
-      "rank": 512,
+      "rank": 511,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7586,7 +7587,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3863",
-      "rank": 513,
+      "rank": 512,
       "size": "L",
       "importance": "medium",
       "score": 45,
@@ -7601,7 +7602,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2444",
-      "rank": 514,
+      "rank": 513,
       "size": "L",
       "importance": "medium",
       "score": 44,
@@ -7616,7 +7617,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2443",
-      "rank": 515,
+      "rank": 514,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7628,7 +7629,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2442",
-      "rank": 516,
+      "rank": 515,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7640,7 +7641,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2409",
-      "rank": 517,
+      "rank": 516,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7652,7 +7653,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2392",
-      "rank": 518,
+      "rank": 517,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7665,7 +7666,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2335",
-      "rank": 519,
+      "rank": 518,
       "size": "XS",
       "importance": "medium",
       "score": 44,
@@ -7677,7 +7678,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2295",
-      "rank": 520,
+      "rank": 519,
       "size": "L",
       "importance": "medium",
       "score": 44,
@@ -7689,7 +7690,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3767",
-      "rank": 521,
+      "rank": 520,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -7701,7 +7702,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3615",
-      "rank": 522,
+      "rank": 521,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -7713,7 +7714,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3558",
-      "rank": 523,
+      "rank": 522,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -7725,7 +7726,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3469",
-      "rank": 524,
+      "rank": 523,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -7737,7 +7738,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3333",
-      "rank": 525,
+      "rank": 524,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7749,7 +7750,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3058",
-      "rank": 526,
+      "rank": 525,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7761,7 +7762,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2288",
-      "rank": 527,
+      "rank": 526,
       "size": "L",
       "importance": "medium",
       "score": 43,
@@ -7773,7 +7774,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2065",
-      "rank": 528,
+      "rank": 527,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -7785,7 +7786,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2035",
-      "rank": 529,
+      "rank": 528,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -7797,7 +7798,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2034",
-      "rank": 530,
+      "rank": 529,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -7809,7 +7810,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2033",
-      "rank": 531,
+      "rank": 530,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -7821,7 +7822,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2032",
-      "rank": 532,
+      "rank": 531,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -7833,7 +7834,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2031",
-      "rank": 533,
+      "rank": 532,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -7845,7 +7846,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2030",
-      "rank": 534,
+      "rank": 533,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -7857,7 +7858,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2029",
-      "rank": 535,
+      "rank": 534,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -7869,7 +7870,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2028",
-      "rank": 536,
+      "rank": 535,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -7881,7 +7882,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2026",
-      "rank": 537,
+      "rank": 536,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -7893,7 +7894,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2025",
-      "rank": 538,
+      "rank": 537,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -7905,7 +7906,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2024",
-      "rank": 539,
+      "rank": 538,
       "size": "XS",
       "importance": "medium",
       "score": 42,
@@ -7917,7 +7918,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2004",
-      "rank": 540,
+      "rank": 539,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -7929,7 +7930,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1995",
-      "rank": 541,
+      "rank": 540,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -7941,7 +7942,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3739",
-      "rank": 542,
+      "rank": 541,
       "size": "S",
       "importance": "medium",
       "score": 42,
@@ -7953,7 +7954,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3835",
-      "rank": 543,
+      "rank": 542,
       "size": "M",
       "importance": "medium",
       "score": 42,
@@ -7968,7 +7969,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1985",
-      "rank": 544,
+      "rank": 543,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -7980,7 +7981,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1968",
-      "rank": 545,
+      "rank": 544,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -7992,7 +7993,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1967",
-      "rank": 546,
+      "rank": 545,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8005,7 +8006,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1965",
-      "rank": 547,
+      "rank": 546,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8017,7 +8018,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1937",
-      "rank": 548,
+      "rank": 547,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8029,7 +8030,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1926",
-      "rank": 549,
+      "rank": 548,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8041,7 +8042,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1916",
-      "rank": 550,
+      "rank": 549,
       "size": "M",
       "importance": "medium",
       "score": 41,
@@ -8053,7 +8054,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1854",
-      "rank": 551,
+      "rank": 550,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8065,7 +8066,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1853",
-      "rank": 552,
+      "rank": 551,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8077,7 +8078,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1852",
-      "rank": 553,
+      "rank": 552,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8089,7 +8090,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1844",
-      "rank": 554,
+      "rank": 553,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8101,7 +8102,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1840",
-      "rank": 555,
+      "rank": 554,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8113,7 +8114,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1839",
-      "rank": 556,
+      "rank": 555,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8125,7 +8126,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1776",
-      "rank": 557,
+      "rank": 556,
       "size": "M",
       "importance": "medium",
       "score": 40,
@@ -8137,7 +8138,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3706",
-      "rank": 558,
+      "rank": 557,
       "size": "L",
       "importance": "medium",
       "score": 40,
@@ -8149,7 +8150,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3539",
-      "rank": 559,
+      "rank": 558,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8161,7 +8162,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3502",
-      "rank": 560,
+      "rank": 559,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8173,7 +8174,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3837",
-      "rank": 561,
+      "rank": 560,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -8186,7 +8187,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3499",
-      "rank": 562,
+      "rank": 561,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8198,7 +8199,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2978",
-      "rank": 563,
+      "rank": 562,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -8213,7 +8214,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3912",
-      "rank": 564,
+      "rank": 563,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8226,7 +8227,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1754",
-      "rank": 565,
+      "rank": 564,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8238,7 +8239,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1751",
-      "rank": 566,
+      "rank": 565,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8250,7 +8251,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1750",
-      "rank": 567,
+      "rank": 566,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8262,7 +8263,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1748",
-      "rank": 568,
+      "rank": 567,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8274,7 +8275,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1691",
-      "rank": 569,
+      "rank": 568,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8286,7 +8287,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1685",
-      "rank": 570,
+      "rank": 569,
       "size": "XS",
       "importance": "medium",
       "score": 39,
@@ -8298,7 +8299,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1676",
-      "rank": 571,
+      "rank": 570,
       "size": "M",
       "importance": "medium",
       "score": 39,
@@ -8310,7 +8311,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1667",
-      "rank": 572,
+      "rank": 571,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8322,7 +8323,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1657",
-      "rank": 573,
+      "rank": 572,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8334,7 +8335,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1656",
-      "rank": 574,
+      "rank": 573,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8346,7 +8347,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1655",
-      "rank": 575,
+      "rank": 574,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8358,7 +8359,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1654",
-      "rank": 576,
+      "rank": 575,
       "size": "XS",
       "importance": "medium",
       "score": 38,
@@ -8370,7 +8371,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1653",
-      "rank": 577,
+      "rank": 576,
       "size": "XS",
       "importance": "medium",
       "score": 38,
@@ -8382,7 +8383,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1623",
-      "rank": 578,
+      "rank": 577,
       "size": "M",
       "importance": "medium",
       "score": 38,
@@ -8394,7 +8395,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1561",
-      "rank": 579,
+      "rank": 578,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8406,7 +8407,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1550",
-      "rank": 580,
+      "rank": 579,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8418,7 +8419,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1545",
-      "rank": 581,
+      "rank": 580,
       "size": "XS",
       "importance": "medium",
       "score": 37,
@@ -8430,7 +8431,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1542",
-      "rank": 582,
+      "rank": 581,
       "size": "XS",
       "importance": "medium",
       "score": 37,
@@ -8442,7 +8443,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1524",
-      "rank": 583,
+      "rank": 582,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8454,7 +8455,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1490",
-      "rank": 584,
+      "rank": 583,
       "size": "M",
       "importance": "medium",
       "score": 37,
@@ -8466,7 +8467,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1485",
-      "rank": 585,
+      "rank": 584,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8478,7 +8479,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1473",
-      "rank": 586,
+      "rank": 585,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8490,7 +8491,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1443",
-      "rank": 587,
+      "rank": 586,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -8503,7 +8504,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1442",
-      "rank": 588,
+      "rank": 587,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8515,7 +8516,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1432",
-      "rank": 589,
+      "rank": 588,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8527,7 +8528,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1223",
-      "rank": 590,
+      "rank": 589,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8539,7 +8540,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1165",
-      "rank": 591,
+      "rank": 590,
       "size": "M",
       "importance": "medium",
       "score": 36,
@@ -8551,7 +8552,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1151",
-      "rank": 592,
+      "rank": 591,
       "size": "XS",
       "importance": "medium",
       "score": 35,
@@ -8563,7 +8564,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3684",
-      "rank": 593,
+      "rank": 592,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8577,7 +8578,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1060",
-      "rank": 594,
+      "rank": 593,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8589,7 +8590,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1051",
-      "rank": 595,
+      "rank": 594,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8601,7 +8602,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1037",
-      "rank": 596,
+      "rank": 595,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8613,7 +8614,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-958",
-      "rank": 597,
+      "rank": 596,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8625,7 +8626,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-949",
-      "rank": 598,
+      "rank": 597,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8637,7 +8638,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3157",
-      "rank": 599,
+      "rank": 598,
       "size": "XS",
       "importance": "medium",
       "score": 40,
@@ -8650,7 +8651,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3955",
-      "rank": 600,
+      "rank": 599,
       "size": "XS",
       "importance": "low",
       "score": 35,
@@ -8662,7 +8663,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-947",
-      "rank": 601,
+      "rank": 600,
       "size": "M",
       "importance": "medium",
       "score": 35,
@@ -8674,7 +8675,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-938",
-      "rank": 602,
+      "rank": 601,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -8686,7 +8687,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-903",
-      "rank": 603,
+      "rank": 602,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -8698,7 +8699,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-902",
-      "rank": 604,
+      "rank": 603,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -8710,7 +8711,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-901",
-      "rank": 605,
+      "rank": 604,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -8722,7 +8723,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-818",
-      "rank": 606,
+      "rank": 605,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -8734,7 +8735,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-736",
-      "rank": 607,
+      "rank": 606,
       "size": "M",
       "importance": "medium",
       "score": 34,
@@ -8746,7 +8747,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3322",
-      "rank": 608,
+      "rank": 607,
       "size": "XS",
       "importance": "medium",
       "score": 34,
@@ -8758,7 +8759,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-678",
-      "rank": 609,
+      "rank": 608,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8770,7 +8771,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-675",
-      "rank": 610,
+      "rank": 609,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8783,7 +8784,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-654",
-      "rank": 611,
+      "rank": 610,
       "size": "L",
       "importance": "medium",
       "score": 33,
@@ -8795,7 +8796,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-649",
-      "rank": 612,
+      "rank": 611,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8807,7 +8808,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-637",
-      "rank": 613,
+      "rank": 612,
       "size": "XS",
       "importance": "medium",
       "score": 33,
@@ -8819,7 +8820,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-629",
-      "rank": 614,
+      "rank": 613,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8831,7 +8832,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-613",
-      "rank": 615,
+      "rank": 614,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8843,7 +8844,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-607",
-      "rank": 616,
+      "rank": 615,
       "size": "M",
       "importance": "medium",
       "score": 33,
@@ -8855,7 +8856,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-606",
-      "rank": 617,
+      "rank": 616,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8867,7 +8868,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-548",
-      "rank": 618,
+      "rank": 617,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8879,7 +8880,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-546",
-      "rank": 619,
+      "rank": 618,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8891,7 +8892,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-537",
-      "rank": 620,
+      "rank": 619,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8903,7 +8904,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-531",
-      "rank": 621,
+      "rank": 620,
       "size": "XS",
       "importance": "medium",
       "score": 32,
@@ -8915,7 +8916,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-452",
-      "rank": 622,
+      "rank": 621,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8927,7 +8928,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-450",
-      "rank": 623,
+      "rank": 622,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -8939,7 +8940,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1126",
-      "rank": 624,
+      "rank": 623,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -8951,7 +8952,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1066",
-      "rank": 625,
+      "rank": 624,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -8963,7 +8964,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3441",
-      "rank": 626,
+      "rank": 625,
       "size": "L",
       "importance": "low",
       "score": 30,
@@ -8975,7 +8976,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2968",
-      "rank": 627,
+      "rank": 626,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -8987,7 +8988,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2941",
-      "rank": 628,
+      "rank": 627,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -8999,7 +9000,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2936",
-      "rank": 629,
+      "rank": 628,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9011,7 +9012,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2922",
-      "rank": 630,
+      "rank": 629,
       "size": "M",
       "importance": "low",
       "score": 29,
@@ -9023,7 +9024,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2868",
-      "rank": 631,
+      "rank": 630,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9035,7 +9036,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2767",
-      "rank": 632,
+      "rank": 631,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9047,7 +9048,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2679",
-      "rank": 633,
+      "rank": 632,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9059,7 +9060,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2662",
-      "rank": 634,
+      "rank": 633,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9071,7 +9072,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2645",
-      "rank": 635,
+      "rank": 634,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9083,7 +9084,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2635",
-      "rank": 636,
+      "rank": 635,
       "size": "XS",
       "importance": "low",
       "score": 28,
@@ -9095,7 +9096,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2630",
-      "rank": 637,
+      "rank": 636,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9107,7 +9108,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2629",
-      "rank": 638,
+      "rank": 637,
       "size": "M",
       "importance": "low",
       "score": 28,
@@ -9119,7 +9120,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3443",
-      "rank": 639,
+      "rank": 638,
       "size": "L",
       "importance": "low",
       "score": 28,
@@ -9131,7 +9132,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3958",
-      "rank": 640,
+      "rank": 639,
       "size": "XL",
       "importance": "medium",
       "score": 30,
@@ -9146,7 +9147,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2628",
-      "rank": 641,
+      "rank": 640,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9158,7 +9159,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2622",
-      "rank": 642,
+      "rank": 641,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9170,7 +9171,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2600",
-      "rank": 643,
+      "rank": 642,
       "size": "XS",
       "importance": "low",
       "score": 27,
@@ -9182,7 +9183,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2533",
-      "rank": 644,
+      "rank": 643,
       "size": "XS",
       "importance": "low",
       "score": 27,
@@ -9194,7 +9195,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2527",
-      "rank": 645,
+      "rank": 644,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9206,7 +9207,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2514",
-      "rank": 646,
+      "rank": 645,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9218,7 +9219,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2507",
-      "rank": 647,
+      "rank": 646,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9231,7 +9232,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2505",
-      "rank": 648,
+      "rank": 647,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9243,7 +9244,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2504",
-      "rank": 649,
+      "rank": 648,
       "size": "M",
       "importance": "low",
       "score": 27,
@@ -9255,7 +9256,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2449",
-      "rank": 650,
+      "rank": 649,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9267,7 +9268,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3940",
-      "rank": 651,
+      "rank": 650,
       "size": "XL",
       "importance": "low",
       "score": 30,
@@ -9281,7 +9282,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2424",
-      "rank": 652,
+      "rank": 651,
       "size": "L",
       "importance": "low",
       "score": 26,
@@ -9295,7 +9296,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2406",
-      "rank": 653,
+      "rank": 652,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9308,7 +9309,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2394",
-      "rank": 654,
+      "rank": 653,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9320,7 +9321,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2356",
-      "rank": 655,
+      "rank": 654,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9333,7 +9334,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2355",
-      "rank": 656,
+      "rank": 655,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9346,7 +9347,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2354",
-      "rank": 657,
+      "rank": 656,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9359,7 +9360,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2352",
-      "rank": 658,
+      "rank": 657,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9372,7 +9373,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2353",
-      "rank": 659,
+      "rank": 658,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9385,7 +9386,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3133",
-      "rank": 660,
+      "rank": 659,
       "size": "S",
       "importance": "low",
       "score": 26,
@@ -9397,7 +9398,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3011",
-      "rank": 661,
+      "rank": 660,
       "size": "M",
       "importance": "low",
       "score": 26,
@@ -9413,7 +9414,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3957",
-      "rank": 662,
+      "rank": 661,
       "size": "L",
       "importance": "low",
       "score": 25,
@@ -9425,7 +9426,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2282",
-      "rank": 663,
+      "rank": 662,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9437,7 +9438,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2091",
-      "rank": 664,
+      "rank": 663,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9449,7 +9450,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2085",
-      "rank": 665,
+      "rank": 664,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9461,7 +9462,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2084",
-      "rank": 666,
+      "rank": 665,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9473,7 +9474,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2083",
-      "rank": 667,
+      "rank": 666,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9488,7 +9489,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2082",
-      "rank": 668,
+      "rank": 667,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9500,7 +9501,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2074",
-      "rank": 669,
+      "rank": 668,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9512,7 +9513,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2046",
-      "rank": 670,
+      "rank": 669,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9524,7 +9525,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2006",
-      "rank": 671,
+      "rank": 670,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9536,7 +9537,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3919",
-      "rank": 672,
+      "rank": 671,
       "size": "S",
       "importance": "low",
       "score": 25,
@@ -9549,7 +9550,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2005",
-      "rank": 673,
+      "rank": 672,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9561,7 +9562,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2002",
-      "rank": 674,
+      "rank": 673,
       "size": "XS",
       "importance": "low",
       "score": 24,
@@ -9573,7 +9574,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1999",
-      "rank": 675,
+      "rank": 674,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9585,7 +9586,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1986",
-      "rank": 676,
+      "rank": 675,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9597,7 +9598,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1983",
-      "rank": 677,
+      "rank": 676,
       "size": "L",
       "importance": "low",
       "score": 24,
@@ -9609,7 +9610,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1980",
-      "rank": 678,
+      "rank": 677,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9622,7 +9623,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1958",
-      "rank": 679,
+      "rank": 678,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9634,7 +9635,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1949",
-      "rank": 680,
+      "rank": 679,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9647,7 +9648,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1907",
-      "rank": 681,
+      "rank": 680,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9659,7 +9660,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1895",
-      "rank": 682,
+      "rank": 681,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9671,7 +9672,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1878",
-      "rank": 683,
+      "rank": 682,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9683,7 +9684,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1782",
-      "rank": 684,
+      "rank": 683,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9695,7 +9696,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1773",
-      "rank": 685,
+      "rank": 684,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9707,7 +9708,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1646",
-      "rank": 686,
+      "rank": 685,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9719,7 +9720,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1643",
-      "rank": 687,
+      "rank": 686,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9731,7 +9732,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1592",
-      "rank": 688,
+      "rank": 687,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9743,7 +9744,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1581",
-      "rank": 689,
+      "rank": 688,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9755,7 +9756,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1552",
-      "rank": 690,
+      "rank": 689,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9767,7 +9768,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1533",
-      "rank": 691,
+      "rank": 690,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9779,7 +9780,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1483",
-      "rank": 692,
+      "rank": 691,
       "size": "XS",
       "importance": "low",
       "score": 22,
@@ -9791,7 +9792,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1482",
-      "rank": 693,
+      "rank": 692,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9803,7 +9804,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1481",
-      "rank": 694,
+      "rank": 693,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9815,7 +9816,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1356",
-      "rank": 695,
+      "rank": 694,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9827,7 +9828,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1242",
-      "rank": 696,
+      "rank": 695,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9839,7 +9840,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1222",
-      "rank": 697,
+      "rank": 696,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9851,7 +9852,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1208",
-      "rank": 698,
+      "rank": 697,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9863,7 +9864,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1166",
-      "rank": 699,
+      "rank": 698,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9875,7 +9876,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1153",
-      "rank": 700,
+      "rank": 699,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9887,7 +9888,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2667",
-      "rank": 701,
+      "rank": 700,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9900,7 +9901,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1152",
-      "rank": 702,
+      "rank": 701,
       "size": "XS",
       "importance": "low",
       "score": 21,
@@ -9912,7 +9913,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1135",
-      "rank": 703,
+      "rank": 702,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9924,7 +9925,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1133",
-      "rank": 704,
+      "rank": 703,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9937,7 +9938,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1123",
-      "rank": 705,
+      "rank": 704,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -9949,7 +9950,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1121",
-      "rank": 706,
+      "rank": 705,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9961,7 +9962,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1117",
-      "rank": 707,
+      "rank": 706,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9973,7 +9974,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1116",
-      "rank": 708,
+      "rank": 707,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9985,7 +9986,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1065",
-      "rank": 709,
+      "rank": 708,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9997,7 +9998,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1064",
-      "rank": 710,
+      "rank": 709,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10009,7 +10010,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1063",
-      "rank": 712,
+      "rank": 710,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10033,7 +10034,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3971",
-      "rank": 713,
+      "rank": 712,
       "size": "L",
       "importance": "low",
       "score": 20,
@@ -10045,7 +10046,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3768",
-      "rank": 714,
+      "rank": 713,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10057,7 +10058,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3034",
-      "rank": 715,
+      "rank": 714,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10069,7 +10070,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2983",
-      "rank": 716,
+      "rank": 715,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10081,7 +10082,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3778",
-      "rank": 717,
+      "rank": 716,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -10094,7 +10095,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3824",
-      "rank": 718,
+      "rank": 717,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10107,7 +10108,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3823",
-      "rank": 719,
+      "rank": 718,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10120,7 +10121,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1049",
-      "rank": 720,
+      "rank": 719,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10132,7 +10133,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-984",
-      "rank": 721,
+      "rank": 720,
       "size": "XS",
       "importance": "low",
       "score": 19,
@@ -10144,7 +10145,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-962",
-      "rank": 722,
+      "rank": 721,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10157,7 +10158,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-961",
-      "rank": 723,
+      "rank": 722,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10169,7 +10170,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-943",
-      "rank": 724,
+      "rank": 723,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10181,7 +10182,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-908",
-      "rank": 725,
+      "rank": 724,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10193,7 +10194,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-898",
-      "rank": 726,
+      "rank": 725,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10205,7 +10206,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-853",
-      "rank": 727,
+      "rank": 726,
       "size": "L",
       "importance": "low",
       "score": 19,
@@ -10217,7 +10218,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-833",
-      "rank": 728,
+      "rank": 727,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10229,7 +10230,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-832",
-      "rank": 729,
+      "rank": 728,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10242,7 +10243,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-810",
-      "rank": 730,
+      "rank": 729,
       "size": "XS",
       "importance": "low",
       "score": 18,
@@ -10255,7 +10256,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-797",
-      "rank": 731,
+      "rank": 730,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10267,7 +10268,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-793",
-      "rank": 732,
+      "rank": 731,
       "size": "XS",
       "importance": "low",
       "score": 18,
@@ -10279,7 +10280,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-791",
-      "rank": 733,
+      "rank": 732,
       "size": "XS",
       "importance": "low",
       "score": 18,
@@ -10291,7 +10292,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-790",
-      "rank": 734,
+      "rank": 733,
       "size": "L",
       "importance": "low",
       "score": 18,
@@ -10303,7 +10304,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-786",
-      "rank": 735,
+      "rank": 734,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10315,7 +10316,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-777",
-      "rank": 736,
+      "rank": 735,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10327,7 +10328,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-775",
-      "rank": 737,
+      "rank": 736,
       "size": "L",
       "importance": "low",
       "score": 18,
@@ -10339,7 +10340,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3456",
-      "rank": 738,
+      "rank": 737,
       "size": "XS",
       "importance": "low",
       "score": 18,
@@ -10351,7 +10352,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-774",
-      "rank": 739,
+      "rank": 738,
       "size": "XS",
       "importance": "low",
       "score": 17,
@@ -10363,7 +10364,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-773",
-      "rank": 740,
+      "rank": 739,
       "size": "XS",
       "importance": "low",
       "score": 17,
@@ -10375,7 +10376,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-772",
-      "rank": 741,
+      "rank": 740,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10388,7 +10389,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-771",
-      "rank": 742,
+      "rank": 741,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10400,7 +10401,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-769",
-      "rank": 743,
+      "rank": 742,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10415,7 +10416,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-765",
-      "rank": 744,
+      "rank": 743,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10427,7 +10428,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-764",
-      "rank": 745,
+      "rank": 744,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10439,7 +10440,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-762",
-      "rank": 746,
+      "rank": 745,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10451,7 +10452,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-752",
-      "rank": 747,
+      "rank": 746,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10463,7 +10464,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-751",
-      "rank": 748,
+      "rank": 747,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10475,7 +10476,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-750",
-      "rank": 749,
+      "rank": 748,
       "size": "L",
       "importance": "low",
       "score": 16,
@@ -10487,7 +10488,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-749",
-      "rank": 750,
+      "rank": 749,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10499,7 +10500,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-747",
-      "rank": 751,
+      "rank": 750,
       "size": "XS",
       "importance": "low",
       "score": 16,
@@ -10511,7 +10512,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-743",
-      "rank": 752,
+      "rank": 751,
       "size": "XS",
       "importance": "low",
       "score": 16,
@@ -10523,7 +10524,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-738",
-      "rank": 753,
+      "rank": 752,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10535,7 +10536,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-735",
-      "rank": 754,
+      "rank": 753,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10547,7 +10548,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-730",
-      "rank": 755,
+      "rank": 754,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10559,7 +10560,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-702",
-      "rank": 756,
+      "rank": 755,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10571,7 +10572,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-701",
-      "rank": 757,
+      "rank": 756,
       "size": "XS",
       "importance": "low",
       "score": 15,
@@ -10583,7 +10584,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-663",
-      "rank": 758,
+      "rank": 757,
       "size": "XS",
       "importance": "low",
       "score": 15,
@@ -10595,7 +10596,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-660",
-      "rank": 759,
+      "rank": 758,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10607,7 +10608,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-658",
-      "rank": 760,
+      "rank": 759,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10622,7 +10623,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-624",
-      "rank": 761,
+      "rank": 760,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10634,7 +10635,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-623",
-      "rank": 762,
+      "rank": 761,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10646,7 +10647,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-622",
-      "rank": 763,
+      "rank": 762,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10658,7 +10659,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-604",
-      "rank": 764,
+      "rank": 763,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10670,7 +10671,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-603",
-      "rank": 765,
+      "rank": 764,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10682,7 +10683,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-591",
-      "rank": 766,
+      "rank": 765,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10694,7 +10695,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-589",
-      "rank": 767,
+      "rank": 766,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10706,7 +10707,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-576",
-      "rank": 768,
+      "rank": 767,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10718,7 +10719,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-571",
-      "rank": 769,
+      "rank": 768,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10730,7 +10731,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-568",
-      "rank": 770,
+      "rank": 769,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10742,7 +10743,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-565",
-      "rank": 771,
+      "rank": 770,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10754,7 +10755,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-564",
-      "rank": 772,
+      "rank": 771,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10766,7 +10767,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-554",
-      "rank": 773,
+      "rank": 772,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10778,7 +10779,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-543",
-      "rank": 774,
+      "rank": 773,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10790,7 +10791,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-483",
-      "rank": 775,
+      "rank": 774,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10802,7 +10803,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-480",
-      "rank": 776,
+      "rank": 775,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10814,7 +10815,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-476",
-      "rank": 777,
+      "rank": 776,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10826,7 +10827,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-468",
-      "rank": 778,
+      "rank": 777,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10838,7 +10839,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-461",
-      "rank": 779,
+      "rank": 778,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10850,7 +10851,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-459",
-      "rank": 780,
+      "rank": 779,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10862,7 +10863,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-407",
-      "rank": 781,
+      "rank": 780,
       "size": "XS",
       "importance": "low",
       "score": 13,
@@ -10874,7 +10875,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2348",
-      "rank": 782,
+      "rank": 781,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10886,7 +10887,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2346",
-      "rank": 783,
+      "rank": 782,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10899,7 +10900,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2345",
-      "rank": 784,
+      "rank": 783,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10912,7 +10913,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2344",
-      "rank": 785,
+      "rank": 784,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10925,7 +10926,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2343",
-      "rank": 786,
+      "rank": 785,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10937,7 +10938,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2073",
-      "rank": 787,
+      "rank": 786,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10949,7 +10950,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2071",
-      "rank": 788,
+      "rank": 787,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10961,7 +10962,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2068",
-      "rank": 789,
+      "rank": 788,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10973,7 +10974,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2067",
-      "rank": 790,
+      "rank": 789,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10985,7 +10986,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1684",
-      "rank": 791,
+      "rank": 790,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10997,7 +10998,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1683",
-      "rank": 792,
+      "rank": 791,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11009,7 +11010,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1474",
-      "rank": 793,
+      "rank": 792,
       "size": "M",
       "importance": "low",
       "score": 9,
@@ -11021,7 +11022,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-1469",
-      "rank": 794,
+      "rank": 793,
       "size": "M",
       "importance": "low",
       "score": 9,
@@ -11033,7 +11034,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-674",
-      "rank": 795,
+      "rank": 794,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11045,7 +11046,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-634",
-      "rank": 796,
+      "rank": 795,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11057,7 +11058,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2908",
-      "rank": 797,
+      "rank": 796,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11069,7 +11070,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-106",
-      "rank": 798,
+      "rank": 797,
       "size": "M",
       "importance": "high",
       "score": 77,
@@ -11082,7 +11083,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-262",
-      "rank": 799,
+      "rank": 798,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -11094,7 +11095,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-176",
-      "rank": 800,
+      "rank": 799,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -11106,7 +11107,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-334",
-      "rank": 801,
+      "rank": 800,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11118,7 +11119,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-324",
-      "rank": 802,
+      "rank": 801,
       "size": "XS",
       "importance": "medium",
       "score": 49,
@@ -11131,7 +11132,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-304",
-      "rank": 803,
+      "rank": 802,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11143,7 +11144,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-245",
-      "rank": 804,
+      "rank": 803,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11155,7 +11156,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-244",
-      "rank": 805,
+      "rank": 804,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11167,7 +11168,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-178",
-      "rank": 806,
+      "rank": 805,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -11180,7 +11181,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-113",
-      "rank": 807,
+      "rank": 806,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -11192,7 +11193,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-49",
-      "rank": 808,
+      "rank": 807,
       "size": "XS",
       "importance": "medium",
       "score": 48,
@@ -11204,7 +11205,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-294",
-      "rank": 809,
+      "rank": 808,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -11216,7 +11217,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-293",
-      "rank": 810,
+      "rank": 809,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11228,7 +11229,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-277",
-      "rank": 811,
+      "rank": 810,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11240,7 +11241,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-258",
-      "rank": 812,
+      "rank": 811,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11252,7 +11253,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-255",
-      "rank": 813,
+      "rank": 812,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11264,7 +11265,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-252",
-      "rank": 814,
+      "rank": 813,
       "size": "XS",
       "importance": "medium",
       "score": 31,
@@ -11276,7 +11277,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-243",
-      "rank": 815,
+      "rank": 814,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11288,7 +11289,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-77",
-      "rank": 816,
+      "rank": 815,
       "size": "XS",
       "importance": "medium",
       "score": 31,
@@ -11300,7 +11301,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-54",
-      "rank": 817,
+      "rank": 816,
       "size": "L",
       "importance": "medium",
       "score": 31,
@@ -11312,7 +11313,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-38",
-      "rank": 818,
+      "rank": 817,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -11324,7 +11325,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-37",
-      "rank": 819,
+      "rank": 818,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -11336,7 +11337,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3564",
-      "rank": 820,
+      "rank": 819,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -11349,7 +11350,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3571",
-      "rank": 821,
+      "rank": 820,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11362,7 +11363,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3248",
-      "rank": 822,
+      "rank": 821,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11375,7 +11376,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3244",
-      "rank": 823,
+      "rank": 822,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11388,7 +11389,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3078",
-      "rank": 824,
+      "rank": 823,
       "size": "S",
       "importance": "low",
       "score": 18,
@@ -11401,7 +11402,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2775",
-      "rank": 825,
+      "rank": 824,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11414,7 +11415,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2960",
-      "rank": 826,
+      "rank": 825,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11427,7 +11428,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3634",
-      "rank": 827,
+      "rank": 826,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11440,7 +11441,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3505",
-      "rank": 828,
+      "rank": 827,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11453,7 +11454,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2659",
-      "rank": 829,
+      "rank": 828,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11466,7 +11467,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3321",
-      "rank": 830,
+      "rank": 829,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11479,7 +11480,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3914",
-      "rank": 831,
+      "rank": 830,
       "size": "S",
       "importance": "low",
       "score": 18,
@@ -11492,7 +11493,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-3868",
-      "rank": 832,
+      "rank": 831,
       "size": "XS",
       "importance": "low",
       "score": 15,
@@ -11505,7 +11506,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-299",
-      "rank": 833,
+      "rank": 832,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11517,7 +11518,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-298",
-      "rank": 834,
+      "rank": 833,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11529,7 +11530,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-297",
-      "rank": 835,
+      "rank": 834,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11541,7 +11542,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-283",
-      "rank": 836,
+      "rank": 835,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11553,7 +11554,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-271",
-      "rank": 837,
+      "rank": 836,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11565,7 +11566,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-265",
-      "rank": 838,
+      "rank": 837,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11577,7 +11578,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-249",
-      "rank": 839,
+      "rank": 838,
       "size": "XS",
       "importance": "low",
       "score": 12,
@@ -11589,7 +11590,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-241",
-      "rank": 840,
+      "rank": 839,
       "size": "L",
       "importance": "low",
       "score": 12,
@@ -11601,7 +11602,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-228",
-      "rank": 841,
+      "rank": 840,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11613,7 +11614,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-227",
-      "rank": 842,
+      "rank": 841,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11625,7 +11626,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-198",
-      "rank": 843,
+      "rank": 842,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11637,7 +11638,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-190",
-      "rank": 844,
+      "rank": 843,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11649,7 +11650,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-180",
-      "rank": 845,
+      "rank": 844,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11661,7 +11662,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-177",
-      "rank": 846,
+      "rank": 845,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11673,7 +11674,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-175",
-      "rank": 847,
+      "rank": 846,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11685,7 +11686,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-155",
-      "rank": 848,
+      "rank": 847,
       "size": "L",
       "importance": "low",
       "score": 11,
@@ -11697,7 +11698,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-146",
-      "rank": 849,
+      "rank": 848,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11709,7 +11710,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-55",
-      "rank": 850,
+      "rank": 849,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11721,7 +11722,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-52",
-      "rank": 851,
+      "rank": 850,
       "size": "XS",
       "importance": "low",
       "score": 11,
@@ -11733,7 +11734,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-51",
-      "rank": 852,
+      "rank": 851,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11745,7 +11746,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-47",
-      "rank": 853,
+      "rank": 852,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11758,7 +11759,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-44",
-      "rank": 854,
+      "rank": 853,
       "size": "M",
       "importance": "low",
       "score": 10,
@@ -11770,7 +11771,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-43",
-      "rank": 855,
+      "rank": 854,
       "size": "M",
       "importance": "low",
       "score": 10,
@@ -11782,7 +11783,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
     },
     {
       "issue": "PAN-2070",
-      "rank": 856,
+      "rank": 855,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11792,21 +11793,6 @@ Planning agents wedge after a background Explore task finishes; parent never con
       "rationale": "Triage: the flywheel is now a loop skill; the docs page target changes. Rank held.",
       "gate": "auto",
       "planning": "skip"
-    },
-    {
-      "issue": "PAN-3974",
-      "rank": 438,
-      "size": "L",
-      "importance": "medium",
-      "score": 52,
-      "condition": "ok",
-      "dependsOn": [
-        "PAN-3937"
-      ],
-      "why": "Companion TERMINAL runs `opencode attach` on the live ACP session/port from PAN-3937; establishes the seam PAN-3835 reuses",
-      "rationale": "New this run: medium/52 — well-specified operator feature: the conversation TERMINAL view attaches a native `opencode attach` client to the same running ACP server and session, with the server resolving port/session/cwd and dashboard delivery staying on the ACP socket. It builds on PAN-3937 (which records `opencode-port` and `acp-session-id` for new OpenCode conversations, in pipeline) and is meant to land the shared companion-terminal lifecycle that PAN-3835 (Codex) reuses, so it ranks above that companion. Size L: domain lifecycle, authenticated routes, frontend seam, tests, and three docs pages.",
-      "gate": "auto",
-      "planning": "auto"
     }
   ],
   "edges": [
@@ -12602,36 +12588,8 @@ Planning agents wedge after a background Explore task finishes; parent never con
       "confidence": 1
     },
     {
-      "from": "PAN-3963",
-      "to": "PAN-3947",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3963",
-      "to": "PAN-3540",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3965",
-      "to": "PAN-3963",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-3964",
       "to": "PAN-3920",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3964",
-      "to": "PAN-3963",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
@@ -13029,13 +12987,6 @@ Planning agents wedge after a background Explore task finishes; parent never con
       "confidence": 0.5
     },
     {
-      "from": "PAN-3963",
-      "to": "PAN-3965",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
-    },
-    {
       "from": "PAN-3920",
       "to": "PAN-3964",
       "type": "informs",
@@ -13118,13 +13069,6 @@ Planning agents wedge after a background Explore task finishes; parent never con
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-3963",
-      "to": "PAN-3973",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.9
     },
     {
       "from": "PAN-3947",
