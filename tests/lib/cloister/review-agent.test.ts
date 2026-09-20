@@ -36,6 +36,7 @@ import {
 const {
   mockKillSessionAsync,
   mockListSessionNames,
+  mockAgentPaneExists,
   mockListSessionNamesEffect,
   mockSaveAgentStateAsync,
   mockSpawnRun,
@@ -59,6 +60,7 @@ const {
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
   mockListSessionNames: vi.fn().mockReturnValue([]),
   mockListSessionNamesEffect: vi.fn(),
+  mockAgentPaneExists: vi.fn(),
   mockSaveAgentStateAsync: vi.fn().mockResolvedValue(undefined),
   mockSpawnRun: vi.fn().mockResolvedValue({ id: 'agent-pan-1059-review-security' }),
   mockMessageAgent: vi.fn().mockResolvedValue(undefined),
@@ -77,6 +79,10 @@ const {
   mockWipeAgentStateDirs: vi.fn().mockResolvedValue(undefined),
   mockMarkAgentStoppedState: vi.fn((state: { id?: string; status?: string }) => ({ ...state, status: 'stopped' })),
   mockConvergeRowFromVerdictOfRecord: vi.fn(),
+}));
+
+vi.mock('../../../src/lib/terminal-backends/launch.js', () => ({
+  agentPaneExists: (agentId: string) => mockAgentPaneExists(agentId),
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {
@@ -162,6 +168,14 @@ beforeEach(() => {
   mockKillSessionAsync.mockResolvedValue(undefined);
   mockListSessionNames.mockReturnValue([]);
   mockListSessionNamesEffect.mockImplementation(() => Effect.sync(() => mockListSessionNames()));
+  // review-convoy asks the SELECTED backend per reviewer (agentPaneExists); by
+  // default answer from the same session list the tmux mock serves, so a probe
+  // failure configured on the tmux mock still surfaces as a thrown probe.
+  mockAgentPaneExists.mockReset();
+  mockAgentPaneExists.mockImplementation(async (agentId: string) => {
+    const names = await Effect.runPromise(mockListSessionNamesEffect() as Effect.Effect<string[], Error>);
+    return names.includes(agentId);
+  });
   mockSaveAgentStateAsync.mockResolvedValue(undefined);
   mockMessageAgent.mockResolvedValue(undefined);
   mockGetAgentState.mockReturnValue(null);
@@ -1125,7 +1139,7 @@ describe('convoy orchestration', () => {
 // dispatch error (e.g., tmux not ready, file-system issue).
 
 describe('dispatch failure reviewStatus regression', () => {
-  it('review-pipeline.ts request-review route blocks dirty worktrees before verification', async () => {
+  it('review-pipeline.ts startRequestReviewPipeline blocks dirty worktrees before verification', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
@@ -1133,7 +1147,7 @@ describe('dispatch failure reviewStatus regression', () => {
       'utf-8',
     );
     const requestReviewMatch = routeSrc.match(
-      /const postWorkspaceRequestReviewRoute[\s\S]*?export const reviewPipelineRouteLayer/,
+      /export async function startRequestReviewPipeline[\s\S]*?registerRequestReviewStarter\(startRequestReviewPipeline\)/,
     );
     expect(requestReviewMatch).not.toBeNull();
     const requestReviewBlock = requestReviewMatch![0];
@@ -1148,7 +1162,7 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(requestReviewBlock).not.toContain('Effect.promise(() => getWorkspaceGitInfo(');
   });
 
-  it('review-pipeline.ts request-review route starts guarded background verification', async () => {
+  it('review-pipeline.ts startRequestReviewPipeline starts guarded background verification', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
@@ -1156,7 +1170,7 @@ describe('dispatch failure reviewStatus regression', () => {
       'utf-8',
     );
     const requestReviewMatch = routeSrc.match(
-      /const postWorkspaceRequestReviewRoute[\s\S]*?export const reviewPipelineRouteLayer/,
+      /export async function startRequestReviewPipeline[\s\S]*?registerRequestReviewStarter\(startRequestReviewPipeline\)/,
     );
     expect(requestReviewMatch).not.toBeNull();
     const requestReviewBlock = requestReviewMatch![0];
