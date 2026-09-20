@@ -5364,11 +5364,16 @@
 
 .conversationStalledStatus {
   min-width: 0;
+  flex-shrink: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--muted-foreground);
   font-size: 10px;
+}
+
+.conversationMetaLine .conversationStalledStatus {
+  order: -1;
 }
 
 .conversationStalledIcon {
