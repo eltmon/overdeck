@@ -97,4 +97,4 @@
 1141 src/lib/agents/spawn-prep.ts # PAN-3917
 1398 src/lib/cloister/merge-agent.ts # PAN-3903
 1089 src/lib/cloister/verification-runner.ts # PAN-3903
-1032 src/lib/agents/delivery.ts # PAN-3917
+1056 src/lib/agents/delivery.ts # PAN-3944
