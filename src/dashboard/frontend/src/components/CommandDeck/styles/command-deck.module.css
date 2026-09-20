@@ -5362,6 +5362,20 @@
   cursor: help;
 }
 
+.conversationStalledStatus {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+
+.conversationStalledIcon {
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+}
+
 /* ─── Branch / worktree chips (PAN-1523) ─────────────────────────────────── */
 
 .conversationBranchChip {
