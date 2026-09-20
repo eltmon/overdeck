@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'fs';
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { getOverdeckHome } from './paths.js';
 import { getHarnessBehavior } from './runtimes/behavior.js';
@@ -49,23 +49,23 @@ function acquireSessionIndexLock(dir: string): string {
   const lockDir = join(dir, 'sessions.lock');
   const sleeper = new Int32Array(new SharedArrayBuffer(4));
   for (let attempt = 0; attempt <= SESSION_INDEX_LOCK_DELAYS_MS.length; attempt++) {
+    let acquired = false;
     try {
-      mkdirSync(lockDir, { mode: 0o700 });
+      const fd = openSync(lockDir, 'wx', 0o600);
+      acquired = true;
       try {
-        writeFileSync(join(lockDir, 'pid'), `${process.pid}\n`, 'utf8');
-      } catch (error) {
-        rmSync(lockDir, { recursive: true, force: true });
-        throw error;
-      }
+        writeFileSync(fd, `${process.pid}\n`, 'utf8');
+      } finally { closeSync(fd); }
       return lockDir;
     } catch (error) {
+      if (acquired) unlinkSync(lockDir);
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       try {
-        const owner = Number.parseInt(readFileSync(join(lockDir, 'pid'), 'utf8').trim(), 10);
+        const owner = Number.parseInt(readFileSync(lockDir, 'utf8').trim(), 10);
         if (Number.isInteger(owner) && owner > 0 && owner !== process.pid) process.kill(owner, 0);
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
-          rmSync(lockDir, { recursive: true, force: true });
+          unlinkSync(lockDir);
           continue;
         }
       }
@@ -140,7 +140,7 @@ export function appendSessionIdToHistory(
     entries.push({ sessionId, at: new Date().toISOString(), source });
     writeSessionIndexAtomic(file, entries);
   } finally {
-    rmSync(lockDir, { recursive: true, force: true });
+    unlinkSync(lockDir);
   }
 }
 
