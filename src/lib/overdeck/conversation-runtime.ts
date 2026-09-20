@@ -826,12 +826,12 @@ export async function spawnConversationSession(
       const codexHomeDir = codexFields.codexHome;
       void (async () => {
         try {
-          const { waitForCodexRollout, extractThreadIdFromRollout, writeThreadId } =
+          const { waitForCodexRollout, extractThreadIdFromRollout, recordCodexRolloutSession } =
             await import('../runtimes/codex.js');
           const rollout = await waitForCodexRollout(codexHomeDir, 120_000);
           if (rollout) {
             const threadId = extractThreadIdFromRollout(rollout);
-            if (threadId) writeThreadId(tmuxSession, threadId);
+            if (threadId) recordCodexRolloutSession(tmuxSession, threadId, rollout);
           }
         } catch {
         }
