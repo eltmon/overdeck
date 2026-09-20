@@ -57,6 +57,7 @@ import { listCodexSubagents, resolveCodexSubagentTranscript } from '../../dashbo
 import { listSubagentMetas, subagentTranscriptPath } from '../../dashboard/server/services/conversation/subagents.js';
 import {
   readLauncherPinnedSessionId,
+  resolveAcpTranscriptPath,
   resolveCodexRolloutPath,
   resolveKimiWirePath,
   resolvePiSessionPath,
@@ -98,6 +99,14 @@ export async function resolveSessionFile(conv: Conversation): Promise<string | n
     const codexPath = await resolveCodexRolloutPath(conv.tmuxSession);
     if (codexPath) return codexPath;
     // Fall through if codex path not found — same stale-harness recovery.
+  }
+  // OpenCode conversations persist the normalized ACP transcript in the
+  // agent directory. Conversation-list activity enrichment reads this path
+  // to surface active tools and stalled turns.
+  if (getHarnessBehavior(conv.harness).transcriptKind === 'acp-jsonl') {
+    const acpPath = await resolveAcpTranscriptPath(conv.tmuxSession);
+    if (acpPath) return acpPath;
+    // Fall through if the harness is stale from an earlier ACP run.
   }
   // Native kimi-code conversations write wire.jsonl under Kimi's own
   // ~/.kimi-code/sessions/<workDirKey>/<sessionId>/agents/main/ tree.
