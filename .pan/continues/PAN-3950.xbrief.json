@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3950",
   "created": "2026-09-20T13:53:05.511Z",
-  "updated": "2026-09-20T14:52:36.673Z",
+  "updated": "2026-09-20T14:52:46.899Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -112,6 +112,10 @@
     "w10-docs-fix-pass.ac2": {
       "status": "completed",
       "doneAt": "2026-09-20T14:52:36.673Z"
+    },
+    "w10-docs-fix-pass.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:52:46.899Z"
     }
   }
 }
