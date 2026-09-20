@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3950",
   "created": "2026-09-20T13:53:05.511Z",
-  "updated": "2026-09-20T14:50:44.027Z",
+  "updated": "2026-09-20T14:50:54.281Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -68,6 +68,10 @@
     "w7-reset-marker-fails-loud.ac2": {
       "status": "completed",
       "doneAt": "2026-09-20T14:50:44.027Z"
+    },
+    "w7-reset-marker-fails-loud.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:50:54.281Z"
     }
   }
 }
