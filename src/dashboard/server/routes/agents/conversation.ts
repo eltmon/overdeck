@@ -20,7 +20,7 @@ import { parseAcpConversationMessages } from '../../services/acp-conversation-pa
 import { sharedTranscriptParser } from '../../services/shared-transcript-parser.js';
 import {
   listAgentTranscriptCandidates,
-} from '../jsonl-resolver.js';
+} from '../../../../lib/agents/transcript-resolver.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import {

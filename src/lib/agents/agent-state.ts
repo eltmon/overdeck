@@ -10,6 +10,7 @@ import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-pop
 import { normalizeAgentId } from './identity.js';
 import { removeAgentStateDir } from './state-dir-removal.js';
 import { registerPipelineTelemetryAgentReader } from '../telemetry/pipeline-agent-reader.js';
+import { clearSessionResetMarker } from '../session-history.js';
 import {
   registerActiveReviewArtifactContextReader,
   registerFeedbackAgentStateReader,
@@ -717,6 +718,10 @@ export function markAgentRunning(state: AgentState, options?: { preserveFailureT
   // this the flag is sticky across the stop→resume→crash sequence and autoResume
   // would permanently skip the agent on any subsequent orphan recovery.
   delete state.stoppedByUser;
+  // Every successful spawn, restart, resume, and recovery converges here.
+  // Once the replacement process is running, transcript resolution may cross
+  // the reset boundary again and wait for the new harness-owned transcript.
+  clearSessionResetMarker(state.id);
   logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → running (markAgentRunning)`);
 }
 

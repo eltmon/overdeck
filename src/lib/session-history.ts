@@ -36,7 +36,7 @@ export interface SessionIndexEntry {
 }
 
 export type TranscriptCandidateKind = 'claude' | 'codex' | 'pi' | 'ohmypi' | 'acp' | 'kimi' | 'muse';
-export interface TranscriptCandidate { kind: TranscriptCandidateKind; path: string }
+export interface TranscriptCandidate { kind: TranscriptCandidateKind; path: string; model?: string }
 
 export interface TranscriptCandidateSources {
   entries: readonly SessionIndexEntry[];
@@ -70,7 +70,7 @@ export function transcriptCandidateKinds(
   return current === 'claude' ? ['claude'] : [current, 'claude'];
 }
 
-/** Pure authority ordering shared by sync and async transcript adapters. */
+/** Pure authority ordering shared by transcript adapters. */
 export function orderedTranscriptCandidates(sources: TranscriptCandidateSources): TranscriptCandidate[] {
   const candidates: TranscriptCandidate[] = [];
   const legacyClaudeFallbacks: TranscriptCandidate[] = [];
@@ -78,7 +78,7 @@ export function orderedTranscriptCandidates(sources: TranscriptCandidateSources)
     for (const kind of transcriptCandidateKinds(entry.harness, sources.currentHarness)) {
       const path = sources.indexedPaths.get(transcriptCandidateKey(kind, entry.sessionId));
       if (!path) continue;
-      const candidate = { kind, path };
+      const candidate = { kind, path, ...(entry.model ? { model: entry.model } : {}) };
       if (!entry.harness && kind === 'claude' && transcriptCandidateKind(sources.currentHarness) !== 'claude') {
         legacyClaudeFallbacks.push(candidate);
       } else candidates.push(candidate);
@@ -234,7 +234,10 @@ export async function resetSessionIndex(
   dir = join(getOverdeckHome(), 'agents', agentId),
 ): Promise<void> {
   mkdirSync(dir, { recursive: true });
-  const line = `${JSON.stringify({ reset: true, at: new Date().toISOString(), source: 'operator-reset' })}\n`;
+  // A leading newline is intentional: legacy indexes were JSON arrays and did
+  // not necessarily end with one. This keeps the reset independently parseable
+  // without rewriting or truncating the append-only file.
+  const line = `\n${JSON.stringify({ reset: true, at: new Date().toISOString(), source: 'operator-reset' })}\n`;
   appendFileSync(join(dir, 'sessions.json'), line, { flag: 'a' });
   writeFileSync(join(dir, SESSION_RESET_MARKER), '');
 }

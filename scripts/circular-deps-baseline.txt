@@ -7,7 +7,6 @@ src/dashboard/frontend/src/components/Stage/HomePane/Launcher.tsx > src/dashboar
 src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/chat/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/TimelineRowRenderer.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/dividers.tsx > src/dashboard/frontend/src/components/chat/messagesTimeline/types.ts
 src/dashboard/frontend/src/components/conversations/SessionDetail.tsx > src/dashboard/frontend/src/components/conversations/SessionTranscript.tsx
 src/dashboard/server/routes/conversations.ts
-src/dashboard/server/routes/jsonl-resolver.ts > src/lib/agents.ts > src/lib/agents/resume.ts > src/dashboard/server/services/conversation-compaction.ts > src/lib/conversations/summary-fork.ts > src/lib/conversations/transcript-adapter.ts
 src/dashboard/server/routes/workspaces.ts > src/dashboard/server/routes/workspaces/container-ops.ts
 src/dashboard/server/routes/workspaces.ts > src/dashboard/server/routes/workspaces/merge-ops.ts
 src/dashboard/server/routes/workspaces.ts > src/dashboard/server/routes/workspaces/review-control.ts

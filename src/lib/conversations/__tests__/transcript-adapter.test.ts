@@ -28,7 +28,7 @@ vi.mock('../smart-compaction.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../../../dashboard/server/routes/jsonl-resolver.js', () => ({
+vi.mock('../../agents/transcript-resolver.js', () => ({
   resolveCodexRolloutPath: vi.fn(),
 }));
 
@@ -38,7 +38,7 @@ import {
 } from '../smart-compaction.js';
 import { getTranscriptAdapter } from '../transcript-adapter.js';
 import { kimiSessionsRoot } from '../../runtimes/kimi-code.js';
-import { resolveCodexRolloutPath } from '../../../dashboard/server/routes/jsonl-resolver.js';
+import { resolveCodexRolloutPath } from '../../agents/transcript-resolver.js';
 
 const originalOverdeckHome = process.env.OVERDECK_HOME;
 const originalHome = process.env.HOME;

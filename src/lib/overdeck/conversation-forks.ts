@@ -71,7 +71,7 @@ import {
   resolveCodexRolloutPath,
   resolveKimiWirePath,
   resolvePiSessionPath,
-} from '../../dashboard/server/routes/jsonl-resolver.js';
+} from '../agents/transcript-resolver.js';
 import * as self from './conversation-forks.js';
 
 // Canonical model-id shape (allows the `[1m]` suffix) — see model-validation.ts (PAN-2979).

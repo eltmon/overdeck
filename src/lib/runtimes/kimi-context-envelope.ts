@@ -2,7 +2,8 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { readdir, stat } from 'node:fs/promises';
+import { basename, dirname, join } from 'node:path';
 
 import { claudeSystemPromptFiles } from '../context-layers/launch-sources.js';
 import { getOverdeckHome } from '../paths.js';
@@ -23,6 +24,47 @@ export interface PreparedKimiMessage {
   contextIncluded: boolean;
   contextSha256?: string;
   overdeckHome: string;
+}
+
+export function kimiWorkDirKey(workDir: string): string {
+  const hash = createHash('sha256').update(workDir).digest('hex').slice(0, 12);
+  return `wd_${basename(workDir)}_${hash}`;
+}
+
+export function kimiSessionsRoot(kimiHome: string, workDir: string): string {
+  return join(kimiHome, 'sessions', kimiWorkDirKey(workDir));
+}
+
+export async function findKimiWirePathAsync(
+  kimiHome: string,
+  workspace: string,
+  sessionId: string | null,
+): Promise<string | null> {
+  if (sessionId) {
+    const candidate = join(kimiSessionsRoot(kimiHome, workspace), sessionId, 'agents', 'main', 'wire.jsonl');
+    try {
+      await stat(candidate);
+      return candidate;
+    } catch { /* fall through to newest-session fallback */ }
+  }
+  return findLatestKimiSessionAsync(kimiHome, workspace);
+}
+
+export async function findLatestKimiSessionAsync(
+  kimiHome: string,
+  workspace: string,
+): Promise<string | null> {
+  const bucketDir = kimiSessionsRoot(kimiHome, workspace);
+  const entries = await readdir(bucketDir).catch(() => []);
+  let newest: { path: string; mtimeMs: number } | null = null;
+  for (const entry of entries.sort()) {
+    const path = join(bucketDir, entry, 'agents', 'main', 'wire.jsonl');
+    const mtimeMs = await stat(path).then(info => info.mtimeMs, () => -1);
+    if (mtimeMs >= 0 && (!newest || mtimeMs > newest.mtimeMs || (mtimeMs === newest.mtimeMs && path < newest.path))) {
+      newest = { path, mtimeMs };
+    }
+  }
+  return newest?.path ?? null;
 }
 
 function receiptPath(agentId: string, overdeckHome = getOverdeckHome()): string {

@@ -58,7 +58,7 @@ import {
 import { assertWorkspaceStackHealthyForSpawn, buildAgentLaunchConfig } from './spawn-prep.js';
 import { prepareSupervisorForRelaunch, buildResumeContinueMessage } from './supervisor-channels.js';
 import { stopAgent } from './termination.js';
-import { clearSessionResetMarker, createFreshSessionIdentity } from '../session-history.js';
+import { createFreshSessionIdentity } from '../session-history.js';
 
 export type RecoverAgentResult =
   | { action: 'respawned'; state: AgentState }
@@ -352,7 +352,6 @@ export async function restartAgent(
 
     markAgentRunning(agentState);
     saveAgentStateSync(agentState);
-    clearSessionResetMarker(normalizedId);
 
     await saveAgentRuntimeState(normalizedId, {
       state: 'active',

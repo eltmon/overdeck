@@ -3,8 +3,7 @@
  * Transcript candidates mirror the dashboard's asynchronous adapter so every
  * consumer observes the same harness-aware session authority.
  */
-import { existsSync, readFileSync, readdirSync, type Dirent } from 'fs'
-import { createHash } from 'node:crypto'
+import { existsSync, readFileSync } from 'fs'
 import { readdir, readFile, stat } from 'fs/promises'
 import { homedir } from 'os'
 import { basename, join } from 'path'
@@ -24,16 +23,7 @@ import { resolveProjectFromIssueSync } from './projects.js'
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js'
 import { extractPrefixSync } from './issue-id.js'
 import { getLatestSessionIdSync } from './agents/activity.js'
-import { findRolloutPath } from './runtimes/codex.js'
-import {
-  orderedTranscriptCandidates,
-  readSessionIndexWithLegacySync,
-  SESSION_RESET_MARKER,
-  transcriptCandidateKey,
-  transcriptCandidateKind,
-  transcriptCandidateKinds,
-  type TranscriptCandidate,
-} from './session-history.js'
+import { resolveAgentTranscriptCandidate } from './agents/transcript-resolver.js'
 
 const execAsync = promisify(exec)
 
@@ -241,74 +231,10 @@ function getProjectPathByPrefix(issuePrefix: string): string {
   }
 }
 
-function findPiTranscriptForSessionSync(agentDir: string, sessionId: string): string | null {
-  for (const dir of [join(agentDir, 'sessions'), agentDir]) {
-    let names: string[]
-    try { names = readdirSync(dir).sort() } catch { continue }
-    const name = names.find((entry) => entry.endsWith('_' + sessionId + '.jsonl') || entry === sessionId + '.jsonl')
-    if (name) return join(dir, name)
-  }
-  return null
-}
-
-export function listAgentTranscriptCandidatesSync(agentId: string, workspace: string): TranscriptCandidate[] {
-  const state = getAgentStateSync(agentId)
-  const currentHarness = state?.harness
-  const currentKind = transcriptCandidateKind(currentHarness)
-  const agentDir = getAgentDir(agentId)
-  if (existsSync(join(agentDir, SESSION_RESET_MARKER))) return []
-  const projectDir = getClaudeProjectDir(workspace)
-  const entries = readSessionIndexWithLegacySync(agentId)
-  const indexedPaths = new Map<string, string>()
-  for (const entry of entries) {
-    for (const kind of transcriptCandidateKinds(entry.harness, currentHarness)) {
-      let path: string | null = kind === 'claude' ? join(projectDir, entry.sessionId + '.jsonl')
-        : kind === 'kimi' ? join(homedir(), '.kimi-code', 'sessions', `wd_${basename(workspace)}_${createHash('sha256').update(workspace).digest('hex').slice(0, 12)}`, entry.sessionId, 'agents', 'main', 'wire.jsonl')
-        : kind === 'pi' || kind === 'ohmypi' ? findPiTranscriptForSessionSync(agentDir, entry.sessionId)
-        : kind === 'acp' ? join(agentDir, 'acp-session.jsonl')
-        : kind === 'muse' ? join(agentDir, 'muse-session.jsonl') : null
-      if (kind === 'codex') {
-        let homes: Dirent[] = []
-        try {
-          homes = readdirSync(agentDir, { withFileTypes: true })
-            .filter((home) => home.isDirectory() && home.name.startsWith('codex-home'))
-            .sort((a, b) => a.name.localeCompare(b.name))
-        } catch { /* absent agent directory */ }
-        for (const home of homes) {
-          path = findRolloutPath(join(agentDir, home.name), entry.sessionId)
-          if (path) break
-        }
-      }
-      if (path) indexedPaths.set(transcriptCandidateKey(kind, entry.sessionId), path)
-    }
-  }
-
-  let launcherPinned: TranscriptCandidate | null = null
-  if (currentKind === 'claude') {
-    try {
-      const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8')
-      const id = /--(?:session-id|resume)\s+['"]?([0-9a-fA-F-]{36})/.exec(launcher)?.[1]
-      if (id) launcherPinned = { kind: 'claude', path: join(projectDir, id + '.jsonl') }
-    } catch { /* compatibility source */ }
-  }
-
-  const sessionId = currentKind === 'claude' ? getLatestSessionIdSync(agentId) : null
-  return orderedTranscriptCandidates({
-    entries,
-    currentHarness,
-    indexedPaths,
-    launcherPinned,
-    stateDerived: sessionId ? [{ kind: 'claude', path: join(projectDir, sessionId + '.jsonl') }] : [],
-  })
-}
-
 async function getAgentJsonlPathPromise(agentId: string): Promise<string | null> {
   const workspace = await Effect.runPromise(getAgentWorkspace(agentId))
   if (!workspace) return null
-  for (const candidate of listAgentTranscriptCandidatesSync(agentId, workspace)) {
-    if (existsSync(candidate.path)) return candidate.path
-  }
-  return null
+  return (await resolveAgentTranscriptCandidate(agentId, workspace))?.path ?? null
 }
 
 /**

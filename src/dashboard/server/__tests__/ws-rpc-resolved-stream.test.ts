@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -14,11 +13,12 @@ const resolverMock = vi.hoisted(() => ({
   resolveAcpTranscriptPath: vi.fn(async () => null),
   resolveKimiWirePath: vi.fn(async () => null),
   resolveJsonlPath: vi.fn(async () => null),
-  listAgentTranscriptCandidates: vi.fn(async () => [] as Array<{ kind: 'claude'; path: string }>),
-  resolveAgentTranscriptCandidate: vi.fn(async () => null as { kind: 'claude'; path: string } | null),
+  listAgentTranscriptCandidates: vi.fn(async () => [] as Array<{ kind: 'claude'; path: string; model?: string }>),
+  listAgentTranscriptWatchRoots: vi.fn(async () => [] as string[]),
+  resolveAgentTranscriptCandidate: vi.fn(async () => null as { kind: 'claude'; path: string; model?: string } | null),
   readLauncherPinnedSessionId: vi.fn(async () => null),
 }));
-vi.mock('../routes/jsonl-resolver.js', () => resolverMock);
+vi.mock('../../../lib/agents/transcript-resolver.js', () => resolverMock);
 vi.mock('../services/dashboard-db-task.js', () => ({
   runDashboardDbJob: vi.fn(async (_operation: string, input: { sessionFile: string }) => {
     const { parseCodexConversationMessages } = await import('../services/codex-conversation-parser.js');
@@ -29,7 +29,7 @@ vi.mock('../services/dashboard-db-task.js', () => ({
 import {
   streamHarnessFullParseSnapshots,
   streamResolvedFullParseSnapshots,
-  streamSyntheticAgentTranscript,
+  watchForAgentTranscriptCandidate,
 } from '../ws-rpc.js';
 import type { ParseResult } from '../services/conversation-service.js';
 
@@ -151,25 +151,46 @@ describe('streamResolvedFullParseSnapshots — unresolved transcript', () => {
 });
 
 describe('synthetic agent transcript discovery', () => {
-  it('keeps the subscription live and attaches the parser when the JSONL appears later', async () => {
+  it('discovers from an initially empty candidate list and closes every watcher on unsubscribe', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'synthetic-agent-stream-'));
     const transcript = join(dir, 'delayed.jsonl');
-    resolverMock.listAgentTranscriptCandidates.mockResolvedValue([{ kind: 'claude', path: transcript }]);
-    resolverMock.resolveAgentTranscriptCandidate.mockImplementation(async () =>
-      existsSync(transcript) ? { kind: 'claude', path: transcript } : null);
+    const candidate = { kind: 'claude' as const, path: transcript, model: 'claude-sonnet-4-6' };
+    const watched: Array<{ path: string; listener: () => void; closed: boolean }> = [];
+    let signalRegistered!: () => void;
+    const registered = new Promise<void>((resolve) => { signalRegistered = resolve; });
+    resolverMock.listAgentTranscriptCandidates.mockResolvedValue([]);
+    resolverMock.listAgentTranscriptWatchRoots.mockResolvedValue([dir]);
+    resolverMock.resolveAgentTranscriptCandidate.mockResolvedValue(null);
+    const watch = vi.fn((path: string, _options: { recursive: boolean }, listener: () => void) => {
+      const handle = { path, listener, closed: false };
+      watched.push(handle);
+      if (path === dir) signalRegistered();
+      return { close: () => { handle.closed = true; } };
+    });
 
     try {
       const eventsPromise = Effect.runPromise(
-        streamSyntheticAgentTranscript('agent-pan-3950').pipe(Stream.take(2), Stream.runCollect),
+        watchForAgentTranscriptCandidate('agent-pan-3950', '', { watch }).pipe(Stream.take(1), Stream.runCollect),
       );
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      await writeFile(transcript, '{"type":"session_meta","payload":{"id":"delayed"}}\n');
+      await registered;
+      expect(resolverMock.resolveAgentTranscriptCandidate).toHaveBeenCalledWith(
+        'agent-pan-3950',
+        '',
+        {},
+        [],
+      );
+
+      resolverMock.listAgentTranscriptCandidates.mockResolvedValue([candidate]);
+      resolverMock.resolveAgentTranscriptCandidate.mockResolvedValue(candidate);
+      watched.find(entry => entry.path === dir)!.listener();
 
       const events = Array.from(await eventsPromise);
-      expect(events[0]).toEqual({ kind: 'discovering' });
-      expect(events[1]).toMatchObject({ kind: 'messages', snapshot: true });
+      expect(events).toEqual([candidate]);
+      expect(watched.length).toBeGreaterThan(0);
+      expect(watched.every(entry => entry.closed)).toBe(true);
     } finally {
       resolverMock.listAgentTranscriptCandidates.mockResolvedValue([]);
+      resolverMock.listAgentTranscriptWatchRoots.mockResolvedValue([]);
       resolverMock.resolveAgentTranscriptCandidate.mockResolvedValue(null);
       await rm(dir, { recursive: true, force: true });
     }

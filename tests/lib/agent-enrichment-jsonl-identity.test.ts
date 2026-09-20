@@ -61,6 +61,18 @@ const WORKSPACE = '/home/eltmon/Projects/overdeck';
 const OWN_SESSION = '5f5168f3-7e17-4aed-9fe2-2bbb622e4acd';
 const OTHER_SESSION = 'ceba1402-1e09-436f-aa3d-6dd2b6a4c202';
 
+function pinSession(agentId: string, sessionId: string): void {
+  ownSessionIds.set(agentId, sessionId);
+  const agentDir = join(process.env.OVERDECK_HOME ?? join(fakeHome, '.overdeck'), 'agents', agentId);
+  mkdirSync(agentDir, { recursive: true });
+  writeFileSync(join(agentDir, 'sessions.json'), `${JSON.stringify({
+    sessionId,
+    at: '2026-07-28T10:00:00.000Z',
+    source: 'test',
+    harness: 'claude-code',
+  })}\n`);
+}
+
 const { getAgentJsonlPath, getAgentWorkspace, getClaudeProjectDir } = await import('../../src/lib/agent-enrichment.js');
 const { detectPendingOperatorDecision } = await import('../../src/lib/agents/pending-decision-gate.js');
 const { Effect } = await import('effect');
@@ -127,7 +139,7 @@ describe('getAgentWorkspace()', () => {
 
 describe('getAgentJsonlPath()', () => {
   it('reads its own transcript, not the freshest one in a shared project dir', async () => {
-    ownSessionIds.set('flywheel-orchestrator', OWN_SESSION);
+    pinSession('flywheel-orchestrator', OWN_SESSION);
     const projectDir = writeTranscripts(OTHER_SESSION, OWN_SESSION);
 
     const resolved = await Effect.runPromise(getAgentJsonlPath('flywheel-orchestrator'));
@@ -144,7 +156,7 @@ describe('getAgentJsonlPath()', () => {
   });
 
   it('does not replace a missing owned transcript with another session', async () => {
-    ownSessionIds.set('conv-20260716-6155', 'never-written-to-disk');
+    pinSession('conv-20260716-6155', 'never-written-to-disk');
     writeTranscripts(OTHER_SESSION);
 
     const resolved = await Effect.runPromise(getAgentJsonlPath('conv-20260716-6155'));
@@ -171,7 +183,7 @@ describe('forced fresh-session decision boundary', () => {
 
   it('still reports an AUQ from the replacement session pinned to the agent', async () => {
     const agentId = 'agent-pan-3228';
-    ownSessionIds.set(agentId, OWN_SESSION);
+    pinSession(agentId, OWN_SESSION);
     recordedStartedAt.set(agentId, '2026-07-28T10:01:00.000Z');
     writePendingAuqTranscript(OWN_SESSION, new Date('2026-07-28T10:00:01.000Z'));
 

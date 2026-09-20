@@ -86,7 +86,6 @@ import {
 import { stopAgent } from './termination.js';
 import {
   appendSessionIdToHistory,
-  clearSessionResetMarker,
   createFreshSessionIdentity,
   logLauncherSessionPinned,
 } from '../session-history.js';
@@ -584,7 +583,6 @@ async function spawnRunWithoutConsentClaim(
   } catch { /* non-fatal — marker stays absent */ }
 
   await Effect.runPromise(saveAgentState(state));
-  clearSessionResetMarker(agentId);
 
   // PAN-1556: the review role emits a single dedicated "Review role spawned"
   // event from spawnReviewRoleForIssue. Suppress the generic per-spawn
@@ -1025,7 +1023,6 @@ async function spawnAgentWithoutConsentClaim(
   // Update status
   markAgentRunning(state);
   saveAgentStateSync(state);
-  clearSessionResetMarker(agentId);
 
   // Track work in CV
   startWorkSync(agentId, options.issueId);

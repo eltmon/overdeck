@@ -21,7 +21,16 @@ import { shouldBroadcastDashboardEvent, streamAgentOutput } from './services/age
 import type { LegacyConversation } from '../../lib/overdeck/conversations.js';
 import { contextUsageFromParseResult, gateSnapshotEmission, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
 import { isPiSessionFile } from './services/pi-conversation-parser.js';
-import { listAgentTranscriptCandidates, resolveAgentTranscriptCandidate, resolvePiSessionPath, resolveCodexRolloutPath, resolveAcpTranscriptPath, resolveKimiWirePath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
+import {
+  listAgentTranscriptCandidates,
+  listAgentTranscriptWatchRoots,
+  readLauncherPinnedSessionId,
+  resolveAcpTranscriptPath,
+  resolveAgentTranscriptCandidate,
+  resolveCodexRolloutPath,
+  resolveKimiWirePath,
+  resolvePiSessionPath,
+} from '../../lib/agents/transcript-resolver.js';
 import { getOverdeckHome, sessionFilePath } from '../../lib/paths.js';
 import type { TranscriptCandidate } from '../../lib/session-history.js';
 import { getRuntimeCensus } from '../../lib/runtime-census.js';
@@ -241,16 +250,36 @@ function nearestExistingDirectory(path: string): string | null {
   return candidate;
 }
 
+function nearestExistingWatchRoot(path: string): { path: string; recursive: boolean } | null {
+  let candidate = path;
+  while (!existsSync(candidate)) {
+    const parent = dirname(candidate);
+    if (parent === candidate) return null;
+    candidate = parent;
+  }
+  return { path: candidate, recursive: candidate === path };
+}
+
+export interface TranscriptDiscoveryDeps {
+  watch?: (
+    path: string,
+    options: { recursive: boolean },
+    listener: () => void,
+  ) => { close(): void };
+}
+
 /** Keep synthetic-agent resolution live until a concrete transcript appears. */
 export function watchForAgentTranscriptCandidate(
   agentId: string,
   workspace = '',
+  deps: TranscriptDiscoveryDeps = {},
 ): Stream.Stream<TranscriptCandidate, PanRpcError> {
   return Stream.callback<TranscriptCandidate, PanRpcError>((queue) =>
     Effect.acquireRelease(
       Effect.sync(() => {
         let stopped = false, resolving = false, rerun = false, watchedRoots = '';
-        let watchers: ReturnType<typeof fsWatch>[] = [];
+        let watchers: Array<{ close(): void }> = [];
+        const watch = deps.watch ?? ((path, options, listener) => fsWatch(path, options, listener));
         const closeWatchers = () => {
           for (const watcher of watchers) try { watcher.close(); } catch { /* already closed */ }
           watchers = [];
@@ -269,13 +298,24 @@ export function watchForAgentTranscriptCandidate(
               return;
             }
             const index = join(getOverdeckHome(), 'agents', agentId, 'sessions.json');
-            const roots = [...new Set([index, ...candidates.map(({ path }) => path)]
-              .map(nearestExistingDirectory).filter((path): path is string => path !== null))].sort();
-            const signature = roots.join('\0');
+            const runtimeRoots = await listAgentTranscriptWatchRoots(agentId, workspace);
+            const roots = new Map<string, boolean>();
+            for (const path of [index, ...candidates.map(candidate => candidate.path)]) {
+              const root = nearestExistingDirectory(path);
+              if (root) roots.set(root, roots.get(root) ?? false);
+            }
+            for (const path of runtimeRoots) {
+              const root = nearestExistingWatchRoot(path);
+              if (root) roots.set(root.path, (roots.get(root.path) ?? false) || root.recursive);
+            }
+            const watched = [...roots].sort(([a], [b]) => a.localeCompare(b));
+            const signature = watched.map(([path, recursive]) => `${path}:${recursive}`).join('\0');
             if (signature !== watchedRoots) {
               watchedRoots = signature;
               closeWatchers();
-              for (const root of roots) try { watchers.push(fsWatch(root, () => void resolveCandidate())); } catch { /* retry on another event */ }
+              for (const [root, recursive] of watched) {
+                try { watchers.push(watch(root, { recursive }, () => void resolveCandidate())); } catch { /* retry on another event */ }
+              }
               rerun = true; // close the listing→watch race
             }
           } catch {
@@ -311,11 +351,11 @@ export function streamSyntheticAgentTranscript(
     Stream.flatMap((candidate) => {
       const sessionFile = selectedSubagentId ? subagentTranscriptPath(candidate.path, selectedSubagentId) : candidate.path;
       if (!sessionFile) return conversationDiscoveringStream();
-      if (candidate.kind === 'claude') return streamClaudeTranscript(sessionFile, agentId, null, selectedSubagentId);
+      if (candidate.kind === 'claude') return streamClaudeTranscript(sessionFile, agentId, candidate.model ?? null, selectedSubagentId);
       return streamResolvedFullParseSnapshots(
         async () => sessionFile,
         sharedTranscriptParser(candidate.kind),
-        null,
+        candidate.model ?? null,
         false,
         candidate.kind === 'codex' && selectedSubagentId === undefined,
       );

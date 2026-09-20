@@ -5,22 +5,25 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { getAgentJsonlPath, listAgentTranscriptCandidatesSync } from '../../../../src/lib/agent-enrichment.js';
+import { getAgentJsonlPath } from '../../../../src/lib/agent-enrichment.js';
 import { getLatestSessionIdSync, saveSessionId } from '../../../../src/lib/agents/activity.js';
 import { restartAgent } from '../../../../src/lib/agents/recovery.js';
 import type { AgentState } from '../../../../src/lib/agents/agent-state.js';
+import { markAgentRunning } from '../../../../src/lib/agents/agent-state.js';
 import { encodeClaudeProjectDir } from '../../../../src/lib/paths.js';
+import { kimiSessionsRoot } from '../../../../src/lib/runtimes/kimi-code.js';
 import {
   appendSessionIdToHistory,
   clearSessionResetMarker,
   isSessionResetMarker,
+  latestSessionResetTime,
   orderedTranscriptCandidates,
   readSessionIndexSync,
   readSessionIndexWithLegacySync,
   resetSessionIndex,
   transcriptCandidateKey,
 } from '../../../../src/lib/session-history.js';
-import { listAgentTranscriptCandidates } from '../../../../src/dashboard/server/routes/jsonl-resolver.js';
+import { listAgentTranscriptCandidates } from '../../../../src/lib/agents/transcript-resolver.js';
 
 let root: string;
 let previousHome: string | undefined;
@@ -156,7 +159,41 @@ describe('sessions.json index', () => {
     expect(readSessionIndexSync('agent-pan-3950').map((entry) => entry.sessionId)).toEqual(['after-reset']);
   });
 
-  it('keeps sync and async concrete candidates in parity for untagged legacy entries', async () => {
+  it('writes a reset on its own line after a legacy array without a trailing newline', async () => {
+    const agentDir = join(process.env.OVERDECK_HOME!, 'agents', 'agent-pan-3950');
+    mkdirSync(agentDir, { recursive: true });
+    const indexPath = join(agentDir, 'sessions.json');
+    writeFileSync(indexPath, JSON.stringify(['legacy-session']));
+
+    await resetSessionIndex('agent-pan-3950');
+
+    const raw = readFileSync(indexPath, 'utf8');
+    expect(raw).toMatch(/^\["legacy-session"\]\n\{"reset":true,/);
+    expect(latestSessionResetTime(raw)).not.toBeNull();
+    expect(readSessionIndexSync('agent-pan-3950')).toEqual([]);
+  });
+
+  it('clears the reset marker at the shared successful-launch transition', async () => {
+    const state = {
+      id: 'agent-pan-3950',
+      issueId: 'PAN-3950',
+      workspace: root,
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'starting',
+      startedAt: '2026-09-20T00:00:00.000Z',
+      startedBy: 'test',
+    } as AgentState;
+    await resetSessionIndex(state.id);
+
+    markAgentRunning(state);
+
+    expect(state.status).toBe('running');
+    expect(isSessionResetMarker(state.id)).toBe(false);
+  });
+
+  it('uses the single resolver for untagged legacy entries', async () => {
     const agentId = 'agent-pan-3950';
     const workspace = join(root, 'workspace');
     const agentDir = join(process.env.OVERDECK_HOME!, 'agents', agentId);
@@ -181,18 +218,16 @@ describe('sessions.json index', () => {
     writeFileSync(claudePath, '{}\n');
     writeFileSync(codexPath, '{}\n');
 
-    const syncCandidates = listAgentTranscriptCandidatesSync(agentId, workspace);
-    const asyncCandidates = await listAgentTranscriptCandidates(agentId, workspace, {
+    const candidates = await listAgentTranscriptCandidates(agentId, workspace, {
       agentsDirOverride: join(process.env.OVERDECK_HOME!, 'agents'),
       claudeProjectsDirOverride: join(root, '.claude', 'projects'),
     });
 
-    expect(syncCandidates).toEqual([
+    expect(candidates).toEqual([
       { kind: 'codex', path: codexPath },
       { kind: 'claude', path: claudePath },
     ]);
-    expect(asyncCandidates).toEqual(syncCandidates);
-    expect(syncCandidates.every(({ path }) => !path.includes('*'))).toBe(true);
+    expect(candidates.every(({ path }) => !path.includes('*'))).toBe(true);
   });
 
   it('makes a reset marker authoritative in both candidate adapters', async () => {
@@ -204,14 +239,12 @@ describe('sessions.json index', () => {
     appendSessionIdToHistory(agentId, 'old-session', 'launcher');
     await resetSessionIndex(agentId);
 
-    expect(listAgentTranscriptCandidatesSync(agentId, workspace)).toEqual([]);
     await expect(listAgentTranscriptCandidates(agentId, workspace, {
       agentsDirOverride: join(process.env.OVERDECK_HOME!, 'agents'),
       claudeProjectsDirOverride: join(root, '.claude', 'projects'),
     })).resolves.toEqual([]);
 
     clearSessionResetMarker(agentId);
-    expect(listAgentTranscriptCandidatesSync(agentId, workspace)).toEqual([]);
     await expect(listAgentTranscriptCandidates(agentId, workspace, {
       agentsDirOverride: join(process.env.OVERDECK_HOME!, 'agents'),
       claudeProjectsDirOverride: join(root, '.claude', 'projects'),
@@ -244,6 +277,41 @@ describe('sessions.json index', () => {
     await expect(Effect.runPromise(getAgentJsonlPath(agentId))).resolves.toBe(olderTranscript);
   });
 
+  it('enrichment uses the current Kimi transcript ahead of an untagged legacy Claude entry', async () => {
+    const agentId = 'agent-pan-3950';
+    const workspace = join(root, 'workspace');
+    const agentDir = join(process.env.OVERDECK_HOME!, 'agents', agentId);
+    const projectDir = join(root, '.claude', 'projects', encodeClaudeProjectDir(workspace));
+    const sessionId = 'kimi-current';
+    const wirePath = join(
+      kimiSessionsRoot(join(root, '.kimi-code'), workspace),
+      sessionId,
+      'agents',
+      'main',
+      'wire.jsonl',
+    );
+    mkdirSync(agentDir, { recursive: true });
+    mkdirSync(projectDir, { recursive: true });
+    mkdirSync(join(wirePath, '..'), { recursive: true });
+    writeFileSync(join(agentDir, 'state.json'), JSON.stringify({
+      id: agentId,
+      issueId: 'PAN-3950',
+      workspace,
+      harness: 'kimi-code',
+      model: 'kimi-for-coding',
+      role: 'work',
+      status: 'stopped',
+      startedAt: '2026-09-20T00:00:00.000Z',
+      startedBy: 'test',
+    }));
+    writeFileSync(join(agentDir, 'sessions.json'), JSON.stringify(['legacy-claude']));
+    writeFileSync(join(agentDir, 'kimi-session-id'), sessionId);
+    writeFileSync(join(projectDir, 'legacy-claude.jsonl'), '{}\n');
+    writeFileSync(wirePath, '{}\n');
+
+    await expect(Effect.runPromise(getAgentJsonlPath(agentId))).resolves.toBe(wirePath);
+  });
+
   it('orders mixed-harness entries before launcher and state fallbacks', () => {
     const paths = new Map([
       [transcriptCandidateKey('claude', 'claude-old'), '/claude/old.jsonl'],
@@ -263,6 +331,19 @@ describe('sessions.json index', () => {
       { kind: 'claude', path: '/claude/old.jsonl' },
       { kind: 'claude', path: '/claude/launcher.jsonl' },
       { kind: 'claude', path: '/claude/state.jsonl' },
+    ]);
+  });
+
+  it('preserves indexed models on transcript candidates', () => {
+    const paths = new Map([
+      [transcriptCandidateKey('claude', 'session-a'), '/claude/session-a.jsonl'],
+    ]);
+    expect(orderedTranscriptCandidates({
+      entries: [{ sessionId: 'session-a', at: '', source: 'hook', harness: 'claude-code', model: 'claude-sonnet-4-6' }],
+      currentHarness: 'claude-code',
+      indexedPaths: paths,
+    })).toEqual([
+      { kind: 'claude', path: '/claude/session-a.jsonl', model: 'claude-sonnet-4-6' },
     ]);
   });
 });

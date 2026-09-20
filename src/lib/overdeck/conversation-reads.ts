@@ -60,7 +60,7 @@ import {
   resolveCodexRolloutPath,
   resolveKimiWirePath,
   resolvePiSessionPath,
-} from '../../dashboard/server/routes/jsonl-resolver.js';
+} from '../agents/transcript-resolver.js';
 import { parseKimiConversationMessages } from '../../dashboard/server/services/kimi-conversation-parser.js';
 import { codexConversationPendingInput } from './conversation-delivery.js';
 import { claudeConversationPaneChoice, type PendingPaneChoice } from './conversation-pane-choice.js';

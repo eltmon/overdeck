@@ -13,7 +13,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../lib/agent-enrichment.js', () => ({
   getClaudeProjectDir: vi.fn(),
-  getActiveSessionPath: vi.fn(),
   getAgentWorkspace: vi.fn(() => Effect.succeed('/workspace/feature-pan-473')),
   getAgentJsonlPath: vi.fn(),
   getPendingQuestions: vi.fn(),
@@ -41,7 +40,7 @@ vi.mock('../../services/acp-conversation-parser.js', () => ({
   parseAcpConversationMessages: vi.fn(),
 }));
 
-vi.mock('../jsonl-resolver.js', () => ({
+vi.mock('../../../../lib/agents/transcript-resolver.js', () => ({
   listAgentTranscriptCandidates: vi.fn(() => Promise.resolve([])),
 }));
 
@@ -62,7 +61,7 @@ import { parseCodexConversationMessages } from '../../services/codex-conversatio
 import { parseAcpConversationMessages } from '../../services/acp-conversation-parser.js';
 import {
   listAgentTranscriptCandidates,
-} from '../jsonl-resolver.js';
+} from '../../../../lib/agents/transcript-resolver.js';
 import { access } from 'node:fs/promises';
 
 const mockGetAgentWorkspace = vi.mocked(getAgentWorkspace);

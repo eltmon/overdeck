@@ -6,6 +6,7 @@ import { join } from 'path';
 import {
   readLauncherPinnedSessionId,
   listAgentTranscriptCandidates,
+  listAgentTranscriptWatchRoots,
   resolveCodexRolloutPath,
   resolveAcpTranscriptPath,
   resolveJsonlPath,
@@ -456,6 +457,25 @@ describe('resolveJsonlPath — kimi-code agents (PAN-1837 wi8a)', () => {
       kimiHomeOverride: kimiHomeDir,
     })).toBeNull();
   });
+
+  it('exposes the workspace bucket as a watch root before any Kimi candidate exists', async () => {
+    const agentDir = join(agentsDir, KIMI_AGENT_ID);
+    await mkdir(agentDir, { recursive: true });
+    await writeFile(join(agentDir, 'state.json'), JSON.stringify({
+      id: KIMI_AGENT_ID,
+      harness: 'kimi-code',
+      workspace: WORKSPACE_PATH,
+    }));
+
+    await expect(listAgentTranscriptCandidates(KIMI_AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      kimiHomeOverride: kimiHomeDir,
+    })).resolves.toEqual([]);
+    await expect(listAgentTranscriptWatchRoots(KIMI_AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      kimiHomeOverride: kimiHomeDir,
+    })).resolves.toEqual([kimiSessionsRoot(kimiHomeDir, WORKSPACE_PATH)]);
+  });
 });
 
 describe('resolveJsonlPath — recorded harness is authoritative', () => {
@@ -643,6 +663,21 @@ describe('resolveJsonlPath / resolvePiSessionPath — pi agents (PAN-1908)', () 
     const path = await resolvePiSessionPath(PI_AGENT_ID, { agentsDirOverride: agentsDir });
 
     expect(path).toBe(newer);
+  });
+
+  it('breaks equal-mtime Pi transcript ties deterministically by path', async () => {
+    const agentDir = await setupPiAgent();
+    const sessionsDir = join(agentDir, 'sessions');
+    await mkdir(sessionsDir, { recursive: true });
+    const alpha = join(sessionsDir, 'a.jsonl');
+    const zulu = join(sessionsDir, 'z.jsonl');
+    await writeFile(zulu, '{"type":"session"}\n');
+    await writeFile(alpha, '{"type":"session"}\n');
+    const tied = new Date('2026-09-20T00:00:00.000Z');
+    await utimes(alpha, tied, tied);
+    await utimes(zulu, tied, tied);
+
+    await expect(resolvePiSessionPath(PI_AGENT_ID, { agentsDirOverride: agentsDir })).resolves.toBe(alpha);
   });
 
   it('returns null when pi has not written a transcript yet', async () => {

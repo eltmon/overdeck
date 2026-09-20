@@ -32,7 +32,7 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 
 import { readCodexRolloutMessage } from '../codex-rollout-message.js';
-import { resolveCodexRolloutPath } from '../../dashboard/server/routes/jsonl-resolver.js';
+import { resolveCodexRolloutPath } from '../agents/transcript-resolver.js';
 import type { AcpTranscriptEntry, AcpTranscriptToolCallState } from '../acp/transcript.js';
 import type { LegacyConversation as Conversation } from '../overdeck/conversations.js';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -357,11 +357,7 @@ const acpAdapter: ConversationTranscriptAdapter = {
 // skipped, matching the pi/acp adapters above.
 
 /**
- * Resolve the native Kimi Code CLI wire.jsonl for a conversation. Mirrors
- * jsonl-resolver.ts's resolveKimiWirePath, reimplemented locally (rather than
- * imported) to avoid a circular import this module would otherwise close:
- * jsonl-resolver.js -> agents.js -> agents/resume.js ->
- * conversation-compaction.js -> summary-fork.js -> transcript-adapter.js.
+ * Resolve the native Kimi Code CLI wire.jsonl for a conversation.
  * Fast path: the captured `kimi-session-id` for this conversation's tmux
  * session maps directly to the wire.jsonl path; fallback (no captured id):
  * the newest session directory under the workspace's bucket.
