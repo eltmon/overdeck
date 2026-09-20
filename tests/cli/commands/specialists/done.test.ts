@@ -39,6 +39,15 @@ vi.mock('../../../../src/lib/cloister/pr-review-verdict.js', () => ({
 
 vi.mock('../../../../src/lib/cloister/pr-facts.js', () => ({
   getPrFacts: mockGetPrFacts,
+  resetPrFactsCache: vi.fn(),
+}));
+
+vi.mock('../../../../src/dashboard/server/services/pr-tab-cache.js', () => ({
+  bumpIssuePrTabCacheGeneration: vi.fn(),
+}));
+
+vi.mock('../../../../src/lib/cloister/pipeline-journal.js', () => ({
+  appendPipelineEntry: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/overdeck/issue-projects.js', () => ({
