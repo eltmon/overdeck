@@ -2,8 +2,8 @@ import { Effect } from 'effect';
 /**
  * pan show <id> — unified observation command
  *
- * Default: compact summary (derived issue state, health, recent CV entries) —
- * guaranteed to fit in ≤ 25 lines so it stays skimmable.
+ * Default: compact summary (derived issue state, the last few pipeline journal
+ * entries, health, recent CV entries) — kept short so it stays skimmable.
  *
  * Flags scope the output to specific views (full detail):
  *   --cv        Agent work history (CV)
@@ -21,6 +21,8 @@ import { getAgentRuntimeStateSync, getAgentStateSync } from '../../lib/agents.js
 import { getAgentEffectiveLastActivityMs, isAlive, type LivenessVerdict } from '../../lib/agents/liveness.js';
 import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 import { getDerivedIssueState } from '../../lib/overdeck/derived-issue-state.js';
+import { getIssueWorkspacePath } from '../../lib/overdeck/issue-projects.js';
+import { readPipelineJournal, type PipelineJournalEntry } from '../../lib/cloister/pipeline-journal.js';
 import { hostTerminalBackendName } from '../../lib/terminal-backends/select.js';
 
 interface ShowOptions {
@@ -64,6 +66,52 @@ export function describeLiveness(
     case 'runtime-missing': return { status: 'dead', detail: 'the harness process is gone' };
     default: return { status: 'unknown', detail: 'liveness probe did not answer' };
   }
+}
+
+/** How many journal entries the compact view shows, newest last. */
+const JOURNAL_LINES = 6;
+
+function shortSha(value: unknown): string {
+  return typeof value === 'string' ? value.slice(0, 8) : String(value ?? '');
+}
+
+/**
+ * One line of "what Overdeck did" per journal entry. The journal is not
+ * authority — the `state` line above it is derived from the PR — so this reads
+ * as a log, never as a status.
+ */
+export function summarizePipelineEntry(entry: PipelineJournalEntry): string {
+  const data = entry.data ?? {};
+  switch (entry.type) {
+    case 'verification.started':
+    case 'verification.passed':
+      return data.head ? `head=${shortSha(data.head)}` : '';
+    case 'verification.failed':
+      return `${data.failedCheck ?? 'unknown check'}${data.cycleCount ? ` (attempt ${data.cycleCount})` : ''}`;
+    case 'review.requested':
+      return entry.source ?? '';
+    case 'review.dispatched':
+    case 'review.redispatched': {
+      const count = Array.isArray(data.reviewers) ? data.reviewers.length : data.launched;
+      const run = data.runId ? ` (run ${shortSha(data.runId)})` : '';
+      const why = data.reason ? ` — ${data.reason}` : '';
+      return `${count ?? '?'} reviewers${run}${why}`;
+    }
+    case 'review.verdict':
+      return `${data.verdict ?? 'unknown'}${data.subRole ? ` (${data.subRole})` : ''}`;
+    case 'merge.attempted':
+      return typeof data.kind === 'string' ? data.kind : '';
+    case 'merge.completed':
+    case 'merge.failed':
+      return typeof data.reason === 'string' ? data.reason : '';
+    default:
+      return '';
+  }
+}
+
+function journalClock(at: string): string {
+  const when = new Date(at);
+  return Number.isNaN(when.getTime()) ? '--:--:--' : when.toTimeString().slice(0, 8);
 }
 
 export async function showCommand(id: string, options: ShowOptions = {}): Promise<void> {
@@ -110,6 +158,12 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
     : null;
   const cvData = readAgentCVSync(agentId);
 
+  // What Overdeck DID, from the workspace's append-only journal. No forge call
+  // is added: this is a local file read, and the derived `state` above still
+  // wins wherever the two disagree.
+  const workspacePath = getIssueWorkspacePath(issueId);
+  const journal = workspacePath ? readPipelineJournal(workspacePath) : [];
+
   if (json) {
     console.log(JSON.stringify({
       issueId,
@@ -121,6 +175,7 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
       health: healthData,
       liveness: liveness ? { backend, ...liveness } : null,
       cv: cvData,
+      journal,
     }, null, 2));
     return;
   }
@@ -133,6 +188,20 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
   console.log(`  ${chalk.dim('state')}    ${chalk.cyan(issueState.state)}`);
   if (issueState.attention) {
     console.log(`  ${chalk.dim('needs')}    ${chalk.yellow(issueState.attention)}`);
+  }
+
+  // What Overdeck DID — the last few journal entries, newest last. This is a
+  // log of actions, not a status: where it disagrees with `state` above, the
+  // PR wins and the journal is simply stale.
+  const recentJournal = journal.slice(-JOURNAL_LINES);
+  if (recentJournal.length > 0) {
+    console.log('');
+    console.log(chalk.dim('  pipeline:'));
+    for (const entry of recentJournal) {
+      const summary = summarizePipelineEntry(entry);
+      console.log(`    ${chalk.dim(journalClock(entry.at))}  ${entry.type.padEnd(21)} ${chalk.dim(summary)}`);
+    }
+    console.log('');
   }
 
   // Health line

@@ -255,6 +255,23 @@ setPipelineHandlerSync((event) => {
       return;
     }
 
+    // The append-only pipeline journal (cloister/pipeline-journal.ts). The
+    // entry is already durable in the workspace; this projects it into the
+    // event stream so a live reader sees the action at the moment it happened.
+    case 'pipeline.entry': {
+      try {
+        const es = getEventStore();
+        es.append({
+          type: 'pipeline.journal',
+          timestamp: new Date().toISOString(),
+          payload: { issueId: event.issueId, entry: event.entry },
+        } as any);
+      } catch (err) {
+        console.error('[pipeline] Failed to append pipeline.journal event:', err);
+      }
+      return;
+    }
+
     // PAN-915 — task_queued surfaces "review-agent dispatched" before the
     // first SQLite mutation lands. Maps to pipeline.review-started so the
     // kanban card flips to "review in progress" immediately.

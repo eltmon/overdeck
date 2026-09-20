@@ -15,13 +15,13 @@
 import { mkdir, readFile, rm } from 'fs/promises';
 import { dirname, join } from 'path';
 import { Effect } from 'effect';
-import { listSessionNames } from '../tmux.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { loadConfigSync as loadYamlConfig, resolveModel } from '../config-yaml.js';
 import { formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
+import { appendPipelineEntry } from './pipeline-journal.js';
 import { AGENTS_DIR, packageRoot } from '../paths.js';
 import type { RuntimeName } from '../runtimes/types.js';
 
@@ -57,9 +57,17 @@ function isReviewerStateWriteContention(error: unknown, agentId: string): boolea
     && /database is locked|SQLITE_BUSY/i.test(message);
 }
 
+/**
+ * Is this reviewer's pane still there?
+ *
+ * This used to ask tmux for session names, which is always empty under Herdr —
+ * so on the default backend every reviewer read as dead. `agentPaneExists`
+ * asks the SELECTED backend.
+ */
 async function reviewerSessionIsLive(agentId: string): Promise<boolean> {
   try {
-    return (await Effect.runPromise(listSessionNames())).includes(agentId);
+    const { agentPaneExists } = await import('../terminal-backends/launch.js');
+    return await agentPaneExists(agentId);
   } catch {
     return false;
   }
@@ -329,6 +337,20 @@ export async function launchConvoyReviewersPromise(params: ConvoyLaunchParams): 
   if (failedReviewers.length > 0) {
     console.warn(`[review-agent] Convoy launched for ${params.issueId}, but ${failedReviewers.length} reviewer(s) failed to spawn`);
   }
+
+  // The moment reviewers exist. `reviewers` carries the agent ids so a later
+  // reader can tell which lanes this run dispatched without re-deriving them.
+  const launchedSubRoles = params.subRoles ?? REVIEW_SUB_ROLES;
+  appendPipelineEntry(params.workspace, {
+    type: 'review.dispatched',
+    issueId: params.issueId.toUpperCase(),
+    source: 'review-convoy',
+    data: {
+      runId: params.runId,
+      reviewers: launchedSubRoles.map((subRole) => reviewerAgentId(params.issueId, subRole)),
+      launched: reviewerResults.filter(r => r.success).length,
+    },
+  });
   return reviewerResults;
 }
 
@@ -401,15 +423,21 @@ export async function recoverMissingConvoyReviewers(
   const workspace = parent.workspace;
   const runId = parent.reviewRunId;
 
-  // Reviewer evidence is per lane: one completed report or live session never
-  // proves that a sibling reviewer launched.
-  let sessions = new Set<string>();
+  // Reviewer evidence is per lane: one completed report or live pane never
+  // proves that a sibling reviewer launched. The probe asks the SELECTED
+  // backend per reviewer — the old tmux session-name list is always empty on
+  // Herdr, which made every reviewer read as dead and relaunched live ones.
   let livenessProbeOk = true;
+  const liveReviewers = new Set<string>();
   try {
-    sessions = new Set(await Effect.runPromise(listSessionNames()));
+    const { agentPaneExists } = await import('../terminal-backends/launch.js');
+    for (const subRole of REVIEW_SUB_ROLES) {
+      const reviewerId = reviewerAgentId(normalized, subRole);
+      if (await agentPaneExists(reviewerId)) liveReviewers.add(reviewerId);
+    }
   } catch {
-    // Liveness probe failed — tmux cannot answer, so the state row's live claim
-    // is the only signal left and keeps its conservative vote below.
+    // The backend could not answer, so the state row's live claim is the only
+    // signal left and keeps its conservative vote below.
     livenessProbeOk = false;
   }
 
@@ -420,9 +448,9 @@ export async function recoverMissingConvoyReviewers(
     const reviewer = getAgentStateSync(reviewerId);
     const stateClaimsLive = reviewer?.status === 'running' || reviewer?.status === 'starting';
     if (existsSync(reviewerAgentOutputPath(workspace, runId, subRole))) continue;
-    if (sessions.has(reviewerId)) continue;
-    // tmux is the liveness oracle (docs/AGENT-STATE-PLANES.md): a probe that
-    // answered "no session" outranks a state.json row still claiming
+    if (liveReviewers.has(reviewerId)) continue;
+    // The backend is the liveness oracle (docs/AGENT-STATE-PLANES.md): a probe
+    // that answered "no pane" outranks a state.json row still claiming
     // running/starting. Rows go stale whenever liveness reconciliation cannot
     // run (deacon freeze, boot --no-resume) or a reviewer exits without a
     // stopped event; trusting the claim no-oped the convoy launch and stranded
