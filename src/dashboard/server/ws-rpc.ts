@@ -10,16 +10,16 @@ import { resolveMuseSessionPath } from '../../lib/runtimes/muse-session.js';
 import { Effect, Layer, Queue, Schedule, Schema, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { RpcSerialization, RpcServer } from 'effect/unstable/rpc';
-import { DomainEvent as DomainEventSchema, PanRpcGroup, PanRpcError, WS_METHODS } from '@overdeck/contracts';
+import { DomainEvent as DomainEventSchema, isAgentSessionName, PanRpcGroup, PanRpcError, WS_METHODS } from '@overdeck/contracts';
 import { PanOpen } from './services/open.js';
 import { EventStoreService } from './services/domain-services.js';
 import { ReadModelService, type ReadModelServiceShape } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
 import { shouldBroadcastDashboardEvent, streamAgentOutput } from './services/agent-output-stream.js';
 import type { LegacyConversation } from '../../lib/overdeck/conversations.js';
-import { contextUsageFromParseResult, gateSnapshotEmission, parseConversationMessages, parseEntireConversation, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
+import { contextUsageFromParseResult, gateSnapshotEmission, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
 import { isPiSessionFile } from './services/pi-conversation-parser.js';
-import { resolveAgentHarness, resolvePiSessionPath, resolveCodexRolloutPath, resolveAcpTranscriptPath, resolveKimiWirePath, resolveJsonlPath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
+import { resolveAgentTranscriptCandidate, resolvePiSessionPath, resolveCodexRolloutPath, resolveAcpTranscriptPath, resolveKimiWirePath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
 import { sessionFilePath } from '../../lib/paths.js';
 import { getRuntimeCensus } from '../../lib/runtime-census.js';
 import { listProjectsSync } from '../../lib/projects.js';
@@ -141,12 +141,91 @@ export function streamHarnessFullParseSnapshots(
       () => resolveKimiWirePath(sessionName, workspace ? { workspaceOverride: workspace } : {}),
       sharedTranscriptParser('kimi'),
     );
-    case 'claude-jsonl': return streamResolved(
-      () => resolveJsonlPath(sessionName, workspace ?? ''),
-      parseEntireConversation,
-    );
+    // Claude uses the worker-backed initial parse plus incremental watcher below.
+    case 'claude-jsonl': return null;
     default: return null;
   }
+}
+
+function streamClaudeTranscript(
+  sessionFile: string,
+  conversationName: string,
+  model: string | null,
+  agentId?: string,
+): FullParseSnapshotStream {
+  return Stream.callback<ConversationEvent, PanRpcError>((queue) =>
+    Effect.acquireRelease(
+      Effect.promise(async () => {
+        const offer = (event: ConversationEvent) => {
+          try { Queue.offerUnsafe(queue, event); } catch { /* disconnected */ }
+        };
+        const initial = await runDashboardDbJob<ParseResult>('parseTranscriptSnapshot', {
+          sessionFile,
+          parser: 'claude-initial',
+        });
+        let currentByteOffset = initial.byteOffset;
+        let currentContextUsage = contextUsageFromParseResult(initial, model);
+        let highWaterCount = initial.messages.length;
+        if (initial.messages.length === 0 && initial.workLog.length === 0 && currentByteOffset > 0) {
+          console.warn(`[conv-stream] initial parse of ${conversationName} yielded no transcript content despite byteOffset=${currentByteOffset}`);
+        }
+        const priorState: ParseState = {
+          pendingToolUse: initial.pendingToolUse,
+          unresolvedResults: initial.unresolvedResults,
+          lastSequence: initial.lastSequence,
+          planToolUseIds: initial.planToolUseIds,
+          proposedPlan: initial.proposedPlan,
+          latestAssistantUsage: initial.latestAssistantUsage,
+          contextBoundaryOffset: initial.contextBoundaryOffset,
+          permissionMode: initial.permissionMode,
+          countedUsageIds: initial.countedUsageIds,
+          fileEditsByAssistantId: initial.fileEditsByAssistantId,
+          pendingAssistantId: initial.pendingAssistantId,
+          orphanToolUseIds: initial.orphanToolUseIds,
+        };
+        offer({
+          kind: 'messages',
+          messages: initial.messages,
+          workLog: [...initial.workLog, ...initial.pendingToolUse.values()],
+          streaming: initial.streaming,
+          snapshot: true,
+          proposedPlan: initial.proposedPlan,
+          compactBoundaries: initial.compactBoundaries?.length ? initial.compactBoundaries : undefined,
+          contextUsage: currentContextUsage,
+        });
+        let pendingSubagentToolUseIds = new Set(initial.pendingToolUse.keys());
+        const subagentPoller = agentId ? null : await startSubagentListPolling(
+          sessionFile,
+          () => pendingSubagentToolUseIds,
+          offer,
+        );
+        const handle = watchConversation(sessionFile, (result) => {
+          const fileWasReset = result.byteOffset < currentByteOffset;
+          const gate = gateSnapshotEmission(fileWasReset, result.messages.length, highWaterCount);
+          highWaterCount = gate.highWaterCount;
+          currentByteOffset = result.byteOffset;
+          currentContextUsage = contextUsageFromParseResult(result, model);
+          pendingSubagentToolUseIds = new Set(result.pendingToolUse.keys());
+          void subagentPoller?.refresh();
+          if (gate.suppressedShrink) {
+            console.warn(`[conv-stream] suppressed shrinking reset for ${conversationName}`);
+          }
+          offer({
+            kind: 'messages',
+            messages: result.messages,
+            workLog: result.workLog,
+            streaming: result.streaming,
+            snapshot: gate.snapshot,
+            proposedPlan: result.proposedPlan,
+            compactBoundaries: result.compactBoundaries?.length ? result.compactBoundaries : undefined,
+            contextUsage: currentContextUsage,
+          });
+        }, { byteOffset: initial.byteOffset, priorState });
+        return { stop() { handle.stop(); subagentPoller?.stop(); } };
+      }),
+      (handle) => Effect.sync(() => handle.stop()),
+    ),
+  );
 }
 
 function buildAgentIssueLookup(agents: readonly AgentIssueRecord[]): AgentIssueLookup {
@@ -662,11 +741,19 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             // PAN-1908: synthetic agent sessions (work/planning/specialist panels)
             // have no conversations-table row. Resolve their durable agent
             // transcript and stream snapshots over the same RPC transport.
-            if (!conv && /^(agent-|planning-|specialist-|strike-|inspect-)|^(flywheel-orchestrator|conv-flywheel-orchestrator)$/.test(input.conversationName)) {
-              const harness = yield* Effect.promise(() => resolveAgentHarness(input.conversationName));
-              const stream = streamHarnessFullParseSnapshots(input.conversationName, harness, null, false, null, input.agentId);
-              if (stream) return stream;
-              return conversationDiscoveringStream();
+            if (!conv && isAgentSessionName(input.conversationName)) {
+              const candidate = yield* Effect.promise(() => resolveAgentTranscriptCandidate(input.conversationName, ''));
+              if (!candidate) return conversationDiscoveringStream();
+              const sessionFile = input.agentId ? subagentTranscriptPath(candidate.path, input.agentId) : candidate.path;
+              if (!sessionFile) return conversationDiscoveringStream();
+              if (candidate.kind === 'claude') return streamClaudeTranscript(sessionFile, input.conversationName, null, input.agentId);
+              return streamResolvedFullParseSnapshots(
+                async () => sessionFile,
+                sharedTranscriptParser(candidate.kind),
+                null,
+                false,
+                candidate.kind === 'codex' && input.agentId === undefined,
+              );
             }
 
             if (!conv) {
@@ -703,114 +790,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
               return conversationDiscoveringStream();
             }
 
-            return Stream.callback<ConversationEvent, PanRpcError>((queue) =>
-              Effect.acquireRelease(
-                Effect.promise(async () => {
-                  const offer = (event: ConversationEvent) => {
-                    try {
-                      Queue.offerUnsafe(queue, event);
-                    } catch {
-                      // The queue may be shut down if the client disconnected
-                      // while an async file watcher callback was still running.
-                    }
-                  };
-
-                  // Parse the complete existing transcript before subscribing to
-                  // appends. Keep pending tool_use entries in parser state for the
-                  // watcher instead of flushing them into the display-only work log.
-                  const initial = await runDashboardDbJob<ParseResult>('parseTranscriptSnapshot', {
-                    sessionFile,
-                    parser: 'claude-initial',
-                  });
-                  let currentByteOffset = initial.byteOffset;
-                  let currentContextUsage = contextUsageFromParseResult(initial, model);
-                  // Per-subscription high-water mark of the largest full transcript
-                  // we have emitted as an authoritative snapshot. The append-only
-                  // guard (gateSnapshotEmission) uses it to refuse any later
-                  // reset-snapshot that would shrink the transcript. See PAN-1642.
-                  let highWaterCount = initial.messages.length;
-                  if (initial.messages.length === 0 && currentByteOffset > 0) {
-                    // The file has complete lines on disk yet parsed to zero
-                    // messages — a transient read during a respawn rewrite, or a
-                    // transcript shape we failed to parse. Logged (not fatal) so a
-                    // recurring blank-on-subscribe can be correlated with respawns.
-                    console.warn(
-                      `[conv-stream] initial parse of ${input.conversationName} yielded 0 messages ` +
-                      `despite byteOffset=${currentByteOffset} — emitting empty snapshot (client HTTP backfill covers this)`,
-                    );
-                  }
-                  const priorState: ParseState = {
-                    pendingToolUse: initial.pendingToolUse,
-                    unresolvedResults: initial.unresolvedResults,
-                    lastSequence: initial.lastSequence,
-                    planToolUseIds: initial.planToolUseIds,
-                    proposedPlan: initial.proposedPlan,
-                    latestAssistantUsage: initial.latestAssistantUsage,
-                    contextBoundaryOffset: initial.contextBoundaryOffset,
-                    permissionMode: initial.permissionMode,
-                    countedUsageIds: initial.countedUsageIds,
-                    fileEditsByAssistantId: initial.fileEditsByAssistantId,
-                    pendingAssistantId: initial.pendingAssistantId,
-                    orphanToolUseIds: initial.orphanToolUseIds,
-                  };
-
-                  offer({
-                    kind: 'messages' as const,
-                    messages: initial.messages,
-                    workLog: [...initial.workLog, ...initial.pendingToolUse.values()],
-                    streaming: initial.streaming,
-                    snapshot: true,
-                    proposedPlan: initial.proposedPlan,
-                    compactBoundaries: initial.compactBoundaries && initial.compactBoundaries.length > 0 ? initial.compactBoundaries : undefined,
-                    contextUsage: currentContextUsage,
-                  });
-                  let pendingSubagentToolUseIds = new Set(initial.pendingToolUse.keys());
-                  const subagentPoller = input.agentId ? null : await startSubagentListPolling(sessionFile, () => pendingSubagentToolUseIds, offer);
-
-                  // Watch only bytes written after the initial full parse. Subsequent
-                  // events are deltas; the client merges them into its cache.
-                  const handle = watchConversation(sessionFile, (result) => {
-                    const fileWasReset = result.byteOffset < currentByteOffset;
-                    // Append-only guard: a watcher reset fires only when the file
-                    // shrank and was re-parsed from byte 0, so result.messages is a
-                    // full transcript. claude-code transcripts never legitimately
-                    // shrink on a stable subscription (resume reuses the same file;
-                    // compaction appends), so a smaller full re-parse is a transient
-                    // rewrite window — downgrade it to a merge instead of letting it
-                    // wipe the reader's view to "How can I help you?" (PAN-1642).
-                    const gate = gateSnapshotEmission(fileWasReset, result.messages.length, highWaterCount);
-                    highWaterCount = gate.highWaterCount;
-                    currentByteOffset = result.byteOffset;
-                    currentContextUsage = contextUsageFromParseResult(result, model);
-                    pendingSubagentToolUseIds = new Set(result.pendingToolUse.keys());
-                    void subagentPoller?.refresh();
-                    if (gate.suppressedShrink) {
-                      console.warn(
-                        `[conv-stream] suppressed shrinking reset for ${input.conversationName}: ` +
-                        `byteOffset ${currentByteOffset} (re-parsed ${result.messages.length} msgs) < ` +
-                        `high-water ${highWaterCount} — treating as transient rewrite, merging instead of replacing`,
-                      );
-                    }
-                    offer({
-                      kind: 'messages' as const,
-                      messages: result.messages,
-                      workLog: result.workLog,
-                      streaming: result.streaming,
-                      snapshot: gate.snapshot,
-                      proposedPlan: result.proposedPlan,
-                      compactBoundaries: result.compactBoundaries && result.compactBoundaries.length > 0 ? result.compactBoundaries : undefined,
-                      contextUsage: currentContextUsage,
-                    });
-                  }, { byteOffset: initial.byteOffset, priorState });
-
-                  return { stop() { handle.stop(); subagentPoller?.stop(); } };
-                }),
-                (handle) =>
-                  Effect.sync(() => {
-                    handle.stop();
-                  }),
-              ),
-            );
+            return streamClaudeTranscript(sessionFile, input.conversationName, model, input.agentId);
           }),
         ),
 

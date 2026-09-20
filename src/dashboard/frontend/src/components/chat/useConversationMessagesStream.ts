@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stream } from 'effect';
-import { getHarnessBehavior, WS_METHODS } from '@overdeck/contracts';
+import { getHarnessBehavior, isAgentSessionName, WS_METHODS } from '@overdeck/contracts';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 import type { Conversation } from '../CommandDeck/ConversationList';
@@ -143,11 +143,9 @@ export function shouldStreamConversationMessages(conversation: Pick<Conversation
   // stream resolves them from durable agent state and tails every supported
   // harness while live. Historical reads remain one-shot HTTP.
   if (!conversation.sessionAlive) return false;
-  const name = conversation.name ?? '';
-  const isAgentSession = /^(agent-|planning-|specialist-)/.test(name);
   const behavior = getHarnessBehavior(conversation.harness);
   const streamable = behavior.supportsConversationStreaming || behavior.supportsPatchProjection;
-  return isAgentSession && streamable;
+  return isAgentSessionName(conversation.name ?? '') && streamable;
 }
 
 export function useConversationMessagesStream(

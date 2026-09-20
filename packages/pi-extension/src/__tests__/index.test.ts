@@ -100,6 +100,8 @@ describe('handleSessionStart', () => {
       sessionId: 'sess-resume-target',
       at: fixedTime,
       source: 'session-start',
+      harness: 'pi',
+      model: 'unknown',
     })
   })
 

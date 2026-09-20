@@ -347,7 +347,10 @@ async function spawnRunWithoutConsentClaim(
       : (options.resumeSessionId ?? randomUUID());
 
     if (!isAcp && resolvedHarness !== 'kimi-code' && rawSessionId) {
-      appendSessionIdToHistory(agentId, rawSessionId, 'launcher');
+      appendSessionIdToHistory(agentId, rawSessionId, 'launcher', {
+        harness: resolvedHarness,
+        model: selectedModel,
+      });
     }
 
     try {
@@ -691,7 +694,7 @@ async function spawnAgentWithoutConsentClaim(
     startedAt: new Date().toISOString(),
     ...(resolvedHarness === 'codex' ? {} : { costSoFar: 0 }),
     hostOverride: options.allowHost || undefined,
-    sessionId: createFreshSessionIdentity(agentId, resolvedHarness),
+    sessionId: createFreshSessionIdentity(agentId, resolvedHarness, selectedModel),
     flywheelRunId: flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID,
     startedBy,
   };

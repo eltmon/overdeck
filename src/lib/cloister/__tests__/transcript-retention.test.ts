@@ -92,13 +92,43 @@ describe('sweepTranscriptRetention', () => {
     const rollout = join(agentDir, 'codex-home', 'sessions', '2026', '08', '01', 'rollout-old.jsonl');
     writeArtifact(rollout, 60);
 
-    await sweepTranscriptRetention({
+    const deps = {
+      ...retentionDeps(['agent-pan-3950']),
+      removeFile: vi.fn(async () => undefined),
+      pruneAgentDir: vi.fn(async () => undefined),
+      removeTree: vi.fn(async () => undefined),
+    };
+    const actions = await sweepTranscriptRetention({
       transcriptDays: 30,
       agentsDir,
-      deps: retentionDeps(['agent-pan-3950']),
+      deps,
     });
 
     expect(existsSync(rollout)).toBe(true);
+    expect(deps.removeFile).not.toHaveBeenCalled();
+    expect(deps.pruneAgentDir).not.toHaveBeenCalled();
+    expect(deps.removeTree).not.toHaveBeenCalled();
+    expect(actions[0]).toContain('deleted 0 transcript files');
+    expect(actions[0]).toContain('from 0 ended agent state dirs');
+  });
+
+  it('rechecks liveness before each destructive phase and stops when the agent restarts', async () => {
+    const agentDir = join(agentsDir, 'agent-pan-3950');
+    const rollout = join(agentDir, 'codex-home', 'sessions', '2026', '08', '01', 'rollout-old.jsonl');
+    writeArtifact(rollout, 60);
+    const deps = retentionDeps();
+    deps.listLiveAgentIds
+      .mockResolvedValueOnce(new Set())
+      .mockResolvedValueOnce(new Set())
+      .mockResolvedValueOnce(new Set(['agent-pan-3950']));
+    const pruneAgentDir = vi.fn(async () => undefined);
+    const removeTree = vi.fn(async () => undefined);
+
+    await sweepTranscriptRetention({ transcriptDays: 30, agentsDir, deps: { ...deps, pruneAgentDir, removeTree } });
+
+    expect(existsSync(rollout)).toBe(false);
+    expect(pruneAgentDir).not.toHaveBeenCalled();
+    expect(removeTree).not.toHaveBeenCalled();
   });
 
   it('fails closed when backend liveness inventory is indeterminate', async () => {

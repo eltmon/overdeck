@@ -5,9 +5,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const SCRIPT_PATH = join(process.cwd(), 'sync-sources', 'hooks', 'session-start-hook')
+const HOOK_LIB_PATH = join(process.cwd(), 'sync-sources', 'hooks', 'pan-hook-lib.sh')
 
 function writeStubHookLib(dir: string, eventLog: string): void {
-  const lib = `#!/bin/bash
+  const lib = `${readFileSync(HOOK_LIB_PATH, 'utf-8')}
 set +e
 pan_resolve_agent_id() {
   AGENT_ID="\${OVERDECK_AGENT_ID:-}"
@@ -84,6 +85,7 @@ describe('session-start-hook compaction repair (PAN-2884)', () => {
     const { stdout, code } = await runHook(tempDir, input, {
       OVERDECK_AGENT_ID: 'agent-pan-2884',
       OVERDECK_HOME: overdeckHome,
+      OVERDECK_DASHBOARD_URL: 'http://dashboard.test',
       PAN_DASHBOARD_URL: 'http://dashboard.test',
       CURL_LOG: curlLog,
     })
@@ -110,6 +112,16 @@ describe('session-start-hook compaction repair (PAN-2884)', () => {
       agentId: 'agent-pan-2884',
       sessionId: 'session-2884',
       reason: 'session-start',
+    })
+    const indexEntry = JSON.parse(readFileSync(
+      join(overdeckHome, 'agents', 'agent-pan-2884', 'sessions.json'),
+      'utf-8',
+    ))
+    expect(indexEntry).toMatchObject({
+      sessionId: 'session-2884',
+      source: 'session-start-hook',
+      harness: 'claude-code',
+      model: 'gpt-5.6-sol',
     })
 
     const curlArgs = readFileSync(curlLog, 'utf-8')

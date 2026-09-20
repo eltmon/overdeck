@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { Effect } from 'effect';
 import { emitAgentEvent } from '../agent-runtime.js';
-import { SESSION_RESET_MARKER } from '../session-history.js';
+import { resetSessionIndex, SESSION_RESET_MARKER } from '../session-history.js';
 import { getAgentDir, getAgentStateSync, saveAgentStateSync } from './agent-state.js';
 
 export interface ClearedAgentSessionPointers {
@@ -25,7 +25,10 @@ export async function clearAgentSessionPointers(
   const agentDir = getAgentDir(agentId);
   const cleared: string[] = [];
 
-  for (const name of ['sessions.json', 'session.id', 'codex-thread-id', 'launcher.sh']) {
+  // Explicit operator reset may truncate the otherwise append-only index.
+  await resetSessionIndex(agentId, agentDir);
+  cleared.push('sessions.json');
+  for (const name of ['session.id', 'codex-thread-id', 'launcher.sh']) {
     const path = join(agentDir, name);
     if (!existsSync(path)) continue;
     unlinkSync(path);

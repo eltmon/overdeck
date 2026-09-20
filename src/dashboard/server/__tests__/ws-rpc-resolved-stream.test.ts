@@ -40,13 +40,9 @@ import type { ParseResult } from '../services/conversation-service.js';
 const emptyParse = vi.fn<(file: string) => Promise<ParseResult>>();
 
 describe('streamHarnessFullParseSnapshots — ACP dispatch', () => {
-  it('keeps a WS/RPC stream open for synthetic Claude agent sessions', async () => {
+  it('leaves Claude sessions to the worker-backed incremental stream', () => {
     const stream = streamHarnessFullParseSnapshots('agent-pan-3950', 'claude-code', null, true);
-    expect(stream).not.toBeNull();
-    const first = await Effect.runPromise(stream!.pipe(Stream.take(1), Stream.runCollect));
-    expect(Array.from(first)).toEqual([
-      { kind: 'messages', messages: [], workLog: [], streaming: false, snapshot: true },
-    ]);
+    expect(stream).toBeNull();
   });
 
   it('creates a ready stream for an ACP conversation before its transcript exists', async () => {

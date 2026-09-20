@@ -7,7 +7,6 @@ import type { ConversationResponse } from '@overdeck/contracts';
 import { Effect, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { getOverdeckHome } from '../../../../lib/paths.js';
 import {
   getActivity,
   getAgentState,
@@ -18,13 +17,9 @@ import { parsePiConversationMessages } from '../../services/pi-conversation-pars
 import { parseOhmypiConversationMessages } from '../../services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from '../../services/codex-conversation-parser.js';
 import { parseAcpConversationMessages } from '../../services/acp-conversation-parser.js';
+import { sharedTranscriptParser } from '../../services/shared-transcript-parser.js';
 import {
-  listClaudeTranscriptPaths,
-  resolvePiSessionPath,
-  resolveCodexRolloutPath,
-  resolveAcpTranscriptPath,
-  resolveAgentHarness,
-  resolveJsonlPath,
+  listAgentTranscriptCandidates,
 } from '../jsonl-resolver.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
@@ -124,44 +119,24 @@ function missingTranscript(id: string, checked: string[]): AgentConversationResu
  * Claude resolution follows the append-only session index, newest first.
  */
 export async function buildAgentConversationResult(id: string): Promise<AgentConversationResult> {
-  const checked: string[] = [];
   try {
-    const harness = await resolveAgentHarness(id);
-    const agentDir = join(getOverdeckHome(), 'agents', id);
-
-    if (harness === 'ohmypi') {
-      const sessionFile = await resolvePiSessionPath(id);
-      if (sessionFile) checked.push(sessionFile);
-      checked.push(join(agentDir, 'sessions', '**', '*.jsonl'), join(agentDir, '*.jsonl'));
-      if (!sessionFile || !(await pathExists(sessionFile))) return missingTranscript(id, checked);
-      const result = await parseOhmypiConversationMessages(sessionFile);
-      return { status: 200, body: { ...result, streaming: false } };
+    const workspace = await Effect.runPromise(getAgentWorkspace(id));
+    const candidates = await listAgentTranscriptCandidates(id, workspace ?? '');
+    const checked = candidates.map(({ path }) => path);
+    let selected: (typeof candidates)[number] | null = null;
+    for (const candidate of candidates) {
+      if (await pathExists(candidate.path)) { selected = candidate; break; }
     }
+    if (!selected) return missingTranscript(id, checked);
 
-    if (harness === 'pi') {
-      const sessionFile = await resolvePiSessionPath(id);
-      if (sessionFile) checked.push(sessionFile);
-      checked.push(join(agentDir, 'sessions', '**', '*.jsonl'), join(agentDir, '*.jsonl'));
-      if (!sessionFile || !(await pathExists(sessionFile))) return missingTranscript(id, checked);
-      const result = await parsePiConversationMessages(sessionFile);
-      return { status: 200, body: { ...result, streaming: false } };
-    }
+    const result = selected.kind === 'claude' ? await parseEntireConversation(selected.path)
+      : selected.kind === 'pi' ? await parsePiConversationMessages(selected.path)
+      : selected.kind === 'ohmypi' ? await parseOhmypiConversationMessages(selected.path)
+      : selected.kind === 'codex' ? await parseCodexConversationMessages(selected.path)
+      : selected.kind === 'acp' ? await parseAcpConversationMessages(selected.path)
+      : await sharedTranscriptParser(selected.kind)(selected.path);
 
-    if (harness === 'codex') {
-      const sessionFile = await resolveCodexRolloutPath(id);
-      if (sessionFile) checked.push(sessionFile);
-      checked.push(join(agentDir, 'codex-home*', 'sessions', '**', 'rollout-*.jsonl'));
-      if (!sessionFile || !(await pathExists(sessionFile))) return missingTranscript(id, checked);
-      const result = await parseCodexConversationMessages(sessionFile);
-      return { status: 200, body: { ...result, streaming: false } };
-    }
-
-    if (harness === 'acp' || harness === 'opencode') {
-      const sessionFile = await resolveAcpTranscriptPath(id);
-      if (sessionFile) checked.push(sessionFile);
-      checked.push(join(agentDir, 'acp-session.jsonl'));
-      if (!sessionFile || !(await pathExists(sessionFile))) return missingTranscript(id, checked);
-      const result = await parseAcpConversationMessages(sessionFile);
+    if (selected.kind === 'acp') {
       return { status: 200, body: {
         ...result,
         messages: result.messages.map((message) => message.role === 'assistant'
@@ -174,32 +149,6 @@ export async function buildAgentConversationResult(id: string): Promise<AgentCon
         streaming: false,
       } };
     }
-
-    // claude-code (default): append-only index first; mutable compatibility
-    // pointers are considered by the shared resolver only when no index exists.
-    checked.push(
-      join(agentDir, 'sessions.json'),
-      join(agentDir, 'session.id'),
-      join(agentDir, 'runtime.json'),
-      join(agentDir, 'state.json'),
-    );
-    const workspace = await Effect.runPromise(getAgentWorkspace(id));
-    let jsonlPath: string | null = null;
-    if (workspace) {
-      for (const candidate of await listClaudeTranscriptPaths(id, workspace)) {
-        checked.push(candidate);
-      }
-      jsonlPath = await resolveJsonlPath(id, workspace);
-      if (jsonlPath && !checked.includes(jsonlPath)) checked.push(jsonlPath);
-    } else {
-      checked.push(join(agentDir, 'state.json (workspace missing)'));
-    }
-    if (!jsonlPath) return missingTranscript(id, checked);
-    // parseEntireConversation, not parseConversationMessages: a single parse caps
-    // at MAX_READ_BYTES (10 MB) and would drop the most recent turns of a larger
-    // transcript (PAN-1989). This one-shot endpoint must return the whole file.
-    const result = await parseEntireConversation(jsonlPath);
-    // Force streaming: false — tmux session is dead, any "streaming" state is stale
     return { status: 200, body: { ...result, streaming: false } };
   } catch (err) {
     console.error('[conversation] failed for', id, err);

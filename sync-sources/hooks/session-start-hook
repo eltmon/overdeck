@@ -43,7 +43,7 @@ pan_emit_event "$AGENT_ID" "{\"kind\":\"activity\",\"activity\":\"idle\",\"hookN
 READY_DIR="${OVERDECK_HOME:-$HOME/.overdeck}/agents/$AGENT_ID"
 mkdir -p "$READY_DIR" 2>/dev/null
 if [ -n "$CLAUDE_SESSION_ID" ] && command -v jq >/dev/null 2>&1; then
-  pan_append_session_index "$READY_DIR" "$CLAUDE_SESSION_ID" "$TS" "session-start-hook" || true
+  pan_append_session_index "$READY_DIR" "$CLAUDE_SESSION_ID" "$TS" "session-start-hook" "claude-code" "$MODEL" || true
 fi
 if command -v jq >/dev/null 2>&1; then
   jq -n --arg agentId "$AGENT_ID" --arg sid "$CLAUDE_SESSION_ID" --arg ts "$TS" \

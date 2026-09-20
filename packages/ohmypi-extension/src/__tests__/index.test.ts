@@ -105,6 +105,8 @@ describe('handleSessionStart', () => {
       sessionId: 'sess-resume-target',
       at: fixedTime,
       source: 'session-start',
+      harness: 'ohmypi',
+      model: 'unknown',
     })
   })
 

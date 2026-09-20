@@ -42,13 +42,7 @@ vi.mock('../../services/acp-conversation-parser.js', () => ({
 }));
 
 vi.mock('../jsonl-resolver.js', () => ({
-  resolveAgentHarness: vi.fn(() => Promise.resolve(null)),
-  resolvePiSessionPath: vi.fn(() => Promise.resolve(null)),
-  resolveCodexRolloutPath: vi.fn(() => Promise.resolve(null)),
-  resolveAcpTranscriptPath: vi.fn(() => Promise.resolve(null)),
-  resolveClaudeSessionId: vi.fn(() => Promise.resolve(null)),
-  resolveJsonlPath: vi.fn(() => Promise.resolve(null)),
-  listClaudeTranscriptPaths: vi.fn(() => Promise.resolve([])),
+  listAgentTranscriptCandidates: vi.fn(() => Promise.resolve([])),
 }));
 
 vi.mock('node:fs/promises', async (importOriginal) => {
@@ -67,12 +61,7 @@ import { parseOhmypiConversationMessages } from '../../services/ohmypi-conversat
 import { parseCodexConversationMessages } from '../../services/codex-conversation-parser.js';
 import { parseAcpConversationMessages } from '../../services/acp-conversation-parser.js';
 import {
-  resolveAgentHarness,
-  resolvePiSessionPath,
-  resolveCodexRolloutPath,
-  resolveAcpTranscriptPath,
-  listClaudeTranscriptPaths,
-  resolveJsonlPath,
+  listAgentTranscriptCandidates,
 } from '../jsonl-resolver.js';
 import { access } from 'node:fs/promises';
 
@@ -82,12 +71,7 @@ const mockParsePiConversationMessages = vi.mocked(parsePiConversationMessages);
 const mockParseOhmypiConversationMessages = vi.mocked(parseOhmypiConversationMessages);
 const mockParseCodexConversationMessages = vi.mocked(parseCodexConversationMessages);
 const mockParseAcpConversationMessages = vi.mocked(parseAcpConversationMessages);
-const mockResolveAgentHarness = vi.mocked(resolveAgentHarness);
-const mockResolvePiSessionPath = vi.mocked(resolvePiSessionPath);
-const mockResolveCodexRolloutPath = vi.mocked(resolveCodexRolloutPath);
-const mockResolveAcpTranscriptPath = vi.mocked(resolveAcpTranscriptPath);
-const mockListClaudeTranscriptPaths = vi.mocked(listClaudeTranscriptPaths);
-const mockResolveJsonlPath = vi.mocked(resolveJsonlPath);
+const mockListAgentTranscriptCandidates = vi.mocked(listAgentTranscriptCandidates);
 const mockAccess = vi.mocked(access);
 
 const EMPTY = { messages: [], workLog: [], streaming: false, totalCost: 0, byteOffset: 0 };
@@ -108,10 +92,8 @@ const PARSE_RESULT_BASE = {
 describe('buildConversationResponse', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockResolveAgentHarness.mockResolvedValue(null);
     mockGetAgentWorkspace.mockReturnValue(Effect.succeed('/workspace/feature-pan-473'));
-    mockResolveJsonlPath.mockResolvedValue(null);
-    mockListClaudeTranscriptPaths.mockResolvedValue([]);
+    mockListAgentTranscriptCandidates.mockResolvedValue([]);
     mockAccess.mockResolvedValue(undefined);
   });
 
@@ -127,7 +109,7 @@ describe('buildConversationResponse', () => {
 
   it('parses messages and forces streaming: false when file exists', async () => {
     const jsonlPath = '/some/path/session.jsonl';
-    mockResolveJsonlPath.mockResolvedValue(jsonlPath);
+    mockListAgentTranscriptCandidates.mockResolvedValue([{ kind: 'claude', path: jsonlPath }]);
     mockAccess.mockResolvedValue(undefined);
     mockParseEntireConversation.mockResolvedValue({
       messages: [{ role: 'user', content: 'hello' } as never],
@@ -145,7 +127,7 @@ describe('buildConversationResponse', () => {
 
   it('returns empty result and logs error when parseEntireConversation throws', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    mockResolveJsonlPath.mockResolvedValue('/some/path/session.jsonl');
+    mockListAgentTranscriptCandidates.mockResolvedValue([{ kind: 'claude', path: '/some/path/session.jsonl' }]);
     mockAccess.mockResolvedValue(undefined);
     mockParseEntireConversation.mockRejectedValue(new Error('corrupt JSONL'));
 
@@ -162,7 +144,7 @@ describe('buildConversationResponse', () => {
 
   it('uses the path chosen by the shared session resolver', async () => {
     const indexedPath = '/claude/projects/workspace/indexed.jsonl';
-    mockResolveJsonlPath.mockResolvedValue(indexedPath);
+    mockListAgentTranscriptCandidates.mockResolvedValue([{ kind: 'claude', path: indexedPath }]);
     mockParseEntireConversation.mockResolvedValue({
       messages: [{ role: 'assistant', content: 'indexed session' } as never],
       ...PARSE_RESULT_BASE,
@@ -178,8 +160,10 @@ describe('buildConversationResponse', () => {
   it('resolves an older indexed transcript for a stopped agent when the newest is missing', async () => {
     const newer = '/claude/projects/workspace/newer.jsonl';
     const older = '/claude/projects/workspace/older.jsonl';
-    mockListClaudeTranscriptPaths.mockResolvedValue([newer, older]);
-    mockResolveJsonlPath.mockResolvedValue(older);
+    mockListAgentTranscriptCandidates.mockResolvedValue([
+      { kind: 'claude', path: newer },
+      { kind: 'claude', path: older },
+    ]);
     mockAccess.mockImplementation((path) => path === older
       ? Promise.resolve()
       : Promise.reject(new Error('ENOENT')));
@@ -196,26 +180,19 @@ describe('buildConversationResponse', () => {
 
   it('returns every indexed candidate in the explicit 404 body', async () => {
     const paths = ['/claude/projects/workspace/newer.jsonl', '/claude/projects/workspace/older.jsonl'];
-    mockListClaudeTranscriptPaths.mockResolvedValue(paths);
+    mockListAgentTranscriptCandidates.mockResolvedValue(paths.map((path) => ({ kind: 'claude' as const, path })));
     mockAccess.mockRejectedValue(new Error('ENOENT'));
 
     const result = await buildAgentConversationResult('agent-PAN-473');
     expect(result).toMatchObject({ status: 404, body: { error: 'No transcript found for agent-PAN-473.' } });
-    expect(result.status === 404 ? result.body.checked : []).toEqual(expect.arrayContaining(paths));
-    expect(result.status === 404 ? result.body.checked : []).toEqual(expect.arrayContaining([
-      expect.stringContaining('sessions.json'),
-      expect.stringContaining('session.id'),
-      expect.stringContaining('runtime.json'),
-      expect.stringContaining('state.json'),
-    ]));
+    expect(result.status === 404 ? result.body.checked : []).toEqual(paths);
   });
 
   // ── ohmypi harness (PAN-2012) ─────────────────────────────────────────────────
 
   it('routes ohmypi agents through parseOhmypiConversationMessages', async () => {
     const piPath = '/home/testuser/.overdeck/agents/agent-PAN-473/2026-06-23T10:00:00_abc.jsonl';
-    mockResolveAgentHarness.mockResolvedValue('ohmypi');
-    mockResolvePiSessionPath.mockResolvedValue(piPath);
+    mockListAgentTranscriptCandidates.mockResolvedValue([{ kind: 'ohmypi', path: piPath }]);
     mockAccess.mockResolvedValue(undefined);
     mockParseOhmypiConversationMessages.mockResolvedValue({
       messages: [{ role: 'assistant', content: 'Starting — how can I help you?' } as never],
@@ -231,9 +208,6 @@ describe('buildConversationResponse', () => {
   });
 
   it('returns empty for ohmypi agent when session file not found', async () => {
-    mockResolveAgentHarness.mockResolvedValue('ohmypi');
-    mockResolvePiSessionPath.mockResolvedValue(null);
-
     const result = await buildConversationResponse('agent-PAN-473');
 
     expect(result).toEqual(EMPTY);
@@ -242,8 +216,7 @@ describe('buildConversationResponse', () => {
 
   it('routes recorded pi agents through parsePiConversationMessages', async () => {
     const piPath = '/home/testuser/.overdeck/agents/agent-PAN-473/2026-06-23T10:00:00_abc.jsonl';
-    mockResolveAgentHarness.mockResolvedValue('pi');
-    mockResolvePiSessionPath.mockResolvedValue(piPath);
+    mockListAgentTranscriptCandidates.mockResolvedValue([{ kind: 'pi', path: piPath }]);
     mockAccess.mockResolvedValue(undefined);
     mockParsePiConversationMessages.mockResolvedValue({
       messages: [{ role: 'assistant', content: 'Starting — how can I help you?' } as never],
@@ -263,8 +236,7 @@ describe('buildConversationResponse', () => {
 
   it('routes codex agents through parseCodexConversationMessages', async () => {
     const codexPath = '/home/testuser/.overdeck/agents/agent-PAN-473/codex-home/sessions/rollout.jsonl';
-    mockResolveAgentHarness.mockResolvedValue('codex');
-    mockResolveCodexRolloutPath.mockResolvedValue(codexPath);
+    mockListAgentTranscriptCandidates.mockResolvedValue([{ kind: 'codex', path: codexPath }]);
     mockAccess.mockResolvedValue(undefined);
     mockParseCodexConversationMessages.mockResolvedValue({
       messages: [{ role: 'assistant', content: 'codex response' } as never],
@@ -280,9 +252,6 @@ describe('buildConversationResponse', () => {
   });
 
   it('returns empty for codex agent when rollout not found', async () => {
-    mockResolveAgentHarness.mockResolvedValue('codex');
-    mockResolveCodexRolloutPath.mockResolvedValue(null);
-
     const result = await buildConversationResponse('agent-PAN-473');
 
     expect(result).toEqual(EMPTY);
@@ -293,8 +262,7 @@ describe('buildConversationResponse', () => {
 
   it('routes ACP agents through the native parser and finalizes assistant messages', async () => {
     const acpPath = '/home/testuser/.overdeck/agents/agent-PAN-473/acp-session.jsonl';
-    mockResolveAgentHarness.mockResolvedValue('acp');
-    mockResolveAcpTranscriptPath.mockResolvedValue(acpPath);
+    mockListAgentTranscriptCandidates.mockResolvedValue([{ kind: 'acp', path: acpPath }]);
     mockAccess.mockResolvedValue(undefined);
     mockParseAcpConversationMessages.mockResolvedValue({
       messages: [{
@@ -321,9 +289,6 @@ describe('buildConversationResponse', () => {
   });
 
   it('returns empty for ACP agent when transcript not found', async () => {
-    mockResolveAgentHarness.mockResolvedValue('acp');
-    mockResolveAcpTranscriptPath.mockResolvedValue(null);
-
     const result = await buildConversationResponse('agent-PAN-473');
 
     expect(result).toEqual(EMPTY);

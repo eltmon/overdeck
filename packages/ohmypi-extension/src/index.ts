@@ -106,6 +106,7 @@ export async function setThinkingLevelIfSupported(runtime: unknown, level: Think
 export interface SessionStartEvent {
   reason?: string
   sessionId?: string
+  model?: string
 }
 
 export interface UsageLike {
@@ -424,8 +425,8 @@ async function sessionIdFor(env: HookEnv): Promise<string | null> {
   }
 }
 
-async function appendSessionIndexEntry(path: string, sessionId: string, at: string): Promise<void> {
-  const line = `${JSON.stringify({ sessionId, at, source: 'session-start' })}\n`
+async function appendSessionIndexEntry(path: string, sessionId: string, at: string, model: string): Promise<void> {
+  const line = `${JSON.stringify({ sessionId, at, source: 'session-start', harness: 'ohmypi', model })}\n`
   if (Buffer.byteLength(line) > 4096) throw new Error('sessions.json entry exceeds PIPE_BUF')
   appendFileSync(path, line, { flag: 'a' })
 }
@@ -610,7 +611,9 @@ export async function handleSessionStart(env: HookEnv, event: SessionStartEvent)
     pid: env.pid ?? process.pid,
   })
   if (event.sessionId) {
-    await appendSessionIndexEntry(paths.sessionsIndexPath, event.sessionId, ts)
+    const state = await readAgentState(env)
+    const model = event.model ?? (typeof state['model'] === 'string' ? state['model'] : 'unknown')
+    await appendSessionIndexEntry(paths.sessionsIndexPath, event.sessionId, ts, model)
   }
   await postEvent(env, { kind: 'model_set', model: 'pi', claudeSessionId: event.sessionId ?? undefined, timestamp: ts })
   await postEvent(env, { kind: 'activity', activity: 'idle', timestamp: ts })

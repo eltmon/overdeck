@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync } from 'fs';
+import { writeFile } from 'node:fs/promises';
 import { join } from 'path';
 import { getOverdeckHome } from './paths.js';
 import { getHarnessBehavior } from './runtimes/behavior.js';
@@ -24,6 +25,55 @@ export interface SessionIndexEntry {
   sessionId: string;
   at: string;
   source: string;
+  harness?: string;
+  model?: string;
+}
+
+export type TranscriptCandidateKind = 'claude' | 'codex' | 'pi' | 'ohmypi' | 'acp' | 'kimi' | 'muse';
+export interface TranscriptCandidate { kind: TranscriptCandidateKind; path: string }
+
+export interface TranscriptCandidateSources {
+  entries: readonly SessionIndexEntry[];
+  currentHarness?: string | null;
+  indexedPaths: ReadonlyMap<string, string>;
+  launcherPinned?: TranscriptCandidate | null;
+  stateDerived?: readonly TranscriptCandidate[];
+  freshestInProjectDir?: TranscriptCandidate | null;
+}
+
+export function transcriptCandidateKey(kind: TranscriptCandidateKind, sessionId: string): string {
+  return `${kind}:${sessionId}`;
+}
+
+export function transcriptCandidateKind(harness: string | null | undefined): TranscriptCandidateKind {
+  const transcriptKind = getHarnessBehavior(harness as Parameters<typeof getHarnessBehavior>[0]).transcriptKind;
+  if (transcriptKind === 'codex-rollout-jsonl') return 'codex';
+  if (transcriptKind === 'ohmypi-jsonl') return harness === 'pi' ? 'pi' : 'ohmypi';
+  if (transcriptKind === 'acp-jsonl') return 'acp';
+  if (transcriptKind === 'kimi-wire-jsonl') return 'kimi';
+  if (transcriptKind === 'muse-jsonl') return 'muse';
+  return 'claude';
+}
+
+/** Pure authority ordering shared by sync and async transcript adapters. */
+export function orderedTranscriptCandidates(sources: TranscriptCandidateSources): TranscriptCandidate[] {
+  const candidates: TranscriptCandidate[] = [];
+  for (const entry of [...sources.entries].reverse()) {
+    const kind = transcriptCandidateKind(entry.harness ?? sources.currentHarness);
+    const path = sources.indexedPaths.get(transcriptCandidateKey(kind, entry.sessionId));
+    if (path) candidates.push({ kind, path });
+  }
+  if (sources.launcherPinned) candidates.push(sources.launcherPinned);
+  candidates.push(...sources.stateDerived ?? []);
+  if (sources.freshestInProjectDir) candidates.push(sources.freshestInProjectDir);
+
+  const seen = new Set<string>();
+  return candidates.filter(({ kind, path }) => {
+    const key = `${kind}:${path}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function normalizeSessionEntry(value: unknown, legacy = false): SessionIndexEntry | null {
@@ -37,10 +87,12 @@ function normalizeSessionEntry(value: unknown, legacy = false): SessionIndexEntr
     sessionId: entry.sessionId.trim(),
     at: typeof entry.at === 'string' ? entry.at : '',
     source: typeof entry.source === 'string' ? entry.source : 'unknown',
+    ...(typeof entry.harness === 'string' && entry.harness.trim() ? { harness: entry.harness.trim() } : {}),
+    ...(typeof entry.model === 'string' && entry.model.trim() ? { model: entry.model.trim() } : {}),
   };
 }
 
-function parseSessionIndex(contents: string): SessionIndexEntry[] {
+export function parseSessionIndex(contents: string): SessionIndexEntry[] {
   const trimmed = contents.trimStart();
   let entries: SessionIndexEntry[] = [];
   let jsonLines = contents;
@@ -117,20 +169,38 @@ export function appendSessionIdToHistory(
   agentId: string,
   sessionId: string,
   source = 'observed',
+  metadata: { harness?: string; model?: string } = {},
 ): void {
   sessionId = sessionId.trim();
   if (!sessionId) return;
   const dir = join(getOverdeckHome(), 'agents', agentId);
   mkdirSync(dir, { recursive: true });
-  const line = `${JSON.stringify({ sessionId, at: new Date().toISOString(), source })}\n`;
+  let recorded: { harness?: unknown; model?: unknown } = {};
+  try { recorded = JSON.parse(readFileSync(join(dir, 'state.json'), 'utf8')); } catch { /* legacy/no state */ }
+  const harness = metadata.harness?.trim()
+    || (typeof recorded.harness === 'string' ? recorded.harness.trim() : '')
+    || 'unknown';
+  const model = metadata.model?.trim()
+    || (typeof recorded.model === 'string' ? recorded.model.trim() : '')
+    || 'unknown';
+  const line = `${JSON.stringify({ sessionId, at: new Date().toISOString(), source, harness, model })}\n`;
   if (Buffer.byteLength(line) > 4096) throw new Error('sessions.json entry exceeds PIPE_BUF');
   appendFileSync(join(dir, 'sessions.json'), line, { flag: 'a' });
 }
 
-export function createFreshSessionIdentity(agentId: string, harness: RuntimeName): string | undefined {
+/** Explicit operator reset is the only operation allowed to truncate the append-only index. */
+export async function resetSessionIndex(
+  agentId: string,
+  dir = join(getOverdeckHome(), 'agents', agentId),
+): Promise<void> {
+  mkdirSync(dir, { recursive: true });
+  await writeFile(join(dir, 'sessions.json'), '', { flag: 'w' });
+}
+
+export function createFreshSessionIdentity(agentId: string, harness: RuntimeName, model?: string): string | undefined {
   if (getHarnessBehavior(harness).sessionIdSource !== 'launcher-session-id') return undefined;
   const sessionId = randomUUID();
-  appendSessionIdToHistory(agentId, sessionId, 'launcher');
+  appendSessionIdToHistory(agentId, sessionId, 'launcher', { harness, model });
   const dir = join(getOverdeckHome(), 'agents', agentId);
   logAgentLifecycleSync(
     agentId,

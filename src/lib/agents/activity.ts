@@ -83,7 +83,11 @@ export function saveSessionId(
   sessionId: string,
   source: 'rotation' | 'recovered' = 'rotation',
 ): void {
-  appendSessionIdToHistory(agentId, sessionId, source);
+  const state = getAgentStateSync(agentId);
+  appendSessionIdToHistory(agentId, sessionId, source, {
+    harness: state?.harness,
+    model: state?.model,
+  });
 }
 
 /**

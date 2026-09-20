@@ -45,6 +45,7 @@ import {
   spawnPanCommandDetached,
 } from './shared.js';
 import { claimAgentStart, releaseAgentStart } from './spawn-helpers.js';
+import { resetSessionIndex } from '../../../../lib/session-history.js';
 
 function pendingDecisionError(
   agentId: string,
@@ -740,11 +741,12 @@ export const postAgentResetSessionRoute = HttpRouter.add(
 
     const agentDir = getAgentDir(id);
 
-    // Clear the durable index and its read-only compatibility fallback.
-    yield* Effect.promise(() => Promise.all([
-      rm(join(agentDir, 'sessions.json'), { force: true }), // PAN-3357: not a dir removal
-      rm(join(agentDir, 'session.id'), { force: true }), // PAN-3357: not a dir removal
-    ]));
+    // Explicit reset is the sole exception to append-only sessions.json: use
+    // the session-history mutation door to truncate it, then drop the legacy pointer.
+    yield* Effect.promise(async () => {
+      await resetSessionIndex(id, agentDir);
+      await rm(join(agentDir, 'session.id'), { force: true }); // PAN-3357: not a dir removal
+    });
 
     // Clear claudeSessionId from runtime.json (preserve other fields).
     // Must read/write directly — saveAgentRuntimeState merges with existing file.

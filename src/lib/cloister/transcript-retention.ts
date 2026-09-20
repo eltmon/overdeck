@@ -62,6 +62,15 @@ async function canonicalTarget(path: string, canonicalRoot: string, deps: Transc
   return canonical;
 }
 
+async function isDefinitelyStopped(agentId: string, deps: TranscriptRetentionDeps): Promise<boolean> {
+  try {
+    const live = await deps.listLiveAgentIds();
+    return live !== null && !live.has(agentId);
+  } catch {
+    return false;
+  }
+}
+
 function conversationEligibility(deps: TranscriptRetentionDeps): Map<string, boolean> | null {
   try {
     const eligible = new Map<string, boolean>();
@@ -267,12 +276,15 @@ export async function sweepTranscriptRetention(options: TranscriptRetentionOptio
         const artifacts = await agentRetentionArtifacts(agentDir, deps, canonicalAgentDir);
         if (!artifacts || artifacts.newestMtimeMs >= cutoffMs) continue;
         eligibleDirs++;
+        if (!await isDefinitelyStopped(entry.name, deps)) continue;
         for (const rollout of artifacts.rollouts) {
           await canonicalTarget(rollout, canonicalAgentDir, deps);
           await deps.removeFile(rollout);
         }
         deletedFiles += artifacts.rollouts.length;
+        if (!await isDefinitelyStopped(entry.name, deps)) continue;
         await deps.pruneAgentDir(agentDir, agentsDir);
+        if (!await isDefinitelyStopped(entry.name, deps)) continue;
         const recanonicalizedAgentDir = await canonicalTarget(agentDir, canonicalAgentsDir, deps);
         if (recanonicalizedAgentDir !== canonicalAgentDir || relative(canonicalAgentsDir, recanonicalizedAgentDir).includes(sep)) {
           throw new Error(`Transcript retention target changed during sweep: ${agentDir}`);
@@ -283,6 +295,7 @@ export async function sweepTranscriptRetention(options: TranscriptRetentionOptio
       }
 
       eligibleDirs++;
+      if (!await isDefinitelyStopped(entry.name, deps)) continue;
       const result = await pruneTranscriptFiles(agentDir, cutoffMs, deps, canonicalAgentDir);
       deletedFiles += result.deletedFiles;
       prunedDirs += result.prunedDirs;

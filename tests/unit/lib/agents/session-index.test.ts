@@ -12,8 +12,10 @@ import type { AgentState } from '../../../../src/lib/agents/agent-state.js';
 import { encodeClaudeProjectDir } from '../../../../src/lib/paths.js';
 import {
   appendSessionIdToHistory,
+  orderedTranscriptCandidates,
   readSessionIndexSync,
   readSessionIndexWithLegacySync,
+  transcriptCandidateKey,
 } from '../../../../src/lib/session-history.js';
 
 let root: string;
@@ -46,6 +48,7 @@ describe('sessions.json index', () => {
       expect.objectContaining({ sessionId: 'session-b', source: 'session-start' }),
       expect.objectContaining({ sessionId: 'session-a', source: 'rotation' }),
     ]);
+    expect(readSessionIndexSync('agent-pan-3950').every((entry) => entry.harness && entry.model)).toBe(true);
   });
 
   it('uses the newest indexed entry as the current session', () => {
@@ -161,5 +164,29 @@ describe('sessions.json index', () => {
     writeFileSync(olderTranscript, '{}\n');
 
     await expect(Effect.runPromise(getAgentJsonlPath(agentId))).resolves.toBe(olderTranscript);
+  });
+
+  it('orders mixed-harness entries before launcher, state, and freshest fallbacks', () => {
+    const paths = new Map([
+      [transcriptCandidateKey('claude', 'claude-old'), '/claude/old.jsonl'],
+      [transcriptCandidateKey('codex', 'codex-new'), '/codex/new.jsonl'],
+    ]);
+    expect(orderedTranscriptCandidates({
+      entries: [
+        { sessionId: 'claude-old', at: '', source: 'legacy', harness: 'claude-code' },
+        { sessionId: 'codex-new', at: '', source: 'hook', harness: 'codex' },
+      ],
+      currentHarness: 'claude-code',
+      indexedPaths: paths,
+      launcherPinned: { kind: 'claude', path: '/claude/launcher.jsonl' },
+      stateDerived: [{ kind: 'claude', path: '/claude/state.jsonl' }],
+      freshestInProjectDir: { kind: 'claude', path: '/claude/freshest.jsonl' },
+    })).toEqual([
+      { kind: 'codex', path: '/codex/new.jsonl' },
+      { kind: 'claude', path: '/claude/old.jsonl' },
+      { kind: 'claude', path: '/claude/launcher.jsonl' },
+      { kind: 'claude', path: '/claude/state.jsonl' },
+      { kind: 'claude', path: '/claude/freshest.jsonl' },
+    ]);
   });
 });

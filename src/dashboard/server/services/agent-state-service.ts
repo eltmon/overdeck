@@ -69,7 +69,22 @@ const RUNTIME_EVENT_TYPES: ReadonlySet<string> = new Set([
   'agent.stopped',
 ]);
 
-function isRuntimeEvent(e: { type: string }): boolean {
+export function observeSessionIndexEvent(
+  ev: DomainEvent,
+  append: typeof appendSessionIdToHistory = appendSessionIdToHistory,
+  log: (...values: unknown[]) => void = (...values) => console.error(...values),
+): void {
+  if (ev.type !== 'agent.model_set') return;
+  const payload = ev.payload as { agentId?: string; claudeSessionId?: string; model?: string };
+  if (!payload.agentId || !payload.claudeSessionId) return;
+  try {
+    append(payload.agentId, payload.claudeSessionId, 'session-start', { model: payload.model });
+  } catch (error) {
+    log(`[AgentStateService] Failed to observe session index for ${payload.agentId}:`, error);
+  }
+}
+
+function isRuntimeEvent(e: { type: string }): e is DomainEvent {
   return RUNTIME_EVENT_TYPES.has(e.type);
 }
 
@@ -155,12 +170,7 @@ export const AgentStateServiceLive = Layer.effect(
       // resume pointer is written the instant it is known, instead of living
       // only in the in-memory snapshot that a restart discards. The state-plane
       // copy of the same list is gone with the record plane (PAN-3917).
-      if (ev.type === 'agent.model_set') {
-        const payload = (ev as { payload?: { agentId?: string; claudeSessionId?: string } }).payload;
-        if (payload?.agentId && payload.claudeSessionId) {
-          appendSessionIdToHistory(payload.agentId, payload.claudeSessionId, 'session-start');
-        }
-      }
+      observeSessionIndexEvent(ev);
       Effect.runFork(applyEventToRef(ref, ev));
     });
 

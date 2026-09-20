@@ -1,17 +1,4 @@
-/**
- * Agent enrichment utilities (PAN-440 / PAN-1048)
- *
- * Shared functions for computing enrichment fields:
- *   role, hasPendingQuestion, pendingQuestionCount, resolution, resolutionCount
- *
- * Used by both the legacy REST /api/agents endpoint and the new
- * AgentEnrichmentService background poller.
- *
- * PAN-1048: replaced the legacy `agentPhase` string with the role primitive —
- * the dashboard derives label/status from `role` + lifecycle state.
- */
-
-import { existsSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { readdir, readFile, stat } from 'fs/promises'
 import { homedir } from 'os'
 import { basename, join } from 'path'
@@ -31,7 +18,13 @@ import { resolveProjectFromIssueSync } from './projects.js'
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js'
 import { extractPrefixSync } from './issue-id.js'
 import { getLatestSessionIdSync } from './agents/activity.js'
-import { readSessionIdHistorySync } from './session-history.js'
+import {
+  orderedTranscriptCandidates,
+  readSessionIndexWithLegacySync,
+  transcriptCandidateKey,
+  transcriptCandidateKind,
+  type TranscriptCandidate,
+} from './session-history.js'
 
 const execAsync = promisify(exec)
 
@@ -268,30 +261,52 @@ function getProjectPathByPrefix(issuePrefix: string): string {
   } catch {
     return null
   }
-}/**
- * Resolve the transcript belonging to THIS agent.
- *
- * A Claude project dir is keyed on the cwd, so every session that ever ran in
- * the same cwd shares one directory. Agents whose cwd is the primary repo — the
- * flywheel orchestrator, conversations, any `--cwd <repo>` handoff — therefore
- * sit in a directory alongside each other's transcripts. Picking the freshest
- * file there attributes whichever session wrote last to whoever asks, so the
- * flywheel was observed reporting a conversation's open question as its own.
- *
- * The agent's session ids are recorded at spawn and SessionStart. Walk the
- * append-only index newest-first so an aborted newest launch can fall back to
- * the latest older transcript without scanning unrelated workspace sessions.
- */
+}
+
+export function listAgentTranscriptCandidatesSync(agentId: string, workspace: string, freshest: string | null): TranscriptCandidate[] {
+  const state = getAgentStateSync(agentId)
+  const currentHarness = state?.harness
+  const currentKind = transcriptCandidateKind(currentHarness)
+  const agentDir = getAgentDir(agentId)
+  const projectDir = getClaudeProjectDir(workspace)
+  const entries = readSessionIndexWithLegacySync(agentId)
+  const indexedPaths = new Map<string, string>()
+  for (const entry of entries) {
+    const kind = transcriptCandidateKind(entry.harness ?? currentHarness)
+    const path = kind === 'claude' ? join(projectDir, entry.sessionId + '.jsonl')
+      : kind === 'codex' ? join(agentDir, 'codex-home*', 'sessions', '**', 'rollout-*-' + entry.sessionId + '.jsonl')
+      : kind === 'kimi' ? join(homedir(), '.kimi-code', 'sessions', '*', entry.sessionId, 'agents', 'main', 'wire.jsonl')
+      : kind === 'pi' || kind === 'ohmypi' ? join(agentDir, 'sessions', '**', '*_' + entry.sessionId + '.jsonl')
+      : kind === 'acp' ? join(agentDir, 'acp-session.jsonl') : join(agentDir, 'muse-session.jsonl')
+    indexedPaths.set(transcriptCandidateKey(kind, entry.sessionId), path)
+  }
+
+  let launcherPinned: TranscriptCandidate | null = null
+  if (currentKind === 'claude') {
+    try {
+      const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8')
+      const id = /--(?:session-id|resume)\s+['"]?([0-9a-fA-F-]{36})/.exec(launcher)?.[1]
+      if (id) launcherPinned = { kind: 'claude', path: join(projectDir, id + '.jsonl') }
+    } catch { /* compatibility source */ }
+  }
+
+  const sessionId = currentKind === 'claude' ? getLatestSessionIdSync(agentId) : null
+  return orderedTranscriptCandidates({
+    entries,
+    currentHarness,
+    indexedPaths,
+    launcherPinned,
+    stateDerived: sessionId ? [{ kind: 'claude', path: join(projectDir, sessionId + '.jsonl') }] : [],
+    freshestInProjectDir: currentKind === 'claude' && freshest ? { kind: 'claude', path: freshest } : null,
+  })
+}
+
 async function getAgentJsonlPathPromise(agentId: string): Promise<string | null> {
   const workspace = await Effect.runPromise(getAgentWorkspace(agentId))
   if (!workspace) return null
-  const projectDir = getClaudeProjectDir(workspace)
-  const history = readSessionIdHistorySync(agentId)
-  const latest = getLatestSessionIdSync(agentId)
-  const candidates = history.length > 0 ? [...history].reverse() : (latest ? [latest] : [])
-  for (const sessionId of candidates) {
-    const ownPath = join(projectDir, `${sessionId}.jsonl`)
-    if (existsSync(ownPath)) return ownPath
+  const freshest = await getActiveSessionPath(getClaudeProjectDir(workspace))
+  for (const candidate of listAgentTranscriptCandidatesSync(agentId, workspace, freshest)) {
+    if (existsSync(candidate.path)) return candidate.path
   }
   return null
 }

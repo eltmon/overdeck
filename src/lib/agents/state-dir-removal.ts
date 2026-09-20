@@ -1,3 +1,9 @@
+/**
+ * Agent-state cleanup doors.
+ *
+ * Close-out pruning keeps durable state and transcripts, removing only direct
+ * regenerable children. Full removal remains a separate retention-owned door.
+ */
 import { lstat, readdir, realpath, rm, rmdir, unlink, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
@@ -32,14 +38,6 @@ function assertContained(root: string, candidate: string): void {
   }
 }
 
-async function entryBytes(entryPath: string): Promise<number> {
-  const entryStat = await lstat(entryPath);
-  if (!entryStat.isDirectory() || entryStat.isSymbolicLink()) return entryStat.size;
-  const entries = await readdir(entryPath);
-  const sizes = await Promise.all(entries.map((entry) => entryBytes(join(entryPath, entry))));
-  return sizes.reduce((total, size) => total + size, 0);
-}
-
 async function listKeptFiles(dirPath: string, root: string): Promise<string[]> {
   const entries = await readdir(dirPath, { withFileTypes: true });
   const kept: string[] = [];
@@ -54,19 +52,20 @@ async function listKeptFiles(dirPath: string, root: string): Promise<string[]> {
   return kept;
 }
 
-async function pruneSocketEntries(dirPath: string, root: string, removed: string[]): Promise<number> {
-  let bytesFreed = 0;
-  for (const entry of await readdir(dirPath, { withFileTypes: true })) {
-    const entryPath = join(dirPath, entry.name);
-    if (entry.name.endsWith('.sock')) {
-      bytesFreed += await entryBytes(entryPath);
-      await rm(entryPath, { recursive: true, force: true });
-      removed.push(relative(root, entryPath));
-    } else if (entry.isDirectory() && !entry.isSymbolicLink()) {
-      bytesFreed += await pruneSocketEntries(entryPath, root, removed);
-    }
+async function validateDirectDeletion(parent: string, path: string): Promise<number> {
+  if (relative(parent, path).includes(sep)) {
+    throw new Error(`pruneAgentStateDir: expected direct child: ${path}`);
   }
-  return bytesFreed;
+  const pathStat = await lstat(path);
+  if (pathStat.isSymbolicLink()) {
+    throw new Error(`pruneAgentStateDir: refusing symbolic-link child: ${path}`);
+  }
+  const canonicalPath = await realpath(path);
+  assertContained(parent, canonicalPath);
+  if (relative(parent, canonicalPath).includes(sep)) {
+    throw new Error(`pruneAgentStateDir: canonical path is not a direct child: ${canonicalPath}`);
+  }
+  return pathStat.size;
 }
 
 export async function pruneAgentStateDir(
@@ -104,24 +103,25 @@ export async function pruneAgentStateDir(
   let bytesFreed = 0;
   const entries = await readdir(candidate, { withFileTypes: true });
   for (const entry of entries) {
-    const entryPath = join(candidate, entry.name);
-    if (entry.name === 'pending.lock') {
-      bytesFreed += await entryBytes(entryPath);
+    const entryPath = join(canonicalCandidate, entry.name);
+    if (entry.name === 'pending.lock' || entry.name.endsWith('.sock')) {
+      bytesFreed += await validateDirectDeletion(canonicalCandidate, entryPath);
       await rm(entryPath, { recursive: true, force: true });
       removed.push(entry.name);
       continue;
     }
     if (!entry.isDirectory() || !entry.name.startsWith('codex-home')) continue;
 
+    await validateDirectDeletion(canonicalCandidate, entryPath);
+    const canonicalCodexHome = await realpath(entryPath);
     for (const child of await readdir(entryPath, { withFileTypes: true })) {
       if (child.name === 'sessions') continue;
       const childPath = join(entryPath, child.name);
-      bytesFreed += await entryBytes(childPath);
+      bytesFreed += await validateDirectDeletion(canonicalCodexHome, childPath);
       await rm(childPath, { recursive: true, force: true });
-      removed.push(relative(candidate, childPath));
+      removed.push(relative(canonicalCandidate, childPath));
     }
   }
-  bytesFreed += await pruneSocketEntries(candidate, candidate, removed);
 
   return { kept: (await listKeptFiles(candidate, candidate)).sort(), removed: removed.sort(), bytesFreed };
 }

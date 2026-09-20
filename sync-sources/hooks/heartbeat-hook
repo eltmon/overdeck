@@ -28,10 +28,12 @@ if command -v jq >/dev/null 2>&1; then HAVE_JQ=1; fi
 TOOL_NAME="unknown"
 TOOL_INPUT=""
 CLAUDE_SESSION_ID=""
+MODEL=""
 if [ "$HAVE_JQ" = "1" ]; then
   TOOL_NAME=$(echo "$TOOL_INFO" | jq -r '.tool_name // "unknown"' 2>/dev/null || echo "unknown")
   TOOL_INPUT=$(echo "$TOOL_INFO" | jq -r '.tool_input | tostring | .[0:100] // ""' 2>/dev/null || echo "")
   CLAUDE_SESSION_ID=$(echo "$TOOL_INFO" | jq -r '.session_id // ""' 2>/dev/null || echo "")
+  MODEL=$(echo "$TOOL_INFO" | jq -r '.model // .model_name // ""' 2>/dev/null || echo "")
 fi
 
 TS=$(date -Iseconds)
@@ -64,7 +66,7 @@ fi
 
 # ── Claude session history (append-only bookkeeping) ──────────────────────
 if [ "$HAVE_JQ" = "1" ] && [ -n "$CLAUDE_SESSION_ID" ]; then
-  pan_append_session_index "$AGENT_DIR" "$CLAUDE_SESSION_ID" "$TS" "heartbeat-hook" || true
+  pan_append_session_index "$AGENT_DIR" "$CLAUDE_SESSION_ID" "$TS" "heartbeat-hook" "claude-code" "$MODEL" || true
 fi
 
 # ── Cost-event recording (unchanged, its own flock-serialized path) ──────

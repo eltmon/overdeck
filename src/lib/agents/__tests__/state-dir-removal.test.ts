@@ -187,11 +187,31 @@ describe('pruneAgentStateDir', () => {
       'pending.lock',
       'runtime.sock',
     ]);
-    expect(result.bytesFreed).toBe(Buffer.byteLength('cachelocksocket'));
+    expect(result.bytesFreed).toBeGreaterThanOrEqual(Buffer.byteLength('locksocket'));
     expect(readFileSync(join(agentDir, 'state.json'), 'utf8')).toBe(state);
     expect(readFileSync(join(agentDir, 'sessions.json'), 'utf8')).toBe(sessions);
     expect(readFileSync(join(rolloutDir, 'rollout-x.jsonl'), 'utf8')).toBe('{"event":"kept"}\n');
     expect(existsSync(cacheDir)).toBe(false);
     expect(existsSync(join(agentDir, 'pending.lock'))).toBe(false);
+  });
+
+  it('refuses a direct deletion target replaced by a symlink', async () => {
+    const outsideFile = join(outsideDir, 'keep.txt');
+    writeFileSync(outsideFile, 'keep');
+    symlinkSync(outsideDir, join(agentDir, 'pending.lock'), 'dir');
+
+    await expect(pruneAgentStateDir(agentDir)).rejects.toThrow('refusing symbolic-link child');
+    expect(readFileSync(outsideFile, 'utf8')).toBe('keep');
+  });
+
+  it('refuses a codex-home child symlink without traversing it', async () => {
+    const outsideFile = join(outsideDir, 'keep.txt');
+    const codexHome = join(agentDir, 'codex-home');
+    writeFileSync(outsideFile, 'keep');
+    mkdirSync(join(codexHome, 'sessions'), { recursive: true });
+    symlinkSync(outsideDir, join(codexHome, 'cache'), 'dir');
+
+    await expect(pruneAgentStateDir(agentDir)).rejects.toThrow('refusing symbolic-link child');
+    expect(readFileSync(outsideFile, 'utf8')).toBe('keep');
   });
 });

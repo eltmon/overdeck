@@ -85,6 +85,11 @@ describe('shouldStreamConversationMessages (PAN-1908 agent streaming)', () => {
     expect(shouldStreamConversationMessages(base({ id: -1, name: 'specialist-x-merge', harness: 'codex' }))).toBe(true);
   });
 
+  it('streams strike and inspect agent panels through the shared identity predicate', () => {
+    expect(shouldStreamConversationMessages(base({ id: -1, name: 'strike-pan-3950', harness: 'claude-code' }))).toBe(true);
+    expect(shouldStreamConversationMessages(base({ id: -1, name: 'inspect-pan-3950-security', harness: 'codex' }))).toBe(true);
+  });
+
   it('does not stream a non-agent synthetic name', () => {
     expect(shouldStreamConversationMessages(base({ id: -1, name: 'draft-123', harness: 'ohmypi' }))).toBe(false);
   });

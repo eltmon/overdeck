@@ -247,7 +247,9 @@ function shortId(): string {
       }),
     ];
     await writeFile(targetSessionFile, `${lines.join('\n')}\n`, 'utf-8');
-    appendSessionIdToHistory(opts.tmuxSession, sessionId, 'format-conversion');
+    appendSessionIdToHistory(opts.tmuxSession, sessionId, 'format-conversion', {
+      harness: opts.toHarness,
+    });
     return { sessionId, targetSessionFile };
   }
 
