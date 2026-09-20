@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3950",
   "created": "2026-09-20T13:53:05.511Z",
-  "updated": "2026-09-20T14:52:16.264Z",
+  "updated": "2026-09-20T14:52:26.747Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -104,6 +104,10 @@
     "w9-pi-tiebreak-test.ac3": {
       "status": "completed",
       "doneAt": "2026-09-20T14:52:16.264Z"
+    },
+    "w10-docs-fix-pass.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:52:26.747Z"
     }
   }
 }
