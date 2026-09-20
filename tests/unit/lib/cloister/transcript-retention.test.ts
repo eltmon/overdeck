@@ -48,7 +48,9 @@ describe('sweepTranscriptRetention filesystem boundary', () => {
       stat: async () => ({ mtimeMs: NOW.getTime() - 60 * 24 * 60 * 60 * 1000 }) as Stats,
       removeFile: async (path) => { removedFiles.push(path); },
       removeTree: async (path) => { removedTrees.push(path); },
-      listSessionNames: async () => [],
+      realpath: async (path) => path,
+      pruneAgentDir: async () => undefined,
+      listLiveAgentIds: async () => new Set(),
       listConversations: () => [],
       listArchivedConversations: () => [],
       log: () => {},
@@ -62,5 +64,31 @@ describe('sweepTranscriptRetention filesystem boundary', () => {
     expect(removedTrees).toEqual(['/agents/agent-pan-3950']);
     expect(visited.every((path) => path.startsWith('/agents'))).toBe(true);
     expect(visited.join('\n')).not.toContain('.claude');
+  });
+
+  it('revalidates the canonical agent directory immediately before recursive removal', async () => {
+    const removedTrees: string[] = [];
+    let pruned = false;
+    const dirs: Record<string, Array<[string, 'dir' | 'file']>> = {
+      '/agents': [['agent-pan-3950', 'dir']],
+      '/agents/agent-pan-3950': [['codex-home', 'dir']],
+      '/agents/agent-pan-3950/codex-home/sessions': [['rollout-old.jsonl', 'file']],
+    };
+    const deps: Partial<TranscriptRetentionDeps> = {
+      readDir: async (path) => (dirs[path] ?? []).map(([name, kind]) => dirent(name, kind)),
+      stat: async () => ({ mtimeMs: NOW.getTime() - 60 * 24 * 60 * 60 * 1000 }) as Stats,
+      removeFile: async () => undefined,
+      removeTree: async (path) => { removedTrees.push(path); },
+      realpath: async (path) => path === '/agents/agent-pan-3950' && pruned ? '/outside/agent-pan-3950' : path,
+      pruneAgentDir: async () => { pruned = true; },
+      listLiveAgentIds: async () => new Set(),
+      listConversations: () => [],
+      listArchivedConversations: () => [],
+      log: () => {},
+    };
+
+    await sweepTranscriptRetention({ transcriptDays: 30, agentsDir: AGENTS_DIR, deps });
+
+    expect(removedTrees).toEqual([]);
   });
 });
