@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3937",
   "created": "2026-09-20T20:38:35.661Z",
-  "updated": "2026-09-20T20:42:29.737Z",
+  "updated": "2026-09-20T20:42:30.870Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -80,6 +80,11 @@
       "claimedBy": "conv-20260920-4179",
       "claimedAt": "2026-09-20T20:42:20.108Z",
       "doneAt": "2026-09-20T20:42:29.737Z"
+    },
+    "acp-host-deterministic-port.ac3": {
+      "status": "in_progress",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:42:30.870Z"
     }
   }
 }
