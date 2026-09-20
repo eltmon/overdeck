@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-20T23:00:00.420884Z · model: claude-opus-5 · open: 856_
+_Last sequenced: 2026-09-20T23:11:01.164669Z · model: claude-opus-5 · open: 856_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1191,7 +1191,7 @@ Planning agents wedge after a background Explore task finishes; parent never con
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-20T23:00:00.420884Z",
+  "generatedAt": "2026-09-20T23:11:01.164669Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 856,
@@ -13151,6 +13151,13 @@ Planning agents wedge after a background Explore task finishes; parent never con
       "from": "PAN-3974",
       "to": "PAN-3835",
       "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-3968",
+      "to": "PAN-3959",
+      "type": "informs",
       "source": "github-ref",
       "confidence": 1
     }
