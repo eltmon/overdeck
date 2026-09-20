@@ -46,7 +46,7 @@ fi
 pan_emit_event "$AGENT_ID" "$BODY"
 
 # ── Activity log (retained for forensics) ─────────────────────────────────
-AGENT_DIR="$HOME/.overdeck/agents/$AGENT_ID"
+AGENT_DIR="${OVERDECK_HOME:-$HOME/.overdeck}/agents/$AGENT_ID"
 mkdir -p "$AGENT_DIR" 2>/dev/null
 if [ "$HAVE_JQ" = "1" ]; then
   ENTRY=$(jq -n --arg ts "$TS" --arg tool "$TOOL_NAME" --arg action "$TOOL_INPUT" \
@@ -64,16 +64,7 @@ fi
 
 # ── Claude session history (append-only bookkeeping) ──────────────────────
 if [ "$HAVE_JQ" = "1" ] && [ -n "$CLAUDE_SESSION_ID" ]; then
-  SESSIONS_FILE="$AGENT_DIR/sessions.json"
-  if [ -f "$SESSIONS_FILE" ]; then
-    if ! jq -e --arg sid "$CLAUDE_SESSION_ID" 'any(.[]; . == $sid)' "$SESSIONS_FILE" >/dev/null 2>&1; then
-      TMP="$SESSIONS_FILE.tmp"
-      jq --arg sid "$CLAUDE_SESSION_ID" '. + [$sid]' "$SESSIONS_FILE" > "$TMP" 2>/dev/null \
-        && mv "$TMP" "$SESSIONS_FILE" 2>/dev/null || true
-    fi
-  else
-    echo "[\"$CLAUDE_SESSION_ID\"]" > "$SESSIONS_FILE" 2>/dev/null || true
-  fi
+  pan_append_session_index "$AGENT_DIR" "$CLAUDE_SESSION_ID" "$TS" "heartbeat-hook" || true
 fi
 
 # ── Cost-event recording (unchanged, its own flock-serialized path) ──────

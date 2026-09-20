@@ -7,12 +7,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { getAgentJsonlPath } from '../../../../src/lib/agent-enrichment.js';
 import { getLatestSessionIdSync, saveSessionId } from '../../../../src/lib/agents/activity.js';
-import { prepareRestartSessionIdentity } from '../../../../src/lib/agents/recovery.js';
+import { restartAgent } from '../../../../src/lib/agents/recovery.js';
 import type { AgentState } from '../../../../src/lib/agents/agent-state.js';
 import { encodeClaudeProjectDir } from '../../../../src/lib/paths.js';
 import {
   appendSessionIdToHistory,
-  createFreshSessionIdentity,
   readSessionIndexSync,
 } from '../../../../src/lib/session-history.js';
 
@@ -66,7 +65,7 @@ describe('sessions.json index', () => {
     expect(existsSync(join(agentDir, 'sessions.json'))).toBe(false);
   });
 
-  it('records a fresh restart identity before launch', () => {
+  it('restartAgent aborts before launch when durable prelaunch indexing fails', async () => {
     const order: string[] = [];
     const state = {
       id: 'agent-pan-3950',
@@ -79,18 +78,36 @@ describe('sessions.json index', () => {
       startedAt: '2026-09-20T00:00:00.000Z',
       startedBy: 'test',
     } as AgentState;
-    const allocate = (agentId: string, harness: 'claude-code') => {
-      const sessionId = createFreshSessionIdentity(agentId, harness);
-      expect(readSessionIndexSync(agentId).at(-1)?.sessionId).toBe(sessionId);
-      order.push('indexed');
-      return sessionId;
-    };
+    const result = await restartAgent(state.id, { graceful: false }, {
+      getAgentStateSync: () => state,
+      detectPendingOperatorDecision: async () => null,
+      assertWorkspaceStackHealthyForSpawn: async () => undefined,
+      resolveHarness: async () => 'claude-code',
+      prepareHarnessLaunch: async () => ({ binaryPath: '/bin/claude', pathExport: '' }),
+      sessionExists: async () => false,
+      stopAgent: async () => { order.push('stopped'); },
+      logAgentLifecycleSync: () => undefined,
+      allocateSessionIdentity: () => {
+        order.push('index-attempt');
+        throw new Error('index write failed');
+      },
+    });
 
-    const sessionId = prepareRestartSessionIdentity(state.id, 'claude-code', state, allocate);
-    order.push('launched');
+    expect(result).toEqual({
+      success: false,
+      error: 'Failed to restart agent: session index write failed: index write failed',
+    });
+    expect(order).toEqual(['stopped', 'index-attempt']);
+  });
 
-    expect(order).toEqual(['indexed', 'launched']);
-    expect(state.sessionId).toBe(sessionId);
+  it('propagates a malformed index write error without replacing the file', () => {
+    const agentDir = join(process.env.OVERDECK_HOME!, 'agents', 'agent-pan-3950');
+    mkdirSync(agentDir, { recursive: true });
+    const indexPath = join(agentDir, 'sessions.json');
+    writeFileSync(indexPath, '{malformed');
+
+    expect(() => appendSessionIdToHistory('agent-pan-3950', 'session-new', 'launcher')).toThrow();
+    expect(readFileSync(indexPath, 'utf8')).toBe('{malformed');
   });
 
   it('falls back to an older indexed transcript when the newest JSONL is absent', async () => {

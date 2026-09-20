@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { getOverdeckHome } from './paths.js';
 import { getHarnessBehavior } from './runtimes/behavior.js';
@@ -47,6 +47,51 @@ function parseSessionIndex(raw: unknown): SessionIndexEntry[] {
   });
 }
 
+const SESSION_INDEX_LOCK_DELAYS_MS = [5, 10, 20, 40, 80, 160, 320] as const;
+
+function acquireSessionIndexLock(dir: string): string {
+  const lockDir = join(dir, 'sessions.lock');
+  const sleeper = new Int32Array(new SharedArrayBuffer(4));
+  for (let attempt = 0; attempt <= SESSION_INDEX_LOCK_DELAYS_MS.length; attempt++) {
+    try {
+      mkdirSync(lockDir, { mode: 0o700 });
+      try {
+        writeFileSync(join(lockDir, 'pid'), `${process.pid}\n`, 'utf8');
+      } catch (error) {
+        rmSync(lockDir, { recursive: true, force: true });
+        throw error;
+      }
+      return lockDir;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      try {
+        const owner = Number.parseInt(readFileSync(join(lockDir, 'pid'), 'utf8').trim(), 10);
+        if (Number.isInteger(owner) && owner > 0 && owner !== process.pid) process.kill(owner, 0);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
+          rmSync(lockDir, { recursive: true, force: true });
+          continue;
+        }
+      }
+      const delay = SESSION_INDEX_LOCK_DELAYS_MS[attempt];
+      if (delay === undefined) break;
+      Atomics.wait(sleeper, 0, 0, delay);
+    }
+  }
+  throw new Error(`sessions.json is locked: ${lockDir}`);
+}
+
+function writeSessionIndexAtomic(file: string, entries: SessionIndexEntry[]): void {
+  const temp = `${file}.${process.pid}.${randomUUID()}.tmp`;
+  try {
+    writeFileSync(temp, JSON.stringify(entries), { encoding: 'utf8', mode: 0o600 });
+    renameSync(temp, file);
+  } catch (error) {
+    rmSync(temp, { force: true });
+    throw error;
+  }
+}
+
 export function readSessionIndexSync(agentId: string): SessionIndexEntry[] {
   try {
     const file = join(getOverdeckHome(), 'agents', agentId, 'sessions.json');
@@ -83,19 +128,19 @@ export function appendSessionIdToHistory(
   sessionId: string,
   source = 'observed',
 ): void {
-  if (!sessionId || !sessionId.trim()) return;
+  sessionId = sessionId.trim();
+  if (!sessionId) return;
+  const dir = join(getOverdeckHome(), 'agents', agentId);
+  mkdirSync(dir, { recursive: true });
+  const lockDir = acquireSessionIndexLock(dir);
   try {
-    const dir = join(getOverdeckHome(), 'agents', agentId);
-    mkdirSync(dir, { recursive: true });
     const file = join(dir, 'sessions.json');
-    const entries = existsSync(file)
-      ? parseSessionIndex(JSON.parse(readFileSync(file, 'utf8')))
-      : [];
+    const entries = existsSync(file) ? parseSessionIndex(JSON.parse(readFileSync(file, 'utf8'))) : [];
     if (entries.some((entry) => entry.sessionId === sessionId)) return;
     entries.push({ sessionId, at: new Date().toISOString(), source });
-    writeFileSync(file, JSON.stringify(entries));
-  } catch {
-    /* non-fatal — bookkeeping only */
+    writeSessionIndexAtomic(file, entries);
+  } finally {
+    rmSync(lockDir, { recursive: true, force: true });
   }
 }
 

@@ -6,9 +6,9 @@
  */
 
 import { watch, type FSWatcher } from 'node:fs'
-import { appendFile, mkdir, open, readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, open, readdir, readFile, rename, rm, stat, unlink, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { matchSpecialistCompletion, normalizeSpecialistCompletionName } from './specialist-completion-patterns.js'
 
 export interface PiExtensionAPI {
@@ -401,17 +401,53 @@ async function sessionIdFor(env: HookEnv): Promise<string | null> {
 }
 
 async function appendSessionIndexEntry(path: string, sessionId: string, at: string): Promise<void> {
-  let entries: unknown[] = []
+  const lockDir = join(dirname(path), 'sessions.lock')
+  for (let attempt = 0; ; attempt++) {
+    let acquired = false
+    try {
+      await mkdir(lockDir, { mode: 0o700 })
+      acquired = true
+      await writeFile(join(lockDir, 'pid'), `${process.pid}\n`, 'utf8')
+      break
+    } catch (error) {
+      if (acquired) {
+        await rm(lockDir, { recursive: true, force: true })
+        throw error
+      }
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST' || attempt >= 49) throw error
+      try {
+        const owner = Number.parseInt((await readFile(join(lockDir, 'pid'), 'utf8')).trim(), 10)
+        process.kill(owner, 0)
+      } catch (ownerError) {
+        if ((ownerError as NodeJS.ErrnoException).code === 'ESRCH') {
+          await rm(lockDir, { recursive: true, force: true })
+          continue
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    }
+  }
+  const temp = `${path}.${process.pid}.tmp`
   try {
-    const parsed: unknown = JSON.parse(await readFile(path, 'utf8'))
-    if (Array.isArray(parsed)) entries = parsed
-  } catch { /* first entry */ }
-  const ids = entries.map((entry) => typeof entry === 'string'
-    ? entry
-    : (entry as { sessionId?: unknown } | null)?.sessionId)
-  if (ids.includes(sessionId)) return
-  entries.push({ sessionId, at, source: 'session-start' })
-  await writeFile(path, JSON.stringify(entries), 'utf8')
+    let entries: unknown[] = []
+    try {
+      const parsed: unknown = JSON.parse(await readFile(path, 'utf8'))
+      if (!Array.isArray(parsed)) throw new Error(`Invalid session index: ${path}`)
+      entries = parsed
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    }
+    const ids = entries.map((entry) => typeof entry === 'string'
+      ? entry
+      : (entry as { sessionId?: unknown } | null)?.sessionId)
+    if (ids.includes(sessionId)) return
+    entries.push({ sessionId, at, source: 'session-start' })
+    await writeFile(temp, JSON.stringify(entries), 'utf8')
+    await rename(temp, path)
+  } finally {
+    await rm(temp, { force: true }).catch(() => {})
+    await rm(lockDir, { recursive: true, force: true })
+  }
 }
 
 function roleFor(env: HookEnv): string {

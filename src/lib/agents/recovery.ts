@@ -89,6 +89,7 @@ export interface RestartAgentDeps {
   sessionExists?: (agentId: string) => Promise<boolean>;
   sendGracefulRestartWarning?: typeof sendGracefulRestartWarning;
   stopAgent?: (agentId: string) => Promise<unknown>;
+  allocateSessionIdentity?: typeof createFreshSessionIdentity;
 }
 
 export function prepareRestartSessionIdentity(
@@ -204,8 +205,20 @@ export async function restartAgent(
   }
   agentState.harness = effectiveHarness;
   agentState.status = 'starting';
-  const freshSessionId = prepareRestartSessionIdentity(normalizedId, effectiveHarness, agentState);
-  saveAgentStateSync(agentState);
+  let freshSessionId: string | undefined;
+  try {
+    freshSessionId = prepareRestartSessionIdentity(
+      normalizedId,
+      effectiveHarness,
+      agentState,
+      deps.allocateSessionIdentity ?? createFreshSessionIdentity,
+    );
+    saveAgentStateSync(agentState);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    logLifecycle(normalizedId, `restartAgent ABORTED before launch: session index write failed: ${msg}`);
+    return { success: false, error: `Failed to restart agent: session index write failed: ${msg}` };
+  }
 
   try {
     clearReadySignal(normalizedId);
