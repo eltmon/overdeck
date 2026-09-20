@@ -4,17 +4,17 @@
     "created": "2026-09-20T12:30:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3959: Record the transcript path in the session index at session start; resolver stops guessing per harness",
-    "updated": "2026-09-20T12:44:32.479Z"
+    "updated": "2026-09-20T22:52:44.856Z"
   },
   "plan": {
     "id": "pan-3959",
     "title": "Record the transcript path in the session index at session start; resolver stops guessing per harness",
-    "status": "proposed",
+    "status": "running",
     "uid": "2c36f229-cf83-4b68-a612-802167369b81",
     "author": "agent:k3",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-20T12:30:00.000Z",
-    "updated": "2026-09-20T12:44:32.479Z",
+    "updated": "2026-09-20T22:52:44.856Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3959",
