@@ -18,6 +18,7 @@ import {
   isSessionResetMarker,
   latestSessionResetTime,
   orderedTranscriptCandidates,
+  parseSessionIndex,
   readSessionIndexSync,
   readSessionIndexWithLegacySync,
   resetSessionIndex,
@@ -385,6 +386,48 @@ describe('sessions.json index', () => {
       { kind: 'claude', path: '/claude/launcher.jsonl' },
       { kind: 'claude', path: '/claude/state.jsonl' },
     ]);
+  });
+
+  it('round-trips an appended transcript path through the index', () => {
+    appendSessionIdToHistory('agent-pan-3950', 'session-a', 'session-start', { path: '/abs/path/to/session-a.jsonl' });
+
+    expect(readSessionIndexSync('agent-pan-3950')).toEqual([
+      expect.objectContaining({ sessionId: 'session-a', path: '/abs/path/to/session-a.jsonl' }),
+    ]);
+  });
+
+  it('inherits the displaced entry path onto a pathless duplicate of the same session id', () => {
+    appendSessionIdToHistory('agent-pan-3950', 'session-a', 'launcher', { path: '/abs/path/to/session-a.jsonl' });
+    appendSessionIdToHistory('agent-pan-3950', 'session-a', 'observed');
+
+    expect(readSessionIndexSync('agent-pan-3950')).toEqual([
+      expect.objectContaining({ sessionId: 'session-a', source: 'observed', path: '/abs/path/to/session-a.jsonl' }),
+    ]);
+  });
+
+  it('lets a duplicate carrying a different path win outright', () => {
+    appendSessionIdToHistory('agent-pan-3950', 'session-a', 'launcher', { path: '/abs/old.jsonl' });
+    appendSessionIdToHistory('agent-pan-3950', 'session-a', 'observed', { path: '/abs/new.jsonl' });
+
+    expect(readSessionIndexSync('agent-pan-3950')).toEqual([
+      expect.objectContaining({ sessionId: 'session-a', source: 'observed', path: '/abs/new.jsonl' }),
+    ]);
+  });
+
+  it('clears indexed paths along with every other entry at a reset boundary', async () => {
+    appendSessionIdToHistory('agent-pan-3950', 'before-reset', 'launcher', { path: '/abs/before-reset.jsonl' });
+
+    await resetSessionIndex('agent-pan-3950');
+
+    expect(readSessionIndexSync('agent-pan-3950')).toEqual([]);
+    expect(parseSessionIndex(`${JSON.stringify({ reset: true })}\n`)).toEqual([]);
+  });
+
+  it('still throws when a path-carrying entry exceeds the PIPE_BUF guard', () => {
+    const hugePath = `/abs/${'x'.repeat(4200)}.jsonl`;
+
+    expect(() => appendSessionIdToHistory('agent-pan-3950', 'session-a', 'session-start', { path: hugePath }))
+      .toThrow('sessions.json entry exceeds PIPE_BUF');
   });
 
   it('preserves indexed models on transcript candidates', () => {
