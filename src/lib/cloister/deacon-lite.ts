@@ -264,6 +264,10 @@ export async function recoverStalledReviews(now = Date.now()): Promise<string[]>
         });
         if (!started.started) continue;
         outcome = `re-requested review (${reason})`;
+      } else if (!recovery.success) {
+        // Nothing was launched: do not journal a re-dispatch that never happened.
+        console.warn(`[deacon-lite] Stalled-review recovery declined for ${issueId}: ${recovery.message}`);
+        continue;
       }
     } catch (err) {
       console.error(`[deacon-lite] Stalled-review recovery failed for ${issueId}:`, err);
