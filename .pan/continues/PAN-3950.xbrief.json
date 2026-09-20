@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3950",
   "created": "2026-09-20T13:53:05.511Z",
-  "updated": "2026-09-20T14:24:05.335Z",
+  "updated": "2026-09-20T14:29:27.975Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -34,9 +34,10 @@
       "doneAt": "2026-09-20T14:23:58.433Z"
     },
     "w10-docs-fix-pass": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3950",
-      "claimedAt": "2026-09-20T14:24:05.335Z"
+      "claimedAt": "2026-09-20T14:24:05.335Z",
+      "doneAt": "2026-09-20T14:29:27.975Z"
     }
   }
 }
