@@ -136,3 +136,27 @@ export async function agentPaneExists(agentId: string, backend?: TerminalBackend
   const { sessionExists } = await import('../tmux.js');
   return await Effect.runPromise(sessionExists(agentId));
 }
+
+/**
+ * Close the pane `agentPaneExists` sees for an agent. `stopAgent` reaches only
+ * a tmux session (plus a launcher-path process sweep that cannot match a Herdr
+ * pane's bare `/bin/bash`), so on Herdr a finished agent's pane — and the idle
+ * harness inside it — outlives every stop until the pane itself is closed.
+ * Returns true when a Herdr pane was closed; false when there was nothing to
+ * close or the host runs tmux (where `stopAgent`'s `killSession` already did it).
+ */
+export async function closeAgentPane(agentId: string, backend?: TerminalBackend): Promise<boolean> {
+  const resolved = backend ?? (await resolveLaunchBackend());
+  if (resolved.name !== 'herdr') return false;
+  const { findHerdrAgent } = await import('./herdr.js');
+  const ref = await findHerdrAgent(agentId);
+  if (!ref) return false;
+  await Effect.runPromise(resolved.close({
+    backend: 'herdr',
+    workspaceId: ref.workspaceId,
+    paneId: ref.paneId,
+    terminalId: ref.terminalId,
+    agentName: agentId,
+  })).catch(() => {});
+  return true;
+}
