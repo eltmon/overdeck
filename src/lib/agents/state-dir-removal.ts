@@ -1,3 +1,9 @@
+/**
+ * Agent-directory cleanup has two distinct modes. Close-out calls
+ * `pruneAgentStateDir` to remove only regenerable locks, sockets, and Codex
+ * caches while preserving state and transcripts. Explicit wipe and garbage
+ * collection may still call the destructive removal helpers below.
+ */
 import { lstat, readdir, realpath, rm, rmdir, unlink, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 

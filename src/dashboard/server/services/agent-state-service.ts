@@ -22,6 +22,10 @@
  * PAN-3917 (FR-12): the bootstrap seed is the terminal backend's live pane
  * inventory, not a reconstruction from `state.json` plus tmux. There is no
  * persisted runtime mirror to reconstruct from any more.
+ *
+ * Session observations append to `sessions.json`; its newest entry identifies
+ * the current harness session. The service never maintains a mutable session
+ * pointer.
  */
 
 import { Effect, Layer, Context, Stream, SubscriptionRef } from 'effect';

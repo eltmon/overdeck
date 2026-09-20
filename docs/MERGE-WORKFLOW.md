@@ -150,6 +150,12 @@ pressure) also runs from a plain interval scheduler independent of any
 issue's merge — check `pan workspace list --stale [--all]` for merged
 branches still on disk and reclaim with `pan workspace destroy <id>`.
 
+Close-out prunes only regenerable agent-directory weight: `pending.lock`,
+`*.sock`, and each `codex-home*/` entry except `sessions/`. It keeps
+`state.json`, the append-only `sessions.json` index, lifecycle and activity
+logs, context receipts, Codex thread IDs, and every transcript. Explicit wipe,
+garbage collection, and retention remain the destructive cleanup paths.
+
 When the merge-train flag (`flywheel.merge_train_enabled`, default off) is
 ON, a merge-train reconcile pass rebases/re-verifies ready sibling branches
 (PAN-1691); with the flag off, reconcile an affected workspace explicitly

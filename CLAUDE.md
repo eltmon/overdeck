@@ -33,6 +33,7 @@
 
 ## Key Invariants (one-liners)
 
+- `sessions.json` is the append-only session index; there is no `session.id`; close-out prunes caches, never state or transcripts.
 - The resource governor holds dispatch during memory or CPU saturation, and every local Vitest run enters the shared CPU admission queue. See "Agent Auto-Resume Gates" in [docs/PIPELINE-GATES.md](docs/PIPELINE-GATES.md).
 - `.claude/agents/` + `.claude/skills/` in worktrees are **sync targets** populated from `sync-sources/`; shipped subagent definitions carry no `model:` pin — they inherit the session model so Cloister routing applies (prefer built-in `Explore`/`general-purpose` for ad-hoc exploration).
 - Project CI state reaches Command Deck rows through the shared read-model event path (`ciByProjectKey` → `/ws/rpc`); webhook observations and server-side REST repair feed it, never frontend polling. [docs/EXTERNAL-EVENT-STREAM.md](docs/EXTERNAL-EVENT-STREAM.md)

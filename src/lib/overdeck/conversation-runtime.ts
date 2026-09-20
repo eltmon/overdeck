@@ -271,7 +271,6 @@ export function shouldReportUnresolvedLiveSession(
   if (!conv || conv.status !== 'active') return false;
   return getHarnessBehavior(conv.harness).transcriptKind === 'claude-jsonl';
 }
-
 export function conversationSessionAliveFromState(
   conv: Pick<Conversation, 'status' | 'forkStatus'>,
   tmuxSessionAlive: boolean,

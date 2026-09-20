@@ -1,3 +1,8 @@
+/**
+ * Read operations for registered conversations. Agent-backed issue sessions
+ * use `/api/agents/:id/conversation`; this module never scans agent state or
+ * global transcript directories to make a missing conversation row succeed.
+ */
 import { resolveMuseSessionPath } from '../runtimes/muse-session.js';
 import { parseMuseConversationMessages } from '../../dashboard/server/services/muse-conversation-parser.js';
 import { existsSync } from 'node:fs';
