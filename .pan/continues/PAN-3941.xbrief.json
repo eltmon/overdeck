@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3941",
   "created": "2026-09-20T01:25:34.323Z",
-  "updated": "2026-09-20T01:26:00.723Z",
+  "updated": "2026-09-20T02:15:23.030Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -10,9 +10,10 @@
   "sessionHistory": [],
   "items": {
     "auto-start": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3941",
-      "claimedAt": "2026-09-20T01:26:00.722Z"
+      "claimedAt": "2026-09-20T01:26:00.722Z",
+      "doneAt": "2026-09-20T02:15:23.029Z"
     }
   }
 }
