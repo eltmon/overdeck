@@ -11,6 +11,10 @@ import {
   ContextMenuItem,
   ContextMenuLabel,
   ContextMenuSeparator,
+  MenuItemButton,
+  MenuOverlay,
+  MenuSeparator,
+  MenuSurface,
 } from '../shared/ContextMenu';
 import {
   IssueActionGroupedBody,
@@ -60,11 +64,13 @@ function actionButtonClass(view: IssueActionView, inline: boolean) {
 
 function ActionButton({ view, inline = false, onInvoked }: { view: IssueActionView; inline?: boolean; onInvoked?: () => void }) {
   const [submenuOpen, setSubmenuOpen] = useState(false);
+  const submenuTriggerRef = useRef<HTMLButtonElement>(null);
   const hasSubmenu = !!view.submenu?.length;
 
   return (
     <span className="relative inline-flex">
       <button
+        ref={submenuTriggerRef}
         type="button"
         data-testid={`issue-action-${view.action.key}`}
         className={actionButtonClass(view, inline)}
@@ -86,19 +92,18 @@ function ActionButton({ view, inline = false, onInvoked }: { view: IssueActionVi
       </button>
       {hasSubmenu && submenuOpen ? (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setSubmenuOpen(false)} />
-          <div
-            role="menu"
+          <MenuOverlay onClick={() => setSubmenuOpen(false)} />
+          <MenuSurface
+            aria-label={`${view.action.label} options`}
+            onClose={() => setSubmenuOpen(false)}
+            returnFocusRef={submenuTriggerRef}
             data-testid={`issue-action-submenu-${view.action.key}`}
-            className="absolute left-0 top-full z-50 mt-1 w-[220px] rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg"
+            className="absolute left-0 top-full z-[1000] mt-1 w-[220px]"
           >
             {view.submenu!.map((option) => (
-              <button
+              <MenuItemButton
                 key={option.key}
-                type="button"
-                role="menuitem"
                 data-testid={`issue-action-${view.action.key}-option-${option.key}`}
-                className="relative flex w-full cursor-pointer select-none items-center rounded px-3 py-1.5 text-left text-xs text-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
                 onClick={() => {
                   setSubmenuOpen(false);
                   option.invoke();
@@ -106,9 +111,9 @@ function ActionButton({ view, inline = false, onInvoked }: { view: IssueActionVi
                 }}
               >
                 {option.label}
-              </button>
+              </MenuItemButton>
             ))}
-          </div>
+          </MenuSurface>
         </>
       ) : null}
     </span>
@@ -130,33 +135,33 @@ function createPopoverMenuItem(onClose: () => void, destructive: boolean) {
       : 'text-foreground hover:bg-accent hover:text-accent-foreground';
 
     return (
-      <button
+      <MenuItemButton
         {...props}
-        type="button"
         role={role}
+        destructive={destructive}
         disabled={disabled}
-        className={`relative flex w-full cursor-pointer select-none items-center rounded px-3 py-1.5 text-left text-xs outline-none transition-colors disabled:pointer-events-none disabled:opacity-40 ${colorClass} ${className}`}
+        className={`${colorClass} ${className}`}
         onClick={() => {
           onActivate?.();
           if (!preventClose) onClose();
         }}
       >
         {children}
-      </button>
+      </MenuItemButton>
     );
   };
 }
 
 function PopoverMenuLabel({ children }: { children: ReactNode }) {
   return (
-    <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
       {children}
     </div>
   );
 }
 
 function PopoverMenuSeparator() {
-  return <div className="mx-1 my-1 h-px bg-border" />;
+  return <MenuSeparator />;
 }
 
 function popoverMenuPrimitives(onClose: () => void): IssueActionMenuPrimitives {
@@ -171,20 +176,24 @@ function popoverMenuPrimitives(onClose: () => void): IssueActionMenuPrimitives {
 function OverflowMenu({
   actions,
   onClose,
+  returnFocusRef,
 }: {
   actions: Pick<UseIssueActionsResult, 'all' | 'primary' | 'phase'>;
   onClose: () => void;
+  returnFocusRef?: RefObject<HTMLButtonElement>;
 }) {
   return (
     <>
-      <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div
-        role="menu"
+      <MenuOverlay onClick={onClose} />
+      <MenuSurface
+        aria-label="Issue actions"
+        onClose={onClose}
+        returnFocusRef={returnFocusRef}
         data-testid="issue-action-overflow-menu"
-        className="absolute right-0 top-full z-50 mt-1 max-h-[70vh] w-[320px] overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg"
+        className="absolute right-0 top-full z-[1000] mt-1 w-[320px]"
       >
         <IssueActionGroupedBody actions={actions} primitives={popoverMenuPrimitives(onClose)} />
-      </div>
+      </MenuSurface>
     </>
   );
 }
@@ -294,7 +303,7 @@ function OverflowButton({
         <MoreHorizontal className="h-4 w-4" />
         <span>{more} more</span>
       </button>
-      {open ? <OverflowMenu actions={actions} onClose={() => setOpenMenu(null)} /> : null}
+      {open ? <OverflowMenu actions={actions} onClose={() => setOpenMenu(null)} returnFocusRef={triggerRef} /> : null}
     </div>
   );
 }

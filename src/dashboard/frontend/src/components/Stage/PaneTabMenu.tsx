@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Columns2, Rows2, X } from 'lucide-react'
-import menu from '../CommandDeck/styles/command-deck.module.css'
+import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu'
 
 interface PaneTabMenuProps {
   /** Viewport coordinates (fixed positioning) — typically the cursor. */
@@ -20,8 +20,8 @@ interface PaneTabMenuProps {
 /**
  * Lightweight right-click menu for non-conversation pane tabs (issue, plan,
  * docs, commits, files, browser, home). Conversation/agent tabs use the richer
- * {@link ConversationActionMenu} instead. Reuses the command-deck menu styling
- * so both menus look identical. Portaled + fixed-positioned to escape clips.
+ * {@link ConversationActionMenu} instead. Uses the shared menu surface so pane,
+ * conversation, and issue actions share one interaction vocabulary.
  */
 export function PaneTabMenu({ position, onClose, onOpenInSplit, onSplitDown, onCloseTab, onCloseAll }: PaneTabMenuProps) {
   useEffect(() => {
@@ -39,28 +39,33 @@ export function PaneTabMenu({ position, onClose, onOpenInSplit, onSplitDown, onC
 
   return createPortal(
     <>
-      <div className={menu.headerMenuOverlay} onClick={onClose} />
-      <div role="menu" className={menu.headerMenu} style={{ position: 'fixed', top: position.top, left: position.left, right: 'auto' }}>
-        <button role="menuitem" className={menu.headerMenuItem} onClick={() => { onOpenInSplit(); onClose() }}>
+      <MenuOverlay onClick={onClose} />
+      <MenuSurface
+        aria-label="Pane actions"
+        onClose={onClose}
+        className="fixed z-[1000] min-w-[220px]"
+        style={{ position: 'fixed', top: position.top, left: position.left, right: 'auto' }}
+      >
+        <MenuItemButton onClick={() => { onOpenInSplit(); onClose() }}>
           <Columns2 size={14} />
           Split right
-        </button>
-        <button role="menuitem" className={menu.headerMenuItem} onClick={() => { onSplitDown(); onClose() }}>
+        </MenuItemButton>
+        <MenuItemButton onClick={() => { onSplitDown(); onClose() }}>
           <Rows2 size={14} />
           Split down
-        </button>
-        <div className={menu.headerMenuDivider} />
+        </MenuItemButton>
+        <MenuSeparator />
         {onCloseTab && (
-          <button role="menuitem" className={menu.headerMenuItem} onClick={() => { onCloseTab(); onClose() }}>
+          <MenuItemButton onClick={() => { onCloseTab(); onClose() }}>
             <X size={14} />
             Close tab
-          </button>
+          </MenuItemButton>
         )}
-        <button role="menuitem" className={menu.headerMenuItem} onClick={() => { onCloseAll(); onClose() }}>
+        <MenuItemButton onClick={() => { onCloseAll(); onClose() }}>
           <X size={14} />
           Close all tabs
-        </button>
-      </div>
+        </MenuItemButton>
+      </MenuSurface>
     </>,
     document.body,
   )

@@ -242,17 +242,10 @@ function groupScope(group: string): Exclude<PaletteScope, 'all'> {
   return 'actions';
 }
 
-/** Subtle accent (icon-chip fill + icon color) per result type, so rows read as
- *  intentional icon chips rather than empty checkboxes. */
-function accentForGroup(group: string): { box: string; icon: string } {
-  switch (groupScope(group)) {
-    case 'conversations': return { box: 'bg-indigo-500/15', icon: 'text-indigo-400' };
-    case 'memory':        return { box: 'bg-amber-500/15',  icon: 'text-amber-400' };
-    case 'issues':        return { box: 'bg-sky-500/15',    icon: 'text-sky-400' };
-    case 'workspaces':    return { box: 'bg-violet-500/15', icon: 'text-violet-400' };
-    case 'commands':      return { box: 'bg-emerald-500/15', icon: 'text-emerald-400' };
-    default:              return { box: 'bg-muted',          icon: 'text-muted-foreground' };
-  }
+/** Result-type icons are taxonomy, so they stay neutral instead of competing
+ * with operational signal colors. */
+function accentForGroup(_group: string): { box: string; icon: string } {
+  return { box: 'bg-muted', icon: 'text-muted-foreground' };
 }
 
 // ─── Server API ───────────────────────────────────────────────────────────────
@@ -348,7 +341,7 @@ interface HighlightedProps {
 // only the backdrop signals "this matched". GitHub-search style — quieter
 // than swapping the text color, and the same single rule reads well in
 // both light and dark themes.
-const HIGHLIGHT_CLASS = 'rounded-sm px-px text-inherit bg-amber-300/40 dark:bg-amber-400/20';
+const HIGHLIGHT_CLASS = 'rounded-sm bg-primary/12 px-px text-inherit';
 
 function Highlighted({ text, terms }: HighlightedProps) {
   if (!text) return null;

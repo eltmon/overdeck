@@ -8,6 +8,7 @@ import type { ConversationMutations } from './useConversationMutations';
 import { fetchRegisteredProjects } from './UnknownProjectState';
 import { resolveEffectiveProjectKey } from './projectsData';
 import { useConfirm } from '../DialogProvider';
+import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
 import styles from './styles/command-deck.module.css';
 
 interface ConversationActionMenuProps {
@@ -127,10 +128,11 @@ export function ConversationActionMenu({ conversation, mutations, position, onCl
 
   return createPortal(
     <>
-      <div className={styles.headerMenuOverlay} onClick={onClose} />
-      <div
-        role="menu"
-        className={styles.headerMenu}
+      <MenuOverlay onClick={onClose} />
+      <MenuSurface
+        aria-label={`Actions for ${conversation.title ?? conversation.name}`}
+        onClose={onClose}
+        className="fixed z-[1000] min-w-[220px]"
         style={{ position: 'fixed', top: position.top, left: position.left, right: 'auto' }}
       >
         {renaming ? (
@@ -151,21 +153,18 @@ export function ConversationActionMenu({ conversation, mutations, position, onCl
           />
         ) : (
           <>
-            <button
-              role="menuitem"
-              className={`${styles.headerMenuItem} ${conversation.isFavorited ? styles.headerMenuItemActive : ''}`}
+            <MenuItemButton
+              active={conversation.isFavorited}
               onClick={() => { mutations.toggleFavorite({ name: conversation.name, favorited: !!conversation.isFavorited }); onClose(); }}
             >
               <Star size={14} style={{ fill: conversation.isFavorited ? 'currentColor' : 'none' }} />
               {conversation.isFavorited ? 'Unfavorite' : 'Favorite'}
-            </button>
-            <button role="menuitem" className={styles.headerMenuItem} onClick={() => setRenaming(true)}>
+            </MenuItemButton>
+            <MenuItemButton onClick={() => setRenaming(true)}>
               <Pencil size={14} />
               Rename
-            </button>
-            <button
-              role="menuitem"
-              className={styles.headerMenuItem}
+            </MenuItemButton>
+            <MenuItemButton
               onClick={() => { mutations.retitle(conversation.name); onClose(); }}
               disabled={mutations.isRetitlePending(conversation.name)}
             >
@@ -173,31 +172,31 @@ export function ConversationActionMenu({ conversation, mutations, position, onCl
                 ? <Loader2 size={14} className={styles.spinnerIcon} />
                 : <Sparkles size={14} />}
               Regenerate title
-            </button>
+            </MenuItemButton>
             {registeredProjects.length > 0 && (
               <span style={{ position: 'relative', display: 'block' }}>
-                <button
-                  role="menuitem"
-                  className={styles.headerMenuItem}
+                <MenuItemButton
                   aria-haspopup="menu"
                   aria-expanded={moveSubmenuOpen}
                   onClick={() => setMoveSubmenuOpen((open) => !open)}
                 >
                   <FolderInput size={14} />
                   Move
-                </button>
+                </MenuItemButton>
                 {moveSubmenuOpen && (
                   <>
-                    <div className={styles.headerMenuOverlay} onClick={() => setMoveSubmenuOpen(false)} />
-                    <div role="menu" className={styles.headerSubmenu}>
+                    <MenuOverlay onClick={() => setMoveSubmenuOpen(false)} />
+                    <MenuSurface
+                      aria-label="Move conversation"
+                      onClose={() => setMoveSubmenuOpen(false)}
+                      className="absolute left-full top-0 z-[1001] ml-1 min-w-[180px]"
+                    >
                       {registeredProjects.map((project) => {
                         const isCurrent = resolveEffectiveProjectKey(conversation, registeredProjects) === project.key;
                         const projectName = project.name ?? project.key;
                         return (
-                          <button
+                          <MenuItemButton
                             key={project.key}
-                            role="menuitem"
-                            className={styles.headerMenuItem}
                             disabled={isCurrent}
                             onClick={() => {
                               if (isCurrent) return;
@@ -207,11 +206,11 @@ export function ConversationActionMenu({ conversation, mutations, position, onCl
                             }}
                           >
                             {projectName}
-                            {isCurrent && <Check size={14} className={styles.headerMenuItemCheck} />}
-                          </button>
+                            {isCurrent && <Check size={14} className="ml-auto text-primary" />}
+                          </MenuItemButton>
                         );
                       })}
-                    </div>
+                    </MenuSurface>
                   </>
                 )}
               </span>
@@ -221,128 +220,115 @@ export function ConversationActionMenu({ conversation, mutations, position, onCl
                 when this menu was opened from a pane tab (onCloseTab present). */}
             {onCloseTab && (
               <>
-                <div className={styles.headerMenuDivider} />
+                <MenuSeparator />
                 {onOpenInSplit && (
-                  <button role="menuitem" className={styles.headerMenuItem} onClick={() => { onOpenInSplit(); onClose(); }}>
+                  <MenuItemButton onClick={() => { onOpenInSplit(); onClose(); }}>
                     <Columns2 size={14} />
                     Split right
-                  </button>
+                  </MenuItemButton>
                 )}
                 {onSplitDown && (
-                  <button role="menuitem" className={styles.headerMenuItem} onClick={() => { onSplitDown(); onClose(); }}>
+                  <MenuItemButton onClick={() => { onSplitDown(); onClose(); }}>
                     <Rows2 size={14} />
                     Split down
-                  </button>
+                  </MenuItemButton>
                 )}
-                <button
-                  role="menuitem"
-                  className={styles.headerMenuItem}
+                <MenuItemButton
                   onClick={() => { window.open(`/popout/conversation/${conversation.id}`, '_blank', 'popup=yes,width=920,height=1040'); onClose(); }}
                 >
                   <ExternalLink size={14} />
                   Pop out to window
-                </button>
+                </MenuItemButton>
                 {onCloseOthers && (
-                  <button role="menuitem" className={styles.headerMenuItem} onClick={() => { onCloseOthers(); onClose(); }}>
+                  <MenuItemButton onClick={() => { onCloseOthers(); onClose(); }}>
                     <X size={14} />
                     Close other tabs
-                  </button>
+                  </MenuItemButton>
                 )}
                 {onCloseRight && (
-                  <button role="menuitem" className={styles.headerMenuItem} onClick={() => { onCloseRight(); onClose(); }}>
+                  <MenuItemButton onClick={() => { onCloseRight(); onClose(); }}>
                     <X size={14} />
                     Close tabs to the right
-                  </button>
+                  </MenuItemButton>
                 )}
                 {onCloseAll && (
-                  <button role="menuitem" className={styles.headerMenuItem} onClick={() => { onCloseAll(); onClose(); }}>
+                  <MenuItemButton onClick={() => { onCloseAll(); onClose(); }}>
                     <X size={14} />
                     Close all tabs
-                  </button>
+                  </MenuItemButton>
                 )}
               </>
             )}
 
-            <div className={styles.headerMenuDivider} />
+            <MenuSeparator />
             {conversation.claudeSessionId && (
-              <button
-                role="menuitem"
-                className={styles.headerMenuItem}
+              <MenuItemButton
                 onClick={() => { mutations.openForkModal(conversation, { mode: 'handoff' }); onClose(); }}
               >
                 <Share2 size={14} />
                 Hand off to new conversation
-              </button>
+              </MenuItemButton>
             )}
             {conversation.claudeSessionId && conversation.harness !== 'pi' && conversation.harness !== 'ohmypi' && (
-              <button
-                role="menuitem"
-                className={styles.headerMenuItem}
+              <MenuItemButton
                 onClick={() => { mutations.openForkModal(conversation); onClose(); }}
               >
                 <GitBranchPlus size={14} />
                 Create summary fork
-              </button>
+              </MenuItemButton>
             )}
-            <button role="menuitem" className={styles.headerMenuItem} onClick={handleExport}>
+            <MenuItemButton onClick={handleExport}>
               <Download size={14} />
               Export transcript
-            </button>
+            </MenuItemButton>
             {conversation.handoffDocPath && (
-              <button
-                role="menuitem"
-                className={styles.headerMenuItem}
+              <MenuItemButton
                 onClick={() => { window.open(`/api/conversations/${encodeURIComponent(conversation.name)}/handoff-doc`, '_blank', 'noopener,noreferrer'); onClose(); }}
               >
                 <FileText size={14} />
                 Open handoff doc
-              </button>
+              </MenuItemButton>
             )}
             {conversation.handoffTargetConvId && (
-              <button
-                role="menuitem"
-                className={styles.headerMenuItem}
+              <MenuItemButton
                 onClick={() => { window.location.href = `/conv/${conversation.handoffTargetConvId}`; onClose(); }}
               >
                 <ExternalLink size={14} />
                 Open handoff target
-              </button>
+              </MenuItemButton>
             )}
 
-            <div className={styles.headerMenuDivider} />
-            <button role="menuitem" className={styles.headerMenuItem} onClick={handleCopyLink}>
+            <MenuSeparator />
+            <MenuItemButton onClick={handleCopyLink}>
               {copied ? <Check size={14} /> : <Copy size={14} />}
               Copy link
-            </button>
+            </MenuItemButton>
             {conversation.sessionAlive && (
-              <button
-                role="menuitem"
-                className={styles.headerMenuItem}
+              <MenuItemButton
                 onClick={() => { mutations.stop(conversation.name); onClose(); }}
               >
                 <Square size={14} />
                 Stop agent
-              </button>
+              </MenuItemButton>
             )}
 
-            <div className={styles.headerMenuDivider} />
-            <button
-              role="menuitem"
-              className={`${styles.headerMenuItem} ${styles.headerMenuItemDestructive}`}
+            <MenuSeparator />
+            <MenuItemButton
+              destructive
               onClick={handleArchive}
             >
               <Archive size={14} />
               Archive
-            </button>
+            </MenuItemButton>
             {onCloseTab && (
-              <button role="menuitem" className={styles.headerMenuItem} onClick={() => { onCloseTab(); onClose(); }}>
+              <MenuItemButton onClick={() => { onCloseTab(); onClose(); }}>
                 <X size={14} />
                 Close tab
-              </button>
+              </MenuItemButton>
             )}
           </>
         )}
-      </div>
+      </MenuSurface>
     </>,
     document.body,
   );
