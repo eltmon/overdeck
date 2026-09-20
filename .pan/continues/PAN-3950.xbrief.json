@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3950",
   "created": "2026-09-20T13:53:05.511Z",
-  "updated": "2026-09-20T14:41:56.778Z",
+  "updated": "2026-09-20T14:49:29.384Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -44,6 +44,10 @@
       "claimedBy": "agent-pan-3950",
       "claimedAt": "2026-09-20T14:29:32.808Z",
       "doneAt": "2026-09-20T14:41:56.778Z"
+    },
+    "w6-watcher-retry.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:49:29.383Z"
     }
   }
 }
