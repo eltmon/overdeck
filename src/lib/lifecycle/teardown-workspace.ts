@@ -26,6 +26,7 @@ import { findAllWorkspacePaths, findWorkspacePath } from './archive-planning.js'
 import { getContainersReferencingWorkspacePath } from '../workspace-manager.js';
 import { DEVCONTAINER_DIRNAME } from '../workspace/devcontainer-renderer.js';
 import { pruneAgentStateDir } from '../agents/state-dir-removal.js';
+import { listAgentStatesSync, saveAgentStateSync } from '../agents/agent-state.js';
 
 const execAsync = promisify(exec);
 
@@ -41,6 +42,19 @@ function killTmuxSessions(issueLower: string): Effect.Effect<StepResult> {
       Effect.succeed(stepFailed('teardown:tmux-sessions', `Failed: ${(err as Error).message}`)),
     ),
   );
+}
+
+export function persistIssueAgentsStopped(issueLower: string): number {
+  let persisted = 0;
+  for (const state of listAgentStatesSync()) {
+    if ((state.issueId ?? '').toLowerCase() !== issueLower) continue;
+    if (state.status === 'stopped') continue;
+    state.status = 'stopped';
+    state.stoppedAt = new Date().toISOString();
+    saveAgentStateSync(state);
+    persisted++;
+  }
+  return persisted;
 }
 
 async function killTmuxSessionsImpl(issueLower: string): Promise<StepResult> {
@@ -99,6 +113,11 @@ async function killTmuxSessionsImpl(issueLower: string): Promise<StepResult> {
   } catch {
     // Session listing may fail if tmux server is not running
   }
+
+  // The state directory is durable after close-out. Persist the terminal
+  // lifecycle fact before pruning so a closed Session tab never projects a
+  // retained agent as writable/live after the terminal has been killed.
+  persistIssueAgentsStopped(issueLower);
 
   // NOTE: Per-project ephemeral specialists (specialist-{project}-{type}) are NOT killed here.
   // They belong to the project, not the issue, and accumulate context across issues via --resume.

@@ -200,12 +200,12 @@ describe('applyEventReducer — agent events', () => {
     expect(next.agentsById['agent-1']).toEqual(baseAgent)
   })
 
-  it('agent.stopped removes agent from store', () => {
+  it('agent.stopped keeps a stopped agent in the store', () => {
     const state: DashboardState = { ...emptyState, agentsById: { 'agent-1': baseAgent } }
     const event = makeEvent('agent.stopped', 3, { agentId: 'agent-1', issueId: 'PAN-1' })
     const next = applyEventReducer(state, event)
-    expect(next.agentsById['agent-1']).toBeUndefined()
-    expect(Object.keys(next.agentsById)).toHaveLength(0)
+    expect(next.agentsById['agent-1']).toMatchObject({ status: 'stopped', hasLiveTmuxSession: false })
+    expect(Object.keys(next.agentsById)).toHaveLength(1)
   })
 
   it('agent.status_changed updates agent status and tmux liveness', () => {

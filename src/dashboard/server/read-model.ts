@@ -233,7 +233,7 @@ function overdeckStatusToLegacy(
   return status; // 'starting' | 'running' | 'stopped' are 1:1
 }
 
-function agentSnapshotFromOverdeck(agent: OverdeckAgent): AgentSnapshot {
+export function agentSnapshotFromOverdeck(agent: OverdeckAgent): AgentSnapshot {
   return {
     id: agent.id,
     issueId: agent.issueId,
