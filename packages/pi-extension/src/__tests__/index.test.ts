@@ -105,6 +105,58 @@ describe('handleSessionStart', () => {
     })
   })
 
+  it('appends the recorded transcript path when a matching session log file exists (PAN-3959)', async () => {
+    const paths = overdeckPathsFor('agent-pan-636', h.home)
+    const sessionDir = join(paths.agentDir, 'sessions', 'bucket-1')
+    mkdirSync(sessionDir, { recursive: true })
+    const logPath = join(sessionDir, 'sess-with-log.jsonl')
+    writeFileSync(logPath, '{}\n')
+
+    await handleSessionStart(
+      { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
+      { reason: 'new', sessionId: 'sess-with-log' },
+    )
+
+    expect(JSON.parse(readFileSync(paths.sessionsIndexPath, 'utf8').trim())).toEqual({
+      sessionId: 'sess-with-log',
+      at: fixedTime,
+      source: 'session-start',
+      harness: 'pi',
+      model: 'unknown',
+      path: logPath,
+    })
+  })
+
+  it('finds a prefixed session log file nested under a bucket subdirectory (PAN-3959)', async () => {
+    const paths = overdeckPathsFor('agent-pan-636', h.home)
+    const nestedDir = join(paths.agentDir, 'sessions', 'bucket-2', 'agents')
+    mkdirSync(nestedDir, { recursive: true })
+    const logPath = join(nestedDir, 'main_sess-nested.jsonl')
+    writeFileSync(logPath, '{}\n')
+
+    await handleSessionStart(
+      { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
+      { reason: 'new', sessionId: 'sess-nested' },
+    )
+
+    expect(JSON.parse(readFileSync(paths.sessionsIndexPath, 'utf8').trim()).path).toBe(logPath)
+  })
+
+  it('records no path key when no matching session log file exists (PAN-3959)', async () => {
+    await handleSessionStart(
+      { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
+      { reason: 'new', sessionId: 'sess-no-log' },
+    )
+    const paths = overdeckPathsFor('agent-pan-636', h.home)
+    expect(JSON.parse(readFileSync(paths.sessionsIndexPath, 'utf8').trim())).toEqual({
+      sessionId: 'sess-no-log',
+      at: fixedTime,
+      source: 'session-start',
+      harness: 'pi',
+      model: 'unknown',
+    })
+  })
+
   it('does not create a session index when Pi reports no session id', async () => {
     await handleSessionStart(
       { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
@@ -508,6 +560,35 @@ describe('handleTurnEnd', () => {
       timestamp: fixedTime,
     })
     expect(fetchCalls[1]!.body).toMatchObject({ kind: 'cost-event', issueId: 'PAN-636', tool: 'turn_end' })
+  })
+
+  it('records the session log path once on turn_end and dedupes a repeat (PAN-3959)', async () => {
+    const paths = overdeckPathsFor('agent-pan-636', h.home)
+    mkdirSync(paths.agentDir, { recursive: true })
+    writeFileSync(paths.sessionsIndexPath, `${JSON.stringify(
+      { sessionId: 'sess-turn-end-upgrade', at: fixedTime, source: 'session-start', harness: 'pi', model: 'unknown' },
+    )}\n`)
+    const sessionLogPath = '/tmp/pi-turn-end-upgrade-fixture.jsonl'
+
+    await handleTurnEnd(
+      { agentId: 'agent-pan-636', home: h.home, pid: 7, now },
+      { sessionLogPath },
+    )
+    await handleTurnEnd(
+      { agentId: 'agent-pan-636', home: h.home, pid: 7, now },
+      { sessionLogPath },
+    )
+
+    const lines = readFileSync(paths.sessionsIndexPath, 'utf8').trim().split('\n')
+    expect(lines).toHaveLength(2)
+    expect(JSON.parse(lines[1]!)).toEqual({
+      sessionId: 'sess-turn-end-upgrade',
+      at: fixedTime,
+      source: 'turn-end',
+      harness: 'pi',
+      model: 'unknown',
+      path: sessionLogPath,
+    })
   })
 
   it('posts work-complete when the dashboard plan checklist is complete', async () => {
