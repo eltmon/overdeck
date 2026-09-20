@@ -1,0 +1,113 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-20T01:24:16.963Z",
+    "updated": "2026-09-20T01:24:45.562Z",
+    "author": "overdeck/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-3941: Unify dashboard menus, popovers, and semantic color styling",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-3941",
+    "title": "Unify dashboard menus, popovers, and semantic color styling",
+    "status": "running",
+    "uid": "66ad7840-f7b9-4efa-a694-91f760e9b94b",
+    "author": "overdeck/auto-start",
+    "sequence": 2,
+    "created": "2026-09-20T01:24:16.963Z",
+    "updated": "2026-09-20T01:24:45.562Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3941",
+        "label": "PAN-3941",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-20-PAN-3941-unify-dashboard-menus-popovers-and-semantic-color-styling.xbrief.json"
+    },
+    "narratives": {
+      "Problem": "## Problem\n\nSeveral dashboard surfaces bypass the shared menu, popup, and semantic-color vocabulary. The result is visible drift: the same overflow action changes density and shadow by route, operational warnings use unrelated colors, and some system popovers look like separate products.\n\nThis issue is a bounded refinement of the incumbent Command Deck design. Preserve behavior and information architecture; consolidate one-off styling into existing shared primitives and semantic tokens.\n\n## Incumbent visual truth\n\nUse these as the baseline:\n\n- `src/dashboard/frontend/src/components/shared/ContextMenu.tsx`\n- `src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx`\n- the semantic tokens and theme definitions already used by those surfaces\n- `src/dashboard/frontend/PRODUCT.md`: calm under load, dense but legible, one interaction vocabulary\n\nThe Issue Actions menu may still need structural simplification, but do not copy its admin-matrix density into simple context menus. Reuse its shared popup vocabulary where the interaction role matches.\n\n## High-confidence inconsistencies\n\n### 1. Conversation and pane menus\n\n`src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css` defines a legacy menu skin with custom width, padding, radii, raw shadow, and item sizing. It is consumed by:\n\n- `CommandDeck/ConversationActionMenu.tsx`\n- `CommandDeck/ConversationRow.tsx`\n- `chat/ConversationPanel.tsx`\n- `Stage/PaneTabMenu.tsx`\n\nMove matching context-menu interactions onto the shared menu primitive/tokens. Preserve positioning, keyboard behavior, destructive-state treatment, and route-specific actions.\n\n### 2. Deacon pause state\n\n`DeaconPauseToggle.tsx` hard-codes `sky-*` colors for an operational pause/alert state while neighboring operational surfaces use semantic warning tokens. Replace palette-specific classes with the correct semantic state and verify all themes and compact/expanded states.\n\n### 3. Planning surfaces\n\n`PlanDialog.tsx` and `PlanSetupScreen.tsx` use hard-coded purple-to-blue gradients and purple borders. Bring them into the established `primary` / `signal-review` vocabulary without flattening hierarchy or obscuring the primary planning action.\n\n### 4. Cloister restart popover\n\n`CloisterStatusBar.tsx` uses inline width, radius, raw RGBA shadow, and fallback colors inside `SystemMenu.tsx`. Replace the one-off frame with shared popup tokens or a shared component. Preserve restart state, confirmation, focus return, and constrained viewport placement.\n\n## Secondary audit-and-fix scope\n\nReview these while the shared vocabulary is in hand. Fix raw styling when an existing semantic token expresses the same meaning; document a narrow exception when the color is genuine domain encoding:\n\n- `CommandDeck/ActivityView/index.tsx`: raw indigo/purple/green/pink values and card side accents.\n- `CommandPalette.tsx`: hard-coded Tailwind category palettes.\n- `BacklogSequencerPage.tsx`: legacy aliases, arbitrary `color-mix`, custom chips, and a pass picker that does not match menu semantics.\n\n## Intentional exemptions\n\n- God View's scoped neon theme and Space Grotesk typography.\n- Terminal presentation.\n- Kanban and IssueCard status stripes when color carries stable task-state meaning.\n\nDo not normalize these as collateral cleanup.\n\n## Requirements\n\n- [ ] Classify each finding as a missing token, one-off implementation, conceptual mismatch, or local defect before editing.\n- [ ] Reuse shared primitives for same-role menus and popovers; do not introduce a second replacement primitive.\n- [ ] Replace palette literals with semantic tokens wherever the meaning already exists.\n- [ ] Preserve action availability, ordering, copy, destructive confirmation, positioning, and disabled/loading behavior.\n- [ ] Preserve visible focus, menu semantics, keyboard navigation, focus return, and screen-reader names.\n- [ ] Verify light and dark themes at narrow and desktop widths.\n- [ ] Use Playwright screenshots and inspect them directly; do not delegate visual acceptance to the operator.\n- [ ] Run the Impeccable detector after edits and resolve new applicable findings in one bounded correction pass.\n- [ ] Add or update focused component tests for interaction and semantic behavior.\n- [ ] Update the dashboard style documentation to identify the canonical context-menu/popover primitive and intentional exemptions.\n\n## Acceptance criteria\n\n- Same-role context menus have consistent padding, radius, type scale, item states, and shadow across issue, conversation, and pane surfaces.\n- Deacon pause and planning states use theme-aware semantic colors with acceptable contrast.\n- The Cloister restart flow uses the common popup vocabulary and remains fully keyboard-operable.\n- Secondary surfaces contain no unexplained palette literals where a semantic token exists.\n- Desktop and narrow screenshots show no clipping, accidental density changes, or hierarchy regressions in either theme.\n- Relevant frontend tests, typecheck, build, and detector checks pass.",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-20T01:24:16.963Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-3941",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "## Problem\n\nSeveral dashboard surfaces bypass the shared menu, popup, and semantic-color vocabulary. The result is visible drift: the same overflow action changes density and shadow by route, operational warnings use unrelated colors, and some system popovers look like separate products.\n\nThis issue is a bounded refinement of the incumbent Command Deck design. Preserve behavior and information architecture; consolidate one-off styling into existing shared primitives and semantic tokens.\n\n## Incumbent visual truth\n\nUse these as the baseline:\n\n- `src/dashboard/frontend/src/components/shared/ContextMenu.tsx`\n- `src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx`\n- the semantic tokens and theme definitions already used by those surfaces\n- `src/dashboard/frontend/PRODUCT.md`: calm under load, dense but legible, one interaction vocabulary\n\nThe Issue Actions menu may still need structural simplification, but do not copy its admin-matrix density into simple context menus. Reuse its shared popup vocabulary where the interaction role matches.\n\n## High-confidence inconsistencies\n\n### 1. Conversation and pane menus\n\n`src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css` defines a legacy menu skin with custom width, padding, radii, raw shadow, and item sizing. It is consumed by:\n\n- `CommandDeck/ConversationActionMenu.tsx`\n- `CommandDeck/ConversationRow.tsx`\n- `chat/ConversationPanel.tsx`\n- `Stage/PaneTabMenu.tsx`\n\nMove matching context-menu interactions onto the shared menu primitive/tokens. Preserve positioning, keyboard behavior, destructive-state treatment, and route-specific actions.\n\n### 2. Deacon pause state\n\n`DeaconPauseToggle.tsx` hard-codes `sky-*` colors for an operational pause/alert state while neighboring operational surfaces use semantic warning tokens. Replace palette-specific classes with the correct semantic state and verify all themes and compact/expanded states.\n\n### 3. Planning surfaces\n\n`PlanDialog.tsx` and `PlanSetupScreen.tsx` use hard-coded purple-to-blue gradients and purple borders. Bring them into the established `primary` / `signal-review` vocabulary without flattening hierarchy or obscuring the primary planning action.\n\n### 4. Cloister restart popover\n\n`CloisterStatusBar.tsx` uses inline width, radius, raw RGBA shadow, and fallback colors inside `SystemMenu.tsx`. Replace the one-off frame with shared popup tokens or a shared component. Preserve restart state, confirmation, focus return, and constrained viewport placement.\n\n## Secondary audit-and-fix scope\n\nReview these while the shared vocabulary is in hand. Fix raw styling when an existing semantic token expresses the same meaning; document a narrow exception when the color is genuine domain encoding:\n\n- `CommandDeck/ActivityView/index.tsx`: raw indigo/purple/green/pink values and card side accents.\n- `CommandPalette.tsx`: hard-coded Tailwind category palettes.\n- `BacklogSequencerPage.tsx`: legacy aliases, arbitrary `color-mix`, custom chips, and a pass picker that does not match menu semantics.\n\n## Intentional exemptions\n\n- God View's scoped neon theme and Space Grotesk typography.\n- Terminal presentation.\n- Kanban and IssueCard status stripes when color carries stable task-state meaning.\n\nDo not normalize these as collateral cleanup.\n\n## Requirements\n\n- [ ] Classify each finding as a missing token, one-off implementation, conceptual mismatch, or local defect before editing.\n- [ ] Reuse shared primitives for same-role menus and popovers; do not introduce a second replacement primitive.\n- [ ] Replace palette literals with semantic tokens wherever the meaning already exists.\n- [ ] Preserve action availability, ordering, copy, destructive confirmation, positioning, and disabled/loading behavior.\n- [ ] Preserve visible focus, menu semantics, keyboard navigation, focus return, and screen-reader names.\n- [ ] Verify light and dark themes at narrow and desktop widths.\n- [ ] Use Playwright screenshots and inspect them directly; do not delegate visual acceptance to the operator.\n- [ ] Run the Impeccable detector after edits and resolve new applicable findings in one bounded correction pass.\n- [ ] Add or update focused component tests for interaction and semantic behavior.\n- [ ] Update the dashboard style documentation to identify the canonical context-menu/popover primitive and intentional exemptions.\n\n## Acceptance criteria\n\n- Same-role context menus have consistent padding, radius, type scale, item states, and shadow across issue, conversation, and pane surfaces.\n- Deacon pause and planning states use theme-aware semantic colors with acceptable contrast.\n- The Cloister restart flow uses the common popup vocabulary and remains fully keyboard-operable.\n- Secondary surfaces contain no unexplained palette literals where a semantic token exists.\n- Desktop and narrow screenshots show no clipping, accidental density changes, or hierarchy regressions in either theme.\n- Relevant frontend tests, typecheck, build, and detector checks pass."
+        },
+        "items": [
+          {
+            "id": "auto-start.ac1",
+            "title": "Same-role context menus have consistent padding, radius, type scale, item states, and shadow across issue, conversation, and pane surfaces.",
+            "status": "pending",
+            "created": "2026-09-20T01:24:16.963Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac2",
+            "title": "Deacon pause and planning states use theme-aware semantic colors with acceptable contrast.",
+            "status": "pending",
+            "created": "2026-09-20T01:24:16.963Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac3",
+            "title": "The Cloister restart flow uses the common popup vocabulary and remains fully keyboard-operable.",
+            "status": "pending",
+            "created": "2026-09-20T01:24:16.963Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac4",
+            "title": "Secondary surfaces contain no unexplained palette literals where a semantic token exists.",
+            "status": "pending",
+            "created": "2026-09-20T01:24:16.963Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac5",
+            "title": "Desktop and narrow screenshots show no clipping, accidental density changes, or hierarchy regressions in either theme.",
+            "status": "pending",
+            "created": "2026-09-20T01:24:16.963Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "auto-start.ac6",
+            "title": "Relevant frontend tests, typecheck, build, and detector checks pass.",
+            "status": "pending",
+            "created": "2026-09-20T01:24:16.963Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  },
+  "status": "active"
+}
