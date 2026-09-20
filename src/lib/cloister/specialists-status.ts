@@ -4,12 +4,12 @@
  * Resolves specialist session state, token usage, and startup status.
  */
 
-import { readFileSync, existsSync } from 'fs';
-import { basename, join } from 'path';
+import { existsSync } from 'fs';
+import { basename } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
-import { AGENTS_DIR } from '../paths.js';
+import { readLatestIndexedSessionIdSync } from '../session-history.js';
 import { getAllSessionFilesSync, parseClaudeSessionSync } from '../cost-parsers/jsonl-parser.js';
 import { listPaneValues, sessionExists } from '../tmux.js';
 import {
@@ -23,14 +23,7 @@ import {
 const execAsync = promisify(exec);
 
 function readRecordedClaudeSessionId(tmuxSession: string): string | null {
-  const sessionFile = join(AGENTS_DIR, tmuxSession, 'session.id');
-  if (!existsSync(sessionFile)) return null;
-  try {
-    const sessionId = readFileSync(sessionFile, 'utf-8').trim();
-    return sessionId || null;
-  } catch {
-    return null;
-  }
+  return readLatestIndexedSessionIdSync(tmuxSession);
 }
 
 /**

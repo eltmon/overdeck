@@ -58,6 +58,7 @@ import {
 import { assertWorkspaceStackHealthyForSpawn, buildAgentLaunchConfig } from './spawn-prep.js';
 import { prepareSupervisorForRelaunch, buildResumeContinueMessage } from './supervisor-channels.js';
 import { stopAgent } from './termination.js';
+import { createFreshSessionIdentity } from '../session-history.js';
 
 export type RecoverAgentResult =
   | { action: 'respawned'; state: AgentState }
@@ -88,6 +89,19 @@ export interface RestartAgentDeps {
   sessionExists?: (agentId: string) => Promise<boolean>;
   sendGracefulRestartWarning?: typeof sendGracefulRestartWarning;
   stopAgent?: (agentId: string) => Promise<unknown>;
+  allocateSessionIdentity?: typeof createFreshSessionIdentity;
+}
+
+export function prepareRestartSessionIdentity(
+  agentId: string,
+  harness: RuntimeName,
+  state: AgentState,
+  allocate: typeof createFreshSessionIdentity = createFreshSessionIdentity,
+): string | undefined {
+  const sessionId = allocate(agentId, harness, state.model);
+  if (sessionId) state.sessionId = sessionId;
+  else delete state.sessionId;
+  return sessionId;
 }
 
 export function resolveRecoveryResumeSessionId(agentId: string, harness: RuntimeName): string | undefined {
@@ -96,7 +110,11 @@ export function resolveRecoveryResumeSessionId(agentId: string, harness: Runtime
     return path ? museSessionId(path) : undefined;
   }
   if (harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode') return undefined;
-  return getLatestSessionIdSync(agentId) ?? undefined;
+  const state = getAgentStateSync(agentId);
+  const resolutionState = state
+    ? { ...state, harness }
+    : { id: agentId, harness } as AgentState;
+  return getLatestSessionIdSync(agentId, { getAgentState: () => resolutionState }) ?? undefined;
 }
 
 export async function restartAgent(
@@ -191,7 +209,20 @@ export async function restartAgent(
   }
   agentState.harness = effectiveHarness;
   agentState.status = 'starting';
-  saveAgentStateSync(agentState);
+  let freshSessionId: string | undefined;
+  try {
+    freshSessionId = prepareRestartSessionIdentity(
+      normalizedId,
+      effectiveHarness,
+      agentState,
+      deps.allocateSessionIdentity ?? createFreshSessionIdentity,
+    );
+    saveAgentStateSync(agentState);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    logLifecycle(normalizedId, `restartAgent ABORTED before launch: session index write failed: ${msg}`);
+    return { success: false, error: `Failed to restart agent: session index write failed: ${msg}` };
+  }
 
   try {
     clearReadySignal(normalizedId);
@@ -209,6 +240,7 @@ export async function restartAgent(
       useSupervisor: supervisorLaunch.useSupervisor,
       supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
       extraEnvExports: [harnessLaunch.pathExport],
+      sessionId: freshSessionId,
     });
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
@@ -279,7 +311,6 @@ export async function restartAgent(
     } else {
       await launchAndCaptureKimiSession();
     }
-
     // PAN-2974 (root cause B): the fallback continue-prompt is phase-aware —
     // a handed-off agent (completed marker) gets a passive restore, not a
     // "pick up where you left off" that re-drives the pipeline.
@@ -556,7 +587,7 @@ export async function recoverAgent(
   }
 
   if (recoveryHarness === 'kimi-code') {
-    // PAN-1837: kimi-code has no launcher-writable session.id — its resume id
+    // PAN-1837: kimi-code has no launcher-writable session index — its resume id
     // comes from resolveRecoveryResumeSessionId (kimi-session-newest source)
     // and buildAgentLaunchConfig threads kimiCodeLauncherFields (model/yolo)
     // that buildKimiCodeCommand() requires; the generic default branch below

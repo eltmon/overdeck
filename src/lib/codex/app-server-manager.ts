@@ -110,6 +110,14 @@ export class CodexAppServerManager extends EventEmitter {
       return result;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      if (isActiveWriterResumeError(message)) {
+        // The thread is still open in this same app-server (a live host being
+        // re-prompted for the next review cycle). codex refuses a second
+        // writer, and dropping the prompt here stranded the PAN-3705 reviewer
+        // — a fresh thread loses the old context but keeps the message.
+        this.emit('warning', `thread/resume refused for ${threadId} (active writer); starting a fresh thread.`);
+        return this.startThread(options);
+      }
       if (!isMissingThreadResumeError(message)) throw error;
       this.emit('warning', `thread/resume could not find ${threadId}; starting a fresh thread.`);
       return this.startThread(options);
@@ -295,6 +303,10 @@ function stripAnsi(value: string): string {
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function isActiveWriterResumeError(message: string): boolean {
+  return /thread\/resume/i.test(message) && /active writer|thread-store conflict/i.test(message);
 }
 
 function isMissingThreadResumeError(message: string): boolean {

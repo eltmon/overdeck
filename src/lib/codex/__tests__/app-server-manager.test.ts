@@ -134,6 +134,28 @@ describe('CodexAppServerManager', () => {
     manager.stop();
   });
 
+  it('starts a fresh thread when codex refuses the resume because the thread has an active writer', async () => {
+    // A live host re-prompted for the next review cycle: codex keeps its own
+    // round-one thread open and answers the resume with a thread-store
+    // conflict. The prompt must not be dropped (PAN-3705).
+    const warnings: string[] = [];
+    const fake = createFakeAppServer((message, server) => {
+      if (message.method === 'initialize') server.send({ id: message.id, result: {} });
+      if (message.method === 'thread/resume') {
+        server.send({ id: message.id, error: { message: 'thread-store conflict: thread t1 already has an active writer' } });
+      }
+      if (message.method === 'thread/start') server.send({ id: message.id, result: { thread: { id: 't2' } } });
+    });
+    const manager = new CodexAppServerManager({ cwd: '/tmp', readVersion: async () => '0.144.1', spawnProcess: () => fake.child });
+    manager.on('warning', warning => warnings.push(String(warning)));
+    await manager.start();
+    await manager.resumeThread('t1', { model: 'caller-model' });
+    expect(fake.messages.map(message => message.method)).toContain('thread/start');
+    expect(manager.getState().threadId).toBe('t2');
+    expect(warnings[0]).toContain('active writer');
+    manager.stop();
+  });
+
   it('falls back only for missing-thread resume errors', async () => {
     const warnings: string[] = [];
     const fake = createFakeAppServer((message, server) => {

@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -7,7 +7,6 @@ import type { ConversationResponse } from '@overdeck/contracts';
 import { Effect, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { encodeClaudeProjectDir } from '../../../../lib/paths.js';
 import {
   getActivity,
   getAgentState,
@@ -18,18 +17,14 @@ import { parsePiConversationMessages } from '../../services/pi-conversation-pars
 import { parseOhmypiConversationMessages } from '../../services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from '../../services/codex-conversation-parser.js';
 import { parseAcpConversationMessages } from '../../services/acp-conversation-parser.js';
+import { sharedTranscriptParser } from '../../services/shared-transcript-parser.js';
 import {
-  readLauncherPinnedSessionId,
-  resolvePiSessionPath,
-  resolveCodexRolloutPath,
-  resolveAcpTranscriptPath,
-  resolveAgentHarness,
-} from '../jsonl-resolver.js';
+  listAgentTranscriptCandidates,
+} from '../../../../lib/agents/transcript-resolver.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import {
   execAsync,
-  getAgentJsonlPath,
   getAgentWorkspace,
 } from './shared.js';
 
@@ -103,45 +98,46 @@ export const getAgentOutputRoute = HttpRouter.add(
 
 const EMPTY_CONVERSATION: ConversationResponse = { messages: [], workLog: [], streaming: false, totalCost: 0, byteOffset: 0 };
 
+type AgentConversationResult =
+  | { status: 200; body: ConversationResponse }
+  | { status: 404; body: { error: string; checked: string[] } }
+  | { status: 500; body: { error: string } };
+
+async function pathExists(path: string): Promise<boolean> {
+  return access(path).then(() => true, () => false);
+}
+
+function missingTranscript(id: string, checked: string[]): AgentConversationResult {
+  return { status: 404, body: { error: `No transcript found for ${id}.`, checked } };
+}
+
 /**
  * Resolve and parse an agent's conversation JSONL file.
  * Exported for unit testing — the Effect route layer is not directly unit-testable.
  *
  * Dispatches on harness so Pi and Codex agents get their native parsers (PAN-2012).
- * For claude-code agents, tries the launcher-pinned --session-id first (the exact
- * session the Terminal tab attaches to) before falling back to mtime-based pick
- * (PAN-2011). This makes the Conversation tab match the Terminal tab by construction.
+ * Claude resolution follows the append-only session index, newest first.
  */
-export async function buildConversationResponse(id: string): Promise<ConversationResponse> {
+export async function buildAgentConversationResult(id: string): Promise<AgentConversationResult> {
   try {
-    const harness = await resolveAgentHarness(id);
-
-    if (harness === 'ohmypi') {
-      const sessionFile = await resolvePiSessionPath(id);
-      if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
-      const result = await parseOhmypiConversationMessages(sessionFile);
-      return { ...result, streaming: false };
+    const workspace = await Effect.runPromise(getAgentWorkspace(id));
+    const candidates = await listAgentTranscriptCandidates(id, workspace ?? '');
+    const checked = candidates.map(({ path }) => path);
+    let selected: (typeof candidates)[number] | null = null;
+    for (const candidate of candidates) {
+      if (await pathExists(candidate.path)) { selected = candidate; break; }
     }
+    if (!selected) return missingTranscript(id, checked);
 
-    if (harness === 'pi') {
-      const sessionFile = await resolvePiSessionPath(id);
-      if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
-      const result = await parsePiConversationMessages(sessionFile);
-      return { ...result, streaming: false };
-    }
+    const result = selected.kind === 'claude' ? await parseEntireConversation(selected.path)
+      : selected.kind === 'pi' ? await parsePiConversationMessages(selected.path)
+      : selected.kind === 'ohmypi' ? await parseOhmypiConversationMessages(selected.path)
+      : selected.kind === 'codex' ? await parseCodexConversationMessages(selected.path)
+      : selected.kind === 'acp' ? await parseAcpConversationMessages(selected.path)
+      : await sharedTranscriptParser(selected.kind)(selected.path);
 
-    if (harness === 'codex') {
-      const sessionFile = await resolveCodexRolloutPath(id);
-      if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
-      const result = await parseCodexConversationMessages(sessionFile);
-      return { ...result, streaming: false };
-    }
-
-    if (harness === 'acp' || harness === 'opencode') {
-      const sessionFile = await resolveAcpTranscriptPath(id);
-      if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
-      const result = await parseAcpConversationMessages(sessionFile);
-      return {
+    if (selected.kind === 'acp') {
+      return { status: 200, body: {
         ...result,
         messages: result.messages.map((message) => message.role === 'assistant'
           ? {
@@ -151,39 +147,19 @@ export async function buildConversationResponse(id: string): Promise<Conversatio
             }
           : message),
         streaming: false,
-      };
+      } };
     }
-
-    // claude-code (default): try launcher-pinned session ID first (ground truth),
-    // then fall back to mtime-based pick.
-    let jsonlPath: string | null = null;
-    const pinnedSessionId = await readLauncherPinnedSessionId(id);
-    if (pinnedSessionId) {
-      const workspace = await Effect.runPromise(getAgentWorkspace(id));
-      if (workspace) {
-        const candidate = join(
-          homedir(), '.claude', 'projects',
-          encodeClaudeProjectDir(workspace),
-          `${pinnedSessionId}.jsonl`,
-        );
-        if (existsSync(candidate)) jsonlPath = candidate;
-      }
-    }
-    if (!jsonlPath) {
-      jsonlPath = await Effect.runPromise(getAgentJsonlPath(id));
-    }
-
-    if (!jsonlPath || !existsSync(jsonlPath)) return EMPTY_CONVERSATION;
-    // parseEntireConversation, not parseConversationMessages: a single parse caps
-    // at MAX_READ_BYTES (10 MB) and would drop the most recent turns of a larger
-    // transcript (PAN-1989). This one-shot endpoint must return the whole file.
-    const result = await parseEntireConversation(jsonlPath);
-    // Force streaming: false — tmux session is dead, any "streaming" state is stale
-    return { ...result, streaming: false };
+    return { status: 200, body: { ...result, streaming: false } };
   } catch (err) {
     console.error('[conversation] failed for', id, err);
-    return EMPTY_CONVERSATION;
+    return { status: 500, body: { error: `Failed to load transcript for ${id}.` } };
   }
+}
+
+/** Compatibility helper retained for callers that only consume a transcript body. */
+export async function buildConversationResponse(id: string): Promise<ConversationResponse> {
+  const result = await buildAgentConversationResult(id);
+  return result.status === 200 ? result.body : EMPTY_CONVERSATION;
 }
 
 export const getAgentConversationRoute = HttpRouter.add(
@@ -192,7 +168,10 @@ export const getAgentConversationRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    return yield* Effect.promise(async () => jsonResponse(await buildConversationResponse(id)));
+    return yield* Effect.promise(async () => {
+      const result = await buildAgentConversationResult(id);
+      return jsonResponse(result.body, { status: result.status });
+    });
   })),
 );
 

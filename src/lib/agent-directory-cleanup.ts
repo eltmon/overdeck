@@ -3,7 +3,7 @@
  *
  * Valid directories (preserved):
  *   - agent-<issueId>    — work agents (always preserved)
- *   - planning-<issueId> — planning agents (only preserved while tmux session is running)
+ *   - planning-<issueId> — planning agents (always preserved)
  *   - conv-*             — conversation directories (ALWAYS preserved: ohmypi
  *                          conversations write their only transcript to
  *                          conv-<name>/sessions/*.jsonl via --session-dir, and
@@ -29,7 +29,7 @@ import { listSessionNames } from './tmux.js';
 import { parseIssueIdSync } from './issue-id.js';
 import { FsError } from './errors.js';
 import { getAgentStateSync } from './agents.js';
-import { removeAgentStateDir } from './agents/state-dir-removal.js';
+import { pruneAgentStateDir } from './agents/state-dir-removal.js';
 
 export const CLOSED_ISSUE_AGENT_DIR_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -54,14 +54,14 @@ export const CLOSED_ISSUE_AGENT_DIR_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
  *
  * Work-agent directories (agent-<issueId>) are always preserved, and so are
  * strike directories (strike-<issueId>) — strike sessions are registered in
- * the agents table and their state dir holds session.id/mail like any other
+ * the agents table and their state dir holds session history/mail like any other
  * agent. Reaping them orphans the DB row and drops the strike node from the
  * issue tree.
- * Planning-agent directories are handled separately — they are only valid
- * while their tmux session is running.
+ * Planning-agent directories are durable session history and are preserved
+ * after their terminal exits just like work and strike directories.
  */
 export function isValidAgentDirectoryName(name: string): boolean {
-  const match = name.match(/^(?:agent|strike)-(.+)$/);
+  const match = name.match(/^(?:agent|planning|strike)-(.+)$/);
   if (!match) return false;
 
   const suffix = match[1]!;
@@ -163,13 +163,6 @@ async function findOrphanedAgentDirsPromise(
     // conversations (sessions/*.jsonl, codex-home/sessions/). Never touch them.
     if (isConversationDirectory(name)) continue;
 
-    // Planning directories are valid only while their tmux session is running
-    const planningIssueId = getPlanningIssueId(name);
-    if (planningIssueId !== null) {
-      if (sessionSet.has(name)) continue; // running session — preserve
-      // No running session — orphaned
-    }
-
     const dirPath = join(agentsDir, name);
     orphaned.push({
       name,
@@ -226,7 +219,7 @@ async function cleanupAgentDirectoriesPromise(options: {
 
   for (const dir of removable) {
     try {
-      await removeAgentStateDir(dir.path, agentsDir);
+      await pruneAgentStateDir(dir.path, agentsDir);
       result.removed.push(dir.name);
     } catch {
       // Non-fatal — directory may have already been removed or permissions changed.
@@ -428,7 +421,7 @@ async function cleanupClosedIssueAgentDirectoriesPromise(options: {
 
   for (const dir of removable) {
     try {
-      await removeAgentStateDir(dir.path, agentsDir);
+      await pruneAgentStateDir(dir.path, agentsDir);
       result.removed.push(dir.name);
     } catch {
       // Non-fatal — directory may have already been removed or permissions changed.

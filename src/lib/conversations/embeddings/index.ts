@@ -199,7 +199,8 @@ export async function embedSessions(opts: EmbedSessionsOptions = {}): Promise<Em
         apiKey: provider === 'ollama' ? undefined : config.apiKeys?.[provider],
       }));
 
-      insertEmbedding(session.id, model, embedResult.embedding);
+      const { id: sessionId } = session;
+      insertEmbedding(sessionId, model, embedResult.embedding);
       embedTokens += embedResult.tokenCount ?? 0;
       result.embedded++;
       emitProgress(true);

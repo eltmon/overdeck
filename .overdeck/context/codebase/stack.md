@@ -31,9 +31,7 @@
   harnesses: claude-code, ohmypi, codex, acp, kimi-code, opencode (via ACP),
   and muse, with persistent transports.
 - **Issue tracking:** GitHub Issues (`PAN-<n>` = `#<n>` on eltmon/overdeck);
-  xBRIEF v0.8 specs and task state live under `.pan/` in the project repo
-  (drafts, specs, continues) and are exposed through `pan task`. The archived
-  `overdeck-state` branch is retired — never write to it.
+  xBRIEF v0.8 specs and task state live under `.pan/` in the project repo and are exposed through `pan task`.
 - **Config:** YAML at `~/.overdeck/` (settings, projects.yaml), normalized by
   `src/lib/config-yaml.ts`; Mintlify docs in `configuration/*.mdx` +
   `reference/*.mdx`.

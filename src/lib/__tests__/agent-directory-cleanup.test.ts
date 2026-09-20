@@ -58,9 +58,9 @@ describe('isValidAgentDirectoryName', () => {
     expect(isValidAgentDirectoryName('agent-us12345')).toBe(true);
   });
 
-  it('rejects planning directories (handled separately)', () => {
-    expect(isValidAgentDirectoryName('planning-pan-801')).toBe(false);
-    expect(isValidAgentDirectoryName('planning-min-5')).toBe(false);
+  it('accepts durable planning directories', () => {
+    expect(isValidAgentDirectoryName('planning-pan-801')).toBe(true);
+    expect(isValidAgentDirectoryName('planning-min-5')).toBe(true);
   });
 
   it('rejects bare numeric agent directories', () => {
@@ -214,7 +214,7 @@ describe('findOrphanedAgentDirs', () => {
     expect(result.every((d) => !d.hasRunningSession)).toBe(true);
   });
 
-  it('treats stale planning directories (no running session) as orphaned', async () => {
+  it('preserves ended planning directories as durable history', async () => {
     vi.mocked(listSessionNames).mockReturnValue(Effect.succeed([]));
 
     mkdirSync(join(TEST_DIR, 'agent-pan-801'), { recursive: true });
@@ -224,10 +224,10 @@ describe('findOrphanedAgentDirs', () => {
     const result = await Effect.runPromise(findOrphanedAgentDirs(TEST_DIR));
     const names = result.map((d) => d.name).sort();
 
-    expect(names).toEqual(['planning-min-787', 'planning-pan-569']);
+    expect(names).toEqual([]);
   });
 
-  it('preserves planning directories with running tmux sessions', async () => {
+  it('preserves every planning directory regardless of terminal liveness', async () => {
     vi.mocked(listSessionNames).mockReturnValue(Effect.succeed(['planning-pan-817']));
 
     mkdirSync(join(TEST_DIR, 'planning-pan-817'), { recursive: true });
@@ -236,8 +236,7 @@ describe('findOrphanedAgentDirs', () => {
     const result = await Effect.runPromise(findOrphanedAgentDirs(TEST_DIR));
     const names = result.map((d) => d.name).sort();
 
-    expect(names).toEqual(['planning-pan-569']);
-    expect(result[0].hasRunningSession).toBe(false);
+    expect(names).toEqual([]);
   });
 
   it('marks running legacy sessions as protected', async () => {
@@ -280,9 +279,9 @@ describe('cleanupAgentDirectories', () => {
       agentsDir: TEST_DIR,
     }));
 
-    expect(result.totalOrphaned).toBe(2);
+    expect(result.totalOrphaned).toBe(1);
     expect(result.wouldRemove).toContain('agent-108');
-    expect(result.wouldRemove).toContain('planning-pan-569');
+    expect(result.wouldRemove).not.toContain('planning-pan-569');
     expect(result.wouldRemove).not.toContain('conv-20260411-1125');
     expect(result.removed).toEqual([]);
     expect(result.protected).toEqual([]);
@@ -294,7 +293,7 @@ describe('cleanupAgentDirectories', () => {
     expect(existsSync(join(TEST_DIR, 'agent-pan-801'))).toBe(true);
   });
 
-  it('removes orphaned directories in non-dry-run mode', async () => {
+  it('prunes orphaned directories without deleting durable directories', async () => {
     vi.mocked(listSessionNames).mockReturnValue(Effect.succeed([]));
 
     mkdirSync(join(TEST_DIR, 'agent-pan-801'), { recursive: true });
@@ -308,16 +307,16 @@ describe('cleanupAgentDirectories', () => {
       agentsDir: TEST_DIR,
     }));
 
-    expect(result.totalOrphaned).toBe(2);
+    expect(result.totalOrphaned).toBe(1);
     expect(result.removed).toContain('agent-108');
-    expect(result.removed).toContain('planning-pan-569');
+    expect(result.removed).not.toContain('planning-pan-569');
     expect(result.removed).not.toContain('conv-20260411-1125');
     expect(result.wouldRemove).toEqual([]);
     expect(result.protected).toEqual([]);
 
-    // Verify deletion — conv-* dirs survive (transcript storage, never removed)
-    expect(existsSync(join(TEST_DIR, 'agent-108'))).toBe(false);
-    expect(existsSync(join(TEST_DIR, 'planning-pan-569'))).toBe(false);
+    // Cleanup prunes regenerable contents; retention exclusively owns deletion.
+    expect(existsSync(join(TEST_DIR, 'agent-108'))).toBe(true);
+    expect(existsSync(join(TEST_DIR, 'planning-pan-569'))).toBe(true);
     expect(existsSync(join(TEST_DIR, 'conv-20260411-1125'))).toBe(true);
     expect(existsSync(join(TEST_DIR, 'agent-pan-801'))).toBe(true);
   });
@@ -340,7 +339,7 @@ describe('cleanupAgentDirectories', () => {
     expect(existsSync(join(TEST_DIR, 'agent-min-215'))).toBe(true);
   });
 
-  it('protects running planning sessions and never counts conv dirs as orphaned', async () => {
+  it('treats all planning and conversation directories as durable', async () => {
     vi.mocked(listSessionNames).mockReturnValue(Effect.succeed([
       'planning-pan-817',
       'conv-20260425-025517-630',
@@ -356,13 +355,13 @@ describe('cleanupAgentDirectories', () => {
       agentsDir: TEST_DIR,
     }));
 
-    expect(result.totalOrphaned).toBe(1);
+    expect(result.totalOrphaned).toBe(0);
     expect(result.protected).not.toContain('conv-20260425-025517-630');
-    expect(result.removed).toContain('planning-pan-569');
+    expect(result.removed).toEqual([]);
 
     expect(existsSync(join(TEST_DIR, 'planning-pan-817'))).toBe(true);
     expect(existsSync(join(TEST_DIR, 'conv-20260425-025517-630'))).toBe(true);
-    expect(existsSync(join(TEST_DIR, 'planning-pan-569'))).toBe(false);
+    expect(existsSync(join(TEST_DIR, 'planning-pan-569'))).toBe(true);
   });
 
   it('handles empty agents directory', async () => {
@@ -414,7 +413,7 @@ describe('closed issue agent directory cleanup', () => {
     expect(result).toEqual([]);
   });
 
-  it('removes old closed-issue agent directories during cleanup', async () => {
+  it('prunes old closed-issue agent directories without deleting durable state', async () => {
     vi.mocked(listSessionNames).mockReturnValue(Effect.succeed([]));
     mkdirSync(join(TEST_DIR, 'agent-pan-1190-review'), { recursive: true });
 
@@ -426,7 +425,7 @@ describe('closed issue agent directory cleanup', () => {
     }));
 
     expect(result.removed).toEqual(['agent-pan-1190-review']);
-    expect(existsSync(join(TEST_DIR, 'agent-pan-1190-review'))).toBe(false);
+    expect(existsSync(join(TEST_DIR, 'agent-pan-1190-review'))).toBe(true);
   });
 
   it('protects directories that contain JSONL session files', async () => {

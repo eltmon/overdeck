@@ -10,6 +10,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { Effect } from 'effect';
+import { appendSessionIdToHistory } from '../../session-history.js';
 
 const mocks = vi.hoisted(() => ({
   assertWorkspaceStackHealthyForSpawn: vi.fn(async () => undefined),
@@ -89,6 +90,7 @@ import { saveAgentStateSync, getAgentDir } from '../agent-state.js';
 import { sessionFilePath } from '../../paths.js';
 
 let tempHome: string;
+let prevHome: string | undefined;
 let prevOverdeckHome: string | undefined;
 let workspace: string;
 
@@ -105,16 +107,19 @@ beforeEach(() => {
   mocks.killSession.mockReturnValue(Effect.succeed(undefined));
 
   tempHome = mkdtempSync(join(tmpdir(), 'pan-resume-kimi-test-'));
+  prevHome = process.env.HOME;
   prevOverdeckHome = process.env.OVERDECK_HOME;
+  process.env.HOME = tempHome;
   process.env.OVERDECK_HOME = tempHome;
   workspace = mkdtempSync(join(tmpdir(), 'pan-resume-kimi-workspace-'));
 });
 
 afterEach(() => {
+  if (prevHome === undefined) delete process.env.HOME;
+  else process.env.HOME = prevHome;
   if (prevOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
   else process.env.OVERDECK_HOME = prevOverdeckHome;
   rmSync(tempHome, { recursive: true, force: true });
-  rmSync(dirname(sessionFilePath(workspace, 'cleanup')), { recursive: true, force: true });
   rmSync(workspace, { recursive: true, force: true });
 });
 
@@ -124,7 +129,7 @@ describe('resumeAgent — Claude resume-summary gate (PAN-3636)', () => {
     mkdirSync(dirname(transcriptPath), { recursive: true });
     writeFileSync(transcriptPath, '{"type":"summary","summary":"prior work"}\n');
     mkdirSync(getAgentDir(agentId), { recursive: true });
-    writeFileSync(join(getAgentDir(agentId), 'session.id'), `${sessionId}\n`);
+    appendSessionIdToHistory(agentId, sessionId, 'launcher');
     saveAgentStateSync({
       id: agentId,
       issueId: 'PAN-3411',

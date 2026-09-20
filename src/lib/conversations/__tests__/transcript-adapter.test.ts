@@ -28,9 +28,16 @@ vi.mock('../smart-compaction.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../../../dashboard/server/routes/jsonl-resolver.js', () => ({
-  resolveCodexRolloutPath: vi.fn(),
-}));
+// Only Codex resolution is mocked (existing tests drive it directly); Pi, ACP,
+// and Kimi resolution goes through the real resolver so the adapter and a
+// direct resolver call can be compared against the same on-disk fixtures.
+vi.mock('../../agents/transcript-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../agents/transcript-resolver.js')>();
+  return {
+    ...actual,
+    resolveCodexRolloutPath: vi.fn(),
+  };
+});
 
 import {
   generateSmartSummary as mockedGenerateSmartSummary,
@@ -38,7 +45,12 @@ import {
 } from '../smart-compaction.js';
 import { getTranscriptAdapter } from '../transcript-adapter.js';
 import { kimiSessionsRoot } from '../../runtimes/kimi-code.js';
-import { resolveCodexRolloutPath } from '../../../dashboard/server/routes/jsonl-resolver.js';
+import {
+  resolveAcpTranscriptPath,
+  resolveCodexRolloutPath,
+  resolveKimiWirePath,
+  resolvePiSessionPath,
+} from '../../agents/transcript-resolver.js';
 
 const originalOverdeckHome = process.env.OVERDECK_HOME;
 const originalHome = process.env.HOME;
@@ -124,6 +136,70 @@ describe('ConversationTranscriptAdapter.compactSummary', () => {
 
     await expect(adapter.resolveSessionFile(conv)).resolves.toBe(rolloutPath);
     expect(resolveCodexRolloutPath).toHaveBeenCalledWith('conv-codex-source');
+  });
+
+  it('resolves a nested Pi transcript written under an encoded-cwd subdirectory (PAN-3950 W8)', async () => {
+    const tmuxSession = 'conv-pi-nested';
+    const nestedDir = join(workDir, 'agents', tmuxSession, 'sessions', '-home-eltmon-workspace');
+    await mkdir(nestedDir, { recursive: true });
+    const file = join(nestedDir, '2026-09-20T00-00-00_abc123.jsonl');
+    await writeFile(file, `${JSON.stringify({ type: 'session', id: 'abc123' })}\n`);
+
+    const adapter = getTranscriptAdapter('ohmypi');
+    const conv = { tmuxSession } as Parameters<typeof adapter.resolveSessionFile>[0];
+
+    await expect(adapter.resolveSessionFile(conv)).resolves.toBe(file);
+  });
+
+  it('pi, acp, and kimi adapters resolve exactly what the shared resolver returns (PAN-3950 W8)', async () => {
+    const piTmux = 'conv-pi-parity';
+    const piDir = join(workDir, 'agents', piTmux, 'sessions');
+    await mkdir(piDir, { recursive: true });
+    const piFile = join(piDir, '2026-09-20T00-00-01_parity.jsonl');
+    await writeFile(piFile, `${JSON.stringify({ type: 'session', id: 'parity' })}\n`);
+
+    const acpTmux = 'conv-acp-parity';
+    const acpAgentDir = join(workDir, 'agents', acpTmux);
+    await mkdir(acpAgentDir, { recursive: true });
+    const acpFile = join(acpAgentDir, 'acp-session.jsonl');
+    await writeFile(acpFile, `${JSON.stringify({ role: 'user', content: 'hi' })}\n`);
+
+    process.env.HOME = workDir;
+    const kimiTmux = 'conv-kimi-parity';
+    const kimiWorkspace = join(workDir, 'kimi-parity-workspace');
+    await mkdir(kimiWorkspace, { recursive: true });
+    const kimiHome = join(workDir, '.kimi-code');
+    const kimiSessionDir = join(kimiSessionsRoot(kimiHome, kimiWorkspace), 'session-parity', 'agents', 'main');
+    await mkdir(kimiSessionDir, { recursive: true });
+    const kimiFile = join(kimiSessionDir, 'wire.jsonl');
+    await writeFile(kimiFile, `${JSON.stringify({ type: 'metadata', created_at: 1 })}\n`);
+
+    const piAdapterInstance = getTranscriptAdapter('ohmypi');
+    const acpAdapterInstance = getTranscriptAdapter('acp');
+    const kimiAdapterInstance = getTranscriptAdapter('kimi-code');
+    const piConv = { tmuxSession: piTmux } as Parameters<typeof piAdapterInstance.resolveSessionFile>[0];
+    const acpConv = { tmuxSession: acpTmux } as Parameters<typeof acpAdapterInstance.resolveSessionFile>[0];
+    const kimiConv = { tmuxSession: kimiTmux, cwd: kimiWorkspace } as Parameters<typeof kimiAdapterInstance.resolveSessionFile>[0];
+
+    const [piAdapterResult, piResolverResult] = await Promise.all([
+      piAdapterInstance.resolveSessionFile(piConv),
+      resolvePiSessionPath(piTmux),
+    ]);
+    const [acpAdapterResult, acpResolverResult] = await Promise.all([
+      acpAdapterInstance.resolveSessionFile(acpConv),
+      resolveAcpTranscriptPath(acpTmux),
+    ]);
+    const [kimiAdapterResult, kimiResolverResult] = await Promise.all([
+      kimiAdapterInstance.resolveSessionFile(kimiConv),
+      resolveKimiWirePath(kimiTmux, { workspaceOverride: kimiWorkspace }),
+    ]);
+
+    expect(piAdapterResult).toBe(piResolverResult);
+    expect(piAdapterResult).toBe(piFile);
+    expect(acpAdapterResult).toBe(acpResolverResult);
+    expect(acpAdapterResult).toBe(acpFile);
+    expect(kimiAdapterResult).toBe(kimiResolverResult);
+    expect(kimiAdapterResult).toBe(kimiFile);
   });
 
   it('produces a non-empty summary from a Pi source transcript', async () => {

@@ -6,8 +6,8 @@
  * Forked from @overdeck/pi-extension (PAN-636, PAN-1134).
  */
 
-import { watch, type FSWatcher } from 'node:fs'
-import { appendFile, mkdir, open, readdir, readFile, rename, stat, unlink, writeFile } from 'node:fs/promises'
+import { appendFileSync, watch, type FSWatcher } from 'node:fs'
+import { appendFile, mkdir, open, readdir, readFile, rename, rm, stat, unlink, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { matchSpecialistCompletion, normalizeSpecialistCompletionName } from './specialist-completion-patterns.js'
@@ -106,6 +106,7 @@ export async function setThinkingLevelIfSupported(runtime: unknown, level: Think
 export interface SessionStartEvent {
   reason?: string
   sessionId?: string
+  model?: string
 }
 
 export interface UsageLike {
@@ -154,7 +155,7 @@ export interface OverdeckPaths {
   readyPath: string
   completedPath: string
   heartbeatPath: string
-  sessionIdPath: string
+  sessionsIndexPath: string
   pendingEventsPath: string
   costEventsPath: string
   progressStatePath: string
@@ -170,7 +171,7 @@ export function overdeckPathsFor(agentId: string, home: string = homedir()): Ove
     readyPath: join(agentDir, 'ready.json'),
     completedPath: join(agentDir, 'completed'),
     heartbeatPath: join(heartbeatsDir, `${agentId}.json`),
-    sessionIdPath: join(agentDir, 'session.id'),
+    sessionsIndexPath: join(agentDir, 'sessions.json'),
     pendingEventsPath: join(agentDir, 'pending-events.jsonl'),
     costEventsPath: join(agentDir, 'cost-events.jsonl'),
     progressStatePath: join(agentDir, 'pi-progress.json'),
@@ -396,11 +397,38 @@ async function workspaceFor(env: HookEnv): Promise<string | null> {
 async function sessionIdFor(env: HookEnv): Promise<string | null> {
   const { paths } = envFor(env)
   try {
-    const sessionId = (await readFile(paths.sessionIdPath, 'utf8')).trim()
-    return sessionId.length > 0 ? sessionId : null
+    const contents = await readFile(paths.sessionsIndexPath, 'utf8')
+    const trimmed = contents.trimStart()
+    const values: unknown[] = []
+    let lines = contents
+    if (trimmed.startsWith('[')) {
+      const end = trimmed.lastIndexOf(']')
+      if (end < 0) return null
+      const legacy: unknown = JSON.parse(trimmed.slice(0, end + 1))
+      if (Array.isArray(legacy)) values.push(...legacy)
+      lines = trimmed.slice(end + 1)
+    }
+    for (const line of lines.split(/\r?\n/)) {
+      try { if (line.trim()) values.push(JSON.parse(line)) } catch { /* skip malformed lines */ }
+    }
+    const ids = new Map<string, string>()
+    for (const value of values) {
+      const id = typeof value === 'string' ? value : (value as { sessionId?: unknown } | null)?.sessionId
+      if (typeof id === 'string' && id.trim()) {
+        ids.delete(id.trim())
+        ids.set(id.trim(), id.trim())
+      }
+    }
+    return [...ids.values()].at(-1) ?? null
   } catch {
     return null
   }
+}
+
+async function appendSessionIndexEntry(path: string, sessionId: string, at: string, model: string): Promise<void> {
+  const line = `${JSON.stringify({ sessionId, at, source: 'session-start', harness: 'ohmypi', model })}\n`
+  if (Buffer.byteLength(line) > 4096) throw new Error('sessions.json entry exceeds PIPE_BUF')
+  appendFileSync(path, line, { flag: 'a' })
 }
 
 function roleFor(env: HookEnv): string {
@@ -583,7 +611,9 @@ export async function handleSessionStart(env: HookEnv, event: SessionStartEvent)
     pid: env.pid ?? process.pid,
   })
   if (event.sessionId) {
-    await writeFile(paths.sessionIdPath, `${event.sessionId}\n`, 'utf8')
+    const state = await readAgentState(env)
+    const model = event.model ?? (typeof state['model'] === 'string' ? state['model'] : 'unknown')
+    await appendSessionIndexEntry(paths.sessionsIndexPath, event.sessionId, ts, model)
   }
   await postEvent(env, { kind: 'model_set', model: 'pi', claudeSessionId: event.sessionId ?? undefined, timestamp: ts })
   await postEvent(env, { kind: 'activity', activity: 'idle', timestamp: ts })

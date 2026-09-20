@@ -12,7 +12,6 @@
  */
 
 import { readFile } from 'node:fs/promises';
-import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
@@ -22,11 +21,11 @@ import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 
 import type { RuntimeName } from '../runtimes/types.js';
-import { getOverdeckHome } from '../paths.js';
 import { Db, EventBus, getOverdeckDatabaseSync } from './infra.js';
 import { resolveWorkspaceForCwd } from '../workspaces/resolver.js';
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import { ensureDiscoveredSessionsSchema } from './discovered-sessions.js';
+import { readLatestIndexedSessionIdSync } from '../session-history.js';
 
 // ── Local Drizzle table definitions ──────────────────────────────────────────
 // Mirror locked schema (docs/overdeck-remodel/overdeck-schema.ts:97-163).
@@ -840,10 +839,9 @@ export function isAgentConversationName(name: string): boolean {
  *
  * Work-agent / specialist conversations rotate Claude sessions, but the DB only records the
  * FIRST session (the oldest conversation_files locator), so the stored id is stale by
- * construction. The agent folder's session.id is the authoritative live session — it is what
- * `claude --resume` actually runs. So for agent conversations resolve from the filesystem
- * (session.id, then sessions.json), falling back to the DB value; for human conversation-panel
- * sessions the DB value is canonical. Applied at the read door (rowToLegacyConversation) so the
+ * construction. The agent folder's append-only session index is authoritative.
+ * For agent conversations resolve its newest entry, falling back to the DB value;
+ * for human conversation-panel sessions the DB value is canonical. Applied at the read door so the
  * CLI, panel, teardown, and frontend all observe the same id.
  *
  * Read inline (not via lib/agents.ts) to avoid the agents <-> conversations import cycle.
@@ -854,19 +852,7 @@ export function resolveLiveSessionId(conv: {
   claudeSessionId: string | null;
 }): string | null {
   if (!isAgentConversationName(conv.name)) return conv.claudeSessionId;
-  const agentDir = join(getOverdeckHome(), 'agents', conv.tmuxSession);
-  try {
-    const sid = readFileSync(join(agentDir, 'session.id'), 'utf8').trim();
-    if (sid) return sid;
-  } catch { /* no session.id yet */ }
-  try {
-    const arr: unknown = JSON.parse(readFileSync(join(agentDir, 'sessions.json'), 'utf8'));
-    if (Array.isArray(arr) && arr.length > 0) {
-      const last = arr[arr.length - 1];
-      if (typeof last === 'string' && last.trim()) return last.trim();
-    }
-  } catch { /* no/invalid sessions.json */ }
-  return conv.claudeSessionId;
+  return readLatestIndexedSessionIdSync(conv.tmuxSession) ?? conv.claudeSessionId;
 }
 
 function overdeckDb() {

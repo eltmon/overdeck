@@ -92,7 +92,7 @@ describe('reapIssueResidue', () => {
 
     expect(actions.length).toBeGreaterThan(0);
     expect(existsSync(workspacePath)).toBe(false);
-    expect(existsSync(agentDir)).toBe(false);
+    expect(existsSync(agentDir)).toBe(true);
     expect(mocks.exec.mock.calls.some((call) => String(call[0]) === 'git branch -D "feature/pan-2054"')).toBe(true);
     expect(mocks.exec.mock.calls.some((call) => String(call[0]) === 'git push origin --delete "feature/pan-2054"')).toBe(true);
     expect(mocks.killSession).toHaveBeenCalledTimes(4);
@@ -108,8 +108,8 @@ describe('reapIssueResidue', () => {
     const actions = await reapIssueResidue(projectPath, 'PAN-2054');
 
     expect(existsSync(transcriptPath)).toBe(true);
-    expect(existsSync(join(agentDir, 'state.json'))).toBe(false);
-    expect(actions).toContain('cleaned agent state agent-pan-2054 (1 transcript file preserved)');
+    expect(existsSync(join(agentDir, 'state.json'))).toBe(true);
+    expect(actions).toContain('pruned agent state agent-pan-2054 (0 regenerable entries removed)');
   });
 
   it('skips disk cleanup when the feature branch is unmerged', async () => {

@@ -33,18 +33,13 @@
 - Inline SVG icons use `currentColor` + a color map (see
   `components/chat/ProviderIcons.tsx` for the existing pattern).
 
-## Planning artifacts (xBRIEF v0.8, PAN-1124)
-- PRD drafts: `.pan/drafts/<issue-lowercase>.md` in the project repo (or the
-  configured plan-home repo for polyrepo projects), committed on the feature
-  branch (human-mutable narrative).
-- Spec: `.pan/specs/<date>-<ISSUE>-<slug>.xbrief.json` on `main` — immutable
-  after planning except `plan.status`.
-- Project continue state: `.pan/continues/<issue-lowercase>.xbrief.json`, written by `pan task`.
-- Workspace continue state: `<workspace>/.overdeck/continue.json` (gitignored,
-  mirrored to the project continue state at finalize).
-- `pan plan finalize` promotes the workspace draft/spec through the write door;
-  the legacy `overdeck-state` branch and `${OVERDECK_HOME}/state/` layout are
-  retired — do not write there.
+## Planning artifacts (xBRIEF v0.8, PAN-1124; relocated under `.pan/` by PAN-3917)
+- PRD drafts: `<planHome>/.pan/drafts/<issue>.md` (human-mutable narrative), committed on the feature branch.
+- Spec: `<planHome>/.pan/specs/<date>-<ISSUE>-<slug>.xbrief.json` — immutable after planning except `plan.status`.
+- Project continue state: `<planHome>/.pan/continues/<issue>.xbrief.json` (written by `pan task`).
+- Workspace continue state: `<workspace>/.overdeck/continue.json` (gitignored); item status changes go to its `statusOverrides`, never the spec.
+- Legacy `${OVERDECK_HOME}/state/<project>/…` and the `overdeck-state` branch are retired (branch archived, never delete it).
+- Agent transcripts: `sessions.json` under `~/.overdeck/agents/<id>/` is the append-only session index; `session.id` is gone (PAN-3950). One async resolver, `src/lib/agents/transcript-resolver.ts`, interprets agent directories; per-harness path formulas live only in `src/lib/runtimes/*`.
 
 ## Testing
 - Vitest, unit tests under `tests/unit/**` mirroring `src/`, plus co-located
