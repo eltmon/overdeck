@@ -669,8 +669,11 @@ describe('resolveJsonlPath / resolvePiSessionPath — pi agents (PAN-1908)', () 
     const agentDir = await setupPiAgent();
     const sessionsDir = join(agentDir, 'sessions');
     await mkdir(sessionsDir, { recursive: true });
-    const alpha = join(sessionsDir, 'a.jsonl');
+    // Split across directories so walk order (sessions/ first, root second)
+    // differs from path order — otherwise a stable sort over tied mtimes
+    // would happen to return the right answer even without the tie-break.
     const zulu = join(sessionsDir, 'z.jsonl');
+    const alpha = join(agentDir, 'a.jsonl');
     await writeFile(zulu, '{"type":"session"}\n');
     await writeFile(alpha, '{"type":"session"}\n');
     const tied = new Date('2026-09-20T00:00:00.000Z');
