@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3959",
   "created": "2026-09-20T22:53:20.505Z",
-  "updated": "2026-09-20T23:14:34.108Z",
+  "updated": "2026-09-20T23:20:17.873Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-09-20T23:14:28.153Z"
     },
     "w4-codex-writers-record-path": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3959",
-      "claimedAt": "2026-09-20T23:14:34.108Z"
+      "claimedAt": "2026-09-20T23:14:34.108Z",
+      "doneAt": "2026-09-20T23:20:17.873Z"
     }
   }
 }
