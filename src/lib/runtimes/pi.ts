@@ -24,6 +24,7 @@
  */
 
 import { existsSync, readFileSync, readdirSync, statSync, mkdirSync, writeFileSync, chmodSync, unlinkSync } from 'node:fs'
+import { readdir as readdirAsync, stat as statAsync } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { promisify } from 'node:util'
@@ -50,6 +51,7 @@ import { generateLauncherScriptSync } from '../launcher-generator.js'
 import { createPiFifo, destroyPiFifoSync, writePiCommandSync, piFifoPaths, PiNotReady } from './pi-fifo.js'
 import { ProcessSpawnError, ProcessTimeoutError, TmuxError } from '../errors.js'
 import { getOverdeckHome } from '../paths.js'
+import { readLatestIndexedSessionIdSync } from '../session-history.js'
 
 const execAsync = promisify(exec)
 
@@ -93,35 +95,63 @@ function piSessionDirFor(agentId: string): string {
   return join(agentDirFor(agentId), 'sessions')
 }
 
+export function piSessionsRoot(agentDir: string): string {
+  return join(agentDir, 'sessions')
+}
+
+const NON_TRANSCRIPT_JSONL = new Set([
+  'acp-session.jsonl',
+  'cost-events.jsonl',
+  'activity.jsonl',
+  'pending-events.jsonl',
+])
+
+/** Resolve a Pi/oh-my-pi transcript from the runtime-owned session layout. */
+export async function findPiTranscriptPath(
+  agentDir: string,
+  sessionId?: string,
+): Promise<string | null> {
+  const files: string[] = []
+  const walk = async (dir: string): Promise<void> => {
+    const entries = await readdirAsync(dir, { withFileTypes: true }).catch(() => [])
+    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      const path = join(dir, entry.name)
+      if (entry.isDirectory()) await walk(path)
+      else if (entry.isFile() && entry.name.endsWith('.jsonl')) files.push(path)
+    }
+  }
+  await walk(piSessionsRoot(agentDir))
+  const rootEntries = await readdirAsync(agentDir, { withFileTypes: true }).catch(() => [])
+  for (const entry of rootEntries.sort((a, b) => a.name.localeCompare(b.name))) {
+    if (entry.isFile() && entry.name.endsWith('.jsonl') && !NON_TRANSCRIPT_JSONL.has(entry.name)) {
+      files.push(join(agentDir, entry.name))
+    }
+  }
+  if (sessionId) {
+    return files.find((path) => path.endsWith(`_${sessionId}.jsonl`) || path.endsWith(`/${sessionId}.jsonl`)) ?? null
+  }
+  const withMtime = await Promise.all(files.map(async path => ({
+    path,
+    mtime: await statAsync(path).then(info => info.mtimeMs, () => -1),
+  })))
+  return withMtime.sort((a, b) => b.mtime - a.mtime || a.path.localeCompare(b.path))[0]?.path ?? null
+}
+
 function readyPathFor(agentId: string): string {
   return piFifoPaths(agentId).readyPath
 }
 
-function sessionIdPathFor(agentId: string): string {
-  return join(agentDirFor(agentId), 'session.id')
-}
-
 /**
  * Read the persisted Pi session id for resume (PAN-636 workspace-3119).
- * Returns null when the file is absent (fresh agent or post-deep-wipe) or
- * unreadable. The pi-extension writes this file on every session_start with
- * a non-null sessionId; killAgent intentionally preserves it so the next
- * spawn can resume.
+ * The extension appends every observed id to the shared session index.
  */
 function readStoredSessionId(agentId: string): string | null {
-  const path = sessionIdPathFor(agentId)
-  if (!existsSync(path)) return null
-  try {
-    const raw = readFileSync(path, 'utf8').trim()
-    return raw || null
-  } catch {
-    return null
-  }
+  return readLatestIndexedSessionIdSync(agentId)
 }
 
 /**
- * PAN-1988: resolve the REAL pi session id from the freshest session JSONL. The `session.id` file
- * holds a spawn-time placeholder for non-claude harnesses (or can be missing), so resuming from it
+ * PAN-1988: resolve the REAL pi session id from the freshest session JSONL. The session index
+ * can hold a spawn-time placeholder for non-claude harnesses, so resuming from it
  * makes pi drift into a fresh session and lose conversation history — the same bug fixed for codex's
  * rollout. The session JSONL always carries the real id (`parsed.sessionId`). Returns null when
  * there is no prior session on disk. Picks the freshest by mtime, tolerating nested cwd subdirs.
@@ -353,11 +383,11 @@ export class PiRuntimeSync {
     const promptFile = config.prompt ? writeAgentPromptFile(agentId, config.prompt) : undefined
 
     // Resume into the previously-recorded Pi session if one exists (AC2).
-    // AC3: when session.id is missing AFTER a prior spawn (sessions/*.jsonl
+    // AC3: when the session index is missing AFTER a prior spawn (sessions/*.jsonl
     // present) we fall back to a fresh session and warn so the dashboard
     // can surface the divergence. On a first-ever spawn — sessions/ is
     // empty — we stay silent.
-    // PAN-1988: resume from the stored `session.id` when present, else recover the REAL session id
+    // PAN-1988: resume from the stored session index when present, else recover the REAL session id
     // from the freshest session JSONL rather than spawning fresh and losing history (the old AC3
     // behavior threw the session away whenever the stored id was a spawn-time placeholder or
     // missing). Only when neither yields an id do we start fresh.

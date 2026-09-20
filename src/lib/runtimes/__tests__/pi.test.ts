@@ -207,9 +207,8 @@ vi.mock('child_process', async () => {
 })
 
 // ── PiRuntime resume behavior (PAN-636 workspace-3119) ──────────────────────
-// The pi/ohmypi-extension persists ~/.overdeck/agents/<id>/session.id on every
-// session_start with a non-null sessionId; PiRuntime.spawnAgent reads that
-// file and forwards it as `omp --resume <id>` so the next spawn lands in the
+// The pi/ohmypi-extension appends each non-null id to sessions.json;
+// PiRuntime.spawnAgent reads the newest entry and forwards it as `omp --resume <id>` so the next spawn lands in the
 // same session. We mock tmux out so we can drive spawnAgent end-to-end
 // without a real shell process.
 vi.mock('../../tmux.js', async () => {
@@ -222,7 +221,7 @@ vi.mock('../../tmux.js', async () => {
   }
 })
 
-describe('PiRuntime.spawnAgent resume via session.id (PAN-636 workspace-3119)', () => {
+describe('PiRuntime.spawnAgent resume via sessions.json (PAN-636 workspace-3119)', () => {
   let h: ReturnType<typeof withFakeHome>
   let warnSpy: ReturnType<typeof vi.spyOn>
   beforeEach(() => {
@@ -242,13 +241,14 @@ describe('PiRuntime.spawnAgent resume via session.id (PAN-636 workspace-3119)', 
     writeFileSync(join(dir, 'ready.json'), JSON.stringify({ sessionId: 'irrelevant' }))
   }
 
-  it('AC2: re-spawning after a kill emits `omp --resume <id>` when session.id is present', async () => {
+  it('AC2: re-spawning after a kill emits `omp --resume <id>` when the index is present', async () => {
     const agentId = 'agent-resume-1'
     const dir = join(h.home, '.overdeck', 'agents', agentId)
     const sessionsDir = join(dir, 'sessions')
     mkdirSync(sessionsDir, { recursive: true })
-    // Simulate a prior spawn that already wrote session.id and one .jsonl
-    writeFileSync(join(dir, 'session.id'), 'sess-stored-7777\n')
+    writeFileSync(join(dir, 'sessions.json'), JSON.stringify([
+      { sessionId: 'sess-stored-7777', at: '2026-09-20T00:00:00.000Z', source: 'session-start' },
+    ]))
     writeFileSync(join(sessionsDir, '01a-session.jsonl'), '{"type":"session"}\n')
     preCreateReady(agentId)
 
@@ -264,14 +264,14 @@ describe('PiRuntime.spawnAgent resume via session.id (PAN-636 workspace-3119)', 
     expect(launcher).toMatch(/--resume\s+'?sess-stored-7777'?/)
   })
 
-  it('AC3: goes fresh and warns only when NEITHER session.id NOR a parseable session id exists', async () => {
+  it('AC3: goes fresh and warns only when neither index nor a parseable session id exists', async () => {
     const agentId = 'agent-resume-2'
     const dir = join(h.home, '.overdeck', 'agents', agentId)
     const sessionsDir = join(dir, 'sessions')
     mkdirSync(sessionsDir, { recursive: true })
     // A session-root line with NO id — unparseable, so there is genuinely nothing to resume.
     writeFileSync(join(sessionsDir, '01a-session.jsonl'), '{"type":"session"}\n')
-    // session.id intentionally absent
+    // sessions.json intentionally absent
     preCreateReady(agentId)
 
     const r = new PiRuntimeSync()
@@ -289,12 +289,12 @@ describe('PiRuntime.spawnAgent resume via session.id (PAN-636 workspace-3119)', 
     expect(warned).toMatch(/no resumable session id/)
   })
 
-  it('PAN-1988: recovers the real session id from the freshest JSONL when session.id is absent', async () => {
+  it('PAN-1988: recovers the real session id from the freshest JSONL when the index is absent', async () => {
     const agentId = 'agent-resume-jsonl'
     const dir = join(h.home, '.overdeck', 'agents', agentId)
     const sessionsDir = join(dir, 'sessions')
     mkdirSync(sessionsDir, { recursive: true })
-    // session.id is absent (it is only written on suspend), but the session JSONL carries the real
+    // The index is absent, but the session JSONL carries the real
     // id as its session-root `id` — resume from THAT instead of throwing the session away.
     writeFileSync(join(sessionsDir, '01a-session.jsonl'), '{"type":"session","id":"real-pi-sess-9999"}\n')
     preCreateReady(agentId)
@@ -314,7 +314,7 @@ describe('PiRuntime.spawnAgent resume via session.id (PAN-636 workspace-3119)', 
     expect(warned).not.toMatch(/no resumable session id/)
   })
 
-  it('first-ever spawn (no prior sessions/*.jsonl, no session.id) does NOT warn — clean path', async () => {
+  it('first-ever spawn (no prior sessions/*.jsonl or index) does not warn', async () => {
     const agentId = 'agent-resume-3-first'
     preCreateReady(agentId)
 
@@ -327,7 +327,7 @@ describe('PiRuntime.spawnAgent resume via session.id (PAN-636 workspace-3119)', 
     } as any)
 
     const warned = warnSpy.mock.calls.map((c) => String(c[0])).join('\n')
-    expect(warned).not.toMatch(/session\.id/)
+    expect(warned).not.toMatch(/session index/)
   })
 })
 

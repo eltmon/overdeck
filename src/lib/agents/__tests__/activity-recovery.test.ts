@@ -1,5 +1,8 @@
 import { Effect } from 'effect';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import type { AgentState } from '../agent-state.js';
 import {
@@ -8,6 +11,22 @@ import {
   resolveLatestSessionIdSync,
   type ClaudeSessionRecoveryDeps,
 } from '../activity.js';
+import { appendSessionIdToHistory } from '../../session-history.js';
+
+let tempHome: string;
+let previousHome: string | undefined;
+
+beforeEach(() => {
+  tempHome = mkdtempSync(join(tmpdir(), 'pan-activity-session-'));
+  previousHome = process.env.OVERDECK_HOME;
+  process.env.OVERDECK_HOME = tempHome;
+});
+
+afterEach(() => {
+  if (previousHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = previousHome;
+  rmSync(tempHome, { recursive: true, force: true });
+});
 
 const agentState: AgentState = {
   id: 'agent-min-839',
@@ -30,6 +49,39 @@ function deps(overrides: Partial<ClaudeSessionRecoveryDeps> = {}): ClaudeSession
 }
 
 describe('Claude session reconstruction fallback', () => {
+  it('prefers the newest indexed Claude session over launcher and projected state', () => {
+    const dir = join(tempHome, 'agents', agentState.id);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'launcher.sh'), "claude --resume '11111111-1111-1111-1111-111111111111'\n");
+    appendSessionIdToHistory(agentState.id, 'indexed-session', 'test');
+
+    const result = resolveLatestSessionIdSync(agentState.id, deps({
+      getAgentState: () => ({ ...agentState, sessionId: 'stale-state-session' }),
+    }));
+
+    expect(result.sessionId).toBe('indexed-session');
+  });
+
+  it('does not apply retained Codex state to a Claude harness', () => {
+    const dir = join(tempHome, 'agents', agentState.id);
+    mkdirSync(join(dir, 'codex-home'), { recursive: true });
+    writeFileSync(join(dir, 'codex-thread-id'), 'retained-codex-thread\n');
+
+    expect(resolveLatestSessionIdSync(agentState.id, deps({
+      getAgentState: () => agentState,
+    })).sessionId).toBeNull();
+  });
+
+  it('resolves Codex state only when the current harness is Codex', () => {
+    const dir = join(tempHome, 'agents', agentState.id);
+    mkdirSync(join(dir, 'codex-home'), { recursive: true });
+    writeFileSync(join(dir, 'codex-thread-id'), 'current-codex-thread\n');
+
+    expect(resolveLatestSessionIdSync(agentState.id, deps({
+      getAgentState: () => ({ ...agentState, harness: 'codex' }),
+    })).sessionId).toBe('current-codex-thread');
+  });
+
   it('keeps sync and async resolution aligned for an event-store-only session', async () => {
     const recoveryDeps = deps({
       getAgentState: () => agentState,
@@ -63,7 +115,6 @@ describe('Claude session reconstruction fallback', () => {
     expect(result).toEqual({
       sessionId: 'event-session',
       checked: ['agent.model_set event history'],
-      needsPointerRepair: true,
     });
   });
 
@@ -76,7 +127,6 @@ describe('Claude session reconstruction fallback', () => {
     const result = resolveClaudeSessionRecoverySync(agentState.id, agentState, deps());
 
     expect(result.sessionId).toBeNull();
-    expect(result.needsPointerRepair).toBeUndefined();
     expect(result.checked).toEqual(['agent.model_set event history']);
   });
 

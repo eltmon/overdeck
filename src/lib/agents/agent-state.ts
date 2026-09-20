@@ -10,6 +10,7 @@ import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-pop
 import { normalizeAgentId } from './identity.js';
 import { removeAgentStateDir } from './state-dir-removal.js';
 import { registerPipelineTelemetryAgentReader } from '../telemetry/pipeline-agent-reader.js';
+import { clearSessionResetMarker } from '../session-history.js';
 import {
   registerActiveReviewArtifactContextReader,
   registerFeedbackAgentStateReader,
@@ -704,6 +705,8 @@ function assertAgentCanTransitionToRunning(state: AgentState): void {
 
 export function markAgentRunning(state: AgentState, options?: { preserveFailureTracking?: boolean }): void {
   assertAgentCanTransitionToRunning(state);
+  // Clear before any mutation so a throw here leaves state.status untouched.
+  clearSessionResetMarker(state.id);
   const oldStatus = state.status;
   state.status = 'running';
   // Codex activity comes from app-server notifications or rollout JSONL. A

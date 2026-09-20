@@ -9,13 +9,17 @@ export function museDataHome(agentId: string, agentsRoot = join(getOverdeckHome(
   return join(agentsRoot, agentId, 'muse-data');
 }
 
+export function museSessionsRoot(agentId: string, agentsRoot?: string): string {
+  return join(museDataHome(agentId, agentsRoot), 'muse', 'sessions');
+}
+
 export function museSessionId(path: string): string {
   return basename(dirname(path));
 }
 
 /** Only root logs at YYYY/MM/DD/UUID/session.jsonl; never select a subagent. */
 export async function listMuseSessionPaths(agentId: string, agentsRoot?: string): Promise<string[]> {
-  let dirs = [join(museDataHome(agentId, agentsRoot), 'muse', 'sessions')];
+  let dirs = [museSessionsRoot(agentId, agentsRoot)];
   for (let depth = 0; depth < 4; depth++) {
     const children = await Promise.all(dirs.map(async dir => {
       const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
@@ -38,7 +42,7 @@ export async function resolveMuseSessionPath(agentId: string, agentsRoot?: strin
 
 /** Legacy runtime introspection interface is synchronous; server resolvers use the async door above. */
 export function resolveMuseSessionPathSync(agentId: string): string | null {
-  let dirs = [join(museDataHome(agentId), 'muse', 'sessions')];
+  let dirs = [museSessionsRoot(agentId)];
   for (let depth = 0; depth < 4; depth++) {
     dirs = dirs.flatMap(dir => {
       try {
