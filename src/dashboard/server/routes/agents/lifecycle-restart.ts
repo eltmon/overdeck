@@ -1,6 +1,4 @@
-import { existsSync } from 'node:fs';
-import { readFile, rm, writeFile } from 'node:fs/promises';
-import { dirname, join, basename } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { Cause, Effect, Exit } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
@@ -22,7 +20,6 @@ import {
   recoverAgent,
   resumeAgent,
   restartAgent,
-  getAgentDir,
   getProviderAuthMode,
   listRunningAgents,
   wipeAgentStateDirs,
@@ -45,7 +42,7 @@ import {
   spawnPanCommandDetached,
 } from './shared.js';
 import { claimAgentStart, releaseAgentStart } from './spawn-helpers.js';
-import { resetSessionIndex } from '../../../../lib/session-history.js';
+import { clearAgentSessionPointers } from '../../../../lib/agents/session-pointers.js';
 
 function pendingDecisionError(
   agentId: string,
@@ -739,26 +736,10 @@ export const postAgentResetSessionRoute = HttpRouter.add(
       return jsonResponse({ error: `Agent ${id} has no saved session to reset`, lifecycle }, { status: 404 });
     }
 
-    const agentDir = getAgentDir(id);
-
-    // Explicit reset is the sole exception to append-only sessions.json: use
-    // the session-history mutation door to truncate it, then drop the legacy pointer.
-    yield* Effect.promise(async () => {
-      await resetSessionIndex(id, agentDir);
-      await rm(join(agentDir, 'session.id'), { force: true }); // PAN-3357: not a dir removal
-    });
-
-    // Clear claudeSessionId from runtime.json (preserve other fields).
-    // Must read/write directly — saveAgentRuntimeState merges with existing file.
-    const runtimeFile = join(agentDir, 'runtime.json');
-    if (existsSync(runtimeFile)) {
-      try {
-        const runtimeContent = yield* Effect.promise(() => readFile(runtimeFile, 'utf-8'));
-        const runtime = JSON.parse(runtimeContent);
-        delete runtime.claudeSessionId;
-        yield* Effect.promise(() => writeFile(runtimeFile, JSON.stringify(runtime, null, 2)));
-      } catch { /* non-fatal */ }
-    }
+    // Use the same complete reset door as CLI/resume. The route persists its
+    // own stopped projection below, so suppress only the helper's duplicate
+    // runtime event.
+    yield* Effect.promise(() => clearAgentSessionPointers(id, { emitRuntimeEvent: false }));
 
     yield* killSession(id).pipe(Effect.catch(() => Effect.void));
 

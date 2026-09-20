@@ -55,7 +55,7 @@ describe('clearAgentSessionPointers', () => {
     for (const name of ['session.id', 'codex-thread-id', 'launcher.sh']) {
       expect(existsSync(join(mocks.agentDir, name))).toBe(false);
     }
-    expect(readFileSync(join(mocks.agentDir, 'sessions.json'), 'utf8')).toBe('');
+    expect(readFileSync(join(mocks.agentDir, 'sessions.json'), 'utf8')).toContain('"reset":true');
     expect(isAgentSessionReset('agent-pan-2895-review')).toBe(true);
     expect(JSON.parse(readFileSync(join(mocks.agentDir, 'runtime.json'), 'utf-8'))).toEqual({ state: 'stopped' });
     expect(mocks.state?.sessionId).toBeUndefined();

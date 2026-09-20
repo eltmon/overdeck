@@ -8,6 +8,8 @@ import { resolveMuseSessionPath } from '../../lib/runtimes/muse-session.js';
  */
 
 import { Effect, Layer, Queue, Schedule, Schema, Stream } from 'effect';
+import { existsSync, watch as fsWatch } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { RpcSerialization, RpcServer } from 'effect/unstable/rpc';
 import { DomainEvent as DomainEventSchema, isAgentSessionName, PanRpcGroup, PanRpcError, WS_METHODS } from '@overdeck/contracts';
@@ -19,8 +21,9 @@ import { shouldBroadcastDashboardEvent, streamAgentOutput } from './services/age
 import type { LegacyConversation } from '../../lib/overdeck/conversations.js';
 import { contextUsageFromParseResult, gateSnapshotEmission, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
 import { isPiSessionFile } from './services/pi-conversation-parser.js';
-import { resolveAgentTranscriptCandidate, resolvePiSessionPath, resolveCodexRolloutPath, resolveAcpTranscriptPath, resolveKimiWirePath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
-import { sessionFilePath } from '../../lib/paths.js';
+import { listAgentTranscriptCandidates, resolveAgentTranscriptCandidate, resolvePiSessionPath, resolveCodexRolloutPath, resolveAcpTranscriptPath, resolveKimiWirePath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
+import { getOverdeckHome, sessionFilePath } from '../../lib/paths.js';
+import type { TranscriptCandidate } from '../../lib/session-history.js';
 import { getRuntimeCensus } from '../../lib/runtime-census.js';
 import { listProjectsSync } from '../../lib/projects.js';
 import type { AgentStatus, ConversationEvent, DomainEvent, EmbedProgressEvent, EnrichCompleteEvent, EnrichProgressEvent, ScanCompleteEvent, ScanProgressEvent, ScanStartedEvent, SessionNodePresence, SessionTreeDelta, SystemHeartbeatEvent } from '@overdeck/contracts';
@@ -226,6 +229,99 @@ function streamClaudeTranscript(
       (handle) => Effect.sync(() => handle.stop()),
     ),
   );
+}
+
+function nearestExistingDirectory(path: string): string | null {
+  let candidate = dirname(path);
+  while (!existsSync(candidate)) {
+    const parent = dirname(candidate);
+    if (parent === candidate) return null;
+    candidate = parent;
+  }
+  return candidate;
+}
+
+/** Keep synthetic-agent resolution live until a concrete transcript appears. */
+export function watchForAgentTranscriptCandidate(
+  agentId: string,
+  workspace = '',
+): Stream.Stream<TranscriptCandidate, PanRpcError> {
+  return Stream.callback<TranscriptCandidate, PanRpcError>((queue) =>
+    Effect.acquireRelease(
+      Effect.sync(() => {
+        let stopped = false, resolving = false, rerun = false, watchedRoots = '';
+        let watchers: ReturnType<typeof fsWatch>[] = [];
+        const closeWatchers = () => {
+          for (const watcher of watchers) try { watcher.close(); } catch { /* already closed */ }
+          watchers = [];
+        };
+        const resolveCandidate = async (): Promise<void> => {
+          if (stopped) return;
+          if (resolving) { rerun = true; return; }
+          resolving = true;
+          try {
+            const candidates = await listAgentTranscriptCandidates(agentId, workspace);
+            const resolved = await resolveAgentTranscriptCandidate(agentId, workspace, {}, candidates);
+            if (stopped) return;
+            if (resolved) {
+              closeWatchers();
+              Queue.offerUnsafe(queue, resolved);
+              return;
+            }
+            const index = join(getOverdeckHome(), 'agents', agentId, 'sessions.json');
+            const roots = [...new Set([index, ...candidates.map(({ path }) => path)]
+              .map(nearestExistingDirectory).filter((path): path is string => path !== null))].sort();
+            const signature = roots.join('\0');
+            if (signature !== watchedRoots) {
+              watchedRoots = signature;
+              closeWatchers();
+              for (const root of roots) try { watchers.push(fsWatch(root, () => void resolveCandidate())); } catch { /* retry on another event */ }
+              rerun = true; // close the listing→watch race
+            }
+          } catch {
+            // Agent/candidate directories may be between atomic replacements.
+          } finally {
+            resolving = false;
+            if (rerun && !stopped) {
+              rerun = false;
+              void resolveCandidate();
+            }
+          }
+        };
+
+        void resolveCandidate();
+        return {
+          stop() {
+            stopped = true;
+            closeWatchers();
+          },
+        };
+      }),
+      (handle) => Effect.sync(() => handle.stop()),
+    ),
+  );
+}
+
+export function streamSyntheticAgentTranscript(
+  agentId: string,
+  selectedSubagentId?: string,
+): FullParseSnapshotStream {
+  const resolved = watchForAgentTranscriptCandidate(agentId).pipe(
+    Stream.take(1),
+    Stream.flatMap((candidate) => {
+      const sessionFile = selectedSubagentId ? subagentTranscriptPath(candidate.path, selectedSubagentId) : candidate.path;
+      if (!sessionFile) return conversationDiscoveringStream();
+      if (candidate.kind === 'claude') return streamClaudeTranscript(sessionFile, agentId, null, selectedSubagentId);
+      return streamResolvedFullParseSnapshots(
+        async () => sessionFile,
+        sharedTranscriptParser(candidate.kind),
+        null,
+        false,
+        candidate.kind === 'codex' && selectedSubagentId === undefined,
+      );
+    }),
+  );
+  return Stream.concat(Stream.succeed({ kind: 'discovering' } as ConversationEvent), resolved);
 }
 
 function buildAgentIssueLookup(agents: readonly AgentIssueRecord[]): AgentIssueLookup {
@@ -742,18 +838,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
             // have no conversations-table row. Resolve their durable agent
             // transcript and stream snapshots over the same RPC transport.
             if (!conv && isAgentSessionName(input.conversationName)) {
-              const candidate = yield* Effect.promise(() => resolveAgentTranscriptCandidate(input.conversationName, ''));
-              if (!candidate) return conversationDiscoveringStream();
-              const sessionFile = input.agentId ? subagentTranscriptPath(candidate.path, input.agentId) : candidate.path;
-              if (!sessionFile) return conversationDiscoveringStream();
-              if (candidate.kind === 'claude') return streamClaudeTranscript(sessionFile, input.conversationName, null, input.agentId);
-              return streamResolvedFullParseSnapshots(
-                async () => sessionFile,
-                sharedTranscriptParser(candidate.kind),
-                null,
-                false,
-                candidate.kind === 'codex' && input.agentId === undefined,
-              );
+              return streamSyntheticAgentTranscript(input.conversationName, input.agentId);
             }
 
             if (!conv) {

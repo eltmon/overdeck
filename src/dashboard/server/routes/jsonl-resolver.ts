@@ -1,3 +1,8 @@
+/**
+ * Harness-aware transcript resolution for dashboard agent routes and streams.
+ * Candidate construction is shared with the synchronous agent adapter; this
+ * module only supplies asynchronous filesystem materialization and existence.
+ */
 import { resolveMuseSessionPath } from '../../../lib/runtimes/muse-session.js';
 import { access, readFile, stat, readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -10,9 +15,12 @@ import { logAgentLifecycleSync } from '../../../lib/persistent-logger.js';
 import { kimiSessionsRoot } from '../../../lib/runtimes/kimi-code.js';
 import {
   orderedTranscriptCandidates,
+  latestSessionResetTime,
   parseSessionIndex,
+  SESSION_RESET_MARKER,
   transcriptCandidateKey,
   transcriptCandidateKind,
+  transcriptCandidateKinds,
   type SessionIndexEntry,
   type TranscriptCandidate,
 } from '../../../lib/session-history.js';
@@ -50,11 +58,11 @@ async function readOptional(p: string): Promise<string | null> {
   return readFile(p, 'utf-8').catch(() => null);
 }
 
-async function readIndexedSessionEntries(agentDir: string): Promise<{ entries: SessionIndexEntry[]; exists: boolean }> {
+async function readIndexedSessionEntries(agentDir: string): Promise<{ entries: SessionIndexEntry[]; exists: boolean; resetAt: number | null }> {
   const raw = await readOptional(join(agentDir, 'sessions.json'));
   return raw === null
-    ? { entries: [], exists: false }
-    : { entries: parseSessionIndex(raw), exists: true };
+    ? { entries: [], exists: false, resetAt: null }
+    : { entries: parseSessionIndex(raw), exists: true, resetAt: latestSessionResetTime(raw) };
 }
 
 const LAUNCHER_UUID =
@@ -201,18 +209,6 @@ async function findPiTranscriptForSession(agentDir: string, sessionId: string): 
   return null;
 }
 
-async function freshestClaudeTranscript(projectDir: string): Promise<string | null> {
-  let names: string[];
-  try { names = await readdir(projectDir); } catch { return null; }
-  const candidates = await Promise.all(names.filter((name) => name.endsWith('.jsonl')).map(async (name) => {
-    const path = join(projectDir, name);
-    try { return { path, mtimeMs: (await stat(path)).mtimeMs }; } catch { return null; }
-  }));
-  return candidates
-    .filter((candidate): candidate is { path: string; mtimeMs: number } => candidate !== null)
-    .sort((a, b) => b.mtimeMs - a.mtimeMs)[0]?.path ?? null;
-}
-
 export async function listAgentTranscriptCandidates(
   agentId: string,
   workspacePath: string,
@@ -220,6 +216,7 @@ export async function listAgentTranscriptCandidates(
 ): Promise<TranscriptCandidate[]> {
   const agentsRoot = opts.agentsDirOverride ?? join(getOverdeckHome(), 'agents');
   const agentDir = join(agentsRoot, agentId);
+  if (await pathExists(join(agentDir, SESSION_RESET_MARKER))) return [];
   const recorded = await readRecordedState(agentId, opts);
   const currentHarness = recorded.harness;
   const effectiveWorkspace = recorded.workspace ?? workspacePath;
@@ -235,24 +232,24 @@ export async function listAgentTranscriptCandidates(
 
   const indexedPaths = new Map<string, string>();
   for (const entry of entries) {
-    const kind = transcriptCandidateKind(entry.harness ?? currentHarness);
-    let path: string | null = null;
-    if (kind === 'claude') path = join(projectDir, `${entry.sessionId}.jsonl`);
-    else if (kind === 'kimi') path = join(kimiSessionsRoot(kimiHome, effectiveWorkspace), entry.sessionId, 'agents', 'main', 'wire.jsonl');
-    else if (kind === 'codex') {
-      for (const home of (await readdir(agentDir, { withFileTypes: true }).catch(() => []))) {
-        if (home.isDirectory() && home.name.startsWith('codex-home')) {
+    for (const kind of transcriptCandidateKinds(entry.harness, currentHarness)) {
+      let path: string | null = null;
+      if (kind === 'claude') path = join(projectDir, `${entry.sessionId}.jsonl`);
+      else if (kind === 'kimi') path = join(kimiSessionsRoot(kimiHome, effectiveWorkspace), entry.sessionId, 'agents', 'main', 'wire.jsonl');
+      else if (kind === 'codex') {
+        const homes = (await readdir(agentDir, { withFileTypes: true }).catch(() => []))
+          .filter((home) => home.isDirectory() && home.name.startsWith('codex-home'))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        for (const home of homes) {
           path = await findCodexRolloutForSession(join(agentDir, home.name, 'sessions'), entry.sessionId);
           if (path) break;
         }
-      }
-      path ??= join(agentDir, 'codex-home*', 'sessions', '**', `rollout-*-${entry.sessionId}.jsonl`);
-    } else if (kind === 'pi' || kind === 'ohmypi') {
-      path = await findPiTranscriptForSession(agentDir, entry.sessionId)
-        ?? join(agentDir, 'sessions', '**', `*_${entry.sessionId}.jsonl`);
-    } else if (kind === 'acp') path = join(agentDir, 'acp-session.jsonl');
-    else if (kind === 'muse') path = join(agentDir, 'muse-session.jsonl');
-    if (path) indexedPaths.set(transcriptCandidateKey(kind, entry.sessionId), path);
+      } else if (kind === 'pi' || kind === 'ohmypi') {
+        path = await findPiTranscriptForSession(agentDir, entry.sessionId);
+      } else if (kind === 'acp') path = join(agentDir, 'acp-session.jsonl');
+      else if (kind === 'muse') path = join(agentDir, 'muse-session.jsonl');
+      if (path) indexedPaths.set(transcriptCandidateKey(kind, entry.sessionId), path);
+    }
   }
 
   let launcherPinned: TranscriptCandidate | null = null;
@@ -280,17 +277,20 @@ export async function listAgentTranscriptCandidates(
       : currentKind === 'kimi' ? await resolveKimiWirePath(agentId, opts)
       : currentKind === 'muse' ? await resolveMuseSessionPath(agentId, opts.agentsDirOverride)
       : null;
-    if (path) stateDerived.push({ kind: currentKind, path });
+    if (path) {
+      const mtime = await stat(path).then((value) => value.mtimeMs, () => null);
+      if (index.resetAt === null || (mtime !== null && mtime >= index.resetAt)) {
+        stateDerived.push({ kind: currentKind, path });
+      }
+    }
   }
 
-  const freshest = currentKind === 'claude' ? await freshestClaudeTranscript(projectDir) : null;
   return orderedTranscriptCandidates({
     entries,
     currentHarness,
     indexedPaths,
     launcherPinned,
     stateDerived,
-    freshestInProjectDir: freshest ? { kind: 'claude', path: freshest } : null,
   });
 }
 

@@ -5,6 +5,7 @@ import { join } from 'path';
 
 import {
   readLauncherPinnedSessionId,
+  listAgentTranscriptCandidates,
   resolveCodexRolloutPath,
   resolveAcpTranscriptPath,
   resolveJsonlPath,
@@ -132,7 +133,7 @@ describe('resolveJsonlPath (PAN-830)', () => {
     expect(path).toBeNull();
   });
 
-  it('uses the freshest project JSONL only as the final fallback', async () => {
+  it('does not adopt an unrelated freshest project JSONL without session identity', async () => {
     const encoded = encodeClaudeProjectDir(WORKSPACE_PATH);
     const projectDir = join(claudeProjectsDir, encoded);
     await mkdir(projectDir, { recursive: true });
@@ -144,7 +145,26 @@ describe('resolveJsonlPath (PAN-830)', () => {
       getRuntimeStateAsync: async () => null,
     });
 
-    expect(path).toBe(join(projectDir, `${AGENT_ID}.jsonl`));
+    expect(path).toBeNull();
+    await expect(listAgentTranscriptCandidates(AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+      getRuntimeStateAsync: async () => null,
+    })).resolves.toEqual([]);
+  });
+
+  it('honors the reset marker before launcher, state, and directory fallbacks', async () => {
+    const encoded = encodeClaudeProjectDir(WORKSPACE_PATH);
+    const projectDir = join(claudeProjectsDir, encoded);
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`), '{}\n');
+    await writeFile(join(agentsDir, AGENT_ID, 'launcher.sh'), `claude --resume '${CLAUDE_SESSION_ID}'\n`);
+    await writeFile(join(agentsDir, AGENT_ID, 'session-reset'), '');
+
+    await expect(listAgentTranscriptCandidates(AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+    })).resolves.toEqual([]);
   });
 
   it('uses the encoded workspace path under claudeProjects root', async () => {
@@ -238,6 +258,20 @@ describe('resolveJsonlPath — codex agents (PAN-1805)', () => {
     });
 
     expect(path).toBeNull();
+  });
+
+  it('does not revive a pre-reset rollout after the launch marker clears', async () => {
+    await setupCodexAgent({ rollouts: 1 });
+    await writeFile(join(agentsDir, CODEX_AGENT_ID, 'sessions.json'), `${JSON.stringify({
+      reset: true,
+      at: new Date().toISOString(),
+      source: 'operator-reset',
+    })}\n`);
+
+    await expect(listAgentTranscriptCandidates(CODEX_AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+    })).resolves.toEqual([]);
   });
 
   it('codex harness wins over a stale claude session.id', async () => {

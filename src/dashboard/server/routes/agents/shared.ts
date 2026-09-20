@@ -31,7 +31,6 @@ import { getGitHubConfig } from '../../services/tracker-config.js';
 import { recordFeatureRegistryLifecycle } from '../../../../lib/registry/feature-registry-population.js';
 import {
   getClaudeProjectDir as getClaudeProjectDirShared,
-  getActiveSessionPath as getActiveSessionPathShared,
   getAgentWorkspace as getAgentWorkspaceShared,
   getAgentJsonlPath as getAgentJsonlPathShared,
   getPendingQuestions as getPendingQuestionsShared,
@@ -646,7 +645,6 @@ export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuar
 
 // Shared enrichment utilities (PAN-440) — aliases for readability
 const getClaudeProjectDir = getClaudeProjectDirShared;
-const getActiveSessionPath = getActiveSessionPathShared;
 const getAgentWorkspace = getAgentWorkspaceShared;
 const getAgentJsonlPath = getAgentJsonlPathShared;
 const getPendingQuestions = getPendingQuestionsShared;
@@ -680,7 +678,6 @@ export {
   resolveAgentCountEnv,
   formatLeakedSpecialistSummary,
   getClaudeProjectDir,
-  getActiveSessionPath,
   getAgentWorkspace,
   getAgentJsonlPath,
   getPendingQuestions,

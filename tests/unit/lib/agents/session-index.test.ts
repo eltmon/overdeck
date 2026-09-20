@@ -5,18 +5,22 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { getAgentJsonlPath } from '../../../../src/lib/agent-enrichment.js';
+import { getAgentJsonlPath, listAgentTranscriptCandidatesSync } from '../../../../src/lib/agent-enrichment.js';
 import { getLatestSessionIdSync, saveSessionId } from '../../../../src/lib/agents/activity.js';
 import { restartAgent } from '../../../../src/lib/agents/recovery.js';
 import type { AgentState } from '../../../../src/lib/agents/agent-state.js';
 import { encodeClaudeProjectDir } from '../../../../src/lib/paths.js';
 import {
   appendSessionIdToHistory,
+  clearSessionResetMarker,
+  isSessionResetMarker,
   orderedTranscriptCandidates,
   readSessionIndexSync,
   readSessionIndexWithLegacySync,
+  resetSessionIndex,
   transcriptCandidateKey,
 } from '../../../../src/lib/session-history.js';
+import { listAgentTranscriptCandidates } from '../../../../src/dashboard/server/routes/jsonl-resolver.js';
 
 let root: string;
 let previousHome: string | undefined;
@@ -140,6 +144,80 @@ describe('sessions.json index', () => {
     ]);
   });
 
+  it('records reset as an append-only boundary without erasing a concurrent later observation', async () => {
+    appendSessionIdToHistory('agent-pan-3950', 'before-reset', 'launcher');
+
+    await resetSessionIndex('agent-pan-3950');
+    appendSessionIdToHistory('agent-pan-3950', 'after-reset', 'session-start');
+
+    expect(isSessionResetMarker('agent-pan-3950')).toBe(true);
+    expect(readSessionIndexSync('agent-pan-3950').map((entry) => entry.sessionId)).toEqual(['after-reset']);
+    clearSessionResetMarker('agent-pan-3950');
+    expect(readSessionIndexSync('agent-pan-3950').map((entry) => entry.sessionId)).toEqual(['after-reset']);
+  });
+
+  it('keeps sync and async concrete candidates in parity for untagged legacy entries', async () => {
+    const agentId = 'agent-pan-3950';
+    const workspace = join(root, 'workspace');
+    const agentDir = join(process.env.OVERDECK_HOME!, 'agents', agentId);
+    const projectDir = join(root, '.claude', 'projects', encodeClaudeProjectDir(workspace));
+    const codexDir = join(agentDir, 'codex-home-v2', 'sessions', '2026', '09', '20');
+    mkdirSync(projectDir, { recursive: true });
+    mkdirSync(codexDir, { recursive: true });
+    writeFileSync(join(agentDir, 'state.json'), JSON.stringify({
+      id: agentId,
+      issueId: 'PAN-3950',
+      workspace,
+      harness: 'codex',
+      role: 'work',
+      model: 'gpt-5.4',
+      status: 'stopped',
+      startedAt: '2026-09-20T00:00:00.000Z',
+      startedBy: 'test',
+    }));
+    writeFileSync(join(agentDir, 'sessions.json'), JSON.stringify(['legacy-session']));
+    const claudePath = join(projectDir, 'legacy-session.jsonl');
+    const codexPath = join(codexDir, 'rollout-2026-09-20-legacy-session.jsonl');
+    writeFileSync(claudePath, '{}\n');
+    writeFileSync(codexPath, '{}\n');
+
+    const syncCandidates = listAgentTranscriptCandidatesSync(agentId, workspace);
+    const asyncCandidates = await listAgentTranscriptCandidates(agentId, workspace, {
+      agentsDirOverride: join(process.env.OVERDECK_HOME!, 'agents'),
+      claudeProjectsDirOverride: join(root, '.claude', 'projects'),
+    });
+
+    expect(syncCandidates).toEqual([
+      { kind: 'codex', path: codexPath },
+      { kind: 'claude', path: claudePath },
+    ]);
+    expect(asyncCandidates).toEqual(syncCandidates);
+    expect(syncCandidates.every(({ path }) => !path.includes('*'))).toBe(true);
+  });
+
+  it('makes a reset marker authoritative in both candidate adapters', async () => {
+    const agentId = 'agent-pan-3950';
+    const workspace = join(root, 'workspace');
+    const agentDir = join(process.env.OVERDECK_HOME!, 'agents', agentId);
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, 'state.json'), JSON.stringify({ id: agentId, workspace, harness: 'claude-code' }));
+    appendSessionIdToHistory(agentId, 'old-session', 'launcher');
+    await resetSessionIndex(agentId);
+
+    expect(listAgentTranscriptCandidatesSync(agentId, workspace)).toEqual([]);
+    await expect(listAgentTranscriptCandidates(agentId, workspace, {
+      agentsDirOverride: join(process.env.OVERDECK_HOME!, 'agents'),
+      claudeProjectsDirOverride: join(root, '.claude', 'projects'),
+    })).resolves.toEqual([]);
+
+    clearSessionResetMarker(agentId);
+    expect(listAgentTranscriptCandidatesSync(agentId, workspace)).toEqual([]);
+    await expect(listAgentTranscriptCandidates(agentId, workspace, {
+      agentsDirOverride: join(process.env.OVERDECK_HOME!, 'agents'),
+      claudeProjectsDirOverride: join(root, '.claude', 'projects'),
+    })).resolves.toEqual([]);
+  });
+
   it('falls back to an older indexed transcript when the newest JSONL is absent', async () => {
     const agentId = 'agent-pan-3950';
     const workspace = join(root, 'workspace');
@@ -166,7 +244,7 @@ describe('sessions.json index', () => {
     await expect(Effect.runPromise(getAgentJsonlPath(agentId))).resolves.toBe(olderTranscript);
   });
 
-  it('orders mixed-harness entries before launcher, state, and freshest fallbacks', () => {
+  it('orders mixed-harness entries before launcher and state fallbacks', () => {
     const paths = new Map([
       [transcriptCandidateKey('claude', 'claude-old'), '/claude/old.jsonl'],
       [transcriptCandidateKey('codex', 'codex-new'), '/codex/new.jsonl'],
@@ -180,13 +258,11 @@ describe('sessions.json index', () => {
       indexedPaths: paths,
       launcherPinned: { kind: 'claude', path: '/claude/launcher.jsonl' },
       stateDerived: [{ kind: 'claude', path: '/claude/state.jsonl' }],
-      freshestInProjectDir: { kind: 'claude', path: '/claude/freshest.jsonl' },
     })).toEqual([
       { kind: 'codex', path: '/codex/new.jsonl' },
       { kind: 'claude', path: '/claude/old.jsonl' },
       { kind: 'claude', path: '/claude/launcher.jsonl' },
       { kind: 'claude', path: '/claude/state.jsonl' },
-      { kind: 'claude', path: '/claude/freshest.jsonl' },
     ]);
   });
 });

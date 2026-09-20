@@ -584,6 +584,7 @@ async function spawnRunWithoutConsentClaim(
   } catch { /* non-fatal — marker stays absent */ }
 
   await Effect.runPromise(saveAgentState(state));
+  clearSessionResetMarker(agentId);
 
   // PAN-1556: the review role emits a single dedicated "Review role spawned"
   // event from spawnReviewRoleForIssue. Suppress the generic per-spawn
@@ -708,7 +709,6 @@ async function spawnAgentWithoutConsentClaim(
   );
 
   saveAgentStateSync(state);
-  clearSessionResetMarker(agentId);
   // Transition issue tracker to "in progress" immediately so Linear reflects reality
   // while workspace setup continues. Best-effort, don't block agent spawn.
   // Only for work agents, not planning/specialist agents.
@@ -1025,6 +1025,7 @@ async function spawnAgentWithoutConsentClaim(
   // Update status
   markAgentRunning(state);
   saveAgentStateSync(state);
+  clearSessionResetMarker(agentId);
 
   // Track work in CV
   startWorkSync(agentId, options.issueId);

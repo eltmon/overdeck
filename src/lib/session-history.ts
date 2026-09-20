@@ -1,6 +1,12 @@
+/**
+ * Durable session history and transcript-candidate ordering.
+ *
+ * `sessions.json` is append-only, including explicit reset boundaries. The
+ * separate reset marker prevents compatibility fallbacks from reviving an old
+ * transcript before the next launch has established a new session identity.
+ */
 import { randomUUID } from 'crypto';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync } from 'fs';
-import { writeFile } from 'node:fs/promises';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { getOverdeckHome } from './paths.js';
 import { getHarnessBehavior } from './runtimes/behavior.js';
@@ -38,7 +44,6 @@ export interface TranscriptCandidateSources {
   indexedPaths: ReadonlyMap<string, string>;
   launcherPinned?: TranscriptCandidate | null;
   stateDerived?: readonly TranscriptCandidate[];
-  freshestInProjectDir?: TranscriptCandidate | null;
 }
 
 export function transcriptCandidateKey(kind: TranscriptCandidateKind, sessionId: string): string {
@@ -55,17 +60,33 @@ export function transcriptCandidateKind(harness: string | null | undefined): Tra
   return 'claude';
 }
 
+/** Untagged legacy entries predate harness metadata and may belong to Claude. */
+export function transcriptCandidateKinds(
+  entryHarness: string | null | undefined,
+  currentHarness: string | null | undefined,
+): TranscriptCandidateKind[] {
+  if (entryHarness) return [transcriptCandidateKind(entryHarness)];
+  const current = transcriptCandidateKind(currentHarness);
+  return current === 'claude' ? ['claude'] : [current, 'claude'];
+}
+
 /** Pure authority ordering shared by sync and async transcript adapters. */
 export function orderedTranscriptCandidates(sources: TranscriptCandidateSources): TranscriptCandidate[] {
   const candidates: TranscriptCandidate[] = [];
+  const legacyClaudeFallbacks: TranscriptCandidate[] = [];
   for (const entry of [...sources.entries].reverse()) {
-    const kind = transcriptCandidateKind(entry.harness ?? sources.currentHarness);
-    const path = sources.indexedPaths.get(transcriptCandidateKey(kind, entry.sessionId));
-    if (path) candidates.push({ kind, path });
+    for (const kind of transcriptCandidateKinds(entry.harness, sources.currentHarness)) {
+      const path = sources.indexedPaths.get(transcriptCandidateKey(kind, entry.sessionId));
+      if (!path) continue;
+      const candidate = { kind, path };
+      if (!entry.harness && kind === 'claude' && transcriptCandidateKind(sources.currentHarness) !== 'claude') {
+        legacyClaudeFallbacks.push(candidate);
+      } else candidates.push(candidate);
+    }
   }
   if (sources.launcherPinned) candidates.push(sources.launcherPinned);
   candidates.push(...sources.stateDerived ?? []);
-  if (sources.freshestInProjectDir) candidates.push(sources.freshestInProjectDir);
+  candidates.push(...legacyClaudeFallbacks);
 
   const seen = new Set<string>();
   return candidates.filter(({ kind, path }) => {
@@ -96,31 +117,33 @@ export function parseSessionIndex(contents: string): SessionIndexEntry[] {
   const trimmed = contents.trimStart();
   let entries: SessionIndexEntry[] = [];
   let jsonLines = contents;
+  const applyRecord = (value: unknown, legacy = false): void => {
+    if (value && typeof value === 'object' && (value as { reset?: unknown }).reset === true) {
+      entries = [];
+      return;
+    }
+    const entry = normalizeSessionEntry(value, legacy);
+    if (entry) entries.push(entry);
+  };
   if (trimmed.startsWith('[')) {
     const arrayEnd = trimmed.lastIndexOf(']');
     if (arrayEnd < 0) return [];
     try {
       const parsed: unknown = JSON.parse(trimmed.slice(0, arrayEnd + 1));
-      entries = Array.isArray(parsed)
-        ? parsed.flatMap((value) => {
-            const entry = normalizeSessionEntry(value, true);
-            return entry ? [entry] : [];
-          })
-        : [];
+      if (Array.isArray(parsed)) parsed.forEach((value) => applyRecord(value, true));
     } catch {
       return [];
     }
     jsonLines = trimmed.slice(arrayEnd + 1);
   }
-  entries.push(...jsonLines.split(/\r?\n/).flatMap((line) => {
-    if (!line.trim()) return [];
+  for (const line of jsonLines.split(/\r?\n/)) {
+    if (!line.trim()) continue;
     try {
-      const entry = normalizeSessionEntry(JSON.parse(line));
-      return entry ? [entry] : [];
+      applyRecord(JSON.parse(line));
     } catch {
-      return [];
+      // Append-only readers skip malformed observations and continue.
     }
-  }));
+  }
 
   const newestById = new Map<string, SessionIndexEntry>();
   for (const entry of entries) {
@@ -128,6 +151,20 @@ export function parseSessionIndex(contents: string): SessionIndexEntry[] {
     newestById.set(entry.sessionId, entry);
   }
   return [...newestById.values()];
+}
+
+export function latestSessionResetTime(contents: string): number | null {
+  let latest: number | null = null;
+  for (const line of contents.split(/\r?\n/)) {
+    try {
+      const value = JSON.parse(line) as { reset?: unknown; at?: unknown };
+      if (value.reset === true && typeof value.at === 'string') {
+        const timestamp = Date.parse(value.at);
+        if (Number.isFinite(timestamp)) latest = timestamp;
+      }
+    } catch { /* legacy arrays and malformed observations are not reset boundaries */ }
+  }
+  return latest;
 }
 
 export function readSessionIndexSync(agentId: string): SessionIndexEntry[] {
@@ -188,13 +225,18 @@ export function appendSessionIdToHistory(
   appendFileSync(join(dir, 'sessions.json'), line, { flag: 'a' });
 }
 
-/** Explicit operator reset is the only operation allowed to truncate the append-only index. */
+/**
+ * Record an explicit reset without truncating concurrent observations, then
+ * block compatibility fallbacks until a successful launch clears the marker.
+ */
 export async function resetSessionIndex(
   agentId: string,
   dir = join(getOverdeckHome(), 'agents', agentId),
 ): Promise<void> {
   mkdirSync(dir, { recursive: true });
-  await writeFile(join(dir, 'sessions.json'), '', { flag: 'w' });
+  const line = `${JSON.stringify({ reset: true, at: new Date().toISOString(), source: 'operator-reset' })}\n`;
+  appendFileSync(join(dir, 'sessions.json'), line, { flag: 'a' });
+  writeFileSync(join(dir, SESSION_RESET_MARKER), '');
 }
 
 export function createFreshSessionIdentity(agentId: string, harness: RuntimeName, model?: string): string | undefined {

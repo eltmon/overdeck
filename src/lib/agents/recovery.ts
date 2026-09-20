@@ -58,7 +58,7 @@ import {
 import { assertWorkspaceStackHealthyForSpawn, buildAgentLaunchConfig } from './spawn-prep.js';
 import { prepareSupervisorForRelaunch, buildResumeContinueMessage } from './supervisor-channels.js';
 import { stopAgent } from './termination.js';
-import { createFreshSessionIdentity } from '../session-history.js';
+import { clearSessionResetMarker, createFreshSessionIdentity } from '../session-history.js';
 
 export type RecoverAgentResult =
   | { action: 'respawned'; state: AgentState }
@@ -311,7 +311,6 @@ export async function restartAgent(
     } else {
       await launchAndCaptureKimiSession();
     }
-
     // PAN-2974 (root cause B): the fallback continue-prompt is phase-aware —
     // a handed-off agent (completed marker) gets a passive restore, not a
     // "pick up where you left off" that re-drives the pipeline.
@@ -353,6 +352,7 @@ export async function restartAgent(
 
     markAgentRunning(agentState);
     saveAgentStateSync(agentState);
+    clearSessionResetMarker(normalizedId);
 
     await saveAgentRuntimeState(normalizedId, {
       state: 'active',

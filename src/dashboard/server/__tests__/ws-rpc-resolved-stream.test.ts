@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -13,6 +14,8 @@ const resolverMock = vi.hoisted(() => ({
   resolveAcpTranscriptPath: vi.fn(async () => null),
   resolveKimiWirePath: vi.fn(async () => null),
   resolveJsonlPath: vi.fn(async () => null),
+  listAgentTranscriptCandidates: vi.fn(async () => [] as Array<{ kind: 'claude'; path: string }>),
+  resolveAgentTranscriptCandidate: vi.fn(async () => null as { kind: 'claude'; path: string } | null),
   readLauncherPinnedSessionId: vi.fn(async () => null),
 }));
 vi.mock('../routes/jsonl-resolver.js', () => resolverMock);
@@ -26,6 +29,7 @@ vi.mock('../services/dashboard-db-task.js', () => ({
 import {
   streamHarnessFullParseSnapshots,
   streamResolvedFullParseSnapshots,
+  streamSyntheticAgentTranscript,
 } from '../ws-rpc.js';
 import type { ParseResult } from '../services/conversation-service.js';
 
@@ -143,6 +147,32 @@ describe('streamResolvedFullParseSnapshots — unresolved transcript', () => {
     );
 
     expect(Array.from(first)).toEqual([{ kind: 'discovering' }]);
+  });
+});
+
+describe('synthetic agent transcript discovery', () => {
+  it('keeps the subscription live and attaches the parser when the JSONL appears later', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'synthetic-agent-stream-'));
+    const transcript = join(dir, 'delayed.jsonl');
+    resolverMock.listAgentTranscriptCandidates.mockResolvedValue([{ kind: 'claude', path: transcript }]);
+    resolverMock.resolveAgentTranscriptCandidate.mockImplementation(async () =>
+      existsSync(transcript) ? { kind: 'claude', path: transcript } : null);
+
+    try {
+      const eventsPromise = Effect.runPromise(
+        streamSyntheticAgentTranscript('agent-pan-3950').pipe(Stream.take(2), Stream.runCollect),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      await writeFile(transcript, '{"type":"session_meta","payload":{"id":"delayed"}}\n');
+
+      const events = Array.from(await eventsPromise);
+      expect(events[0]).toEqual({ kind: 'discovering' });
+      expect(events[1]).toMatchObject({ kind: 'messages', snapshot: true });
+    } finally {
+      resolverMock.listAgentTranscriptCandidates.mockResolvedValue([]);
+      resolverMock.resolveAgentTranscriptCandidate.mockResolvedValue(null);
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
 

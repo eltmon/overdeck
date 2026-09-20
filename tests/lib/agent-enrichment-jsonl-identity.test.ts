@@ -135,23 +135,21 @@ describe('getAgentJsonlPath()', () => {
     expect(resolved).toBe(join(projectDir, `${OWN_SESSION}.jsonl`));
   });
 
-  it('falls back to the freshest transcript when the agent has no session id of its own', async () => {
-    // codex and omp keep history elsewhere and pin no claude-code session id
-    // here, so freshest-wins stays their only signal.
-    const projectDir = writeTranscripts(OTHER_SESSION, OWN_SESSION);
+  it('does not adopt the freshest transcript when the agent has no session identity', async () => {
+    writeTranscripts(OTHER_SESSION, OWN_SESSION);
 
     const resolved = await Effect.runPromise(getAgentJsonlPath('agent-pan-2765'));
 
-    expect(resolved).toBe(join(projectDir, `${OTHER_SESSION}.jsonl`));
+    expect(resolved).toBeNull();
   });
 
-  it('falls back to the freshest transcript when its own session id has no file on disk', async () => {
+  it('does not replace a missing owned transcript with another session', async () => {
     ownSessionIds.set('conv-20260716-6155', 'never-written-to-disk');
-    const projectDir = writeTranscripts(OTHER_SESSION);
+    writeTranscripts(OTHER_SESSION);
 
     const resolved = await Effect.runPromise(getAgentJsonlPath('conv-20260716-6155'));
 
-    expect(resolved).toBe(join(projectDir, `${OTHER_SESSION}.jsonl`));
+    expect(resolved).toBeNull();
   });
 });
 
