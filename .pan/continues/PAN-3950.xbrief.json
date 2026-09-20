@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3950",
   "created": "2026-09-20T13:53:05.511Z",
-  "updated": "2026-09-20T14:12:40.516Z",
+  "updated": "2026-09-20T14:12:46.183Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -20,6 +20,11 @@
       "claimedBy": "agent-pan-3950",
       "claimedAt": "2026-09-20T14:02:52.842Z",
       "doneAt": "2026-09-20T14:12:40.516Z"
+    },
+    "w8-adapters-use-resolver": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3950",
+      "claimedAt": "2026-09-20T14:12:46.183Z"
     }
   }
 }
