@@ -4,6 +4,7 @@ import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import type { AgentState } from '../agents.js';
+import { readSessionIndexSync } from '../session-history.js';
 
 // Spawn/resume flows preflight the harness binary; CI runners have no claude/omp
 // installed, so stub the filesystem probes while keeping the pure helpers real.
@@ -815,9 +816,8 @@ describe('AgentState role persistence', () => {
         }),
       );
       expect(deliverInitialPromptWithRetry).toHaveBeenCalled();
-      const sessionIndex = JSON.parse(readFileSync(join(agentDir, 'sessions.json'), 'utf-8')) as Array<string | { sessionId: string }>;
-      const latest = sessionIndex.at(-1);
-      const freshSessionId = typeof latest === 'string' ? latest : latest?.sessionId;
+      const sessionIndex = readSessionIndexSync(agentId);
+      const freshSessionId = sessionIndex.at(-1)?.sessionId;
       expect(freshSessionId).not.toBe('missing-session');
       const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf-8');
       expect(launcher).not.toContain("--resume 'missing-session'");

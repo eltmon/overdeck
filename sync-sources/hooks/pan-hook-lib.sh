@@ -116,50 +116,18 @@ pan_release_singleflight_lock() {
   return 0
 }
 
-# Append one structured sessions.json entry under a cross-process lock shared
-# by SessionStart and heartbeat hooks. Readers accept legacy string entries;
-# dedupe therefore normalizes both shapes before an atomic rename.
+# Append one structured JSON line. O_APPEND plus a single write keeps concurrent
+# writers from interleaving; readers resolve duplicate session ids.
 pan_append_session_index() {
   local agent_dir="$1" session_id="$2" observed_at="$3" source="$4"
   [ -n "$session_id" ] && command -v jq >/dev/null 2>&1 || return 1
   mkdir -p "$agent_dir" 2>/dev/null || return 1
-
-  local lock_dir="$agent_dir/sessions.lock" attempt=0
-  while ! mkdir "$lock_dir" 2>/dev/null; do
-    local owner_pid
-    owner_pid=$(cat "$lock_dir/pid" 2>/dev/null || true)
-    if [[ "$owner_pid" =~ ^[1-9][0-9]*$ ]] && ! kill -0 "$owner_pid" 2>/dev/null; then
-      rm -rf "$lock_dir" 2>/dev/null
-      continue
-    fi
-    attempt=$((attempt + 1))
-    [ "$attempt" -lt 50 ] || return 1
-    /bin/sleep 0.01
-  done
-  printf '%s\n' "$$" > "$lock_dir/pid" 2>/dev/null || {
-    rm -rf "$lock_dir" 2>/dev/null
-    return 1
-  }
-
-  local sessions_file="$agent_dir/sessions.json" sessions_tmp rc=0
-  sessions_tmp=$(mktemp "$agent_dir/sessions.XXXXXX" 2>/dev/null) || rc=1
-  if [ "$rc" -eq 0 ]; then
-    if [ -f "$sessions_file" ]; then
-      jq --arg sid "$session_id" --arg at "$observed_at" --arg source "$source" '
-        if any(.[]?; (if type == "string" then . else .sessionId end) == $sid)
-        then . else . + [{sessionId: $sid, at: $at, source: $source}] end
-      ' "$sessions_file" > "$sessions_tmp" 2>/dev/null || rc=1
-    else
-      jq -n --arg sid "$session_id" --arg at "$observed_at" --arg source "$source" \
-        '[{sessionId: $sid, at: $at, source: $source}]' > "$sessions_tmp" || rc=1
-    fi
-  fi
-  if [ "$rc" -eq 0 ]; then
-    mv "$sessions_tmp" "$sessions_file" 2>/dev/null || rc=1
-  fi
-  [ -n "$sessions_tmp" ] && [ -f "$sessions_tmp" ] && rm -f "$sessions_tmp" 2>/dev/null
-  rm -rf "$lock_dir" 2>/dev/null || rc=1
-  return "$rc"
+  local line byte_count
+  line=$(jq -cn --arg sid "$session_id" --arg at "$observed_at" --arg source "$source" \
+    '{sessionId: $sid, at: $at, source: $source}') || return 1
+  byte_count=$(printf '%s' "$line" | LC_ALL=C wc -c) || return 1
+  [ "$byte_count" -le 4095 ] || return 1
+  printf '%s\n' "$line" >> "$agent_dir/sessions.json"
 }
 
 # Run a command with a hard deadline while preserving its stdin, stdout, and

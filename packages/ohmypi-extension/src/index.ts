@@ -6,10 +6,10 @@
  * Forked from @overdeck/pi-extension (PAN-636, PAN-1134).
  */
 
-import { watch, type FSWatcher } from 'node:fs'
+import { appendFileSync, watch, type FSWatcher } from 'node:fs'
 import { appendFile, mkdir, open, readdir, readFile, rename, rm, stat, unlink, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { matchSpecialistCompletion, normalizeSpecialistCompletionName } from './specialist-completion-patterns.js'
 
 export interface OhmypiExtensionAPI {
@@ -396,65 +396,38 @@ async function workspaceFor(env: HookEnv): Promise<string | null> {
 async function sessionIdFor(env: HookEnv): Promise<string | null> {
   const { paths } = envFor(env)
   try {
-    const parsed: unknown = JSON.parse(await readFile(paths.sessionsIndexPath, 'utf8'))
-    if (!Array.isArray(parsed)) return null
-    const latest = parsed.at(-1)
-    if (typeof latest === 'string') return latest.trim() || null
-    const sessionId = (latest as { sessionId?: unknown } | undefined)?.sessionId
-    return typeof sessionId === 'string' && sessionId.trim() ? sessionId.trim() : null
+    const contents = await readFile(paths.sessionsIndexPath, 'utf8')
+    const trimmed = contents.trimStart()
+    const values: unknown[] = []
+    let lines = contents
+    if (trimmed.startsWith('[')) {
+      const end = trimmed.lastIndexOf(']')
+      if (end < 0) return null
+      const legacy: unknown = JSON.parse(trimmed.slice(0, end + 1))
+      if (Array.isArray(legacy)) values.push(...legacy)
+      lines = trimmed.slice(end + 1)
+    }
+    for (const line of lines.split(/\r?\n/)) {
+      try { if (line.trim()) values.push(JSON.parse(line)) } catch { /* skip malformed lines */ }
+    }
+    const ids = new Map<string, string>()
+    for (const value of values) {
+      const id = typeof value === 'string' ? value : (value as { sessionId?: unknown } | null)?.sessionId
+      if (typeof id === 'string' && id.trim()) {
+        ids.delete(id.trim())
+        ids.set(id.trim(), id.trim())
+      }
+    }
+    return [...ids.values()].at(-1) ?? null
   } catch {
     return null
   }
 }
 
 async function appendSessionIndexEntry(path: string, sessionId: string, at: string): Promise<void> {
-  const lockDir = join(dirname(path), 'sessions.lock')
-  for (let attempt = 0; ; attempt++) {
-    let acquired = false
-    try {
-      await mkdir(lockDir, { mode: 0o700 })
-      acquired = true
-      await writeFile(join(lockDir, 'pid'), `${process.pid}\n`, 'utf8')
-      break
-    } catch (error) {
-      if (acquired) {
-        await rm(lockDir, { recursive: true, force: true })
-        throw error
-      }
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST' || attempt >= 49) throw error
-      try {
-        const owner = Number.parseInt((await readFile(join(lockDir, 'pid'), 'utf8')).trim(), 10)
-        process.kill(owner, 0)
-      } catch (ownerError) {
-        if ((ownerError as NodeJS.ErrnoException).code === 'ESRCH') {
-          await rm(lockDir, { recursive: true, force: true })
-          continue
-        }
-      }
-      await new Promise((resolve) => setTimeout(resolve, 10))
-    }
-  }
-  const temp = `${path}.${process.pid}.tmp`
-  try {
-    let entries: unknown[] = []
-    try {
-      const parsed: unknown = JSON.parse(await readFile(path, 'utf8'))
-      if (!Array.isArray(parsed)) throw new Error(`Invalid session index: ${path}`)
-      entries = parsed
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
-    }
-    const ids = entries.map((entry) => typeof entry === 'string'
-      ? entry
-      : (entry as { sessionId?: unknown } | null)?.sessionId)
-    if (ids.includes(sessionId)) return
-    entries.push({ sessionId, at, source: 'session-start' })
-    await writeFile(temp, JSON.stringify(entries), 'utf8')
-    await rename(temp, path)
-  } finally {
-    await rm(temp, { force: true }).catch(() => {})
-    await rm(lockDir, { recursive: true, force: true })
-  }
+  const line = `${JSON.stringify({ sessionId, at, source: 'session-start' })}\n`
+  if (Buffer.byteLength(line) > 4096) throw new Error('sessions.json entry exceeds PIPE_BUF')
+  appendFileSync(path, line, { flag: 'a' })
 }
 
 function roleFor(env: HookEnv): string {

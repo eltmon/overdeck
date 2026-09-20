@@ -37,14 +37,14 @@ afterEach(() => {
 });
 
 describe('sessions.json index', () => {
-  it('appends structured entries and deduplicates by session id', () => {
-    saveSessionId('agent-pan-3950', 'session-a');
+  it('appends JSON lines and resolves duplicate session ids from the last occurrence', () => {
     saveSessionId('agent-pan-3950', 'session-a');
     appendSessionIdToHistory('agent-pan-3950', 'session-b', 'session-start');
+    saveSessionId('agent-pan-3950', 'session-a');
 
     expect(readSessionIndexSync('agent-pan-3950')).toEqual([
-      expect.objectContaining({ sessionId: 'session-a', source: 'rotation' }),
       expect.objectContaining({ sessionId: 'session-b', source: 'session-start' }),
+      expect.objectContaining({ sessionId: 'session-a', source: 'rotation' }),
     ]);
   });
 
@@ -104,14 +104,37 @@ describe('sessions.json index', () => {
     expect(order).toEqual(['stopped', 'index-attempt']);
   });
 
-  it('propagates a malformed index write error without replacing the file', () => {
+  it('skips malformed lines without preventing later appends', () => {
     const agentDir = join(process.env.OVERDECK_HOME!, 'agents', 'agent-pan-3950');
     mkdirSync(agentDir, { recursive: true });
     const indexPath = join(agentDir, 'sessions.json');
-    writeFileSync(indexPath, '{malformed');
+    writeFileSync(indexPath, '{malformed\n');
 
-    expect(() => appendSessionIdToHistory('agent-pan-3950', 'session-new', 'launcher')).toThrow();
-    expect(readFileSync(indexPath, 'utf8')).toBe('{malformed');
+    appendSessionIdToHistory('agent-pan-3950', 'session-new', 'launcher');
+    expect(readSessionIndexSync('agent-pan-3950')).toEqual([
+      expect.objectContaining({ sessionId: 'session-new', source: 'launcher' }),
+    ]);
+  });
+
+  it('reads the legacy JSON array format', () => {
+    const agentDir = join(process.env.OVERDECK_HOME!, 'agents', 'agent-pan-3950');
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, 'sessions.json'), JSON.stringify([
+      'legacy-string',
+      { sessionId: 'legacy-object', at: '2026-09-20T00:00:00.000Z', source: 'launcher' },
+    ]));
+
+    expect(readSessionIndexSync('agent-pan-3950').map((entry) => entry.sessionId)).toEqual([
+      'legacy-string',
+      'legacy-object',
+    ]);
+
+    appendSessionIdToHistory('agent-pan-3950', 'jsonl-after-legacy', 'session-start');
+    expect(readSessionIndexSync('agent-pan-3950').map((entry) => entry.sessionId)).toEqual([
+      'legacy-string',
+      'legacy-object',
+      'jsonl-after-legacy',
+    ]);
   });
 
   it('falls back to an older indexed transcript when the newest JSONL is absent', async () => {

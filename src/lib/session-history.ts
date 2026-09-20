@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { getOverdeckHome } from './paths.js';
 import { getHarnessBehavior } from './runtimes/behavior.js';
@@ -26,73 +26,63 @@ export interface SessionIndexEntry {
   source: string;
 }
 
-function parseSessionIndex(raw: unknown): SessionIndexEntry[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.flatMap((value): SessionIndexEntry[] => {
-    if (typeof value === 'string' && value.trim()) {
-      return [{ sessionId: value.trim(), at: '', source: 'legacy-index' }];
-    }
-    if (!value || typeof value !== 'object') return [];
-    const entry = value as Partial<SessionIndexEntry>;
-    if (typeof entry.sessionId !== 'string' || !entry.sessionId.trim()) return [];
-    return [{
-      sessionId: entry.sessionId.trim(),
-      at: typeof entry.at === 'string' ? entry.at : '',
-      source: typeof entry.source === 'string' ? entry.source : 'unknown',
-    }];
-  });
+function normalizeSessionEntry(value: unknown, legacy = false): SessionIndexEntry | null {
+  if (legacy && typeof value === 'string' && value.trim()) {
+    return { sessionId: value.trim(), at: '', source: 'legacy-index' };
+  }
+  if (!value || typeof value !== 'object') return null;
+  const entry = value as Partial<SessionIndexEntry>;
+  if (typeof entry.sessionId !== 'string' || !entry.sessionId.trim()) return null;
+  return {
+    sessionId: entry.sessionId.trim(),
+    at: typeof entry.at === 'string' ? entry.at : '',
+    source: typeof entry.source === 'string' ? entry.source : 'unknown',
+  };
 }
 
-const SESSION_INDEX_LOCK_DELAYS_MS = [5, 10, 20, 40, 80, 160, 320] as const;
-
-function acquireSessionIndexLock(dir: string): string {
-  const lockDir = join(dir, 'sessions.lock');
-  const sleeper = new Int32Array(new SharedArrayBuffer(4));
-  for (let attempt = 0; attempt <= SESSION_INDEX_LOCK_DELAYS_MS.length; attempt++) {
-    let acquired = false;
+function parseSessionIndex(contents: string): SessionIndexEntry[] {
+  const trimmed = contents.trimStart();
+  let entries: SessionIndexEntry[] = [];
+  let jsonLines = contents;
+  if (trimmed.startsWith('[')) {
+    const arrayEnd = trimmed.lastIndexOf(']');
+    if (arrayEnd < 0) return [];
     try {
-      const fd = openSync(lockDir, 'wx', 0o600);
-      acquired = true;
-      try {
-        writeFileSync(fd, `${process.pid}\n`, 'utf8');
-      } finally { closeSync(fd); }
-      return lockDir;
-    } catch (error) {
-      if (acquired) unlinkSync(lockDir);
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
-      try {
-        const owner = Number.parseInt(readFileSync(lockDir, 'utf8').trim(), 10);
-        if (Number.isInteger(owner) && owner > 0 && owner !== process.pid) process.kill(owner, 0);
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ESRCH') {
-          unlinkSync(lockDir);
-          continue;
-        }
-      }
-      const delay = SESSION_INDEX_LOCK_DELAYS_MS[attempt];
-      if (delay === undefined) break;
-      Atomics.wait(sleeper, 0, 0, delay);
+      const parsed: unknown = JSON.parse(trimmed.slice(0, arrayEnd + 1));
+      entries = Array.isArray(parsed)
+        ? parsed.flatMap((value) => {
+            const entry = normalizeSessionEntry(value, true);
+            return entry ? [entry] : [];
+          })
+        : [];
+    } catch {
+      return [];
     }
+    jsonLines = trimmed.slice(arrayEnd + 1);
   }
-  throw new Error(`sessions.json is locked: ${lockDir}`);
-}
+  entries.push(...jsonLines.split(/\r?\n/).flatMap((line) => {
+    if (!line.trim()) return [];
+    try {
+      const entry = normalizeSessionEntry(JSON.parse(line));
+      return entry ? [entry] : [];
+    } catch {
+      return [];
+    }
+  }));
 
-function writeSessionIndexAtomic(file: string, entries: SessionIndexEntry[]): void {
-  const temp = `${file}.${process.pid}.${randomUUID()}.tmp`;
-  try {
-    writeFileSync(temp, JSON.stringify(entries), { encoding: 'utf8', mode: 0o600 });
-    renameSync(temp, file);
-  } catch (error) {
-    rmSync(temp, { force: true });
-    throw error;
+  const newestById = new Map<string, SessionIndexEntry>();
+  for (const entry of entries) {
+    newestById.delete(entry.sessionId);
+    newestById.set(entry.sessionId, entry);
   }
+  return [...newestById.values()];
 }
 
 export function readSessionIndexSync(agentId: string): SessionIndexEntry[] {
   try {
     const file = join(getOverdeckHome(), 'agents', agentId, 'sessions.json');
     if (!existsSync(file)) return [];
-    return parseSessionIndex(JSON.parse(readFileSync(file, 'utf8')));
+    return parseSessionIndex(readFileSync(file, 'utf8'));
   } catch {
     return [];
   }
@@ -132,16 +122,9 @@ export function appendSessionIdToHistory(
   if (!sessionId) return;
   const dir = join(getOverdeckHome(), 'agents', agentId);
   mkdirSync(dir, { recursive: true });
-  const lockDir = acquireSessionIndexLock(dir);
-  try {
-    const file = join(dir, 'sessions.json');
-    const entries = existsSync(file) ? parseSessionIndex(JSON.parse(readFileSync(file, 'utf8'))) : [];
-    if (entries.some((entry) => entry.sessionId === sessionId)) return;
-    entries.push({ sessionId, at: new Date().toISOString(), source });
-    writeSessionIndexAtomic(file, entries);
-  } finally {
-    unlinkSync(lockDir);
-  }
+  const line = `${JSON.stringify({ sessionId, at: new Date().toISOString(), source })}\n`;
+  if (Buffer.byteLength(line) > 4096) throw new Error('sessions.json entry exceeds PIPE_BUF');
+  appendFileSync(join(dir, 'sessions.json'), line, { flag: 'a' });
 }
 
 export function createFreshSessionIdentity(agentId: string, harness: RuntimeName): string | undefined {

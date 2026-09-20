@@ -75,14 +75,28 @@ function behaviorForHarness(harness: string | null | undefined) {
 }
 
 function parseSessionIds(raw: string): string[] {
-  const parsed: unknown = JSON.parse(raw);
-  if (!Array.isArray(parsed)) return [];
-  return parsed.flatMap((value): string[] => {
-    if (typeof value === 'string' && value.trim()) return [value.trim()];
-    if (!value || typeof value !== 'object') return [];
-    const sessionId = (value as { sessionId?: unknown }).sessionId;
-    return typeof sessionId === 'string' && sessionId.trim() ? [sessionId.trim()] : [];
-  });
+  const trimmed = raw.trimStart();
+  const values: unknown[] = [];
+  let lines = raw;
+  if (trimmed.startsWith('[')) {
+    const end = trimmed.lastIndexOf(']');
+    if (end < 0) return [];
+    const legacy: unknown = JSON.parse(trimmed.slice(0, end + 1));
+    if (Array.isArray(legacy)) values.push(...legacy);
+    lines = trimmed.slice(end + 1);
+  }
+  for (const line of lines.split(/\r?\n/)) {
+    try { if (line.trim()) values.push(JSON.parse(line)); } catch { /* skip malformed lines */ }
+  }
+  const ids = new Map<string, string>();
+  for (const value of values) {
+    const id = typeof value === 'string' ? value : (value as { sessionId?: unknown } | null)?.sessionId;
+    if (typeof id === 'string' && id.trim()) {
+      ids.delete(id.trim());
+      ids.set(id.trim(), id.trim());
+    }
+  }
+  return [...ids.values()];
 }
 
 async function readIndexedSessionIds(agentDir: string): Promise<{ ids: string[]; exists: boolean }> {

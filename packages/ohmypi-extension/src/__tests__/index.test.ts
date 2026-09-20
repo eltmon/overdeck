@@ -101,11 +101,11 @@ describe('handleSessionStart', () => {
       { reason: 'new', sessionId: 'sess-resume-target' },
     )
     const paths = overdeckPathsFor('agent-pan-636', h.home)
-    expect(JSON.parse(readFileSync(paths.sessionsIndexPath, 'utf8'))).toEqual([{
+    expect(JSON.parse(readFileSync(paths.sessionsIndexPath, 'utf8').trim())).toEqual({
       sessionId: 'sess-resume-target',
       at: fixedTime,
       source: 'session-start',
-    }])
+    })
   })
 
   it('does not create a session index when Pi reports no session id', async () => {
@@ -620,9 +620,9 @@ describe('handleTurnEnd', () => {
   it('posts specialist auto-complete with trusted runtime metadata when a specialist marker appears', async () => {
     const paths = overdeckPathsFor('agent-pan-636-review', h.home)
     mkdirSync(paths.agentDir, { recursive: true })
-    writeFileSync(paths.sessionsIndexPath, JSON.stringify([
+    writeFileSync(paths.sessionsIndexPath, `{malformed\n${JSON.stringify(
       { sessionId: 'pi-session-123', at: fixedTime, source: 'session-start' },
-    ]))
+    )}\n`)
 
     await handleTurnEnd(
       { agentId: 'agent-pan-636-review', home: h.home, pid: 7, now, role: 'review', issueId: 'PAN-636' },

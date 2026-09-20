@@ -48,11 +48,16 @@ describe('resolveClaudeSessionId (PAN-830)', () => {
   });
 
   it('uses the last entry of sessions.json', async () => {
-    const arr = [
+    const entries = [
       { sessionId: 'oldest-uuid', at: '2026-09-18T00:00:00.000Z', source: 'launcher' },
       { sessionId: CLAUDE_SESSION_ID, at: '2026-09-20T00:00:00.000Z', source: 'session-start' },
     ];
-    await writeFile(join(agentsDir, AGENT_ID, 'sessions.json'), JSON.stringify(arr));
+    await writeFile(join(agentsDir, AGENT_ID, 'sessions.json'), [
+      JSON.stringify(entries[0]),
+      '{malformed',
+      JSON.stringify(entries[1]),
+      '',
+    ].join('\n'));
 
     const id = await resolveClaudeSessionId(AGENT_ID, { agentsDirOverride: agentsDir });
 

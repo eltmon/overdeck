@@ -448,7 +448,9 @@ describe('spawnAgent PTY supervisor wiring', () => {
 
     const agentDir = join(tmpHome, 'agents', 'agent-pan-1409');
     const persisted = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf8')) as AgentState;
-    const history = JSON.parse(readFileSync(join(agentDir, 'sessions.json'), 'utf8')) as Array<{ sessionId: string }>;
+    const history = readFileSync(join(agentDir, 'sessions.json'), 'utf8').trim().split('\n').map(
+      (line) => JSON.parse(line) as { sessionId: string; source: string },
+    );
     const sessionId = history[0]?.sessionId;
     const launcher = readFileSync(join(agentDir, 'launcher.sh'), 'utf8');
     const lifecycle = readFileSync(join(agentDir, 'lifecycle.log'), 'utf8');
