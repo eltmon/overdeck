@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-20T22:47:41.791Z · model: claude-opus-5 · open: 854_
+_Last sequenced: 2026-09-20T20:49:03.587954Z · model: claude-opus-5 · open: 854_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -53,6 +53,7 @@ _Last sequenced: 2026-09-20T22:47:41.791Z · model: claude-opus-5 · open: 854_
 | 46 | PAN-3967 | XS | high | ok |  |  | Every strike agent ends on `pan strike-ready`, a verb PAN-3917 cut; 4 prompt/recovery refs still name it. Push is the signal. |
 | 47 | PAN-3953 | XS | high | ok |  |  | planned label is applied at planning spawn, before any spec exists; five issues labeled planned with no spec on disk |
 | 48 | PAN-3500 | S | critical | ok |  |  | A review sub-role edited seven tracked files after writing its report and the changes were auto-committed into the feature history. |
+| 49 | PAN-3961 | XS | high | needs-refinement |  |  | pan plan --auto labels planned one second after spawn; possible duplicate of PAN-3953 — fold into it |
 | 50 | PAN-3313 | S | critical | ok |  |  | A transient upstream stream error benches CLIProxy's only auth: ~70% of GPT-routed inference 503s with a message that blames credentials. |
 | 51 | PAN-3580 | S | critical | ok |  |  | UAT-failure relay has no convergence cap — 65 identical rework files in 12h with uat_notes NULL |
 | 52 | PAN-3282 | M | critical | ok |  |  | Review agents die before writing a verdict across 5 issues and 2 projects, leaving a verdict-shaped status with no artifact behind it. |
@@ -665,200 +666,199 @@ _Last sequenced: 2026-09-20T22:47:41.791Z · model: claude-opus-5 · open: 854_
 | 659 | PAN-3133 | S | low | ok |  |  | Evaluation spike for TRON encoding of prompt-bound xBRIEF payloads; savings are modest today since agents get a bounded slice. |
 | 660 | PAN-3011 | M | low | ok |  | PAN-1641, PAN-465 | Add poolside Laguna S 2.1 as a model target; the honest hardware note says it will not fit this machine's GPU. |
 | 661 | PAN-3957 | L | low | ok |  |  | Parked: Overdeck-owned project memory in the repo replacing per-harness auto-memory; needs a PRD deciding the store location |
-| 662 | PAN-3971 | L | low | ok |  |  | Overdeck-owned artifact pages (publish/persist/share HTML ledgers) replacing Claude Code artifacts; operator says backlog only |
-| 663 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
-| 664 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
-| 665 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
-| 666 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
-| 667 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
-| 668 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
-| 669 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
-| 670 | PAN-2046 | M | low | ok |  |  | Conversation view does not surface terminal command responses |
-| 671 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
-| 672 | PAN-3919 | S | low | needs-refinement |  |  | Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized |
-| 673 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
-| 674 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
-| 675 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
-| 676 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
-| 677 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
-| 678 | PAN-1980 | M | low | needs-refinement |  |  | Session rotation on resume is gone with compaction state; the "one pipeline-membership view" half may still apply to pipeline-membership.ts |
-| 679 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
-| 680 | PAN-1949 | M | low | needs-refinement |  |  | Surface inspection sub-runs in the issue tree + a parent Inspection node aggregating all item verdicts |
-| 681 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
-| 682 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
-| 683 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
-| 684 | PAN-1782 | M | low | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout |
-| 685 | PAN-1773 | M | low | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
-| 686 | PAN-1646 | M | low | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
-| 687 | PAN-1643 | M | low | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
-| 688 | PAN-1592 | M | low | ok |  |  | Composer: make ephemeral composer state reload-durable (pasted images + unsent/failed message text) |
-| 689 | PAN-1581 | M | low | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
-| 690 | PAN-1552 | M | low | ok |  |  | Dashboard conversation-message 500 cause is unloggable: serve mode never writes dashboard.log |
-| 691 | PAN-1533 | M | low | ok |  |  | Fork-into-worktree from conversation branch chip |
-| 692 | PAN-1483 | XS | low | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
-| 693 | PAN-1482 | M | low | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
-| 694 | PAN-1481 | M | low | ok |  |  | Add cost-event telemetry for Caveman token savings |
-| 695 | PAN-1356 | M | low | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
-| 696 | PAN-1242 | M | low | ok |  |  | Create a new issue directly from a kanban column |
-| 697 | PAN-1222 | M | low | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
-| 698 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
-| 699 | PAN-1166 | M | low | ok |  |  | Re-introduce /ws/terminal auth gate with a working bootstrap path |
-| 700 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
-| 701 | PAN-2667 | M | low | stale |  |  | beads-rollup admission signal is gone from resource discovery; if still wanted, source it from xBRIEF item completion instead |
-| 702 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
-| 703 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
-| 704 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
-| 705 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
-| 706 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
-| 707 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
-| 708 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
-| 709 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
-| 710 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
+| 662 | PAN-2282 | M | low | ok |  |  | Conversation view shows no history for ohmypi-harness conversations |
+| 663 | PAN-2091 | XS | low | ok |  |  | delete dead IssueCockpitBody cockpit subtree (8 files, superseded by IssueMissionControl) |
+| 664 | PAN-2085 | M | low | ok |  |  | Auto-isolate conversations in a lightweight git worktree (Conductor-style workspaces) |
+| 665 | PAN-2084 | M | low | ok |  |  | Auto-create lightweight conversation worktrees on project chats |
+| 666 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
+| 667 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
+| 668 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
+| 669 | PAN-2046 | M | low | ok |  |  | Conversation view does not surface terminal command responses |
+| 670 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
+| 671 | PAN-3919 | S | low | needs-refinement |  |  | Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized |
+| 672 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
+| 673 | PAN-2002 | XS | low | ok |  |  | [HUMAN-ONLY] Sign & notarize the macOS desktop build (Apple Developer ID) |
+| 674 | PAN-1999 | M | low | ok |  |  | Backlog Sequencer: one sequencer per project (currently a single global runner scoped to PAN) |
+| 675 | PAN-1986 | M | low | ok |  |  | restartAgent (change harness/model): wipe stale agent-dir session pointers + refresh conversations row |
+| 676 | PAN-1983 | L | low | ok |  |  | Remove all panopticon.db-supporting code (legacy SQLite layer + db↔db migration + seed-from-legacy) |
+| 677 | PAN-1980 | M | low | needs-refinement |  |  | Session rotation on resume is gone with compaction state; the "one pipeline-membership view" half may still apply to pipeline-membership.ts |
+| 678 | PAN-1958 | M | low | ok |  |  | Source-tagged programmatic delivery into pi conversation agents (extension sendUserMessage + input.source) |
+| 679 | PAN-1949 | M | low | needs-refinement |  |  | Surface inspection sub-runs in the issue tree + a parent Inspection node aggregating all item verdicts |
+| 680 | PAN-1907 | M | low | ok |  |  | Generalize ToS gate: block ALL non-Claude-Code harnesses from Anthropic-subscription models; gray out + non-selectable + validate every… |
+| 681 | PAN-1895 | M | low | ok |  |  | Spawn work agents from issue workspace slide-out |
+| 682 | PAN-1878 | M | low | ok |  |  | process: bake 'docs updated' into acceptance criteria / definition-of-done in role + planning prompts |
+| 683 | PAN-1782 | M | low | ok |  |  | Handoff forks stall at "Injecting…" then die on double 300s summary timeout |
+| 684 | PAN-1773 | M | low | ok |  |  | Swarm v2 Phase 2: remote slot agents on Fly (B5 follow-up to PAN-1762) |
+| 685 | PAN-1646 | M | low | ok |  |  | Rabbit-hole drift detection and lift-to-new-conversation |
+| 686 | PAN-1643 | M | low | ok |  |  | Extend local Ollama support to Codex + Claude Code harnesses and dashboard model picker |
+| 687 | PAN-1592 | M | low | ok |  |  | Composer: make ephemeral composer state reload-durable (pasted images + unsent/failed message text) |
+| 688 | PAN-1581 | M | low | ok |  |  | Duplicate skills in picker: code-review collides with official plugin; beads/pan-flywheel/pan-handoff doubled across project+user sync |
+| 689 | PAN-1552 | M | low | ok |  |  | Dashboard conversation-message 500 cause is unloggable: serve mode never writes dashboard.log |
+| 690 | PAN-1533 | M | low | ok |  |  | Fork-into-worktree from conversation branch chip |
+| 691 | PAN-1483 | XS | low | ok |  |  | Distinguish general-use skills from Panopticon-only dev skills in pan sync |
+| 692 | PAN-1482 | M | low | ok |  |  | Token spend report should aggregate data from repo, not just local machine |
+| 693 | PAN-1481 | M | low | ok |  |  | Add cost-event telemetry for Caveman token savings |
+| 694 | PAN-1356 | M | low | ok |  |  | Extend the memory Observation pipeline to ad-hoc conversations |
+| 695 | PAN-1242 | M | low | ok |  |  | Create a new issue directly from a kanban column |
+| 696 | PAN-1222 | M | low | ok |  |  | Project-templated DB lifecycle: auxiliary databases + seed refresh from prod |
+| 697 | PAN-1208 | M | low | ok |  |  | Polyrepo: support non-feature 'main' workspaces alongside feature-* |
+| 698 | PAN-1166 | M | low | ok |  |  | Re-introduce /ws/terminal auth gate with a working bootstrap path |
+| 699 | PAN-1153 | M | low | ok |  |  | Vite TRAEFIK_ENABLED conflates 'Traefik on' with 'inside container' |
+| 700 | PAN-2667 | M | low | stale |  |  | beads-rollup admission signal is gone from resource discovery; if still wanted, source it from xBRIEF item completion instead |
+| 701 | PAN-1152 | XS | low | ok |  |  | Remove PANOPTICON_DEV env-var persistence |
+| 702 | PAN-1135 | M | low | ok |  |  | Document the hook system in docs/HOOKS.md |
+| 703 | PAN-1133 | M | low | stale |  |  | Deacon-patrol tie-in for TLDR supervision is gone; would need its own liveness check |
+| 704 | PAN-1123 | XS | low | ok |  |  | Channels delivery: surface failures, add fallback toggle, route conversations through channels |
+| 705 | PAN-1121 | M | low | ok |  |  | Context bloat: agents receive oversized prompts that exceed tool limits and force immediate compaction |
+| 706 | PAN-1117 | M | low | ok |  |  | Memory: pinned docs (long-form doc chunking + retrieval) |
+| 707 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
+| 708 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
+| 709 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
+| 710 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
 | 711 | PAN-1641 | M | low | ok |  |  | Run agents on local GPU models via a managed Ollama sidecar |
-| 712 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
-| 713 | PAN-3768 | XS | low | ok |  |  | pan handoff --title already implemented and landed (678f6b389e5); open only pending close-out. |
-| 714 | PAN-3034 | XS | low | ok |  |  | Fix already landed on main (strike/slot workspace names and live tmux now seed the session tree); open pending close-out. |
-| 715 | PAN-2983 | M | low | ok |  |  | OKF v3 deferrals: lease-based concurrent writes and an LLM semantic auditor, both gated on evidence that isn't here yet. |
-| 716 | PAN-3778 | S | low | ok |  |  | Reconnect-loop fix (48fd8f7a) is already on main; open only pending verify and close-out. |
-| 717 | PAN-3824 | XS | low | needs-refinement |  |  | Image-only report: default view on Windows breaks the model selector; needs a written repro and expected behavior |
-| 718 | PAN-3823 | XS | low | needs-refinement |  |  | Image-only report titled "pan sync issue"; needs the command, output text, and expected behavior |
-| 719 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
-| 720 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
-| 721 | PAN-962 | M | low | needs-refinement |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
-| 722 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
-| 723 | PAN-943 | M | low | ok |  |  | Add memory file review and management command |
-| 724 | PAN-908 | M | low | ok |  |  | PAN-908: Make work-agent spawn limits configurable and overridable |
-| 725 | PAN-898 | M | low | ok |  |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
-| 726 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
-| 727 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
-| 728 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
-| 729 | PAN-810 | XS | low | needs-refinement |  |  | Inspector: diagnostic UI when pipeline phase is unknown |
-| 730 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
-| 731 | PAN-793 | XS | low | ok |  |  | Borrow Deft's explicit scope-lifecycle transitions for Panopticon agent state machine |
-| 732 | PAN-791 | XS | low | ok |  |  | Skill mapping: Deft Directive v0.20.0-rc.3 ↔ Panopticon CLI |
-| 733 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
-| 734 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
-| 735 | PAN-777 | M | low | ok |  |  | Inter-agent communication skill: send messages to conversation-mode agents |
-| 736 | PAN-775 | L | low | ok |  |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
-| 737 | PAN-3456 | XS | low | ok |  |  | Already fixed in 4117c9a777 with a regression test; open only pending close-out. |
-| 738 | PAN-774 | XS | low | ok |  |  | Unify launch UX and release pipeline for 1.0 |
-| 739 | PAN-773 | XS | low | ok |  |  | Design prompt-style overlays with model hierarchy and scoped toggles |
-| 740 | PAN-772 | M | low | stale |  |  | Auto-resume ladder paths it names are gone; terminal-stack consistency now means the Herdr/tmux contract in TERMINAL-BACKENDS.md |
-| 741 | PAN-771 | M | low | needs-refinement |  |  | Investigate Vercel Sandbox execution backend support |
-| 742 | PAN-769 | M | low | stale |  | PAN-750 | Phase-transition history no longer accumulates in a record; a churn metric would be rebuilt from PR review cycles or the pipeline journal |
-| 743 | PAN-765 | M | low | ok |  |  | Preserve trailing zeros in cost displays |
-| 744 | PAN-764 | M | low | ok |  |  | Add quota/usage inspector for routed model providers |
-| 745 | PAN-762 | M | low | ok |  |  | Settings: warn when model overrides target disabled providers |
-| 746 | PAN-752 | M | low | ok |  |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
-| 747 | PAN-751 | M | low | ok |  |  | Historical Metrics Data Persistence |
-| 748 | PAN-750 | L | low | ok |  |  | Complete Metrics Page Redesign |
-| 749 | PAN-749 | M | low | needs-refinement |  |  | Research and borrow best features from gstack |
-| 750 | PAN-747 | XS | low | ok |  |  | Conversation list items lack accessible labels in accessibility tree |
-| 751 | PAN-743 | XS | low | ok |  |  | Add consistent new conversation icon actions in Command Deck |
-| 752 | PAN-738 | M | low | ok |  |  | Add right-click fork option to conversation list |
-| 753 | PAN-735 | M | low | ok |  |  | Settings page: review and configure overridden subagent model files |
-| 754 | PAN-730 | M | low | ok |  |  | Add provider account telemetry for credits, balances, and usage |
-| 755 | PAN-702 | M | low | ok |  |  | OpenAI provider: add plan/subscription support and fix unregistered model resolution |
-| 756 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
-| 757 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
-| 758 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
-| 759 | PAN-658 | M | low | ok |  | PAN-2356 | Shared Sessions v0: GitHub-auth'd shared conversation panel with WebRTC transport |
-| 760 | PAN-624 | M | low | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
-| 761 | PAN-623 | M | low | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
-| 762 | PAN-622 | M | low | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
-| 763 | PAN-604 | M | low | ok |  |  | Hide planning agent from workspace detail pane |
-| 764 | PAN-603 | M | low | ok |  |  | Plan review loop with configurable reviewer model |
-| 765 | PAN-591 | XS | low | ok |  |  | Integrate Karpathy LLM guidelines into all Panopticon CLAUDE.md templates |
-| 766 | PAN-589 | XS | low | ok |  |  | Review and update commands-skills.md with all available Panopticon skills |
-| 767 | PAN-576 | M | low | ok |  |  | Global / search should include conversations in addition to workspace features |
-| 768 | PAN-571 | XS | low | ok |  |  | Add OpenRouter credits/plan status endpoint and UI |
-| 769 | PAN-568 | M | low | ok |  |  | Kanban: Show workspace and tmux session counts in stats |
-| 770 | PAN-565 | M | low | ok |  |  | Handle CTRL-Z to undo accidental conversation archival |
-| 771 | PAN-564 | M | low | ok |  |  | Slash menu positioned incorrectly |
-| 772 | PAN-554 | M | low | ok |  |  | Add kanban board deeplinks for issue URLs |
-| 773 | PAN-543 | M | low | ok |  |  | Add confirmation dialog before applying Optimal Defaults |
-| 774 | PAN-483 | M | low | ok |  |  | Unify Resume Agent UX |
-| 775 | PAN-480 | M | low | ok |  |  | Pass --effort flag when spawning planning agents via Cloister |
-| 776 | PAN-476 | M | low | ok |  |  | Agent resume with Haiku session summary instead of claude --resume |
-| 777 | PAN-468 | M | low | ok |  |  | Agent test conversations pollute production database |
-| 778 | PAN-461 | M | low | ok |  |  | Deep-wipe multi-step progress dialog |
-| 779 | PAN-459 | M | low | ok |  |  | Planning setup screen with SSE progress streaming |
-| 780 | PAN-407 | XS | low | ok |  |  | Run Panopticon from a main workspace for development isolation |
-| 781 | PAN-2348 | XS | low | ok |  |  | docs: migrate STATE-STORAGE-AUDIT.md content to living docs, then delete |
-| 782 | PAN-2346 | XS | low | needs-refinement |  |  | docs: refresh AGENT_TYPES_INDEX.md — flywheel is a loop skill, inspect is per-item verification; update to the post-cut tree |
-| 783 | PAN-2345 | XS | low | needs-refinement |  |  | docs: refresh pan-done.md — drop the boot-reconciliation reference; describe the current pan done flow |
-| 784 | PAN-2344 | XS | low | needs-refinement |  |  | docs: refresh KANBAN-MODEL.md for derived issue state + PR-based review (boot reconciliation and inspect gates are gone) |
-| 785 | PAN-2343 | XS | low | ok |  |  | docs: refresh MISSION-CONTROL.md |
-| 786 | PAN-2073 | XS | low | ok |  |  | docs: add user-facing page for the Desktop App |
-| 787 | PAN-2071 | XS | low | ok |  |  | docs: add user-facing page for the Hooks system |
-| 788 | PAN-2068 | XS | low | ok |  |  | docs: add user-facing page for Caveman (agent output compression) |
-| 789 | PAN-2067 | XS | low | ok |  |  | docs: add user-facing page for RTK (Bash output compression) |
-| 790 | PAN-1684 | XS | low | ok |  |  | build full marketing kit + plan (SEO, video list, channels) from MARKETING.md seed |
-| 791 | PAN-1683 | XS | low | ok |  |  | docs: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) |
-| 792 | PAN-1474 | M | low | ok |  |  | Add ACKNOWLEDGEMENTS doc |
-| 793 | PAN-1469 | M | low | ok |  |  | End-to-end review and consolidation of all project documentation |
-| 794 | PAN-674 | XS | low | ok |  |  | docs: add glossary of Panopticon domain terms |
-| 795 | PAN-634 | M | low | ok |  |  | Documentation cleanup: restructure docs, update installation (npx panctl), refresh stale PRDs |
-| 796 | PAN-2908 | M | low | ok |  |  | Make overdeck not suck |
-| 797 | PAN-106 | M | high | stale |  |  | Cost prediction/estimation for in-progress work |
-| 798 | PAN-262 | M | high | stale |  |  | Refactor post-merge lifecycle into composable, idempotent operations |
-| 799 | PAN-176 | M | high | stale |  |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
-| 800 | PAN-334 | S | medium | stale |  |  | Dashboard server has no duplicate-process protection |
-| 801 | PAN-324 | XS | medium | needs-refinement |  |  | Approval is now a PR review or the dashboard MERGE button; verify whether the agent detail pane already surfaces MERGE post-cut |
-| 802 | PAN-304 | S | medium | stale |  |  | closeLinearDirect returns stepOk even when state update never happens |
-| 803 | PAN-245 | S | medium | stale |  |  | Ctrl+C aborts planning dialog instead of copying text |
-| 804 | PAN-244 | S | medium | stale |  |  | Deep-wipe leaves local branch and worktree metadata behind |
-| 805 | PAN-178 | M | low | stale |  |  | Per-task checkpointing is covered by Item: commit trailers + xBRIEF item status; the .planning/checkpoints proposal predates the cut |
-| 806 | PAN-113 | S | medium | stale |  |  | Dashboard 'Start Agent' returns success before verifying agent actually started |
-| 807 | PAN-49 | XS | medium | stale |  |  | Fix CloisterService tests that require real runtime |
-| 808 | PAN-294 | M | medium | stale |  |  | Surface module initialization errors as system-level, not per-issue |
-| 809 | PAN-293 | M | medium | stale |  |  | Project Living Memory |
-| 810 | PAN-277 | M | medium | stale |  |  | Session reasoning capture & collaborative PRD refinement |
-| 811 | PAN-258 | M | medium | stale |  |  | Kanban board: fit all columns without horizontal scrolling |
-| 812 | PAN-255 | M | medium | stale |  |  | Agents lack awareness of MCP tools |
-| 813 | PAN-252 | XS | medium | stale |  |  | Disable Sync with Main button when workspace is up to date |
-| 814 | PAN-243 | M | medium | stale |  |  | Audit dashboard actions: ensure all are available via CLI |
-| 815 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
-| 816 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
-| 817 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
-| 818 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
-| 819 | PAN-3564 | M | low | needs-refinement |  |  | Global state-git lock is gone; verify whether the per-issue fs-lock convoy (100% duty cycle, reviewer spawns die) can still occur |
-| 820 | PAN-3571 | S | low | stale |  |  | Stale: targets work-agent-stop-hook (7b953449633) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 821 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 822 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 823 | PAN-3078 | S | low | needs-refinement |  |  | review_status.inspect_status is gone; verify whether the surviving inspect-agent specialist still never delivers its verdict |
-| 824 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 825 | PAN-2960 | S | low | needs-refinement |  |  | review_status.inspect_status is gone; re-diagnose whether the surviving inspect-agent specialist has a self-termination gap |
-| 826 | PAN-3634 | S | low | stale |  |  | Stale: targets flywheelRunId stamping deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 827 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 828 | PAN-2659 | S | low | stale |  |  | Stale: targets pan-dir/record-lock.ts deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 829 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 830 | PAN-3914 | S | low | needs-refinement |  |  | Stale: checkOrphanedCompletions / deacon.ts patrol deleted by the PAN-3917 cut (ca15def); re-triage or close |
-| 831 | PAN-3868 | XS | low | stale |  |  | Stale: work-agent-stop-hook was deleted by the PAN-3917 cut (ca15def) (7b953449633); the wrong verb no longer exists |
-| 832 | PAN-299 | M | low | stale |  |  | Granular session state persistence across context compaction |
-| 833 | PAN-298 | M | low | stale |  |  | Auto-detect package manager and runtime in workspace setup |
-| 834 | PAN-297 | M | low | stale |  |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
-| 835 | PAN-283 | M | low | stale |  |  | Reset should sync workspace feature branch with latest main |
-| 836 | PAN-271 | M | low | stale |  |  | Auto-assign Linear project from project config when creating issues |
-| 837 | PAN-265 | M | low | stale |  |  | Review skill categorization: all skills available everywhere via personal + workspace |
-| 838 | PAN-249 | XS | low | stale |  |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
-| 839 | PAN-241 | L | low | stale |  |  | Mobile redesign initiative: full UX/UI overhaul + implementation plan |
-| 840 | PAN-228 | M | low | stale |  |  | Shift-left post-edit diagnostics |
-| 841 | PAN-227 | M | low | stale |  |  | Phase gate validation |
-| 842 | PAN-198 | M | low | stale |  |  | Structured audit trail for agent actions |
-| 843 | PAN-190 | M | low | stale |  |  | PAN-190: Specialized reviewer prompts (industry best-practice checklists) |
-| 844 | PAN-180 | M | low | stale |  |  | PAN-180: Cross-terminal file locking for concurrent agents |
-| 845 | PAN-177 | M | low | stale |  |  | PAN-177: Iteration limits with escalation for autonomous agents |
-| 846 | PAN-175 | M | low | stale |  |  | PAN-175: Pre-compact auto-save hook for agent sessions |
-| 847 | PAN-155 | L | low | stale |  |  | PAN-155: Redesign health page with Stitch (system overview, timeline, costs) |
-| 848 | PAN-146 | M | low | stale |  |  | PAN-146: Refine light mode theming across all dashboard pages |
-| 849 | PAN-55 | M | low | stale |  |  | Track specialist costs with time period filtering |
-| 850 | PAN-52 | XS | low | stale |  |  | Guidance needed: Running complex multi-container projects with Panopticon worktrees |
-| 851 | PAN-51 | M | low | stale |  |  | Documentation: Clarify issue tracker options beyond Linear |
-| 852 | PAN-47 | M | low | stale |  |  | PRDs already live under .pan/ on the feature branch; the docs/prds/active merge-blocking flow no longer exists |
-| 853 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
-| 854 | PAN-43 | M | low | stale |  |  | Add Slack and email notifications for agent events |
-| 855 | PAN-2070 | XS | low | needs-refinement |  |  | docs: user-facing Flywheel page should target the pan-flywheel v2 loop skill, not a CLI daemon with a dashboard toggle |
+| 712 | PAN-3768 | XS | low | ok |  |  | pan handoff --title already implemented and landed (678f6b389e5); open only pending close-out. |
+| 713 | PAN-3034 | XS | low | ok |  |  | Fix already landed on main (strike/slot workspace names and live tmux now seed the session tree); open pending close-out. |
+| 714 | PAN-2983 | M | low | ok |  |  | OKF v3 deferrals: lease-based concurrent writes and an LLM semantic auditor, both gated on evidence that isn't here yet. |
+| 715 | PAN-3778 | S | low | ok |  |  | Reconnect-loop fix (48fd8f7a) is already on main; open only pending verify and close-out. |
+| 716 | PAN-3824 | XS | low | needs-refinement |  |  | Image-only report: default view on Windows breaks the model selector; needs a written repro and expected behavior |
+| 717 | PAN-3823 | XS | low | needs-refinement |  |  | Image-only report titled "pan sync issue"; needs the command, output text, and expected behavior |
+| 718 | PAN-1049 | M | low | needs-refinement |  |  | Spike: evaluate Tauri v2 desktop shell |
+| 719 | PAN-984 | XS | low | needs-refinement |  |  | Evaluate context-mode MCP server as session continuity + search layer |
+| 720 | PAN-962 | M | low | needs-refinement |  |  | Post-PAN-946: vBRIEF lifecycle follow-up plan |
+| 721 | PAN-961 | M | low | ok |  |  | Update documentation for vBRIEF v0.6 lifecycle model |
+| 722 | PAN-943 | M | low | ok |  |  | Add memory file review and management command |
+| 723 | PAN-908 | M | low | ok |  |  | PAN-908: Make work-agent spawn limits configurable and overridable |
+| 724 | PAN-898 | M | low | ok |  |  | Dashboard polling and WebSocket efficiency: remaining audit findings |
+| 725 | PAN-853 | L | low | needs-refinement |  |  | Evaluate terminal-bench@2.0 custom agent harnesses for Panopticon integration |
+| 726 | PAN-833 | M | low | ok |  |  | Agent spawn logs ENOTDIR for .git/pan-credentials in worktrees (GitHub App credential loader) |
+| 727 | PAN-832 | M | low | needs-refinement |  |  | state.json staleness: lastActivity/costSoFar not updated as agent runs; /api/agents drops phase/cost/lastActivity |
+| 728 | PAN-810 | XS | low | needs-refinement |  |  | Inspector: diagnostic UI when pipeline phase is unknown |
+| 729 | PAN-797 | M | low | needs-refinement |  |  | Cost display: cache write tokens not shown separately; investigate Claude Code discrepancy |
+| 730 | PAN-793 | XS | low | ok |  |  | Borrow Deft's explicit scope-lifecycle transitions for Panopticon agent state machine |
+| 731 | PAN-791 | XS | low | ok |  |  | Skill mapping: Deft Directive v0.20.0-rc.3 ↔ Panopticon CLI |
+| 732 | PAN-790 | L | low | ok |  |  | PAN-789: Eliminate remaining TanStack Query polling |
+| 733 | PAN-786 | M | low | ok |  |  | Post planning Q\&A answers as issue comment |
+| 734 | PAN-777 | M | low | ok |  |  | Inter-agent communication skill: send messages to conversation-mode agents |
+| 735 | PAN-775 | L | low | ok |  |  | Redesign workspace inspector panel: sidebar layout is cramped and wrong |
+| 736 | PAN-3456 | XS | low | ok |  |  | Already fixed in 4117c9a777 with a regression test; open only pending close-out. |
+| 737 | PAN-774 | XS | low | ok |  |  | Unify launch UX and release pipeline for 1.0 |
+| 738 | PAN-773 | XS | low | ok |  |  | Design prompt-style overlays with model hierarchy and scoped toggles |
+| 739 | PAN-772 | M | low | stale |  |  | Auto-resume ladder paths it names are gone; terminal-stack consistency now means the Herdr/tmux contract in TERMINAL-BACKENDS.md |
+| 740 | PAN-771 | M | low | needs-refinement |  |  | Investigate Vercel Sandbox execution backend support |
+| 741 | PAN-769 | M | low | stale |  | PAN-750 | Phase-transition history no longer accumulates in a record; a churn metric would be rebuilt from PR review cycles or the pipeline journal |
+| 742 | PAN-765 | M | low | ok |  |  | Preserve trailing zeros in cost displays |
+| 743 | PAN-764 | M | low | ok |  |  | Add quota/usage inspector for routed model providers |
+| 744 | PAN-762 | M | low | ok |  |  | Settings: warn when model overrides target disabled providers |
+| 745 | PAN-752 | M | low | ok |  |  | Add Gemini OAuth support, remove O3/O4-mini, disable GPT-5.4-Pro |
+| 746 | PAN-751 | M | low | ok |  |  | Historical Metrics Data Persistence |
+| 747 | PAN-750 | L | low | ok |  |  | Complete Metrics Page Redesign |
+| 748 | PAN-749 | M | low | needs-refinement |  |  | Research and borrow best features from gstack |
+| 749 | PAN-747 | XS | low | ok |  |  | Conversation list items lack accessible labels in accessibility tree |
+| 750 | PAN-743 | XS | low | ok |  |  | Add consistent new conversation icon actions in Command Deck |
+| 751 | PAN-738 | M | low | ok |  |  | Add right-click fork option to conversation list |
+| 752 | PAN-735 | M | low | ok |  |  | Settings page: review and configure overridden subagent model files |
+| 753 | PAN-730 | M | low | ok |  |  | Add provider account telemetry for credits, balances, and usage |
+| 754 | PAN-702 | M | low | ok |  |  | OpenAI provider: add plan/subscription support and fix unregistered model resolution |
+| 755 | PAN-701 | XS | low | ok |  |  | Quick-Create conversation via keystroke using Conversations-page default model |
+| 756 | PAN-663 | XS | low | ok |  |  | Workspace frontend containers not auto-started for panopticon-cli self-hosted workspaces |
+| 757 | PAN-660 | M | low | ok |  |  | Slash menu command catalog drifts: hardcoded array in ComposerPromptEditor needs codegen |
+| 758 | PAN-658 | M | low | ok |  | PAN-2356 | Shared Sessions v0: GitHub-auth'd shared conversation panel with WebRTC transport |
+| 759 | PAN-624 | M | low | ok |  |  | Loop nodes: iterative agent execution with conditional termination |
+| 760 | PAN-623 | M | low | ok |  |  | Multi-channel workflow triggers: Slack, Discord, Telegram, GitHub webhooks |
+| 761 | PAN-622 | M | low | ok |  |  | YAML workflow DAGs: custom per-project pipeline definitions |
+| 762 | PAN-604 | M | low | ok |  |  | Hide planning agent from workspace detail pane |
+| 763 | PAN-603 | M | low | ok |  |  | Plan review loop with configurable reviewer model |
+| 764 | PAN-591 | XS | low | ok |  |  | Integrate Karpathy LLM guidelines into all Panopticon CLAUDE.md templates |
+| 765 | PAN-589 | XS | low | ok |  |  | Review and update commands-skills.md with all available Panopticon skills |
+| 766 | PAN-576 | M | low | ok |  |  | Global / search should include conversations in addition to workspace features |
+| 767 | PAN-571 | XS | low | ok |  |  | Add OpenRouter credits/plan status endpoint and UI |
+| 768 | PAN-568 | M | low | ok |  |  | Kanban: Show workspace and tmux session counts in stats |
+| 769 | PAN-565 | M | low | ok |  |  | Handle CTRL-Z to undo accidental conversation archival |
+| 770 | PAN-564 | M | low | ok |  |  | Slash menu positioned incorrectly |
+| 771 | PAN-554 | M | low | ok |  |  | Add kanban board deeplinks for issue URLs |
+| 772 | PAN-543 | M | low | ok |  |  | Add confirmation dialog before applying Optimal Defaults |
+| 773 | PAN-483 | M | low | ok |  |  | Unify Resume Agent UX |
+| 774 | PAN-480 | M | low | ok |  |  | Pass --effort flag when spawning planning agents via Cloister |
+| 775 | PAN-476 | M | low | ok |  |  | Agent resume with Haiku session summary instead of claude --resume |
+| 776 | PAN-468 | M | low | ok |  |  | Agent test conversations pollute production database |
+| 777 | PAN-461 | M | low | ok |  |  | Deep-wipe multi-step progress dialog |
+| 778 | PAN-459 | M | low | ok |  |  | Planning setup screen with SSE progress streaming |
+| 779 | PAN-407 | XS | low | ok |  |  | Run Panopticon from a main workspace for development isolation |
+| 780 | PAN-2348 | XS | low | ok |  |  | docs: migrate STATE-STORAGE-AUDIT.md content to living docs, then delete |
+| 781 | PAN-2346 | XS | low | needs-refinement |  |  | docs: refresh AGENT_TYPES_INDEX.md — flywheel is a loop skill, inspect is per-item verification; update to the post-cut tree |
+| 782 | PAN-2345 | XS | low | needs-refinement |  |  | docs: refresh pan-done.md — drop the boot-reconciliation reference; describe the current pan done flow |
+| 783 | PAN-2344 | XS | low | needs-refinement |  |  | docs: refresh KANBAN-MODEL.md for derived issue state + PR-based review (boot reconciliation and inspect gates are gone) |
+| 784 | PAN-2343 | XS | low | ok |  |  | docs: refresh MISSION-CONTROL.md |
+| 785 | PAN-2073 | XS | low | ok |  |  | docs: add user-facing page for the Desktop App |
+| 786 | PAN-2071 | XS | low | ok |  |  | docs: add user-facing page for the Hooks system |
+| 787 | PAN-2068 | XS | low | ok |  |  | docs: add user-facing page for Caveman (agent output compression) |
+| 788 | PAN-2067 | XS | low | ok |  |  | docs: add user-facing page for RTK (Bash output compression) |
+| 789 | PAN-1684 | XS | low | ok |  |  | build full marketing kit + plan (SEO, video list, channels) from MARKETING.md seed |
+| 790 | PAN-1683 | XS | low | ok |  |  | docs: canonical agent session-prefix registry + reconcile role taxonomy (ROLES.md/AGENT_TYPES_INDEX/CLAUDE.md) |
+| 791 | PAN-1474 | M | low | ok |  |  | Add ACKNOWLEDGEMENTS doc |
+| 792 | PAN-1469 | M | low | ok |  |  | End-to-end review and consolidation of all project documentation |
+| 793 | PAN-674 | XS | low | ok |  |  | docs: add glossary of Panopticon domain terms |
+| 794 | PAN-634 | M | low | ok |  |  | Documentation cleanup: restructure docs, update installation (npx panctl), refresh stale PRDs |
+| 795 | PAN-2908 | M | low | ok |  |  | Make overdeck not suck |
+| 796 | PAN-106 | M | high | stale |  |  | Cost prediction/estimation for in-progress work |
+| 797 | PAN-262 | M | high | stale |  |  | Refactor post-merge lifecycle into composable, idempotent operations |
+| 798 | PAN-176 | M | high | stale |  |  | PAN-176: Hook-enforced delegation guardrails for specialist agents |
+| 799 | PAN-334 | S | medium | stale |  |  | Dashboard server has no duplicate-process protection |
+| 800 | PAN-324 | XS | medium | needs-refinement |  |  | Approval is now a PR review or the dashboard MERGE button; verify whether the agent detail pane already surfaces MERGE post-cut |
+| 801 | PAN-304 | S | medium | stale |  |  | closeLinearDirect returns stepOk even when state update never happens |
+| 802 | PAN-245 | S | medium | stale |  |  | Ctrl+C aborts planning dialog instead of copying text |
+| 803 | PAN-244 | S | medium | stale |  |  | Deep-wipe leaves local branch and worktree metadata behind |
+| 804 | PAN-178 | M | low | stale |  |  | Per-task checkpointing is covered by Item: commit trailers + xBRIEF item status; the .planning/checkpoints proposal predates the cut |
+| 805 | PAN-113 | S | medium | stale |  |  | Dashboard 'Start Agent' returns success before verifying agent actually started |
+| 806 | PAN-49 | XS | medium | stale |  |  | Fix CloisterService tests that require real runtime |
+| 807 | PAN-294 | M | medium | stale |  |  | Surface module initialization errors as system-level, not per-issue |
+| 808 | PAN-293 | M | medium | stale |  |  | Project Living Memory |
+| 809 | PAN-277 | M | medium | stale |  |  | Session reasoning capture & collaborative PRD refinement |
+| 810 | PAN-258 | M | medium | stale |  |  | Kanban board: fit all columns without horizontal scrolling |
+| 811 | PAN-255 | M | medium | stale |  |  | Agents lack awareness of MCP tools |
+| 812 | PAN-252 | XS | medium | stale |  |  | Disable Sync with Main button when workspace is up to date |
+| 813 | PAN-243 | M | medium | stale |  |  | Audit dashboard actions: ensure all are available via CLI |
+| 814 | PAN-77 | XS | medium | stale |  |  | Cost breakdown modal: show costs by stage and model when clicking cost badge |
+| 815 | PAN-54 | L | medium | stale |  |  | e2e command for full workflow integration test |
+| 816 | PAN-38 | M | medium | stale |  |  | Support multiple merge agents per repository |
+| 817 | PAN-37 | M | medium | stale |  |  | Support external PR selection for merge-agent |
+| 818 | PAN-3564 | M | low | needs-refinement |  |  | Global state-git lock is gone; verify whether the per-issue fs-lock convoy (100% duty cycle, reviewer spawns die) can still occur |
+| 819 | PAN-3571 | S | low | stale |  |  | Stale: targets work-agent-stop-hook (7b953449633) deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 820 | PAN-3248 | XS | low | stale |  |  | Stale: targets the deploy patrol (pan reload is the new home) deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 821 | PAN-3244 | S | low | stale |  |  | Stale: targets the deploy-patrol deploy window deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 822 | PAN-3078 | S | low | needs-refinement |  |  | review_status.inspect_status is gone; verify whether the surviving inspect-agent specialist still never delivers its verdict |
+| 823 | PAN-2775 | S | low | needs-refinement |  |  | Stale: targets boot-correlated reaping (boot reconciliation) deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 824 | PAN-2960 | S | low | needs-refinement |  |  | review_status.inspect_status is gone; re-diagnose whether the surviving inspect-agent specialist has a self-termination gap |
+| 825 | PAN-3634 | S | low | stale |  |  | Stale: targets flywheelRunId stamping deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 826 | PAN-3505 | XS | low | needs-refinement |  |  | Stale: targets the flywheel state write door deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 827 | PAN-2659 | S | low | stale |  |  | Stale: targets pan-dir/record-lock.ts deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 828 | PAN-3321 | XS | low | stale |  |  | Stale: targets pan unstick deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 829 | PAN-3914 | S | low | needs-refinement |  |  | Stale: checkOrphanedCompletions / deacon.ts patrol deleted by the PAN-3917 cut (ca15def); re-triage or close |
+| 830 | PAN-3868 | XS | low | stale |  |  | Stale: work-agent-stop-hook was deleted by the PAN-3917 cut (ca15def) (7b953449633); the wrong verb no longer exists |
+| 831 | PAN-299 | M | low | stale |  |  | Granular session state persistence across context compaction |
+| 832 | PAN-298 | M | low | stale |  |  | Auto-detect package manager and runtime in workspace setup |
+| 833 | PAN-297 | M | low | stale |  |  | Workspace templates: pre/post tool hooks for auto-format, typecheck, lint |
+| 834 | PAN-283 | M | low | stale |  |  | Reset should sync workspace feature branch with latest main |
+| 835 | PAN-271 | M | low | stale |  |  | Auto-assign Linear project from project config when creating issues |
+| 836 | PAN-265 | M | low | stale |  |  | Review skill categorization: all skills available everywhere via personal + workspace |
+| 837 | PAN-249 | XS | low | stale |  |  | Add data-testid attributes across dashboard UI and create Playwright smoke test suite |
+| 838 | PAN-241 | L | low | stale |  |  | Mobile redesign initiative: full UX/UI overhaul + implementation plan |
+| 839 | PAN-228 | M | low | stale |  |  | Shift-left post-edit diagnostics |
+| 840 | PAN-227 | M | low | stale |  |  | Phase gate validation |
+| 841 | PAN-198 | M | low | stale |  |  | Structured audit trail for agent actions |
+| 842 | PAN-190 | M | low | stale |  |  | PAN-190: Specialized reviewer prompts (industry best-practice checklists) |
+| 843 | PAN-180 | M | low | stale |  |  | PAN-180: Cross-terminal file locking for concurrent agents |
+| 844 | PAN-177 | M | low | stale |  |  | PAN-177: Iteration limits with escalation for autonomous agents |
+| 845 | PAN-175 | M | low | stale |  |  | PAN-175: Pre-compact auto-save hook for agent sessions |
+| 846 | PAN-155 | L | low | stale |  |  | PAN-155: Redesign health page with Stitch (system overview, timeline, costs) |
+| 847 | PAN-146 | M | low | stale |  |  | PAN-146: Refine light mode theming across all dashboard pages |
+| 848 | PAN-55 | M | low | stale |  |  | Track specialist costs with time period filtering |
+| 849 | PAN-52 | XS | low | stale |  |  | Guidance needed: Running complex multi-container projects with Panopticon worktrees |
+| 850 | PAN-51 | M | low | stale |  |  | Documentation: Clarify issue tracker options beyond Linear |
+| 851 | PAN-47 | M | low | stale |  |  | PRDs already live under .pan/ on the feature branch; the docs/prds/active merge-blocking flow no longer exists |
+| 852 | PAN-44 | M | low | stale |  |  | Planning should fetch ALL issue context: comments, attachments, linked issues, discussions |
+| 853 | PAN-43 | M | low | stale |  |  | Add Slack and email notifications for agent events |
+| 854 | PAN-2070 | XS | low | needs-refinement |  |  | docs: user-facing Flywheel page should target the pan-flywheel v2 loop skill, not a CLI daemon with a dashboard toggle |
 
 ## Rationale detail
 
@@ -1054,6 +1054,10 @@ Violates the cut's rule that planned is derived from spec existence; a dead plan
 
 New this pass. A review sub-role that had already written its report was resumed by a later message and edited seven tracked files, and pan start --fresh then auto-committed those reviewer-owned changes into the feature history during sync-main. Review isolation is currently prompt-level only; it has to be mechanical, because a contaminated branch is very hard to detect after the fact.
 
+### PAN-3961 (rank 49)
+
+Same defect as PAN-3953 observed on PAN-3959; ranked below it and marked needs-refinement so only one is picked.
+
 ### PAN-3313 (rank 50)
 
 New this pass. A transient upstream stream error benches CLIProxy's only auth entry, so every GPT-routed request returns 503 auth_unavailable until an internal cooldown lapses — 35 failures against 14 successes in one hour, with valid credentials throughout. The message reads as 'your credentials are gone' and sends the operator to re-authenticate, which fixes nothing. Every GPT-routed agent on the machine is affected at once.
@@ -1178,10 +1182,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
 
 Planning agents wedge after a background Explore task finishes; parent never consumes the result. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
 
-### PAN-3096 (rank 81)
-
-New this pass. pan done's preflight blocks on the generated .devcontainer/ and dev artifacts, and with only commit/discard/surface offered, agents invented their own exits: one attempted to delete workspace infrastructure, another committed a wrapper-repo gitignore change that moved HEAD and fed a four-hour review reset loop. A gate that pushes agents toward destructive workarounds needs fixing at the gate.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1189,7 +1189,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-20T22:47:41.791Z",
+  "generatedAt": "2026-09-20T20:49:03.587954Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 854,
@@ -1815,6 +1815,19 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "dependsOn": [],
       "why": "A review sub-role edited seven tracked files after writing its report and the changes were auto-committed into the feature history.",
       "rationale": "New this pass. A review sub-role that had already written its report was resumed by a later message and edited seven tracked files, and pan start --fresh then auto-committed those reviewer-owned changes into the feature history during sync-main. Review isolation is currently prompt-level only; it has to be mechanical, because a contaminated branch is very hard to detect after the fact.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3961",
+      "rank": 49,
+      "size": "XS",
+      "importance": "high",
+      "score": 60,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "pan plan --auto labels planned one second after spawn; possible duplicate of PAN-3953 — fold into it",
+      "rationale": "Same defect as PAN-3953 observed on PAN-3959; ranked below it and marked needs-refinement so only one is picked.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -6306,19 +6319,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "planning": "auto"
     },
     {
-      "issue": "PAN-3822",
-      "rank": 409,
-      "size": "L",
-      "importance": "medium",
-      "score": 56,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920",
-      "rationale": "Promoted 468→409: body now carries a full PRD (12 work items, FR-1..14) so it is plan-ready, scope grew to L, and it unblocks PAN-3920 (agents page PR context).",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-1740",
       "rank": 410,
       "size": "XS",
@@ -7035,6 +7035,19 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "dependsOn": [],
       "why": "One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains",
       "rationale": "Triage: the agents SQLite table is gone but read-model.ts agentsById may still be a second door beside AgentsResolver; verify before treating as resolved. Rank held.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3822",
+      "rank": 409,
+      "size": "L",
+      "importance": "medium",
+      "score": 56,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920",
+      "rationale": "Promoted 468→409: body now carries a full PRD (12 work items, FR-1..14) so it is plan-ready, scope grew to L, and it unblocks PAN-3920 (agents page PR context).",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9407,21 +9420,8 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "planning": "auto"
     },
     {
-      "issue": "PAN-3971",
-      "rank": 662,
-      "size": "L",
-      "importance": "low",
-      "score": 25,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Overdeck-owned artifact pages (publish/persist/share HTML ledgers) replacing Claude Code artifacts; operator says backlog only",
-      "rationale": "New 2026-09-20. Well-specified minimum shape (pan artifact publish, page-side state door, per-project listing, harness-agnostic) but the operator marks it backlog only: the Claude Code artifact path is the working default for pan-open-threads. Ranked beside PAN-3957 (same shape: a parked Overdeck-owned replacement for a harness-specific feature); revisit when a second harness needs to publish a page. Informs PAN-3920 as the natural home for per-conversation pages.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-2282",
-      "rank": 663,
+      "rank": 662,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9433,7 +9433,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2091",
-      "rank": 664,
+      "rank": 663,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9445,7 +9445,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2085",
-      "rank": 665,
+      "rank": 664,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9457,7 +9457,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2084",
-      "rank": 666,
+      "rank": 665,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9469,7 +9469,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2083",
-      "rank": 667,
+      "rank": 666,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9484,7 +9484,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2082",
-      "rank": 668,
+      "rank": 667,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9496,7 +9496,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2074",
-      "rank": 669,
+      "rank": 668,
       "size": "XS",
       "importance": "low",
       "score": 25,
@@ -9508,7 +9508,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2046",
-      "rank": 670,
+      "rank": 669,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9520,7 +9520,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2006",
-      "rank": 671,
+      "rank": 670,
       "size": "M",
       "importance": "low",
       "score": 25,
@@ -9532,7 +9532,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3919",
-      "rank": 672,
+      "rank": 671,
       "size": "S",
       "importance": "low",
       "score": 25,
@@ -9545,7 +9545,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2005",
-      "rank": 673,
+      "rank": 672,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9557,7 +9557,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2002",
-      "rank": 674,
+      "rank": 673,
       "size": "XS",
       "importance": "low",
       "score": 24,
@@ -9569,7 +9569,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1999",
-      "rank": 675,
+      "rank": 674,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9581,7 +9581,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1986",
-      "rank": 676,
+      "rank": 675,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9593,7 +9593,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1983",
-      "rank": 677,
+      "rank": 676,
       "size": "L",
       "importance": "low",
       "score": 24,
@@ -9605,7 +9605,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1980",
-      "rank": 678,
+      "rank": 677,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9618,7 +9618,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1958",
-      "rank": 679,
+      "rank": 678,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9630,7 +9630,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1949",
-      "rank": 680,
+      "rank": 679,
       "size": "M",
       "importance": "low",
       "score": 24,
@@ -9643,7 +9643,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1907",
-      "rank": 681,
+      "rank": 680,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9655,7 +9655,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1895",
-      "rank": 682,
+      "rank": 681,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9667,7 +9667,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1878",
-      "rank": 683,
+      "rank": 682,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9679,7 +9679,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1782",
-      "rank": 684,
+      "rank": 683,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9691,7 +9691,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1773",
-      "rank": 685,
+      "rank": 684,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9703,7 +9703,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1646",
-      "rank": 686,
+      "rank": 685,
       "size": "M",
       "importance": "low",
       "score": 23,
@@ -9715,7 +9715,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1643",
-      "rank": 687,
+      "rank": 686,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9727,7 +9727,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1592",
-      "rank": 688,
+      "rank": 687,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9739,7 +9739,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1581",
-      "rank": 689,
+      "rank": 688,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9751,7 +9751,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1552",
-      "rank": 690,
+      "rank": 689,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9763,7 +9763,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1533",
-      "rank": 691,
+      "rank": 690,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9775,7 +9775,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1483",
-      "rank": 692,
+      "rank": 691,
       "size": "XS",
       "importance": "low",
       "score": 22,
@@ -9787,7 +9787,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1482",
-      "rank": 693,
+      "rank": 692,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9799,7 +9799,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1481",
-      "rank": 694,
+      "rank": 693,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9811,7 +9811,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1356",
-      "rank": 695,
+      "rank": 694,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9823,7 +9823,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1242",
-      "rank": 696,
+      "rank": 695,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9835,7 +9835,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1222",
-      "rank": 697,
+      "rank": 696,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9847,7 +9847,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1208",
-      "rank": 698,
+      "rank": 697,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9859,7 +9859,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1166",
-      "rank": 699,
+      "rank": 698,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9871,7 +9871,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1153",
-      "rank": 700,
+      "rank": 699,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9883,7 +9883,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2667",
-      "rank": 701,
+      "rank": 700,
       "size": "M",
       "importance": "low",
       "score": 22,
@@ -9896,7 +9896,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1152",
-      "rank": 702,
+      "rank": 701,
       "size": "XS",
       "importance": "low",
       "score": 21,
@@ -9908,7 +9908,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1135",
-      "rank": 703,
+      "rank": 702,
       "size": "M",
       "importance": "low",
       "score": 21,
@@ -9920,7 +9920,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1133",
-      "rank": 704,
+      "rank": 703,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9933,7 +9933,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1123",
-      "rank": 705,
+      "rank": 704,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -9945,7 +9945,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1121",
-      "rank": 706,
+      "rank": 705,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9957,7 +9957,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1117",
-      "rank": 707,
+      "rank": 706,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9969,7 +9969,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1116",
-      "rank": 708,
+      "rank": 707,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9981,7 +9981,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1065",
-      "rank": 709,
+      "rank": 708,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -9993,13 +9993,25 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1064",
-      "rank": 710,
+      "rank": 709,
       "size": "M",
       "importance": "low",
       "score": 20,
       "condition": "ok",
       "dependsOn": [],
       "why": "Harden launcher generation against shell-quote injection (model and arg quoting)",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-1063",
+      "rank": 710,
+      "size": "M",
+      "importance": "low",
+      "score": 20,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound",
       "gate": "auto",
       "planning": "auto"
     },
@@ -10016,20 +10028,8 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "planning": "skip"
     },
     {
-      "issue": "PAN-1063",
-      "rank": 712,
-      "size": "M",
-      "importance": "low",
-      "score": 20,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3768",
-      "rank": 713,
+      "rank": 712,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10041,7 +10041,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3034",
-      "rank": 714,
+      "rank": 713,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10053,7 +10053,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2983",
-      "rank": 715,
+      "rank": 714,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -10065,7 +10065,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3778",
-      "rank": 716,
+      "rank": 715,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -10078,7 +10078,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3824",
-      "rank": 717,
+      "rank": 716,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10091,7 +10091,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3823",
-      "rank": 718,
+      "rank": 717,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -10104,7 +10104,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1049",
-      "rank": 719,
+      "rank": 718,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10116,7 +10116,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-984",
-      "rank": 720,
+      "rank": 719,
       "size": "XS",
       "importance": "low",
       "score": 19,
@@ -10128,7 +10128,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-962",
-      "rank": 721,
+      "rank": 720,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10141,7 +10141,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-961",
-      "rank": 722,
+      "rank": 721,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10153,7 +10153,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-943",
-      "rank": 723,
+      "rank": 722,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10165,7 +10165,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-908",
-      "rank": 724,
+      "rank": 723,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10177,7 +10177,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-898",
-      "rank": 725,
+      "rank": 724,
       "size": "M",
       "importance": "low",
       "score": 19,
@@ -10189,7 +10189,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-853",
-      "rank": 726,
+      "rank": 725,
       "size": "L",
       "importance": "low",
       "score": 19,
@@ -10201,7 +10201,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-833",
-      "rank": 727,
+      "rank": 726,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10213,7 +10213,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-832",
-      "rank": 728,
+      "rank": 727,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10226,7 +10226,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-810",
-      "rank": 729,
+      "rank": 728,
       "size": "XS",
       "importance": "low",
       "score": 18,
@@ -10239,7 +10239,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-797",
-      "rank": 730,
+      "rank": 729,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10251,7 +10251,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-793",
-      "rank": 731,
+      "rank": 730,
       "size": "XS",
       "importance": "low",
       "score": 18,
@@ -10263,7 +10263,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-791",
-      "rank": 732,
+      "rank": 731,
       "size": "XS",
       "importance": "low",
       "score": 18,
@@ -10275,7 +10275,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-790",
-      "rank": 733,
+      "rank": 732,
       "size": "L",
       "importance": "low",
       "score": 18,
@@ -10287,7 +10287,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-786",
-      "rank": 734,
+      "rank": 733,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10299,7 +10299,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-777",
-      "rank": 735,
+      "rank": 734,
       "size": "M",
       "importance": "low",
       "score": 18,
@@ -10311,7 +10311,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-775",
-      "rank": 736,
+      "rank": 735,
       "size": "L",
       "importance": "low",
       "score": 18,
@@ -10323,7 +10323,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3456",
-      "rank": 737,
+      "rank": 736,
       "size": "XS",
       "importance": "low",
       "score": 18,
@@ -10335,7 +10335,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-774",
-      "rank": 738,
+      "rank": 737,
       "size": "XS",
       "importance": "low",
       "score": 17,
@@ -10347,7 +10347,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-773",
-      "rank": 739,
+      "rank": 738,
       "size": "XS",
       "importance": "low",
       "score": 17,
@@ -10359,7 +10359,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-772",
-      "rank": 740,
+      "rank": 739,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10372,7 +10372,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-771",
-      "rank": 741,
+      "rank": 740,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10384,7 +10384,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-769",
-      "rank": 742,
+      "rank": 741,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10399,7 +10399,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-765",
-      "rank": 743,
+      "rank": 742,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10411,7 +10411,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-764",
-      "rank": 744,
+      "rank": 743,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10423,7 +10423,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-762",
-      "rank": 745,
+      "rank": 744,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10435,7 +10435,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-752",
-      "rank": 746,
+      "rank": 745,
       "size": "M",
       "importance": "low",
       "score": 17,
@@ -10447,7 +10447,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-751",
-      "rank": 747,
+      "rank": 746,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10459,7 +10459,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-750",
-      "rank": 748,
+      "rank": 747,
       "size": "L",
       "importance": "low",
       "score": 16,
@@ -10471,7 +10471,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-749",
-      "rank": 749,
+      "rank": 748,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10483,7 +10483,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-747",
-      "rank": 750,
+      "rank": 749,
       "size": "XS",
       "importance": "low",
       "score": 16,
@@ -10495,7 +10495,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-743",
-      "rank": 751,
+      "rank": 750,
       "size": "XS",
       "importance": "low",
       "score": 16,
@@ -10507,7 +10507,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-738",
-      "rank": 752,
+      "rank": 751,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10519,7 +10519,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-735",
-      "rank": 753,
+      "rank": 752,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10531,7 +10531,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-730",
-      "rank": 754,
+      "rank": 753,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10543,7 +10543,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-702",
-      "rank": 755,
+      "rank": 754,
       "size": "M",
       "importance": "low",
       "score": 16,
@@ -10555,7 +10555,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-701",
-      "rank": 756,
+      "rank": 755,
       "size": "XS",
       "importance": "low",
       "score": 15,
@@ -10567,7 +10567,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-663",
-      "rank": 757,
+      "rank": 756,
       "size": "XS",
       "importance": "low",
       "score": 15,
@@ -10579,7 +10579,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-660",
-      "rank": 758,
+      "rank": 757,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10591,7 +10591,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-658",
-      "rank": 759,
+      "rank": 758,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10606,7 +10606,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-624",
-      "rank": 760,
+      "rank": 759,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10618,7 +10618,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-623",
-      "rank": 761,
+      "rank": 760,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10630,7 +10630,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-622",
-      "rank": 762,
+      "rank": 761,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10642,7 +10642,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-604",
-      "rank": 763,
+      "rank": 762,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10654,7 +10654,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-603",
-      "rank": 764,
+      "rank": 763,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -10666,7 +10666,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-591",
-      "rank": 765,
+      "rank": 764,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10678,7 +10678,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-589",
-      "rank": 766,
+      "rank": 765,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10690,7 +10690,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-576",
-      "rank": 767,
+      "rank": 766,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10702,7 +10702,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-571",
-      "rank": 768,
+      "rank": 767,
       "size": "XS",
       "importance": "low",
       "score": 14,
@@ -10714,7 +10714,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-568",
-      "rank": 769,
+      "rank": 768,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10726,7 +10726,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-565",
-      "rank": 770,
+      "rank": 769,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10738,7 +10738,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-564",
-      "rank": 771,
+      "rank": 770,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10750,7 +10750,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-554",
-      "rank": 772,
+      "rank": 771,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10762,7 +10762,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-543",
-      "rank": 773,
+      "rank": 772,
       "size": "M",
       "importance": "low",
       "score": 14,
@@ -10774,7 +10774,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-483",
-      "rank": 774,
+      "rank": 773,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10786,7 +10786,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-480",
-      "rank": 775,
+      "rank": 774,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10798,7 +10798,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-476",
-      "rank": 776,
+      "rank": 775,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10810,7 +10810,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-468",
-      "rank": 777,
+      "rank": 776,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10822,7 +10822,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-461",
-      "rank": 778,
+      "rank": 777,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10834,7 +10834,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-459",
-      "rank": 779,
+      "rank": 778,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -10846,7 +10846,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-407",
-      "rank": 780,
+      "rank": 779,
       "size": "XS",
       "importance": "low",
       "score": 13,
@@ -10858,7 +10858,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2348",
-      "rank": 781,
+      "rank": 780,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10870,7 +10870,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2346",
-      "rank": 782,
+      "rank": 781,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10883,7 +10883,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2345",
-      "rank": 783,
+      "rank": 782,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10896,7 +10896,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2344",
-      "rank": 784,
+      "rank": 783,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10909,7 +10909,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2343",
-      "rank": 785,
+      "rank": 784,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10921,7 +10921,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2073",
-      "rank": 786,
+      "rank": 785,
       "size": "XS",
       "importance": "low",
       "score": 10,
@@ -10933,7 +10933,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2071",
-      "rank": 787,
+      "rank": 786,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10945,7 +10945,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2068",
-      "rank": 788,
+      "rank": 787,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10957,7 +10957,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2067",
-      "rank": 789,
+      "rank": 788,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10969,7 +10969,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1684",
-      "rank": 790,
+      "rank": 789,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10981,7 +10981,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1683",
-      "rank": 791,
+      "rank": 790,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -10993,7 +10993,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1474",
-      "rank": 792,
+      "rank": 791,
       "size": "M",
       "importance": "low",
       "score": 9,
@@ -11005,7 +11005,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-1469",
-      "rank": 793,
+      "rank": 792,
       "size": "M",
       "importance": "low",
       "score": 9,
@@ -11017,7 +11017,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-674",
-      "rank": 794,
+      "rank": 793,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -11029,7 +11029,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-634",
-      "rank": 795,
+      "rank": 794,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11041,7 +11041,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2908",
-      "rank": 796,
+      "rank": 795,
       "size": "M",
       "importance": "low",
       "score": 8,
@@ -11053,7 +11053,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-106",
-      "rank": 797,
+      "rank": 796,
       "size": "M",
       "importance": "high",
       "score": 77,
@@ -11066,7 +11066,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-262",
-      "rank": 798,
+      "rank": 797,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -11078,7 +11078,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-176",
-      "rank": 799,
+      "rank": 798,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -11090,7 +11090,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-334",
-      "rank": 800,
+      "rank": 799,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11102,7 +11102,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-324",
-      "rank": 801,
+      "rank": 800,
       "size": "XS",
       "importance": "medium",
       "score": 49,
@@ -11115,7 +11115,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-304",
-      "rank": 802,
+      "rank": 801,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11127,7 +11127,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-245",
-      "rank": 803,
+      "rank": 802,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11139,7 +11139,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-244",
-      "rank": 804,
+      "rank": 803,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -11151,7 +11151,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-178",
-      "rank": 805,
+      "rank": 804,
       "size": "M",
       "importance": "low",
       "score": 15,
@@ -11164,7 +11164,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-113",
-      "rank": 806,
+      "rank": 805,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -11176,7 +11176,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-49",
-      "rank": 807,
+      "rank": 806,
       "size": "XS",
       "importance": "medium",
       "score": 48,
@@ -11188,7 +11188,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-294",
-      "rank": 808,
+      "rank": 807,
       "size": "M",
       "importance": "medium",
       "score": 32,
@@ -11200,7 +11200,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-293",
-      "rank": 809,
+      "rank": 808,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11212,7 +11212,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-277",
-      "rank": 810,
+      "rank": 809,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11224,7 +11224,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-258",
-      "rank": 811,
+      "rank": 810,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11236,7 +11236,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-255",
-      "rank": 812,
+      "rank": 811,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11248,7 +11248,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-252",
-      "rank": 813,
+      "rank": 812,
       "size": "XS",
       "importance": "medium",
       "score": 31,
@@ -11260,7 +11260,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-243",
-      "rank": 814,
+      "rank": 813,
       "size": "M",
       "importance": "medium",
       "score": 31,
@@ -11272,7 +11272,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-77",
-      "rank": 815,
+      "rank": 814,
       "size": "XS",
       "importance": "medium",
       "score": 31,
@@ -11284,7 +11284,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-54",
-      "rank": 816,
+      "rank": 815,
       "size": "L",
       "importance": "medium",
       "score": 31,
@@ -11296,7 +11296,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-38",
-      "rank": 817,
+      "rank": 816,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -11308,7 +11308,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-37",
-      "rank": 818,
+      "rank": 817,
       "size": "M",
       "importance": "medium",
       "score": 30,
@@ -11320,7 +11320,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3564",
-      "rank": 819,
+      "rank": 818,
       "size": "M",
       "importance": "low",
       "score": 20,
@@ -11333,7 +11333,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3571",
-      "rank": 820,
+      "rank": 819,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11346,7 +11346,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3248",
-      "rank": 821,
+      "rank": 820,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11359,7 +11359,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3244",
-      "rank": 822,
+      "rank": 821,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11372,7 +11372,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3078",
-      "rank": 823,
+      "rank": 822,
       "size": "S",
       "importance": "low",
       "score": 18,
@@ -11385,7 +11385,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2775",
-      "rank": 824,
+      "rank": 823,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11398,7 +11398,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2960",
-      "rank": 825,
+      "rank": 824,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11411,7 +11411,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3634",
-      "rank": 826,
+      "rank": 825,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11424,7 +11424,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3505",
-      "rank": 827,
+      "rank": 826,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11437,7 +11437,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2659",
-      "rank": 828,
+      "rank": 827,
       "size": "S",
       "importance": "low",
       "score": 20,
@@ -11450,7 +11450,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3321",
-      "rank": 829,
+      "rank": 828,
       "size": "XS",
       "importance": "low",
       "score": 20,
@@ -11463,7 +11463,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3914",
-      "rank": 830,
+      "rank": 829,
       "size": "S",
       "importance": "low",
       "score": 18,
@@ -11476,7 +11476,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3868",
-      "rank": 831,
+      "rank": 830,
       "size": "XS",
       "importance": "low",
       "score": 15,
@@ -11489,7 +11489,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-299",
-      "rank": 832,
+      "rank": 831,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11501,7 +11501,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-298",
-      "rank": 833,
+      "rank": 832,
       "size": "M",
       "importance": "low",
       "score": 13,
@@ -11513,7 +11513,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-297",
-      "rank": 834,
+      "rank": 833,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11525,7 +11525,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-283",
-      "rank": 835,
+      "rank": 834,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11537,7 +11537,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-271",
-      "rank": 836,
+      "rank": 835,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11549,7 +11549,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-265",
-      "rank": 837,
+      "rank": 836,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11561,7 +11561,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-249",
-      "rank": 838,
+      "rank": 837,
       "size": "XS",
       "importance": "low",
       "score": 12,
@@ -11573,7 +11573,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-241",
-      "rank": 839,
+      "rank": 838,
       "size": "L",
       "importance": "low",
       "score": 12,
@@ -11585,7 +11585,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-228",
-      "rank": 840,
+      "rank": 839,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11597,7 +11597,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-227",
-      "rank": 841,
+      "rank": 840,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11609,7 +11609,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-198",
-      "rank": 842,
+      "rank": 841,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11621,7 +11621,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-190",
-      "rank": 843,
+      "rank": 842,
       "size": "M",
       "importance": "low",
       "score": 12,
@@ -11633,7 +11633,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-180",
-      "rank": 844,
+      "rank": 843,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11645,7 +11645,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-177",
-      "rank": 845,
+      "rank": 844,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11657,7 +11657,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-175",
-      "rank": 846,
+      "rank": 845,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11669,7 +11669,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-155",
-      "rank": 847,
+      "rank": 846,
       "size": "L",
       "importance": "low",
       "score": 11,
@@ -11681,7 +11681,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-146",
-      "rank": 848,
+      "rank": 847,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11693,7 +11693,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-55",
-      "rank": 849,
+      "rank": 848,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11705,7 +11705,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-52",
-      "rank": 850,
+      "rank": 849,
       "size": "XS",
       "importance": "low",
       "score": 11,
@@ -11717,7 +11717,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-51",
-      "rank": 851,
+      "rank": 850,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11729,7 +11729,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-47",
-      "rank": 852,
+      "rank": 851,
       "size": "M",
       "importance": "low",
       "score": 11,
@@ -11742,7 +11742,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-44",
-      "rank": 853,
+      "rank": 852,
       "size": "M",
       "importance": "low",
       "score": 10,
@@ -11754,7 +11754,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-43",
-      "rank": 854,
+      "rank": 853,
       "size": "M",
       "importance": "low",
       "score": 10,
@@ -11766,7 +11766,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2070",
-      "rank": 855,
+      "rank": 854,
       "size": "XS",
       "importance": "low",
       "score": 9,
@@ -12634,6 +12634,13 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "confidence": 1
     },
     {
+      "from": "PAN-3961",
+      "to": "PAN-3959",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
       "from": "PAN-3960",
       "to": "PAN-3921",
       "type": "informs",
@@ -12963,6 +12970,13 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "confidence": 1
     },
     {
+      "from": "PAN-3953",
+      "to": "PAN-3961",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
       "from": "PAN-3960",
       "to": "PAN-3948",
       "type": "unblocks",
@@ -12996,6 +13010,13 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-3953",
+      "to": "PAN-3961",
+      "type": "unblocks",
+      "source": "ai-inferred",
+      "confidence": 0.9
     },
     {
       "from": "PAN-3963",
@@ -13087,13 +13108,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-3971",
-      "to": "PAN-3920",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
     }
   ]
 }
