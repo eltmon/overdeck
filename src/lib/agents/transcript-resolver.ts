@@ -1,15 +1,17 @@
 /**
  * Authoritative harness-aware transcript resolution for agents.
  *
- * Candidate ordering lives in session-history; concrete paths come from each
- * runtime's own path helpers. Dashboard routes, live streams, and enrichment
- * all use this async resolver so there is no second filesystem interpretation.
+ * Candidate ordering lives in session-history; candidates come from the
+ * absolute path each harness's capture point recorded in the session index
+ * at session start (PAN-3959), with per-harness path formulas applied only
+ * to pre-PAN-3959 entries that predate that recording. Dashboard routes,
+ * live streams, and enrichment all use this async resolver so there is no
+ * second filesystem interpretation.
  */
 import { access, readFile, readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { Effect } from 'effect';
 import { claudeProjectDir, getOverdeckHome } from '../paths.js';
 import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { acpTranscriptPath } from '../acp/transcript.js';
@@ -34,7 +36,6 @@ import {
   type TranscriptCandidate,
 } from '../session-history.js';
 import { getAgentStateSync } from './agent-state-read.js';
-import { getAgentRuntimeState } from './runtime-state.js';
 
 export interface ResolveJsonlPathOptions {
   agentsDirOverride?: string;
@@ -269,50 +270,15 @@ export async function listAgentTranscriptCandidates(
     }
   }
 
-  let launcherPinned: TranscriptCandidate | null = null;
-  if (transcriptCandidateKind(currentHarness) === 'claude') {
-    const launcher = await readOptional(join(agentDir, 'launcher.sh'));
-    const sessionId = launcher
-      ? (LAUNCHER_SESSION_ID_RE.exec(launcher) ?? LAUNCHER_RESUME_RE.exec(launcher))?.[1]
-      : undefined;
-    if (sessionId) {
-      launcherPinned = {
-        kind: 'claude',
-        path: join(projectDir, `${sessionId}.jsonl`),
-        ...(recorded.model ? { model: recorded.model } : {}),
-      };
-    }
-  }
-
+  // Fallback for the current non-claude harness: pre-PAN-3959 agents record
+  // their current session in a side file (kimi-session-id, codex-thread-id,
+  // the acp/pi session pointers) rather than in sessions.json, and the
+  // per-entry formula guess above can point at a session id that never wrote
+  // a real file. resolveAgentTranscriptCandidate's existence check already
+  // falls through past a stale/guessed candidate to this one.
   const stateDerived: TranscriptCandidate[] = [];
   const currentKind = transcriptCandidateKind(currentHarness);
-  if (currentKind === 'claude') {
-    try {
-      // Same discipline as readRecordedState: an agentsDirOverride means the
-      // caller is sandboxed to a foreign/test agents root, so this must not
-      // fall through to the live runtime service — that would return
-      // whatever the CURRENT process's real agent happens to have for this
-      // id, unrelated to the override.
-      const lookup = opts.getRuntimeStateAsync
-        ?? (opts.agentsDirOverride ? async () => null : (id: string) => Effect.runPromise(getAgentRuntimeState(id)));
-      const runtime = await lookup(agentId);
-      const runtimeId = runtime?.claudeSessionId?.trim();
-      if (runtimeId) {
-        stateDerived.push({
-          kind: 'claude',
-          path: join(projectDir, `${runtimeId}.jsonl`),
-          ...(runtime?.sessionModel || recorded.model ? { model: runtime?.sessionModel ?? recorded.model } : {}),
-        });
-      }
-    } catch { /* optional runtime mirror */ }
-    if (recorded.sessionId?.trim()) {
-      stateDerived.push({
-        kind: 'claude',
-        path: join(projectDir, `${recorded.sessionId.trim()}.jsonl`),
-        ...(recorded.model ? { model: recorded.model } : {}),
-      });
-    }
-  } else {
+  if (currentKind !== 'claude') {
     const path = currentKind === 'codex' ? await resolveCodexRolloutPath(agentId, opts)
       : currentKind === 'pi' || currentKind === 'ohmypi' ? await resolvePiSessionPath(agentId, opts)
       : currentKind === 'acp' ? await resolveAcpTranscriptPath(agentId, opts)
@@ -331,7 +297,7 @@ export async function listAgentTranscriptCandidates(
     }
   }
 
-  return orderedTranscriptCandidates({ entries, currentHarness, indexedPaths, launcherPinned, stateDerived });
+  return orderedTranscriptCandidates({ entries, currentHarness, indexedPaths, stateDerived });
 }
 
 export async function resolveAgentTranscriptCandidate(

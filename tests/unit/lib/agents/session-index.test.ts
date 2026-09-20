@@ -366,7 +366,7 @@ describe('sessions.json index', () => {
     await expect(Effect.runPromise(getAgentJsonlPath(agentId))).resolves.toBe(wirePath);
   });
 
-  it('orders mixed-harness entries before launcher and state fallbacks', () => {
+  it('orders mixed-harness entries newest-first', () => {
     const paths = new Map([
       [transcriptCandidateKey('claude', 'claude-old'), '/claude/old.jsonl'],
       [transcriptCandidateKey('codex', 'codex-new'), '/codex/new.jsonl'],
@@ -378,13 +378,9 @@ describe('sessions.json index', () => {
       ],
       currentHarness: 'claude-code',
       indexedPaths: paths,
-      launcherPinned: { kind: 'claude', path: '/claude/launcher.jsonl' },
-      stateDerived: [{ kind: 'claude', path: '/claude/state.jsonl' }],
     })).toEqual([
       { kind: 'codex', path: '/codex/new.jsonl' },
       { kind: 'claude', path: '/claude/old.jsonl' },
-      { kind: 'claude', path: '/claude/launcher.jsonl' },
-      { kind: 'claude', path: '/claude/state.jsonl' },
     ]);
   });
 

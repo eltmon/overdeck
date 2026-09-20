@@ -47,7 +47,7 @@ export interface TranscriptCandidateSources {
   entries: readonly SessionIndexEntry[];
   currentHarness?: string | null;
   indexedPaths: ReadonlyMap<string, string>;
-  launcherPinned?: TranscriptCandidate | null;
+  /** Fallback candidate for the current harness when no indexed entry has a path yet. */
   stateDerived?: readonly TranscriptCandidate[];
 }
 
@@ -89,7 +89,6 @@ export function orderedTranscriptCandidates(sources: TranscriptCandidateSources)
       } else candidates.push(candidate);
     }
   }
-  if (sources.launcherPinned) candidates.push(sources.launcherPinned);
   candidates.push(...sources.stateDerived ?? []);
   candidates.push(...legacyClaudeFallbacks);
 
