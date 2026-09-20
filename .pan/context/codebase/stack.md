@@ -23,10 +23,11 @@
   (`codex app-server` transport), acp, kimi-code; CLIProxy sidecar (port 8317)
   bridges GPT models; model routing via Cloister config, never hardcoded
   fallbacks.
-- **Key dirs:** `~/.overdeck/` (home: agents/, sockets/, state/, config.yaml),
-  `${OVERDECK_HOME}/state/<project>/` (overdeck-state worktree),
-  `workspaces/feature-<issue>/` (git worktrees).
+- **Key dirs:** `~/.overdeck/` (home: agents/, sockets/, config.yaml),
+  `.pan/` in the project (or plan-home) repo (drafts/, specs/, continues/,
+  orders/ — the archived `overdeck-state` orphan branch is no longer read
+  or written), `workspaces/feature-<issue>/` (git worktrees).
 - **Dashboard:** port 3011 (`pan up` → `node dist/dashboard/server.js`);
   frontend dev via `pan dev` (Vite HMR).
 
-<!-- last-verified: 2026-08-12 -->
+<!-- last-verified: 2026-09-20 -->

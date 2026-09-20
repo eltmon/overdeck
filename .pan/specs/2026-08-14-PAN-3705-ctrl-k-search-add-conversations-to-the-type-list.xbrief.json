@@ -128,7 +128,7 @@
           },
           {
             "id": "pin-conversations-scope-chip.ac5",
-            "title": "Given two conversation hits with rank 1 and rank 2, when the Conversations scope is active, then the list renders them in ascending rank order (scope filtering preserves upstream ordering, the composition contract for #3703/#3704)",
+            "title": "Given two conversation hits, when the Conversations scope is active, then the list renders them in whichever order the active ordering mode (newest-first by default, or rank when toggled off, per #3703/#3704) already produces upstream -- scope filtering does not reorder results",
             "status": "pending",
             "metadata": {
               "kind": "acceptance_criterion"

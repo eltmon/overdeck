@@ -22,11 +22,14 @@ merge.
   distributed to harness context via `pan sync`.
 - `roles/` — role instruction files (plan.md, work.md, review.md, test.md).
 
-## State planes (PAN-1908 / PAN-2541)
+## State planes (PAN-1908 / PAN-2541 / PAN-3917)
 
-1. **Permanent** — git orphan branch `overdeck-state`, checked out at
-   `${OVERDECK_HOME}/state/<project>/`: `records/`, `specs/`, `continues/`,
-   `drafts/` (`.beads/` is dead — beads removed, PAN-2648).
+1. **Permanent** — planning artifacts (`drafts/`, `specs/`, `continues/`,
+   `orders/`, `notes/`, backlog sequence) live under `.pan/` in the project
+   repo (or the configured plan-home repo for polyrepo projects), committed
+   on the feature branch (`.beads/` is dead — beads removed, PAN-2648). The
+   `overdeck-state` orphan branch is archived (PAN-3917) — Overdeck no longer
+   reads or writes it; never delete it.
 2. **Runtime** — SQLite `~/.overdeck/overdeck.db` (`agents` table is the
    authoritative runtime registry; `state.json` per agent dir is a
    rebuild source). `getAgentStateSync` returns the DB row.
@@ -55,10 +58,11 @@ Single-source-of-truth tenet: one resolver (read door) and one writer
 
 `pan start` is the paved road (auto-plans if needed). Planning writes workspace
 `.overdeck/spec.vbrief.json`; `pan plan finalize` promotes the spec to
-`specs/` on `overdeck-state` and transitions the issue. Work agents claim and
+`.pan/specs/` in the project (or plan-home) repo and transitions the issue.
+Work agents claim and
 complete vBRIEF items via `pan task` (beads removed, PAN-2648); verification
 gate runs quality gates; review convoy +
 test role; server-side rebase/readyForMerge; human or flywheel merges;
 `postMergeLifecycle` → close-out owns teardown.
 
-<!-- last-verified: 2026-08-01 -->
+<!-- last-verified: 2026-09-20 -->

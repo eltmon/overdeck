@@ -43,14 +43,16 @@
   helpers in `src/components/CommandDeck/`.
 
 ## Planning artifacts
-- PRD drafts: `drafts/<issue>.md` on `overdeck-state`
-  (`${OVERDECK_HOME}/state/<project>/drafts/`).
+- PRD drafts: `<planHome>/.pan/drafts/<issue>.md` (project repo, or the
+  configured plan-home repo for polyrepo projects), committed on the
+  feature branch. The `overdeck-state` orphan branch is archived
+  (PAN-3917) and is no longer read or written by Overdeck.
 - vBRIEF (xBRIEF v0.8): exactly `xBRIEFInfo` + `plan` top-level keys;
   ACs are nested items with `metadata.kind: "acceptance_criterion"` naming
   observable behavior; every item carries difficulty/kind/files_scope/
   readiness/requiresInspection metadata.
 - `pan plan finalize` is the only sanctioned promoter of the workspace spec
-  to `specs/` on `overdeck-state`; items are tracked via `pan task` (beads
-  removed, PAN-2648).
+  to `.pan/specs/` in the project (or plan-home) repo; items are tracked
+  via `pan task` (beads removed, PAN-2648).
 
-<!-- last-verified: 2026-07-26 -->
+<!-- last-verified: 2026-09-20 -->
