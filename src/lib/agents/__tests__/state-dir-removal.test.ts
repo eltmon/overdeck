@@ -15,6 +15,7 @@ vi.mock('../../paths.js', async (importOriginal) => {
 
 import {
   listAgentStateFilesForRemoval,
+  pruneAgentStateDir,
   removeAgentStateDir,
 } from '../state-dir-removal.js';
 
@@ -156,5 +157,41 @@ describe('removeAgentStateDir', () => {
       removedDir: false,
     });
     expect(readFileSync(transcriptPath, 'utf8')).toBe('{"message":"kept"}\n');
+  });
+});
+
+describe('pruneAgentStateDir', () => {
+  it('removes only regenerable runtime weight and keeps state and transcripts', async () => {
+    const state = '{"issueId":"PAN-3950"}\n';
+    const sessions = '[{"sessionId":"session-1"}]\n';
+    const rolloutDir = join(agentDir, 'codex-home-v2', 'sessions', '2026', '09', '20');
+    const cacheDir = join(agentDir, 'codex-home-v2', 'cache');
+    mkdirSync(rolloutDir, { recursive: true });
+    mkdirSync(cacheDir, { recursive: true });
+    writeFileSync(join(agentDir, 'state.json'), state);
+    writeFileSync(join(agentDir, 'sessions.json'), sessions);
+    writeFileSync(join(rolloutDir, 'rollout-x.jsonl'), '{"event":"kept"}\n');
+    writeFileSync(join(cacheDir, 'blob'), 'cache');
+    writeFileSync(join(agentDir, 'pending.lock'), 'lock');
+    writeFileSync(join(agentDir, 'runtime.sock'), 'socket');
+
+    const result = await pruneAgentStateDir(agentDir);
+
+    expect(result.kept).toEqual([
+      'codex-home-v2/sessions/2026/09/20/rollout-x.jsonl',
+      'sessions.json',
+      'state.json',
+    ]);
+    expect(result.removed).toEqual([
+      'codex-home-v2/cache',
+      'pending.lock',
+      'runtime.sock',
+    ]);
+    expect(result.bytesFreed).toBe(Buffer.byteLength('cachelocksocket'));
+    expect(readFileSync(join(agentDir, 'state.json'), 'utf8')).toBe(state);
+    expect(readFileSync(join(agentDir, 'sessions.json'), 'utf8')).toBe(sessions);
+    expect(readFileSync(join(rolloutDir, 'rollout-x.jsonl'), 'utf8')).toBe('{"event":"kept"}\n');
+    expect(existsSync(cacheDir)).toBe(false);
+    expect(existsSync(join(agentDir, 'pending.lock'))).toBe(false);
   });
 });

@@ -25,7 +25,7 @@ import { stepOk, stepSkipped, stepFailed } from './types.js';
 import { findAllWorkspacePaths, findWorkspacePath } from './archive-planning.js';
 import { getContainersReferencingWorkspacePath } from '../workspace-manager.js';
 import { DEVCONTAINER_DIRNAME } from '../workspace/devcontainer-renderer.js';
-import { removeAgentStateDir } from '../agents/state-dir-removal.js';
+import { pruneAgentStateDir } from '../agents/state-dir-removal.js';
 
 const execAsync = promisify(exec);
 
@@ -322,19 +322,17 @@ async function removeAgentStateImpl(issueLower: string): Promise<StepResult> {
     name === work || name === planner || name === strike || name.startsWith(specialistPrefix),
   );
 
-  let removed = 0;
-  let preservedTranscripts = 0;
+  let pruned = 0;
   for (const name of targets) {
     try {
-      const result = await removeAgentStateDir(join(AGENTS_DIR, name));
-      if (result.removedDir || result.preservedTranscripts > 0) removed++;
-      preservedTranscripts += result.preservedTranscripts;
+      await pruneAgentStateDir(join(AGENTS_DIR, name));
+      pruned++;
     } catch { /* non-fatal */ }
   }
 
-  if (removed > 0) {
+  if (pruned > 0) {
     return stepOk(step, [
-      `Cleaned ${removed} agent state director${removed === 1 ? 'y' : 'ies'} (${preservedTranscripts} transcript files preserved)`,
+      `Pruned ${pruned} agent directories (transcripts and state kept)`,
     ]);
   }
   return stepSkipped(step, ['No agent state directories found']);
