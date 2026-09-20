@@ -195,6 +195,128 @@ export function readPipelineMirrorMarkerSync(db: SqliteDatabase): string | null 
   }
 }
 
+/** `app_settings` key recording that the dead `issues` FK rebuild already ran. */
+export const DEAD_ISSUES_FK_DROPPED_SETTING = 'schema.deadIssuesFkDropped';
+
+/**
+ * Live tables whose `issue_id → issues(id)` foreign key still gates post-cut
+ * writers. Nothing inserts `issues` rows since the Cut (PAN-3917), so each of
+ * these FKs rejects every new issue id (PAN-3963: batch assembly died on
+ * `uat_generation_members` for exactly this reason). The dropped
+ * pipeline-mirror tables are not listed — they are gone.
+ */
+const DEAD_ISSUES_FK_TABLES = [
+  'merge_queue',
+  'merge_sets',
+  'release_sets',
+  'pending_auto_merges',
+  'uat_generation_members',
+  'uat_generation_member_repos',
+] as const;
+
+const ISSUES_FK_PRESENT_RE = /FOREIGN KEY\s*\(\s*`issue_id`\s*\)\s*REFERENCES\s*`issues`\s*\(\s*`id`\s*\)/i;
+/** The FK clause, with its leading comma — the last clause in every listed table. */
+const ISSUES_FK_CLAUSE_RE = /,\s*FOREIGN KEY\s*\(`issue_id`\)\s*REFERENCES\s*`issues`\s*\(`id`\)[^,)]*/i;
+
+export interface DropDeadIssuesFkResult {
+  /** True when this call ran the rebuild (and wrote the marker). */
+  readonly dropped: boolean;
+  /** Tables actually rebuilt (absent or already-clean tables are skipped). */
+  readonly tables: readonly string[];
+  readonly skipped?: 'peer' | 'already-dropped';
+}
+
+/**
+ * PAN-3963: rebuild the live tables whose `issue_id → issues(id)` FK can bite
+ * post-cut writers, dropping that one constraint and preserving every row,
+ * index, and the table's remaining FKs. SQLite has no DROP CONSTRAINT, so each
+ * table is rebuilt: copy into a new table under the edited CREATE statement,
+ * drop the old one, rename, recreate its indexes.
+ *
+ * The new definition is derived from the table's own sqlite_master SQL with
+ * the issues-FK clause excised — never hand-copied — so drift between the init
+ * migration, the top-ups, and a live database cannot produce a wrong schema
+ * here. A table whose SQL does not carry the clause (fresh database, or one
+ * already rebuilt) is skipped; a table where the excision does not match
+ * cleanly aborts the whole run loudly and the marker is never written, so the
+ * next primary boot retries.
+ *
+ * Same two gates as the pipeline-mirror drop above (fix10): PRIMARY ONLY, and
+ * EXACTLY ONCE via an app_settings marker. It runs from the dashboard boot
+ * step in main.ts, never on database open.
+ */
+export function dropDeadIssuesForeignKeysSync(
+  db: SqliteDatabase = getOverdeckDatabaseSync(),
+  env: NodeJS.ProcessEnv = process.env,
+): DropDeadIssuesFkResult {
+  if (isPeerDashboardProcess(env)) return { dropped: false, tables: [], skipped: 'peer' };
+  let marker: string | null = null;
+  try {
+    const row = db
+      .prepare('SELECT value FROM app_settings WHERE key = ?')
+      .get(DEAD_ISSUES_FK_DROPPED_SETTING) as { value: string | null } | undefined;
+    marker = row?.value ?? null;
+  } catch {
+    marker = null; // no app_settings table yet
+  }
+  if (marker !== null) return { dropped: false, tables: [], skipped: 'already-dropped' };
+
+  const rebuilt: string[] = [];
+  // FK enforcement must be off for the drop/rename step, and the pragma is a
+  // no-op inside a transaction — so it wraps the transaction, not vice versa.
+  db.pragma('foreign_keys = OFF');
+  try {
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.exec(
+        'CREATE TABLE IF NOT EXISTS `app_settings` '
+        + '(`key` text PRIMARY KEY NOT NULL, `value` text, `updated_at` integer)',
+      );
+      for (const table of DEAD_ISSUES_FK_TABLES) {
+        const row = db
+          .prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?`)
+          .get(table) as { sql: string | null } | undefined;
+        if (!row?.sql || !ISSUES_FK_PRESENT_RE.test(row.sql)) continue;
+
+        const newSql = row.sql.replace(ISSUES_FK_CLAUSE_RE, '');
+        if (ISSUES_FK_PRESENT_RE.test(newSql) || newSql.length >= row.sql.length) {
+          throw new Error(`[schema] could not excise the issues FK from ${table} — leaving it untouched`);
+        }
+        const tmp = `__pan3963_${table}`;
+        const tmpSql = newSql.replace(
+          new RegExp(`(CREATE\\s+TABLE\\s+)\`?${table}\`?`, 'i'),
+          `$1\`${tmp}\``,
+        );
+        if (!new RegExp(`CREATE\\s+TABLE\\s+\`${tmp}\``, 'i').test(tmpSql)) {
+          throw new Error(`[schema] could not rename ${table} in its CREATE statement — leaving it untouched`);
+        }
+
+        const indexes = db
+          .prepare(`SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = ? AND sql IS NOT NULL`)
+          .all(table) as Array<{ sql: string }>;
+
+        db.exec(tmpSql);
+        db.exec(`INSERT INTO \`${tmp}\` SELECT * FROM \`${table}\``);
+        db.exec(`DROP TABLE \`${table}\``);
+        db.exec(`ALTER TABLE \`${tmp}\` RENAME TO \`${table}\``);
+        for (const index of indexes) db.exec(index.sql);
+        rebuilt.push(table);
+      }
+      db.prepare(
+        `INSERT INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+      ).run(DEAD_ISSUES_FK_DROPPED_SETTING, new Date().toISOString(), Date.now());
+      db.exec('COMMIT');
+    } catch (error) {
+      db.exec('ROLLBACK');
+      throw error;
+    }
+  } finally {
+    db.pragma('foreign_keys = ON');
+  }
+  return { dropped: true, tables: rebuilt };
+}
+
 /**
  * Idempotent schema top-up for first-class projects/workspaces (PAN-1990).
  * A fresh overdeck.db predates these tables — the init migration only runs on
@@ -279,6 +401,9 @@ function ensureWorkspaceTablesSync(db: SqliteDatabase): void {
  * requiring a full migration reset.
  */
 function ensureReleaseSetTablesSync(db: SqliteDatabase): void {
+  // PAN-3963: no FK into `issues` — that table is a pre-cut cache nothing
+  // writes any more, so the constraint rejects every post-cut issue id.
+  // Existing databases get the FK dropped by dropDeadIssuesForeignKeysSync.
   db.exec(`
     CREATE TABLE IF NOT EXISTS \`release_sets\` (
       \`issue_id\` text PRIMARY KEY NOT NULL,
@@ -287,8 +412,7 @@ function ensureReleaseSetTablesSync(db: SqliteDatabase): void {
       \`workspace_type\` text NOT NULL,
       \`status\` text DEFAULT 'pending' NOT NULL,
       \`created_at\` integer NOT NULL,
-      \`updated_at\` integer NOT NULL,
-      FOREIGN KEY (\`issue_id\`) REFERENCES \`issues\`(\`id\`) ON UPDATE no action ON DELETE no action
+      \`updated_at\` integer NOT NULL
     )
   `);
   db.exec('CREATE INDEX IF NOT EXISTS \`release_sets_project_idx\` ON \`release_sets\` (\`project_key\`,\`updated_at\`)');
@@ -348,8 +472,7 @@ function ensureUatGenerationRepoTablesSync(db: SqliteDatabase): void {
       \`head_sha\` text NOT NULL,
       \`merge_order_in_repo\` integer DEFAULT 0 NOT NULL,
       PRIMARY KEY(\`uat_name\`, \`issue_id\`, \`repo_key\`),
-      FOREIGN KEY (\`uat_name\`) REFERENCES \`uat_generations\`(\`name\`) ON UPDATE no action ON DELETE no action,
-      FOREIGN KEY (\`issue_id\`) REFERENCES \`issues\`(\`id\`) ON UPDATE no action ON DELETE no action
+      FOREIGN KEY (\`uat_name\`) REFERENCES \`uat_generations\`(\`name\`) ON UPDATE no action ON DELETE no action
     )
   `);
   db.exec('CREATE INDEX IF NOT EXISTS \`uat_generation_member_repos_uat_idx\` ON \`uat_generation_member_repos\` (\`uat_name\`,\`issue_id\`)');
