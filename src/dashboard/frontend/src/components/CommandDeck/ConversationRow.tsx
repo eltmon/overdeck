@@ -365,7 +365,7 @@ export function ConversationRow({
         <AlertCircle
           size={spinnerSize}
           className={styles.conversationStalledIcon}
-          aria-label={`Agent stalled in ${conv.name}`}
+          aria-hidden="true"
         />
       ) : conv.isWorking ? (
         <WorkingSpinner

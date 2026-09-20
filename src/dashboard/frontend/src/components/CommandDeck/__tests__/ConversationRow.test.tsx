@@ -77,7 +77,7 @@ describe('ConversationRow stalled OpenCode turn', () => {
     });
 
     expect(screen.getByText(/waiting on agent — no activity since/i)).toBeInTheDocument();
-    expect(screen.getAllByLabelText('Agent stalled in test-conversation')).toHaveLength(2);
+    expect(screen.getByLabelText('Agent stalled in test-conversation')).toBeInTheDocument();
     expect(screen.queryByLabelText('Agent working in test-conversation')).not.toBeInTheDocument();
   });
 });
