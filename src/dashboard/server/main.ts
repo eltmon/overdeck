@@ -186,7 +186,7 @@ if (isPeerDashboard) {
       force: true,
     })).then((result) => {
       if (result.removed.length > 0) {
-        console.log(`[overdeck] Removed ${result.removed.length} old closed-issue agent dir${result.removed.length === 1 ? '' : 's'}: ${result.removed.join(', ')}`);
+        console.log(`[overdeck] Pruned ${result.removed.length} old closed-issue agent dir${result.removed.length === 1 ? '' : 's'} (state and transcripts kept): ${result.removed.join(', ')}`);
       }
       if (result.protected.length > 0) {
         console.warn(`[overdeck] Protected ${result.protected.length} old closed-issue agent dir${result.protected.length === 1 ? '' : 's'} because it has a live tmux session or JSONL file: ${result.protected.join(', ')}`);
@@ -801,4 +801,3 @@ if (isPeerDashboard) {
   console.log('[overdeck] Cloister auto-starting (startup.auto_start=true)');
   emitActivityEntrySync({ source: 'dashboard', level: 'info', message: 'Cloister auto-starting on dashboard boot' });
 }
-
