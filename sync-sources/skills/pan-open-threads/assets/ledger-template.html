@@ -82,6 +82,7 @@ ul.items input{margin:4px 0 0;width:16px;height:16px;accent-color:var(--accent);
 .tag.risk{color:var(--risk);background:var(--risk-soft)}
 .tag.ask{color:var(--ask);background:var(--ask-soft)}
 .tag.open{color:var(--muted);background:var(--line-soft)}
+.tag.close{color:var(--accent);background:var(--accent-soft)}
 li.done .item-body{color:var(--done)} li.done .item-body p a{color:var(--done)} li.done .tag{opacity:.55}
 li.done .item-body p{text-decoration:line-through;text-decoration-color:var(--line)}
 body.hide-done li.done{display:none}
@@ -113,20 +114,21 @@ body.hide-done article.conv.all-done{display:none}
 <script>
 // ---- Data. Tags: owe = something only you can do; risk = data or money at stake; ask = an agent asked you and never got an answer; open = pending work nobody is driving.
 const GROUPS = [
-{ id:"example", title:"Project name", lede:"One sentence on the state of this project's conversations.", convs:[
+{ id:"close", title:"Safe to close", lede:"Finished, empty, or handed off to a successor. Tick each one as you close it in the dashboard.", convs:[
+  { key:"close-1235", id:"1235", title:"Finished conversation", meta:"Harness · model", stopped:"Why it is finished.", items:[ {t:"close", h:"Close it."} ]}
+]},
+{ id:"example", title:"Project name", lede:"One sentence on the state of this project's conversations. Keep open: 1234.", convs:[
   { id:"1234", title:"Conversation title", meta:"Harness · model", stopped:"One sentence on where the conversation stopped and whether it is settled or mid-task.", items:[
     {t:"owe", h:"Something only the operator can do, with the exact click or command."},
     {t:"risk", h:"Data or money exposed: unpushed commits, a secret on disk, a key reset."},
     {t:"ask", h:"A question an agent asked the operator that never got an answer."},
     {t:"open", h:"Pending work nobody is driving, with the <a href='https://github.com/eltmon/overdeck/issues/1'>issue link</a>."}
   ]}
-]},
-{ id:"close", title:"Safe to close", lede:"Conversations that are finished, empty, or handed off to a successor. Tick when closed.", convs:[
-  { id:"1235", title:"Finished conversation", meta:"Harness · model", stopped:"Why it is finished.", items:[ {t:"close", h:"Close it."} ]}
 ]}
 ];
+// A conversation may appear in both the close group and a project group; give the close-group row a distinct key so item ids never collide.
 
-const CLOSEABLE = "Finished and safe to close: <b>2827</b> docs DNS, <b>2828</b> landing page, <b>2839</b> disk inventory, <b>2846</b>, <b>2847</b> Warp, <b>2848</b>, <b>2836</b> filed MIN-1041, <b>2837</b>. Empty shells: <b>2826</b>, <b>2829</b>, <b>2833</b>, <b>2835</b>.";
+const CLOSEABLE = "";
 
 // ---- State
 const stateEl = document.getElementById('ledger-state');
@@ -135,7 +137,7 @@ try { state = Object.assign(state, JSON.parse(stateEl.textContent)); } catch (e)
 try { const ls = localStorage.getItem('ledger-local'); if (ls) { const l = JSON.parse(ls); if (!state.done.length && l.done) state.done = l.done; if (l.hideDone !== undefined) state.hideDone = l.hideDone; } } catch (e) {}
 const doneSet = new Set(state.done);
 
-const TAG_LABEL = {owe:"You", risk:"At risk", ask:"Unanswered", open:"Open"};
+const TAG_LABEL = {owe:"You", risk:"At risk", ask:"Unanswered", open:"Open", close:"Close"};
 
 function render(){
   const main = document.getElementById('main');
@@ -148,21 +150,21 @@ function render(){
     sec.innerHTML = `<h2>${g.title}</h2><p class="lede">${g.lede}</p>`;
     railHtml += `<ul><li style="border:0;padding-bottom:2px"><a href="#g-${g.id}"><b>${g.title}</b></a></li>`;
     for (const c of g.convs){
-      const art = document.createElement('article'); art.className='conv'; art.id='c-'+c.id;
+      const key = c.key || c.id;
+      const art = document.createElement('article'); art.className='conv'; art.id='c-'+key;
       let openHere = 0;
       let lis = '';
       c.items.forEach((it, i) => {
-        const id = c.id+'-'+i; const isDone = doneSet.has(id);
+        const id = key+'-'+i; const isDone = doneSet.has(id);
         counts.total++; if (isDone) counts.done++; else { openHere++; if (counts[it.t] !== undefined) counts[it.t]++; }
         lis += `<li class="${isDone?'done':''}"><input type="checkbox" id="cb-${id}" data-id="${id}" ${isDone?'checked':''} aria-label="Mark handled"><div class="item-body"><p><label for="cb-${id}"><span class="tag ${it.t}">${TAG_LABEL[it.t]}</span></label>${it.h}</p></div></li>`;
       });
       if (openHere === 0) art.classList.add('all-done');
       art.innerHTML = `<div class="conv-head"><a class="chip conv" href="https://overdeck.localhost/conv/${c.id}">conv ${c.id}</a><h3><a href="https://overdeck.localhost/conv/${c.id}">${c.title}</a></h3><span class="chip">${c.meta}</span></div><p class="stopped">${c.stopped}</p><ul class="items">${lis}</ul>`;
       sec.appendChild(art);
-      railHtml += `<li><a href="#c-${c.id}">${c.id} · ${c.title}</a><em>${openHere}</em></li>`;
+      railHtml += `<li><a href="#c-${key}">${c.id} · ${c.title}</a><em>${openHere}</em></li>`;
     }
     railHtml += '</ul>';
-    if (g.id === 'lexerra') { const d = document.createElement('div'); d.className='closeable'; d.innerHTML = CLOSEABLE; sec.appendChild(d); }
     main.appendChild(sec);
   }
   railHtml += `<div class="controls"><label><input type="checkbox" id="hide-done" ${state.hideDone?'checked':''}> Hide handled items</label></div>
