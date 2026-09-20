@@ -43,6 +43,18 @@ import type { ParseResult } from '../services/conversation-service.js';
 
 const emptyParse = vi.fn<(file: string) => Promise<ParseResult>>();
 
+async function waitUntil(predicate: () => boolean, timeoutMs = 2000): Promise<void> {
+  const start = Date.now();
+  while (!predicate()) {
+    if (Date.now() - start > timeoutMs) throw new Error('timed out waiting for condition');
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
+async function settle(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 20));
+}
+
 describe('streamHarnessFullParseSnapshots — ACP dispatch', () => {
   it('leaves Claude sessions to the worker-backed incremental stream', () => {
     const stream = streamHarnessFullParseSnapshots('agent-pan-3950', 'claude-code', null, true);
@@ -188,6 +200,133 @@ describe('synthetic agent transcript discovery', () => {
       expect(events).toEqual([candidate]);
       expect(watched.length).toBeGreaterThan(0);
       expect(watched.every(entry => entry.closed)).toBe(true);
+    } finally {
+      resolverMock.listAgentTranscriptCandidates.mockResolvedValue([]);
+      resolverMock.listAgentTranscriptWatchRoots.mockResolvedValue([]);
+      resolverMock.resolveAgentTranscriptCandidate.mockResolvedValue(null);
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  // PAN-3950 W6: a watch root whose fs.watch() attachment throws (e.g. the
+  // directory disappears between listing and watch()) must not be abandoned
+  // forever — it has to be retried the next time a surviving watcher fires.
+  it('retries a watch root whose watch() call failed once a surviving watcher fires', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'synthetic-agent-retry-'));
+    const rootA = join(dir, 'a');
+    const rootB = join(dir, 'b');
+    await mkdir(rootA, { recursive: true });
+    await mkdir(rootB, { recursive: true });
+    const transcript = join(rootA, 'late.jsonl');
+    const candidate = { kind: 'claude' as const, path: transcript, model: 'claude-sonnet-4-6' };
+
+    let allowA = false;
+    let aListener: (() => void) | undefined;
+    let bListener: (() => void) | undefined;
+    const watch = vi.fn((path: string, _options: { recursive: boolean }, listener: () => void) => {
+      if (path === rootA) {
+        if (!allowA) throw new Error('simulated watch failure');
+        aListener = listener;
+      } else if (path === rootB) {
+        bListener = listener;
+      }
+      return { close: vi.fn() };
+    });
+
+    resolverMock.listAgentTranscriptCandidates.mockResolvedValue([]);
+    resolverMock.listAgentTranscriptWatchRoots.mockResolvedValue([rootA, rootB]);
+    resolverMock.resolveAgentTranscriptCandidate.mockResolvedValue(null);
+
+    try {
+      const eventsPromise = Effect.runPromise(
+        watchForAgentTranscriptCandidate('agent-pan-3950-retry', '', { watch }).pipe(Stream.take(1), Stream.runCollect),
+      );
+
+      await waitUntil(() => bListener !== undefined);
+      expect(aListener).toBeUndefined(); // root A's watch() has never succeeded yet
+
+      // root A can now attach; firing the surviving watcher (B) is what
+      // triggers the retry — nothing else does.
+      allowA = true;
+      bListener!();
+      await waitUntil(() => aListener !== undefined);
+
+      resolverMock.listAgentTranscriptCandidates.mockResolvedValue([candidate]);
+      resolverMock.resolveAgentTranscriptCandidate.mockResolvedValue(candidate);
+      aListener!();
+
+      const events = Array.from(await eventsPromise);
+      expect(events).toEqual([candidate]);
+    } finally {
+      resolverMock.listAgentTranscriptCandidates.mockResolvedValue([]);
+      resolverMock.listAgentTranscriptWatchRoots.mockResolvedValue([]);
+      resolverMock.resolveAgentTranscriptCandidate.mockResolvedValue(null);
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  // PAN-3950 W6: a watch root whose watch() call always throws must be
+  // retried exactly once per surviving event — never spontaneously, and
+  // never via a timer (the retry scheme uses none).
+  it('grows watch attempts for a permanently failing root by exactly one per surviving event, and schedules no timers', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'synthetic-agent-permanent-fail-'));
+    const rootA = join(dir, 'a');
+    const rootB = join(dir, 'b');
+    await mkdir(rootA, { recursive: true });
+    await mkdir(rootB, { recursive: true });
+    const transcript = join(rootB, 'late.jsonl');
+    const candidate = { kind: 'claude' as const, path: transcript, model: 'claude-sonnet-4-6' };
+
+    let watchCallsA = 0;
+    let bListener: (() => void) | undefined;
+    const watch = vi.fn((path: string, _options: { recursive: boolean }, listener: () => void) => {
+      if (path === rootA) {
+        watchCallsA++;
+        throw new Error('simulated permanent watch failure');
+      }
+      if (path === rootB) bListener = listener;
+      return { close: vi.fn() };
+    });
+
+    resolverMock.listAgentTranscriptCandidates.mockResolvedValue([]);
+    resolverMock.listAgentTranscriptWatchRoots.mockResolvedValue([rootA, rootB]);
+    resolverMock.resolveAgentTranscriptCandidate.mockResolvedValue(null);
+
+    try {
+      const eventsPromise = Effect.runPromise(
+        watchForAgentTranscriptCandidate('agent-pan-3950-permanent-fail', '', { watch }).pipe(Stream.take(1), Stream.runCollect),
+      );
+
+      await waitUntil(() => bListener !== undefined);
+      await waitUntil(() => watchCallsA >= 1);
+      await settle();
+      const settledCalls = watchCallsA;
+
+      vi.useFakeTimers();
+      try {
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+
+      bListener!();
+      await waitUntil(() => watchCallsA === settledCalls + 1);
+      await settle();
+      expect(watchCallsA).toBe(settledCalls + 1); // grew by exactly one, no runaway retries
+
+      vi.useFakeTimers();
+      try {
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+
+      resolverMock.listAgentTranscriptCandidates.mockResolvedValue([candidate]);
+      resolverMock.resolveAgentTranscriptCandidate.mockResolvedValue(candidate);
+      bListener!();
+
+      const events = Array.from(await eventsPromise);
+      expect(events).toEqual([candidate]);
     } finally {
       resolverMock.listAgentTranscriptCandidates.mockResolvedValue([]);
       resolverMock.listAgentTranscriptWatchRoots.mockResolvedValue([]);

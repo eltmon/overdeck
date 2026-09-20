@@ -240,16 +240,6 @@ function streamClaudeTranscript(
   );
 }
 
-function nearestExistingDirectory(path: string): string | null {
-  let candidate = dirname(path);
-  while (!existsSync(candidate)) {
-    const parent = dirname(candidate);
-    if (parent === candidate) return null;
-    candidate = parent;
-  }
-  return candidate;
-}
-
 function nearestExistingWatchRoot(path: string): { path: string; recursive: boolean } | null {
   let candidate = path;
   while (!existsSync(candidate)) {
@@ -277,12 +267,12 @@ export function watchForAgentTranscriptCandidate(
   return Stream.callback<TranscriptCandidate, PanRpcError>((queue) =>
     Effect.acquireRelease(
       Effect.sync(() => {
-        let stopped = false, resolving = false, rerun = false, watchedRoots = '';
-        let watchers: Array<{ close(): void }> = [];
+        let stopped = false, resolving = false, rerun = false;
+        const watchers = new Map<string, { root: string; recursive: boolean; handle: { close(): void } }>();
         const watch = deps.watch ?? ((path, options, listener) => fsWatch(path, options, listener));
         const closeWatchers = () => {
-          for (const watcher of watchers) try { watcher.close(); } catch { /* already closed */ }
-          watchers = [];
+          for (const entry of watchers.values()) try { entry.handle.close(); } catch { /* already closed */ }
+          watchers.clear();
         };
         const resolveCandidate = async (): Promise<void> => {
           if (stopped) return;
@@ -301,22 +291,35 @@ export function watchForAgentTranscriptCandidate(
             const runtimeRoots = await listAgentTranscriptWatchRoots(agentId, workspace);
             const roots = new Map<string, boolean>();
             for (const path of [index, ...candidates.map(candidate => candidate.path)]) {
-              const root = nearestExistingDirectory(path);
-              if (root) roots.set(root, roots.get(root) ?? false);
+              const root = nearestExistingWatchRoot(dirname(path));
+              if (root) roots.set(root.path, roots.get(root.path) ?? false);
             }
             for (const path of runtimeRoots) {
               const root = nearestExistingWatchRoot(path);
               if (root) roots.set(root.path, (roots.get(root.path) ?? false) || root.recursive);
             }
-            const watched = [...roots].sort(([a], [b]) => a.localeCompare(b));
-            const signature = watched.map(([path, recursive]) => `${path}:${recursive}`).join('\0');
-            if (signature !== watchedRoots) {
-              watchedRoots = signature;
-              closeWatchers();
-              for (const [root, recursive] of watched) {
-                try { watchers.push(watch(root, { recursive }, () => void resolveCandidate())); } catch { /* retry on another event */ }
+            if (stopped) return;
+            const desired = new Map<string, { root: string; recursive: boolean }>();
+            for (const [root, recursive] of roots) desired.set(`${root}:${recursive}`, { root, recursive });
+            for (const [key, entry] of watchers) {
+              if (!desired.has(key)) {
+                try { entry.handle.close(); } catch { /* already closed */ }
+                watchers.delete(key);
               }
+            }
+            let attached = false;
+            for (const [key, { root, recursive }] of desired) {
+              if (watchers.has(key)) continue;
+              try {
+                const handle = watch(root, { recursive }, () => void resolveCandidate());
+                watchers.set(key, { root, recursive, handle });
+                attached = true;
+              } catch { /* retry on another event */ }
+            }
+            if (attached) {
               rerun = true; // close the listing→watch race
+            } else if (watchers.size === 0 && desired.size > 0) {
+              console.warn(`[transcript-discovery] no watchers attached for agent ${agentId}; will retry on next event`);
             }
           } catch {
             // Agent/candidate directories may be between atomic replacements.
