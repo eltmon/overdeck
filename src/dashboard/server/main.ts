@@ -73,7 +73,7 @@ import { createOverdeckDatabase } from '../../../scripts/create-overdeck-db.js';
 import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
 import { startProjectCiRefillAfterProjectionReady } from './services/project-ci-refill-startup.js';
 import { ProjectsLive } from '../../lib/overdeck/config.js';
-import { RecordsLive, TmuxLive, dropPipelineStateMirrorTablesSync } from '../../lib/overdeck/infra.js';
+import { RecordsLive, TmuxLive, dropPipelineStateMirrorTablesSync, dropDeadIssuesForeignKeysSync } from '../../lib/overdeck/infra.js';
 import { startServerBootTelemetry } from './telemetry.js';
 import { isPeerDashboardProcess } from '../../lib/boot-gates.js';
 import { isSmeeConfiguredSync, startSmeeProcessSync } from '../../lib/smee.js';
@@ -141,6 +141,20 @@ try {
   }
 } catch (err) {
   console.warn('[overdeck] Pipeline-state mirror drop failed (non-fatal):', err);
+}
+
+// PAN-3963: rebuild the live tables whose `issue_id → issues(id)` FK rejects
+// every post-cut issue id (nothing writes `issues` since the Cut). Same gates
+// as the mirror drop above: once, and only in a primary dashboard.
+try {
+  const fkDrop = dropDeadIssuesForeignKeysSync();
+  if (fkDrop.dropped) {
+    console.log(`[overdeck] Dropped the dead issues FKs (once; marker written) — rebuilt: ${fkDrop.tables.join(', ') || 'none (already clean)'}`);
+  } else if (fkDrop.skipped === 'peer') {
+    console.log('[overdeck] Dead-issues-FK rebuild SKIPPED — peer dashboard runs no destructive migration');
+  }
+} catch (err) {
+  console.warn('[overdeck] Dead-issues-FK rebuild failed (non-fatal):', err);
 }
 
 // Bind the HTTP socket before starting any background service or the Deacon.
