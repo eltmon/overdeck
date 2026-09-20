@@ -297,29 +297,22 @@ describe('synthetic agent transcript discovery', () => {
         watchForAgentTranscriptCandidate('agent-pan-3950-permanent-fail', '', { watch }).pipe(Stream.take(1), Stream.runCollect),
       );
 
+      // A vi.getTimerCount() check here would be vacuous: fake timers only
+      // track timers scheduled while active, and nothing schedules any while
+      // this stream runs — the retry path is driven entirely by watch()
+      // events, never a timer. The real guard against a timer creeping back
+      // in is the source-level check in ws-rpc.ts's own test coverage (the
+      // setInterval/setTimeout count stays pinned to its e42bb79eb39
+      // baseline; see w6's verify_commands).
       await waitUntil(() => bListener !== undefined);
       await waitUntil(() => watchCallsA >= 1);
       await settle();
       const settledCalls = watchCallsA;
 
-      vi.useFakeTimers();
-      try {
-        expect(vi.getTimerCount()).toBe(0);
-      } finally {
-        vi.useRealTimers();
-      }
-
       bListener!();
       await waitUntil(() => watchCallsA === settledCalls + 1);
       await settle();
       expect(watchCallsA).toBe(settledCalls + 1); // grew by exactly one, no runaway retries
-
-      vi.useFakeTimers();
-      try {
-        expect(vi.getTimerCount()).toBe(0);
-      } finally {
-        vi.useRealTimers();
-      }
 
       resolverMock.listAgentTranscriptCandidates.mockResolvedValue([candidate]);
       resolverMock.resolveAgentTranscriptCandidate.mockResolvedValue(candidate);
