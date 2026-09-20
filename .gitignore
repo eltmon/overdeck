@@ -240,6 +240,11 @@ __pycache__/
 .overdeck/sessions.jsonl
 .overdeck/pipeline-verdict.json
 .overdeck/verification-latest.json
+# PAN-3944 follow-up: per-issue pipeline journal + verification run artifacts + feedback
+# files are workspace runtime, never tracked (the dirty-tree gate refuses review otherwise).
+.overdeck/pipeline.jsonl
+.overdeck/verification/
+.overdeck/feedback/
 .overdeck/feedback/
 .overdeck/review/
 .overdeck/test/

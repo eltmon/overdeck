@@ -50,6 +50,24 @@ async function loadTerminalBackendConfig(): Promise<{ terminal?: { backend?: 'he
 }
 
 /**
+ * Does this agent run behind a host process with its own delivery socket?
+ * codex app-server (the default codex transport) and ACP/opencode do; codex in
+ * `transport: tui` mode does not.
+ */
+async function isHostBackedTarget(state: AgentState | null): Promise<boolean> {
+  if (!state) return false;
+  if (state.harness === 'acp' || state.harness === 'opencode') return true;
+  if (state.harness !== 'codex') return false;
+  try {
+    const { loadConfigSync } = await import('../config-yaml.js');
+    const loaded = loadConfigSync() as { config?: { codex?: { transport?: string } } };
+    return loaded.config?.codex?.transport !== 'tui';
+  } catch {
+    return true;
+  }
+}
+
+/**
  * Which backend this host delivers through. Resolved once per process: the
  * answer is a property of the host (binary plus socket, or an explicit
  * `terminal.backend`), not of the message, and a probe per delivery would put
@@ -377,7 +395,13 @@ export async function deliverAgentMessage(
   // The SENDER's own tokens, looked up from ITS agent id — never the target's.
   const sender = opts.sender
     ?? senderFromEnv(process.env, (senderId) => tokensFromLaunchMetadata(getAgentStateSync(senderId)));
-  const herdrAgent = (await deliveryBackendName()) === 'herdr'
+  // A harness reached through its own host process (codex app-server, ACP /
+  // opencode) is never prompted through Herdr. Herdr detects the codex process
+  // UNDER the app-server host, and `agent.prompt` then types the message into
+  // the pane, where the host's stdin reader treats every line as its own
+  // message — the PAN-3705 kickoff arrived as 97 one-line threads that way.
+  // Their socket tiers below are the only correct door.
+  const herdrAgent = !(await isHostBackedTarget(state)) && (await deliveryBackendName()) === 'herdr'
     ? await (await import('../terminal-backends/herdr.js')).findHerdrAgent(normalizedId)
     : null;
   if (herdrAgent) {

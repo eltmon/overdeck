@@ -88,6 +88,28 @@ afterEach(() => {
   rmSync(home, { recursive: true, force: true });
 });
 
+describe('deliverAgentMessage never prompts a host-backed harness through Herdr', () => {
+  it('skips agent.prompt for a codex app-server target even when Herdr detected the codex process', async () => {
+    writeAgentState('agent-pan-3705-review', { issueId: 'PAN-3705', role: 'review', harness: 'codex', model: 'gpt-5.6-sol' });
+    // Herdr sees the codex process under the app-server host and reports a
+    // detected agent; `agent.prompt` would type the message into the pane and
+    // the host's stdin reader would split it into one thread per line.
+    mocks.findHerdrAgent.mockResolvedValue({
+      paneId: 'wG:p7', terminalId: 't', workspaceId: 'wG', state: 'idle', tokens: { harness: 'codex', role: 'review' }, paneBound: false,
+    });
+    mocks.prompt.mockReturnValue(Effect.succeed({ kind: 'delivered', messageId: 'm2' }));
+
+    const result = await deliverAgentMessage(
+      'agent-pan-3705-review', 'line one\nline two\nline three', 'test', undefined,
+      { messageId: 'm2', sender: { id: 'conv-2781' } },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.path).not.toBe('herdr');
+    expect(mocks.prompt).not.toHaveBeenCalled();
+  });
+});
+
 describe('deliverAgentMessage when Herdr cannot prompt the pane', () => {
   it('falls through to the harness transport instead of failing the delivery', async () => {
     writeAgentState('agent-pan-3705-review', { issueId: 'PAN-3705', role: 'review', harness: 'codex', model: 'gpt-5.6-sol' });
@@ -132,8 +154,9 @@ describe('deliverAgentMessage when Herdr cannot prompt the pane', () => {
     expect(mocks.sendKeys).toHaveBeenCalledTimes(1);
   });
 
+  // A Herdr-prompted harness (claude-code); host-backed ones never reach agent.prompt.
   it('still reports a Herdr THROW as a herdr failure — only `unsupported` falls through', async () => {
-    writeAgentState('agent-pan-3705-review', { issueId: 'PAN-3705', role: 'review', harness: 'codex', model: 'gpt-5.6-sol' });
+    writeAgentState('agent-pan-3705-review', { issueId: 'PAN-3705', role: 'review', harness: 'claude-code', model: 'claude-sonnet-5' });
     mocks.prompt.mockReturnValue(Effect.fail(new Error('herdr socket_error')));
 
     const result = await deliverAgentMessage(
