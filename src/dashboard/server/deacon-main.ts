@@ -4,9 +4,10 @@ import { setActivityEventStoreProvider } from '../../lib/activity-logger.js';
 import { getAgentState, type AgentState } from '../../lib/agents.js';
 import { setCloisterEventStoreProvider, getCloisterService } from '../../lib/cloister/service.js';
 import {
-  runDeaconLite,
+  runDeaconLitePatrol,
   setAgentStoppedNotifier,
   setAgentStatusChangedNotifier,
+  setPatrolRunObserver,
 } from '../../lib/cloister/deacon-lite.js';
 import { createDeaconEventClient } from '../../lib/cloister/deacon-event-client.js';
 import { ensureInternalTokenSync } from '../../lib/internal-token.js';
@@ -89,10 +90,16 @@ setAgentStatusChangedNotifier((state, previousStatus, hasLiveTmuxSession) => {
   append(domainEvent('agent.status_changed', buildAgentStatusChangedPayload(state, previousStatus, hasLiveTmuxSession)));
 });
 
+// PAN-3922: relay every completed tick to the supervisor over IPC so the
+// dashboard process (which never runs deacon-lite itself) can report status.
+setPatrolRunObserver((report) => {
+  process.send?.({ type: 'patrol-done', at: report.at, error: report.error });
+});
+
 process.on('message', (message) => {
   if (!message || typeof message !== 'object') return;
   if ((message as { type?: unknown }).type === 'patrol') {
-    void runDeaconLite().catch((err) => {
+    void runDeaconLitePatrol().catch((err) => {
       console.error('[deacon-child] patrol request failed:', err);
     });
     return;

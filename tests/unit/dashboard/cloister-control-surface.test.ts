@@ -8,12 +8,6 @@ const mocks = vi.hoisted(() => ({
     thresholds: { stale: 5, warning: 10, stuck: 20 },
     auto_actions: { poke_on_warning: true, kill_on_stuck: false },
   })),
-  getDeaconLiteStatus: vi.fn(() => ({
-    running: true,
-    intervalMs: 60_000,
-    lastRunAt: '2026-07-03T00:00:00.000Z',
-    lastRunError: null,
-  })),
   readCloisterStateFile: vi.fn(() => ({ running: true, pid: 1234, startedAt: '2026-07-03T00:00:00.000Z' })),
   isCloisterSpawnsPausedSync: vi.fn(() => true),
   setCloisterSpawnsPausedSync: vi.fn(),
@@ -22,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   sendPatrolNow: vi.fn(() => true),
   reloadDeaconConfig: vi.fn(() => true),
   isChildRunning: vi.fn(() => true),
+  lastPatrolReport: vi.fn(() => ({ at: '2026-07-03T00:00:00.000Z', error: null })),
 }));
 
 vi.mock('../../../src/lib/agents.js', () => ({
@@ -37,7 +32,7 @@ vi.mock('../../../src/lib/cloister/config.js', () => ({
 }));
 
 vi.mock('../../../src/lib/cloister/deacon-lite.js', () => ({
-  getDeaconLiteStatus: mocks.getDeaconLiteStatus,
+  DEACON_LITE_INTERVAL_MS: 60_000,
 }));
 
 vi.mock('../../../src/lib/cloister/service.js', () => ({
@@ -55,6 +50,7 @@ vi.mock('../../../src/dashboard/server/services/deacon-supervisor.js', () => ({
   sendPatrolNow: mocks.sendPatrolNow,
   reloadDeaconConfig: mocks.reloadDeaconConfig,
   isChildRunning: mocks.isChildRunning,
+  lastPatrolReport: mocks.lastPatrolReport,
 }));
 
 // Import once at module scope; vi.mock hoisting ensures mocks are wired.
@@ -75,12 +71,7 @@ describe('cloister control surface (PAN-3917 W4: shrunk to deacon-lite\'s surfac
     vi.clearAllMocks();
     mocks.listRunningAgentsSync.mockReturnValue([]);
     mocks.readCloisterStateFile.mockReturnValue({ running: true, pid: 1234, startedAt: '2026-07-03T00:00:00.000Z' });
-    mocks.getDeaconLiteStatus.mockReturnValue({
-      running: true,
-      intervalMs: 60_000,
-      lastRunAt: '2026-07-03T00:00:00.000Z',
-      lastRunError: null,
-    });
+    mocks.lastPatrolReport.mockReturnValue({ at: '2026-07-03T00:00:00.000Z', error: null });
     mocks.isChildRunning.mockReturnValue(true);
     mocks.sendPatrolNow.mockReturnValue(true);
     mocks.reloadDeaconConfig.mockReturnValue(true);
@@ -96,7 +87,7 @@ describe('cloister control surface (PAN-3917 W4: shrunk to deacon-lite\'s surfac
     expect(status.patrol.intervalMs).toBe(60_000);
     expect(areDurableSpawnsPaused()).toBe(true);
     expect(mocks.readCloisterStateFile).toHaveBeenCalled();
-    expect(mocks.getDeaconLiteStatus).toHaveBeenCalled();
+    expect(mocks.lastPatrolReport).toHaveBeenCalled();
     expect(mocks.isCloisterSpawnsPausedSync).toHaveBeenCalled();
   });
 

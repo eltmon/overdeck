@@ -4,17 +4,17 @@
     "created": "2026-09-19T11:42:35Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3922: Deacon-lite: relay run status from the deacon child to the dashboard; watchdog stale verdict",
-    "updated": "2026-09-19T11:50:33.230Z"
+    "updated": "2026-09-19T13:20:20.237Z"
   },
   "plan": {
     "id": "pan-3922",
     "title": "Deacon-lite: relay run status from the deacon child to the dashboard; watchdog stale verdict",
-    "status": "proposed",
+    "status": "running",
     "uid": "8484accf-3f4c-4635-96a0-3b872b07d0c1",
     "author": "agent:claude-fable-5-1",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-19T11:42:35Z",
-    "updated": "2026-09-19T11:50:33.230Z",
+    "updated": "2026-09-19T13:20:20.237Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3922",
