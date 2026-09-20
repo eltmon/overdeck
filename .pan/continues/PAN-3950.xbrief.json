@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3950",
   "created": "2026-09-20T13:53:05.511Z",
-  "updated": "2026-09-20T14:02:52.842Z",
+  "updated": "2026-09-20T14:12:40.516Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -16,9 +16,10 @@
       "doneAt": "2026-09-20T14:02:42.519Z"
     },
     "w7-reset-marker-fails-loud": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3950",
-      "claimedAt": "2026-09-20T14:02:52.842Z"
+      "claimedAt": "2026-09-20T14:02:52.842Z",
+      "doneAt": "2026-09-20T14:12:40.516Z"
     }
   }
 }
