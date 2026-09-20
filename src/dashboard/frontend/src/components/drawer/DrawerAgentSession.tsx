@@ -22,7 +22,7 @@ import { ConversationPanel } from '../chat/ConversationPanel';
 import { StartAgentCta } from '../issue-view/StartAgentCta';
 import { XTerminal } from '../XTerminal';
 import { useConversationUiState } from '../../hooks/useConversationUiState';
-import { agentToConversation, isEndedAgent, type SessionAgent } from '../../lib/agentConversation';
+import { agentToConversation, isEndedAgent, sortIssueAgents, type SessionAgent } from '../../lib/agentConversation';
 import { ViewToggle } from '../shared/ViewToggle';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
@@ -83,10 +83,11 @@ interface DrawerAgentSessionProps {
 
 export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, onChangeView, issueId, hideComposer = false }: DrawerAgentSessionProps) {
   const testId = `drawer-tab-panel-${view}`;
+  const orderedAgents = useMemo(() => sortIssueAgents(agents), [agents]);
 
   const agent = useMemo(
-    () => agents.find((candidate) => candidate.id === agentId) ?? null,
-    [agents, agentId],
+    () => orderedAgents.find((candidate) => candidate.id === agentId) ?? null,
+    [agentId, orderedAgents],
   );
   const conversation = useMemo(() => (agent ? agentToConversation(agent) : null), [agent]);
 
@@ -161,7 +162,7 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, onCha
     <div data-testid={testId} className="flex min-h-0 flex-1 flex-col gap-[10px]">
       <div className="flex shrink-0 items-center gap-[8px]">
         {viewToggle}
-        {agents.length > 1 && (
+        {orderedAgents.length > 1 && (
           <>
             <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
               Agent
@@ -172,7 +173,7 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent, onCha
               aria-label="Select agent session"
               className="rounded-[var(--radius-sm)] border border-border bg-card px-[8px] py-[4px] text-[12px] text-foreground"
             >
-              {agents.map((candidate) => (
+              {orderedAgents.map((candidate) => (
                 <option key={candidate.id} value={candidate.id}>
                   {agentOptionLabel(candidate)}
                 </option>

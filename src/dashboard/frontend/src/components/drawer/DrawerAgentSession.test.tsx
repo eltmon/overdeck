@@ -205,4 +205,32 @@ describe('DrawerAgentSession view selector', () => {
     expect(onChangeView).toHaveBeenNthCalledWith(2, 'conversation');
     expect(picker).toHaveValue('agent-specialist');
   });
+
+  it('sorts every caller\'s picker centrally by lifecycle role', () => {
+    const agents = [
+      agent({ id: 'strike-pan-1', role: 'strike', status: 'stopped' }),
+      agent({ id: 'planning-pan-1', role: 'plan', status: 'stopped' }),
+      agent({ id: 'agent-pan-1-review-security', role: 'review', status: 'stopped' }),
+      agent({ id: 'agent-pan-1-test', role: 'test', status: 'stopped' }),
+      agent({ id: 'agent-pan-1-review', role: 'review', status: 'stopped' }),
+      agent({ id: 'agent-pan-1', role: 'work', status: 'stopped' }),
+    ];
+    render(
+      <DrawerAgentSession
+        view="conversation"
+        agents={agents}
+        agentId="agent-pan-1"
+        onSelectAgent={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByRole('option').map((option) => option.getAttribute('value'))).toEqual([
+      'agent-pan-1',
+      'agent-pan-1-review',
+      'agent-pan-1-review-security',
+      'agent-pan-1-test',
+      'planning-pan-1',
+      'strike-pan-1',
+    ]);
+  });
 });
