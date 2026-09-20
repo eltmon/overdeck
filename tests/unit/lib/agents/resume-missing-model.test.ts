@@ -36,7 +36,6 @@ vi.mock('../../../../src/lib/agents/activity.js', async (importOriginal) => ({
   resolveLatestSessionIdSync: vi.fn(() => ({
     sessionId: 'sess-123',
     checked: ['mock'],
-    needsPointerRepair: false,
   })),
   saveSessionId: vi.fn(),
 }));

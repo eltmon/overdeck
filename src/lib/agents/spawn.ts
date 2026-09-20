@@ -1,7 +1,7 @@
 import { materializeMuseContext } from '../runtimes/muse-context.js';
 import { resolveMuseSessionPath, museSessionId } from '../runtimes/muse-session.js';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
-import { mkdir, writeFile, writeFile as writeFileAsync } from 'fs/promises';
+import { writeFile as writeFileAsync } from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
@@ -84,7 +84,12 @@ import {
   writeChannelsBridgeMcpConfig,
 } from './supervisor-channels.js';
 import { stopAgent } from './termination.js';
-import { clearSessionResetMarker, createFreshSessionIdentity, logLauncherSessionPinned } from '../session-history.js';
+import {
+  appendSessionIdToHistory,
+  clearSessionResetMarker,
+  createFreshSessionIdentity,
+  logLauncherSessionPinned,
+} from '../session-history.js';
 import { ensureLifecycleHooksBeforeLaunch } from './hook-readiness.js';
 import {
   withAutoSpawnConsentClaim,
@@ -342,15 +347,7 @@ async function spawnRunWithoutConsentClaim(
       : (options.resumeSessionId ?? randomUUID());
 
     if (!isAcp && resolvedHarness !== 'kimi-code' && rawSessionId) {
-      // Persist the session ID to <agentDir>/session.id so resolveClaudeSessionId can locate the
-      // JSONL after the specialist exits. Works for both fresh (--session-id) and resumed (--resume).
-      try {
-        const agentDir = getAgentDir(agentId);
-        await mkdir(agentDir, { recursive: true });
-        await writeFile(join(agentDir, 'session.id'), rawSessionId, 'utf-8');
-      } catch (err) {
-        console.warn(`[spawnRun] Failed to persist session.id for ${agentId}:`, err instanceof Error ? err.message : String(err));
-      }
+      appendSessionIdToHistory(agentId, rawSessionId, 'launcher');
     }
 
     try {

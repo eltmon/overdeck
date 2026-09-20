@@ -63,7 +63,6 @@ describe('Claude session reconstruction fallback', () => {
     expect(result).toEqual({
       sessionId: 'event-session',
       checked: ['agent.model_set event history'],
-      needsPointerRepair: true,
     });
   });
 
@@ -76,7 +75,6 @@ describe('Claude session reconstruction fallback', () => {
     const result = resolveClaudeSessionRecoverySync(agentState.id, agentState, deps());
 
     expect(result.sessionId).toBeNull();
-    expect(result.needsPointerRepair).toBeUndefined();
     expect(result.checked).toEqual(['agent.model_set event history']);
   });
 

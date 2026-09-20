@@ -33,6 +33,7 @@ import { Data, Effect } from 'effect';
 import type { RuntimeName } from './runtimes/types.js';
 import { sessionFilePath } from './paths.js';
 import { writeThreadId } from './runtimes/codex.js';
+import { appendSessionIdToHistory } from './session-history.js';
 
 export interface ConvertOptions {
   fromHarness: RuntimeName;
@@ -246,9 +247,7 @@ function shortId(): string {
       }),
     ];
     await writeFile(targetSessionFile, `${lines.join('\n')}\n`, 'utf-8');
-    // spawnConversationSession resumes Pi from <agentDir>/session.id — point it
-    // at the converted session so the new runtime picks up the carried history.
-    await writeFile(join(agentDir, 'session.id'), `${sessionId}\n`, 'utf-8');
+    appendSessionIdToHistory(opts.tmuxSession, sessionId, 'format-conversion');
     return { sessionId, targetSessionFile };
   }
 
@@ -315,4 +314,3 @@ export const convertConversationTranscript = (
         cause,
       }),
   });
-

@@ -54,7 +54,7 @@ export const CLOSED_ISSUE_AGENT_DIR_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
  *
  * Work-agent directories (agent-<issueId>) are always preserved, and so are
  * strike directories (strike-<issueId>) — strike sessions are registered in
- * the agents table and their state dir holds session.id/mail like any other
+ * the agents table and their state dir holds session history/mail like any other
  * agent. Reaping them orphans the DB row and drops the strike node from the
  * issue tree.
  * Planning-agent directories are handled separately — they are only valid

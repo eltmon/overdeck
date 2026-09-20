@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { RuntimeName } from '../runtimes/types.js';
+import { readLatestIndexedSessionIdSync } from '../session-history.js';
 import { getAgentDir } from './agent-state.js';
 
 export interface PinnedAgentLaunch {
@@ -42,13 +43,13 @@ export function parsePinnedAgentLaunch(
 export function readPinnedAgentLaunchSync(agentId: string): PinnedAgentLaunch | null {
   const agentDir = getAgentDir(agentId);
   const launcherPath = join(agentDir, 'launcher.sh');
-  const sessionIdPath = join(agentDir, 'session.id');
-  if (!existsSync(launcherPath) || !existsSync(sessionIdPath)) return null;
+  const sessionId = readLatestIndexedSessionIdSync(agentId);
+  if (!existsSync(launcherPath) || !sessionId) return null;
 
   try {
     return parsePinnedAgentLaunch(
       readFileSync(launcherPath, 'utf8'),
-      readFileSync(sessionIdPath, 'utf8'),
+      sessionId,
     );
   } catch {
     return null;

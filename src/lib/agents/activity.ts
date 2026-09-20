@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, statSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { Effect } from 'effect';
@@ -12,7 +12,11 @@ import { findLatestRollout, extractThreadIdFromRollout } from '../runtimes/codex
 import { resolveLatestOhmypiSessionId } from '../runtimes/ohmypi.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { readLatestAgentClaudeSessionIdEventSync } from '../overdeck/event-reads.js';
-import { appendSessionIdToHistory, isSessionResetMarker, persistCurrentSessionId } from '../session-history.js';
+import {
+  appendSessionIdToHistory,
+  isSessionResetMarker,
+  readLatestIndexedSessionIdSync,
+} from '../session-history.js';
 
 /** Activity log entry (still written by heartbeat-hook as a forensic artifact). */
 export interface ActivityEntry {
@@ -75,38 +79,25 @@ export function getActivity(agentId: string, limit = 100): ActivityEntry[] {
  * Save Claude session ID for later resume. `reason` distinguishes an
  * ordinary rotation from a crash-recovery pickup for callers/logs that care;
  * both paths persist identically (PAN-3917: the durable cross-machine
- * agent-plane mirror this used to also write is gone with the record plane —
- * session.id/sessions.json, written below, are the only copy now).
+ * agent-plane mirror this used to also write is gone with the record plane.
  */
 export function saveSessionId(
   agentId: string,
   sessionId: string,
-  _reason: 'rotation' | 'recovered' = 'rotation',
+  source: 'rotation' | 'recovered' = 'rotation',
 ): void {
-  persistCurrentSessionId(agentId, sessionId);
-  appendSessionIdToHistory(agentId, sessionId);
+  appendSessionIdToHistory(agentId, sessionId, source);
 }
 
 /**
  * Get saved Claude session ID
  */
 export function getSessionId(agentId: string): string | null {
-  const sessionFile = join(getAgentDir(agentId), 'session.id');
-
-  if (!existsSync(sessionFile)) {
-    return null;
-  }
-
-  try {
-    return readFileSync(sessionFile, 'utf8').trim();
-  } catch {
-    return null;
-  }
+  return readLatestIndexedSessionIdSync(agentId);
 }
 
 /**
- * PAN-1988 — for a codex agent, resolve its REAL resumable thread id. codex writes a placeholder
- * UUID into `session.id` at spawn; the resumable id is the codex thread, recorded in the rollout.
+ * PAN-1988 — for a codex agent, resolve its real resumable thread id from the rollout.
  * Prefer the explicitly-captured `codex-thread-id`, then fall back to the freshest rollout on disk
  * (always current — codex writes a new rollout per resume, so this self-heals across resume cycles
  * without depending on the capture poll landing). Returns null for non-codex agents.
@@ -132,35 +123,9 @@ function resolveCodexThreadIdSync(agentId: string): string | null {
   return null;
 }
 
-/**
- * Sync mirror of jsonl-resolver.ts's pickFreshestSessionId: from a list of
- * candidate session ids, return the one whose JSONL transcript has the most
- * recent mtime, skipping ids with no file on disk. Falls back to the last
- * appended id when none have a transcript (e.g. workspace moved). Returns null
- * only when there are no usable candidates.
- */
-function pickFreshestExistingSessionIdSync(agentId: string, candidates: unknown[]): string | null {
-  const valid = candidates.filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
-  if (valid.length === 0) return null;
-  const workspace = getAgentStateSync(agentId)?.workspace;
-  if (workspace) {
-    const projectDir = join(homedir(), '.claude', 'projects', encodeClaudeProjectDir(workspace));
-    let best: { id: string; mtimeMs: number } | null = null;
-    for (const id of valid) {
-      try {
-        const s = statSync(join(projectDir, `${id}.jsonl`));
-        if (!best || s.mtimeMs > best.mtimeMs) best = { id, mtimeMs: s.mtimeMs };
-      } catch { /* no JSONL for this id — skip */ }
-    }
-    if (best) return best.id;
-  }
-  return valid[valid.length - 1] ?? null;
-}
-
 export interface SessionResolutionResult {
   sessionId: string | null;
   checked: string[];
-  needsPointerRepair?: true;
 }
 
 export interface ClaudeSessionRecoveryDeps {
@@ -185,8 +150,8 @@ function defaultClaudeSessionRecoveryDeps(): ClaudeSessionRecoveryDeps {
 }
 
 /**
- * Last-resort claude-code session lookup, tried once nothing on disk (session.id,
- * sessions.json, runtime.json) has an answer: the `agent.model_set` event-store
+ * Last-resort claude-code session lookup, tried once the session index and
+ * runtime state have no answer: the `agent.model_set` event-store
  * history. PAN-3917: this used to check the durable git-tracked agent-plane
  * record first — that door (pan-dir/agents.ts) and its writer are gone with the
  * record plane, so the event-store check is the only surviving source.
@@ -205,7 +170,7 @@ export function resolveClaudeSessionRecoverySync(
     checked.push('agent.model_set event history');
     const eventSessionId = deps.readEventSessionId(agentId);
     if (eventSessionId && deps.transcriptExists(agentState.workspace, eventSessionId)) {
-      return { sessionId: eventSessionId, checked, needsPointerRepair: true };
+      return { sessionId: eventSessionId, checked };
     }
   } catch (error) {
     deps.log(
@@ -229,9 +194,7 @@ export function resolveLatestSessionIdSync(
   }
 
   const checked: string[] = ['Codex rollout/thread id'];
-  // 0. codex thread id FIRST — `session.id` below holds a placeholder UUID for codex agents, so
-  //    returning it would make resumeAgent target a non-existent thread and codex would drift into
-  //    a fresh rollout, losing conversation history (PAN-1988). The freshest rollout is the truth.
+  // 0. Codex thread id first: the freshest rollout is the resume truth.
   const codexThreadId = resolveCodexThreadIdSync(agentId);
   if (codexThreadId) return { sessionId: codexThreadId, checked };
 
@@ -248,28 +211,10 @@ export function resolveLatestSessionIdSync(
     } catch { /* non-fatal */ }
   }
 
-  // 2. session.id (pinned before fresh launch and updated by suspend/resume) —
-  //    the real id for claude-code.
-  checked.push('session.id');
-  const fromSessionFile = getSessionId(agentId);
-  if (fromSessionFile) return { sessionId: fromSessionFile, checked };
-
-  // 2. sessions.json (append-only list of session ids the agent has used).
-  //    The array can hold aborted/empty ids (e.g. a fresh session that never
-  //    produced a transcript), so we can't trust "last entry" — pick the id
-  //    whose JSONL is freshest on disk, matching resolveClaudeSessionId
-  //    (jsonl-resolver.ts). Falls back to last-appended when none exist on disk.
+  // 2. sessions.json (append-only; its last entry is the current session).
   checked.push('sessions.json');
-  const sessionsFile = join(getAgentDir(agentId), 'sessions.json');
-  try {
-    if (existsSync(sessionsFile)) {
-      const sessions = JSON.parse(readFileSync(sessionsFile, 'utf8'));
-      if (Array.isArray(sessions) && sessions.length > 0) {
-        const picked = pickFreshestExistingSessionIdSync(agentId, sessions);
-        if (picked) return { sessionId: picked, checked };
-      }
-    }
-  } catch { /* non-fatal */ }
+  const indexed = getSessionId(agentId);
+  if (indexed) return { sessionId: indexed, checked };
 
   // 3. runtime.json claudeSessionId
   checked.push('runtime.json');
@@ -279,8 +224,7 @@ export function resolveLatestSessionIdSync(
   }
 
   // 4. codex-thread-id (written after codex rollout appears; fallback so
-  //    resumeAgent can locate the Codex session even if session.id has a
-  //    stale random UUID from spawnRun's placeholder write).
+  //    resumeAgent can locate the Codex session after startup capture).
   checked.push('codex-thread-id');
   const codexThreadIdPath = join(getAgentDir(agentId), 'codex-thread-id');
   try {
@@ -290,8 +234,7 @@ export function resolveLatestSessionIdSync(
     }
   } catch { /* non-fatal */ }
 
-  // 5. ohmypi (omp) — PAN-2098. omp never writes a `session.id` file, so none of
-  //    the claude-code/codex sources above can find it; the real id lives inside
+  // 5. ohmypi (omp) — PAN-2098. The real id also lives inside
   //    the freshest session JSONL. Mirror the ohmypi runtime adapter's own resume
   //    resolution so the deacon recovery path can resume a crashed ohmypi agent
   //    instead of only respawning it fresh and losing context.
@@ -301,8 +244,7 @@ export function resolveLatestSessionIdSync(
     if (ohmypiSessionId) return { sessionId: ohmypiSessionId, checked };
   }
 
-  // 6. kimi-code — the native Kimi Code CLI has no launcher-writable session.id
-  //    equivalent; the id is captured post-launch from its own wire.jsonl
+  // 6. kimi-code — the id is captured post-launch from its own wire.jsonl
   //    session directory and persisted to `<agentDir>/kimi-session-id`
   //    (writeKimiSessionId, mirrors codex's thread-id file above).
   if (sessionIdSource === 'kimi-session-newest') {
@@ -317,11 +259,7 @@ export function resolveLatestSessionIdSync(
     return { sessionId: null, checked };
   }
   const recovered = resolveClaudeSessionRecoverySync(agentId, agentState, recoveryDeps);
-  return {
-    sessionId: recovered.sessionId,
-    checked: [...checked, ...recovered.checked],
-    ...(recovered.needsPointerRepair ? { needsPointerRepair: true as const } : {}),
-  };
+  return { sessionId: recovered.sessionId, checked: [...checked, ...recovered.checked] };
 }
 
 export function getLatestSessionIdSync(agentId: string): string | null {

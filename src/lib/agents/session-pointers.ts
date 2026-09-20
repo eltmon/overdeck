@@ -25,7 +25,7 @@ export async function clearAgentSessionPointers(
   const agentDir = getAgentDir(agentId);
   const cleared: string[] = [];
 
-  for (const name of ['session.id', 'sessions.json', 'codex-thread-id', 'launcher.sh']) {
+  for (const name of ['sessions.json', 'codex-thread-id', 'launcher.sh']) {
     const path = join(agentDir, name);
     if (!existsSync(path)) continue;
     unlinkSync(path);

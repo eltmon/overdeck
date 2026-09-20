@@ -154,7 +154,7 @@ export interface OverdeckPaths {
   readyPath: string
   completedPath: string
   heartbeatPath: string
-  sessionIdPath: string
+  sessionsIndexPath: string
   pendingEventsPath: string
   costEventsPath: string
   progressStatePath: string
@@ -170,7 +170,7 @@ export function overdeckPathsFor(agentId: string, home: string = homedir()): Ove
     readyPath: join(agentDir, 'ready.json'),
     completedPath: join(agentDir, 'completed'),
     heartbeatPath: join(heartbeatsDir, `${agentId}.json`),
-    sessionIdPath: join(agentDir, 'session.id'),
+    sessionsIndexPath: join(agentDir, 'sessions.json'),
     pendingEventsPath: join(agentDir, 'pending-events.jsonl'),
     costEventsPath: join(agentDir, 'cost-events.jsonl'),
     progressStatePath: join(agentDir, 'pi-progress.json'),
@@ -396,11 +396,29 @@ async function workspaceFor(env: HookEnv): Promise<string | null> {
 async function sessionIdFor(env: HookEnv): Promise<string | null> {
   const { paths } = envFor(env)
   try {
-    const sessionId = (await readFile(paths.sessionIdPath, 'utf8')).trim()
-    return sessionId.length > 0 ? sessionId : null
+    const parsed: unknown = JSON.parse(await readFile(paths.sessionsIndexPath, 'utf8'))
+    if (!Array.isArray(parsed)) return null
+    const latest = parsed.at(-1)
+    if (typeof latest === 'string') return latest.trim() || null
+    const sessionId = (latest as { sessionId?: unknown } | undefined)?.sessionId
+    return typeof sessionId === 'string' && sessionId.trim() ? sessionId.trim() : null
   } catch {
     return null
   }
+}
+
+async function appendSessionIndexEntry(path: string, sessionId: string, at: string): Promise<void> {
+  let entries: unknown[] = []
+  try {
+    const parsed: unknown = JSON.parse(await readFile(path, 'utf8'))
+    if (Array.isArray(parsed)) entries = parsed
+  } catch { /* first entry */ }
+  const ids = entries.map((entry) => typeof entry === 'string'
+    ? entry
+    : (entry as { sessionId?: unknown } | null)?.sessionId)
+  if (ids.includes(sessionId)) return
+  entries.push({ sessionId, at, source: 'session-start' })
+  await writeFile(path, JSON.stringify(entries), 'utf8')
 }
 
 function roleFor(env: HookEnv): string {
@@ -583,7 +601,7 @@ export async function handleSessionStart(env: HookEnv, event: SessionStartEvent)
     pid: env.pid ?? process.pid,
   })
   if (event.sessionId) {
-    await writeFile(paths.sessionIdPath, `${event.sessionId}\n`, 'utf8')
+    await appendSessionIndexEntry(paths.sessionsIndexPath, event.sessionId, ts)
   }
   await postEvent(env, { kind: 'model_set', model: 'pi', claudeSessionId: event.sessionId ?? undefined, timestamp: ts })
   await postEvent(env, { kind: 'activity', activity: 'idle', timestamp: ts })

@@ -31,6 +31,7 @@ import { resolveProjectFromIssueSync } from './projects.js'
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js'
 import { extractPrefixSync } from './issue-id.js'
 import { getLatestSessionIdSync } from './agents/activity.js'
+import { readSessionIdHistorySync } from './session-history.js'
 
 const execAsync = promisify(exec)
 
@@ -277,21 +278,22 @@ function getProjectPathByPrefix(issuePrefix: string): string {
  * file there attributes whichever session wrote last to whoever asks, so the
  * flywheel was observed reporting a conversation's open question as its own.
  *
- * The agent's own session id is recorded at spawn, so resolve that first and
- * only fall back to freshest-wins when the agent has no identifiable transcript
- * of its own (codex/omp keep their history elsewhere, and their thread ids are
- * not `.jsonl` files here).
+ * The agent's session ids are recorded at spawn and SessionStart. Walk the
+ * append-only index newest-first so an aborted newest launch can fall back to
+ * the latest older transcript without scanning unrelated workspace sessions.
  */
 async function getAgentJsonlPathPromise(agentId: string): Promise<string | null> {
   const workspace = await Effect.runPromise(getAgentWorkspace(agentId))
   if (!workspace) return null
   const projectDir = getClaudeProjectDir(workspace)
-  const sessionId = getLatestSessionIdSync(agentId)
-  if (sessionId) {
+  const history = readSessionIdHistorySync(agentId)
+  const latest = getLatestSessionIdSync(agentId)
+  const candidates = history.length > 0 ? [...history].reverse() : (latest ? [latest] : [])
+  for (const sessionId of candidates) {
     const ownPath = join(projectDir, `${sessionId}.jsonl`)
     if (existsSync(ownPath)) return ownPath
   }
-  return await getActiveSessionPath(projectDir)
+  return null
 }
 
 /**

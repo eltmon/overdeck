@@ -154,7 +154,7 @@ export const AgentStateServiceLive = Layer.effect(
       if (ev.type === 'agent.model_set') {
         const payload = (ev as { payload?: { agentId?: string; claudeSessionId?: string } }).payload;
         if (payload?.agentId && payload.claudeSessionId) {
-          appendSessionIdToHistory(payload.agentId, payload.claudeSessionId);
+          appendSessionIdToHistory(payload.agentId, payload.claudeSessionId, 'session-start');
         }
       }
       Effect.runFork(applyEventToRef(ref, ev));

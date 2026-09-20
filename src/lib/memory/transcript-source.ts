@@ -12,6 +12,7 @@ import { sessionFilePath } from '../paths.js';
 import { extractPiTranscript, extractCodexTranscript } from '../session-format-converter.js';
 import { findRolloutPath, writeThreadId as _writeThreadId } from '../runtimes/codex.js';
 import { compressJsonlBuffer } from './compress.js';
+import { readLatestIndexedSessionIdSync } from '../session-history.js';
 
 export interface TranscriptEntry {
   agentId: string;
@@ -303,12 +304,7 @@ function getAgentRuntimeStateFromStore(agentId: string): Promise<{ claudeSession
 
 async function readPiSessionId(agent: RunningAgent): Promise<string | null> {
   if (agent.sessionId) return agent.sessionId;
-  try {
-    const saved = (await readFile(join(getAgentDir(agent.id), 'session.id'), 'utf8')).trim();
-    return saved || null;
-  } catch {
-    return null;
-  }
+  return readLatestIndexedSessionIdSync(agent.id);
 }
 
 async function resolvePiTranscriptPath(agent: RunningAgent, sessionId: string): Promise<string | null> {

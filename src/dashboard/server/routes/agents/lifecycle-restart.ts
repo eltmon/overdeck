@@ -142,7 +142,7 @@ export const postAgentResumeRoute = HttpRouter.add(
       // PAN-1985 follow-up: the messageDelivered flag distinguishes "agent is
       // resumed and your message landed in its composer" from "agent is
       // resumed but your message did NOT land in its composer (PTY supervisor
-      // echo-confirm timed out, harness/session.id mismatch, etc.)". The
+      // echo-confirm timed out, harness/session-index mismatch, etc.)". The
       // former gets a 'delivered' toast; the latter gets a clear 'queued in
       // mail' warning so the operator can intervene if needed.
       const delivered = result.messageDelivered !== false;
@@ -739,9 +739,6 @@ export const postAgentResetSessionRoute = HttpRouter.add(
     }
 
     const agentDir = getAgentDir(id);
-
-    // Clear session.id
-    yield* Effect.promise(() => rm(join(agentDir, 'session.id'), { force: true })); // PAN-3357: not a dir removal
 
     // Clear sessions.json
     yield* Effect.promise(() => rm(join(agentDir, 'sessions.json'), { force: true })); // PAN-3357: not a dir removal

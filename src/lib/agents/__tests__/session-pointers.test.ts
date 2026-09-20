@@ -39,7 +39,7 @@ describe('clearAgentSessionPointers', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('clears disk, launcher, agent-row, and runtime session pointers without touching transcripts', async () => {
+  it('clears the session index and runtime pointers without touching transcripts or legacy input', async () => {
     for (const name of ['session.id', 'sessions.json', 'codex-thread-id', 'launcher.sh']) {
       writeFileSync(join(mocks.agentDir, name), name === 'launcher.sh' ? "claude --resume 'dead-session'\n" : 'dead-session');
     }
@@ -52,9 +52,10 @@ describe('clearAgentSessionPointers', () => {
 
     await clearAgentSessionPointers('agent-pan-2895-review');
 
-    for (const name of ['session.id', 'sessions.json', 'codex-thread-id', 'launcher.sh']) {
+    for (const name of ['sessions.json', 'codex-thread-id', 'launcher.sh']) {
       expect(existsSync(join(mocks.agentDir, name))).toBe(false);
     }
+    expect(readFileSync(join(mocks.agentDir, 'session.id'), 'utf8')).toBe('dead-session');
     expect(isAgentSessionReset('agent-pan-2895-review')).toBe(true);
     expect(JSON.parse(readFileSync(join(mocks.agentDir, 'runtime.json'), 'utf-8'))).toEqual({ state: 'stopped' });
     expect(mocks.state?.sessionId).toBeUndefined();

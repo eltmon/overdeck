@@ -95,23 +95,26 @@ describe('handleSessionStart', () => {
     })
   })
 
-  it('AC1 (PAN-636 workspace-3119): also writes ~/.overdeck/agents/<id>/session.id with the Pi session id', async () => {
+  it('appends the Pi session id to sessions.json', async () => {
     await handleSessionStart(
       { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
       { reason: 'new', sessionId: 'sess-resume-target' },
     )
     const paths = overdeckPathsFor('agent-pan-636', h.home)
-    expect(existsSync(paths.sessionIdPath)).toBe(true)
-    expect(readFileSync(paths.sessionIdPath, 'utf8').trim()).toBe('sess-resume-target')
+    expect(JSON.parse(readFileSync(paths.sessionsIndexPath, 'utf8'))).toEqual([{
+      sessionId: 'sess-resume-target',
+      at: fixedTime,
+      source: 'session-start',
+    }])
   })
 
-  it('does NOT write session.id when Pi reports a null/missing sessionId — null would defeat resume', async () => {
+  it('does not create a session index when Pi reports no session id', async () => {
     await handleSessionStart(
       { agentId: 'agent-pan-636', home: h.home, pid: 4242, now },
       { reason: 'new' /* sessionId omitted */ },
     )
     const paths = overdeckPathsFor('agent-pan-636', h.home)
-    expect(existsSync(paths.sessionIdPath)).toBe(false)
+    expect(existsSync(paths.sessionsIndexPath)).toBe(false)
   })
 
   it('PAN-1134: POSTs model_set + activity idle to the dashboard', async () => {
@@ -617,7 +620,9 @@ describe('handleTurnEnd', () => {
   it('posts specialist auto-complete with trusted runtime metadata when a specialist marker appears', async () => {
     const paths = overdeckPathsFor('agent-pan-636-review', h.home)
     mkdirSync(paths.agentDir, { recursive: true })
-    writeFileSync(paths.sessionIdPath, 'pi-session-123\n')
+    writeFileSync(paths.sessionsIndexPath, JSON.stringify([
+      { sessionId: 'pi-session-123', at: fixedTime, source: 'session-start' },
+    ]))
 
     await handleTurnEnd(
       { agentId: 'agent-pan-636-review', home: h.home, pid: 7, now, role: 'review', issueId: 'PAN-636' },

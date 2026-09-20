@@ -184,7 +184,15 @@ function buildSessionIndex(): Map<string, SessionMapping> {
     let sessionIds: string[] = [];
     if (existsSync(sessionsFile)) {
       try {
-        sessionIds = JSON.parse(readFileSync(sessionsFile, 'utf-8'));
+        const parsed: unknown = JSON.parse(readFileSync(sessionsFile, 'utf-8'));
+        if (Array.isArray(parsed)) {
+          sessionIds = parsed.flatMap((value): string[] => {
+            if (typeof value === 'string') return value.trim() ? [value.trim()] : [];
+            if (!value || typeof value !== 'object') return [];
+            const sessionId = (value as { sessionId?: unknown }).sessionId;
+            return typeof sessionId === 'string' && sessionId.trim() ? [sessionId.trim()] : [];
+          });
+        }
       } catch { /* skip */ }
     }
 

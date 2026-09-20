@@ -7,21 +7,8 @@ import { resolveMuseSessionPath } from '../../../lib/runtimes/muse-session.js';
  *
  * Codex agents (PAN-1805) write rollout JSONLs under the per-agent
  * `codex-home/sessions/` tree — resolution dispatches on the harness recorded
- * in state.json (thread-id fast path, then latest-rollout fallback).
- *
- * For claude-code agents the JSONL filename is the *Claude session ID* (a UUID
- * written by Claude Code itself), NOT the agent/tmux name. Lookup order:
- *   1. session.id     — UUID pinned before fresh work-agent launch and updated
- *                       by auto-suspend/resume flows
- *   2. sessions.json  — array of UUIDs the agent has used; the heartbeat hook
- *                       APPENDS new IDs and dedupes, so once a session has been
- *                       seen its array index never moves. After a `pan resume`
- *                       brings an older session back as the live one, the array
- *                       order no longer reflects time-recency. We disambiguate
- *                       across all listed IDs by JSONL mtime.
- *   3. runtime state  — in-process mirror, populated by hooks
- *   4. agents registry — the DB row's session_id recorded at spawn; survives
- *                        janitor removal of the agent directory
+ * in state.json (thread-id fast path, then latest-rollout fallback). Claude
+ * sessions resolve from the append-only sessions.json index, newest first.
  *
  * Async-only (fs/promises) because this code path runs inside the dashboard
  * server's event loop.
@@ -33,7 +20,6 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 import { getAgentRuntimeState, getAgentStateSync } from '../../../lib/agents.js';
 import { encodeClaudeProjectDir, getOverdeckHome } from '../../../lib/paths.js';
-import { getAgentWorkspace } from '../../../lib/agent-enrichment.js';
 import { getHarnessBehavior } from '../../../lib/runtimes/behavior.js';
 import type { HarnessName } from '../../../lib/runtimes/types.js';
 import { logAgentLifecycleSync } from '../../../lib/persistent-logger.js';
@@ -88,68 +74,25 @@ function behaviorForHarness(harness: string | null | undefined) {
   return getHarnessBehavior(harness as HarnessName | null | undefined);
 }
 
-/**
- * Pick the candidate UUID whose JSONL transcript has the most recent mtime.
- *
- * The heartbeat hook appends to sessions.json and dedupes — so once an ID is
- * recorded, its array index never moves even if a later resume makes it the
- * current session again. Choosing by JSONL mtime is the only reliable signal
- * for "which session is actually live right now."
- *
- * Returns null if no candidate has a corresponding JSONL on disk. Falls back
- * to scanning every project dir if the workspace path can't be resolved
- * (covers specialist sessions whose workspace lives elsewhere).
- */
-async function pickFreshestSessionId(
-  candidates: ReadonlyArray<string>,
-  agentId: string,
-  opts: ResolveJsonlPathOptions,
-): Promise<string | null> {
-  if (candidates.length === 0) return null;
-  if (candidates.length === 1) return candidates[0]!;
+function parseSessionIds(raw: string): string[] {
+  const parsed: unknown = JSON.parse(raw);
+  if (!Array.isArray(parsed)) return [];
+  return parsed.flatMap((value): string[] => {
+    if (typeof value === 'string' && value.trim()) return [value.trim()];
+    if (!value || typeof value !== 'object') return [];
+    const sessionId = (value as { sessionId?: unknown }).sessionId;
+    return typeof sessionId === 'string' && sessionId.trim() ? [sessionId.trim()] : [];
+  });
+}
 
-  const projectsRoot = opts.claudeProjectsDirOverride ?? join(homedir(), '.claude', 'projects');
-
-  // Fast path: derive the agent's workspace and look only in the matching
-  // project dir. Avoids fanning out across every Claude project.
-  let candidatePaths: Array<{ id: string; path: string }> = [];
+async function readIndexedSessionIds(agentDir: string): Promise<{ ids: string[]; exists: boolean }> {
+  const raw = await readOptional(join(agentDir, 'sessions.json'));
+  if (raw === null) return { ids: [], exists: false };
   try {
-    const workspace = await Effect.runPromise(getAgentWorkspace(agentId));
-    if (workspace) {
-      const projectDir = join(projectsRoot, encodeClaudeProjectDir(workspace));
-      candidatePaths = candidates.map((id) => ({ id, path: join(projectDir, `${id}.jsonl`) }));
-    }
-  } catch { /* non-fatal — fall back to project-dir scan */ }
-
-  // Slow path: scan all project dirs (specialist agents, multi-workspace cases).
-  if (candidatePaths.length === 0) {
-    try {
-      const dirs = await readdir(projectsRoot);
-      const SAFE_DIR = /^[a-zA-Z0-9_.-]+$/;
-      for (const id of candidates) {
-        for (const dir of dirs) {
-          if (!SAFE_DIR.test(dir)) continue;
-          candidatePaths.push({ id, path: join(projectsRoot, dir, `${id}.jsonl`) });
-        }
-      }
-    } catch { /* fall through to no-mtime path */ }
+    return { ids: parseSessionIds(raw), exists: true };
+  } catch {
+    return { ids: [], exists: true };
   }
-
-  // Stat each candidate path; pick the (id, mtime) with the newest mtime.
-  let best: { id: string; mtimeMs: number } | null = null;
-  for (const { id, path } of candidatePaths) {
-    try {
-      const s = await stat(path);
-      if (!best || s.mtimeMs > best.mtimeMs) {
-        best = { id, mtimeMs: s.mtimeMs };
-      }
-    } catch { /* missing file — skip */ }
-  }
-
-  // If no candidate has a JSONL on disk, fall back to the historical "last
-  // appended" heuristic — the previous behavior. Better than returning null
-  // for callers that only need a session ID, not necessarily a live JSONL.
-  return best ? best.id : (candidates[candidates.length - 1] ?? null);
 }
 
 /** Async equivalent of getLatestSessionId from lib/agents.ts. */
@@ -160,37 +103,22 @@ export async function resolveClaudeSessionId(
   const agentsRoot = opts.agentsDirOverride ?? join(getOverdeckHome(), 'agents');
   const agentDir = join(agentsRoot, agentId);
 
-  // 1. session.id — UUID pinned before fresh work-agent launch and updated by
-  //    suspend/resume flows. Authoritative when present.
-  const sessionIdRaw = await readOptional(join(agentDir, 'session.id'));
-  const sessionIdTrimmed = sessionIdRaw?.trim();
-  if (sessionIdTrimmed) return sessionIdTrimmed;
-
-  // 2. sessions.json — array of UUIDs the agent has ever used. We can't trust
-  //    array order (see file-level docs), so disambiguate by JSONL mtime.
-  const sessionsRaw = await readOptional(join(agentDir, 'sessions.json'));
-  if (sessionsRaw) {
-    try {
-      const parsed: unknown = JSON.parse(sessionsRaw);
-      if (Array.isArray(parsed)) {
-        const valid = parsed.filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
-        const fresh = await pickFreshestSessionId(valid, agentId, opts);
-        if (fresh) return fresh;
-      }
-    } catch { /* non-fatal */ }
+  const index = await readIndexedSessionIds(agentDir);
+  const indexed = index.ids.at(-1);
+  if (indexed) return indexed;
+  if (!index.exists) {
+    const legacy = (await readOptional(join(agentDir, 'session.id')))?.trim(); // legacy read-only fallback
+    if (legacy) return legacy;
   }
 
-  // 3. runtime state claudeSessionId (in-process mirror)
+  // Runtime state claudeSessionId (in-process mirror)
   try {
     const lookup = opts.getRuntimeStateAsync ?? ((id: string) => Effect.runPromise(getAgentRuntimeState(id)));
     const runtimeState = await lookup(agentId);
     if (runtimeState?.claudeSessionId) return runtimeState.claudeSessionId;
   } catch { /* non-fatal */ }
 
-  // 4. agents registry — the DB row records session_id at spawn (PAN-1908) and
-  //    survives janitors removing the agent directory, so an ended session's
-  //    transcript stays resolvable. Skipped under agentsDirOverride (test hook)
-  //    to keep resolver tests hermetic, mirroring readRecordedState.
+  // State fallback for pre-index runtime snapshots.
   if (!opts.agentsDirOverride) {
     const registrySessionId = getAgentStateSync(agentId)?.sessionId?.trim();
     if (registrySessionId) return registrySessionId;
@@ -437,8 +365,7 @@ export async function resolveJsonlPath(
   workspacePath: string,
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
-  // Dispatch on the recorded harness so a stale session.id from an earlier
-  // claude-code run of the same agent id can't shadow the codex transcript.
+  // Dispatch on the recorded harness so an earlier Claude run cannot shadow Codex.
   const harness = await resolveAgentHarness(agentId, opts);
   const behavior = behaviorForHarness(harness);
   if (behavior.transcriptKind === 'codex-rollout-jsonl') {
@@ -455,13 +382,18 @@ export async function resolveJsonlPath(
     return resolveKimiWirePath(agentId, opts);
   }
 
-  const claudeSessionId = await resolveClaudeSessionId(agentId, opts);
+  const agentsRoot = opts.agentsDirOverride ?? join(getOverdeckHome(), 'agents');
+  const index = await readIndexedSessionIds(join(agentsRoot, agentId));
+  const currentSessionId = await resolveClaudeSessionId(agentId, opts);
+  const candidates = [...index.ids].reverse();
+  if (currentSessionId && !candidates.includes(currentSessionId)) candidates.unshift(currentSessionId);
+  const claudeSessionId = candidates[0] ?? null;
   if (!claudeSessionId) {
     logTranscriptResolution(
       agentId,
       `missing-session-id:${harness ?? 'unknown'}`,
       `failed harness=${harness ?? 'unknown'} reason=no-session-id `
-        + 'checked=session.id,sessions.json,runtime-state',
+        + 'checked=sessions.json,runtime-state',
       opts,
     );
     return null;
@@ -471,16 +403,19 @@ export async function resolveJsonlPath(
   const effectiveWorkspacePath = recordedWorkspace ?? workspacePath;
   const projectsRoot = opts.claudeProjectsDirOverride ?? join(homedir(), '.claude', 'projects');
   const encodedDir = encodeClaudeProjectDir(effectiveWorkspacePath);
-  const jsonlPath = join(projectsRoot, encodedDir, `${claudeSessionId}.jsonl`);
-  if (await pathExists(jsonlPath)) {
-    logTranscriptResolution(
-      agentId,
-      `resolved:${jsonlPath}`,
-      `resolved harness=${harness ?? 'claude-code'} sessionId=${claudeSessionId} path=${jsonlPath}`,
-      opts,
-    );
-    return jsonlPath;
+  for (const sessionId of candidates) {
+    const jsonlPath = join(projectsRoot, encodedDir, `${sessionId}.jsonl`);
+    if (await pathExists(jsonlPath)) {
+      logTranscriptResolution(
+        agentId,
+        `resolved:${jsonlPath}`,
+        `resolved harness=${harness ?? 'claude-code'} sessionId=${sessionId} path=${jsonlPath}`,
+        opts,
+      );
+      return jsonlPath;
+    }
   }
+  const jsonlPath = join(projectsRoot, encodedDir, `${claudeSessionId}.jsonl`);
   logTranscriptResolution(
     agentId,
     `missing-jsonl:${jsonlPath}`,

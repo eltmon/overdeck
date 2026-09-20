@@ -42,6 +42,26 @@ pan_emit_event "$AGENT_ID" "{\"kind\":\"activity\",\"activity\":\"idle\",\"hookN
 # its presence means "this session reached the prompt".
 READY_DIR="${OVERDECK_HOME:-$HOME/.overdeck}/agents/$AGENT_ID"
 mkdir -p "$READY_DIR" 2>/dev/null
+if [ -n "$CLAUDE_SESSION_ID" ] && command -v jq >/dev/null 2>&1; then
+  SESSIONS_FILE="$READY_DIR/sessions.json"
+  SESSIONS_TMP=$(mktemp "$READY_DIR/sessions.XXXXXX" 2>/dev/null)
+  if [ -n "$SESSIONS_TMP" ]; then
+    if [ -f "$SESSIONS_FILE" ]; then
+      if jq --arg sid "$CLAUDE_SESSION_ID" --arg at "$TS" '
+        if any(.[]?; (if type == "string" then . else .sessionId end) == $sid)
+        then . else . + [{sessionId: $sid, at: $at, source: "session-start-hook"}] end
+      ' "$SESSIONS_FILE" > "$SESSIONS_TMP" 2>/dev/null; then
+        mv "$SESSIONS_TMP" "$SESSIONS_FILE" 2>/dev/null || rm -f "$SESSIONS_TMP"
+      else
+        rm -f "$SESSIONS_TMP"
+      fi
+    else
+      jq -n --arg sid "$CLAUDE_SESSION_ID" --arg at "$TS" \
+        '[{sessionId: $sid, at: $at, source: "session-start-hook"}]' > "$SESSIONS_TMP"
+      mv "$SESSIONS_TMP" "$SESSIONS_FILE" 2>/dev/null || rm -f "$SESSIONS_TMP"
+    fi
+  fi
+fi
 if command -v jq >/dev/null 2>&1; then
   jq -n --arg agentId "$AGENT_ID" --arg sid "$CLAUDE_SESSION_ID" --arg ts "$TS" \
     '{ready: true, agentId: $agentId, sessionId: (if $sid == "" then null else $sid end), reason: "session-start", timestamp: $ts}' \

@@ -113,7 +113,7 @@ export function listAgentRuntimeEventEvidenceSync(): AgentRuntimeEventEvidence[]
       const sessionId = payload['claudeSessionId'];
       if (typeof sessionId !== 'string' || !sessionId.trim()) {
         current.sessions = [];
-      } else if (!current.sessions.some((session) => session.id === sessionId.trim())) {
+      } else if (!current.sessions.some(({ id }) => id === sessionId.trim())) {
         current.sessions.push({
           id: sessionId.trim(),
           startedAt: eventTimestamp(row.timestamp),

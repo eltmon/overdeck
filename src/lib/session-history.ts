@@ -21,74 +21,81 @@ export function clearSessionResetMarker(agentId: string): void {
 }
 
 /**
- * PAN-1989: durably record a Claude session id in the agent's append-only
- * sessions.json the moment the system learns it.
- *
- * Background: a work agent's resumable session id was only durable if the
- * PostToolUse heartbeat hook had written sessions.json (first tool call) or
- * auto-suspend had written session.id. A session that boots but is stopped
- * before its first tool — kickoff never delivered, or a reboot mid-run — left
- * the id only in the EPHEMERAL in-memory runtime snapshot, which a dashboard
- * restart or reboot rebuilds from sources (state.json + tmux) that don't carry
- * the session id. The agent then resolves to "No saved session ID found" and
- * goes troubled even though its JSONL transcript is intact on disk.
- *
- * Calling this from the AgentStateService event sink (the single convergence
- * point for every model_set event, hook-emitted or server-emitted) makes the
- * pointer durable from the moment it is learned. The append-only list may
- * accumulate aborted/empty ids; the resolver picks the freshest id with a real
- * transcript, so empties never shadow the truth. De-dupes; never throws.
- *
- * Lives in its own module (not agents.ts) so the dashboard event sink can import
- * it without pulling the whole agents.ts graph — avoids an ESM import cycle.
+ * Append-only session index. New entries carry their observation time and
+ * source; string entries remain readable for compatibility with older files.
  */
-export function readSessionIdHistorySync(agentId: string): string[] {
+export interface SessionIndexEntry {
+  sessionId: string;
+  at: string;
+  source: string;
+}
+
+function parseSessionIndex(raw: unknown): SessionIndexEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((value): SessionIndexEntry[] => {
+    if (typeof value === 'string' && value.trim()) {
+      return [{ sessionId: value.trim(), at: '', source: 'legacy-index' }];
+    }
+    if (!value || typeof value !== 'object') return [];
+    const entry = value as Partial<SessionIndexEntry>;
+    if (typeof entry.sessionId !== 'string' || !entry.sessionId.trim()) return [];
+    return [{
+      sessionId: entry.sessionId.trim(),
+      at: typeof entry.at === 'string' ? entry.at : '',
+      source: typeof entry.source === 'string' ? entry.source : 'unknown',
+    }];
+  });
+}
+
+export function readSessionIndexSync(agentId: string): SessionIndexEntry[] {
   try {
     const file = join(getOverdeckHome(), 'agents', agentId, 'sessions.json');
     if (!existsSync(file)) return [];
-    const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
-    return Array.isArray(parsed)
-      ? parsed.filter((value): value is string => typeof value === 'string' && Boolean(value.trim()))
-      : [];
+    return parseSessionIndex(JSON.parse(readFileSync(file, 'utf8')));
   } catch {
     return [];
   }
 }
 
-export function appendSessionIdToHistory(agentId: string, sessionId: string): void {
+export function readSessionIdHistorySync(agentId: string): string[] {
+  return readSessionIndexSync(agentId).map((entry) => entry.sessionId);
+}
+
+export function readLegacySessionIdSync(agentId: string): string | null {
+  const file = join(getOverdeckHome(), 'agents', agentId, 'session.id'); // legacy read-only fallback
+  try {
+    const value = readFileSync(file, 'utf8').trim();
+    return value || null;
+  } catch {
+    return null;
+  }
+}
+
+export function readLatestIndexedSessionIdSync(agentId: string): string | null {
+  const file = join(getOverdeckHome(), 'agents', agentId, 'sessions.json');
+  const entries = readSessionIndexSync(agentId);
+  if (entries.length > 0) return entries.at(-1)?.sessionId ?? null;
+  return existsSync(file) ? null : readLegacySessionIdSync(agentId);
+}
+
+export function appendSessionIdToHistory(
+  agentId: string,
+  sessionId: string,
+  source = 'observed',
+): void {
   if (!sessionId || !sessionId.trim()) return;
   try {
     const dir = join(getOverdeckHome(), 'agents', agentId);
     mkdirSync(dir, { recursive: true });
     const file = join(dir, 'sessions.json');
-    let list: string[] = [];
-    if (existsSync(file)) {
-      const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
-      if (Array.isArray(parsed)) list = parsed.filter((value): value is string => typeof value === 'string');
-    }
-    if (list.includes(sessionId)) return;
-    list.push(sessionId);
-    writeFileSync(file, JSON.stringify(list));
+    const entries = existsSync(file)
+      ? parseSessionIndex(JSON.parse(readFileSync(file, 'utf8')))
+      : [];
+    if (entries.some((entry) => entry.sessionId === sessionId)) return;
+    entries.push({ sessionId, at: new Date().toISOString(), source });
+    writeFileSync(file, JSON.stringify(entries));
   } catch {
     /* non-fatal — bookkeeping only */
-  }
-}
-
-/**
- * Persist the current Claude session pointer before launch.
- *
- * Fresh work agents know their Claude UUID before the process starts. Writing
- * it here makes transcript discovery and resume independent of lifecycle hooks
- * (and therefore independent of jq being installed on the host).
- */
-export function persistCurrentSessionId(agentId: string, sessionId: string): void {
-  if (!sessionId || !sessionId.trim()) return;
-  try {
-    const dir = join(getOverdeckHome(), 'agents', agentId);
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'session.id'), sessionId);
-  } catch {
-    /* non-fatal — the caller records diagnostics and transcript resolution will explain the miss */
   }
 }
 
@@ -99,14 +106,12 @@ export function persistCurrentSessionId(agentId: string, sessionId: string): voi
 export function createFreshSessionIdentity(agentId: string, harness: RuntimeName): string | undefined {
   if (getHarnessBehavior(harness).sessionIdSource !== 'launcher-session-id') return undefined;
   const sessionId = randomUUID();
-  persistCurrentSessionId(agentId, sessionId);
-  appendSessionIdToHistory(agentId, sessionId);
+  appendSessionIdToHistory(agentId, sessionId, 'launcher');
   const dir = join(getOverdeckHome(), 'agents', agentId);
   logAgentLifecycleSync(
     agentId,
     `session identity allocated: harness=${harness} sessionId=${sessionId} `
-      + `pointerPersisted=${existsSync(join(dir, 'session.id'))} `
-      + `historyPersisted=${existsSync(join(dir, 'sessions.json'))}`,
+      + `indexPersisted=${existsSync(join(dir, 'sessions.json'))}`,
   );
   return sessionId;
 }

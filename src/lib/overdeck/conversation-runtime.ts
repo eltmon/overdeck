@@ -67,6 +67,7 @@ import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
 import { sessionFilePath, getOverdeckHome, resolveOhmypiExtensionPath } from '../paths.js';
 import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
 import { buildResumeContract } from '../resume-contract.js';
+import { readLatestIndexedSessionIdSync } from '../session-history.js';
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import { markRespawnPending } from '../../dashboard/server/services/pending-respawn.js';
@@ -625,7 +626,7 @@ export async function spawnConversationSession(
       await mkdir(paths.agentDir, { recursive: true, mode: 0o700 });
       await mkdir(piSessionDir, { recursive: true, mode: 0o700 });
       const storedPiSessionId = resume
-        ? (await readFile(join(paths.agentDir, 'session.id'), 'utf-8').then((s) => s.trim()).catch(() => undefined))
+        ? readLatestIndexedSessionIdSync(tmuxSession) ?? undefined
         : undefined;
       piFields = {
         harness: 'ohmypi',

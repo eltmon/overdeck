@@ -39,7 +39,7 @@ afterEach(async () => {
 });
 
 describe('resolveClaudeSessionId (PAN-830)', () => {
-  it('reads session.id when present', async () => {
+  it('reads the legacy pointer only when the session index is absent', async () => {
     await writeFile(join(agentsDir, AGENT_ID, 'session.id'), `${CLAUDE_SESSION_ID}\n`);
 
     const id = await resolveClaudeSessionId(AGENT_ID, { agentsDirOverride: agentsDir });
@@ -47,8 +47,11 @@ describe('resolveClaudeSessionId (PAN-830)', () => {
     expect(id).toBe(CLAUDE_SESSION_ID);
   });
 
-  it('falls back to last entry of sessions.json when session.id missing', async () => {
-    const arr = ['oldest-uuid', 'older-uuid', CLAUDE_SESSION_ID];
+  it('uses the last entry of sessions.json', async () => {
+    const arr = [
+      { sessionId: 'oldest-uuid', at: '2026-09-18T00:00:00.000Z', source: 'launcher' },
+      { sessionId: CLAUDE_SESSION_ID, at: '2026-09-20T00:00:00.000Z', source: 'session-start' },
+    ];
     await writeFile(join(agentsDir, AGENT_ID, 'sessions.json'), JSON.stringify(arr));
 
     const id = await resolveClaudeSessionId(AGENT_ID, { agentsDirOverride: agentsDir });
@@ -56,7 +59,7 @@ describe('resolveClaudeSessionId (PAN-830)', () => {
     expect(id).toBe(CLAUDE_SESSION_ID);
   });
 
-  it('falls back to runtime state when session.id and sessions.json missing', async () => {
+  it('falls back to runtime state when sessions.json is missing', async () => {
     const id = await resolveClaudeSessionId(AGENT_ID, {
       agentsDirOverride: agentsDir,
       getRuntimeStateAsync: async () => ({ claudeSessionId: CLAUDE_SESSION_ID }),
@@ -65,13 +68,15 @@ describe('resolveClaudeSessionId (PAN-830)', () => {
     expect(id).toBe(CLAUDE_SESSION_ID);
   });
 
-  it('prefers session.id over sessions.json', async () => {
-    await writeFile(join(agentsDir, AGENT_ID, 'session.id'), 'session-id-wins\n');
-    await writeFile(join(agentsDir, AGENT_ID, 'sessions.json'), JSON.stringify(['sessions-json-loses']));
+  it('ignores the legacy pointer when sessions.json exists', async () => {
+    await writeFile(join(agentsDir, AGENT_ID, 'session.id'), 'legacy-loses\n');
+    await writeFile(join(agentsDir, AGENT_ID, 'sessions.json'), JSON.stringify([
+      { sessionId: 'sessions-json-wins', at: '2026-09-20T00:00:00.000Z', source: 'launcher' },
+    ]));
 
     const id = await resolveClaudeSessionId(AGENT_ID, { agentsDirOverride: agentsDir });
 
-    expect(id).toBe('session-id-wins');
+    expect(id).toBe('sessions-json-wins');
   });
 
   it('prefers sessions.json over runtime state', async () => {
@@ -150,7 +155,7 @@ describe('resolveJsonlPath (PAN-830)', () => {
 
     expect(path).toBeNull();
     expect(diagnostics).toEqual([
-      expect.stringContaining('reason=no-session-id checked=session.id,sessions.json,runtime-state'),
+      expect.stringContaining('reason=no-session-id checked=sessions.json,runtime-state'),
     ]);
   });
 
@@ -243,7 +248,7 @@ describe('resolveJsonlPath (PAN-830)', () => {
     const projectDir = join(claudeProjectsDir, encoded);
     await mkdir(projectDir, { recursive: true });
     await writeFile(join(projectDir, `${AGENT_ID}.jsonl`), '{"old":"bug"}\n');
-    // No session.id, no sessions.json, no runtime state — so claudeSessionId is null
+    // No sessions.json or runtime state — so claudeSessionId is null
     const path = await resolveJsonlPath(AGENT_ID, WORKSPACE_PATH, {
       agentsDirOverride: agentsDir,
       claudeProjectsDirOverride: claudeProjectsDir,
