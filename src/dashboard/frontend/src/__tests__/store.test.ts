@@ -422,7 +422,10 @@ describe('applyEventsReducer', () => {
       makeEvent('agent.stopped', 2, { agentId: 'a1', issueId: 'PAN-1' }),
     ]
     const next = applyEventsReducer(emptyState, events)
-    expect(next.agentsById['a1']).toBeUndefined()
+    expect(next.agentsById['a1']).toMatchObject({
+      status: 'stopped',
+      hasLiveTmuxSession: false,
+    })
     expect(next.sequence).toBe(2)
   })
 
