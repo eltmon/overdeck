@@ -194,7 +194,7 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
   };
 }
 
-async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promise<WorkAgentLifecycleState> {
+export async function getWorkAgentLifecycleStateAsync(agentOrIssueId: string): Promise<WorkAgentLifecycleState> {
   const agentId = normalizeAgentId(agentOrIssueId);
   const agentState = await Effect.runPromise(getAgentState(agentId));
   const runtimeState = await Effect.runPromise(getAgentRuntimeState(agentId));
@@ -343,6 +343,31 @@ export function assertCanResumeSessionSync(agentOrIssueId: string): WorkAgentLif
   return lifecycle;
 }
 
+/** Async door twin of {@link assertCanStartFreshSync} — same throw messages, backend-aware liveness. */
+export async function assertCanStartFreshAsync(agentOrIssueId: string, options: StartFreshOptions = {}): Promise<WorkAgentLifecycleState> {
+  const lifecycle = await getWorkAgentLifecycleStateAsync(agentOrIssueId);
+  const pausedForceOverride = options.allowPausedForce === true
+    && lifecycle.requiresSessionResetBeforeFreshStart
+    && getAgentStateSync(lifecycle.agentId)?.paused === true;
+  const liveSessionReplacement = options.allowLiveSessionReplacement === true && lifecycle.isRunning;
+  if (liveSessionReplacement && lifecycle.canResetSession) {
+    throw new Error(sessionResetRequiredReason(lifecycle.agentId, agentOrIssueId));
+  }
+  if (!canStartFresh(lifecycle, options.explicitFresh === true) && !pausedForceOverride && !liveSessionReplacement) {
+    throw new Error(lifecycle.reason || `Cannot start fresh for ${lifecycle.agentId}`);
+  }
+  return lifecycle;
+}
+
+/** Async door twin of {@link assertCanResumeSessionSync} — same throw messages, backend-aware liveness. */
+export async function assertCanResumeSessionAsync(agentOrIssueId: string): Promise<WorkAgentLifecycleState> {
+  const lifecycle = await getWorkAgentLifecycleStateAsync(agentOrIssueId);
+  if (!lifecycle.canResumeSession && !lifecycle.isRunningButStuck) {
+    throw new Error(lifecycle.reason || `Cannot resume session for ${lifecycle.agentId}`);
+  }
+  return lifecycle;
+}
+
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /**
@@ -357,15 +382,15 @@ export class WorkAgentLifecycleViolation extends Data.TaggedError('WorkAgentLife
 export const getWorkAgentLifecycleState = (
   agentOrIssueId: string,
 ): Effect.Effect<WorkAgentLifecycleState> =>
-  Effect.promise(() => getWorkAgentLifecycleStateSnapshot(agentOrIssueId));
+  Effect.promise(() => getWorkAgentLifecycleStateAsync(agentOrIssueId));
 
-/** Assert the agent can start fresh; lifts the synchronous throw to a typed error. */
+/** Assert the agent can start fresh; lifts the async door's throw to a typed error. */
 export const assertCanStartFresh = (
   agentOrIssueId: string,
   options: { allowPausedForce?: boolean } = {},
 ): Effect.Effect<WorkAgentLifecycleState, WorkAgentLifecycleViolation> =>
-  Effect.try({
-    try: () => assertCanStartFreshSync(agentOrIssueId, options),
+  Effect.tryPromise({
+    try: () => assertCanStartFreshAsync(agentOrIssueId, options),
     catch: (cause) =>
       new WorkAgentLifecycleViolation({
         agentId: agentOrIssueId,
@@ -373,12 +398,12 @@ export const assertCanStartFresh = (
       }),
   });
 
-/** Assert the agent can resume; lifts the synchronous throw to a typed error. */
+/** Assert the agent can resume; lifts the async door's throw to a typed error. */
 export const assertCanResumeSession = (
   agentOrIssueId: string,
 ): Effect.Effect<WorkAgentLifecycleState, WorkAgentLifecycleViolation> =>
-  Effect.try({
-    try: () => assertCanResumeSessionSync(agentOrIssueId),
+  Effect.tryPromise({
+    try: () => assertCanResumeSessionAsync(agentOrIssueId),
     catch: (cause) =>
       new WorkAgentLifecycleViolation({
         agentId: agentOrIssueId,
