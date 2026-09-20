@@ -141,7 +141,13 @@ function defaultConversationResponse(method: string, url: string): Response | un
   return undefined;
 }
 
-function makeClient(messagesData = {
+function makeClient(messagesData: {
+  messages: Array<Record<string, unknown>>;
+  workLog: Array<Record<string, unknown>>;
+  streaming: boolean;
+  error?: string;
+  checked?: string[];
+} = {
   messages: [],
   workLog: [],
   streaming: false,
@@ -735,6 +741,23 @@ describe('ConversationPanel empty-state gating (workLog-only agent sessions)', (
       { messages: [], workLog: [], streaming: false },
     );
     expect(screen.getByText('How can I help you?')).toBeInTheDocument();
+  });
+
+  it('renders the agent id and every checked path when its transcript is missing', () => {
+    renderPanel(
+      mockConversation,
+      { agentId: 'agent-pan-3950' },
+      {
+        messages: [],
+        workLog: [],
+        streaming: false,
+        error: 'No transcript found for agent-pan-3950.',
+        checked: ['/transcripts/new.jsonl', '/transcripts/old.jsonl'],
+      },
+    );
+    expect(screen.getByText(
+      'No transcript found for agent-pan-3950. Checked: /transcripts/new.jsonl, /transcripts/old.jsonl',
+    )).toBeInTheDocument();
   });
 });
 

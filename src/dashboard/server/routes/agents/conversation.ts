@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -7,7 +7,7 @@ import type { ConversationResponse } from '@overdeck/contracts';
 import { Effect, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { encodeClaudeProjectDir } from '../../../../lib/paths.js';
+import { encodeClaudeProjectDir, getOverdeckHome } from '../../../../lib/paths.js';
 import {
   getActivity,
   getAgentState,
@@ -20,6 +20,7 @@ import { parseCodexConversationMessages } from '../../services/codex-conversatio
 import { parseAcpConversationMessages } from '../../services/acp-conversation-parser.js';
 import {
   readLauncherPinnedSessionId,
+  listClaudeTranscriptPaths,
   resolvePiSessionPath,
   resolveCodexRolloutPath,
   resolveAcpTranscriptPath,
@@ -103,6 +104,19 @@ export const getAgentOutputRoute = HttpRouter.add(
 
 const EMPTY_CONVERSATION: ConversationResponse = { messages: [], workLog: [], streaming: false, totalCost: 0, byteOffset: 0 };
 
+type AgentConversationResult =
+  | { status: 200; body: ConversationResponse }
+  | { status: 404; body: { error: string; checked: string[] } }
+  | { status: 500; body: { error: string } };
+
+async function pathExists(path: string): Promise<boolean> {
+  return access(path).then(() => true, () => false);
+}
+
+function missingTranscript(id: string, checked: string[]): AgentConversationResult {
+  return { status: 404, body: { error: `No transcript found for ${id}.`, checked } };
+}
+
 /**
  * Resolve and parse an agent's conversation JSONL file.
  * Exported for unit testing — the Effect route layer is not directly unit-testable.
@@ -112,36 +126,42 @@ const EMPTY_CONVERSATION: ConversationResponse = { messages: [], workLog: [], st
  * session the Terminal tab attaches to) before falling back to mtime-based pick
  * (PAN-2011). This makes the Conversation tab match the Terminal tab by construction.
  */
-export async function buildConversationResponse(id: string): Promise<ConversationResponse> {
+export async function buildAgentConversationResult(id: string): Promise<AgentConversationResult> {
+  const checked: string[] = [];
   try {
     const harness = await resolveAgentHarness(id);
+    const agentDir = join(getOverdeckHome(), 'agents', id);
 
     if (harness === 'ohmypi') {
       const sessionFile = await resolvePiSessionPath(id);
-      if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
+      checked.push(sessionFile ?? join(agentDir, 'sessions', '**', '*.jsonl'), join(agentDir, '*.jsonl'));
+      if (!sessionFile || !(await pathExists(sessionFile))) return missingTranscript(id, checked);
       const result = await parseOhmypiConversationMessages(sessionFile);
-      return { ...result, streaming: false };
+      return { status: 200, body: { ...result, streaming: false } };
     }
 
     if (harness === 'pi') {
       const sessionFile = await resolvePiSessionPath(id);
-      if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
+      checked.push(sessionFile ?? join(agentDir, 'sessions', '**', '*.jsonl'), join(agentDir, '*.jsonl'));
+      if (!sessionFile || !(await pathExists(sessionFile))) return missingTranscript(id, checked);
       const result = await parsePiConversationMessages(sessionFile);
-      return { ...result, streaming: false };
+      return { status: 200, body: { ...result, streaming: false } };
     }
 
     if (harness === 'codex') {
       const sessionFile = await resolveCodexRolloutPath(id);
-      if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
+      checked.push(sessionFile ?? join(agentDir, 'codex-home*', 'sessions', '**', 'rollout-*.jsonl'));
+      if (!sessionFile || !(await pathExists(sessionFile))) return missingTranscript(id, checked);
       const result = await parseCodexConversationMessages(sessionFile);
-      return { ...result, streaming: false };
+      return { status: 200, body: { ...result, streaming: false } };
     }
 
     if (harness === 'acp' || harness === 'opencode') {
       const sessionFile = await resolveAcpTranscriptPath(id);
-      if (!sessionFile || !existsSync(sessionFile)) return EMPTY_CONVERSATION;
+      checked.push(sessionFile ?? join(agentDir, 'acp-transcript.jsonl'));
+      if (!sessionFile || !(await pathExists(sessionFile))) return missingTranscript(id, checked);
       const result = await parseAcpConversationMessages(sessionFile);
-      return {
+      return { status: 200, body: {
         ...result,
         messages: result.messages.map((message) => message.role === 'assistant'
           ? {
@@ -151,39 +171,52 @@ export async function buildConversationResponse(id: string): Promise<Conversatio
             }
           : message),
         streaming: false,
-      };
+      } };
     }
 
-    // claude-code (default): try launcher-pinned session ID first (ground truth),
-    // then fall back to mtime-based pick.
+    // claude-code (default): launcher pin first, then the append-only index.
     let jsonlPath: string | null = null;
     const pinnedSessionId = await readLauncherPinnedSessionId(id);
-    if (pinnedSessionId) {
-      const workspace = await Effect.runPromise(getAgentWorkspace(id));
-      if (workspace) {
+    const workspace = await Effect.runPromise(getAgentWorkspace(id));
+    if (workspace) {
+      if (pinnedSessionId) {
         const candidate = join(
           homedir(), '.claude', 'projects',
           encodeClaudeProjectDir(workspace),
           `${pinnedSessionId}.jsonl`,
         );
-        if (existsSync(candidate)) jsonlPath = candidate;
+        checked.push(candidate);
+        if (await pathExists(candidate)) jsonlPath = candidate;
       }
+      for (const candidate of await listClaudeTranscriptPaths(id, workspace)) {
+        if (!checked.includes(candidate)) checked.push(candidate);
+        if (!jsonlPath && await pathExists(candidate)) jsonlPath = candidate;
+      }
+    } else {
+      checked.push(join(agentDir, 'state.json (workspace missing)'));
     }
     if (!jsonlPath) {
       jsonlPath = await Effect.runPromise(getAgentJsonlPath(id));
+      if (jsonlPath && !checked.includes(jsonlPath)) checked.push(jsonlPath);
     }
 
-    if (!jsonlPath || !existsSync(jsonlPath)) return EMPTY_CONVERSATION;
+    if (!jsonlPath || !(await pathExists(jsonlPath))) return missingTranscript(id, checked);
     // parseEntireConversation, not parseConversationMessages: a single parse caps
     // at MAX_READ_BYTES (10 MB) and would drop the most recent turns of a larger
     // transcript (PAN-1989). This one-shot endpoint must return the whole file.
     const result = await parseEntireConversation(jsonlPath);
     // Force streaming: false — tmux session is dead, any "streaming" state is stale
-    return { ...result, streaming: false };
+    return { status: 200, body: { ...result, streaming: false } };
   } catch (err) {
     console.error('[conversation] failed for', id, err);
-    return EMPTY_CONVERSATION;
+    return { status: 500, body: { error: `Failed to load transcript for ${id}.` } };
   }
+}
+
+/** Compatibility helper retained for callers that only consume a transcript body. */
+export async function buildConversationResponse(id: string): Promise<ConversationResponse> {
+  const result = await buildAgentConversationResult(id);
+  return result.status === 200 ? result.body : EMPTY_CONVERSATION;
 }
 
 export const getAgentConversationRoute = HttpRouter.add(
@@ -192,7 +225,10 @@ export const getAgentConversationRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    return yield* Effect.promise(async () => jsonResponse(await buildConversationResponse(id)));
+    return yield* Effect.promise(async () => {
+      const result = await buildAgentConversationResult(id);
+      return jsonResponse(result.body, { status: result.status });
+    });
   })),
 );
 

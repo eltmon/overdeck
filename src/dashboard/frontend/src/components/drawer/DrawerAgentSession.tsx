@@ -28,7 +28,7 @@ import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // Re-exported so existing importers (IssueDrawer, dock, tests) keep working —
 // the definitions live in lib/agentConversation.ts (PAN-3090).
-export type { SessionAgent } from '../../lib/agentConversation';
+export { sortIssueAgents, type SessionAgent } from '../../lib/agentConversation';
 
 interface AgentGitInfo {
   actualBranch: string | null;

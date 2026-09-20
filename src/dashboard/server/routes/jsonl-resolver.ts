@@ -95,6 +95,20 @@ async function readIndexedSessionIds(agentDir: string): Promise<{ ids: string[];
   }
 }
 
+/** Candidate Claude transcripts recorded for an agent, newest index entry first. */
+export async function listClaudeTranscriptPaths(
+  agentId: string,
+  workspace: string,
+  opts: ResolveJsonlPathOptions = {},
+): Promise<string[]> {
+  const agentsRoot = opts.agentsDirOverride ?? join(getOverdeckHome(), 'agents');
+  const agentDir = join(agentsRoot, agentId);
+  const index = await readIndexedSessionIds(agentDir);
+  const projectsRoot = opts.claudeProjectsDirOverride ?? join(homedir(), '.claude', 'projects');
+  const projectDir = join(projectsRoot, encodeClaudeProjectDir(workspace));
+  return [...index.ids].reverse().map((sessionId) => join(projectDir, `${sessionId}.jsonl`));
+}
+
 /** Async equivalent of getLatestSessionId from lib/agents.ts. */
 export async function resolveClaudeSessionId(
   agentId: string,

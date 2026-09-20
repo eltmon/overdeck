@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Agent } from '../../types';
-import { DrawerAgentSession, pickDefaultDrawerAgent } from './DrawerAgentSession';
+import { DrawerAgentSession, pickDefaultDrawerAgent, sortIssueAgents } from './DrawerAgentSession';
 
 vi.mock('@tanstack/react-query', () => ({
   useQuery: () => ({ data: null }),
@@ -90,6 +90,28 @@ describe('pickDefaultDrawerAgent', () => {
       agent({ id: 'agent-b', role: 'plan', status: 'stopped' }),
     ];
     expect(pickDefaultDrawerAgent(agents)?.id).toBe('agent-a');
+  });
+});
+
+describe('sortIssueAgents', () => {
+  it('keeps stopped agents and orders work, coordinator, lanes, test, planning, strike', () => {
+    const agents = [
+      agent({ id: 'strike-pan-1', role: 'strike', status: 'stopped' }),
+      agent({ id: 'planning-pan-1', role: 'plan', status: 'stopped' }),
+      agent({ id: 'agent-pan-1-review-security', role: 'review', status: 'stopped' }),
+      agent({ id: 'agent-pan-1-test', role: 'test', status: 'stopped' }),
+      agent({ id: 'agent-pan-1-review', role: 'review', status: 'stopped' }),
+      agent({ id: 'agent-pan-1', role: 'work', status: 'stopped' }),
+    ];
+
+    expect(sortIssueAgents(agents).map((entry) => entry.id)).toEqual([
+      'agent-pan-1',
+      'agent-pan-1-review',
+      'agent-pan-1-review-security',
+      'agent-pan-1-test',
+      'planning-pan-1',
+      'strike-pan-1',
+    ]);
   });
 });
 

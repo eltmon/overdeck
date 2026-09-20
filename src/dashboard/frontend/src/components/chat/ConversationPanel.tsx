@@ -178,7 +178,7 @@ export function ConversationPanel({
   const committingRef = useRef(false);
   const queryClient = useQueryClient();
   const messagesQueryKey = useMemo(() => conversationMessagesQueryKey(conversation.name), [conversation.name]);
-  const { enabled: streamMessagesEnabled, receivedFirstPayload } = useConversationMessagesStream(conversation);
+  const { enabled: streamMessagesEnabled, receivedFirstPayload } = useConversationMessagesStream(conversation, Boolean(agentId));
   // Ref mirrors the latest streaming state so the HTTP queryFn can discard
   // responses that were already in flight when streaming became active.
   const streamActiveRef = useRef(streamMessagesEnabled);
@@ -1128,6 +1128,7 @@ interface MessagesResponse {
   /** Server-side resolution failure to surface in the panel (e.g. the live
    * session could not be resolved from the launcher). Rendered as a banner. */
   error?: string;
+  checked?: string[];
 }
 
 export async function fetchMessages(name: string, signal?: AbortSignal, agentId?: string): Promise<MessagesResponse> {
@@ -1135,13 +1136,19 @@ export async function fetchMessages(name: string, signal?: AbortSignal, agentId?
   // during a server restart rejects (and retries) instead of pinning the
   // panel on "Loading…" forever, and switching conversations cancels the
   // previous conversation's fetch.
-  const res = await fetchWithTimeout(`/api/conversations/${encodeURIComponent(name)}/messages`, { signal });
-  // An agent the store knows (queued specialist, wiped workspace, cleaned
-  // session file) 404s here — that means "no saved history", not an incident.
-  // Render the honest empty state instead of the warning card. Real user
-  // conversations (no agentId) keep the failure card + Retry.
+  const path = agentId
+    ? `/api/agents/${encodeURIComponent(agentId)}/conversation`
+    : `/api/conversations/${encodeURIComponent(name)}/messages`;
+  const res = await fetchWithTimeout(path, { signal });
   if (res.status === 404 && agentId) {
-    return { messages: [], workLog: [], streaming: false };
+    const missing = await res.json() as { error?: string; checked?: string[] };
+    return {
+      messages: [],
+      workLog: [],
+      streaming: false,
+      error: missing.error ?? `No transcript found for ${agentId}.`,
+      checked: missing.checked ?? [],
+    };
   }
   if (!res.ok) throw new Error('Failed to fetch messages');
   return res.json();
@@ -1325,7 +1332,9 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
           <p className={styles.conversationEmptyStateTitle} style={{ color: 'var(--warning)' }}>
             ⚠ Session could not be resolved
           </p>
-          <p className={styles.conversationEmptyStateSubtitle}>{data.error}</p>
+          <p className={styles.conversationEmptyStateSubtitle}>
+            {data.error}{data.checked ? ` Checked: ${data.checked.join(', ')}` : ''}
+          </p>
         </div>
       ) : messagesFetchFailed ? (
         <div className={styles.conversationEmptyState}>

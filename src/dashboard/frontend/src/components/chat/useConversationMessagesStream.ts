@@ -151,9 +151,12 @@ export function shouldStreamConversationMessages(conversation: Pick<Conversation
   return isAgentSession && streamable;
 }
 
-export function useConversationMessagesStream(conversation: Pick<Conversation, 'name' | 'harness' | 'sessionAlive'> & { id?: number; endedAt?: string | null }): { enabled: boolean; receivedFirstPayload: boolean } {
+export function useConversationMessagesStream(
+  conversation: Pick<Conversation, 'name' | 'harness' | 'sessionAlive'> & { id?: number; endedAt?: string | null },
+  disabled = false,
+): { enabled: boolean; receivedFirstPayload: boolean } {
   const queryClient = useQueryClient();
-  const enabled = shouldStreamConversationMessages(conversation);
+  const enabled = !disabled && shouldStreamConversationMessages(conversation);
   const streamIdentity = `${enabled ? 'enabled' : 'disabled'}:${conversation.name}`;
   const [firstPayloadIdentity, setFirstPayloadIdentity] = useState<string | null>(null);
   const receivedFirstPayload = firstPayloadIdentity === streamIdentity;

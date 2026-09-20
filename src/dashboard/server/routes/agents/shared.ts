@@ -28,7 +28,6 @@ import {
 } from '../../../../lib/agents.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { getGitHubConfig } from '../../services/tracker-config.js';
-import { getClosedIssueIdsForReadSource } from '../../read-model.js';
 import { recordFeatureRegistryLifecycle } from '../../../../lib/registry/feature-registry-population.js';
 import {
   getClaudeProjectDir as getClaudeProjectDirShared,
@@ -208,16 +207,6 @@ export const agentsCache: { data: unknown[] | null; timestamp: number } = { data
 export function invalidateAgentsCache(): void {
   agentsCache.data = null;
   agentsCache.timestamp = 0;
-}
-
-function filterClosedIssueAgents<T>(agents: T[], issues: unknown[]): T[] {
-  const closedIssueIds = getClosedIssueIdsForReadSource(issues);
-  if (closedIssueIds.size === 0) return agents;
-  return agents.filter((agent) => {
-    if (!agent || typeof agent !== 'object') return true;
-    const issueId = (agent as { issueId?: unknown }).issueId;
-    return typeof issueId !== 'string' || !closedIssueIds.has(issueId.toUpperCase());
-  });
 }
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
@@ -677,7 +666,6 @@ export {
   updateRegistryForAgentStart,
   getIssueDataService,
   AGENTS_CACHE_TTL_MS,
-  filterClosedIssueAgents,
   readJsonBody,
   toAgentStatusPayload,
   buildAgentControlEventPayload,
