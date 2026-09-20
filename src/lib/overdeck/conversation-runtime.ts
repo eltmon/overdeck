@@ -37,13 +37,15 @@ import {
   sessionExists,
   isHarnessProcessAlive,
   killSession,
-  createSession,
   setOption,
   exactPaneTarget,
   listSessionNames,
   findManagedServerPidSync,
 } from '../tmux.js';
 import { deliverAgentMessage, writeChannelsBridgeMcpConfig, dismissDevChannelsDialog, waitForReadySignal, clearReadySignal } from '../agents.js';
+import { closeAgentPaneByName, launchAgentPane, resolveLaunchBackend } from '../terminal-backends/launch.js';
+import type { AgentPaneRef, TerminalBackend } from '../terminal-backends/types.js';
+import { isAgentRole, type AgentRole } from '@overdeck/contracts';
 import {
   getAgentRuntimeBaseCommand,
   getProviderExportsForModel,
@@ -175,17 +177,13 @@ export async function stopConversationRuntime(conv: Conversation, name: string):
   if (hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) {
     return;
   }
-  await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
+  await closeAgentPaneByName(conv.tmuxSession);
   try {
     await killConversationRuntimeProcesses(conv);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
     console.warn(`[conversations] failed to cleanup runtime processes for ${name}: ${msg}`);
   }
-}
-/** Quote a string for safe use in a bash script using single-quote wrapping. */
-function shellQuote(str: string): string {
-  return "'" + str.replace(/'/g, "'\"'\"'") + "'";
 }
 // Canonical model-id shape lives in model-validation.ts — it permits the
 // square-bracket context suffix (e.g. `k3[1m]`) that a local copy of this
@@ -542,6 +540,24 @@ export async function piConversationSystemPromptFiles(cwd: string): Promise<stri
 function isNotFound(error: unknown): boolean {
   return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
 }
+function conversationStateDir(tmuxSession: string): string {
+  return join(getOverdeckHome(), 'conversations', tmuxSession);
+}
+/**
+ * A conversation's pane role lives in `<stateDir>/pane-role` (PAN-3921 D2):
+ * no DB column, and it survives every respawn, resume, restart-all and
+ * fork-pipeline spawn. Without a file the role is `conversation`.
+ */
+export async function writeConversationPaneRole(tmuxSession: string, role: AgentRole): Promise<void> {
+  const stateDir = conversationStateDir(tmuxSession);
+  await mkdir(stateDir, { recursive: true });
+  await writeFile(join(stateDir, 'pane-role'), `${role}\n`, { mode: 0o600 });
+}
+async function readConversationPaneRole(tmuxSession: string): Promise<AgentRole> {
+  const raw = await readFile(join(conversationStateDir(tmuxSession), 'pane-role'), 'utf-8').catch(() => '');
+  const role = raw.trim();
+  return isAgentRole(role) ? role : 'conversation';
+}
 export async function spawnConversationSession(
   tmuxSession: string,
   cwd: string,
@@ -552,11 +568,14 @@ export async function spawnConversationSession(
   resume = false,
   harness: RuntimeName = 'claude-code',
   plainFork = false,
+  launch: { role?: AgentRole; backend?: TerminalBackend } = {},
 ): Promise<void> {
   const behavior = getHarnessBehavior(harness);
   const harnessLaunch = await prepareHarnessLaunch(harness);
-  const stateDir = join(getOverdeckHome(), 'conversations', tmuxSession);
+  const stateDir = conversationStateDir(tmuxSession);
   await mkdir(stateDir, { recursive: true });
+  if (launch.role) await writeConversationPaneRole(tmuxSession, launch.role);
+  const role: AgentRole = launch.role ?? await readConversationPaneRole(tmuxSession);
   clearReadySignal(tmuxSession);
   const launcherScript = join(stateDir, 'launcher.sh');
   const permissionFlags = getClaudePermissionFlagsStringSync();
@@ -702,7 +721,10 @@ export async function spawnConversationSession(
   if (effort && !(harness === 'opencode' ? /^[a-z][a-z0-9_-]*$/ : SAFE_EFFORT_PATTERN).test(effort)) {
     throw new Error('Invalid effort level');
   }
-  const useSupervisor = shouldUseSupervisorForConversation(harness, { codexTransport });
+  const backend = launch.backend ?? await resolveLaunchBackend();
+  // The PTY supervisor is tmux-only: node-pty hides the harness from Herdr's
+  // foreground-process detector (PAN-3917 W12, docs/TERMINAL-BACKENDS.md).
+  const useSupervisor = backend.name === 'tmux' && shouldUseSupervisorForConversation(harness, { codexTransport });
   let supervisorScriptPath: string | undefined;
   if (useSupervisor) {
     supervisorScriptPath = resolvePtySupervisorScriptPath();
@@ -734,6 +756,7 @@ export async function spawnConversationSession(
   // one cwd never snapshot the same "existing sessions" set and race for the
   // same newest directory. Non-kimi harnesses run this closure directly,
   // unaffected by the lock.
+  let pane: AgentPaneRef | null = null;
   const launchTmuxAndCaptureSession = async (): Promise<void> => {
     // Conversations have no AgentState row, so the dashboard can't resolve
     // their wire.jsonl without a conversation-owned captured session id —
@@ -795,24 +818,35 @@ export async function spawnConversationSession(
       { mode: 0o700 },
     );
     await rename(launcherTmp, launcherScript);
-    try {
-      await Effect.runPromise(killSession(tmuxSession));
-    } catch {
-    }
-    console.log(`[claude-invoke] purpose=conversation-session | model=${model || 'default'} | source=conversations.ts:spawnConversationSession | session=${tmuxSession} | resume=${resume} | command="${runtimeCommand}"`);
+    await closeAgentPaneByName(tmuxSession, backend);
+    console.log(`[claude-invoke] purpose=conversation-session | model=${model || 'default'} | source=conversations.ts:spawnConversationSession | session=${tmuxSession} | resume=${resume} | command="${runtimeCommand}" | backend=${backend.name}`);
     try {
       const { preTrustDirectory } = await import('../workspace-manager.js') as { preTrustDirectory: (dir: string) => void };
       preTrustDirectory(cwd);
     } catch { /* non-fatal */ }
+    // PAN-3921 FR-2: the pane goes through the launch door with the live agent
+    // name `conv-<name>` and the conversation's tokens. On tmux this is the
+    // same createSession call as before (same session name, cwd, env, launcher).
     try {
-      await Effect.runPromise(createSession(tmuxSession, cwd, `bash ${shellQuote(launcherScript)}`, {
+      pane = await launchAgentPane({
+        ...(issueId ? { issueId } : {}),
+        cwd,
+        agentId: tmuxSession,
+        argv: ['bash', launcherScript],
         env: {
           ...BLANKED_PROVIDER_ENV,
           TERM: 'xterm-256color',
         },
-      }));
+        tokens: {
+          ...(issueId ? { issue: issueId } : {}),
+          role,
+          harness,
+          model: model ?? 'default',
+        },
+      }, backend);
     } catch (err) {
-      if ((err as { code?: string })?.code === 'ENOENT') {
+      const code = (err as { code?: string })?.code ?? (err as { cause?: { code?: string } })?.cause?.code;
+      if (backend.name === 'tmux' && code === 'ENOENT') {
         throw new Error(
           'tmux is not installed. Install it with: brew install tmux (macOS) or sudo apt-get install tmux (Linux)',
         );
@@ -873,8 +907,11 @@ export async function spawnConversationSession(
       console.error(`[conversations] dismissDevChannelsDialog failed for ${tmuxSession}: ${msg}`);
     });
   }
-  await Effect.runPromise(setOption(tmuxSession, 'destroy-unattached', 'off'));
-  await Effect.runPromise(setOption(exactPaneTarget(tmuxSession), 'remain-on-exit', 'on'));
+  // tmux-only session options: Herdr owns its panes' lifetime itself.
+  if ((pane as AgentPaneRef | null)?.backend === 'tmux') {
+    await Effect.runPromise(setOption(tmuxSession, 'destroy-unattached', 'off'));
+    await Effect.runPromise(setOption(exactPaneTarget(tmuxSession), 'remain-on-exit', 'on'));
+  }
 }
 export interface ResolvedRegisteredProject {
   key: string;

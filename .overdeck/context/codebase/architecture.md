@@ -1,7 +1,8 @@
 # Architecture
 
 Overdeck is a multi-agent orchestrator for AI coding work: a CLI (`pan`), a
-dashboard server, a React frontend, and a fleet of tmux-hosted coding agents.
+dashboard server, a React frontend, and a fleet of coding agents hosted by a
+**terminal backend** — Herdr by default, tmux as the fallback (PAN-3917 D10).
 
 ## Top-level layout
 
@@ -42,6 +43,14 @@ dashboard server, a React frontend, and a fleet of tmux-hosted coding agents.
 - `planning/spawn-planning-session.ts` — plan-role kickoff (own spawn path).
 - `launcher-generator.ts` — generates tmux launcher scripts (`--resume`, PTY
   supervisor wrapping, env exports).
+- `terminal-backends/` (PAN-3917 W8) — the backend contract (`types.ts`), the Herdr
+  adapter (`herdr.ts`, `herdr-api.ts`, `herdr-stream.ts`), the tmux adapter (`tmux.ts`),
+  selection (`select.ts`: `OVERDECK_TERMINAL_BACKEND` → `terminal.backend` → Herdr when
+  its socket exists), the FR-17 prompt guard (`prompt-guard.ts`), and the **launch door**
+  `launch.ts` (`launchAgentPane`: place a pane in the issue workspace and stamp the
+  `issue`/`role`/`harness`/`model` tokens). Every spawner goes through it; PAN-3921 adds
+  conversations/handoffs. Herdr detects agents by the pane's FOREGROUND process, so the
+  PTY supervisor wrapper is tmux-only (`decideSupervisorForWorkAgent`).
 - `tmux.ts` — tmux primitives on the `overdeck` socket. Async (Effect) variants
   are canonical; `*Sync` are legacy debt.
 - `session-format-converter.ts` — conversation transcript conversion between
@@ -58,10 +67,14 @@ dashboard server, a React frontend, and a fleet of tmux-hosted coding agents.
 
 ## Agent pipeline
 
-Issue → `pan plan` (xBRIEF plan + item checklist) → `pan start` (work agent in a git worktree
-`workspaces/feature-<issue>/`) → verification gate → review convoy → test/UAT →
-server-side rebase/merge → close-out. Spawned agents live in tmux sessions
-(`tmux -L overdeck`), with state in `~/.overdeck/agents/<id>/state.json`.
+Issue → `pan plan` (xBRIEF plan + item checklist under `.pan/` in the project repo) →
+`pan start` (work agent in a git worktree `workspaces/feature-<issue>/`) → verification
+gate → review convoy → test/UAT → server-side rebase/merge → close-out. Spawned agents
+live in the terminal backend (Herdr live agents named after the agent id, or tmux
+sessions on `tmux -L overdeck`), with launch state in `~/.overdeck/agents/<id>/state.json`
+(`backend`, `paneId`). Issue state is DERIVED (tracker + PR + checks + git + backend
+inventory; `src/lib/overdeck/derived-issue-state.ts`) — there is no record plane and no
+`overdeck-state` branch writes (PAN-3917).
 
 ## Spawn sites (harness decision points)
 
@@ -73,7 +86,11 @@ server-side rebase/merge → close-out. Spawned agents live in tmux sessions
 
 Conversations pin harness at creation in `handleConversationCreate`
 (`src/lib/overdeck/conversation-runtime.ts` ~:918, called from `POST /api/conversations` in
-`routes/conversations.ts` ~:303) — not a spawn site. Conversation kickoff templates read at
+`routes/conversations.ts` ~:303); the one spawn function is `spawnConversationSession`
+(~:545), also used by respawn/restart-all, the fork/handoff pipeline
+(`conversation-forks.ts`), and `pan flywheel start`. The conversation's backend identity is
+`tmuxSession` = `conv-<name>` (Herdr agent name or tmux session); `deliverAgentMessage`
+and the terminal WebSocket resolve it by that name on either backend. Conversation kickoff templates read at
 request time live in `roles/` (`handoff.md`, `retrospective.md`); `src/lib/cloister/prompts/*.md`
 are build-copied to `dist/dashboard/prompts/` and cached by `renderPrompt`.
 
@@ -107,4 +124,4 @@ Work agents can run on Fly.io VMs (`src/lib/remote/remote-agents.ts`,
 `routes/projects.ts` `collectSessionTreeNodes()` (PAN-1775). Remote agents have
 no local tmux session — never assume tmux discovery covers them.
 
-<!-- last-verified: 2026-09-16 -->
+<!-- last-verified: 2026-09-19 -->

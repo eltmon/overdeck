@@ -10,6 +10,10 @@
   `packages/contracts` if touched.
 
 ## Code rules (enforced by review, some by CI)
+- **Launch through the launch door** — new spawn paths call `launchAgentPane`
+  (`src/lib/terminal-backends/launch.ts`) and decide the PTY supervisor by backend
+  (tmux-only); never `createSession` directly. Message delivery goes through
+  `deliverAgentMessage` (Herdr `agent.prompt` by name, else the tmux cascade).
 - **Async tmux primitives only** — new tmux interactions use `*Async`/Effect
   variants in `src/lib/tmux.ts`; never add sync callers. Message delivery =
   load-buffer + paste-buffer + 300ms + `C-m`.
@@ -33,16 +37,19 @@
 - Inline SVG icons use `currentColor` + a color map (see
   `components/chat/ProviderIcons.tsx` for the existing pattern).
 
-## Planning artifacts (xBRIEF v0.8, PAN-1124)
-- PRD drafts: `${OVERDECK_HOME}/state/<project>/drafts/<issue>.md` (human-mutable narrative).
-- Spec: `${OVERDECK_HOME}/state/<project>/specs/<date>-<ISSUE>-<slug>.xbrief.json` — immutable after planning except `plan.status` via `updateSpecStatus()`.
-- Project continue state: `${OVERDECK_HOME}/state/<project>/continues/<issue>.xbrief.json`.
-- Workspace continue state: `<workspace>/.overdeck/continue.json` (gitignored); item status changes go to its `statusOverrides`, never the spec.
-- `pan task` reads and updates the xBRIEF item checklist through the canonical state door.
+## Planning artifacts (xBRIEF v0.8, PAN-3917 FR-2/FR-10)
+- Everything lives under `.pan/` in the project repo (or the configured plan-home repo for
+  polyrepo projects) and is committed on the feature branch by the agent that changes it.
+- PRD drafts: `.pan/drafts/<issue>.md`. Spec: `.pan/specs/<date>-<ISSUE>-<slug>.xbrief.json`
+  (`plan.status` flips in place; files never move). Item status/claims:
+  `.pan/continues/<issue>.xbrief.json`, written by `pan task claim|done`.
+- Workspace continue state: `<workspace>/.overdeck/continue.json` (runtime dir, gitignored).
+- `pan task done <item>` requires a commit on the branch carrying the trailer `Item: <item-id>`.
+- The `overdeck-state` branch is archived (tag `state-final`) — never written, never deleted.
 
 ## Testing
 - Vitest, unit tests under `tests/unit/**` mirroring `src/`, plus co-located
   `__tests__/` in some lib dirs (e.g. `src/lib/cloister/__tests__/`).
 - Frontend tests co-located under `components/**/__tests__/`.
 
-<!-- last-verified: 2026-06-12 -->
+<!-- last-verified: 2026-09-19 -->

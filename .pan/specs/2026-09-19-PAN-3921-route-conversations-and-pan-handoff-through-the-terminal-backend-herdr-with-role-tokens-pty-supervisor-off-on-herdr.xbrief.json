@@ -4,17 +4,17 @@
     "created": "2026-09-19T12:04:40.358Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3921: Route conversations and pan handoff through the terminal backend (Herdr) with role tokens; PTY supervisor off on Herdr",
-    "updated": "2026-09-19T12:13:56.640Z"
+    "updated": "2026-09-19T13:25:36.372Z"
   },
   "plan": {
     "id": "pan-3921",
     "title": "Route conversations and pan handoff through the terminal backend (Herdr) with role tokens; PTY supervisor off on Herdr",
-    "status": "proposed",
+    "status": "running",
     "uid": "8dd98032-a62a-4a63-8924-df514d65b681",
     "author": "agent:claude-fable-5-1",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-19T12:04:40.358Z",
-    "updated": "2026-09-19T12:13:56.640Z",
+    "updated": "2026-09-19T13:25:36.372Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3921",

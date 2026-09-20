@@ -6,10 +6,11 @@
  * tokens: `issue`, `role`, `harness`, `model`. This module is the one place
  * that resolves the backend (D10 selection), finds or creates the workspace,
  * and starts the pane — so a launcher is three lines and cannot forget the
- * tokens. `pan handoff --issue` does not route through here yet — the forked
- * conversation still inherits its parent's cwd (or an explicit `--cwd`), not
- * the issue's workspace; giving it the same pane placement is a post-release
- * follow-up (docs/THE-CUT.md).
+ * tokens. Conversations, forks and handoffs, and `pan flywheel start` route
+ * through `launchAgentPane` too (PAN-3921): the pane is named `conv-<name>`
+ * and stamped with role `conversation` unless `pan handoff --role` says
+ * otherwise, so a handoff started with `--issue X --role review` is X's
+ * Review row.
  *
  * Importing it registers both adapters.
  */
@@ -107,4 +108,31 @@ export async function agentPaneExists(agentId: string, backend?: TerminalBackend
   }
   const { sessionExists } = await import('../tmux.js');
   return await Effect.runPromise(sessionExists(agentId));
+}
+
+/**
+ * Close whatever pane already answers to this agent id on the host backend:
+ * the tmux session of that name, or the Herdr agent of that name. A respawn
+ * reuses the id, so the old pane must be gone before `launchAgentPane`.
+ * Errors are swallowed: there is nothing to close when no pane answers.
+ */
+export async function closeAgentPaneByName(agentId: string, backend?: TerminalBackend): Promise<void> {
+  const resolved = backend ?? (await resolveLaunchBackend());
+  if (resolved.name === 'herdr') {
+    const { findHerdrAgent } = await import('./herdr.js');
+    const live = await findHerdrAgent(agentId);
+    if (!live) return;
+    await Effect.runPromise(
+      resolved.close({
+        backend: 'herdr',
+        workspaceId: live.workspaceId,
+        paneId: live.paneId,
+        terminalId: live.terminalId,
+        agentName: agentId,
+      }),
+    ).catch(() => {});
+    return;
+  }
+  const { killSession } = await import('../tmux.js');
+  await Effect.runPromise(killSession(agentId)).catch(() => {});
 }

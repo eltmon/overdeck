@@ -1,6 +1,24 @@
 # Concerns / hazards
 
-Live landmines a change in this repo can step on. Verified 2026-07-26.
+Live landmines a change in this repo can step on. Verified 2026-09-19.
+
+- **Herdr detects agents by the pane's FOREGROUND process** (PAN-3917 fix11, verified
+  live 2026-09-19). Any wrapper between bash and the harness — the PTY supervisor
+  (`node pty-supervisor.js …`), `script -qfaec`, a node shim — hides the harness; the
+  adapter's 60 s detection wait times out and `startAgent` closes the pane. The
+  supervisor is therefore tmux-only (`decideSupervisorForWorkAgent` refuses it for
+  `backend === 'herdr'`). Herdr 0.9.1 detects pi, claude, codex, omp, opencode, kimi,
+  muse (and more) but NOT Overdeck's `acp` host process.
+- **A Herdr agent has no tmux session.** Any liveness read that asks tmux
+  (`sessionExists`, `listSessionNames`, `isHarnessProcessAlive`, the runtime census)
+  reports every Herdr-hosted agent dead. Agents go through `isAlive`
+  (`src/lib/agents/liveness.ts`, backend-aware); conversations get their own door in
+  PAN-3921 (`conversation-liveness.ts`). A Herdr probe that does not answer is
+  `indeterminate` = alive, never a death — a Herdr outage must not reap the fleet.
+- **Herdr session isolation:** the session name derives from `OVERDECK_HOME`
+  (`overdeck` for the default home, `overdeck-<hash>` otherwise). A test or isolated
+  stack that uses the default home spawns into the operator's LIVE session. Tests
+  must inject a fake backend, never touch the socket.
 
 - **ToS policy gate** — `canUseHarnessSync()` (`src/lib/harness-policy.ts:69`) blocks
   Pi + Anthropic + subscription auth. Every harness resolution path must end by
@@ -105,4 +123,4 @@ Live landmines a change in this repo can step on. Verified 2026-07-26.
   `/workspace`. Never run durable work without verifying the volume mount
   (PAN-1845).
 
-<!-- last-verified: 2026-07-28 -->
+<!-- last-verified: 2026-09-19 -->
