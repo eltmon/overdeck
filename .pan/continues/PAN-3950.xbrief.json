@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3950",
   "created": "2026-09-20T13:53:05.511Z",
-  "updated": "2026-09-20T14:51:45.526Z",
+  "updated": "2026-09-20T14:51:55.994Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -92,6 +92,10 @@
     "w8-adapters-use-resolver.ac4": {
       "status": "completed",
       "doneAt": "2026-09-20T14:51:45.526Z"
+    },
+    "w9-pi-tiebreak-test.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:51:55.994Z"
     }
   }
 }
