@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3937",
   "created": "2026-09-20T20:38:35.661Z",
-  "updated": "2026-09-20T20:43:41.481Z",
+  "updated": "2026-09-20T20:43:42.667Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -116,6 +116,11 @@
       "claimedBy": "conv-20260920-4179",
       "claimedAt": "2026-09-20T20:43:29.534Z",
       "doneAt": "2026-09-20T20:43:41.481Z"
+    },
+    "dashboard-acp-stalled-turn-signal.ac1": {
+      "status": "in_progress",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:43:42.667Z"
     }
   }
 }
