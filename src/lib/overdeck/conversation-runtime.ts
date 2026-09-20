@@ -850,14 +850,14 @@ export async function spawnConversationSession(
       // can render a DIFFERENT conversation's or agent's prompts/transcript
       // under this identity. Require a real captured id or fail the launch,
       // same fail-closed contract as spawnAgent/restartAgent/recoverAgent.
-      const { waitForNewKimiSessionAsync, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
+      const { waitForNewKimiSessionAsync, recordKimiSessionCapture } = await import('../runtimes/kimi-code.js');
       const sessionId = await waitForNewKimiSessionAsync(join(homedir(), '.kimi-code'), cwd, kimiExistingSessionsBefore);
       if (!sessionId) {
         throw new Error(
           `kimi-code session capture timed out for ${tmuxSession} — no new session directory appeared under the workspace bucket`,
         );
       }
-      writeKimiSessionId(tmuxSession, sessionId);
+      recordKimiSessionCapture(tmuxSession, sessionId, cwd);
     }
   };
 

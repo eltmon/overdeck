@@ -51,6 +51,7 @@ import {
 } from './kimi-context-envelope.js';
 export { findKimiWirePathAsync, findLatestKimiSessionAsync, kimiSessionsRoot, kimiWorkDirKey } from './kimi-context-envelope.js';
 import { parseKimiSessionSync } from '../cost-parsers/kimi-parser.js';
+import { appendSessionIdToHistory } from '../session-history.js';
 import { getOverdeckHome } from '../paths.js';
 import { isPidDead } from '../pan-dir/fs-lock.js';
 import { getRuntimeBehavior } from './behavior.js';
@@ -213,6 +214,21 @@ export async function waitForNewKimiSessionAsync(
 /** Persist the captured session id to `<overdeckHome>/agents/<id>/kimi-session-id` (mirrors codex's thread-id file). */
 export function writeKimiSessionId(agentId: string, sessionId: string, overdeckHome: string = getOverdeckHome()): void {
   writeFileSync(join(overdeckHome, 'agents', agentId, 'kimi-session-id'), sessionId, 'utf-8');
+}
+
+/** Persist the captured session id and record its wire.jsonl path in the session index. */
+export function recordKimiSessionCapture(
+  agentId: string,
+  sessionId: string,
+  workspace: string,
+  opts: { kimiHome?: string; overdeckHome?: string } = {},
+): void {
+  const kimiHome = opts.kimiHome ?? join(homedir(), '.kimi-code');
+  writeKimiSessionId(agentId, sessionId, opts.overdeckHome);
+  appendSessionIdToHistory(agentId, sessionId, 'capture', {
+    harness: 'kimi-code',
+    path: join(kimiSessionsRoot(kimiHome, workspace), sessionId, 'agents', 'main', 'wire.jsonl'),
+  });
 }
 
 /**
@@ -397,7 +413,7 @@ export async function launchAndCaptureManagedKimiSession(options: {
   return withKimiSessionCaptureLock(kimiHome, options.workspace, async () => {
     if (options.resumeSessionId) {
       await options.launch();
-      writeKimiSessionId(options.agentId, options.resumeSessionId, options.overdeckHome);
+      recordKimiSessionCapture(options.agentId, options.resumeSessionId, options.workspace, options);
       return options.resumeSessionId;
     }
 
@@ -414,7 +430,7 @@ export async function launchAndCaptureManagedKimiSession(options: {
       options.timeoutMs,
     );
     if (!sessionId) throw new KimiCodeSpawnTimeout(options.agentId);
-    writeKimiSessionId(options.agentId, sessionId, options.overdeckHome);
+    recordKimiSessionCapture(options.agentId, sessionId, options.workspace, options);
     return sessionId;
   }, options.overdeckHome);
 }
@@ -712,7 +728,12 @@ export class KimiCodeRuntimeSync implements AgentRuntimeSync {
   }
 
   private writeSessionId(agentId: string, sessionId: string): void {
-    writeKimiSessionId(agentId, sessionId, this.home());
+    const workspace = this.workspaceFor(agentId);
+    if (!workspace) {
+      writeKimiSessionId(agentId, sessionId, this.home());
+      return;
+    }
+    recordKimiSessionCapture(agentId, sessionId, workspace, { kimiHome: this.kimiHome(), overdeckHome: this.home() });
   }
 
   /**
