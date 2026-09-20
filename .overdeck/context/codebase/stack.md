@@ -30,9 +30,10 @@
   (`tmux -L overdeck`); per-agent state under `~/.overdeck/agents/`;
   harnesses: claude-code, pi, and codex with persistent transports.
 - **Issue tracking:** GitHub Issues (`PAN-<n>` = `#<n>` on eltmon/overdeck);
-  xBRIEF v0.8 specs and task state live on `overdeck-state` and are exposed through `pan task`.
+  xBRIEF v0.8 specs live under `.pan/specs/` and item state under `.pan/continues/` in the
+  project repo (feature branch), exposed through `pan task`; `overdeck-state` is archived.
 - **Config:** YAML at `~/.overdeck/` (settings, projects.yaml), normalized by
   `src/lib/config-yaml.ts`; Mintlify docs in `configuration/*.mdx` +
   `reference/*.mdx`.
 
-<!-- last-verified: 2026-08-06 -->
+<!-- last-verified: 2026-09-19 -->

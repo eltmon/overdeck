@@ -41,7 +41,7 @@ describe('role definitions', () => {
     expect(body).toContain('Files never move between directories');
   });
 
-  it('defines the work role with Jidoka inspection gates and no phase labels', () => {
+  it('defines the work role with the push-before-done item loop and no phase labels', () => {
     const { frontmatter, body } = splitFrontmatter(readRepoFile('roles/work.md'));
 
     expect(frontmatter).toMatchObject({
@@ -51,12 +51,12 @@ describe('role definitions', () => {
     });
     expect(frontmatter.model).toBeUndefined();
     expect(body).toContain('## Per-Task Workflow');
-    expect(body).toContain('metadata.requiresInspection === true');
-    expect(body).toContain('inspectionDepth: "deep"');
-    expect(body).toContain('pan inspect <ISSUE-ID> --item <item-id>');
-    expect(body).toContain('--deep');
-    expect(body).toContain("resolveModel('work', 'inspect')");
-    expect(body).toContain("resolveModel('work', 'inspect-deep')");
+    expect(body).toContain('Item: <item-id>');
+    expect(body).toContain('git push -u origin');
+    expect(body).toContain('pan task done <ISSUE-ID> <item-id>');
+    expect(body).not.toContain('pan inspect');
+    expect(body).not.toContain('--reason');
+    expect(body).not.toContain('Jidoka');
     expect(body).toContain('one undifferentiated mode');
     expect(body).toContain('Never approve, deny, dismiss, or answer permission prompts');
     expect(body).toContain('tmux send-keys');

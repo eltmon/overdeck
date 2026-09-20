@@ -4,17 +4,17 @@
     "created": "2026-09-19T11:46:23.327Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3927: pan inspect residue: lint-prompts.sh requires the deleted verb in the work-agent item loop",
-    "updated": "2026-09-19T11:48:58.072Z"
+    "updated": "2026-09-19T13:27:09.460Z"
   },
   "plan": {
     "id": "pan-3927",
     "title": "pan inspect residue: lint-prompts.sh requires the deleted verb in the work-agent item loop",
-    "status": "proposed",
+    "status": "running",
     "uid": "6e2d1080-1a37-4fc2-9b29-0b148a9a2dc5",
     "author": "agent:claude-fable-5-1",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-19T11:46:23.327Z",
-    "updated": "2026-09-19T11:48:58.072Z",
+    "updated": "2026-09-19T13:27:09.460Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3927",

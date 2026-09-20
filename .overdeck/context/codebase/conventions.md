@@ -33,16 +33,18 @@
 - Inline SVG icons use `currentColor` + a color map (see
   `components/chat/ProviderIcons.tsx` for the existing pattern).
 
-## Planning artifacts (xBRIEF v0.8, PAN-1124)
-- PRD drafts: `${OVERDECK_HOME}/state/<project>/drafts/<issue>.md` (human-mutable narrative).
-- Spec: `${OVERDECK_HOME}/state/<project>/specs/<date>-<ISSUE>-<slug>.xbrief.json` — immutable after planning except `plan.status` via `updateSpecStatus()`.
-- Project continue state: `${OVERDECK_HOME}/state/<project>/continues/<issue>.xbrief.json`.
-- Workspace continue state: `<workspace>/.overdeck/continue.json` (gitignored); item status changes go to its `statusOverrides`, never the spec.
-- `pan task` reads and updates the xBRIEF item checklist through the canonical state door.
+## Planning artifacts (xBRIEF v0.8; post-PAN-3917 cut)
+- Live in the project repo (or the configured plan-home repo), committed on the feature branch — the `overdeck-state` branch is archived and no longer read or written.
+- PRD drafts: `.pan/drafts/<issue>.md` (human-mutable narrative).
+- Spec: `.pan/specs/<date>-<ISSUE>-<slug>.xbrief.json` — immutable after planning except `plan.status`.
+- Item status: `.pan/continues/<issue>.xbrief.json`, written only by `pan task claim|done`; `pan task done` requires a pushed commit carrying the body trailer `Item: <item-id>` and accepts no `--reason` flag.
+- Workspace continue context: `<workspace>/.overdeck/continue.json` (decisions, hazards, resumePoint from planning; gitignored).
+- Per-item inspection (`pan inspect`) is gone; `metadata.requiresInspection` is only a tier-supervisor subscription signal.
+- Prompt lint: `scripts/lint-prompts.sh` (in `npm run lint`) pins strings in `roles/*.md` and `src/lib/cloister/prompts/*.md`; its `--self-test` is manual. Any `roles/*.md` change needs a `Prompt-Change:` commit-body line (`scripts/check-prompt-change-trailer.sh`).
 
 ## Testing
 - Vitest, unit tests under `tests/unit/**` mirroring `src/`, plus co-located
   `__tests__/` in some lib dirs (e.g. `src/lib/cloister/__tests__/`).
 - Frontend tests co-located under `components/**/__tests__/`.
 
-<!-- last-verified: 2026-06-12 -->
+<!-- last-verified: 2026-09-19 -->
