@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3950",
   "created": "2026-09-20T13:53:05.511Z",
-  "updated": "2026-09-20T14:51:55.994Z",
+  "updated": "2026-09-20T14:52:06.112Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -96,6 +96,10 @@
     "w9-pi-tiebreak-test.ac1": {
       "status": "completed",
       "doneAt": "2026-09-20T14:51:55.994Z"
+    },
+    "w9-pi-tiebreak-test.ac2": {
+      "status": "completed",
+      "doneAt": "2026-09-20T14:52:06.112Z"
     }
   }
 }
