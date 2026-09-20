@@ -4,10 +4,7 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 
 import { isConversationDirectory } from '../agent-directory-cleanup.js';
-import { RETAINED_TRANSCRIPTS_MARKER } from '../agents/state-dir-removal.js';
-import { listAgentStatesSync } from '../agents/agent-state.js';
 import { listArchivedConversations, listConversations } from '../overdeck/conversations.js';
-import { getPrFacts } from './pr-facts.js';
 import { AGENTS_DIR } from '../paths.js';
 import { listSessionNames } from '../tmux.js';
 
@@ -17,37 +14,13 @@ interface TranscriptRetentionConversation {
   archivedAt: string | null;
 }
 
-export interface TranscriptRetentionAgent {
-  id: string;
-  issueId: string;
-  status: string;
-  workspace?: string | null;
-  paused?: boolean | null;
-  troubled?: boolean | null;
-  stoppedByUser?: boolean | null;
-}
-
-/**
- * PAN-3917: an agent's transcripts age out once its work has landed. "Landed"
- * used to be a `closedOut` flag on the issue record; it is now the forge saying
- * the pull request merged.
- */
-export async function isTranscriptRetentionTerminalAgent(
-  agent: TranscriptRetentionAgent,
-  readPrFacts: (issueId: string) => Promise<{ merged: boolean }> = getPrFacts,
-): Promise<boolean> {
-  if (agent.status !== 'stopped' || !agent.workspace) return false;
-  return (await readPrFacts(agent.issueId)).merged;
-}
-
 export interface TranscriptRetentionDeps {
   readDir(path: string): Promise<Dirent[]>;
   stat(path: string): Promise<Stats>;
   removeFile(path: string): Promise<void>;
   removeDir(path: string): Promise<void>;
+  removeTree(path: string): Promise<void>;
   listSessionNames(): Promise<readonly string[]>;
-  listAgents(): readonly TranscriptRetentionAgent[];
-  isTerminalAgent(agent: TranscriptRetentionAgent): Promise<boolean>;
   listConversations(): readonly TranscriptRetentionConversation[];
   listArchivedConversations(): readonly TranscriptRetentionConversation[];
   now(): number;
@@ -65,9 +38,8 @@ const defaultDeps: TranscriptRetentionDeps = {
   stat,
   removeFile: async (path) => { await rm(path, { force: true }); },
   removeDir: rmdir,
+  removeTree: async (path) => { await rm(path, { recursive: true, force: true }); },
   listSessionNames: () => Effect.runPromise(listSessionNames()),
-  listAgents: listAgentStatesSync,
-  isTerminalAgent: isTranscriptRetentionTerminalAgent,
   listConversations,
   listArchivedConversations,
   now: () => Date.now(),
@@ -87,29 +59,6 @@ function conversationEligibility(deps: TranscriptRetentionDeps): Map<string, boo
     }
     for (const conversation of deps.listArchivedConversations()) {
       if (!eligible.has(conversation.name)) eligible.set(conversation.name, true);
-    }
-    return eligible;
-  } catch {
-    return null;
-  }
-}
-
-async function agentEligibility(deps: TranscriptRetentionDeps): Promise<Map<string, boolean> | null> {
-  try {
-    const eligible = new Map<string, boolean>();
-    const terminalByIssue = new Map<string, boolean>();
-    for (const agent of deps.listAgents()) {
-      if (agent.status !== 'stopped' || !agent.workspace) {
-        eligible.set(agent.id, false);
-        continue;
-      }
-      const issueKey = `${agent.workspace}\0${agent.issueId}`;
-      let terminal = terminalByIssue.get(issueKey);
-      if (terminal === undefined) {
-        terminal = await deps.isTerminalAgent(agent);
-        terminalByIssue.set(issueKey, terminal);
-      }
-      eligible.set(agent.id, terminal);
     }
     return eligible;
   } catch {
@@ -175,6 +124,61 @@ async function pruneTranscriptFiles(
   return { deletedFiles, prunedDirs, remainingTranscripts, removedDir };
 }
 
+async function collectJsonlFiles(
+  dirPath: string,
+  deps: TranscriptRetentionDeps,
+  files: string[],
+): Promise<void> {
+  let entries: Dirent[];
+  try {
+    entries = await deps.readDir(dirPath);
+  } catch (error) {
+    if (hasErrorCode(error, 'ENOENT')) return;
+    throw error;
+  }
+  for (const entry of entries) {
+    const entryPath = join(dirPath, entry.name);
+    if (entry.isDirectory()) await collectJsonlFiles(entryPath, deps, files);
+    else if (entry.isFile() && entry.name.endsWith('.jsonl')) files.push(entryPath);
+  }
+}
+
+async function agentRetentionArtifacts(
+  agentDir: string,
+  deps: TranscriptRetentionDeps,
+): Promise<{ newestMtimeMs: number; rollouts: string[] } | null> {
+  let entries: Dirent[];
+  try {
+    entries = await deps.readDir(agentDir);
+  } catch (error) {
+    if (hasErrorCode(error, 'ENOENT')) return null;
+    throw error;
+  }
+
+  const rollouts: string[] = [];
+  const candidates: string[] = [];
+  for (const entry of entries) {
+    if (entry.isFile() && entry.name === 'activity.jsonl') {
+      candidates.push(join(agentDir, entry.name));
+    } else if (entry.isDirectory() && entry.name.startsWith('codex-home')) {
+      await collectJsonlFiles(join(agentDir, entry.name, 'sessions'), deps, rollouts);
+    }
+  }
+  candidates.push(...rollouts);
+  if (candidates.length === 0) return null;
+
+  const mtimes = await Promise.all(candidates.map(async (path) => {
+    try {
+      return (await deps.stat(path)).mtimeMs;
+    } catch (error) {
+      if (hasErrorCode(error, 'ENOENT')) return Number.NEGATIVE_INFINITY;
+      throw error;
+    }
+  }));
+  const newestMtimeMs = Math.max(...mtimes);
+  return Number.isFinite(newestMtimeMs) ? { newestMtimeMs, rollouts } : null;
+}
+
 /**
  * Delete explicitly expired transcript artifacts from ended agent state dirs.
  * Unset, non-finite, zero, or negative retention never traverses the filesystem.
@@ -209,8 +213,6 @@ export async function sweepTranscriptRetention(
   const cutoffMs = deps.now() - transcriptDays * 24 * 60 * 60 * 1000;
   let conversationEligibilityMap: Map<string, boolean> | null = null;
   let conversationEligibilityLoaded = false;
-  let agentEligibilityMap: Map<string, boolean> | null = null;
-  let agentEligibilityLoaded = false;
   let eligibleDirs = 0;
   let deletedFiles = 0;
   let prunedDirs = 0;
@@ -228,16 +230,15 @@ export async function sweepTranscriptRetention(
       const conversationName = entry.name.slice('conv-'.length);
       if (conversationEligibilityMap.get(conversationName) !== true) continue;
     } else {
-      // NFR-4: a transcript is deleted only when the sweep can SAY the work
-      // landed — the agent is stopped and the forge reports its PR merged.
-      // An agent the listing cannot vouch for (a retired dir whose state.json
-      // is gone, an unreadable listing, a forge read that failed) is skipped,
-      // never deleted: the retention gate fails closed.
-      if (!agentEligibilityLoaded) {
-        agentEligibilityMap = await agentEligibility(deps);
-        agentEligibilityLoaded = true;
-      }
-      if (agentEligibilityMap === null || agentEligibilityMap.get(entry.name) !== true) continue;
+      const agentDir = join(agentsDir, entry.name);
+      const artifacts = await agentRetentionArtifacts(agentDir, deps);
+      if (!artifacts || artifacts.newestMtimeMs >= cutoffMs) continue;
+      eligibleDirs++;
+      for (const rollout of artifacts.rollouts) await deps.removeFile(rollout);
+      deletedFiles += artifacts.rollouts.length;
+      await deps.removeTree(agentDir);
+      prunedDirs++;
+      continue;
     }
 
     eligibleDirs++;
@@ -246,19 +247,6 @@ export async function sweepTranscriptRetention(
     deletedFiles += result.deletedFiles;
     prunedDirs += result.prunedDirs;
 
-    if (!conversation && result.remainingTranscripts === 0) {
-      if (!result.removedDir) {
-        await deps.removeFile(join(agentDir, RETAINED_TRANSCRIPTS_MARKER));
-        try {
-          await deps.removeDir(agentDir);
-          prunedDirs++;
-        } catch (error) {
-          if (!hasErrorCode(error, 'ENOENT')
-            && !hasErrorCode(error, 'ENOTEMPTY')
-            && !hasErrorCode(error, 'EEXIST')) throw error;
-        }
-      }
-    }
   }
 
   const fileLabel = `transcript file${deletedFiles === 1 ? '' : 's'}`;
