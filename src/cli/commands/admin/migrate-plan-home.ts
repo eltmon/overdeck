@@ -15,11 +15,14 @@ import { loadConfigSync } from '../../../lib/config.js';
 import { getIssuePrefix, getProjectSync, type ProjectConfig } from '../../../lib/projects.js';
 import { createTracker } from '../../../lib/tracker/factory.js';
 import type { Issue, TrackerType } from '../../../lib/tracker/interface.js';
+import { issueIdFromTrackerIssue } from '../../../lib/tracker/issue-id.js';
 import {
   migratePanHome,
   readOpenIssuesFile,
   resolveMigrationTargets,
 } from '../../../lib/pan-dir/migrate-plan-home.js';
+
+export { issueIdFromTrackerIssue };
 
 export interface MigratePlanHomeCliOptions {
   commit?: boolean;
@@ -37,22 +40,6 @@ function resolveProjectTrackerType(project: ProjectConfig): TrackerType {
   if (getIssuePrefix(project)) return 'linear';
   if (project.gitlab_repo) return 'gitlab';
   throw new Error(`Cannot resolve tracker for ${project.name}`);
-}
-
-/**
- * The `${issuePrefix}-<n>` id for one tracker issue.
- *
- * GitHub's `ref` is a bare `#<number>` (no team/prefix concept at the
- * tracker layer — Overdeck's own `issue_prefix` convention, e.g.
- * `PAN-<n>` == `eltmon/overdeck#<n>`, is layered on top), so it is combined
- * with `issuePrefix` here. Linear/GitLab/Rally already return a prefixed
- * identifier (e.g. `MIN-902`) as `ref`.
- */
-export function issueIdFromTrackerIssue(issue: Issue, trackerType: TrackerType, issuePrefix: string): string {
-  if (trackerType === 'github') {
-    return `${issuePrefix.toUpperCase()}-${issue.ref.replace(/^#/, '')}`;
-  }
-  return issue.ref.toUpperCase();
 }
 
 /**

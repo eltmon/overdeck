@@ -4,17 +4,17 @@
     "created": "2026-09-19T11:39:14Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3924: pipeline-membership: intermittent gh graphql failure surfaces as a toast; capture stderr, retry once; listProjectTrackerIssues is blind to GitHub-tracked projects",
-    "updated": "2026-09-19T11:51:11.465Z"
+    "updated": "2026-09-19T13:26:04.461Z"
   },
   "plan": {
     "id": "pan-3924",
     "title": "pipeline-membership: intermittent gh graphql failure surfaces as a toast; capture stderr, retry once; listProjectTrackerIssues is blind to GitHub-tracked projects",
-    "status": "proposed",
+    "status": "running",
     "uid": "6c6fcf84-54a2-4374-b5b3-8e5c4b7053c2",
     "author": "agent:claude-fable-5-1",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-19T11:39:14Z",
-    "updated": "2026-09-19T11:51:11.465Z",
+    "updated": "2026-09-19T13:26:04.461Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3924",
