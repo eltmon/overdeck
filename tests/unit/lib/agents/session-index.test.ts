@@ -13,6 +13,7 @@ import { encodeClaudeProjectDir } from '../../../../src/lib/paths.js';
 import {
   appendSessionIdToHistory,
   readSessionIndexSync,
+  readSessionIndexWithLegacySync,
 } from '../../../../src/lib/session-history.js';
 
 let root: string;
@@ -61,6 +62,9 @@ describe('sessions.json index', () => {
     writeFileSync(legacyPath, 'legacy-session\n');
 
     expect(getLatestSessionIdSync('agent-pan-3950')).toBe('legacy-session');
+    expect(readSessionIndexWithLegacySync('agent-pan-3950')).toEqual([
+      { sessionId: 'legacy-session', at: '', source: 'legacy-pointer' },
+    ]);
     expect(readFileSync(legacyPath, 'utf8')).toBe('legacy-session\n');
     expect(existsSync(join(agentDir, 'sessions.json'))).toBe(false);
   });

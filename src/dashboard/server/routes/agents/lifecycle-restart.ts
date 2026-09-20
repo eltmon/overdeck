@@ -740,8 +740,11 @@ export const postAgentResetSessionRoute = HttpRouter.add(
 
     const agentDir = getAgentDir(id);
 
-    // Clear sessions.json
-    yield* Effect.promise(() => rm(join(agentDir, 'sessions.json'), { force: true })); // PAN-3357: not a dir removal
+    // Clear the durable index and its read-only compatibility fallback.
+    yield* Effect.promise(() => Promise.all([
+      rm(join(agentDir, 'sessions.json'), { force: true }), // PAN-3357: not a dir removal
+      rm(join(agentDir, 'session.id'), { force: true }),
+    ]));
 
     // Clear claudeSessionId from runtime.json (preserve other fields).
     // Must read/write directly — saveAgentRuntimeState merges with existing file.

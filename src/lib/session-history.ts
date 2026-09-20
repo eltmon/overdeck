@@ -102,6 +102,14 @@ export function readSessionIndexSync(agentId: string): SessionIndexEntry[] {
   }
 }
 
+/** Read the durable index, treating a legacy pointer as one entry only when no index exists. */
+export function readSessionIndexWithLegacySync(agentId: string): SessionIndexEntry[] {
+  const file = join(getOverdeckHome(), 'agents', agentId, 'sessions.json');
+  if (existsSync(file)) return readSessionIndexSync(agentId);
+  const sessionId = readLegacySessionIdSync(agentId);
+  return sessionId ? [{ sessionId, at: '', source: 'legacy-pointer' }] : [];
+}
+
 export function readSessionIdHistorySync(agentId: string): string[] {
   return readSessionIndexSync(agentId).map((entry) => entry.sessionId);
 }
@@ -117,10 +125,7 @@ export function readLegacySessionIdSync(agentId: string): string | null {
 }
 
 export function readLatestIndexedSessionIdSync(agentId: string): string | null {
-  const file = join(getOverdeckHome(), 'agents', agentId, 'sessions.json');
-  const entries = readSessionIndexSync(agentId);
-  if (entries.length > 0) return entries.at(-1)?.sessionId ?? null;
-  return existsSync(file) ? null : readLegacySessionIdSync(agentId);
+  return readSessionIndexWithLegacySync(agentId).at(-1)?.sessionId ?? null;
 }
 
 export function appendSessionIdToHistory(

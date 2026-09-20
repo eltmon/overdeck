@@ -32,6 +32,7 @@ import type { IssueId } from '../overdeck/issues.js';
 import { classifySessionBucket, type ConversationSessionLookup } from './attribution.js';
 import type { CostEvent } from './events.js';
 import { lookupSkipVerdict, recordSkipVerdict } from './skip-cache.js';
+import { readSessionIndexWithLegacySync } from '../session-history.js';
 
 // ============== Types ==============
 
@@ -55,7 +56,7 @@ export type PiCollectResult = {
 };
 export type PiCollectBatch = Pick<PiCollectResult, 'events' | 'verdicts'>;
 
-interface SessionMapping {
+export interface SessionMapping {
   agentId: string;
   issueId: string | null;
   sessionType: string;  // planning, implementation, review, test, merge
@@ -163,7 +164,7 @@ function decodeClaudeDirName(dirName: string): string {
  * 1. sessions.json files in agent directories (authoritative — written by heartbeat hook)
  * 2. Agent state.json for issue/workspace context
  */
-function buildSessionIndex(): Map<string, SessionMapping> {
+export function buildSessionIndex(): Map<string, SessionMapping> {
   const index = new Map<string, SessionMapping>();
   const agentsDir = getAgentsDir();
 
@@ -179,22 +180,7 @@ function buildSessionIndex(): Map<string, SessionMapping> {
   for (const agentDir of entries) {
     const agentPath = join(agentsDir, agentDir);
 
-    // Read sessions.json for the session UUID list
-    const sessionsFile = join(agentPath, 'sessions.json');
-    let sessionIds: string[] = [];
-    if (existsSync(sessionsFile)) {
-      try {
-        const parsed: unknown = JSON.parse(readFileSync(sessionsFile, 'utf-8'));
-        if (Array.isArray(parsed)) {
-          sessionIds = parsed.flatMap((value): string[] => {
-            if (typeof value === 'string') return value.trim() ? [value.trim()] : [];
-            if (!value || typeof value !== 'object') return [];
-            const sessionId = (value as { sessionId?: unknown }).sessionId;
-            return typeof sessionId === 'string' && sessionId.trim() ? [sessionId.trim()] : [];
-          });
-        }
-      } catch { /* skip */ }
-    }
+    const sessionIds = readSessionIndexWithLegacySync(agentDir).map((entry) => entry.sessionId);
 
     // Read state.json for issue/workspace context and role.
     const stateFile = join(agentPath, 'state.json');
