@@ -783,10 +783,7 @@ describe('CommandPalette conversations scope chip (PAN-3705)', () => {
 
     renderCommandPalette();
     fireEvent.click(screen.getByRole('button', { name: 'Conversations' }));
-    // Query text matches the fixture issue, so the Issues chip stays available
-    // alongside the pinned Conversations chip while the search is in flight —
-    // otherwise the chip row briefly collapses to one entry and resets to All.
-    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'Alpha' } });
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'zzzz-no-local-match' } });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(120);
     });
@@ -809,15 +806,13 @@ describe('CommandPalette conversations scope chip (PAN-3705)', () => {
 
     renderCommandPalette();
     fireEvent.click(screen.getByRole('button', { name: 'Conversations' }));
-    // Matches the fixture issue so the chip row (Issues + Conversations)
-    // survives the reset effect while the failed search settles.
-    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'Alpha' } });
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'zzzz-no-local-match' } });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(120);
     });
 
     // The Conversations scope excludes the (non-conversation) issue match too.
-    expect(screen.getByText('No results for "Alpha"')).toBeInTheDocument();
+    expect(screen.getByText('No results for "zzzz-no-local-match"')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Conversations' }).className).toMatch(/text-primary/);
   });
 });
