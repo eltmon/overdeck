@@ -892,8 +892,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     for (const action of filtered) for (const s of action.alsoScopes ?? []) present.add(s);
     for (const s of PINNED_SCOPES) present.add(s);
     const ordered = (['actions', 'commands', 'workspaces', 'issues', 'conversations', 'memory'] as const).filter((s) => present.has(s));
-    const hasPinnedScope = PINNED_SCOPES.some((s) => present.has(s));
-    return ordered.length > 1 || hasPinnedScope ? ['all', ...ordered] : [];
+    return ordered.length > 1 || PINNED_SCOPES.some((s) => present.has(s)) ? ['all', ...ordered] : [];
   }, [groupOrder, filtered]);
 
   // If the active scope drops out of the results (e.g. the query changed), reset.
