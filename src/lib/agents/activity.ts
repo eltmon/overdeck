@@ -2,11 +2,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } fr
 import { join } from 'path';
 import { homedir } from 'os';
 import { Effect } from 'effect';
-import {
-  getAgentDir,
-  getAgentStateSync,
-  getAgentRuntimeStateSync,
-} from '../agents.js';
+import { getAgentDir, getAgentStateSync } from './agent-state.js';
+import { getAgentRuntimeStateSync } from './runtime-state.js';
 import { encodeClaudeProjectDir } from '../paths.js';
 import { findLatestRollout, extractThreadIdFromRollout } from '../runtimes/codex.js';
 import { resolveLatestOhmypiSessionId } from '../runtimes/ohmypi.js';
@@ -104,8 +101,6 @@ export function getSessionId(agentId: string): string | null {
  */
 function resolveCodexThreadIdSync(agentId: string): string | null {
   const agentDir = getAgentDir(agentId);
-  const codexHome = join(agentDir, 'codex-home');
-  if (!existsSync(codexHome)) return null; // not a codex agent
   try {
     const threadIdPath = join(agentDir, 'codex-thread-id');
     if (existsSync(threadIdPath)) {
@@ -113,6 +108,8 @@ function resolveCodexThreadIdSync(agentId: string): string | null {
       if (id) return id;
     }
   } catch { /* non-fatal */ }
+  const codexHome = join(agentDir, 'codex-home');
+  if (!existsSync(codexHome)) return null;
   try {
     const rollout = findLatestRollout(codexHome);
     if (rollout) {
@@ -186,23 +183,22 @@ export function resolveClaudeSessionRecoverySync(
 
 export function resolveLatestSessionIdSync(
   agentId: string,
-  recoveryDeps?: ClaudeSessionRecoveryDeps,
+  recoveryDeps?: Partial<ClaudeSessionRecoveryDeps>,
 ): SessionResolutionResult {
-  const isSessionReset = recoveryDeps?.isSessionReset ?? isSessionResetMarker;
-  if (isSessionReset(agentId)) {
+  const deps = { ...defaultClaudeSessionRecoveryDeps(), ...recoveryDeps };
+  if ((deps.isSessionReset ?? isSessionResetMarker)(agentId)) {
     return { sessionId: null, checked: ['session reset marker'] };
   }
 
-  const checked: string[] = ['Codex rollout/thread id'];
-  // 0. Codex thread id first: the freshest rollout is the resume truth.
-  const codexThreadId = resolveCodexThreadIdSync(agentId);
-  if (codexThreadId) return { sessionId: codexThreadId, checked };
+  const agentState = deps.getAgentState?.(agentId) ?? getAgentStateSync(agentId);
+  const sessionIdSource = getHarnessBehavior(agentState?.harness).sessionIdSource;
+  const checked: string[] = [];
 
-  // 1. ACP session id — the host writes the provider's durable session/load id.
-  const agentState = recoveryDeps?.getAgentState?.(agentId) ?? getAgentStateSync(agentId);
-  const sessionIdSource = agentState?.harness
-    ? getHarnessBehavior(agentState.harness).sessionIdSource
-    : undefined;
+  if (agentState?.harness === 'codex') {
+    checked.push('Codex rollout/thread id');
+    return { sessionId: resolveCodexThreadIdSync(agentId), checked };
+  }
+
   if (sessionIdSource === 'acp-session-id') {
     checked.push('ACP session id');
     try {
@@ -211,30 +207,7 @@ export function resolveLatestSessionIdSync(
     } catch { /* non-fatal */ }
   }
 
-  // 2. sessions.json (append-only; its last entry is the current session).
-  checked.push('sessions.json');
-  const indexed = getSessionId(agentId);
-  if (indexed) return { sessionId: indexed, checked };
-
-  // 3. runtime.json claudeSessionId
-  checked.push('runtime.json');
-  const runtimeState = getAgentRuntimeStateSync(agentId);
-  if (runtimeState?.claudeSessionId) {
-    return { sessionId: runtimeState.claudeSessionId, checked };
-  }
-
-  // 4. codex-thread-id (written after codex rollout appears; fallback so
-  //    resumeAgent can locate the Codex session after startup capture).
-  checked.push('codex-thread-id');
-  const codexThreadIdPath = join(getAgentDir(agentId), 'codex-thread-id');
-  try {
-    if (existsSync(codexThreadIdPath)) {
-      const threadId = readFileSync(codexThreadIdPath, 'utf-8').trim();
-      if (threadId) return { sessionId: threadId, checked };
-    }
-  } catch { /* non-fatal */ }
-
-  // 5. ohmypi (omp) — PAN-2098. The real id also lives inside
+  // OhMyPi's resumable id lives inside its freshest session JSONL.
   //    the freshest session JSONL. Mirror the ohmypi runtime adapter's own resume
   //    resolution so the deacon recovery path can resume a crashed ohmypi agent
   //    instead of only respawning it fresh and losing context.
@@ -242,9 +215,11 @@ export function resolveLatestSessionIdSync(
     checked.push('OhMyPi transcript session');
     const ohmypiSessionId = resolveLatestOhmypiSessionId(agentId);
     if (ohmypiSessionId) return { sessionId: ohmypiSessionId, checked };
+    checked.push(join(getAgentDir(agentId), 'sessions.json'));
+    return { sessionId: getSessionId(agentId), checked };
   }
 
-  // 6. kimi-code — the id is captured post-launch from its own wire.jsonl
+  // Kimi's id is captured post-launch from its own wire.jsonl
   //    session directory and persisted to `<agentDir>/kimi-session-id`
   //    (writeKimiSessionId, mirrors codex's thread-id file above).
   if (sessionIdSource === 'kimi-session-newest') {
@@ -255,19 +230,46 @@ export function resolveLatestSessionIdSync(
     } catch { /* non-fatal */ }
   }
 
-  if (agentState?.harness && sessionIdSource !== 'launcher-session-id') {
+  if (sessionIdSource !== 'launcher-session-id') {
     return { sessionId: null, checked };
   }
-  const recovered = resolveClaudeSessionRecoverySync(agentId, agentState, recoveryDeps);
+
+  const agentDir = getAgentDir(agentId);
+  const indexPath = join(agentDir, 'sessions.json');
+  checked.push(indexPath, join(agentDir, 'session.id'));
+  const indexed = getSessionId(agentId);
+  if (indexed) return { sessionId: indexed, checked };
+  // An existing index is authoritative even when empty or malformed. Mutable
+  // launcher/runtime/state pointers are compatibility fallbacks only when the
+  // index has never been created.
+  if (existsSync(indexPath)) return { sessionId: null, checked };
+
+  const launcherPath = join(agentDir, 'launcher.sh');
+  checked.push(launcherPath);
+  try {
+    const launcher = readFileSync(launcherPath, 'utf8');
+    const pinned = /--(?:session-id|resume)\s+['"]?([0-9a-fA-F-]{36})/.exec(launcher)?.[1];
+    if (pinned) return { sessionId: pinned, checked };
+  } catch { /* compatibility fallback only */ }
+
+  checked.push(join(agentDir, 'runtime.json'), join(agentDir, 'state.json'));
+  const runtimeSessionId = getAgentRuntimeStateSync(agentId)?.claudeSessionId;
+  if (runtimeSessionId) return { sessionId: runtimeSessionId, checked };
+  if (agentState?.sessionId) return { sessionId: agentState.sessionId, checked };
+
+  const recovered = resolveClaudeSessionRecoverySync(agentId, agentState, deps);
   return { sessionId: recovered.sessionId, checked: [...checked, ...recovered.checked] };
 }
 
-export function getLatestSessionIdSync(agentId: string): string | null {
-  return resolveLatestSessionIdSync(agentId).sessionId;
+export function getLatestSessionIdSync(
+  agentId: string,
+  recoveryDeps?: Partial<ClaudeSessionRecoveryDeps>,
+): string | null {
+  return resolveLatestSessionIdSync(agentId, recoveryDeps).sessionId;
 }
 
 export const getLatestSessionId = (
   agentId: string,
-  recoveryDeps?: ClaudeSessionRecoveryDeps,
+  recoveryDeps?: Partial<ClaudeSessionRecoveryDeps>,
 ): Effect.Effect<string | null> =>
   Effect.sync(() => resolveLatestSessionIdSync(agentId, recoveryDeps).sessionId);

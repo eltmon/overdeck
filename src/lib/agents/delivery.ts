@@ -18,7 +18,7 @@ import {
   waitForPromptReady,
   SESSION_EXITED_BEFORE_KICKOFF,
 } from '../agents.js';
-import { getAgentRuntimeState } from './runtime-state.js';
+import { getLatestSessionIdSync } from './activity.js';
 import { isPaneDead, sendKeys, sessionExists } from '../tmux.js';
 import { checkPrompt, senderFromEnv, tokensFromLaunchMetadata } from '../terminal-backends/prompt-guard.js';
 import { selectTerminalBackend } from '../terminal-backends/select.js';
@@ -888,14 +888,7 @@ export async function deliverInitialPromptWithRetry(
       return null;
     }
 
-    let sessionId = state.sessionId;
-    if (!sessionId) {
-      try {
-        sessionId = (await Effect.runPromise(getAgentRuntimeState(normalizedId)))?.claudeSessionId;
-      } catch {
-        sessionId = undefined;
-      }
-    }
+    const sessionId = getLatestSessionIdSync(normalizedId, { getAgentState: () => state }) ?? undefined;
     if (!sessionId) return null;
 
     return {

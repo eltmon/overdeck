@@ -43,7 +43,6 @@ vi.mock('../../services/acp-conversation-parser.js', () => ({
 
 vi.mock('../jsonl-resolver.js', () => ({
   resolveAgentHarness: vi.fn(() => Promise.resolve(null)),
-  readLauncherPinnedSessionId: vi.fn(() => Promise.resolve(null)),
   resolvePiSessionPath: vi.fn(() => Promise.resolve(null)),
   resolveCodexRolloutPath: vi.fn(() => Promise.resolve(null)),
   resolveAcpTranscriptPath: vi.fn(() => Promise.resolve(null)),
@@ -61,7 +60,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 // ─── Import after mocks ───────────────────────────────────────────────────────
 
 import { buildAgentConversationResult, buildConversationResponse } from '../agents.js';
-import { getAgentJsonlPath, getAgentWorkspace } from '../../../../lib/agent-enrichment.js';
+import { getAgentWorkspace } from '../../../../lib/agent-enrichment.js';
 import { parseEntireConversation } from '../../services/conversation-service.js';
 import { parsePiConversationMessages } from '../../services/pi-conversation-parser.js';
 import { parseOhmypiConversationMessages } from '../../services/ohmypi-conversation-parser.js';
@@ -69,15 +68,14 @@ import { parseCodexConversationMessages } from '../../services/codex-conversatio
 import { parseAcpConversationMessages } from '../../services/acp-conversation-parser.js';
 import {
   resolveAgentHarness,
-  readLauncherPinnedSessionId,
   resolvePiSessionPath,
   resolveCodexRolloutPath,
   resolveAcpTranscriptPath,
   listClaudeTranscriptPaths,
+  resolveJsonlPath,
 } from '../jsonl-resolver.js';
 import { access } from 'node:fs/promises';
 
-const mockGetAgentJsonlPath = vi.mocked(getAgentJsonlPath);
 const mockGetAgentWorkspace = vi.mocked(getAgentWorkspace);
 const mockParseEntireConversation = vi.mocked(parseEntireConversation);
 const mockParsePiConversationMessages = vi.mocked(parsePiConversationMessages);
@@ -85,11 +83,11 @@ const mockParseOhmypiConversationMessages = vi.mocked(parseOhmypiConversationMes
 const mockParseCodexConversationMessages = vi.mocked(parseCodexConversationMessages);
 const mockParseAcpConversationMessages = vi.mocked(parseAcpConversationMessages);
 const mockResolveAgentHarness = vi.mocked(resolveAgentHarness);
-const mockReadLauncherPinnedSessionId = vi.mocked(readLauncherPinnedSessionId);
 const mockResolvePiSessionPath = vi.mocked(resolvePiSessionPath);
 const mockResolveCodexRolloutPath = vi.mocked(resolveCodexRolloutPath);
 const mockResolveAcpTranscriptPath = vi.mocked(resolveAcpTranscriptPath);
 const mockListClaudeTranscriptPaths = vi.mocked(listClaudeTranscriptPaths);
+const mockResolveJsonlPath = vi.mocked(resolveJsonlPath);
 const mockAccess = vi.mocked(access);
 
 const EMPTY = { messages: [], workLog: [], streaming: false, totalCost: 0, byteOffset: 0 };
@@ -111,27 +109,15 @@ describe('buildConversationResponse', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockResolveAgentHarness.mockResolvedValue(null);
-    mockReadLauncherPinnedSessionId.mockResolvedValue(null);
     mockGetAgentWorkspace.mockReturnValue(Effect.succeed('/workspace/feature-pan-473'));
-    mockGetAgentJsonlPath.mockReturnValue(Effect.succeed(null));
+    mockResolveJsonlPath.mockResolvedValue(null);
     mockListClaudeTranscriptPaths.mockResolvedValue([]);
     mockAccess.mockResolvedValue(undefined);
   });
 
   // ── claude-code (default harness) ─────────────────────────────────────────
 
-  it('returns empty result when getAgentJsonlPath resolves null', async () => {
-    mockGetAgentJsonlPath.mockReturnValue(Effect.succeed(null));
-
-    const result = await buildConversationResponse('agent-PAN-473');
-
-    expect(result).toEqual(EMPTY);
-    expect(mockParseEntireConversation).not.toHaveBeenCalled();
-  });
-
-  it('returns empty result when the JSONL file does not exist on disk', async () => {
-    mockGetAgentJsonlPath.mockReturnValue(Effect.succeed('/some/path/session.jsonl'));
-    mockAccess.mockRejectedValue(new Error('ENOENT'));
+  it('returns empty result when the shared resolver returns null', async () => {
 
     const result = await buildConversationResponse('agent-PAN-473');
 
@@ -141,7 +127,7 @@ describe('buildConversationResponse', () => {
 
   it('parses messages and forces streaming: false when file exists', async () => {
     const jsonlPath = '/some/path/session.jsonl';
-    mockGetAgentJsonlPath.mockReturnValue(Effect.succeed(jsonlPath));
+    mockResolveJsonlPath.mockResolvedValue(jsonlPath);
     mockAccess.mockResolvedValue(undefined);
     mockParseEntireConversation.mockResolvedValue({
       messages: [{ role: 'user', content: 'hello' } as never],
@@ -159,7 +145,7 @@ describe('buildConversationResponse', () => {
 
   it('returns empty result and logs error when parseEntireConversation throws', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    mockGetAgentJsonlPath.mockReturnValue(Effect.succeed('/some/path/session.jsonl'));
+    mockResolveJsonlPath.mockResolvedValue('/some/path/session.jsonl');
     mockAccess.mockResolvedValue(undefined);
     mockParseEntireConversation.mockRejectedValue(new Error('corrupt JSONL'));
 
@@ -174,64 +160,26 @@ describe('buildConversationResponse', () => {
     consoleSpy.mockRestore();
   });
 
-  // ── launcher-pinned session ID (PAN-2011) ─────────────────────────────────
-
-  it('uses launcher-pinned session ID when available, bypassing mtime pick', async () => {
-    const pinnedId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
-    mockReadLauncherPinnedSessionId.mockResolvedValue(pinnedId);
-    mockAccess.mockImplementation((path) => String(path).includes(pinnedId)
-      ? Promise.resolve()
-      : Promise.reject(new Error('ENOENT')));
+  it('uses the path chosen by the shared session resolver', async () => {
+    const indexedPath = '/claude/projects/workspace/indexed.jsonl';
+    mockResolveJsonlPath.mockResolvedValue(indexedPath);
     mockParseEntireConversation.mockResolvedValue({
-      messages: [{ role: 'assistant', content: 'pinned session' } as never],
+      messages: [{ role: 'assistant', content: 'indexed session' } as never],
       ...PARSE_RESULT_BASE,
     });
 
     const result = await buildConversationResponse('agent-PAN-473');
 
-    expect(mockParseEntireConversation).toHaveBeenCalledWith(expect.stringContaining(pinnedId));
-    expect(mockGetAgentJsonlPath).not.toHaveBeenCalled();
+    expect(mockParseEntireConversation).toHaveBeenCalledWith(indexedPath);
     expect(result.messages).toHaveLength(1);
     expect(result.streaming).toBe(false);
-  });
-
-  it('falls back to mtime-based pick when launcher has no pinned ID', async () => {
-    const mtimePath = '/some/mtime/session.jsonl';
-    mockReadLauncherPinnedSessionId.mockResolvedValue(null);
-    mockGetAgentJsonlPath.mockReturnValue(Effect.succeed(mtimePath));
-    mockAccess.mockResolvedValue(undefined);
-    mockParseEntireConversation.mockResolvedValue({
-      messages: [],
-      ...PARSE_RESULT_BASE,
-    });
-
-    await buildConversationResponse('agent-PAN-473');
-
-    expect(mockGetAgentJsonlPath).toHaveBeenCalled();
-    expect(mockParseEntireConversation).toHaveBeenCalledWith(mtimePath);
-  });
-
-  it('falls back to mtime-based pick when pinned file does not exist on disk', async () => {
-    const pinnedId = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
-    const mtimePath = '/some/mtime/session.jsonl';
-    mockReadLauncherPinnedSessionId.mockResolvedValue(pinnedId);
-    // pinned path does not exist; mtime path does
-    mockAccess.mockImplementation((path) => path === mtimePath
-      ? Promise.resolve()
-      : Promise.reject(new Error('ENOENT')));
-    mockGetAgentJsonlPath.mockReturnValue(Effect.succeed(mtimePath));
-    mockParseEntireConversation.mockResolvedValue({ messages: [], ...PARSE_RESULT_BASE });
-
-    await buildConversationResponse('agent-PAN-473');
-
-    expect(mockGetAgentJsonlPath).toHaveBeenCalled();
-    expect(mockParseEntireConversation).toHaveBeenCalledWith(mtimePath);
   });
 
   it('resolves an older indexed transcript for a stopped agent when the newest is missing', async () => {
     const newer = '/claude/projects/workspace/newer.jsonl';
     const older = '/claude/projects/workspace/older.jsonl';
     mockListClaudeTranscriptPaths.mockResolvedValue([newer, older]);
+    mockResolveJsonlPath.mockResolvedValue(older);
     mockAccess.mockImplementation((path) => path === older
       ? Promise.resolve()
       : Promise.reject(new Error('ENOENT')));
@@ -257,7 +205,8 @@ describe('buildConversationResponse', () => {
     expect(result.status === 404 ? result.body.checked : []).toEqual(expect.arrayContaining([
       expect.stringContaining('sessions.json'),
       expect.stringContaining('session.id'),
-      expect.stringContaining('launcher.sh'),
+      expect.stringContaining('runtime.json'),
+      expect.stringContaining('state.json'),
     ]));
   });
 

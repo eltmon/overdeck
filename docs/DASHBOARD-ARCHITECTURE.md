@@ -164,8 +164,9 @@ door that does not exist; a real record read door would be a separate change.
   sidebar list. Favorites, pending-input state, and normal list navigation remain intact.
 - Issue Session tabs load agent transcripts through
   `GET /api/agents/:agentId/conversation`. For Claude agents, the route checks the
-  launcher-pinned session and then walks `sessions.json` from newest to oldest until
-  it finds an existing JSONL. A 404 names the agent and every path checked.
+  durable `sessions.json` index from newest to oldest until it finds an existing
+  JSONL. Legacy launcher/runtime/state pointers are eligible only when the index is
+  absent. A 404 names the agent and every path checked.
 - `GET /api/conversations/:name/messages` serves registered conversations only. It
   never scans agent directories or global session UUIDs to resolve an agent-backed row.
 - HTTP acceptance and transcript confirmation are distinct. A late echo does not prove

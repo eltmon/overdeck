@@ -110,7 +110,11 @@ export function resolveRecoveryResumeSessionId(agentId: string, harness: Runtime
     return path ? museSessionId(path) : undefined;
   }
   if (harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code' && harness !== 'opencode') return undefined;
-  return getLatestSessionIdSync(agentId) ?? undefined;
+  const state = getAgentStateSync(agentId);
+  const resolutionState = state
+    ? { ...state, harness }
+    : { id: agentId, harness } as AgentState;
+  return getLatestSessionIdSync(agentId, { getAgentState: () => resolutionState }) ?? undefined;
 }
 
 export async function restartAgent(

@@ -121,12 +121,12 @@ describe('resolveClaudeSessionId (PAN-830)', () => {
     expect(id).toBeNull();
   });
 
-  it('returns null on empty sessions.json array', async () => {
+  it('does not fall back to runtime state when sessions.json exists but is empty', async () => {
     await writeFile(join(agentsDir, AGENT_ID, 'sessions.json'), '[]');
 
     const id = await resolveClaudeSessionId(AGENT_ID, {
       agentsDirOverride: agentsDir,
-      getRuntimeStateAsync: async () => null,
+      getRuntimeStateAsync: async () => ({ claudeSessionId: 'runtime-must-not-win' }),
     });
 
     expect(id).toBeNull();
@@ -435,17 +435,17 @@ describe('resolveJsonlPath — ACP agents', () => {
     expect(path).toBe(transcriptPath);
   });
 
-  it('corrects a stale claude-code recording when only an ACP transcript exists', async () => {
-    const transcriptPath = await setupAcpAgent('claude-code');
+  it('does not infer ACP from retained artifacts when Claude is recorded', async () => {
+    await setupAcpAgent('claude-code');
 
     expect(await resolveAgentHarness(ACP_AGENT_ID, {
       agentsDirOverride: agentsDir,
       claudeProjectsDirOverride: claudeProjectsDir,
-    })).toBe('acp');
+    })).toBe('claude-code');
     expect(await resolveJsonlPath(ACP_AGENT_ID, WORKSPACE_PATH, {
       agentsDirOverride: agentsDir,
       claudeProjectsDirOverride: claudeProjectsDir,
-    })).toBe(transcriptPath);
+    })).toBeNull();
   });
 
   it('does not misclassify acp-session.jsonl as a Pi transcript', async () => {
@@ -522,19 +522,19 @@ describe('resolveJsonlPath — kimi-code agents (PAN-1837 wi8a)', () => {
     })).toBe('kimi-code');
   });
 
-  it('ac3: the stale-default correction identifies kimi-code from an on-disk wire.jsonl probe', async () => {
-    const wirePath = await setupKimiAgent({ harness: 'claude-code' });
+  it('ac3: does not infer kimi-code from retained artifacts when Claude is recorded', async () => {
+    await setupKimiAgent({ harness: 'claude-code' });
 
     expect(await resolveAgentHarness(KIMI_AGENT_ID, {
       agentsDirOverride: agentsDir,
       claudeProjectsDirOverride: claudeProjectsDir,
       kimiHomeOverride: kimiHomeDir,
-    })).toBe('kimi-code');
+    })).toBe('claude-code');
     expect(await resolveJsonlPath(KIMI_AGENT_ID, WORKSPACE_PATH, {
       agentsDirOverride: agentsDir,
       claudeProjectsDirOverride: claudeProjectsDir,
       kimiHomeOverride: kimiHomeDir,
-    })).toBe(wirePath);
+    })).toBeNull();
   });
 
   it('returns null when no session bucket exists for the workspace', async () => {
@@ -553,13 +553,7 @@ describe('resolveJsonlPath — kimi-code agents (PAN-1837 wi8a)', () => {
   });
 });
 
-describe('resolveAgentHarness — stale claude-code self-corrects to the live runtime', () => {
-  // Reproduces PAN-1832: a wipe-and-respawn changed the provider-default harness
-  // to codex, but state.json kept the pre-respawn 'claude-code'. The resolver took
-  // the claude-code branch, found no claudeSessionId, and the dashboard showed
-  // "No conversation data available" for a live codex agent. resolveAgentHarness
-  // now self-corrects from on-disk artifacts when the recording is the generic
-  // 'claude-code' default.
+describe('resolveAgentHarness — recorded harness is authoritative', () => {
   const STALE_AGENT = 'agent-pan-1832';
 
   async function writeState(agentId: string, harness: string | null): Promise<void> {
@@ -579,13 +573,13 @@ describe('resolveAgentHarness — stale claude-code self-corrects to the live ru
     );
   }
 
-  it('corrects stale claude-code to codex when a codex rollout exists and no claude transcript does', async () => {
+  it('does not apply a retained Codex rollout to a Claude agent', async () => {
     await writeState(STALE_AGENT, 'claude-code');
     await writeCodexRollout(STALE_AGENT);
 
     const harness = await resolveAgentHarness(STALE_AGENT, { agentsDirOverride: agentsDir });
 
-    expect(harness).toBe('codex');
+    expect(harness).toBe('claude-code');
   });
 
   it('keeps claude-code when a claude transcript IS present (past codex run does not shadow it)', async () => {
@@ -613,7 +607,7 @@ describe('resolveAgentHarness — stale claude-code self-corrects to the live ru
     expect(harness).toBe('codex');
   });
 
-  it('resolveJsonlPath returns the codex rollout for the stale-claude-code agent', async () => {
+  it('resolveJsonlPath does not return a Codex rollout for a Claude agent', async () => {
     await writeState(STALE_AGENT, 'claude-code');
     await writeCodexRollout(STALE_AGENT);
 
@@ -622,8 +616,7 @@ describe('resolveAgentHarness — stale claude-code self-corrects to the live ru
       claudeProjectsDirOverride: claudeProjectsDir,
     });
 
-    expect(path).not.toBeNull();
-    expect(path).toContain('rollout-');
+    expect(path).toBeNull();
   });
 });
 
