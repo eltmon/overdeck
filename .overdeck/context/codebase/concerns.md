@@ -105,4 +105,13 @@ Live landmines a change in this repo can step on. Verified 2026-07-26.
   `/workspace`. Never run durable work without verifying the volume mount
   (PAN-1845).
 
-<!-- last-verified: 2026-07-28 -->
+- **Derived issue state is recomputed, and the batch door is not free** (PAN-3917
+  FR-6, PAN-3925) — `loadIssueStatesForProject` (`src/lib/overdeck/derived-issue-state.ts`)
+  costs one cached `gh pr list` per project plus, for every issue WITHOUT a PR row,
+  three serial `git` execs. With ~1300 tracker issues that is 10s idle and minutes
+  under load. `IssueDataService.derivedStatesCache` holds the last answer but only
+  refreshes when a tracker poll reports CHANGED issues — PR-only changes do not
+  refresh it. Route code must never call `getDerivedIssueState` in a loop over
+  issues or agents; go through the batch/cached door.
+
+<!-- last-verified: 2026-09-19 -->

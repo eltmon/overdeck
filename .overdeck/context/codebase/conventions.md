@@ -33,16 +33,20 @@
 - Inline SVG icons use `currentColor` + a color map (see
   `components/chat/ProviderIcons.tsx` for the existing pattern).
 
-## Planning artifacts (xBRIEF v0.8, PAN-1124)
-- PRD drafts: `${OVERDECK_HOME}/state/<project>/drafts/<issue>.md` (human-mutable narrative).
-- Spec: `${OVERDECK_HOME}/state/<project>/specs/<date>-<ISSUE>-<slug>.xbrief.json` — immutable after planning except `plan.status` via `updateSpecStatus()`.
-- Project continue state: `${OVERDECK_HOME}/state/<project>/continues/<issue>.xbrief.json`.
-- Workspace continue state: `<workspace>/.overdeck/continue.json` (gitignored); item status changes go to its `statusOverrides`, never the spec.
-- `pan task` reads and updates the xBRIEF item checklist through the canonical state door.
+## Planning artifacts (xBRIEF v0.8, `.pan/` since PAN-3917)
+- Everything lives under `.pan/` in the project repo (or the configured plan-home
+  repo for polyrepo projects), committed on the feature branch. No `state/`
+  worktree and no `overdeck-state` branch reads/writes any more.
+- PRD drafts: `.pan/drafts/<ISSUE>.md` (`pan plan finalize` reads the UPPERCASE
+  name from the workspace directory name).
+- Spec: `.pan/specs/<date>-<ISSUE>-<slug>.xbrief.json` — immutable after planning
+  except `plan.status`.
+- Item status: `.pan/continues/<issue>.xbrief.json`, written by `pan task`.
+- Workspace continue state: `<workspace>/.overdeck/continue.json` (gitignored).
 
 ## Testing
 - Vitest, unit tests under `tests/unit/**` mirroring `src/`, plus co-located
   `__tests__/` in some lib dirs (e.g. `src/lib/cloister/__tests__/`).
 - Frontend tests co-located under `components/**/__tests__/`.
 
-<!-- last-verified: 2026-06-12 -->
+<!-- last-verified: 2026-09-19 -->

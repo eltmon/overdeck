@@ -11,12 +11,14 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   deriveIssueState,
   getDerivedIssueState,
   loadIssueStateFacts,
+  loadIssueStatesForProject,
+  parseFeatureBranchRefs,
   specExistsFor,
   type IssueStateFacts,
 } from '../../../../src/lib/overdeck/derived-issue-state.js';
@@ -142,5 +144,82 @@ describe('the backend owns liveness', () => {
       model: 'opus', state: 'blocked' as const, stateSince: NOW, terminalId: 'w1:p1',
     };
     expect(deriveIssueState(facts({ panes: [pane] })).attention).toBe('needs-you');
+  });
+});
+
+describe('the batch door lists branches once', () => {
+  const SHA_A = 'a'.repeat(40);
+  const SHA_B = 'b'.repeat(40);
+  let projectPath: string;
+
+  beforeEach(() => {
+    projectPath = mkdtempSync(join(tmpdir(), 'derived-issue-state-batch-'));
+  });
+
+  afterEach(() => {
+    rmSync(projectPath, { recursive: true, force: true });
+  });
+
+  it('parses local and remote refs into one entry per local branch', () => {
+    const map = parseFeatureBranchRefs([
+      `refs/heads/feature/pan-1 ${SHA_A} 2 10`,
+      `refs/remotes/origin/feature/pan-1 ${SHA_A} 2 10`,
+      `refs/heads/feature/pan-2 ${SHA_A} 1 0`,
+      `refs/remotes/origin/feature/pan-2 ${SHA_B} 3 0`,
+      `refs/heads/feature/pan-3 ${SHA_B} 0 4`,
+      `refs/remotes/origin/feature/pan-4 ${SHA_A} 5 0`,
+      '',
+    ].join('\n'));
+
+    expect(map.get('feature/pan-1')).toEqual({ name: 'feature/pan-1', aheadOfMain: 2, pushed: true });
+    expect(map.get('feature/pan-2')).toEqual({ name: 'feature/pan-2', aheadOfMain: 1, pushed: false });
+    expect(map.get('feature/pan-3')).toEqual({ name: 'feature/pan-3', aheadOfMain: 0, pushed: false });
+    expect(map.has('feature/pan-4')).toBe(false);
+    expect(map.size).toBe(3);
+  });
+
+  it('reads the branch map once for fifty PR-less issues and never the per-issue seam', async () => {
+    const issueIds = Array.from({ length: 50 }, (_, i) => `PAN-${i + 1}`);
+    const readBranches = vi.fn(async () => new Map([
+      ['feature/pan-1', { name: 'feature/pan-1', aheadOfMain: 2, pushed: false }],
+    ]));
+    const readBranch = vi.fn(async () => null);
+
+    const states = await loadIssueStatesForProject(projectPath, issueIds, {
+      now: () => NOW,
+      panes: [],
+      readPr: async () => null,
+      readBranches,
+      readBranch,
+      issues: Object.fromEntries(issueIds.map((id) => [id, { open: true, labels: [] }])),
+    });
+
+    expect(readBranches).toHaveBeenCalledTimes(1);
+    expect(readBranches).toHaveBeenCalledWith(projectPath);
+    expect(readBranch).not.toHaveBeenCalled();
+    expect(states.get('PAN-1')?.state).toBe('working');
+    expect(states.get('PAN-1')?.branch).toEqual({ name: 'feature/pan-1', aheadOfMain: 2, pushed: false });
+    expect(states.get('PAN-2')?.state).toBe('backlog');
+    expect(states.get('PAN-2')?.branch).toBeUndefined();
+  });
+
+  it('keeps the per-issue readBranch seam when no readBranches is given', async () => {
+    const issueIds = ['PAN-1', 'PAN-2', 'PAN-3'];
+    const readBranch = vi.fn(async (_projectPath: string, branch: string) =>
+      branch === 'feature/pan-3' ? { name: branch, aheadOfMain: 1, pushed: true } : null);
+
+    const states = await loadIssueStatesForProject(projectPath, issueIds, {
+      now: () => NOW,
+      panes: [],
+      readPr: async () => null,
+      readBranch,
+      issues: Object.fromEntries(issueIds.map((id) => [id, { open: true, labels: [] }])),
+    });
+
+    expect(readBranch).toHaveBeenCalledTimes(3);
+    expect(readBranch.mock.calls.map(([, branch]) => branch))
+      .toEqual(['feature/pan-1', 'feature/pan-2', 'feature/pan-3']);
+    expect(states.get('PAN-3')?.state).toBe('working');
+    expect(states.get('PAN-1')?.state).toBe('backlog');
   });
 });

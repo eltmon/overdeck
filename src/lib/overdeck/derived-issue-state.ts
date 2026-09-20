@@ -385,15 +385,18 @@ function forgeReader(projectPath: string) {
   return forgeForProject(projectPath) === 'gitlab' ? readMrWithGlab : readPrWithGh;
 }
 
+async function runGit(projectPath: string, args: string[]): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync('git', args, { cwd: projectPath, encoding: 'utf-8', timeout: 15_000 });
+    return stdout.trim();
+  } catch {
+    return null;
+  }
+}
+
+/** Three git execs for ONE branch — the single-issue door's read. */
 async function readBranchWithGit(projectPath: string, branch: string): Promise<DerivedBranchState | null> {
-  const run = async (args: string[]): Promise<string | null> => {
-    try {
-      const { stdout } = await execFileAsync('git', args, { cwd: projectPath, encoding: 'utf-8', timeout: 15_000 });
-      return stdout.trim();
-    } catch {
-      return null;
-    }
-  };
+  const run = (args: string[]) => runGit(projectPath, args);
   const ahead = await run(['rev-list', '--count', `origin/main..${branch}`]);
   if (ahead === null) return null;
   const remote = await run(['rev-parse', '--verify', `origin/${branch}`]);
@@ -403,6 +406,88 @@ async function readBranchWithGit(projectPath: string, branch: string): Promise<D
     aheadOfMain: Number.parseInt(ahead, 10) || 0,
     pushed: remote !== null && local !== null && remote === local,
   };
+}
+
+/** Every local feature branch of one repo, keyed by branch name (`feature/pan-1`). */
+export type FeatureBranchMap = ReadonlyMap<string, DerivedBranchState>;
+
+const FEATURE_REF_PREFIXES = ['refs/heads/feature/', 'refs/remotes/origin/feature/'];
+const FOR_EACH_REF_OPTS = { encoding: 'utf-8', timeout: 15_000, maxBuffer: 16 * 1024 * 1024 } as const;
+
+/**
+ * One `git for-each-ref` per repo, in place of three execs per issue. Local
+ * `refs/heads/feature/*` rows become entries; `refs/remotes/origin/feature/*`
+ * rows only decide `pushed`. A remote-only branch derives no entry — parity
+ * with `readBranchWithGit`, whose `rev-list origin/main..feature/x` fails when
+ * no local ref exists. Any failure other than an old git means the project has
+ * no branch facts (not a repo, no `origin/main`), which is an empty map.
+ */
+export async function listFeatureBranchesWithGit(projectPath: string): Promise<FeatureBranchMap> {
+  const format = '%(refname) %(objectname) %(ahead-behind:origin/main)';
+  let stdout: string;
+  try {
+    ({ stdout } = await execFileAsync(
+      'git', ['for-each-ref', `--format=${format}`, ...FEATURE_REF_PREFIXES],
+      { cwd: projectPath, ...FOR_EACH_REF_OPTS },
+    ));
+  } catch (error) {
+    // Verified on git 2.43 (2026-09-19): an unsupported format atom prints
+    // `fatal: unknown field name: <atom>`; a missing base prints
+    // `fatal: failed to find 'origin/main'`. Only the first means "old git"
+    // (`ahead-behind` needs ≥ 2.41); the second means there are no facts.
+    const stderr = String((error as { stderr?: unknown }).stderr ?? '');
+    if (!/unknown field name/.test(stderr)) return new Map();
+    return listFeatureBranchesWithoutAheadBehind(projectPath);
+  }
+  return parseFeatureBranchRefs(stdout);
+}
+
+/**
+ * Pure. `refs/heads/feature/x <sha> [<ahead> <behind>]` lines → the map. A
+ * line without the ahead/behind columns (the fallback's plain listing) gets
+ * `aheadOfMain: 0`, which the fallback overlays from `rev-list`.
+ */
+export function parseFeatureBranchRefs(stdout: string): FeatureBranchMap {
+  const local = new Map<string, { sha: string; aheadOfMain: number }>();
+  const remote = new Map<string, string>();
+  for (const line of stdout.split('\n')) {
+    const [ref, sha, ahead] = line.trim().split(/\s+/);
+    if (!ref || !sha) continue;
+    if (ref.startsWith('refs/heads/feature/')) {
+      local.set(ref.slice('refs/heads/'.length), { sha, aheadOfMain: Number.parseInt(ahead ?? '', 10) || 0 });
+    } else if (ref.startsWith('refs/remotes/origin/feature/')) {
+      remote.set(ref.slice('refs/remotes/origin/'.length), sha);
+    }
+  }
+  const out = new Map<string, DerivedBranchState>();
+  for (const [name, { sha, aheadOfMain }] of local) {
+    out.set(name, { name, aheadOfMain, pushed: remote.get(name) === sha });
+  }
+  return out;
+}
+
+/**
+ * The git < 2.41 path: a plain listing, then one `rev-list --count` per LOCAL
+ * feature branch — bounded by branch count, not issue count. A branch whose
+ * `rev-list` fails is dropped, never reported as `aheadOfMain: 0`.
+ */
+async function listFeatureBranchesWithoutAheadBehind(projectPath: string): Promise<FeatureBranchMap> {
+  let stdout: string;
+  try {
+    ({ stdout } = await execFileAsync(
+      'git', ['for-each-ref', '--format=%(refname) %(objectname)', ...FEATURE_REF_PREFIXES],
+      { cwd: projectPath, ...FOR_EACH_REF_OPTS },
+    ));
+  } catch {
+    return new Map();
+  }
+  const out = new Map<string, DerivedBranchState>();
+  for (const [name, entry] of parseFeatureBranchRefs(stdout)) {
+    const ahead = await runGit(projectPath, ['rev-list', '--count', `origin/main..${name}`]);
+    if (ahead === null) continue;
+    out.set(name, { ...entry, aheadOfMain: Number.parseInt(ahead, 10) || 0 });
+  }
+  return out;
 }
 
 /**
@@ -651,24 +736,29 @@ export async function listReadyIssuesForProject(
 
 // ─── the batch door ──────────────────────────────────────────────────────────
 
+export interface BatchLoaderDeps extends IssueStateLoaderDeps {
+  /**
+   * The tracker rows the caller already holds, by upper-cased issue id. A
+   * missing (or `null`) entry is unknown — never assumed open.
+   */
+  readonly issues?: Readonly<Record<string, TrackerIssueFacts | null>>;
+  /** One branch listing per project. Wins over `readBranch` when both are given. */
+  readonly readBranches?: (projectPath: string) => Promise<FeatureBranchMap>;
+}
+
 /**
  * Derive many issues at once. One forge listing per repo (cached), one backend
- * inventory read, a spec `existsSync` per issue, and a git read only for the
- * issues that have no PR — that row is the only one needing `aheadOfMain`.
+ * inventory read, one branch listing per repo, and a spec `existsSync` per
+ * issue. The branch row is consulted only for issues with no PR — that row is
+ * the only one needing `aheadOfMain`.
  *
  * Every board-shaped route uses this. Calling `getDerivedIssueState` in a loop
- * would issue one `gh` and two `git` invocations per issue.
+ * would issue one `gh` and three `git` invocations per issue.
  */
 export async function loadIssueStatesForProject(
   projectPath: string,
   issueIds: readonly string[],
-  deps: IssueStateLoaderDeps & {
-    /**
-     * The tracker rows the caller already holds, by upper-cased issue id. A
-     * missing (or `null`) entry is unknown — never assumed open.
-     */
-    readonly issues?: Readonly<Record<string, TrackerIssueFacts | null>>;
-  } = {},
+  deps: BatchLoaderDeps = {},
 ): Promise<Map<string, DerivedIssueState>> {
   const now = (deps.now ?? Date.now)();
   const gitlab = forgeForProject(projectPath) === 'gitlab';
@@ -683,15 +773,25 @@ export async function loadIssueStatesForProject(
   }
 
   const panes = deps.panes ?? await listPanesWithBackend(now);
+  // A caller-supplied per-issue `readBranch` keeps the old path (test seams);
+  // otherwise one listing serves every PR-less issue.
+  const branches = deps.readBranches
+    ? await deps.readBranches(projectPath)
+    : deps.readBranch ? null : await listFeatureBranchesWithGit(projectPath);
   const out = new Map<string, DerivedIssueState>();
 
   for (const raw of issueIds) {
     const issueId = raw.toUpperCase();
+    const branchName = featureBranchFor(issueId);
     const pr = prByIssue.get(issueId)
-      ?? (gitlab ? await (deps.readPr ?? forgeReader(projectPath))(issueId, projectPath, featureBranchFor(issueId)) : null);
+      ?? (gitlab ? await (deps.readPr ?? forgeReader(projectPath))(issueId, projectPath, branchName) : null);
     const branch = pr
       ? null
-      : await (deps.readBranch ?? readBranchWithGit)(projectPath, featureBranchFor(issueId));
+      : branches
+        ? branches.get(branchName) ?? null
+        : deps.readBranch
+          ? await deps.readBranch(projectPath, branchName)
+          : null;
 
     const issue = deps.issues?.[issueId] ?? null;
     const facts: IssueStateFacts = {

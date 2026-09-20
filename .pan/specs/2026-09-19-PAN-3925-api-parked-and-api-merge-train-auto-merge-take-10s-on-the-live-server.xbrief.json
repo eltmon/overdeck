@@ -4,17 +4,17 @@
     "created": "2026-09-19T11:50:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3925: /api/parked and /api/merge-train/auto-merge take 10s+ on the live server",
-    "updated": "2026-09-19T12:02:40.598Z"
+    "updated": "2026-09-19T13:29:44.091Z"
   },
   "plan": {
     "id": "pan-3925",
     "title": "/api/parked and /api/merge-train/auto-merge take 10s+ on the live server",
-    "status": "proposed",
+    "status": "running",
     "uid": "baff84c1-c538-4851-9583-829fd750e370",
     "author": "agent:claude-fable-5-1",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-19T11:50:00Z",
-    "updated": "2026-09-19T12:02:40.598Z",
+    "updated": "2026-09-19T13:29:44.091Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3925",
