@@ -284,7 +284,13 @@ export async function listAgentTranscriptCandidates(
   const currentKind = transcriptCandidateKind(currentHarness);
   if (currentKind === 'claude') {
     try {
-      const lookup = opts.getRuntimeStateAsync ?? ((id: string) => Effect.runPromise(getAgentRuntimeState(id)));
+      // Same discipline as readRecordedState: an agentsDirOverride means the
+      // caller is sandboxed to a foreign/test agents root, so this must not
+      // fall through to the live runtime service — that would return
+      // whatever the CURRENT process's real agent happens to have for this
+      // id, unrelated to the override.
+      const lookup = opts.getRuntimeStateAsync
+        ?? (opts.agentsDirOverride ? async () => null : (id: string) => Effect.runPromise(getAgentRuntimeState(id)));
       const runtime = await lookup(agentId);
       const runtimeId = runtime?.claudeSessionId?.trim();
       if (runtimeId) {
