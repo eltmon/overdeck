@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3950",
   "created": "2026-09-20T13:53:05.511Z",
-  "updated": "2026-09-20T14:22:14.253Z",
+  "updated": "2026-09-20T14:22:19.955Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -26,6 +26,11 @@
       "claimedBy": "agent-pan-3950",
       "claimedAt": "2026-09-20T14:12:46.183Z",
       "doneAt": "2026-09-20T14:22:14.253Z"
+    },
+    "w9-pi-tiebreak-test": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3950",
+      "claimedAt": "2026-09-20T14:22:19.955Z"
     }
   }
 }
