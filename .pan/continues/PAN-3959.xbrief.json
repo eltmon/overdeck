@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3959",
   "created": "2026-09-20T22:53:20.505Z",
-  "updated": "2026-09-20T23:40:18.168Z",
+  "updated": "2026-09-20T23:50:10.053Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -52,9 +52,10 @@
       "doneAt": "2026-09-20T23:39:37.693Z"
     },
     "w8-drop-guessing-extras": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3959",
-      "claimedAt": "2026-09-20T23:40:18.168Z"
+      "claimedAt": "2026-09-20T23:40:18.168Z",
+      "doneAt": "2026-09-20T23:50:10.053Z"
     }
   }
 }
