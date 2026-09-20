@@ -183,6 +183,8 @@ export function buildReviewRolePrompt(opts: {
     `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>" --run-id "${opts.runId}"`,
     `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>" --run-id "${opts.runId}"`,
     '',
+    `Your final chat message is exactly this shape: first line \`✓ Review verdict: APPROVED for ${opts.issueId}.\` or \`✗ Review verdict: CHANGES REQUESTED for ${opts.issueId}.\`, then one or two sentences saying why, then the report path.`,
+    '',
     // PAN-2007: do NOT tell the agent to `exit`. The session is kept alive through
     // the pipeline (KEEP_SPECIALIST_SESSIONS_ALIVE) so it can be reused for the next
     // review cycle without a cold re-spawn. Exiting before the signal command is
@@ -251,6 +253,8 @@ function buildSelfReviewPrompt(opts: {
     'Then signal the verdict with the Overdeck CLI (exactly one):',
     `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>" --run-id "${opts.runId}"`,
     `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>" --run-id "${opts.runId}"`,
+    '',
+    `Your final chat message is exactly this shape: first line \`✓ Review verdict: APPROVED for ${opts.issueId}.\` or \`✗ Review verdict: CHANGES REQUESTED for ${opts.issueId}.\`, then one or two sentences saying why, then the report path.`,
     '',
     // PAN-2007: do NOT tell the agent to `exit`. The session is kept alive through
     // the pipeline (KEEP_SPECIALIST_SESSIONS_ALIVE) so it can be reused for the next
