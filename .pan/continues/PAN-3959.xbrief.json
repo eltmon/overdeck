@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3959",
   "created": "2026-09-20T22:53:20.505Z",
-  "updated": "2026-09-21T00:02:53.192Z",
+  "updated": "2026-09-21T00:03:17.974Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -134,6 +134,10 @@
     "w5-kimi-capture-records-path.ac3": {
       "status": "completed",
       "doneAt": "2026-09-21T00:02:53.192Z"
+    },
+    "w6-pi-ohmypi-extensions-record-path.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:03:17.974Z"
     }
   }
 }
