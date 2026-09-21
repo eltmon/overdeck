@@ -33,6 +33,7 @@
 1053 src/dashboard/frontend/src/components/CommandPalette.tsx # PAN-3330
 1092 src/dashboard/frontend/src/components/CommandPalette.tsx # PAN-3704
 1096 src/dashboard/frontend/src/components/CommandPalette.tsx # PAN-3705
+1113 src/dashboard/frontend/src/components/CommandPalette.tsx # PAN-3975
 1304 src/lib/projects.ts # PAN-3917
 1172 src/dashboard/server/routes/settings.ts # PAN-3410
 1533 src/lib/model-capabilities.ts # PAN-3515
