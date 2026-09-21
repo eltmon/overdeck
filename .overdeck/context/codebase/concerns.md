@@ -1,6 +1,6 @@
 # Concerns / hazards
 
-Live landmines a change in this repo can step on. Verified 2026-07-26.
+Live landmines a change in this repo can step on. Verified 2026-09-20.
 
 - **ToS policy gate** — `canUseHarnessSync()` (`src/lib/harness-policy.ts:69`) blocks
   Pi + Anthropic + subscription auth. Every harness resolution path must end by
@@ -105,4 +105,22 @@ Live landmines a change in this repo can step on. Verified 2026-07-26.
   `/workspace`. Never run durable work without verifying the volume mount
   (PAN-1845).
 
-<!-- last-verified: 2026-07-28 -->
+- **OpenCode ACP drops permission asks from Task-subagent sessions** (PAN-3937) —
+  opencode 1.18.31's `acp/permission.ts` `Handler.process()` looks up the asking
+  session via `ACPSession.tryGet(sessionID)` and returns silently if it misses;
+  a `mode=subagent` session spawned by the `task` tool is never registered as an
+  ACP session, so any permission key opencode defaults to `ask`
+  (`external_directory`, `doom_loop`, `read` for `*.env`/`*.env.*`) deadlocks that
+  subagent — and the parent's `session/prompt` — forever, with no
+  `permission_request` ever written to `acp-session.jsonl`. Subagents inherit the
+  parent session's `external_directory` ruleset verbatim
+  (`agent/subagent-permissions.ts` `deriveSubagentSessionPermission`), so
+  Overdeck's launch-time permission policy (`OPENCODE_PERMISSION` env,
+  `buildOpenCodeAcpSpawnInput`) is the only lever that reaches subagents; the
+  ACP relay auto-approve path (`AcpHost.handlePermissionRequest`,
+  `selectAutoPermissionOutcome`) never fires for them. `OPENCODE_PERMISSION`
+  deep-merges last over the user's own `opencode.jsonc`, including any explicit
+  `deny` — widening the pre-allow keys widens what a user's own denial can no
+  longer block.
+
+<!-- last-verified: 2026-09-20 -->

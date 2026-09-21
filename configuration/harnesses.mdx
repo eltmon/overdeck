@@ -24,7 +24,7 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 | `codex` | [OpenAI Codex CLI](https://github.com/openai/codex) (`codex`) | OpenAI-model work | Uses persistent `codex app-server` sessions by default; requires Codex CLI `0.144.0` or newer. |
 | `acp` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Opt-in Kimi work | Uses the open Agent Client Protocol over a persistent authenticated host; Kimi is the first wired ACP agent. |
 | `kimi-code` | [Kimi Code CLI](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html) (`kimi`) | Kimi models (built-in default) | Drives Kimi's own native terminal UI directly — no ACP host, no Anthropic-compatibility endpoint. Kimi models only. Set `providerHarnesses.kimi` to `acp` or `claude-code` to opt back out. |
-| `opencode` | [OpenCode](https://opencode.ai) (`opencode`) | OpenCode Go and Zen | Persistent ACP sessions, native credentials, and model discovery; verified with 1.18.29. |
+| `opencode` | [OpenCode](https://opencode.ai) (`opencode`) | OpenCode Go and Zen | Persistent ACP sessions, native credentials, and model discovery; verified with 1.18.31. |
 | `muse` | Muse Code (`muse`) | Meta Muse Spark models | Persistent native terminal sessions with separate Standard and Contributor model choices. |
 
 ## Composer commands across harnesses
@@ -352,7 +352,7 @@ cost parsing (`src/lib/cost-parsers/kimi-parser.ts`).
 ### OpenCode with Go and Zen
 
 Overdeck supports the OpenCode harness with OpenCode Go and OpenCode Zen.
-The integration was verified against OpenCode **1.18.29**. Install or update the
+The integration was verified against OpenCode **1.18.31**. Install or update the
 CLI with `npm install -g opencode-ai@latest`, then check `opencode --version`.
 The official release feed is [anomalyco/opencode](https://github.com/anomalyco/opencode/releases).
 
@@ -398,6 +398,44 @@ OpenCode receives Overdeck's rendered context at session start. Use
 rules and its Agent Skills discovery remain available. Effort defaults to `high`
 when the selected model exposes effort controls. An unsupported explicit effort
 or an unavailable model fails visibly instead of selecting another value.
+
+#### Permission deadlock protection
+
+OpenCode can lose a permission request from a Task subagent before ACP sends it
+to Overdeck. Overdeck prevents that request from blocking the parent turn by
+setting this launch-time policy:
+
+```json
+{"external_directory":"allow","doom_loop":"allow","read":{"*.env":"allow","*.env.*":"allow"}}
+```
+
+These are the only permissions that OpenCode defaults to `ask`. The policy does
+not change `question`, `plan_enter`, `plan_exit`, or other permission keys. The
+`OPENCODE_PERMISSION` environment value takes precedence over matching rules in
+the user's `opencode.jsonc`, so an explicit deny for these three keys is also
+overridden. This narrow override prevents an unobservable subagent ask from
+deadlocking the complete conversation.
+
+Each OpenCode ACP host also reserves a loopback HTTP port and records it in
+`~/.overdeck/agents/<conversation>/opencode-port`. While a prompt is running,
+the host checks once per minute. After 180 seconds without an ACP runtime event,
+it lists pending permissions and replies `always` to each one. A recovered ask
+is recorded in `acp-session.jsonl` with `"source":"watchdog"`.
+
+If an older host is already stuck, inspect and answer its pending request:
+
+```bash
+CONVERSATION=conv-YYYYMMDD-NNNN
+OPENCODE_PORT=$(cat "$HOME/.overdeck/agents/$CONVERSATION/opencode-port")
+curl -sS "http://127.0.0.1:$OPENCODE_PORT/permission"
+curl -sS -X POST \
+  "http://127.0.0.1:$OPENCODE_PORT/permission/<permission-id>/reply" \
+  -H 'content-type: application/json' \
+  -d '{"reply":"always"}'
+```
+
+For hosts created before the port file existed, use `ss -ltnp` to find the
+loopback port owned by that conversation's `opencode acp` process.
 
 ## Installing oh-my-pi
 

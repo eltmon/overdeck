@@ -1,0 +1,557 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-20T09:07:58Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3937: OpenCode conversations stop answering when a Task subagent hits a permission ask; pre-allow at launch and add a stuck-turn watchdog",
+    "updated": "2026-09-20T09:10:50.092Z"
+  },
+  "plan": {
+    "id": "pan-3937",
+    "title": "OpenCode conversations stop answering when a Task subagent hits a permission ask; pre-allow at launch and add a stuck-turn watchdog",
+    "status": "proposed",
+    "uid": "947f9443-aa0d-499b-8ec0-ca2e8ab53244",
+    "author": "agent:claude-fable-5-1",
+    "sequence": 2,
+    "created": "2026-09-20T09:07:58Z",
+    "updated": "2026-09-20T09:10:50.092Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3937",
+        "label": "PAN-3937",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "acp",
+      "opencode",
+      "permissions",
+      "watchdog",
+      "dashboard"
+    ],
+    "narratives": {
+      "Problem": "OpenCode 1.18.31's ACP permission relay (packages/opencode/src/acp/permission.ts Handler.process()) silently drops permission asks whose sessionID belongs to a Task subagent session (mode=subagent is never registered with ACPSession, so tryGet() misses and the handler returns without ever replying). Overdeck launches `opencode acp` with opencode's stock permission defaults, three of which default to \"ask\" (external_directory, doom_loop, read for .env globs) and subagents inherit the parent session's external_directory ruleset verbatim (deriveSubagentSessionPermission). When a subagent hits one of these asks, its Deferred never resolves, the parent's task tool call hangs, the parent's session/prompt RPC never resolves, and AcpHost.promptQueue (src/lib/acp/host.ts) never advances — every subsequent operator message queues behind the dead turn forever with no error surfaced. Confirmed live in conv 2834 (2026-09-19): an external_directory /tmp/* ask from a Task subagent produced no permission_request transcript entry and stalled the conversation for 20+ minutes until manually unstuck via the opencode HTTP API's /permission endpoints.",
+      "Proposal": "(1) Pre-allow the three ask-by-default permission keys (external_directory, doom_loop, read for .env globs) at launch via the OPENCODE_PERMISSION env var, live-verified to merge correctly into opencode's config and win over its hardcoded defaults. (2) Give the ACP host a deterministic, host-reserved port for the opencode HTTP server it already spawns, and add a host-side watchdog that polls GET /permission and auto-replies {\"reply\":\"always\"} to anything pending once a prompt has been stalled past a threshold, logging a permission_outcome transcript entry with source \"watchdog\" as a visible fallback. (3) Extend the dashboard's existing ACP transcript-derived activity summary with a stalledSince signal and render a muted stuck-turn label in the conversation list. (4) Document the policy, the watchdog, and a generalized manual unstick recipe in configuration/harnesses.mdx and pan-diagnose.",
+      "NonGoals": "- Filing the upstream anomalyco/opencode bug report is not part of this xBRIEF; left to the operator per the issue text.\n- The stalled-turn label ships only in ConversationRow (conversation list), not in the full ConversationPanel header.\n- Pre-allowing question, plan_enter, or plan_exit is out of scope — those default to \"deny\", not \"ask\", and do not cause this deadlock.\n- Changing the ACP relay's own auto-approve policy (selectAutoPermissionOutcome) for primary-session asks is out of scope — that path already works correctly.\n- Reworking opencode's own vendored port-selection code (startWithPortFallback) is out of scope — Overdeck works around the gap from the host side instead."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Pre-allow exactly external_directory, doom_loop, and read (*.env, *.env.*) via OPENCODE_PERMISSION; leave question/plan_enter/plan_exit untouched.",
+        "rationale": "Source-verified (packages/opencode/src/agent/agent.ts) that these three keys are opencode's only ask-by-default permissions; question/plan_enter/plan_exit default to deny, which fails fast rather than deadlocking, so widening the pre-allow set to them has no deadlock-prevention benefit."
+      },
+      {
+        "summary": "Reserve the opencode HTTP server port deterministically from the host (net.createServer().listen(0), close, pass as an explicit --port) instead of discovering it via ss -ltnp against the child PID as the issue text suggested.",
+        "rationale": "Live-verified opencode acp --help exposes --port/--hostname flags that win over user config; deterministic reservation avoids brittle process/PID port-scraping and gives both the spawn path and the watchdog the same known value up front."
+      },
+      {
+        "summary": "Watchdog always replies {\"reply\":\"always\"} rather than reusing selectAutoPermissionOutcome.",
+        "rationale": "selectAutoPermissionOutcome categorizes ACP's named options list, but the opencode HTTP GET /permission response is a bare PermissionV1.Request with no options list to categorize against — \"always\" is the only reply shape available and matches Overdeck's existing stance of auto-approving every relayed ask."
+      },
+      {
+        "summary": "Dashboard stall-banner threshold (300s) set strictly looser than the host watchdog's own trigger threshold (180s) plus one poll cycle.",
+        "rationale": "Keeps the operator-facing banner a fallback signal shown only after the host's own automatic recovery has had a full cycle to fire, avoiding a row that simultaneously shows \"working\" and \"stalled\" as contradictory states."
+      },
+      {
+        "summary": "No xBRIEF item files the upstream opencode bug report.",
+        "rationale": "Issue text explicitly frames upstream filing as the operator's call; the PRD's Problem section is written so its root-cause paragraph can be pasted directly into that report if the operator chooses to file it."
+      }
+    ],
+    "items": [
+      {
+        "id": "acp-pre-allow-opencode-permission",
+        "title": "Pre-allow OpenCode's ask-by-default permission keys at launch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-20T09:07:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3937",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/acp/opencode.ts",
+            "src/lib/acp/__tests__/opencode.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/acp/__tests__/opencode.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "opencode.test.ts passes with the updated exact-equality spawn-input assertion including OPENCODE_PERMISSION"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In buildOpenCodeAcpSpawnInput (src/lib/acp/opencode.ts:22-33), always set OPENCODE_PERMISSION in the returned env to the JSON string {\"external_directory\":\"allow\",\"doom_loop\":\"allow\",\"read\":{\"*.env\":\"allow\",\"*.env.*\":\"allow\"}}, merged with any caller-supplied environment. Update the existing opencode.test.ts spawn-input assertion to expect the new env key."
+        },
+        "items": [
+          {
+            "id": "acp-pre-allow-opencode-permission.ac1",
+            "title": "Given any call to buildOpenCodeAcpSpawnInput for opencode/opencode-go, it returns env.OPENCODE_PERMISSION equal to the exact JSON string {\"external_directory\":\"allow\",\"doom_loop\":\"allow\",\"read\":{\"*.env\":\"allow\",\"*.env.*\":\"allow\"}}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-pre-allow-opencode-permission.ac2",
+            "title": "The updated opencode.test.ts exact-equality assertion for buildOpenCodeAcpSpawnInput's return value passes under npx vitest run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-pre-allow-opencode-permission.ac3",
+            "title": "Given caller-supplied environment entries such as OPENCODE_API_KEY, buildOpenCodeAcpSpawnInput's returned env object preserves them unchanged alongside the injected OPENCODE_PERMISSION key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-host-deterministic-port",
+        "title": "Reserve a deterministic port for the opencode HTTP server at host launch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-20T09:07:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3937",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/acp/opencode.ts",
+            "src/lib/acp/host.ts",
+            "src/lib/acp/__tests__/opencode.test.ts",
+            "src/lib/acp/__tests__/host.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/acp/__tests__/opencode.test.ts src/lib/acp/__tests__/host.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "opencode.test.ts and host.test.ts pass including the new port-argument and kimi-unaffected cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "buildOpenCodeAcpSpawnInput gains a required port argument and appends [\"--hostname\",\"127.0.0.1\",\"--port\",String(port)] to args for opencode/opencode-go only. AcpHost.main() reserves a free TCP port (net.createServer().listen(0), read the assigned port, close) before constructing the opencode runtime, threads that port into the spawn-input builder, and passes it into a new optional AcpHostOptions.openCodePort field so AcpHost stores it for the watchdog (item acp-host-permission-watchdog) to read. Kimi's buildKimiAcpSpawnInput and spawn path are untouched."
+        },
+        "items": [
+          {
+            "id": "acp-host-deterministic-port.ac1",
+            "title": "Given a port argument, buildOpenCodeAcpSpawnInput appends exactly [\"--hostname\",\"127.0.0.1\",\"--port\",\"<port>\"] to the returned args array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-host-deterministic-port.ac2",
+            "title": "Given provider opencode or opencode-go, AcpHost.main() reserves a free TCP port before spawning and returns a constructed AcpHost instance whose openCodePort matches that reserved port",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-host-deterministic-port.ac3",
+            "title": "Given provider kimi, buildKimiAcpSpawnInput's args contains no --port or --hostname entries and AcpHost.main() skips port reservation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-host-permission-watchdog",
+        "title": "Add a host-side watchdog that auto-replies to permission asks the ACP relay never received",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-20T09:07:58Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3937",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "acp-doc-permission-policy"
+          ],
+          "files_scope": [
+            "src/lib/acp/host.ts",
+            "src/lib/acp/transcript.ts",
+            "src/lib/acp/__tests__/host.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/acp/__tests__/host.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "host.test.ts passes including fake-timer-driven watchdog cases (trigger, no-trigger-before-threshold, kimi-excluded, benign-404)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-2",
+            "NFR-3"
+          ],
+          "readinessReason": "Depends only on acp-host-deterministic-port's port value (declared via the blocks edge); once that lands, the watchdog's own files (host.ts, transcript.ts) are touched by no other item and can proceed in its own slot."
+        },
+        "narrative": {
+          "Action": "Extend AcpTranscriptEntry.source (src/lib/acp/transcript.ts) to include \"watchdog\". In AcpHost, for provider opencode/opencode-go only, run a 60s-cadence interval while a prompt is in flight; once 180s have passed with no runtime event observed, GET http://127.0.0.1:{openCodePort}/permission, POST {\"reply\":\"always\"} to /permission/{id}/reply for each entry returned, and append one permission_outcome transcript entry per reply with source \"watchdog\" and the entry's own sessionID. A reply that 404s (already resolved by the relay) is treated as benign, not an error. The interval stops when the prompt operation settles."
+        },
+        "items": [
+          {
+            "id": "acp-host-permission-watchdog.ac1",
+            "title": "Given a prompt in flight for an opencode-provider host with no runtime event observed for 180 simulated seconds (vi.useFakeTimers), the host issues a GET request to the reserved port's /permission endpoint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-host-permission-watchdog.ac2",
+            "title": "Given that GET returns one pending entry, the host POSTs {\"reply\":\"always\"} to /permission/{id}/reply and appends a transcript entry with source \"watchdog\" and content type permission_outcome carrying that entry's sessionID",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-host-permission-watchdog.ac3",
+            "title": "Given the prompt has been in flight for fewer than 180 simulated seconds since the last runtime event, zero HTTP requests reach the opencode server",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-host-permission-watchdog.ac4",
+            "title": "Given provider is kimi, the watchdog interval never starts and zero HTTP requests occur regardless of prompt duration",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-host-permission-watchdog.ac5",
+            "title": "Given a POST /permission/{id}/reply stub returns HTTP 404, the host does not throw and does not append an error-tagged transcript entry for that reply",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-acp-stalled-turn-signal",
+        "title": "Derive a stalledSince signal from ACP transcript recency",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-20T09:07:58Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3937",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/conversation/types.ts",
+            "src/dashboard/server/services/conversation/activity-summary.ts",
+            "src/lib/overdeck/conversation-list.ts",
+            "src/dashboard/server/services/conversation/__tests__/activity-summary-acp.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/conversation/__tests__/activity-summary-acp.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "activity-summary-acp.test.ts passes including the new stalledSince cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add stalledSince?: string to ConversationActivitySummary. In summarizeConversationActivity's ACP branch, add STALLED_TURN_MS = 300_000 and set stalledSince to the transcript's mtime (ISO string) when isWorking is true and the transcript has not been modified in over 300000ms; otherwise leave it undefined. Thread stalledSince through conversation-list.ts's enriched conversation row alongside the existing isWorking/currentTool fields."
+        },
+        "items": [
+          {
+            "id": "dashboard-acp-stalled-turn-signal.ac1",
+            "title": "Given an ACP transcript with an open turn (no turn_completed/prompt_failed since the last prompt) whose file mtime is older than 300000ms, summarizeConversationActivity returns stalledSince set to that mtime as an ISO string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-acp-stalled-turn-signal.ac2",
+            "title": "Given the same open-turn transcript but written within the last 300000ms, summarizeConversationActivity returns stalledSince as undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-acp-stalled-turn-signal.ac3",
+            "title": "Given a transcript whose last event is turn_completed regardless of file age, summarizeConversationActivity returns stalledSince as undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-acp-stalled-turn-signal.ac4",
+            "title": "Given a conversation whose session file produced a stalledSince value from summarizeConversationActivity, conversation-list.ts's enriched row returns that same stalledSince value unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dashboard-acp-stalled-turn-ui",
+        "title": "Render a stuck-turn label in the conversation list row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-20T09:07:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3937",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ConversationRow.test.tsx passes including the new stalled-label case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add stalledSince?: string | null to the Conversation interface in ConversationList.tsx. In ConversationRow.tsx, when conv.stalledSince is set, render a muted text label \"waiting on agent — no activity since {HH:MM}\" in place of the WorkingSpinner/status dot for that row, following pan-style-guide (muted status text, no decorative color) and the AwaitingInputIndicator aria-label pattern."
+        },
+        "items": [
+          {
+            "id": "dashboard-acp-stalled-turn-ui.ac1",
+            "title": "Given a conversation row prop with stalledSince set to an ISO timestamp, ConversationRow renders a muted text label containing \"waiting on agent\" and the HH:MM formatted from that timestamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-acp-stalled-turn-ui.ac2",
+            "title": "Given stalledSince is unset or null, ConversationRow renders the existing WorkingSpinner/status-dot behavior with no visible change from current output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dashboard-acp-stalled-turn-ui.ac3",
+            "title": "Given stalledSince is set, ConversationRow renders a stalled label whose aria-label contains the conversation name, matching the existing AwaitingInputIndicator pattern",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-doc-permission-policy",
+        "title": "Document the OpenCode permission policy, watchdog, and unstick recipe",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-20T09:07:58Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3937",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/harnesses.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'external_directory.*allow' configuration/harnesses.mdx",
+            "grep -n 'watchdog' configuration/harnesses.mdx"
+          ],
+          "expected_outputs": [
+            "the exact OPENCODE_PERMISSION JSON and the three pre-allowed keys appear in the OpenCode section",
+            "the watchdog's port-discovery, cadence, threshold, and reply policy plus a generalized manual unstick recipe appear in the same section"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In the existing \"OpenCode with Go and Zen\" section of configuration/harnesses.mdx, add a subsection documenting: the exact OPENCODE_PERMISSION JSON Overdeck sets and why; the deny-override caveat for those three keys; the watchdog's port-discovery mechanism, 60s poll cadence, 180s trigger threshold, and always-reply-\"always\" policy; and a manual unstick recipe generalized to use the discovered (not hardcoded) port."
+        },
+        "items": [
+          {
+            "id": "acp-doc-permission-policy.ac1",
+            "title": "configuration/harnesses.mdx's OpenCode section contains the exact OPENCODE_PERMISSION JSON string and the three pre-allowed key names external_directory, doom_loop, and read",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-doc-permission-policy.ac2",
+            "title": "The same section contains a statement that this setting overrides a matching user-configured deny for those three keys only, and that all other permission keys are unaffected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-doc-permission-policy.ac3",
+            "title": "The same section contains the watchdog's poll cadence of 60s, trigger threshold of 180s, reply policy of always, and a manual unstick recipe using a discovered port",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "acp-diagnose-permission-unstick-recipe",
+        "title": "Add the permission-deadlock unstick recipe to pan-diagnose",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-09-20T09:07:58Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3937",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-diagnose/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'permission/reply' sync-sources/skills/pan-diagnose/SKILL.md",
+            "grep -n 'source.:.watchdog' sync-sources/skills/pan-diagnose/SKILL.md"
+          ],
+          "expected_outputs": [
+            "the manual curl unstick recipe appears in the new troubleshooting section",
+            "the watchdog-already-attempted transcript grep appears in the same section"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Add an \"OpenCode conversation stuck after a permission ask\" entry to sync-sources/skills/pan-diagnose/SKILL.md's existing troubleshooting structure, with the manual GET/POST unstick recipe and a note on grepping the conversation's acp-session.jsonl for a \"source\":\"watchdog\" entry to tell whether the watchdog already attempted a fix."
+        },
+        "items": [
+          {
+            "id": "acp-diagnose-permission-unstick-recipe.ac1",
+            "title": "sync-sources/skills/pan-diagnose/SKILL.md contains a section covering the stuck-permission scenario with the curl GET /permission and POST /permission/{id}/reply unstick recipe",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "acp-diagnose-permission-unstick-recipe.ac2",
+            "title": "The same section contains the transcript grep for a watchdog source entry that an operator uses to check whether the watchdog already attempted a fix",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "acp-pre-allow-opencode-permission",
+        "to": "acp-host-deterministic-port",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-host-deterministic-port",
+        "to": "acp-host-permission-watchdog",
+        "type": "blocks"
+      },
+      {
+        "from": "dashboard-acp-stalled-turn-signal",
+        "to": "dashboard-acp-stalled-turn-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "acp-pre-allow-opencode-permission",
+        "to": "acp-doc-permission-policy",
+        "type": "informs"
+      },
+      {
+        "from": "acp-host-deterministic-port",
+        "to": "acp-doc-permission-policy",
+        "type": "informs"
+      },
+      {
+        "from": "acp-host-permission-watchdog",
+        "to": "acp-doc-permission-policy",
+        "type": "informs"
+      },
+      {
+        "from": "acp-host-permission-watchdog",
+        "to": "acp-diagnose-permission-unstick-recipe",
+        "type": "informs"
+      },
+      {
+        "from": "dashboard-acp-stalled-turn-ui",
+        "to": "acp-doc-permission-policy",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-09-20-PAN-3937-opencode-conversations-stop-answering-when-a-task-subagent-hits-a-permission-ask-pre-allow-at-launch-and-add-a-stuck-turn-watchdog.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}

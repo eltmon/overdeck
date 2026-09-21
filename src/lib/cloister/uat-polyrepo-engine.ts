@@ -215,7 +215,9 @@ function conflictingWith(feature: ReadyFeature, mergedIssueIds: readonly string[
 
 /**
  * Assemble one polyrepo generation. Always returns the generation row (status
- * 'ready' or 'failed'); throws only on store failures. On success, older
+ * 'ready' or 'failed'); never throws — an unexpected failure (a store write
+ * above all, PAN-3963) marks the row 'failed' at once rather than stranding
+ * it in 'assembling' for the reconciler's stuck sweep. On success, older
  * 'ready' generations for the project flip to 'superseded'.
  */
 export async function assemblePolyrepoUatGeneration(
@@ -278,92 +280,121 @@ export async function assemblePolyrepoUatGeneration(
     };
   };
 
-  const allContributing = contributingRepos(input.features, input.repos);
-  if (allContributing.length === 0) {
-    log(`[uat-polyrepo] ${name}: no member repo has a contributing feature branch — marking failed`);
-    return finish('failed', [], [], []);
-  }
-  log(`[uat-polyrepo] ${name}: assembling across ${allContributing.map((r) => r.repoKey).join(', ')}`);
-
-  const missingDeps = allContributing.filter((repo) => !deps.repoGit.has(repo.repoKey));
-  if (missingDeps.length > 0) {
-    log(`[uat-polyrepo] ${name}: no git deps for repo(s) ${missingDeps.map((r) => r.repoKey).join(', ')} — marking failed`);
-    return finish('failed', [], [], []);
-  }
-
-  // ONE pass, feature-atomic. Each feature is merged into every repo it
-  // contributes to; if any repo rejects it, the repos that already took it are
-  // rolled back to the head they had before that feature, and assembly moves on.
-  // Earlier accepted features are never rebuilt, so the work is O(R x F) rather
-  // than the O(R x F^2) a rebuild-and-replay design costs.
-  const pass = await runAssemblyPass(name, input.features, allContributing, repoWorktree, deps, log, {
-    onHeldOut: async (blocked) => {
-      heldOutIds.add(blocked.issueId);
-      // The reconciler compares a held-out feature's stored headSha against a
-      // composite anchor over ALL its contributions, so storing the single
-      // blocking repo's SHA would never match and would churn the generation
-      // every tick. Record the same composite shape members use.
-      const blockedFeature = input.features.find((f) => f.issueId === blocked.issueId);
-      heldOut.push({
-        issueId: blocked.issueId,
-        // The LOGICAL feature branch, not the blocking repo's contribution
-        // branch: the reconciler keys its head anchors by ReadyFeature.branch,
-        // and a repo with a custom branch_prefix (feat/ vs feature/) would make
-        // that lookup miss forever and rebuild the generation every tick. The
-        // blocking repo is already named in the reason.
-        branch: blockedFeature?.branch ?? blocked.branch,
-        headSha: await heldOutAnchor(blockedFeature, deps),
-        reason: blocked.reason,
-      });
-      deps.store.update(name, { heldOut });
-      log(`[uat-polyrepo] ${name}: holding ${blocked.issueId} out of the whole generation (${blocked.repoKey})`);
-    },
-  });
-  for (const repo of pass.repos) baseShaByRepo.set(repo.repoKey, repo.baseSha);
-
-  if (pass.fatal) {
-    log(`[uat-polyrepo] ${name}: ${pass.fatal}`);
-    return finish('failed', pass.repos, [], []);
-  }
-
-  // A repo every one of whose features was held out carries nothing. Its
-  // worktree and branch exist locally but are never pushed; cleanup reaps them
-  // with the generation folder.
-  const carrying = new Set([...pass.mergedByIssue.values()].flat().map((o) => o.repoKey));
-  const abandoned = pass.repos.filter((r) => !carrying.has(r.repoKey));
-  if (abandoned.length > 0) {
-    log(`[uat-polyrepo] ${name}: repo(s) ${abandoned.map((r) => r.repoKey).join(', ')} lost every contribution to a hold-out — no branch published; local worktree reaped with the generation folder`);
-  }
-  const publishedRepos = pass.repos.filter((r) => carrying.has(r.repoKey));
-
-  const { members, resolutions } = collectMembers(input.features, heldOutIds, pass.mergedByIssue);
-
-  if (members.length === 0) {
-    // Anchor on the full candidate set even though nothing published: the
-    // reconciler's desired anchor covers every ready-set contribution, and
-    // FAILED_RETRY_BACKOFF_MS only suppresses a repeat when the two signatures
-    // match exactly. Without it an all-held-out batch reassembles every tick.
-    log(`[uat-polyrepo] ${name}: nothing merged (${heldOut.length} held out) — marking failed`);
-    return finish('failed', publishedRepos, [], [], allContributing);
-  }
-
-  // Push every repo. A partial push is recoverable — cleanup reaps the branches
-  // that did land — but the generation is not testable, so it is failed.
-  for (const repo of publishedRepos) {
-    try {
-      await deps.repoGit.get(repo.repoKey)!.push(name);
-    } catch (err) {
-      log(`[uat-polyrepo] ${name}: push failed in ${repo.repoKey}: ${err instanceof Error ? err.message : String(err)}`);
-      return finish('failed', publishedRepos, members, resolutions);
+  try {
+    const allContributing = contributingRepos(input.features, input.repos);
+    if (allContributing.length === 0) {
+      log(`[uat-polyrepo] ${name}: no member repo has a contributing feature branch — marking failed`);
+      return finish('failed', [], [], []);
     }
-  }
+    log(`[uat-polyrepo] ${name}: assembling across ${allContributing.map((r) => r.repoKey).join(', ')}`);
 
-  for (const older of deps.store.listChain(input.projectRoot, ['ready'])) {
-    if (older.name !== name) deps.store.update(older.name, { status: 'superseded' });
-  }
+    const missingDeps = allContributing.filter((repo) => !deps.repoGit.has(repo.repoKey));
+    if (missingDeps.length > 0) {
+      log(`[uat-polyrepo] ${name}: no git deps for repo(s) ${missingDeps.map((r) => r.repoKey).join(', ')} — marking failed`);
+      return finish('failed', [], [], []);
+    }
 
-  log(`[uat-polyrepo] ${name}: ready — ${members.length} member(s) across ${publishedRepos.length} repo(s), ${resolutions.length} resolution(s), ${heldOut.length} held out`);
-  return finish('ready', publishedRepos, members, resolutions, allContributing);
+    // ONE pass, feature-atomic. Each feature is merged into every repo it
+    // contributes to; if any repo rejects it, the repos that already took it are
+    // rolled back to the head they had before that feature, and assembly moves on.
+    // Earlier accepted features are never rebuilt, so the work is O(R x F) rather
+    // than the O(R x F^2) a rebuild-and-replay design costs.
+    const pass = await runAssemblyPass(name, input.features, allContributing, repoWorktree, deps, log, {
+      onHeldOut: async (blocked) => {
+        heldOutIds.add(blocked.issueId);
+        // The reconciler compares a held-out feature's stored headSha against a
+        // composite anchor over ALL its contributions, so storing the single
+        // blocking repo's SHA would never match and would churn the generation
+        // every tick. Record the same composite shape members use.
+        const blockedFeature = input.features.find((f) => f.issueId === blocked.issueId);
+        heldOut.push({
+          issueId: blocked.issueId,
+          // The LOGICAL feature branch, not the blocking repo's contribution
+          // branch: the reconciler keys its head anchors by ReadyFeature.branch,
+          // and a repo with a custom branch_prefix (feat/ vs feature/) would make
+          // that lookup miss forever and rebuild the generation every tick. The
+          // blocking repo is already named in the reason.
+          branch: blockedFeature?.branch ?? blocked.branch,
+          headSha: await heldOutAnchor(blockedFeature, deps),
+          reason: blocked.reason,
+        });
+        deps.store.update(name, { heldOut });
+        log(`[uat-polyrepo] ${name}: holding ${blocked.issueId} out of the whole generation (${blocked.repoKey})`);
+      },
+    });
+    for (const repo of pass.repos) baseShaByRepo.set(repo.repoKey, repo.baseSha);
+
+    if (pass.fatal) {
+      log(`[uat-polyrepo] ${name}: ${pass.fatal}`);
+      return finish('failed', pass.repos, [], []);
+    }
+
+    // A repo every one of whose features was held out carries nothing. Its
+    // worktree and branch exist locally but are never pushed; cleanup reaps them
+    // with the generation folder.
+    const carrying = new Set([...pass.mergedByIssue.values()].flat().map((o) => o.repoKey));
+    const abandoned = pass.repos.filter((r) => !carrying.has(r.repoKey));
+    if (abandoned.length > 0) {
+      log(`[uat-polyrepo] ${name}: repo(s) ${abandoned.map((r) => r.repoKey).join(', ')} lost every contribution to a hold-out — no branch published; local worktree reaped with the generation folder`);
+    }
+    const publishedRepos = pass.repos.filter((r) => carrying.has(r.repoKey));
+
+    const { members, resolutions } = collectMembers(input.features, heldOutIds, pass.mergedByIssue);
+
+    if (members.length === 0) {
+      // Anchor on the full candidate set even though nothing published: the
+      // reconciler's desired anchor covers every ready-set contribution, and
+      // FAILED_RETRY_BACKOFF_MS only suppresses a repeat when the two signatures
+      // match exactly. Without it an all-held-out batch reassembles every tick.
+      log(`[uat-polyrepo] ${name}: nothing merged (${heldOut.length} held out) — marking failed`);
+      return finish('failed', publishedRepos, [], [], allContributing);
+    }
+
+    // Push every repo. A partial push is recoverable — cleanup reaps the branches
+    // that did land — but the generation is not testable, so it is failed.
+    for (const repo of publishedRepos) {
+      try {
+        await deps.repoGit.get(repo.repoKey)!.push(name);
+      } catch (err) {
+        log(`[uat-polyrepo] ${name}: push failed in ${repo.repoKey}: ${err instanceof Error ? err.message : String(err)}`);
+        return finish('failed', publishedRepos, members, resolutions);
+      }
+    }
+
+    for (const older of deps.store.listChain(input.projectRoot, ['ready'])) {
+      if (older.name !== name) deps.store.update(older.name, { status: 'superseded' });
+    }
+
+    log(`[uat-polyrepo] ${name}: ready — ${members.length} member(s) across ${publishedRepos.length} repo(s), ${resolutions.length} resolution(s), ${heldOut.length} held out`);
+    return finish('ready', publishedRepos, members, resolutions, allContributing);
+  } catch (err) {
+    // PAN-3963: same fail-loud contract as the monorepo engine — an
+    // unexpected throw (a store write above all) must mark the generation
+    // failed immediately, never strand it in 'assembling' for the stuck
+    // sweep. Status-only update: finish() rewrites member rows, the very
+    // write that may have thrown.
+    const message = err instanceof Error ? err.message : String(err);
+    log(`[uat-polyrepo] ${name}: assembly aborted: ${message} — marking failed`);
+    // Keep the anchor consistent with finish()'s failure paths so the
+    // reconciler's same-input backoff can still recognize this failure.
+    const anchor = baseShaByRepo.size > 0
+      ? compositeAnchor(
+          input.repos
+            .filter((r) => baseShaByRepo.has(r.repoKey))
+            .map((r) => ({ repoKey: r.repoKey, sha: baseShaByRepo.get(r.repoKey)!, mergeOrder: r.mergeOrder })),
+        )
+      : '';
+    try {
+      deps.store.update(name, { status: 'failed', baseSha: anchor });
+    } catch (updateErr) {
+      log(`[uat-polyrepo] ${name}: could not mark the generation failed: ${updateErr instanceof Error ? updateErr.message : String(updateErr)}`);
+    }
+    return {
+      name, worktreePath, projectRoot: input.projectRoot, baseSha: anchor,
+      status: 'failed', repos: [], members: [], heldOut, resolutions: [],
+      stackStartedAt: null, cleanedAt: null, createdAt: '', updatedAt: '',
+    };
+  }
 }
 
 /**

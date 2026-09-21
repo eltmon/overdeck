@@ -66,6 +66,22 @@ describe('ConversationRow model metadata', () => {
   });
 });
 
+describe('ConversationRow stalled OpenCode turn', () => {
+  it('shows a muted stalled label instead of the working spinner', () => {
+    renderRow({
+      harness: 'opencode',
+      sessionAlive: true,
+      isWorking: true,
+      currentTool: 'Bash',
+      stalledSince: '2026-09-20T14:23:08.000Z',
+    });
+
+    expect(screen.getByText(/waiting on agent — no activity since/i)).toBeInTheDocument();
+    expect(screen.getByLabelText('Agent stalled in test-conversation')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Agent working in test-conversation')).not.toBeInTheDocument();
+  });
+});
+
 describe('ConversationRow handoff-fallback badge (PAN-3736)', () => {
   it('shouts in red while the conversation has shown no sign of life', () => {
     renderRow({

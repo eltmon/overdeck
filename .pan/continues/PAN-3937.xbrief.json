@@ -1,0 +1,193 @@
+{
+  "version": "1",
+  "issueId": "PAN-3937",
+  "created": "2026-09-20T20:38:35.661Z",
+  "updated": "2026-09-20T20:46:11.077Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "acp-pre-allow-opencode-permission": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:38:35.661Z",
+      "doneAt": "2026-09-20T20:39:12.064Z"
+    },
+    "acp-host-deterministic-port": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:39:38.606Z",
+      "doneAt": "2026-09-20T20:39:48.269Z"
+    },
+    "acp-host-permission-watchdog": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:39:49.289Z",
+      "doneAt": "2026-09-20T20:39:59.197Z"
+    },
+    "dashboard-acp-stalled-turn-signal": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:40:00.338Z",
+      "doneAt": "2026-09-20T20:40:10.995Z"
+    },
+    "dashboard-acp-stalled-turn-ui": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:40:12.180Z",
+      "doneAt": "2026-09-20T20:40:21.847Z"
+    },
+    "acp-doc-permission-policy": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:40:23.014Z",
+      "doneAt": "2026-09-20T20:40:33.213Z"
+    },
+    "acp-diagnose-permission-unstick-recipe": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:40:34.421Z",
+      "doneAt": "2026-09-20T20:40:43.699Z"
+    },
+    "acp-pre-allow-opencode-permission.ac1": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:41:36.737Z",
+      "doneAt": "2026-09-20T20:41:46.166Z"
+    },
+    "acp-pre-allow-opencode-permission.ac2": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:41:47.277Z",
+      "doneAt": "2026-09-20T20:41:56.556Z"
+    },
+    "acp-pre-allow-opencode-permission.ac3": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:41:57.604Z",
+      "doneAt": "2026-09-20T20:42:08.541Z"
+    },
+    "acp-host-deterministic-port.ac1": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:42:09.586Z",
+      "doneAt": "2026-09-20T20:42:19.031Z"
+    },
+    "acp-host-deterministic-port.ac2": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:42:20.108Z",
+      "doneAt": "2026-09-20T20:42:29.737Z"
+    },
+    "acp-host-deterministic-port.ac3": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:42:30.870Z",
+      "doneAt": "2026-09-20T20:42:40.929Z"
+    },
+    "acp-host-permission-watchdog.ac1": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:42:42.085Z",
+      "doneAt": "2026-09-20T20:42:52.917Z"
+    },
+    "acp-host-permission-watchdog.ac2": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:42:54.098Z",
+      "doneAt": "2026-09-20T20:43:04.970Z"
+    },
+    "acp-host-permission-watchdog.ac3": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:43:06.205Z",
+      "doneAt": "2026-09-20T20:43:16.478Z"
+    },
+    "acp-host-permission-watchdog.ac4": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:43:17.609Z",
+      "doneAt": "2026-09-20T20:43:28.307Z"
+    },
+    "acp-host-permission-watchdog.ac5": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:43:29.534Z",
+      "doneAt": "2026-09-20T20:43:41.481Z"
+    },
+    "dashboard-acp-stalled-turn-signal.ac1": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:43:42.667Z",
+      "doneAt": "2026-09-20T20:43:52.119Z"
+    },
+    "dashboard-acp-stalled-turn-signal.ac2": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:43:53.202Z",
+      "doneAt": "2026-09-20T20:44:03.907Z"
+    },
+    "dashboard-acp-stalled-turn-signal.ac3": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:44:05.137Z",
+      "doneAt": "2026-09-20T20:44:16.404Z"
+    },
+    "dashboard-acp-stalled-turn-signal.ac4": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:44:17.645Z",
+      "doneAt": "2026-09-20T20:44:28.891Z"
+    },
+    "dashboard-acp-stalled-turn-ui.ac1": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:44:30.062Z",
+      "doneAt": "2026-09-20T20:44:41.451Z"
+    },
+    "dashboard-acp-stalled-turn-ui.ac2": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:44:42.547Z",
+      "doneAt": "2026-09-20T20:44:52.939Z"
+    },
+    "dashboard-acp-stalled-turn-ui.ac3": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:44:54.070Z",
+      "doneAt": "2026-09-20T20:45:05.453Z"
+    },
+    "acp-doc-permission-policy.ac1": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:45:06.807Z",
+      "doneAt": "2026-09-20T20:45:17.635Z"
+    },
+    "acp-doc-permission-policy.ac2": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:45:18.957Z",
+      "doneAt": "2026-09-20T20:45:31.563Z"
+    },
+    "acp-doc-permission-policy.ac3": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:45:33.069Z",
+      "doneAt": "2026-09-20T20:45:43.612Z"
+    },
+    "acp-diagnose-permission-unstick-recipe.ac1": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:45:44.808Z",
+      "doneAt": "2026-09-20T20:45:56.061Z"
+    },
+    "acp-diagnose-permission-unstick-recipe.ac2": {
+      "status": "completed",
+      "claimedBy": "conv-20260920-4179",
+      "claimedAt": "2026-09-20T20:45:57.326Z",
+      "doneAt": "2026-09-20T20:46:11.077Z"
+    }
+  }
+}

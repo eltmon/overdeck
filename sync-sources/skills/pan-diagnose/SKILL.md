@@ -156,6 +156,32 @@ pan tell ISSUE-123 "What is your current status?"
 
 **WARNING:** DO NOT use raw `tmux send-keys` - agents often forget the Enter key. Always use `pan tell` which handles this correctly.
 
+### OpenCode conversation stuck after a permission ask
+
+An OpenCode Task subagent can block its parent turn if its permission request
+does not reach ACP. First check whether the host watchdog already recovered it:
+
+```bash
+CONVERSATION=conv-YYYYMMDD-NNNN
+grep '"source":"watchdog"' \
+  "$HOME/.overdeck/agents/$CONVERSATION/acp-session.jsonl" | tail -5
+```
+
+If the turn is still stuck, list the pending asks on the host's recorded port,
+then reply to the relevant permission id:
+
+```bash
+OPENCODE_PORT=$(cat "$HOME/.overdeck/agents/$CONVERSATION/opencode-port")
+curl -sS "http://127.0.0.1:$OPENCODE_PORT/permission"
+curl -sS -X POST \
+  "http://127.0.0.1:$OPENCODE_PORT/permission/<permission-id>/reply" \
+  -H 'content-type: application/json' \
+  -d '{"reply":"always"}'
+```
+
+If `opencode-port` is absent, the conversation predates the watchdog. Use
+`ss -ltnp` to find the loopback port owned by its `opencode acp` process.
+
 ### Agent crashed
 
 ```bash

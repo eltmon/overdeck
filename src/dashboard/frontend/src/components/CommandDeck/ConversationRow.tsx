@@ -42,6 +42,14 @@ function shortHarness(harness: NonNullable<Conversation['harness']>): string {
   return harness;
 }
 
+function formatStalledTime(timestamp: string): string {
+  return new Date(timestamp).toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
 // ─── WorkingSpinner ───────────────────────────────────────────────────────────
 
 const PHASE_ICONS = {
@@ -150,6 +158,9 @@ export function ConversationRow({
   const iconSize = isNested ? 10 : 11;
   const dotSize = isNested ? 6 : 7;
   const spinnerSize = isNested ? 10 : 12;
+  const stalledLabel = conv.stalledSince
+    ? `waiting on agent — no activity since ${formatStalledTime(conv.stalledSince)}`
+    : null;
 
   const beginRename = useCallback(() => {
     committingRef.current = false;
@@ -218,6 +229,15 @@ export function ConversationRow({
   // Fork / spawn status badges — shared by both row variants.
   const forkBadges = (
     <>
+      {stalledLabel && (
+        <span
+          className={styles.conversationStalledStatus}
+          aria-label={`Agent stalled in ${conv.name}`}
+          title={new Date(conv.stalledSince!).toLocaleString()}
+        >
+          {stalledLabel}
+        </span>
+      )}
       {conv.forkStatus && conv.forkStatus !== 'failed' && (
         <span className={styles.conversationForkStatus} title={`Fork: ${conv.forkStatus}`}>
           <Loader2 size={10} className={styles.conversationWorkingSpinner} />
@@ -340,6 +360,12 @@ export function ConversationRow({
           kinds={conv.pendingInputKinds}
           size={spinnerSize}
           onClick={() => requestAskUserQuestionReopen(conv.name)}
+        />
+      ) : conv.stalledSince ? (
+        <AlertCircle
+          size={spinnerSize}
+          className={styles.conversationStalledIcon}
+          aria-hidden="true"
         />
       ) : conv.isWorking ? (
         <WorkingSpinner

@@ -156,7 +156,9 @@ export function generationFolderName(branchName: string): string {
 
 /**
  * Assemble the next generation from the given ready set. Always returns the
- * generation row (status 'ready' or 'failed'); throws only on store failures.
+ * generation row (status 'ready' or 'failed'); never throws — an unexpected
+ * failure (a store write above all, PAN-3963) marks the row 'failed' at once
+ * rather than stranding it in 'assembling' for the reconciler's stuck sweep.
  * On success, older 'ready' generations for the project flip to 'superseded'.
  */
 export async function assembleUatGeneration(
@@ -198,171 +200,192 @@ export async function assembleUatGeneration(
   };
 
   try {
-    await deps.git.createWorktree(name, worktreePath);
-  } catch (err) {
-    log(`[uat-generation] ${name}: worktree creation failed: ${err instanceof Error ? err.message : String(err)}`);
-    return finish('failed');
-  }
-
-  // Union lint (PAN-3166): owners come from the branch as just cut from the
-  // target, so a member colliding with a migration already on main is caught
-  // too; reservations cover every candidate branch, so an allocated version
-  // cannot collide with one a later member already holds. A read failure here
-  // fails the generation — a lint that quietly disables itself is worse than
-  // none, because assembly would still report ready.
-  let ledger: Awaited<ReturnType<typeof seedUnionLedger>>;
-  try {
-    ledger = await seedUnionLedger(deps.git, name, input.features.map((f) => f.branch));
-  } catch (err) {
-    log(`[uat-generation] ${name}: union lint could not read migrations: ${err instanceof Error ? err.message : String(err)} — marking failed`);
-    return finish('failed');
-  }
-
-  for (const feature of input.features) {
-    const mergedIssueIds = members.map((m) => m.issueId);
-    const attemptedHeadSha = async () => deps.git.branchHeadSha(feature.branch).catch(() => 'unknown');
-    const recordMember = async (): Promise<UatGenerationMember> => ({
-      issueId: feature.issueId,
-      title: feature.title,
-      branch: feature.branch,
-      headSha: await attemptedHeadSha(),
-      mergeOrder: members.length + 1,
-      ...(feature.pr !== undefined ? { pr: feature.pr } : {}),
-      ...(feature.prUrl !== undefined ? { prUrl: feature.prUrl } : {}),
-    });
-    const holdOut = async (reason: string): Promise<void> => {
-      heldOut.push({ issueId: feature.issueId, branch: feature.branch, headSha: await attemptedHeadSha(), reason });
-    };
-
-    // Union lint runs BEFORE the merge: git would take this branch cleanly
-    // (the colliding migrations are different filenames), and the batch would
-    // only fail at Flyway startup, long after assembly reported ready. A
-    // collision between migrations touching disjoint objects is renumbered
-    // after the merge lands; only a same-object collision holds the member out.
-    const plan = await planUnionLint({
-      git: deps.git,
-      ledger,
-      generationBranch: name,
-      featureBranch: feature.branch,
-      issueId: feature.issueId,
-    });
-    if (plan.disposition.kind === 'hold-out') {
-      log(`[uat-generation] ${name}: holding ${feature.issueId} out — ${plan.disposition.reason}`);
-      await holdOut(plan.disposition.reason);
-      deps.store.update(name, { members, heldOut, resolutions });
-      continue;
+    try {
+      await deps.git.createWorktree(name, worktreePath);
+    } catch (err) {
+      log(`[uat-generation] ${name}: worktree creation failed: ${err instanceof Error ? err.message : String(err)}`);
+      return finish('failed');
     }
 
-    /**
-     * Land any renumbering and record the member's (possibly renamed) files.
-     * Returns false when a planned rename did not land: the branch would then
-     * carry the very collision the lint exists to prevent, and this engine has
-     * no post-merge rollback, so the caller abandons the generation rather than
-     * publish a union known not to boot.
-     */
-    const settleUnionLint = async (): Promise<boolean> => {
-      let applied: Awaited<ReturnType<typeof applyUnionLintPlan>>;
+    // Union lint (PAN-3166): owners come from the branch as just cut from the
+    // target, so a member colliding with a migration already on main is caught
+    // too; reservations cover every candidate branch, so an allocated version
+    // cannot collide with one a later member already holds. A read failure here
+    // fails the generation — a lint that quietly disables itself is worse than
+    // none, because assembly would still report ready.
+    let ledger: Awaited<ReturnType<typeof seedUnionLedger>>;
+    try {
+      ledger = await seedUnionLedger(deps.git, name, input.features.map((f) => f.branch));
+    } catch (err) {
+      log(`[uat-generation] ${name}: union lint could not read migrations: ${err instanceof Error ? err.message : String(err)} — marking failed`);
+      return finish('failed');
+    }
+
+    for (const feature of input.features) {
+      const mergedIssueIds = members.map((m) => m.issueId);
+      const attemptedHeadSha = async () => deps.git.branchHeadSha(feature.branch).catch(() => 'unknown');
+      const recordMember = async (): Promise<UatGenerationMember> => ({
+        issueId: feature.issueId,
+        title: feature.title,
+        branch: feature.branch,
+        headSha: await attemptedHeadSha(),
+        mergeOrder: members.length + 1,
+        ...(feature.pr !== undefined ? { pr: feature.pr } : {}),
+        ...(feature.prUrl !== undefined ? { prUrl: feature.prUrl } : {}),
+      });
+      const holdOut = async (reason: string): Promise<void> => {
+        heldOut.push({ issueId: feature.issueId, branch: feature.branch, headSha: await attemptedHeadSha(), reason });
+      };
+
+      // Union lint runs BEFORE the merge: git would take this branch cleanly
+      // (the colliding migrations are different filenames), and the batch would
+      // only fail at Flyway startup, long after assembly reported ready. A
+      // collision between migrations touching disjoint objects is renumbered
+      // after the merge lands; only a same-object collision holds the member out.
+      const plan = await planUnionLint({
+        git: deps.git,
+        ledger,
+        generationBranch: name,
+        featureBranch: feature.branch,
+        issueId: feature.issueId,
+      });
+      if (plan.disposition.kind === 'hold-out') {
+        log(`[uat-generation] ${name}: holding ${feature.issueId} out — ${plan.disposition.reason}`);
+        await holdOut(plan.disposition.reason);
+        deps.store.update(name, { members, heldOut, resolutions });
+        continue;
+      }
+
+      /**
+       * Land any renumbering and record the member's (possibly renamed) files.
+       * Returns false when a planned rename did not land: the branch would then
+       * carry the very collision the lint exists to prevent, and this engine has
+       * no post-merge rollback, so the caller abandons the generation rather than
+       * publish a union known not to boot.
+       */
+      const settleUnionLint = async (): Promise<boolean> => {
+        let applied: Awaited<ReturnType<typeof applyUnionLintPlan>>;
+        try {
+          applied = await applyUnionLintPlan(deps.git, plan, feature.issueId);
+        } catch (err) {
+          log(`[uat-generation] ${name}: renumbering ${feature.issueId} failed: ${err instanceof Error ? err.message : String(err)}`);
+          return false;
+        }
+        if (applied) {
+          log(`[uat-generation] ${name}: renumbered ${feature.issueId} migrations — ${applied.note}`);
+          resolutions.push({
+            issueIds: [feature.issueId],
+            files: applied.files,
+            commitSha: applied.commitSha,
+            kind: 'migration-renumber',
+            note: applied.note,
+          });
+        } else if (plan.disposition.kind === 'renumber') {
+          log(`[uat-generation] ${name}: ${feature.issueId} needed renumbering but no rename primitive is wired`);
+          return false;
+        }
+        ledger?.record(plannedFiles(plan), feature.issueId);
+        return true;
+      };
+
+      let result: Awaited<ReturnType<GenerationGitDeps['mergeBranch']>>;
       try {
-        applied = await applyUnionLintPlan(deps.git, plan, feature.issueId);
+        result = await deps.git.mergeBranch(feature.branch);
       } catch (err) {
-        log(`[uat-generation] ${name}: renumbering ${feature.issueId} failed: ${err instanceof Error ? err.message : String(err)}`);
-        return false;
+        await deps.git.abortMerge().catch(() => {});
+        await holdOut(`merge failed: ${err instanceof Error ? err.message.split('\n')[0] : String(err)}`);
+        deps.store.update(name, { members, heldOut, resolutions });
+        continue;
       }
-      if (applied) {
-        log(`[uat-generation] ${name}: renumbered ${feature.issueId} migrations — ${applied.note}`);
-        resolutions.push({
-          issueIds: [feature.issueId],
-          files: applied.files,
-          commitSha: applied.commitSha,
-          kind: 'migration-renumber',
-          note: applied.note,
+
+      if (result.ok) {
+        if (!(await settleUnionLint())) return finish('failed');
+        members.push(await recordMember());
+        deps.store.update(name, { members, heldOut, resolutions });
+        continue;
+      }
+
+      if (!result.conflict || !deps.resolveConflict) {
+        await deps.git.abortMerge().catch(() => {});
+        await holdOut(result.conflict
+          ? `conflicts with ${conflictingWith(feature, mergedIssueIds).join(', ') || 'an earlier member'} — no assembly agent available`
+          : result.reason);
+        deps.store.update(name, { members, heldOut, resolutions });
+        continue;
+      }
+
+      const conflictingIssueIds = conflictingWith(feature, mergedIssueIds);
+      log(`[uat-generation] ${name}: resolving conflict ${feature.issueId} <-> ${conflictingIssueIds.join(', ') || '(unknown member)'}`);
+      let resolution: ConflictResolutionResult | null = null;
+      try {
+        resolution = await deps.resolveConflict({
+          feature,
+          mergedIssueIds,
+          conflictingIssueIds,
+          branchName: name,
+          worktreePath,
         });
-      } else if (plan.disposition.kind === 'renumber') {
-        log(`[uat-generation] ${name}: ${feature.issueId} needed renumbering but no rename primitive is wired`);
-        return false;
+      } catch (err) {
+        log(`[uat-generation] ${name}: conflict agent threw: ${err instanceof Error ? err.message : String(err)}`);
+        resolution = null;
       }
-      ledger?.record(plannedFiles(plan), feature.issueId);
-      return true;
-    };
 
-    let result: Awaited<ReturnType<GenerationGitDeps['mergeBranch']>>;
+      if (resolution) {
+        if (!(await settleUnionLint())) return finish('failed');
+        members.push(await recordMember());
+        resolutions.push({
+          issueIds: [feature.issueId, ...conflictingIssueIds],
+          files: resolution.files,
+          commitSha: resolution.commitSha,
+          kind: 'conflict',
+        });
+      } else {
+        await deps.git.abortMerge().catch(() => {});
+        await holdOut(`conflict with ${conflictingIssueIds.join(', ') || 'an earlier member'} could not be auto-resolved — waits for the next generation`);
+      }
+      deps.store.update(name, { members, heldOut, resolutions });
+    }
+
+    if (members.length === 0) {
+      log(`[uat-generation] ${name}: nothing merged (${heldOut.length} held out) — marking failed`);
+      return finish('failed');
+    }
+
     try {
-      result = await deps.git.mergeBranch(feature.branch);
+      await deps.git.push(name);
     } catch (err) {
-      await deps.git.abortMerge().catch(() => {});
-      await holdOut(`merge failed: ${err instanceof Error ? err.message.split('\n')[0] : String(err)}`);
-      deps.store.update(name, { members, heldOut, resolutions });
-      continue;
+      log(`[uat-generation] ${name}: push failed: ${err instanceof Error ? err.message : String(err)}`);
+      return finish('failed');
     }
 
-    if (result.ok) {
-      if (!(await settleUnionLint())) return finish('failed');
-      members.push(await recordMember());
-      deps.store.update(name, { members, heldOut, resolutions });
-      continue;
+    // This generation is now the current one; older ready generations remain
+    // testable but are no longer the freshest — flip them to superseded.
+    for (const older of deps.store.listChain(input.projectRoot, ['ready'])) {
+      if (older.name !== name) deps.store.update(older.name, { status: 'superseded' });
     }
 
-    if (!result.conflict || !deps.resolveConflict) {
-      await deps.git.abortMerge().catch(() => {});
-      await holdOut(result.conflict
-        ? `conflicts with ${conflictingWith(feature, mergedIssueIds).join(', ') || 'an earlier member'} — no assembly agent available`
-        : result.reason);
-      deps.store.update(name, { members, heldOut, resolutions });
-      continue;
-    }
-
-    const conflictingIssueIds = conflictingWith(feature, mergedIssueIds);
-    log(`[uat-generation] ${name}: resolving conflict ${feature.issueId} <-> ${conflictingIssueIds.join(', ') || '(unknown member)'}`);
-    let resolution: ConflictResolutionResult | null = null;
-    try {
-      resolution = await deps.resolveConflict({
-        feature,
-        mergedIssueIds,
-        conflictingIssueIds,
-        branchName: name,
-        worktreePath,
-      });
-    } catch (err) {
-      log(`[uat-generation] ${name}: conflict agent threw: ${err instanceof Error ? err.message : String(err)}`);
-      resolution = null;
-    }
-
-    if (resolution) {
-      if (!(await settleUnionLint())) return finish('failed');
-      members.push(await recordMember());
-      resolutions.push({
-        issueIds: [feature.issueId, ...conflictingIssueIds],
-        files: resolution.files,
-        commitSha: resolution.commitSha,
-        kind: 'conflict',
-      });
-    } else {
-      await deps.git.abortMerge().catch(() => {});
-      await holdOut(`conflict with ${conflictingIssueIds.join(', ') || 'an earlier member'} could not be auto-resolved — waits for the next generation`);
-    }
-    deps.store.update(name, { members, heldOut, resolutions });
-  }
-
-  if (members.length === 0) {
-    log(`[uat-generation] ${name}: nothing merged (${heldOut.length} held out) — marking failed`);
-    return finish('failed');
-  }
-
-  try {
-    await deps.git.push(name);
+    log(`[uat-generation] ${name}: ready — ${members.length} member(s), ${resolutions.length} resolution(s), ${heldOut.length} held out`);
+    return finish('ready');
   } catch (err) {
-    log(`[uat-generation] ${name}: push failed: ${err instanceof Error ? err.message : String(err)}`);
-    return finish('failed');
+    // PAN-3963: a thrown store write (the dead `issues` FK before its
+    // rebuild was the live instance) used to escape here, leaving the row in
+    // 'assembling' for the 60-minute stuck sweep while the reconciler built
+    // a fresh worktree every hour. Mark the generation failed at once — with
+    // a STATUS-ONLY update, because finish() rewrites the member rows whose
+    // write may be exactly what threw.
+    const message = err instanceof Error ? err.message : String(err);
+    log(`[uat-generation] ${name}: assembly aborted: ${message} — marking failed`);
+    try {
+      deps.store.update(name, { status: 'failed' });
+    } catch (updateErr) {
+      log(`[uat-generation] ${name}: could not mark the generation failed: ${updateErr instanceof Error ? updateErr.message : String(updateErr)}`);
+    }
+    return {
+      name, worktreePath, projectRoot: input.projectRoot, baseSha,
+      status: 'failed', members, heldOut, resolutions,
+      stackStartedAt: null, cleanedAt: null, createdAt: '', updatedAt: '',
+    };
   }
-
-  // This generation is now the current one; older ready generations remain
-  // testable but are no longer the freshest — flip them to superseded.
-  for (const older of deps.store.listChain(input.projectRoot, ['ready'])) {
-    if (older.name !== name) deps.store.update(older.name, { status: 'superseded' });
-  }
-
-  log(`[uat-generation] ${name}: ready — ${members.length} member(s), ${resolutions.length} resolution(s), ${heldOut.length} held out`);
-  return finish('ready');
 }
 
 function conflictingWith(feature: ReadyFeature, mergedIssueIds: readonly string[]): string[] {
