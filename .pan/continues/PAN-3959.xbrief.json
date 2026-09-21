@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3959",
   "created": "2026-09-20T22:53:20.505Z",
-  "updated": "2026-09-21T00:06:11.163Z",
+  "updated": "2026-09-21T00:06:21.886Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -186,6 +186,10 @@
     "w9-docs-transcript-path-index.ac2": {
       "status": "completed",
       "doneAt": "2026-09-21T00:06:11.163Z"
+    },
+    "w9-docs-transcript-path-index.ac3": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:06:21.886Z"
     }
   }
 }
