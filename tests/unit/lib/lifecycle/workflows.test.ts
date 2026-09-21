@@ -185,7 +185,7 @@ const closeOut = (...args: Parameters<typeof closeOutProgram>) => Effect.runProm
 const deepWipe = (...args: Parameters<typeof deepWipeProgram>) => Effect.runPromise(deepWipeProgram(...args));
 const close = (...args: Parameters<typeof closeProgram>) => Effect.runPromise(closeProgram(...args));
 const resetToTodo = (...args: Parameters<typeof resetToTodoProgram>) => Effect.runPromise(resetToTodoProgram(...args));
-import { AGENTS_DIR, OVERDECK_HOME } from '../../../../src/lib/paths.js';
+import { AGENTS_DIR, OVERDECK_HOME, getOverdeckHome } from '../../../../src/lib/paths.js';
 import { findSpecByIssue as findSpecByIssueProgram, writeSpecForIssue as writeSpecForIssueProgram } from '../../../../src/lib/pan-dir/specs.js';
 
 // PAN-1249: pan-dir/specs functions return Effect; bridge to sync via runPromise for tests.
@@ -1241,6 +1241,50 @@ describe('workflows', () => {
       expect(spec?.status).toBe('completed');
       expect(spec?.document.plan.status).toBe('completed');
       expect(mockResetPostMergeState).toHaveBeenCalledWith('PAN-100');
+    });
+
+    it("keeps state.json and sessions.json of the issue's agents (PAN-3968)", async () => {
+      const agentDir = join(getOverdeckHome(), 'agents', 'agent-pan-100');
+      mkdirSync(agentDir, { recursive: true });
+      writeFileSync(join(agentDir, 'state.json'), JSON.stringify({
+        id: 'agent-pan-100',
+        issueId: 'PAN-100',
+        role: 'work',
+        status: 'running',
+        workspace: '/repo/workspaces/feature-pan-100',
+        harness: 'claude-code',
+        model: 'claude',
+        startedAt: '2026-09-20T00:00:00.000Z',
+      }));
+      writeFileSync(join(agentDir, 'sessions.json'), JSON.stringify({
+        sessionId: 'session-1',
+        at: '2026-09-20T00:00:00.000Z',
+        source: 'hook',
+        harness: 'claude-code',
+        model: 'claude',
+      }) + '\n');
+      writeFileSync(join(agentDir, 'activity.jsonl'), '');
+      writeFileSync(join(agentDir, 'pending.lock'), '');
+
+      try {
+        await writeSpecForIssue(testDir, makeXBrief('PAN-100'), 'active');
+
+        const ctx = { issueId: 'PAN-100', projectPath: testDir };
+        const result = await closeOut(ctx, { tracker: successfulTracker() });
+
+        expect(result.success).toBe(true);
+        expect(existsSync(join(agentDir, 'state.json'))).toBe(true);
+        expect(existsSync(join(agentDir, 'sessions.json'))).toBe(true);
+        expect(existsSync(join(agentDir, 'activity.jsonl'))).toBe(true);
+        expect(existsSync(join(agentDir, '.retained-transcripts'))).toBe(false);
+
+        const state = JSON.parse(readFileSync(join(agentDir, 'state.json'), 'utf-8'));
+        expect(state.status).toBe('stopped');
+
+        expect(result.steps.some(s => s.step === 'close-out:prune-agent-rows')).toBe(false);
+      } finally {
+        rmSync(agentDir, { recursive: true, force: true });
+      }
     });
 
     it('should abort before closing the tracker issue on teardown failure', async () => {
