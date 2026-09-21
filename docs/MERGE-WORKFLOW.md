@@ -155,6 +155,9 @@ Close-out prunes only regenerable agent-directory weight: `pending.lock`,
 `state.json`, the append-only `sessions.json` index, lifecycle and activity
 logs, context receipts, Codex thread IDs, and every transcript. Explicit wipe,
 garbage collection, and retention remain the destructive cleanup paths.
+The ceremony runs no agent-row garbage collection of its own (PAN-3968 removed
+the `close-out:prune-agent-rows` step); the only paths that delete `state.json`
+are deep-wipe, `pan admin db gc-agents`, and transcript retention.
 
 When the merge-train flag (`flywheel.merge_train_enabled`, default off) is
 ON, a merge-train reconcile pass rebases/re-verifies ready sibling branches
