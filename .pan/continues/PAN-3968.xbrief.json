@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3968",
   "created": "2026-09-21T00:11:40.860Z",
-  "updated": "2026-09-21T00:25:09.946Z",
+  "updated": "2026-09-21T00:26:49.579Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -22,9 +22,10 @@
       "doneAt": "2026-09-21T00:25:06.462Z"
     },
     "delete-dead-execute-close-out": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3968",
-      "claimedAt": "2026-09-21T00:25:09.946Z"
+      "claimedAt": "2026-09-21T00:25:09.946Z",
+      "doneAt": "2026-09-21T00:26:49.578Z"
     }
   }
 }
