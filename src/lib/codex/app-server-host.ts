@@ -16,9 +16,10 @@ import {
   type TurnOptions,
 } from './app-server-manager.js';
 import { BRIDGE_TOKEN_HEADER } from '../bridge-token.js';
-import { codexHome, writeThreadId } from '../runtimes/codex.js';
+import { codexHome, waitForCodexRollout, writeThreadId } from '../runtimes/codex.js';
 import { calculateCostSync, getPricingSync } from '../cost.js';
 import { recordAgentActivitySync } from '../agents/agent-state.js';
+import { appendSessionIdToHistory } from '../session-history.js';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -242,7 +243,13 @@ export class CodexAppServerHost {
   private attachManagerEvents(): void {
     this.manager.on('notification', (message: AppServerMessage) => {
       const threadId = extractThreadId(message);
-      if (message.method === 'thread/started' && threadId) writeThreadId(this.options.agentId, threadId);
+      if (message.method === 'thread/started' && threadId) {
+        writeThreadId(this.options.agentId, threadId);
+        const agentId = this.options.agentId;
+        void waitForCodexRollout(this.options.codexHome ?? codexHome(), 120_000)
+          .then(rollout => rollout && appendSessionIdToHistory(agentId, threadId, 'app-server', { harness: 'codex', path: rollout }))
+          .catch(() => {});
+      }
       this.renderNotification(message);
       this.recordObservedActivity(message);
       void this.appendEvent('notification', message as JsonRecord);

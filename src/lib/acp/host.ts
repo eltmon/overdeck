@@ -31,6 +31,7 @@ import {
   selectAutoPermissionOutcome,
 } from "./permissions.js";
 import { resolveAcpModelId, resolveAcpProviderSupport } from "./providers.js";
+import { appendSessionIdToHistory } from "../session-history.js";
 import {
   AcpSessionRuntime,
   type AcpSessionRuntimeEvent,
@@ -171,6 +172,11 @@ export class AcpHost {
       this.state = "ready";
       await writeFile(this.sessionIdPath(), `${started.sessionId}\n`, { mode: FILE_MODE });
       await chmod(this.sessionIdPath(), FILE_MODE);
+      appendSessionIdToHistory(this.options.agentId, started.sessionId, "acp-host", {
+        harness: "acp",
+        model: this.options.model,
+        path: this.transcriptPath(),
+      });
     } catch (error) {
       const launchError = this.options.provider === "kimi" && isAuthenticationFailure(error)
         ? "Kimi authentication is required. Run `kimi`, then /login, and retry."

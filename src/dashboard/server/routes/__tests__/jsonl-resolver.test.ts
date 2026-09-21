@@ -188,6 +188,84 @@ describe('resolveJsonlPath (PAN-830)', () => {
   });
 });
 
+describe('listAgentTranscriptCandidates — recorded transcript path fast path (PAN-3959)', () => {
+  it('resolves a path-carrying entry to the recorded file with no formula-derived candidate for the same entry', async () => {
+    const encoded = encodeClaudeProjectDir(WORKSPACE_PATH);
+    const projectDir = join(claudeProjectsDir, encoded);
+    await mkdir(projectDir, { recursive: true });
+    // Formula-derived location for this session id — must NOT be the resolved candidate.
+    await writeFile(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`), '{"formula":"wrong"}\n');
+    const recordedDir = join(testDir, 'recorded');
+    await mkdir(recordedDir, { recursive: true });
+    const recordedPath = join(recordedDir, `${CLAUDE_SESSION_ID}.jsonl`);
+    await writeFile(recordedPath, '{"recorded":"right"}\n');
+    await writeFile(join(agentsDir, AGENT_ID, 'sessions.json'), `${JSON.stringify({
+      sessionId: CLAUDE_SESSION_ID,
+      at: new Date().toISOString(),
+      source: 'session-start-hook',
+      harness: 'claude-code',
+      path: recordedPath,
+    })}\n`);
+
+    const candidates = await listAgentTranscriptCandidates(AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+      getRuntimeStateAsync: async () => null,
+    });
+
+    expect(candidates).toEqual([{ kind: 'claude', path: recordedPath }]);
+  });
+
+  it('falls through to an older entry when the recorded path is missing on disk', async () => {
+    const OLDER_SESSION_ID = '11111111-2222-4333-8444-555555555555';
+    const encoded = encodeClaudeProjectDir(WORKSPACE_PATH);
+    const projectDir = join(claudeProjectsDir, encoded);
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(join(projectDir, `${OLDER_SESSION_ID}.jsonl`), '{"older":"formula"}\n');
+    const missingRecordedPath = join(testDir, 'missing', `${CLAUDE_SESSION_ID}.jsonl`);
+    const lines = [
+      JSON.stringify({ sessionId: OLDER_SESSION_ID, at: '2026-09-19T00:00:00.000Z', source: 'launcher', harness: 'claude-code' }),
+      JSON.stringify({
+        sessionId: CLAUDE_SESSION_ID,
+        at: '2026-09-20T00:00:00.000Z',
+        source: 'session-start-hook',
+        harness: 'claude-code',
+        path: missingRecordedPath,
+      }),
+    ];
+    await writeFile(join(agentsDir, AGENT_ID, 'sessions.json'), `${lines.join('\n')}\n`);
+
+    const path = await resolveJsonlPath(AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+      getRuntimeStateAsync: async () => null,
+    });
+
+    expect(path).toBe(join(projectDir, `${OLDER_SESSION_ID}.jsonl`));
+  });
+
+  it('still resolves a pathless entry via its per-harness formula', async () => {
+    const encoded = encodeClaudeProjectDir(WORKSPACE_PATH);
+    const projectDir = join(claudeProjectsDir, encoded);
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`), '{}\n');
+    await writeFile(join(agentsDir, AGENT_ID, 'sessions.json'), `${JSON.stringify({
+      sessionId: CLAUDE_SESSION_ID,
+      at: new Date().toISOString(),
+      source: 'session-start-hook',
+      harness: 'claude-code',
+    })}\n`);
+
+    const path = await resolveJsonlPath(AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+      getRuntimeStateAsync: async () => null,
+    });
+
+    expect(path).toBe(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`));
+  });
+});
+
 describe('resolveJsonlPath — codex agents (PAN-1805)', () => {
   const CODEX_AGENT_ID = 'agent-pan-1803';
   // Each test gets a distinct thread-id: findRolloutPath caches by

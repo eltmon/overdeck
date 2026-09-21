@@ -1009,12 +1009,12 @@ async function spawnAgentWithoutConsentClaim(
     const codexHomeForAgent = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home-v2');
     void (async () => {
       try {
-        const { waitForCodexRollout, extractThreadIdFromRollout, writeThreadId } =
+        const { waitForCodexRollout, extractThreadIdFromRollout, recordCodexRolloutSession } =
           await import('../runtimes/codex.js');
         const rollout = await waitForCodexRollout(codexHomeForAgent, 120_000);
         if (rollout) {
           const threadId = extractThreadIdFromRollout(rollout);
-          if (threadId) writeThreadId(agentId, threadId);
+          if (threadId) recordCodexRolloutSession(agentId, threadId, rollout);
         }
       } catch { /* non-fatal — the latest-rollout fallback still resolves the transcript */ }
     })();

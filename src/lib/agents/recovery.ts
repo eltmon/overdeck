@@ -290,7 +290,7 @@ export async function restartAgent(
       }));
 
       if (kimiExistingSessionsBefore) {
-        const { waitForNewKimiSessionAsync, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
+        const { waitForNewKimiSessionAsync, recordKimiSessionCapture } = await import('../runtimes/kimi-code.js');
         const sessionId = await waitForNewKimiSessionAsync(
           join(homedir(), '.kimi-code'),
           agentState.workspace,
@@ -301,7 +301,7 @@ export async function restartAgent(
             `kimi-code session capture timed out after fresh relaunch for ${normalizedId} — no new session directory appeared under the workspace bucket`,
           );
         }
-        writeKimiSessionId(normalizedId, sessionId);
+        recordKimiSessionCapture(normalizedId, sessionId, agentState.workspace);
       }
     };
 
@@ -640,14 +640,14 @@ export async function recoverAgent(
       }));
 
       if (kimiExistingSessionsBefore) {
-        const { waitForNewKimiSessionAsync, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
+        const { waitForNewKimiSessionAsync, recordKimiSessionCapture } = await import('../runtimes/kimi-code.js');
         const sessionId = await waitForNewKimiSessionAsync(
           join(homedir(), '.kimi-code'),
           state.workspace,
           kimiExistingSessionsBefore,
         );
         if (sessionId) {
-          writeKimiSessionId(normalizedId, sessionId);
+          recordKimiSessionCapture(normalizedId, sessionId, state.workspace);
         } else {
           // PAN-1837 review fix: fail closed like restartAgent/spawnAgent — a
           // missing capture would otherwise leave a running, unowned Kimi

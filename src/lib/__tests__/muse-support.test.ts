@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -16,6 +16,30 @@ import { parseMuseRecords, summarizeMuseRecords } from '../cost-parsers/muse-par
 import { museDataHome, resolveMuseSessionPath } from '../runtimes/muse-session.js';
 import { renderForHarness } from '../context-layers/harness.js';
 import { parseMuseConversationMessages } from '../../dashboard/server/services/muse-conversation-parser.js';
+import { readSessionIndexSync } from '../session-history.js';
+import { MuseRuntimeSync } from '../runtimes/muse.js';
+
+vi.mock('../harness-binary.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../harness-binary.js')>();
+  return { ...actual, prepareHarnessLaunch: vi.fn(async () => ({ binaryPath: '/usr/bin/muse', pathExport: '' })) };
+});
+vi.mock('../runtimes/tmux-cli.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../runtimes/tmux-cli.js')>();
+  return {
+    ...actual,
+    tmuxCreateSession: vi.fn(async () => undefined),
+    tmuxSessionExists: vi.fn(async () => false),
+    tmuxKillSession: vi.fn(async () => undefined),
+  };
+});
+vi.mock('../agents/runtime-command.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../agents/runtime-command.js')>();
+  return { ...actual, waitForPromptReady: vi.fn(async () => true) };
+});
+vi.mock('../runtimes/muse-context.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../runtimes/muse-context.js')>();
+  return { ...actual, materializeMuseContext: vi.fn(async () => '/tmp/fake-muse-context.md') };
+});
 
 const models = ['muse-spark-1.3', 'muse-spark-1.3-contributor'] as const;
 const temporary: string[] = [];
@@ -135,5 +159,40 @@ describe('Muse model and harness support', () => {
     expect(metadata.cwdFromFirstMessage).toBeTruthy();
     expect(result.streaming).toBe(false);
     expect(result.lastTurnCompletedAt).toBeTruthy();
+  });
+
+  it('records the real session log path in the session index after a native spawn (PAN-3959)', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'muse-spawn-')); temporary.push(root);
+    const originalOverdeckHome = process.env.OVERDECK_HOME;
+    process.env.OVERDECK_HOME = root;
+    try {
+      const agentId = 'agent-muse-spawn-test';
+      const sessionDir = join(museDataHome(agentId, join(root, 'agents')), 'muse', 'sessions', '2026', '09', '20', '01-fresh');
+      await mkdir(sessionDir, { recursive: true });
+      const sessionLogPath = join(sessionDir, 'session.jsonl');
+      await writeFile(sessionLogPath, '{}\n');
+
+      const runtime = new MuseRuntimeSync();
+      const agent = await runtime.spawnAgent({
+        agentId,
+        workspace: '/tmp/muse-workspace',
+        runtime: 'muse',
+        model: 'muse-spark-1.3',
+      });
+
+      expect(agent.sessionId).toBe('01-fresh');
+      expect(readSessionIndexSync(agentId)).toEqual([
+        expect.objectContaining({
+          sessionId: '01-fresh',
+          source: 'launcher',
+          harness: 'muse',
+          model: 'muse-spark-1.3',
+          path: sessionLogPath,
+        }),
+      ]);
+    } finally {
+      if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+      else process.env.OVERDECK_HOME = originalOverdeckHome;
+    }
   });
 });

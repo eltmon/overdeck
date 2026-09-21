@@ -45,6 +45,7 @@ import { tmuxCreateSession, tmuxKillSession, tmuxSessionExists } from './tmux-cl
 import { TmuxError, ProcessSpawnError, ProcessTimeoutError } from '../errors.js'
 import { prepareHarnessLaunch } from '../harness-binary.js'
 import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js'
+import { appendSessionIdToHistory } from '../session-history.js'
 
 const execAsync = promisify(exec)
 
@@ -212,6 +213,12 @@ function readThreadId(agentId: string): string | null {
 /** Persist the thread-id after spawn so introspection can find the rollout file. */
 export function writeThreadId(agentId: string, threadId: string): void {
   writeFileSync(threadIdPathFor(agentId), threadId, { mode: 0o600 })
+}
+
+/** Persist the thread-id and record the rollout path in the session index. */
+export function recordCodexRolloutSession(agentId: string, threadId: string, rolloutPath: string): void {
+  writeThreadId(agentId, threadId)
+  appendSessionIdToHistory(agentId, threadId, 'capture', { harness: 'codex', path: rolloutPath })
 }
 
 /** Cache resolved rollout paths to avoid repeated synchronous directory walks. */
@@ -833,7 +840,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     // 5. Capture thread-id from the rollout filename and persist it.
     const threadId = extractThreadIdFromRollout(rolloutPath)
     if (threadId) {
-      writeThreadId(agentId, threadId)
+      recordCodexRolloutSession(agentId, threadId, rolloutPath)
     }
 
     return {
