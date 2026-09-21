@@ -1,0 +1,1400 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-09-21T21:53:37.150Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3964: Restore the Flywheel page as a derived view (cut by PAN-3917 FR-13 against operator intent)",
+    "updated": "2026-09-21T22:04:22.033Z"
+  },
+  "plan": {
+    "id": "pan-3964",
+    "title": "Restore the Flywheel page as a derived view (cut by PAN-3917 FR-13 against operator intent)",
+    "status": "proposed",
+    "uid": "cbfb01b5-ce31-4430-8f51-cd083f4433ff",
+    "author": "agent:claude-opus-5",
+    "sequence": 2,
+    "created": "2026-09-21T21:53:37.150Z",
+    "updated": "2026-09-21T22:04:22.033Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3964",
+        "label": "PAN-3964",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/pan-3964.md",
+        "label": "PRD",
+        "type": "document"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3917",
+        "label": "PAN-3917 (the Cut)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "flywheel",
+      "dashboard",
+      "cli",
+      "derived-state",
+      "restore"
+    ],
+    "metadata": {
+      "sizeJustification": "One plan on purpose: the issue's acceptance is 'every v1 row has a home' plus 'pan flywheel status and the page agree', and both span the lib, the CLI, the routes, the page, and the skill. Landing the verbs without the page (or the page without the verbs) is exactly the partial restore the operator objected to. Items are small vertical slices with one shared deriver (wi-3) so they still parallelize.",
+      "canonicalFilename": "2026-09-21-PAN-3964-restore-the-flywheel-page-as-a-derived-view-cut-by-pan-3917-fr-13-against-operator-intent.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "PAN-3917 FR-13 deleted the Flywheel dashboard page, its run-record telemetry, and the pause/resume/abort/report/stats verbs, leaving only `pan flywheel start|stop|status` (which answers 'is the tmux session alive') and the pan-flywheel loop skill. The operator did not want the page cut. Today there is no view of what the loop is doing, no home for the auto_pickup_backlog and require_uat_before_merge policies, no pending-auto-merge surface, no state or report file, and the skill lost the pickup-gate vocabulary and the metabolism mission.",
+      "Proposal": "Restore every v1 affordance as a derived view. One shared `deriveFlywheelStatus()` in `src/lib/flywheel/` reads the flywheel conversation row, its transcript (the skill prints a parseable `flywheel-tick:` line at the end of every tick), the per-issue pipeline journals, the control-settings policies, and the running order book. The CLI (`pan flywheel status|stats|pause|resume|abort|report|stop|start`), new `/api/flywheel/*` routes, and a restored `/flywheel` page all consume it. The loop maintains `.pan/flywheel/state.md` and writes `.pan/flywheel/report.md` on stop, committed like the backlog sequence. Substrate-bug stats (c1 discovery rate, c2 P0 count, 30d window, trend) are computed on read from the tracker label `substrate-improvement` and merged PRs. No new SQLite table; no run record.",
+      "NonGoals": "- Stats criteria c3–c7 (pass rate, MTTR, intervention, time consistency, flake); their inputs were the deleted telemetry\n- Any run record, run id, flywheel_runs table, telemetry service, or POST /api/flywheel/status written by the loop\n- Boot reconciliation, Recover button, orphan-test-agent surface, VerifyingOnMain badge, reset/restart-from-plan buttons (same cut commit, separate concerns)\n- Moving merge_train_enabled off the Merge train section of Awaiting Merge\n- Changing the loop's phases or the pan start launch path\n- Re-adding roles/flywheel.md as a launched role prompt (it is cited as source text for the skill only)\n- A `.pan/` substrate-bug observation file (D2: the tracker is the source)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "State and report files live at <planHome>/.pan/flywheel/state.md and report.md, not docs/FLYWHEEL-STATE.md.",
+        "rationale": "The issue's acceptance says the only stores are .pan/ files and the pipeline journal; the loop commits them with commitPlanArtifacts exactly as pan backlog write-sequence commits .pan/backlog."
+      },
+      {
+        "summary": "Substrate-bug stats are computed on read from tracker issues labeled substrate-improvement plus merged PRs, not from a .pan/ observation file or the pipeline journal.",
+        "rationale": "The journal dies with the workspace so it cannot hold a 30-day window; the tracker already holds every substrate bug as a labeled issue, so a second file would drift. The cache's closedWindowDays=14 cannot serve 30 days, so the reader shells gh issue list through an injected, 60s-cached dependency. Only c1 and c2 return; c3–c7 are non-goals."
+      },
+      {
+        "summary": "The status pane is fed by a parseable `flywheel-tick:` line the skill prints at the end of every tick; parsed by one function used by the CLI and the server.",
+        "rationale": "The issue asks for status derived from the conversation transcript. Free prose is not parseable; a one-line marker is the smallest contract that keeps the loop free of endpoints and stored records."
+      },
+      {
+        "summary": "pause = handleConversationStop (session killed, row ended, transcript kept); resume = handleConversationResume then re-send /pan-flywheel; abort = pause without a report; stop = ask the loop to write report.md, wait up to 120s, then pause.",
+        "rationale": "The issue maps pause/resume to the conversation and report to the loop writing report.md on stop. The existing conversation handlers already do the bookkeeping today's pan flywheel stop skips (markConversationEnded)."
+      },
+      {
+        "summary": "pan flywheel start refuses when a paused flywheel conversation exists unless --fresh.",
+        "rationale": "createConversation deletes the row by name, so a plain start over a paused loop would silently drop its conversation; the operator should choose resume or fresh."
+      },
+      {
+        "summary": "auto_pickup_backlog and require_uat_before_merge get switches in the Flywheel page header; merge_train_enabled stays on the Awaiting Merge page with a read-only chip on the Flywheel page.",
+        "rationale": "The issue row says merge_train_enabled lives on the Merge train page and asks for a home for the other two, which currently have no UI at all."
+      },
+      {
+        "summary": "One shared deriveFlywheelStatus() in src/lib/flywheel/derive-status.ts feeds pan flywheel status, GET /api/flywheel/status, and the page.",
+        "rationale": "The acceptance says the CLI and the page must agree, both reading the conversation and the journals; a single deriver makes that true by construction instead of by discipline."
+      },
+      {
+        "summary": "The flywheel is scoped to the project of its conversation's cwd (process.cwd() of the dashboard when no conversation exists); in-flight issues are that project's workspaces/feature-* directories.",
+        "rationale": "v1 read docs/FLYWHEEL-STATE.md from process.cwd(); the loop still runs in the project root; listFeatureWorkspaces already enumerates live feature workspaces and loadIssueStatesForProject derives their state."
+      },
+      {
+        "summary": "One plan with sizeJustification rather than sibling issues.",
+        "rationale": "The no-loss and CLI/page-agreement acceptance criteria span every layer; sibling issues would serialize behind the deriver anyway and leave a partial restore in between."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi-1-contracts",
+        "title": "Add FlywheelDerivedStatus, FlywheelStats, TickMarker schemas to @overdeck/contracts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-21T21:53:37.150Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3964",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/flywheel.ts",
+            "packages/contracts/src/index.ts",
+            "packages/contracts/src/flywheel.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bun run --cwd packages/contracts build",
+            "npx vitest run packages/contracts/src/flywheel.test.ts"
+          ],
+          "expected_outputs": [
+            "contracts build completes without errors",
+            "flywheel.test.ts passes decoding one status and one stats fixture"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create packages/contracts/src/flywheel.ts with Effect Schema structs for TickMarker {tick, pick, phase, inFlight, needsYou}, FlywheelDerivedStatus (run, conversation, lastTick, freshness, policies, inFlight[], orderBook, projectRoot, generatedAt) and FlywheelStats (window, generatedAt, criteria.c1_bugRate, criteria.c2_p0Bugs, bugs[]) exactly as PRD FR-1/FR-2/FR-4 describe, following the Schema.Literals / Schema.optional style of derived-issue-state.ts. Export from index.ts. Rebuild contracts."
+        },
+        "items": [
+          {
+            "id": "wi-1-contracts.ac1",
+            "title": "Given the contracts package, when it builds, then it exports FlywheelDerivedStatus, FlywheelStats and TickMarker types and schemas",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-1-contracts.ac2",
+            "title": "Given a full status fixture and a stats fixture, when decoded with the schemas, then decoding returns the same values without error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-1-contracts.ac3",
+            "title": "Given run='idle', when decoded, then conversation and lastTick accept null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-2-tick-marker",
+        "title": "Tick marker format/parse and shared flywheel constants",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-21T21:53:37.150Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3964",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wi-3-derive-status",
+            "wi-10-status-pane",
+            "wi-15-skill"
+          ],
+          "files_scope": [
+            "src/lib/flywheel/constants.ts",
+            "src/lib/flywheel/tick-marker.ts",
+            "src/cli/commands/flywheel.ts",
+            "tests/unit/lib/flywheel/tick-marker.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/flywheel/tick-marker.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tick-marker.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/flywheel/constants.ts holding FLYWHEEL_CONVERSATION_SESSION='conv-flywheel' and FLYWHEEL_SKILL_COMMAND='/pan-flywheel' (moved from src/cli/commands/flywheel.ts:30-33, which re-exports them). Create src/lib/flywheel/tick-marker.ts exporting TICK_MARKER_PREFIX='flywheel-tick:', formatTickMarker(t) producing `flywheel-tick: tick=<n> pick=<ISSUE|none> phase=<phase> in-flight=<A,B|none> needs-you=<text|none>`, and parseTickMarker(text) that takes the LAST line starting with the prefix, parses key=value tokens, treats needs-you as the rest of the line, maps 'none' to null/[] and unknown phases to 'watch'. This line shape is the cross-cutting contract between the skill prose (wi-15) and the deriver (wi-3)."
+        },
+        "items": [
+          {
+            "id": "wi-2-tick-marker.ac1",
+            "title": "Given a TickMarker fixture, when formatTickMarker then parseTickMarker runs, then the parsed value deep-equals the fixture",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-2-tick-marker.ac2",
+            "title": "Given text with two marker lines, when parsed, then the last line wins",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-2-tick-marker.ac3",
+            "title": "Given pick=none, in-flight=none, needs-you=none, when parsed, then pick is null, inFlight is [], needsYou is null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-2-tick-marker.ac4",
+            "title": "Given phase=bogus or a needs-you containing spaces and '=', when parsed, then phase falls back to 'watch' and needsYou preserves the full text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-3-derive-status",
+        "title": "deriveFlywheelStatus(): conversation + transcript + journals + policies + order book",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-21T21:53:37.150Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3964",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wi-7-cli-verbs",
+            "wi-8-routes",
+            "wi-9-page-shell",
+            "wi-10-status-pane"
+          ],
+          "files_scope": [
+            "src/lib/flywheel/derive-status.ts",
+            "tests/unit/lib/flywheel/derive-status.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/flywheel/derive-status.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "derive-status.test.ts passes idle/paused/running/freshness/in-flight/order-book cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/flywheel/derive-status.ts exporting deriveFlywheelStatus(opts) returning FlywheelDerivedStatus per PRD FR-1. Defaults for injectable deps: getConversation=getConversationByName (src/lib/overdeck/conversations.ts:1005); sessionAlive=tmuxSessionExists (src/lib/overdeck/conversation-runtime.ts:297); readTranscript = resolveSessionFile (conversation-reads.ts:88) then getCachedMessages(file,false).messages (:221); listWorkspaces=listFeatureWorkspaces (src/lib/cloister/deacon-workspaces.ts:15) filtered to projectPath===projectRoot; loadStates=loadIssueStatesForProject (src/lib/overdeck/derived-issue-state.ts:718); lastJournal=lastPipelineEntry (src/lib/cloister/pipeline-journal.ts:118); policies from control-settings.ts:473-494; runningBook = listBooks(panDir).find(status==='running') (src/lib/orders/resolver.ts:144); now. projectRoot = conv?.cwd ?? opts.projectRoot ?? process.cwd(); panDir = join(resolvePlanHome(projectRoot),'.pan'). run: 'running' when row exists && status==='active' && sessionAlive; 'paused' when row exists otherwise; 'idle' when no row. lastTick = parseTickMarker of the newest assistant message that contains the prefix, with at=createdAt; freshness live<=60s, breathing<=20min, else stalled. Never writes anything."
+        },
+        "items": [
+          {
+            "id": "wi-3-derive-status.ac1",
+            "title": "Given no conversation row, when derived, then run is 'idle', conversation and lastTick are null, and policies and inFlight still populate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-3-derive-status.ac2",
+            "title": "Given a row whose tmux session is dead, when derived, then run is 'paused'; given a live session, then run is 'running'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-3-derive-status.ac3",
+            "title": "Given a transcript with two marker lines in different assistant messages, when derived, then lastTick reflects the newest marker and its createdAt, and freshness returns live/breathing/stalled for injected now values of 30s/10min/25min later",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-3-derive-status.ac4",
+            "title": "Given two feature workspaces for the project, when derived, then inFlight has two rows each carrying the derived state and the last pipeline journal entry (null when the journal is empty)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-3-derive-status.ac5",
+            "title": "Given a running order book in .pan/orders, when derived, then orderBook returns its id, name, status, landed and total; given none running, then null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-4-files",
+        "title": "State and report file readers under .pan/flywheel/",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-21T21:53:37.150Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3964",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/flywheel/files.ts",
+            "tests/unit/lib/flywheel/files.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/flywheel/files.test.ts"
+          ],
+          "expected_outputs": [
+            "files.test.ts passes missing/present/traversal cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/flywheel/files.ts exporting FLYWHEEL_STATE_RELATIVE_PATH='.pan/flywheel/state.md', FLYWHEEL_REPORT_RELATIVE_PATH='.pan/flywheel/report.md', readFlywheelStateFile(planHome) and readFlywheelReportFile(planHome), each returning {exists, path, content, lastModified} — port v1 readFlywheelState from `git show 0219a2636e1^:src/dashboard/server/services/flywheel-state.ts` with planHome instead of process.cwd(). Async fs only; ENOENT -> exists:false; a resolved path outside planHome throws."
+        },
+        "items": [
+          {
+            "id": "wi-4-files.ac1",
+            "title": "Given no .pan/flywheel/state.md, when read, then the reader returns exists:false, content:null, lastModified:null and path '.pan/flywheel/state.md'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-4-files.ac2",
+            "title": "Given a present report.md, when read, then the reader returns its content and an ISO lastModified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-4-files.ac3",
+            "title": "Given a planHome whose resolved file path escapes it, when read, then the reader throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-5-substrate-stats",
+        "title": "computeSubstrateStats(): c1 discovery rate and c2 P0 count on read",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-21T21:53:37.150Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3964",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/flywheel/substrate-stats.ts",
+            "tests/unit/lib/flywheel/substrate-stats.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/flywheel/substrate-stats.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "substrate-stats.test.ts passes threshold, trend, sufficiency and severity cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/flywheel/substrate-stats.ts exporting computeSubstrateStats({projectPath, windowDays=30, now, listSubstrateIssues, listMergedPrs}) returning FlywheelStats per PRD FR-4 (thresholds: c1 green <0.1, yellow <0.3, red otherwise; c2 green 0, yellow <=2, red otherwise; trend vs the preceding equal window, flat when the difference is <10% of the larger; dataSufficient false when merged PRs in window <5; severity from P0/P1/P2 labels else 'unknown'). Default listSubstrateIssues runs `gh issue list --label substrate-improvement --state all --search \"created:>=<since>\" --json number,title,createdAt,closedAt,labels --limit 500` via promisified execFile (cwd projectPath, 20s timeout) cached 60s per project; default listMergedPrs filters listRepoPullRequests (derived-issue-state.ts:272) by mergedAt in window. No execSync."
+        },
+        "items": [
+          {
+            "id": "wi-5-substrate-stats.ac1",
+            "title": "Given 2 substrate issues and 10 merged PRs in the window, when computed, then c1 value is 0.2 with status yellow and dataSufficient true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-5-substrate-stats.ac2",
+            "title": "Given 3 merged PRs in the window, when computed, then dataSufficient is false for c1 and the value is still reported",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-5-substrate-stats.ac3",
+            "title": "Given one P0-labeled issue in the window and none in the prior window, when computed, then c2 value is 1, status yellow, trend up",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-5-substrate-stats.ac4",
+            "title": "Given an issue with no severity label, when computed, then bugs[] lists it with severity 'unknown'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-6-actions",
+        "title": "Flywheel actions library: start, pause, resume, abort, report, stop",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-21T21:53:37.150Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3964",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/flywheel/actions.ts",
+            "src/lib/flywheel/errors.ts",
+            "src/cli/commands/flywheel.ts",
+            "tests/unit/lib/flywheel/actions.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/flywheel/actions.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "actions.test.ts passes with fake timers for stopFlywheel",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/flywheel/errors.ts (FlywheelAlreadyRunning, FlywheelPausedExists, FlywheelNotRunning) and src/lib/flywheel/actions.ts. startFlywheel(opts) = the body of flywheelStartCommand (src/cli/commands/flywheel.ts:47-99) minus console output, returning {session, harness, model, prompt, cwd}; before createConversation, if getConversationByName('conv-flywheel') exists and the session is dead, throw FlywheelPausedExists unless opts.fresh. pauseFlywheel() calls handleConversationStop('conv-flywheel', {}) (conversation-runtime.ts:996) and throws FlywheelNotRunning on a 404 body. resumeFlywheel() calls handleConversationResume(name, {}, {resolveSessionFile}) (:1028), waitForTmuxSession, waitForConversationRuntimeReady(name, harness, 'respawn'), then sendKeysAsync(name, '/pan-flywheel') + 'Enter'. abortFlywheel() = pauseFlywheel(). requestFlywheelReport() sends the PRD FR-5 report message via sendKeysAsync and throws FlywheelNotRunning when the session is dead. stopFlywheel({timeoutMs=120000, readReport, sleep}) sends the FR-5 stop message, polls readFlywheelReportFile(planHome).lastModified every 5s until newer than the request time or timeout, then pauseFlywheel(); returns {reportWritten}. Update src/cli/commands/flywheel.ts start to call startFlywheel (behavior unchanged for this item)."
+        },
+        "items": [
+          {
+            "id": "wi-6-actions.ac1",
+            "title": "Given a paused flywheel row and no fresh flag, when startFlywheel runs, then it throws FlywheelPausedExists before createConversation is called; with fresh:true it proceeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-6-actions.ac2",
+            "title": "Given a running flywheel, when pauseFlywheel runs, then handleConversationStop is called for conv-flywheel and the row reads status ended",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-6-actions.ac3",
+            "title": "Given a paused flywheel, when resumeFlywheel runs, then the resume handler is called and '/pan-flywheel' followed by Enter is sent to conv-flywheel after the runtime reports ready",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-6-actions.ac4",
+            "title": "Given the report mtime advances after 10s of fake time, when stopFlywheel runs, then it returns reportWritten:true and pauses; given no report within timeoutMs, then it returns reportWritten:false and still pauses",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-7-cli-verbs",
+        "title": "pan flywheel start|stop|abort|pause|resume|report|status|stats verbs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-21T21:53:37.150Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3964",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/flywheel.ts",
+            "tests/unit/cli/commands/flywheel.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/commands/flywheel.test.ts",
+            "npm run build && node dist/cli/index.js flywheel --help && node dist/cli/index.js flywheel start --help"
+          ],
+          "expected_outputs": [
+            "flywheel.test.ts passes",
+            "help output lists start stop abort pause resume report status stats, and start lists --orders and --fresh"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/flywheel.ts registerFlywheelCommands: add abort, pause, resume, report, stats; add --orders <book-id> and --fresh to start; add --timeout <ms> to stop. start/stop/abort/pause/resume/report wrap wi-6 actions with chalk output and process.exitCode=1 on FlywheelAlreadyRunning/FlywheelPausedExists/FlywheelNotRunning (start prints 'paused flywheel exists — pan flywheel resume to continue, pan flywheel start --fresh to start over'). status prints deriveFlywheelStatus (wi-3): run state, conversation model/harness, last tick + freshness, policies, an in-flight table (issue, state, attention, PR, last journal), order book; --json prints the object verbatim. stats prints computeSubstrateStats (wi-5) with --window <days> and --json. report: running -> requestFlywheelReport; not running -> print .pan/flywheel/report.md or 'no report yet'. Keep startFlywheelRun's signature for pan orders start (orders.ts:325)."
+        },
+        "items": [
+          {
+            "id": "wi-7-cli-verbs.ac1",
+            "title": "Given the built CLI, when `pan flywheel --help` runs, then it lists start, stop, abort, pause, resume, report, status, stats; and `pan flywheel start --help` lists --orders and --fresh",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-7-cli-verbs.ac2",
+            "title": "Given a mocked deriver, when `pan flywheel status --json` runs, then stdout is exactly the deriver's JSON",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-7-cli-verbs.ac3",
+            "title": "Given startFlywheel throws FlywheelPausedExists, when `pan flywheel start` runs, then it prints the resume/--fresh hint and exits 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-7-cli-verbs.ac4",
+            "title": "Given no running flywheel and a present report.md, when `pan flywheel report` runs, then it prints the report contents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-8-routes",
+        "title": "/api/flywheel/* routes (status, state, report, stats, start, pause, resume, stop, abort, report) with NO_LOSS_MATRIX rows",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-21T21:53:37.150Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3964",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/flywheel.ts",
+            "src/dashboard/server/server.ts",
+            "src/dashboard/server/routes/__tests__/flywheel.test.ts",
+            "tests/unit/lib/overdeck/no-loss-matrix.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/flywheel.test.ts tests/unit/lib/overdeck/no-loss-matrix.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "flywheel route tests pass",
+            "no-loss-matrix.test.ts passes with the new /api/flywheel rows",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/routes/flywheel.ts registering GET /api/flywheel/status (deriveFlywheelStatus), GET /api/flywheel/state and GET /api/flywheel/report (wi-4 readers on resolvePlanHome of the status projectRoot), GET /api/flywheel/stats?window=<days> (wi-5), and POST /api/flywheel/start (body {model?, harness?, orders?, fresh?}), /pause, /resume, /stop, /abort, /report calling wi-6; every POST runs the same origin check as routes/merge-train.ts:427-432 (hasDashboardInternalToken || validateOrigin + rejectUnsafeDashboardMutationRequest); map FlywheelAlreadyRunning/FlywheelPausedExists to 409 and FlywheelNotRunning to 404. Export flywheelRouteLayer and add it to Layer.mergeAll in server.ts:364. In tests/unit/lib/overdeck/no-loss-matrix.ts replace the stale flywheel.ts block (:257-267, keep the moved merge-train rows) with one READ/WRITE row per new route, door 'src/lib/flywheel/*'."
+        },
+        "items": [
+          {
+            "id": "wi-8-routes.ac1",
+            "title": "Given injected lib functions, when GET /api/flywheel/status|state|report|stats are requested, then each returns the injected payload as JSON with status 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-8-routes.ac2",
+            "title": "Given a request without a trusted origin, when POST /api/flywheel/pause is requested, then the route rejects it with 403 and no action runs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-8-routes.ac3",
+            "title": "Given startFlywheel throws FlywheelAlreadyRunning, when POST /api/flywheel/start is requested, then the route returns 409 with the error message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-8-routes.ac4",
+            "title": "Given the new routes, when `npx vitest run tests/unit/lib/overdeck/no-loss-matrix.test.ts` runs, then it exits 0 because the matrix contains a row for each /api/flywheel route",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-9-page-shell",
+        "title": "FlywheelPage at /flywheel: header, policy toggles, rail tabs, split, nav and palette entries",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-21T21:53:37.150Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-3964",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/pages/FlywheelPage.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx",
+            "src/dashboard/frontend/src/lib/flywheelApi.ts",
+            "src/dashboard/frontend/src/components/Header.tsx",
+            "src/dashboard/frontend/src/App/routes.ts",
+            "src/dashboard/frontend/src/App/AppRoutes.tsx",
+            "src/dashboard/frontend/src/components/Sidebar.tsx",
+            "src/dashboard/frontend/src/components/CommandPalette.tsx",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/pages/__tests__/FlywheelPage.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "FlywheelPage.test.tsx passes",
+            "typecheck completes without errors",
+            "lint passes including the file-size ratchet"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-5"
+          ],
+          "parallelSafeReason": "Touches only page/nav/palette files no other item edits; its component and route dependencies are ordered by blocks edges, so once those land it runs alone in its slot."
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/lib/flywheelApi.ts with useFlywheelStatus() (GET /api/flywheel/status, refetchInterval 5000, exposes isError) and useFlywheelAction(name) (POST /api/flywheel/<name> with dashboardMutationJsonHeaders, invalidates ['flywheel']). Create pages/FlywheelPage.tsx from v1 (`git show 3fb7100^:src/dashboard/frontend/src/pages/FlywheelPage.tsx`) minus run-record hooks: header with title 'Fix-All Flywheel', run chip (running · tick N / paused / idle), freshness chip, in-flight count, ToggleSwitch 'Auto-pickup' and 'Require UAT' bound to useMergeTrainConfig/useMergeTrainConfigMutation (components/merge-train/config.ts), read-only 'Merge train: on/off' chip linking to /awaiting-merge; resizable split persisted at localStorage 'overdeck.ui.flywheelSplitWidth' (min 360 each side); rail = PendingAutoMergesCard, FlywheelOrderBookCard, RailCard with Status|State|Stats tabs rendering wi-10/wi-11 panes; right column FlywheelConversationPane (wi-14) receiving status as a prop. When the status query errors render 'Can't reach the server — retrying' instead of idle. Wire Tab 'flywheel' in Header.tsx:4, TAB_PATHS flywheel:'/flywheel' in App/routes.ts, mount in AppRoutes.tsx beside orders (:249), add a primary Sidebar item after Home with a muted 'live' text badge (no pill, no green) when run==='running', add CommandPalette action id 'pan-flywheel' in group Actions. Add scripts/file-size-allowlist.txt rows '<lines> src/dashboard/frontend/src/components/CommandPalette.tsx # PAN-3964' and a Sidebar.tsx row if it exceeds 1000 lines."
+        },
+        "items": [
+          {
+            "id": "wi-9-page-shell.ac1",
+            "title": "Given status run='idle'|'paused'|'running', when the page renders, then the header chip reads idle / paused / 'running · tick N' respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-9-page-shell.ac2",
+            "title": "Given the Auto-pickup switch is clicked, when the mutation fires, then it POSTs /api/merge-train/config with {auto_pickup_backlog:true}; Require UAT posts {require_uat_before_merge:false}",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-9-page-shell.ac3",
+            "title": "Given the status fetch fails, when the page renders, then it shows 'Can't reach the server — retrying' and not the idle empty state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-9-page-shell.ac4",
+            "title": "Given the sidebar, when status run is 'running', then the Flywheel item shows 'live'; otherwise it does not",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-9-page-shell.ac5",
+            "title": "Given a browser at /flywheel, when the page loads, then it renders the header, rail tabs and conversation column (verified with an isolated Playwright profile)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-10-status-pane",
+        "title": "FlywheelStatusPane: last tick, freshness, needs-you, in-flight table, order book line",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-21T21:53:37.150Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3964",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelStatusPane.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatusPane.test.tsx"
+          ],
+          "expected_outputs": [
+            "FlywheelStatusPane.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Create components/flywheel/FlywheelStatusPane.tsx taking props {status: FlywheelDerivedStatus | null, onNavigateIssue?}. Renders run state + conversation model/harness; last tick line 'tick N · <phase> · pick <ISSUE|none>' with relative time and a freshness chip (live / last tick Nm ago / stalled — last tick Nm ago, v1 tones); a needs-you callout when non-null; an in-flight table (issue id link, derived state, attention, PR #n review/checks, last journal type + relative time); order book line 'Book <name>: landed/total'. Empty states: idle -> 'No flywheel running — pan flywheel start or Start below'; paused -> 'Paused — Resume to continue'; running with lastTick null -> 'Running — waiting for the first tick'. Follow pan-style-guide (muted status text, no pill badges)."
+        },
+        "items": [
+          {
+            "id": "wi-10-status-pane.ac1",
+            "title": "Given a running status with a tick and needsYou text, when rendered, then the pane shows the tick line, the freshness chip and the needs-you callout",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-10-status-pane.ac2",
+            "title": "Given two in-flight rows, when rendered, then each row shows state, PR number and the last journal entry type, and clicking the id calls onNavigateIssue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-10-status-pane.ac3",
+            "title": "Given freshness live/breathing/stalled, when rendered, then the chip text is 'live', 'last tick Nm ago', 'stalled — last tick Nm ago'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-10-status-pane.ac4",
+            "title": "Given run idle, paused, or running without a tick, when rendered, then the matching empty-state copy appears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-11-state-stats-panes",
+        "title": "FlywheelStatePane (markdown of .pan/flywheel/state.md) and FlywheelStatsPanel (c1/c2 cards)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-21T21:53:37.150Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3964",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelStatePane.tsx",
+            "src/dashboard/frontend/src/components/flywheel/FlywheelStatsPanel.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatePane.test.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatsPanel.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatePane.test.tsx src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelStatsPanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "both pane tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Port v1 FlywheelStatePane (`git show 3fb7100^:src/dashboard/frontend/src/components/flywheel/FlywheelStatePane.tsx`) to fetch GET /api/flywheel/state every 10s and render content with react-markdown + remark-gfm; empty state names .pan/flywheel/state.md. Create FlywheelStatsPanel fetching GET /api/flywheel/stats?window=<days> every 60s with a 7/30/90 window selector; render c1_bugRate and c2_p0Bugs cards (value, status tone green/yellow/red, trend arrow, 'collecting since <date>' when dataSufficient is false) and the bugs list (number, title, severity, createdAt). Reuse v1 FlywheelStatsPanel formatting helpers where they still apply."
+        },
+        "items": [
+          {
+            "id": "wi-11-state-stats-panes.ac1",
+            "title": "Given GET /api/flywheel/state returns markdown content, when the state pane renders, then the markdown renders as HTML with the path and last-modified header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-11-state-stats-panes.ac2",
+            "title": "Given exists:false, when the state pane renders, then it shows the empty state naming .pan/flywheel/state.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-11-state-stats-panes.ac3",
+            "title": "Given stats with c1 dataSufficient false and c2 status red trend down, when the stats panel renders, then c1 shows 'collecting since' and c2 shows the red tone with a down arrow",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-11-state-stats-panes.ac4",
+            "title": "Given the window selector is set to 90, when it changes, then the panel refetches /api/flywheel/stats?window=90",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-12-pending-automerges",
+        "title": "PendingAutoMergesCard reading /api/merge-train/auto-merge/pending with cancel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-21T21:53:37.150Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3964",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/PendingAutoMergesCard.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/PendingAutoMergesCard.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/flywheel/__tests__/PendingAutoMergesCard.test.tsx"
+          ],
+          "expected_outputs": [
+            "PendingAutoMergesCard.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Create components/flywheel/PendingAutoMergesCard.tsx from v1 PendingAutoMergesBanner (in the v1 FlywheelPage): poll GET /api/merge-train/auto-merge/pending every 5s, show rows with status 'pending' (issue link via onNavigateIssue, 'PR #n' from prUrl, countdown 'auto-merging in m:ss' from scheduledMergeAt ticking each second), Cancel button calling DELETE /api/merge-train/auto-merge/<issueId> with dashboardMutationJsonHeaders and invalidating the query; disabled while status is 'merging' or the countdown reached zero; render nothing when there are no pending rows."
+        },
+        "items": [
+          {
+            "id": "wi-12-pending-automerges.ac1",
+            "title": "Given the pending endpoint returns [], when the card renders, then it renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-12-pending-automerges.ac2",
+            "title": "Given one pending row 90s out, when rendered, then it shows 'PR #<n>' and 'auto-merging in 1:30'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-12-pending-automerges.ac3",
+            "title": "Given Cancel is clicked for PAN-1, when the mutation fires, then it sends DELETE /api/merge-train/auto-merge/PAN-1 and refetches the pending list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-13-order-book-card",
+        "title": "FlywheelOrderBookCard rendering the running book's ProgressPanel",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-21T21:53:37.150Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3964",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelOrderBookCard.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelOrderBookCard.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelOrderBookCard.test.tsx"
+          ],
+          "expected_outputs": [
+            "FlywheelOrderBookCard.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Create components/flywheel/FlywheelOrderBookCard.tsx: fetch GET /api/orders (optionally ?project=<key> from the status projectRoot's project), find the book with status 'running', render a RailCard titled 'Order book' containing components/orders/ProgressPanel for it and a link to /orders?project=<key>; render nothing when no book is running."
+        },
+        "items": [
+          {
+            "id": "wi-13-order-book-card.ac1",
+            "title": "Given /api/orders returns a running book, when the card renders, then ProgressPanel renders that book and the link points to /orders?project=<key>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-13-order-book-card.ac2",
+            "title": "Given no running book, when the card renders, then it renders nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-14-conversation-pane",
+        "title": "FlywheelConversationPane (embedded ConversationPanel, terminal toggle, actions, run config) and /popout/flywheel-conversation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-21T21:53:37.150Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3964",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/FlywheelConversationPane.tsx",
+            "src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx",
+            "src/dashboard/frontend/src/App/StandaloneRoutes.tsx",
+            "src/dashboard/frontend/src/App.tsx",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/flywheel/__tests__/FlywheelConversationPane.test.tsx",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "FlywheelConversationPane.test.tsx passes",
+            "typecheck completes without errors",
+            "lint passes including the file-size ratchet"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13"
+          ]
+        },
+        "narrative": {
+          "Action": "Port v1 FlywheelConversationPane (`git show 3fb7100^:src/dashboard/frontend/src/components/flywheel/FlywheelConversationPane.tsx`) with props {status, onOpenSettings?}: fetch GET /api/conversations/conv-flywheel every 5s; embed ConversationPanel (components/chat/ConversationPanel.tsx, embedded) with a ViewToggle to XTerminal sessionName='conv-flywheel'; toolbar buttons by run state — idle: Start; running: Pause, Report, Stop, Abort; paused: Resume, Start fresh — each POSTing /api/flywheel/<action> (start fresh sends {fresh:true}) with toasts, Stop and Abort behind useConfirm with v1 copy; Popout button opens /popout/flywheel-conversation; footer 'Run config' reads /api/settings roles.flywheel (harness, model, effort, maxAgents, scope) and calls onOpenSettings. Empty state when no conversation row: 'No flywheel conversation yet — Start to create it'. Add StandaloneFlywheelPopoutRoute to App/StandaloneRoutes.tsx and match '/popout/flywheel-conversation' in App.tsx before the /popout/diff match (:122-130). Add an App.tsx row to scripts/file-size-allowlist.txt ('<lines> src/dashboard/frontend/src/App.tsx # PAN-3964')."
+        },
+        "items": [
+          {
+            "id": "wi-14-conversation-pane.ac1",
+            "title": "Given run idle/running/paused, when rendered, then the toolbar shows Start / Pause,Report,Stop,Abort / Resume,Start fresh respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-14-conversation-pane.ac2",
+            "title": "Given Stop is clicked, when the confirm resolves true, then POST /api/flywheel/stop fires; when it resolves false, no request fires",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-14-conversation-pane.ac3",
+            "title": "Given the Terminal toggle is selected, when rendered, then XTerminal mounts with sessionName conv-flywheel; otherwise ConversationPanel mounts embedded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-14-conversation-pane.ac4",
+            "title": "Given the path /popout/flywheel-conversation, when the app routes, then it renders the pane without dashboard chrome",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-15-skill",
+        "title": "pan-flywheel skill: mission, pickup gate vocabulary, tick marker, state/report duties, verb list",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-09-21T21:53:37.150Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3964",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-flywheel/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint",
+            "grep -n '^## Mission\\|^## Pickup gate\\|^## Tick marker\\|^## State file' sync-sources/skills/pan-flywheel/SKILL.md"
+          ],
+          "expected_outputs": [
+            "lint passes (skill lint accepts every pan flywheel sub-verb mentioned)",
+            "grep prints the four headings"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit sync-sources/skills/pan-flywheel/SKILL.md: add '## Mission' quoting the metabolism doctrine verbatim from roles/flywheel.md:47-49 ('Every revolution must permanently improve the substrate — Overdeck itself. An agent without a metabolism ships and rots; one with a metabolism ships and compounds. A workaround is a failed tick.'); add '## Pickup gate' with the formula and the ready/planned/released/parked/vetoed/objection/inPipeline/epic definitions copied from roles/flywheel.md:216-231 plus 'vetoed is absolute' from :494-495, stating that released and vetoed are operator-only labels the loop never adds or removes; add '## Tick marker' requiring the wi-2 line at the end of every tick with the example `flywheel-tick: tick=3 pick=PAN-3964 phase=watch in-flight=PAN-3964,PAN-3920 needs-you=none`; change Orient to read policies from `pan flywheel status --json` (.policies); add '## State file' (append substrate fixes and learnings to .pan/flywheel/state.md, commit and push 'chore(workspace): flywheel state' (main must not diverge)); extend Stop conditions to write .pan/flywheel/report.md, commit and push 'chore(workspace): flywheel report', print phase=stopping; list the verbs start|stop|abort|pause|resume|report|status|stats. Commit with trailer 'Prompt-Change: restore pickup gate, metabolism, tick marker, state/report duties (PAN-3964)'."
+        },
+        "items": [
+          {
+            "id": "wi-15-skill.ac1",
+            "title": "Given the skill file, when grepped, then it contains the headings ## Mission, ## Pickup gate, ## Tick marker and ## State file and the metabolism sentence 'A workaround is a failed tick.'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-15-skill.ac2",
+            "title": "Given the Pickup gate section, when read, then it states the formula `ready && planned && (released || auto_pickup_backlog || activeBookMember) && !parked && !vetoed && !objection && !inPipeline && !epic` and that released and vetoed are operator-only",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-15-skill.ac3",
+            "title": "Given the Tick marker section, when read, then the example line parses with parseTickMarker to tick 3, pick PAN-3964, phase watch, two in-flight ids, needsYou null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-15-skill.ac4",
+            "title": "Given the commit that changes SKILL.md, when scripts/check-prompt-change-trailer.sh runs, then it exits 0 because the commit carries a Prompt-Change: trailer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-16-no-loss-test",
+        "title": "tests/unit/flywheel/no-loss.test.ts enumerating the eleven v1 affordances",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-21T21:53:37.150Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-3964",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/flywheel/no-loss.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/flywheel/no-loss.test.ts"
+          ],
+          "expected_outputs": [
+            "no-loss.test.ts passes with eleven table rows"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-15"
+          ]
+        },
+        "narrative": {
+          "Action": "Create tests/unit/flywheel/no-loss.test.ts with a table of the eleven v1 rows from the issue (status pane, state pane, stats panel, merge queue card, order book module, policy toggles, embedded conversation, pause/resume/abort/report/stats verbs, pickup gate vocabulary, metabolism mission, popout), each mapped to {route?, view?, verb?, skillHeading?}. For each row read the source tree and assert: the route string appears in src/dashboard/server/routes/flywheel.ts; the view file exists under src/dashboard/frontend/src; the verb appears as .command('<verb>') in src/cli/commands/flywheel.ts; the heading appears in sync-sources/skills/pan-flywheel/SKILL.md. Follow tests/unit/dashboard/system-health-no-loss.test.ts for the file-reading style."
+        },
+        "items": [
+          {
+            "id": "wi-16-no-loss-test.ac1",
+            "title": "Given the restored tree, when the test runs, then it reports eleven passing rows and zero failures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-16-no-loss-test.ac2",
+            "title": "Given the 'pause' verb is removed from src/cli/commands/flywheel.ts in a scratch copy, when the assertion runs against it, then the test fails naming the missing verb",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-17-docs",
+        "title": "docs/FLYWHEEL.md, THE-CUT rows, CLAUDE.md topic index, order-books.mdx corrections",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-09-21T21:53:37.150Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3964",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/FLYWHEEL.md",
+            "docs/THE-CUT.md",
+            "CLAUDE.md",
+            "configuration/order-books.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -f docs/FLYWHEEL.md && grep -c 'PAN-3964' docs/THE-CUT.md && grep -n 'docs/FLYWHEEL.md' CLAUDE.md && ! grep -n 'pan flywheel complete' configuration/order-books.mdx"
+          ],
+          "expected_outputs": [
+            "docs/FLYWHEEL.md exists; THE-CUT.md mentions PAN-3964 on the flywheel rows; CLAUDE.md links docs/FLYWHEEL.md; order-books.mdx has no 'pan flywheel complete'"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-16"
+          ]
+        },
+        "narrative": {
+          "Action": "Write docs/FLYWHEEL.md with sections: Sources (a table: pane -> what it derives from), Tick marker contract, .pan/flywheel/ files and who commits them, Verb -> route -> view map, Policies and where each lives, Non-goals. Amend docs/THE-CUT.md rows 127, 133-136, 140-142, 173-174 to read 'restored by PAN-3964 as a derived view — see docs/FLYWHEEL.md' (keep the original disposition text before it). Add a CLAUDE.md topic index row 'Flywheel page and loop skill | docs/FLYWHEEL.md'. In configuration/order-books.mdx keep `pan flywheel start --orders <id>` (valid again) and replace the `pan flywheel complete` / `--force` lines (:167-173) with 'a book completes when its items are terminal; inspect with pan orders show <id>'."
+        },
+        "items": [
+          {
+            "id": "wi-17-docs.ac1",
+            "title": "Given docs/FLYWHEEL.md, when read, then it contains the six sections and a verb->route->view table listing every pan flywheel verb",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-17-docs.ac2",
+            "title": "Given docs/THE-CUT.md, when grepped for 'flywheel', then each flywheel route/service/page/doc row ends with 'restored by PAN-3964 as a derived view — see docs/FLYWHEEL.md'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-17-docs.ac3",
+            "title": "Given CLAUDE.md, when read, then the Topic Index has a row linking docs/FLYWHEEL.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-17-docs.ac4",
+            "title": "Given configuration/order-books.mdx, when grepped, then 'pan flywheel complete' no longer appears and `pan flywheel start --orders` remains",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi-1-contracts",
+        "to": "wi-3-derive-status",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-1-contracts",
+        "to": "wi-5-substrate-stats",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-1-contracts",
+        "to": "wi-2-tick-marker",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-1-contracts",
+        "to": "wi-10-status-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-1-contracts",
+        "to": "wi-11-state-stats-panes",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-1-contracts",
+        "to": "wi-14-conversation-pane",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-2-tick-marker",
+        "to": "wi-3-derive-status",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-2-tick-marker",
+        "to": "wi-6-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-2-tick-marker",
+        "to": "wi-15-skill",
+        "type": "informs"
+      },
+      {
+        "from": "wi-3-derive-status",
+        "to": "wi-7-cli-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-3-derive-status",
+        "to": "wi-8-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-4-files",
+        "to": "wi-6-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-4-files",
+        "to": "wi-8-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-5-substrate-stats",
+        "to": "wi-7-cli-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-5-substrate-stats",
+        "to": "wi-8-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-6-actions",
+        "to": "wi-7-cli-verbs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-6-actions",
+        "to": "wi-8-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-7-cli-verbs",
+        "to": "wi-15-skill",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-8-routes",
+        "to": "wi-9-page-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-8-routes",
+        "to": "wi-11-state-stats-panes",
+        "type": "informs"
+      },
+      {
+        "from": "wi-8-routes",
+        "to": "wi-14-conversation-pane",
+        "type": "informs"
+      },
+      {
+        "from": "wi-10-status-pane",
+        "to": "wi-9-page-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-11-state-stats-panes",
+        "to": "wi-9-page-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-12-pending-automerges",
+        "to": "wi-9-page-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-13-order-book-card",
+        "to": "wi-9-page-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-14-conversation-pane",
+        "to": "wi-9-page-shell",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-7-cli-verbs",
+        "to": "wi-16-no-loss-test",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-9-page-shell",
+        "to": "wi-16-no-loss-test",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-15-skill",
+        "to": "wi-16-no-loss-test",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-7-cli-verbs",
+        "to": "wi-17-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-8-routes",
+        "to": "wi-17-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-15-skill",
+        "to": "wi-17-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
