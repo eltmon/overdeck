@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-21T01:41:04.550Z · model: claude-opus-5 · open: 855_
+_Last sequenced: 2026-09-21T04:04:02.290Z · model: claude-opus-5 · open: 855_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -310,8 +310,8 @@ _Last sequenced: 2026-09-21T01:41:04.550Z · model: claude-opus-5 · open: 855_
 | 303 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
 | 304 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
 | 305 | PAN-2351 | XS | high | ok |  | PAN-1166 | Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats (security prerequisites) |
+| 306 | PAN-2350 | L | high | needs-refinement | ✓ |  | Epic container for Overdeck Anywhere P0-P3; PAN-3762 proposes replacing the relay-first direction with per-machine server federation. |
 | 307 | PAN-3787 | L | medium | ok |  |  | Add a per-child composer and live Working-for indicator to subagent transcripts for Codex and Claude Code |
-| 307 | PAN-2350 | L | high | needs-refinement | ✓ |  | Epic container for Overdeck Anywhere P0-P3; PAN-3762 proposes replacing the relay-first direction with per-machine server federation. |
 | 308 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
 | 309 | PAN-2079 | M | high | needs-refinement |  |  | Inbox spine: boot reconciliation (producer #1) is gone; may still be worth pursuing for pending AUQ, cost alerts and other producers |
 | 310 | PAN-3934 | S | medium | ok |  | PAN-3929 | roles/*.md and two docs still name deleted status fields outside the guard's Markdown roots; follow-up to PAN-3929 |
@@ -714,8 +714,8 @@ _Last sequenced: 2026-09-21T01:41:04.550Z · model: claude-opus-5 · open: 855_
 | 707 | PAN-1116 | M | low | ok |  |  | Memory: cross-project search mode |
 | 708 | PAN-1065 | M | low | ok |  |  | Validate issueId at every shell-string interpolation site (defense in depth) |
 | 709 | PAN-1064 | M | low | ok |  |  | Harden launcher generation against shell-quote injection (model and arg quoting) |
+| 710 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
 | 711 | PAN-1641 | M | low | ok |  |  | Run agents on local GPU models via a managed Ollama sidecar |
-| 711 | PAN-1063 | M | low | ok |  |  | Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound |
 | 712 | PAN-3971 | L | low | ok |  |  | Overdeck-native artifact pages (pan artifact publish + state door + dashboard listing); body says backlog only, Claude artifacts work today |
 | 713 | PAN-3768 | XS | low | ok |  |  | pan handoff --title already implemented and landed (678f6b389e5); open only pending close-out. |
 | 714 | PAN-3034 | XS | low | ok |  |  | Fix already landed on main (strike/slot workspace names and live tmux now seed the session tree); open pending close-out. |
@@ -1190,7 +1190,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-21T01:41:04.550Z",
+  "generatedAt": "2026-09-21T04:04:02.290Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 855,
@@ -5057,6 +5057,20 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "planning": "skip"
     },
     {
+      "issue": "PAN-2350",
+      "rank": 306,
+      "size": "L",
+      "importance": "high",
+      "score": 69,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Epic container for Overdeck Anywhere P0-P3; PAN-3762 proposes replacing the relay-first direction with per-machine server federation.",
+      "rationale": "Rank shifted from 307 to 306: the prior run collided it with the in-pipeline pin PAN-3787 at rank 307; moved into the adjacent vacant slot.",
+      "gate": "blocked",
+      "planning": "skip",
+      "isEpic": true
+    },
+    {
       "issue": "PAN-3787",
       "rank": 307,
       "size": "L",
@@ -5068,20 +5082,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "rationale": "New this pass. Extends the subagent rail from read-only viewing to direct child input, which needs thread-scoped routing on the Codex app-server adapter and a structured child-input connection under the Claude Code PTY. Genuine operator value once the rail exists, but it is conversation ergonomics rather than pipeline integrity, so it sits in the feature tier. In-pipeline, pinned.",
       "gate": "auto",
       "planning": "auto"
-    },
-    {
-      "issue": "PAN-2350",
-      "rank": 307,
-      "size": "L",
-      "importance": "high",
-      "score": 69,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Epic container for Overdeck Anywhere P0-P3; PAN-3762 proposes replacing the relay-first direction with per-machine server federation.",
-      "rationale": "Triage: PRDs now live under .pan/drafts on the feature branch; verify retrievability before any phase starts. Technical content not superseded. Epic; operator gate=blocked and planning=skip preserved; contains edge to closed PAN-3513 dropped.",
-      "gate": "blocked",
-      "planning": "skip",
-      "isEpic": true
     },
     {
       "issue": "PAN-1217",
@@ -10009,6 +10009,19 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "planning": "auto"
     },
     {
+      "issue": "PAN-1063",
+      "rank": 710,
+      "size": "M",
+      "importance": "low",
+      "score": 20,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound",
+      "rationale": "Rank shifted from 711 to 710: the prior run collided it with the in-pipeline pin PAN-1641 at rank 711; moved into the adjacent vacant slot.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-1641",
       "rank": 711,
       "size": "M",
@@ -10019,18 +10032,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "why": "Run agents on local GPU models via a managed Ollama sidecar",
       "gate": "auto",
       "planning": "skip"
-    },
-    {
-      "issue": "PAN-1063",
-      "rank": 711,
-      "size": "M",
-      "importance": "low",
-      "score": 20,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Harden tts_daemon.py: bearer auth, CORS, body size cap, concurrency bound",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-3971",
