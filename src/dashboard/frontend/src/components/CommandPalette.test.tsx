@@ -796,7 +796,7 @@ describe('CommandPalette conversations scope chip (PAN-3705)', () => {
     await act(async () => { await pendingSearch; });
   });
 
-  it('falls back to the standard empty state on a 500 and keeps the Conversations scope active (AC3)', async () => {
+  it('shows a search-unavailable error instead of No results on a 500 and keeps the Conversations scope active (AC3, PAN-3975)', async () => {
     fetchControl = installStrictFetchMock(({ method, url }) => {
       if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
       if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
@@ -811,8 +811,27 @@ describe('CommandPalette conversations scope chip (PAN-3705)', () => {
       await vi.advanceTimersByTimeAsync(120);
     });
 
-    // The Conversations scope excludes the (non-conversation) issue match too.
-    expect(screen.getByText('No results for "zzzz-no-local-match"')).toBeInTheDocument();
+    // A failed search request must not read as "zero results" (PAN-3975).
+    expect(screen.getByText('Search unavailable (HTTP 500): sign in again / try again')).toBeInTheDocument();
+    expect(screen.queryByText('No results for "zzzz-no-local-match"')).toBeNull();
     expect(screen.getByRole('button', { name: 'Conversations' }).className).toMatch(/text-primary/);
+  });
+
+  it('shows the search-unavailable error copy on a 401 (expired session), not No results (PAN-3975)', async () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: [] });
+      if (method === 'GET' && url.startsWith('/api/palette/search')) return new Response(null, { status: 401 });
+      return undefined;
+    });
+
+    renderCommandPalette();
+    fireEvent.change(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), { target: { value: 'zzzz-no-local-match' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120);
+    });
+
+    expect(screen.getByText('Search unavailable (HTTP 401): sign in again / try again')).toBeInTheDocument();
+    expect(screen.queryByText(/No results for/)).toBeNull();
   });
 });

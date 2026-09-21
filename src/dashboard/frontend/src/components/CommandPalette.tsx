@@ -297,7 +297,9 @@ async function fetchWorkspaceRegistry(): Promise<WorkspaceRegistryRow[]> {
 async function fetchPaletteSearch(query: string, signal: AbortSignal): Promise<PaletteSearchResponse> {
   try {
     const res = await fetch(`/api/palette/search?q=${encodeURIComponent(query)}&limit=15`, { signal });
-    if (!res.ok) return EMPTY_SEARCH;
+    // PAN-3975: non-OK statuses (401 expired session, 500, …) must surface as
+    // an error, not collapse into "zero results".
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json() as PaletteSearchResponse;
     return {
       memory: data.memory ?? [],
@@ -307,7 +309,7 @@ async function fetchPaletteSearch(query: string, signal: AbortSignal): Promise<P
     };
   } catch (err) {
     if ((err as { name?: string }).name === 'AbortError') return EMPTY_SEARCH;
-    return EMPTY_SEARCH;
+    throw err;
   }
 }
 
@@ -402,6 +404,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     () => localStorage.getItem(WORKSPACES_PIPELINE_EXPANDED_KEY) === 'true',
   );
   const [searchResults, setSearchResults] = useState<PaletteSearchResponse>(EMPTY_SEARCH);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [scope, setScope] = useState<PaletteScope>(initialScope);
   const [conversationsNewestFirst, setConversationsNewestFirst] = useState(
@@ -422,6 +425,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     if (!isOpen) return;
     setQuery('');
     setSearchResults(EMPTY_SEARCH);
+    setSearchError(null);
     setScope(initialScope);
     // Re-read the shared expansion flag so a rail toggle is picked up here.
     setPipelineWorkspacesExpanded(localStorage.getItem(WORKSPACES_PIPELINE_EXPANDED_KEY) === 'true');
@@ -437,13 +441,24 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     const trimmed = debouncedQuery.trim();
     if (trimmed.length < 2) {
       setSearchResults(EMPTY_SEARCH);
+      setSearchError(null);
       setIsSearchLoading(false);
       return;
     }
     const controller = new AbortController();
     setIsSearchLoading(true);
     void fetchPaletteSearch(trimmed, controller.signal)
-      .then((data) => setSearchResults(data))
+      .then((data) => {
+        setSearchResults(data);
+        setSearchError(null);
+      })
+      .catch((err: unknown) => {
+        // Aborted superseded requests resolve with EMPTY_SEARCH above and land
+        // in .then; anything reaching here is a real failure (non-OK status,
+        // network error) and must not read as "zero results" (PAN-3975).
+        setSearchResults(EMPTY_SEARCH);
+        setSearchError(err instanceof Error ? err.message : 'request failed');
+      })
       .finally(() => setIsSearchLoading(false));
     return () => controller.abort();
   }, [isOpen, debouncedQuery]);
@@ -986,7 +1001,9 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
                 <Command.Empty className="py-6 text-center text-sm text-muted-foreground">
                   {query.trim().length === 0
                     ? (scope === 'conversations' ? 'Type to search conversations…' : 'Start typing…')
-                    : `No results for "${query}"`}
+                    : searchError && query.trim().length >= 2
+                      ? `Search unavailable (${searchError}): sign in again / try again`
+                      : `No results for "${query}"`}
                 </Command.Empty>
               )
             ) : (
