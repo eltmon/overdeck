@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3968",
   "created": "2026-09-21T00:11:40.860Z",
-  "updated": "2026-09-21T00:49:47.412Z",
+  "updated": "2026-09-21T00:50:00.768Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -60,6 +60,10 @@
     "delete-prune-stopped-agents-for-issue.ac3": {
       "status": "completed",
       "doneAt": "2026-09-21T00:49:47.412Z"
+    },
+    "delete-dead-execute-close-out.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:50:00.768Z"
     }
   }
 }
