@@ -78,13 +78,13 @@ describe('getWorkAgentLifecycleStateSync after handoff (PAN-3334)', () => {
     mocks.hasCompletionMarkerForAgent.mockReturnValue(true);
   });
 
-  it('reports nothing to resume: this synchronous door cannot ask the forge', () => {
+  it('reports the handed-off agent as warm-resumable without asking the forge (supersedes PAN-3334)', () => {
     const state = getWorkAgentLifecycleStateSync('agent-pan-3846');
 
     expect(state.handedOff).toBe(true);
-    expect(state.canResumeSession).toBe(false);
-    expect(state.recommendedAction).toBe('none');
-    expect(state.reason).toContain('nothing to resume');
+    expect(state.canResumeSession).toBe(true);
+    expect(state.recommendedAction).toBe('resume');
+    expect(state.reason).toContain('handed off');
     expect(mocks.getPrFacts).not.toHaveBeenCalled();
   });
 

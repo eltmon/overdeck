@@ -19,13 +19,11 @@ function canStartFresh(lifecycle: WorkAgentLifecycleState, fresh: boolean): bool
 }
 
 /**
- * PAN-3555: a completion marker stops meaning "nothing to resume" the moment the
- * pipeline owes the agent rework — a failed verification, a blocked/failed review,
- * a failed test, or a failed UAT after the handoff makes the warm session the
- * rework target (the same condition PAN-2668 uses to clear stoppedByUser for
- * feedback delivery). Without this, the handed-off branch routed `pan start` to a
- * silent fresh session whenever the feedback loop's direct resumeAgent() path
- * failed, abandoning the resumable transcript with no refusal and no logged reason.
+ * PAN-3555: a failed verification, blocked/failed review, failed test, or failed
+ * UAT after the handoff makes the warm session the rework target (the same
+ * condition PAN-2668 uses to clear stoppedByUser for feedback delivery). Since
+ * 2026-09-21 a handed-off agent is resumable regardless; this verdict now only
+ * selects the more specific reason text in the async door.
  */
 export async function issueOwesRework(issueId: string | undefined): Promise<boolean> {
   if (!issueId) return false;
