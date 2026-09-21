@@ -183,7 +183,7 @@ export function PlanSetupScreen({ issueIdentifier, issueTitle, steps, error }: P
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-8">
       {/* Hero area */}
-      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 border border-purple-500/30 flex items-center justify-center mb-6">
+      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl border border-signal-review/32 bg-signal-review/8">
         <Terminal className="w-10 h-10 text-signal-review" />
       </div>
 
@@ -212,7 +212,7 @@ export function PlanSetupScreen({ issueIdentifier, issueTitle, steps, error }: P
         </div>
         <div className="w-full h-1.5 bg-popover rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-500 ease-out"
+            className="h-full rounded-full bg-signal-review transition-all duration-500 ease-out"
             style={{ width: `${progressPct}%` }}
           />
         </div>

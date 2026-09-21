@@ -72,7 +72,7 @@ export function DeaconPauseToggle({ compact = false }: { compact?: boolean }) {
         disabled={busy}
         className={`relative inline-flex items-center gap-1.5 transition-colors disabled:opacity-50 ${
           paused
-            ? 'rounded-full border border-warning/50 bg-warning/15 px-2.5 py-1 text-xs font-medium text-warning-foreground hover:bg-warning/25'
+            ? 'rounded-md border border-warning/32 bg-warning/8 px-2.5 py-1 text-xs font-medium text-warning-foreground hover:bg-warning/16'
             : 'rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground'
         }`}
         title={title}
@@ -80,7 +80,7 @@ export function DeaconPauseToggle({ compact = false }: { compact?: boolean }) {
         <Snowflake className="h-3.5 w-3.5" />
         {paused && <span>Deacon frozen</span>}
         {paused && (
-          <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 animate-pulse items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold leading-none text-white ring-2 ring-background">!</span>
+          <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 animate-pulse items-center justify-center rounded-full bg-warning text-[9px] font-medium leading-none text-warning-foreground ring-2 ring-background">!</span>
         )}
       </button>
     );
@@ -90,10 +90,10 @@ export function DeaconPauseToggle({ compact = false }: { compact?: boolean }) {
     <button
       onClick={onClick}
       disabled={busy}
-      className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold transition-colors disabled:opacity-50 ${
+      className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-xs font-medium transition-colors disabled:opacity-50 ${
         paused
-          ? 'text-sky-200 bg-sky-900/70 hover:bg-sky-800/80 border border-sky-400/60'
-          : 'text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent'
+          ? 'border-warning/32 bg-warning/8 text-warning-foreground hover:bg-warning/16'
+          : 'border-transparent text-muted-foreground hover:bg-accent hover:text-foreground'
       }`}
       title={title}
     >
@@ -124,15 +124,15 @@ export function DeaconPauseBanner() {
   if (data?.paused !== true) return null;
 
   return (
-    <div className="bg-sky-900/40 border-b-2 border-sky-400/60 px-4 py-2 flex items-center gap-3 shrink-0">
-      <Snowflake className="w-5 h-5 text-sky-300 shrink-0" />
-      <p className="text-sky-100 text-sm font-semibold flex-1">
+    <div className="flex shrink-0 items-center gap-3 border-b border-warning/32 bg-warning/8 px-4 py-2">
+      <Snowflake className="h-5 w-5 shrink-0 text-warning-foreground" />
+      <p className="flex-1 text-sm font-medium text-warning-foreground">
         Deacon is frozen — no automatic patrol, recovery, re-dispatch, or auto-completion is running.
       </p>
       <button
         onClick={() => mutation.mutate(false)}
         disabled={mutation.isPending}
-        className="inline-flex items-center gap-1.5 px-3 py-1 rounded text-xs font-semibold bg-sky-700/60 text-sky-50 border border-sky-300/60 hover:bg-sky-600/70 disabled:opacity-50"
+        className="inline-flex items-center gap-1.5 rounded-md border border-warning/32 bg-warning/16 px-3 py-1 text-xs font-medium text-warning-foreground transition-colors hover:bg-warning/24 disabled:opacity-50"
       >
         <Play className="w-3.5 h-3.5" />
         Resume Deacon
