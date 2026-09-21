@@ -23,7 +23,6 @@ import {
 } from '../../../lib/backlog/pickup.js';
 import { buildClassifyLookups } from '../../../lib/backlog/lookups.js';
 import { getProjectPanPaths } from '../../../lib/pan-dir/paths.js';
-import { loadIssueStatesForProject } from '../services/derived-issue-state.js';
 import { isFlywheelAutoPickupBacklog } from '../../../lib/overdeck/control-settings.js';
 import { SEQUENCER_AGENT_ID } from '../../../lib/backlog/sequencer-agent.js';
 import { resolvePiSessionPath } from './jsonl-resolver.js';
@@ -102,7 +101,6 @@ const getBacklogSequenceRoute = HttpRouter.add(
         }
 
         // issuesWithTasks precomputed above in generator scope.
-        const workspacesDir = join(projectRoot, 'workspaces');
 
         // Join issue titles from the in-memory read-model issue service so the
         // detail panel can show the title (the sequence cache stores only the id).
@@ -124,20 +122,12 @@ const getBacklogSequenceRoute = HttpRouter.add(
         // event loop with per-workspace process calls.
         const lookups = buildClassifyLookups(projectRoot);
 
-        // PAN-3917 FR-6: "the pipeline owns this issue" is derived — one batched
-        // forge + inventory read for the whole sequence, never a stored status.
-        const derivedStates = await loadIssueStatesForProject(
-          projectRoot,
-          cachedNodes.map((r) => r.issueId),
-        );
-        const PIPELINE_OWNED = new Set(['working', 'in-review', 'changes-requested', 'ready', 'merged']);
-
+        // PAN-3969: `inPipeline` comes from the classifier's workspace-exists
+        // lookup — the same oracle the forecast route uses. Deriving the full
+        // FR-6 state here spawned one serial git process per issue (11–21 s for
+        // ~850 nodes) for a `pipelineState` field nothing reads.
         const nodes = cachedNodes.map((r) => {
           const issueUpper = r.issueId.toUpperCase();
-          const derived = derivedStates.get(issueUpper);
-          const inPipeline =
-            (derived !== undefined && PIPELINE_OWNED.has(derived.state)) ||
-            existsSync(join(workspacesDir, `feature-${r.issueId.toLowerCase()}`));
           const hasPrd = prdFiles.has(issueUpper);
           const ready = specIssues.has(issueUpper);
           const state = classifyIssue({ issue: r.issueId, gate: r.gate } as unknown as Parameters<typeof classifyIssue>[0], lookups);
@@ -154,11 +144,10 @@ const getBacklogSequenceRoute = HttpRouter.add(
             why: r.why,
             gate: r.gate,
             planning: r.planning,
-            inPipeline,
+            inPipeline: state.inPipeline,
             hasPrd,
             ready,
             state,
-            pipelineState: derived?.state ?? null,
           };
         });
 
