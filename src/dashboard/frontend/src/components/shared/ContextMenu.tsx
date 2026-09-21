@@ -15,7 +15,7 @@ import {
 const MENU_SURFACE_CLASS =
   'max-h-[70vh] min-w-[168px] max-w-[calc(100vw-1rem)] overflow-x-hidden overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-floating';
 const MENU_ITEM_CLASS =
-  'relative flex w-full cursor-pointer select-none items-center gap-2 rounded px-3 py-1.5 text-left text-xs text-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground disabled:pointer-events-none disabled:opacity-40';
+  'relative flex w-full cursor-pointer select-none items-center gap-2 rounded px-3 py-1.5 text-left text-xs text-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground disabled:pointer-events-none disabled:opacity-40 data-[disabled]:pointer-events-none data-[disabled]:opacity-40';
 const MENU_DESTRUCTIVE_ITEM_CLASS =
   'text-destructive hover:bg-destructive/10 hover:text-destructive focus-visible:bg-destructive/10 focus-visible:text-destructive';
 
@@ -33,16 +33,30 @@ function focusableMenuItems(menu: HTMLElement): HTMLElement[] {
     .filter((item) => !item.hasAttribute('disabled') && item.closest('[role="menu"]') === menu);
 }
 
-function useReturnFocus(returnFocusRef?: RefObject<HTMLElement | null>) {
+function useReturnFocus(
+  surfaceRef: RefObject<HTMLElement | null>,
+  returnFocusRef?: RefObject<HTMLElement | null>,
+) {
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const surface = surfaceRef.current;
     return () => {
+      // Restore focus only when closing this surface actually stranded it:
+      // either the focused node lived inside the now-unmounted surface (the
+      // browser resets activeElement to body), or focus never moved at all.
+      // When a menu action mounts a successor dialog with autofocus, the
+      // commit-phase focus has already landed there — leave it alone.
+      const active = document.activeElement;
+      const focusLost = !active || active === document.body || active === document.documentElement;
+      const focusOnSurface =
+        !!surface && active instanceof HTMLElement && (surface === active || surface.contains(active));
+      if (!focusLost && !focusOnSurface) return;
       const trigger = returnFocusRef?.current ?? previousFocusRef.current;
       if (trigger && document.contains(trigger)) trigger.focus();
     };
-  }, [returnFocusRef]);
+  }, [surfaceRef, returnFocusRef]);
 }
 
 function useViewportConstraint(surfaceRef: RefObject<HTMLElement | null>) {
@@ -93,7 +107,7 @@ export const MenuSurface = forwardRef<HTMLDivElement, MenuSurfaceProps>(function
   forwardedRef,
 ) {
   const localRef = useRef<HTMLDivElement | null>(null);
-  useReturnFocus(returnFocusRef);
+  useReturnFocus(localRef, returnFocusRef);
   useViewportConstraint(localRef);
 
   useEffect(() => {
@@ -177,7 +191,7 @@ export const PopoverSurface = forwardRef<HTMLDivElement, PopoverSurfaceProps>(fu
   forwardedRef,
 ) {
   const localRef = useRef<HTMLDivElement | null>(null);
-  useReturnFocus(returnFocusRef);
+  useReturnFocus(localRef, returnFocusRef);
   useViewportConstraint(localRef);
 
   useEffect(() => {

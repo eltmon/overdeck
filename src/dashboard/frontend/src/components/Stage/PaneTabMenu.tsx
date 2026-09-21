@@ -25,7 +25,7 @@ interface PaneTabMenuProps {
  */
 export function PaneTabMenu({ position, onClose, onOpenInSplit, onSplitDown, onCloseTab, onCloseAll }: PaneTabMenuProps) {
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented) onClose() }
     const dismiss = () => onClose()
     window.addEventListener('keydown', onKey)
     window.addEventListener('scroll', dismiss, true)

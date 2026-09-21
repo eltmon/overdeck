@@ -296,6 +296,8 @@ function OverflowButton({
         ref={triggerRef}
         type="button"
         data-testid="issue-action-overflow-button"
+        aria-haspopup="menu"
+        aria-expanded={open}
         aria-label={`${more} more issue actions`}
         className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         onClick={() => setOpenMenu(open ? null : key)}

@@ -121,12 +121,17 @@ export function ConversationRow({
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const menuBtnRef = useRef<HTMLSpanElement>(null);
+  const rowRef = useRef<HTMLButtonElement>(null);
+  // Which control opened the overflow menu: the kebab (click/keyboard) or the
+  // row itself (right-click). Focus returns to the actual opener.
+  const menuOpenerRef = useRef<'row' | 'kebab'>('kebab');
   const [moveSubmenuOpen, setMoveSubmenuOpen] = useState(false);
   const confirm = useConfirm();
   const now = useNow(60_000);
 
   const openMenu = useCallback((e: React.MouseEvent | React.KeyboardEvent) => {
     e.stopPropagation();
+    menuOpenerRef.current = 'kebab';
     const rect = menuBtnRef.current?.getBoundingClientRect();
     if (rect) {
       // Right-align the menu under the trigger; clamp to the viewport.
@@ -140,7 +145,7 @@ export function ConversationRow({
   useEffect(() => {
     if (!menuOpen) { setMoveSubmenuOpen(false); return; }
     const dismiss = () => setMenuOpen(false);
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented) setMenuOpen(false); };
     window.addEventListener('keydown', onKey);
     window.addEventListener('scroll', dismiss, true);
     window.addEventListener('resize', dismiss);
@@ -293,6 +298,7 @@ export function ConversationRow({
   return (
     <>
     <button
+      ref={rowRef}
       className={itemClass}
       draggable
       style={{ cursor: 'grab' }}
@@ -305,6 +311,7 @@ export function ConversationRow({
         e.preventDefault();
         e.stopPropagation();
         e.currentTarget.focus();
+        menuOpenerRef.current = 'row';
         setMenuPos({
           top: Math.max(8, Math.min(e.clientY, window.innerHeight - 320)),
           left: Math.max(8, Math.min(e.clientX, window.innerWidth - 230)),
@@ -518,7 +525,7 @@ export function ConversationRow({
         <MenuSurface
           aria-label={`Actions for ${conv.title ?? conv.name}`}
           onClose={() => setMenuOpen(false)}
-          returnFocusRef={menuBtnRef}
+          returnFocusRef={menuOpenerRef.current === 'row' ? rowRef : menuBtnRef}
           className="fixed z-[1000] min-w-[220px]"
           style={{ position: 'fixed', top: menuPos.top, left: menuPos.left, right: 'auto' }}
         >

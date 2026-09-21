@@ -383,6 +383,8 @@ export function CloisterStatusBar({ onOpenSettings }: { onOpenSettings?: () => v
         <button
           ref={buttonRef}
           onClick={() => showRestartPopover ? setShowRestartPopover(false) : openPopover()}
+          aria-haspopup="dialog"
+          aria-expanded={showRestartPopover}
           className="p-1 rounded text-xs bg-popover text-foreground border border-border hover:bg-card transition-colors"
           title="Restart sessions"
         >

@@ -51,7 +51,7 @@ export function ConversationActionMenu({ conversation, mutations, position, onCl
 
   // Dismiss on Escape / scroll / resize (portaled; position isn't tracked).
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented) onClose(); };
     const dismiss = () => onClose();
     window.addEventListener('keydown', onKey);
     window.addEventListener('scroll', dismiss, true);

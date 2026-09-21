@@ -34,6 +34,7 @@ export function SystemMenu({ onOpenSettings }: { onOpenSettings?: () => void }) 
         ref={triggerRef}
         type="button"
         aria-label="System controls"
+        aria-haspopup="dialog"
         aria-expanded={open}
         title="System controls — Cloister, restart, emergency stop, settings"
         onClick={() => setOpen((o) => !o)}
