@@ -9,6 +9,7 @@ import {
   getOverdeckDatabaseSync,
   runSchemaTopUp,
   dropPipelineStateMirrorTablesSync,
+  dropDeadIssuesForeignKeysSync,
 } from '../infra.js';
 
 let tempDirs: string[] = [];
@@ -111,6 +112,84 @@ describe('overdeck schema top-ups', () => {
       .all<{ detail: string }>('agent-pan-2807', 0);
 
     expect(plan.some((row) => row.detail.includes('idx_cost_agent_id'))).toBe(true);
+  });
+
+  it('creates the live issue-referencing tables WITHOUT the dead issues FK in a fresh database (PAN-3963)', () => {
+    const db = getOverdeckDatabaseSync(makeDbPath());
+    for (const table of [
+      'merge_queue',
+      'merge_sets',
+      'release_sets',
+      'pending_auto_merges',
+      'uat_generation_members',
+      'uat_generation_member_repos',
+    ]) {
+      const row = db
+        .prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?`)
+        .get<{ sql: string }>(table);
+      expect(row?.sql ?? '', table).not.toMatch(/REFERENCES\s*`issues`/i);
+    }
+  });
+
+  it('rebuilds a pre-cut table to drop the dead issues FK, preserving rows and the live FKs (PAN-3963)', () => {
+    const db = getOverdeckDatabaseSync(makeDbPath());
+    // Recreate the pre-migration shape: uat_generation_members gated on the
+    // issues cache that nothing writes since the Cut.
+    db.exec('DROP TABLE `uat_generation_members`');
+    db.exec(`
+      CREATE TABLE \`uat_generation_members\` (
+        \`uat_name\` text NOT NULL,
+        \`issue_id\` text NOT NULL,
+        \`role\` text DEFAULT 'member' NOT NULL,
+        \`title\` text,
+        \`branch\` text,
+        \`head_sha\` text,
+        \`merge_order\` integer,
+        \`pr\` integer,
+        \`pr_url\` text,
+        \`reason\` text,
+        PRIMARY KEY(\`uat_name\`, \`issue_id\`),
+        FOREIGN KEY (\`uat_name\`) REFERENCES \`uat_generations\`(\`name\`) ON UPDATE no action ON DELETE no action,
+        FOREIGN KEY (\`issue_id\`) REFERENCES \`issues\`(\`id\`) ON UPDATE no action ON DELETE no action
+      )
+    `);
+    db.prepare('INSERT INTO issues (id, stage, updated_at) VALUES (?, ?, ?)').run('PAN-3705', 'done', 1);
+    db.prepare(
+      `INSERT INTO uat_generations (name, worktree_path, project_root, base_sha, status, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run('uat/pan-onyx-0920', '/w', '/proj', 'sha', 'ready', 1, 1);
+    db.prepare('INSERT INTO uat_generation_members (uat_name, issue_id) VALUES (?, ?)').run('uat/pan-onyx-0920', 'PAN-3705');
+    // Pre-migration behavior: the post-cut issue id is rejected.
+    expect(() =>
+      db.prepare('INSERT INTO uat_generation_members (uat_name, issue_id) VALUES (?, ?)').run('uat/pan-onyx-0920', 'PAN-3950'),
+    ).toThrow(/FOREIGN KEY/);
+
+    const result = dropDeadIssuesForeignKeysSync(db, {});
+
+    expect(result).toMatchObject({ dropped: true, tables: ['uat_generation_members'] });
+    // The existing row survived, and the post-cut issue id now inserts.
+    expect(() =>
+      db.prepare('INSERT INTO uat_generation_members (uat_name, issue_id) VALUES (?, ?)').run('uat/pan-onyx-0920', 'PAN-3950'),
+    ).not.toThrow();
+    expect(
+      db.prepare('SELECT issue_id FROM uat_generation_members ORDER BY issue_id').all<{ issue_id: string }>()
+        .map((row) => row.issue_id),
+    ).toEqual(['PAN-3705', 'PAN-3950']);
+    // The LIVE FK into uat_generations survives the rebuild.
+    expect(() =>
+      db.prepare('INSERT INTO uat_generation_members (uat_name, issue_id) VALUES (?, ?)').run('uat/nonexistent', 'PAN-1'),
+    ).toThrow(/FOREIGN KEY/);
+  });
+
+  it('runs the dead-issues-FK rebuild once via marker, and never in a peer process', () => {
+    const db = getOverdeckDatabaseSync(makeDbPath());
+    // Fresh database: nothing to rebuild, but the marker still lands.
+    expect(dropDeadIssuesForeignKeysSync(db, {})).toMatchObject({ dropped: true, tables: [] });
+    expect(dropDeadIssuesForeignKeysSync(db, {})).toMatchObject({ dropped: false, skipped: 'already-dropped' });
+
+    const peerDb = getOverdeckDatabaseSync(makeDbPath());
+    expect(dropDeadIssuesForeignKeysSync(peerDb, { OVERDECK_DISABLE_DEACON: '1' } as NodeJS.ProcessEnv))
+      .toMatchObject({ dropped: false, skipped: 'peer' });
   });
 
   it('silently tolerates a duplicate column reported by SQLite', () => {

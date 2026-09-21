@@ -35,6 +35,17 @@ import type { UatGeneration } from '../overdeck/merge-sync.js';
 export const STUCK_ASSEMBLING_MS = 60 * 60 * 1000;
 /** Minimum age before re-attempting an assembly that failed for the same input. */
 export const FAILED_RETRY_BACKOFF_MS = 10 * 60 * 1000;
+/**
+ * After this many CONSECUTIVE failed assemblies (newest-first tail of the
+ * chain, regardless of input signature), stop re-assembling and surface instead
+ * of burning a worktree per attempt forever. PAN-3963: a store-write failure
+ * killed three generations in a row today; the 10-minute backoff alone only
+ * spaces the failures out. Any newer non-failed row (a live or invalidated
+ * generation) breaks the streak, and `force` bypasses the cutoff the same way
+ * it bypasses the backoff — that is the operator's retry lever once the
+ * underlying cause is fixed.
+ */
+export const MAX_CONSECUTIVE_FAILED_ASSEMBLIES = 3;
 
 export interface UatReconcilerDeps {
   /** Gate: flywheel.merge_train_enabled. */
@@ -77,7 +88,7 @@ export interface UatReconcilerDeps {
 }
 
 export interface ReconcileResult {
-  action: 'disabled' | 'no-queue' | 'idle' | 'assembled' | 'assembly-failed' | 'backoff' | 'in-flight';
+  action: 'disabled' | 'no-queue' | 'idle' | 'assembled' | 'assembly-failed' | 'assembly-blocked' | 'backoff' | 'in-flight';
   invalidated: string[];
   generation?: UatGeneration;
 }
@@ -245,6 +256,27 @@ export async function reconcileUatGenerations(
       if (live.some((gen) => liveSignatureMatches(gen, readySet, headShas, mainSha))) {
         await deps.cleanup().catch(() => {});
         return { action: 'idle', invalidated };
+      }
+      // Consecutive-failure cutoff (PAN-3963): the backoff spaces retries out,
+      // but a deterministic failure (a bad FK, a broken dep) still burns one
+      // worktree per window forever. A trailing streak of failed rows means
+      // every recent attempt died; stop and surface until the operator forces
+      // a rebuild after fixing the cause. The streak is signature-independent
+      // on purpose — a failure before the first member row is recorded leaves
+      // a row whose signature can never match `desired`.
+      const chain = deps.store.listChain(projectRoot);
+      let failedStreak = 0;
+      for (const gen of chain) {
+        if (gen.status === 'failed') failedStreak += 1;
+        else break;
+      }
+      if (failedStreak >= MAX_CONSECUTIVE_FAILED_ASSEMBLIES) {
+        const names = chain.slice(0, failedStreak).map((gen) => gen.name).join(', ');
+        log(
+          `[uat-reconciler] BLOCKED — ${failedStreak} consecutive assemblies failed (${names}); `
+          + 'not re-assembling. Fix the logged cause, then force a rebuild from the Merge train page',
+        );
+        return { action: 'assembly-blocked', invalidated };
       }
       const failed = deps.store.listChain(projectRoot, ['failed']);
       const recentFailure = failed.find((gen) =>

@@ -398,6 +398,60 @@ describe('single-flight, stuck assemblies, backoff', () => {
   });
 });
 
+describe('consecutive-failure cutoff (PAN-3963)', () => {
+  const failedRow = (proj: string, name: string, hour: number) =>
+    gen(proj, name, 'failed', {
+      createdAt: `2026-06-10T0${hour}:00:00.000Z`,
+      updatedAt: `2026-06-10T0${hour}:00:00.000Z`,
+    });
+
+  it('stops re-assembling after three consecutive failed assemblies', async () => {
+    const proj = freshProject();
+    const deps = makeDeps(proj, {
+      rows: [
+        failedRow(proj, 'uat/pan-f1-0610', 6),
+        failedRow(proj, 'uat/pan-f2-0610', 7),
+        failedRow(proj, 'uat/pan-f3-0610', 8),
+      ],
+    });
+    const result = await reconcileUatGenerations(proj, deps);
+    expect(result.action).toBe('assembly-blocked');
+    expect(deps.assembled).toHaveLength(0);
+    expect(deps.logs.some((m) => m.includes('BLOCKED') && m.includes('uat/pan-f3-0610'))).toBe(true);
+  });
+
+  it('still assembles below the cutoff, and a newer non-failed row breaks the streak', async () => {
+    const proj = freshProject();
+    const twoFailures = makeDeps(proj, {
+      rows: [failedRow(proj, 'uat/pan-f1-0610', 6), failedRow(proj, 'uat/pan-f2-0610', 7)],
+    });
+    expect((await reconcileUatGenerations(proj, twoFailures)).action).toBe('assembled');
+
+    const proj2 = freshProject();
+    const brokenStreak = makeDeps(proj2, {
+      rows: [
+        failedRow(proj2, 'uat/pan-f1-0610', 6),
+        failedRow(proj2, 'uat/pan-f2-0610', 7),
+        failedRow(proj2, 'uat/pan-f3-0610', 8),
+        gen(proj2, 'uat/pan-otter-0610', 'invalidated', { createdAt: '2026-06-10T09:00:00.000Z' }),
+      ],
+    });
+    expect((await reconcileUatGenerations(proj2, brokenStreak)).action).toBe('assembled');
+  });
+
+  it('force bypasses the cutoff — the operator retry lever after the cause is fixed', async () => {
+    const proj = freshProject();
+    const deps = makeDeps(proj, {
+      rows: [
+        failedRow(proj, 'uat/pan-f1-0610', 6),
+        failedRow(proj, 'uat/pan-f2-0610', 7),
+        failedRow(proj, 'uat/pan-f3-0610', 8),
+      ],
+    });
+    expect((await reconcileUatGenerations(proj, deps, { force: true })).action).toBe('assembled');
+  });
+});
+
 describe('empty queue', () => {
   it('is idle (after invalidation rules) when the ready set is empty', async () => {
     const proj = freshProject();

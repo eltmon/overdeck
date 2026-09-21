@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { getHarnessBehavior, getHarness } from '@overdeck/contracts';
-import { buildOpenCodeAcpSpawnInput, resolveOpenCodeAuthMethodId, translateOpenCodeAcpModelId } from '../opencode.js';
+import {
+  buildOpenCodeAcpSpawnInput,
+  OPENCODE_PRE_ALLOWED_PERMISSION,
+  resolveOpenCodeAuthMethodId,
+  translateOpenCodeAcpModelId,
+} from '../opencode.js';
 import { resolveAcpProviderSupport, resolveAcpModelId } from '../providers.js';
 import { getProviderForModelSync, getBuiltInDefaultHarness } from '../../providers.js';
 import { getModelProviderSync, isOpenRouterModelSync } from '../../model-fallback.js';
@@ -32,8 +37,14 @@ describe('OpenCode Go and Zen', () => {
   });
 
   it('starts a persistent ACP process with the selected binary and working directory', () => {
-    expect(buildOpenCodeAcpSpawnInput({ binaryPath: '/tools/open code' }, '/workspace', { OPENCODE_API_KEY: 'test' })).toEqual({
-      command: '/tools/open code', args: ['acp'], cwd: '/workspace', env: { OPENCODE_API_KEY: 'test' },
+    expect(buildOpenCodeAcpSpawnInput({ binaryPath: '/tools/open code' }, '/workspace', 43123, { OPENCODE_API_KEY: 'test' })).toEqual({
+      command: '/tools/open code',
+      args: ['acp', '--hostname', '127.0.0.1', '--port', '43123'],
+      cwd: '/workspace',
+      env: {
+        OPENCODE_API_KEY: 'test',
+        OPENCODE_PERMISSION: OPENCODE_PRE_ALLOWED_PERMISSION,
+      },
     });
     expect(resolveOpenCodeAuthMethodId({ protocolVersion: 1, authMethods: [{ id: 'opencode-login', name: 'Login with opencode' }] })).toBe('opencode-login');
     expect(() => resolveOpenCodeAuthMethodId({ protocolVersion: 1, authMethods: [] })).toThrow('opencode auth login');

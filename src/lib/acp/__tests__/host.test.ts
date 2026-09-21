@@ -9,14 +9,16 @@ import * as Effect from "effect/Effect";
 import * as Queue from "effect/Queue";
 import * as Stream from "effect/Stream";
 import type * as EffectAcpSchema from "effect-acp/schema";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { BRIDGE_TOKEN_HEADER } from "../../bridge-token.js";
 import { INPUT_PURGE_MAX_CHARS } from "../../channels/injection-budget.js";
 import {
   AcpHost,
+  OPENCODE_PERMISSION_WATCHDOG_STALE_MS,
   type AcpHostRuntime,
   parseAcpHostArgs,
+  reserveOpenCodePort,
   readPersistedAcpSessionId,
 } from "../host.js";
 import type { AcpSessionRuntimeEvent } from "../session-runtime.js";
@@ -234,9 +236,16 @@ async function makeHome(): Promise<string> {
 afterEach(async () => {
   await Promise.all(hosts.splice(0).map((host) => host.stop()));
   await Promise.all(tempHomes.splice(0).map((home) => rm(home, { recursive: true, force: true })));
+  vi.useRealTimers();
 });
 
 describe("AcpHost", () => {
+  it("reserves a loopback TCP port for OpenCode launches", async () => {
+    const port = await reserveOpenCodePort();
+    expect(port).toBeGreaterThan(0);
+    expect(port).toBeLessThanOrEqual(65_535);
+  });
+
   it("binds its socket and writes mode-0600 token and session files", async () => {
     const overdeckHome = await makeHome();
     const stub = await makeStubRuntime();
@@ -672,6 +681,128 @@ describe("AcpHost", () => {
 
     await Effect.runPromise(Deferred.succeed(promptGate, undefined));
     await host.waitForIdle();
+  });
+
+  it("answers a stuck OpenCode subagent permission after the watchdog threshold", async () => {
+    const overdeckHome = await makeHome();
+    const promptStarted = await Effect.runPromise(Deferred.make<void>());
+    const promptGate = await Effect.runPromise(Deferred.make<void>());
+    const stub = await makeStubRuntime({ promptStarted, promptGate });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify([{
+        id: "per-stuck",
+        sessionID: "subagent-session",
+        permission: "external_directory",
+      }]), { status: 200, headers: { "content-type": "application/json" } }))
+      .mockResolvedValueOnce(new Response("", { status: 200 }));
+    const host = new AcpHost({
+      agentId: "agent-opencode-watchdog",
+      provider: "opencode",
+      workspace: process.cwd(),
+      overdeckHome,
+      runtime: stub.runtime,
+      openCodePort: 43123,
+      fetch: fetchMock,
+    });
+    hosts.push(host);
+    await host.start();
+    await expect(readFile(
+      join(overdeckHome, "agents", "agent-opencode-watchdog", "opencode-port"),
+      "utf-8",
+    )).resolves.toBe("43123\n");
+    vi.useFakeTimers();
+
+    await host.handleOp({ op: "message", content: "run a task subagent" });
+    await Effect.runPromise(Deferred.await(promptStarted));
+    await vi.advanceTimersByTimeAsync(OPENCODE_PERMISSION_WATCHDOG_STALE_MS - 1);
+    expect(fetchMock).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    vi.useRealTimers();
+    await Effect.runPromise(Deferred.succeed(promptGate, undefined));
+    await host.waitForIdle();
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "http://127.0.0.1:43123/permission");
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "http://127.0.0.1:43123/permission/per-stuck/reply",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ reply: "always" }) }),
+    );
+    const transcript = await readFile(
+      join(overdeckHome, "agents", "agent-opencode-watchdog", "acp-session.jsonl"),
+      "utf-8",
+    );
+    expect(transcript).toContain('"source":"watchdog"');
+    expect(transcript).toContain('"sessionId":"subagent-session"');
+    const watchdog = transcript.trim().split("\n")
+      .map((line) => JSON.parse(line))
+      .find((entry) => entry.source === "watchdog");
+    expect(JSON.parse(watchdog.content)).toMatchObject({
+      type: "permission_outcome",
+      outcome: "selected",
+      chosenOptionId: "always",
+      watchdog: true,
+    });
+  });
+
+  it("does not run the OpenCode permission watchdog while idle or for Kimi", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn();
+    for (const provider of ["opencode", "kimi"] as const) {
+      const host = new AcpHost({
+        agentId: `agent-watchdog-idle-${provider}`,
+        provider,
+        workspace: process.cwd(),
+        overdeckHome: await makeHome(),
+        runtime: (await makeStubRuntime()).runtime,
+        openCodePort: 43123,
+        fetch: fetchMock,
+      });
+      hosts.push(host);
+      await host.start();
+    }
+    await vi.advanceTimersByTimeAsync(OPENCODE_PERMISSION_WATCHDOG_STALE_MS * 2);
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it("treats a raced OpenCode permission reply 404 as benign", async () => {
+    const overdeckHome = await makeHome();
+    const promptStarted = await Effect.runPromise(Deferred.make<void>());
+    const promptGate = await Effect.runPromise(Deferred.make<void>());
+    const stub = await makeStubRuntime({ promptStarted, promptGate });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify([{
+        id: "per-raced",
+        sessionID: "subagent-session",
+      }]), { status: 200, headers: { "content-type": "application/json" } }))
+      .mockResolvedValueOnce(new Response("", { status: 404 }));
+    const host = new AcpHost({
+      agentId: "agent-opencode-watchdog-race",
+      provider: "opencode-go",
+      workspace: process.cwd(),
+      overdeckHome,
+      runtime: stub.runtime,
+      openCodePort: 43124,
+      fetch: fetchMock,
+    });
+    hosts.push(host);
+    await host.start();
+    vi.useFakeTimers();
+
+    await host.handleOp({ op: "message", content: "run a task subagent" });
+    await Effect.runPromise(Deferred.await(promptStarted));
+    await vi.advanceTimersByTimeAsync(OPENCODE_PERMISSION_WATCHDOG_STALE_MS);
+    vi.useRealTimers();
+    await Effect.runPromise(Deferred.succeed(promptGate, undefined));
+    await host.waitForIdle();
+
+    const transcript = await readFile(
+      join(overdeckHome, "agents", "agent-opencode-watchdog-race", "acp-session.jsonl"),
+      "utf-8",
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(transcript).not.toContain('"source":"watchdog"');
+    expect(transcript).not.toContain("watchdog failed");
   });
 
   it("writes one ordered completion boundary for each successful prompt", async () => {
