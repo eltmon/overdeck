@@ -4,17 +4,17 @@
     "created": "2026-09-20T23:05:13.326Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3968: pan close still deletes state.json/sessions.json — close-out.ts step 5 never moved to pruneAgentStateDir (PAN-3950 AC-1 unmet)",
-    "updated": "2026-09-20T23:09:29.253Z"
+    "updated": "2026-09-21T00:11:24.512Z"
   },
   "plan": {
     "id": "pan-3968",
     "title": "pan close still deletes state.json/sessions.json — the live deleter is the close-out:prune-agent-rows step in lifecycle/workflows.ts (PAN-3950 AC-1 unmet)",
-    "status": "proposed",
+    "status": "running",
     "uid": "b8c234a0-633a-407c-9dab-9d4bd1368f53",
     "author": "agent:claude-opus-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-09-20T23:05:13.326Z",
-    "updated": "2026-09-20T23:09:29.253Z",
+    "updated": "2026-09-21T00:11:24.512Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3968",
