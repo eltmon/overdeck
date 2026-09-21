@@ -4,17 +4,17 @@
     "created": "2026-09-20T13:34:29Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3950: Transcripts must stay discoverable: keep agent state at close-out, drop session.id, issue panel uses the agent transcript route — round-6 fix pass on feature/pan-3950 (PR #3951)",
-    "updated": "2026-09-20T13:51:12.455Z"
+    "updated": "2026-09-20T20:21:11.642Z"
   },
   "plan": {
     "id": "pan-3950",
     "title": "Transcripts must stay discoverable: keep agent state at close-out, drop session.id, issue panel uses the agent transcript route",
-    "status": "running",
+    "status": "completed",
     "uid": "fe977439-2961-47d9-85af-8db76f5ac72f",
     "author": "agent:claude-opus-5",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-09-20T13:34:29Z",
-    "updated": "2026-09-20T13:51:12.455Z",
+    "updated": "2026-09-20T20:21:11.642Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3950",
@@ -503,5 +503,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }
