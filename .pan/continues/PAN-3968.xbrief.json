@@ -1,0 +1,18 @@
+{
+  "version": "1",
+  "issueId": "PAN-3968",
+  "created": "2026-09-21T00:11:40.860Z",
+  "updated": "2026-09-21T00:11:40.860Z",
+  "gitState": {},
+  "decisions": [],
+  "hazards": [],
+  "resumePoint": null,
+  "sessionHistory": [],
+  "items": {
+    "remove-close-out-row-gc": {
+      "status": "in_progress",
+      "claimedBy": "agent-pan-3968",
+      "claimedAt": "2026-09-21T00:11:40.860Z"
+    }
+  }
+}
