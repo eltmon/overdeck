@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3959",
   "created": "2026-09-20T22:53:20.505Z",
-  "updated": "2026-09-21T00:03:47.058Z",
+  "updated": "2026-09-21T00:04:11.772Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -150,6 +150,10 @@
     "w6-pi-ohmypi-extensions-record-path.ac4": {
       "status": "completed",
       "doneAt": "2026-09-21T00:03:47.058Z"
+    },
+    "w7-acp-muse-writers-record-path.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:04:11.772Z"
     }
   }
 }
