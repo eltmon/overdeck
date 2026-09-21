@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3968",
   "created": "2026-09-21T00:11:40.860Z",
-  "updated": "2026-09-21T00:50:38.932Z",
+  "updated": "2026-09-21T00:50:50.692Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -76,6 +76,10 @@
     "delete-dead-execute-close-out.ac4": {
       "status": "completed",
       "doneAt": "2026-09-21T00:50:38.932Z"
+    },
+    "docs-close-out-no-row-gc.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:50:50.692Z"
     }
   }
 }
