@@ -96,7 +96,7 @@ describe('canResumeSession truth (PAN-806)', () => {
     expect(lifecycle.recommendedAction).toBe('resume');
   });
 
-  it('is FALSE with action none for a handed-off agent (completion marker, PAN-3334)', async () => {
+  it('is TRUE with action resume for a handed-off agent that still has a saved session (supersedes PAN-3334)', async () => {
     mockHasCompletionMarker.mockReturnValue(true);
     try {
       mockGetAgentState.mockReturnValue(agentState());
@@ -107,8 +107,8 @@ describe('canResumeSession truth (PAN-806)', () => {
       const lifecycle = await Effect.runPromise(getWorkAgentLifecycleState('agent-pan-806'));
 
       expect(lifecycle.handedOff).toBe(true);
-      expect(lifecycle.canResumeSession).toBe(false);
-      expect(lifecycle.recommendedAction).toBe('none');
+      expect(lifecycle.canResumeSession).toBe(true);
+      expect(lifecycle.recommendedAction).toBe('resume');
       expect(lifecycle.reason).toContain('handed off');
     } finally {
       mockHasCompletionMarker.mockReturnValue(false);
