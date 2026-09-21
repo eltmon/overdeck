@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3968",
   "created": "2026-09-21T00:11:40.860Z",
-  "updated": "2026-09-21T00:35:01.487Z",
+  "updated": "2026-09-21T00:48:29.845Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -32,6 +32,10 @@
       "claimedBy": "agent-pan-3968",
       "claimedAt": "2026-09-21T00:26:56.171Z",
       "doneAt": "2026-09-21T00:35:01.487Z"
+    },
+    "remove-close-out-row-gc.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:48:29.845Z"
     }
   }
 }
