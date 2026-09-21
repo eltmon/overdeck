@@ -109,7 +109,9 @@ Live landmines a change in this repo can step on. Verified 2026-09-20.
   is dead (no production caller; PAN-3968 deletes it) — only `isBranchMerged` there is
   live. Agent-directory cleanup at close-out must go through `pruneAgentStateDir`
   (keeps `state.json`/`sessions.json`); `removeAgentStateDir` is the destructive door
-  for deep-wipe / `pan admin db gc-agents` only (PAN-3950, PAN-3968).
+  for deep-wipe, `pan admin db gc-agents`, the startup legacy-row sweep
+  (`dropLegacyAgentStatesMissingRoleAsync`), review-agent purge, and swarm reset
+  (PAN-3950, PAN-3968).
 - **`tests/unit/lib/lifecycle/workflows.test.ts` has two agent roots** — it mocks
   `paths.js` `AGENTS_DIR` to `<tmpdir>/overdeck-wf-test-home/agents`, but
   `listAgentStatesSync`/`saveAgentStateSync` resolve `getOverdeckHome()` (per-worker

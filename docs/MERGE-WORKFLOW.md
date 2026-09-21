@@ -156,8 +156,11 @@ Close-out prunes only regenerable agent-directory weight: `pending.lock`,
 logs, context receipts, Codex thread IDs, and every transcript. Explicit wipe,
 garbage collection, and retention remain the destructive cleanup paths.
 The ceremony runs no agent-row garbage collection of its own (PAN-3968 removed
-the `close-out:prune-agent-rows` step); the only paths that delete `state.json`
-are deep-wipe, `pan admin db gc-agents`, and transcript retention.
+the `close-out:prune-agent-rows` step); the paths that delete `state.json` are
+deep-wipe, `pan admin db gc-agents`, the startup legacy-row sweep
+(`dropLegacyAgentStatesMissingRoleAsync`), review-agent purge, and swarm reset
+— all of them route through `removeAgentStateDir`. Transcript retention
+deletes only `*.jsonl` transcripts and keeps `state.json`.
 
 When the merge-train flag (`flywheel.merge_train_enabled`, default off) is
 ON, a merge-train reconcile pass rebases/re-verifies ready sibling branches
