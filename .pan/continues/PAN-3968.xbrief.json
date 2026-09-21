@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3968",
   "created": "2026-09-21T00:11:40.860Z",
-  "updated": "2026-09-21T00:26:56.171Z",
+  "updated": "2026-09-21T00:35:01.487Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -28,9 +28,10 @@
       "doneAt": "2026-09-21T00:26:49.578Z"
     },
     "docs-close-out-no-row-gc": {
-      "status": "in_progress",
+      "status": "completed",
       "claimedBy": "agent-pan-3968",
-      "claimedAt": "2026-09-21T00:26:56.171Z"
+      "claimedAt": "2026-09-21T00:26:56.171Z",
+      "doneAt": "2026-09-21T00:35:01.487Z"
     }
   }
 }
