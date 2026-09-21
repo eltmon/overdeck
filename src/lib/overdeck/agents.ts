@@ -9,6 +9,7 @@ import { Db, Tmux, getOverdeckDatabaseSync } from './infra.js';
 import { IssueId, type Stage } from './issues.js';
 import { getOverdeckHome } from '../paths.js';
 import { listAgentStatesSync, type AgentState } from '../agents/agent-state.js';
+import { resolveLatestSessionIdSync } from '../agents/activity.js';
 
 // ── Local table definitions (mirrors overdeck-schema.ts — no FK/index annotations here) ─
 
@@ -161,7 +162,7 @@ function agentStateToEntityInput(state: AgentState): Record<string, unknown> {
     role: state.role,
     status: state.status,
     workspace: state.workspace ?? '',
-    sessionId: state.sessionId ?? null,
+    sessionId: resolveLatestSessionIdSync(state.id, { getAgentState: () => state }).sessionId,
     harness: state.harness ?? '',
     model: state.model ?? '',
     hostOverride: typeof state.hostOverride === 'string' ? state.hostOverride : null,
@@ -277,4 +278,3 @@ export function listAgentIdsByPrefixSync(prefix: string): string[] {
     return [];
   }
 }
-

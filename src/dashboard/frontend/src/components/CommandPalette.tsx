@@ -230,6 +230,12 @@ const SCOPE_LABEL: Record<PaletteScope, string> = {
   memory: 'Memory',
 };
 
+/** Scopes whose chip is always offered, even with zero results of that type.
+ *  Conversation hits only exist after a typed server search, so without this
+ *  the chip would be invisible on open (and Ctrl-J's initialScope='conversations'
+ *  would have nothing to pin to). */
+const PINNED_SCOPES: Exclude<PaletteScope, 'all'>[] = ['conversations'];
+
 /** Map a result group heading to the scope chip it belongs under. */
 function groupScope(group: string): Exclude<PaletteScope, 'all'> {
   if (group === 'Conversations') return 'conversations';
@@ -284,7 +290,9 @@ async function fetchWorkspaceRegistry(): Promise<WorkspaceRegistryRow[]> {
 async function fetchPaletteSearch(query: string, signal: AbortSignal): Promise<PaletteSearchResponse> {
   try {
     const res = await fetch(`/api/palette/search?q=${encodeURIComponent(query)}&limit=15`, { signal });
-    if (!res.ok) return EMPTY_SEARCH;
+    // PAN-3975: non-OK statuses (401 expired session, 500, …) must surface as
+    // an error, not collapse into "zero results".
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json() as PaletteSearchResponse;
     return {
       memory: data.memory ?? [],
@@ -294,7 +302,7 @@ async function fetchPaletteSearch(query: string, signal: AbortSignal): Promise<P
     };
   } catch (err) {
     if ((err as { name?: string }).name === 'AbortError') return EMPTY_SEARCH;
-    return EMPTY_SEARCH;
+    throw err;
   }
 }
 
@@ -389,6 +397,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     () => localStorage.getItem(WORKSPACES_PIPELINE_EXPANDED_KEY) === 'true',
   );
   const [searchResults, setSearchResults] = useState<PaletteSearchResponse>(EMPTY_SEARCH);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [scope, setScope] = useState<PaletteScope>(initialScope);
   const [conversationsNewestFirst, setConversationsNewestFirst] = useState(
@@ -409,6 +418,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     if (!isOpen) return;
     setQuery('');
     setSearchResults(EMPTY_SEARCH);
+    setSearchError(null);
     setScope(initialScope);
     // Re-read the shared expansion flag so a rail toggle is picked up here.
     setPipelineWorkspacesExpanded(localStorage.getItem(WORKSPACES_PIPELINE_EXPANDED_KEY) === 'true');
@@ -424,13 +434,24 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     const trimmed = debouncedQuery.trim();
     if (trimmed.length < 2) {
       setSearchResults(EMPTY_SEARCH);
+      setSearchError(null);
       setIsSearchLoading(false);
       return;
     }
     const controller = new AbortController();
     setIsSearchLoading(true);
     void fetchPaletteSearch(trimmed, controller.signal)
-      .then((data) => setSearchResults(data))
+      .then((data) => {
+        setSearchResults(data);
+        setSearchError(null);
+      })
+      .catch((err: unknown) => {
+        // Aborted superseded requests resolve with EMPTY_SEARCH above and land
+        // in .then; anything reaching here is a real failure (non-OK status,
+        // network error) and must not read as "zero results" (PAN-3975).
+        setSearchResults(EMPTY_SEARCH);
+        setSearchError(err instanceof Error ? err.message : 'request failed');
+      })
       .finally(() => setIsSearchLoading(false));
     return () => controller.abort();
   }, [isOpen, debouncedQuery]);
@@ -877,8 +898,9 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     // An action may answer to a chip its group does not imply, so the chip has
     // to be offered even when nothing else of that type is listed.
     for (const action of filtered) for (const s of action.alsoScopes ?? []) present.add(s);
+    for (const s of PINNED_SCOPES) present.add(s);
     const ordered = (['actions', 'commands', 'workspaces', 'issues', 'conversations', 'memory'] as const).filter((s) => present.has(s));
-    return ordered.length > 1 ? ['all', ...ordered] : [];
+    return ordered.length > 1 || PINNED_SCOPES.some((s) => present.has(s)) ? ['all', ...ordered] : [];
   }, [groupOrder, filtered]);
 
   // If the active scope drops out of the results (e.g. the query changed), reset.
@@ -943,6 +965,10 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
                   key={s}
                   type="button"
                   onClick={() => setScope(s)}
+                  // cmdk's Command root swallows Enter (to select the highlighted
+                  // result row) before the browser's default button-activation
+                  // fires, so a focused chip needs its own stop to be keyboard-activatable.
+                  onKeyDown={(e) => { if (e.key === 'Enter') e.stopPropagation(); }}
                   className={`text-[11px] px-2.5 py-1 rounded-full border whitespace-nowrap transition-colors ${
                     scope === s
                       ? 'bg-primary/15 border-primary/40 text-primary font-medium'
@@ -960,13 +986,17 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
             {isSearchLoading && query.trim().length >= 2 && (
               <div className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                Searching conversations & memory…
+                {scope === 'conversations' ? 'Searching conversations…' : 'Searching conversations & memory…'}
               </div>
             )}
             {visibleGroups.length === 0 ? (
               isSearchLoading && query.trim().length >= 2 ? null : (
                 <Command.Empty className="py-6 text-center text-sm text-muted-foreground">
-                  {query.trim().length === 0 ? 'Start typing…' : `No results for "${query}"`}
+                  {query.trim().length === 0
+                    ? (scope === 'conversations' ? 'Type to search conversations…' : 'Start typing…')
+                    : searchError && query.trim().length >= 2
+                      ? `Search unavailable (${searchError}): sign in again / try again`
+                      : `No results for "${query}"`}
                 </Command.Empty>
               )
             ) : (

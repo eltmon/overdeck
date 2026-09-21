@@ -1,5 +1,13 @@
 import { appendFile, mkdir, readFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
+import { getOverdeckHome } from "../paths.js";
+
+export function acpTranscriptPath(
+  agentId: string,
+  agentsRoot = join(getOverdeckHome(), "agents"),
+): string {
+  return join(agentsRoot, agentId, "acp-session.jsonl");
+}
 
 export type AcpTranscriptRole = "user" | "assistant" | "tool" | "system";
 export type AcpTranscriptStopReason =
@@ -25,7 +33,7 @@ export interface AcpTranscriptEntry {
   readonly content: string;
   readonly sessionId?: string;
   readonly toolCalls?: ReadonlyArray<AcpTranscriptToolCallState>;
-  readonly source?: "orchestrator" | "agent";
+  readonly source?: "orchestrator" | "agent" | "watchdog";
   readonly promptId?: string;
   /** Durable lifecycle record for queued, failed, and completed prompts. */
   readonly event?: "prompt_queued" | "prompt_failed" | "turn_completed";

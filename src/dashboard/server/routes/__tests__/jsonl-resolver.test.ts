@@ -5,8 +5,8 @@ import { join } from 'path';
 
 import {
   readLauncherPinnedSessionId,
-  resolveAgentHarness,
-  resolveClaudeSessionId,
+  listAgentTranscriptCandidates,
+  listAgentTranscriptWatchRoots,
   resolveCodexRolloutPath,
   resolveAcpTranscriptPath,
   resolveJsonlPath,
@@ -38,105 +38,6 @@ afterEach(async () => {
   await rm(testDir, { recursive: true, force: true });
 });
 
-describe('resolveClaudeSessionId (PAN-830)', () => {
-  it('reads session.id when present', async () => {
-    await writeFile(join(agentsDir, AGENT_ID, 'session.id'), `${CLAUDE_SESSION_ID}\n`);
-
-    const id = await resolveClaudeSessionId(AGENT_ID, { agentsDirOverride: agentsDir });
-
-    expect(id).toBe(CLAUDE_SESSION_ID);
-  });
-
-  it('falls back to last entry of sessions.json when session.id missing', async () => {
-    const arr = ['oldest-uuid', 'older-uuid', CLAUDE_SESSION_ID];
-    await writeFile(join(agentsDir, AGENT_ID, 'sessions.json'), JSON.stringify(arr));
-
-    const id = await resolveClaudeSessionId(AGENT_ID, { agentsDirOverride: agentsDir });
-
-    expect(id).toBe(CLAUDE_SESSION_ID);
-  });
-
-  it('falls back to runtime state when session.id and sessions.json missing', async () => {
-    const id = await resolveClaudeSessionId(AGENT_ID, {
-      agentsDirOverride: agentsDir,
-      getRuntimeStateAsync: async () => ({ claudeSessionId: CLAUDE_SESSION_ID }),
-    });
-
-    expect(id).toBe(CLAUDE_SESSION_ID);
-  });
-
-  it('prefers session.id over sessions.json', async () => {
-    await writeFile(join(agentsDir, AGENT_ID, 'session.id'), 'session-id-wins\n');
-    await writeFile(join(agentsDir, AGENT_ID, 'sessions.json'), JSON.stringify(['sessions-json-loses']));
-
-    const id = await resolveClaudeSessionId(AGENT_ID, { agentsDirOverride: agentsDir });
-
-    expect(id).toBe('session-id-wins');
-  });
-
-  it('prefers sessions.json over runtime state', async () => {
-    await writeFile(join(agentsDir, AGENT_ID, 'sessions.json'), JSON.stringify(['sessions-json-wins']));
-
-    const id = await resolveClaudeSessionId(AGENT_ID, {
-      agentsDirOverride: agentsDir,
-      getRuntimeStateAsync: async () => ({ claudeSessionId: 'runtime-loses' }),
-    });
-
-    expect(id).toBe('sessions-json-wins');
-  });
-
-  it('returns null when nothing is available', async () => {
-    const id = await resolveClaudeSessionId(AGENT_ID, {
-      agentsDirOverride: agentsDir,
-      getRuntimeStateAsync: async () => null,
-    });
-
-    expect(id).toBeNull();
-  });
-
-  it('returns null on malformed sessions.json (non-array)', async () => {
-    await writeFile(join(agentsDir, AGENT_ID, 'sessions.json'), '{"not":"array"}');
-
-    const id = await resolveClaudeSessionId(AGENT_ID, {
-      agentsDirOverride: agentsDir,
-      getRuntimeStateAsync: async () => null,
-    });
-
-    expect(id).toBeNull();
-  });
-
-  it('returns null on malformed sessions.json (invalid JSON)', async () => {
-    await writeFile(join(agentsDir, AGENT_ID, 'sessions.json'), 'not-json{');
-
-    const id = await resolveClaudeSessionId(AGENT_ID, {
-      agentsDirOverride: agentsDir,
-      getRuntimeStateAsync: async () => null,
-    });
-
-    expect(id).toBeNull();
-  });
-
-  it('returns null on empty sessions.json array', async () => {
-    await writeFile(join(agentsDir, AGENT_ID, 'sessions.json'), '[]');
-
-    const id = await resolveClaudeSessionId(AGENT_ID, {
-      agentsDirOverride: agentsDir,
-      getRuntimeStateAsync: async () => null,
-    });
-
-    expect(id).toBeNull();
-  });
-
-  it('returns null when agent dir does not exist', async () => {
-    const id = await resolveClaudeSessionId('nonexistent-agent', {
-      agentsDirOverride: agentsDir,
-      getRuntimeStateAsync: async () => null,
-    });
-
-    expect(id).toBeNull();
-  });
-});
-
 describe('resolveJsonlPath (PAN-830)', () => {
   it('logs a durable diagnostic when no session identity source exists', async () => {
     const diagnostics: string[] = [];
@@ -150,7 +51,7 @@ describe('resolveJsonlPath (PAN-830)', () => {
 
     expect(path).toBeNull();
     expect(diagnostics).toEqual([
-      expect.stringContaining('reason=no-session-id checked=session.id,sessions.json,runtime-state'),
+      expect.stringContaining('failed checked='),
     ]);
   });
 
@@ -167,10 +68,8 @@ describe('resolveJsonlPath (PAN-830)', () => {
 
     expect(path).toBeNull();
     expect(diagnostics).toHaveLength(1);
-    expect(diagnostics[0]).toContain(`reason=jsonl-missing sessionId=${CLAUDE_SESSION_ID}`);
-    expect(diagnostics[0]).toContain(`workspace=${WORKSPACE_PATH}`);
     expect(diagnostics[0]).toContain(
-      `expectedPath=${join(claudeProjectsDir, encodeClaudeProjectDir(WORKSPACE_PATH), `${CLAUDE_SESSION_ID}.jsonl`)}`,
+      join(claudeProjectsDir, encodeClaudeProjectDir(WORKSPACE_PATH), `${CLAUDE_SESSION_ID}.jsonl`),
     );
   });
 
@@ -211,8 +110,7 @@ describe('resolveJsonlPath (PAN-830)', () => {
     });
 
     expect(path).toBe(jsonlPath);
-    expect(diagnostics).toEqual([expect.stringContaining(`resolved harness=claude-code sessionId=${CLAUDE_SESSION_ID}`)]);
-    expect(diagnostics.join('\n')).not.toContain('jsonl-missing');
+    expect(diagnostics).toEqual([expect.stringContaining('resolved kind=claude')]);
   });
 
   it('returns null when claudeSessionId resolves but file does not exist', async () => {
@@ -236,14 +134,12 @@ describe('resolveJsonlPath (PAN-830)', () => {
     expect(path).toBeNull();
   });
 
-  it('does NOT return an agent-id-named JSONL (the bug PAN-830 fixes)', async () => {
-    // Pre-PAN-830 behavior would have built ~/.claude/projects/<encoded>/<agentId>.jsonl
-    // and returned it if present. Verify the new resolver does NOT do that.
+  it('does not adopt an unrelated freshest project JSONL without session identity', async () => {
     const encoded = encodeClaudeProjectDir(WORKSPACE_PATH);
     const projectDir = join(claudeProjectsDir, encoded);
     await mkdir(projectDir, { recursive: true });
     await writeFile(join(projectDir, `${AGENT_ID}.jsonl`), '{"old":"bug"}\n');
-    // No session.id, no sessions.json, no runtime state — so claudeSessionId is null
+    // No sessions.json or runtime state — so claudeSessionId is null
     const path = await resolveJsonlPath(AGENT_ID, WORKSPACE_PATH, {
       agentsDirOverride: agentsDir,
       claudeProjectsDirOverride: claudeProjectsDir,
@@ -251,6 +147,25 @@ describe('resolveJsonlPath (PAN-830)', () => {
     });
 
     expect(path).toBeNull();
+    await expect(listAgentTranscriptCandidates(AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+      getRuntimeStateAsync: async () => null,
+    })).resolves.toEqual([]);
+  });
+
+  it('honors the reset marker before launcher, state, and directory fallbacks', async () => {
+    const encoded = encodeClaudeProjectDir(WORKSPACE_PATH);
+    const projectDir = join(claudeProjectsDir, encoded);
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`), '{}\n');
+    await writeFile(join(agentsDir, AGENT_ID, 'launcher.sh'), `claude --resume '${CLAUDE_SESSION_ID}'\n`);
+    await writeFile(join(agentsDir, AGENT_ID, 'session-reset'), '');
+
+    await expect(listAgentTranscriptCandidates(AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+    })).resolves.toEqual([]);
   });
 
   it('uses the encoded workspace path under claudeProjects root', async () => {
@@ -270,6 +185,84 @@ describe('resolveJsonlPath (PAN-830)', () => {
 
     expect(path).toContain(encoded);
     expect(path).toContain(`${CLAUDE_SESSION_ID}.jsonl`);
+  });
+});
+
+describe('listAgentTranscriptCandidates — recorded transcript path fast path (PAN-3959)', () => {
+  it('resolves a path-carrying entry to the recorded file with no formula-derived candidate for the same entry', async () => {
+    const encoded = encodeClaudeProjectDir(WORKSPACE_PATH);
+    const projectDir = join(claudeProjectsDir, encoded);
+    await mkdir(projectDir, { recursive: true });
+    // Formula-derived location for this session id — must NOT be the resolved candidate.
+    await writeFile(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`), '{"formula":"wrong"}\n');
+    const recordedDir = join(testDir, 'recorded');
+    await mkdir(recordedDir, { recursive: true });
+    const recordedPath = join(recordedDir, `${CLAUDE_SESSION_ID}.jsonl`);
+    await writeFile(recordedPath, '{"recorded":"right"}\n');
+    await writeFile(join(agentsDir, AGENT_ID, 'sessions.json'), `${JSON.stringify({
+      sessionId: CLAUDE_SESSION_ID,
+      at: new Date().toISOString(),
+      source: 'session-start-hook',
+      harness: 'claude-code',
+      path: recordedPath,
+    })}\n`);
+
+    const candidates = await listAgentTranscriptCandidates(AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+      getRuntimeStateAsync: async () => null,
+    });
+
+    expect(candidates).toEqual([{ kind: 'claude', path: recordedPath }]);
+  });
+
+  it('falls through to an older entry when the recorded path is missing on disk', async () => {
+    const OLDER_SESSION_ID = '11111111-2222-4333-8444-555555555555';
+    const encoded = encodeClaudeProjectDir(WORKSPACE_PATH);
+    const projectDir = join(claudeProjectsDir, encoded);
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(join(projectDir, `${OLDER_SESSION_ID}.jsonl`), '{"older":"formula"}\n');
+    const missingRecordedPath = join(testDir, 'missing', `${CLAUDE_SESSION_ID}.jsonl`);
+    const lines = [
+      JSON.stringify({ sessionId: OLDER_SESSION_ID, at: '2026-09-19T00:00:00.000Z', source: 'launcher', harness: 'claude-code' }),
+      JSON.stringify({
+        sessionId: CLAUDE_SESSION_ID,
+        at: '2026-09-20T00:00:00.000Z',
+        source: 'session-start-hook',
+        harness: 'claude-code',
+        path: missingRecordedPath,
+      }),
+    ];
+    await writeFile(join(agentsDir, AGENT_ID, 'sessions.json'), `${lines.join('\n')}\n`);
+
+    const path = await resolveJsonlPath(AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+      getRuntimeStateAsync: async () => null,
+    });
+
+    expect(path).toBe(join(projectDir, `${OLDER_SESSION_ID}.jsonl`));
+  });
+
+  it('still resolves a pathless entry via its per-harness formula', async () => {
+    const encoded = encodeClaudeProjectDir(WORKSPACE_PATH);
+    const projectDir = join(claudeProjectsDir, encoded);
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`), '{}\n');
+    await writeFile(join(agentsDir, AGENT_ID, 'sessions.json'), `${JSON.stringify({
+      sessionId: CLAUDE_SESSION_ID,
+      at: new Date().toISOString(),
+      source: 'session-start-hook',
+      harness: 'claude-code',
+    })}\n`);
+
+    const path = await resolveJsonlPath(AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+      getRuntimeStateAsync: async () => null,
+    });
+
+    expect(path).toBe(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`));
   });
 });
 
@@ -344,6 +337,20 @@ describe('resolveJsonlPath — codex agents (PAN-1805)', () => {
     });
 
     expect(path).toBeNull();
+  });
+
+  it('does not revive a pre-reset rollout after the launch marker clears', async () => {
+    await setupCodexAgent({ rollouts: 1 });
+    await writeFile(join(agentsDir, CODEX_AGENT_ID, 'sessions.json'), `${JSON.stringify({
+      reset: true,
+      at: new Date().toISOString(),
+      source: 'operator-reset',
+    })}\n`);
+
+    await expect(listAgentTranscriptCandidates(CODEX_AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+    })).resolves.toEqual([]);
   });
 
   it('codex harness wins over a stale claude session.id', async () => {
@@ -430,17 +437,13 @@ describe('resolveJsonlPath — ACP agents', () => {
     expect(path).toBe(transcriptPath);
   });
 
-  it('corrects a stale claude-code recording when only an ACP transcript exists', async () => {
-    const transcriptPath = await setupAcpAgent('claude-code');
+  it('does not infer ACP from retained artifacts when Claude is recorded', async () => {
+    await setupAcpAgent('claude-code');
 
-    expect(await resolveAgentHarness(ACP_AGENT_ID, {
-      agentsDirOverride: agentsDir,
-      claudeProjectsDirOverride: claudeProjectsDir,
-    })).toBe('acp');
     expect(await resolveJsonlPath(ACP_AGENT_ID, WORKSPACE_PATH, {
       agentsDirOverride: agentsDir,
       claudeProjectsDirOverride: claudeProjectsDir,
-    })).toBe(transcriptPath);
+    })).toBeNull();
   });
 
   it('does not misclassify acp-session.jsonl as a Pi transcript', async () => {
@@ -508,28 +511,14 @@ describe('resolveJsonlPath — kimi-code agents (PAN-1837 wi8a)', () => {
     expect(path).toBe(wirePath);
   });
 
-  it('ac3: trusts a recorded kimi-code harness as-is', async () => {
-    await setupKimiAgent();
+  it('ac3: does not infer kimi-code from retained artifacts when Claude is recorded', async () => {
+    await setupKimiAgent({ harness: 'claude-code' });
 
-    expect(await resolveAgentHarness(KIMI_AGENT_ID, {
-      agentsDirOverride: agentsDir,
-      kimiHomeOverride: kimiHomeDir,
-    })).toBe('kimi-code');
-  });
-
-  it('ac3: the stale-default correction identifies kimi-code from an on-disk wire.jsonl probe', async () => {
-    const wirePath = await setupKimiAgent({ harness: 'claude-code' });
-
-    expect(await resolveAgentHarness(KIMI_AGENT_ID, {
-      agentsDirOverride: agentsDir,
-      claudeProjectsDirOverride: claudeProjectsDir,
-      kimiHomeOverride: kimiHomeDir,
-    })).toBe('kimi-code');
     expect(await resolveJsonlPath(KIMI_AGENT_ID, WORKSPACE_PATH, {
       agentsDirOverride: agentsDir,
       claudeProjectsDirOverride: claudeProjectsDir,
       kimiHomeOverride: kimiHomeDir,
-    })).toBe(wirePath);
+    })).toBeNull();
   });
 
   it('returns null when no session bucket exists for the workspace', async () => {
@@ -546,15 +535,28 @@ describe('resolveJsonlPath — kimi-code agents (PAN-1837 wi8a)', () => {
       kimiHomeOverride: kimiHomeDir,
     })).toBeNull();
   });
+
+  it('exposes the workspace bucket as a watch root before any Kimi candidate exists', async () => {
+    const agentDir = join(agentsDir, KIMI_AGENT_ID);
+    await mkdir(agentDir, { recursive: true });
+    await writeFile(join(agentDir, 'state.json'), JSON.stringify({
+      id: KIMI_AGENT_ID,
+      harness: 'kimi-code',
+      workspace: WORKSPACE_PATH,
+    }));
+
+    await expect(listAgentTranscriptCandidates(KIMI_AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      kimiHomeOverride: kimiHomeDir,
+    })).resolves.toEqual([]);
+    await expect(listAgentTranscriptWatchRoots(KIMI_AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      kimiHomeOverride: kimiHomeDir,
+    })).resolves.toEqual([kimiSessionsRoot(kimiHomeDir, WORKSPACE_PATH)]);
+  });
 });
 
-describe('resolveAgentHarness — stale claude-code self-corrects to the live runtime', () => {
-  // Reproduces PAN-1832: a wipe-and-respawn changed the provider-default harness
-  // to codex, but state.json kept the pre-respawn 'claude-code'. The resolver took
-  // the claude-code branch, found no claudeSessionId, and the dashboard showed
-  // "No conversation data available" for a live codex agent. resolveAgentHarness
-  // now self-corrects from on-disk artifacts when the recording is the generic
-  // 'claude-code' default.
+describe('resolveJsonlPath — recorded harness is authoritative', () => {
   const STALE_AGENT = 'agent-pan-1832';
 
   async function writeState(agentId: string, harness: string | null): Promise<void> {
@@ -574,41 +576,7 @@ describe('resolveAgentHarness — stale claude-code self-corrects to the live ru
     );
   }
 
-  it('corrects stale claude-code to codex when a codex rollout exists and no claude transcript does', async () => {
-    await writeState(STALE_AGENT, 'claude-code');
-    await writeCodexRollout(STALE_AGENT);
-
-    const harness = await resolveAgentHarness(STALE_AGENT, { agentsDirOverride: agentsDir });
-
-    expect(harness).toBe('codex');
-  });
-
-  it('keeps claude-code when a claude transcript IS present (past codex run does not shadow it)', async () => {
-    await writeState(STALE_AGENT, 'claude-code');
-    await writeCodexRollout(STALE_AGENT);
-    // A live claude-code transcript exists for this agent.
-    await writeFile(join(agentsDir, STALE_AGENT, 'session.id'), `${CLAUDE_SESSION_ID}\n`);
-    const projectDir = join(claudeProjectsDir, encodeClaudeProjectDir(WORKSPACE_PATH));
-    await mkdir(projectDir, { recursive: true });
-    await writeFile(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`), '{}');
-
-    const harness = await resolveAgentHarness(STALE_AGENT, {
-      agentsDirOverride: agentsDir,
-      claudeProjectsDirOverride: claudeProjectsDir,
-    });
-
-    expect(harness).toBe('claude-code');
-  });
-
-  it('trusts an explicit non-default harness (codex) without probing', async () => {
-    await writeState(STALE_AGENT, 'codex');
-    // No codex rollout on disk at all.
-    const harness = await resolveAgentHarness(STALE_AGENT, { agentsDirOverride: agentsDir });
-
-    expect(harness).toBe('codex');
-  });
-
-  it('resolveJsonlPath returns the codex rollout for the stale-claude-code agent', async () => {
+  it('resolveJsonlPath does not return a Codex rollout for a Claude agent', async () => {
     await writeState(STALE_AGENT, 'claude-code');
     await writeCodexRollout(STALE_AGENT);
 
@@ -617,8 +585,7 @@ describe('resolveAgentHarness — stale claude-code self-corrects to the live ru
       claudeProjectsDirOverride: claudeProjectsDir,
     });
 
-    expect(path).not.toBeNull();
-    expect(path).toContain('rollout-');
+    expect(path).toBeNull();
   });
 });
 
@@ -774,6 +741,24 @@ describe('resolveJsonlPath / resolvePiSessionPath — pi agents (PAN-1908)', () 
     const path = await resolvePiSessionPath(PI_AGENT_ID, { agentsDirOverride: agentsDir });
 
     expect(path).toBe(newer);
+  });
+
+  it('breaks equal-mtime Pi transcript ties deterministically by path', async () => {
+    const agentDir = await setupPiAgent();
+    const sessionsDir = join(agentDir, 'sessions');
+    await mkdir(sessionsDir, { recursive: true });
+    // Split across directories so walk order (sessions/ first, root second)
+    // differs from path order — otherwise a stable sort over tied mtimes
+    // would happen to return the right answer even without the tie-break.
+    const zulu = join(sessionsDir, 'z.jsonl');
+    const alpha = join(agentDir, 'a.jsonl');
+    await writeFile(zulu, '{"type":"session"}\n');
+    await writeFile(alpha, '{"type":"session"}\n');
+    const tied = new Date('2026-09-20T00:00:00.000Z');
+    await utimes(alpha, tied, tied);
+    await utimes(zulu, tied, tied);
+
+    await expect(resolvePiSessionPath(PI_AGENT_ID, { agentsDirOverride: agentsDir })).resolves.toBe(alpha);
   });
 
   it('returns null when pi has not written a transcript yet', async () => {

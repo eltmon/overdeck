@@ -131,7 +131,9 @@ const defaultPostMergeRowDeps: PostMergeRowDeps = {
   listAgents: async () => Effect.runPromise(listRunningAgents()),
 };
 
-export const DEFAULT_MAIN_VERIFY_REQUIRED_CHECKS = ['test', 'lint', 'build (22)', 'guard'];
+// The fourth check is the no-planning-on-main workflow's job; it was renamed from
+// 'guard' to 'reject-planning-paths' and the stale name blocked every close-out.
+export const DEFAULT_MAIN_VERIFY_REQUIRED_CHECKS = ['test', 'lint', 'build (22)', 'reject-planning-paths'];
 
 interface MainVerifyRowDeps {
   readCheckRuns: (ctx: LifecycleContext, commit: string) => Promise<CommitCheckRuns>;

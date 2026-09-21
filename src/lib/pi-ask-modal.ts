@@ -16,7 +16,7 @@
 import { Effect } from 'effect'
 
 import { scanPendingInputsPromise, type PendingInputsScan } from './agent-enrichment.js'
-import { resolvePiSessionPath } from '../dashboard/server/routes/jsonl-resolver.js'
+import { resolvePiSessionPath } from './agents/transcript-resolver.js'
 import { capturePaneText, sendRawKeystroke, sessionExists, tmuxExecAsync, exactPaneTarget } from './tmux.js'
 import { randomUUID } from 'node:crypto'
 import { writeFile, unlink } from 'node:fs/promises'

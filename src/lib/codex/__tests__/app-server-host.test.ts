@@ -7,6 +7,18 @@ import { PassThrough, Writable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CodexAppServerHost, codexNotificationCost } from '../app-server-host.js';
 import type { CodexAppServerState, ThreadOptions, TurnOptions } from '../app-server-manager.js';
+import { readSessionIndexSync } from '../../session-history.js';
+
+const FAKE_ROLLOUT_PATH = '/fake/rollout/for-thread-started.jsonl';
+
+// Bounded background capture in attachManagerEvents() polls the real
+// filesystem for the rollout file; a fake resolved promise stands in for
+// that poll instead of a real 120s wait (per the fake-timers-over-real-I/O
+// rule — the poll itself is real fs, not a delay a fake clock can drive).
+vi.mock('../../runtimes/codex.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../runtimes/codex.js')>();
+  return { ...actual, waitForCodexRollout: vi.fn(async () => FAKE_ROLLOUT_PATH) };
+});
 
 class FakeManager extends EventEmitter {
   readonly startThreadCalls: ThreadOptions[] = [];
@@ -231,6 +243,16 @@ describe('CodexAppServerHost', () => {
       expect.objectContaining({ type: 'notification', method: 'thread/started' }),
       expect.objectContaining({ type: 'notification', method: 'item/completed' }),
     ]));
+    await vi.waitFor(() => {
+      expect(readSessionIndexSync('agent-host-test')).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          sessionId: 'thread-started',
+          source: 'app-server',
+          harness: 'codex',
+          path: FAKE_ROLLOUT_PATH,
+        }),
+      ]));
+    });
   });
 
   it('projects app-server notifications into agent activity without tmux', async () => {

@@ -162,6 +162,26 @@ door that does not exist; a real record read door would be a separate change.
 **Conversation loading and delivery:**
 - A `/conv/<id>` deep link loads that conversation directly, independently of the
   sidebar list. Favorites, pending-input state, and normal list navigation remain intact.
+- Issue Session tabs load agent transcripts through
+  `GET /api/agents/:agentId/conversation`. For Claude agents, the route checks the
+  durable `sessions.json` index from newest to oldest until it finds an existing
+  JSONL. Legacy launcher/runtime/state pointers are eligible only when the index is
+  absent. A 404 names the agent and every path checked. Since PAN-3959, each
+  harness's capture point records the transcript's absolute path in the entry it
+  writes at session start, so resolution is a newest-first lookup over recorded
+  paths; per-harness path formulas apply only to pre-PAN-3959 entries that predate
+  that recording.
+- `src/lib/agents/transcript-resolver.ts` is the single resolver: the agent
+  conversation route above, the `/ws/rpc` synthetic-agent stream, enrichment, and
+  the summary-fork/handoff transcript adapters all call it — no other path re-derives
+  an agent's on-disk transcript layout.
+- The `/ws/rpc` synthetic-agent stream watches every root a transcript could still
+  appear under. A root whose watch attachment fails (e.g. the directory does not
+  exist yet) is retried on the next event fired by a surviving watcher — there is no
+  timer or poll. If every watch attempt fails, the stream stays in `discovering`
+  until an operator or later launch creates one of the watched roots.
+- `GET /api/conversations/:name/messages` serves registered conversations only. It
+  never scans agent directories or global session UUIDs to resolve an agent-backed row.
 - HTTP acceptance and transcript confirmation are distinct. A late echo does not prove
   delivery failure. Unknown delivery preserves the operator's text; confirmed rejection
   retains the existing recovery actions. The client bounds the request and body read to

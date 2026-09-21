@@ -243,8 +243,8 @@ export function ConversationPanel({
   }, [conversation.name]);
 
   // Query messages at this level so we can drive the header working-spinner.
-  // Live claude-code conversations are pushed through useConversationMessagesStream;
-  // keep the existing polling path for non-claude harnesses and historical views.
+  // Live transcripts are pushed through WS/RPC. HTTP supplies the initial
+  // snapshot/backfill and is the sole read path for stopped history.
   const { data: messagesData, isLoading: messagesLoading } = useQuery({
     queryKey: messagesQueryKey,
     queryFn: async ({ signal }) => {
@@ -262,8 +262,8 @@ export function ConversationPanel({
       }
       return fetched;
     },
-    enabled: !streamMessagesEnabled,
-    refetchInterval: streamMessagesEnabled ? false : (conversation.sessionAlive ? 2000 : false),
+    enabled: true,
+    refetchInterval: streamMessagesEnabled || agentId ? false : (conversation.sessionAlive ? 2000 : false),
   });
   // PAN-2876 — the rail lists the main agent plus every subagent; picking a subagent swaps the body to its transcript.
   const subagents = messagesData?.subagents ?? [];
@@ -1120,6 +1120,7 @@ interface MessagesResponse {
   /** Server-side resolution failure to surface in the panel (e.g. the live
    * session could not be resolved from the launcher). Rendered as a banner. */
   error?: string;
+  checked?: string[];
 }
 
 export async function fetchMessages(name: string, signal?: AbortSignal, agentId?: string): Promise<MessagesResponse> {
@@ -1127,13 +1128,19 @@ export async function fetchMessages(name: string, signal?: AbortSignal, agentId?
   // during a server restart rejects (and retries) instead of pinning the
   // panel on "Loading…" forever, and switching conversations cancels the
   // previous conversation's fetch.
-  const res = await fetchWithTimeout(`/api/conversations/${encodeURIComponent(name)}/messages`, { signal });
-  // An agent the store knows (queued specialist, wiped workspace, cleaned
-  // session file) 404s here — that means "no saved history", not an incident.
-  // Render the honest empty state instead of the warning card. Real user
-  // conversations (no agentId) keep the failure card + Retry.
+  const path = agentId
+    ? `/api/agents/${encodeURIComponent(agentId)}/conversation`
+    : `/api/conversations/${encodeURIComponent(name)}/messages`;
+  const res = await fetchWithTimeout(path, { signal });
   if (res.status === 404 && agentId) {
-    return { messages: [], workLog: [], streaming: false };
+    const missing = await res.json() as { error?: string; checked?: string[] };
+    return {
+      messages: [],
+      workLog: [],
+      streaming: false,
+      error: missing.error ?? `No transcript found for ${agentId}.`,
+      checked: missing.checked ?? [],
+    };
   }
   if (!res.ok) throw new Error('Failed to fetch messages');
   return res.json();
@@ -1258,7 +1265,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   // PAN-3744: before this subscription emits, the transcript is loading rather
   // than empty. Keep this signal hook-local because query-cache entries survive
   // conversation switches and could flash a stale empty state.
-  const awaitingFirstPayload = streamMessagesEnabled && !receivedFirstPayload && messages.length === 0;
+  const awaitingFirstPayload = streamMessagesEnabled && !receivedFirstPayload && messages.length === 0 && !data?.error;
   const isDiscovering = streamMessagesEnabled && data?.discovering === true && messages.length === 0;
   // Zero chat messages ≠ zero activity for agent sessions (PAN-3544). Since
   // the CLIProxy 7.2 upgrade (2026-08-03) GPT-harness sessions emit only
@@ -1317,7 +1324,9 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
           <p className={styles.conversationEmptyStateTitle} style={{ color: 'var(--warning)' }}>
             ⚠ Session could not be resolved
           </p>
-          <p className={styles.conversationEmptyStateSubtitle}>{data.error}</p>
+          <p className={styles.conversationEmptyStateSubtitle}>
+            {data.error}{data.checked && data.checked.length > 0 ? ` Checked: ${data.checked.join(', ')}` : ''}
+          </p>
         </div>
       ) : messagesFetchFailed ? (
         <div className={styles.conversationEmptyState}>

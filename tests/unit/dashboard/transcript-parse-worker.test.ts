@@ -27,7 +27,7 @@ const tempDirs: string[] = [];
 afterEach(() => {
   vi.useRealTimers();
   vi.doUnmock('../../../src/dashboard/server/services/dashboard-db-task.js');
-  vi.doUnmock('../../../src/dashboard/server/routes/jsonl-resolver.js');
+  vi.doUnmock('../../../src/lib/agents/transcript-resolver.js');
   vi.resetModules();
   for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
@@ -41,13 +41,15 @@ describe('transcript parse worker routing', () => {
     vi.doMock('../../../src/dashboard/server/services/dashboard-db-task.js', () => ({
       runDashboardDbJob: jobSpy,
     }));
-    vi.doMock('../../../src/dashboard/server/routes/jsonl-resolver.js', () => ({
-      resolveAgentHarness: vi.fn(async () => 'claude-code'),
+    vi.doMock('../../../src/lib/agents/transcript-resolver.js', () => ({
       resolvePiSessionPath: vi.fn(async () => piFixture.pathname),
       resolveCodexRolloutPath: vi.fn(async () => piFixture.pathname),
       resolveAcpTranscriptPath: vi.fn(async () => piFixture.pathname),
       resolveKimiWirePath: vi.fn(async () => piFixture.pathname),
       readLauncherPinnedSessionId: vi.fn(async () => null),
+      listAgentTranscriptCandidates: vi.fn(async () => []),
+      listAgentTranscriptWatchRoots: vi.fn(async () => []),
+      resolveAgentTranscriptCandidate: vi.fn(async () => null),
     }));
     const { streamHarnessFullParseSnapshots: isolatedStreamHarness } = await import(
       '../../../src/dashboard/server/ws-rpc.js'

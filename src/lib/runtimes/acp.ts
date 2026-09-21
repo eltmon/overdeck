@@ -7,6 +7,8 @@ import { promisify } from 'node:util'
 
 import type { AgentState } from '../agents/agent-state.js'
 import { materializeAcpContextFile } from '../acp/context.js'
+import { acpTranscriptPath } from '../acp/transcript.js'
+export { acpTranscriptPath } from '../acp/transcript.js'
 import { listAgentStates } from '../agents/queries.js'
 import { BRIDGE_TOKEN_HEADER } from '../bridge-token.js'
 import { prepareHarnessLaunch } from '../harness-binary.js'
@@ -83,7 +85,7 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
   }
 
   getSessionPath(agentId: string): string {
-    return join(this.home(), 'agents', agentId, 'acp-session.jsonl')
+    return acpTranscriptPath(agentId, join(this.home(), 'agents'))
   }
 
   getLastActivity(agentId: string): Date | null {

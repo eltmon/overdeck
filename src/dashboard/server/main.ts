@@ -73,7 +73,7 @@ import { createOverdeckDatabase } from '../../../scripts/create-overdeck-db.js';
 import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
 import { startProjectCiRefillAfterProjectionReady } from './services/project-ci-refill-startup.js';
 import { ProjectsLive } from '../../lib/overdeck/config.js';
-import { RecordsLive, TmuxLive, dropPipelineStateMirrorTablesSync } from '../../lib/overdeck/infra.js';
+import { RecordsLive, TmuxLive, dropPipelineStateMirrorTablesSync, dropDeadIssuesForeignKeysSync } from '../../lib/overdeck/infra.js';
 import { startServerBootTelemetry } from './telemetry.js';
 import { isPeerDashboardProcess } from '../../lib/boot-gates.js';
 import { isSmeeConfiguredSync, startSmeeProcessSync } from '../../lib/smee.js';
@@ -143,6 +143,20 @@ try {
   console.warn('[overdeck] Pipeline-state mirror drop failed (non-fatal):', err);
 }
 
+// PAN-3963: rebuild the live tables whose `issue_id → issues(id)` FK rejects
+// every post-cut issue id (nothing writes `issues` since the Cut). Same gates
+// as the mirror drop above: once, and only in a primary dashboard.
+try {
+  const fkDrop = dropDeadIssuesForeignKeysSync();
+  if (fkDrop.dropped) {
+    console.log(`[overdeck] Dropped the dead issues FKs (once; marker written) — rebuilt: ${fkDrop.tables.join(', ') || 'none (already clean)'}`);
+  } else if (fkDrop.skipped === 'peer') {
+    console.log('[overdeck] Dead-issues-FK rebuild SKIPPED — peer dashboard runs no destructive migration');
+  }
+} catch (err) {
+  console.warn('[overdeck] Dead-issues-FK rebuild failed (non-fatal):', err);
+}
+
 // Bind the HTTP socket before starting any background service or the Deacon.
 // A bind failure is retried by server.ts and then terminates this process through
 // Effect's Node runtime; no headless orchestrator is allowed to survive it.
@@ -186,7 +200,7 @@ if (isPeerDashboard) {
       force: true,
     })).then((result) => {
       if (result.removed.length > 0) {
-        console.log(`[overdeck] Removed ${result.removed.length} old closed-issue agent dir${result.removed.length === 1 ? '' : 's'}: ${result.removed.join(', ')}`);
+        console.log(`[overdeck] Pruned ${result.removed.length} old closed-issue agent dir${result.removed.length === 1 ? '' : 's'} (state and transcripts kept): ${result.removed.join(', ')}`);
       }
       if (result.protected.length > 0) {
         console.warn(`[overdeck] Protected ${result.protected.length} old closed-issue agent dir${result.protected.length === 1 ? '' : 's'} because it has a live tmux session or JSONL file: ${result.protected.join(', ')}`);
@@ -801,4 +815,3 @@ if (isPeerDashboard) {
   console.log('[overdeck] Cloister auto-starting (startup.auto_start=true)');
   emitActivityEntrySync({ source: 'dashboard', level: 'info', message: 'Cloister auto-starting on dashboard boot' });
 }
-

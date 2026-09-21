@@ -28,6 +28,8 @@ export interface Conversation {
   isWorking?: boolean;
   /** Tool name currently executing (e.g. "Bash", "Read"). Null when idle or not in a tool call. */
   currentTool?: string | null;
+  /** Transcript mtime when an ACP turn has remained open without activity for five minutes. */
+  stalledSince?: string | null;
   isFavorited?: boolean;
   /** Absolute path to the Claude Code JSONL session file. Null until discovered. Legacy fallback. */
   sessionFile?: string | null;

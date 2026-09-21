@@ -1,0 +1,67 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-28T21:40:57.260Z",
+    "updated": "2026-07-28T21:40:57.260Z",
+    "author": "overdeck/auto-start",
+    "description": "Auto-synthesized minimal plan for PAN-3252: Benchmark: QuantumLlama — PAN-1837 kimi-code e2e verification",
+    "inspectionPolicy": "never"
+  },
+  "plan": {
+    "id": "pan-3252",
+    "title": "Benchmark: QuantumLlama — PAN-1837 kimi-code e2e verification",
+    "status": "proposed",
+    "uid": "462ce7cf-4a9f-48ea-b424-c4f54a1fa220",
+    "author": "overdeck/auto-start",
+    "sequence": 1,
+    "created": "2026-07-28T21:40:57.260Z",
+    "updated": "2026-07-28T21:40:57.260Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3252",
+        "label": "PAN-3252",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "auto-start"
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-28-PAN-3252-benchmark-quantumllama-pan-1837-kimi-code-e2e-verification.xbrief.json"
+    },
+    "narratives": {
+      "Problem": "$(cat benchmarks/templates/quantumllama.md)\n\n---\nThrowaway issue for PAN-1837 wi14 live end-to-end verification of the kimi-code harness. Never merge this branch.\n\n---\nFlywheel-Run-Id: RUN-73\nFlywheel-Filed-By: operator\nFlywheel-Discovered-In: PAN-1837",
+      "Proposal": "Implement the issue directly from the tracker-provided title and body."
+    },
+    "items": [
+      {
+        "id": "auto-start",
+        "title": "Implement issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-28T21:40:57.260Z",
+        "metadata": {
+          "difficulty": "simple",
+          "issueLabel": "pan-3252",
+          "requiresInspection": false,
+          "inspectionDepth": "fast"
+        },
+        "narrative": {
+          "Action": "$(cat benchmarks/templates/quantumllama.md)\n\n---\nThrowaway issue for PAN-1837 wi14 live end-to-end verification of the kimi-code harness. Never merge this branch.\n\n---\nFlywheel-Run-Id: RUN-73\nFlywheel-Filed-By: operator\nFlywheel-Discovered-In: PAN-1837"
+        },
+        "items": [
+          {
+            "id": "auto-start.ac1",
+            "title": "Issue's stated fix implemented with tests",
+            "status": "pending",
+            "created": "2026-07-28T21:40:57.260Z",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": []
+  }
+}

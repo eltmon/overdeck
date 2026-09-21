@@ -1,17 +1,9 @@
 /**
- * Agent enrichment utilities (PAN-440 / PAN-1048)
- *
- * Shared functions for computing enrichment fields:
- *   role, hasPendingQuestion, pendingQuestionCount, resolution, resolutionCount
- *
- * Used by both the legacy REST /api/agents endpoint and the new
- * AgentEnrichmentService background poller.
- *
- * PAN-1048: replaced the legacy `agentPhase` string with the role primitive —
- * the dashboard derives label/status from `role` + lifecycle state.
+ * Agent read-model enrichment and synchronous transcript resolution.
+ * Transcript candidates mirror the dashboard's asynchronous adapter so every
+ * consumer observes the same harness-aware session authority.
  */
-
-import { existsSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { readdir, readFile, stat } from 'fs/promises'
 import { homedir } from 'os'
 import { basename, join } from 'path'
@@ -31,6 +23,7 @@ import { resolveProjectFromIssueSync } from './projects.js'
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js'
 import { extractPrefixSync } from './issue-id.js'
 import { getLatestSessionIdSync } from './agents/activity.js'
+import { resolveAgentTranscriptCandidate } from './agents/transcript-resolver.js'
 
 const execAsync = promisify(exec)
 
@@ -187,37 +180,6 @@ export function getClaudeProjectDir(workspacePath: string): string {
   return join(homedir(), '.claude', 'projects', encodeClaudeProjectDir(workspacePath))
 }
 
-export async function getActiveSessionPath(projectDir: string): Promise<string | null> {
-  if (!existsSync(projectDir)) return null
-  try {
-    const entries = await readdir(projectDir)
-    const jsonlFiles = entries.filter(f => f.endsWith('.jsonl'))
-    if (jsonlFiles.length === 0) return null
-    // Claude Code rotates/renames JSONL session files, so a file present at
-    // readdir() can vanish before stat(). Stat each file independently and DROP
-    // the ones that disappear — never let a single ENOENT reject the whole batch
-    // and collapse the result to null. (PAN: the null path made the
-    // complete-planning pending-AskUserQuestion guard scan nothing → it
-    // completed planning while the operator's question was still open.)
-    const withMtime = (
-      await Promise.all(
-        jsonlFiles.map(async f => {
-          try {
-            return { name: f, path: join(projectDir, f), mtime: (await stat(join(projectDir, f))).mtime.getTime() }
-          } catch {
-            return null
-          }
-        }),
-      )
-    ).filter((x): x is { name: string; path: string; mtime: number } => x !== null)
-    if (withMtime.length === 0) return null
-    withMtime.sort((a, b) => b.mtime - a.mtime)
-    return withMtime[0].path
-  } catch {
-    return null
-  }
-}
-
 function getProjectPathByPrefix(issuePrefix: string): string {
   const issueId = `${issuePrefix}-1`
   const resolved = resolveProjectFromIssueSync(issueId)
@@ -267,31 +229,12 @@ function getProjectPathByPrefix(issuePrefix: string): string {
   } catch {
     return null
   }
-}/**
- * Resolve the transcript belonging to THIS agent.
- *
- * A Claude project dir is keyed on the cwd, so every session that ever ran in
- * the same cwd shares one directory. Agents whose cwd is the primary repo — the
- * flywheel orchestrator, conversations, any `--cwd <repo>` handoff — therefore
- * sit in a directory alongside each other's transcripts. Picking the freshest
- * file there attributes whichever session wrote last to whoever asks, so the
- * flywheel was observed reporting a conversation's open question as its own.
- *
- * The agent's own session id is recorded at spawn, so resolve that first and
- * only fall back to freshest-wins when the agent has no identifiable transcript
- * of its own (codex/omp keep their history elsewhere, and their thread ids are
- * not `.jsonl` files here).
- */
+}
+
 async function getAgentJsonlPathPromise(agentId: string): Promise<string | null> {
   const workspace = await Effect.runPromise(getAgentWorkspace(agentId))
   if (!workspace) return null
-  const projectDir = getClaudeProjectDir(workspace)
-  const sessionId = getLatestSessionIdSync(agentId)
-  if (sessionId) {
-    const ownPath = join(projectDir, `${sessionId}.jsonl`)
-    if (existsSync(ownPath)) return ownPath
-  }
-  return await getActiveSessionPath(projectDir)
+  return (await resolveAgentTranscriptCandidate(agentId, workspace))?.path ?? null
 }
 
 /**

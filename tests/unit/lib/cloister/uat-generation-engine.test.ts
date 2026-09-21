@@ -277,6 +277,32 @@ describe('assembleUatGeneration — failure paths', () => {
     const gen = await assembleUatGeneration(input(), deps(makeFakeGit({ failPush: true }), makeFakeStore()));
     expect(gen.status).toBe('failed');
   });
+
+  // PAN-3963: a throwing store write (the live instance was the dead `issues`
+  // FK on uat_generation_members) used to escape the engine and strand the row
+  // in 'assembling' for the reconciler's 60-minute stuck sweep.
+  it('marks the generation failed instead of throwing when a member write fails', async () => {
+    const store = makeFakeStore();
+    const realUpdate = store.update;
+    const updates: Array<Parameters<GenerationStorePort['update']>[1]> = [];
+    store.update = (name, patch) => {
+      updates.push(patch);
+      // Every member-carrying write throws; the status-only recovery write
+      // must still land.
+      if (patch.members !== undefined) throw new Error('FOREIGN KEY constraint failed');
+      realUpdate(name, patch);
+    };
+    const log = vi.fn();
+
+    const gen = await assembleUatGeneration(input(), deps(makeFakeGit(), store, { log }));
+
+    expect(gen.status).toBe('failed');
+    expect(gen.members.map((m) => m.issueId)).toEqual(['PAN-1']);
+    expect(store.rows.get(gen.name)!.status).toBe('failed');
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('FOREIGN KEY constraint failed'));
+    // The recovery write carries no members — that write is what threw.
+    expect(updates.at(-1)).toEqual({ status: 'failed' });
+  });
 });
 
 // PAN-3166: git merges two differently named V256 migrations without a murmur,

@@ -111,11 +111,11 @@ describe('work-agent-lifecycle', () => {
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     expect(lifecycle.handedOff).toBe(true);
-    expect(lifecycle.canResumeSession).toBe(false);
+    expect(lifecycle.canResumeSession).toBe(true);
     expect(lifecycle.requiresSessionResetBeforeFreshStart).toBe(true);
     expect(lifecycle.canStartFresh).toBe(false);
-    expect(lifecycle.recommendedAction).toBe('none');
-    expect(() => assertCanStartFreshSync(agentId)).toThrow(/nothing to resume/);
+    expect(lifecycle.recommendedAction).toBe('resume');
+    expect(() => assertCanStartFreshSync(agentId)).toThrow(/handed off/);
     expect(() => assertCanStartFreshSync(agentId, { explicitFresh: true })).not.toThrow();
 
     transcriptExistsSpy.mockRestore();
@@ -384,7 +384,7 @@ describe('work-agent-lifecycle', () => {
     return agentId;
   }
 
-  it('keeps the handed-off nothing-to-resume posture: this door cannot ask the forge (PAN-3334)', () => {
+  it('keeps a handed-off agent warm-resumable without asking the forge (supersedes PAN-3334)', () => {
     const agentId = setUpHandedOffAgentOwingRework('handoff-resting');
 
     const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
@@ -393,10 +393,10 @@ describe('work-agent-lifecycle', () => {
     const lifecycle = getWorkAgentLifecycleStateSync(agentId);
 
     expect(lifecycle.handedOff).toBe(true);
-    expect(lifecycle.canResumeSession).toBe(false);
+    expect(lifecycle.canResumeSession).toBe(true);
     expect(lifecycle.canStartFresh).toBe(false);
-    expect(lifecycle.recommendedAction).toBe('none');
-    expect(() => assertCanStartFreshSync(agentId)).toThrow(/nothing to resume/);
+    expect(lifecycle.recommendedAction).toBe('resume');
+    expect(() => assertCanStartFreshSync(agentId)).toThrow(/handed off/);
     expect(() => assertCanStartFreshSync(agentId, { explicitFresh: true })).not.toThrow();
 
     transcriptExistsSpy.mockRestore();

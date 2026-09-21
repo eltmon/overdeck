@@ -255,3 +255,6 @@ __pycache__/
 # (config.yaml) make these non-portable — they must never be committed.
 .overdeck/config.yaml
 .overdeck/projects.yaml
+
+# pan reload keeps a rollback copy of the previous build next to dist/
+dist.rollback.*/

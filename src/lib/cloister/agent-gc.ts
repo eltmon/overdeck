@@ -270,24 +270,6 @@ export async function pruneAgentRowsAfterTranscriptCleanup(
   return { removed, preserved };
 }
 
-/**
- * Close-out-only pruning path. The lifecycle workflow has already positively
- * verified tracker terminality before it reaches this handoff, so it does not
- * repeat the periodic sweep's remote checks.
- */
-export async function pruneStoppedAgentsForIssue(
-  issueId: string,
-  agents: AgentGcRow[] = listAgentStatesSync(),
-  deps: AgentGcDeps = defaultAgentGcDeps(),
-): Promise<AgentGcResult> {
-  const issue = issueId.toUpperCase();
-  const scoped = agents.filter(agent => agent.issueId.toUpperCase() === issue);
-  const terminal = scoped.filter(agent => agent.status === 'stopped');
-  const live = scoped.filter(agent => agent.status !== 'stopped').map(agent => agent.id);
-  const result = await pruneAgentRowsAfterTranscriptCleanup(terminal, deps);
-  return { removed: result.removed, preserved: [...live, ...result.preserved] };
-}
-
 export async function pruneTerminalStoppedAgents(
   agents: AgentGcRow[] = listAgentStatesSync(),
   deps: AgentGcDeps = defaultAgentGcDeps(),

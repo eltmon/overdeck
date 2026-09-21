@@ -181,8 +181,9 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
       });
       return;
     }
+    const { id: sessionId } = session;
     const sessionResult = await Effect.runPromise(enrichSession({
-      sessionId: session.id,
+      sessionId,
       jsonlPath: session.jsonlPath,
       tier,
       modelOverride: opts.modelOverride,
@@ -199,7 +200,7 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
       result.errors++;
     } else {
       result.enriched++;
-      enrichedIds.push(session.id);
+      enrichedIds.push(sessionId);
       if (sessionResult.cost !== undefined) {
         actualCost += sessionResult.cost;
         actualCostCount++;
@@ -213,7 +214,7 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
         errors: result.errors,
         elapsedMs: Date.now() - startTs,
         session: {
-          sessionId: session.id,
+          sessionId,
           tier,
           model: sessionResult.model,
           cost: sessionResult.error ? undefined : sessionResult.cost ?? estimateEnrichmentCost(1, tier),

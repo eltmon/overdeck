@@ -1,53 +1,24 @@
 import type { Dirent, Stats } from 'node:fs';
-import { readdir, rm, rmdir, stat } from 'node:fs/promises';
-import { join } from 'node:path';
-import { Effect } from 'effect';
+import { readdir, realpath, rm, rmdir, stat } from 'node:fs/promises';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { isConversationDirectory } from '../agent-directory-cleanup.js';
-import { RETAINED_TRANSCRIPTS_MARKER } from '../agents/state-dir-removal.js';
-import { listAgentStatesSync } from '../agents/agent-state.js';
+import { pruneAgentStateDir } from '../agents/state-dir-removal.js';
 import { listArchivedConversations, listConversations } from '../overdeck/conversations.js';
-import { getPrFacts } from './pr-facts.js';
 import { AGENTS_DIR } from '../paths.js';
-import { listSessionNames } from '../tmux.js';
+import { listLiveAgentIds } from '../terminal-backends/inventory.js';
 
-interface TranscriptRetentionConversation {
-  name: string;
-  status: 'active' | 'ended';
-  archivedAt: string | null;
-}
-
-export interface TranscriptRetentionAgent {
-  id: string;
-  issueId: string;
-  status: string;
-  workspace?: string | null;
-  paused?: boolean | null;
-  troubled?: boolean | null;
-  stoppedByUser?: boolean | null;
-}
-
-/**
- * PAN-3917: an agent's transcripts age out once its work has landed. "Landed"
- * used to be a `closedOut` flag on the issue record; it is now the forge saying
- * the pull request merged.
- */
-export async function isTranscriptRetentionTerminalAgent(
-  agent: TranscriptRetentionAgent,
-  readPrFacts: (issueId: string) => Promise<{ merged: boolean }> = getPrFacts,
-): Promise<boolean> {
-  if (agent.status !== 'stopped' || !agent.workspace) return false;
-  return (await readPrFacts(agent.issueId)).merged;
-}
+interface TranscriptRetentionConversation { name: string; status: 'active' | 'ended'; archivedAt: string | null }
 
 export interface TranscriptRetentionDeps {
   readDir(path: string): Promise<Dirent[]>;
   stat(path: string): Promise<Stats>;
   removeFile(path: string): Promise<void>;
   removeDir(path: string): Promise<void>;
-  listSessionNames(): Promise<readonly string[]>;
-  listAgents(): readonly TranscriptRetentionAgent[];
-  isTerminalAgent(agent: TranscriptRetentionAgent): Promise<boolean>;
+  removeTree(path: string): Promise<void>;
+  realpath(path: string): Promise<string>;
+  pruneAgentDir(path: string, agentsRoot: string): Promise<unknown>;
+  listLiveAgentIds(): Promise<ReadonlySet<string> | null>;
   listConversations(): readonly TranscriptRetentionConversation[];
   listArchivedConversations(): readonly TranscriptRetentionConversation[];
   now(): number;
@@ -55,9 +26,7 @@ export interface TranscriptRetentionDeps {
 }
 
 export interface TranscriptRetentionOptions {
-  transcriptDays?: number;
-  agentsDir?: string;
-  deps?: Partial<TranscriptRetentionDeps>;
+  transcriptDays?: number; agentsDir?: string; deps?: Partial<TranscriptRetentionDeps>;
 }
 
 const defaultDeps: TranscriptRetentionDeps = {
@@ -65,17 +34,41 @@ const defaultDeps: TranscriptRetentionDeps = {
   stat,
   removeFile: async (path) => { await rm(path, { force: true }); },
   removeDir: rmdir,
-  listSessionNames: () => Effect.runPromise(listSessionNames()),
-  listAgents: listAgentStatesSync,
-  isTerminalAgent: isTranscriptRetentionTerminalAgent,
+  removeTree: async (path) => { await rm(path, { recursive: true, force: true }); },
+  realpath,
+  pruneAgentDir: pruneAgentStateDir,
+  listLiveAgentIds,
   listConversations,
   listArchivedConversations,
   now: () => Date.now(),
   log: (message) => console.log(`[deacon] ${message}`),
 };
 
-function hasErrorCode(error: unknown, code: string): boolean {
-  return (error as NodeJS.ErrnoException).code === code;
+const hasErrorCode = (error: unknown, code: string): boolean => (error as NodeJS.ErrnoException).code === code;
+
+function isContained(root: string, candidate: string, allowRoot = false): boolean {
+  const fromRoot = relative(root, candidate);
+  return (allowRoot && fromRoot === '') || (
+    fromRoot !== '' &&
+    fromRoot !== '..' &&
+    !fromRoot.startsWith(`..${sep}`) &&
+    !isAbsolute(fromRoot)
+  );
+}
+
+async function canonicalTarget(path: string, canonicalRoot: string, deps: TranscriptRetentionDeps, allowRoot = false): Promise<string> {
+  const canonical = await deps.realpath(path);
+  if (!isContained(canonicalRoot, canonical, allowRoot)) throw new Error(`Transcript retention target escapes agent directory: ${path}`);
+  return canonical;
+}
+
+async function isDefinitelyStopped(agentId: string, deps: TranscriptRetentionDeps): Promise<boolean> {
+  try {
+    const live = await deps.listLiveAgentIds();
+    return live !== null && !live.has(agentId);
+  } catch {
+    return false;
+  }
 }
 
 function conversationEligibility(deps: TranscriptRetentionDeps): Map<string, boolean> | null {
@@ -94,34 +87,10 @@ function conversationEligibility(deps: TranscriptRetentionDeps): Map<string, boo
   }
 }
 
-async function agentEligibility(deps: TranscriptRetentionDeps): Promise<Map<string, boolean> | null> {
-  try {
-    const eligible = new Map<string, boolean>();
-    const terminalByIssue = new Map<string, boolean>();
-    for (const agent of deps.listAgents()) {
-      if (agent.status !== 'stopped' || !agent.workspace) {
-        eligible.set(agent.id, false);
-        continue;
-      }
-      const issueKey = `${agent.workspace}\0${agent.issueId}`;
-      let terminal = terminalByIssue.get(issueKey);
-      if (terminal === undefined) {
-        terminal = await deps.isTerminalAgent(agent);
-        terminalByIssue.set(issueKey, terminal);
-      }
-      eligible.set(agent.id, terminal);
-    }
-    return eligible;
-  } catch {
-    return null;
-  }
-}
-
 async function pruneTranscriptFiles(
-  dirPath: string,
-  cutoffMs: number,
-  deps: TranscriptRetentionDeps,
+  dirPath: string, cutoffMs: number, deps: TranscriptRetentionDeps, canonicalAgentDir: string,
 ): Promise<{ deletedFiles: number; prunedDirs: number; remainingTranscripts: number; removedDir: boolean }> {
+  await canonicalTarget(dirPath, canonicalAgentDir, deps, true);
   let entries: Dirent[];
   try {
     entries = await deps.readDir(dirPath);
@@ -138,7 +107,7 @@ async function pruneTranscriptFiles(
   for (const entry of entries) {
     const entryPath = join(dirPath, entry.name);
     if (entry.isDirectory()) {
-      const nested = await pruneTranscriptFiles(entryPath, cutoffMs, deps);
+      const nested = await pruneTranscriptFiles(entryPath, cutoffMs, deps, canonicalAgentDir);
       deletedFiles += nested.deletedFiles;
       prunedDirs += nested.prunedDirs;
       remainingTranscripts += nested.remainingTranscripts;
@@ -158,12 +127,14 @@ async function pruneTranscriptFiles(
       continue;
     }
 
+    await canonicalTarget(entryPath, canonicalAgentDir, deps);
     await deps.removeFile(entryPath);
     deletedFiles++;
   }
 
   let removedDir = false;
   try {
+    await canonicalTarget(dirPath, canonicalAgentDir, deps, true);
     await deps.removeDir(dirPath);
     prunedDirs++;
     removedDir = true;
@@ -175,24 +146,79 @@ async function pruneTranscriptFiles(
   return { deletedFiles, prunedDirs, remainingTranscripts, removedDir };
 }
 
-/**
- * Delete explicitly expired transcript artifacts from ended agent state dirs.
- * Unset, non-finite, zero, or negative retention never traverses the filesystem.
- */
-export async function sweepTranscriptRetention(
-  options: TranscriptRetentionOptions,
-): Promise<string[]> {
+async function collectJsonlFiles(
+  dirPath: string, deps: TranscriptRetentionDeps, files: string[], canonicalAgentDir: string,
+): Promise<void> {
+  try {
+    await canonicalTarget(dirPath, canonicalAgentDir, deps, true);
+  } catch (error) {
+    if (hasErrorCode(error, 'ENOENT')) return;
+    throw error;
+  }
+  let entries: Dirent[];
+  try {
+    entries = await deps.readDir(dirPath);
+  } catch (error) {
+    if (hasErrorCode(error, 'ENOENT')) return;
+    throw error;
+  }
+  for (const entry of entries) {
+    const entryPath = join(dirPath, entry.name);
+    if (entry.isDirectory()) await collectJsonlFiles(entryPath, deps, files, canonicalAgentDir);
+    else if (entry.isFile() && entry.name.endsWith('.jsonl')) files.push(entryPath);
+  }
+}
+
+async function agentRetentionArtifacts(
+  agentDir: string, deps: TranscriptRetentionDeps, canonicalAgentDir: string,
+): Promise<{ newestMtimeMs: number; rollouts: string[] } | null> {
+  let entries: Dirent[];
+  try {
+    entries = await deps.readDir(agentDir);
+  } catch (error) {
+    if (hasErrorCode(error, 'ENOENT')) return null;
+    throw error;
+  }
+
+  const rollouts: string[] = [];
+  const candidates: string[] = [];
+  for (const entry of entries) {
+    if (entry.isFile() && entry.name === 'activity.jsonl') {
+      candidates.push(join(agentDir, entry.name));
+    } else if (entry.isDirectory() && entry.name.startsWith('codex-home')) {
+      await collectJsonlFiles(join(agentDir, entry.name, 'sessions'), deps, rollouts, canonicalAgentDir);
+    }
+  }
+  candidates.push(...rollouts);
+  if (candidates.length === 0) return null;
+
+  const mtimes = await Promise.all(candidates.map(async (path) => {
+    try {
+      await canonicalTarget(path, canonicalAgentDir, deps);
+      return (await deps.stat(path)).mtimeMs;
+    } catch (error) {
+      if (hasErrorCode(error, 'ENOENT')) return Number.NEGATIVE_INFINITY;
+      throw error;
+    }
+  }));
+  const newestMtimeMs = Math.max(...mtimes);
+  return Number.isFinite(newestMtimeMs) ? { newestMtimeMs, rollouts } : null;
+}
+
+export async function sweepTranscriptRetention(options: TranscriptRetentionOptions): Promise<string[]> {
   const transcriptDays = options.transcriptDays;
   if (transcriptDays === undefined || !Number.isFinite(transcriptDays) || transcriptDays <= 0) {
     return [];
   }
 
   const deps = { ...defaultDeps, ...options.deps };
-  let liveSessions: Set<string>;
+  let liveSessions: ReadonlySet<string>;
   try {
-    liveSessions = new Set(await deps.listSessionNames());
+    const inventory = await deps.listLiveAgentIds();
+    if (inventory === null) throw new Error('indeterminate backend inventory');
+    liveSessions = inventory;
   } catch {
-    const action = 'Transcript retention sweep skipped: tmux liveness census unavailable';
+    const action = 'Transcript retention sweep skipped: backend liveness inventory unavailable';
     deps.log(action);
     return [action];
   }
@@ -206,11 +232,18 @@ export async function sweepTranscriptRetention(
     else throw error;
   }
 
+  let canonicalAgentsDir: string;
+  try {
+    canonicalAgentsDir = await deps.realpath(resolve(agentsDir));
+  } catch {
+    const action = 'Transcript retention sweep skipped: agent root cannot be canonicalized';
+    deps.log(action);
+    return [action];
+  }
+
   const cutoffMs = deps.now() - transcriptDays * 24 * 60 * 60 * 1000;
   let conversationEligibilityMap: Map<string, boolean> | null = null;
   let conversationEligibilityLoaded = false;
-  let agentEligibilityMap: Map<string, boolean> | null = null;
-  let agentEligibilityLoaded = false;
   let eligibleDirs = 0;
   let deletedFiles = 0;
   let prunedDirs = 0;
@@ -218,47 +251,55 @@ export async function sweepTranscriptRetention(
   for (const entry of agentEntries) {
     if (!entry.isDirectory() || liveSessions.has(entry.name)) continue;
 
-    const conversation = isConversationDirectory(entry.name);
-    if (conversation) {
-      if (!conversationEligibilityLoaded) {
-        conversationEligibilityMap = conversationEligibility(deps);
-        conversationEligibilityLoaded = true;
-      }
-      if (conversationEligibilityMap === null) continue;
-      const conversationName = entry.name.slice('conv-'.length);
-      if (conversationEligibilityMap.get(conversationName) !== true) continue;
-    } else {
-      // NFR-4: a transcript is deleted only when the sweep can SAY the work
-      // landed — the agent is stopped and the forge reports its PR merged.
-      // An agent the listing cannot vouch for (a retired dir whose state.json
-      // is gone, an unreadable listing, a forge read that failed) is skipped,
-      // never deleted: the retention gate fails closed.
-      if (!agentEligibilityLoaded) {
-        agentEligibilityMap = await agentEligibility(deps);
-        agentEligibilityLoaded = true;
-      }
-      if (agentEligibilityMap === null || agentEligibilityMap.get(entry.name) !== true) continue;
-    }
-
-    eligibleDirs++;
     const agentDir = join(agentsDir, entry.name);
-    const result = await pruneTranscriptFiles(agentDir, cutoffMs, deps);
-    deletedFiles += result.deletedFiles;
-    prunedDirs += result.prunedDirs;
-
-    if (!conversation && result.remainingTranscripts === 0) {
-      if (!result.removedDir) {
-        await deps.removeFile(join(agentDir, RETAINED_TRANSCRIPTS_MARKER));
-        try {
-          await deps.removeDir(agentDir);
-          prunedDirs++;
-        } catch (error) {
-          if (!hasErrorCode(error, 'ENOENT')
-            && !hasErrorCode(error, 'ENOTEMPTY')
-            && !hasErrorCode(error, 'EEXIST')) throw error;
-        }
+    let canonicalAgentDir: string;
+    try {
+      canonicalAgentDir = await canonicalTarget(agentDir, canonicalAgentsDir, deps);
+      if (relative(canonicalAgentsDir, canonicalAgentDir).includes(sep)) {
+        throw new Error(`not a direct child: ${agentDir}`);
       }
+    } catch {
+      continue;
     }
+
+    try {
+      const conversation = isConversationDirectory(entry.name);
+      if (conversation) {
+        if (!conversationEligibilityLoaded) {
+          conversationEligibilityMap = conversationEligibility(deps);
+          conversationEligibilityLoaded = true;
+        }
+        if (conversationEligibilityMap === null) continue;
+        const conversationName = entry.name.slice('conv-'.length);
+        if (conversationEligibilityMap.get(conversationName) !== true) continue;
+      } else {
+        const artifacts = await agentRetentionArtifacts(agentDir, deps, canonicalAgentDir);
+        if (!artifacts || artifacts.newestMtimeMs >= cutoffMs) continue;
+        eligibleDirs++;
+        if (!await isDefinitelyStopped(entry.name, deps)) continue;
+        for (const rollout of artifacts.rollouts) {
+          await canonicalTarget(rollout, canonicalAgentDir, deps);
+          await deps.removeFile(rollout);
+        }
+        deletedFiles += artifacts.rollouts.length;
+        if (!await isDefinitelyStopped(entry.name, deps)) continue;
+        await deps.pruneAgentDir(agentDir, agentsDir);
+        if (!await isDefinitelyStopped(entry.name, deps)) continue;
+        const recanonicalizedAgentDir = await canonicalTarget(agentDir, canonicalAgentsDir, deps);
+        if (recanonicalizedAgentDir !== canonicalAgentDir || relative(canonicalAgentsDir, recanonicalizedAgentDir).includes(sep)) {
+          throw new Error(`Transcript retention target changed during sweep: ${agentDir}`);
+        }
+        await deps.removeTree(agentDir);
+        prunedDirs++;
+        continue;
+      }
+
+      eligibleDirs++;
+      if (!await isDefinitelyStopped(entry.name, deps)) continue;
+      const result = await pruneTranscriptFiles(agentDir, cutoffMs, deps, canonicalAgentDir);
+      deletedFiles += result.deletedFiles;
+      prunedDirs += result.prunedDirs;
+    } catch { continue; }
   }
 
   const fileLabel = `transcript file${deletedFiles === 1 ? '' : 's'}`;

@@ -415,7 +415,18 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     }
 
     case 'agent.stopped': {
-      const { [event.payload.agentId]: _removed, ...rest } = state.agentsById
+      const stoppedAgent = state.agentsById[event.payload.agentId]
+      const nextAgentsById = stoppedAgent
+        ? {
+            ...state.agentsById,
+            [event.payload.agentId]: {
+              ...stoppedAgent,
+              status: 'stopped' as const,
+              hasLiveTmuxSession: false,
+              lastActivity: event.timestamp,
+            },
+          }
+        : state.agentsById
       // PAN-800 — mark the runtime snapshot stopped too. pan kill bypasses the
       // Stop hook, so without this fold a killed agent shows activity: "idle"
       // forever. Retain the row (don't delete) so the projection cache has the
@@ -458,7 +469,7 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
       return {
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
-        agentsById: rest,
+        agentsById: nextAgentsById,
         agentRuntimeById: nextRuntimeById,
         channelPermissionRequestsById: nextPermissionRequestsById,
         channelPermissionRequestIdsByAgentId: restPendingIds,

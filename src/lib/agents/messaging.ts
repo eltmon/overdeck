@@ -473,7 +473,10 @@ export async function messageAgent(
       });
     } else if (ready && resumeMessage.message) {
       if (fallbackHarness === 'claude-code') {
-        const fallbackSessionId = getLatestSessionIdSync(normalizedId);
+        const fallbackSessionId = getLatestSessionIdSync(
+          normalizedId,
+          { getAgentState: () => agentState },
+        );
         if (fallbackSessionId) {
           const delivery = await deliverMessageWithTranscriptConfirmation({
             agentId: normalizedId,
@@ -643,7 +646,7 @@ export async function messageAgent(
   const deliveryMethod = resolveAgentDeliveryMethod(agentState);
   const deliveryCaller = `messageAgent:${caller}`;
   const transcriptSessionId = getHarnessBehavior(expectedHarness).transcriptKind === 'claude-jsonl'
-    ? agentState?.sessionId ?? getLatestSessionIdSync(normalizedId)
+    ? getLatestSessionIdSync(normalizedId, { getAgentState: () => agentState })
     : undefined;
 
   if (agentState?.workspace && transcriptSessionId && opts.dedupKey === undefined) {

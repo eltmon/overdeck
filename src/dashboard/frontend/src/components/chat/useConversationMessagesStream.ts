@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Stream } from 'effect';
-import { getHarnessBehavior, WS_METHODS } from '@overdeck/contracts';
+import { getHarnessBehavior, isAgentSessionName, WS_METHODS } from '@overdeck/contracts';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 import type { Conversation } from '../CommandDeck/ConversationList';
@@ -139,21 +139,21 @@ export function shouldStreamConversationMessages(conversation: Pick<Conversation
     const behavior = getHarnessBehavior(conversation.harness);
     return behavior.supportsConversationStreaming || behavior.supportsPatchProjection;
   }
-  // Synthetic agent sessions (id < 0 — work/planning/specialist SessionPanels)
-  // have no conversations-table row and only stream while their session is live.
-  // Only pi/codex stream here (PAN-1908): the server tails their transcript and
-  // pushes snapshots. Claude work agents stay on the existing HTTP-poll path,
-  // which already works — no need to add a server watcher for them.
+  // Synthetic agent sessions have no conversations-table row, but the RPC
+  // stream resolves them from durable agent state and tails every supported
+  // harness while live. Historical reads remain one-shot HTTP.
   if (!conversation.sessionAlive) return false;
-  const name = conversation.name ?? '';
-  const isAgentSession = /^(agent-|planning-|specialist-)/.test(name);
-  const streamable = getHarnessBehavior(conversation.harness).supportsConversationStreaming;
-  return isAgentSession && streamable;
+  const behavior = getHarnessBehavior(conversation.harness);
+  const streamable = behavior.supportsConversationStreaming || behavior.supportsPatchProjection;
+  return isAgentSessionName(conversation.name ?? '') && streamable;
 }
 
-export function useConversationMessagesStream(conversation: Pick<Conversation, 'name' | 'harness' | 'sessionAlive'> & { id?: number; endedAt?: string | null }): { enabled: boolean; receivedFirstPayload: boolean } {
+export function useConversationMessagesStream(
+  conversation: Pick<Conversation, 'name' | 'harness' | 'sessionAlive'> & { id?: number; endedAt?: string | null },
+  disabled = false,
+): { enabled: boolean; receivedFirstPayload: boolean } {
   const queryClient = useQueryClient();
-  const enabled = shouldStreamConversationMessages(conversation);
+  const enabled = !disabled && shouldStreamConversationMessages(conversation);
   const streamIdentity = `${enabled ? 'enabled' : 'disabled'}:${conversation.name}`;
   const [firstPayloadIdentity, setFirstPayloadIdentity] = useState<string | null>(null);
   const receivedFirstPayload = firstPayloadIdentity === streamIdentity;

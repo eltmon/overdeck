@@ -3,7 +3,8 @@ import { existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, writeFileS
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-import { CodexRuntimeSync, findRolloutPath, writeThreadId, initCodexHome, extractThreadIdFromRollout, findLatestRollout, toCodexSandboxValue } from '../codex.js'
+import { CodexRuntimeSync, findRolloutPath, writeThreadId, recordCodexRolloutSession, initCodexHome, extractThreadIdFromRollout, findLatestRollout, toCodexSandboxValue } from '../codex.js'
+import { readSessionIndexSync } from '../../session-history.js'
 import { getGlobalRegistry, getRuntime, setGlobalRegistry, RuntimeRegistry } from '../index.js'
 import { createClaudeCodeRuntimeSync } from '../claude-code.js'
 import { createPiRuntimeSync } from '../pi.js'
@@ -76,6 +77,24 @@ describe('CodexRuntimeSync — session path resolution', () => {
 
     const rt = new CodexRuntimeSync()
     expect(rt.getSessionPath('agent-test-02')).toBeNull()
+  })
+
+  it('recordCodexRolloutSession writes both the thread-id file and the session index entry', () => {
+    const threadId = 'record-rollout-thread'
+    const agentDir = join(ctx.agentsHome, 'agent-test-03')
+    mkdirSync(agentDir, { recursive: true })
+    const dayDir = join(agentDir, 'codex-home', 'sessions', '2025', '06', '01')
+    mkdirSync(dayDir, { recursive: true })
+    const rolloutPath = join(dayDir, `rollout-some-uuid-${threadId}.jsonl`)
+    writeFileSync(rolloutPath, '{"type":"message"}\n')
+
+    recordCodexRolloutSession('agent-test-03', threadId, rolloutPath)
+
+    const rt = new CodexRuntimeSync()
+    expect(rt.getSessionPath('agent-test-03')).toBe(rolloutPath)
+    expect(readSessionIndexSync('agent-test-03')).toEqual([
+      expect.objectContaining({ sessionId: threadId, source: 'capture', harness: 'codex', path: rolloutPath }),
+    ])
   })
 })
 

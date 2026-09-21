@@ -1,10 +1,32 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { extractCostEvents, resolveUnmappedSessionIssueId } from '../reconciler.js';
+import { buildSessionIndex, extractCostEvents, resolveUnmappedSessionIssueId } from '../reconciler.js';
 import type { ConversationSessionLookup } from '../attribution.js';
 
 describe('reconciler no-issue buckets', () => {
   const sessionId = 'session-cost-bucket';
+  let root: string;
+  let previousHome: string | undefined;
+  let previousOverdeckHome: string | undefined;
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'cost-session-index-'));
+    previousHome = process.env.HOME;
+    previousOverdeckHome = process.env.OVERDECK_HOME;
+    process.env.HOME = root;
+    process.env.OVERDECK_HOME = join(root, '.overdeck');
+  });
+
+  afterEach(() => {
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+    if (previousOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = previousOverdeckHome;
+    rmSync(root, { recursive: true, force: true });
+  });
 
   function claudeAssistantLine(requestId: string): string {
     return JSON.stringify({
@@ -41,5 +63,19 @@ describe('reconciler no-issue buckets', () => {
 
     expect(events).toHaveLength(1);
     expect(events[0]!.issueId).toBe('PAN-2387');
+  });
+
+  it('attributes a legacy-only session pointer as one compatible index entry', () => {
+    const agentId = 'agent-pan-3950';
+    const agentDir = join(root, '.overdeck', 'agents', agentId);
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, 'session.id'), 'legacy-cost-session\n');
+    writeFileSync(join(agentDir, 'state.json'), JSON.stringify({ issueId: 'PAN-3950', role: 'work' }));
+
+    expect(buildSessionIndex().get('legacy-cost-session')).toEqual({
+      agentId,
+      issueId: 'PAN-3950',
+      sessionType: 'work',
+    });
   });
 });

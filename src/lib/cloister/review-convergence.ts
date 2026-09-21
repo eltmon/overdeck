@@ -83,8 +83,14 @@ export function countBlockingFindingsForRun(runDir: string): number | null {
     let totalCount = 0;
     for (const file of reportFiles) {
       const content = readFileSync(join(runDir, file), 'utf8');
-      const findings = findBlockingFindings(content);
-      totalCount += findings.length;
+      // A self-review `review.md` is written in the synthesis layout
+      // (`## Blocking Findings` + one `###` per finding), not the per-lane
+      // report layout (`### !` markers). Parsing it with the lane parser read
+      // every real round as zero blockers, the series went flat, and the
+      // convergence gate withheld feedback from the work agent (PAN-3705).
+      totalCount += content.includes('## Blocking Findings')
+        ? countSynthesisBlockingFindings(content)
+        : findBlockingFindings(content).length;
     }
 
     return totalCount;
@@ -106,6 +112,12 @@ export function evaluateReviewConvergence(counts: number[]): 'converging' | 'not
   }
 
   const n = counts.length;
+
+  // No blockers left in the latest round: there is nothing to converge on, so
+  // a flat run of zeros (aborted or clean rounds) is never a stall.
+  if (counts[n - 1] === 0) {
+    return 'converging';
+  }
 
   // Check for reversal: the latest value > previous value (an increase after decreases)
   const hasReversal = counts[n - 1] > counts[n - 2];
