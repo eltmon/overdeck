@@ -2,7 +2,7 @@
   "version": "1",
   "issueId": "PAN-3959",
   "created": "2026-09-20T22:53:20.505Z",
-  "updated": "2026-09-20T23:59:21.848Z",
+  "updated": "2026-09-21T00:00:05.519Z",
   "gitState": {},
   "decisions": [],
   "hazards": [],
@@ -78,6 +78,10 @@
     "w1-index-path-field.ac4": {
       "status": "completed",
       "doneAt": "2026-09-20T23:59:21.848Z"
+    },
+    "w2-claude-hooks-record-path.ac1": {
+      "status": "completed",
+      "doneAt": "2026-09-21T00:00:05.519Z"
     }
   }
 }
