@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-21T00:13:55.716Z · model: claude-opus-5 · open: 856_
+_Last sequenced: 2026-09-21T00:54:16.668Z · model: claude-opus-5 · open: 856_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -26,17 +26,17 @@ _Last sequenced: 2026-09-21T00:13:55.716Z · model: claude-opus-5 · open: 856_
 | 19 | PAN-3939 | S | critical | ok |  |  | Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive |
 | 20 | PAN-3973 | S | critical | ok |  |  | Post-cut nothing lands a finished strike: prompt still says the Deacon merges it; open a PR on completion and rewrite the prompt |
 | 21 | PAN-3968 | S | critical | ok |  |  | Every pan close still deletes state.json/sessions.json (close-out.ts step 5 never moved to pruneAgentStateDir); PAN-3950 AC-1 unmet |
-| 22 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
-| 23 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
-| 24 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
-| 25 | PAN-3960 | M | critical | ok |  |  | Planning, resume and recovery spawns still create tmux sessions directly; route through launchAgentPane so one backend hosts the fleet |
-| 26 | PAN-3524 | M | critical | needs-refinement |  |  | A server-owned --changed verification loop relaunches through deacon freeze, review abort, pause and operator stop; peaked at 78 workers. |
-| 27 | PAN-3962 | S | critical | ok |  |  | PTY supervisor lifecycle POSTs 404 for conv-* ids: conversation exit/turn events never recorded; exit is inferred, not owned |
-| 28 | PAN-3250 | S | critical | ok |  |  | Workspace spawn branches from local HEAD instead of origin/main, so every new feature branch inherits unpushed local-main commits. |
-| 29 | PAN-3946 | S | critical | ok |  |  | Review request treats an APPROVED review on an older commit as "already passed"; newer commits ride an old approval |
-| 30 | PAN-2954 | XS | critical | ok |  |  | postMergeLifecycle refuses GitLab projects |
-| 31 | PAN-3935 | S | critical | ok |  |  | PRD draft promotion writes the draft into the primary main checkout and deletes the feature-branch copy; PRDs are stranded untracked |
-| 32 | PAN-3969 | M | high | ok |  |  | Sequence route + tracker-poll refresh spawn ~800 serial git rev-list per call (11-21s Backlog load); batch via for-each-ref |
+| 22 | PAN-3977 | S | critical | ok |  |  | pan start's auto-spawn after planning is a no-op for 'todo' issues: stateToRole('todo') is null, so no work agent ever starts |
+| 23 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
+| 24 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
+| 25 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
+| 26 | PAN-3960 | M | critical | ok |  |  | Planning, resume and recovery spawns still create tmux sessions directly; route through launchAgentPane so one backend hosts the fleet |
+| 27 | PAN-3524 | M | critical | needs-refinement |  |  | A server-owned --changed verification loop relaunches through deacon freeze, review abort, pause and operator stop; peaked at 78 workers. |
+| 28 | PAN-3962 | S | critical | ok |  |  | PTY supervisor lifecycle POSTs 404 for conv-* ids: conversation exit/turn events never recorded; exit is inferred, not owned |
+| 29 | PAN-3250 | S | critical | ok |  |  | Workspace spawn branches from local HEAD instead of origin/main, so every new feature branch inherits unpushed local-main commits. |
+| 30 | PAN-3946 | S | critical | ok |  |  | Review request treats an APPROVED review on an older commit as "already passed"; newer commits ride an old approval |
+| 31 | PAN-2954 | XS | critical | ok |  |  | postMergeLifecycle refuses GitLab projects |
+| 32 | PAN-3935 | S | critical | ok |  |  | PRD draft promotion writes the draft into the primary main checkout and deletes the feature-branch copy; PRDs are stranded untracked |
 | 33 | PAN-3657 | S | critical | ok |  |  | Merge-train queues endpoint runs the monorepo queue builder for polyrepo projects, so MYN/Auricle trains are permanently empty. |
 | 34 | PAN-3947 | S | critical | needs-refinement |  |  | Same root as PAN-3966 (stopAgent never closes Herdr panes); remaining scope = post-merge lifecycle should stop specialists, not pause |
 | 35 | PAN-3565 | M | critical | ok |  |  | Failed review spawn wedges 'starting', and an all-lanes infra failure is synthesized as a real CHANGES REQUESTED verdict. |
@@ -948,49 +948,49 @@ New since the prior run. Strikes are the pipeline's self-repair path, and today 
 
 Regression of the transcript-discoverability fix that just merged: close-out.ts step 5 still calls removeAgentStateDir, so every pan close the flywheel runs destroys that agent's session index while printing the new 'state kept' message. The 'freshest JSONL' fallback was deliberately removed in PAN-3950, so each close-out now leaves an agent whose transcript route returns nothing. Cause, fix, regression test and acceptance are spelled out; S-sized. The backfill for already-pruned agents is shared with PAN-3959 (in pipeline), so land this on top of it.
 
-### PAN-3566 (rank 22)
+### PAN-3977 (rank 22)
+
+New this run. The paved road (`pan start` on an unplanned issue) finalizes planning and then silently never spawns the work agent: complete-planning hands autoSpawn to the reactive dispatcher with the tracker state, a fresh GitHub issue is still 'todo', stateToRole('todo') is null, and the dispatcher returns. Reproduced twice today with ~3h of dead time on PAN-3968. That is a pipeline-blocking defect on the primary entry point, so critical despite the P3 label. The fix is small and well-specified (spawn the work role directly when a readable xBRIEF was just written, or transition to in_progress first, plus a 'todo' finalize test). Sits in the same planning-spawn code PAN-3960 is rerouting through launchAgentPane, so land whichever merges first and rebase the other.
+
+### PAN-3566 (rank 23)
 
 New this pass and the highest-leverage fix in the batch: the test-role launcher's final exec has no -p, no positional prompt and no piped stdin, so the role boots an interactive REPL and never takes a turn. That single missing argument is the deterministic producer of the zombie test agents tracked in PAN-2706, PAN-3563 and PAN-3274 — three separate hardening issues chasing one root cause. Reproduced across eight session IDs, so there is no diagnosis left to do.
 
-### PAN-3952 (rank 23)
+### PAN-3952 (rank 24)
 
 On the default backend the harness TUI renders into a one-line terminal until an operator opens it, so stuck detection, readiness scans, health capture, AUQ/permission detection and screenshots all see nothing. Deterministic pane sizing in the Herdr adapter is a small change with fleet-wide effect.
 
-### PAN-3285 (rank 24)
+### PAN-3285 (rank 25)
 
 New this pass, labelled critical. A supervisor unit pinned to a pan reload generation SIGTERMs every correctly-running dashboard and is structurally incapable of starting a replacement; the observed outcome was a 3.5-hour total outage with 1,107 consecutive failed recovery attempts and no operator escalation. Manual recovery also fails, because the supervisor kills the operator's dashboard within 30 seconds. Nothing else in the backlog can take the whole product down for hours with the recovery path itself broken.
 
-### PAN-3960 (rank 25)
+### PAN-3960 (rank 26)
 
 Three spawn paths bypass the backend registry, giving two inventories for one fleet: pan tell cannot reach tmux planners (PAN-3948), and a resumed agent silently migrates backends. Sibling of PAN-3921 (in pipeline) and PAN-3936.
 
-### PAN-3524 (rank 26)
+### PAN-3524 (rank 27)
 
 Triage: verify the --changed verification-loop relaunch against deacon-lite's smaller suppression surface. Kept in the critical band: an unstoppable server-owned test loop is the worst kind of runaway.
 
-### PAN-3962 (rank 27)
+### PAN-3962 (rank 28)
 
 Breaks the CLAUDE.md invariant that supervisor-launched sessions write stopped from their own exited event: a conversation showed active 45s after Claude died and the first message went into a dead shell. Small route fix plus a test.
 
-### PAN-3250 (rank 28)
+### PAN-3250 (rank 29)
 
 New this pass, labelled blocks-main and substrate. Two spawn sites branch from the local HEAD or defaultBranch instead of origin/main, so every new feature branch inherits whatever unpushed commits are sitting on the shared local main. Four branches were already contaminated when it was filed, two of them created after the problem was identified, and their PRs read MERGEABLE/CLEAN. It spreads with each spawn, so the cost of leaving it grows.
 
-### PAN-3946 (rank 29)
+### PAN-3946 (rank 30)
 
 Merge-safety bug seen on PR #3933: an approval on fd3334e6 satisfied the request for head ae9d82f0. Approval must count only when its commit_id is the current head; add --force as the explicit override.
 
-### PAN-2954 (rank 30)
+### PAN-2954 (rank 31)
 
 Dependency cleared: PAN-2882 (the missing GitLab merged-MR oracle this blocked on) closed since the last pass, so postMergeLifecycle's GitLab refusal is now directly workable. Re-ranked up from 67 to sit with the other unblocked critical merge-path fixes.
 
-### PAN-3935 (rank 31)
+### PAN-3935 (rank 32)
 
 The PAN-2858 defect in a new shape: complete-planning promotes to the primary checkout, where nothing commits, and removes the workspace copy the planning commit would have picked up. Evidence: untracked pan-3927.md on main. Also a write-to-main hazard.
-
-### PAN-3969 (rank 32)
-
-The visible symptom is the Backlog page sitting on 'Loading sequence…' for 11-21s, but the heavier fact is that the same whole-backlog loadIssueStatesForProject loop also runs in the background on every tracker poll and every pushUpdated(), firing ~800 serial git processes each time — fleet-wide CPU load, not just one slow route. The route result (pipelineState) is never read by the frontend and inPipeline is already computed by classifyIssue on the same route. Two well-specified items: drop the per-request derivation, and replace per-issue rev-list with two for-each-ref calls in the loader. Overlaps PAN-3925 (in pipeline) which batches the same loader for /api/parked; sequence after it.
 
 ### PAN-3657 (rank 33)
 
@@ -1191,7 +1191,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-21T00:13:55.716Z",
+  "generatedAt": "2026-09-21T00:54:16.668Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 856,
@@ -1470,8 +1470,21 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "planning": "auto"
     },
     {
-      "issue": "PAN-3566",
+      "issue": "PAN-3977",
       "rank": 22,
+      "size": "S",
+      "importance": "critical",
+      "score": 86,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "pan start's auto-spawn after planning is a no-op for 'todo' issues: stateToRole('todo') is null, so no work agent ever starts",
+      "rationale": "New this run. The paved road (`pan start` on an unplanned issue) finalizes planning and then silently never spawns the work agent: complete-planning hands autoSpawn to the reactive dispatcher with the tracker state, a fresh GitHub issue is still 'todo', stateToRole('todo') is null, and the dispatcher returns. Reproduced twice today with ~3h of dead time on PAN-3968. That is a pipeline-blocking defect on the primary entry point, so critical despite the P3 label. The fix is small and well-specified (spawn the work role directly when a readable xBRIEF was just written, or transition to in_progress first, plus a 'todo' finalize test). Sits in the same planning-spawn code PAN-3960 is rerouting through launchAgentPane, so land whichever merges first and rebase the other.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3566",
+      "rank": 23,
       "size": "XS",
       "importance": "critical",
       "score": 92,
@@ -1484,7 +1497,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3952",
-      "rank": 23,
+      "rank": 24,
       "size": "S",
       "importance": "critical",
       "score": 85,
@@ -1497,7 +1510,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3285",
-      "rank": 24,
+      "rank": 25,
       "size": "M",
       "importance": "critical",
       "score": 92,
@@ -1510,7 +1523,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3960",
-      "rank": 25,
+      "rank": 26,
       "size": "M",
       "importance": "critical",
       "score": 84,
@@ -1523,7 +1536,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3524",
-      "rank": 26,
+      "rank": 27,
       "size": "M",
       "importance": "critical",
       "score": 90,
@@ -1536,7 +1549,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3962",
-      "rank": 27,
+      "rank": 28,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -1549,7 +1562,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3250",
-      "rank": 28,
+      "rank": 29,
       "size": "S",
       "importance": "critical",
       "score": 90,
@@ -1562,7 +1575,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3946",
-      "rank": 29,
+      "rank": 30,
       "size": "S",
       "importance": "critical",
       "score": 84,
@@ -1575,7 +1588,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-2954",
-      "rank": 30,
+      "rank": 31,
       "size": "XS",
       "importance": "critical",
       "score": 90,
@@ -1588,7 +1601,7 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
     },
     {
       "issue": "PAN-3935",
-      "rank": 31,
+      "rank": 32,
       "size": "S",
       "importance": "critical",
       "score": 82,
@@ -1596,19 +1609,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "dependsOn": [],
       "why": "PRD draft promotion writes the draft into the primary main checkout and deletes the feature-branch copy; PRDs are stranded untracked",
       "rationale": "The PAN-2858 defect in a new shape: complete-planning promotes to the primary checkout, where nothing commits, and removes the workspace copy the planning commit would have picked up. Evidence: untracked pan-3927.md on main. Also a write-to-main hazard.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3969",
-      "rank": 32,
-      "size": "M",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Sequence route + tracker-poll refresh spawn ~800 serial git rev-list per call (11-21s Backlog load); batch via for-each-ref",
-      "rationale": "The visible symptom is the Backlog page sitting on 'Loading sequence…' for 11-21s, but the heavier fact is that the same whole-backlog loadIssueStatesForProject loop also runs in the background on every tracker poll and every pushUpdated(), firing ~800 serial git processes each time — fleet-wide CPU load, not just one slow route. The route result (pipelineState) is never read by the frontend and inPipeline is already computed by classifyIssue on the same route. Two well-specified items: drop the per-request derivation, and replace per-issue rev-list with two for-each-ref calls in the loader. Overlaps PAN-3925 (in pipeline) which batches the same loader for /api/parked; sequence after it.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13078,13 +13078,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "confidence": 0.7
     },
     {
-      "from": "PAN-3925",
-      "to": "PAN-3969",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.6
-    },
-    {
       "from": "PAN-3947",
       "to": "PAN-3973",
       "type": "informs",
@@ -13125,6 +13118,13 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.6
+    },
+    {
+      "from": "PAN-3960",
+      "to": "PAN-3977",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
