@@ -76,6 +76,7 @@ describe('model-fallback', () => {
     it('should return all Anthropic models', () => {
       const models = getModelsByProviderSync('anthropic');
       expect(models).toContain('claude-fable-5');
+      expect(models).toContain('claude-opus-5-5');
       expect(models).toContain('claude-opus-5');
       expect(models).toContain('claude-opus-4-8');
       expect(models).toContain('claude-opus-4-7');
@@ -84,7 +85,7 @@ describe('model-fallback', () => {
       expect(models).toContain('claude-sonnet-4-6');
       expect(models).toContain('claude-sonnet-4-5');
       expect(models).toContain('claude-haiku-4-5');
-      expect(models).toHaveLength(10);
+      expect(models).toHaveLength(11);
     });
 
     it('should return all OpenAI models', () => {
@@ -376,6 +377,7 @@ describe('model-fallback', () => {
       const models = getAvailableModelsSync(enabled);
 
       expect(models).toContain('claude-fable-5');
+      expect(models).toContain('claude-opus-5-5');
       expect(models).toContain('claude-opus-5');
       expect(models).toContain('claude-opus-4-8');
       expect(models).toContain('claude-opus-4-7');
@@ -384,14 +386,14 @@ describe('model-fallback', () => {
       expect(models).toContain('claude-sonnet-4-6');
       expect(models).not.toContain('claude-sonnet-4-5');
       expect(models).toContain('claude-haiku-4-5');
-      expect(models).toHaveLength(9);
+      expect(models).toHaveLength(10);
     });
 
     it('should return all models when all providers enabled', () => {
       const enabled = new Set<ModelProvider>(['anthropic', 'openai', 'google', 'kimi']);
       const models = getAvailableModelsSync(enabled);
 
-      expect(models.length).toBe(28); // 9 Anthropic + 17 OpenAI + 6 Google + 7 Kimi
+      expect(models.length).toBe(29); // 10 Anthropic + 7 OpenAI + 5 Google + 7 Kimi
     });
 
     it('should include OpenAI models when OpenAI enabled', () => {
@@ -407,7 +409,7 @@ describe('model-fallback', () => {
       expect(models).not.toContain('o3');
       expect(models).not.toContain('gpt-5.3-codex');
       expect(models).not.toContain('gpt-4o');
-      expect(models.length).toBe(16); // 9 Anthropic + 17 OpenAI
+      expect(models.length).toBe(17); // 10 Anthropic + 7 current OpenAI
     });
 
     it('should include Google models when Google enabled', () => {
@@ -419,7 +421,7 @@ describe('model-fallback', () => {
       expect(models).toContain('gemini-3.1-flash-lite-preview');
       expect(models).not.toContain('gemini-2.5-pro');
       expect(models).not.toContain('gemini-2.5-flash');
-      expect(models.length).toBe(14); // 9 Anthropic + 6 Google
+      expect(models.length).toBe(15); // 10 Anthropic + 5 current Google
     });
   });
 

@@ -883,7 +883,7 @@ const DEFAULT_CHUNK_BUDGET_CHARS = 300_000;
 
 function getChunkBudgetChars(model: string | undefined): number {
   if (!model) return DEFAULT_CHUNK_BUDGET_CHARS;
-  return CHUNK_BUDGET_CHARS_BY_MODEL[model] ?? DEFAULT_CHUNK_BUDGET_CHARS;
+  return CHUNK_BUDGET_CHARS_BY_MODEL[model === 'claude-opus-5-5' ? 'claude-opus-5' : model] ?? DEFAULT_CHUNK_BUDGET_CHARS;
 }
 
 function chunkEntriesByBudget(entries: any[], budgetChars: number): any[][] {

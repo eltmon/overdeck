@@ -5,7 +5,7 @@ import { SETTINGS_FILE } from './paths.js';
 import { FsError } from './errors.js';
 
 // Model identifiers
-export type AnthropicModel = 'claude-fable-5-1' | 'claude-fable-5' | 'claude-opus-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
+export type AnthropicModel = 'claude-fable-5-1' | 'claude-fable-5' | 'claude-opus-5-5' | 'claude-opus-5' | 'claude-opus-4-8' | 'claude-opus-4-7' | 'claude-opus-4-6' | 'claude-sonnet-5' | 'claude-sonnet-4-6' | 'claude-sonnet-4-5' | 'claude-haiku-4-5';
 export type OpenAIModel =
   // Supported (Codex CLI catalog, 2026-09-07)
   | 'gpt-6-astra'
@@ -232,6 +232,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
   const anthropicModels: AnthropicModel[] = [
     'claude-fable-5-1',
     'claude-fable-5',
+    'claude-opus-5-5',
     'claude-opus-5',
     'claude-opus-4-8',
     'claude-opus-4-7',
@@ -311,6 +312,7 @@ export function getClaudeModelFlagSync(modelId: ModelId | string): string {
     'claude-fable-5': 'claude-fable-5',
     // Pass the full API ID through: the CLI's short `opus` alias may still
     // resolve to Opus 4.8 depending on installed Claude Code version.
+    'claude-opus-5-5': 'claude-opus-5-5',
     'claude-opus-5': 'claude-opus-5',
     'claude-opus-4-8': 'opus',
     'claude-opus-4-7': 'opus',

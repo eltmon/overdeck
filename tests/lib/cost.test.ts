@@ -16,6 +16,16 @@ import { normalizeModelName } from '../../src/lib/cost-parsers/jsonl-parser.js';
 
 describe('cost module', () => {
   describe('DEFAULT_PRICING - Pricing Accuracy', () => {
+    it('should have correct pricing for claude-opus-5-5', () => {
+      const pricing = DEFAULT_PRICING.find(p => p.model === 'claude-opus-5-5');
+      expect(pricing).toBeDefined();
+      expect(pricing?.inputPer1k).toBe(0.004);
+      expect(pricing?.outputPer1k).toBe(0.020);
+      expect(pricing?.cacheReadPer1k).toBe(0.0002);
+      expect(pricing?.cacheWrite5mPer1k).toBe(0.005);
+      expect(pricing?.cacheWrite1hPer1k).toBe(0.008);
+    });
+
     it('should have correct pricing for claude-opus-4-6', () => {
       const pricing = DEFAULT_PRICING.find(p => p.model === 'claude-opus-4-6');
       expect(pricing).toBeDefined();
@@ -411,6 +421,13 @@ describe('cost module', () => {
   });
 
   describe('normalizeModelName', () => {
+    it('should normalize opus-5.5 separately from opus-5', () => {
+      const dashed = normalizeModelName('claude-opus-5-5');
+      const dotted = normalizeModelName('claude-opus-5.5');
+      expect(dashed).toEqual({ provider: 'anthropic', model: 'claude-opus-5-5' });
+      expect(dotted).toEqual({ provider: 'anthropic', model: 'claude-opus-5-5' });
+    });
+
     it('should normalize opus-4.6 to claude-opus-4-6', () => {
       const result = normalizeModelName('claude-opus-4.6-20250929');
       expect(result.provider).toBe('anthropic');
