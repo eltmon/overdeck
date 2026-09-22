@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-22T13:33:30.497Z · model: claude-opus-5 · open: 858_
+_Last sequenced: 2026-09-22T14:16:19.459854Z · model: claude-opus-5 · open: 858_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -187,7 +187,7 @@ _Last sequenced: 2026-09-22T13:33:30.497Z · model: claude-opus-5 · open: 858_
 | 180 | PAN-3943 | L | high | ok |  | PAN-3942 | Toggleable Deft Directive compatibility profile and skill bundle on top of PAN-3942; no second planning authority in a project |
 | 181 | PAN-570 | XS | high | ok |  | PAN-2642 | Show PLAN badge on costs when under a subscription/plan |
 | 182 | PAN-2059 | XL | high | ok | ✓ |  | Backlog pickup gate |
-| 183 | PAN-2376 | XL | high | ok | ✓ |  | Epic: CI/CD reliability |
+| 183 | PAN-2376 | XL | high | stale | ✓ |  | Epic: CI/CD reliability — all 21 named children are closed; needs an operator disposition (close or restate) |
 | 184 | PAN-3775 | S | high | ok |  |  | makeDbLive opens overdeck.db unmigrated; zero-table db poisons a vitest worker home and breaks later read-only audits. |
 | 185 | PAN-3652 | XS | high | ok |  |  | No workflow_dispatch on ci.yml / state-plane-branches.yml, so an unverified main tip can never be verified and DoD row 6 blocks close-out. |
 | 186 | PAN-3579 | M | high | ok |  |  | ~20 frontend mutations hand-write JSON headers and omit the CSRF token, so each 403s the moment its route becomes guarded. |
@@ -1193,7 +1193,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-22T13:33:30.497Z",
+  "generatedAt": "2026-09-22T14:16:19.459854Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 858,
@@ -3564,10 +3564,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "size": "XL",
       "importance": "high",
       "score": 77,
-      "condition": "ok",
+      "condition": "stale",
       "dependsOn": [],
-      "why": "Epic: CI/CD reliability",
-      "rationale": "Epic — CI/CD reliability: flake policy, verification-to-merge convergence, strike/swarm merge-path hardening, deploy hygiene.",
+      "why": "Epic: CI/CD reliability — all 21 named children are closed; needs an operator disposition (close or restate)",
+      "rationale": "Epic — CI/CD reliability: flake policy, verification-to-merge convergence, strike/swarm merge-path hardening, deploy hygiene. Condition corrected from ok to stale: every child named in its phase table (PAN-2373, 2371, 2336, 2207, 2341, 2167, 2359, 2363, 2360, 2300, 2270, 2372, 2364, 2095, 2375, 2374, 2229, 2230, 2297, 2265) and the absorbed epic PAN-2198 are closed, so the epic tracks no open work and its body describes a pipeline that has since been cut and rebuilt. The prior pass carried ok in error; this is a correction, not a fresh delta. Rank, score, importance, and the operator-set blocked gate are untouched — only the operator can decide whether the remaining soak-based exit criteria justify keeping it open.",
       "gate": "blocked",
       "planning": "skip",
       "isEpic": true
@@ -13241,6 +13241,41 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.5
+    },
+    {
+      "from": "PAN-2566",
+      "to": "PAN-2565",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2566",
+      "to": "PAN-2608",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2566",
+      "to": "PAN-2609",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-2566",
+      "to": "PAN-658",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.9
+    },
+    {
+      "from": "PAN-2566",
+      "to": "PAN-277",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 0.9
     }
   ]
 }
