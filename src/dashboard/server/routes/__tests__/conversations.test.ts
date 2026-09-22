@@ -1299,6 +1299,56 @@ describe('conversations route — DB integration', () => {
     });
   });
 
+  it('serves ended OpenCode conversation history through the ACP parser', async () => {
+    const { createConversation, markConversationEnded } = await import('../../../../lib/overdeck/conversations.js');
+    const tmuxSession = 'conv-opencode-history';
+    const sessionFile = join(TEST_HOME, 'agents', tmuxSession, 'acp-session.jsonl');
+    mkdirSync(join(sessionFile, '..'), { recursive: true });
+    writeFileSync(sessionFile, [
+      JSON.stringify({
+        timestamp: '2026-09-19T14:14:52.933Z',
+        role: 'user',
+        content: 'What is 1 + 1?',
+        sessionId: 'ses_opencode_history',
+        source: 'orchestrator',
+      }),
+      JSON.stringify({
+        timestamp: '2026-09-19T14:15:01.925Z',
+        role: 'assistant',
+        content: "It's 2.",
+        sessionId: 'ses_opencode_history',
+        source: 'agent',
+      }),
+      JSON.stringify({
+        timestamp: '2026-09-19T14:15:02.039Z',
+        role: 'system',
+        content: '',
+        sessionId: 'ses_opencode_history',
+        source: 'agent',
+        event: 'turn_completed',
+        stopReason: 'end_turn',
+      }),
+    ].join('\n') + '\n', 'utf8');
+
+    createConversation({
+      name: 'opencode-history',
+      tmuxSession,
+      cwd: '/cwd/opencode',
+      harness: 'opencode',
+      model: 'opencode/muse-spark-1.3-contributor-free',
+    });
+    markConversationEnded('opencode-history');
+
+    const response = await getConversationMessages('opencode-history');
+    const body = decodeJsonResponse(response) as { messages?: Array<{ role: string; text: string }> };
+
+    expect(response.status).toBe(200);
+    expect(body.messages).toEqual([
+      expect.objectContaining({ role: 'user', text: 'What is 1 + 1?' }),
+      expect.objectContaining({ role: 'assistant', text: "It's 2." }),
+    ]);
+  });
+
   it('serves pi messages through discovered_sessions when the agent dir transcript is gone', async () => {
     const { createConversation } = await import('../../../../lib/overdeck/conversations.js');
     const { upsertDiscoveredSession } = await import('../../../../lib/overdeck/discovered-sessions.js');
