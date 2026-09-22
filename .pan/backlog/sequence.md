@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-22T14:16:19.459854Z · model: claude-opus-5 · open: 858_
+_Last sequenced: 2026-09-22T17:26:51.713Z · model: claude-opus-5 · open: 858_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -676,7 +676,7 @@ _Last sequenced: 2026-09-22T14:16:19.459854Z · model: claude-opus-5 · open: 85
 | 669 | PAN-2083 | M | low | ok |  | PAN-1592 | Composer: a failed first send leaves the text in BOTH the composer box and the retry outbox |
 | 670 | PAN-2082 | M | low | ok |  |  | Composer: a single send failure clears ALL in-flight optimistic bubbles (and strips siblings' compaction net) |
 | 671 | PAN-2074 | XS | low | ok |  |  | research: evaluate ponytail (DietrichGebert/ponytail) for prompt compression and consider building in-house |
-| 672 | PAN-2046 | M | low | ok |  |  | Conversation view does not surface terminal command responses |
+| 672 | PAN-2046 | M | low | stale |  |  | Conversation view does not surface terminal command responses |
 | 673 | PAN-2006 | M | low | ok |  |  | Pipeline semantics lock-down: Definition of Ready, pickup gates (parked/vetoed/blocks-main), unblock override, and Run definition |
 | 674 | PAN-3919 | S | low | needs-refinement |  |  | Review the universal effort-high default and supervisor effort discretion; explicitly an operator decision, no work authorized |
 | 675 | PAN-2005 | M | low | ok |  |  | Backlog Sequencer: Pickup Forecast |
@@ -1193,7 +1193,7 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-22T14:16:19.459854Z",
+  "generatedAt": "2026-09-22T17:26:51.713Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 858,
@@ -9562,9 +9562,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "size": "M",
       "importance": "low",
       "score": 25,
-      "condition": "ok",
+      "condition": "stale",
       "dependsOn": [],
       "why": "Conversation view does not surface terminal command responses",
+      "rationale": "Condition ok -> stale: crossed the 90-day age line this run (90.0 days) with no body or comment activity since 2026-06-24, and it describes conversation-view delivery feedback in a path substantially rebuilt by the Herdr terminal-backend work (PAN-3921, PAN-3962). Rank unchanged at 672 — staleness alone does not justify a move, and it already sits deep in the tail at low importance.",
       "gate": "auto",
       "planning": "auto"
     },
