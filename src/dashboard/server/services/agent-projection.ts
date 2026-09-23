@@ -350,9 +350,11 @@ async function applyConversationLifecycleEvent(
         return { applied: false, reason: 'respawn-pending' };
       }
       // An exit from a launch older than the newest one that reported
-      // session-started belongs to a harness already replaced.
+      // session-started belongs to a harness already replaced. Only a
+      // supervisor that predates `launchedAt` omits it, so once any launch
+      // has reported one, an exit without it is from an older launch.
       const latestLaunchMs = latestConversationLaunch.get(sessionId);
-      if (latestLaunchMs !== undefined && launchedAtMs < latestLaunchMs) {
+      if (latestLaunchMs !== undefined && (Number.isNaN(launchedAtMs) || launchedAtMs < latestLaunchMs)) {
         return { applied: false, reason: 'superseded-launch' };
       }
       const exitedAtMs = isoToMs(at);

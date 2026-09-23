@@ -274,6 +274,26 @@ describe('applyAgentLifecycleEventWithDeps for a supervised conversation (PAN-39
       expect(stale).toEqual({ applied: false, reason: 'superseded-launch' });
       expect(deps.markConversationEnded).not.toHaveBeenCalled();
     });
+
+    it('a late exit without launchedAt (pre-deploy supervisor) after a newer launch started is superseded', async () => {
+      const deps = makeConversationDeps();
+      const eventStore = makeEventStore();
+      const newLaunch = '2026-09-22T10:00:01.000Z';
+      await applyAgentLifecycleEventWithDeps(
+        eventStore, SESSION, { event: 'session-started', at: newLaunch, launchedAt: newLaunch }, deps,
+      );
+      // The old supervisor's retried exit lands after the respawn window closed,
+      // stamped later than the new launch.
+      const stale = await applyAgentLifecycleEventWithDeps(eventStore, SESSION, {
+        event: 'exited',
+        at: '2026-09-22T10:00:20.000Z',
+      }, deps);
+
+      expect(stale).toEqual({ applied: false, reason: 'superseded-launch' });
+      expect(deps.markConversationEnded).not.toHaveBeenCalled();
+      expect(deps.cleanupEndedConversation).not.toHaveBeenCalled();
+      expect(eventStore.appended.map((event) => (event['payload'] as { activity: string }).activity)).toEqual(['idle']);
+    });
   });
 
   it('an exit for a row something else already ended records the time but never re-runs cleanup (F3)', async () => {
