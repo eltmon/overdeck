@@ -48,6 +48,8 @@ async function runHook(): Promise<HookOutput> {
     const proc = spawn('bash', [hookPath], { stdio: ['pipe', 'pipe', 'pipe'] })
     let stdout = ''
     let stderr = ''
+    // A hook that exits before reading stdin makes this write EPIPE; the exit code is the answer.
+    proc.stdin.on('error', () => {})
     proc.stdin.write(payload)
     proc.stdin.end()
     proc.stdout.on('data', (chunk) => { stdout += chunk })

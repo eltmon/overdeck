@@ -37,6 +37,8 @@ function runHook(scriptDir: string, stdin: string, env: Record<string, string> =
     child.on('error', () => {
       resolve({ stdout, stderr, code: 1 })
     })
+    // A hook that exits before reading stdin makes this write EPIPE; the exit code is the answer.
+    child.stdin.on('error', () => {})
     if (stdin) child.stdin.write(stdin)
     child.stdin.end()
   })
