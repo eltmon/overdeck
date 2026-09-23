@@ -34,6 +34,12 @@ export interface VerificationArtifact {
   currentGateOutput?: string;
   failedCheck?: string;
   gates: VerificationGateRecord[];
+  /**
+   * PAN-3965: configured gates this run did NOT execute on the host because
+   * the project's tests run on CI (`verification.tests: ci`). The CI test job
+   * on the PR head is their gate.
+   */
+  deferredToCi?: string[];
   /** Immutable per-run file this artifact was written to — terminal writes only (PAN-3847). */
   path?: string;
 }
@@ -63,6 +69,8 @@ export function writeVerificationArtifact(
     /** Terminal writes: run-start timestamp + workspace head — write the immutable per-run file too. */
     ranAt?: string;
     head8?: string;
+    /** PAN-3965: gates handed to CI instead of run on the host. */
+    deferredToCi?: string[];
   },
 ): VerificationArtifact {
   const failed = gateResults.find((r) => !r.passed && r.required !== false);
@@ -89,6 +97,7 @@ export function writeVerificationArtifact(
       ...(r.passed ? {} : { output: r.output }),
       ...(r.error ? { error: r.error } : {}),
     })),
+    ...(options?.deferredToCi && options.deferredToCi.length > 0 ? { deferredToCi: [...options.deferredToCi] } : {}),
   };
   mkdirSync(join(workspacePath, '.overdeck'), { recursive: true });
   if (isRunWrite) {

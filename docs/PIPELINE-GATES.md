@@ -9,6 +9,47 @@ the agent can fix and retry. There is no separate stuck counter stored on a
 record — a run that keeps failing is visible directly in the PR's check
 history.
 
+### One full-suite run per push, on CI (PAN-3965)
+
+For a project with CI, the verification gate runs **typecheck and lint only**
+on the host (plus any other non-`test` gate the project declares, and the
+local test-skip diff check below). The quality gate named `test` is not run;
+the **CI test job on the PR head is the test gate**:
+
+- Merge readiness already requires the PR's checks green (`pr-facts.ts`
+  `evaluateMergeReadiness`); `PrFacts.testChecks` is the verdict over just the
+  test job (a check named `test`/`tests`, with or without a matrix suffix such
+  as `test (22)`).
+- A red CI test job reaches the work agent through
+  `src/lib/cloister/ci-failure-feedback.ts` (fired by the `check_run`,
+  `check_suite` and `status` webhooks). For a CI-mode project the relay reads
+  the PR's checks, and when the test job is red on the head the webhook
+  reported, it appends `verification.failed { failedCheck: 'test', via: 'ci' }`
+  to the pipeline journal (once per head) and messages the agent
+  `VERIFICATION FAILED … Failed check: test` with the rework re-drive contract.
+- The verification artifact lists only the gates that ran on the host and
+  names the handed-off gate in `deferredToCi: ["test"]`. The `overdeck/test`
+  status still posts (branch protection requires the context) with the
+  description "typecheck+lint; tests run on CI".
+
+`projects.yaml` chooses per project:
+
+```yaml
+verification:
+  tests: ci      # or: local
+```
+
+Unset, the mode is `ci` when the project has a `github_repo` and a
+`.github/workflows/` directory with at least one workflow (in the project root
+or a polyrepo member), else `local`. `local` keeps the `test` gate on the host
+exactly as before. The CI-failure relay is GitHub-webhook-driven, so a GitLab
+project that sets `tests: ci` gets the merge gate (a green pipeline) but no
+automatic agent feedback for a red test job.
+
+Work agents run only the tests they touched (`npx vitest run <files>`);
+reviewers never run the suite — they read the CI result on the head
+(`gh pr checks <pr>`).
+
 ## Verification artifacts (FR-8)
 
 Each verification run writes an immutable artifact named by run time and
@@ -55,8 +96,10 @@ Two escapes exist for a genuine net removal:
   `.skip`/`.only`, and it is operator-conversation-only — a pipeline agent
   cannot waive the coverage loss it just produced.
 
-CI runs vitest on every push; the `overdeck/test` commit status records only
-that the changed-file-scoped verification gate passed for the tested sha.
+The test-skip gate stays local in both modes: it is a diff check, not a test
+run. CI runs vitest on every push; the `overdeck/test` commit status records
+only that the verification gate passed for the tested sha (changed-file scope
+in `local` mode, typecheck+lint in `ci` mode).
 
 ## Verdict feedback routing
 
@@ -151,6 +194,7 @@ One piece of stored pipeline state came back, and it is not a status.
 | Type | Written by |
 | --- | --- |
 | `verification.started` / `.passed` / `.failed` | `cloister/verification-runner.ts`, at the start and at every outcome return |
+| `verification.failed` (`failedCheck: 'test'`, `via: 'ci'`) | `cloister/ci-failure-feedback.ts`, when a `verification.tests: ci` project's CI test job is red on the PR head (once per head) |
 | `review.requested` | `startRequestReviewPipeline` — the one door the HTTP route, `pan review request`, `pan done` and the PR webhook all pass through |
 | `review.dispatched` | `cloister/review-convoy.ts` `launchConvoyReviewersPromise`, once reviewers exist |
 | `review.redispatched` | deacon-lite's `recoverStalledReviews` |

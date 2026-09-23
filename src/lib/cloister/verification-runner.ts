@@ -3,7 +3,9 @@
  *
  * Runs quality gates (typecheck → lint → test by default, or project-specific
  * gates from projects.yaml), updates review status, writes feedback files,
- * and notifies the work agent on failure.
+ * and notifies the work agent on failure. PAN-3965: when the project's tests
+ * run on CI (`verification.tests`), the `test` gate is not run on the host —
+ * the CI test job on the PR head is the test gate.
  *
  * Extracted from dashboard/server to be independently testable.
  */
@@ -15,6 +17,7 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { runQualityGates, DEFAULT_GATES } from './validation.js';
+import { resolveVerificationTestsMode, selectLocalVerificationGates } from './verification-tests-mode.js';
 import {
   readVerificationArtifact,
   verificationArtifactPath,
@@ -518,11 +521,18 @@ async function runVerificationForIssuePromise(
     if (postSyncMergedOutcome) return postSyncMergedOutcome;
 
     // Load project-specific gates or fall back to defaults
-    const gates =
+    const configuredGates =
       projectConfig?.quality_gates && Object.keys(projectConfig.quality_gates).length > 0
         ? projectConfig.quality_gates
         : DEFAULT_GATES;
-    console.log(`[${logPrefix}] Project: ${projectConfig?.name || 'NOT FOUND'}, gates: [${Object.keys(gates).join(', ')}], workspace: ${workspacePath}`);
+    // PAN-3965: one full-suite run per push, on CI. In `ci` mode the `test`
+    // gate is not run here; the CI test job on the PR head is the test gate,
+    // merge readiness requires it green, and a red run reaches the agent
+    // through ci-failure-feedback.
+    const testsMode = resolveVerificationTestsMode(projectConfig);
+    const { gates, deferredToCi } = selectLocalVerificationGates(configuredGates, testsMode);
+    const artifactExtras = deferredToCi.length > 0 ? { deferredToCi } : {};
+    console.log(`[${logPrefix}] Project: ${projectConfig?.name || 'NOT FOUND'}, gates: [${Object.keys(gates).join(', ')}], tests: ${testsMode}${deferredToCi.length > 0 ? ` (deferred to CI: ${deferredToCi.join(', ')})` : ''}, workspace: ${workspacePath}`);
 
     // Build template placeholders for container name resolution
     const featureFolder = basename(workspacePath);  // e.g., 'feature-min-574'
@@ -599,6 +609,7 @@ async function runVerificationForIssuePromise(
         writeVerificationArtifact(workspacePath, issueId, liveGateResults, {
           currentGate: liveGateName,
           currentGateOutput: liveGateTail || undefined,
+          ...artifactExtras,
         });
       } catch { /* best-effort */ }
     };
@@ -701,6 +712,7 @@ async function runVerificationForIssuePromise(
       const finalArtifact = writeVerificationArtifact(workspacePath, issueId, gateResults, {
         ranAt: runStartedAt,
         ...(head8 ? { head8 } : {}),
+        ...artifactExtras,
       });
       runArtifactPath = finalArtifact.path;
     } catch (artifactErr: any) {
@@ -940,7 +952,18 @@ async function runVerificationForIssuePromise(
     const prePassMergedOutcome = await skipMergedVerification(issueId, logPrefix);
     if (prePassMergedOutcome) return prePassMergedOutcome;
 
-    await reportVerificationCheckRun(workspacePath, issueId, headShort, 'success', 'verification gate passed', 'Every required gate passed (changed-file scope).', logPrefix);
+    const testsOnCi = testsMode === 'ci';
+    await reportVerificationCheckRun(
+      workspacePath,
+      issueId,
+      headShort,
+      'success',
+      'verification gate passed',
+      testsOnCi
+        ? 'Every required local gate passed; the test gate is the CI test job on this head (PAN-3965).'
+        : 'Every required gate passed (changed-file scope).',
+      logPrefix,
+    );
     // PAN-3847 (FR-10), re-pointed by PAN-3917: a verification pass lifts the
     // pause escalateVerificationStuck set. There is no stuck flag left to clear
     // — the pause IS the state, and the gate that set it clears it.
@@ -988,7 +1011,10 @@ async function runVerificationForIssuePromise(
         if (!repo || !repo.includes('/')) return;
         const [owner, name] = repo.split('/');
         const { postOverdeckTestsStatus } = await import('../github-app.js');
-        await postOverdeckTestsStatus(workspacePath, owner!, name!, 'success', 'Verification gate passed (changed-file scope)', verifiedSha);
+        const description = testsOnCi
+          ? 'Verification gate passed (typecheck+lint; tests run on CI)'
+          : 'Verification gate passed (changed-file scope)';
+        await postOverdeckTestsStatus(workspacePath, owner!, name!, 'success', description, verifiedSha);
       } catch (err: any) {
         console.warn(`[${logPrefix}] Failed to post overdeck/tests status: ${err.message}`);
       }

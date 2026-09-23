@@ -21,6 +21,7 @@ import { promisify } from 'node:util';
 import { listOpenGitLabMergeRequests, type GitLabMergeRequestRow } from '../gitlab-merge-requests.js';
 import { fetchIssuePullRequest, type IssuePullRequestData } from '../overdeck/pull-requests.js';
 import { resolveProjectReposForIssueSync, type ResolvedProjectRepo } from '../project-repos.js';
+import { isCiTestCheckName } from './verification-tests-mode.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -51,6 +52,12 @@ export interface PrFacts {
   mergeable: boolean | null;
   mergeableState: string | null;
   checks: ChecksVerdict;
+  /**
+   * PAN-3965: the verdict over just the CI test job's checks (`test`, `test (22)`).
+   * With `verification.tests: ci` this is the verification gate's test gate.
+   * GitLab reports one pipeline verdict, not per-job checks, so it is `none` there.
+   */
+  testChecks: ChecksVerdict;
   /** Set when the forge lookup itself failed; every flag is then conservative. */
   error?: string;
 }
@@ -120,6 +127,7 @@ export function emptyPrFacts(issueId: string, error?: string): PrFacts {
     mergeable: null,
     mergeableState: null,
     checks: 'none',
+    testChecks: 'none',
     ...(error ? { error } : {}),
   };
 }
@@ -148,6 +156,13 @@ export function summarizeStatusCheckRollup(
   if (failed) return 'red';
   if (pending) return 'pending';
   return 'green';
+}
+
+/** PAN-3965: the verdict over only the CI test job's checks. */
+export function summarizeTestChecks(
+  rollup: IssuePullRequestData['statusCheckRollup'] | null | undefined,
+): ChecksVerdict {
+  return summarizeStatusCheckRollup((rollup ?? []).filter((check) => isCiTestCheckName(check.name)));
 }
 
 /** Epoch ms of the PR's head commit, used to age out a stale approval marker. */
@@ -210,6 +225,7 @@ function gitHubFacts(issueId: string, pr: IssuePullRequestData): PrFacts {
     mergeable: mergeable === 'MERGEABLE' ? true : mergeable === 'CONFLICTING' ? false : null,
     mergeableState: pr.mergeable ? pr.mergeable.toLowerCase() : null,
     checks: summarizeStatusCheckRollup(pr.statusCheckRollup),
+    testChecks: summarizeTestChecks(pr.statusCheckRollup),
   };
 }
 
@@ -270,6 +286,7 @@ function gitLabFacts(issueId: string, row: GitLabMergeRequestRow, view: GitLabMr
     mergeable,
     mergeableState: detailed ?? view?.merge_status ?? null,
     checks: view ? gitLabChecks(view) : 'none',
+    testChecks: 'none',
   };
 }
 

@@ -9,14 +9,21 @@
  * - Fetches failed log excerpts with `gh run view --log-failed`.
  * - Diff's the PR's failing check names against main's current failing set so
  *   inherited main-red failures are labelled as such.
+ * - PAN-3965: for a project whose tests run on CI (`verification.tests: ci`),
+ *   a red CI test job on the PR head IS the verification gate's test failure.
+ *   It is journaled as `verification.failed { failedCheck: 'test' }` — same
+ *   shape the local gate writes — and the agent is told it owes rework.
  */
 
 import { execFile } from 'node:child_process';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 import { getAgentStateSync, messageAgent } from '../agents.js';
-import { resolveProjectFromIssueSync } from '../projects.js';
+import { findProjectByPathSync, resolveProjectFromIssueSync } from '../projects.js';
 import { writeFeedbackFile } from './feedback-writer.js';
+import { appendPipelineEntry } from './pipeline-journal.js';
+import type { PrFacts } from './pr-facts.js';
+import { resolveVerificationTestsMode, TEST_GATE_NAME } from './verification-tests-mode.js';
 
 function execFilePromise(
   file: string,
@@ -55,14 +62,84 @@ export interface CiFailure {
 export interface CiFailureFeedbackResult {
   feedbackPath?: string;
   agentMessageSent: boolean;
+  /** PAN-3965: the CI test job — the verification test gate — failed on this head. */
+  testGateFailed?: boolean;
+}
+
+export interface CiFailureFeedbackDeps {
+  /** Fresh forge read of the PR; defaults to an uncached `getPrFacts`. */
+  readPrFacts?: (issueId: string) => Promise<PrFacts>;
 }
 
 /** Per-issue head SHA we last sent CI failure feedback for. */
 const lastNotifiedSha = new Map<string, string>();
+/** Per-issue head SHA we last journaled a CI test-gate failure for. */
+const lastJournaledTestFailureSha = new Map<string, string>();
 
 /** Reset internal debounce state — for tests only. */
 export function resetCiFailureFeedbackStateForTests(): void {
   lastNotifiedSha.clear();
+  lastJournaledTestFailureSha.clear();
+}
+
+/**
+ * Webhooks bump the PR-tab cache generation before relaying, so passing the
+ * PR reader explicitly skips pr-facts' 60s memo without re-reading stale data.
+ */
+async function readFreshPrFacts(issueId: string): Promise<PrFacts> {
+  // Lazy: the forge readers pull in the GitHub App client, which only this
+  // CI-mode branch needs.
+  const [{ getPrFacts }, { fetchIssuePullRequest }] = await Promise.all([
+    import('./pr-facts.js'),
+    import('../overdeck/pull-requests.js'),
+  ]);
+  return getPrFacts(issueId, { fetchGitHubPr: fetchIssuePullRequest });
+}
+
+/**
+ * PAN-3965: when the project's tests run on CI and the PR head's test job is
+ * red, record the verification test-gate failure in the pipeline journal.
+ * Returns true when this failure is the test gate's.
+ */
+async function recordCiTestGateFailure(
+  issueId: string,
+  opts: CiFailureFeedbackOptions,
+  projectPath: string | undefined,
+  workspacePath: string | undefined,
+  deps: CiFailureFeedbackDeps,
+): Promise<boolean> {
+  if (!projectPath) return false;
+  if (resolveVerificationTestsMode(findProjectByPathSync(projectPath)) !== 'ci') return false;
+  if (lastJournaledTestFailureSha.get(issueId) === opts.headSha) return true;
+
+  let facts: PrFacts;
+  try {
+    facts = await (deps.readPrFacts ?? readFreshPrFacts)(issueId);
+  } catch (err) {
+    console.warn(
+      `[ci-failure-feedback] Could not read PR checks for ${issueId}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return false;
+  }
+  if (facts.testChecks !== 'red') return false;
+  // A late webhook for an older head is not a verdict on the current one.
+  if (facts.headSha && facts.headSha !== opts.headSha) return false;
+
+  if (workspacePath) {
+    appendPipelineEntry(workspacePath, {
+      type: 'verification.failed',
+      issueId,
+      source: `ci:${opts.source}`,
+      data: {
+        failedCheck: TEST_GATE_NAME,
+        head: opts.headSha.slice(0, 8),
+        via: 'ci',
+        prNumber: opts.prNumber,
+      },
+    });
+  }
+  lastJournaledTestFailureSha.set(issueId, opts.headSha);
+  return true;
 }
 
 function agentIdForIssue(issueId: string): string {
@@ -163,6 +240,7 @@ function buildFeedbackBody(opts: {
   prUrl?: string;
   failures: CiFailure[];
   source: string;
+  testGateFailed?: boolean;
 }): string {
   const shortSha = opts.headSha.slice(0, 8);
   const prLine = opts.prUrl
@@ -170,6 +248,11 @@ function buildFeedbackBody(opts: {
     : `Pull request #${opts.prNumber} in ${opts.repo} (head \`${shortSha}\`)`;
 
   let body = `# CI Failure Feedback for ${opts.issueId}\n\n${prLine}\n\nSource: ${opts.source}\n\n`;
+  if (opts.testGateFailed) {
+    body +=
+      'Failed check: test — this project runs its tests on CI (`verification.tests: ci`), so the CI test job ' +
+      'is the verification test gate. Reproduce with `npx vitest run <failing files>`; do not run the full suite locally.\n\n';
+  }
 
   if (opts.failures.length === 0) {
     body +=
@@ -200,22 +283,33 @@ function buildFeedbackBody(opts: {
 
 async function relayCiFailureFeedbackPromise(
   opts: CiFailureFeedbackOptions,
+  deps: CiFailureFeedbackDeps = {},
 ): Promise<CiFailureFeedbackResult> {
   const issueId = opts.issueId.toUpperCase();
+
+  const resolved = resolveProjectFromIssueSync(issueId);
+  const workspacePath = resolved
+    ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`)
+    : undefined;
+
+  // PAN-3965: journal a CI test-gate failure whether or not an agent is live —
+  // the journal records what happened to the PR, not who was told.
+  const testGateFailed = await recordCiTestGateFailure(issueId, opts, resolved?.projectPath, workspacePath, deps);
+  const testGateFlag = testGateFailed ? { testGateFailed: true } : {};
 
   // Only relay for work agents. The feedback file/message would not be useful
   // for plan/review/test/ship/strike roles.
   const agentId = agentIdForIssue(issueId);
   const agentState = getAgentStateSync(agentId);
   if (!agentState || agentState.role !== 'work') {
-    return { agentMessageSent: false };
+    return { agentMessageSent: false, ...testGateFlag };
   }
 
   // Debounce per head SHA so duplicate webhook deliveries / retries do not spam.
   const lastSha = lastNotifiedSha.get(issueId);
   if (lastSha === opts.headSha) {
     console.log(`[ci-failure-feedback] Skipping duplicate feedback for ${issueId} @ ${opts.headSha.slice(0, 8)}`);
-    return { agentMessageSent: false };
+    return { agentMessageSent: false, ...testGateFlag };
   }
 
   const { owner, repo } = parseRepo(opts.repo);
@@ -238,13 +332,8 @@ async function relayCiFailureFeedbackPromise(
     console.log(
       `[ci-failure-feedback] No failing runs found for ${issueId} @ ${opts.headSha.slice(0, 8)}; skipping feedback`,
     );
-    return { agentMessageSent: false };
+    return { agentMessageSent: false, ...testGateFlag };
   }
-
-  const resolved = resolveProjectFromIssueSync(issueId);
-  const workspacePath = resolved
-    ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`)
-    : undefined;
 
   const markdownBody = buildFeedbackBody({
     issueId,
@@ -254,6 +343,7 @@ async function relayCiFailureFeedbackPromise(
     prUrl: opts.prUrl,
     failures,
     source: opts.source,
+    testGateFailed,
   });
 
   const fileResult = await Effect.runPromise(
@@ -269,17 +359,35 @@ async function relayCiFailureFeedbackPromise(
 
   if (!fileResult.success || !fileResult.filePath) {
     console.error(`[ci-failure-feedback] Failed to write feedback for ${issueId}: ${fileResult.error}`);
-    return { agentMessageSent: false };
+    return { agentMessageSent: false, ...testGateFlag };
   }
 
   let agentMessageSent = false;
-  const message =
-    `SPECIALIST FEEDBACK: ci-monitor reported CI FAILED for ${issueId}.\n\n` +
-    `MUST READ: ${fileResult.filePath}\n\n` +
-    'Use your Read tool to open this file, read every line, then fix ALL failing checks. Do NOT stop at the prompt.';
+  const message = testGateFailed
+    ? `VERIFICATION FAILED for ${issueId}.\nFailed check: ${TEST_GATE_NAME} — the CI test job failed on PR head ${opts.headSha.slice(0, 8)}.\n\n` +
+      `MUST READ: ${fileResult.filePath}\n\n` +
+      'Use your Read tool to open this file, read every line, reproduce each failure with `npx vitest run <failing files>`, ' +
+      'fix it, commit, and invoke /rebase-and-submit. Do NOT stop at the prompt.'
+    : `SPECIALIST FEEDBACK: ci-monitor reported CI FAILED for ${issueId}.\n\n` +
+      `MUST READ: ${fileResult.filePath}\n\n` +
+      'Use your Read tool to open this file, read every line, then fix ALL failing checks. Do NOT stop at the prompt.';
   try {
-    await messageAgent(agentId, message);
-    agentMessageSent = true;
+    // PAN-3965: a red CI test job is the test gate failing, so the agent owes
+    // rework — the same re-drive contract as local verification feedback.
+    const outcome = await messageAgent(
+      agentId,
+      message,
+      'internal',
+      testGateFailed ? { owesRework: true, feedbackRedelivery: true } : {},
+    );
+    // messageAgent reports a failed delivery as `delivered: false` rather than
+    // throwing (PR #3874), so success is the outcome, not the absence of a throw.
+    agentMessageSent = outcome?.delivered === true;
+    if (!agentMessageSent) {
+      console.warn(
+        `[ci-failure-feedback] Message to ${agentId} was not delivered (${outcome?.reason ?? 'no delivery outcome'}); feedback file remains at ${fileResult.filePath}`,
+      );
+    }
   } catch (err) {
     console.warn(
       `[ci-failure-feedback] Could not message ${agentId}; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`,
@@ -287,10 +395,11 @@ async function relayCiFailureFeedbackPromise(
   }
 
   lastNotifiedSha.set(issueId, opts.headSha);
-  return { feedbackPath: fileResult.filePath, agentMessageSent };
+  return { feedbackPath: fileResult.filePath, agentMessageSent, ...testGateFlag };
 }
 
 /** Effect variant of {@link relayCiFailureFeedbackPromise}. */
 export const relayCiFailureFeedback = (
   opts: CiFailureFeedbackOptions,
-): Effect.Effect<CiFailureFeedbackResult> => Effect.promise(() => relayCiFailureFeedbackPromise(opts));
+  deps: CiFailureFeedbackDeps = {},
+): Effect.Effect<CiFailureFeedbackResult> => Effect.promise(() => relayCiFailureFeedbackPromise(opts, deps));

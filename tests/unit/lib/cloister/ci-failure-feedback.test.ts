@@ -2,9 +2,14 @@
  * Tests for ci-failure-feedback.ts (PAN-1801)
  */
 import { execFile } from 'node:child_process';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Effect } from 'effect';
 import { relayCiFailureFeedback, resetCiFailureFeedbackStateForTests } from '../../../../src/lib/cloister/ci-failure-feedback.js';
+import { readPipelineJournal } from '../../../../src/lib/cloister/pipeline-journal.js';
+import type { PrFacts } from '../../../../src/lib/cloister/pr-facts.js';
 
 vi.mock('node:child_process', () => ({
   execFile: vi.fn(),
@@ -19,9 +24,11 @@ vi.mock('../../../../src/lib/agents.js', () => ({
 }));
 
 const mockResolveProjectFromIssueSync = vi.fn();
+const mockFindProjectByPathSync = vi.fn();
 
 vi.mock('../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssueSync: (...args: Parameters<typeof mockResolveProjectFromIssueSync>) => mockResolveProjectFromIssueSync(...args),
+  findProjectByPathSync: (...args: Parameters<typeof mockFindProjectByPathSync>) => mockFindProjectByPathSync(...args),
 }));
 
 const mockWriteFeedbackFile = vi.fn();
@@ -74,7 +81,9 @@ beforeEach(() => {
     filePath: '/tmp/overdeck/workspaces/feature-pan-1801/.pan/feedback/001-ci-monitor-failed.md',
     relativePath: '.pan/feedback/001-ci-monitor-failed.md',
   }));
-  mockMessageAgent.mockResolvedValue(undefined);
+  mockMessageAgent.mockResolvedValue({ delivered: true, queuedToMail: false });
+  // No project config → the local test gate; the CI test-gate path stays off.
+  mockFindProjectByPathSync.mockReturnValue(null);
 });
 
 afterEach(() => {
@@ -131,6 +140,8 @@ describe('relayCiFailureFeedback', () => {
     expect(mockMessageAgent).toHaveBeenCalledWith(
       'agent-pan-1801',
       expect.stringContaining('SPECIALIST FEEDBACK: ci-monitor reported CI FAILED for PAN-1801'),
+      'internal',
+      {},
     );
     expect(mockWriteFeedbackFile).toHaveBeenCalledWith(expect.objectContaining({
       issueId: 'PAN-1801',
@@ -339,5 +350,139 @@ describe('relayCiFailureFeedback', () => {
 
     expect(result.agentMessageSent).toBe(false);
     expect(mockWriteFeedbackFile).not.toHaveBeenCalled();
+  });
+});
+
+describe('PAN-3965: the CI test job is the verification test gate', () => {
+  let projectPath: string;
+  let workspacePath: string;
+
+  const relayOpts = {
+    issueId: 'PAN-1801',
+    repo: 'test-owner/test-repo',
+    prNumber: 42,
+    headSha: 'abc123def456',
+    headRef: 'feature/pan-1801',
+    prUrl: 'https://github.com/test-owner/test-repo/pull/42',
+    source: 'check_run:test',
+  };
+
+  function facts(overrides: Partial<PrFacts>): PrFacts {
+    return {
+      issueId: 'PAN-1801', forge: 'github', url: relayOpts.prUrl, number: 42,
+      exists: true, open: true, merged: false, closed: false, draft: false,
+      headSha: 'abc123def456', headBranch: 'feature/pan-1801',
+      reviewDecision: null, approved: false, changesRequested: false,
+      mergeable: true, mergeableState: 'mergeable', checks: 'green', testChecks: 'green',
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    projectPath = mkdtempSync(join(tmpdir(), 'pan-3965-ci-'));
+    workspacePath = join(projectPath, 'workspaces', 'feature-pan-1801');
+    mkdirSync(workspacePath, { recursive: true });
+    mockResolveProjectFromIssueSync.mockReturnValue({ projectKey: 'overdeck', projectName: 'Overdeck', projectPath });
+    mockFindProjectByPathSync.mockReturnValue({ name: 'Overdeck', path: projectPath, verification: { tests: 'ci' } });
+  });
+
+  afterEach(() => {
+    rmSync(projectPath, { recursive: true, force: true });
+  });
+
+  it('journals verification.failed { failedCheck: test } and tells the agent it owes rework', async () => {
+    makeGhMocks();
+    const readPrFacts = vi.fn(async () => facts({ checks: 'red', testChecks: 'red' }));
+
+    const result = await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts }));
+
+    expect(result.testGateFailed).toBe(true);
+    expect(result.agentMessageSent).toBe(true);
+    const failed = readPipelineJournal(workspacePath).filter((entry) => entry.type === 'verification.failed');
+    expect(failed).toHaveLength(1);
+    expect(failed[0]).toMatchObject({
+      issueId: 'PAN-1801',
+      source: 'ci:check_run:test',
+      data: { failedCheck: 'test', head: 'abc123de', via: 'ci', prNumber: 42 },
+    });
+    expect(mockMessageAgent).toHaveBeenCalledWith(
+      'agent-pan-1801',
+      expect.stringContaining('Failed check: test'),
+      'internal',
+      { owesRework: true, feedbackRedelivery: true },
+    );
+    expect(mockWriteFeedbackFile).toHaveBeenCalledWith(expect.objectContaining({
+      markdownBody: expect.stringContaining('the CI test job is the verification test gate'),
+    }));
+  });
+
+  it('journals once per head even when several webhooks report the same red test job', async () => {
+    makeGhMocks();
+    const readPrFacts = vi.fn(async () => facts({ checks: 'red', testChecks: 'red' }));
+
+    await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts }));
+    await Effect.runPromise(relayCiFailureFeedback({ ...relayOpts, source: 'check_suite' }, { readPrFacts }));
+
+    expect(readPipelineJournal(workspacePath).filter((entry) => entry.type === 'verification.failed')).toHaveLength(1);
+    expect(mockMessageAgent).toHaveBeenCalledTimes(1);
+  });
+
+  it('journals the failure even when no work agent is live to tell', async () => {
+    mockGetAgentStateSync.mockReturnValue(null);
+    const readPrFacts = vi.fn(async () => facts({ checks: 'red', testChecks: 'red' }));
+
+    const result = await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts }));
+
+    expect(result).toEqual({ agentMessageSent: false, testGateFailed: true });
+    expect(readPipelineJournal(workspacePath).map((entry) => entry.type)).toEqual(['verification.failed']);
+  });
+
+  it('does not journal a test failure when only a non-test check is red', async () => {
+    makeGhMocks();
+    const readPrFacts = vi.fn(async () => facts({ checks: 'red', testChecks: 'green' }));
+
+    const result = await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts }));
+
+    expect(result.testGateFailed).toBeUndefined();
+    expect(readPipelineJournal(workspacePath)).toEqual([]);
+    expect(mockMessageAgent).toHaveBeenCalledWith(
+      'agent-pan-1801',
+      expect.stringContaining('SPECIALIST FEEDBACK'),
+      'internal',
+      {},
+    );
+  });
+
+  it('ignores a red test job reported for a head the PR has moved past', async () => {
+    makeGhMocks();
+    const readPrFacts = vi.fn(async () => facts({ headSha: 'newer0000000', checks: 'red', testChecks: 'red' }));
+
+    const result = await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts }));
+
+    expect(result.testGateFailed).toBeUndefined();
+    expect(readPipelineJournal(workspacePath)).toEqual([]);
+  });
+
+  it('leaves a verification.tests: local project to the local gate', async () => {
+    makeGhMocks();
+    mockFindProjectByPathSync.mockReturnValue({ name: 'Overdeck', path: projectPath, verification: { tests: 'local' } });
+    const readPrFacts = vi.fn(async () => facts({ checks: 'red', testChecks: 'red' }));
+
+    const result = await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts }));
+
+    expect(readPrFacts).not.toHaveBeenCalled();
+    expect(result.testGateFailed).toBeUndefined();
+    expect(readPipelineJournal(workspacePath)).toEqual([]);
+  });
+
+  it('reports the message as unsent when delivery is refused', async () => {
+    makeGhMocks();
+    mockMessageAgent.mockResolvedValue({ delivered: false, queuedToMail: false, reason: 'pane gone' });
+    const readPrFacts = vi.fn(async () => facts({ checks: 'red', testChecks: 'red' }));
+
+    const result = await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts }));
+
+    expect(result.agentMessageSent).toBe(false);
+    expect(result.testGateFailed).toBe(true);
   });
 });
