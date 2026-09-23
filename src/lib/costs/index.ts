@@ -15,14 +15,6 @@ export {
   deduplicateEventsSync,
   eventsFileExists,
   getEventsFilePath,
-  // Effect variants (PAN-1249)
-  appendCostEvent,
-  readEvents,
-  tailEvents,
-  readEventsFromLine,
-  getLastEventMetadata,
-  replaceEventsFile,
-  deduplicateEvents,
   type CostEvent,
   type EventMetadata,
   type ReadEventsOptions,
@@ -39,15 +31,6 @@ export {
   getCostsForIssueSync,
   setIssueBudgetSync,
   getCacheStatus,
-  // Effect variants (PAN-1249)
-  loadCache,
-  saveCache,
-  updateCacheFromEvents,
-  rebuildCache,
-  syncCache,
-  getCostsByIssue,
-  getCostsForIssue,
-  setIssueBudget,
   type CostCache,
   type IssueStats,
   type ModelStats,
@@ -60,9 +43,7 @@ export {
   needsMigrationSync,
   migrateIfNeededSync,
   // Effect variants (PAN-1249)
-  migrateAllSessions,
   needsMigration,
-  migrateIfNeeded,
   type MigrationStats,
 } from './migration.js';
 
@@ -78,9 +59,7 @@ export {
   needsPruningSync,
   getRetentionStatusSync,
   // Effect variants (PAN-1249)
-  pruneOldEvents,
   needsPruning,
-  getRetentionStatus,
   type RetentionStats,
 } from './retention.js';
 

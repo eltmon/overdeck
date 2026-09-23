@@ -10,21 +10,19 @@
  *   1. `OVERDECK_INTERNAL_TOKEN` env var (preferred for tests / explicit setup)
  *   2. `<OVERDECK_HOME>/internal-token` (auto-generated on first server start)
  *
- * The dashboard server calls `ensureInternalToken()` once at startup, which
+ * The dashboard server calls `ensureInternalTokenSync()` once at startup, which
  * generates a random token and persists it with mode 0600 if neither source is
  * present. CLI processes (running as the same user) read it via
- * `getInternalToken()` and attach it as the `X-Overdeck-Internal-Token`
+ * `getInternalTokenSync()` and attach it as the `X-Overdeck-Internal-Token`
  * header. If the CLI cannot resolve a token (e.g. dashboard never started),
- * `notifyPipeline()` skips the cross-process forward — the SQLite write is
+ * `notifyPipelineSync()` skips the cross-process forward — the SQLite write is
  * already durable, so no domain event is ever lost.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
-import { Effect } from 'effect';
 
 import { getOverdeckHome } from './paths.js';
-import { FsError } from './errors.js';
 
 export const INTERNAL_TOKEN_HEADER = 'x-overdeck-internal-token';
 const TOKEN_FILE_NAME = 'internal-token';
@@ -103,24 +101,3 @@ export function ensureInternalTokenSync(): string {
 export function _resetInternalTokenCacheForTests(): void {
   cachedToken = undefined;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Effect-native variant of getInternalToken. Returns the resolved token or
- * null; never fails — read errors collapse to null like the underlying
- * function. Wrapped to compose with Effect call sites.
- */
-export const getInternalToken = (): Effect.Effect<string | null, never> =>
-  Effect.sync(() => getInternalTokenSync());
-
-/**
- * Effect-native variant of ensureInternalToken. Fails with FsError if the
- * overdeck home directory or token file cannot be written.
- */
-export const ensureInternalToken = (): Effect.Effect<string, FsError> =>
-  Effect.try({
-    try: () => ensureInternalTokenSync(),
-    catch: (cause) =>
-      new FsError({ path: tokenFilePath(), operation: 'ensureInternalToken', cause }),
-  });

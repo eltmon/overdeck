@@ -509,23 +509,9 @@ export function migrateIfNeededSync(): MigrationStats | null {
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
-/** Effect variant of migrateAllSessions. Failures surface as FsError. */
-export const migrateAllSessions = (): Effect.Effect<MigrationStats, FsError> =>
-  Effect.try({
-    try: () => migrateAllSessionsSync(),
-    catch: (cause) => new FsError({ path: '<all sessions>', operation: 'migrateAllSessions', cause }),
-  });
-
 /** Effect variant of needsMigration. */
 export const needsMigration = (): Effect.Effect<boolean, FsError> =>
   Effect.try({
     try: () => needsMigrationSync(),
     catch: (cause) => new FsError({ path: '<events>', operation: 'needsMigration', cause }),
-  });
-
-/** Effect variant of migrateIfNeeded. */
-export const migrateIfNeeded = (): Effect.Effect<MigrationStats | null, FsError> =>
-  Effect.try({
-    try: () => migrateIfNeededSync(),
-    catch: (cause) => new FsError({ path: '<all sessions>', operation: 'migrateIfNeeded', cause }),
   });

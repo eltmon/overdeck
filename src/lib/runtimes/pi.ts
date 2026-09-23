@@ -12,7 +12,7 @@
  * Spawn flow:
  *   1. mkdir agent dir
  *   2. createPiFifo
- *   3. write launcher.sh via generateLauncherScript({ harness: 'pi', ... })
+ *   3. write launcher.sh via generateLauncherScriptSync({ harness: 'pi', ... })
  *   4. tmux new-session running launcher.sh
  *   5. wait for ~/.overdeck/agents/<id>/ready.json (max 30s)
  *

@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { deleteReleaseSet as dbDelete, getAllReleaseSetsFromDb, getReleaseSetFromDb, upsertReleaseSet as dbUpsert } from './overdeck/release-sync.js';
 import { resolveIssueIdSync } from './issue-id.js';
 import type {
@@ -51,34 +50,3 @@ export function withComponentStateSync(
     )),
   };
 }
-
-export const upsertReleaseSet = (releaseSet: ReleaseSet): Effect.Effect<void, Error> =>
-  Effect.try({
-    try: () => upsertReleaseSetSync(releaseSet),
-    catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
-  });
-
-export const getReleaseSet = (issueId: string): Effect.Effect<ReleaseSet | null, Error> =>
-  Effect.try({
-    try: () => getReleaseSetSync(issueId),
-    catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
-  });
-
-export const getAllReleaseSets = (projectKey?: string): Effect.Effect<ReleaseSet[], Error> =>
-  Effect.try({
-    try: () => getAllReleaseSetsSync(projectKey),
-    catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
-  });
-
-export const deleteReleaseSet = (issueId: string): Effect.Effect<void, Error> =>
-  Effect.try({
-    try: () => deleteReleaseSetSync(issueId),
-    catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
-  });
-
-export const withComponentState = (
-  releaseSet: ReleaseSet,
-  componentKey: string,
-  patch: Partial<ReleaseComponentState>,
-): Effect.Effect<ReleaseSet> =>
-  Effect.sync(() => withComponentStateSync(releaseSet, componentKey, patch));

@@ -163,39 +163,3 @@ export const createPiFifo = (
         cause,
       }),
   })
-
-/**
- * Effect variant of `writePiCommand`. Lifts the sync FD ops via `Effect.try`.
- * The PiNotReady signal is preserved in the cause field so callers can branch.
- */
-export const writePiCommand = (
-  agentId: string,
-  command: unknown,
-  home?: string,
-): Effect.Effect<void, PiFifoError> =>
-  Effect.try({
-    try: () => writePiCommandSync(agentId, command, home),
-    catch: (cause) =>
-      new PiFifoError({
-        agentId,
-        stage: 'write',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  })
-
-/** Effect variant of `destroyPiFifo`. */
-export const destroyPiFifo = (
-  agentId: string,
-  home?: string,
-): Effect.Effect<void, PiFifoError> =>
-  Effect.try({
-    try: () => destroyPiFifoSync(agentId, home),
-    catch: (cause) =>
-      new PiFifoError({
-        agentId,
-        stage: 'destroy',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  })

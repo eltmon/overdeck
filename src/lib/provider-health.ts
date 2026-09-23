@@ -300,7 +300,3 @@ export const validateProviderHealth = (
       });
     },
   });
-
-/** Effect variant of {@link invalidateProbeCacheSync}. Pure cache mutation; cannot fail. */
-export const invalidateProbeCache = (provider?: string): Effect.Effect<void, never> =>
-  Effect.sync(() => invalidateProbeCacheSync(provider));

@@ -482,9 +482,3 @@ export const handleStatus = (
     try: () => handleStatusPromise(payload),
     catch: (cause) => toGhError('handleStatus', cause),
   });
-
-/** True if the repo is in the cached tracked-repos allowlist. Pure. */
-export const isTrackedRepository = (
-  fullName: string | undefined,
-): Effect.Effect<boolean> =>
-  Effect.sync(() => isTrackedRepositorySync(fullName));

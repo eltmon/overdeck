@@ -8,8 +8,6 @@
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { Effect } from 'effect';
-import { FsError } from './errors.js';
 
 /**
  * Path to the Overdeck environment file
@@ -126,21 +124,3 @@ export function hasEnvFile(): boolean {
 export function getEnvFilePath(): string {
   return ENV_FILE_PATH;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Effect-native version of loadOverdeckEnv. Mutates process.env as a side
- * effect (like the original). Fails with FsError if the env file is present
- * but unreadable; missing file is reported via the loaded/skipped/error
- * payload, not via the typed error channel.
- */
-export const loadOverdeckEnv = (): Effect.Effect<
-  { loaded: string[]; skipped: string[]; error?: string },
-  FsError
-> =>
-  Effect.try({
-    try: () => loadOverdeckEnvSync(),
-    catch: (cause) =>
-      new FsError({ path: ENV_FILE_PATH, operation: 'loadOverdeckEnv', cause }),
-  });

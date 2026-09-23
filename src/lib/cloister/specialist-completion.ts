@@ -107,13 +107,6 @@ export function reportSpecialistCompletion(
 }
 
 /**
- * Check if there's a pending waiter for an issue.
- */
-export function hasPendingCompletion(issueId: string): Effect.Effect<boolean> {
-  return Effect.sync(() => _pendingCompletions.has(issueId.toUpperCase()));
-}
-
-/**
  * Cancel all pending completions (e.g., on server shutdown).
  */
 export function cancelAllPendingCompletions(): Effect.Effect<void> {

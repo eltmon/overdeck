@@ -1,5 +1,4 @@
 import { museDataHome } from './runtimes/muse-session.js';
-import { Effect } from 'effect';
 import { prepareClaudeContext } from './launcher-context.js';
 import { dirname, join } from 'node:path';
 import type { Role } from './agents.js';
@@ -998,16 +997,6 @@ export function buildPiCommand(config: LauncherConfig, useExec: boolean): string
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 // Pure-sync launcher emission — additive Effect.sync wrappers.
-
-/** Build the bash launcher script body for a Cloister role spawn. Pure. */
-export const generateLauncherScript = (
-  config: LauncherConfig,
-): Effect.Effect<string> => Effect.sync(() => generateLauncherScriptSync(config));
-
-/** Build an optional launcher wrapper (returns null when not needed). Pure. */
-export const generateLauncherWrapper = (
-  config: LauncherConfig,
-): Effect.Effect<string | null> => Effect.sync(() => generateLauncherWrapperSync(config));
 
 /** Persistent native TUI, verified against Muse Code 1.0.2. */
 function buildMuseCommand(config: LauncherConfig, useExec: boolean): string[] {

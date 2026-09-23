@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { getProjectSync, resolveProjectFromIssueSync, type ProjectConfig, type ResolvedProject } from './projects.js';
@@ -272,41 +271,3 @@ export function resolveSlotWorkspaceWorktreesSync(
     });
   return { isPolyrepo, nested };
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Pure-sync project/repo resolution — additive Effect.sync wrappers.
-
-/** Normalize a free-form forge string ("github.com", "Gitlab", etc.). Pure. */
-export const normalizeForge = (
-  value?: string | null,
-): Effect.Effect<ForgeType | null> => Effect.sync(() => normalizeForgeSync(value));
-
-/** Infer the forge for a project from configured repo URLs. Pure. */
-export const inferProjectForge = (
-  projectConfig: Pick<ProjectConfig, 'github_repo' | 'gitlab_repo'>,
-): Effect.Effect<ForgeType | null> => Effect.sync(() => inferProjectForgeSync(projectConfig));
-
-/** Expand configured repos for an issue into a flat list. Pure. */
-export const resolveConfiguredRepos = (
-  projectKey: string,
-  projectPath: string,
-  projectConfig: ProjectConfig,
-  issueId: string,
-): Effect.Effect<ResolvedProjectRepo[]> =>
-  Effect.sync(() =>
-    resolveConfiguredReposSync(projectKey, projectPath, projectConfig, issueId),
-  );
-
-/** Resolve repos for an issue by id + labels. Pure. */
-export const resolveProjectReposForIssue = (
-  issueId: string,
-  labels: string[] = [],
-): Effect.Effect<ResolvedProjectRepo[] | null> =>
-  Effect.sync(() => resolveProjectReposForIssueSync(issueId, labels));
-
-/** Resolve repos from an already-resolved project. Pure. */
-export const resolveProjectReposFromResolvedIssue = (
-  issueId: string,
-  resolvedProject: ResolvedProject,
-): Effect.Effect<ResolvedProjectRepo[] | null> =>
-  Effect.sync(() => resolveProjectReposFromResolvedIssueSync(issueId, resolvedProject));

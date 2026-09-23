@@ -756,7 +756,3 @@ export const restartCliproxy = (
 /** Effect variant of {@link restartTraefik}. */
 export const restartTraefik = (config: PlatformConfig): Effect.Effect<void, StageError> =>
   Effect.tryPromise({ try: () => restartTraefikPromise(config), catch: stageErrorOf('restartTraefik') });
-
-/** Effect variant of {@link readPlatformConfigSync}. Pure config read; cannot fail. */
-export const readPlatformConfig = (): Effect.Effect<PlatformConfig, never> =>
-  Effect.sync(() => readPlatformConfigSync());

@@ -398,7 +398,7 @@ export async function messageAgent(
     // so the role-specific .claude/agents/* definition file is loaded.
     const resumeRole: Role = agentState.role ?? 'work';
     // PAN-1048 review feedback 006 (S1): Pi-backed resumes need the same
-    // launcher fields the fresh-spawn path threads through generateLauncherScript.
+    // launcher fields the fresh-spawn path threads through generateLauncherScriptSync.
     // buildPiCommand throws on missing piSessionDir, so the previous fallback
     // emitted a launcher that would crash on resume for any Pi role agent.
     const resumeModel = agentState.model || 'claude-sonnet-4-6';

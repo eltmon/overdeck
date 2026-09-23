@@ -12,7 +12,7 @@
  *   GET  /status             → current dashboard watchdog state
  *   POST /restart-dashboard  → 202 Accepted; spawns `pan restart --dashboard`
  *
- * Started by `pan up` via `startSupervisorProcess()` in `src/lib/supervisor.ts`.
+ * Started by `pan up` via `startSupervisorProcessSync()` in `src/lib/supervisor.ts`.
  * Stopped by `pan down`. Independent of the dashboard's own lifecycle.
  */
 

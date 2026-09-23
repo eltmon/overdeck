@@ -7,14 +7,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { Effect } from 'effect';
 import {
   CostEvent,
   forEachCostEventSync,
   getEventsFileSizeSync,
   readEventsFromByteOffsetSync,
 } from './events.js';
-import { FsError } from '../errors.js';
 
 // ============== Types ==============
 
@@ -370,69 +368,3 @@ export function getCacheStatus(): {
     needsSync: getEventsFileSizeSync() !== cache.lastEventByteOffset,
   };
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Effect variant of loadCache. Failures surface as FsError. */
-export const loadCache = (): Effect.Effect<CostCache, FsError> =>
-  Effect.try({
-    try: () => loadCacheSync(),
-    catch: (cause) => new FsError({ path: getCacheFile(), operation: 'loadCache', cause }),
-  });
-
-/** Effect variant of saveCache. */
-export const saveCache = (cache: CostCache): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => saveCacheSync(cache),
-    catch: (cause) => new FsError({ path: getCacheFile(), operation: 'saveCache', cause }),
-  });
-
-/** Effect variant of updateCacheFromEvents. */
-export const updateCacheFromEvents = (
-  events: CostEvent[],
-  newLineNumber?: number,
-): Effect.Effect<CostCache, FsError> =>
-  Effect.try({
-    try: () => updateCacheFromEventsSync(events, newLineNumber),
-    catch: (cause) => new FsError({ path: getCacheFile(), operation: 'updateCacheFromEvents', cause }),
-  });
-
-/** Effect variant of rebuildCache. */
-export const rebuildCache = (): Effect.Effect<CostCache, FsError> =>
-  Effect.try({
-    try: () => rebuildCacheSync(),
-    catch: (cause) => new FsError({ path: getCacheFile(), operation: 'rebuildCache', cause }),
-  });
-
-/** Effect variant of syncCache. */
-export const syncCache = (): Effect.Effect<CostCache, FsError> =>
-  Effect.try({
-    try: () => syncCacheSync(),
-    catch: (cause) => new FsError({ path: getCacheFile(), operation: 'syncCache', cause }),
-  });
-
-/** Effect variant of getCostsByIssue. */
-export const getCostsByIssue = (): Effect.Effect<Record<string, IssueStats>, FsError> =>
-  Effect.try({
-    try: () => getCostsByIssueSync(),
-    catch: (cause) => new FsError({ path: getCacheFile(), operation: 'getCostsByIssue', cause }),
-  });
-
-/** Effect variant of getCostsForIssue. */
-export const getCostsForIssue = (
-  issueId: string,
-): Effect.Effect<IssueStats | null, FsError> =>
-  Effect.try({
-    try: () => getCostsForIssueSync(issueId),
-    catch: (cause) => new FsError({ path: getCacheFile(), operation: 'getCostsForIssue', cause }),
-  });
-
-/** Effect variant of setIssueBudget. */
-export const setIssueBudget = (
-  issueId: string,
-  budget: number,
-): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => setIssueBudgetSync(issueId, budget),
-    catch: (cause) => new FsError({ path: getCacheFile(), operation: 'setIssueBudget', cause }),
-  });
