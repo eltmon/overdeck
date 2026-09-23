@@ -139,6 +139,18 @@ internal configuration records are excluded from the chat feed.
   Both transports are persistent sessions — never one-shot `codex exec`.
 - The app-server transport requires Codex CLI `0.144.0` or newer. Upgrade with
   your normal Codex CLI install method, then verify with `codex --version`.
+- Conversations (not work or review agents) run their app-server on a private
+  native endpoint, a Unix socket at
+  `~/.overdeck/agents/<id>/codex-native/app.sock` (directory `0700`, socket
+  `0600`), and Overdeck connects to it as a WebSocket client instead of stdio.
+  That lets **Terminal** attach the native Codex CLI to the same thread with
+  `codex resume --remote`, while the dashboard keeps its structured connection;
+  see [Native Codex CLI in Terminal](/features/conversations#native-codex-cli-in-terminal).
+  The native CLI needs Codex CLI `0.153.4` or newer. With an older CLI the
+  conversation keeps working over stdio and Terminal explains the upgrade.
+  Conversations started before this release show **Restart required for the
+  native CLI** until they are stopped and resumed. Protocol evidence:
+  `docs/CODEX-APP-SERVER-PROTOCOL.md`.
 - Runtime adapter at `src/lib/runtimes/codex.ts`; per-agent thread-id pinning
   enables session introspection and cost parsing
   (`src/lib/cost-parsers/codex-parser.ts`).
@@ -623,6 +635,11 @@ Run `codex --version`. The app-server transport requires Codex CLI `0.144.0`
 or newer and the `codex app-server` subcommand. If the version is too old,
 upgrade Codex CLI and start a fresh session. To keep work moving during a
 rollout, set `codex.transport: tui` to use the legacy TUI transport temporarily.
+
+The native Codex CLI in a conversation's Terminal needs `0.153.4` or newer.
+Below that, the conversation's host falls back to stdio and logs
+`[terminal] native Codex terminal unavailable: cli-unsupported` in Runtime log.
+Upgrade, then stop and resume the conversation.
 
 ## Tradeoffs
 
