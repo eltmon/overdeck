@@ -427,6 +427,28 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
     expect(mockMessageAgent).toHaveBeenCalledTimes(1);
   });
 
+  it('a red test job still reaches the agent after an earlier non-test failure on the same head', async () => {
+    makeGhMocks();
+    const readPrFacts = vi.fn()
+      .mockResolvedValueOnce(facts({ checks: 'red', testChecks: 'pending' }))
+      .mockResolvedValue(facts({ checks: 'red', testChecks: 'red' }));
+
+    const first = await Effect.runPromise(relayCiFailureFeedback({ ...relayOpts, source: 'check_run:lint' }, { readPrFacts }));
+    const second = await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts }));
+    const third = await Effect.runPromise(relayCiFailureFeedback({ ...relayOpts, source: 'check_suite' }, { readPrFacts }));
+
+    expect(first.testGateFailed).toBeUndefined();
+    expect(second).toMatchObject({ testGateFailed: true, agentMessageSent: true });
+    expect(third.agentMessageSent).toBe(false);
+    expect(mockMessageAgent).toHaveBeenCalledTimes(2);
+    expect(mockMessageAgent).toHaveBeenLastCalledWith(
+      'agent-pan-1801',
+      expect.stringContaining('Failed check: test'),
+      'internal',
+      { owesRework: true, feedbackRedelivery: true },
+    );
+  });
+
   it('journals the failure even when no work agent is live to tell', async () => {
     mockGetAgentStateSync.mockReturnValue(null);
     const readPrFacts = vi.fn(async () => facts({ checks: 'red', testChecks: 'red' }));

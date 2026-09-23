@@ -75,11 +75,14 @@ export interface CiFailureFeedbackDeps {
 const lastNotifiedSha = new Map<string, string>();
 /** Per-issue head SHA we last journaled a CI test-gate failure for. */
 const lastJournaledTestFailureSha = new Map<string, string>();
+/** Per-issue head SHA we last sent a CI test-gate (rework) message for. */
+const lastNotifiedTestGateSha = new Map<string, string>();
 
 /** Reset internal debounce state — for tests only. */
 export function resetCiFailureFeedbackStateForTests(): void {
   lastNotifiedSha.clear();
   lastJournaledTestFailureSha.clear();
+  lastNotifiedTestGateSha.clear();
 }
 
 /**
@@ -306,8 +309,11 @@ async function relayCiFailureFeedbackPromise(
   }
 
   // Debounce per head SHA so duplicate webhook deliveries / retries do not spam.
+  // A test-gate failure is the exception once per head: an earlier generic
+  // "CI FAILED" (a faster non-test check) must not swallow the rework message.
   const lastSha = lastNotifiedSha.get(issueId);
-  if (lastSha === opts.headSha) {
+  const testGateAlreadyNotified = lastNotifiedTestGateSha.get(issueId) === opts.headSha;
+  if (lastSha === opts.headSha && (!testGateFailed || testGateAlreadyNotified)) {
     console.log(`[ci-failure-feedback] Skipping duplicate feedback for ${issueId} @ ${opts.headSha.slice(0, 8)}`);
     return { agentMessageSent: false, ...testGateFlag };
   }
@@ -395,6 +401,7 @@ async function relayCiFailureFeedbackPromise(
   }
 
   lastNotifiedSha.set(issueId, opts.headSha);
+  if (testGateFailed) lastNotifiedTestGateSha.set(issueId, opts.headSha);
   return { feedbackPath: fileResult.filePath, agentMessageSent, ...testGateFlag };
 }
 
