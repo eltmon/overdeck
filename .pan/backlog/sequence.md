@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-23T05:02:45.914Z · model: claude-opus-5 · open: 853_
+_Last sequenced: 2026-09-23T05:29:03.676Z · model: claude-opus-5 · open: 852_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -40,7 +40,6 @@ _Last sequenced: 2026-09-23T05:02:45.914Z · model: claude-opus-5 · open: 853_
 | 38 | PAN-3565 | M | critical | ok |  |  | Failed review spawn wedges 'starting', and an all-lanes infra failure is synthesized as a real CHANGES REQUESTED verdict. |
 | 39 | PAN-3554 | M | critical | needs-refinement |  |  | Red main has no mechanical owner: it hid for ~5h because the merge gate renders red main as an empty queue, not an alarm. |
 | 40 | PAN-3532 | S | critical | ok |  |  | CI runs only a hand-picked slice of the frontend suite, so main stayed red on frontend for hours while every run reported green. |
-| 41 | PAN-3965 | M | high | ok |  |  | Operator decision: one full test run per push on CI; verification gate = typecheck+lint local; agents run touched tests; no 1-feature… |
 | 42 | PAN-3685 | S | high | ok |  |  | Swarm GC leaves consumed completion markers that hold slot capacity after assignments are freed |
 | 43 | PAN-3085 | XS | critical | needs-refinement |  |  | Review feedback is written to .overdeck/feedback but agents and the deacon merge gate are pointed at a nonexistent .pan/feedback. |
 | 44 | PAN-3653 | M | critical | ok |  |  | A strike blocked on red main has no owner that wakes it when main goes green; the session stays alive so recover refuses it. |
@@ -1001,10 +1000,6 @@ New this pass. Main stayed red for about five hours because nothing owns the sta
 
 New this pass. The CI test job runs root npm test, whose frontend leg is a hand-picked list of files, so two frontend test files were red on main for hours while every main CI run reported success. Green CI that does not mean green is worse than no CI, because every downstream gate and every close-out trusts it.
 
-### PAN-3965 (rank 41)
-
-Cuts three redundant on-box suite runs per feature that produced admission-hold pressure and killed Codex test runs on 2026-09-20; item 3 would also have avoided the PAN-3963 loop. Operator-decided, well-specified, touches the gate runner, prompts and merge-train reconciler.
-
 ### PAN-3685 (rank 42)
 
 Swarm GC leaves consumed completion markers that hold slot capacity after assignments are freed. Critical: this breaks the substrate the rest of the backlog runs on — a wrong merge, a lost verdict, or a dead pipeline lane — so it ranks ahead of feature work of equal size.
@@ -1181,6 +1176,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 
 Triage: verify days-stale "running" against the current liveness definition (idle = stale work activity). Rank held.
 
+### PAN-1824 (rank 86)
+
+Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass — PAN-3243, PAN-3492, PAN-3520 and PAN-2421 — all trace red or flaky main to real-timer tests under load. This is the shared fix for that family and it is now marked ready, so it should sit with the other CI-integrity work rather than behind it.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1188,10 +1187,10 @@ Triage: verify days-stale "running" against the current liveness definition (idl
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-23T05:02:45.914Z",
+  "generatedAt": "2026-09-23T05:29:03.676Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 853,
+  "openCount": 852,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1647,19 +1646,6 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "dependsOn": [],
       "why": "CI runs only a hand-picked slice of the frontend suite, so main stayed red on frontend for hours while every run reported green.",
       "rationale": "New this pass. The CI test job runs root npm test, whose frontend leg is a hand-picked list of files, so two frontend test files were red on main for hours while every main CI run reported success. Green CI that does not mean green is worse than no CI, because every downstream gate and every close-out trusts it.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3965",
-      "rank": 41,
-      "size": "M",
-      "importance": "high",
-      "score": 76,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Operator decision: one full test run per push on CI; verification gate = typecheck+lint local; agents run touched tests; no 1-feature…",
-      "rationale": "Cuts three redundant on-box suite runs per feature that produced admission-hold pressure and killed Codex test runs on 2026-09-20; item 3 would also have avoided the PAN-3963 loop. Operator-decided, well-specified, touches the gate runner, prompts and merge-train reconciler.",
       "gate": "auto",
       "planning": "auto"
     },
