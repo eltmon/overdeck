@@ -95,6 +95,21 @@ initDashboardLogFile();
 // spawn→listen window attributable. See server.ts for the matching listen mark.
 console.log(`[boot-timing] module graph loaded at +${Math.round(performance.now())}ms (since process start)`);
 console.log(`[overdeck] Boot gates: ${formatBootGateState(resolveBootGates())}`);
+// PAN-3956: name the terminal backend once, and say loudly when the default
+// cannot serve — a tmux fallback used to happen here in silence.
+void (async () => {
+  try {
+    const { selectTerminalBackend, probeHerdrAvailability, describeTerminalBackendBoot } =
+      await import('../../lib/terminal-backends/select.js');
+    const { loadConfigSync } = await import('../../lib/config-yaml.js');
+    const selection = await selectTerminalBackend(loadConfigSync().config);
+    const probe = selection.backend === 'herdr' ? await probeHerdrAvailability() : null;
+    const { level, line } = describeTerminalBackendBoot(selection, probe);
+    console[level](line);
+  } catch (err) {
+    console.warn('[terminal] backend selection could not be logged:', err instanceof Error ? err.message : String(err));
+  }
+})();
 
 // Ensure OVERDECK_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
 await mkdir(getOverdeckHome(), { recursive: true });

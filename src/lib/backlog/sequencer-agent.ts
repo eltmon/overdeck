@@ -91,7 +91,7 @@ async function stopSequencerRun(): Promise<void> {
   await closeAgentPane(SEQUENCER_AGENT_ID);
   const deadline = Date.now() + REAP_SETTLE_MS;
   while (Date.now() < deadline) {
-    if (!(await agentPaneExists(SEQUENCER_AGENT_ID))) return;
+    if (!(await agentPaneExists(SEQUENCER_AGENT_ID).catch(() => false))) return;
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
 }

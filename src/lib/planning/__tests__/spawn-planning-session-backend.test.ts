@@ -26,7 +26,14 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../terminal-backends/select.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../terminal-backends/select.js')>();
-  return { ...actual, hostTerminalBackendName: vi.fn(async () => mocks.host) };
+  return {
+    ...actual,
+    hostTerminalBackendName: vi.fn(async () => mocks.host),
+    // PAN-3956: a herdr host in these tests has a live session server.
+    probeHerdrAvailability: vi.fn(async () => ({
+      binary: '/usr/bin/herdr', session: 'overdeck', socket: '/tmp/herdr.sock', socketExists: true, available: true,
+    })),
+  };
 });
 
 vi.mock('../../terminal-backends/herdr.js', async (importOriginal) => {
