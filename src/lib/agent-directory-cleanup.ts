@@ -12,6 +12,12 @@
  *                          destroys conversation history permanently — 2026-07-05
  *                          incident: a boot-time `pan sync` wiped every ended
  *                          pi/codex conversation transcript.)
+ *   - ext-*              — external agent registrations (PAN-3920 W18): a
+ *                          write-once registration.json plus the append-only
+ *                          sessions.json that points at a transcript another
+ *                          tool wrote. They are facts, never status; cleanup
+ *                          keeps them (the Codex plugin deletes its own job
+ *                          records, so this is the only copy of the link).
  *
  * Legacy directories (eligible for cleanup when no tmux session is running):
  *   - work-<issueId>, review-<issueId>, test-<issueId>, merge-<issueId>
@@ -101,6 +107,15 @@ export function isConversationDirectory(name: string): boolean {
 }
 
 /**
+ * Check whether a directory name is an external agent registration (ext-*).
+ * Registrations are write-once facts about agents another tool launched; they
+ * must never be auto-removed (PAN-3920 D20).
+ */
+export function isExternalAgentDirectory(name: string): boolean {
+  return name.startsWith('ext-');
+}
+
+/**
  * Extract the issue ID from a planning-* directory name.
  * Returns null if the name is not a planning directory or the issue ID is invalid.
  */
@@ -162,6 +177,9 @@ async function findOrphanedAgentDirsPromise(
     // Conversation directories hold the only transcript for ohmypi/codex
     // conversations (sessions/*.jsonl, codex-home/sessions/). Never touch them.
     if (isConversationDirectory(name)) continue;
+
+    // External agent registrations are write-once facts (PAN-3920 D20).
+    if (isExternalAgentDirectory(name)) continue;
 
     const dirPath = join(agentsDir, name);
     orphaned.push({

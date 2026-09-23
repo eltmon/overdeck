@@ -6,6 +6,8 @@ import type { BackendPane } from '@overdeck/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AgentState } from '../../../../lib/agents/agent-state-read.js';
+import type { ExternalRegistration } from '../../../../lib/agents/external-registry.js';
+import { listExternalCandidates, type ExternalDirectorySources } from '../agent-directory-external.js';
 import {
   _resetAgentDirectoryForTests,
   buildAgentDirectory,
@@ -66,6 +68,7 @@ function deps(overrides: AgentDirectoryDeps = {}): AgentDirectoryDeps {
     listConversationSubagents: async () => [],
     listAgentSubagents: async () => [],
     issueTitles: () => new Map(),
+    listExternalEntries: async () => [],
     projectKeyForIssue: (issueId) => (issueId.startsWith('PAN-') ? 'overdeck' : null),
     projectKeyForPath: (path) => (path.startsWith('/home/op/Projects/overdeck') ? 'overdeck' : null),
     ...overrides,
@@ -364,6 +367,104 @@ describe('buildAgentDirectory', () => {
       latestWorkerReportAt: async () => NOW,
     }));
     expect(result.entries[0]!.state).toBe('idle');
+  });
+});
+
+function registration(overrides: Partial<ExternalRegistration> & { id: string }): ExternalRegistration {
+  return {
+    source: 'codex-plugin',
+    externalId: overrides.id.replace(/^ext-codex-plugin-/, ''),
+    registeredBy: 'codex-plugin',
+    harness: 'codex',
+    model: 'gpt-5.6-sol',
+    cwd: '/home/op/Projects/overdeck/workspaces/feature-pan-7',
+    issueId: 'PAN-7',
+    parentId: 'conv-alpha',
+    label: 'Fix the flaky test',
+    pid: 4242,
+    pidStartTime: '9001',
+    logFile: null,
+    registeredAt: iso(10 * 60_000),
+    ...overrides,
+  };
+}
+
+/** Registrations with injected liveness, transcript and turn state — no fs, no /proc. */
+function external(
+  registrations: ExternalRegistration[],
+  facts: Partial<ExternalDirectorySources> & { rolloutMtime?: number | null } = {},
+): Pick<AgentDirectoryDeps, 'listExternalEntries'> {
+  const sources: ExternalDirectorySources = {
+    listRegistrations: async () => registrations,
+    liveness: async () => 'alive',
+    resolveTranscript: async (r) => ({ kind: 'codex', path: `/rollouts/${r.id}.jsonl` }),
+    mtimeMs: async () => (facts.rolloutMtime === undefined ? NOW - 5_000 : facts.rolloutMtime),
+    turnComplete: async () => false,
+    ...facts,
+  };
+  return { listExternalEntries: (now) => listExternalCandidates(now, sources) };
+}
+
+describe('buildAgentDirectory — external agents (Phase C)', () => {
+  it('lists a running plugin job under its parent conversation as working', async () => {
+    const result = await buildAgentDirectory(24, deps({
+      listConversations: async () => [conversation({ name: 'alpha', tmuxSession: 'conv-alpha', isWorking: true })],
+      ...external([registration({ id: 'ext-codex-plugin-task-1' })]),
+    }));
+    const entry = result.entries.find((e) => e.id === 'ext-codex-plugin-task-1')!;
+    expect(entry).toMatchObject({
+      kind: 'external',
+      source: 'codex-plugin',
+      state: 'working',
+      parentId: 'conv:alpha',
+      issueId: 'PAN-7',
+      projectKey: 'overdeck',
+      harness: 'codex',
+      model: 'gpt-5.6-sol',
+      label: 'Fix the flaky test',
+      location: 'local',
+      transcript: { route: 'agent', agentId: 'ext-codex-plugin-task-1' },
+      lastActivityAt: iso(5_000),
+    });
+  });
+
+  it('shows a finished plugin job as done from its rollout', async () => {
+    const result = await buildAgentDirectory(24, deps(external(
+      [registration({ id: 'ext-codex-plugin-task-2', pid: null, pidStartTime: null, parentId: 'claude-session:b4e68a48' })],
+      { liveness: async () => 'unknown', turnComplete: async () => true, rolloutMtime: NOW - 3 * HOUR },
+    )));
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0]).toMatchObject({ state: 'done', parentId: 'claude-session:b4e68a48', lastActivityAt: iso(3 * HOUR) });
+  });
+
+  it('shows a dead pid with an incomplete transcript as stopped', async () => {
+    const result = await buildAgentDirectory(24, deps(external(
+      [registration({ id: 'ext-codex-plugin-task-3' })],
+      { liveness: async () => 'dead', turnComplete: async () => false },
+    )));
+    expect(result.entries[0]!.state).toBe('stopped');
+  });
+
+  it('drops an old finished job outside the window, keeps a pid-less one that is still writing, and has no transcript ref without a candidate', async () => {
+    const result = await buildAgentDirectory(24, deps(external(
+      [
+        registration({ id: 'ext-codex-plugin-old', registeredAt: iso(3 * 24 * HOUR) }),
+        registration({ id: 'ext-my-tool-run-7', source: 'registered', pid: null, pidStartTime: null, parentId: null, issueId: null, cwd: '/elsewhere' }),
+      ],
+      {
+        liveness: async (r) => (r.pid === null ? 'unknown' : 'dead'),
+        resolveTranscript: async (r) => (r.id === 'ext-codex-plugin-old' ? null : { kind: 'claude', path: '/t/run-7.jsonl' }),
+        mtimeMs: async () => NOW - 30_000,
+      },
+    )));
+    expect(result.entries.map((e) => e.id)).toEqual(['ext-my-tool-run-7']);
+    expect(result.entries[0]).toMatchObject({ state: 'working', source: 'registered', projectKey: 'unassigned' });
+
+    const old = await buildAgentDirectory(168, deps(external(
+      [registration({ id: 'ext-codex-plugin-old', registeredAt: iso(3 * 24 * HOUR) })],
+      { liveness: async () => 'dead', resolveTranscript: async () => null },
+    )));
+    expect(old.entries[0]).toMatchObject({ state: 'stopped', transcript: null, lastActivityAt: iso(3 * 24 * HOUR) });
   });
 });
 

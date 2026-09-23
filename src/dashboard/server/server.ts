@@ -43,6 +43,7 @@ import { parkedRouteLayer } from './routes/parked.js'
 import { velocityRouteLayer } from './routes/velocity.js'
 import { agentsRouteLayer } from './routes/agents.js'
 import { agentDirectoryRouteLayer } from './routes/agent-directory.js'
+import { workersRegisterRouteLayer } from './routes/workers-register.js'
 import { workspacesRouteLayer } from './routes/workspaces.js'
 import { workspaceRegistryRouteLayer } from './routes/workspace-registry.js'
 import { specialistsRouteLayer } from './routes/specialists.js'
@@ -346,6 +347,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   velocityRouteLayer,
   agentsRouteLayer,
   agentDirectoryRouteLayer,
+  workersRegisterRouteLayer,
   workspacesRouteLayer,
   workspaceRegistryRouteLayer,
   specialistsRouteLayer,

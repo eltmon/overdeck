@@ -15,9 +15,9 @@ import { conversationMessagesQueryKey } from '../../chat/useConversationMessages
 import { TellComposer } from '../../issue-view/TellComposer';
 import { DirectoryIssueContext } from './DirectoryIssueContext';
 import { DirectoryStateBadge } from './DirectoryStateBadge';
-import { displayStateOf, hoursSince, known } from './directory-state';
+import { displayStateOf, externalSourceLabel, hoursSince, known } from './directory-state';
 import { DirectoryTranscript } from './DirectoryTranscript';
-import { isLiveState } from './directory-tree';
+import { isLiveState, parentLabel } from './directory-tree';
 
 function formatCost(value: number): string {
   if (value >= 100) return `$${value.toFixed(0)}`;
@@ -62,6 +62,7 @@ function DirectoryDetailBody({ entry, entriesById, onSelectEntry }: { entry: Dir
   const cost = useTranscriptCost(entry);
   const [tellOpen, setTellOpen] = useState(false);
   const parent = entry.parentId ? entriesById.get(entry.parentId) : undefined;
+  const spawnedBy = entry.parentId ? parentLabel(entry.parentId, parent) : null;
   const isWorker = entry.role === 'worker' && entry.kind === 'agent' && entry.source === 'overdeck';
   const attention = useDerivedIssueState(entry.issueId)?.attention;
   const state = displayStateOf(entry, attention);
@@ -87,10 +88,15 @@ function DirectoryDetailBody({ entry, entriesById, onSelectEntry }: { entry: Dir
             onClick={() => parent && onSelectEntry(parent.id)}
             disabled={!parent}
             className="mt-1 max-w-full truncate text-left text-[11px] text-muted-foreground hover:text-foreground disabled:cursor-default disabled:hover:text-muted-foreground"
-            title={`Spawned by ${parent?.label ?? entry.parentId}`}
+            title={`Spawned by ${spawnedBy}`}
           >
-            Spawned by {parent?.label ?? entry.parentId}
+            Spawned by {spawnedBy}
           </button>
+        )}
+        {entry.kind === 'external' && (
+          <p className="mt-1 text-[11px] text-muted-foreground" data-component="directory-external-note">
+            Launched outside Overdeck as {externalSourceLabel(entry.source)}. Read-only: Overdeck shows it but cannot message, stop or restart it.
+          </p>
         )}
         {isWorker && (
           <div className="mt-2">

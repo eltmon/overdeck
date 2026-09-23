@@ -35,6 +35,8 @@ function makeDeps(overrides: Partial<WorkerCliDeps> = {}) {
     isAlive: vi.fn(async () => ({ alive: true as const, paneAlive: true as const })),
     stopWorker: vi.fn(async () => {}),
     workerExists: vi.fn(async () => true),
+    registerExternal: vi.fn(async () => ({ id: 'ext-x-1', created: true })),
+    cwd: () => '/home/op',
     readFile: vi.fn(async () => 'brief from file'),
     readStdin: vi.fn(async () => 'report from stdin'),
     stdinIsTTY: () => false,
@@ -228,11 +230,11 @@ describe('pan worker list', () => {
 });
 
 describe('registration', () => {
-  it('pan worker --help lists run, wait, report and list', () => {
+  it('pan worker --help lists run, wait, report, list and register', () => {
     const program = new Command();
     registerWorkerCommands(program, () => makeDeps().deps);
     const worker = program.commands.find((command) => command.name() === 'worker')!;
-    expect(worker.commands.map((command) => command.name())).toEqual(['run', 'wait', 'report', 'list']);
+    expect(worker.commands.map((command) => command.name())).toEqual(['run', 'wait', 'report', 'list', 'register']);
     expect(worker.helpInformation()).toContain('run');
   });
 });

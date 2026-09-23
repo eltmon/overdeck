@@ -1,6 +1,6 @@
 ---
 name: pan-worker
-description: "pan worker run|wait|report|list — delegate a bounded task to a registered, issue-linked worker agent and get its report back. Use instead of a harness plugin such as the Codex plugin."
+description: "pan worker run|wait|report|list|register — delegate a bounded task to a registered, issue-linked worker agent and get its report back. Use instead of a harness plugin such as the Codex plugin; register agents another tool launched so the Agents Directory shows them."
 triggers:
   - pan worker
   - delegate to a worker
@@ -8,6 +8,8 @@ triggers:
   - run a worker
   - second opinion from another model
   - codex plugin
+  - pan worker register
+  - register an external agent
 allowed-tools:
   - Bash
   - Read
@@ -123,3 +125,28 @@ is removed only when the issue's workspace is deleted, and the branch only once 
 The brief ends with the exact command. Write the report as Markdown to a file, then run
 `pan worker report <your-id> --file <path>`, with `--status blocked` or `--status failed` when you
 could not finish. Put the answer first. An agent can record a report only for itself.
+
+## Registering an agent another tool launched
+
+`pan worker register` records an externally spawned agent (one Overdeck did not launch) so the Agents
+Directory shows it, with its transcript when Overdeck can read that kind. Overdeck can show and read an
+external agent; it cannot `pan tell`, stop or restart it.
+
+```bash
+pan worker register --source my-tool --external-id run-7 --harness codex \
+  --model gpt-5.5 --cwd . --issue PAN-123 --parent "$OVERDECK_CONVERSATION" \
+  --label "second opinion" --pid 4242 --transcript ~/.codex/sessions/2026/09/23/rollout-…-<thread>.jsonl
+pan worker register --source my-tool --external-id run-7 --harness codex --json   # { "id": …, "created": false }
+```
+
+- Required: `--source` (`[a-z0-9-]`, up to 32 characters; `codex-plugin` is reserved), `--external-id`,
+  `--harness`. Optional: `--model`, `--cwd`, `--issue`, `--parent` (agent id, conversation tmux session,
+  or `claude-session:<uuid>`), `--label`, `--pid`, `--transcript`, `--session-id`, `--json`.
+- The id is `ext-<source>-<external-id>`. Registering the same source and external id again prints the
+  existing id and writes nothing.
+- With `--pid`, the directory shows the agent working while that process runs (the pid's start time is
+  recorded, so a reused pid is not mistaken for it).
+- Scripts without the CLI can `POST /api/workers/register` with the same fields as JSON and the
+  `x-overdeck-internal-token` header.
+- Codex-plugin jobs (`codex:codex-rescue` and friends) are registered automatically; you do not need
+  to register them.
