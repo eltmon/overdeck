@@ -31,7 +31,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
 import yaml from 'js-yaml';
 
-import type { ProjectConfig } from '../projects.js';
+import { getProjectSync, resolveProjectFromIssueSync, type ProjectConfig } from '../projects.js';
 import type { QualityGateConfig } from '../workspace-config.js';
 
 export type VerificationTestsMode = 'ci' | 'local';
@@ -267,6 +267,20 @@ export function resolveVerificationTestsMode(
   deps: VerificationTestsModeDeps = {},
 ): VerificationTestsMode {
   return resolveVerificationTestsModeDecision(project, deps).mode;
+}
+
+/**
+ * #4021: true when the issue's project runs its tests on CI, so merge readiness
+ * requires the CI test job to have passed on the PR head. An issue no project
+ * claims, or a config that cannot be read, keeps the local test gate (false).
+ */
+export function issueRunsTestsOnCi(issueId: string): boolean {
+  try {
+    const resolved = resolveProjectFromIssueSync(issueId);
+    return resolved !== null && resolveVerificationTestsMode(getProjectSync(resolved.projectKey)) === 'ci';
+  } catch {
+    return false;
+  }
 }
 
 /**

@@ -7,6 +7,7 @@ const HEAD_SHA = 'b'.repeat(40);
 
 const mocks = vi.hoisted(() => ({
   completePendingOperation: vi.fn(),
+  evaluateIssueMergeGate: vi.fn(),
   exec: vi.fn<[string, any?], Promise<{ stdout: string; stderr: string }>>(),
   execFile: vi.fn<[string, string[], any?], Promise<{ stdout: string; stderr: string }>>(),
   existsSync: vi.fn(() => true),
@@ -130,6 +131,12 @@ vi.mock('../../../services/merge-queue-service.js', () => ({
   clearMergeRun: vi.fn(),
 }));
 
+// #4016/#4021/#4036: the forge-facts merge gate is exercised by its own tests
+// (pr-facts, merge-gate, merge-queue-advance); here it lets the merge through.
+vi.mock('../../../../../lib/cloister/merge-gate.js', () => ({
+  evaluateIssueMergeGate: mocks.evaluateIssueMergeGate,
+}));
+
 vi.mock('../../specialists.js', () => ({ _serverManagedMerges: new Set<string>() }));
 
 import { triggerMerge } from '../merge-ops.js';
@@ -147,6 +154,7 @@ describe('triggerMerge server rebase escalation', () => {
     vi.useFakeTimers();
     vi.clearAllMocks();
     mocks.existsSync.mockReturnValue(true);
+    mocks.evaluateIssueMergeGate.mockResolvedValue({ ready: true, facts: { headBranch: 'feature/pan-3110' } });
     mocks.getPullRequestState.mockReturnValue(Effect.succeed(pullRequestState()));
     mocks.rebaseFeatureBranch.mockReturnValue(Effect.succeed({ success: true, newHead: HEAD_SHA }));
     mocks.mergeReviewArtifact.mockResolvedValue(undefined);
@@ -165,6 +173,26 @@ describe('triggerMerge server rebase escalation', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+  });
+
+  it('refuses before claiming the merge slot when the forge-facts merge gate says no (#4021/#4036)', async () => {
+    mocks.evaluateIssueMergeGate.mockResolvedValue({
+      ready: false,
+      reason: `no CI test job reported on PR HEAD ${HEAD_SHA} (verification.tests: ci)`,
+      facts: { headBranch: 'feature/pan-3110' },
+    });
+
+    const result = await triggerMerge('PAN-3110');
+
+    expect(result).toEqual({
+      success: false,
+      statusCode: 400,
+      error: `Cannot merge: no CI test job reported on PR HEAD ${HEAD_SHA} (verification.tests: ci)`,
+      state: 'ready',
+    });
+    expect(mocks.setMergeRun).not.toHaveBeenCalled();
+    expect(mocks.rebaseFeatureBranch).not.toHaveBeenCalled();
+    expect(mocks.mergeReviewArtifact).not.toHaveBeenCalled();
   });
 
   it('queues a retry when the local workspace is missing', async () => {

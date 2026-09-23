@@ -55,9 +55,20 @@ verdict, every time it's asked.
    performance, requirements) post PR reviews — approve or request changes.
    Verification (typecheck, lint, tests) runs as check runs on the PR.
    "Ready" is derived, not stored: approvals in, checks green, forge reports
-   `mergeable: true`.
+   `mergeable: true`. Two more conditions come from the forge too
+   (`cloister/merge-gate.ts`, see
+   [PIPELINE-GATES.md](PIPELINE-GATES.md#the-merge-gate-4016-4021-4036)): in a
+   `verification.tests: ci` project the CI `test` job must have concluded
+   `SUCCESS` on the PR head (a missing or skipped test job blocks), and a
+   failed browser UAT at the PR head blocks when UAT is required for the
+   issue (its `hold-for-uat` / `auto-merge` label, else the project's
+   `auto_merge_default`, else the global `require_uat_before_merge`). A
+   passing UAT, at that head or a newer one, restores readiness.
 4. **Human clicks the dashboard Merge button** (or `gh pr merge`). The
-   dashboard:
+   dashboard re-reads readiness from the forge and refuses with the first
+   failing condition (`Cannot merge: …`); the board enables the button on
+   approvals, checks and mergeability alone, so the CI test job and UAT
+   conditions show up as that refusal. Otherwise it:
    - Merges a GitHub-clean PR directly when its head already contains the
      required base and checks are complete.
    - Otherwise runs `rebaseFeatureBranch(workspacePath, featureBranch, baseBranch)`
@@ -82,6 +93,18 @@ verdict, every time it's asked.
 
 Content failures — red CI, a closed or draft PR, unresolved conflicts — are
 visible directly on the PR; there is no separate failure status to set.
+
+## The per-project merge queue
+
+Merges are serialized per project. A Merge clicked while another merge holds
+the project's slot is queued, and when a merge finishes the queue advances
+(`advanceMergeQueue` in `routes/workspaces/merge-strike.ts`): it drops every
+entry that cannot start and triggers the first one that can. Every entry
+passes the same gate as a direct Merge (every condition in Flow step 3) and
+merges its feature PR (#4016). The queue once landed
+an entry's `strike/<issue>` branch instead whenever one existed, without that
+gate; strikes now open their own PR (PAN-3973), so the queue no longer looks
+for strike branches.
 
 ## Review freshness
 

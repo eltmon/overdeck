@@ -64,8 +64,29 @@ export interface PrFacts {
    * failure. Absent when the forge reports no per-check detail (GitLab).
    */
   testCheckFailures?: readonly FailedCheck[];
+  /**
+   * #4021: at least one CI test-job check on the head concluded `SUCCESS`.
+   * `testChecks` alone reads a skipped-only test job as green; in
+   * `verification.tests: ci` mode merge readiness needs a test run that passed.
+   */
+  testJobSucceeded?: boolean;
+  /**
+   * #4036: the newest browser-UAT verdict posted on the PR for the current
+   * head commit, read from the verdict comments. `null` when no UAT verdict
+   * applies to this head (none was posted, or the head moved since).
+   */
+  uatVerdict?: UatVerdict | null;
   /** Set when the forge lookup itself failed; every flag is then conservative. */
   error?: string;
+}
+
+/** A browser-UAT verdict read back from a PR comment (#4036). */
+export interface UatVerdict {
+  status: 'passed' | 'failed';
+  /** The commit UAT exercised, from the comment's marker; null on a legacy comment. */
+  sha: string | null;
+  /** When the verdict comment was posted. */
+  postedAt: string | null;
 }
 
 /** A failing check as the forge reported it (conclusion or status state, upper-cased). */
@@ -120,6 +141,33 @@ export function parseVerdictMarker(body: string | null | undefined): MarkerVerdi
   return match ? (match[1].toUpperCase() as MarkerVerdict) : null;
 }
 
+/**
+ * The machine marker a UAT verdict comment carries (#4036): the outcome and the
+ * commit UAT exercised (`--tested-sha`, else the PR head when the verdict was
+ * posted). Merge readiness reads it back to tell a failure at the current head
+ * from one a later push already superseded.
+ */
+export function formatUatMarker(status: 'passed' | 'failed', sha?: string | null): string {
+  return `<!-- overdeck-uat: ${status}${sha ? ` sha=${sha.toLowerCase()}` : ''} -->`;
+}
+
+const UAT_MARKER_RE = /<!--\s*overdeck-uat:\s*(passed|failed)(?:\s+sha=([0-9a-f]{7,40}))?\s*-->/i;
+/** A verdict comment posted before the marker existed: `**uat verdict: failed**` / `**browser UAT: failed**`. */
+const LEGACY_UAT_RE = /\*\*(?:uat verdict|browser UAT):\s*(passed|failed)\*\*/i;
+
+/** The UAT outcome (and the commit it is anchored on) a comment body declares, or null. */
+export function parseUatVerdict(
+  body: string | null | undefined,
+): { status: 'passed' | 'failed'; sha: string | null } | null {
+  if (!body) return null;
+  const marker = body.match(UAT_MARKER_RE);
+  if (marker) {
+    return { status: marker[1].toLowerCase() as 'passed' | 'failed', sha: marker[2]?.toLowerCase() ?? null };
+  }
+  const legacy = body.match(LEGACY_UAT_RE);
+  return legacy ? { status: legacy[1].toLowerCase() as 'passed' | 'failed', sha: null } : null;
+}
+
 export function emptyPrFacts(issueId: string, error?: string): PrFacts {
   return {
     issueId: issueId.toUpperCase(),
@@ -140,6 +188,8 @@ export function emptyPrFacts(issueId: string, error?: string): PrFacts {
     mergeableState: null,
     checks: 'none',
     testChecks: 'none',
+    testJobSucceeded: false,
+    uatVerdict: null,
     ...(error ? { error } : {}),
   };
 }
@@ -196,6 +246,19 @@ export function summarizeTestChecks(
   return summarizeStatusCheckRollup((rollup ?? []).filter((check) => isCiTestCheckName(check.name)));
 }
 
+/**
+ * #4021: true when at least one CI test-job check concluded `SUCCESS`. A
+ * `SKIPPED` or `NEUTRAL` test job ran no tests, so it does not count.
+ */
+export function testJobSucceeded(
+  rollup: IssuePullRequestData['statusCheckRollup'] | null | undefined,
+): boolean {
+  return (rollup ?? []).some((check) => (
+    isCiTestCheckName(check.name)
+    && (normalize(check.conclusion) === 'SUCCESS' || normalize(check.state) === 'SUCCESS')
+  ));
+}
+
 /** Epoch ms of the PR's head commit, used to age out a stale approval marker. */
 function headCommitTime(pr: IssuePullRequestData): number | null {
   const commits = pr.commits ?? [];
@@ -224,6 +287,41 @@ function markerVerdictFromComments(pr: IssuePullRequestData): MarkerVerdict | nu
       if (headAt !== null && (Number.isNaN(commentAt) || commentAt < headAt)) return null;
     }
     return verdict;
+  }
+  return null;
+}
+
+/** True when `sha` (full or abbreviated) names the same commit as `head`. */
+function sameCommit(sha: string, head: string): boolean {
+  const a = sha.toLowerCase();
+  const b = head.toLowerCase();
+  return a.startsWith(b) || b.startsWith(a);
+}
+
+/**
+ * #4036: the newest UAT verdict that applies to the PR's current head.
+ *
+ * A marker carries the commit UAT exercised, so it applies when that commit is
+ * the head. A legacy comment carries no commit and applies when it is at least
+ * as new as the head commit (the dating the approval marker uses). When the
+ * head's date cannot be read, a legacy verdict is taken as current: a failure
+ * then holds rather than letting untested code through.
+ */
+function uatVerdictAtHead(pr: IssuePullRequestData): UatVerdict | null {
+  const comments = pr.comments ?? [];
+  const head = pr.headRefOid ?? null;
+  const headAt = headCommitTime(pr);
+  for (let index = comments.length - 1; index >= 0; index -= 1) {
+    const verdict = parseUatVerdict(comments[index]?.body);
+    if (!verdict) continue;
+    const postedAt = comments[index]?.createdAt ?? null;
+    if (verdict.sha) {
+      if (head && !sameCommit(verdict.sha, head)) continue;
+    } else if (headAt !== null) {
+      const commentAt = Date.parse(postedAt ?? '');
+      if (Number.isNaN(commentAt) || commentAt < headAt) continue;
+    }
+    return { status: verdict.status, sha: verdict.sha, postedAt };
   }
   return null;
 }
@@ -258,6 +356,8 @@ function gitHubFacts(issueId: string, pr: IssuePullRequestData): PrFacts {
     checks: summarizeStatusCheckRollup(pr.statusCheckRollup),
     testChecks: summarizeTestChecks(pr.statusCheckRollup),
     testCheckFailures: listFailedTestChecks(pr.statusCheckRollup),
+    testJobSucceeded: testJobSucceeded(pr.statusCheckRollup),
+    uatVerdict: uatVerdictAtHead(pr),
   };
 }
 
@@ -319,6 +419,9 @@ function gitLabFacts(issueId: string, row: GitLabMergeRequestRow, view: GitLabMr
     mergeableState: detailed ?? view?.merge_status ?? null,
     checks: view ? gitLabChecks(view) : 'none',
     testChecks: 'none',
+    testJobSucceeded: false,
+    // GitLab MR notes are not read here, so no UAT verdict is observed there.
+    uatVerdict: null,
   };
 }
 
@@ -407,10 +510,33 @@ export interface MergeReadiness {
 }
 
 /**
- * FR-9's ready set: approved + checks green + forge `mergeable`. One reason is
- * returned, in the order an operator would want to see it.
+ * Project and issue policy the forge facts are judged against. Both default to
+ * off, so a caller that passes nothing gets FR-9's approved + green + mergeable.
+ * `cloister/merge-gate.ts` resolves both for an issue.
  */
-export function evaluateMergeReadiness(facts: PrFacts): MergeReadiness {
+export interface MergeReadinessPolicy {
+  /**
+   * #4021: the project runs `verification.tests: ci`, so CI is the only place
+   * tests run and the CI test job must have passed on the head. Only GitHub
+   * reports per-job checks; a GitLab pipeline is judged by `checks` alone.
+   */
+  ciTestsRequired?: boolean;
+  /**
+   * #4036: UAT is required for the issue (`issueHoldsForUat`: its
+   * `auto-merge` / `hold-for-uat` label, else the project's
+   * `auto_merge_default`, else the global `flywheel.require_uat_before_merge`),
+   * so a failed UAT verdict at the current head blocks the merge.
+   */
+  uatRequired?: boolean;
+}
+
+/**
+ * FR-9's ready set: approved + checks green + forge `mergeable`, plus the CI
+ * test job (#4021) and a failed required UAT (#4036) when `policy` asks for
+ * them. One reason is returned, in the order an operator would want to see it.
+ */
+export function evaluateMergeReadiness(facts: PrFacts, policy: MergeReadinessPolicy = {}): MergeReadiness {
+  const head = facts.headSha ?? 'unknown';
   if (facts.error) return { ready: false, reason: facts.error };
   if (!facts.exists) return { ready: false, reason: 'no pull request for this issue' };
   if (facts.merged) return { ready: false, reason: 'PR is already merged' };
@@ -422,9 +548,24 @@ export function evaluateMergeReadiness(facts: PrFacts): MergeReadiness {
   // commit) and `null` (the forge has not computed mergeability yet) are the
   // absence of evidence, not evidence of readiness. Merging on either is how a
   // red or conflicting branch reaches main.
-  if (facts.checks === 'red') return { ready: false, reason: `CI checks failing on PR HEAD ${facts.headSha ?? 'unknown'}` };
-  if (facts.checks === 'pending') return { ready: false, reason: `CI checks still pending on PR HEAD ${facts.headSha ?? 'unknown'}` };
-  if (facts.checks !== 'green') return { ready: false, reason: `no CI checks reported on PR HEAD ${facts.headSha ?? 'unknown'}` };
+  if (facts.checks === 'red') return { ready: false, reason: `CI checks failing on PR HEAD ${head}` };
+  if (facts.checks === 'pending') return { ready: false, reason: `CI checks still pending on PR HEAD ${head}` };
+  if (facts.checks !== 'green') return { ready: false, reason: `no CI checks reported on PR HEAD ${head}` };
+  // #4021: with tests on CI, "every present check is green" is not enough. A
+  // workflow change that renames or drops the test job, or a path filter or
+  // job-level `if:` that skips it, would otherwise merge code no test ran on.
+  if (policy.ciTestsRequired && facts.forge === 'github' && !facts.testJobSucceeded) {
+    return {
+      ready: false,
+      reason: facts.testChecks === 'none'
+        ? `no CI test job reported on PR HEAD ${head} (verification.tests: ci)`
+        : `the CI test job was skipped on PR HEAD ${head} (verification.tests: ci)`,
+    };
+  }
+  // #4036: a failed UAT at this head is evidence the code does not work.
+  if (policy.uatRequired && facts.uatVerdict?.status === 'failed') {
+    return { ready: false, reason: `browser UAT failed on PR HEAD ${facts.uatVerdict.sha ?? head}` };
+  }
   if (facts.mergeable !== true) {
     return {
       ready: false,

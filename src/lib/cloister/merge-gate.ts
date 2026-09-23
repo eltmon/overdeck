@@ -1,0 +1,82 @@
+/**
+ * The merge gate for one issue: the forge's facts judged against the project's
+ * and the issue's policy (#4016, #4021, #4036).
+ *
+ * `evaluateMergeReadiness` in `pr-facts.ts` is the pure rule. This module
+ * resolves the two policy inputs it cannot know by itself:
+ *
+ *   - whether the project runs `verification.tests: ci` (#4021), in which case
+ *     the CI test job must have passed on the PR head;
+ *   - whether UAT is required for the issue (#4036), in which case a failed UAT
+ *     verdict at the PR head blocks the merge.
+ *
+ * Every merge door asks this one function: the merge-ready set
+ * (`getMergeReadyIssues`), the dashboard Merge button and the auto-merge
+ * executor (both through `triggerMerge`), and the per-project merge queue.
+ * Nothing is stored: each input is read from the forge, `projects.yaml`, the
+ * tracker's labels, or the global setting at the moment it is asked.
+ */
+import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
+import { issueHoldsForUat } from './auto-merge-eligibility.js';
+import {
+  evaluateMergeReadiness,
+  getPrFacts,
+  type MergeReadiness,
+  type PrFacts,
+} from './pr-facts.js';
+import { issueRunsTestsOnCi } from './verification-tests-mode.js';
+
+export interface MergeGateDeps {
+  getFacts?: (issueId: string) => Promise<PrFacts>;
+  /** True when the issue's project runs `verification.tests: ci`. */
+  ciTestsRequired?: (issueId: string) => boolean;
+  /** True when UAT is required for the issue (the `issueHoldsForUat` tiers). */
+  uatRequired?: (issueId: string) => Promise<boolean>;
+}
+
+export interface MergeGateResult extends MergeReadiness {
+  facts: PrFacts;
+}
+
+/** The issue's project config, or null when no project claims the issue. */
+function projectConfigFor(issueId: string) {
+  const resolved = resolveProjectFromIssueSync(issueId);
+  return resolved ? getProjectSync(resolved.projectKey) : null;
+}
+
+/**
+ * #4036: UAT is required when the issue is held for UAT — the tiers
+ * auto-merge eligibility applies: the `auto-merge` / `hold-for-uat` label, else
+ * the project's `auto_merge_default`, else the global
+ * `flywheel.require_uat_before_merge`. An `auto-merge` label is the operator
+ * saying UAT is not required, so a failed verdict there is advisory.
+ */
+export async function defaultUatRequired(issueId: string): Promise<boolean> {
+  const { isFlywheelRequireUatBeforeMerge } = await import('../overdeck/control-settings.js');
+  return issueHoldsForUat(issueId, projectConfigFor(issueId), isFlywheelRequireUatBeforeMerge());
+}
+
+/**
+ * Is this issue's PR ready to merge right now? Never throws: a failed forge
+ * read comes back not-ready with the lookup error as the reason.
+ *
+ * The UAT requirement is resolved only when a failed UAT verdict applies to the
+ * head, so the common case costs no tracker label read.
+ */
+export async function evaluateIssueMergeGate(
+  issueId: string,
+  deps: MergeGateDeps = {},
+): Promise<MergeGateResult> {
+  const facts = await (deps.getFacts ?? getPrFacts)(issueId);
+  const ciTestsRequired = facts.forge === 'github' && (deps.ciTestsRequired ?? issueRunsTestsOnCi)(issueId);
+  let uatRequired = false;
+  if (facts.uatVerdict?.status === 'failed') {
+    try {
+      uatRequired = await (deps.uatRequired ?? defaultUatRequired)(issueId);
+    } catch {
+      // The requirement could not be read; a failed UAT at this head holds.
+      uatRequired = true;
+    }
+  }
+  return { ...evaluateMergeReadiness(facts, { ciTestsRequired, uatRequired }), facts };
+}

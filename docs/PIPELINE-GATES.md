@@ -16,10 +16,14 @@ on the host (plus any other non-`test` gate the project declares, and the
 local test-skip diff check below). The quality gate named `test` is not run;
 the **CI test job on the PR head is the test gate**:
 
-- Merge readiness already requires the PR's checks green (`pr-facts.ts`
-  `evaluateMergeReadiness`); `PrFacts.testChecks` is the verdict over just the
-  test job (a check named `test`/`tests`, with or without a matrix suffix such
-  as `test (22)`).
+- Merge readiness requires the CI test job to have **passed on the PR head**,
+  not just every present check to be green (#4021, see
+  [The merge gate](#the-merge-gate-4016-4021-4036)): at least one check the
+  test matcher recognizes (the `test` aggregate, `test-shard (N/4)`,
+  `test-e2e`, …) must have concluded `SUCCESS`. No test check, or a test job
+  that only `SKIPPED` (a path filter, a job-level `if:`, a renamed or deleted
+  job), blocks the merge. `PrFacts.testChecks` is the verdict over just the
+  test job; `PrFacts.testJobSucceeded` is the positive evidence.
 - A red CI test job reaches the work agent through
   `src/lib/cloister/ci-failure-feedback.ts` (fired by the `check_run`,
   `check_suite` and `status` webhooks). For a CI-mode project the relay reads
@@ -96,7 +100,9 @@ CI job that never runs. `local` keeps the `test` gate on the host exactly as
 before. The runner logs the mode with its reason and records both in the
 artifact's `testsMode` field. The CI-failure relay is GitHub-webhook-driven, so a GitLab
 project that sets `tests: ci` gets the merge gate (a green pipeline) but no
-automatic agent feedback for a red test job.
+automatic agent feedback for a red test job. GitLab reports one pipeline
+verdict, not per-job checks, so there the green pipeline is the whole test
+requirement.
 
 Work agents run only the tests they touched (the work prompt names
 `npx vitest run <files>` only in a vitest project, and says "the suite runs on
@@ -172,6 +178,73 @@ carries a key derived from the tested commit (`--tested-sha`, else the PR
 head), which the tmux/PTY-supervisor tiers
 enforce across processes (Herdr-prompted agents bypass the keyed cascade, as
 review feedback does); a passing UAT clears the anchor (PAN-4030).
+
+The UAT verdict comment ends with a machine marker carrying the outcome and
+the commit UAT exercised, `<!-- overdeck-uat: failed sha=<commit> -->` (the
+`--tested-sha`, else the PR head when the verdict was posted). Merge
+readiness reads it back from the PR; see the next section.
+
+## The merge gate (#4016, #4021, #4036)
+
+One function decides whether an issue's PR may merge:
+`evaluateIssueMergeGate` (`cloister/merge-gate.ts`) reads the PR facts from
+the forge (`cloister/pr-facts.ts`) and judges them with
+`evaluateMergeReadiness`. Every merge door asks it: the merge-ready set
+(`getMergeReadyIssues`, which feeds the Flywheel merge order and the merge
+train), the dashboard Merge button, the auto-merge executor and the merge
+train's merge-next (all through `triggerMerge`), and the per-project merge
+queue.
+Auto-merge eligibility applies the same rule. Nothing is stored; each input is
+read when the question is asked. The PR is merge-ready when, in order:
+
+1. it exists, is open, is not a draft, and is approved (a forge review
+   decision, else the verdict marker comment) with no changes requested;
+2. its checks on the head are all green (`none` and `pending` are not green);
+3. **the CI test job passed on the head** when the project runs
+   `verification.tests: ci` (resolved from `projects.yaml` or detected, as
+   above). GitHub only: a GitLab pipeline is judged by its one verdict;
+4. **no required UAT failed at the head**;
+5. the forge reports it `mergeable`.
+
+A refusal names the first failing condition, e.g. `Cannot merge: browser UAT
+failed on PR HEAD <sha>`. The board's derived `ready` state (and so whether
+the Merge button is enabled) is computed from the batched PR listing and
+covers conditions 1, 2 and 5 only; conditions 3 and 4 surface as that
+refusal when the button is clicked.
+
+**Failed UAT.** The newest UAT verdict that applies to the current head
+decides. A marked verdict applies when its commit is the head (an abbreviated
+SHA matches); a verdict comment posted before the marker existed applies when
+it is at least as new as the head commit. So:
+
+- a failed UAT at the current head blocks the merge;
+- a later passing UAT at that head, or at a newer head, restores readiness;
+- a push after a failure also lifts the block: the failure was recorded
+  against a commit that is no longer the head. That is deliberate. The UAT
+  stack is assembled from ready features, so a failure that outlived its
+  head would keep a fix from ever reaching UAT again. When UAT is required,
+  the untested new head is still held from auto-merge by the UAT hold below.
+
+**Which UAT is "required".** The same three tiers auto-merge eligibility uses
+(`issueHoldsForUat` in `cloister/auto-merge-eligibility.ts`): the issue's
+`hold-for-uat` label (required) or `auto-merge` label (not required), else
+the project's `auto_merge_default` (`hold` requires it), else the global
+`flywheel.require_uat_before_merge` (on by default). An `auto-merge` label is
+the operator saying UAT is not required for this issue, so a failed verdict
+there is advisory and does not block. The tiers are read only when a failed
+verdict applies to the head, so the common case costs no tracker read; if
+they cannot be read, the failure blocks. GitLab MR notes are not read, so a
+GitLab MR's UAT verdict does not reach this gate.
+
+**Strike branches.** The merge queue used to turn a queued entry into a
+strike landing whenever `origin/strike/<issue>` existed, and skip the gate
+for it, so a strike branch could merge without approval or green checks. Only
+a normal Merge enqueues, and since PAN-3973 a strike opens its own PR that the
+operator merges, so the queue no longer looks for strike branches: every entry
+passes the gate above and merges its feature PR. `triggerMerge` still accepts a
+strike request (nothing sends one now); it passes the same gate against the
+`strike/<issue>` PR and refuses when the PR the forge reports is on any other
+branch.
 
 ## Review Convergence Gate (PAN-3151)
 
