@@ -15,6 +15,7 @@ import Button from '../primitives/Button';
 import type { VerbBadgeProps } from '../primitives/VerbBadge';
 import { IssueActionMenu } from '../IssueActionMenu';
 import { StartAgentCta } from '../issue-view';
+import { AgentsDirectory } from './directory/AgentsDirectory';
 
 const ROLE_ORDER = {
   plan: 0,
@@ -43,8 +44,11 @@ type FilterOption = {
   name: string;
 };
 
-type AgentsViewMode = 'grid' | 'table' | 'timeline';
-const VIEW_MODES: AgentsViewMode[] = ['grid', 'table', 'timeline'];
+// PAN-3920: the Agents Directory is the default view; grid/table/timeline are
+// kept unchanged behind ?view= (D11).
+type AgentsViewMode = 'directory' | 'grid' | 'table' | 'timeline';
+const VIEW_MODES: AgentsViewMode[] = ['directory', 'grid', 'table', 'timeline'];
+const DEFAULT_VIEW_MODE: AgentsViewMode = 'directory';
 
 type CostSummaryResponse = {
   today?: {
@@ -60,16 +64,16 @@ async function fetchCostSummary(): Promise<CostSummaryResponse> {
 }
 
 function readViewMode(): AgentsViewMode {
-  if (typeof window === 'undefined') return 'grid';
+  if (typeof window === 'undefined') return DEFAULT_VIEW_MODE;
   const params = new URLSearchParams(window.location.search);
   const view = params.get('view');
-  return VIEW_MODES.includes(view as AgentsViewMode) ? (view as AgentsViewMode) : 'grid';
+  return VIEW_MODES.includes(view as AgentsViewMode) ? (view as AgentsViewMode) : DEFAULT_VIEW_MODE;
 }
 
 function replaceViewUrl(view: AgentsViewMode) {
   if (typeof window === 'undefined') return;
   const url = new URL(window.location.href);
-  if (view === 'grid') {
+  if (view === DEFAULT_VIEW_MODE) {
     url.searchParams.delete('view');
   } else {
     url.searchParams.set('view', view);
@@ -439,6 +443,13 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
   const metaString = `${runningCount} active · ${stuckCount} stuck · ${formatDuration(cumulativeRuntimeMs)} cumulative runtime`;
 
   const content = (() => {
+    if (viewMode === 'directory') {
+      return (
+        <div className="min-h-0 flex-1">
+          <AgentsDirectory />
+        </div>
+      );
+    }
     if (fleetAgents.length === 0) {
       return (
         <div className="p-6">

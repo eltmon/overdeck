@@ -8,6 +8,10 @@ import { FleetAgentsView } from './FleetAgentsView';
 import { IssueDrawer } from '../drawer/IssueDrawer';
 import { DialogProvider } from '../DialogProvider';
 
+vi.mock('./directory/AgentsDirectory', () => ({
+  AgentsDirectory: () => <div data-component="agents-directory">Agents Directory</div>,
+}));
+
 function agent(overrides: Partial<Agent>): Agent {
   return {
     id: overrides.id ?? 'agent-pan-1',
@@ -65,7 +69,8 @@ describe('FleetAgentsView', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-18T03:00:00.000Z'));
-    window.history.replaceState(null, '', '/agents');
+    // Grid-view tests pin ?view=grid; the directory is the default (PAN-3920 D11).
+    window.history.replaceState(null, '', '/agents?view=grid');
     useDashboardStore.setState({
       drawer: { issueId: null, tab: 'overview' },
       issuesRaw: [issue({ identifier: 'PAN-1', title: 'Fleet drawer issue' })],
@@ -318,7 +323,7 @@ describe('FleetAgentsView', () => {
     fireEvent.click(within(runningCard as HTMLElement).getByText('Open issue'));
 
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'overview' });
-    expect(window.location.search).toBe('?issue=PAN-1&tab=overview');
+    expect(window.location.search).toBe('?view=grid&issue=PAN-1&tab=overview');
     expect(window.location.hash).toBe('#active-agent');
 
     const activeAgent = document.getElementById('active-agent');
@@ -335,7 +340,7 @@ describe('FleetAgentsView', () => {
     renderFleetView();
 
     fireEvent.click(screen.getByRole('button', { name: 'work' }));
-    expect(window.location.search).toBe('?phase=work');
+    expect(window.location.search).toBe('?view=grid&phase=work');
     expect(screen.getByText('agent-running')).toBeInTheDocument();
     expect(screen.queryByText('agent-idle')).not.toBeInTheDocument();
     expect(screen.queryByText('agent-stuck')).not.toBeInTheDocument();
@@ -364,7 +369,7 @@ describe('FleetAgentsView', () => {
     renderFleetView();
 
     fireEvent.click(screen.getByLabelText('Overdeck'));
-    expect(window.location.search).toBe('?projects=pan');
+    expect(window.location.search).toBe('?view=grid&projects=pan');
     expect(screen.getByText('agent-running')).toBeInTheDocument();
     expect(screen.queryByText('agent-idle')).not.toBeInTheDocument();
     expect(screen.queryByText('agent-stuck')).not.toBeInTheDocument();
@@ -423,10 +428,35 @@ describe('FleetAgentsView', () => {
     expect(screen.getByRole('button', { name: 'Start agent' })).toBeInTheDocument();
   });
 
-  it('defaults to grid view and renders the existing card grid', () => {
+  it('defaults to the directory view', () => {
+    window.history.replaceState(null, '', '/agents');
+    renderFleetView();
+
+    expect(screen.getByRole('button', { name: 'directory', pressed: true })).toBeInTheDocument();
+    expect(document.querySelector('[data-component="agents-directory"]')).not.toBeNull();
+    expect(document.querySelector('[data-component="agent-card"]')).toBeNull();
+    expect(document.querySelector('[data-component="metric-tile"]')).toBeNull();
+  });
+
+  it('?view=grid still renders the card grid, MetricStrip and filters', () => {
     renderFleetView();
 
     expect(screen.getByRole('button', { name: 'grid', pressed: true })).toBeInTheDocument();
+    expect(screen.getByText('agent-running')).toBeInTheDocument();
+    expect(document.querySelectorAll('[data-component="metric-tile"]')).toHaveLength(6);
+    expect(document.querySelector('[data-component="agents-filter-row"]')).not.toBeNull();
+    expect(document.querySelector('[data-component="agents-directory"]')).toBeNull();
+  });
+
+  it('switching to directory drops ?view= and switching back to grid sets it', () => {
+    renderFleetView();
+
+    fireEvent.click(screen.getByRole('button', { name: 'directory' }));
+    expect(new URLSearchParams(window.location.search).has('view')).toBe(false);
+    expect(document.querySelector('[data-component="agents-directory"]')).not.toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'grid' }));
+    expect(new URLSearchParams(window.location.search).get('view')).toBe('grid');
     expect(screen.getByText('agent-running')).toBeInTheDocument();
   });
 
@@ -453,7 +483,7 @@ describe('FleetAgentsView', () => {
     renderFleetView();
 
     fireEvent.click(screen.getByRole('button', { name: 'work' }));
-    expect(window.location.search).toBe('?phase=work');
+    expect(window.location.search).toBe('?view=grid&phase=work');
 
     fireEvent.click(screen.getByRole('button', { name: 'table' }));
     expect(new URLSearchParams(window.location.search).get('phase')).toBe('work');
