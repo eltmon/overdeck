@@ -147,6 +147,34 @@ describe('runMigratePlanHome --repair-ignore', () => {
   });
 });
 
+// Review of #4015 (4015-1): an already-migrated state worktree is refused
+// without --force-remigrate, and a differing destination is listed, not replaced.
+describe('runMigratePlanHome on an already-migrated plan home', () => {
+  it('refuses a state worktree with migration-complete.json in one line', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    write(stateRoot, 'migration-complete.json', '{"completedAt":"2026-07-10T03:30:41.003Z"}\n');
+
+    const code = await runMigratePlanHome('fixture', { stateRoot, planHome, openIssues });
+
+    expect(code).toBe(1);
+    expect(error).toHaveBeenCalledTimes(1);
+    expect(String(error.mock.calls[0][0])).toMatch(/^migrate-plan-home: .*already migrated.*--force-remigrate/);
+  });
+
+  it('lists a differing destination as a conflict and exits 1 without replacing it', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    write(planHome, '.pan/drafts/pan-100.md', '# newer plan-home draft\n');
+
+    const code = await runMigratePlanHome('fixture', { stateRoot, planHome, openIssues, forceRemigrate: true });
+
+    expect(code).toBe(1);
+    const output = log.mock.calls.map((call) => String(call[0])).join('\n');
+    expect(output).toContain('conflict: .pan/drafts/pan-100.md');
+    expect(output).toContain('were not overwritten');
+  });
+});
+
 describe('panIgnoreReport', () => {
   const legacy = { kind: 'legacy', repoRoot: '/r', source: '/r/.gitignore', line: 44, pattern: '.pan/' } as const;
   const foreign = { kind: 'foreign', repoRoot: '/r', source: '/r/.git/info/exclude', line: 2, pattern: '.pan/' } as const;

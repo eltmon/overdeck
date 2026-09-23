@@ -32,6 +32,7 @@ export interface MigratePlanHomeCliOptions {
   commit?: boolean;
   dryRun?: boolean;
   repairIgnore?: boolean;
+  forceRemigrate?: boolean;
   stateRoot?: string;
   planHome?: string;
   openIssues?: string;
@@ -247,6 +248,7 @@ export async function runMigratePlanHome(projectKey: string, options: MigratePla
       openIssues,
       commit: options.commit,
       dryRun: options.dryRun,
+      forceRemigrate: options.forceRemigrate,
     });
   } catch (error) {
     // PAN-3996: typed failures (MigratePlanHomeError, PlanHomeGitError) carry
@@ -265,6 +267,20 @@ export async function runMigratePlanHome(projectKey: string, options: MigratePla
   console.log(`Progress copied for ${result.progressUpdated.length} issue(s).`);
   if (result.copied.length > 0) {
     for (const rel of result.copied) console.log(`  ${verb === 'copied' ? 'copied' : 'would copy'}: ${rel}`);
+  }
+  if (result.migrationComplete && options.dryRun && !options.forceRemigrate) {
+    console.log(
+      `Warning: the state worktree carries migration-complete.json`
+      + `${result.migrationComplete.completedAt ? ` (${result.migrationComplete.completedAt})` : ''};`
+      + ' a real run refuses without --force-remigrate.',
+    );
+  }
+  if (result.conflicts.length > 0) {
+    console.log(
+      `${result.conflicts.length} file(s) already exist under .pan/ and differ from the state worktree copy;`
+      + ' they were not overwritten. Compare them and keep the version you want by hand:',
+    );
+    for (const rel of result.conflicts) console.log(`  conflict: .pan/${rel}`);
   }
   if (result.leftUncommitted.length > 0) {
     console.log(
@@ -289,6 +305,7 @@ export function registerMigratePlanHomeCommand(admin: Command): void {
     .option('--commit', 'Commit the copied artifacts in the plan home')
     .option('--dry-run', 'Preview what would be copied without writing anything')
     .option('--repair-ignore', "Only remove Overdeck's legacy .pan/ line from .gitignore and commit that file (no copy)")
+    .option('--force-remigrate', 'Run even though the state worktree carries migration-complete.json')
     .option('--state-root <dir>', 'Override the state worktree root (tests / odd setups)')
     .option('--plan-home <dir>', 'Override the plan home (tests / odd setups)')
     .option('--open-issues <file>', 'Read open issue ids from a file instead of calling the tracker')

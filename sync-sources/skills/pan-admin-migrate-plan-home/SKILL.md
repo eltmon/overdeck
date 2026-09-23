@@ -33,6 +33,8 @@ Options:
   ignore rule (below). The commit holds only files this run wrote, plus files an earlier run
   copied that still match the state worktree. Any other uncommitted `.pan/` change (an operator
   or live agent edit) is listed as "left uncommitted" and stays out of the commit.
+- `--force-remigrate` — run even though the state worktree carries `migration-complete.json`
+  (every run otherwise refuses before copying; `--dry-run` still previews and names the marker)
 - `--repair-ignore` — do only the ignore repair: remove Overdeck's legacy `.pan/` line and commit
   `.gitignore` alone. Copies nothing and never calls the tracker. Not combinable with `--commit`.
 - `--dry-run` — report what would be copied, and whether `.pan/` is ignored, without writing anything
@@ -51,6 +53,13 @@ branch. It also reads each open issue's `records/<issue>.json`
 those item statuses into `.pan/continues/<ISSUE>.xbrief.json`'s `items` map
 (`completed` → `done`), so a project's in-flight checklist progress survives
 the cutover.
+
+It never replaces a file that already exists under `.pan/`. A destination
+that differs from the state copy (including a continue file whose records
+statuses changed) is listed as a `conflict`, left alone, and counted in
+`remaining`, so the run exits 1 until you reconcile it by hand. The state
+worktree stopped moving at the Cut, so the plan-home copy is often the newer
+one.
 
 Idempotent: run it again and it copies nothing and reports `0 remaining`.
 It never writes to the state worktree, never deletes anything, and never
