@@ -1,5 +1,5 @@
 /**
- * `pan worker run | wait | report | list` (PAN-3920 W14, FR-10, FR-11, D17).
+ * `pan worker run | wait | report | list | register` (PAN-3920 W14, W19, FR-10, FR-11, FR-16, D17).
  *
  * `run` starts a registered worker (a native agent with role `worker`) for an
  * issue and blocks until it reports, dies, idles out, or hits the deadline.
@@ -10,8 +10,12 @@
  *   2  the worker exited, or sat idle, without a report
  *   3  timeout (the worker is still running)
  *   1  usage or spawn error
+ *
+ * `register` records an agent another tool launched (an external agent) in
+ * the Agents Directory; Overdeck can show and read it, never tell or stop it.
  */
 import { access, readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 
 import type { Command } from 'commander';
 import { Effect } from 'effect';
@@ -36,6 +40,11 @@ import {
   type WorkerListing,
   type WorkerReportStatus,
 } from '../../lib/agents/worker/index.js';
+import {
+  parseExternalRegisterFields,
+  performExternalRegistration,
+  type ExternalRegisterRequest,
+} from '../../lib/agents/external-register.js';
 
 export const WORKER_EXIT = { done: 0, usage: 1, noReport: 2, timeout: 3, blocked: 4 } as const;
 
@@ -49,6 +58,8 @@ export interface WorkerCliDeps {
   isAlive: (id: string) => Promise<LivenessVerdict>;
   stopWorker: (id: string) => Promise<void>;
   workerExists: (id: string) => Promise<boolean>;
+  registerExternal: (request: ExternalRegisterRequest) => Promise<{ id: string; created: boolean }>;
+  cwd: () => string;
   readFile: (path: string) => Promise<string>;
   readStdin: () => Promise<string>;
   stdinIsTTY: () => boolean;
@@ -75,6 +86,8 @@ export function defaultWorkerCliDeps(): WorkerCliDeps {
       await Effect.runPromise(stopAgent(id, 'operator'));
     },
     workerExists: (id) => access(workerDir(id)).then(() => true, () => false),
+    registerExternal: (request) => performExternalRegistration(request),
+    cwd: () => process.cwd(),
     readFile: (path) => readFile(path, 'utf8'),
     readStdin: readAllStdin,
     stdinIsTTY: () => Boolean(process.stdin.isTTY),
@@ -356,10 +369,65 @@ export async function workerListCommand(
   return WORKER_EXIT.done;
 }
 
+export interface WorkerRegisterOptions {
+  source?: string;
+  externalId?: string;
+  harness?: string;
+  model?: string;
+  cwd?: string;
+  issue?: string;
+  parent?: string;
+  label?: string;
+  pid?: string;
+  transcript?: string;
+  sessionId?: string;
+  json?: boolean;
+}
+
+/**
+ * `pan worker register` (W19): record an externally spawned agent. Calls the
+ * registration core directly (the CLI and the server share one core). A
+ * repeat registration of the same source and external id prints the existing
+ * id and writes nothing.
+ */
+export async function workerRegisterCommand(options: WorkerRegisterOptions, deps: WorkerCliDeps): Promise<number> {
+  const absolute = (path: string | undefined) => (path ? resolve(deps.cwd(), path) : undefined);
+  const parsed = parseExternalRegisterFields({
+    source: options.source,
+    externalId: options.externalId,
+    harness: options.harness,
+    model: options.model,
+    cwd: absolute(options.cwd),
+    issue: options.issue,
+    parent: options.parent,
+    label: options.label,
+    pid: options.pid,
+    transcript: absolute(options.transcript),
+    sessionId: options.sessionId,
+  });
+  if (!parsed.ok) {
+    deps.stderr(`Cannot register: ${parsed.error}.`);
+    return WORKER_EXIT.usage;
+  }
+  let result: { id: string; created: boolean };
+  try {
+    result = await deps.registerExternal(parsed.value);
+  } catch (error) {
+    deps.stderr(`Could not record the registration: ${error instanceof Error ? error.message : String(error)}`);
+    return WORKER_EXIT.usage;
+  }
+  if (options.json) deps.stdout(JSON.stringify(result));
+  else {
+    deps.stdout(result.id);
+    if (!result.created) deps.stderr(`${result.id} was already registered; nothing written`);
+  }
+  return WORKER_EXIT.done;
+}
+
 export function registerWorkerCommands(program: Command, deps: () => WorkerCliDeps = defaultWorkerCliDeps): void {
   const worker = program
     .command('worker')
-    .description('Registered workers: spawn an issue-linked agent and get its report back');
+    .description('Registered workers: spawn an issue-linked agent and get its report back; register external agents');
 
   worker
     .command('run')
@@ -403,4 +471,21 @@ export function registerWorkerCommands(program: Command, deps: () => WorkerCliDe
     .option('--json', 'Print JSON')
     .action(async (options: { issue?: string; parent?: string; json?: boolean }) =>
       exitCli(await workerListCommand(options, deps())));
+
+  worker
+    .command('register')
+    .description('Record an agent another tool launched so the Agents Directory shows it (read-only; prints its id)')
+    .option('--source <name>', 'Who launched it ([a-z0-9-], not codex-plugin) (required)')
+    .option('--external-id <id>', 'The launcher\'s id for it (required)')
+    .option('--harness <harness>', 'codex, claude-code, … (required)')
+    .option('--model <model>', 'Model it runs')
+    .option('--cwd <path>', 'Its working directory')
+    .option('--issue <id>', 'Issue it works on')
+    .option('--parent <id>', 'Spawning agent id, conversation tmux session, or claude-session:<uuid>')
+    .option('--label <text>', 'Label shown in the Agents Directory')
+    .option('--pid <n>', 'Its process id (liveness is read from it)')
+    .option('--transcript <path>', 'Its transcript file')
+    .option('--session-id <id>', 'Its session or thread id')
+    .option('--json', 'Print { id, created }')
+    .action(async (options: WorkerRegisterOptions) => exitCli(await workerRegisterCommand(options, deps())));
 }
