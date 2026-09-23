@@ -238,9 +238,19 @@ describe('PAN-1696 merge-train-routes', () => {
       );
       const entries = await getMergeTrainQueuesPayload();
       const myn = entries.find((e) => e.projectKey === 'myn');
-      expect(myn).toEqual({ projectKey: 'myn', projectName: 'Mind Your Now', enabled: false, queue: [] });
+      expect(myn).toEqual({ projectKey: 'myn', projectName: 'Mind Your Now', enabled: false, holdsForUat: expect.any(Boolean), queue: [] });
       // A disabled project must never trigger git work in its repo (hazard H2).
       expect(mergeOrderMocks.listEligibleCandidatesByProject).not.toHaveBeenCalledWith('/repos/myn');
+    });
+
+    it('reports whether each project holds merges for UAT (PAN-3965)', async () => {
+      projectsMocks.listProjectsSync.mockReturnValue([
+        { key: 'overdeck', config: { ...PAN, auto_merge_default: 'auto' } },
+        { key: 'myn', config: { ...MYN, auto_merge_default: 'hold' } },
+      ]);
+      const entries = await getMergeTrainQueuesPayload();
+      expect(entries.find((e) => e.projectKey === 'overdeck')?.holdsForUat).toBe(false);
+      expect(entries.find((e) => e.projectKey === 'myn')?.holdsForUat).toBe(true);
     });
 
     it('keeps the other projects when one project throws', async () => {

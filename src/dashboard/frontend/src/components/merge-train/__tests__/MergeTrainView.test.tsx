@@ -129,7 +129,7 @@ afterEach(() => {
 describe('single ready feature (PAN-3965)', () => {
   it('says one ready feature merges directly instead of promising a batch', async () => {
     mockFetch({
-      '/api/merge-train/queues': [{ projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, queue: MIN_QUEUE }],
+      '/api/merge-train/queues': [{ projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, holdsForUat: false, queue: MIN_QUEUE }],
       '/api/merge-train/generations': [{ projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, generations: [] }],
     });
     renderView();
@@ -138,9 +138,20 @@ describe('single ready feature (PAN-3965)', () => {
     expect(screen.getByTestId('merge-train-project-myn').textContent).not.toContain('A test batch assembles automatically');
   });
 
+  it('keeps the batch copy for one ready feature in a project that holds merges for UAT', async () => {
+    mockFetch({
+      '/api/merge-train/queues': [{ projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, holdsForUat: true, queue: MIN_QUEUE }],
+      '/api/merge-train/generations': [{ projectKey: 'myn', projectName: 'Mind Your Now', enabled: true, generations: [] }],
+    });
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-myn')).toBeTruthy());
+    expect(screen.queryByTestId('merge-train-single-feature-myn')).toBeNull();
+    expect(screen.getByTestId('merge-train-project-myn').textContent).toContain('A test batch assembles automatically');
+  });
+
   it('keeps the batch copy when two features are ready', async () => {
     mockFetch({
-      '/api/merge-train/queues': [{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: PAN_QUEUE }],
+      '/api/merge-train/queues': [{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, holdsForUat: false, queue: PAN_QUEUE }],
       '/api/merge-train/generations': [{ projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [] }],
     });
     renderView();

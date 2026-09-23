@@ -53,6 +53,7 @@ function makeDeps(projectRoot: string, options: {
   headShas?: Record<string, string>;
   assembleStatus?: UatGenerationStatus;
   containedNames?: string[];
+  holdsForUat?: boolean;
 } = {}): UatReconcilerDeps & {
   rows: Map<string, UatGeneration>;
   assembled: ReadyFeature[][];
@@ -96,6 +97,7 @@ function makeDeps(projectRoot: string, options: {
     },
     teardownStack: async (g) => { teardowns.push(g.name); },
     cleanup: async () => { cleanups.push(1); },
+    ...(options.holdsForUat !== undefined ? { holdsForUat: () => options.holdsForUat! } : {}),
     now: () => T0,
     log: (message) => { logs.push(message); },
   };
@@ -473,9 +475,9 @@ describe('empty queue', () => {
 });
 
 describe('PAN-3965 no batch for a single ready feature', () => {
-  it('assembles no generation when exactly one feature is ready', async () => {
+  it('assembles no generation when exactly one feature is ready and the project does not hold for UAT', async () => {
     const proj = freshProject();
-    const deps = makeDeps(proj, { readySet: [READY[0]!] });
+    const deps = makeDeps(proj, { readySet: [READY[0]!], holdsForUat: false });
 
     const result = await reconcileUatGenerations(proj, deps);
 
@@ -484,6 +486,30 @@ describe('PAN-3965 no batch for a single ready feature', () => {
     expect(deps.assembled).toEqual([]);
     expect(deps.rows.size).toBe(0);
     expect(deps.logs.join('\n')).toContain('merges directly');
+  });
+
+  it('a project that holds merges for UAT still gets a batch for one ready feature', async () => {
+    const proj = freshProject();
+    const deps = makeDeps(proj, { readySet: [READY[0]!], holdsForUat: true });
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(result.action).toBe('assembled');
+    expect(deps.assembled).toHaveLength(1);
+    expect(deps.assembled[0]!.map((f) => f.issueId)).toEqual(['PAN-1']);
+  });
+
+  it('assembles exactly one generation when two features are ready, held or not', async () => {
+    for (const holdsForUat of [false, true]) {
+      const proj = freshProject();
+      const deps = makeDeps(proj, { readySet: READY, holdsForUat });
+
+      const result = await reconcileUatGenerations(proj, deps);
+
+      expect(result.action).toBe('assembled');
+      expect(deps.assembled).toHaveLength(1);
+      expect(deps.assembled[0]!.map((f) => f.issueId)).toEqual(['PAN-1', 'PAN-2']);
+    }
   });
 
   it('assembles exactly one generation when two features are ready', async () => {
