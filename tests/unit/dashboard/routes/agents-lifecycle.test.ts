@@ -26,6 +26,7 @@ import {
   createConversation,
   getConversationByName,
   markConversationEnded,
+  setClearedToConvId,
 } from '../../../../src/lib/overdeck/conversations.js';
 import { markRespawnPending } from '../../../../src/dashboard/server/services/pending-respawn.js';
 import { saveOverdeckAgentStateSync } from '../../../helpers/overdeck-test-db.js';
@@ -226,7 +227,7 @@ describe('POST /api/agents/:id/lifecycle for a supervised conversation (PAN-3962
   it('records the full start → turn → exit lifecycle with 2xx on every event', async () => {
     const { name, sessionId, token } = seedConversation();
     // The conversation was ended by a previous run; the new supervisor revives it.
-    markConversationEnded(name);
+    markConversationEnded(name, Date.parse('2026-09-22T09:00:00.000Z'));
     expect(getConversationByName(name)?.status).toBe('ended');
     const before = currentSequence();
 
@@ -277,7 +278,7 @@ describe('POST /api/agents/:id/lifecycle for a supervised conversation (PAN-3962
     expect(retry.body).toMatchObject({ success: true, applied: false, reason: 'duplicate' });
   });
 
-  it('an exit inside a respawn window does not end the conversation being revived', async () => {
+  it('an exit dated before the respawn began is ignored (the replaced harness)', async () => {
     const { name, sessionId, token } = seedConversation();
     const respawn = markRespawnPending(sessionId);
     try {
@@ -290,14 +291,65 @@ describe('POST /api/agents/:id/lifecycle for a supervised conversation (PAN-3962
     }
   });
 
-  it('a late session-started after the backend reports the pane exited does not revive the conversation', async () => {
+  it('a late session-started older than the recorded exit does not revive the conversation', async () => {
     const { name, sessionId, token } = seedConversation();
-    markConversationEnded(name);
-    backendPanes.push({ id: sessionId, terminalId: sessionId, state: 'exited' });
+    // No backend pane is listed for the conv-* session (a Herdr host): the
+    // guard must not depend on the pane inventory.
+    const exited = await postLifecycle(
+      { event: 'exited', at: '2026-09-22T13:00:05.000Z', exitCode: 1 }, token, sessionId,
+    );
+    expect(exited.status).toBe(200);
 
-    const res = await postLifecycle({ event: 'session-started', at: '2026-09-22T13:00:00.000Z' }, token, sessionId);
-    expect(res.status).toBe(409);
+    const late = await postLifecycle({ event: 'session-started', at: '2026-09-22T13:00:00.000Z' }, token, sessionId);
+    expect(late.status).toBe(409);
     expect(getConversationByName(name)?.status).toBe('ended');
+  });
+
+  it('the new harness exiting inside the resume window ends the conversation (review of #3988, F1)', async () => {
+    const { name, sessionId, token } = seedConversation();
+    markConversationEnded(name, Date.now() - 60_000);
+    const respawn = markRespawnPending(sessionId);
+    try {
+      const launchedAt = new Date().toISOString();
+      const started = await postLifecycle({ event: 'session-started', at: launchedAt, launchedAt }, token, sessionId);
+      expect(started.body).toMatchObject({ applied: true, status: 'running' });
+      expect(getConversationByName(name)?.status).toBe('active');
+
+      const exitAt = new Date(Date.parse(launchedAt) + 500).toISOString();
+      const exited = await postLifecycle({ event: 'exited', at: exitAt, launchedAt, exitCode: 1 }, token, sessionId);
+      expect(exited.status).toBe(200);
+      expect(exited.body).toMatchObject({ success: true, applied: true, status: 'stopped' });
+      expect(getConversationByName(name)?.status).toBe('ended');
+    } finally {
+      respawn.done();
+    }
+  });
+
+  it('events for a post-/clear sibling land on the sibling, never the /clear-ended parent (F2)', async () => {
+    const { name: parentName, sessionId, token } = seedConversation();
+    const sibling = createConversation({
+      name: `${parentName}-post-clear-abcd1234`,
+      tmuxSession: sessionId,
+      cwd: '/tmp/conv-pan-3962',
+      harness: 'claude-code',
+      workspaceId: null,
+    });
+    setClearedToConvId(parentName, sibling.id);
+    const parentEndedAt = Date.parse('2026-09-22T15:00:00.000Z');
+    markConversationEnded(parentName, parentEndedAt);
+
+    const exitAt = '2026-09-22T15:10:00.000Z';
+    const exited = await postLifecycle({ event: 'exited', at: exitAt, exitCode: 0 }, token, sessionId);
+    expect(exited.body).toMatchObject({ applied: true, status: 'stopped' });
+    expect(new Date(getConversationByName(sibling.name)!.endedAt!).getTime()).toBe(Date.parse(exitAt));
+    // The parent keeps its own /clear end time: the exit was not its own.
+    expect(new Date(getConversationByName(parentName)!.endedAt!).getTime()).toBe(parentEndedAt);
+
+    // The operator resumes the sibling; its new supervisor starts.
+    const started = await postLifecycle({ event: 'session-started', at: '2026-09-22T15:20:00.000Z' }, token, sessionId);
+    expect(started.body).toMatchObject({ applied: true, status: 'running' });
+    expect(getConversationByName(sibling.name)?.status).toBe('active');
+    expect(getConversationByName(parentName)?.status).toBe('ended');
   });
 
   it('still 404s a conv id with neither agent state nor a conversation row', async () => {

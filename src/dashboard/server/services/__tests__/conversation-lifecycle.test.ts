@@ -29,6 +29,7 @@ async function buildRuntimeCensusMock() {
     })));
   }
   return {
+    sampledAt: Date.now(),
     available: true,
     sessionNames: new Set(sessions),
     panesBySession,
@@ -87,6 +88,8 @@ vi.mock('node:util', () => ({ promisify: vi.fn((fn: unknown) => fn) }));
 describe('ConversationLifecycleService — pollConversations', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Row re-reads return nothing unless a case stubs them (no leak between cases).
+    mockGetConversationByName.mockReset();
     // Default: harness alive in sessions that exist (corpse cases set false explicitly).
     mockIsHarnessProcessAlive.mockResolvedValue(true);
     mockIsRespawnPending.mockReturnValue(false);
@@ -203,6 +206,89 @@ describe('ConversationLifecycleService — pollConversations', () => {
 
     expect(mockMarkConversationRunning).toHaveBeenCalledWith('latched-ended');
     expect(mockMarkConversationEnded).not.toHaveBeenCalled();
+  });
+
+  describe('resurrect vs a just-recorded exit (review of #3988, F3)', () => {
+    const ended = (overrides: Record<string, unknown> = {}) => ({
+      name: 'just-exited',
+      tmuxSession: 'conv-just-exited',
+      status: 'ended',
+      endedAt: null,
+      clearedToConvId: null,
+      cwd: '/tmp/work',
+      claudeSessionId: null,
+      createdAt: '2026-05-24T19:00:00.000Z',
+      ...overrides,
+    });
+
+    it('does not resurrect a row whose exit was recorded after the census snapshot', async () => {
+      const snapshotAt = Date.parse('2026-09-22T10:00:00.000Z');
+      mockGetRuntimeCensus.mockImplementation(async () => ({ ...(await buildRuntimeCensusMock()), sampledAt: snapshotAt }));
+      const row = ended({ endedAt: '2026-09-22T10:00:01.000Z' });
+      mockListConversations.mockReturnValue([row]);
+      mockGetConversationByName.mockReturnValue(row);
+      mockListSessionNames.mockReturnValue(Effect.succeed(['conv-just-exited']));
+
+      const { pollConversations } = await import('../conversation-lifecycle.js');
+      await pollConversations();
+
+      expect(mockMarkConversationRunning).not.toHaveBeenCalled();
+    });
+
+    it('does not resurrect when a fresh probe finds the harness gone (stale snapshot)', async () => {
+      const row = ended({ endedAt: '2020-01-01T00:00:00.000Z' });
+      mockListConversations.mockReturnValue([row]);
+      mockGetConversationByName.mockReturnValue(row);
+      mockListSessionNames.mockReturnValue(Effect.succeed(['conv-just-exited']));
+      // The cached census still shows the harness; the fresh probe does not.
+      mockIsHarnessProcessAlive.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+
+      const { pollConversations } = await import('../conversation-lifecycle.js');
+      await pollConversations();
+
+      expect(mockMarkConversationRunning).not.toHaveBeenCalled();
+      expect(mockMarkConversationEnded).not.toHaveBeenCalled();
+      expect(mockCleanupUnreferencedConversationAttachments).not.toHaveBeenCalled();
+    });
+
+    it('does not resurrect when the row changed while the probe ran', async () => {
+      const row = ended({ endedAt: '2020-01-01T00:00:00.000Z' });
+      mockListConversations.mockReturnValue([row]);
+      mockGetConversationByName
+        .mockReturnValueOnce(row)
+        .mockReturnValueOnce({ ...row, endedAt: '2020-01-01T00:00:09.000Z' });
+      mockListSessionNames.mockReturnValue(Effect.succeed(['conv-just-exited']));
+
+      const { pollConversations } = await import('../conversation-lifecycle.js');
+      await pollConversations();
+
+      expect(mockMarkConversationRunning).not.toHaveBeenCalled();
+    });
+
+    it('never resurrects a /clear-ended parent whose session the sibling now runs', async () => {
+      mockListConversations.mockReturnValue([ended({ clearedToConvId: 7 })]);
+      mockListSessionNames.mockReturnValue(Effect.succeed(['conv-just-exited']));
+
+      const { pollConversations } = await import('../conversation-lifecycle.js');
+      await pollConversations();
+
+      expect(mockMarkConversationRunning).not.toHaveBeenCalled();
+    });
+
+    it('does not end or clean up a row the supervisor exit ended during the census await', async () => {
+      const active = { ...ended(), status: 'active' };
+      mockListConversations.mockReturnValue([active]);
+      mockGetConversationByName
+        .mockReturnValueOnce(active) // grace/fork re-read
+        .mockReturnValueOnce({ ...active, status: 'ended', endedAt: '2026-09-22T10:00:01.000Z' });
+      mockListSessionNames.mockReturnValue(Effect.succeed([]));
+
+      const { pollConversations } = await import('../conversation-lifecycle.js');
+      await pollConversations();
+
+      expect(mockMarkConversationEnded).not.toHaveBeenCalled();
+      expect(mockCleanupUnreferencedConversationAttachments).not.toHaveBeenCalled();
+    });
   });
 
   it('handles empty conversation list without errors', async () => {

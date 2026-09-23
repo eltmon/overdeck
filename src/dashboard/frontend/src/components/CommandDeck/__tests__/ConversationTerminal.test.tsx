@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConversationTerminal } from '../ConversationTerminal';
 import type { Conversation } from '../ConversationList';
 
+const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
+vi.mock('sonner', () => ({ toast: { error: toastError } }));
 vi.mock('../../XTerminal', () => ({ XTerminal: () => <div data-testid="x-terminal" /> }));
 
 const baseConversation: Conversation = {
@@ -38,6 +40,7 @@ describe('ConversationTerminal', () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    toastError.mockReset();
   });
 
   it('renders context usage in the header', () => {
@@ -95,5 +98,22 @@ describe('ConversationTerminal', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     const resumeCall = fetchMock.mock.calls.find(([url]) => String(url) === '/api/conversations/test-conv/resume');
     expect(JSON.parse(String((resumeCall?.[1] as RequestInit).body))).toEqual({ sendResumeContract: false });
+  });
+
+  it('shows the server error as a toast when resume fails', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      Response.json({ error: 'ACP host session conv-test-session exited before readiness' }, { status: 500 }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    renderTerminal({ ...baseConversation, status: 'ended', sessionAlive: false });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Resume Session' }));
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith(
+      'ACP host session conv-test-session exited before readiness',
+      { duration: 8000 },
+    ));
+    // The failed resume leaves the resume controls up instead of an optimistic terminal.
+    expect(screen.queryByTestId('x-terminal')).toBeNull();
   });
 });
