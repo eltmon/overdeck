@@ -15,10 +15,12 @@ import { loadConfigSync } from '../../../lib/config.js';
 import { getIssuePrefix, getProjectSync, type ProjectConfig } from '../../../lib/projects.js';
 import { createTracker } from '../../../lib/tracker/factory.js';
 import type { Issue, TrackerType } from '../../../lib/tracker/interface.js';
+import { describePanIgnore } from '../../../lib/pan-dir/legacy-pan-ignore.js';
 import {
   migratePanHome,
   readOpenIssuesFile,
   resolveMigrationTargets,
+  type MigratePanHomeResult,
 } from '../../../lib/pan-dir/migrate-plan-home.js';
 
 export interface MigratePlanHomeCliOptions {
@@ -95,6 +97,41 @@ async function listOpenIssuesFromTracker(project: ProjectConfig): Promise<string
   return filterOpenIssueIds(issues, trackerType, issuePrefix);
 }
 
+/**
+ * What the run found and did about a plan home that ignores `.pan/`
+ * (PAN-3996). Empty when `.pan/` is not ignored.
+ */
+export function panIgnoreReport(
+  result: Pick<MigratePanHomeResult, 'panIgnore' | 'ignoreLinesRemoved'>,
+  options: Pick<MigratePlanHomeCliOptions, 'commit' | 'dryRun'>,
+): string[] {
+  const status = result.panIgnore;
+  if (status.kind !== 'legacy' && status.kind !== 'foreign') return [];
+  const where = describePanIgnore(status);
+  if (result.ignoreLinesRemoved.length > 0) {
+    const lines = result.ignoreLinesRemoved.join(', ');
+    return [`Removed Overdeck's legacy .pan/ ignore rule (${status.source} line ${lines}); committed with the artifacts.`];
+  }
+  if (status.kind === 'foreign') {
+    return [
+      `Warning: the plan home ignores .pan/ via ${where}, which is not Overdeck's legacy line.`,
+      '  Artifacts under .pan/ cannot be committed until that rule is removed or narrowed; it was not edited.',
+    ];
+  }
+  if (options.dryRun) {
+    return [
+      `The plan home ignores .pan/ via Overdeck's legacy rule ${where}.`,
+      `  ${options.commit ? 'Without --dry-run, --commit' : '--commit'} removes that line and commits .gitignore with the artifacts.`,
+    ];
+  }
+  return [
+    `Warning: the plan home ignores .pan/ via Overdeck's legacy rule ${where};`
+    + ' the copied artifacts are ignored by git and were not committed.',
+    '  Fix: rerun with --commit (removes that line and commits .gitignore with the artifacts),',
+    `  or delete line ${status.line} from ${status.source} and commit it yourself.`,
+  ];
+}
+
 export async function runMigratePlanHome(projectKey: string, options: MigratePlanHomeCliOptions): Promise<number> {
   let stateRoot: string;
   let planHome: string;
@@ -127,13 +164,23 @@ export async function runMigratePlanHome(projectKey: string, options: MigratePla
   }
   console.log(`Found ${openIssues.length} open issue(s) for ${projectKey}.`);
 
-  const result = await migratePanHome({
-    stateRoot,
-    planHome,
-    openIssues,
-    commit: options.commit,
-    dryRun: options.dryRun,
-  });
+  let result: MigratePanHomeResult;
+  try {
+    result = await migratePanHome({
+      stateRoot,
+      planHome,
+      openIssues,
+      commit: options.commit,
+      dryRun: options.dryRun,
+    });
+  } catch (error) {
+    // PAN-3996: typed failures (MigratePlanHomeError, PlanHomeGitError) carry
+    // an operator-facing message; nothing here prints a raw stack.
+    console.error(`migrate-plan-home: ${error instanceof Error ? error.message : String(error)}`);
+    return 1;
+  }
+
+  for (const line of panIgnoreReport(result, options)) console.log(line);
 
   const verb = options.dryRun ? 'would copy' : 'copied';
   console.log(

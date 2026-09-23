@@ -6,13 +6,25 @@
  * plus new coverage for item-progress copying and `--dry-run`.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   MIGRATION_COMMIT_SUBJECT,
+  MigratePlanHomeError,
+  PlanHomeGitError,
   destinationName,
   issueIdForArtifact,
   migratePanHome,
@@ -45,7 +57,8 @@ function initGit(cwd: string): void {
 }
 
 beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), 'migrate-plan-home-'));
+  // realpath: git reports rule sources under the resolved repo root.
+  root = realpathSync(mkdtempSync(join(tmpdir(), 'migrate-plan-home-')));
   stateRoot = join(root, 'state');
   planHome = join(root, 'repo');
   mkdirSync(planHome, { recursive: true });
@@ -263,6 +276,142 @@ describe('migratePanHome', () => {
     const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, commit: true, dryRun: true });
     expect(result.committed).toBe(false);
     expect(git(planHome, 'status', '--porcelain').trim()).toBe('');
+  });
+});
+
+describe('migratePanHome: plan home that ignores .pan/ (PAN-3996)', () => {
+  const LEGACY_GITIGNORE = 'node_modules/\n# Overdeck state\n.pan/\ndist/\n';
+
+  beforeEach(() => {
+    // Isolate from the host's global excludes so only the rules under test apply.
+    write(root, 'empty-gitconfig', '');
+    vi.stubEnv('GIT_CONFIG_GLOBAL', join(root, 'empty-gitconfig'));
+    vi.stubEnv('GIT_CONFIG_NOSYSTEM', '1');
+    initGit(planHome);
+    write(planHome, '.gitignore', LEGACY_GITIGNORE);
+    write(planHome, 'tracked.txt', 'v1\n');
+    git(planHome, 'add', '--', '.gitignore', 'tracked.txt');
+    git(planHome, 'commit', '-q', '-m', 'init');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const headFiles = (): string[] =>
+    git(planHome, 'show', '--name-only', '--format=', 'HEAD').split('\n').filter(Boolean).sort();
+
+  it('--commit removes the legacy line and commits .gitignore with the artifacts, and nothing else', async () => {
+    write(planHome, 'tracked.txt', 'operator edit, unstaged\n');
+
+    const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, commit: true });
+
+    expect(result.panIgnore).toMatchObject({ kind: 'legacy', line: 3, pattern: '.pan/' });
+    expect(result.ignoreLinesRemoved).toEqual([3]);
+    expect(result.committed).toBe(true);
+    expect(readFileSync(join(planHome, '.gitignore'), 'utf8')).toBe('node_modules/\n# Overdeck state\ndist/\n');
+    expect(git(planHome, 'log', '-1', '--format=%s').trim()).toBe(MIGRATION_COMMIT_SUBJECT);
+    expect(headFiles()).toEqual(['.gitignore', ...result.copied.map((rel) => `.pan/${rel}`)].sort());
+    // The unrelated modification stays exactly where it was: modified, unstaged, uncommitted.
+    expect(git(planHome, 'status', '--porcelain')).toBe(' M tracked.txt\n');
+    expect(git(planHome, 'diff', '--cached', '--name-only')).toBe('');
+  });
+
+  it('--dry-run reports the legacy rule and writes nothing', async () => {
+    const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, commit: true, dryRun: true });
+
+    expect(result.panIgnore).toMatchObject({ kind: 'legacy', source: join(planHome, '.gitignore'), line: 3 });
+    expect(result.ignoreLinesRemoved).toEqual([]);
+    expect(result.committed).toBe(false);
+    expect(readFileSync(join(planHome, '.gitignore'), 'utf8')).toBe(LEGACY_GITIGNORE);
+    expect(existsSync(join(planHome, '.pan'))).toBe(false);
+    expect(git(planHome, 'status', '--porcelain')).toBe('');
+  });
+
+  it('without --commit copies, reports the rule, and edits nothing', async () => {
+    const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN });
+
+    expect(result.panIgnore.kind).toBe('legacy');
+    expect(result.copied.length).toBeGreaterThan(0);
+    expect(result.committed).toBe(false);
+    expect(readFileSync(join(planHome, '.gitignore'), 'utf8')).toBe(LEGACY_GITIGNORE);
+    // The copies are there but invisible to git: that is what the warning is for.
+    expect(git(planHome, 'status', '--porcelain')).toBe('');
+  });
+
+  it('a later --commit run commits artifacts an earlier run already copied', async () => {
+    await migratePanHome({ stateRoot, planHome, openIssues: OPEN });
+
+    const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, commit: true });
+
+    expect(result.copied).toEqual([]);
+    expect(result.committed).toBe(true);
+    expect(headFiles()).toContain('.gitignore');
+    expect(headFiles()).toContain('.pan/drafts/pan-100.md');
+    expect(headFiles()).toContain('.pan/continues/PAN-100.xbrief.json');
+    expect(git(planHome, 'status', '--porcelain')).toBe('');
+  });
+
+  it('refuses --commit before copying when a foreign rule ignores .pan/, and edits nothing', async () => {
+    write(planHome, '.gitignore', 'node_modules/\n');
+    git(planHome, 'commit', '-q', '-am', 'drop legacy line');
+    write(planHome, '.git/info/exclude', '.pan/\n');
+
+    const failure = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, commit: true }).catch((e: unknown) => e);
+
+    expect(failure).toBeInstanceOf(MigratePlanHomeError);
+    expect((failure as MigratePlanHomeError).code).toBe('pan-ignored-by-foreign-rule');
+    expect((failure as Error).message).toContain(`${join(planHome, '.git', 'info', 'exclude')}:1`);
+    expect(existsSync(join(planHome, '.pan'))).toBe(false);
+    expect(readFileSync(join(planHome, '.git/info/exclude'), 'utf8')).toBe('.pan/\n');
+  });
+
+  it('--commit stops without committing when a foreign rule sits behind the legacy line', async () => {
+    write(planHome, '.git/info/exclude', '.pan/\n');
+
+    const failure = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, commit: true }).catch((e: unknown) => e);
+
+    expect(failure).toBeInstanceOf(MigratePlanHomeError);
+    expect((failure as MigratePlanHomeError).code).toBe('pan-ignored-by-foreign-rule');
+    expect((failure as Error).message).toContain(`${join(planHome, '.git', 'info', 'exclude')}:1`);
+    expect(git(planHome, 'log', '-1', '--format=%s').trim()).toBe('init');
+    expect(readFileSync(join(planHome, '.git/info/exclude'), 'utf8')).toBe('.pan/\n');
+    // The legacy line is gone from the working tree (the message says so); nothing was staged.
+    expect(readFileSync(join(planHome, '.gitignore'), 'utf8')).toBe('node_modules/\n# Overdeck state\ndist/\n');
+    expect(git(planHome, 'diff', '--cached', '--name-only')).toBe('');
+  });
+
+  it('reports a foreign rule without --commit and does not edit it', async () => {
+    write(planHome, '.gitignore', 'node_modules/\n');
+    git(planHome, 'commit', '-q', '-am', 'drop legacy line');
+    write(planHome, '.pan/.gitignore', '*\n');
+    const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN });
+    expect(result.panIgnore).toMatchObject({ kind: 'foreign', source: join(planHome, '.pan', '.gitignore') });
+    expect(readFileSync(join(planHome, '.pan/.gitignore'), 'utf8')).toBe('*\n');
+  });
+
+  it('refuses --commit when .gitignore already has uncommitted changes', async () => {
+    write(planHome, '.gitignore', `${LEGACY_GITIGNORE}operator-rule/\n`);
+
+    const failure = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, commit: true }).catch((e: unknown) => e);
+
+    expect(failure).toBeInstanceOf(MigratePlanHomeError);
+    expect((failure as MigratePlanHomeError).code).toBe('gitignore-dirty');
+    expect(existsSync(join(planHome, '.pan'))).toBe(false);
+    expect(readFileSync(join(planHome, '.gitignore'), 'utf8')).toBe(`${LEGACY_GITIGNORE}operator-rule/\n`);
+  });
+
+  it('a failing git commit surfaces as a typed PlanHomeGitError and leaves nothing staged', async () => {
+    write(planHome, '.git/hooks/pre-commit', '#!/bin/sh\necho "hook says no" >&2\nexit 1\n');
+    chmodSync(join(planHome, '.git/hooks/pre-commit'), 0o755);
+
+    const failure = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, commit: true }).catch((e: unknown) => e);
+
+    expect(failure).toBeInstanceOf(PlanHomeGitError);
+    expect((failure as PlanHomeGitError).step).toBe('commit');
+    expect((failure as Error).message).toContain('hook says no');
+    expect(git(planHome, 'diff', '--cached', '--name-only')).toBe('');
+    expect(git(planHome, 'log', '-1', '--format=%s').trim()).toBe('init');
   });
 });
 
