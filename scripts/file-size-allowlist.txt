@@ -103,3 +103,4 @@
 1004 src/lib/runtimes/codex.ts # PAN-3959
 1145 src/lib/agents/spawn-prep.ts # PAN-3920
 1032 src/lib/launcher-generator.ts # PAN-3920
+1092 src/lib/agents/spawn.ts # PAN-3920
