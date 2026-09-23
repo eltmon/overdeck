@@ -858,8 +858,9 @@ program
       return candidates.find((p) => existsSync(p)) ?? null;
     })();
 
-    const { startPostLaunchSidecars } = await import('./up-sidecars.js');
+    const { startPostLaunchSidecars, ensureHerdrBeforeDashboard } = await import('./up-sidecars.js');
     const startUpSidecars = () => startPostLaunchSidecars({ selfCli: fileURLToPath(import.meta.url), projectRoot: process.cwd() });
+    await ensureHerdrBeforeDashboard(); // PAN-3956: before the dashboard, so its pane feed finds a server
 
     async function openDashboardInBrowser(url: string): Promise<void> {
       if (options.open === false) return;
