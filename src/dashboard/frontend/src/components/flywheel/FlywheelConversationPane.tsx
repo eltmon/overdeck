@@ -147,7 +147,8 @@ export function FlywheelConversationPane({ onOpenSettings }: { onOpenSettings?: 
           )}
           {run === 'paused' && (
             <>
-              <button type="button" className={PRIMARY_BUTTON} disabled={busy} onClick={() => resume.run()}>
+              {/* The embedded panel's "Resume flywheel" is this view's one primary CTA. */}
+              <button type="button" className={BUTTON} disabled={busy} onClick={() => resume.run()}>
                 <RotateCcw className="h-3.5 w-3.5" />Resume
               </button>
               <button type="button" className={BUTTON} disabled={busy} onClick={() => void handleStartFresh()}>

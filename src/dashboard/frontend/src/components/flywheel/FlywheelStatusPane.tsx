@@ -132,7 +132,7 @@ export function FlywheelStatusPane({ status, unreachable, nowMs, onNavigateIssue
                   <td className="py-1.5 pr-2">
                     <button
                       type="button"
-                      className="font-mono text-foreground hover:underline"
+                      className="whitespace-nowrap font-mono text-foreground hover:underline"
                       onClick={() => onNavigateIssue?.(row.issueId)}
                     >
                       {row.issueId}
