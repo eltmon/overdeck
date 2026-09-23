@@ -1,8 +1,15 @@
+import { chmodSync, lstatSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  HerdrConfigEditError,
   ensureHerdrConfig,
+  herdrConfigDisablesResume,
   herdrConfigPath,
+  planResumeAgentsOnRestore,
   setResumeAgentsOnRestore,
 } from '../../../../src/lib/herdr-setup/config.js';
 import type { HerdrExec } from '../../../../src/lib/herdr-setup/status.js';
@@ -12,9 +19,19 @@ const DESIRED = 'resume_agents_on_restore = false';
 
 describe('herdrConfigPath (D3)', () => {
   it('is ~/.config/herdr/config.toml, honoring XDG_CONFIG_HOME', () => {
-    expect(herdrConfigPath({ homeDir: '/home/op', configHome: '/home/op/.config' }))
+    expect(herdrConfigPath({ homeDir: '/home/op', configHome: '/home/op/.config', env: {} }))
       .toBe('/home/op/.config/herdr/config.toml');
-    expect(herdrConfigPath({ homeDir: '/home/op', configHome: '/xdg' })).toBe('/xdg/herdr/config.toml');
+    expect(herdrConfigPath({ homeDir: '/home/op', configHome: '/xdg', env: {} })).toBe('/xdg/herdr/config.toml');
+    expect(herdrConfigPath({ homeDir: '/home/op', env: { XDG_CONFIG_HOME: '/xdg2' } })).toBe('/xdg2/herdr/config.toml');
+    expect(herdrConfigPath({ homeDir: '/home/op', env: {} })).toBe('/home/op/.config/herdr/config.toml');
+  });
+
+  it('honors HERDR_CONFIG_PATH first, the way herdr does (review finding 3)', () => {
+    expect(herdrConfigPath({
+      homeDir: '/home/op',
+      configHome: '/xdg',
+      env: { HERDR_CONFIG_PATH: '/etc/herdr/mine.toml', XDG_CONFIG_HOME: '/xdg' },
+    })).toBe('/etc/herdr/mine.toml');
   });
 });
 
@@ -59,6 +76,81 @@ describe('setResumeAgentsOnRestore — the six rules (PAN-3956 W6)', () => {
   });
 });
 
+describe('planResumeAgentsOnRestore — real TOML shapes (review findings 4 and 11)', () => {
+  function edited(text: string): string {
+    const plan = planResumeAgentsOnRestore(text);
+    if (plan.kind !== 'edited') throw new Error(`expected an edit, got ${JSON.stringify(plan)}`);
+    return plan.text;
+  }
+
+  it('rewrites a root dotted key in place', () => {
+    expect(edited('onboarding = false\nsession.resume_agents_on_restore = true\n[ui]\nx = 1\n'))
+      .toBe('onboarding = false\nsession.resume_agents_on_restore = false\n[ui]\nx = 1\n');
+  });
+
+  it('adds a dotted key beside other root `session.` keys instead of a clashing [session] table', () => {
+    expect(edited('session.foo = 1\n[ui]\nx = 1\n'))
+      .toBe('session.foo = 1\nsession.resume_agents_on_restore = false\n[ui]\nx = 1\n');
+  });
+
+  it('reads a spaced header and keeps the end-of-line comment on the key line', () => {
+    expect(edited('[ session ]\nresume_agents_on_restore = true # my note\n'))
+      .toBe('[ session ]\nresume_agents_on_restore = false # my note\n');
+  });
+
+  it('rewrites a quoted key and inserts under a quoted header', () => {
+    expect(edited('[session]\n"resume_agents_on_restore" = true\n')).toBe('[session]\n"resume_agents_on_restore" = false\n');
+    expect(edited('["session"]\nfoo = 1\n')).toBe(`["session"]\n${DESIRED}\nfoo = 1\n`);
+  });
+
+  it('never mistakes a multi-line array element or a multi-line string line for a header', () => {
+    const array = '[session]\nfoo = [\n  ["a"],\n  ["b"],\n]\nbar = 2\n[ui]\nx = 1\n';
+    expect(edited(array)).toBe(`[session]\n${DESIRED}\nfoo = [\n  ["a"],\n  ["b"],\n]\nbar = 2\n[ui]\nx = 1\n`);
+    const string = '[session]\ndoc = """\n[fake]\nresume_agents_on_restore = true\n"""\n';
+    expect(edited(string)).toBe(`[session]\n${DESIRED}\ndoc = """\n[fake]\nresume_agents_on_restore = true\n"""\n`);
+  });
+
+  it('leaves a prose comment that starts with the key name alone', () => {
+    const input = '[session]\n# resume_agents_on_restore = true restarts agents; see docs\n';
+    expect(edited(input)).toBe(`[session]\n${DESIRED}\n# resume_agents_on_restore = true restarts agents; see docs\n`);
+  });
+
+  it('keeps CRLF line endings on inserted lines', () => {
+    expect(edited('onboarding = false\r\n[session]\r\nfoo = 1\r\n'))
+      .toBe(`onboarding = false\r\n[session]\r\n${DESIRED}\r\nfoo = 1\r\n`);
+  });
+
+  it('is unchanged when any TOML shape already says false', () => {
+    for (const text of [
+      'session.resume_agents_on_restore = false\n',
+      'session = { resume_agents_on_restore = false }\n',
+      '[ session ]\n\'resume_agents_on_restore\' = false\n',
+    ]) {
+      expect(planResumeAgentsOnRestore(text)).toEqual({ kind: 'unchanged' });
+    }
+  });
+
+  it('refuses an inline table with the exact hand fix', () => {
+    expect(planResumeAgentsOnRestore('session = { resume_agents_on_restore = true, foo = 1 }\n')).toEqual({
+      kind: 'refused',
+      reason: '`session` is an inline table (`session = { … }`), which Overdeck does not rewrite',
+      hint: 'set `resume_agents_on_restore = false` inside the `session = { … }` inline table',
+    });
+  });
+
+  it('refuses a file that does not parse, naming the fallback to resume on', () => {
+    const plan = planResumeAgentsOnRestore('[session\nfoo = 1\n');
+    expect(plan.kind).toBe('refused');
+    if (plan.kind !== 'refused') return;
+    expect(plan.reason).toMatch(/does not parse as TOML .*runs with resume_agents_on_restore = true/);
+    expect(plan.hint).toContain(`add \`${DESIRED}\` under \`[session]\``);
+  });
+
+  it('setResumeAgentsOnRestore throws HerdrConfigEditError instead of returning an unsafe edit', () => {
+    expect(() => setResumeAgentsOnRestore('session = { foo = 1 }\n')).toThrow(HerdrConfigEditError);
+  });
+});
+
 function memoryFs(initial: string | null) {
   const files = new Map<string, string>();
   const path = '/home/op/.config/herdr/config.toml';
@@ -78,6 +170,8 @@ function memoryFs(initial: string | null) {
     }),
     unlink: vi.fn(async (p: string) => { files.delete(p); }),
     mkdir: vi.fn(async () => {}),
+    realpath: vi.fn(async (p: string) => p),
+    fileMode: vi.fn(async () => null),
   };
 }
 
@@ -99,7 +193,7 @@ describe('ensureHerdrConfig', () => {
     const result = await ensureHerdrConfig({ ...fs, exec, binary: '/b/herdr', session: 'overdeck', serverRunning: true });
     expect(result.changed).toBe(true);
     expect(fs.files.get(fs.path)).toBe(`onboarding = false\n\n[session]\n${DESIRED}\n`);
-    expect(fs.writeFile).toHaveBeenCalledWith(`${fs.path}.tmp`, expect.any(String));
+    expect(fs.writeFile).toHaveBeenCalledWith(`${fs.path}.${process.pid}.tmp`, expect.any(String));
     expect(exec.mock.calls.map((call) => call[1])).toEqual([
       ['config', 'check'],
       ['--session', 'overdeck', 'server', 'reload-config'],
@@ -130,5 +224,78 @@ describe('ensureHerdrConfig', () => {
     await expect(ensureHerdrConfig({ ...fs, exec, binary: '/b/herdr', session: 'overdeck', serverRunning: false }))
       .rejects.toThrow(/config check rejected/);
     expect(fs.files.has(fs.path)).toBe(false);
+  });
+
+  it('writes nothing and throws the hand fix when no safe edit exists', async () => {
+    const fs = memoryFs('session = { foo = 1 }\n');
+    const exec = vi.fn(ok);
+    await expect(ensureHerdrConfig({ ...fs, exec, binary: '/b/herdr', session: 'overdeck', serverRunning: false }))
+      .rejects.toThrow(/Cannot safely edit .*config\.toml: `session` is an inline table.*then run `pan sync`/);
+    expect(fs.writeFile).not.toHaveBeenCalled();
+    expect(exec).not.toHaveBeenCalled();
+  });
+
+  it('reports a reload that exits non-zero, with the file still written (review finding 2)', async () => {
+    const fs = memoryFs('onboarding = false\n');
+    const exec = vi.fn<HerdrExec>(async (_file, args) => (
+      args.includes('reload-config')
+        ? { stdout: '', stderr: 'no server is running', exitCode: 1 }
+        : { stdout: '', stderr: '', exitCode: 0 }
+    ));
+    const result = await ensureHerdrConfig({ ...fs, exec, binary: '/b/herdr', session: 'overdeck', serverRunning: true });
+    expect(result.changed).toBe(true);
+    expect(result.reloadWarning).toMatch(/server reload-config` failed \(no server is running\)/);
+    expect(result.reloadWarning).toContain('keeps its old setting until its next restart');
+    expect(fs.files.get(fs.path)).toContain(DESIRED);
+  });
+
+  it('reports a reload that times out instead of calling the config "not updated"', async () => {
+    const fs = memoryFs('onboarding = false\n');
+    const exec = vi.fn<HerdrExec>(async (_file, args) => {
+      if (args.includes('reload-config')) throw new Error('Command timed out after 10000ms');
+      return { stdout: '', stderr: '', exitCode: 0 };
+    });
+    const result = await ensureHerdrConfig({ ...fs, exec, binary: '/b/herdr', session: 'overdeck', serverRunning: true });
+    expect(result.changed).toBe(true);
+    expect(result.reloadWarning).toContain('Command timed out after 10000ms');
+  });
+});
+
+describe('ensureHerdrConfig on a real filesystem (review finding 11)', () => {
+  const ok: HerdrExec = async () => ({ stdout: '', stderr: '', exitCode: 0 });
+
+  it('edits a symlink\'s target, keeps the link and the file mode, and leaves no tmp file', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'herdr-config-'));
+    try {
+      const target = join(dir, 'dotfiles-config.toml');
+      const link = join(dir, 'config.toml');
+      writeFileSync(target, 'onboarding = false\n');
+      chmodSync(target, 0o600);
+      symlinkSync(target, link);
+
+      const result = await ensureHerdrConfig({ exec: ok, binary: '/b/herdr', session: 'overdeck', serverRunning: false, path: link });
+
+      expect(result).toEqual({ changed: true, path: link });
+      expect(lstatSync(link).isSymbolicLink()).toBe(true);
+      expect(readFileSync(target, 'utf-8')).toBe(`onboarding = false\n\n[session]\n${DESIRED}\n`);
+      expect(statSync(target).mode & 0o777).toBe(0o600);
+      await expect(herdrConfigDisablesResume(link)).resolves.toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('herdrConfigDisablesResume is false for a missing, unparseable or resume-on file', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'herdr-config-'));
+    try {
+      const path = join(dir, 'config.toml');
+      await expect(herdrConfigDisablesResume(path)).resolves.toBe(false);
+      writeFileSync(path, '[session\n');
+      await expect(herdrConfigDisablesResume(path)).resolves.toBe(false);
+      writeFileSync(path, '[session]\nresume_agents_on_restore = true\n');
+      await expect(herdrConfigDisablesResume(path)).resolves.toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -111,6 +111,20 @@ describe('checkHerdr (PAN-3956 W9)', () => {
     expect(row(unset, 'Herdr config').message).toContain('defaults to true');
   });
 
+  it('names the exact hand fix when pan sync cannot edit the config safely (review finding 4)', async () => {
+    const inline = await checkHerdr(deps({ configText: 'session = { resume_agents_on_restore = true }\n' }));
+    expect(row(inline, 'Herdr config').status).toBe('error');
+    expect(row(inline, 'Herdr config').fix).toBe(
+      'By hand: set `resume_agents_on_restore = false` inside the `session = { … }` inline table in '
+      + '~/.config/herdr/config.toml (pan sync cannot edit it safely: `session` is an inline table '
+      + '(`session = { … }`), which Overdeck does not rewrite)',
+    );
+    const broken = await checkHerdr(deps({ configText: '[session\n' }));
+    expect(row(broken, 'Herdr config').fix).toMatch(/^By hand: fix the syntax, then add `resume_agents_on_restore = false`/);
+    const dotted = await checkHerdr(deps({ configText: 'session.resume_agents_on_restore = true\n' }));
+    expect(row(dotted, 'Herdr config').fix).toBe('Run: pan sync');
+  });
+
   it('is an error when a pilot harness is installed but its integration is not', async () => {
     const rows = await checkHerdr(deps({ integrationRows: parseIntegrationStatus(INTEGRATION_STATUS_TEXT) }));
     expect(row(rows, 'Herdr integration: omp')).toMatchObject({ status: 'error', fix: 'Run: pan sync' });

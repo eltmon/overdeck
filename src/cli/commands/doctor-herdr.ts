@@ -17,7 +17,7 @@ import { delimiter, dirname, join, resolve } from 'node:path';
 
 import { parse as parseToml } from '@iarna/toml';
 
-import { herdrConfigPath } from '../../lib/herdr-setup/config.js';
+import { herdrConfigPath, planResumeAgentsOnRestore } from '../../lib/herdr-setup/config.js';
 import { herdrInstallDir } from '../../lib/herdr-setup/binary.js';
 import {
   HERDR_INTEGRATION_BINARY,
@@ -200,6 +200,17 @@ function serverRow(deps: HerdrDoctorDeps): CheckResult {
   return { name: 'Herdr server', status: 'ok', message };
 }
 
+/**
+ * The fix for a config that does not say `false`: `pan sync` when it can make
+ * the edit safely, otherwise the exact line to add by hand — `pan sync` would
+ * refuse the same file, so naming it would never converge.
+ */
+function configFix(configText: string, where: string): string {
+  const plan = planResumeAgentsOnRestore(configText);
+  if (plan.kind !== 'refused') return FIX_SYNC;
+  return `By hand: ${plan.hint} in ${where} (pan sync cannot edit it safely: ${plan.reason})`;
+}
+
 function configRow(deps: HerdrDoctorDeps): CheckResult {
   const where = deps.configPath.startsWith(deps.home) ? `~${deps.configPath.slice(deps.home.length)}` : deps.configPath;
   if (deps.configText === null) {
@@ -213,7 +224,7 @@ function configRow(deps: HerdrDoctorDeps): CheckResult {
       name: 'Herdr config',
       status: 'error',
       message: `${where} does not parse: ${error instanceof Error ? error.message : String(error)}`,
-      fix: FIX_SYNC,
+      fix: configFix(deps.configText, where),
     };
   }
   if (value === false) {
@@ -224,7 +235,7 @@ function configRow(deps: HerdrDoctorDeps): CheckResult {
     status: 'error',
     message: `resume_agents_on_restore is ${value === undefined ? 'unset (defaults to true)' : String(value)} in ${where}`
       + ' — a Herdr restart would relaunch paused and stopped agents',
-    fix: FIX_SYNC,
+    fix: configFix(deps.configText, where),
   };
 }
 

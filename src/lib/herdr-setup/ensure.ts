@@ -2,15 +2,20 @@
  * `ensureHerdr` — the one Herdr host-setup pass `pan install`, `pan sync` and
  * `pan up` run (PAN-3956 W8, D4–D7, D10).
  *
- * Order: skip check → binary (install if absent; update per D5) → channel →
- * config (`resume_agents_on_restore = false`) → session server → status
- * verify → pilot integrations.
+ * Order: skip check → binary (install if absent) → channel → binary update
+ * (D5; after the channel so a preview binary updates to stable) → config
+ * (`resume_agents_on_restore = false`) → session server → status verify →
+ * pilot integrations.
  *
  * - `install`: installs, updates when the manifest is newer, sets up all.
  * - `sync`: same, but updates the binary only when no session server runs for
  *   this home; otherwise it warns with the manual steps.
  * - `up`: never installs or updates the binary and installs no integrations —
  *   it makes sure the config is safe and the session server is running.
+ *
+ * The herdr binary is shared by every Overdeck home, so only the default home
+ * updates it: a throwaway `OVERDECK_HOME` sees its own session stopped and
+ * would otherwise replace the binary under the live default server.
  *
  * Nothing here stops or restarts a running session server: that closes every
  * agent pane, so it is always the operator's call.
@@ -19,6 +24,7 @@
 import { homedir } from 'node:os';
 
 import {
+  DEFAULT_HERDR_SESSION_NAME,
   probeHerdrAvailability,
   selectTerminalBackend,
   type HerdrAvailability,
@@ -33,12 +39,22 @@ import {
   readHerdrVersion,
   updateHerdrBinary,
 } from './binary.js';
-import { ensureHerdrConfig, herdrConfigPath } from './config.js';
+import {
+  ensureHerdrConfig,
+  herdrConfigDisablesResume,
+  herdrConfigPath,
+  type EnsureHerdrConfigResult,
+} from './config.js';
 import {
   ensureHerdrIntegrations,
   type EnsureHerdrIntegrationsResult,
 } from './integrations.js';
-import { ensureHerdrServer, herdrUnitName, type EnsureHerdrServerResult } from './service.js';
+import {
+  ensureHerdrServer,
+  herdrPersistentUnitWanted,
+  herdrUnitName,
+  type EnsureHerdrServerResult,
+} from './service.js';
 import { defaultHerdrExec, readHerdrStatus, type HerdrExec, type HerdrStatus } from './status.js';
 
 export type EnsureHerdrMode = 'install' | 'sync' | 'up';
@@ -56,8 +72,10 @@ export interface EnsureHerdrDeps {
   readonly readStatus?: (binary: string, session: string) => Promise<HerdrStatus | null>;
   readonly ensureChannel?: (binary: string, status: HerdrStatus | null) => Promise<'stable' | 'changed' | 'unmanaged'>;
   readonly ensureConfig?: (input: { binary: string; session: string; serverRunning: boolean }) =>
-    Promise<{ changed: boolean; path: string }>;
-  readonly ensureServer?: (input: { binary: string; session: string; socket: string }) =>
+    Promise<EnsureHerdrConfigResult>;
+  /** True when the on-disk config already says `resume_agents_on_restore = false`. */
+  readonly configDisablesResume?: (path: string) => Promise<boolean>;
+  readonly ensureServer?: (input: { binary: string; session: string; socket: string; persistentUnit: boolean }) =>
     Promise<EnsureHerdrServerResult>;
   readonly ensureIntegrations?: (input: { binary: string }) => Promise<EnsureHerdrIntegrationsResult>;
 }
@@ -140,10 +158,12 @@ export async function ensureHerdr(options: EnsureHerdrOptions): Promise<EnsureHe
 
   const deps = options.deps ?? {};
   const mode = options.mode;
+  const env = deps.env ?? process.env;
   const home = deps.home ?? homedir();
   const exec = deps.exec ?? defaultHerdrExec;
   const readVersion = deps.readVersion ?? ((binary: string) => readHerdrVersion(binary, exec));
   const readStatus = deps.readStatus ?? ((binary: string, session: string) => readHerdrStatus(binary, session, exec));
+  const configPath = herdrConfigPath({ homeDir: home, env });
   const warnings: string[] = [];
 
   const probe = await (deps.probe ?? (() => probeHerdrAvailability({ homeDir: home })))();
@@ -160,7 +180,7 @@ export async function ensureHerdr(options: EnsureHerdrOptions): Promise<EnsureHe
         session,
         binary: { path: null, version: null, action: 'missing' },
         channel: 'unchecked',
-        config: { changed: false, path: herdrConfigPath({ homeDir: home }) },
+        config: { changed: false, path: configPath },
         server: { running: false, reason: "the 'herdr' binary is not installed — run `pan install`" },
         integrations: { installed: [], already: [], skipped: [] },
         warnings,
@@ -174,7 +194,7 @@ export async function ensureHerdr(options: EnsureHerdrOptions): Promise<EnsureHe
         session,
         binary: { path: null, version: null, action: 'missing' },
         channel: 'unchecked',
-        config: { changed: false, path: herdrConfigPath({ homeDir: home }) },
+        config: { changed: false, path: configPath },
         server: { running: false, reason: `Herdr install failed: ${errorMessage(error)}` },
         integrations: { installed: [], already: [], skipped: [] },
         warnings,
@@ -185,13 +205,34 @@ export async function ensureHerdr(options: EnsureHerdrOptions): Promise<EnsureHe
   let version = await readVersion(binary);
   let status = await readStatus(binary, session);
 
+  // ── channel (before the update, so a preview binary updates to stable) ────
+  let channel: EnsureHerdrRunReport['channel'] = 'unchecked';
+  if (mode !== 'up') {
+    try {
+      channel = await (deps.ensureChannel ?? ((b: string, s: HerdrStatus | null) => ensureStableChannel(b, s, exec, home)))(
+        binary,
+        status,
+      );
+    } catch (error) {
+      warnings.push(`Could not set the Herdr update channel to stable: ${errorMessage(error)}`);
+    }
+  }
+
+  // ── binary update ─────────────────────────────────────────────────────────
   if (action === 'present' && mode !== 'up') {
     latest = await (deps.fetchLatest ?? (() => fetchLatestStableVersion()))();
     if (latest === null) {
       warnings.push('Could not read https://herdr.dev/latest.json; skipped the Herdr update check.');
     } else if (version && compareSemver(latest, version) > 0) {
       const serverRunning = status?.server.running;
-      if (mode === 'install' || serverRunning === false) {
+      if (session !== DEFAULT_HERDR_SESSION_NAME) {
+        // The binary is shared: only the default home may replace it.
+        action = 'update-available';
+        warnings.push(
+          `herdr ${latest} is available; this Overdeck home (session '${session}') leaves the shared herdr binary `
+          + 'alone — update it from the default home (`pan sync` with OVERDECK_HOME unset)',
+        );
+      } else if (mode === 'install' || serverRunning === false) {
         try {
           await (deps.updateBinary ?? ((b: string) => updateHerdrBinary(b, exec)))(binary);
           action = 'updated';
@@ -210,42 +251,52 @@ export async function ensureHerdr(options: EnsureHerdrOptions): Promise<EnsureHe
     }
   }
 
-  // ── channel ───────────────────────────────────────────────────────────────
-  let channel: EnsureHerdrRunReport['channel'] = 'unchecked';
-  if (mode !== 'up') {
-    try {
-      channel = await (deps.ensureChannel ?? ((b: string, s: HerdrStatus | null) => ensureStableChannel(b, s, exec, home)))(
-        binary,
-        status,
-      );
-    } catch (error) {
-      warnings.push(`Could not set the Herdr update channel to stable: ${errorMessage(error)}`);
-    }
-  }
-
   // ── config (before the server starts, so it never starts with resume on) ──
+  const serverRunningBefore = status?.server.running === true;
   let config: EnsureHerdrRunReport['config'];
   try {
-    config = await (deps.ensureConfig ?? ((input) => ensureHerdrConfig({ ...input, exec, path: herdrConfigPath({ homeDir: home }) })))({
+    const result = await (deps.ensureConfig ?? ((input) => ensureHerdrConfig({ ...input, exec, path: configPath })))({
       binary,
       session,
-      serverRunning: status?.server.running === true,
+      serverRunning: serverRunningBefore,
     });
+    config = { changed: result.changed, path: result.path };
+    if (result.reloadWarning) warnings.push(result.reloadWarning);
   } catch (error) {
-    config = { changed: false, path: herdrConfigPath({ homeDir: home }), error: errorMessage(error) };
+    config = { changed: false, path: configPath, error: errorMessage(error) };
     warnings.push(`Herdr config not updated: ${errorMessage(error)}`);
   }
 
   // ── session server ────────────────────────────────────────────────────────
+  // A config that could not be made safe blocks STARTING a server: a server
+  // started with resume on relaunches every saved agent pane into its native
+  // resume, bypassing Overdeck's paused and stopped gates — worse than no
+  // server, whose failure is loud and fixed by the one line the error names.
+  // A server that is already running is left as it is (nothing here restarts
+  // one), and a config that already says `false` on disk never blocks.
   let server: EnsureHerdrRunReport['server'];
-  try {
-    server = await (deps.ensureServer ?? ((input) => ensureHerdrServer({ ...input, exec })))({
-      binary,
-      session,
-      socket: probe.socket,
-    });
-  } catch (error) {
-    server = { running: false, reason: errorMessage(error) };
+  const unsafeToStart = config.error !== undefined
+    && !serverRunningBefore
+    && !(await (deps.configDisablesResume ?? herdrConfigDisablesResume)(config.path));
+  if (unsafeToStart) {
+    server = {
+      running: false,
+      reason: `not started — ${config.path} does not set [session] resume_agents_on_restore = false, and a server `
+        + `started now would relaunch paused and stopped agents (${config.error})`,
+    };
+  } else {
+    try {
+      const { warning, ...result } = await (deps.ensureServer ?? ((input) => ensureHerdrServer({ ...input, exec })))({
+        binary,
+        session,
+        socket: probe.socket,
+        persistentUnit: herdrPersistentUnitWanted(session, env),
+      });
+      server = result;
+      if (warning) warnings.push(warning);
+    } catch (error) {
+      server = { running: false, reason: errorMessage(error) };
+    }
   }
 
   // ── verify ────────────────────────────────────────────────────────────────
