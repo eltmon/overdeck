@@ -3,7 +3,8 @@
  * temp plugin root, a temp Codex home and a temp OVERDECK_HOME with real
  * awaits; only the 15 s schedule runs under fake timers, with a no-I/O scan.
  */
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -12,9 +13,11 @@ import {
   CODEX_PLUGIN_SCAN_MS,
   _resetCodexPluginImporterForTests,
   issueFromCwd,
+  parseThreadReady,
   scanCodexPluginJobsOnce,
   startCodexPluginImporter,
   stopCodexPluginImporter,
+  walkForRollout,
   type CodexPluginImporterDeps,
 } from '../codex-plugin-importer.js';
 
@@ -26,6 +29,7 @@ let pluginRoot: string;
 let codexHome: string;
 let overdeckHome: string;
 let previousHome: string | undefined;
+let previousCodexHome: string | undefined;
 
 function jobsDir(): string {
   return join(pluginRoot, 'state', 'overdeck-b289e7acb782d40b', 'jobs');
@@ -96,7 +100,10 @@ beforeEach(() => {
   overdeckHome = join(base, 'overdeck');
   mkdirSync(pluginRoot, { recursive: true });
   previousHome = process.env.OVERDECK_HOME;
+  previousCodexHome = process.env.CODEX_HOME;
   process.env.OVERDECK_HOME = overdeckHome;
+  // Rollouts must sit under $CODEX_HOME/sessions, one of the transcript roots.
+  process.env.CODEX_HOME = codexHome;
 });
 
 afterEach(() => {
@@ -104,6 +111,8 @@ afterEach(() => {
   vi.useRealTimers();
   if (previousHome === undefined) delete process.env.OVERDECK_HOME;
   else process.env.OVERDECK_HOME = previousHome;
+  if (previousCodexHome === undefined) delete process.env.CODEX_HOME;
+  else process.env.CODEX_HOME = previousCodexHome;
   rmSync(base, { recursive: true, force: true });
 });
 
@@ -192,6 +201,71 @@ describe('scanCodexPluginJobsOnce', () => {
 
   it('answers an empty result when the plugin has no data directory', async () => {
     expect(await scanCodexPluginJobsOnce(deps({ root: join(base, 'missing') }))).toEqual({ jobs: 0, registered: 0, transcripts: 0 });
+  });
+});
+
+describe('scanCodexPluginJobsOnce — file safety (#4038 review)', () => {
+  it('never opens a FIFO job log, and the scan still finishes', async () => {
+    const log = writeJob('task-fifo', { status: 'running', pid: 4242 });
+    execFileSync('mkfifo', [log]);
+    const result = await scanCodexPluginJobsOnce(deps());
+    expect(result).toMatchObject({ jobs: 1, registered: 1, transcripts: 0 });
+  });
+
+  it('ignores a job log that symlinks out of the plugin root', async () => {
+    writeRollout();
+    const outsideLog = join(base, 'outside.log');
+    writeFileSync(outsideLog, `Thread ready (${THREAD}).\n`);
+    const log = writeJob('task-escape', { status: 'running', pid: 4242 });
+    symlinkSync(outsideLog, log);
+    expect(await parseThreadReady(log, pluginRoot)).toBeNull();
+    expect(await scanCodexPluginJobsOnce(deps())).toMatchObject({ registered: 1, transcripts: 0 });
+  });
+
+  it('skips a FIFO named like a job record', async () => {
+    mkdirSync(jobsDir(), { recursive: true });
+    execFileSync('mkfifo', [join(jobsDir(), 'task-pipe.json')]);
+    expect(await scanCodexPluginJobsOnce(deps())).toEqual({ jobs: 0, registered: 0, transcripts: 0 });
+  });
+
+  it('does not link a rollout that is not a regular file under the Codex sessions root', async () => {
+    writeJob('task-done-1', { status: 'completed', threadId: THREAD });
+    const warn = vi.fn();
+    const outside = join(base, `rollout-x-${THREAD}.jsonl`);
+    writeFileSync(outside, '');
+    await scanCodexPluginJobsOnce(deps({ warn, findRollout: async () => outside }));
+    await scanCodexPluginJobsOnce(deps({ warn, findRollout: async () => outside }));
+    expect(existsSync(join(overdeckHome, 'agents', 'ext-codex-plugin-task-done-1', 'sessions.json'))).toBe(false);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]![0]).toMatch(/outside the allowed directories/);
+  });
+
+  it('treats a torn registration as not seen and rewrites it with the parent link', async () => {
+    writeJob('task-run-1', { status: 'running', pid: 4242 });
+    const dir = join(overdeckHome, 'agents', 'ext-codex-plugin-task-run-1');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'registration.json'), '{"id":"ext-codex-plu');
+    expect(await scanCodexPluginJobsOnce(deps())).toMatchObject({ registered: 1 });
+    expect(registrationOf('task-run-1')).toMatchObject({ parentId: 'conv-orchestrator', pid: 4242 });
+  });
+});
+
+describe('walkForRollout', () => {
+  it('finds a rollout below YYYY/MM/DD without the sync walk, newest first, and misses cleanly', async () => {
+    const path = writeRollout();
+    expect(await walkForRollout(join(codexHome, 'sessions'), THREAD)).toBe(path);
+    expect(await walkForRollout(join(codexHome, 'sessions'), '00000000-0000-0000-0000-000000000000')).toBeNull();
+    expect(await walkForRollout(join(base, 'missing'), THREAD)).toBeNull();
+  });
+
+  it('falls back to the walk when the rollout is not in the creation-day directory', async () => {
+    const dir = join(codexHome, 'sessions', '2026', '01', '02');
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, `rollout-2026-01-02T00-00-00-${THREAD}.jsonl`);
+    writeFileSync(path, '');
+    writeJob('task-done-1', { status: 'completed', threadId: THREAD });
+    await scanCodexPluginJobsOnce(deps());
+    expect(sessionsOf('task-done-1')).toContain(path);
   });
 });
 

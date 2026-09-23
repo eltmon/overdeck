@@ -2,12 +2,17 @@
  * PAN-3920 W18 — the external agent registry: write-once registrations, the
  * sessions.json transcript link, D21 liveness and transcript completion.
  */
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { codexThreadStatus } from '../../conversations/codex-thread-status.js';
+import { checkTranscriptPath, readRegularFile } from '../external-paths.js';
 import {
+  ExternalPathError,
+  cachedTranscriptTurnComplete,
   externalAgentId,
   externalLiveness,
   listExternalRegistrations,
@@ -22,18 +27,25 @@ import {
 import { listAgentTranscriptCandidates } from '../transcript-resolver.js';
 
 let home: string;
+/** Transcript fixtures live under ~/.overdeck/agents, one of the allowed transcript roots. */
+let fixtures: string;
+let outside: string;
 let previousHome: string | undefined;
 
 beforeEach(() => {
   previousHome = process.env.OVERDECK_HOME;
   home = mkdtempSync(join(tmpdir(), 'external-registry-'));
+  outside = mkdtempSync(join(tmpdir(), 'external-registry-outside-'));
   process.env.OVERDECK_HOME = home;
+  fixtures = join(home, 'agents', 'fixtures');
+  mkdirSync(fixtures, { recursive: true });
 });
 
 afterEach(() => {
   if (previousHome === undefined) delete process.env.OVERDECK_HOME;
   else process.env.OVERDECK_HOME = previousHome;
   rmSync(home, { recursive: true, force: true });
+  rmSync(outside, { recursive: true, force: true });
 });
 
 function input(overrides: Partial<ExternalRegistrationInput> = {}): ExternalRegistrationInput {
@@ -107,7 +119,7 @@ describe('registerExternalAgent', () => {
 describe('recordExternalTranscript', () => {
   it('makes the agent transcript resolver return the recorded path, and a repeat writes nothing', async () => {
     const { id } = await registerExternalAgent(input());
-    const rollout = join(home, 'rollout-2026-09-23T10-00-00-thread-1.jsonl');
+    const rollout = join(fixtures, 'rollout-2026-09-23T10-00-00-thread-1.jsonl');
     writeFileSync(rollout, '');
 
     expect(await recordExternalTranscript(id, { sessionId: 'thread-1', harness: 'codex', model: 'gpt-5.6-sol', path: rollout })).toBe(true);
@@ -164,8 +176,8 @@ describe('transcriptTurnComplete', () => {
   const event = (type: string) => JSON.stringify({ type: 'event_msg', payload: { type } });
 
   it('reads a Codex rollout by its newest task event', async () => {
-    const done = join(home, 'done.jsonl');
-    const running = join(home, 'running.jsonl');
+    const done = join(fixtures, 'done.jsonl');
+    const running = join(fixtures, 'running.jsonl');
     writeFileSync(done, [event('task_started'), event('task_complete')].join('\n'));
     writeFileSync(running, [event('task_complete'), event('task_started')].join('\n'));
     expect(await transcriptTurnComplete('codex', done)).toBe(true);
@@ -174,8 +186,8 @@ describe('transcriptTurnComplete', () => {
 
   it('reads a Claude transcript by the last assistant stop_reason', async () => {
     const assistant = (stop: string | null) => JSON.stringify({ type: 'assistant', message: { stop_reason: stop } });
-    const done = join(home, 'claude-done.jsonl');
-    const mid = join(home, 'claude-mid.jsonl');
+    const done = join(fixtures, 'claude-done.jsonl');
+    const mid = join(fixtures, 'claude-mid.jsonl');
     writeFileSync(done, [assistant('tool_use'), JSON.stringify({ type: 'user' }), assistant('end_turn'), ''].join('\n'));
     writeFileSync(mid, [assistant('end_turn'), JSON.stringify({ type: 'user' }), assistant('tool_use')].join('\n'));
     expect(await transcriptTurnComplete('claude', done)).toBe(true);
@@ -183,7 +195,72 @@ describe('transcriptTurnComplete', () => {
   });
 
   it('answers false for other kinds and missing files', async () => {
-    expect(await transcriptTurnComplete('pi', join(home, 'x.jsonl'))).toBe(false);
-    expect(await transcriptTurnComplete('claude', join(home, 'missing.jsonl'))).toBe(false);
+    expect(await transcriptTurnComplete('pi', join(fixtures, 'x.jsonl'))).toBe(false);
+    expect(await transcriptTurnComplete('claude', join(fixtures, 'missing.jsonl'))).toBe(false);
+  });
+});
+
+describe('transcript path rules (#4038 review)', () => {
+  function fifo(path: string): string {
+    execFileSync('mkfifo', [path]);
+    return path;
+  }
+
+  it('accepts a regular file under a root and records its canonical path', async () => {
+    const file = join(fixtures, 'ok.jsonl');
+    writeFileSync(file, '');
+    expect(await checkTranscriptPath(file)).toEqual({ ok: true, path: file });
+  });
+
+  it('rejects a path outside the roots, a symlink escaping them, a FIFO and a directory', async () => {
+    const secret = join(outside, 'secret.jsonl');
+    writeFileSync(secret, '{"type":"assistant"}\n');
+    const escape = join(fixtures, 'escape.jsonl');
+    symlinkSync(secret, escape);
+    const pipe = fifo(join(fixtures, 'pipe.jsonl'));
+    const dir = join(fixtures, 'dir.jsonl');
+    mkdirSync(dir);
+
+    expect(await checkTranscriptPath(secret)).toMatchObject({ ok: false, error: expect.stringMatching(/outside the allowed directories/) });
+    expect(await checkTranscriptPath(escape)).toMatchObject({ ok: false, error: expect.stringMatching(/outside the allowed directories/) });
+    expect(await checkTranscriptPath(pipe)).toMatchObject({ ok: false, error: expect.stringMatching(/not a regular file/) });
+    expect(await checkTranscriptPath(dir)).toMatchObject({ ok: false, error: expect.stringMatching(/not a regular file/) });
+
+    const { id } = await registerExternalAgent(input());
+    for (const path of [secret, escape, pipe, dir]) {
+      await expect(recordExternalTranscript(id, { sessionId: 's', harness: 'codex', path })).rejects.toBeInstanceOf(ExternalPathError);
+    }
+    expect(existsSync(join(home, 'agents', id, 'sessions.json'))).toBe(false);
+  });
+
+  it('never blocks on a FIFO swapped in after registration', async () => {
+    const pipe = fifo(join(fixtures, 'swapped.jsonl'));
+    // Every read path answers at once instead of waiting for a writer.
+    expect(await transcriptTurnComplete('codex', pipe)).toBe(false);
+    expect(await transcriptTurnComplete('claude', pipe)).toBe(false);
+    expect(await cachedTranscriptTurnComplete('claude', pipe)).toBe(false);
+    expect(await readRegularFile(pipe, 1024)).toBeNull();
+    await expect(codexThreadStatus(pipe)).rejects.toThrow(/not a regular file/);
+  });
+});
+
+describe('crash-safe write-once registration (#4038 review)', () => {
+  it('replaces a torn (empty or unparseable) registration and leaves no temp files', async () => {
+    const id = externalAgentId('codex-plugin', 'task-mu9b1x4e-bqx80g');
+    const dir = join(home, 'agents', id);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'registration.json'), '');
+    expect(await readExternalRegistration(id)).toBeNull();
+
+    expect(await registerExternalAgent(input())).toEqual({ id, created: true });
+    expect(await readExternalRegistration(id)).toMatchObject({ id, parentId: 'conv-alpha' });
+    expect(await registerExternalAgent(input())).toEqual({ id, created: false });
+    expect(readdirSync(dir)).toEqual(['registration.json']);
+  });
+
+  it('two concurrent registrations create exactly one', async () => {
+    const results = await Promise.all([registerExternalAgent(input()), registerExternalAgent(input())]);
+    expect(results.filter((result) => result.created)).toHaveLength(1);
+    expect(readdirSync(join(home, 'agents', results[0]!.id))).toEqual(['registration.json']);
   });
 });

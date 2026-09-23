@@ -9,10 +9,13 @@
 import { basename, isAbsolute } from 'node:path';
 
 import { parseIssueIdSync } from '../issue-id.js';
+import { checkTranscriptPath } from './external-paths.js';
 import {
   EXTERNAL_FIELD_ID_RE,
   EXTERNAL_SOURCE_RE,
+  ExternalPathError,
   RESERVED_EXTERNAL_SOURCES,
+  hasRecordedTranscript,
   readPidStartTime,
   recordExternalTranscript,
   registerExternalAgent,
@@ -141,18 +144,25 @@ export interface ExternalRegisterDeps {
 }
 
 /**
- * Write the registration (reading the pid's start time itself) and, for a new
- * registration, its transcript link. A repeat registration writes nothing.
+ * Write the registration (reading the pid's start time itself) and its
+ * transcript link. The transcript path is checked before anything is written
+ * (a regular file under the transcript roots; `ExternalPathError` otherwise).
+ * A repeat registration writes no registration; it links the transcript only
+ * when none is linked yet, so a retry after a failed append repairs the link.
  */
 export async function performExternalRegistration(
   request: ExternalRegisterRequest,
   deps: ExternalRegisterDeps = {},
 ): Promise<{ id: string; created: boolean }> {
+  if (request.transcript?.path) {
+    const checked = await checkTranscriptPath(request.transcript.path);
+    if (!checked.ok) throw new ExternalPathError(`transcript ${checked.error}`);
+  }
   const pidStartTime = request.input.pid === null
     ? null
     : await (deps.readPidStartTime ?? readPidStartTime)(request.input.pid);
   const result = await registerExternalAgent({ ...request.input, pidStartTime });
-  if (result.created && request.transcript) {
+  if (request.transcript && (result.created || !(await hasRecordedTranscript(result.id)))) {
     await recordExternalTranscript(result.id, {
       sessionId: request.transcript.sessionId,
       harness: request.input.harness,

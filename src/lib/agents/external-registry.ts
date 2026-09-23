@@ -6,24 +6,32 @@
  * or message it; it can only show it. A registration records facts, never
  * status:
  *
- *   ~/.overdeck/agents/ext-<source>-<slug>/registration.json  write-once (`wx`)
+ *   ~/.overdeck/agents/ext-<source>-<slug>/registration.json  write-once
  *   ~/.overdeck/agents/ext-<source>-<slug>/sessions.json      append-only index
+ *
+ * Write-once is crash-safe: the registration is written to a temp file,
+ * fsynced, then `link()`ed to its final name, so the name only ever appears
+ * with complete content. A file that does not parse (from a crash before this
+ * rule) counts as absent and is replaced.
  *
  * Later facts (thread id, transcript path) are appended to `sessions.json`, so
  * the agent transcript route (`/api/agents/:id/conversation`) reads external
- * agents with no change. Liveness is derived on every read from the recorded
- * pid and its start time; nothing here ever writes a state.
+ * agents with no change. Transcript paths must be regular files under the
+ * allowed roots (external-paths.ts), checked when recorded and before every
+ * read. Liveness is derived on every read from the recorded pid and its start
+ * time; nothing here ever writes a state.
  *
  * Async fs only: the dashboard server imports this module.
  */
-import { createHash } from 'node:crypto';
-import { access, mkdir, open, readFile, readdir, stat, writeFile } from 'node:fs/promises';
+import { createHash, randomBytes } from 'node:crypto';
+import { access, link, mkdir, open, readFile, readdir, rename, stat, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { codexThreadStatus } from '../conversations/codex-thread-status.js';
 import { getOverdeckHome } from '../paths.js';
+import { checkTranscriptPath, readRegularFile } from './external-paths.js';
 import {
-  appendSessionIdToHistory,
+  appendSessionIdToHistoryAsync,
   parseSessionIndex,
   type SessionIndexEntry,
   type TranscriptCandidateKind,
@@ -135,21 +143,50 @@ export async function registerExternalAgent(
     registeredAt: now().toISOString(),
   };
   await mkdir(dir, { recursive: true });
+  const final = join(dir, REGISTRATION_FILE);
+  const temp = join(dir, `.${REGISTRATION_FILE}.${process.pid}.${randomBytes(4).toString('hex')}.tmp`);
   try {
-    await writeFile(join(dir, REGISTRATION_FILE), `${JSON.stringify(registration, null, 2)}\n`, { flag: 'wx' });
+    const handle = await open(temp, 'wx');
+    try {
+      await handle.writeFile(`${JSON.stringify(registration, null, 2)}\n`, 'utf8');
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    try {
+      await link(temp, final);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      // Present and complete: this is a repeat registration, write nothing.
+      if (await readExternalRegistration(id)) return { id, created: false };
+      // Present but unparseable (a torn write from before the link rule): replace it atomically.
+      await rename(temp, final);
+    }
+    await syncDirectory(dir);
     return { id, created: true };
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'EEXIST') return { id, created: false };
-    throw error;
+  } finally {
+    await unlink(temp).catch(() => {});
   }
 }
 
-async function readIndex(id: string): Promise<SessionIndexEntry[]> {
+/** Persist the new directory entry; best effort (not every platform can fsync a directory). */
+async function syncDirectory(dir: string): Promise<void> {
   try {
-    return parseSessionIndex(await readFile(join(externalAgentDir(id), 'sessions.json'), 'utf8'));
-  } catch {
-    return [];
-  }
+    const handle = await open(dir, 'r');
+    try { await handle.sync(); } finally { await handle.close(); }
+  } catch { /* best effort */ }
+}
+
+const SESSION_INDEX_MAX_BYTES = 4 * 1024 * 1024;
+
+async function readIndex(id: string): Promise<SessionIndexEntry[]> {
+  const raw = await readRegularFile(join(externalAgentDir(id), 'sessions.json'), SESSION_INDEX_MAX_BYTES);
+  return raw === null ? [] : parseSessionIndex(raw);
+}
+
+/** A caller-supplied path that is not a regular file under the allowed roots. */
+export class ExternalPathError extends Error {
+  readonly name = 'ExternalPathError';
 }
 
 /** True when the registration's session index already names a transcript path. */
@@ -160,17 +197,25 @@ export async function hasRecordedTranscript(id: string): Promise<boolean> {
 /**
  * Append the transcript facts to `sessions.json` (D20). Skipped when the index
  * already holds the same session with a path, so repeated scans write nothing.
+ * A path must be a regular file under the transcript roots; its canonical path
+ * is what gets recorded. Throws `ExternalPathError` otherwise.
  */
 export async function recordExternalTranscript(
   id: string,
   transcript: { sessionId: string; harness: string; model?: string; path?: string },
 ): Promise<boolean> {
+  let path: string | undefined;
+  if (transcript.path) {
+    const checked = await checkTranscriptPath(transcript.path);
+    if (!checked.ok) throw new ExternalPathError(`transcript ${checked.error}`);
+    path = checked.path;
+  }
   const existing = (await readIndex(id)).find((entry) => entry.sessionId === transcript.sessionId.trim());
-  if (existing && (existing.path || !transcript.path)) return false;
-  appendSessionIdToHistory(id, transcript.sessionId, SOURCE_TAG, {
+  if (existing && (existing.path || !path)) return false;
+  await appendSessionIdToHistoryAsync(id, transcript.sessionId, SOURCE_TAG, {
     harness: transcript.harness,
     ...(transcript.model ? { model: transcript.model } : {}),
-    ...(transcript.path ? { path: transcript.path } : {}),
+    ...(path ? { path } : {}),
   });
   return true;
 }
@@ -211,12 +256,11 @@ export function parseRegistration(raw: string): ExternalRegistration | null {
 
 export async function readExternalRegistration(id: string): Promise<ExternalRegistration | null> {
   if (!isExternalAgentId(id) || !EXTERNAL_FIELD_ID_RE.test(id)) return null;
-  try {
-    return parseRegistration(await readFile(join(externalAgentDir(id), REGISTRATION_FILE), 'utf8'));
-  } catch {
-    return null;
-  }
+  const raw = await readRegularFile(join(externalAgentDir(id), REGISTRATION_FILE), REGISTRATION_MAX_BYTES);
+  return raw === null ? null : parseRegistration(raw);
 }
+
+const REGISTRATION_MAX_BYTES = 64 * 1024;
 
 export async function listExternalRegistrations(): Promise<ExternalRegistration[]> {
   let names: string[];
@@ -292,23 +336,11 @@ export async function externalLiveness(
 
 const CLAUDE_TAIL_BYTES = 64 * 1024;
 
-async function readTail(path: string, bytes: number): Promise<string[]> {
-  const handle = await open(path, 'r');
-  try {
-    const { size } = await handle.stat();
-    const start = Math.max(0, size - bytes);
-    const buffer = Buffer.alloc(size - start);
-    await handle.read(buffer, 0, buffer.length, start);
-    const lines = buffer.toString('utf8').split('\n');
-    if (start > 0) lines.shift();
-    return lines;
-  } finally {
-    await handle.close();
-  }
-}
-
 async function claudeTurnComplete(path: string): Promise<boolean> {
-  for (const line of (await readTail(path, CLAUDE_TAIL_BYTES)).reverse()) {
+  const tail = await readRegularFile(path, CLAUDE_TAIL_BYTES, 'tail');
+  if (tail === null) return false;
+  // A partial first line (the tail cut a record) fails to parse and is skipped.
+  for (const line of tail.split('\n').reverse()) {
     if (!line.trim()) continue;
     let record: { type?: unknown; message?: { stop_reason?: unknown } };
     try { record = JSON.parse(line); } catch { continue; }
@@ -320,9 +352,15 @@ async function claudeTurnComplete(path: string): Promise<boolean> {
 
 /**
  * Whether the transcript's last turn finished: Codex by its newest task event,
- * Claude by the last assistant record's `end_turn`. Other kinds: false.
+ * Claude by the last assistant record's `end_turn`. Other kinds: false. The
+ * path is re-checked (a regular file under the transcript roots) before every
+ * read, because a recorded file can be replaced after registration.
  */
 export async function transcriptTurnComplete(kind: TranscriptCandidateKind, path: string): Promise<boolean> {
+  if (kind !== 'codex' && kind !== 'claude') return false;
+  const checked = await checkTranscriptPath(path);
+  if (!checked.ok) return false;
+  path = checked.path;
   try {
     if (kind === 'codex') return (await codexThreadStatus(path)) === 'done';
     if (kind === 'claude') return await claudeTurnComplete(path);

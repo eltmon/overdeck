@@ -11,8 +11,13 @@
  * `~/.claude/plugins/**`. Writes go to the external registry
  * (`~/.overdeck/agents/ext-codex-plugin-<job>/`), write-once facts plus the
  * append-only sessions.json transcript link. A job is registered once
- * (the registration file's existence is the "seen" check) and its transcript
- * is linked once (a recorded `path` ends the work for that job).
+ * (a registration that parses is the "seen" check; a torn one is rewritten)
+ * and its transcript is linked once (a recorded `path` ends the work for it).
+ *
+ * Every file it opens is checked first: job records and the job log must be
+ * regular files under the plugin root, the rollout a regular file under the
+ * Codex sessions root, and reads use O_NONBLOCK (external-paths.ts), so a
+ * FIFO can never wedge a scan.
  *
  * Retire this adapter when plugin hooks (PAN-3940) let the plugin call the
  * registration door itself.
@@ -24,27 +29,33 @@
  * `threadId` once the job completes; the log holds `Thread ready (<id>).` as
  * soon as the Codex thread starts.
  */
-import { access, open, readdir, readFile } from 'node:fs/promises';
+import { readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import {
+  checkRegularFileUnder,
+  checkTranscriptPath,
+  codexHomeDir,
+  readRegularFile,
+} from '../../../lib/agents/external-paths.js';
+import {
   EXTERNAL_AGENT_PREFIX,
-  REGISTRATION_FILE,
-  externalAgentDir,
   externalAgentId,
   hasRecordedTranscript,
+  readExternalRegistration,
   readPidStartTime,
   recordExternalTranscript,
   registerExternalAgent,
 } from '../../../lib/agents/external-registry.js';
 import { getOverdeckHome } from '../../../lib/paths.js';
-import { findRolloutPath } from '../../../lib/runtimes/codex-rollout-path.js';
 import { parseSessionIndex, type SessionIndexEntry } from '../../../lib/session-history.js';
 
 export const CODEX_PLUGIN_SOURCE = 'codex-plugin';
 export const CODEX_PLUGIN_SCAN_MS = 15_000;
 const LOG_HEAD_BYTES = 16 * 1024;
+const JOB_RECORD_MAX_BYTES = 1024 * 1024;
+const SESSION_INDEX_MAX_BYTES = 4 * 1024 * 1024;
 const THREAD_READY_RE = /Thread ready \(([0-9a-f-]{36})\)/;
 const ISSUE_FROM_CWD_RE = /\/workspaces\/feature-([a-z]+-\d+)(?:\/|$)/i;
 const DAY_MS = 86_400_000;
@@ -72,7 +83,7 @@ export interface ConversationSessionRef {
 export interface CodexPluginImporterDeps {
   /** Plugin data root; default `$OVERDECK_CODEX_PLUGIN_DATA` or `~/.claude/plugins/data/codex-openai-codex`. */
   readonly root?: string;
-  /** Codex home whose `sessions/` holds the rollouts; default `~/.codex`. */
+  /** Codex home whose `sessions/` holds the rollouts; default `$CODEX_HOME`, else `~/.codex` (the transcript root rollouts must sit under). */
   readonly codexHome?: string;
   readonly listConversations?: () => Promise<readonly ConversationSessionRef[]>;
   /** Agent directory names under `~/.overdeck/agents` (agents and conversations). */
@@ -130,20 +141,16 @@ export function issueFromCwd(cwd: string | null): string | null {
   return match ? match[1]!.toUpperCase() : null;
 }
 
-/** The Codex thread id from the first 16 KiB of a job log. */
-export async function parseThreadReady(logFile: string): Promise<string | null> {
-  try {
-    const handle = await open(logFile, 'r');
-    try {
-      const buffer = Buffer.alloc(LOG_HEAD_BYTES);
-      const { bytesRead } = await handle.read(buffer, 0, LOG_HEAD_BYTES, 0);
-      return THREAD_READY_RE.exec(buffer.toString('utf8', 0, bytesRead))?.[1] ?? null;
-    } finally {
-      await handle.close();
-    }
-  } catch {
-    return null;
-  }
+/**
+ * The Codex thread id from the first 16 KiB of a job log. The log must be a
+ * regular file under the plugin data root (a job record names it; a FIFO or a
+ * symlink out of the root is never opened).
+ */
+export async function parseThreadReady(logFile: string, root: string = codexPluginDataRoot()): Promise<string | null> {
+  const checked = await checkRegularFileUnder(logFile, [root]);
+  if (!checked.ok) return null;
+  const head = await readRegularFile(checked.path, LOG_HEAD_BYTES);
+  return head === null ? null : THREAD_READY_RE.exec(head)?.[1] ?? null;
 }
 
 // ─── default sources ─────────────────────────────────────────────────────────
@@ -159,11 +166,8 @@ async function defaultListAgentDirs(): Promise<readonly string[]> {
 }
 
 async function defaultReadSessionIndex(agentDir: string): Promise<readonly SessionIndexEntry[]> {
-  try {
-    return parseSessionIndex(await readFile(join(getOverdeckHome(), 'agents', agentDir, 'sessions.json'), 'utf8'));
-  } catch {
-    return [];
-  }
+  const raw = await readRegularFile(join(getOverdeckHome(), 'agents', agentDir, 'sessions.json'), SESSION_INDEX_MAX_BYTES);
+  return raw === null ? [] : parseSessionIndex(raw);
 }
 
 function localDayDir(ms: number): string[] {
@@ -175,27 +179,63 @@ function localDayDir(ms: number): string[] {
   ];
 }
 
-/** Rollout ids already walked for in this process; the full-tree fallback runs once per thread. */
-const walkedThreads = new Set<string>();
+/** Bounds on the fallback walk of `sessions/`: YYYY/MM/DD/<file>, at most this many entries. */
+export const ROLLOUT_WALK_MAX_DEPTH = 4;
+export const ROLLOUT_WALK_MAX_ENTRIES = 50_000;
+/** A thread the fallback walk did not find is not walked for again this soon. */
+export const ROLLOUT_WALK_MISS_TTL_MS = 10 * 60_000;
+
+/** Fallback-walk results per thread for the process lifetime: a path, or the time of the miss. */
+const walkedThreads = new Map<string, { path: string } | { missedAt: number }>();
+
+/**
+ * Async, bounded walk of `sessions/` for `*-<threadId>.jsonl`: never deeper
+ * than YYYY/MM/DD, never more than ROLLOUT_WALK_MAX_ENTRIES directory entries,
+ * and only regular files match. Newest years/months/days first.
+ */
+export async function walkForRollout(sessionsRoot: string, threadId: string): Promise<string | null> {
+  const suffix = `-${threadId}.jsonl`;
+  let budget = ROLLOUT_WALK_MAX_ENTRIES;
+  const walk = async (dir: string, depth: number): Promise<string | null> => {
+    const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+    budget -= entries.length;
+    const hit = entries.find((entry) => entry.isFile() && entry.name.endsWith(suffix));
+    if (hit) return join(dir, hit.name);
+    if (depth >= ROLLOUT_WALK_MAX_DEPTH) return null;
+    const dirs = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort().reverse();
+    for (const name of dirs) {
+      if (budget <= 0) return null;
+      const found = await walk(join(dir, name), depth + 1);
+      if (found) return found;
+    }
+    return null;
+  };
+  return walk(sessionsRoot, 1);
+}
 
 /**
  * The rollout for a thread: first the `sessions/YYYY/MM/DD` directories around
- * the job's creation day (async), then — once per thread per process — the
- * cached full walk `findRolloutPath` (codex.ts) that other readers share.
+ * the job's creation day, then the bounded async walk, cached per thread for
+ * the process lifetime (a miss is retried after ROLLOUT_WALK_MISS_TTL_MS, since
+ * a running job's rollout may not exist yet).
  */
 async function defaultFindRollout(codexHome: string, threadId: string, createdAt: string | null): Promise<string | null> {
+  const sessionsRoot = join(codexHome, 'sessions');
   const created = createdAt ? Date.parse(createdAt) : Number.NaN;
   if (Number.isFinite(created)) {
     for (const ms of [created, created - DAY_MS, created + DAY_MS]) {
-      const dir = join(codexHome, 'sessions', ...localDayDir(ms));
-      const names = await readdir(dir).catch(() => [] as string[]);
-      const hit = names.find((name) => name.endsWith(`-${threadId}.jsonl`));
-      if (hit) return join(dir, hit);
+      const dir = join(sessionsRoot, ...localDayDir(ms));
+      const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+      const hit = entries.find((entry) => entry.isFile() && entry.name.endsWith(`-${threadId}.jsonl`));
+      if (hit) return join(dir, hit.name);
     }
   }
-  if (walkedThreads.has(threadId)) return null;
-  walkedThreads.add(threadId);
-  return findRolloutPath(codexHome, threadId);
+  const cached = walkedThreads.get(threadId);
+  if (cached && 'path' in cached) return cached.path;
+  if (cached && Date.now() - cached.missedAt < ROLLOUT_WALK_MISS_TTL_MS) return null;
+  const path = await walkForRollout(sessionsRoot, threadId);
+  walkedThreads.set(threadId, path ? { path } : { missedAt: Date.now() });
+  return path;
 }
 
 // ─── scan ────────────────────────────────────────────────────────────────────
@@ -210,8 +250,9 @@ async function listJobFiles(root: string): Promise<string[]> {
   for (const workspace of workspaces) {
     if (!workspace.isDirectory()) continue;
     const jobsDir = join(stateDir, workspace.name, 'jobs');
-    for (const name of await readdir(jobsDir).catch(() => [] as string[])) {
-      if (name.endsWith('.json')) files.push(join(jobsDir, name));
+    // Regular files only: a FIFO, symlink or directory named *.json is never read.
+    for (const entry of await readdir(jobsDir, { withFileTypes: true }).catch(() => [])) {
+      if (entry.isFile() && entry.name.endsWith('.json')) files.push(join(jobsDir, entry.name));
     }
   }
   return files.sort();
@@ -246,24 +287,24 @@ function parentResolver(deps: CodexPluginImporterDeps): (sessionId: string) => P
  */
 export async function scanCodexPluginJobsOnce(deps: CodexPluginImporterDeps = {}): Promise<ScanResult> {
   const root = deps.root ?? codexPluginDataRoot();
-  const codexHome = deps.codexHome ?? join(homedir(), '.codex');
+  const codexHome = deps.codexHome ?? codexHomeDir();
   const warn = deps.warn ?? ((message: string) => console.warn(message));
+  const warnOnce = (key: string, message: string) => {
+    if (warnedPaths.has(key)) return;
+    warnedPaths.add(key);
+    warn(message);
+  };
   const parentFor = parentResolver(deps);
   const findRollout = deps.findRollout ?? defaultFindRollout;
   const result: ScanResult = { jobs: 0, registered: 0, transcripts: 0 };
 
   for (const file of await listJobFiles(root)) {
-    let job: CodexPluginJob | null = null;
-    try {
-      job = parseCodexPluginJob(await readFile(file, 'utf8'));
-    } catch {
-      continue; // removed between readdir and read: the plugin pruned it
-    }
+    // Removed between readdir and read (the plugin pruned it) or no longer a regular file: skip.
+    const raw = await readRegularFile(file, JOB_RECORD_MAX_BYTES);
+    if (raw === null) continue;
+    const job = parseCodexPluginJob(raw);
     if (!job) {
-      if (!warnedPaths.has(file)) {
-        warnedPaths.add(file);
-        warn(`[codex-plugin-importer] skipping unreadable job record ${file} (not JSON, or no id/sessionId)`);
-      }
+      warnOnce(file, `[codex-plugin-importer] skipping unreadable job record ${file} (not JSON, or no id/sessionId)`);
       continue;
     }
     result.jobs++;
@@ -271,7 +312,8 @@ export async function scanCodexPluginJobsOnce(deps: CodexPluginImporterDeps = {}
     if (await hasRecordedTranscript(id)) continue;
 
     try {
-      const seen = await access(join(externalAgentDir(id), REGISTRATION_FILE)).then(() => true, () => false);
+      // Seen = a registration that parses. A torn or empty file is not seen and is rewritten.
+      const seen = (await readExternalRegistration(id)) !== null;
       if (!seen) {
         const live = job.status === 'queued' || job.status === 'running';
         const pid = live ? job.pid : null;
@@ -291,15 +333,20 @@ export async function scanCodexPluginJobsOnce(deps: CodexPluginImporterDeps = {}
         if (registered.created) result.registered++;
       }
 
-      const threadId = job.threadId ?? (job.logFile ? await parseThreadReady(job.logFile) : null);
+      const threadId = job.threadId ?? (job.logFile ? await parseThreadReady(job.logFile, root) : null);
       if (!threadId) continue;
-      const path = await findRollout(codexHome, threadId, job.createdAt);
-      if (!path) continue;
+      const found = await findRollout(codexHome, threadId, job.createdAt);
+      if (!found) continue;
+      const rollout = await checkTranscriptPath(found);
+      if (!rollout.ok) {
+        warnOnce(found, `[codex-plugin-importer] not linking ${job.id}: rollout ${rollout.error}`);
+        continue;
+      }
       const recorded = await recordExternalTranscript(id, {
         sessionId: threadId,
         harness: 'codex',
         ...(job.model ? { model: job.model } : {}),
-        path,
+        path: rollout.path,
       });
       if (recorded) result.transcripts++;
     } catch (error) {

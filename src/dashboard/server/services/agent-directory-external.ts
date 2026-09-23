@@ -28,6 +28,7 @@ import {
   type ExternalLiveness,
   type ExternalRegistration,
 } from '../../../lib/agents/external-registry.js';
+import { checkTranscriptPath } from '../../../lib/agents/external-paths.js';
 import { resolveAgentTranscriptCandidate } from '../../../lib/agents/transcript-resolver.js';
 import { withConcurrencyLimitPromise } from '../../../lib/concurrency.js';
 import type { TranscriptCandidate, TranscriptCandidateKind } from '../../../lib/session-history.js';
@@ -54,9 +55,15 @@ export interface ExternalDirectorySources {
 export const defaultExternalDirectorySources: ExternalDirectorySources = {
   listRegistrations: listExternalRegistrations,
   liveness: (registration) => externalLiveness(registration),
-  // Directory reads never write lifecycle log lines (D1).
-  resolveTranscript: (registration) =>
-    resolveAgentTranscriptCandidate(registration.id, registration.cwd ?? '', { logDiagnostic: () => {} }),
+  resolveTranscript: async (registration) => {
+    // Directory reads never write lifecycle log lines (D1).
+    const candidate = await resolveAgentTranscriptCandidate(registration.id, registration.cwd ?? '', { logDiagnostic: () => {} });
+    if (!candidate) return null;
+    // Another tool wrote this path; it may have been replaced since it was
+    // recorded. Only a regular file under the transcript roots is read.
+    const safe = await checkTranscriptPath(candidate.path);
+    return safe.ok ? { ...candidate, path: safe.path } : null;
+  },
   mtimeMs: (path) => stat(path).then((info) => info.mtimeMs, () => null),
   turnComplete: cachedTranscriptTurnComplete,
 };

@@ -296,3 +296,12 @@ with the parent resolved then (conversation by Claude session, else the agent or
 whose `sessions.json` holds that session, else `claude-session:<uuid>`), and links the job's
 Codex rollout once its thread id is known. It never writes under `~/.claude/plugins`. Cleanup
 keeps `ext-*` directories (`isExternalAgentDirectory`).
+
+File safety (`src/lib/agents/external-paths.ts`): every file another tool names is `realpath`ed
+and must be a regular file under its root, checked at registration and again before every read,
+because it can be replaced later. Transcripts: `~/.claude/projects`, `$CODEX_HOME/sessions`
+(default `~/.codex/sessions`), `~/.overdeck/agents`; the job log: the plugin data root. Reads
+open with `O_NONBLOCK` and re-check the descriptor with `fstat`, so a FIFO never pins a libuv
+thread. A registration is written to a temp file, fsynced and `link()`ed to `registration.json`,
+so the name only appears with complete content; a file that does not parse counts as absent and
+is replaced. The transcript link is appended with the async `appendSessionIdToHistoryAsync`.

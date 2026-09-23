@@ -18,6 +18,7 @@ import {
   type ExternalRegisterFields,
   type ParsedRegisterFields,
 } from '../../../lib/agents/external-register.js';
+import { ExternalPathError } from '../../../lib/agents/external-registry.js';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { validateAgentRuntimeEventAuth } from './agents/shared.js';
@@ -43,18 +44,34 @@ const postWorkersRegisterRoute = HttpRouter.add(
     } catch {
       return jsonResponse({ error: 'body must be JSON' }, { status: 400 });
     }
-    const parsed = parseRegisterBody(body);
-    if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
-
     return yield* Effect.promise(async () => {
-      try {
-        return jsonResponse(await performExternalRegistration(parsed.value));
-      } catch (error: unknown) {
-        console.error('[workers-register] failed:', error instanceof Error ? error.message : String(error));
-        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
-      }
+      const result = await registerFromBody(body);
+      return jsonResponse(result.body, { status: result.status });
     });
   })),
 );
+
+export type RegisterResult =
+  | { status: 200; body: { id: string; created: boolean } }
+  | { status: 400 | 500; body: { error: string } };
+
+/**
+ * Validate and perform one registration. A bad field, or a transcript path
+ * that is not a regular file under the transcript roots, answers 400.
+ */
+export async function registerFromBody(
+  body: unknown,
+  perform: typeof performExternalRegistration = performExternalRegistration,
+): Promise<RegisterResult> {
+  const parsed = parseRegisterBody(body);
+  if (!parsed.ok) return { status: 400, body: { error: parsed.error } };
+  try {
+    return { status: 200, body: await perform(parsed.value) };
+  } catch (error: unknown) {
+    if (error instanceof ExternalPathError) return { status: 400, body: { error: error.message } };
+    console.error('[workers-register] failed:', error instanceof Error ? error.message : String(error));
+    return { status: 500, body: { error: 'Internal server error' } };
+  }
+}
 
 export const workersRegisterRouteLayer = Layer.mergeAll(postWorkersRegisterRoute);

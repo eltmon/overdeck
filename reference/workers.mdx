@@ -220,13 +220,21 @@ pan worker register --source my-tool --external-id run-7 --harness codex \
   `--transcript`, `--session-id`, and `--json` (prints `{ "id", "created" }`).
 - The id is `ext-<source>-<external-id>` (a short hash is added when the
   external id is not already a lowercase slug). Registering the same source and
-  external id again prints the existing id and writes nothing.
+  external id again prints the existing id and writes no new registration; if
+  the first attempt never linked its transcript, the repeat links it.
+- `--transcript` must be a regular file under `~/.claude/projects`, the Codex
+  sessions directory (`$CODEX_HOME/sessions`, default `~/.codex/sessions`) or
+  `~/.overdeck/agents`, after following symlinks. Anything else (another
+  directory, a symlink out of those roots, a FIFO, a directory) is refused with
+  a message that names the allowed directories. The same check runs again
+  before every read, so a transcript replaced later is simply not shown.
 
 Scripts that do not have the CLI can call the same core over HTTP:
 `POST /api/workers/register` with those fields as JSON (`source`,
 `externalId`, `harness`, `model`, `cwd`, `issue`, `parent`, `label`, `pid`,
 `transcript`, `sessionId`) and the `x-overdeck-internal-token` header. The
-answer is `200 { "id", "created" }`, or `400 { "error" }` for a bad field.
+answer is `200 { "id", "created" }`, or `400 { "error" }` for a bad field or
+a transcript path outside the allowed directories.
 
 ### Codex-plugin jobs are registered automatically
 
