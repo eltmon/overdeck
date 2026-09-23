@@ -1038,6 +1038,16 @@ export function getConversationByTmuxSession(tmuxSession: string): LegacyConvers
   return row ? rowToLegacyConversation(row) : null;
 }
 
+/** A tmux session's own row: a post-/clear sibling over its cleared parent (PAN-3962). */
+export function getSupervisedConversationByTmuxSession(tmuxSession: string): LegacyConversation | null {
+  const name = tmuxSession.startsWith('conv-') ? tmuxSession.slice(5) : tmuxSession;
+  const row = overdeckDb().prepare(`${LEGACY_CONVERSATION_SELECT}
+      WHERE c.archived_at IS NULL AND (c.tmux_session = ? OR (c.tmux_session IS NULL AND c.name = ?))
+      ORDER BY (c.cleared_to_conv_id IS NULL) DESC, (c.status = 'active') DESC, c.created_at DESC, c.rowid DESC
+      LIMIT 1`).get(tmuxSession, name) as LegacyConversationRow | undefined;
+  return row ? rowToLegacyConversation(row) : null;
+}
+
 export function listArchivedConversations(): LegacyConversation[] {
   const rows = overdeckDb()
     .prepare(`${LEGACY_CONVERSATION_SELECT}

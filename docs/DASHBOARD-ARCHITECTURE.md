@@ -187,15 +187,25 @@ door that does not exist; a real record read door would be a separate change.
   retains the existing recovery actions. The client bounds the request and body read to
   120 seconds, and reconciles late echoes using message identity or text/time matching.
 - The PTY supervisor reports what it observes about its harness to
-  `POST /api/agents/:id/lifecycle` (`session-started`, `turn-started`, `turn-ended`,
-  `exited`), authenticated by the session's pty-token. `:id` is the supervised session
-  id, so one route serves agents and conversations (`conv-<name>`). For an agent it
-  appends `agent.started`/`agent.activity_changed`/`agent.stopped`. For a conversation
-  (no agent state, a `conversations` row whose `tmux_session` is `:id`),
-  `session-started` marks the row active, `exited` marks it ended at the exit time,
-  and each edge appends `agent.activity_changed` under the session id its hooks report
-  under. An exit inside a same-name respawn window is acknowledged and not recorded
-  (PAN-3962). The 10-second conversation poller stays as the backstop.
+  `POST /api/agents/:id/lifecycle`, authenticated by the session's pty-token. It emits
+  `session-started`, `turn-started` (on a confirmed injection) and `exited`. The route
+  also accepts `turn-ended`, but the supervisor does not emit it: it sees only the PTY
+  byte stream. A turn's `idle` comes from the harness's own hook (claude-code's Stop
+  hook), so a hookless harness stays `working` until its next edge. Each post carries
+  `launchedAt`, the supervisor's start time, as its launch generation. `:id` is the
+  supervised session id, so one route serves agents and conversations (`conv-<name>`).
+  For an agent it appends `agent.started`/`agent.activity_changed`/`agent.stopped`.
+  For a conversation, the row is the non-archived one whose `tmux_session` is `:id`,
+  preferring a post-/clear sibling over its cleared parent. `session-started` marks
+  that row active, unless it is a /clear-ended parent or the start is older than the
+  row's `ended_at`. `exited` marks it ended at the exit time and runs attachment
+  cleanup once, only if the row was not already ended. Each edge appends
+  `agent.activity_changed` under the session id its hooks report under. An exit from a
+  launch older than the in-flight respawn, or older than the newest launch that reported
+  `session-started`, is acknowledged and not recorded. A new harness that dies inside the
+  respawn window still ends the row (PAN-3962). The 10-second conversation poller stays
+  as the backstop. It does not resurrect a row whose end is newer than its census
+  snapshot, or whose harness a fresh probe finds gone.
 - Conversation sends carry `clientMessageId`; retries preserve it and set `retry: true`.
   The server coalesces matching concurrent requests and retains their result, including
   ambiguous failures. Changed text or command confirmation requires a new ID. Receipts

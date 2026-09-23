@@ -23,14 +23,14 @@ import { getAgentStateSync, type AgentState } from '../../../lib/agents.js';
 import { logAgentLifecycleSync } from '../../../lib/persistent-logger.js';
 import { sessionFilePath } from '../../../lib/paths.js';
 import {
-  getConversationByTmuxSession,
+  getSupervisedConversationByTmuxSession,
   markConversationEnded,
   markConversationRunning,
   type LegacyConversation,
 } from '../../../lib/overdeck/conversations.js';
 import { getBackendPanes } from './backend-inventory.js';
 import { cleanupUnreferencedConversationAttachments } from './conversation-attachments.js';
-import { isRespawnPending } from './pending-respawn.js';
+import { respawnStartedAt } from './pending-respawn.js';
 import type { DomainEvent } from '@overdeck/contracts';
 
 export interface AgentProjectionResult {
@@ -94,11 +94,16 @@ export interface AgentLifecycleEventInput {
   event: AgentLifecycleEventName;
   at: string;
   exitCode?: number;
+  /** The posting supervisor's start time: its launch generation (PAN-3962). */
+  launchedAt?: string;
 }
 
 export type AgentLifecycleApplyResult =
   | { applied: true; status: 'running' | 'stopped' | 'unknown' }
-  | { applied: false; reason: 'no-state' | 'already-stopped' | 'duplicate' | 'respawn-pending' };
+  | {
+    applied: false;
+    reason: 'no-state' | 'already-stopped' | 'duplicate' | 'respawn-pending' | 'superseded-launch';
+  };
 
 /**
  * The event payload's agent snapshot. `status` is the event's own meaning at
@@ -140,9 +145,28 @@ function rememberLifecycleKey(key: string): boolean {
   return true;
 }
 
-/** Test seam: forget the dedupe ring between cases. */
+/**
+ * Newest supervisor launch (epoch ms) seen per conversation session, from its
+ * `session-started`. An exit from an older launch belongs to a harness a
+ * respawn already replaced (PAN-3962). Bounded like the dedupe ring.
+ */
+const latestConversationLaunch = new Map<string, number>();
+
+function rememberConversationLaunch(sessionId: string, launchedAtMs: number): void {
+  const previous = latestConversationLaunch.get(sessionId);
+  if (previous !== undefined && previous >= launchedAtMs) return;
+  latestConversationLaunch.delete(sessionId);
+  latestConversationLaunch.set(sessionId, launchedAtMs);
+  if (latestConversationLaunch.size > RECENT_LIFECYCLE_KEYS_MAX) {
+    const oldest = latestConversationLaunch.keys().next().value;
+    if (oldest !== undefined) latestConversationLaunch.delete(oldest);
+  }
+}
+
+/** Test seam: forget the dedupe ring and launch generations between cases. */
 export function _resetAgentLifecycleDedupeForTests(): void {
   recentLifecycleKeys.clear();
+  latestConversationLaunch.clear();
 }
 
 export interface AgentLifecycleDeps {
@@ -152,8 +176,8 @@ export interface AgentLifecycleDeps {
   readonly hasExited?: (agentId: string) => Promise<boolean>;
   /** The conversation supervised under this terminal session id, if any. */
   readonly readConversation?: (sessionId: string) => LegacyConversation | null;
-  /** True while a respawn (kill → spawn under the same name) is in flight. */
-  readonly isRespawnPending?: (sessionId: string) => boolean;
+  /** When the in-flight respawn of this session began (epoch ms), or null. */
+  readonly respawnStartedAt?: (sessionId: string) => number | null;
   readonly markConversationRunning?: (name: string) => void;
   readonly markConversationEnded?: (name: string, endedAtMs?: number) => void;
   /** Attachment cleanup for a conversation that just ended (the poller's cleanup). */
@@ -173,13 +197,19 @@ async function cleanupEndedConversationAttachments(conversation: LegacyConversat
 }
 
 /**
- * The conversation whose supervised tmux session is `sessionId`. Only an exact
- * tmux-session match counts: `getConversationByTmuxSession` also resolves a
- * bare name, and a lifecycle event must never land on a row it does not own.
+ * The conversation whose supervised tmux session is `sessionId`. A post-/clear
+ * sibling shares its parent's session, so the lookup is by session and prefers
+ * the live sibling over the /clear-ended parent. Only an exact tmux-session
+ * match counts: a lifecycle event must never land on a row it does not own.
  */
 function readSupervisedConversation(sessionId: string): LegacyConversation | null {
-  const conversation = getConversationByTmuxSession(sessionId);
+  const conversation = getSupervisedConversationByTmuxSession(sessionId);
   return conversation && conversation.tmuxSession === sessionId ? conversation : null;
+}
+
+/** Epoch ms of an ISO timestamp, or NaN when absent or unparseable. */
+function isoToMs(value: string | null | undefined): number {
+  return value ? Date.parse(value) : Number.NaN;
 }
 
 async function paneAlreadyExited(agentId: string): Promise<boolean> {
@@ -249,11 +279,12 @@ export async function applyAgentLifecycleEventWithDeps(
  * A supervised conversation's lifecycle (PAN-3962). The row's `status` is the
  * conversation's recorded state, so the supervisor's own observation writes
  * it: `session-started` marks it active, `exited` marks it ended at the exit
- * time. Turn edges and the exit are also appended as `agent.activity_changed`
- * keyed by the tmux session id — the id the conversation's hooks already
- * report activity under — so the read model can tell idle from working.
- * `agent.started`/`agent.stopped` are not emitted: conversations are not
- * agents and carry no issue id.
+ * time. Start, turn-start and exit edges are also appended as
+ * `agent.activity_changed` keyed by the tmux session id — the id the
+ * conversation's hooks already report activity under. The supervisor does not
+ * emit `turn-ended`; `idle` after a turn comes from the harness's own hook
+ * (claude-code's Stop hook). `agent.started`/`agent.stopped` are not emitted:
+ * conversations are not agents and carry no issue id.
  */
 async function applyConversationLifecycleEvent(
   eventStore: AgentProjectionEventStore,
@@ -281,11 +312,22 @@ async function applyConversationLifecycleEvent(
 
   switch (input.event) {
     case 'session-started': {
-      // Same guard as agents: a late event must not resurrect a session whose
-      // pane the backend already reports as exited.
-      if (await (deps.hasExited ?? paneAlreadyExited)(sessionId)) {
+      // A /clear-ended parent is never revived: its session now belongs to
+      // the post-/clear sibling.
+      if (conversation.clearedToConvId != null) {
         return { applied: false, reason: 'already-stopped' };
       }
+      // A late (retried or stalled) start must not revive a conversation that
+      // ended after it: every end — the harness's exit, an operator stop, the
+      // poller — stamps ended_at later than the start of the launch it ends.
+      // The backend pane inventory cannot answer this for conversations: a
+      // Herdr host lists no tmux conv-* sessions, and a tmux pane is held
+      // open by the launcher's keep-alive loop.
+      if (conversation.status === 'ended' && isoToMs(at) <= isoToMs(conversation.endedAt)) {
+        return { applied: false, reason: 'already-stopped' };
+      }
+      const launchedAtMs = isoToMs(input.launchedAt);
+      if (!Number.isNaN(launchedAtMs)) rememberConversationLaunch(sessionId, launchedAtMs);
       (deps.markConversationRunning ?? markConversationRunning)(conversation.name);
       appendActivity('idle');
       return { applied: true, status: 'running' };
@@ -296,18 +338,32 @@ async function applyConversationLifecycleEvent(
       return { applied: true, status: 'unknown' };
     }
     case 'exited': {
-      // A respawn (resume, model switch) kills the old harness and spawns a
-      // new one under the same session name. The old supervisor's exit lands
-      // inside that window and must not end the conversation being revived.
-      if ((deps.isRespawnPending ?? isRespawnPending)(sessionId)) {
+      // A respawn (resume, restart-all) spawns a new harness under the same
+      // session name. Only an exit of the generation being replaced is
+      // ignored: one from a supervisor launched before the respawn began. The
+      // new harness dying at startup (bad auth, bad model) must end the row.
+      // A supervisor that predates `launchedAt` is dated by its exit instead.
+      const launchedAtMs = isoToMs(input.launchedAt);
+      const generationMs = Number.isNaN(launchedAtMs) ? isoToMs(at) : launchedAtMs;
+      const respawnStartMs = (deps.respawnStartedAt ?? respawnStartedAt)(sessionId);
+      if (respawnStartMs !== null && !(generationMs >= respawnStartMs)) {
         return { applied: false, reason: 'respawn-pending' };
       }
-      const exitedAtMs = Date.parse(at);
+      // An exit from a launch older than the newest one that reported
+      // session-started belongs to a harness already replaced.
+      const latestLaunchMs = latestConversationLaunch.get(sessionId);
+      if (latestLaunchMs !== undefined && launchedAtMs < latestLaunchMs) {
+        return { applied: false, reason: 'superseded-launch' };
+      }
+      const exitedAtMs = isoToMs(at);
       (deps.markConversationEnded ?? markConversationEnded)(
         conversation.name,
         Number.isNaN(exitedAtMs) ? undefined : exitedAtMs,
       );
       appendActivity('stopped');
+      // A row something else already ended (operator stop, the poller) had its
+      // cleanup run by that writer; only the exit itself is recorded here.
+      if (conversation.status === 'ended') return { applied: true, status: 'stopped' };
       try {
         await (deps.cleanupEndedConversation ?? cleanupEndedConversationAttachments)(conversation);
       } catch (err: unknown) {

@@ -171,14 +171,20 @@ describe('applyAgentLifecycleEventWithDeps for a supervised conversation (PAN-39
     tmuxSession: SESSION,
     cwd: '/tmp/conv-cwd',
     claudeSessionId: 'session-uuid',
+    status: 'active',
+    endedAt: null,
+    clearedToConvId: null,
   } as LegacyConversation;
 
-  function makeConversationDeps(overrides: { isRespawnPending?: (id: string) => boolean } = {}) {
+  function makeConversationDeps(overrides: {
+    respawnStartedAt?: (id: string) => number | null;
+    conversation?: LegacyConversation;
+  } = {}) {
     return {
       readAgentState: () => null,
-      readConversation: () => conversation,
+      readConversation: () => overrides.conversation ?? conversation,
       hasExited: async () => false,
-      isRespawnPending: overrides.isRespawnPending ?? (() => false),
+      respawnStartedAt: overrides.respawnStartedAt ?? (() => null),
       markConversationRunning: vi.fn(),
       markConversationEnded: vi.fn(),
       cleanupEndedConversation: vi.fn(async () => undefined),
@@ -205,13 +211,142 @@ describe('applyAgentLifecycleEventWithDeps for a supervised conversation (PAN-39
     expect(deps.cleanupEndedConversation).toHaveBeenCalledTimes(1);
   });
 
-  it('an exit inside a respawn window neither ends the row nor runs cleanup', async () => {
-    const deps = makeConversationDeps({ isRespawnPending: () => true });
-    const result = await applyAgentLifecycleEventWithDeps(makeEventStore(), SESSION, { event: 'exited', at }, deps);
+  describe('respawn windows and launch generations (F1)', () => {
+    const respawnStart = Date.parse('2026-09-22T10:00:00.000Z');
+    const inWindow = () => respawnStart;
 
-    expect(result).toEqual({ applied: false, reason: 'respawn-pending' });
-    expect(deps.markConversationEnded).not.toHaveBeenCalled();
+    it('an exit from a supervisor launched before the respawn began is ignored', async () => {
+      const deps = makeConversationDeps({ respawnStartedAt: inWindow });
+      const result = await applyAgentLifecycleEventWithDeps(makeEventStore(), SESSION, {
+        event: 'exited',
+        at: '2026-09-22T10:00:02.000Z',
+        launchedAt: '2026-09-22T08:00:00.000Z',
+      }, deps);
+
+      expect(result).toEqual({ applied: false, reason: 'respawn-pending' });
+      expect(deps.markConversationEnded).not.toHaveBeenCalled();
+      expect(deps.cleanupEndedConversation).not.toHaveBeenCalled();
+    });
+
+    it('the NEW harness exiting during the respawn window (resume onto a dead model) ends the row', async () => {
+      const deps = makeConversationDeps({ respawnStartedAt: inWindow });
+      const eventStore = makeEventStore();
+      const launchedAt = '2026-09-22T10:00:01.000Z';
+      await applyAgentLifecycleEventWithDeps(
+        eventStore, SESSION, { event: 'session-started', at: launchedAt, launchedAt }, deps,
+      );
+      const exitAt = '2026-09-22T10:00:03.000Z';
+      const result = await applyAgentLifecycleEventWithDeps(
+        eventStore, SESSION, { event: 'exited', at: exitAt, launchedAt, exitCode: 1 }, deps,
+      );
+
+      expect(result).toEqual({ applied: true, status: 'stopped' });
+      expect(deps.markConversationEnded).toHaveBeenCalledWith(conversation.name, Date.parse(exitAt));
+      expect(deps.cleanupEndedConversation).toHaveBeenCalledTimes(1);
+    });
+
+    it('a supervisor without launchedAt is dated by its exit time', async () => {
+      const deps = makeConversationDeps({ respawnStartedAt: inWindow });
+      const before = await applyAgentLifecycleEventWithDeps(
+        makeEventStore(), SESSION, { event: 'exited', at: '2026-09-22T09:59:59.000Z' }, deps,
+      );
+      const after = await applyAgentLifecycleEventWithDeps(
+        makeEventStore(), SESSION, { event: 'exited', at: '2026-09-22T10:00:05.000Z' }, deps,
+      );
+
+      expect(before).toEqual({ applied: false, reason: 'respawn-pending' });
+      expect(after).toEqual({ applied: true, status: 'stopped' });
+    });
+
+    it('after the window closes, an exit from a launch older than the newest started one is ignored', async () => {
+      const deps = makeConversationDeps();
+      const eventStore = makeEventStore();
+      const newLaunch = '2026-09-22T10:00:01.000Z';
+      await applyAgentLifecycleEventWithDeps(
+        eventStore, SESSION, { event: 'session-started', at: newLaunch, launchedAt: newLaunch }, deps,
+      );
+      const stale = await applyAgentLifecycleEventWithDeps(eventStore, SESSION, {
+        event: 'exited',
+        at: '2026-09-22T10:00:04.000Z',
+        launchedAt: '2026-09-22T08:00:00.000Z',
+      }, deps);
+
+      expect(stale).toEqual({ applied: false, reason: 'superseded-launch' });
+      expect(deps.markConversationEnded).not.toHaveBeenCalled();
+    });
+  });
+
+  it('an exit for a row something else already ended records the time but never re-runs cleanup (F3)', async () => {
+    const ended = { ...conversation, status: 'ended', endedAt: '2026-09-22T10:04:59.000Z' } as LegacyConversation;
+    const deps = makeConversationDeps({ conversation: ended });
+    const eventStore = makeEventStore();
+    const result = await applyAgentLifecycleEventWithDeps(eventStore, SESSION, { event: 'exited', at }, deps);
+
+    expect(result).toEqual({ applied: true, status: 'stopped' });
+    expect(deps.markConversationEnded).toHaveBeenCalledWith(conversation.name, Date.parse(at));
     expect(deps.cleanupEndedConversation).not.toHaveBeenCalled();
+    // The read model still learns the harness stopped.
+    expect(eventStore.appended.map((event) => (event['payload'] as { activity: string }).activity)).toEqual(['stopped']);
+  });
+
+  describe('late session-started (F4)', () => {
+    const ended = {
+      ...conversation,
+      status: 'ended',
+      endedAt: '2026-09-22T10:05:00.000Z',
+    } as LegacyConversation;
+
+    it('rejects a start older than the row\'s end (retried after the harness exited)', async () => {
+      const deps = makeConversationDeps({ conversation: ended });
+      const eventStore = makeEventStore();
+      const result = await applyAgentLifecycleEventWithDeps(eventStore, SESSION, {
+        event: 'session-started',
+        at: '2026-09-22T10:04:00.000Z',
+      }, deps);
+
+      expect(result).toEqual({ applied: false, reason: 'already-stopped' });
+      expect(deps.markConversationRunning).not.toHaveBeenCalled();
+      expect(eventStore.append).not.toHaveBeenCalled();
+    });
+
+    it('accepts a start newer than the row\'s end (a resume)', async () => {
+      const deps = makeConversationDeps({ conversation: ended });
+      const result = await applyAgentLifecycleEventWithDeps(makeEventStore(), SESSION, {
+        event: 'session-started',
+        at: '2026-09-22T10:06:00.000Z',
+      }, deps);
+
+      expect(result).toEqual({ applied: true, status: 'running' });
+      expect(deps.markConversationRunning).toHaveBeenCalledWith(conversation.name);
+    });
+
+    it('does not consult the backend pane inventory, which cannot see conv-* sessions', async () => {
+      const deps = { ...makeConversationDeps(), hasExited: vi.fn(async () => true) };
+      const result = await applyAgentLifecycleEventWithDeps(makeEventStore(), SESSION, {
+        event: 'session-started',
+        at,
+      }, deps);
+
+      expect(result).toEqual({ applied: true, status: 'running' });
+      expect(deps.hasExited).not.toHaveBeenCalled();
+    });
+  });
+
+  it('never revives a /clear-ended parent (F2)', async () => {
+    const parent = {
+      ...conversation,
+      status: 'ended',
+      endedAt: '2026-09-22T09:00:00.000Z',
+      clearedToConvId: 42,
+    } as LegacyConversation;
+    const deps = makeConversationDeps({ conversation: parent });
+    const result = await applyAgentLifecycleEventWithDeps(makeEventStore(), SESSION, {
+      event: 'session-started',
+      at,
+    }, deps);
+
+    expect(result).toEqual({ applied: false, reason: 'already-stopped' });
+    expect(deps.markConversationRunning).not.toHaveBeenCalled();
   });
 
   it('a cleanup failure never fails the exit', async () => {

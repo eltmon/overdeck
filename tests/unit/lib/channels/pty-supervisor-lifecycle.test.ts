@@ -55,6 +55,18 @@ describe('postAgentLifecycleEvent (PAN-3849)', () => {
     expect(JSON.parse(init.body)['exitCode']).toBe(1);
   });
 
+  it('stamps every event with the same launch generation (PAN-3962)', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+
+    await postAgentLifecycleEvent(AGENT, 'session-started', {}, depsWith(fetchImpl));
+    await postAgentLifecycleEvent(AGENT, 'exited', { exitCode: 0 }, depsWith(fetchImpl));
+
+    const launches = fetchImpl.mock.calls.map(([, init]) => JSON.parse((init as { body: string }).body)['launchedAt']);
+    expect(typeof launches[0]).toBe('string');
+    expect(Number.isNaN(Date.parse(launches[0] as string))).toBe(false);
+    expect(launches[1]).toBe(launches[0]);
+  });
+
   it('retries with backoff and posts once the dashboard recovers', async () => {
     const fetchImpl = vi.fn()
       .mockRejectedValueOnce(new Error('connection refused'))
