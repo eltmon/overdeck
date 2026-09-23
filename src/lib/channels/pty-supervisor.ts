@@ -32,7 +32,6 @@ import { pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { getOverdeckHome } from '../paths.js';
-import { getDashboardLoopbackApiUrlSync } from '../config.js';
 import {
   activeComposerPayloadPresence,
   type ComposerPayloadPresence,
@@ -314,9 +313,12 @@ export async function postAgentLifecycleEvent(
 ): Promise<boolean> {
   const fetchImpl = deps.fetchImpl ?? fetch;
   const sleepImpl = deps.sleepImpl ?? sleepUnref;
+  // No config.js here: the supervisor ships vendored with @lydell/node-pty as
+  // its only package, so it resolves the URL from the env like overdeck-bridge.
   const dashboardUrl = deps.dashboardUrl
     ?? process.env.OVERDECK_DASHBOARD_URL
-    ?? getDashboardLoopbackApiUrlSync();
+    ?? process.env.DASHBOARD_URL
+    ?? `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
   const readToken = deps.readToken ?? readPtyToken;
   const postTimeoutMs = deps.postTimeoutMs ?? LIFECYCLE_POST_TIMEOUT_MS;
 
