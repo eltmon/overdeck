@@ -98,6 +98,7 @@ vi.mock('../../../../../src/lib/tmux.js', async (importOriginal) => {
   return { ...actual, resizeWindow: () => Effect.succeed(undefined) };
 });
 
+import { getAgentStateSync, saveAgentStateSync } from '../../../../../src/lib/agents/agent-state.js';
 import { planningRouteLayer } from '../../../../../src/dashboard/server/routes/misc/planning.js';
 import { EventStoreService } from '../../../../../src/dashboard/server/services/domain-services.js';
 
@@ -171,6 +172,29 @@ describe('POST /api/planning/:issueId/message (M1)', () => {
     }));
     expect(mocks.closeAgentPane.mock.invocationCallOrder[0]!)
       .toBeLessThan(mocks.launchAgentPane.mock.invocationCallOrder[0]!);
+  });
+
+  it('records the relaunched claude-code harness, so the oracle probes the right process next time', async () => {
+    mocks.isAlive.mockResolvedValue({ alive: false, reason: 'runtime-missing' });
+    saveAgentStateSync({
+      id: PLANNER,
+      issueId: ISSUE,
+      workspace: join(mocks.projectPath, 'workspaces', 'feature-pan-3960'),
+      harness: 'codex',
+      role: 'plan',
+      model: 'gpt-5.6',
+      status: 'running',
+      startedAt: new Date().toISOString(),
+    });
+
+    await call('POST', `/api/planning/${ISSUE}/message`, { message: 'continue' });
+
+    expect(getAgentStateSync(PLANNER)).toMatchObject({
+      harness: 'claude-code',
+      model: 'claude-sonnet-5',
+      backend: 'herdr',
+      paneId: 'w1:p2',
+    });
   });
 
   it('delivers to a live planner and neither closes nor relaunches it', async () => {

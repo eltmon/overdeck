@@ -16,6 +16,7 @@ import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/type
 import { getOverdeckHome } from '../../../../lib/paths.js';
 import { extractTeamPrefix, findProjectByTeamSync } from '../../../../lib/projects.js';
 import { loadRemoteAgentState } from '../../../../lib/remote/remote-agents.js';
+import { getAgentStateSync, saveAgentStateSync } from '../../../../lib/agents/agent-state.js';
 import { deliverAgentMessage } from '../../../../lib/agents/delivery.js';
 import { isAlive, isConfirmedDead } from '../../../../lib/agents/liveness.js';
 import { closeAgentPane, closeAgentPaneDetailed, launchAgentPane } from '../../../../lib/terminal-backends/launch.js';
@@ -344,6 +345,21 @@ Continue the PLANNING session. Do NOT implement anything.
             model: msgPlanningModel,
           },
         });
+
+        // The continuation always runs claude-code. Record that (and where it
+        // landed) on the planner's state: the liveness oracle looks for the
+        // harness named there, and a planner first spawned on another harness
+        // would otherwise read as dead and be closed on the next message.
+        const priorState = getAgentStateSync(sessionName);
+        if (priorState) {
+          saveAgentStateSync({
+            ...priorState,
+            harness: 'claude-code',
+            model: msgPlanningModel,
+            backend: pane.backend,
+            paneId: pane.paneId,
+          });
+        }
 
         if (pane.backend === 'tmux') {
           try {

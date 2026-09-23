@@ -306,8 +306,8 @@ export async function closeAgentPaneDetailed(
 }
 
 /**
- * `closeAgentPaneDetailed` for callers that only need "did anything close".
- * Never throws. Returns true when a pane or session was closed.
+ * `closeAgentPaneDetailed` for callers that only need a boolean. Never throws.
+ * Returns true only when a pane or session was closed and no close failed.
  */
 export async function closeAgentPane(agentId: string, backend?: TerminalBackend): Promise<boolean> {
   return (await closeAgentPaneDetailed(agentId, backend)).outcome === 'closed';
