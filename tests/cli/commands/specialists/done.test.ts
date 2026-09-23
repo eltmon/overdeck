@@ -318,6 +318,30 @@ describe('specialists done command', () => {
     expect(mockClearUatFailureFeedbackAnchor).not.toHaveBeenCalled();
   });
 
+  it('PAN-4030: anchors on --tested-sha, not the PR head that moved during the run', async () => {
+    // PR head is head-sha-1 (a push landed mid-run); UAT exercised ABC1234.
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await doneCommand('test', 'pan-1059', {
+      status: 'passed', uatStatus: 'failed', uatNotes: 'x', testedSha: 'ABC1234',
+    });
+
+    expect(mockRelayUatFailureFeedback).toHaveBeenCalledWith(expect.objectContaining({ anchor: 'abc1234' }));
+    expect(mockGetPrFacts).not.toHaveBeenCalled();
+  });
+
+  it('PAN-4030: rejects a malformed --tested-sha, or one on a review verdict, before posting', async () => {
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await doneCommand('test', 'pan-1059', { status: 'passed', testedSha: 'not-a-sha' });
+    await doneCommand('review', 'pan-1059', { status: 'passed', testedSha: 'abc1234' });
+
+    expect(exit).toHaveBeenCalledTimes(2);
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(mockDiscoverArtifact).not.toHaveBeenCalled();
+  });
+
   it('PAN-4030: the uat role\'s own failed status is a UAT failure too', async () => {
     const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
 

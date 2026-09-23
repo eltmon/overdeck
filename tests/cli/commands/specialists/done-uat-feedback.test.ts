@@ -57,9 +57,11 @@ import { resetUatFailureFeedbackStateForTests } from '../../../../src/lib/cloist
 const FEEDBACK_PATH = '/project/workspaces/feature-pan-4030/.pan/feedback/001-uat-agent-failed.md';
 
 /** One `pan admin specialists done` invocation in a fresh process. */
-async function reportUat(uatStatus: 'passed' | 'failed', uatNotes: string): Promise<void> {
+async function reportUat(uatStatus: 'passed' | 'failed', uatNotes: string, testedSha?: string): Promise<void> {
   resetUatFailureFeedbackStateForTests();
-  await doneCommand('test', 'pan-4030', { status: 'passed', notes: 'gates green', uatStatus, uatNotes });
+  await doneCommand('test', 'pan-4030', {
+    status: 'passed', notes: 'gates green', uatStatus, uatNotes, ...(testedSha ? { testedSha } : {}),
+  });
 }
 
 describe('PAN-4030: UAT failure feedback reaches the work agent', () => {
@@ -141,5 +143,19 @@ describe('PAN-4030: UAT failure feedback reaches the work agent', () => {
     // ...but the agent was already told about this PR head once.
     const outcomes = await Promise.all(mocks.messageAgent.mock.results.map((r) => r.value));
     expect(outcomes.filter((o: { deduplicated?: boolean }) => !o.deduplicated)).toHaveLength(1);
+  });
+
+  it('anchors on the tested commit: a push during a run does not swallow the next failure', async () => {
+    // UAT runs on A; the work agent pushes B meanwhile, so the PR head is B
+    // when the verdict for A lands.
+    mocks.getPrFacts.mockResolvedValue({ issueId: 'PAN-4030', forge: 'github', open: true, headSha: 'bbbbbbb' });
+    await reportUat('failed', 'criterion 1 unmet on A', 'aaaaaaa');
+    // The next cycle tests B and fails there too.
+    await reportUat('failed', 'criterion 1 still unmet on B', 'bbbbbbb');
+
+    const outcomes = await Promise.all(mocks.messageAgent.mock.results.map((r) => r.value));
+    expect(outcomes).toHaveLength(2);
+    expect(outcomes.filter((o: { deduplicated?: boolean }) => o.deduplicated)).toHaveLength(0);
+    expect(mocks.messageAgent.mock.calls[1][1]).toContain('MUST READ');
   });
 });

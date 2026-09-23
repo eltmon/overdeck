@@ -14,6 +14,19 @@
  * same PR head is reported `deduplicated`, not re-sent. A Herdr-prompted agent
  * is reached before that keyed cascade, so there the key is not enforced —
  * the same exposure review-verdict-feedback has.
+ *
+ * Keyed delivery also trades two guarantees, exactly as review feedback does:
+ * for a Claude Code agent it confirms only that the text reached the agent's
+ * input (composer-level), not that a transcript turn followed — the unkeyed
+ * confirmed-turn path cannot enforce a key — and it skips the mail-dir backup,
+ * because a keyed mail file would replay as a second copy. The feedback file
+ * written here is the durable receipt.
+ *
+ * The target is resolved (and a stopped agent revived) before delivery learns
+ * whether the key was already used; the keyed stores expose no read-only probe.
+ * A revived agent is a new session whose store is empty, so it is sent the
+ * feedback rather than woken for nothing; only a still-live session can report
+ * `deduplicated`.
  */
 
 import { createHash } from 'node:crypto';

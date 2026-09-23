@@ -46,6 +46,7 @@ export function registerSpecialistsCommands(program: Command): void {
     .option('--notes <notes>', 'Optional notes about the result')
     .option('--uat-status <status>', 'Test only: required browser UAT result (passed or failed)')
     .option('--uat-notes <notes>', 'Test only: browser UAT evidence or blocking condition')
+    .option('--tested-sha <sha>', 'Test/UAT only: the commit the run exercised (git rev-parse HEAD before the gates)')
     .option('--run-id <runId>', 'Review cycle ID used to deduplicate review feedback')
     .action(doneAndExitCommand);
 

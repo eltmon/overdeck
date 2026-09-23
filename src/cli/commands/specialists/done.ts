@@ -42,6 +42,8 @@ interface DoneOptions {
   notes?: string;
   uatStatus?: 'passed' | 'failed';
   uatNotes?: string;
+  /** The commit the test/UAT run exercised, recorded before the gates ran. */
+  testedSha?: string;
 }
 
 // PAN-3642: this advisory deadline covers the PR comment, a stopped Claude
@@ -122,6 +124,11 @@ export async function doneCommand(
   if (!validStatuses.includes(options.status)) {
     console.error(chalk.red(`Invalid status: ${options.status}`));
     console.error(chalk.dim(`Valid options for ${role}: ${validStatuses.join(', ')}`));
+    return exitCli(1);
+  }
+
+  if (options.testedSha !== undefined && (role === 'review' || !/^[0-9a-f]{7,40}$/i.test(options.testedSha))) {
+    console.error(chalk.red('--tested-sha applies only to test and uat verdicts and must be a commit SHA'));
     return exitCli(1);
   }
 
@@ -263,8 +270,14 @@ export async function doneCommand(
     const uatNotes = role === 'test' ? options.uatNotes : options.notes;
     try {
       const { relayUatFailureFeedbackPromise } = await import('../../../lib/cloister/uat-failure-feedback.js');
+      // Anchor on the commit UAT actually exercised (pre-Cut: reviewedAtCommit).
+      // The test agent records it before running the gates and passes it as
+      // --tested-sha. Its workspace HEAD at verdict time is no better than the
+      // PR head — the work agent shares that worktree and may have moved it —
+      // so when the SHA was not reported, fall back to the PR head: a push
+      // during the run then mis-anchors this failure onto the newer commit.
       // An unreadable PR head still relays; it only loses cross-run dedup.
-      const anchor = await getPrFacts(normalizedIssueId)
+      const anchor = options.testedSha?.toLowerCase() ?? await getPrFacts(normalizedIssueId)
         .then((facts) => facts.headSha ?? undefined, () => undefined);
       await withFeedbackDeadline(relayUatFailureFeedbackPromise({
         issueId: normalizedIssueId,
