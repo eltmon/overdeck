@@ -40,6 +40,30 @@ export async function readAgentPaneText(
   return await readHerdrPaneText(pane.paneId, lines);
 }
 
+/** Is the agent's pane still there: yes, no, or the probe could not tell. */
+export type AgentPanePresence = 'present' | 'gone' | 'unknown';
+
+/**
+ * Presence of an agent's pane on the host's backend, for waiters that poll it
+ * (review of #4018, L4). On Herdr this is `probeHerdrAgentLiveness`, which
+ * keeps a socket timeout apart from "no such agent": `agentPaneExists` folds
+ * both into false, so one slow `agent.get` ended a readiness wait. On tmux it
+ * is `has-session`, as before.
+ */
+export async function probeAgentPane(agentId: string, backend?: TerminalBackend): Promise<AgentPanePresence> {
+  const { resolveLaunchBackend } = await import('./launch.js');
+  const resolved = backend ?? (await resolveLaunchBackend());
+  if (resolved.name !== 'herdr') {
+    const { sessionExists } = await import('../tmux.js');
+    return (await Effect.runPromise(sessionExists(agentId))) ? 'present' : 'gone';
+  }
+  const { probeHerdrAgentLiveness } = await import('./herdr.js');
+  const probe = await probeHerdrAgentLiveness(agentId);
+  if (probe.kind === 'alive') return 'present';
+  if (probe.kind === 'indeterminate') return 'unknown';
+  return 'gone';
+}
+
 /**
  * Herdr's logical key name for a tmux `send-keys` key name. `enter` is the key
  * the Herdr adapter's own launch path sends; the others follow Herdr's

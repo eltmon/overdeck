@@ -184,17 +184,87 @@ describe('POST /api/planning/:issueId/message (M1)', () => {
       role: 'plan',
       model: 'gpt-5.6',
       status: 'running',
-      startedAt: new Date().toISOString(),
+      startedAt: new Date(Date.now() - 10 * 60_000).toISOString(),
     });
 
     await call('POST', `/api/planning/${ISSUE}/message`, { message: 'continue' });
 
     expect(getAgentStateSync(PLANNER)).toMatchObject({
+      status: 'running',
       harness: 'claude-code',
       model: 'claude-sonnet-5',
       backend: 'herdr',
       paneId: 'w1:p2',
     });
+  });
+
+  // Review of #4018 (L3): until the harness is in the pane the oracle reports
+  // a starting planner dead. A second message then must not kill it.
+  it('marks the planner starting, with its harness, before it closes or launches anything', async () => {
+    mocks.isAlive.mockResolvedValue({ alive: false, reason: 'pane-dead' });
+    const seen: Array<Record<string, unknown> | null> = [];
+    mocks.closeAgentPane.mockImplementation(async () => {
+      seen.push(getAgentStateSync(PLANNER) as Record<string, unknown> | null);
+      return true;
+    });
+
+    await call('POST', `/api/planning/${ISSUE}/message`, { message: 'continue' });
+
+    expect(seen[0]).toMatchObject({ status: 'starting', harness: 'claude-code', model: 'claude-sonnet-5' });
+  });
+
+  it('delivers a second message sent during the launch window instead of relaunching again', async () => {
+    mocks.isAlive.mockResolvedValue({ alive: false, reason: 'runtime-missing' });
+
+    await call('POST', `/api/planning/${ISSUE}/message`, { message: 'first' });
+    const second = await call('POST', `/api/planning/${ISSUE}/message`, { message: 'second' });
+
+    expect(second.body.message).toBe('Message sent to active session');
+    expect(mocks.closeAgentPane).toHaveBeenCalledTimes(1);
+    expect(mocks.launchAgentPane).toHaveBeenCalledTimes(1);
+    expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(PLANNER, 'second', 'planning user message');
+  });
+
+  it('relaunches once the launch window has passed and the oracle still reports it dead', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-09-23T10:00:00Z'));
+      mocks.isAlive.mockResolvedValue({ alive: false, reason: 'runtime-missing' });
+      await call('POST', `/api/planning/${ISSUE}/message`, { message: 'first' });
+
+      vi.setSystemTime(new Date('2026-09-23T10:00:59Z'));
+      await call('POST', `/api/planning/${ISSUE}/message`, { message: 'inside window' });
+      expect(mocks.launchAgentPane).toHaveBeenCalledTimes(1);
+
+      vi.setSystemTime(new Date('2026-09-23T10:01:01Z'));
+      const late = await call('POST', `/api/planning/${ISSUE}/message`, { message: 'after window' });
+      expect(late.body.message).toBe('Planning session restarted in interactive mode');
+      expect(mocks.launchAgentPane).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a failed launch drops the launch window, so the next message relaunches', async () => {
+    mocks.isAlive.mockResolvedValue({ alive: false, reason: 'pane-dead' });
+    mocks.launchAgentPane.mockRejectedValueOnce(new Error('herdr detection timed out'));
+
+    const failed = await call('POST', `/api/planning/${ISSUE}/message`, { message: 'first' });
+    expect(failed.status).toBe(500);
+    expect(getAgentStateSync(PLANNER)?.status).toBe('error');
+
+    await call('POST', `/api/planning/${ISSUE}/message`, { message: 'retry' });
+    expect(mocks.launchAgentPane).toHaveBeenCalledTimes(2);
+    expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
+  });
+
+  it('the status route reports a planner inside its launch window as active', async () => {
+    mocks.isAlive.mockResolvedValue({ alive: false, reason: 'runtime-missing' });
+    await call('POST', `/api/planning/${ISSUE}/message`, { message: 'first' });
+
+    const status = await call('GET', `/api/planning/${ISSUE}/status`);
+
+    expect(status.body).toMatchObject({ active: true });
   });
 
   it('delivers to a live planner and neither closes nor relaunches it', async () => {

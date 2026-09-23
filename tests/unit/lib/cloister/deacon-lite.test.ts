@@ -213,6 +213,50 @@ describe('deacon-lite', () => {
       setAgentStoppedNotifier(null);
     });
 
+    // Review of #4018 (L1): the Herdr inventory lists Herdr panes only. An
+    // agent still live in its pre-switch tmux session is absent from it, and
+    // must not be marked stopped while resumeAgent refuses it as healthy.
+    it('on Herdr, leaves an agent the oracle reports alive (legacy tmux session)', async () => {
+      mocks.listAgentStates.mockReturnValue([workAgent()]);
+      mocks.liveAgentInventory.mockResolvedValue(inventory([], 'herdr'));
+      mocks.isAlive.mockResolvedValue({ alive: true, paneAlive: true, runtimePid: 4242 });
+      const notifier = vi.fn();
+      setAgentStoppedNotifier(notifier);
+
+      const actions = await reconcileAgentLiveness();
+
+      expect(mocks.isAlive).toHaveBeenCalledWith('agent-pan-1');
+      expect(actions).toEqual([]);
+      expect(notifier).not.toHaveBeenCalled();
+      setAgentStoppedNotifier(null);
+    });
+
+    it('on Herdr, leaves an agent whose verdict is indeterminate', async () => {
+      mocks.listAgentStates.mockReturnValue([workAgent()]);
+      mocks.liveAgentInventory.mockResolvedValue(inventory([], 'herdr'));
+      mocks.isAlive.mockResolvedValue({ alive: false, reason: 'runtime-indeterminate' });
+      const notifier = vi.fn();
+      setAgentStoppedNotifier(notifier);
+
+      await expect(reconcileAgentLiveness()).resolves.toEqual([]);
+      expect(notifier).not.toHaveBeenCalled();
+      setAgentStoppedNotifier(null);
+    });
+
+    it('on Herdr, still corrects the cache once the oracle confirms the death', async () => {
+      mocks.listAgentStates.mockReturnValue([workAgent()]);
+      mocks.liveAgentInventory.mockResolvedValue(inventory([], 'herdr'));
+      mocks.isAlive.mockResolvedValue({ alive: false, reason: 'no-session' });
+      const notifier = vi.fn();
+      setAgentStoppedNotifier(notifier);
+
+      const actions = await reconcileAgentLiveness();
+
+      expect(notifier).toHaveBeenCalledWith('agent-pan-1');
+      expect(actions[0]).toContain('absent from the herdr inventory; no-session');
+      setAgentStoppedNotifier(null);
+    });
+
     it('never writes a record — only calls the notifier seam', async () => {
       mocks.listAgentStates.mockReturnValue([workAgent()]);
       mocks.liveAgentInventory.mockResolvedValue(inventory([]));

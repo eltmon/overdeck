@@ -328,12 +328,15 @@ async function waitForKimiCodeTuiReady(agentId: string, timeoutSec = 30): Promis
  * The TUI waiters' pane read, on the host's terminal backend (review of #3992,
  * L1): null once the agent's pane is gone. A tmux-only probe answered "gone"
  * for every Herdr pane, so a restart or recovery that now lands on Herdr
- * never became ready.
+ * never became ready. A probe that could not tell (a Herdr socket timeout)
+ * THROWS instead of answering "gone", so the waiter keeps polling until its
+ * own deadline (review of #4018, L4).
  */
 async function readTuiPane(agentId: string): Promise<string | null> {
-  const { agentPaneExists } = await import('../terminal-backends/launch.js');
-  if (!(await agentPaneExists(agentId))) return null;
-  const { readAgentPaneText } = await import('../terminal-backends/agent-pane-io.js');
+  const { probeAgentPane, readAgentPaneText } = await import('../terminal-backends/agent-pane-io.js');
+  const presence = await probeAgentPane(agentId);
+  if (presence === 'gone') return null;
+  if (presence === 'unknown') throw new Error(`could not tell whether ${agentId}'s pane is still there`);
   return await readAgentPaneText(agentId, 80);
 }
 

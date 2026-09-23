@@ -47,12 +47,31 @@ const checkPlanStatus = (
   return Boolean(status && matchStatus(status));
 });
 
-/** Live, or not confirmed dead: an indeterminate probe never counts as finished. */
+/**
+ * How long after a launch a planner counts as live whatever the oracle says
+ * (review of #4018, L3). Until the harness is in the pane — the launcher runs
+ * first on tmux, and Herdr detection can take up to a minute — the oracle
+ * reports a starting planner as dead, and a second message in that window
+ * would close it and launch another.
+ */
+export const PLANNER_LAUNCH_GRACE_MS = 60_000;
+
+function plannerIsLaunching(sessionName: string, now = Date.now()): boolean {
+  const state = getAgentStateSync(sessionName);
+  if (!state || (state.status !== 'starting' && state.status !== 'running')) return false;
+  const startedAtMs = Date.parse(state.startedAt);
+  return Number.isFinite(startedAtMs) && now - startedAtMs < PLANNER_LAUNCH_GRACE_MS;
+}
+
+/**
+ * Live, not confirmed dead, or launched moments ago: an indeterminate probe
+ * never counts as finished, and neither does a planner still starting.
+ */
 async function plannerIsLive(sessionName: string): Promise<boolean> {
   const verdict = await isAlive(sessionName).catch(
     () => ({ alive: false, reason: 'runtime-indeterminate' }) as const,
   );
-  return !isConfirmedDead(verdict);
+  return !isConfirmedDead(verdict) || plannerIsLaunching(sessionName);
 }
 
 // ─── Route: GET /api/planning/:issueId/status ────────────────────────────────
@@ -320,6 +339,21 @@ Continue the PLANNING session. Do NOT implement anything.
           { mode: 0o755 },
         );
 
+        // Mark the planner as starting BEFORE anything is closed or launched,
+        // with the claude-code harness the continuation runs (the oracle looks
+        // for the harness named here). A second message during the launch then
+        // reads it as live and is delivered, instead of closing it and
+        // launching another (review of #4018, L3).
+        const launchStartedAt = new Date().toISOString();
+        saveAgentStateSync({
+          ...(getAgentStateSync(sessionName)
+            ?? { id: sessionName, issueId, workspace: agentCwd, role: 'plan' as const }),
+          status: 'starting',
+          harness: 'claude-code',
+          model: msgPlanningModel,
+          startedAt: launchStartedAt,
+        });
+
         // Close whatever the finished planner left — a Herdr pane back at its
         // shell prompt, or a dead tmux session — before the relaunch, as every
         // other relaunch path does. Otherwise a second pane with the same agent
@@ -344,21 +378,18 @@ Continue the PLANNING session. Do NOT implement anything.
             harness: 'claude-code',
             model: msgPlanningModel,
           },
+        }).catch((error: unknown) => {
+          // A launch that failed is not a planner starting: drop the grace window.
+          const failedState = getAgentStateSync(sessionName);
+          if (failedState) saveAgentStateSync({ ...failedState, status: 'error' });
+          throw error;
         });
 
-        // The continuation always runs claude-code. Record that (and where it
-        // landed) on the planner's state: the liveness oracle looks for the
-        // harness named there, and a planner first spawned on another harness
-        // would otherwise read as dead and be closed on the next message.
-        const priorState = getAgentStateSync(sessionName);
-        if (priorState) {
-          saveAgentStateSync({
-            ...priorState,
-            harness: 'claude-code',
-            model: msgPlanningModel,
-            backend: pane.backend,
-            paneId: pane.paneId,
-          });
+        // The pane is up: record where it landed. `startedAt` stays the launch
+        // time, so the grace window still covers the harness starting in it.
+        const launchedState = getAgentStateSync(sessionName);
+        if (launchedState) {
+          saveAgentStateSync({ ...launchedState, status: 'running', backend: pane.backend, paneId: pane.paneId });
         }
 
         if (pane.backend === 'tmux') {
