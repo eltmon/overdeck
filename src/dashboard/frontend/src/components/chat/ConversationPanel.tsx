@@ -410,6 +410,10 @@ export function ConversationPanel({
       toastResumeOutcome(conversation.name);
       setResumedAwaitingConfirm(true);
     },
+    // A failed resume must say so; without this the button did nothing visible.
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 8000 });
+    },
   });
 
   const switchModelMutation = useMutation({
