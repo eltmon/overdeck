@@ -8,7 +8,7 @@ import {
 } from './pane-choice-menu.js'
 import { capturePaneText, sendRawKeystroke, sessionExists } from './tmux.js'
 
-const PANE_CAPTURE_LINES = 90
+export const PANE_CAPTURE_LINES = 90
 const KEYSTROKE_GAP_MS = 60
 const DELIVERY_CONFIRM_WAIT_MS = 700
 
@@ -56,6 +56,11 @@ export async function captureSessionPaneChoice(
   } catch {
     return null
   }
+  return paneChoiceFromText(pane)
+}
+
+/** The choice menu on a captured screen, or null when there is none. */
+export function paneChoiceFromText(pane: string): PendingPaneChoice | null {
   const menu = parsePaneChoiceMenu(pane)
   if (!menu) return null
   return {

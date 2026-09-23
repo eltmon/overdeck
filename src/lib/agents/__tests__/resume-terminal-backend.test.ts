@@ -28,7 +28,22 @@ const mocks = vi.hoisted(() => ({
   detectPendingOperatorDecision: vi.fn(async () => null),
   tmuxCreateSession: vi.fn(() => Effect.succeed(undefined)),
   tmuxSessionExists: vi.fn(() => Effect.succeed(false)),
+  tmuxListPaneValues: vi.fn(() => Effect.succeed([] as string[])),
+  tmuxKillSession: vi.fn(() => Effect.succeed(undefined)),
+  findRuntimePid: vi.fn(async () => null as number | null | 'indeterminate'),
+  queryTmuxSession: vi.fn(async () => 'missing' as 'exists' | 'missing' | 'error'),
 }));
+
+// The legacy tmux check on a Herdr host (liveness.ts) — never a real tmux call.
+vi.mock('../tmux-session-query.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../tmux-session-query.js')>();
+  return { ...actual, queryTmuxSession: mocks.queryTmuxSession };
+});
+
+vi.mock('../runtime-pid-probe.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../runtime-pid-probe.js')>();
+  return { ...actual, findAgentRuntimePidInSubtree: mocks.findRuntimePid };
+});
 
 vi.mock('../../terminal-backends/select.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../terminal-backends/select.js')>();
@@ -60,9 +75,9 @@ vi.mock('../../tmux.js', async (importOriginal) => {
     createSession: mocks.tmuxCreateSession,
     createSessionSync: vi.fn(() => { throw new Error('createSessionSync must not be called'); }),
     sessionExists: mocks.tmuxSessionExists,
-    killSession: vi.fn(() => Effect.succeed(undefined)),
+    killSession: mocks.tmuxKillSession,
     isPaneDead: vi.fn(() => Effect.succeed(false)),
-    listPaneValues: vi.fn(() => Effect.succeed([])),
+    listPaneValues: mocks.tmuxListPaneValues,
     sendKeys: vi.fn(() => Effect.succeed(undefined)),
   };
 });
@@ -133,6 +148,9 @@ beforeEach(() => {
   registerTerminalBackend(herdr);
   registerTerminalBackend(tmux);
   mocks.tmuxSessionExists.mockReturnValue(Effect.succeed(false));
+  mocks.tmuxListPaneValues.mockReturnValue(Effect.succeed([]));
+  mocks.findRuntimePid.mockResolvedValue(null);
+  mocks.queryTmuxSession.mockResolvedValue('missing');
   mocks.deliverAgentMessage.mockResolvedValue({ ok: true, path: 'herdr' });
   mocks.waitForPromptReady.mockResolvedValue(true);
 
@@ -154,7 +172,11 @@ afterEach(() => {
 });
 
 /** A stopped claude-code agent whose last pane lived on `previousBackend`. */
-function writeStoppedAgent(agentId: string, previousBackend: TerminalBackendName): void {
+function writeStoppedAgent(
+  agentId: string,
+  previousBackend: TerminalBackendName,
+  status: 'stopped' | 'running' = 'stopped',
+): void {
   const sessionId = `${agentId}-session`;
   const transcriptPath = sessionFilePath(workspace, sessionId);
   mkdirSync(dirname(transcriptPath), { recursive: true });
@@ -168,7 +190,7 @@ function writeStoppedAgent(agentId: string, previousBackend: TerminalBackendName
     harness: 'claude-code',
     role: 'work',
     model: 'claude-sonnet-5',
-    status: 'stopped',
+    status,
     startedAt: new Date().toISOString(),
     kickoffDelivered: true,
     sessionId,
@@ -208,3 +230,52 @@ describe('resumeAgent relaunches on the host backend (PAN-3960)', () => {
   });
 });
 
+describe('resumeAgent on a Herdr host (review of #3992)', () => {
+  it('reads and keys the relaunched Herdr pane for the resume-summary gate (M2)', async () => {
+    mocks.host = 'herdr';
+    const agentId = 'agent-pan-3960-resume-gate-pane';
+    writeStoppedAgent(agentId, 'herdr');
+
+    const result = await resumeAgent(agentId);
+
+    expect(result).toEqual({ success: true, messageDelivered: true });
+    expect(mocks.prepareAutonomousAgentResumePane).toHaveBeenCalledWith(agentId, 'work', {
+      pane: expect.objectContaining({ backend: 'herdr', paneId: `w1:p-${agentId}` }),
+    });
+  });
+
+  it('fails the resume, without delivering, when the gate check fails safe (M2)', async () => {
+    mocks.host = 'herdr';
+    const agentId = 'agent-pan-3960-resume-gate-unreadable';
+    writeStoppedAgent(agentId, 'herdr');
+    mocks.prepareAutonomousAgentResumePane.mockResolvedValueOnce({
+      ready: false,
+      reason: 'could not read herdr pane',
+    } as never);
+
+    const result = await resumeAgent(agentId);
+
+    expect(result.success).toBe(false);
+    expect(mocks.deliverResumeMessageWithTranscriptConfirmation).not.toHaveBeenCalled();
+  });
+
+  it('refuses to resume a running agent whose legacy tmux session is live — no close, no relaunch (M3)', async () => {
+    mocks.host = 'herdr';
+    const agentId = 'agent-pan-3960-resume-legacy-tmux';
+    writeStoppedAgent(agentId, 'tmux', 'running');
+    mocks.tmuxSessionExists.mockReturnValue(Effect.succeed(true));
+    mocks.queryTmuxSession.mockResolvedValue('exists');
+    mocks.tmuxListPaneValues.mockReturnValue(Effect.succeed(['4242\t0']));
+    mocks.findRuntimePid.mockResolvedValue(4243);
+
+    const result = await resumeAgent(agentId);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/appears healthy/);
+    expect(herdr.starts).toHaveLength(0);
+    expect(tmux.starts).toHaveLength(0);
+    expect(herdr.closes).toHaveLength(0);
+    expect(tmux.closes).toHaveLength(0);
+    expect(mocks.tmuxKillSession).not.toHaveBeenCalled();
+  });
+});

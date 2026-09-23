@@ -180,7 +180,9 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
   // as crashed too, matching the start path (flywheel-actions.ts isPaneDead).
   // PAN-3960: the verdict comes from liveness.ts, the one backend-aware oracle —
   // a Herdr agent has no tmux session, so a tmux probe would call every healthy
-  // Herdr agent crashed. `runtime-indeterminate` is never a crash.
+  // Herdr agent crashed. `runtime-indeterminate` is never a crash. On a Herdr
+  // host a live tmux session of this name (an agent from before the switch)
+  // answers alive too, so it is never killed and relaunched (review of #3992, M3).
   const isRunningOrStarting = agentState?.status === 'running' || agentState?.status === 'starting';
   const isCrashed = isRunningOrStarting && isConfirmedDead(await isAlive(normalizedId));
 
@@ -565,7 +567,9 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
         // resume-summary gate instead of a composer. Autonomous pipeline agents
         // have no operator attached to answer it, so cross only that exact menu
         // through the typed pane-choice door before injecting the continuation.
-        const panePreparation = await prepareAutonomousAgentResumePane(normalizedId, agentState.role);
+        // Review of #3992 (M2): the relaunched pane is read and keyed on the
+        // backend it landed on; a Herdr pane that cannot be read fails safe.
+        const panePreparation = await prepareAutonomousAgentResumePane(normalizedId, agentState.role, { pane });
         if (!panePreparation.ready) {
           console.error(`[resumeAgent] Auto-continue prompt not sent: ${panePreparation.reason}`);
         } else {
