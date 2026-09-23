@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-23T04:15:42.923Z · model: claude-opus-5 · open: 854_
+_Last sequenced: 2026-09-23T04:48:21.375662Z · model: claude-opus-5 · open: 853_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -31,7 +31,6 @@ _Last sequenced: 2026-09-23T04:15:42.923Z · model: claude-opus-5 · open: 854_
 | 26 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 27 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
 | 28 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
-| 29 | PAN-3960 | M | critical | ok |  |  | Planning, resume and recovery spawns still create tmux sessions directly; route through launchAgentPane so one backend hosts the fleet |
 | 30 | PAN-3524 | M | critical | needs-refinement |  |  | A server-owned --changed verification loop relaunches through deacon freeze, review abort, pause and operator stop; peaked at 78 workers. |
 | 32 | PAN-3250 | S | critical | ok |  |  | Workspace spawn branches from local HEAD instead of origin/main, so every new feature branch inherits unpushed local-main commits. |
 | 33 | PAN-3946 | S | critical | ok |  |  | Review request treats an APPROVED review on an older commit as "already passed"; newer commits ride an old approval |
@@ -952,7 +951,7 @@ PAN-3973 (strike opens its own PR on completion) closed since the prior run, rem
 
 ### PAN-3977 (rank 25)
 
-New this run. The paved road (`pan start` on an unplanned issue) finalizes planning and then silently never spawns the work agent: complete-planning hands autoSpawn to the reactive dispatcher with the tracker state, a fresh GitHub issue is still 'todo', stateToRole('todo') is null, and the dispatcher returns. Reproduced twice today with ~3h of dead time on PAN-3968. That is a pipeline-blocking defect on the primary entry point, so critical despite the P3 label. The fix is small and well-specified (spawn the work role directly when a readable xBRIEF was just written, or transition to in_progress first, plus a 'todo' finalize test). Sits in the same planning-spawn code PAN-3960 is rerouting through launchAgentPane, so land whichever merges first and rebase the other.
+Rank unchanged: PAN-3960 merged (PR #3992) since the last run, which settles the sequencing note but not the defect. The paved road (`pan start` on an unplanned issue) finalizes planning and then silently never spawns the work agent: complete-planning hands autoSpawn to the reactive dispatcher with the tracker state, a fresh GitHub issue is still 'todo', stateToRole('todo') is null, and the dispatcher returns. Reproduced twice with ~3h of dead time on PAN-3968. Pipeline-blocking on the primary entry point, so critical despite the P3 label. The fix is small and well-specified (spawn the work role directly when a readable xBRIEF was just written, or transition to in_progress first, plus a 'todo' finalize test). It touches the planning-spawn path PAN-3960 just rerouted through launchAgentPane — rebase onto main before planning.
 
 ### PAN-3566 (rank 26)
 
@@ -965,10 +964,6 @@ On the default backend the harness TUI renders into a one-line terminal until an
 ### PAN-3285 (rank 28)
 
 New this pass, labelled critical. A supervisor unit pinned to a pan reload generation SIGTERMs every correctly-running dashboard and is structurally incapable of starting a replacement; the observed outcome was a 3.5-hour total outage with 1,107 consecutive failed recovery attempts and no operator escalation. Manual recovery also fails, because the supervisor kills the operator's dashboard within 30 seconds. Nothing else in the backlog can take the whole product down for hours with the recovery path itself broken.
-
-### PAN-3960 (rank 29)
-
-Three spawn paths bypass the backend registry, giving two inventories for one fleet: pan tell cannot reach tmux planners (PAN-3948), and a resumed agent silently migrates backends. Sibling of PAN-3921 (in pipeline) and PAN-3936.
 
 ### PAN-3524 (rank 30)
 
@@ -1182,6 +1177,10 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 
 Triage: the cited function is deleted; verify whether a never-briefed review session can still block its replacement (PAN-3939 shows the post-cut shape). Rank held.
 
+### PAN-3043 (rank 85)
+
+Triage: verify days-stale "running" against the current liveness definition (idle = stale work activity). Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1189,10 +1188,10 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-23T04:15:42.923Z",
+  "generatedAt": "2026-09-23T04:48:21.375662Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 854,
+  "openCount": 853,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1491,7 +1490,7 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "condition": "ok",
       "dependsOn": [],
       "why": "pan start's auto-spawn after planning is a no-op for 'todo' issues: stateToRole('todo') is null, so no work agent ever starts",
-      "rationale": "New this run. The paved road (`pan start` on an unplanned issue) finalizes planning and then silently never spawns the work agent: complete-planning hands autoSpawn to the reactive dispatcher with the tracker state, a fresh GitHub issue is still 'todo', stateToRole('todo') is null, and the dispatcher returns. Reproduced twice today with ~3h of dead time on PAN-3968. That is a pipeline-blocking defect on the primary entry point, so critical despite the P3 label. The fix is small and well-specified (spawn the work role directly when a readable xBRIEF was just written, or transition to in_progress first, plus a 'todo' finalize test). Sits in the same planning-spawn code PAN-3960 is rerouting through launchAgentPane, so land whichever merges first and rebase the other.",
+      "rationale": "Rank unchanged: PAN-3960 merged (PR #3992) since the last run, which settles the sequencing note but not the defect. The paved road (`pan start` on an unplanned issue) finalizes planning and then silently never spawns the work agent: complete-planning hands autoSpawn to the reactive dispatcher with the tracker state, a fresh GitHub issue is still 'todo', stateToRole('todo') is null, and the dispatcher returns. Reproduced twice with ~3h of dead time on PAN-3968. Pipeline-blocking on the primary entry point, so critical despite the P3 label. The fix is small and well-specified (spawn the work role directly when a readable xBRIEF was just written, or transition to in_progress first, plus a 'todo' finalize test). It touches the planning-spawn path PAN-3960 just rerouted through launchAgentPane — rebase onto main before planning.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1531,19 +1530,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "dependsOn": [],
       "why": "A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures.",
       "rationale": "New this pass, labelled critical. A supervisor unit pinned to a pan reload generation SIGTERMs every correctly-running dashboard and is structurally incapable of starting a replacement; the observed outcome was a 3.5-hour total outage with 1,107 consecutive failed recovery attempts and no operator escalation. Manual recovery also fails, because the supervisor kills the operator's dashboard within 30 seconds. Nothing else in the backlog can take the whole product down for hours with the recovery path itself broken.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3960",
-      "rank": 29,
-      "size": "M",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Planning, resume and recovery spawns still create tmux sessions directly; route through launchAgentPane so one backend hosts the fleet",
-      "rationale": "Three spawn paths bypass the backend registry, giving two inventories for one fleet: pan tell cannot reach tmux planners (PAN-3948), and a resumed agent silently migrates backends. Sibling of PAN-3921 (in pipeline) and PAN-3936.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -2681,7 +2667,7 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "condition": "ok",
       "dependsOn": [],
       "why": "pan tell says \"not running\" for a live tmux planning agent; planners idle forever after \"Connection lost mid-response\"",
-      "rationale": "Symptom of planners living on tmux while the liveness oracle looks at Herdr; PAN-3960 removes the split. Keep for the second half: nothing nudges a planner stuck on a harness connection error.",
+      "rationale": "Rank unchanged: the closure of PAN-3960 removes the blocker, not the residual work. The backend-split half — planners on tmux while the liveness oracle reads Herdr — is fixed by PAN-3960 (merged via PR #3992), which routes planning spawns through launchAgentPane. What remains is the second half: nothing nudges a planner stuck after \"Connection lost mid-response\". Re-verify pan tell against the merged behaviour before planning, and scope this to the watchdog alone.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12583,27 +12569,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "confidence": 1
     },
     {
-      "from": "PAN-3960",
-      "to": "PAN-3921",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3960",
-      "to": "PAN-3936",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3960",
-      "to": "PAN-3948",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-3958",
       "to": "PAN-3920",
       "type": "informs",
@@ -12884,13 +12849,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "confidence": 1
     },
     {
-      "from": "PAN-3960",
-      "to": "PAN-3948",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
       "from": "PAN-3966",
       "to": "PAN-3939",
       "type": "informs",
@@ -12961,13 +12919,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "confidence": 0.7
     },
     {
-      "from": "PAN-3956",
-      "to": "PAN-3960",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.4
-    },
-    {
       "from": "PAN-3967",
       "to": "PAN-3898",
       "type": "informs",
@@ -12994,13 +12945,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
       "type": "unblocks",
       "source": "github-ref",
       "confidence": 1
-    },
-    {
-      "from": "PAN-3960",
-      "to": "PAN-3977",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
     },
     {
       "from": "PAN-2828",
