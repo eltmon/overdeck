@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-23T03:36:07.218Z · model: claude-opus-5 · open: 857_
+_Last sequenced: 2026-09-23T03:47:55.124Z · model: claude-opus-5 · open: 855_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -26,8 +26,7 @@ _Last sequenced: 2026-09-23T03:36:07.218Z · model: claude-opus-5 · open: 857_
 | 20 | PAN-3679 | M | critical | ok |  |  | Swarm marks live polyrepo slots merged and dispatches items whose DAG blockers are still running |
 | 21 | PAN-3968 | S | critical | ok |  |  | Every pan close still deletes state.json/sessions.json (close-out.ts step 5 never moved to pruneAgentStateDir); PAN-3950 AC-1 unmet |
 | 22 | PAN-3939 | S | critical | ok |  |  | Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive |
-| 23 | PAN-3973 | S | critical | ok |  |  | Post-cut nothing lands a finished strike: prompt still says the Deacon merges it; open a PR on completion and rewrite the prompt |
-| 24 | PAN-3981 | M | critical | ok |  | PAN-3973, PAN-3966 | Strike completion must close pane, remove worktree, delete strike/<id>; reaper is fallback and blind to squash merges (operator decision) |
+| 23 | PAN-3981 | M | critical | ok |  | PAN-3966 | Strike completion must close pane, remove worktree, delete strike/<id>; reaper is a fallback and blind to squash merges |
 | 25 | PAN-3977 | S | critical | ok |  |  | pan start's auto-spawn after planning is a no-op for 'todo' issues: stateToRole('todo') is null, so no work agent ever starts |
 | 26 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 27 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
@@ -40,7 +39,6 @@ _Last sequenced: 2026-09-23T03:36:07.218Z · model: claude-opus-5 · open: 857_
 | 34 | PAN-2954 | XS | critical | ok |  |  | postMergeLifecycle refuses GitLab projects |
 | 35 | PAN-3935 | S | critical | ok |  |  | PRD draft promotion writes the draft into the primary main checkout and deletes the feature-branch copy; PRDs are stranded untracked |
 | 36 | PAN-3657 | S | critical | ok |  |  | Merge-train queues endpoint runs the monorepo queue builder for polyrepo projects, so MYN/Auricle trains are permanently empty. |
-| 37 | PAN-3947 | S | critical | needs-refinement |  |  | Same root as PAN-3966 (stopAgent never closes Herdr panes); remaining scope = post-merge lifecycle should stop specialists, not pause |
 | 38 | PAN-3565 | M | critical | ok |  |  | Failed review spawn wedges 'starting', and an all-lanes infra failure is synthesized as a real CHANGES REQUESTED verdict. |
 | 39 | PAN-3554 | M | critical | needs-refinement |  |  | Red main has no mechanical owner: it hid for ~5h because the merge gate renders red main as an empty queue, not an alarm. |
 | 40 | PAN-3532 | S | critical | ok |  |  | CI runs only a hand-picked slice of the frontend suite, so main stayed red on frontend for hours while every run reported green. |
@@ -949,13 +947,9 @@ Regression of the transcript-discoverability fix that just merged: close-out.ts 
 
 Reproduced on PAN-3705 during the cut e2e: an errored codex reviewer blocked every later review request for 15 minutes; pan review abort left the shell alive. Liveness in both guards must come from the backend-aware isAlive. Sibling of PAN-3921 for the resume path.
 
-### PAN-3973 (rank 23)
+### PAN-3981 (rank 23)
 
-New since the prior run. Strikes are the pipeline's self-repair path, and today a strike's pushed fix sits unmerged until an operator notices (PAN-3963 waited 3+ hours and was landed by hand as PR #3972). That undermines every critical bug above it that a strike would otherwise fix, so it ranks with the post-cut critical bugs. Option (a) in the body — the strike opens a PR on completion and the prompt says so — is a small change consistent with docs/MERGE-WORKFLOW.md step 4; option (b) would resurrect a deacon-lite landing routine the cut deleted.
-
-### PAN-3981 (rank 24)
-
-New 2026-09-21 operator decision: strikes leave a pane, worktree and branch behind after every squash merge, and the reaper cannot see through a squash. Ranked directly behind PAN-3973 (which gives completion its merge signal) and PAN-3966 (backend-aware stopAgent) because finishStrike builds on both.
+PAN-3973 (strike opens its own PR on completion) closed since the prior run, removing one of this issue's two blockers and freeing rank 23; the remaining blocker PAN-3966 (Herdr-aware stopAgent) still sits above it at rank 18, so the pair stays in build order. The operator-decision framing in the prior rationale is unchanged: the strike itself closes its pane, removes the worktree and deletes strike/<id> on completion, and the strike-workspace reaper stays a fallback that must also recognise squash merges.
 
 ### PAN-3977 (rank 25)
 
@@ -1004,10 +998,6 @@ The PAN-2858 defect in a new shape: complete-planning promotes to the primary ch
 ### PAN-3657 (rank 36)
 
 New this pass. The merge-train queues endpoint correctly gathers eligible candidates and then hands them to the monorepo queue builder, which does git rev-parse against a polyrepo project root that is not a git repository — so every polyrepo project's train is permanently empty while monorepo projects populate fine. MYN and Auricle cannot use merge trains at all until this lands.
-
-### PAN-3947 (rank 37)
-
-Overlaps PAN-3966 on the termination path; ranked just below it so the two are not both picked. Scope this to the post-merge lifecycle stopping (not pausing) specialists once PAN-3966 lands, or fold it in.
 
 ### PAN-3565 (rank 38)
 
@@ -1185,6 +1175,14 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 
 New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
 
+### PAN-3677 (rank 82)
+
+Planning agents wedge after a background Explore task finishes; parent never consumes the result. High-impact substrate hardening: it recurs across issues and costs operator time on every occurrence, so fixing it compounds across everything downstream.
+
+### PAN-3096 (rank 83)
+
+New this pass. pan done's preflight blocks on the generated .devcontainer/ and dev artifacts, and with only commit/discard/surface offered, agents invented their own exits: one attempted to delete workspace infrastructure, another committed a wrapper-repo gitignore change that moved HEAD and fed a four-hour review reset loop. A gate that pushes agents toward destructive workarounds needs fixing at the gate.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1192,10 +1190,10 @@ New this pass. The test role evaluates the workspace working tree rather than th
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-23T03:36:07.218Z",
+  "generatedAt": "2026-09-23T03:47:55.124Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 857,
+  "openCount": 855,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1471,31 +1469,17 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "planning": "auto"
     },
     {
-      "issue": "PAN-3973",
-      "rank": 23,
-      "size": "S",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Post-cut nothing lands a finished strike: prompt still says the Deacon merges it; open a PR on completion and rewrite the prompt",
-      "rationale": "New since the prior run. Strikes are the pipeline's self-repair path, and today a strike's pushed fix sits unmerged until an operator notices (PAN-3963 waited 3+ hours and was landed by hand as PR #3972). That undermines every critical bug above it that a strike would otherwise fix, so it ranks with the post-cut critical bugs. Option (a) in the body — the strike opens a PR on completion and the prompt says so — is a small change consistent with docs/MERGE-WORKFLOW.md step 4; option (b) would resurrect a deacon-lite landing routine the cut deleted.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
       "issue": "PAN-3981",
-      "rank": 24,
+      "rank": 23,
       "size": "M",
       "importance": "critical",
       "score": 84,
       "condition": "ok",
       "dependsOn": [
-        "PAN-3973",
         "PAN-3966"
       ],
-      "why": "Strike completion must close pane, remove worktree, delete strike/<id>; reaper is fallback and blind to squash merges (operator decision)",
-      "rationale": "New 2026-09-21 operator decision: strikes leave a pane, worktree and branch behind after every squash merge, and the reaper cannot see through a squash. Ranked directly behind PAN-3973 (which gives completion its merge signal) and PAN-3966 (backend-aware stopAgent) because finishStrike builds on both.",
+      "why": "Strike completion must close pane, remove worktree, delete strike/<id>; reaper is a fallback and blind to squash merges",
+      "rationale": "PAN-3973 (strike opens its own PR on completion) closed since the prior run, removing one of this issue's two blockers and freeing rank 23; the remaining blocker PAN-3966 (Herdr-aware stopAgent) still sits above it at rank 18, so the pair stays in build order. The operator-decision framing in the prior rationale is unchanged: the strike itself closes its pane, removes the worktree and deletes strike/<id> on completion, and the strike-workspace reaper stays a fallback that must also recognise squash merges.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -1652,19 +1636,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "dependsOn": [],
       "why": "Merge-train queues endpoint runs the monorepo queue builder for polyrepo projects, so MYN/Auricle trains are permanently empty.",
       "rationale": "New this pass. The merge-train queues endpoint correctly gathers eligible candidates and then hands them to the monorepo queue builder, which does git rev-parse against a polyrepo project root that is not a git repository — so every polyrepo project's train is permanently empty while monorepo projects populate fine. MYN and Auricle cannot use merge trains at all until this lands.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3947",
-      "rank": 37,
-      "size": "S",
-      "importance": "critical",
-      "score": 80,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Same root as PAN-3966 (stopAgent never closes Herdr panes); remaining scope = post-merge lifecycle should stop specialists, not pause",
-      "rationale": "Overlaps PAN-3966 on the termination path; ranked just below it so the two are not both picked. Scope this to the post-merge lifecycle stopping (not pausing) specialists once PAN-3966 lands, or fold it in.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12823,13 +12794,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
     },
     {
       "from": "PAN-3956",
-      "to": "PAN-3947",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3956",
       "to": "PAN-3944",
       "type": "informs",
       "source": "github-ref",
@@ -12865,27 +12829,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
     },
     {
       "from": "PAN-3952",
-      "to": "PAN-3947",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3952",
-      "to": "PAN-3944",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3947",
-      "to": "PAN-3939",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3947",
       "to": "PAN-3944",
       "type": "informs",
       "source": "github-ref",
@@ -12974,13 +12917,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.7
-    },
-    {
-      "from": "PAN-3966",
-      "to": "PAN-3947",
-      "type": "unblocks",
-      "source": "ai-inferred",
-      "confidence": 0.8
     },
     {
       "from": "PAN-3966",
@@ -13074,13 +13010,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "confidence": 0.4
     },
     {
-      "from": "PAN-3947",
-      "to": "PAN-3973",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
       "from": "PAN-3920",
       "to": "PAN-3971",
       "type": "informs",
@@ -13134,13 +13063,6 @@ New this pass. The test role evaluates the workspace working tree rather than th
       "to": "PAN-3981",
       "type": "informs",
       "source": "github-ref",
-      "confidence": 0.8
-    },
-    {
-      "from": "PAN-3973",
-      "to": "PAN-3981",
-      "type": "unblocks",
-      "source": "ai-inferred",
       "confidence": 0.8
     },
     {
