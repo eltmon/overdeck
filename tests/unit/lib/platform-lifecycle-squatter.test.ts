@@ -39,7 +39,7 @@ async function reserveEphemeralPort(): Promise<number> {
 // These tests deliberately run on REAL timers, against the project-wide rule that
 // delay-based tests use `vi.useFakeTimers()`. Everything under test here is real
 // I/O — a real `createServer()` on a real port, a real loopback `fetch`, real
-// `lsof`/`ps` subprocesses — and `waitForDashboardHealthPromise` bounds that I/O
+// `lsof`/`ps` subprocesses — and `waitForDashboardHealth` bounds that I/O
 // with `Date.now()` and paces it with `sleep(pollIntervalMs)`. Faking the clock
 // makes the poll loop advance only when the test advances it, so the test races
 // the real HTTP round-trip it is waiting on: on a contended runner the body read
