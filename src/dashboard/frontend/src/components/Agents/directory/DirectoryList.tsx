@@ -100,9 +100,9 @@ export const DirectoryList = forwardRef<HTMLDivElement, DirectoryListProps>(func
                 </span>
               </div>
               <div role="gridcell" className="mt-0.5 flex min-w-0 items-center gap-1.5 pl-3.5 text-[11px] text-muted-foreground">
-                <span className="truncate font-mono-ui">{entry.id}</span>
+                <span className="max-w-[60%] shrink-0 truncate font-mono-ui">{entry.id}</span>
                 {entry.role && <span className="shrink-0">· {entry.role}</span>}
-                <span className="shrink-0 truncate font-mono-ui">· {entry.harness} · {entry.model}</span>
+                <span className="min-w-0 truncate font-mono-ui">· {entry.harness} · {entry.model}</span>
                 <span className="ml-auto shrink-0">{entry.state}</span>
                 {entry.startedAt && <span className="shrink-0 font-mono-ui tabular-nums">· {age(entry.startedAt, now)}</span>}
               </div>

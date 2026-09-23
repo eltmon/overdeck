@@ -137,7 +137,7 @@ export function AgentsDirectory() {
       data-component="agents-directory"
       className="@container h-full min-h-0 w-full"
     >
-      <div className="grid h-full min-h-0 grid-cols-[260px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_minmax(0,1.2fr)] @[1100px]:grid-cols-[minmax(220px,260px)_minmax(320px,1fr)_minmax(420px,1.4fr)] @[1100px]:grid-rows-1">
+      <div className="grid h-full min-h-0 grid-cols-[260px_minmax(0,1fr)] grid-rows-[minmax(200px,2fr)_minmax(0,3fr)] @[1100px]:grid-cols-[minmax(220px,260px)_minmax(320px,1fr)_minmax(420px,1.4fr)] @[1100px]:grid-rows-1">
         <DirectoryTree
           ref={treeRef}
           nodes={nodes}

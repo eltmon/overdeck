@@ -4,7 +4,7 @@
  * D9. Workers get a "Message worker" button that reveals the shared tell
  * composer instead of a conversation composer.
  */
-import { useState } from 'react';
+import { useCallback, useState, useSyncExternalStore } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { DirectoryEntry } from '@overdeck/contracts';
 
@@ -26,15 +26,20 @@ function formatCost(value: number): string {
 /**
  * Cost for kinds the list does not price (D-cost): the agent transcript's
  * `totalCost`, read from the cache ConversationPanel already fills — never a
- * second transcript fetch. Read per render; the shared 5 s tick re-renders.
+ * second transcript fetch and no second observer on that query.
  */
 function useTranscriptCost(entry: DirectoryEntry): number | null {
   const queryClient = useQueryClient();
-  if (entry.costUsd !== null) return entry.costUsd;
-  if (entry.transcript?.route !== 'agent') return null;
-  const data = queryClient.getQueryData(conversationMessagesQueryKey(entry.transcript.agentId));
-  const total = (data as { totalCost?: unknown } | null | undefined)?.totalCost;
-  return typeof total === 'number' && total > 0 ? total : null;
+  const agentId = entry.costUsd === null && entry.transcript?.route === 'agent' ? entry.transcript.agentId : null;
+  const read = useCallback((): number | null => {
+    if (!agentId) return null;
+    const data = queryClient.getQueryData(conversationMessagesQueryKey(agentId));
+    const total = (data as { totalCost?: unknown } | null | undefined)?.totalCost;
+    return typeof total === 'number' && total > 0 ? total : null;
+  }, [agentId, queryClient]);
+  const subscribe = useCallback((onChange: () => void) => queryClient.getQueryCache().subscribe(onChange), [queryClient]);
+  const transcriptCost = useSyncExternalStore(subscribe, read, read);
+  return entry.costUsd ?? transcriptCost;
 }
 
 interface DirectoryDetailProps {

@@ -46,8 +46,9 @@ function entry(overrides: Partial<DirectoryEntry> & { id: string }): DirectoryEn
   };
 }
 
-function renderDetail(selected: DirectoryEntry, all: DirectoryEntry[] = [selected]) {
+function renderDetail(selected: DirectoryEntry, all: DirectoryEntry[] = [selected], seed?: (client: QueryClient) => void) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+  seed?.(client);
   client.setQueryData(['conversations'], [{
     id: 7, name: 'orchestrator', tmuxSession: 'conv-orchestrator', status: 'active', cwd: '/w', issueId: null,
     createdAt: '2026-09-23T09:00:00.000Z', endedAt: null, lastAttachedAt: null, sessionAlive: true,
@@ -121,6 +122,15 @@ describe('DirectoryDetail', () => {
     expect(screen.getByTestId('conversation-panel')).toBeInTheDocument();
     expect(conversationPanel.mock.calls.at(-1)?.[0]).toMatchObject({ conversation: { name: 'orchestrator' } });
     expect((conversationPanel.mock.calls.at(-1)?.[0] as Record<string, unknown>).hideComposer).toBeUndefined();
+  });
+
+  it('shows the agent transcript cost from the cached transcript query', () => {
+    renderDetail(
+      entry({ id: 'agent-pan-1', transcript: { route: 'agent', agentId: 'agent-pan-1' } }),
+      undefined,
+      (client) => client.setQueryData(['conversation-messages', 'agent-pan-1'], { messages: [], totalCost: 2.5 }),
+    );
+    expect(screen.getByText('· $2.50')).toBeInTheDocument();
   });
 
   it('says so when an entry has no transcript', () => {
