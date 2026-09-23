@@ -104,6 +104,21 @@ docker --version
 git --version
 ```
 
+### 6. Herdr
+
+Herdr is the default terminal backend and is strict: when it is selected but its binary or this home's
+session socket is missing, agent launches fail and `pan doctor` exits 1. Doctor prints these rows:
+
+| Row | Fix when it fails |
+| --- | --- |
+| `Terminal backend` | `pan install` (or set `terminal.backend: tmux` in `~/.overdeck/config.yaml`) |
+| `Herdr binary` | `pan install` |
+| `Herdr server` | `pan sync` (restarting a stale server is manual: `systemctl --user restart overdeck-herdr.service` closes every agent pane) |
+| `Herdr config` | `pan sync` (sets `resume_agents_on_restore = false`) |
+| `Herdr integration: <target>` | `pan sync` (pilot set `pi`, `omp`, `kimi`, `opencode`; `claude`, `codex`, `hermes` are not managed) |
+
+Under an explicit tmux backend only the `Terminal backend` row appears.
+
 ## Health Checklist
 
 | Component | Check Command | Expected |

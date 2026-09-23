@@ -65,6 +65,26 @@ export async function startPostLaunchSidecars(config: {
     console.log(chalk.yellow('⚠ Failed to evaluate Qwen TTS daemon auto-start:'), errorMessage(error));
   }
 
+  // PAN-3956 D7: `pan sync --if-changed` below returns before any step when its
+  // inputs are unchanged, so `pan up` makes sure this home's Herdr session
+  // server runs itself. Never installs, updates, or restarts anything.
+  try {
+    const { ensureHerdr, isHerdrSetupSkipped } = await import('../lib/herdr-setup/ensure.js');
+    const { HERDR_DOWN_HINT } = await import('./herdr-report.js');
+    const herdr = await ensureHerdr({ mode: 'up' });
+    if (isHerdrSetupSkipped(herdr)) {
+      console.log(chalk.dim(herdr.skipped));
+    } else if (herdr.server.running) {
+      console.log(chalk.green(`✓ Herdr session server '${herdr.session}' running (${herdr.server.managedBy ?? 'unknown'})`));
+      for (const warning of herdr.warnings) console.log(chalk.dim(`  ⚠ ${warning}`));
+    } else {
+      console.log(chalk.yellow(`⚠ Herdr session server not running: ${herdr.server.reason ?? 'unknown reason'}`));
+      console.log(chalk.dim(`  ${HERDR_DOWN_HINT}`));
+    }
+  } catch (error: unknown) {
+    console.log(chalk.yellow('⚠ Failed to verify the Herdr session server:'), errorMessage(error));
+  }
+
   try {
     const { startSupervisorProcessSync, getSupervisorPortSync } = await import('../lib/supervisor.js');
     const { startSupervisorUnitIfAvailable, SUPERVISOR_UNIT_NAME } = await import('../lib/systemd.js');

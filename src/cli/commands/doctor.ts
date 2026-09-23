@@ -34,6 +34,7 @@ import {
 import { checkDeployedHooksDrift } from './doctor-hooks-drift.js';
 import { checkCliGenerationLink } from './doctor-cli-generation.js';
 import { checkInotify } from './doctor-inotify.js';
+import { checkHerdr } from './doctor-herdr.js';
 import { checkTierFitnessConfig } from './doctor-tier-fitness.js';
 import { checkDuplicateComposeStacks } from './doctor-duplicate-stacks.js';
 import {
@@ -767,6 +768,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Kimi Code CLI (ACP harness). Resolve the same configured executable used at launch.
   for (const c of await checkKimi()) checks.push(c);
+  for (const c of await checkHerdr()) checks.push(c); // PAN-3956: terminal backend + Herdr
 
   // Check Overdeck directories
   const directories = [

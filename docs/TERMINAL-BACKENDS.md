@@ -28,20 +28,45 @@ not a throw. The error channel carries only genuine failures (socket down, tmux 
 Operations: `workspaceFor`, `startAgent`, `prompt`, `wait`, `observe`, `control`, `list`, `events`,
 `reportMetadata`, `close`, `resume`.
 
-## Selection (D10)
+## Selection (D10, PAN-3956)
 
-`selectTerminalBackend(config)` in `select.ts`, in precedence order:
+Selection is **policy**; availability is a separate **probe**. Neither ever turns a missing Herdr
+into a tmux selection.
 
-1. `OVERDECK_TERMINAL_BACKEND=tmux|herdr` — the explicit override, above config and above any host
-   probe. An unrecognized value is ignored with a warning. Every harness that spawns real agents
-   under an isolated home sets it to `tmux`.
-2. `terminal.backend` in `config.yaml`.
-3. The host probe: Herdr when the `herdr` binary is on `PATH` **and** *this instance's* session
-   socket exists; otherwise tmux, with a diagnostic naming the reason.
+`selectTerminalBackend(config)` in `select.ts` returns `{ backend, source, diagnostic }`, in
+precedence order, and never touches the filesystem:
 
-No subprocess — `fs.access` only, so it is safe on every spawn. Adapters register themselves at
-import time; `registry.ts` resolves a name to an adapter and throws with the missing import when
-nothing registered it.
+1. `OVERDECK_TERMINAL_BACKEND=tmux|herdr` (`source: 'env'`) — the explicit override, above config.
+   An unrecognized value is ignored with a warning. Every harness that spawns real agents under an
+   isolated home sets it to `tmux`, and so does the unit-test setup (`tests/setup.ts`).
+2. `terminal.backend` in `~/.overdeck/config.yaml` (`source: 'config'`).
+3. Otherwise `herdr` (`source: 'default'`).
+
+`hostTerminalBackendName()` memoizes that policy per process; a failure reading config falls back to
+`herdr`, never `tmux`.
+
+`probeHerdrAvailability()` answers whether Herdr can serve **right now**: the `herdr` binary on
+`PATH` or in `~/.local/bin`, **and** *this instance's* session socket. No subprocess — `fs.access`
+only — and never memoized, so a session server started after dashboard boot is usable at once.
+
+What an unavailable Herdr does:
+
+- **Launch:** `resolveLaunchBackend()` (and so `launchAgentPane`, `agentPaneExists`, `pan spawn`)
+  throws `TerminalBackendUnavailableError`, whose message names the reason, `pan install`, and
+  `terminal.backend: tmux`. `closeAgentPane` still kills a legacy tmux session of the agent's name;
+  read paths (`liveAgentInventory`, the terminal bridge, `closeIssuePanes`) read "nothing".
+- **Boot:** the dashboard logs exactly one `[terminal] backend=… source=…` line
+  (`describeTerminalBackendBoot`), with `console.error` and `UNAVAILABLE:` when Herdr is selected
+  but unavailable.
+- **Inventory:** the backend inventory never reads tmux on a Herdr host; it serves the last-known
+  panes and warns once per failure streak.
+- **Doctor:** `pan doctor` reports the `Terminal backend` row as an error, so it exits 1.
+
+Opting into tmux is explicit: `terminal.backend: tmux`. The user-facing page is
+[`configuration/terminal-backend.mdx`](../configuration/terminal-backend.mdx).
+
+Adapters register themselves at import time; `registry.ts` resolves a name to an adapter and throws
+with the missing import when nothing registered it.
 
 `src/lib/terminal-backends/launch.ts` is the one launch path: it resolves the backend, finds or
 creates the issue workspace, starts the pane, and stamps the tokens. Every launcher goes through
@@ -60,15 +85,33 @@ The Herdr session name is the **per-home instance name**, `managedInstanceName()
 It is resolved at call time, never at module load, because `OVERDECK_HOME` is set per process.
 
 This is the Herdr half of the PAN-3673 rule: **a derived per-home instance must never take over the
-default one.** Selection then requires *that* instance's socket, so a process serving a `/tmp` home
-(a test, an isolated verification stack) cannot see the live `overdeck` session and falls back to
-tmux. Before this, any test process on a host with the `herdr` binary and a live `overdeck` socket
+default one.** The availability probe requires *that* instance's socket, so a process serving a
+`/tmp` home (a test, an isolated verification stack) cannot see the live `overdeck` session — it
+either runs on an explicit tmux policy or fails to launch with `TerminalBackendUnavailableError`.
+Before this, any test process on a host with the `herdr` binary and a live `overdeck` socket
 selected Herdr and spawned real agents into the operator's session.
 
 A systemd unit that serves the default home therefore runs `herdr --session overdeck server`, which
 is correct precisely because `~/.overdeck` owns the `overdeck` instance. A second Overdeck instance
 needs its own unit with its own `--session overdeck-<hash>`; it must not reuse the default unit or
 the default session name.
+
+### Host setup (PAN-3956)
+
+`pan install` and `pan sync` own the Herdr host setup (`src/lib/herdr-setup/`); `pan up` makes sure
+the session server runs. All three skip under an explicit tmux policy, `CI`, Vitest, or
+`pan install --skip-herdr`.
+
+| Piece | Where | Notes |
+| --- | --- | --- |
+| Binary | `~/.local/bin/herdr` | Vendor installer (`https://herdr.dev/install.sh`); stable channel. `pan install` updates when `https://herdr.dev/latest.json` is newer; `pan sync` only when no session server runs for this home. |
+| Config | `~/.config/herdr/config.toml` | `[session] resume_agents_on_restore = false`, edited line by line, checked by `herdr config check`, reloaded with `server reload-config`. |
+| Session server | `<session>-herdr.service` (`overdeck-herdr.service` for the default home) | systemd user unit, else a detached `herdr --session <session> server` logging to `~/.overdeck/logs/herdr-<session>.log`. |
+| Integrations | pilot set `pi`, `omp`, `kimi` (≥ 0.14.0), `opencode` | Installed only when the harness binary resolves. `claude`, `codex`, `hermes` are never installed or removed. |
+
+Nothing ever stops or restarts a running session server — a restart closes every agent pane.
+`pan doctor` reports `Terminal backend`, `Herdr binary`, `Herdr server`, `Herdr config`, and one
+`Herdr integration: <target>` row per target.
 
 ## Detection policy per harness (PAN-3917 W12)
 

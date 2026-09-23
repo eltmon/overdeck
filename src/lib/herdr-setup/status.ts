@@ -2,7 +2,7 @@
  * `herdr status --json`, parsed (PAN-3956 W5).
  *
  * Also home of the one subprocess seam every `herdr-setup` module shares:
- * `HerdrExec`. It is async (`execFile`, never `execSync`) because `pan up` and
+ * `HerdrExec`. It is async (`execFile`, never a blocking exec) because `pan up` and
  * the dashboard reach this code, and it RESOLVES on a non-zero exit with the
  * captured output — `herdr` prints diagnostics and JSON either way, so the
  * caller decides what a non-zero exit means. It rejects only when the binary
