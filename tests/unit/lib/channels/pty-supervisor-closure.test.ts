@@ -22,6 +22,7 @@ function runtimeSpecifiers(source: string): string[] {
   const staticRe = /^\s*(import|export)\s+(?!type\s)(?:[^'";]*?\sfrom\s+)?['"]([^'"]+)['"]/gm;
   for (const match of source.matchAll(staticRe)) specifiers.push(match[2]!);
   for (const match of source.matchAll(/\bimport\(\s*['"]([^'"]+)['"]\s*\)/g)) specifiers.push(match[1]!);
+  for (const match of source.matchAll(/\brequire\(\s*['"]([^'"]+)['"]\s*\)/g)) specifiers.push(match[1]!);
   return specifiers;
 }
 

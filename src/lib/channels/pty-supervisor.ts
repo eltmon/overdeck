@@ -314,11 +314,11 @@ export async function postAgentLifecycleEvent(
   const fetchImpl = deps.fetchImpl ?? fetch;
   const sleepImpl = deps.sleepImpl ?? sleepUnref;
   // No config.js here: the supervisor ships vendored with @lydell/node-pty as
-  // its only package, so it resolves the URL from the env like overdeck-bridge.
+  // its only package. Loopback only: DASHBOARD_URL is the public (TLS) URL and
+  // a lifecycle POST to it fails on the local certificate.
   const dashboardUrl = deps.dashboardUrl
-    ?? process.env.OVERDECK_DASHBOARD_URL
-    ?? process.env.DASHBOARD_URL
-    ?? `http://localhost:${process.env.API_PORT || process.env.PORT || '3011'}`;
+    ?? (process.env.OVERDECK_DASHBOARD_URL
+      || `http://127.0.0.1:${process.env.API_PORT || process.env.PORT || '3011'}`);
   const readToken = deps.readToken ?? readPtyToken;
   const postTimeoutMs = deps.postTimeoutMs ?? LIFECYCLE_POST_TIMEOUT_MS;
 
