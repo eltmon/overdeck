@@ -73,6 +73,7 @@ import { getEventStore } from '../../dashboard/server/event-store.js';
 import { markRespawnPending } from '../../dashboard/server/services/pending-respawn.js';
 import { cleanupConversationAttachments, cleanupUnreferencedConversationAttachments } from '../../dashboard/server/services/conversation-attachments.js';
 import { resolveCodexRolloutPath } from '../agents/transcript-resolver.js';
+import { closeCompanionTerminalForOwner } from './companion-terminal/index.js';
 import { sendConversationControlCommand, isPiControlChannelHarness, resolveConversationDeliveryMethod } from './conversation-delivery.js';
 import {
   assertKimiResumeContractResult,
@@ -173,9 +174,8 @@ async function killConversationRuntimeProcesses(conv: Conversation): Promise<voi
   await terminatePids(pids);
 }
 export async function stopConversationRuntime(conv: Conversation, name: string): Promise<void> {
-  if (hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) {
-    return;
-  }
+  await closeCompanionTerminalForOwner(conv.tmuxSession); // PAN-3974: before the shared-session early return
+  if (hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) return;
   await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
   try {
     await killConversationRuntimeProcesses(conv);
@@ -795,10 +795,8 @@ export async function spawnConversationSession(
       { mode: 0o700 },
     );
     await rename(launcherTmp, launcherScript);
-    try {
-      await Effect.runPromise(killSession(tmuxSession));
-    } catch {
-    }
+    await closeCompanionTerminalForOwner(tmuxSession); // PAN-3974: a respawned owner gets a new generation
+    await Effect.runPromise(killSession(tmuxSession)).catch(() => undefined);
     console.log(`[claude-invoke] purpose=conversation-session | model=${model || 'default'} | source=conversations.ts:spawnConversationSession | session=${tmuxSession} | resume=${resume} | command="${runtimeCommand}"`);
     try {
       const { preTrustDirectory } = await import('../workspace-manager.js') as { preTrustDirectory: (dir: string) => void };

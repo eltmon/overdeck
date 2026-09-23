@@ -81,6 +81,11 @@ vi.mock('../pending-respawn.js', () => ({
   isRespawnPending: mockIsRespawnPending,
 }));
 
+const mockCloseCompanionTerminalForOwner = vi.fn(async () => undefined);
+vi.mock('../../../../lib/overdeck/companion-terminal/index.js', () => ({
+  closeCompanionTerminalForOwner: mockCloseCompanionTerminalForOwner,
+}));
+
 // Mock node:child_process so no real tmux processes are spawned
 vi.mock('node:child_process', () => ({ exec: vi.fn(), execFile: vi.fn() }));
 vi.mock('node:util', () => ({ promisify: vi.fn((fn: unknown) => fn) }));
@@ -117,6 +122,8 @@ describe('ConversationLifecycleService — pollConversations', () => {
     expect(mockCleanupUnreferencedConversationAttachments).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'gone-session', sessionFile: null }),
     );
+    // PAN-3974: an owner that exited on its own takes its companion terminal with it.
+    expect(mockCloseCompanionTerminalForOwner).toHaveBeenCalledWith('conv-gone-session');
   });
 
   it('rechecks the bulk census before ending a session that resumed during the poll', async () => {

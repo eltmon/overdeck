@@ -127,6 +127,15 @@ vi.mock('../../../../lib/tmux.js', () => ({
   findManagedServerPidSync: vi.fn(() => undefined),
 }));
 
+// PAN-3974: owner teardown must close the companion terminal first. The spy
+// records call order against killSession so the tests can assert "before".
+const companionTeardownCalls = vi.hoisted(() => [] as string[]);
+vi.mock('../../../../lib/overdeck/companion-terminal/index.js', () => ({
+  closeCompanionTerminalForOwner: vi.fn(async (ownerSession: string) => {
+    companionTeardownCalls.push(`companion:${ownerSession}`);
+  }),
+}));
+
 // PAN-1837 review fix (cycle 8): waitForNewKimiSessionAsync defaults to the
 // real implementation (kept real for the existing happy-path resume test
 // below) — individual tests override it with mockResolvedValueOnce(null) or
@@ -624,5 +633,61 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('companion terminal owner teardown (PAN-3974)', () => {
+  beforeEach(() => {
+    ensurePtySupervisorBuildArtifact();
+    overdeckHome = join(tmpdir(), `pan-conv-companion-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    process.env.OVERDECK_HOME = overdeckHome;
+    createSupervisorSocket = true;
+    createAcpHostArtifacts = false;
+    resolvedHarnessBinary = '/usr/bin/claude';
+    resolvedConversationHarness = 'claude-code';
+    resolvedProviderName = 'anthropic';
+    createSessionCalls = [];
+    companionTeardownCalls.length = 0;
+  });
+
+  afterEach(async () => {
+    await resetConversationDb();
+    for (const call of createSessionCalls) cleanupSession(call.session);
+    rmSync(overdeckHome, { recursive: true, force: true });
+    delete process.env.OVERDECK_HOME;
+  });
+
+  async function recordKillOrder(): Promise<void> {
+    const tmux = await import('../../../../lib/tmux.js');
+    vi.mocked(tmux.killSession).mockClear();
+    vi.mocked(tmux.killSession).mockImplementation((name: string) => Effect.sync(() => {
+      companionTeardownCalls.push(`owner:${name}`);
+    }));
+  }
+
+  it('closes the companion before a respawn kills the owner session', async () => {
+    await recordKillOrder();
+    const { spawnConversationSession } = await import('../../../../lib/overdeck/conversation-runtime.js');
+
+    await spawnConversationSession(
+      'conv-companion-respawn', tmpdir(), 'session-companion', 'claude-sonnet-4-6', undefined, undefined, false, 'claude-code',
+    );
+
+    expect(companionTeardownCalls.slice(0, 2)).toEqual([
+      'companion:conv-companion-respawn',
+      'owner:conv-companion-respawn',
+    ]);
+  });
+
+  it('closes the companion when the owner is stopped', async () => {
+    await recordKillOrder();
+    const { stopConversationRuntime } = await import('../../../../lib/overdeck/conversation-runtime.js');
+
+    await stopConversationRuntime(
+      { name: 'companion-stop', tmuxSession: 'conv-companion-stop', cwd: tmpdir(), claudeSessionId: null } as never,
+      'companion-stop',
+    );
+
+    expect(companionTeardownCalls).toEqual(['companion:conv-companion-stop', 'owner:conv-companion-stop']);
   });
 });

@@ -29,6 +29,7 @@ import {
   setClearedToConvId,
   type LegacyConversation as Conversation,
 } from '../../../lib/overdeck/conversations.js';
+import { closeCompanionTerminalForOwner } from '../../../lib/overdeck/companion-terminal/index.js';
 import {
   getRuntimeCensus,
   refreshRuntimeCensus,
@@ -267,6 +268,8 @@ export async function pollConversations(): Promise<void> {
     // Batch attachment cleanup to avoid an unbounded fan-out when many
     // conversations end simultaneously (e.g., after server restart).
     await runInBatches(endedConversations, 5, async (conv) => {
+      // PAN-3974: an owner that exited on its own takes its companion terminal with it.
+      await closeCompanionTerminalForOwner(conv.tmuxSession);
       const sessionFile = conv.claudeSessionId ? sessionFilePath(conv.cwd, conv.claudeSessionId) : null;
       await cleanupUnreferencedConversationAttachments({ name: conv.name, sessionFile }).catch((err: unknown) => {
         console.error(`[conversation-lifecycle] Cleanup failed for ${conv.name}:`, err);
