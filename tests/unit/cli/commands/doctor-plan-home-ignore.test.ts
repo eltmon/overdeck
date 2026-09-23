@@ -66,7 +66,10 @@ describe('checkPlanHomePanIgnore', () => {
 
     expect(row.status).toBe('warn');
     expect(row.message).toContain(`tindra (${join(tindra, '.gitignore')}:2 (.pan/))`);
-    expect(row.fix).toContain('pan admin migrate-plan-home tindra --commit');
+    // Review of #3998: the repair-only path, not the full migration.
+    expect(row.fix).toContain('pan admin migrate-plan-home tindra --repair-ignore');
+    expect(row.fix).toContain('commits .gitignore alone');
+    expect(row.fix).not.toContain('--commit');
     expect(row.fix).toContain(`${join(tindra, '.gitignore')}:2`);
     expect(readFileSync(join(tindra, '.gitignore'), 'utf8')).toBe('node_modules/\n.pan/\n');
   });

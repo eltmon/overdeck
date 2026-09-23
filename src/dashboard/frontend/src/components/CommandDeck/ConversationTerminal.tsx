@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Circle, Folder, GitFork } from 'lucide-react';
+import { toast } from 'sonner';
 import { XTerminal } from '../XTerminal';
 import { ContextWindowMeter } from '../chat/ContextWindowMeter';
 import { ConversationResumeControls } from '../chat/ConversationResumeControls';
@@ -28,6 +29,10 @@ export function ConversationTerminal({ conversation }: ConversationTerminalProps
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['conversations'] });
       setResumed(true);
+    },
+    // A failed resume must say so; without this the button did nothing visible.
+    onError: (err: Error) => {
+      toast.error(err.message, { duration: 8000 });
     },
   });
 

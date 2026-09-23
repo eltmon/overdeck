@@ -25,6 +25,24 @@ export function normalizeForgeSync(value?: string | null): ForgeType | null {
   return null;
 }
 
+/**
+ * The forge behind a git remote URL, read from its host: `gitlab` for any
+ * host naming GitLab (gitlab.com or a self-hosted `gitlab.example.com`),
+ * `github` for one naming GitHub. Null when the host says neither.
+ */
+export function forgeFromRemoteUrlSync(url?: string | null): ForgeType | null {
+  if (!url) return null;
+  const trimmed = url.trim().toLowerCase();
+  // https://host/…, ssh://user@host:port/…, or scp-style user@host:path
+  const host = /^[a-z][a-z0-9+.-]*:\/\/(?:[^@/]*@)?([^/:]+)/.exec(trimmed)?.[1]
+    ?? /^(?:[^@/]+@)?([^/:]+):/.exec(trimmed)?.[1]
+    ?? null;
+  if (!host) return null;
+  if (host.includes('gitlab')) return 'gitlab';
+  if (host.includes('github')) return 'github';
+  return null;
+}
+
 export function inferProjectForgeSync(projectConfig: Pick<ProjectConfig, 'github_repo' | 'gitlab_repo'>): ForgeType | null {
   if (projectConfig.github_repo && !projectConfig.gitlab_repo) return 'github';
   if (projectConfig.gitlab_repo && !projectConfig.github_repo) return 'gitlab';
@@ -36,7 +54,7 @@ function getRepoSourceBranch(repo: Pick<RepoConfig, 'branch_prefix'> | undefined
   return `${prefix}${issueId.toLowerCase()}`;
 }
 
-function getRepoTargetBranch(
+export function getRepoTargetBranch(
   repo: Pick<RepoConfig, 'pr_target' | 'default_branch'> | undefined,
   projectConfig: Pick<ProjectConfig, 'workspace'>
 ): string {

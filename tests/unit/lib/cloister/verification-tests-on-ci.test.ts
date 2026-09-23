@@ -6,7 +6,7 @@
  * `verification.tests: local` keeps the local test run.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -74,10 +74,62 @@ import { runVerificationForIssueInProcess } from '../../../../src/lib/cloister/v
 import { readVerificationArtifact, writeVerificationArtifact } from '../../../../src/lib/cloister/verification-artifact.js';
 import { readPipelineJournal } from '../../../../src/lib/cloister/pipeline-journal.js';
 import {
+  findPullRequestTestJob,
   isCiTestCheckName,
   resolveVerificationTestsMode,
+  resolveVerificationTestsModeDecision,
   selectLocalVerificationGates,
+  type WorkflowFile,
 } from '../../../../src/lib/cloister/verification-tests-mode.js';
+
+/** A CI workflow with a `test` job on pull requests (the shape of this repo's ci.yml). */
+const PR_TEST_WORKFLOW = `name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps: [{ run: npm run lint }]
+  test:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps: [{ run: npm test }]
+`;
+
+/** lexerra's docs workflow: path-filtered, no test job. */
+const DOCS_WORKFLOW = `name: docs
+on:
+  pull_request:
+    paths: ['docs/**']
+jobs:
+  links:
+    runs-on: ubuntu-latest
+    steps: [{ run: lychee docs }]
+`;
+
+const RELEASE_WORKFLOW = `name: release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps: [{ run: npm test }]
+`;
+
+const SCHEDULED_TEST_WORKFLOW = `name: nightly
+on:
+  schedule:
+    - cron: '0 3 * * *'
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps: [{ run: npm test }]
+`;
 
 const PROJECT_GATES = {
   typecheck: { command: 'npm run typecheck' },
@@ -126,7 +178,41 @@ describe('verification gate with tests on CI (PAN-3965)', () => {
     const artifact = readVerificationArtifact(workspacePath);
     expect(artifact?.gates.map((gate) => gate.name)).toEqual(['typecheck', 'lint']);
     expect(artifact?.deferredToCi).toEqual(['test']);
+    // Review of #3993: the artifact says where the test gate ran, and why.
+    expect(artifact?.testsMode).toEqual({ mode: 'ci', reason: 'verification.tests: ci in projects.yaml' });
     expect(readPipelineJournal(workspacePath).map((entry) => entry.type)).toEqual(['verification.started', 'verification.passed']);
+  });
+
+  it('a GitHub project whose only workflow is not a PR test job keeps the local test gate, and says why', async () => {
+    mkdirSync(join(workspacePath, '.github', 'workflows'), { recursive: true });
+    writeFileSync(join(workspacePath, '.github', 'workflows', 'docs.yml'), DOCS_WORKFLOW);
+    mockFindProject.mockReturnValue(project());
+
+    await verify();
+
+    const gatesRun = Object.keys(mockRunQualityGates.mock.calls[0]![0] as Record<string, unknown>);
+    expect(gatesRun).toEqual(['typecheck', 'lint', 'test']);
+    const artifact = readVerificationArtifact(workspacePath);
+    expect(artifact?.deferredToCi).toBeUndefined();
+    expect(artifact?.testsMode).toEqual({
+      mode: 'local',
+      reason: expect.stringContaining('no GitHub Actions workflow runs a test job'),
+    });
+  });
+
+  it('a GitHub project with a PR-triggered test job defers the test gate to CI', async () => {
+    mkdirSync(join(workspacePath, '.github', 'workflows'), { recursive: true });
+    writeFileSync(join(workspacePath, '.github', 'workflows', 'ci.yml'), PR_TEST_WORKFLOW);
+    mockFindProject.mockReturnValue(project());
+
+    await verify();
+
+    const gatesRun = Object.keys(mockRunQualityGates.mock.calls[0]![0] as Record<string, unknown>);
+    expect(gatesRun).toEqual(['typecheck', 'lint']);
+    expect(readVerificationArtifact(workspacePath)?.testsMode).toEqual({
+      mode: 'ci',
+      reason: '.github/workflows/ci.yml runs test job "test" on pull requests',
+    });
   });
 
   it('verification.tests: local still runs the test gate on the host', async () => {
@@ -192,27 +278,101 @@ describe('a head whose CI test job is already red (PAN-3965)', () => {
   });
 });
 
-describe('resolveVerificationTestsMode', () => {
+describe('resolveVerificationTestsMode (review of #3993: a PR-triggered test job, not any workflow)', () => {
   const base = { path: '/p', github_repo: 'o/r' };
+  const workflowsIn = (files: Record<string, WorkflowFile[]>) => ({
+    readWorkflowFiles: (dir: string) => files[dir] ?? [],
+  });
+  const at = (content: string, name = 'ci.yml'): WorkflowFile[] => [{ name, content }];
 
-  it('defaults to ci when the GitHub repo has Actions workflows', () => {
-    expect(resolveVerificationTestsMode(base, { hasWorkflowFiles: (dir) => dir === '/p/.github/workflows' })).toBe('ci');
+  it('is ci when a workflow runs a test job on pull requests', () => {
+    expect(resolveVerificationTestsModeDecision(base, workflowsIn({ '/p/.github/workflows': at(PR_TEST_WORKFLOW) }))).toEqual({
+      mode: 'ci',
+      reason: '.github/workflows/ci.yml runs test job "test" on pull requests',
+    });
   });
 
-  it('finds workflows in a polyrepo member repo', () => {
+  it('finds the test job in a polyrepo member repo', () => {
     const polyrepo = { ...base, workspace: { repos: [{ name: 'fe', path: 'fe' }] } } as Parameters<typeof resolveVerificationTestsMode>[0];
-    expect(resolveVerificationTestsMode(polyrepo, { hasWorkflowFiles: (dir) => dir === '/p/fe/.github/workflows' })).toBe('ci');
+    expect(resolveVerificationTestsModeDecision(polyrepo, workflowsIn({ '/p/fe/.github/workflows': at(PR_TEST_WORKFLOW) }))).toEqual({
+      mode: 'ci',
+      reason: 'fe/.github/workflows/ci.yml runs test job "test" on pull requests',
+    });
   });
 
-  it('defaults to local with no workflows or no GitHub repo', () => {
-    expect(resolveVerificationTestsMode(base, { hasWorkflowFiles: () => false })).toBe('local');
-    expect(resolveVerificationTestsMode({ path: '/p' }, { hasWorkflowFiles: () => true })).toBe('local');
-    expect(resolveVerificationTestsMode(null)).toBe('local');
+  it('is local for release, docs, schedule and dispatch workflows (the lexerra case)', () => {
+    const files = workflowsIn({
+      '/p/.github/workflows': [
+        { name: 'docs.yml', content: DOCS_WORKFLOW },
+        { name: 'release.yml', content: RELEASE_WORKFLOW },
+        { name: 'nightly.yml', content: SCHEDULED_TEST_WORKFLOW },
+      ],
+    });
+    expect(resolveVerificationTestsModeDecision(base, files)).toEqual({
+      mode: 'local',
+      reason: 'no GitHub Actions workflow runs a test job (a check named test, tests, test-*, test (…)) on pull requests',
+    });
+  });
+
+  it('is local when the PR workflow\'s test job has a name the matcher does not recognize', () => {
+    const unrecognized = `on: pull_request\njobs:\n  unit-tests:\n    runs-on: ubuntu-latest\n    steps: [{ run: npm test }]\n`;
+    expect(resolveVerificationTestsMode(base, workflowsIn({ '/p/.github/workflows': at(unrecognized) }))).toBe('local');
+  });
+
+  it('is local with no workflows, no GitHub repo, or no project', () => {
+    expect(resolveVerificationTestsModeDecision(base, workflowsIn({}))).toEqual({ mode: 'local', reason: 'no GitHub Actions workflows' });
+    expect(resolveVerificationTestsModeDecision({ path: '/p' }, workflowsIn({ '/p/.github/workflows': at(PR_TEST_WORKFLOW) })))
+      .toEqual({ mode: 'local', reason: 'no github_repo configured' });
+    expect(resolveVerificationTestsModeDecision(null)).toEqual({ mode: 'local', reason: 'project not found' });
   });
 
   it('an explicit key wins over detection', () => {
-    expect(resolveVerificationTestsMode({ ...base, verification: { tests: 'local' } }, { hasWorkflowFiles: () => true })).toBe('local');
-    expect(resolveVerificationTestsMode({ path: '/p', verification: { tests: 'ci' } }, { hasWorkflowFiles: () => false })).toBe('ci');
+    expect(resolveVerificationTestsMode({ ...base, verification: { tests: 'local' } }, workflowsIn({ '/p/.github/workflows': at(PR_TEST_WORKFLOW) }))).toBe('local');
+    expect(resolveVerificationTestsModeDecision({ path: '/p', verification: { tests: 'ci' } }, workflowsIn({}))).toEqual({
+      mode: 'ci',
+      reason: 'verification.tests: ci in projects.yaml',
+    });
+  });
+});
+
+describe('findPullRequestTestJob', () => {
+  it('reads the job name, else the id, on pull_request, pull_request_target, and unfiltered or feature-branch pushes', () => {
+    expect(findPullRequestTestJob(PR_TEST_WORKFLOW)).toBe('test');
+    expect(findPullRequestTestJob('on: [push]\njobs:\n  build:\n    name: Test (${{ matrix.node }})\n')).toBe('Test (${{ matrix.node }})');
+    expect(findPullRequestTestJob('on:\n  pull_request_target:\njobs:\n  tests: {}\n')).toBe('tests');
+    expect(findPullRequestTestJob('on:\n  push:\n    branches: ["feature/**"]\njobs:\n  test-shard: {}\n')).toBe('test-shard');
+    expect(findPullRequestTestJob('on:\n  push:\n    branches-ignore: [main]\njobs:\n  test: {}\n')).toBe('test');
+  });
+
+  it('counts a reusable-workflow test job, whose checks are named "test / <inner>" (review of #4017)', () => {
+    expect(findPullRequestTestJob('on: pull_request\njobs:\n  test:\n    uses: ./.github/workflows/tests.yml\n')).toBe('test');
+    expect(isCiTestCheckName('test / vitest')).toBe(true);
+    expect(isCiTestCheckName('lint / test')).toBe(false);
+  });
+
+  it('honors pull_request branch filters against the PR base branch (review of #4017)', () => {
+    const releaseOnly = 'on:\n  pull_request:\n    branches: ["release/*"]\njobs:\n  test: {}\n';
+    expect(findPullRequestTestJob(releaseOnly)).toBeNull();
+    expect(findPullRequestTestJob(releaseOnly, 'release/2026')).toBe('test');
+    expect(findPullRequestTestJob('on:\n  pull_request:\n    branches-ignore: [main]\njobs:\n  test: {}\n')).toBeNull();
+    expect(findPullRequestTestJob('on:\n  pull_request:\n    branches: [main, develop]\njobs:\n  test: {}\n')).toBe('test');
+  });
+
+  it('skips a test job whose if: cannot run on a pull request (review of #4017)', () => {
+    const pushOnly = "on: [push, pull_request]\njobs:\n  test:\n    if: github.event_name == 'push'\n";
+    const mainOnly = "on: pull_request\njobs:\n  test:\n    if: github.ref == 'refs/heads/main'\n";
+    const prAllowed = "on: pull_request\njobs:\n  test:\n    if: github.event_name == 'pull_request' || github.event_name == 'push'\n";
+    expect(findPullRequestTestJob(pushOnly)).toBeNull();
+    expect(findPullRequestTestJob(mainOnly)).toBeNull();
+    expect(findPullRequestTestJob(prAllowed)).toBe('test');
+  });
+
+  it('ignores pushes the feature branch never makes, and non-test jobs', () => {
+    expect(findPullRequestTestJob('on:\n  push:\n    branches: [main]\njobs:\n  test: {}\n')).toBeNull();
+    expect(findPullRequestTestJob('on:\n  push:\n    tags: ["v*"]\njobs:\n  test: {}\n')).toBeNull();
+    expect(findPullRequestTestJob('on:\n  push:\n    branches: ["*"]\njobs:\n  test: {}\n')).toBeNull();
+    expect(findPullRequestTestJob('on: pull_request\njobs:\n  lint: {}\n  build:\n    name: Clean install + server smoke test\n')).toBeNull();
+    expect(findPullRequestTestJob('not: [valid')).toBeNull();
   });
 });
 
@@ -237,6 +397,8 @@ describe('isCiTestCheckName', () => {
     expect(isCiTestCheckName('tests')).toBe(true);
     expect(isCiTestCheckName('test (22)')).toBe(true);
     expect(isCiTestCheckName('test-unit')).toBe(true);
+    expect(isCiTestCheckName('test-shard (1/4)')).toBe(true);
+    expect(isCiTestCheckName('test-e2e')).toBe(true);
     expect(isCiTestCheckName('Clean install + server smoke test')).toBe(false);
     expect(isCiTestCheckName('lint')).toBe(false);
     expect(isCiTestCheckName('testing-tools')).toBe(false);

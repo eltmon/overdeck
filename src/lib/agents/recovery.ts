@@ -478,7 +478,9 @@ export async function recoverAgent(
   // after the harness exited (a zombie). liveness.ts is the one oracle and is
   // backend-aware (PAN-3960): alive → nothing to do; a confirmed death → close
   // whatever pane or session is left and recover. A probe that could not answer
-  // (`runtime-indeterminate`) is never a death, so nothing is reaped on it.
+  // (`runtime-indeterminate`) is never a death, so nothing is reaped on it. On
+  // a Herdr host a live same-name tmux session (an agent from before the
+  // switch) answers alive, so it is never reaped (review of #3992, M3).
   const liveness = await isAlive(normalizedId);
   if (liveness.alive) {
     logAgentLifecycleSync(normalizedId, 'recoverAgent NO_ACTION: live harness runtime is already running');

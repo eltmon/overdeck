@@ -33,7 +33,7 @@ colleague.
 | **Composer** | Send a message to the running agent mid-task — correct its approach, point it at a file, or tell it to stop and rethink |
 | **Model picker** | Hot-swap the model for the next message — Sonnet → Opus → Kimi/GPT/Gemini — without losing the conversation |
 | **Reasoning effort** | Tune how hard the model thinks per message (e.g. *Extra High*) |
-| **Conversation / Terminal toggle** | Switch between the rendered conversation and the raw tmux terminal of the same session |
+| **Conversation / Terminal toggle** | Switch between the rendered conversation and the raw terminal of the same session (the native CLI for OpenCode) |
 | **Copy link** | Grab the `overdeck.localhost/conv/<id>` URL to share or reopen a conversation |
 | **Context window meter** | See how much of the window is used — your cue that a handoff is coming |
 
@@ -46,6 +46,33 @@ click:
   dark="/images/dashboard/model-picker-dark.png"
   alt="The composer model and harness picker, showing Claude Code / Pi / Codex harnesses over Anthropic and other provider models with per-million pricing"
 />
+
+### Native OpenCode CLI in Terminal
+
+For an OpenCode conversation, **Terminal** attaches OpenCode's own interactive
+CLI to the same running server and the same session, instead of showing the
+Overdeck host log. What you type there and what you send from the composer land
+in one session and one transcript; no second OpenCode server or session starts.
+Dashboard messages still travel over the structured ACP connection, never as
+keystrokes into this terminal.
+
+Terminal has two panes for OpenCode:
+
+| Pane | What it shows |
+|:-----|:--------------|
+| **Native CLI** | `opencode attach` running against the conversation's server and session. Overdeck opens it the first time you select Terminal and reuses it after that. |
+| **Runtime log** | The conversation's own terminal, the Overdeck ACP host log that Terminal showed before. |
+
+Switching back to Conversation, changing conversations, or closing the browser
+tab leaves the native CLI running. **Close native CLI** stops only that
+terminal; the conversation keeps running. Stopping, archiving, deleting, or
+restarting the conversation also stops its native CLI.
+
+A conversation started before Overdeck recorded the OpenCode server port shows
+**Restart required for the native CLI**. Stop and resume the conversation to
+attach; nothing restarts automatically. **Show runtime log** keeps the host log
+available meanwhile. Other harnesses, including Codex app-server
+conversations, keep their existing Terminal view.
 
 ## Attachments
 

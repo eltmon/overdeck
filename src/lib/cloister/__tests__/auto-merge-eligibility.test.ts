@@ -6,6 +6,7 @@ import {
   HOLD_FOR_UAT_LABEL,
   autoMergeFromLabels,
   isAutoMergeEligible,
+  issueHoldsForUat,
 } from '../auto-merge-eligibility.js';
 import { emptyPrFacts, type PrFacts } from '../pr-facts.js';
 
@@ -136,5 +137,32 @@ describe('auto-merge eligibility', () => {
       number: 62,
     });
     await expect(isAutoMergeEligible('MIN-831', deps(facts))).resolves.toEqual({ eligible: true });
+  });
+});
+
+describe('issueHoldsForUat (review of #3993: the per-issue tier the merge train must honor)', () => {
+  it('a hold-for-uat label holds an issue in an auto project', async () => {
+    await expect(issueHoldsForUat('PAN-1', { auto_merge_default: 'auto' }, false, {
+      getIssueLabels: async () => [HOLD_FOR_UAT_LABEL],
+    })).resolves.toBe(true);
+  });
+
+  it('an auto-merge label releases an issue in a held project', async () => {
+    await expect(issueHoldsForUat('PAN-1', { auto_merge_default: 'hold' }, true, {
+      getIssueLabels: async () => [AUTO_MERGE_LABEL],
+    })).resolves.toBe(false);
+  });
+
+  it('with no label, follows the project default, then the global flag', async () => {
+    const noLabels = { getIssueLabels: async () => [] };
+    await expect(issueHoldsForUat('PAN-1', { auto_merge_default: 'hold' }, false, noLabels)).resolves.toBe(true);
+    await expect(issueHoldsForUat('PAN-1', {}, true, noLabels)).resolves.toBe(true);
+    await expect(issueHoldsForUat('PAN-1', {}, false, noLabels)).resolves.toBe(false);
+  });
+
+  it('a label read failure falls back to the project and global tiers', async () => {
+    const failing = { getIssueLabels: async () => { throw new Error('gh: rate limited'); } };
+    await expect(issueHoldsForUat('PAN-1', { auto_merge_default: 'hold' }, false, failing)).resolves.toBe(true);
+    await expect(issueHoldsForUat('PAN-1', { auto_merge_default: 'auto' }, true, failing)).resolves.toBe(false);
   });
 });

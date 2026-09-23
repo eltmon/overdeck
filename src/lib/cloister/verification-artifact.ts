@@ -41,6 +41,11 @@ export interface VerificationArtifact {
    */
   deferredToCi?: string[];
   /**
+   * PAN-3965 (review of #3993): where this project's test gate runs and why
+   * (`verification.tests`, or what workflow detection found).
+   */
+  testsMode?: { mode: 'ci' | 'local'; reason: string };
+  /**
    * PAN-3965: `ci` when this run records the CI test job's result on the PR
    * head rather than a gate run on the host. Counted by verification-cycles.
    */
@@ -78,6 +83,8 @@ export function writeVerificationArtifact(
     head8?: string;
     /** PAN-3965: gates handed to CI instead of run on the host. */
     deferredToCi?: string[];
+    /** PAN-3965: where the test gate runs, and why. */
+    testsMode?: { mode: 'ci' | 'local'; reason: string };
     /** PAN-3965: the run records a CI result, not a host gate run. */
     via?: 'ci';
     /** Per-run writes only: false leaves verification-latest.json untouched. */
@@ -109,6 +116,7 @@ export function writeVerificationArtifact(
       ...(r.error ? { error: r.error } : {}),
     })),
     ...(options?.deferredToCi && options.deferredToCi.length > 0 ? { deferredToCi: [...options.deferredToCi] } : {}),
+    ...(options?.testsMode ? { testsMode: { ...options.testsMode } } : {}),
     ...(options?.via ? { via: options.via } : {}),
     ...(isRunWrite && options?.head8 ? { head8: options.head8 } : {}),
   };

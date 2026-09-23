@@ -20,9 +20,12 @@ import {
   ConversationNotFound, AlreadyArchived, NotArchived,
   type ConversationName,
   type Conversation,
+  archiveConversation,
   createConversation,
   getConversationByName,
+  getSupervisedConversationByTmuxSession,
   markConversationEnded,
+  setClearedToConvId,
   markConversationRunning,
   updateForkStatus,
   updateSpawnError,
@@ -322,6 +325,47 @@ describe('markConversationRunning failure-state repair', () => {
 
     const row = odb.raw().prepare('SELECT changes() AS count').get() as { count: number };
     expect(row.count).toBe(0);
+  });
+});
+
+describe('getSupervisedConversationByTmuxSession — post-/clear siblings (PAN-3962)', () => {
+  let odb: OverdeckTestDb;
+
+  beforeEach(() => {
+    odb = setupOverdeckTestDb();
+  }, 15_000);
+
+  afterEach(() => {
+    teardownOverdeckTestDb(odb);
+  });
+
+  function seedClearedPair() {
+    createConversation({ name: 'parent', tmuxSession: 'conv-parent', cwd: '/tmp' });
+    const sibling = createConversation({ name: 'parent-post-clear-1234abcd', tmuxSession: 'conv-parent', cwd: '/tmp' });
+    setClearedToConvId('parent', sibling.id);
+    markConversationEnded('parent');
+    return sibling;
+  }
+
+  it('resolves the shared session to the post-/clear sibling, not the parent', () => {
+    const sibling = seedClearedPair();
+
+    expect(getSupervisedConversationByTmuxSession('conv-parent')?.name).toBe(sibling.name);
+  });
+
+  it('still prefers the sibling once the sibling itself has ended', () => {
+    const sibling = seedClearedPair();
+    markConversationEnded(sibling.name);
+
+    expect(getSupervisedConversationByTmuxSession('conv-parent')?.name).toBe(sibling.name);
+  });
+
+  it('resolves a lone conversation by its session and ignores archived rows', () => {
+    createConversation({ name: 'solo', tmuxSession: 'conv-solo', cwd: '/tmp' });
+    expect(getSupervisedConversationByTmuxSession('conv-solo')?.name).toBe('solo');
+
+    archiveConversation('solo');
+    expect(getSupervisedConversationByTmuxSession('conv-solo')).toBeNull();
   });
 });
 

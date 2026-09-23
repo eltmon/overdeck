@@ -769,7 +769,11 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Kimi Code CLI (ACP harness). Resolve the same configured executable used at launch.
   for (const c of await checkKimi()) checks.push(c);
-  for (const c of await checkHerdr()) checks.push(c); // PAN-3956: terminal backend + Herdr
+  try {
+    for (const c of await checkHerdr()) checks.push(c); // PAN-3956: terminal backend + Herdr
+  } catch (error) {
+    checks.push({ name: 'Terminal backend', status: 'warn', message: `Herdr checks failed: ${error instanceof Error ? error.message : String(error)}` });
+  }
 
   // Check Overdeck directories
   const directories = [

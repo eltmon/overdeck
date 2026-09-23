@@ -59,6 +59,7 @@ import { miscRouteLayer } from './routes/misc.js';
 import { paletteRouteLayer } from './routes/palette.js';
 import { conversationsRouteLayer } from './routes/conversations.js';
 import { conversationsRetrospectiveRouteLayer } from './routes/conversations-retrospective.js';
+import { conversationCompanionTerminalRouteLayer } from './routes/conversation-companion-terminal.js';
 import { eventsRouteLayer } from './routes/events.js';
 import { projectsRouteLayer } from './routes/projects.js';
 import { projectsMergeTrainRouteLayer } from './routes/projects-merge-train.js';
@@ -361,6 +362,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   paletteRouteLayer,
   conversationsRouteLayer,
   conversationsRetrospectiveRouteLayer,
+  conversationCompanionTerminalRouteLayer,
   eventsRouteLayer,
   projectsRouteLayer,
   projectsMergeTrainRouteLayer,

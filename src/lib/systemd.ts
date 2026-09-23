@@ -1,9 +1,9 @@
 import { exec } from 'node:child_process';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { access, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { OVERDECK_HOME } from './paths.js';
+import { OVERDECK_HOME, getCanonicalOverdeckHome } from './paths.js';
 import { getSupervisorPortSync, resolveSupervisorBundle, resolveSupervisorPrimaryRepoRoot } from './supervisor.js';
 
 const execAsync = promisify(exec);
@@ -41,8 +41,14 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
+/** One quoted word; `%` is doubled so systemd's specifier expansion leaves it alone. */
 function systemdQuote(value: string): string {
-  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
+  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('%', '%%')}"`;
+}
+
+/** An ExecStart= word: ExecStart= also expands `$VAR`, so `$` is doubled too (Environment= does not). */
+function execStartQuote(value: string): string {
+  return systemdQuote(value).replaceAll('$', '$$$$');
 }
 
 function systemctl(command: string): Promise<{ stdout: string; stderr: string }> {
@@ -88,7 +94,7 @@ export function renderSupervisorUnit(options: RenderSupervisorUnitOptions = {}):
     // first char is `"`, not `/`). ExecStart= (a command line) and Environment=
     // (word-split assignments) DO support quoting, so those stay quoted.
     `WorkingDirectory=${workingDirectory}`,
-    `ExecStart=${systemdQuote(nodePath)} ${systemdQuote(supervisorBundle)}`,
+    `ExecStart=${execStartQuote(nodePath)} ${execStartQuote(supervisorBundle)}`,
     `Environment=${environment}`,
     'Restart=on-failure',
     `RestartSec=${restartSec}`,
@@ -108,6 +114,7 @@ export async function installSupervisorUnit(options: InstallSupervisorUnitOption
   }
 
   if (existing === unitText) {
+    if (await unitNeedsDaemonReload(SUPERVISOR_UNIT_NAME)) await systemctl('daemon-reload');
     return { path, written: false };
   }
 
@@ -117,14 +124,45 @@ export async function installSupervisorUnit(options: InstallSupervisorUnitOption
   return { path, written: true };
 }
 
-export async function startSupervisorUnitIfAvailable(options: InstallSupervisorUnitOptions = {}): Promise<boolean> {
+/**
+ * `overdeck-supervisor.service` is one unit per user, and it carries its
+ * home's `OVERDECK_HOME`. Only the canonical home (`~/.overdeck`) may write,
+ * start or stop it; any other home runs its own supervisor as a plain process
+ * unless it opts in with `OVERDECK_SUPERVISOR_UNIT=1`. Without this a shell
+ * with a throwaway `OVERDECK_HOME` rewrites the real unit on `pan up` and stops
+ * the real supervisor on `pan down` (review of #4020, finding 1).
+ */
+export function supervisorUnitAllowed(env: Readonly<Record<string, string | undefined>> = process.env): boolean {
+  const home = env.OVERDECK_HOME?.trim();
+  if (!home || resolve(home) === resolve(getCanonicalOverdeckHome())) return true;
+  return env.OVERDECK_SUPERVISOR_UNIT === '1';
+}
+
+export interface StartSupervisorUnitOptions extends InstallSupervisorUnitOptions {
+  /** Unit upkeep failed but the unit is running: a warning, not a failed start. */
+  onWarning?: (message: string) => void;
+}
+
+export async function startSupervisorUnitIfAvailable(options: StartSupervisorUnitOptions = {}): Promise<boolean> {
+  if (!supervisorUnitAllowed()) return false;
   if (!(await systemdUserAvailable())) return false;
-  await installSupervisorUnit(options);
+  try {
+    await installSupervisorUnit(options);
+  } catch (error) {
+    // A daemon-reload timeout while the unit already runs is not a failed start.
+    if (!(await isSupervisorUnitActive())) throw error;
+    options.onWarning?.(
+      `Could not refresh ${SUPERVISOR_UNIT_NAME}: ${error instanceof Error ? error.message : String(error)}; `
+      + 'the running supervisor is unaffected',
+    );
+    return true;
+  }
   await startSupervisorUnit();
   return true;
 }
 
 export async function stopSupervisorUnitIfActive(): Promise<boolean> {
+  if (!supervisorUnitAllowed()) return false;
   if (!(await systemdUserAvailable())) return false;
   if (!(await isSupervisorUnitActive())) return false;
   await stopSupervisorUnit();
@@ -193,12 +231,49 @@ export async function systemdUserAvailable(): Promise<boolean> {
       encoding: 'utf-8',
       timeout: SYSTEMCTL_TIMEOUT_MS,
     });
-    await execAsync('systemctl --user is-system-running', {
+    return USABLE_MANAGER_STATES.has(await userManagerState());
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * States in which the user manager installs, enables and starts units. A
+ * `degraded` manager (one failed unit anywhere, e.g. a failed transient
+ * deploy unit) or one still `starting` works exactly like a `running` one; only
+ * `offline`, `stopping`, `maintenance` and an unreadable state fall back
+ * (PAN-3956 review finding 7).
+ */
+const USABLE_MANAGER_STATES: ReadonlySet<string> = new Set(['running', 'degraded', 'starting', 'initializing']);
+
+/**
+ * `systemctl --user is-system-running` prints the state on stdout and exits
+ * non-zero for everything but `running`, so the state is read from stdout on
+ * either exit path. Empty when systemctl could not answer at all.
+ */
+async function userManagerState(): Promise<string> {
+  try {
+    const { stdout } = await execAsync('systemctl --user is-system-running', {
       encoding: 'utf-8',
       timeout: SYSTEMCTL_TIMEOUT_MS,
     });
+    return String(stdout).trim();
+  } catch (error) {
+    const { stdout, killed } = error as { stdout?: unknown; killed?: boolean };
+    if (killed) return '';
+    return typeof stdout === 'string' ? stdout.trim() : '';
+  }
+}
 
-    return true;
+/**
+ * True when systemd still has an older copy of the unit loaded — a previous
+ * write whose `daemon-reload` failed or timed out. Without this check the next
+ * run sees an identical file and never reloads (PAN-3956 review finding 9).
+ */
+async function unitNeedsDaemonReload(unitName: string): Promise<boolean> {
+  try {
+    const { stdout } = await systemctl(`show -p NeedDaemonReload --value ${unitName}`);
+    return String(stdout).trim() === 'yes';
   } catch {
     return false;
   }
@@ -226,7 +301,10 @@ export async function installUserUnit(
   } catch {
     existing = null;
   }
-  if (existing === unitText) return { path, written: false };
+  if (existing === unitText) {
+    if (await unitNeedsDaemonReload(unitName)) await systemctl('daemon-reload');
+    return { path, written: false };
+  }
 
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, unitText, 'utf-8');

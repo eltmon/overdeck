@@ -178,7 +178,9 @@ describe('resumeAgent — Claude resume-summary gate (PAN-3636)', () => {
     const result = await resumeAgent(agentId);
 
     expect(result).toEqual({ success: true, messageDelivered: true });
-    expect(mocks.prepareAutonomousAgentResumePane).toHaveBeenCalledWith(agentId, 'work');
+    expect(mocks.prepareAutonomousAgentResumePane).toHaveBeenCalledWith(agentId, 'work', {
+      pane: expect.objectContaining({ backend: 'tmux', paneId: agentId }),
+    });
     expect(mocks.deliverResumeMessageWithTranscriptConfirmation).toHaveBeenCalledWith(expect.objectContaining({
       agentId,
       sessionId: 'pan-3411-session',

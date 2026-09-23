@@ -8,7 +8,7 @@ import { markTerminalClick, useNeedsTerminalAutoSwitch, type ViewMode } from './
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, Folder, GitBranchPlus, GitFork, Archive, Sparkles, Info, RefreshCw, FileText, FileX, ExternalLink, RotateCcw, ArrowRight, MoreVertical, Star, Share2, Download, Square } from 'lucide-react';
 import { toast } from 'sonner';
-import { XTerminal } from '../XTerminal';
+import { ConversationTerminalView } from './ConversationTerminalView';
 import type { Conversation } from '../CommandDeck/ConversationList';
 import { updateConversationTitle } from '../CommandDeck/ConversationList';
 import { MessagesTimeline, type RoundMarker } from './MessagesTimeline';
@@ -1024,7 +1024,7 @@ export function ConversationPanel({
       <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
         <div className={styles.conversationTerminalBody}>
           {showTerminal && effectiveViewMode === 'terminal' && (
-            <XTerminal sessionName={conversation.tmuxSession} />
+            <ConversationTerminalView conversation={conversation} />
           )}
           {(effectiveViewMode === 'conversation' || !showTerminal) && (selectedSubagent ? (
             <SubagentTranscript conversation={conversation} subagent={selectedSubagent} resolvedTheme={resolvedTheme} onBack={clearSubagent} />

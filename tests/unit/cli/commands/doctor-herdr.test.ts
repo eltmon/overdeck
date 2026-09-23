@@ -111,6 +111,27 @@ describe('checkHerdr (PAN-3956 W9)', () => {
     expect(row(unset, 'Herdr config').message).toContain('defaults to true');
   });
 
+  it('names the exact hand fix when pan sync cannot edit the config safely (review finding 4)', async () => {
+    const inline = await checkHerdr(deps({ configText: 'session = { resume_agents_on_restore = true }\n' }));
+    expect(row(inline, 'Herdr config').status).toBe('error');
+    expect(row(inline, 'Herdr config').fix).toBe(
+      'By hand: set `resume_agents_on_restore = false` inside the `session = { … }` inline table in '
+      + '~/.config/herdr/config.toml (pan sync cannot edit it safely: `session` is an inline table '
+      + '(`session = { … }`), which Overdeck does not rewrite)',
+    );
+    const broken = await checkHerdr(deps({ configText: '[session\n' }));
+    expect(row(broken, 'Herdr config').message).toMatch(/^Overdeck cannot parse .*run `herdr config check`/);
+    expect(row(broken, 'Herdr config').fix).toMatch(/^By hand: add `resume_agents_on_restore = false`/);
+    const unreadableButFalse = await checkHerdr(deps({ configText: '[session]\nx = @\nresume_agents_on_restore = false\n' }));
+    expect(row(unreadableButFalse, 'Herdr config')).toMatchObject({ status: 'warn', fix: 'Confirm with: herdr config check' });
+    const mixedArray = await checkHerdr(deps({ configText: 'x = [1, "a"]\n[session]\nresume_agents_on_restore = false\n' }));
+    expect(row(mixedArray, 'Herdr config').status).toBe('ok');
+    const bigInt = await checkHerdr(deps({ configText: 'x = 9007199254740993\n' }));
+    expect(row(bigInt, 'Herdr config')).toMatchObject({ status: 'error', fix: 'Run: pan sync' });
+    const dotted = await checkHerdr(deps({ configText: 'session.resume_agents_on_restore = true\n' }));
+    expect(row(dotted, 'Herdr config').fix).toBe('Run: pan sync');
+  });
+
   it('is an error when a pilot harness is installed but its integration is not', async () => {
     const rows = await checkHerdr(deps({ integrationRows: parseIntegrationStatus(INTEGRATION_STATUS_TEXT) }));
     expect(row(rows, 'Herdr integration: omp')).toMatchObject({ status: 'error', fix: 'Run: pan sync' });
@@ -145,6 +166,40 @@ describe('checkHerdr (PAN-3956 W9)', () => {
   it('warns when the server runs outside its unit on a systemd host', async () => {
     const rows = await checkHerdr(deps({ unitActive: false }));
     expect(row(rows, 'Herdr server')).toMatchObject({ status: 'warn', fix: 'Run: pan sync' });
+  });
+
+  it('does not ask a non-default home for a unit pan sync never installs', async () => {
+    const rows = await checkHerdr(deps({
+      unitActive: false,
+      probe: { binary: BINARY, session: 'overdeck-1a2b3c4d', socket: SOCKET, socketExists: true, available: true },
+    }));
+    expect(row(rows, 'Herdr server').status).toBe('ok');
+  });
+
+  it('warns with pan sync for an outdated or needs-repair pilot integration', async () => {
+    const rows = await checkHerdr(deps({
+      integrationRows: parseIntegrationStatus('pi: needs repair (/p)\nkimi: outdated (v1 < v2)\n'),
+    }));
+    expect(row(rows, 'Herdr integration: pi')).toMatchObject({ status: 'warn', fix: 'Run: pan sync' });
+    expect(row(rows, 'Herdr integration: kimi')).toMatchObject({ status: 'warn', fix: 'Run: pan sync' });
+  });
+
+  it('warns, without a fix pan sync cannot deliver, when status is unreadable or a target is unlisted', async () => {
+    const unreadable = await checkHerdr(deps({ integrationRows: [] }));
+    expect(unreadable.filter((r) => r.status === 'error')).toEqual([]);
+    expect(row(unreadable, 'Herdr integration: pi')).toEqual({
+      name: 'Herdr integration: pi',
+      status: 'warn',
+      message: 'status unknown: `herdr integration status` gave no readable output',
+    });
+    expect(row(unreadable, 'Herdr integration: codex').status).toBe('ok');
+
+    const unlisted = await checkHerdr(deps({ integrationRows: parseIntegrationStatus('pi: current (/p)\n') }));
+    expect(row(unlisted, 'Herdr integration: kimi')).toEqual({
+      name: 'Herdr integration: kimi',
+      status: 'warn',
+      message: 'status unknown: not listed by `herdr integration status`',
+    });
   });
 
   it('warns when herdr resolves only from ~/.local/bin and that dir is not on PATH', async () => {

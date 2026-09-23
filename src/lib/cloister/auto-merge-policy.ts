@@ -36,8 +36,15 @@ export function projectHoldsForUat(
   project: { auto_merge_default?: unknown } | null | undefined,
   globalRequireUat: boolean,
 ): boolean {
+  return shouldHoldForUat(undefined, projectAutoMergeDefault(project), globalRequireUat);
+}
+
+/** A project config's `auto_merge_default`, normalized. */
+export function projectAutoMergeDefault(
+  project: { auto_merge_default?: unknown } | null | undefined,
+): ProjectAutoMergeDefault {
   const d = project?.auto_merge_default;
-  return shouldHoldForUat(undefined, d === 'auto' || d === 'hold' ? d : undefined, globalRequireUat);
+  return d === 'auto' || d === 'hold' ? d : undefined;
 }
 
 /** Resolve the per-project auto-merge default for an issue, or undefined. */

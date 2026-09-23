@@ -41,8 +41,10 @@ faithfully follows a flawed spec. Keep speculative future changes and optional
 hardening advisory; a clean report is valid. Deduplicate by root cause/trigger.
 
 Use existing successful verification tied to the exact HEAD when available.
-Never run the full test suite; it runs on CI against the PR head — read it
-with `gh pr checks <pr-number>`. Otherwise run focused checks to answer a
+Never run the full test suite; the verification gate already ran it — on CI
+against the PR head where the project's tests run on CI (read it with
+`gh pr checks <pr-number>`), otherwise locally before review (its record is the
+`overdeck/verification` check). Otherwise run focused checks to answer a
 specific uncertainty. Isolated scratch probes may use a temporary directory; do not edit
 tracked files or use live operator state as fixtures. Record checks not run.
 Use fake timers for synthetic delays and retries.

@@ -154,6 +154,11 @@ export async function detectPanIgnore(dir: string): Promise<PanIgnoreStatus> {
       ['check-ignore', '-v', '-z', '--no-index', '--stdin'],
       { cwd: dir, encoding: 'utf8' },
     );
+    // A git that exits before reading stdin (bad config, refused repo) makes
+    // this write fail with EPIPE. The exit itself rejects `pending` with git's
+    // reason, so the stream error carries nothing more; unhandled, it would
+    // crash the process instead.
+    pending.child.stdin?.on('error', () => undefined);
     pending.child.stdin?.end(`${PAN_IGNORE_PROBES.join('\0')}\0`);
     ({ stdout } = await pending);
   } catch (error) {

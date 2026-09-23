@@ -129,15 +129,15 @@ export async function reconcileAgentLiveness(): Promise<string[]> {
 
   for (const agent of runningAgents) {
     if (liveIds.has(agent.id)) continue;
-    // On tmux an absent session can still mean a probe that failed rather than
-    // a death, so the oracle gets the final word; on Herdr the inventory IS the
-    // oracle, and absence from it is the confirmed death.
-    let reason = `absent from the ${inventory.backend} inventory`;
-    if (inventory.backend === 'tmux') {
-      const verdict = await isAlive(agent.id);
-      if (verdict.alive || !isConfirmedDead(verdict)) continue;
-      reason = verdict.reason;
-    }
+    // Absence from the inventory is not yet a death: on tmux it can be a probe
+    // that failed, and on Herdr the agent may still run in the tmux session it
+    // had before the host switched (review of #4018, L1) — the Herdr inventory
+    // lists Herdr panes only. The oracle gets the final word on both, so this
+    // never marks stopped an agent `resumeAgent` refuses as healthy. An
+    // indeterminate verdict leaves the cache as it is.
+    const verdict = await isAlive(agent.id);
+    if (verdict.alive || !isConfirmedDead(verdict)) continue;
+    const reason = `absent from the ${inventory.backend} inventory; ${verdict.reason}`;
 
     if (agentStoppedNotifier) {
       try {

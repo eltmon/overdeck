@@ -16,10 +16,10 @@ const SOCKET = '/home/op/.config/herdr/sessions/overdeck/herdr.sock';
 const RUNNING = parseHerdrStatus(STATUS_RUNNING_JSON) as HerdrStatus;
 const NOT_RUNNING = parseHerdrStatus(STATUS_NOT_RUNNING_JSON) as HerdrStatus;
 
-function probe(binary: string | null): HerdrAvailability {
+function probe(binary: string | null, session = 'overdeck'): HerdrAvailability {
   return {
     binary,
-    session: 'overdeck',
+    session,
     socket: SOCKET,
     socketExists: binary !== null,
     available: binary !== null,
@@ -47,6 +47,7 @@ function harness(options: {
   policy?: 'herdr' | 'tmux';
   configChanged?: boolean;
   integrationsInstalled?: string[];
+  session?: string;
 } = {}): Harness {
   const binaryPresent = options.binary !== null;
   const spies = {
@@ -77,7 +78,7 @@ function harness(options: {
       source: options.policy === 'tmux' ? 'config' : 'default',
       diagnostic: options.policy === 'tmux' ? "terminal.backend is set to 'tmux' in config.yaml." : 'default',
     }),
-    probe: async () => probe(binaryPresent ? (options.binary ?? BINARY) : null),
+    probe: async () => probe(binaryPresent ? (options.binary ?? BINARY) : null, options.session),
     fetchLatest: async () => (options.latest === undefined ? '0.9.1' : options.latest),
     installBinary: spies.installBinary,
     updateBinary: spies.updateBinary,
@@ -85,6 +86,7 @@ function harness(options: {
     readStatus: async () => ((options.serverRunning ?? true) ? RUNNING : NOT_RUNNING),
     ensureChannel: spies.ensureChannel,
     ensureConfig: spies.ensureConfig,
+    configDisablesResume: async () => false,
     ensureServer: spies.ensureServer,
     ensureIntegrations: spies.ensureIntegrations,
   };
@@ -127,7 +129,7 @@ describe('ensureHerdr — install / sync / up (PAN-3956 W8)', () => {
     expect(report.binary).toMatchObject({ path: BINARY, action: 'installed', version: '0.9.1' });
     expect(h.spies.ensureChannel).toHaveBeenCalled();
     expect(h.spies.ensureConfig).toHaveBeenCalledWith({ binary: BINARY, session: 'overdeck', serverRunning: true });
-    expect(h.spies.ensureServer).toHaveBeenCalledWith({ binary: BINARY, session: 'overdeck', socket: SOCKET });
+    expect(h.spies.ensureServer).toHaveBeenCalledWith({ binary: BINARY, session: 'overdeck', socket: SOCKET, persistentUnit: true });
     expect(report.integrations.installed).toEqual(['pi', 'omp']);
     expect(report.server).toMatchObject({ running: true, endpointCompatible: true, restartNeeded: false });
   });
@@ -212,5 +214,140 @@ describe('ensureHerdr — install / sync / up (PAN-3956 W8)', () => {
     expect(report.binary.action).toBe('missing');
     expect(report.server).toEqual({ running: false, reason: 'Herdr install failed: curl: (6) Could not resolve host' });
     expect(h.spies.ensureServer).not.toHaveBeenCalled();
+  });
+});
+
+describe('ensureHerdr — review of #3995 (PAN-3956)', () => {
+  it('sets the stable channel before updating the binary (low: channel after update)', async () => {
+    const order: string[] = [];
+    const h = harness({ latest: '0.10.0', serverRunning: false });
+    h.spies.ensureChannel.mockImplementation(async () => { order.push('channel'); return 'changed'; });
+    h.spies.updateBinary.mockImplementation(async () => { order.push('update'); });
+    await run('sync', h);
+    expect(order).toEqual(['channel', 'update']);
+  });
+
+  it('never updates the shared binary from a non-default home, in sync or install (finding 6)', async () => {
+    for (const mode of ['sync', 'install'] as const) {
+      const h = harness({ latest: '0.10.0', serverRunning: false, session: 'overdeck-1a2b3c4d' });
+      const report = await run(mode, h);
+      expect(h.spies.updateBinary).not.toHaveBeenCalled();
+      expect(report.binary.action).toBe('update-available');
+      expect(report.warnings.join('\n')).toContain('leaves the shared herdr binary alone');
+    }
+  });
+
+  it('asks for a boot-persistent unit only for the default home or on opt-in (finding 6)', async () => {
+    const other = harness({ session: 'overdeck-1a2b3c4d' });
+    await run('up', other);
+    expect(other.spies.ensureServer).toHaveBeenCalledWith(expect.objectContaining({ persistentUnit: false }));
+
+    const optIn = harness({ session: 'overdeck-1a2b3c4d' });
+    await run('up', { ...optIn, deps: { ...optIn.deps, env: { OVERDECK_HERDR_PERSISTENT_UNIT: '1' } } });
+    expect(optIn.spies.ensureServer).toHaveBeenCalledWith(expect.objectContaining({ persistentUnit: true }));
+  });
+
+  it('surfaces a failed reload-config as a warning while reporting the config as written (finding 2)', async () => {
+    const h = harness();
+    h.spies.ensureConfig.mockResolvedValueOnce({
+      changed: true,
+      path: '/home/op/.config/herdr/config.toml',
+      reloadWarning: 'reload-config failed (exit 1)',
+    });
+    const report = await run('sync', h);
+    expect(report.config).toEqual({ changed: true, path: '/home/op/.config/herdr/config.toml' });
+    expect(report.warnings).toContain('reload-config failed (exit 1)');
+  });
+
+  it('does not start a server while the config cannot be made safe (finding 4)', async () => {
+    const h = harness({ serverRunning: false });
+    h.spies.ensureConfig.mockRejectedValueOnce(new Error('Cannot safely edit config.toml: inline table'));
+    const report = await run('up', h);
+    expect(h.spies.ensureServer).not.toHaveBeenCalled();
+    expect(report.server.running).toBe(false);
+    expect(report.server.reason).toMatch(/^not started — .*resume_agents_on_restore = false.*inline table/);
+    expect(report.config.error).toContain('inline table');
+    expect(report.warnings.join('\n')).toContain('Herdr config not updated: Cannot safely edit');
+  });
+
+  it('still starts the server when the config edit failed but the file already says false', async () => {
+    const h = harness({ serverRunning: false });
+    h.spies.ensureConfig.mockRejectedValueOnce(new Error('herdr config check rejected'));
+    const report = await run('up', { ...h, deps: { ...h.deps, configDisablesResume: async () => true } });
+    expect(h.spies.ensureServer).toHaveBeenCalled();
+    expect(report.server.running).toBe(true);
+  });
+
+  it('leaves an already-running server reported as running when the config edit fails', async () => {
+    const h = harness({ serverRunning: true });
+    h.spies.ensureConfig.mockRejectedValueOnce(new Error('Cannot safely edit config.toml'));
+    const report = await run('sync', h);
+    expect(h.spies.ensureServer).toHaveBeenCalled();
+    expect(report.server.running).toBe(true);
+  });
+
+  it('passes a unit-upkeep warning through without reporting the server down (finding 9)', async () => {
+    const h = harness();
+    h.spies.ensureServer.mockResolvedValueOnce({
+      running: true,
+      managedBy: 'already-running',
+      unit: 'overdeck-herdr.service',
+      warning: 'Could not refresh or enable overdeck-herdr.service: boom',
+    } as never);
+    const report = await run('sync', h);
+    expect(report.server).toMatchObject({ running: true, managedBy: 'already-running' });
+    expect(report.server).not.toHaveProperty('warning');
+    expect(report.warnings).toContain('Could not refresh or enable overdeck-herdr.service: boom');
+  });
+
+  it('re-probes an unreadable status and reports "unknown", not "down", before refusing (review of #4020, 2)', async () => {
+    const h = harness({ serverRunning: false });
+    h.spies.ensureConfig.mockRejectedValueOnce(new Error('Cannot safely edit config.toml'));
+    const readStatus = vi.fn(async () => null);
+    const report = await run('up', { ...h, deps: { ...h.deps, readStatus } });
+    expect(readStatus.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(h.spies.ensureServer).not.toHaveBeenCalled();
+    expect(report.server).toMatchObject({ running: false, stateUnknown: true });
+    expect(report.server.reason).toContain('did not answer');
+    expect(report.server.hint).toContain('pan doctor');
+    expect(report.server.hint).not.toContain('pan install');
+  });
+
+  it('takes the already-running path when the re-probe finds the server up', async () => {
+    const h = harness({ serverRunning: false });
+    h.spies.ensureConfig.mockRejectedValueOnce(new Error('Cannot safely edit config.toml'));
+    let calls = 0;
+    const readStatus = vi.fn(async () => (++calls === 1 ? null : RUNNING));
+    const report = await run('up', { ...h, deps: { ...h.deps, readStatus } });
+    expect(h.spies.ensureServer).toHaveBeenCalled();
+    expect(report.server.running).toBe(true);
+  });
+
+  it('names the config fix, not pan install, when a definitely-stopped server is not started', async () => {
+    const h = harness({ serverRunning: false });
+    h.spies.ensureConfig.mockRejectedValueOnce(new Error('Cannot safely edit config.toml'));
+    const report = await run('up', h);
+    expect(report.server.stateUnknown).toBeUndefined();
+    expect(report.server.hint).toMatch(/^Agent launches will fail until then\. Fix .*config\.toml/);
+    expect(report.server.hint).not.toContain('pan install');
+  });
+
+  it('light sync (dashboard callers) skips the binary update and integration installs', async () => {
+    const h = harness({ latest: '0.10.0', serverRunning: false });
+    const report = await run('sync', { ...h, deps: { ...h.deps, env: { OVERDECK_HERDR_SYNC_LIGHT: '1' } } });
+    expect(h.spies.updateBinary).not.toHaveBeenCalled();
+    expect(h.spies.ensureIntegrations).not.toHaveBeenCalled();
+    expect(h.spies.ensureConfig).toHaveBeenCalled();
+    expect(h.spies.ensureServer).toHaveBeenCalled();
+    expect(report.warnings.join('\n')).toContain('OVERDECK_HERDR_SYNC_LIGHT');
+  });
+
+  it('carries an operator HERDR_CONFIG_PATH into the unit (review of #4020, 7)', async () => {
+    const h = harness();
+    await run('up', { ...h, deps: { ...h.deps, env: { HERDR_CONFIG_PATH: '/etc/herdr/mine.toml' } } });
+    expect(h.spies.ensureServer).toHaveBeenCalledWith(expect.objectContaining({ configPathEnv: '/etc/herdr/mine.toml' }));
+    const plain = harness();
+    await run('up', plain);
+    expect(plain.spies.ensureServer).toHaveBeenCalledWith(expect.not.objectContaining({ configPathEnv: expect.anything() }));
   });
 });

@@ -393,8 +393,11 @@ There is no fallback model when the requested model is unavailable.
 
 Overdeck runs a persistent `opencode acp` process through its ACP host. Dashboard
 messages, interruption, restart, session resume, and transcript rendering use
-that transport. The terminal shows the ACP host's output; it is not the native
-OpenCode TUI. Plain transcript forks are unavailable; use a summary fork instead.
+that transport. The conversation's **Terminal** view attaches the native OpenCode
+CLI (`opencode attach http://127.0.0.1:<port> --session <id> --dir <cwd>`) to
+the same server and session, with the ACP host log under **Runtime log**; see
+[Conversations](/features/conversations#native-opencode-cli-in-terminal).
+Plain transcript forks are unavailable; use a summary fork instead.
 The existing ACP transport does not report session token usage or billed cost.
 Catalog prices shown in the picker are model rates, not a session billing report.
 
@@ -441,6 +444,10 @@ curl -sS -X POST \
 
 For hosts created before the port file existed, use `ss -ltnp` to find the
 loopback port owned by that conversation's `opencode acp` process.
+
+The same port file and `acp-session-id` drive the native CLI in Terminal. A
+conversation without `opencode-port` shows a restart-required message there;
+stop and resume it to record the port.
 
 ## Installing oh-my-pi
 

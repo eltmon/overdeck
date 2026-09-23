@@ -16,6 +16,7 @@ Run the command now:
 
 ```bash
 pan admin migrate-plan-home <project-key> [--commit] [--dry-run]
+pan admin migrate-plan-home <project-key> --repair-ignore [--dry-run]
 ```
 
 ## Usage
@@ -23,12 +24,17 @@ pan admin migrate-plan-home <project-key> [--commit] [--dry-run]
 ```
 pan admin migrate-plan-home lexerra --dry-run   # preview only, writes nothing
 pan admin migrate-plan-home lexerra --commit    # copy + commit in the plan home
+pan admin migrate-plan-home lexerra --repair-ignore  # only drop the legacy .pan/ ignore line, commit .gitignore
 ```
 
 Options:
 
-- `--commit` — commit the migrated artifacts in the plan home (copied now, or already in place
-  from an earlier run but never committed), and repair a legacy `.pan/` ignore rule (below)
+- `--commit` — commit the migrated artifacts in the plan home, and repair a legacy `.pan/`
+  ignore rule (below). The commit holds only files this run wrote, plus files an earlier run
+  copied that still match the state worktree. Any other uncommitted `.pan/` change (an operator
+  or live agent edit) is listed as "left uncommitted" and stays out of the commit.
+- `--repair-ignore` — do only the ignore repair: remove Overdeck's legacy `.pan/` line and commit
+  `.gitignore` alone. Copies nothing and never calls the tracker. Not combinable with `--commit`.
 - `--dry-run` — report what would be copied, and whether `.pan/` is ignored, without writing anything
 - `--state-root <dir>` / `--plan-home <dir>` — override resolution (tests, odd setups)
 - `--open-issues <file>` — read open issue ids from a file instead of calling the tracker
@@ -46,6 +52,13 @@ those item statuses into `.pan/continues/<ISSUE>.xbrief.json`'s `items` map
 (`completed` → `done`), so a project's in-flight checklist progress survives
 the cutover.
 
+It never replaces a file that already exists under `.pan/`. A destination
+that differs from the state copy (including a continue file whose records
+statuses changed) is listed as a `conflict`, left alone, and counted in
+`remaining`, so the run exits 1 until you reconcile it by hand. The state
+worktree stopped moving at the Cut, so the plan-home copy is often the newer
+one.
+
 Idempotent: run it again and it copies nothing and reports `0 remaining`.
 It never writes to the state worktree, never deletes anything, and never
 pushes.
@@ -61,15 +74,18 @@ plan home:
   `.gitignore` is committed together with the artifacts through
   `git add -- <paths>` + `git commit --only -- <paths>`, so unrelated staged or
   unstaged work stays out of the commit. If `.gitignore` already has
-  uncommitted changes, `--commit` refuses before copying. Without `--commit`
-  nothing is edited and it warns that the copies are ignored by git.
-  `--dry-run` names the rule.
+  uncommitted changes, `--commit` refuses before copying. If the commit then
+  fails (a hook, a foreign rule behind the legacy line), the line is put back,
+  so a rerun repairs it again. Without `--commit` nothing is edited and it
+  warns that the copies are ignored by git. `--dry-run` names the rule.
+  `--repair-ignore` makes the same edit and commits `.gitignore` alone.
 - **Any other rule** (nested `.gitignore`, `.git/info/exclude`,
   `core.excludesFile`, a broader pattern): never edited. It is reported with
   its `file:line`; `--commit` refuses before copying.
 
 A refused run or a git failure prints one `migrate-plan-home: …` line and
-exits 1. `pan doctor`'s `Plan home .pan/ tracking` row flags the same
+exits 1. When the ignore check itself cannot run, a copy or `--dry-run`
+reports that and carries on; `--commit` stops. `pan doctor`'s `Plan home .pan/ tracking` row flags the same
 condition for every registered project.
 
 ## When to Use
