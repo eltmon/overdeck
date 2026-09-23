@@ -2,8 +2,9 @@
  * The conversation TERMINAL view (PAN-3974).
  *
  * Harnesses without a companion terminal render exactly what TERMINAL always
- * rendered: the owner session's pane. Harnesses with one (OpenCode today;
- * Codex `resume --remote` next, PAN-3835) get two panes:
+ * rendered: the owner session's pane. Harnesses with one (OpenCode's
+ * `opencode attach`, PAN-3974; Codex's `codex resume --remote`, PAN-3835) get
+ * two panes:
  *
  * - Native CLI — a companion terminal the server opens (or reuses) running
  *   the harness's own client attached to the same session. Leaving the view or
@@ -177,6 +178,13 @@ function CompanionNotice({
   );
 }
 
+function unavailableTitle(reason: CompanionTerminalUnavailableReason): string {
+  if (reason === 'restart-required') return 'Restart required for the native CLI';
+  if (reason === 'cli-unsupported') return 'Upgrade required for the native CLI';
+  if (reason === 'session-not-started') return 'Native CLI not available yet';
+  return 'Native CLI unavailable';
+}
+
 function noticeCopy(state: Exclude<CompanionPhase, { phase: 'attached' | 'opening' }>): {
   title: string;
   message: string;
@@ -195,11 +203,11 @@ function noticeCopy(state: Exclude<CompanionPhase, { phase: 'attached' | 'openin
       return { title: 'Could not attach the native CLI', message: state.message, canOpen: true };
     case 'unavailable':
       return {
-        title: state.reason === 'restart-required' ? 'Restart required for the native CLI' : 'Native CLI unavailable',
+        title: unavailableTitle(state.reason),
         message: state.message,
-        // A restart-required conversation needs the operator to restart it;
-        // retrying the attach cannot help. Everything else can be retried.
-        canOpen: state.reason !== 'restart-required' && state.reason !== 'unsupported',
+        // Restarting, upgrading, or a harness without a companion cannot be
+        // fixed by retrying the attach. Everything else can be retried.
+        canOpen: state.reason !== 'restart-required' && state.reason !== 'unsupported' && state.reason !== 'cli-unsupported',
       };
   }
 }

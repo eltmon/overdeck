@@ -10,7 +10,11 @@ describe("companionTerminalKindFor", () => {
     expect(companionTerminalKindFor({ harness: "opencode" })).toBe("opencode-attach")
   })
 
-  it.each(["claude-code", "ohmypi", "pi", "codex", "acp", "kimi-code", "muse", null, undefined])(
+  it("maps Codex conversations to the native resume --remote companion", () => {
+    expect(companionTerminalKindFor({ harness: "codex" })).toBe("codex-resume-remote")
+  })
+
+  it.each(["claude-code", "ohmypi", "pi", "acp", "kimi-code", "muse", null, undefined])(
     "keeps the owner pane as TERMINAL for harness %s",
     (harness) => {
       expect(companionTerminalKindFor({ harness })).toBeNull()
