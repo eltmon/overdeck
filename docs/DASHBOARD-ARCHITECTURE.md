@@ -36,6 +36,12 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 - Attach uses a deterministic snapshot protocol: the server sends a `snapshot` control frame,
   the client acks `ready`, and only then does live data flow (`readyForLiveData` in XTerminal.tsx);
   unready clients are closed with `terminal-ready-timeout`
+- Companion terminals (PAN-3974): an OpenCode conversation's TERMINAL streams a separate
+  `companion-<ownerSession>` tmux session running `opencode attach`, opened through
+  `POST /api/conversations/:name/companion-terminal/open|close`
+  (`routes/conversation-companion-terminal.ts`) and rendered by `ConversationTerminalView.tsx`.
+  The browser names only the conversation. See "Companion terminals" in
+  [TERMINAL-BACKENDS.md](TERMINAL-BACKENDS.md).
 
 **Frontend data flow:**
 - `EventRouter.tsx` → connects to `/ws/rpc`, fetches snapshot via `getSnapshot` RPC,

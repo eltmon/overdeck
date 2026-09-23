@@ -31,6 +31,7 @@ import {
 import { getBackendPanes } from './backend-inventory.js';
 import { cleanupUnreferencedConversationAttachments } from './conversation-attachments.js';
 import { respawnStartedAt } from './pending-respawn.js';
+import { closeCompanionTerminalForOwner } from '../../../lib/overdeck/companion-terminal/index.js';
 import type { DomainEvent } from '@overdeck/contracts';
 
 export interface AgentProjectionResult {
@@ -182,6 +183,8 @@ export interface AgentLifecycleDeps {
   readonly markConversationEnded?: (name: string, endedAtMs?: number) => void;
   /** Attachment cleanup for a conversation that just ended (the poller's cleanup). */
   readonly cleanupEndedConversation?: (conversation: LegacyConversation) => Promise<void>;
+  /** Owner teardown for the conversation's companion terminal (PAN-3974). Never throws. */
+  readonly closeCompanionTerminal?: (ownerSession: string) => Promise<void>;
 }
 
 /**
@@ -358,6 +361,10 @@ async function applyConversationLifecycleEvent(
         return { applied: false, reason: 'superseded-launch' };
       }
       const exitedAtMs = isoToMs(at);
+      // PAN-3974: the companion terminal goes with its owner, before the row is
+      // marked ended (later writers skip ended rows). Best-effort, never blocks.
+      await (deps.closeCompanionTerminal ?? closeCompanionTerminalForOwner)(conversation.tmuxSession)
+        .catch(() => undefined);
       (deps.markConversationEnded ?? markConversationEnded)(
         conversation.name,
         Number.isNaN(exitedAtMs) ? undefined : exitedAtMs,

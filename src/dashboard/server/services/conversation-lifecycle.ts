@@ -29,6 +29,7 @@ import {
   setClearedToConvId,
   type LegacyConversation as Conversation,
 } from '../../../lib/overdeck/conversations.js';
+import { closeCompanionTerminalForOwner } from '../../../lib/overdeck/companion-terminal/index.js';
 import {
   getRuntimeCensus,
   refreshRuntimeCensus,
@@ -250,6 +251,10 @@ export async function pollConversations(): Promise<void> {
       // The supervisor's exit event may have ended the row (and run its
       // cleanup) while this tick awaited the census; do not end it twice.
       if (getConversationByName(conv.name)?.status === 'ended') continue;
+      // PAN-3974: close the companion terminal before the row is marked ended.
+      // Later ticks skip ended rows, so a close deferred past this point could be
+      // lost for good. Best-effort: a failed close never blocks the mark.
+      await closeCompanionTerminalForOwner(conv.tmuxSession).catch(() => undefined);
       markConversationEnded(conv.name);
       endedConversations.push(conv);
       if (sessionGone) sessionGoneCount++;
