@@ -59,6 +59,7 @@ import {
 import {
   StandaloneConversationPopoutRoute,
   StandaloneDiffPopoutRoute,
+  StandaloneFlywheelPopoutRoute,
   StandaloneTerminalRoute,
 } from './App/StandaloneRoutes';
 import { AppRoutes, type PendingConversationTarget } from './App/AppRoutes';
@@ -126,6 +127,8 @@ export default function App() {
   if (conversationPopoutMatch) {
     return <StandaloneConversationPopoutRoute conversationId={conversationPopoutMatch[1]!} />;
   }
+
+  if (terminalPath === '/popout/flywheel-conversation') return <StandaloneFlywheelPopoutRoute />;
 
   if (terminalPath === '/popout/diff') {
     return <StandaloneDiffPopoutRoute />;

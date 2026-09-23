@@ -369,13 +369,16 @@ describe('CommandPalette navigation actions', () => {
     vi.restoreAllMocks();
   });
 
-  it('no longer offers a flywheel action — the flywheel is a conversation, not a page', async () => {
+  it('offers the pan-flywheel action that opens the restored Flywheel page (PAN-3964)', async () => {
     const user = userEvent.setup();
-    renderPalette();
+    const { onNavigate } = renderPalette();
 
     await user.type(screen.getByPlaceholderText('Search commands, issues, conversations, memory…'), 'flywheel');
 
-    expect(document.querySelector('[role="option"][data-value="pan-flywheel"]')).toBeNull();
+    const option = document.querySelector('[role="option"][data-value="pan-flywheel"]');
+    expect(option).not.toBeNull();
+    await user.click(option as Element);
+    await waitFor(() => expect(onNavigate).toHaveBeenCalledWith('flywheel'));
   });
 
   it('shows Context navigation and opens the Context page', async () => {
