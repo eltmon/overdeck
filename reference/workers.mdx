@@ -103,14 +103,23 @@ subdirectories, however the call reaches them (`cd ..`, `-C`, `--git-dir`,
 - `status`, `diff`, `log`, `show`, `rev-parse`, `rev-list`, `ls-files`,
   `ls-tree`, `blame`, `cat-file`, `merge-base`, `describe`, `grep`,
   `shortlog`, `for-each-ref`, `show-ref`;
-- `config` with `--get`, `--get-all`, `--get-regexp` or `--list`;
-- `remote` bare, `remote -v`, `remote show` and `remote get-url`;
-- `branch --show-current`, `branch --list`, and a bare `branch` listing.
+- `config` only when its first argument is `--get`, `--get-all`,
+  `--get-regexp`, `--list`/`-l` (or `get`/`list`), and every later option is
+  a read option such as `--show-origin` or `--global`;
+- `remote` bare or `-v`, `remote show [-n]` and `remote get-url [--push|--all]`;
+- `branch --show-current`, `branch --list`/`-l` with patterns, a bare `branch`
+  listing, and exactly the listing options `-a`, `-r`, `-v`, `-vv`,
+  `--contains`, `--merged`, `--no-merged`, `--points-at`, `--sort=` and
+  `--format=`.
 
+Options are matched as exact tokens: git accepts unique prefixes of long
+options, so an abbreviation such as `--unset` or `--set-upstream-t=` is refused.
 Everything else is refused there, including `fetch`, which writes refs.
 
 The shim is not a sandbox. Calling git by its absolute path (`/usr/bin/git`)
-bypasses it, and it does not restrict file writes or network access at all.
+bypasses it, so does setting `OVERDECK_PAN_GIT_OP=1` (the switch Overdeck's
+own `pan` git operations use), and it does not restrict file writes or network
+access at all.
 It is there to stop a reviewing worker from changing the branch by mistake,
 not to contain a worker that tries to.
 
@@ -155,10 +164,20 @@ read. Without `--after` you would get report `<n>` again.
 
 Stopping a worker (`pan kill`, or `--stop-after-report`) keeps its
 `.swarm/worker-<n>` worktree and its `<feature-branch>-worker-<n>` branch: the
-parent may still need the work. They are removed when the issue is torn down
-(close-out, close, approve) or its residue is reaped: `git worktree remove
---force`, then `git worktree prune`, then the branch. A teardown that keeps the
-issue's branches deletes only worker branches with no commits of their own.
+parent may still need the work.
+
+When the issue is torn down (close-out, close, approve) the worker worktrees
+are removed only if the workspace itself is deleted (`git worktree remove
+--force`, then `git worktree prune`); a kept workspace keeps them, uncommitted
+changes included. The closed-issue residue reaper removes them with the
+workspace.
+
+A worker branch exists only on this machine, so every cleanup path deletes it
+only when its tip is already in the default branch (`main`, `origin/main`, or
+whatever `origin/HEAD` names) or in the feature branch while that still
+exists. Any other worker branch is kept, and the cleanup logs its name and its
+unmerged commit count. A branch still checked out in a kept worktree is kept.
+
 `.swarm/` is in the repository's `.gitignore`, so `git add -A` in a workspace
 never commits an embedded worktree.
 

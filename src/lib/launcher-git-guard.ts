@@ -22,7 +22,8 @@
  * the same `git rev-parse --git-common-dir` is refused unless it is a read.
  * That covers the primary checkout, every other worktree, and subdirectories.
  * It is a PATH shim that prevents accidental git writes, not a sandbox: an
- * absolute `/usr/bin/git` bypasses it, and file-system and network writes are
+ * absolute `/usr/bin/git` bypasses it, so does `OVERDECK_PAN_GIT_OP=1` (the
+ * switch `pan`'s own git operations use), and file-system and network writes are
  * not restricted at all.
  */
 import { join } from 'node:path';
@@ -41,11 +42,13 @@ export type GitGuardMode = 'default' | 'read-only';
  *
  * `_overdeck_ro_allowed` answers "is this invocation a read?":
  *   - always-read subcommands (status, diff, log, show, rev-parse, ...);
- *   - `config` only with --get, --get-all, --get-regexp, --list/-l (or the
- *     `get`/`list` subcommand forms);
- *   - `remote` only bare, `-v`, `show` or `get-url`;
- *   - `branch` only `--show-current`, `--list`/`-l`, or a bare listing
- *     (flags only, no branch name);
+ *   - `config` only when its FIRST argument is --get, --get-all,
+ *     --get-regexp, --list/-l (or the `get`/`list` subcommands), followed
+ *     only by read options from an exact list;
+ *   - `remote` only bare, `-v`, `show [-n]` or `get-url [--push|--all]`;
+ *   - `branch` only `--show-current`, `--list`/`-l` with patterns, a bare
+ *     listing, and the exact listing options (-a, -r, -v, -vv, --contains,
+ *     --merged, --no-merged, --points-at, --sort=, --format=);
  *   - never `fetch`: it writes refs.
  *
  * `_overdeck_ro_common_dir` prints the canonical common git dir the
@@ -69,35 +72,57 @@ const READ_ONLY_SHIM_SH = [
   '  case "$_ro_cmd" in',
   '    ""|status|diff|log|show|rev-parse|rev-list|ls-files|ls-tree|blame|cat-file|merge-base|describe|grep|shortlog|for-each-ref|show-ref|help|version)',
   '      return 0 ;;',
+  // Exact-token allowlists only: git accepts unique prefixes of long options
+  // and stops option parsing at the first plain argument, so a denylist or an
+  // "a read flag appears somewhere" check can always be walked around.
   '    config)',
-  '      case "${1:-}" in get|list) return 0 ;; esac',
-  '      for _ro_arg in "$@"; do',
-  '        case "$_ro_arg" in --get|--get-all|--get-regexp|--list|-l) return 0 ;; esac',
-  '      done',
-  '      return 1 ;;',
-  '    remote)',
+  '      case "${1:-}" in',
+  '        --get|--get-all|--get-regexp|--list|-l|get|list) shift ;;',
+  '        *) return 1 ;;',
+  '      esac',
   '      for _ro_arg in "$@"; do',
   '        case "$_ro_arg" in',
-  '          -v|--verbose) ;;',
-  '          show|get-url) return 0 ;;',
-  '          *) return 1 ;;',
+  '          --local|--global|--system|--worktree|--show-origin|--show-scope|-z|--null|--name-only|--includes|--no-includes|--all|--regexp|--type=*|--default=*|--value=*|--url=*) ;;',
+  '          -*) return 1 ;;',
+  '        esac',
+  '      done',
+  '      return 0 ;;',
+  '    remote)',
+  '      while [ "$#" -gt 0 ]; do',
+  '        case "$1" in -v|--verbose) shift ;; *) break ;; esac',
+  '      done',
+  '      [ "$#" -eq 0 ] && return 0',
+  '      _ro_sub="$1"',
+  '      shift',
+  '      case "$_ro_sub" in',
+  '        show) _ro_ok=" -n " ;;',
+  '        get-url) _ro_ok=" --push --all " ;;',
+  '        *) return 1 ;;',
+  '      esac',
+  '      for _ro_arg in "$@"; do',
+  '        case "$_ro_arg" in',
+  '          -*) case "$_ro_ok" in *" $_ro_arg "*) ;; *) return 1 ;; esac ;;',
   '        esac',
   '      done',
   '      return 0 ;;',
   '    branch)',
   '      _ro_list=0',
+  '      _ro_value=0',
   '      for _ro_arg in "$@"; do',
+  // --contains/--merged/--no-merged/--points-at take the next word as their commit.
+  '        if [ "$_ro_value" = 1 ]; then',
+  '          _ro_value=0',
+  '          case "$_ro_arg" in -*) ;; *) continue ;; esac',
+  '        fi',
   '        case "$_ro_arg" in',
   '          --show-current|--list|-l) _ro_list=1 ;;',
-  '          -d|-D|-m|-M|-c|-C|-f|-u|--delete|--move|--copy|--force|--set-upstream-to|--set-upstream-to=*|--unset-upstream|--edit-description|--track|--track=*|--no-track|--create-reflog|--recurse-submodules)',
-  '            return 1 ;;',
-  '          --*) ;;',
-  '          -*[dDmMcCfu]*) return 1 ;;',
+  '          -a|-r|-v|-vv|--all|--remotes|--verbose|--sort=*|--format=*) ;;',
+  '          --contains|--no-contains|--merged|--no-merged|--points-at) _ro_list=1; _ro_value=1 ;;',
+  '          --contains=*|--no-contains=*|--merged=*|--no-merged=*|--points-at=*) _ro_list=1 ;;',
+  '          -*) return 1 ;;',
+  // A plain word is a pattern in list mode, and a new branch name otherwise.
+  '          *) [ "$_ro_list" = 1 ] || return 1 ;;',
   '        esac',
-  '      done',
-  '      [ "$_ro_list" = 1 ] && return 0',
-  '      for _ro_arg in "$@"; do',
-  '        case "$_ro_arg" in -*) ;; *) return 1 ;; esac',
   '      done',
   '      return 0 ;;',
   '  esac',

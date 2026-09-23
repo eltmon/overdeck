@@ -188,7 +188,7 @@ describe('reapIssueResidue', () => {
   it('PAN-3920: removes worker worktrees and branches of a merged issue, never of an unmerged one', async () => {
     mocks.reapWorkerWorktrees.mockResolvedValue(['removed worker worktree /x/.swarm/worker-1']);
     const actions = await reapIssueResidue(projectPath, 'PAN-2054');
-    expect(mocks.reapWorkerWorktrees).toHaveBeenCalledWith(projectPath, 'PAN-2054', { deleteBranches: 'all' });
+    expect(mocks.reapWorkerWorktrees).toHaveBeenCalledWith(projectPath, 'PAN-2054', { removeWorktrees: true });
     expect(actions).toContain('removed worker worktree /x/.swarm/worker-1');
 
     mocks.reapWorkerWorktrees.mockClear();

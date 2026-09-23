@@ -298,6 +298,36 @@ describe('read-only mode guards the whole repository (review of #4027)', () => {
     expect(run(['log', '--oneline', '-1'], join(workspace, '..')).status).toBe(0);
   });
 
+  // Re-review of #4027: git stops parsing options at the first plain argument
+  // and accepts unique prefixes of long options, so these all used to get through.
+  it('refuses a config write with a read flag after the key', () => {
+    expect(run(['config', 'foo.bar', '1', '--list'], workspace).status).toBe(1);
+    expect(run(['config', '--get', 'foo.bar', '--add', 'x'], workspace).status).toBe(1);
+    expect(run(['config', '--list', '--unset', 'core.bare'], workspace).status).toBe(1);
+    expect(run(['config', 'set', 'foo.bar', '1'], workspace).status).toBe(1);
+    expect(() => realGit(['config', '--get', 'foo.bar'], workspace)).toThrow();
+  });
+
+  it('refuses branch long-option prefixes of write options', () => {
+    expect(run(['branch', '--set-upstream-t=main'], workspace).status).toBe(1);
+    expect(run(['branch', '--unset'], workspace).status).toBe(1);
+    expect(run(['branch', '--edit'], workspace).status).toBe(1);
+    expect(run(['branch', '--del', 'main'], workspace).status).toBe(1);
+  });
+
+  it('allows the exact branch listing options', () => {
+    expect(run(['branch', '--contains', 'HEAD'], workspace).status).toBe(0);
+    expect(run(['branch', '--merged', 'main', '-v'], workspace).status).toBe(0);
+    expect(run(['branch', '--sort=-committerdate', '--format=%(refname:short)'], workspace).status).toBe(0);
+  });
+
+  it('allows only exact remote read forms', () => {
+    expect(run(['remote', 'rename', 'a', 'b'], workspace).status).toBe(1);
+    expect(run(['remote', 'set-url', 'a', 'b'], workspace).status).toBe(1);
+    expect(run(['remote', 'show', '--foo'], workspace).status).toBe(1);
+    expect(run(['remote', '-vv', 'add', 'x', 'y'], workspace).status).toBe(1);
+  });
+
   it('refuses branch creation and deletion', () => {
     expect(run(['branch', 'newbranch'], workspace).status).toBe(1);
     expect(run(['branch', '-D', 'main'], workspace).status).toBe(1);

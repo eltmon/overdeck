@@ -62,7 +62,8 @@ pan worker list --parent conv-orchestrator --json
   in the issue workspace behind a `git` PATH shim that prevents accidental git writes to the issue's
   repository (the primary checkout and every worktree of it). Reads such as `status`, `diff`, `log`,
   `show`, `config --get` and `branch --show-current` still work; `fetch` does not. The shim is not a
-  sandbox: an absolute `/usr/bin/git` bypasses it, and it does not restrict file or network writes.
+  sandbox: an absolute `/usr/bin/git` bypasses it, so does `OVERDECK_PAN_GIT_OP=1`, and it does not
+  restrict file or network writes.
 - **Parent.** `--parent`, else `$OVERDECK_AGENT_ID`, else `$OVERDECK_CONVERSATION`. Called from an agent
   with none of these, the command fails and asks for `--parent`.
 
@@ -113,8 +114,9 @@ pan worker wait agent-pan-123-worker-1 --after 1   # 1 = the last report you rea
 
 Only the worker's parent, the issue's work agent, or an operator conversation may `pan tell` a worker.
 Stop a worker you no longer need with `pan kill <worker-id>`. Stopping it (or `--stop-after-report`)
-keeps its `.swarm/worker-<n>` worktree and branch, because you may still need its work; they are
-removed when the issue is closed out or its residue is reaped.
+keeps its `.swarm/worker-<n>` worktree and branch, because you may still need its work. The worktree
+is removed only when the issue's workspace is deleted, and the branch only once its commits are in
+`main` or the feature branch; an unmerged worker branch is always kept. Merge what you need.
 
 ## Reporting (for the worker itself)
 

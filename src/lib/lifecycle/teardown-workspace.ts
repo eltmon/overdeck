@@ -324,14 +324,16 @@ async function removeWorktreeImpl(
 }
 
 /**
- * Remove registered workers' worktrees (PAN-3920). Their branches go too when
- * the teardown deletes branches; otherwise only the ones with no work of their own.
+ * Registered workers' residue (PAN-3920). Their `.swarm/worker-<n>` worktrees
+ * are removed only when the workspace itself is deleted: a kept workspace keeps
+ * them, uncommitted changes included. Worker branches are deleted only when
+ * already contained in the default or feature branch (`reapWorkerWorktrees`).
  */
-function removeWorkerWorktrees(projectPath: string, issueId: string, deleteBranches: boolean): Effect.Effect<StepResult> {
+export function removeWorkerWorktrees(projectPath: string, issueId: string, deletingWorkspace: boolean): Effect.Effect<StepResult> {
   const step = 'teardown:worker-worktrees';
   // The promise never rejects: a cleanup failure is reported as a skipped step.
   return Effect.promise(() =>
-    reapWorkerWorktrees(projectPath, issueId, { deleteBranches: deleteBranches ? 'all' : 'merged' }).then(
+    reapWorkerWorktrees(projectPath, issueId, { removeWorktrees: deletingWorkspace }).then(
       (details) => (details.length > 0 ? stepOk(step, details) : stepSkipped(step, ['No worker worktrees'])),
       (err: unknown) => stepSkipped(step, [`Worker worktree cleanup failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`]),
     ));
@@ -767,9 +769,8 @@ export function teardownWorkspace(
         }
       }
 
-      // 8b. PAN-3920: registered workers' `.swarm/worker-<n>` worktrees are
-      // residue once the issue is torn down, whether or not the workspace goes.
-      results.push(yield* removeWorkerWorktrees(ctx.projectPath, ctx.issueId, opts.deleteBranches === true));
+      // 8b. PAN-3920: registered workers' worktrees go only with the workspace.
+      results.push(yield* removeWorkerWorktrees(ctx.projectPath, ctx.issueId, shouldDeleteWorkspace));
 
       // 9. Remove worktree + workspace directory (only if deleting workspace).
       if (shouldDeleteWorkspace) {
