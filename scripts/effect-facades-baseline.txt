@@ -1,38 +1,22 @@
 # Effect façade ratchet baseline (PAN-3958). Rows: <shape> <count> <path>. Shapes: A=Promise façade,
 # B=sync façade, C=sync/async twin pair. Lower with: bash scripts/lint-effect-facades.sh --update
-A 1 src/lib/codex-auth.ts
 A 1 src/lib/config-yaml/load.ts
 A 1 src/lib/conversations/enrichment/enrich-session.ts
 A 1 src/lib/costs/reconciler.ts
 A 1 src/lib/costs/sync-wal.ts
-A 1 src/lib/openai-auth.ts
-A 1 src/lib/openai-compatible-proxy.ts
 A 1 src/lib/prd-draft.ts
 A 1 src/lib/prd-locations.ts
 A 1 src/lib/projects.ts
 A 1 src/lib/runtimes/ohmypi-fifo.ts
-A 1 src/lib/tts-speak.ts
 A 1 src/lib/xbrief/lifecycle-io.ts
 A 10 src/lib/shadow-state.ts
-A 15 src/lib/tts-daemon.ts
 A 2 src/lib/config.ts
 A 2 src/lib/conversations/smart-compaction.ts
-A 2 src/lib/hume.ts
-A 2 src/lib/provider-health.ts
-A 2 src/lib/restart-lock.ts
 A 2 src/lib/review-artifacts.ts
-A 2 src/lib/smee.ts
-A 2 src/lib/tunnel.ts
 A 3 src/lib/conversations/summary-fork.ts
-A 3 src/lib/restart-status.ts
 A 4 src/lib/shadow-mode.ts
 A 5 src/lib/memory/checkpoint-client.ts
 A 5 src/lib/settings-api.ts
-A 6 src/lib/github-app.ts
-A 7 src/lib/cliproxy.ts
-A 7 src/lib/tts-voices.ts
-A 8 src/lib/platform-lifecycle.ts
-A 8 src/lib/webhook-handlers.ts
 B 1 src/lib/activity-logger.ts
 B 1 src/lib/agents/agent-state.ts
 B 1 src/lib/backup.ts
@@ -69,6 +53,7 @@ C 1 src/lib/agents/runtime-state.ts
 C 1 src/lib/agents/termination.ts
 C 1 src/lib/cloister/handoff-logger.ts
 C 1 src/lib/config-yaml/load.ts
+C 1 src/lib/openai-auth.ts
 C 1 src/lib/projects-config-lock.ts
 C 1 src/lib/runtimes/muse-session.ts
 C 1 src/lib/runtimes/ohmypi.ts
@@ -81,4 +66,5 @@ C 3 src/lib/projects-config-write.ts
 C 4 src/lib/agents/agent-state.ts
 C 4 src/lib/projects.ts
 C 4 src/lib/xbrief/io.ts
+C 5 src/lib/cliproxy.ts
 C 8 src/lib/tmux.ts

@@ -40,12 +40,12 @@ vi.mock('../../src/lib/providers.js', async (importOriginal) => {
 
 vi.mock('../../src/lib/openai-auth.js', () => ({
   getOpenAIAuthStatusSync: mockOpenAIAuthStatus,
-  getOpenAIAuthStatus: (...args: unknown[]) => Effect.succeed(mockOpenAIAuthStatus(...args)),
+  getOpenAIAuthStatus: async (...args: unknown[]) => mockOpenAIAuthStatus(...args),
 }));
 
 vi.mock('../../src/lib/cliproxy.js', () => ({
   CLIPROXY_BASE_URL: 'http://127.0.0.1:8317',
-  bridgeGeminiAuthToCliproxy: (...args: Parameters<typeof mockBridgeGeminiAuth>) => Effect.promise(() => mockBridgeGeminiAuth(...args)),
+  bridgeGeminiAuthToCliproxy: (...args: Parameters<typeof mockBridgeGeminiAuth>) => mockBridgeGeminiAuth(...args),
   bridgeGeminiAuthToCliproxyProgram: (...args: Parameters<typeof mockBridgeGeminiAuth>) => Effect.promise(() => mockBridgeGeminiAuth(...args)),
   getCliproxyClientEnv: () => ({
     ANTHROPIC_BASE_URL: 'http://127.0.0.1:8317',

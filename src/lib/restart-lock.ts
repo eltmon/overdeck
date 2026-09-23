@@ -1,6 +1,5 @@
 import { mkdir, open, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { Data, Effect } from 'effect';
 import { getOverdeckHome } from './paths.js';
 
 export type RestartLockHolder = {
@@ -138,7 +137,10 @@ async function acquireStaleBreaker(path: string): Promise<RestartLockHandle | nu
     }
   }
   return null;
-}async function readRestartLockHolderPromise(): Promise<RestartLockHolder | null> {
+}
+
+/** Read the current restart-lock holder (breaking a stale lock), or null when the lock is free. */
+export async function readRestartLockHolder(): Promise<RestartLockHolder | null> {
   const path = restartLockPath();
   const observed = await readHolderFromPath(path);
   if (!observed || !isStale(observed, Date.now())) return observed;
@@ -153,7 +155,10 @@ async function acquireStaleBreaker(path: string): Promise<RestartLockHandle | nu
   } finally {
     await breaker.release();
   }
-}async function acquireRestartLockPromise(caller: string): Promise<RestartLockHandle | null> {
+}
+
+/** Acquire the restart lock for `caller`; resolves to a lock handle, or null while another live holder has it. */
+export async function acquireRestartLock(caller: string): Promise<RestartLockHandle | null> {
   const path = restartLockPath();
   await mkdir(dirname(path), { recursive: true });
 
@@ -178,38 +183,3 @@ async function acquireStaleBreaker(path: string): Promise<RestartLockHandle | nu
 
   return null;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Tagged error for restart-lock Effect variants. */
-export class RestartLockError extends Data.TaggedError('RestartLockError')<{
-  readonly operation: string;
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
-
-/** Effect variant of `readRestartLockHolder`. */
-export const readRestartLockHolder = (): Effect.Effect<RestartLockHolder | null, RestartLockError> =>
-  Effect.tryPromise({
-    try: () => readRestartLockHolderPromise(),
-    catch: (cause) =>
-      new RestartLockError({
-        operation: 'readRestartLockHolder',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `acquireRestartLock`. */
-export const acquireRestartLock = (
-  caller: string,
-): Effect.Effect<RestartLockHandle | null, RestartLockError> =>
-  Effect.tryPromise({
-    try: () => acquireRestartLockPromise(caller),
-    catch: (cause) =>
-      new RestartLockError({
-        operation: 'acquireRestartLock',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });

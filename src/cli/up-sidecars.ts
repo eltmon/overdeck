@@ -2,7 +2,6 @@ import { spawn } from 'child_process';
 import { existsSync } from 'fs';
 import { mkdir, open } from 'fs/promises';
 import { dirname, join } from 'path';
-import { Effect } from 'effect';
 import chalk from 'chalk';
 
 import { getOverdeckHome } from '../lib/paths.js';
@@ -118,7 +117,7 @@ export async function startPostLaunchSidecars(config: {
     const ttsConfig = loadConfigSync().config.tts;
     if (ttsConfig.daemonAutoStart) {
       console.log(chalk.dim('\nStarting Qwen TTS daemon...'));
-      const result = await Effect.runPromise(startTtsDaemon({ config: ttsConfig, detach: true, timeoutMs: 30_000 }));
+      const result = await startTtsDaemon({ config: ttsConfig, detach: true, timeoutMs: 30_000 });
       if (result.ok) {
         console.log(chalk.green(`✓ Qwen TTS daemon listening on http://${ttsConfig.daemonHost}:${ttsConfig.daemonPort}`));
       } else {

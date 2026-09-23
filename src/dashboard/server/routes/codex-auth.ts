@@ -6,7 +6,8 @@ import { readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
-import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
+import { CodexAuthCheckError, checkCodexAuthStatus, type CheckCodexAuthOptions } from '../../../lib/codex-auth.js';
+import { FsError } from '../../../lib/errors.js';
 import { bridgeCodexAuthToCliproxy, getCliproxyAuthDir } from '../../../lib/cliproxy.js';
 import { createSession, sessionExists, listSessionNames } from '../../../lib/tmux.js';
 import { getDashboardApiUrlSync } from '../../../lib/config.js';
@@ -103,6 +104,16 @@ async function readBridgedCodexCredential(): Promise<{ accessToken: string | nul
 
 // ─── Route: GET /api/settings/codex-auth ───────────────────────────────────────
 
+/** Bridge checkCodexAuthStatus into a route, keeping its message in a 500 body. */
+const checkCodexAuth = (options: CheckCodexAuthOptions) =>
+  Effect.tryPromise({
+    try: () => checkCodexAuthStatus(options),
+    catch: (cause) => new CodexAuthCheckError({
+      message: cause instanceof Error ? cause.message : String(cause),
+      cause,
+    }),
+  });
+
 const getCodexAuthRoute = HttpRouter.add(
   'GET',
   '/api/settings/codex-auth',
@@ -111,7 +122,7 @@ const getCodexAuthRoute = HttpRouter.add(
       // PAN-3917: the burned-agent cross-check read a `troubled` flag off the
       // agent mirror, which is gone. Auth status now rests on the native
       // ~/.codex/auth.json mtime check alone.
-      const status = yield* checkCodexAuthStatus({});
+      const status = yield* checkCodexAuth({});
       return jsonResponse(status);
     }),
   ),
@@ -190,13 +201,16 @@ const postCodexReauthStatusRoute = HttpRouter.add(
       }
 
       const beforeCredential = yield* Effect.promise(() => readBridgedCodexCredential());
-      const bridged = yield* bridgeCodexAuthToCliproxy();
+      const bridged = yield* Effect.tryPromise({
+        try: () => bridgeCodexAuthToCliproxy(),
+        catch: (cause) => new FsError({ path: getCliproxyAuthDir(), operation: 'bridgeCodexAuthToCliproxy', cause }),
+      });
       const afterCredential = yield* Effect.promise(() => readBridgedCodexCredential());
       const refreshedCredential = bridged && (
         (beforeCredential.accessToken !== null && afterCredential.accessToken !== beforeCredential.accessToken) ||
         (afterCredential.mtimeMs !== null && afterCredential.mtimeMs >= session.createdAt)
       );
-      const authStatus = yield* checkCodexAuthStatus({
+      const authStatus = yield* checkCodexAuth({
         ...(refreshedCredential ? { ignoreBurnBefore: session.createdAt } : {}),
       });
       if (!refreshedCredential || authStatus.status !== 'valid') {

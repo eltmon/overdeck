@@ -12,8 +12,6 @@ import { existsSync, readFileSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
-import { Effect } from 'effect';
-import { FsError } from './errors.js';
 import { bridgeCodexAuthToCliproxySync } from './cliproxy.js';
 
 export interface OpenAIAuthStatus {
@@ -49,7 +47,8 @@ interface RawAuthFile {
   };
 }
 
-function getCodexAuthPath(): string {
+/** Path of the Codex CLI auth file (`~/.codex/auth.json`). */
+export function getCodexAuthPath(): string {
   return join(homedir(), '.codex', 'auth.json');
 }
 
@@ -126,7 +125,10 @@ function buildStatus(raw: RawAuthFile | null, installed: boolean, bridgedFromCod
     hasOpenAIApiKey: hasApiKey(raw),
     bridgedFromCodex,
   };
-}async function getOpenAIAuthStatusPromise(): Promise<OpenAIAuthStatus> {
+}
+
+/** Read the OpenAI (Codex) auth file and report whether usable credentials exist. */
+export async function getOpenAIAuthStatus(): Promise<OpenAIAuthStatus> {
   const codexDir = join(homedir(), '.codex');
   const authPath = getCodexAuthPath();
   const installed = existsSync(codexDir) || existsSync(authPath);
@@ -141,13 +143,6 @@ function buildStatus(raw: RawAuthFile | null, installed: boolean, bridgedFromCod
 
   return buildStatus(raw, installed, bridgedFromCodex);
 }
-
-/** Effect variant of {@link getOpenAIAuthStatus}. */
-export const getOpenAIAuthStatus = (): Effect.Effect<OpenAIAuthStatus, FsError> =>
-  Effect.tryPromise({
-    try: () => getOpenAIAuthStatusPromise(),
-    catch: (cause) => new FsError({ path: getCodexAuthPath(), operation: 'getOpenAIAuthStatus', cause }),
-  });
 
 /** Synchronous variant for CLI-side code. Dashboard server routes should use {@link getOpenAIAuthStatus}. */
 export function getOpenAIAuthStatusSync(): OpenAIAuthStatus {

@@ -186,17 +186,17 @@ function mockSpawnDependencies(): void {
     getClaudeAuthStatus: vi.fn(() => Effect.succeed({ loggedIn: true, hasAnthropicApiKey: true })),
   }));
   vi.doMock('../openai-auth.js', () => ({
-    getOpenAIAuthStatus: vi.fn(() => Effect.succeed({ loggedIn: true, hasOpenAIApiKey: false })),
+    getOpenAIAuthStatus: vi.fn(async () => ({ loggedIn: true, hasOpenAIApiKey: false })),
     getOpenAIAuthStatusSync: vi.fn(() => ({ loggedIn: true, hasOpenAIApiKey: false })),
   }));
   vi.doMock('../cliproxy.js', async (importOriginal) => ({
     ...((await importOriginal()) as typeof import('../cliproxy.js')),
-    bridgeGeminiAuthToCliproxy: vi.fn(() => Effect.succeed(true)),
+    bridgeGeminiAuthToCliproxy: vi.fn(async () => true),
     getCliproxyClientEnv: vi.fn(() => ({ ANTHROPIC_BASE_URL: 'http://127.0.0.1:4141' })),
-    isCliproxyRunning: vi.fn(() => Effect.succeed(true)),
+    isCliproxyRunning: vi.fn(async () => true),
   }));
   vi.doMock('../provider-health.js', () => ({
-    validateProviderHealth: vi.fn(() => Effect.succeed(undefined)),
+    validateProviderHealth: vi.fn(async () => undefined),
   }));
   // agents.ts now imports getFlywheelActiveRunIdSync from overdeck/control-settings (not database/app-settings)
   vi.doMock('../overdeck/control-settings.js', async (importOriginal) => {

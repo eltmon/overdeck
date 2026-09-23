@@ -22,7 +22,7 @@ const mockLoadConfigSync = vi.hoisted(() => vi.fn());
 const mockCreateResetMarker = vi.hoisted(() => vi.fn(async (input: unknown) => ({ id: 'reset-1', ...(input as Record<string, unknown>) })));
 const mockSetReviewStatusSync = vi.hoisted(() => vi.fn());
 const mockIsGitHubAppConfigured = vi.hoisted(() => vi.fn(() => false));
-const mockListPullRequestsForHead = vi.hoisted(() => vi.fn(() => Effect.succeed([])));
+const mockListPullRequestsForHead = vi.hoisted(() => vi.fn(async () => []));
 const mockSweepOrphanedTasks = vi.hoisted(() => vi.fn().mockResolvedValue({ ok: true, closedIds: [], skipped: 0 }));
 const mockExec = vi.hoisted(() => vi.fn((cmd: string, optionsOrCb?: any, maybeCb?: any) => {
   const callback = typeof optionsOrCb === 'function' ? optionsOrCb : maybeCb;
@@ -176,7 +176,7 @@ describe('postMergeLifecycle post-merge knowledge retro', () => {
     mockExecAsync.mockImplementation(defaultExecAsync);
     mockSpawn.mockReturnValue(mockSpawnChild);
     mockIsGitHubAppConfigured.mockReturnValue(false);
-    mockListPullRequestsForHead.mockReturnValue(Effect.succeed([]));
+    mockListPullRequestsForHead.mockResolvedValue([]);
     resetPostMergeState(ISSUE_ID);
     setAutoRetro(undefined);
   });

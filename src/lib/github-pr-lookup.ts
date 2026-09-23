@@ -1,6 +1,5 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { Effect } from 'effect';
 import { isGitHubAppConfigured, listPullRequestsForHead } from './github-app.js';
 
 const execFileAsync = promisify(execFile);
@@ -21,7 +20,7 @@ export async function lookupPullRequestForBranch(
   branchName: string,
 ): Promise<BranchPullRequest | null> {
   if (isGitHubAppConfigured()) {
-    const prs = await Effect.runPromise(listPullRequestsForHead(owner, repo, branchName, 'all'));
+    const prs = await listPullRequestsForHead(owner, repo, branchName, 'all');
     const pr = prs[0];
     if (!pr) return null;
     return {

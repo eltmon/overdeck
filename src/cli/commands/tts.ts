@@ -44,7 +44,7 @@ async function deleteVoiceDefault(id: string): Promise<boolean> {
 
 async function getTtsDaemonAuthHeadersDefault(): Promise<Record<string, string>> {
   const { getTtsDaemonAuthHeaders } = await import('../../lib/tts-daemon.js');
-  return Effect.runPromise(getTtsDaemonAuthHeaders());
+  return getTtsDaemonAuthHeaders();
 }
 
 async function getTtsDaemonStatusDefault(config: NormalizedTtsDaemonConfig): Promise<TtsDaemonStatus> {

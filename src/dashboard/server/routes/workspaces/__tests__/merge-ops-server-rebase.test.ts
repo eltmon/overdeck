@@ -75,7 +75,7 @@ vi.mock('../../../../../lib/cloister/merge-agent.js', () => ({
 }));
 vi.mock('../../../../../lib/cloister/ship-log.js', () => ({ appendShipLog: vi.fn(), beginShipLog: vi.fn() }));
 vi.mock('../../../../../lib/github-app.js', () => ({
-  getCiCheckRunsStatePromise: vi.fn(async () => ({ green: true, total: 2, successCount: 2, verdict: 'success' })),
+  getCiCheckRunsState: vi.fn(async () => ({ green: true, total: 2, successCount: 2, verdict: 'success' })),
   getPullRequestState: (...args: unknown[]) => mocks.getPullRequestState(...args),
   isGitHubAppConfigured: vi.fn(() => true),
   isIntegrationPermissionError: vi.fn(() => false),
@@ -155,7 +155,7 @@ describe('triggerMerge server rebase escalation', () => {
     vi.clearAllMocks();
     mocks.existsSync.mockReturnValue(true);
     mocks.evaluateIssueMergeGate.mockResolvedValue({ ready: true, facts: { headBranch: 'feature/pan-3110' } });
-    mocks.getPullRequestState.mockReturnValue(Effect.succeed(pullRequestState()));
+    mocks.getPullRequestState.mockResolvedValue(pullRequestState());
     mocks.rebaseFeatureBranch.mockReturnValue(Effect.succeed({ success: true, newHead: HEAD_SHA }));
     mocks.mergeReviewArtifact.mockResolvedValue(undefined);
     mocks.messageAgent.mockResolvedValue({ delivered: true });
@@ -272,7 +272,7 @@ describe('triggerMerge server rebase escalation', () => {
   });
 
   it('keeps failing CI as a non-retryable content failure', async () => {
-    mocks.getPullRequestState.mockReturnValue(Effect.succeed(pullRequestState({ checksFailed: true })));
+    mocks.getPullRequestState.mockResolvedValue(pullRequestState({ checksFailed: true }));
 
     const result = await triggerMerge('PAN-3110');
 

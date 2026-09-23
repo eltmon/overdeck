@@ -32,7 +32,8 @@ import {
 } from '../../../lib/settings-api.js';
 import { getClaudeAuthStatus } from '../../../lib/claude-auth.js';
 import { setUiTheme } from '../../../lib/ui-theme.js';
-import { getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
+import { getCodexAuthPath, getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
+import { FsError } from '../../../lib/errors.js';
 import { PROVIDERS, getKimiAnthropicBaseUrl } from '../../../lib/providers.js';
 import { getDashScopeUpstreamBaseUrl } from '../../../lib/openai-compatible-proxy.js';
 import { OpenRouterService, includeOpenRouterFavorites } from '../services/openrouter-service.js';
@@ -220,7 +221,10 @@ const getOpenAIAuthRoute = HttpRouter.add(
   'GET',
   '/api/settings/openai-auth',
   httpHandler(Effect.gen(function* () {
-    const status = yield* getOpenAIAuthStatus();
+    const status = yield* Effect.tryPromise({
+      try: () => getOpenAIAuthStatus(),
+      catch: (cause) => new FsError({ path: getCodexAuthPath(), operation: 'getOpenAIAuthStatus', cause }),
+    });
     return jsonResponse(status);
   })),
 );

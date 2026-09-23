@@ -1,6 +1,5 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import { Effect } from 'effect';
 
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js';
@@ -177,7 +176,7 @@ export async function verifyMergedBeforeLifecycle(
   const { owner, repo } = ghResolved;
   try {
     if (isGitHubAppConfigured()) {
-      const prs = await Effect.runPromise(listPullRequestsForHead(owner, repo, branchName, 'all'));
+      const prs = await listPullRequestsForHead(owner, repo, branchName, 'all');
       const mergedPr = prs.find((pr) => pr.merged === true || pr.mergedAt != null);
       if (mergedPr) {
         return requireCompletePolyrepoMerge(issueId, {

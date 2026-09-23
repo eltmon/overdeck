@@ -136,9 +136,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     return;
   }
 
-  const [restartStatus, restartEvents] = await Effect.runPromise(
-    Effect.all([readRestartStatus(), readRestartEvents()]),
-  );
+  const [restartStatus, restartEvents] = await Promise.all([readRestartStatus(), readRestartEvents()]);
 
   // Filter out invalid agent states (missing required fields)
   const agents = listRunningAgentsSync().filter(agent =>

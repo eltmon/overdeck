@@ -471,7 +471,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
     spinner.info('Skipping Qwen TTS daemon install (--skip-tts-daemon)');
   } else {
     spinner.start('Installing Qwen TTS daemon dependencies (creates venv, CUDA torch download is large)...');
-    const result = await Effect.runPromise(installTtsDaemonDependencies());
+    const result = await installTtsDaemonDependencies();
     if (result.status === 'installed') {
       spinner.succeed(result.message);
     } else if (result.status === 'skipped') {

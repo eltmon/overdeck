@@ -3,7 +3,6 @@ import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -40,7 +39,7 @@ async function reserveEphemeralPort(): Promise<number> {
 // These tests deliberately run on REAL timers, against the project-wide rule that
 // delay-based tests use `vi.useFakeTimers()`. Everything under test here is real
 // I/O — a real `createServer()` on a real port, a real loopback `fetch`, real
-// `lsof`/`ps` subprocesses — and `waitForDashboardHealthPromise` bounds that I/O
+// `lsof`/`ps` subprocesses — and `waitForDashboardHealth` bounds that I/O
 // with `Date.now()` and paces it with `sleep(pollIntervalMs)`. Faking the clock
 // makes the poll loop advance only when the test advances it, so the test races
 // the real HTTP round-trip it is waiting on: on a contended runner the body read
@@ -85,7 +84,7 @@ describe('dashboard restart with a live port squatter', () => {
       traefikDir: tempDir,
     };
 
-    const restart = Effect.runPromise(restartDashboard(
+    const restart = restartDashboard(
       config,
       async () => {
         await listen(server!, port);
@@ -96,7 +95,7 @@ describe('dashboard restart with a live port squatter', () => {
         expectedIdentity: { repoRoot: '/expected/repo', mode: 'primary' },
         eaddrinuseLogPath: join(tempDir, 'dashboard.log'),
       },
-    ));
+    );
     const rejection = expect(restart).rejects.toSatisfy((error: StageError) =>
       error.failure.reason.includes(`pid ${process.pid}`) &&
       error.failure.reason.includes(`pid ${expectedPid}`) &&
@@ -130,7 +129,7 @@ describe('dashboard restart with a live port squatter', () => {
       traefikDir: tempDir,
     };
 
-    await expect(Effect.runPromise(restartDashboard(
+    await expect(restartDashboard(
       config,
       async () => {
         await listen(server!, port);
@@ -140,6 +139,6 @@ describe('dashboard restart with a live port squatter', () => {
         expectedIdentity: { repoRoot: '/expected/repo', mode: 'primary' },
         eaddrinuseLogPath: join(tempDir, 'dashboard.log'),
       },
-    ))).resolves.toEqual({ ownershipVerified: true, spawnedPid: process.pid });
+    )).resolves.toEqual({ ownershipVerified: true, spawnedPid: process.pid });
   });
 });

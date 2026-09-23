@@ -213,7 +213,7 @@ async function spawnRunWithoutConsentClaim(
     && (await getProviderAuthMode(selectedModel)) === 'subscription'
   ) {
     const { isCliproxyRunning } = await import('../cliproxy.js');
-    if (!(await Effect.runPromise(isCliproxyRunning()))) {
+    if (!(await isCliproxyRunning())) {
       throw new Error(
         'CLIProxyAPI sidecar is not running. GPT subscription role runs route through '
         + 'a local cliproxy process managed by `pan up`. Run `pan up` (or restart the '
@@ -665,7 +665,7 @@ async function spawnAgentWithoutConsentClaim(
     && (await getProviderAuthMode(selectedModel)) === 'subscription'
   ) {
     const { isCliproxyRunning } = await import('../cliproxy.js');
-    if (!(await Effect.runPromise(isCliproxyRunning()))) {
+    if (!(await isCliproxyRunning())) {
       throw new Error(
         'CLIProxyAPI sidecar is not running. GPT subscription agents route through '
         + 'a local cliproxy process managed by `pan up`. Run `pan up` (or restart the '

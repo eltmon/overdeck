@@ -13,7 +13,7 @@ import { resolveIssueWorkModel } from '../../../../lib/agents/staffing.js';
 import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { buildChildEnvWithoutTmuxSync } from '../../../../lib/child-env.js';
-import { checkCodexAuthStatus } from '../../../../lib/codex-auth.js';
+import { CodexAuthCheckError, checkCodexAuthStatus } from '../../../../lib/codex-auth.js';
 import { canUseHarnessSync } from '../../../../lib/harness-policy.js';
 import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
 import { appendOperatorInterventionEvent } from '../../../../lib/operator-interventions.js';
@@ -21,7 +21,7 @@ import { extractPrefixSync, parseIssueIdSync } from '../../../../lib/issue-id.js
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataFn } from '../../../../lib/remote/workspace-metadata.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
-import { validateProviderHealth } from '../../../../lib/provider-health.js';
+import { ProviderHealthError, validateProviderHealth } from '../../../../lib/provider-health.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { isGeneratedGitHookPath, isOverdeckWorkspaceRuntimePath, parsePorcelainStatusPaths } from '../../../../lib/state-plane.js';
 import { assertWorkspaceStackHealthyForSpawn } from '../../../../lib/agents/spawn-prep.js';
@@ -432,7 +432,13 @@ export const postAgentsRoute = HttpRouter.add(
     const explicitModel: string | null = (body as any).model ? spawnModel : null;
     const providerAuthMode = yield* Effect.promise(() => getProviderAuthMode(spawnModel));
     if (providerAuthMode === 'subscription') {
-      const codexAuth = yield* checkCodexAuthStatus();
+      const codexAuth = yield* Effect.tryPromise({
+        try: () => checkCodexAuthStatus(),
+        catch: (cause) => new CodexAuthCheckError({
+          message: cause instanceof Error ? cause.message : String(cause),
+          cause,
+        }),
+      });
       if (codexAuth.status === 'expired' || codexAuth.status === 'burned') {
         return jsonResponse({
           success: false,
@@ -446,10 +452,12 @@ export const postAgentsRoute = HttpRouter.add(
 
     // Pre-flight provider health check — detect quota/auth/network errors
     // before spawning the agent into Claude Code's opaque retry loop.
-    // validateProviderHealth returns an Effect (typed ProviderHealthError
-    // channel) — wrapping it in Effect.promise handed a non-thenable to the
-    // runtime and crashed the whole request (PAN-1768).
-    const providerHealthCheck = yield* validateProviderHealth(spawnModel).pipe(
+    // validateProviderHealth rejects only with ProviderHealthError (any other
+    // throw is re-wrapped), so every failure lands in the blocked branch below.
+    const providerHealthCheck = yield* Effect.tryPromise({
+      try: () => validateProviderHealth(spawnModel),
+      catch: (cause) => cause as ProviderHealthError,
+    }).pipe(
       Effect.match({
         onFailure: (err) => ({ _tag: 'failure' as const, err }),
         onSuccess: () => ({ _tag: 'success' as const, err: null }),

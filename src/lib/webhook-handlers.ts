@@ -12,9 +12,7 @@
  * Shared advisory-check classification keeps CodeRabbit out of merge gates.
  */
 
-import { Effect } from 'effect';
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js';
-import { GitHubApiError } from './errors.js';
 import { recordCiTestGatePass, relayCiFailureFeedback } from './cloister/ci-failure-feedback.js';
 import { isCiTestCheckName } from './cloister/verification-tests-mode.js';
 import { getPrFacts } from './cloister/pr-facts.js';
@@ -131,7 +129,8 @@ export function isTrackedRepositorySync(fullName: string | undefined): boolean {
 /** `gh` statusCheckRollup conclusions/states that count as a failing required check. */
 export const FAILING_CHECK_CONCLUSIONS = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE', 'STALE']);
 
-async function handleCheckSuitePromise(payload: WebhookPayload): Promise<void> {
+/** Handle a `check_suite` GitHub webhook payload. */
+export async function handleCheckSuite(payload: WebhookPayload): Promise<void> {
   // PAN-3537: a push to the default branch produces a check suite with an empty
   // pull_requests array. Record it for the Command Deck CI chip, then fall
   // through to the existing PR-scoped merge-gate logic.
@@ -196,7 +195,8 @@ async function handleCheckSuitePromise(payload: WebhookPayload): Promise<void> {
   }
 }
 
-async function handleCheckRunPromise(payload: WebhookPayload): Promise<void> {
+/** Handle a `check_run` GitHub webhook payload. */
+export async function handleCheckRun(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
   const run = payload.check_run;
   if (!run) return;
@@ -234,7 +234,8 @@ async function handleCheckRunPromise(payload: WebhookPayload): Promise<void> {
   }
 }
 
-async function handlePullRequestPromise(payload: WebhookPayload): Promise<void> {
+/** Handle a `pull_request` GitHub webhook payload. */
+export async function handlePullRequest(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   if (!pr) return;
@@ -320,7 +321,8 @@ async function handlePullRequestPromise(payload: WebhookPayload): Promise<void> 
 
 }
 
-async function handlePullRequestReviewPromise(payload: WebhookPayload): Promise<void> {
+/** Handle a `pull_request_review` GitHub webhook payload. */
+export async function handlePullRequestReview(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   const review = payload.review;
@@ -331,7 +333,8 @@ async function handlePullRequestReviewPromise(payload: WebhookPayload): Promise<
 
 }
 
-async function handlePullRequestReviewCommentPromise(payload: WebhookPayload): Promise<void> {
+/** Handle a `pull_request_review_comment` GitHub webhook payload. */
+export async function handlePullRequestReviewComment(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   if (!pr) return;
@@ -340,7 +343,8 @@ async function handlePullRequestReviewCommentPromise(payload: WebhookPayload): P
   bumpIssuePrTabCacheGeneration(issueId);
 }
 
-async function handleIssueCommentPromise(payload: WebhookPayload): Promise<void> {
+/** Handle an `issue_comment` GitHub webhook payload for PR tab cache invalidation. */
+export async function handleIssueComment(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
   const issue = payload.issue;
   if (!issue?.pull_request || issue.number == null) return;
@@ -353,7 +357,8 @@ async function handleIssueCommentPromise(payload: WebhookPayload): Promise<void>
   if (issueId) bumpIssuePrTabCacheGeneration(issueId);
 }
 
-async function handlePullRequestReviewThreadPromise(payload: WebhookPayload): Promise<void> {
+/** Handle a `pull_request_review_thread` GitHub webhook payload. */
+export async function handlePullRequestReviewThread(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
   const pr = payload.pull_request;
   if (!pr || !payload.thread) return;
@@ -362,7 +367,8 @@ async function handlePullRequestReviewThreadPromise(payload: WebhookPayload): Pr
   bumpIssuePrTabCacheGeneration(issueId);
 }
 
-async function handleStatusPromise(payload: WebhookPayload): Promise<void> {
+/** Handle a `status` GitHub webhook payload. */
+export async function handleStatus(payload: WebhookPayload): Promise<void> {
   if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
   const state = payload.state;
   const branches = payload.branches;
@@ -400,85 +406,3 @@ async function handleStatusPromise(payload: WebhookPayload): Promise<void> {
     });
   }
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-const toGhError = (op: string, cause: unknown): GitHubApiError =>
-  new GitHubApiError({
-    operation: op,
-    status: 0,
-    message: cause instanceof Error ? cause.message : String(cause),
-    cause,
-  });
-
-/** Effect: handle a `check_suite` GitHub webhook payload. */
-export const handleCheckSuite = (
-  payload: WebhookPayload,
-): Effect.Effect<void, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => handleCheckSuitePromise(payload),
-    catch: (cause) => toGhError('handleCheckSuite', cause),
-  });
-
-/** Effect: handle a `check_run` GitHub webhook payload. */
-export const handleCheckRun = (
-  payload: WebhookPayload,
-): Effect.Effect<void, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => handleCheckRunPromise(payload),
-    catch: (cause) => toGhError('handleCheckRun', cause),
-  });
-
-/** Effect: handle a `pull_request` GitHub webhook payload. */
-export const handlePullRequest = (
-  payload: WebhookPayload,
-): Effect.Effect<void, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => handlePullRequestPromise(payload),
-    catch: (cause) => toGhError('handlePullRequest', cause),
-  });
-
-/** Effect: handle a `pull_request_review` GitHub webhook payload. */
-export const handlePullRequestReview = (
-  payload: WebhookPayload,
-): Effect.Effect<void, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => handlePullRequestReviewPromise(payload),
-    catch: (cause) => toGhError('handlePullRequestReview', cause),
-  });
-
-/** Effect: handle a `pull_request_review_comment` GitHub webhook payload. */
-export const handlePullRequestReviewComment = (
-  payload: WebhookPayload,
-): Effect.Effect<void, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => handlePullRequestReviewCommentPromise(payload),
-    catch: (cause) => toGhError('handlePullRequestReviewComment', cause),
-  });
-
-/** Effect: handle an `issue_comment` GitHub webhook payload for PR tab cache invalidation. */
-export const handleIssueComment = (
-  payload: WebhookPayload,
-): Effect.Effect<void, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => handleIssueCommentPromise(payload),
-    catch: (cause) => toGhError('handleIssueComment', cause),
-  });
-
-/** Effect: handle a `pull_request_review_thread` GitHub webhook payload. */
-export const handlePullRequestReviewThread = (
-  payload: WebhookPayload,
-): Effect.Effect<void, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => handlePullRequestReviewThreadPromise(payload),
-    catch: (cause) => toGhError('handlePullRequestReviewThread', cause),
-  });
-
-/** Effect: handle a `status` GitHub webhook payload. */
-export const handleStatus = (
-  payload: WebhookPayload,
-): Effect.Effect<void, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => handleStatusPromise(payload),
-    catch: (cause) => toGhError('handleStatus', cause),
-  });

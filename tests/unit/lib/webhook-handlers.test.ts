@@ -7,7 +7,6 @@
  * cannot: PR-tab cache invalidation, the default-branch CI observation, the CI
  * failure relay, and the post-merge lifecycle for an out-of-band merge.
  */
-import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   getRequestReviewStarter,
@@ -123,13 +122,13 @@ describe('issueIdFromBranch', () => {
 
 describe('handleCheckSuite', () => {
   it('relays a CI failure to the work agent with the PR identity from the payload', async () => {
-    await Effect.runPromise(handleCheckSuite(makePayload({
+    await handleCheckSuite(makePayload({
       check_suite: {
         status: 'completed',
         conclusion: 'failure',
         pull_requests: [{ number: 11, head: { ref: 'feature/pan-123', sha: 'deadbee' } }],
       },
-    })));
+    }));
 
     expect(mockRelayCiFailureFeedback).toHaveBeenCalledWith(expect.objectContaining({
       issueId: 'PAN-123',
@@ -142,28 +141,28 @@ describe('handleCheckSuite', () => {
   });
 
   it('does not relay on a successful check suite', async () => {
-    await Effect.runPromise(handleCheckSuite(makePayload({
+    await handleCheckSuite(makePayload({
       check_suite: {
         status: 'completed',
         conclusion: 'success',
         pull_requests: [{ number: 1, head: { ref: 'feature/pan-123', sha: 'abc' } }],
       },
-    })));
+    }));
 
     expect(mockRelayCiFailureFeedback).not.toHaveBeenCalled();
     expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('PAN-123');
   });
 
   it('ignores a check suite with no pull requests', async () => {
-    await Effect.runPromise(handleCheckSuite(makePayload({
+    await handleCheckSuite(makePayload({
       check_suite: { status: 'completed', conclusion: 'failure', pull_requests: [] },
-    })));
+    }));
 
     expect(mockRelayCiFailureFeedback).not.toHaveBeenCalled();
   });
 
   it('appends a project CI observation for a default-branch suite with no pull requests', async () => {
-    await Effect.runPromise(handleCheckSuite(makePayload({
+    await handleCheckSuite(makePayload({
       check_suite: {
         id: 42,
         status: 'in_progress',
@@ -173,7 +172,7 @@ describe('handleCheckSuite', () => {
         app: { slug: 'github-actions' },
         pull_requests: [],
       },
-    })));
+    }));
 
     expect(mockAppendDomainEventAsync).toHaveBeenCalledTimes(1);
     expect(mockAppendDomainEventAsync.mock.calls[0]![0]).toMatchObject({
@@ -182,7 +181,7 @@ describe('handleCheckSuite', () => {
   });
 
   it('ignores an untracked repository', async () => {
-    await Effect.runPromise(handleCheckSuite({
+    await handleCheckSuite({
       action: 'completed',
       repository: { full_name: 'someone-else/other-repo' },
       check_suite: {
@@ -190,7 +189,7 @@ describe('handleCheckSuite', () => {
         conclusion: 'failure',
         pull_requests: [{ number: 1, head: { ref: 'feature/pan-123', sha: 'abc' } }],
       },
-    }));
+    });
 
     expect(mockRelayCiFailureFeedback).not.toHaveBeenCalled();
     expect(mockBumpIssuePrTabCacheGeneration).not.toHaveBeenCalled();
@@ -199,13 +198,13 @@ describe('handleCheckSuite', () => {
 
 describe('handleCheckRun', () => {
   it('relays a failing non-advisory check run', async () => {
-    await Effect.runPromise(handleCheckRun(makePayload({
+    await handleCheckRun(makePayload({
       check_run: {
         name: 'build',
         conclusion: 'failure',
         pull_requests: [{ number: 5, head: { ref: 'feature/pan-123', sha: 'cafe' } }],
       },
-    })));
+    }));
 
     expect(mockRelayCiFailureFeedback).toHaveBeenCalledWith(expect.objectContaining({
       issueId: 'PAN-123',
@@ -215,20 +214,20 @@ describe('handleCheckRun', () => {
   });
 
   it('bumps the cache but never relays for an advisory check run', async () => {
-    await Effect.runPromise(handleCheckRun(makePayload({
+    await handleCheckRun(makePayload({
       check_run: {
         name: 'CodeRabbit',
         conclusion: 'failure',
         pull_requests: [{ number: 5, head: { ref: 'feature/pan-123', sha: 'cafe' } }],
       },
-    })));
+    }));
 
     expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('PAN-123');
     expect(mockRelayCiFailureFeedback).not.toHaveBeenCalled();
   });
 
   it('processes every PR on the check run, not just the first', async () => {
-    await Effect.runPromise(handleCheckRun(makePayload({
+    await handleCheckRun(makePayload({
       check_run: {
         name: 'build',
         conclusion: 'failure',
@@ -237,7 +236,7 @@ describe('handleCheckRun', () => {
           { number: 6, head: { ref: 'feature/min-42', sha: 'b' } },
         ],
       },
-    })));
+    }));
 
     expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('PAN-123');
     expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('MIN-42');
@@ -245,13 +244,13 @@ describe('handleCheckRun', () => {
   });
 
   it('records a green CI test job as the verification reset (PAN-3965)', async () => {
-    await Effect.runPromise(handleCheckRun(makePayload({
+    await handleCheckRun(makePayload({
       check_run: {
         name: 'test (22)',
         conclusion: 'success',
         pull_requests: [{ number: 5, head: { ref: 'feature/pan-123', sha: 'cafe' } }],
       },
-    })));
+    }));
 
     expect(mockRecordCiTestGatePass).toHaveBeenCalledWith(expect.objectContaining({
       issueId: 'PAN-123',
@@ -262,13 +261,13 @@ describe('handleCheckRun', () => {
   });
 
   it('records nothing for a green non-test check (PAN-3965)', async () => {
-    await Effect.runPromise(handleCheckRun(makePayload({
+    await handleCheckRun(makePayload({
       check_run: {
         name: 'lint',
         conclusion: 'success',
         pull_requests: [{ number: 5, head: { ref: 'feature/pan-123', sha: 'cafe' } }],
       },
-    })));
+    }));
 
     expect(mockRecordCiTestGatePass).not.toHaveBeenCalled();
   });
@@ -276,7 +275,7 @@ describe('handleCheckRun', () => {
 
 describe('handlePullRequest', () => {
   it('fires postMergeLifecycle when GitHub reports the PR closed and merged', async () => {
-    await Effect.runPromise(handlePullRequest(makePayload({
+    await handlePullRequest(makePayload({
       action: 'closed',
       pull_request: {
         number: 9,
@@ -284,7 +283,7 @@ describe('handlePullRequest', () => {
         state: 'closed',
         merged: true,
       },
-    })));
+    }));
 
     expect(mockPostMergeLifecycle).toHaveBeenCalledWith(
       'PAN-123',
@@ -294,7 +293,7 @@ describe('handlePullRequest', () => {
   });
 
   it('does not fire postMergeLifecycle for a PR closed without merging', async () => {
-    await Effect.runPromise(handlePullRequest(makePayload({
+    await handlePullRequest(makePayload({
       action: 'closed',
       pull_request: {
         number: 9,
@@ -302,27 +301,27 @@ describe('handlePullRequest', () => {
         state: 'closed',
         merged: false,
       },
-    })));
+    }));
 
     expect(mockPostMergeLifecycle).not.toHaveBeenCalled();
   });
 
   it('enqueues a membership refresh on open, closed and reopened', async () => {
     for (const action of ['opened', 'closed', 'reopened']) {
-      await Effect.runPromise(handlePullRequest(makePayload({
+      await handlePullRequest(makePayload({
         action,
         pull_request: { number: 9, head: { ref: 'feature/pan-123', sha: 'abc' } },
-      })));
+      }));
     }
 
     expect(mockEnqueueProjectResourceRefresh).toHaveBeenCalledTimes(3);
   });
 
   it('bumps the PR tab cache for any pull_request action', async () => {
-    await Effect.runPromise(handlePullRequest(makePayload({
+    await handlePullRequest(makePayload({
       action: 'synchronize',
       pull_request: { number: 9, head: { ref: 'feature/pan-123', sha: 'abc' } },
-    })));
+    }));
 
     expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('PAN-123');
   });
@@ -342,64 +341,64 @@ describe('handlePullRequest → review pipeline (PAN-3917 W12)', () => {
   });
 
   it('starts the review pipeline when a PR is opened', async () => {
-    await Effect.runPromise(handlePullRequest(makePayload({
+    await handlePullRequest(makePayload({
       action: 'opened',
       pull_request: { number: 9, head: { ref: 'feature/pan-123', sha: 'abc' }, draft: false },
-    })));
+    }));
 
     expect(startReview).toHaveBeenCalledTimes(1);
     expect(startReview.mock.calls[0]![0]).toBe('PAN-123');
   });
 
   it('starts the review pipeline when a draft PR is readied', async () => {
-    await Effect.runPromise(handlePullRequest(makePayload({
+    await handlePullRequest(makePayload({
       action: 'ready_for_review',
       pull_request: { number: 9, head: { ref: 'feature/pan-123', sha: 'abc' }, draft: false },
-    })));
+    }));
 
     expect(startReview).toHaveBeenCalledTimes(1);
   });
 
   it('does not start review for a draft PR, another action, or a merged PR', async () => {
-    await Effect.runPromise(handlePullRequest(makePayload({
+    await handlePullRequest(makePayload({
       action: 'opened',
       pull_request: { number: 9, head: { ref: 'feature/pan-123', sha: 'abc' }, draft: true },
-    })));
-    await Effect.runPromise(handlePullRequest(makePayload({
+    }));
+    await handlePullRequest(makePayload({
       action: 'synchronize',
       pull_request: { number: 9, head: { ref: 'feature/pan-123', sha: 'abc' } },
-    })));
-    await Effect.runPromise(handlePullRequest(makePayload({
+    }));
+    await handlePullRequest(makePayload({
       action: 'opened',
       pull_request: { number: 9, head: { ref: 'feature/pan-123', sha: 'abc' }, state: 'closed', merged: true },
-    })));
+    }));
 
     expect(startReview).not.toHaveBeenCalled();
   });
 
   it('does not start review for a strike or bypass PR — the pipeline reviews feature/<issue>', async () => {
-    await Effect.runPromise(handlePullRequest(makePayload({
+    await handlePullRequest(makePayload({
       action: 'opened',
       pull_request: { number: 9, head: { ref: 'bypass/pan-123', sha: 'abc' } },
-    })));
-    await Effect.runPromise(handlePullRequest(makePayload({
+    }));
+    await handlePullRequest(makePayload({
       action: 'opened',
       pull_request: { number: 9, head: { ref: 'strike/pan-123', sha: 'abc' } },
-    })));
+    }));
 
     expect(startReview).not.toHaveBeenCalled();
   });
 
   it('does not start review for an untracked repo or a branch with no issue', async () => {
-    await Effect.runPromise(handlePullRequest({
+    await handlePullRequest({
       action: 'opened',
       repository: { full_name: 'someone-else/repo' },
       pull_request: { number: 9, head: { ref: 'feature/pan-123', sha: 'abc' } },
-    }));
-    await Effect.runPromise(handlePullRequest(makePayload({
+    });
+    await handlePullRequest(makePayload({
       action: 'opened',
       pull_request: { number: 9, head: { ref: 'chore/cleanup', sha: 'abc' } },
-    })));
+    }));
 
     expect(startReview).not.toHaveBeenCalled();
   });
@@ -407,20 +406,20 @@ describe('handlePullRequest → review pipeline (PAN-3917 W12)', () => {
   it('a starter that rejects does not fail the webhook', async () => {
     startReview.mockRejectedValue(new Error('dashboard is mid-restart'));
 
-    await expect(Effect.runPromise(handlePullRequest(makePayload({
+    await expect(handlePullRequest(makePayload({
       action: 'opened',
       pull_request: { number: 9, head: { ref: 'feature/pan-123', sha: 'abc' } },
-    })))).resolves.toBeUndefined();
+    }))).resolves.toBeUndefined();
   });
 
   it('no registered starter is not a failure', async () => {
     registerRequestReviewStarter(null);
     expect(getRequestReviewStarter()).toBeNull();
 
-    await expect(Effect.runPromise(handlePullRequest(makePayload({
+    await expect(handlePullRequest(makePayload({
       action: 'opened',
       pull_request: { number: 9, head: { ref: 'feature/pan-123', sha: 'abc' } },
-    })))).resolves.toBeUndefined();
+    }))).resolves.toBeUndefined();
   });
 });
 
@@ -428,13 +427,13 @@ describe('handlePullRequestReview / ReviewComment / ReviewThread', () => {
   it('bumps the PR tab cache and writes nothing back', async () => {
     const pull_request = { number: 9, head: { ref: 'feature/pan-123', sha: 'abc' } };
 
-    await Effect.runPromise(handlePullRequestReview(makePayload({
+    await handlePullRequestReview(makePayload({
       action: 'submitted', pull_request, review: { state: 'changes_requested' },
-    })));
-    await Effect.runPromise(handlePullRequestReviewComment(makePayload({ pull_request })));
-    await Effect.runPromise(handlePullRequestReviewThread(makePayload({
+    }));
+    await handlePullRequestReviewComment(makePayload({ pull_request }));
+    await handlePullRequestReviewThread(makePayload({
       pull_request, thread: { id: 1, resolved: false },
-    })));
+    }));
 
     expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledTimes(3);
     expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('PAN-123');
@@ -447,15 +446,15 @@ describe('handleIssueComment', () => {
       cb(null, { stdout: JSON.stringify({ headRefName: 'feature/pan-123' }), stderr: '' });
     });
 
-    await Effect.runPromise(handleIssueComment(makePayload({
+    await handleIssueComment(makePayload({
       issue: { number: 9, pull_request: {} },
-    })));
+    }));
 
     expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('PAN-123');
   });
 
   it('ignores a comment on a plain issue', async () => {
-    await Effect.runPromise(handleIssueComment(makePayload({ issue: { number: 9 } })));
+    await handleIssueComment(makePayload({ issue: { number: 9 } }));
 
     expect(mockBumpIssuePrTabCacheGeneration).not.toHaveBeenCalled();
   });
@@ -463,12 +462,12 @@ describe('handleIssueComment', () => {
 
 describe('handleStatus', () => {
   it('relays a failing commit status using the PR identity the forge reports', async () => {
-    await Effect.runPromise(handleStatus(makePayload({
+    await handleStatus(makePayload({
       state: 'failure',
       sha: 'feedface',
       context: 'ci/build',
       branches: [{ name: 'feature/pan-123' }],
-    })));
+    }));
 
     expect(mockGetPrFacts).toHaveBeenCalledWith('PAN-123');
     expect(mockRelayCiFailureFeedback).toHaveBeenCalledWith(expect.objectContaining({
@@ -480,23 +479,23 @@ describe('handleStatus', () => {
   });
 
   it('never relays an advisory context', async () => {
-    await Effect.runPromise(handleStatus(makePayload({
+    await handleStatus(makePayload({
       state: 'failure',
       sha: 'feedface',
       context: 'coderabbitai',
       branches: [{ name: 'feature/pan-123' }],
-    })));
+    }));
 
     expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('PAN-123');
     expect(mockRelayCiFailureFeedback).not.toHaveBeenCalled();
   });
 
   it('skips non-feature branches', async () => {
-    await Effect.runPromise(handleStatus(makePayload({
+    await handleStatus(makePayload({
       state: 'failure',
       sha: 'feedface',
       branches: [{ name: 'main' }],
-    })));
+    }));
 
     expect(mockRelayCiFailureFeedback).not.toHaveBeenCalled();
   });
@@ -504,11 +503,11 @@ describe('handleStatus', () => {
   it('does not relay when the forge has no open PR for the issue', async () => {
     mockGetPrFacts.mockResolvedValue({ open: false, number: null, url: null });
 
-    await Effect.runPromise(handleStatus(makePayload({
+    await handleStatus(makePayload({
       state: 'error',
       sha: 'feedface',
       branches: [{ name: 'feature/pan-123' }],
-    })));
+    }));
 
     expect(mockRelayCiFailureFeedback).not.toHaveBeenCalled();
   });
