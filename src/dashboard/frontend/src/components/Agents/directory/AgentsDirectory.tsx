@@ -9,7 +9,7 @@
  * on a row focuses the detail; `/` focuses the list filter. Selection lives
  * in the URL (`node`, `entry`, `window`).
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 
 import { DirectoryDetail } from './DirectoryDetail';
 import { DirectoryList } from './DirectoryList';
@@ -52,20 +52,17 @@ export function AgentsDirectory() {
     if (next) focusPane(next);
   }, [focusPane]);
 
-  // `/` focuses the filter from anywhere in the directory except text inputs.
-  useEffect(() => {
-    const onKey = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;
-      const target = event.target as HTMLElement | null;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
-      const inDirectory = target === document.body || Boolean(target?.closest?.('[data-component="agents-directory"]'));
-      if (!inDirectory) return;
-      event.preventDefault();
-      filterRef.current?.focus();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, []);
+  // `/` focuses the filter while focus is inside the directory (outside text
+  // inputs). stopPropagation keeps the app-wide `/` search (a document
+  // listener, above React's root) from also opening.
+  const onRootKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;
+    const target = event.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+    event.preventDefault();
+    event.stopPropagation();
+    filterRef.current?.focus();
+  };
 
   const selectEntry = useCallback((entryId: string) => {
     const entry = entriesById.get(entryId);
@@ -135,6 +132,7 @@ export function AgentsDirectory() {
   return (
     <div
       data-component="agents-directory"
+      onKeyDown={onRootKeyDown}
       className="@container h-full min-h-0 w-full"
     >
       <div className="grid h-full min-h-0 grid-cols-[260px_minmax(0,1fr)] grid-rows-[minmax(200px,2fr)_minmax(0,3fr)] @[1100px]:grid-cols-[minmax(220px,260px)_minmax(320px,1fr)_minmax(420px,1.4fr)] @[1100px]:grid-rows-1">

@@ -107,13 +107,17 @@ describe('AgentsDirectory', () => {
     expect(within(stopped).getByRole('img', { name: 'stopped' }).className).toContain('bg-muted-foreground');
   });
 
-  it('/ focuses the filter and the filter narrows the list', () => {
+  it('/ focuses the filter, not the app-wide search, and the filter narrows the list', () => {
+    const documentSlash = vi.fn();
+    document.addEventListener('keydown', documentSlash);
     render(<AgentsDirectory />);
     screen.getByRole('tree').focus();
     fireEvent.keyDown(screen.getByRole('tree'), { key: '/' });
     const filter = screen.getByRole('searchbox', { name: 'Filter agents' });
     expect(document.activeElement).toBe(filter);
+    expect(documentSlash).not.toHaveBeenCalled();
     fireEvent.change(filter, { target: { value: 'notes' } });
     expect(rowIds()).toEqual(['conv:notes']);
+    document.removeEventListener('keydown', documentSlash);
   });
 });
