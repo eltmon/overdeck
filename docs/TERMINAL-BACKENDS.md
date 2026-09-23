@@ -208,8 +208,10 @@ the Overdeck agent id. `role` is one of
 Overdeck's own `ship` role maps to the `uat` token role (`toPaneRole`).
 
 `BackendPane.agentId` (PAN-3920) carries the Overdeck agent id into the dashboard's pane
-inventory: on Herdr it is the pane's `agentId` token, else Herdr's live agent name (the same
-precedence as `listHerdrAgents`); on tmux it is the session name. On Herdr `pane.id` is the
+inventory: on Herdr it is the pane's `agentId` token, else Herdr's live agent name — but only on
+a pane that carries Overdeck tokens, because Herdr names every agent it detects (`codex-1`,
+`claude-1`), the operator's own panes included; on tmux it is the session name of an Overdeck
+session (agent state, or an `agent-`/`planning-`/`strike-`/`conv-` name). On Herdr `pane.id` is the
 backend handle (`w1:p1`), not the agent name, so any join from an agent to its pane — the
 Agents Directory's first of all — must match `pane.agentId === agent.id`, never `pane.id`.
 A pane created by a live event gets its `agentId` on the next inventory refresh (at most 5 s).

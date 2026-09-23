@@ -55,6 +55,9 @@ const BACKEND = 'tmux' as const;
  * The target's tokens on tmux. There are no pane tokens, so they come from the
  * agent's launch metadata — the same four values a Herdr pane is stamped with.
  */
+/** Session names Overdeck launches: agents, planners, strikes and conversations. */
+const OVERDECK_SESSION_NAME = /^(agent|planning|strike|conv)-/;
+
 export function tmuxTargetTokens(sessionName: string): Partial<PaneTokens> {
   return tokensFromLaunchMetadata(getAgentStateSync(sessionName));
 }
@@ -185,7 +188,8 @@ export class TmuxBackend implements TerminalBackend {
         snapshots.push({
           backend: BACKEND,
           paneId: session.name,
-          agentId: session.name,
+          // PAN-3920: only an Overdeck session (agent state or managed name) names an agent.
+          ...(tokens.role || OVERDECK_SESSION_NAME.test(session.name) ? { agentId: session.name } : {}),
           terminalId: session.name,
           workspaceId: tokens.issue ? `agent-${tokens.issue.toLowerCase()}` : session.name,
           state,

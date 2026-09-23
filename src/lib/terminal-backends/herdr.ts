@@ -509,8 +509,9 @@ export async function listHerdrAgents(
   return [...byAgentId.values()];
 }
 
-/** The Overdeck agent id of a pane: its `agentId` token, else Herdr's live agent name (PAN-3920). */
-const agentIdOf = (pane: HerdrPaneInfo): string | undefined => pane.tokens?.[AGENT_ID_TOKEN]?.trim() || pane.name?.trim() || undefined;
+/** Overdeck agent id: the `agentId` token; Herdr's own agent name only on an Overdeck-tokened pane (PAN-3920). */
+const agentIdOf = (pane: HerdrPaneInfo): string | undefined => pane.tokens?.[AGENT_ID_TOKEN]?.trim()
+  || (pane.tokens?.role || pane.tokens?.issue ? pane.name?.trim() : undefined) || undefined;
 
 /** The recent terminal text of a Herdr pane — the backend's `capture-pane`. */
 export async function readHerdrPaneText(

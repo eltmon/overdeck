@@ -6,9 +6,10 @@ import { isUnsupported } from '../../../../src/lib/terminal-backends/types.js';
 
 /**
  * PAN-3920 W1. `list()` carries the Overdeck agent id on each snapshot: the
- * pane's `agentId` token first, then Herdr's live agent name — the same
- * precedence `listHerdrAgents` uses — so the dashboard can join a `w1:p1` pane
- * to its agent.
+ * pane's `agentId` token first, then Herdr's live agent name — but the name
+ * only on a pane that carries Overdeck tokens. Herdr names every agent it
+ * detects (`codex-1`, `claude-1`), the operator's own panes included, and
+ * those must not become directory rows.
  */
 
 function fakeApi(handler: (method: string) => unknown) {
@@ -16,7 +17,7 @@ function fakeApi(handler: (method: string) => unknown) {
 }
 
 describe('HerdrBackend.list — agentId', () => {
-  it('reads the agentId token, then the live agent name', async () => {
+  it('reads the agentId token, then the live name of an Overdeck-tokened agent', async () => {
     const api = fakeApi((method) => {
       if (method === 'session.snapshot') {
         return {
@@ -29,7 +30,13 @@ describe('HerdrBackend.list — agentId', () => {
         };
       }
       if (method === 'agent.list') {
-        return { agents: [{ pane_id: 'w1:p2', terminal_id: 't2', workspace_id: 'w1', agent_status: 'idle', name: 'conv-x' }] };
+        return {
+          agents: [
+            { pane_id: 'w1:p2', terminal_id: 't2', workspace_id: 'w1', agent_status: 'idle', name: 'agent-pan-2', tokens: { issue: 'PAN-2', role: 'work' } },
+            // The operator's own codex pane: Herdr named it, Overdeck never stamped it.
+            { pane_id: 'w1:p4', terminal_id: 't4', workspace_id: 'w1', agent_status: 'working', name: 'codex-1' },
+          ],
+        };
       }
       return {};
     });
@@ -39,8 +46,8 @@ describe('HerdrBackend.list — agentId', () => {
 
     const byPane = new Map(result.map((snapshot) => [snapshot.paneId, snapshot]));
     expect(byPane.get('w1:p1')?.agentId).toBe('agent-pan-1');
-    expect(byPane.get('w1:p2')?.agentId).toBe('conv-x');
-    // A pane Overdeck never stamped and Herdr never named carries no agent id.
+    expect(byPane.get('w1:p2')?.agentId).toBe('agent-pan-2');
+    expect(byPane.get('w1:p4')).not.toHaveProperty('agentId');
     expect(byPane.get('w1:p3')).not.toHaveProperty('agentId');
   });
 });
