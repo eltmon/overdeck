@@ -127,10 +127,11 @@ are included in the normal project test command, not only runnable manually.
 
 ## Verification budget
 
-Reuse trustworthy successful checks for this exact HEAD and environment when
-available; cite their evidence. Otherwise run focused tests or isolated probes
-needed to resolve a concrete uncertainty. Do not run the full suite merely to
-repeat the pipeline's verification stage. Record unavailable checks as unverified.
+Never run the full test suite: it runs once, on CI, against the PR head. Read
+that result (`gh pr checks <pr-number>`) and cite it; a pending or missing CI
+test job is unverified, not green. Reuse other trustworthy successful checks
+for this exact HEAD. Otherwise run focused tests or isolated probes needed to
+resolve a concrete uncertainty. Record unavailable checks as unverified.
 Scratch probes belong in an isolated temporary directory; do not edit tracked
 source/tests or use live operator state as test data. Use fake timers for
 synthetic retries and delays. Never start, stop, kill, or restart the host-level Overdeck dashboard, supervisor, or Deacon.

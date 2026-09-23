@@ -66,14 +66,14 @@ Plain `tmux list-sessions` queries the default socket and will show "no server r
 
 **You are NOT done until ALL of these are true:**
 
-1. **Tests pass** - Run the full test suite (`npm test` or equivalent)
+1. **Touched tests pass** - Run the tests for what you changed (`npx vitest run <files>` or equivalent). The full suite runs once, on CI, after `pan done` — do not run it on the host
 2. **All changes committed** - `git status` shows "nothing to commit, working tree clean"
 3. **Pushed to remote** - `git push -u origin $(git branch --show-current)`
 
 **Completion checklist:**
 ```bash
-# 1. Run tests
-npm test  # or: mvn test, cargo test, etc.
+# 1. Run the tests you touched (the full suite runs on CI after pan done)
+npx vitest run <changed test files>  # or: mvn -Dtest=<Class> test, cargo test <name>, etc.
 
 # 2. Stage and commit ALL changes with Co-Authored-By line
 # CRITICAL: Use YOUR EXACT MODEL ID in the Co-Authored-By line

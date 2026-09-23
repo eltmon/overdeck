@@ -3,7 +3,9 @@
  *
  * Runs quality gates (typecheck → lint → test by default, or project-specific
  * gates from projects.yaml), updates review status, writes feedback files,
- * and notifies the work agent on failure.
+ * and notifies the work agent on failure. PAN-3965: when the project's tests
+ * run on CI (`verification.tests`), the `test` gate is not run on the host —
+ * the CI test job on the PR head is the test gate.
  *
  * Extracted from dashboard/server to be independently testable.
  */
@@ -13,8 +15,8 @@ import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
-import { emitActivityEntrySync } from '../activity-logger.js';
 import { runQualityGates, DEFAULT_GATES } from './validation.js';
+import { resolveVerificationTestsMode, selectLocalVerificationGates } from './verification-tests-mode.js';
 import {
   readVerificationArtifact,
   verificationArtifactPath,
@@ -23,18 +25,26 @@ import {
 import { evaluateTestSkipGate } from './test-skip-run.js';
 import { buildFinalFailureInstructions } from './verification-feedback.js';
 import {
+  announceVerificationFailure,
+  deliverVerificationFeedback,
+  escalateVerificationStuck,
+  isFinalVerificationAttempt,
+  shouldEscalateVerificationFailure,
+  skipMergedVerification,
+  VERIFICATION_MAX_CYCLES,
+} from './verification-escalation.js';
+import {
   isVerificationWorkerActive,
   markVerificationWorkerAdmissionPhase,
   runSupervisedVerification,
 } from './verification-worker-supervisor.js';
 import type { VerificationRunnerOptions, VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
-import { readVerificationCycleState, type VerificationCycleState } from './verification-cycles.js';
+import { readLatestCiTestResult, readVerificationCycleState } from './verification-cycles.js';
 import { postVerificationCheckRun } from './verification-check-run.js';
-import { getPrFacts } from './pr-facts.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { appendPipelineEntry } from './pipeline-journal.js';
-import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
-import { clearAgentPaused, getAgentStateSync, messageAgent, setAgentPaused, stopAgent } from '../agents.js';
+import { resolveIssueFeedbackTarget } from './feedback-target.js';
+import { clearAgentPaused, getAgentStateSync, messageAgent } from '../agents.js';
 import { findProjectByPathSync, resolveProjectFromIssueSync } from '../projects.js';
 import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
 import { getXBriefACStatusSync } from '../xbrief/acceptance-criteria.js';
@@ -47,27 +57,13 @@ import { parseCompositeSnapshot, snapshotWorkspaceHeadsPromise, type HeadAnchor 
 
 const execAsync = promisify(exec);
 
-export const VERIFICATION_MAX_CYCLES = 3;
-const NO_PROGRESS_REPEAT_THRESHOLD = 2;
+export {
+  deliverVerificationFeedback,
+  MERGED_VERIFICATION_REASON,
+  VERIFICATION_MAX_CYCLES,
+} from './verification-escalation.js';
 
 export type { VerificationRunnerOptions, VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
-
-export const MERGED_VERIFICATION_REASON =
-  'The pull request already merged; pre-merge verification no longer applies.';
-
-/**
- * PAN-3917: the forge says whether the PR merged. Nothing is stamped when it
- * has — a merged PR is the merge state, for every reader.
- */
-async function skipMergedVerification(
-  issueId: string,
-  logPrefix: string,
-): Promise<VerificationRunnerOutcome | null> {
-  const facts = await getPrFacts(issueId);
-  if (!facts.merged) return null;
-  console.log(`[${logPrefix}] Skipping pre-merge verification for ${issueId}: ${MERGED_VERIFICATION_REASON}`);
-  return { outcome: 'skipped', reason: MERGED_VERIFICATION_REASON };
-}
 
 interface SyncResult {
   repoDir: string;
@@ -78,106 +74,6 @@ interface SyncResult {
   hasConflicts?: boolean;
   conflictLines?: string;
   errorOutput?: string;
-}
-
-function isFinalVerificationAttempt(cycleCount: number): boolean {
-  return cycleCount >= VERIFICATION_MAX_CYCLES;
-}
-
-/**
- * PAN-3917: "no progress" is read from the per-run verification artifacts at
- * the current HEAD, not from a stored cycle counter and its notes string.
- */
-function shouldEscalateVerificationFailure(
-  cycles: VerificationCycleState,
-  failedCheck: string,
-  cycleCount: number,
-): boolean {
-  if (isFinalVerificationAttempt(cycleCount)) return true;
-  return cycleCount >= NO_PROGRESS_REPEAT_THRESHOLD && cycles.lastFailedCheck === failedCheck;
-}
-
-/**
- * Announce a verification failure the gates themselves could not record (an
- * incomplete checklist, an empty changeset). The artifact holds the gate runs;
- * this puts the state-derived failure on the activity stream, where it used to
- * go as a `stuck` flag on the review row.
- */
-function announceVerificationFailure(issueId: string, failedCheck: string, summary: string): void {
-  try {
-    emitActivityEntrySync({
-      source: 'cloister',
-      level: 'warn',
-      message: `Verification failed for ${issueId} at ${failedCheck}`,
-      issueId,
-      details: summary,
-    });
-  } catch { /* announcement is best-effort */ }
-}
-
-async function escalateVerificationStuck(
-  issueId: string,
-  failedCheck: string,
-  cycleCount: number,
-  summary: string,
-  logPrefix: string,
-): Promise<void> {
-  if (await skipMergedVerification(issueId, logPrefix)) return;
-
-  const agentId = `agent-${issueId.toLowerCase()}`;
-  const reason = `needs-you: verification stuck after ${cycleCount}/${VERIFICATION_MAX_CYCLES} attempts (${failedCheck})`;
-
-  announceVerificationFailure(issueId, failedCheck, `${reason}\n\n${summary}`);
-
-  try {
-    await Effect.runPromise(setAgentPaused(agentId, reason, true));
-    await Effect.runPromise(stopAgent(agentId));
-    console.log(`[${logPrefix}] Verification stuck for ${issueId} — paused ${agentId}; the pause is the operator signal`);
-  } catch (err: any) {
-    console.error(`[${logPrefix}] Failed to pause ${agentId} after verification stuck:`, err);
-  }
-}
-
-/** Exported for focused delivery-outcome tests (PR #3874 review). */
-export async function deliverVerificationFeedback(
-  issueId: string,
-  message: string,
-  details: Record<string, unknown>,
-  logPrefix: string,
-): Promise<void> {
-  if (await skipMergedVerification(issueId, logPrefix)) return;
-
-  const target = await resolveIssueFeedbackTarget(issueId);
-  if (await skipMergedVerification(issueId, logPrefix)) return;
-
-  if ('agentId' in target) {
-    // PAN-2668: verification feedback owes rework — a stopped-by-user agent
-    // with a completed handoff is re-driven, not silently queued mail.
-    // PR #3874 review: delivered:false no longer throws — escalate instead of
-    // logging success, the same contract as review-verdict-feedback.
-    let outcome: Awaited<ReturnType<typeof messageAgent>>;
-    try {
-      outcome = await messageAgent(target.agentId, message, 'internal', { owesRework: true, feedbackRedelivery: true });
-    } catch (err) {
-      outcome = { delivered: false, queuedToMail: false, reason: err instanceof Error ? err.message : String(err) };
-    }
-    if (outcome.delivered) {
-      console.log(`[${logPrefix}] Sent verification feedback for ${issueId} to ${target.agentId}`);
-      return;
-    }
-    const reason = outcome.reason ?? 'delivery was not accepted';
-    console.warn(`[${logPrefix}] Could not message ${target.agentId}; verification feedback for ${issueId} not delivered: ${reason}`);
-    await surfaceIssueFeedbackNeedsYou(issueId, `Feedback delivery to ${target.agentId} failed: ${reason}`, {
-      specialist: 'verification-gate',
-      ...details,
-    });
-    return;
-  }
-
-  await surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
-    specialist: 'verification-gate',
-    ...details,
-  });
 }
 
 /**
@@ -518,11 +414,18 @@ async function runVerificationForIssuePromise(
     if (postSyncMergedOutcome) return postSyncMergedOutcome;
 
     // Load project-specific gates or fall back to defaults
-    const gates =
+    const configuredGates =
       projectConfig?.quality_gates && Object.keys(projectConfig.quality_gates).length > 0
         ? projectConfig.quality_gates
         : DEFAULT_GATES;
-    console.log(`[${logPrefix}] Project: ${projectConfig?.name || 'NOT FOUND'}, gates: [${Object.keys(gates).join(', ')}], workspace: ${workspacePath}`);
+    // PAN-3965: one full-suite run per push, on CI. In `ci` mode the `test`
+    // gate is not run here; the CI test job on the PR head is the test gate,
+    // merge readiness requires it green, and a red run reaches the agent
+    // through ci-failure-feedback.
+    const testsMode = resolveVerificationTestsMode(projectConfig);
+    const { gates, deferredToCi } = selectLocalVerificationGates(configuredGates, testsMode);
+    const artifactExtras = deferredToCi.length > 0 ? { deferredToCi } : {};
+    console.log(`[${logPrefix}] Project: ${projectConfig?.name || 'NOT FOUND'}, gates: [${Object.keys(gates).join(', ')}], tests: ${testsMode}${deferredToCi.length > 0 ? ` (deferred to CI: ${deferredToCi.join(', ')})` : ''}, workspace: ${workspacePath}`);
 
     // Build template placeholders for container name resolution
     const featureFolder = basename(workspacePath);  // e.g., 'feature-min-574'
@@ -599,6 +502,7 @@ async function runVerificationForIssuePromise(
         writeVerificationArtifact(workspacePath, issueId, liveGateResults, {
           currentGate: liveGateName,
           currentGateOutput: liveGateTail || undefined,
+          ...artifactExtras,
         });
       } catch { /* best-effort */ }
     };
@@ -649,9 +553,25 @@ async function runVerificationForIssuePromise(
 
     // PAN-3906: an operator override stays visible in the verification artifact
     // even though it let the gate pass.
-    const gateResults = !testSkip.failed && testSkip.waiverApplied
+    const localGateResults = !testSkip.failed && testSkip.waiverApplied
       ? [{ name: 'test-skip', passed: true, required: true, output: testSkip.evidence, durationMs: Date.now() - testSkipStart }, ...rawGateResults]
       : rawGateResults;
+    // PAN-3965: in `ci` mode the test gate's verdict for this head is the CI
+    // test job. When it is already known red, re-requesting review on the same
+    // head fails `test` again instead of passing on typecheck+lint alone — so a
+    // resubmit without a fix counts against the attempt budget as it always did.
+    const ciTestRed = testsMode === 'ci'
+      && !localGateResults.some((r) => !r.passed && r.required !== false)
+      && readLatestCiTestResult(workspacePath, headShort) === 'failed';
+    const gateResults = ciTestRed
+      ? [...localGateResults, {
+        name: 'test',
+        passed: false,
+        required: true,
+        durationMs: 0,
+        output: `The CI test job already failed on this head (${headShort}). Fix it and push a new commit; see .pan/feedback/ for the CI failure details.`,
+      }]
+      : localGateResults;
 
     const postGateMergedOutcome = await skipMergedVerification(issueId, logPrefix);
     if (postGateMergedOutcome) return postGateMergedOutcome;
@@ -701,6 +621,7 @@ async function runVerificationForIssuePromise(
       const finalArtifact = writeVerificationArtifact(workspacePath, issueId, gateResults, {
         ranAt: runStartedAt,
         ...(head8 ? { head8 } : {}),
+        ...artifactExtras,
       });
       runArtifactPath = finalArtifact.path;
     } catch (artifactErr: any) {
@@ -940,7 +861,18 @@ async function runVerificationForIssuePromise(
     const prePassMergedOutcome = await skipMergedVerification(issueId, logPrefix);
     if (prePassMergedOutcome) return prePassMergedOutcome;
 
-    await reportVerificationCheckRun(workspacePath, issueId, headShort, 'success', 'verification gate passed', 'Every required gate passed (changed-file scope).', logPrefix);
+    const testsOnCi = testsMode === 'ci';
+    await reportVerificationCheckRun(
+      workspacePath,
+      issueId,
+      headShort,
+      'success',
+      'verification gate passed',
+      testsOnCi
+        ? 'Every required local gate passed; the test gate is the CI test job on this head (PAN-3965).'
+        : 'Every required gate passed (changed-file scope).',
+      logPrefix,
+    );
     // PAN-3847 (FR-10), re-pointed by PAN-3917: a verification pass lifts the
     // pause escalateVerificationStuck set. There is no stuck flag left to clear
     // — the pause IS the state, and the gate that set it clears it.
@@ -988,7 +920,10 @@ async function runVerificationForIssuePromise(
         if (!repo || !repo.includes('/')) return;
         const [owner, name] = repo.split('/');
         const { postOverdeckTestsStatus } = await import('../github-app.js');
-        await postOverdeckTestsStatus(workspacePath, owner!, name!, 'success', 'Verification gate passed (changed-file scope)', verifiedSha);
+        const description = testsOnCi
+          ? 'Verification gate passed (typecheck+lint; tests run on CI)'
+          : 'Verification gate passed (changed-file scope)';
+        await postOverdeckTestsStatus(workspacePath, owner!, name!, 'success', description, verifiedSha);
       } catch (err: any) {
         console.warn(`[${logPrefix}] Failed to post overdeck/tests status: ${err.message}`);
       }

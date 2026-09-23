@@ -21,7 +21,7 @@ import {
 } from './projects-config-write.js';
 import { extractPrefixSync, parseIssueIdSync } from './issue-id.js';
 import { notifyProjectsConfigInvalidated } from './projects-cache-events.js';
-import type { DatabaseConfig, QualityGateConfig, RepoConfig } from './workspace-config.js';
+import type { DatabaseConfig, ProjectVerificationConfig, QualityGateConfig, RepoConfig } from './workspace-config.js';
 
 export const PROJECTS_CONFIG_FILE = join(OVERDECK_HOME, 'projects.yaml');
 
@@ -356,7 +356,7 @@ export interface ProjectConfig {
    */
   merge_train?: 'enabled' | 'disabled';
   /** Merge checks: pre-push quality gates and main-verification fallback requirements. */
-  quality_gates?: Record<string, QualityGateConfig>; main_verify_required_checks?: string[];
+  quality_gates?: Record<string, QualityGateConfig>; main_verify_required_checks?: string[]; verification?: ProjectVerificationConfig;
   /** Version-string propagation performed after a UAT batch merge. */
   version_sync?: VersionSyncConfig;
   /** Release components and rollout checks for coordinated post-merge release. */

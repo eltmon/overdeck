@@ -26,6 +26,20 @@ export function shouldHoldForUat(
   return globalRequireUat; // no per-issue or per-project signal — follow global
 }
 
+/**
+ * PAN-3965: whether a project holds merges for UAT — the tiers above minus the
+ * per-issue flag: the project's `auto_merge_default`, else the global
+ * `flywheel.require_uat_before_merge`. The merge-train reconciler keeps a batch
+ * for a single ready feature only in a held project (it is the UAT stack).
+ */
+export function projectHoldsForUat(
+  project: { auto_merge_default?: unknown } | null | undefined,
+  globalRequireUat: boolean,
+): boolean {
+  const d = project?.auto_merge_default;
+  return shouldHoldForUat(undefined, d === 'auto' || d === 'hold' ? d : undefined, globalRequireUat);
+}
+
 /** Resolve the per-project auto-merge default for an issue, or undefined. */
 export function getProjectAutoMergeDefault(issueId: string): ProjectAutoMergeDefault {
   const project = resolveProjectFromIssueSync(issueId);

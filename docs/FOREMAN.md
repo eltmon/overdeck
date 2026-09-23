@@ -43,7 +43,9 @@ concurrently.
 Every worker, whichever way it was dispatched, follows the same loop:
 
 1. `pan task claim <id> <item-id>` — claims the item in `.pan/continues/<id>.xbrief.json`.
-2. Implement only that item.
+2. Implement only that item, and run only the tests it touched:
+   `npx vitest run <test files you changed or whose subjects you changed>`.
+   Never the full suite — it runs once, on CI, after `pan done` (PAN-3965).
 3. One commit with the trailer `Item: <item-id>`.
 4. Push (a `pan spawn` pane pushes the shared feature branch directly; an
    in-harness subagent hands its worktree back to the foreman to integrate).
@@ -72,8 +74,11 @@ A worker never calls `pan done`.
   ```
 
   Exactly once, from the foreman's own pane, after the last item lands on
-  the feature branch. `pan done` runs quality gates, opens or updates the
-  PR, and requests review — it writes nothing else.
+  the feature branch. `pan done` runs typecheck and lint, opens or updates
+  the PR, and requests review — it writes nothing else. The full test suite
+  runs on CI against the PR head; a red CI test job comes back to the
+  foreman as `VERIFICATION FAILED … Failed check: test`. Do not run the
+  suite on the host before `pan done`.
 
 ## What this protocol does not do
 

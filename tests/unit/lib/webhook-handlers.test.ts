@@ -33,6 +33,7 @@ const mockAppendDomainEventAsync = vi.fn(async () => true);
 const mockResolveDefaultBranchHead = vi.fn(async () => 'abc123');
 const mockEnqueueProjectResourceRefresh = vi.fn();
 const mockRelayCiFailureFeedback = vi.fn(() => Effect.succeed({ agentMessageSent: false }));
+const mockRecordCiTestGatePass = vi.fn(() => Effect.succeed(true));
 const mockGetPrFacts = vi.fn();
 
 vi.mock('../../../src/dashboard/server/services/pr-tab-cache.js', () => ({
@@ -51,6 +52,8 @@ vi.mock('../../../src/dashboard/server/services/tracker-config.js', () => ({
 vi.mock('../../../src/lib/cloister/ci-failure-feedback.js', () => ({
   relayCiFailureFeedback: (...args: Parameters<typeof mockRelayCiFailureFeedback>) =>
     mockRelayCiFailureFeedback(...args),
+  recordCiTestGatePass: (...args: Parameters<typeof mockRecordCiTestGatePass>) =>
+    mockRecordCiTestGatePass(...args),
 }));
 
 vi.mock('../../../src/lib/cloister/pr-facts.js', () => ({
@@ -239,6 +242,34 @@ describe('handleCheckRun', () => {
     expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('PAN-123');
     expect(mockBumpIssuePrTabCacheGeneration).toHaveBeenCalledWith('MIN-42');
     expect(mockRelayCiFailureFeedback).toHaveBeenCalledTimes(2);
+  });
+
+  it('records a green CI test job as the verification reset (PAN-3965)', async () => {
+    await Effect.runPromise(handleCheckRun(makePayload({
+      check_run: {
+        name: 'test (22)',
+        conclusion: 'success',
+        pull_requests: [{ number: 5, head: { ref: 'feature/pan-123', sha: 'cafe' } }],
+      },
+    })));
+
+    expect(mockRecordCiTestGatePass).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'PAN-123',
+      headSha: 'cafe',
+    }));
+    expect(mockRelayCiFailureFeedback).not.toHaveBeenCalled();
+  });
+
+  it('records nothing for a green non-test check (PAN-3965)', async () => {
+    await Effect.runPromise(handleCheckRun(makePayload({
+      check_run: {
+        name: 'lint',
+        conclusion: 'success',
+        pull_requests: [{ number: 5, head: { ref: 'feature/pan-123', sha: 'cafe' } }],
+      },
+    })));
+
+    expect(mockRecordCiTestGatePass).not.toHaveBeenCalled();
   });
 });
 

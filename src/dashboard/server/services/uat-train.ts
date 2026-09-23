@@ -64,6 +64,8 @@ import {
   type ResolvedProjectRepo,
 } from '../../../lib/project-repos.js';
 import { getDashboardIdentity } from '../identity.js';
+import { projectHoldsForUat } from '../../../lib/cloister/auto-merge-policy.js';
+import { isFlywheelRequireUatBeforeMerge } from '../../../lib/overdeck/control-settings.js';
 
 const RECONCILE_INTERVAL_MS = 60_000;
 const CHAIN_PAYLOAD_LIMIT = 10;
@@ -212,6 +214,7 @@ async function runUatTrainReconcileForProject(
       assemble: (features) => assemblePolyrepoFromReadySetForProject(projectPath, features),
       teardownStack: (gen) => teardownUatStack(gen),
       cleanup: makeCleanupForProject(projectPath),
+      holdsForUat: () => projectHoldsForUat(projectConfig, isFlywheelRequireUatBeforeMerge()),
       log: (msg) => console.log(msg),
     }, options);
   }
@@ -228,6 +231,7 @@ async function runUatTrainReconcileForProject(
     assemble: (features) => assembleFromReadySetForProject(projectPath, features),
     teardownStack: (gen) => teardownUatStack(gen),
     cleanup: makeCleanupForProject(projectPath),
+    holdsForUat: () => projectHoldsForUat(projectConfig, isFlywheelRequireUatBeforeMerge()),
     log: (msg) => console.log(msg),
   }, options);
 }
