@@ -31,15 +31,78 @@ pan orders start <book-id>
 backlog directly. `pan orders start <book-id>` opens the same skill bound to
 one order book (`pan orders show <book-id>`).
 
+The Flywheel page (`/flywheel`) and `pan flywheel status` show this loop by
+reading what it leaves behind — this conversation's transcript, the pipeline
+journals, the tracker, and `.pan/flywheel/`. Nothing else records a run.
+
+## Verbs
+
+```bash
+pan flywheel start
+pan flywheel start --orders <book-id>
+pan flywheel start --fresh
+pan flywheel stop
+pan flywheel abort
+pan flywheel pause
+pan flywheel resume
+pan flywheel report
+pan flywheel status --json
+pan flywheel stats --json
+```
+
+`stop` asks this loop to write its report, waits, then pauses the
+conversation; `abort` pauses without a report; `pause` stops the session and
+keeps the conversation; `resume` respawns it and re-sends `/pan-flywheel`
+(re-entry is safe: Orient re-reads everything); `report` asks a running loop
+for its report; `status` and `stats` are derived reads.
+
+## Mission
+
+A **loop with a metabolism.** Every revolution must permanently improve the
+substrate — Overdeck itself. *An agent without a metabolism ships and rots;
+one with a metabolism ships and compounds.* **A workaround is a failed tick.**
+
+When a tick hits a substrate bug, the tick's job becomes fixing it (file it
+with the `substrate-improvement` label, launch the fix with `pan start`), not
+routing around it. Record each substrate fix in the state file below.
+
 ## Phase 1 — Orient
 
-1. Read `.pan/backlog/sequence.md` for the operator-set pickup order.
-2. If an order book is bound (started via `pan orders start`, or one is
+1. Read the policies from `pan flywheel status --json` (the `.policies`
+   object) — never assume their defaults. Read `.pan/flywheel/state.md` for
+   what earlier runs learned.
+2. Read `.pan/backlog/sequence.md` for the operator-set pickup order.
+3. If an order book is bound (started via `pan orders start`, or one is
    `running`), read it with `pan orders show <book-id>` — its Lane A/B items
    and prereqs take priority over the general backlog.
-3. List in-flight work: `gh pr list --search "is:open"` for this repo, and
+4. List in-flight work: `gh pr list --search "is:open"` for this repo, and
    `pan status` for live sessions. Anything already moving does not need a
    new pick.
+
+## Pickup gate
+
+A backlog issue is **auto-pickable** — eligible to *start work* — iff:
+
+    ready && planned && (released || auto_pickup_backlog || activeBookMember) && !parked && !vetoed && !objection && !inPipeline && !epic
+
+This mirrors `isAutoPickable()` in `src/lib/backlog/pickup.ts`. The gates:
+
+- **ready** — operator marked it workable (`ready` label, Definition of Ready).
+- **planned** — has an xBRIEF spec with implementation items.
+- **released** — operator's "go" after reviewing the plan (`released`, PAN-2059). Required to
+  auto-start when `auto_pickup_backlog` is OFF unless the issue belongs to the active order book;
+  when ON, the toggle is the blanket release. Operator-only — never add the label yourself.
+- **parked** (`parked`/`needs-design`/`needs-discussion`) — held for a human decision; skip.
+- **vetoed** — absolute operator hard-stop (see below).
+- **objection** — you raised a written relevance objection; halts pickup until override.
+- **inPipeline** — already has live work/review/test.
+- **epic** — a container, never directly workable.
+
+**`vetoed` is absolute.** Never pick up, plan, or strike a `vetoed` issue, even to unblock
+the pipeline. The one exception to "never block on the operator."
+
+`released` and `vetoed` are operator-only labels: this loop never adds or
+removes either one.
 
 ## Phase 2 — Pick the next item
 
@@ -50,8 +113,9 @@ not blocked, and not parked. "Parked" means the tracker issue carries the
 parked on purpose.
 
 If nothing is pickable — every remaining item is blocked, parked, or the
-book/backlog is empty — say so plainly (`needs-you: pipeline idle — nothing
-pickable`) and stop the loop rather than inventing work.
+book/backlog is empty — say so plainly in the tick marker (`phase=idle
+needs-you=pipeline idle — nothing pickable`) and stop the loop rather than
+inventing work.
 
 ## Phase 3 — Launch
 
@@ -102,6 +166,44 @@ their behalf.
 - `require_uat_before_merge` (default ON): a PR may not merge until UAT has
   passed.
 
+## Tick marker
+
+End every tick — every revolution of orient → pick → launch → watch → park —
+by printing exactly one line in this shape, on its own line, as the last line
+of your message:
+
+```text
+flywheel-tick: tick=3 pick=PAN-3964 phase=watch in-flight=PAN-3964,PAN-3920 needs-you=none
+```
+
+- `tick` counts up from 1 for this conversation.
+- `pick` is the issue this tick picked, or `none`.
+- `phase` is one of `orient`, `pick`, `launch`, `watch`, `park`, `idle`,
+  `stopping`.
+- `in-flight` is a comma-separated list of the issues moving now, or `none`.
+- `needs-you` is `none` or a short plain sentence for the operator. It is
+  always the last key and may contain spaces.
+
+The Flywheel page and `pan flywheel status` parse this line from the
+transcript; it is the only status this loop reports. Never `curl` or POST a
+status anywhere.
+
+## State file
+
+`.pan/flywheel/state.md` is this loop's durable memory across runs: substrate
+fixes it drove (issue, what broke, what fixed it) and learnings worth keeping.
+Append to it — never rewrite history — when a tick produces one, then commit
+and push it so `main` does not diverge:
+
+```bash
+git add .pan/flywheel/state.md
+git commit -m "chore(workspace): flywheel state"
+git push
+```
+
+It is memory, not status: never write a pipeline state, a run id, or a
+counter into it.
+
 ## Phase 5 — Park what you cannot decide
 
 Some calls are the operator's: ambiguous scope, a design tradeoff with no
@@ -119,15 +221,30 @@ an operator decision — park it and keep going.
   blocked with no path forward. Report and stop; do not manufacture more
   scope.
 
+To report — on stop, or whenever asked for a report — write
+`.pan/flywheel/report.md` (what shipped, what is in flight, what is parked,
+substrate fixes this run), overwriting the previous report, then commit and
+push it:
+
+```bash
+git add .pan/flywheel/report.md
+git commit -m "chore(workspace): flywheel report"
+git push
+```
+
+When stopping, print the tick marker with `phase=stopping` and end the loop.
+When only asked for a report, print it with `phase=watch` and continue.
+
 ## Guardrails
 
 - Do not start a second Flywheel loop in the same repo while one is active
   in another conversation — check `pan status` first.
 - Do not auto-merge or deep-wipe from the loop; those stay explicit,
   human-triggered actions (the MERGE button, `gh pr merge`, `pan wipe`).
-- Do not write a pipeline status field anywhere. If you find yourself about
-  to `curl` a `/status` endpoint, stop — that endpoint does not exist
-  anymore; the derived state table above is the only source of truth.
+- Do not write a pipeline status field anywhere. There is no endpoint to
+  report to: `GET /api/flywheel/status` is a derived read of your transcript,
+  and the tick marker is how you report. The derived state table above is the
+  only source of truth for an issue's position.
 
 ## See Also
 
