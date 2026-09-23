@@ -101,18 +101,20 @@
           "requiresInspection": false,
           "inspectionDepth": "fast",
           "files_scope": [
-            "packages/contracts/src/flywheel.ts",
+            "packages/contracts/src/flywheel-derived.ts",
+            "packages/contracts/src/flywheel-stats.ts",
             "packages/contracts/src/index.ts",
-            "packages/contracts/src/flywheel.test.ts"
+            "packages/contracts/src/flywheel-derived.test.ts",
+            "packages/contracts/src/flywheel-stats.test.ts"
           ],
           "files_scope_confidence": "high",
           "verify_commands": [
             "bun run --cwd packages/contracts build",
-            "npx vitest run packages/contracts/src/flywheel.test.ts"
+            "npx vitest run packages/contracts/src/flywheel-derived.test.ts packages/contracts/src/flywheel-stats.test.ts"
           ],
           "expected_outputs": [
             "contracts build completes without errors",
-            "flywheel.test.ts passes decoding one status and one stats fixture"
+            "flywheel-derived.test.ts and flywheel-stats.test.ts pass decoding a status and a stats fixture"
           ],
           "readiness": "ready",
           "traces": [

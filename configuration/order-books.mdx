@@ -139,7 +139,7 @@ pan flywheel start --orders 2026-07-18-refactor-p3-remainder
 
 `queue` is the CLI form of the dashboard's **Queue book** action — it moves a draft to `ready` so the Flywheel can pick the book up from the ready queue. It refuses a book that is not a draft rather than re-queueing a running or completed campaign.
 
-Both start commands open the one `conv-flywheel` conversation with the book named in its `/pan-flywheel` prompt (`pan flywheel start --orders <id>` is the direct form). A flywheel that is already running keeps running; a paused one must be resumed (`pan flywheel resume`) or replaced (`pan flywheel start --fresh`).
+`pan orders start <id>` and `pan flywheel start --orders <id>` both open the one `conv-flywheel` conversation with the book named in its `/pan-flywheel` prompt. They differ when a flywheel is already running: `pan orders start` leaves it running and returns without naming the new book to it, while `pan flywheel start --orders` refuses with "already running" (`pan flywheel stop` first). A paused flywheel makes both refuse; resume it (`pan flywheel resume`) or replace it (`pan flywheel start --fresh --orders <id>`).
 
 ### Work on another project's books
 
