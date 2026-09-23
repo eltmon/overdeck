@@ -18,6 +18,14 @@
  * Anything less (release-only, docs, schedule or dispatch workflows, or a test
  * job named something the matcher misses) keeps the local test gate: dropping
  * it would leave no test run anywhere (review of #3993).
+ *
+ * Detection reads `on.pull_request.branches` / `branches-ignore` against the
+ * project's PR base branch and skips a job whose `if:` plainly cannot run on a
+ * pull request (it tests `github.event_name` without naming `pull_request`,
+ * or pins `github.ref` to a branch or tag). It does not evaluate `paths`
+ * filters or other `if:` expressions, and it does not look inside a reusable
+ * workflow: a `uses:` job named `test` counts, and its checks
+ * (`test / <inner job>`) match the test-check matcher.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
@@ -68,12 +76,13 @@ function defaultReadWorkflowFiles(dir: string): WorkflowFile[] {
 
 /**
  * True when a CI check name is the project's test job: a check named
- * `test`/`tests`, optionally with a matrix suffix (`test (22)`) or a
- * `test-`/`test:` qualifier. `Clean install + server smoke test` is not it.
+ * `test`/`tests`, optionally with a matrix suffix (`test (22)`), a
+ * `test-`/`test:` qualifier, or a reusable workflow's `test / <inner job>`.
+ * `Clean install + server smoke test` is not it.
  */
 export function isCiTestCheckName(name: string | null | undefined): boolean {
   if (!name) return false;
-  return /^tests?(?:\s*\(.*\)|[-_:].*)?$/i.test(name.trim());
+  return /^tests?(?:\s*\(.*\)|[-_:].*|\s+\/\s+.*)?$/i.test(name.trim());
 }
 
 /** A GitHub Actions branch-filter glob as a RegExp (`*` stays inside one path segment). */
@@ -96,6 +105,18 @@ function branchGlobToRegExp(glob: string): RegExp {
 /** Any `feature/<issue>` branch: the branch a work agent pushes. */
 const SAMPLE_FEATURE_BRANCH = 'feature/pan-1';
 
+/** True when a `branches` / `branches-ignore` filter admits `branch`. */
+function branchFilterAdmits(filters: Record<string, unknown>, branch: string): boolean {
+  if ('branches' in filters) {
+    return asStringList(filters.branches)
+      .some((pattern) => !pattern.startsWith('!') && branchGlobToRegExp(pattern).test(branch));
+  }
+  if ('branches-ignore' in filters) {
+    return !asStringList(filters['branches-ignore']).some((pattern) => branchGlobToRegExp(pattern).test(branch));
+  }
+  return true;
+}
+
 function asStringList(value: unknown): string[] {
   if (typeof value === 'string') return [value];
   return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
@@ -106,29 +127,41 @@ function pushRunsOnFeatureBranches(push: unknown): boolean {
   if (push === null || push === undefined) return true;
   if (typeof push !== 'object') return false;
   const filters = push as Record<string, unknown>;
-  if ('branches' in filters) {
-    return asStringList(filters.branches)
-      .some((pattern) => !pattern.startsWith('!') && branchGlobToRegExp(pattern).test(SAMPLE_FEATURE_BRANCH));
-  }
-  if ('branches-ignore' in filters) {
-    return !asStringList(filters['branches-ignore'])
-      .some((pattern) => branchGlobToRegExp(pattern).test(SAMPLE_FEATURE_BRANCH));
-  }
+  if ('branches' in filters || 'branches-ignore' in filters) return branchFilterAdmits(filters, SAMPLE_FEATURE_BRANCH);
   // A tags-only push filter never fires for a branch push.
   return !('tags' in filters) && !('tags-ignore' in filters);
 }
 
+/** True when a `pull_request` trigger fires for a PR into `baseBranch`. */
+function pullRequestRunsOnBase(trigger: unknown, baseBranch: string): boolean {
+  if (trigger === null || trigger === undefined) return true;
+  if (typeof trigger !== 'object') return false;
+  return branchFilterAdmits(trigger as Record<string, unknown>, baseBranch);
+}
+
+/** False when a job's `if:` plainly cannot hold for a pull request. */
+function jobCanRunOnPullRequests(job: Record<string, unknown>): boolean {
+  const condition = job.if;
+  if (typeof condition !== 'string') return true;
+  if (/github\.event_name/.test(condition) && !/pull_request/.test(condition)) return false;
+  if (/github\.ref\s*==\s*['"]refs\/(?:heads|tags)\//.test(condition)) return false;
+  if (/startsWith\(\s*github\.ref\s*,\s*['"]refs\/tags\//.test(condition)) return false;
+  return true;
+}
+
 const PULL_REQUEST_EVENTS = new Set(['pull_request', 'pull_request_target']);
 
-/** True when a workflow's `on:` runs it for a feature branch's pull request. */
-function triggersOnPullRequests(on: unknown): boolean {
+/** True when a workflow's `on:` runs it for a feature branch's pull request into `baseBranch`. */
+function triggersOnPullRequests(on: unknown, baseBranch: string): boolean {
   if (typeof on === 'string') return PULL_REQUEST_EVENTS.has(on) || on === 'push';
   if (Array.isArray(on)) {
     return on.some((event) => typeof event === 'string' && (PULL_REQUEST_EVENTS.has(event) || event === 'push'));
   }
   if (!on || typeof on !== 'object') return false;
   const events = on as Record<string, unknown>;
-  if (Object.keys(events).some((event) => PULL_REQUEST_EVENTS.has(event))) return true;
+  const onPullRequest = Object.entries(events)
+    .some(([event, trigger]) => PULL_REQUEST_EVENTS.has(event) && pullRequestRunsOnBase(trigger, baseBranch));
+  if (onPullRequest) return true;
   return 'push' in events && pushRunsOnFeatureBranches(events.push);
 }
 
@@ -136,7 +169,7 @@ function triggersOnPullRequests(on: unknown): boolean {
  * The check name of the test job this workflow runs on pull requests, or null.
  * A job's check name is its `name:` when set, else its id.
  */
-export function findPullRequestTestJob(workflowYaml: string): string | null {
+export function findPullRequestTestJob(workflowYaml: string, baseBranch = 'main'): string | null {
   let doc: unknown;
   try {
     doc = yaml.load(workflowYaml);
@@ -147,11 +180,13 @@ export function findPullRequestTestJob(workflowYaml: string): string | null {
   const workflow = doc as Record<string, unknown>;
   // A YAML 1.1 reader keys a bare `on:` as boolean true.
   const on = 'on' in workflow ? workflow.on : workflow['true'];
-  if (!triggersOnPullRequests(on)) return null;
+  if (!triggersOnPullRequests(on, baseBranch)) return null;
   const jobs = workflow.jobs;
   if (!jobs || typeof jobs !== 'object') return null;
   for (const [id, job] of Object.entries(jobs as Record<string, unknown>)) {
-    const named = job && typeof job === 'object' ? (job as Record<string, unknown>).name : undefined;
+    const spec = job && typeof job === 'object' ? (job as Record<string, unknown>) : {};
+    if (!jobCanRunOnPullRequests(spec)) continue;
+    const named = spec.name;
     const checkName = typeof named === 'string' && named.trim().length > 0 ? named : id;
     if (isCiTestCheckName(checkName)) return checkName;
   }
@@ -166,6 +201,11 @@ export type GitHubActionsTestJob =
  * Where the project's pull requests run a test job on GitHub Actions: the
  * workflow file and job, or why none qualifies.
  */
+/** The branch the project's PRs target. */
+function prBaseBranch(project: Pick<ProjectConfig, 'workspace'>): string {
+  return project.workspace?.pr_target ?? project.workspace?.default_branch ?? 'main';
+}
+
 export function detectGitHubActionsTestJobSync(
   project: Pick<ProjectConfig, 'github_repo' | 'path' | 'workspace'>,
   deps: VerificationTestsModeDeps = {},
@@ -179,12 +219,13 @@ export function detectGitHubActionsTestJobSync(
       .filter((repo) => typeof repo.path === 'string' && repo.path.length > 0)
       .map((repo) => (isAbsolute(repo.path) ? repo.path : join(project.path, repo.path))),
   ];
+  const baseBranch = prBaseBranch(project);
   let sawWorkflow = false;
   for (const root of roots) {
     const dir = join(root, '.github', 'workflows');
     for (const file of readWorkflows(dir)) {
       sawWorkflow = true;
-      const job = findPullRequestTestJob(file.content);
+      const job = findPullRequestTestJob(file.content, baseBranch);
       if (job) return { found: true, workflow: relative(project.path, join(dir, file.name)), job };
     }
   }

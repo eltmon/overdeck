@@ -43,7 +43,8 @@ import {
   VERIFICATION_MAX_CYCLES,
 } from './verification-cycles.js';
 import { buildFinalFailureInstructions } from './verification-feedback.js';
-import { isCiTestCheckName, resolveVerificationTestsMode, TEST_GATE_NAME } from './verification-tests-mode.js';
+import { readDefaultBranchFailingTestChecks } from './ci-default-branch-tests.js';
+import { resolveVerificationTestsMode, TEST_GATE_NAME } from './verification-tests-mode.js';
 
 function execFilePromise(
   file: string,
@@ -94,16 +95,21 @@ export interface CiFailureFeedbackResult {
 interface CiTestGateFailure {
   cycleCount: number;
   escalate: boolean;
+  /** The workspace the record goes to; absent when it no longer exists. */
+  workspacePath?: string;
 }
 
 export interface CiFailureFeedbackDeps {
   /** Fresh forge read of the PR; defaults to an uncached `getPrFacts`. */
   readPrFacts?: (issueId: string) => Promise<PrFacts>;
   /**
-   * Names of the test checks failing on the default branch's head commit
-   * (`owner/repo`); defaults to a `gh api` read of its check runs.
+   * Names of the test checks failing on the newest default-branch commit whose
+   * test checks finished (`owner/repo`); null when unknown. Defaults to
+   * `ci-default-branch-tests.ts`.
    */
-  readDefaultBranchFailingTestChecks?: (repo: string) => Promise<ReadonlySet<string>>;
+  readDefaultBranchFailingTestChecks?: (repo: string) => Promise<ReadonlySet<string> | null>;
+  /** Surface a needs-you row; defaults to `feedback-target.ts`. */
+  surfaceNeedsYou?: (issueId: string, reason: string, details: Record<string, unknown>) => Promise<void>;
 }
 
 /** Per-issue head SHA we last sent CI failure feedback for. */
@@ -150,34 +156,6 @@ function isFeatureHead(headRef: string | undefined): boolean {
  */
 const COUNTED_TEST_CONCLUSIONS = new Set(['FAILURE', 'ERROR']);
 
-/** Default-branch conclusions that mean the check is broken there too. */
-const DEFAULT_BRANCH_FAILING_CONCLUSIONS = new Set(['failure', 'timed_out']);
-
-/** The test checks failing on the default branch's head commit; empty when unknown. */
-async function readDefaultBranchFailingTestChecks(repo: string): Promise<ReadonlySet<string>> {
-  try {
-    const { stdout } = await execFilePromise(
-      'gh',
-      [
-        'api', `repos/${repo}/commits/HEAD/check-runs?per_page=100`,
-        '--jq', '[.check_runs[] | {name, status, conclusion}]',
-      ],
-      { encoding: 'utf-8', timeout: 30000 },
-    );
-    const runs = JSON.parse(stdout) as Array<{ name?: string; status?: string; conclusion?: string | null }>;
-    return new Set(runs
-      .filter((run) => run.status === 'completed'
-        && DEFAULT_BRANCH_FAILING_CONCLUSIONS.has((run.conclusion ?? '').toLowerCase())
-        && isCiTestCheckName(run.name))
-      .map((run) => run.name!));
-  } catch (err) {
-    console.warn(
-      `[ci-failure-feedback] Could not read the default branch's checks for ${repo}: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    return new Set();
-  }
-}
-
 /**
  * Why a red test job on this head does not use an attempt, or null when it
  * does. `testCheckFailures` absent (no per-check detail) counts, as before.
@@ -193,6 +171,9 @@ async function uncountedTestFailureReason(
     return `only infrastructure conclusions (${failures.map((c) => `${c.name}: ${c.conclusion}`).join(', ')})`;
   }
   const onDefaultBranch = await (deps.readDefaultBranchFailingTestChecks ?? readDefaultBranchFailingTestChecks)(repo);
+  // Review of #4017: while the default branch's tests are still running (or
+  // unreadable) nobody can say the failure is this PR's; spend no attempt.
+  if (onDefaultBranch === null) return 'the default branch\'s test verdict is unknown (no finished test run)';
   if (counted.every((check) => onDefaultBranch.has(check.name))) {
     return `inherited from the default branch (${counted.map((c) => c.name).join(', ')} failing there too)`;
   }
@@ -229,8 +210,11 @@ function isCiTestsProject(projectPath: string | undefined): boolean {
 
 /**
  * PAN-3965: when the project's tests run on CI and the PR head's test job is
- * red, record the verification test-gate failure: a per-run artifact
- * (`via: 'ci'`), the attempt count, and the journal entry.
+ * red, assess the verification test-gate failure: the attempt count and
+ * whether it exhausts the budget. Nothing is written here; the relay records
+ * it ({@link recordCiTestGateFailure}) once its feedback file exists, so a
+ * failure to write the feedback leaves the head unrecorded and a later report
+ * retries it (review of #4017).
  *
  * The count is the larger of the local per-head count (verification-cycles:
  * failed runs at this head, local or CI) and the run of consecutive red CI
@@ -242,7 +226,7 @@ function isCiTestsProject(projectPath: string | undefined): boolean {
  * branch), `repeat` when this head's failure was already recorded (duplicate
  * webhooks, a restart). Callers hold the issue's relay queue.
  */
-async function recordCiTestGateFailure(
+async function assessCiTestGateFailure(
   issueId: string,
   opts: CiFailureFeedbackOptions,
   projectPath: string | undefined,
@@ -274,7 +258,6 @@ async function recordCiTestGateFailure(
     return null;
   }
 
-  lastJournaledTestFailureSha.set(issueId, opts.headSha);
   // The journal and the attempt record die with the workspace; never recreate it.
   if (!hasWorkspace) return { cycleCount: 1, escalate: false };
 
@@ -285,11 +268,27 @@ async function recordCiTestGateFailure(
   const cycleCount = Math.max(perHeadCount, streakCount);
   const escalate = isFinalVerificationAttempt(streakCount)
     || shouldEscalateVerificationFailure(perHead, TEST_GATE_NAME, perHeadCount);
+  return { cycleCount, escalate, workspacePath: workspacePath! };
+}
 
+/**
+ * Record an assessed CI test-gate failure: the in-process memo, a per-run
+ * artifact (`via: 'ci'`) and the `verification.failed` journal entry. From
+ * here on, this head is a `repeat`.
+ */
+function recordCiTestGateFailure(
+  issueId: string,
+  opts: CiFailureFeedbackOptions,
+  counted: CiTestGateFailure,
+): void {
+  lastJournaledTestFailureSha.set(issueId, opts.headSha);
+  const { workspacePath, cycleCount } = counted;
+  if (!workspacePath) return;
+  const head8 = opts.headSha.slice(0, 8);
   // Review of #3993: like the pass below, a CI result is a per-run record
   // only; verification-latest.json stays the local gate run's record.
   try {
-    writeVerificationArtifact(workspacePath!, issueId, [{
+    writeVerificationArtifact(workspacePath, issueId, [{
       name: TEST_GATE_NAME,
       passed: false,
       required: true,
@@ -301,7 +300,7 @@ async function recordCiTestGateFailure(
       `[ci-failure-feedback] Could not record the CI test failure for ${issueId}: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
-  appendPipelineEntry(workspacePath!, {
+  appendPipelineEntry(workspacePath, {
     type: 'verification.failed',
     issueId,
     source: `ci:${opts.source}`,
@@ -313,7 +312,26 @@ async function recordCiTestGateFailure(
       prNumber: opts.prNumber,
     },
   });
-  return { cycleCount, escalate };
+}
+
+async function surfaceNeedsYou(
+  issueId: string,
+  reason: string,
+  details: Record<string, unknown>,
+  deps: CiFailureFeedbackDeps,
+): Promise<void> {
+  try {
+    if (deps.surfaceNeedsYou) {
+      await deps.surfaceNeedsYou(issueId, reason, details);
+      return;
+    }
+    const { surfaceIssueFeedbackNeedsYou } = await import('./feedback-target.js');
+    await surfaceIssueFeedbackNeedsYou(issueId, reason, details);
+  } catch (err) {
+    console.warn(
+      `[ci-failure-feedback] Could not surface needs-you for ${issueId}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 }
 
 /**
@@ -525,6 +543,7 @@ async function deliverCiTestGateFeedback(
   opts: CiFailureFeedbackOptions,
   feedbackPath: string,
   counted: CiTestGateFailure,
+  deps: CiFailureFeedbackDeps,
 ): Promise<boolean> {
   // Lazy: the delivery door pulls in the terminal backend and agent liveness.
   const {
@@ -555,6 +574,10 @@ async function deliverCiTestGateFeedback(
     console.warn(
       `[ci-failure-feedback] Could not deliver the CI test failure for ${issueId}: ${err instanceof Error ? err.message : String(err)}`,
     );
+    // The head is recorded, so no later report re-delivers it: say so now.
+    await surfaceNeedsYou(issueId, `CI test failure feedback for ${head8} was not delivered: ${err instanceof Error ? err.message : String(err)}`, {
+      specialist: 'verification-gate', failedCheck: TEST_GATE_NAME, feedbackPath, via: 'ci',
+    }, deps);
     return false;
   }
 }
@@ -570,7 +593,7 @@ async function relayCiFailureFeedbackPromise(
   // PAN-3965: record a CI test-gate failure whether or not an agent is live —
   // the journal and the attempt count record what happened to the PR, not who
   // was told.
-  const gate = await recordCiTestGateFailure(issueId, opts, projectPath, workspacePath, deps);
+  const gate = await assessCiTestGateFailure(issueId, opts, projectPath, workspacePath, deps);
   if (gate === 'repeat') {
     // Review of #3993: the per-run record says this head was counted and its
     // feedback sent. A replay (duplicate webhook, a restart) delivers nothing:
@@ -653,11 +676,20 @@ async function relayCiFailureFeedbackPromise(
 
   if (!fileResult.success || !fileResult.filePath) {
     console.error(`[ci-failure-feedback] Failed to write feedback for ${issueId}: ${fileResult.error}`);
+    if (counted) {
+      // Review of #4017: nothing is recorded yet, so the next report for this
+      // head retries the count and the delivery. Until then, a person knows.
+      await surfaceNeedsYou(issueId, `CI test failure on ${opts.headSha.slice(0, 8)}: could not write the feedback file (${fileResult.error ?? 'unknown error'})`, {
+        specialist: 'verification-gate', failedCheck: TEST_GATE_NAME, via: 'ci',
+      }, deps);
+      return { agentMessageSent: false };
+    }
     return { agentMessageSent: false, ...testGateFlag };
   }
 
   if (counted) {
-    const agentMessageSent = await deliverCiTestGateFeedback(issueId, opts, fileResult.filePath, counted);
+    recordCiTestGateFailure(issueId, opts, counted);
+    const agentMessageSent = await deliverCiTestGateFeedback(issueId, opts, fileResult.filePath, counted, deps);
     lastNotifiedSha.set(issueId, opts.headSha);
     return { feedbackPath: fileResult.filePath, agentMessageSent, ...testGateFlag };
   }

@@ -47,13 +47,23 @@ the **CI test job on the PR head is the test gate**:
   plain CI FAILED message, which reaches only a live work agent); a test job
   whose failing checks all ended `CANCELLED`, `TIMED_OUT`, `STARTUP_FAILURE`,
   `STALE` or `ACTION_REQUIRED` (only `FAILURE`/`ERROR` are verdicts on the
-  code); and a test job whose failing checks are all failing on the default
-  branch's head commit too (inherited from a red `main`). Relays for one issue
+  code); a test job whose failing checks are all failing on the default
+  branch too (inherited from a red `main`); and a failure while the default
+  branch's test verdict is unknown. The default branch's verdict is its newest
+  commit (of the last 10) whose test checks all finished decisively: main's CI
+  is often still running on HEAD, and a cancelled run says nothing
+  (`cloister/ci-default-branch-tests.ts`). When no such commit exists, or the
+  forge cannot be read, the failure is not counted; the plain CI FAILED
+  message still reaches a live work agent. Relays for one issue
   run one at a time, so concurrent webhooks for one red head (the shards of a
   matrix, the aggregate job, `check_suite`) count it once. A report for a head
   already recorded (a duplicate webhook, a replay after a restart) is never
   re-delivered: the per-run record is the idempotency key, so a replay cannot
-  re-open rework past the budget or lift a stuck pause. CI results are per-run
+  re-open rework past the budget or lift a stuck pause. The record is written
+  only once the feedback file exists (review of #4017): if that write fails,
+  the head stays unrecorded (the next report retries it) and a needs-you row
+  says so; a delivery door that throws after the record also surfaces
+  needs-you. CI results are per-run
   records only; `verification-latest.json` stays the local gate run's record.
   Re-requesting review on a head whose CI test job is already red fails the
   `test` gate again instead of passing on typecheck+lint alone.
@@ -73,7 +83,13 @@ Unset, the mode is `ci` only when the project has a `github_repo` and a
 GitHub Actions workflow (in the project root or a polyrepo member) that runs on
 `pull_request`/`pull_request_target` (or on `push` for feature branches) and
 defines a job whose check name the test matcher recognizes (`test`, `tests`,
-`test-*`, `test (…)`: its `name:`, else its id). Otherwise the mode is `local`:
+`test-*`, `test (…)`, or a reusable workflow's `test / <inner job>`: its
+`name:`, else its id). A `pull_request` `branches`/`branches-ignore` filter is
+read against the project's PR base branch (`pr_target`, else
+`default_branch`, else `main`), and a job whose `if:` plainly cannot run on a
+PR (it tests `github.event_name` without `pull_request`, or pins `github.ref`)
+is skipped. `paths` filters, other `if:` expressions and the inside of a
+reusable workflow are not evaluated. Otherwise the mode is `local`:
 release-only, docs, schedule or dispatch workflows, or a test job named
 something the matcher misses, would otherwise drop the local test gate for a
 CI job that never runs. `local` keeps the `test` gate on the host exactly as

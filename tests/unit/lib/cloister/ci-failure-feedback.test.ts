@@ -709,6 +709,99 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
     expect(mockMessageAgent).toHaveBeenCalledWith('agent-pan-1801', expect.stringContaining('SPECIALIST FEEDBACK'), 'internal', {});
   });
 
+  it('does not count while the default branch\'s test verdict is unknown (review of #4017)', async () => {
+    makeGhMocks();
+    const readPrFacts = vi.fn(async () => facts({
+      checks: 'red',
+      testChecks: 'red',
+      testCheckFailures: [{ name: 'test-shard (1/4)', conclusion: 'FAILURE' }],
+    }));
+    const readDefaultBranchFailingTestChecks = vi.fn(async () => null);
+
+    const result = await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts, readDefaultBranchFailingTestChecks }));
+
+    expect(result.testGateFailed).toBeUndefined();
+    expect(failedEntries()).toEqual([]);
+    expect(runArtifacts()).toEqual([]);
+    expect(mockEscalate).not.toHaveBeenCalled();
+    // The failure is still reported, as a plain CI FAILED message.
+    expect(mockMessageAgent).toHaveBeenCalledWith('agent-pan-1801', expect.stringContaining('SPECIALIST FEEDBACK'), 'internal', {});
+  });
+
+  it('reads main\'s newest finished test run, not a HEAD still in progress (review of #4017)', async () => {
+    // HEAD's shards are still running; the commit before it finished with shard 1 red.
+    (execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(makeExecFileMock([
+      { cmd: 'gh', args: ['api', 'repos/test-owner/test-repo/commits?per_page=10'], stdout: JSON.stringify(['main-head', 'main-prev']) },
+      {
+        cmd: 'gh',
+        args: ['api', 'repos/test-owner/test-repo/commits/main-head/check-runs'],
+        stdout: JSON.stringify([
+          { name: 'test-shard (1/4)', status: 'in_progress', conclusion: null },
+          { name: 'lint', status: 'completed', conclusion: 'success' },
+        ]),
+      },
+      {
+        cmd: 'gh',
+        args: ['api', 'repos/test-owner/test-repo/commits/main-prev/check-runs'],
+        stdout: JSON.stringify([
+          { name: 'test-shard (1/4)', status: 'completed', conclusion: 'failure' },
+          { name: 'test-shard (2/4)', status: 'completed', conclusion: 'success' },
+        ]),
+      },
+      { cmd: 'gh', args: ['run', 'list', '--repo', 'test-owner/test-repo', '--branch', 'main'], stdout: '[]' },
+      { cmd: 'gh', args: ['run', 'list', '--repo', 'test-owner/test-repo', '--branch', 'feature/pan-1801'], stdout: '[]' },
+    ]));
+    const readPrFacts = vi.fn(async () => facts({
+      checks: 'red',
+      testChecks: 'red',
+      testCheckFailures: [{ name: 'test-shard (1/4)', conclusion: 'FAILURE' }],
+    }));
+
+    const result = await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts }));
+
+    expect(result.testGateFailed).toBeUndefined();
+    expect(failedEntries()).toEqual([]);
+    expect(mockEscalate).not.toHaveBeenCalled();
+  });
+
+  it('a feedback-file write failure records nothing, surfaces needs-you, and the next report retries (review of #4017)', async () => {
+    const surfaceNeedsYou = vi.fn(async () => undefined);
+    mockWriteFeedbackFile.mockReturnValueOnce(Effect.succeed({ success: false, error: 'EACCES' }));
+    tick();
+    makeGhMocksForHead('abc123def456');
+    const readPrFacts = vi.fn(async () => facts({ checks: 'red', testChecks: 'red' }));
+
+    const failed = await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts, surfaceNeedsYou }));
+
+    expect(failed).toEqual({ agentMessageSent: false });
+    expect(surfaceNeedsYou).toHaveBeenCalledWith('PAN-1801', expect.stringContaining('could not write the feedback file (EACCES)'), expect.objectContaining({ failedCheck: 'test' }));
+    expect(failedEntries()).toEqual([]);
+    expect(runArtifacts()).toEqual([]);
+    expect(mockDeliverVerificationFeedback).not.toHaveBeenCalled();
+
+    // A restart in between changes nothing: there is no record to replay.
+    resetCiFailureFeedbackStateForTests();
+    const retried = await Effect.runPromise(relayCiFailureFeedback({ ...relayOpts, source: 'check_suite' }, { readPrFacts, surfaceNeedsYou }));
+
+    expect(retried).toMatchObject({ testGateFailed: true, cycleCount: 1, agentMessageSent: true });
+    expect(failedEntries()).toHaveLength(1);
+    expect(runArtifacts()).toHaveLength(1);
+    expect(mockDeliverVerificationFeedback).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces needs-you when the feedback door throws after the head was recorded (review of #4017)', async () => {
+    const surfaceNeedsYou = vi.fn(async () => undefined);
+    mockDeliverVerificationFeedback.mockRejectedValueOnce(new Error('forge unreachable'));
+    tick();
+    makeGhMocksForHead('abc123def456');
+    const readPrFacts = vi.fn(async () => facts({ checks: 'red', testChecks: 'red' }));
+
+    const result = await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts, surfaceNeedsYou }));
+
+    expect(result).toMatchObject({ testGateFailed: true, agentMessageSent: false });
+    expect(surfaceNeedsYou).toHaveBeenCalledWith('PAN-1801', expect.stringContaining('was not delivered: forge unreachable'), expect.anything());
+  });
+
   it('counts a test failure the default branch does not share (review of #3993, M3)', async () => {
     tick();
     makeGhMocksForHead('abc123def456');

@@ -344,6 +344,29 @@ describe('findPullRequestTestJob', () => {
     expect(findPullRequestTestJob('on:\n  push:\n    branches-ignore: [main]\njobs:\n  test: {}\n')).toBe('test');
   });
 
+  it('counts a reusable-workflow test job, whose checks are named "test / <inner>" (review of #4017)', () => {
+    expect(findPullRequestTestJob('on: pull_request\njobs:\n  test:\n    uses: ./.github/workflows/tests.yml\n')).toBe('test');
+    expect(isCiTestCheckName('test / vitest')).toBe(true);
+    expect(isCiTestCheckName('lint / test')).toBe(false);
+  });
+
+  it('honors pull_request branch filters against the PR base branch (review of #4017)', () => {
+    const releaseOnly = 'on:\n  pull_request:\n    branches: ["release/*"]\njobs:\n  test: {}\n';
+    expect(findPullRequestTestJob(releaseOnly)).toBeNull();
+    expect(findPullRequestTestJob(releaseOnly, 'release/2026')).toBe('test');
+    expect(findPullRequestTestJob('on:\n  pull_request:\n    branches-ignore: [main]\njobs:\n  test: {}\n')).toBeNull();
+    expect(findPullRequestTestJob('on:\n  pull_request:\n    branches: [main, develop]\njobs:\n  test: {}\n')).toBe('test');
+  });
+
+  it('skips a test job whose if: cannot run on a pull request (review of #4017)', () => {
+    const pushOnly = "on: [push, pull_request]\njobs:\n  test:\n    if: github.event_name == 'push'\n";
+    const mainOnly = "on: pull_request\njobs:\n  test:\n    if: github.ref == 'refs/heads/main'\n";
+    const prAllowed = "on: pull_request\njobs:\n  test:\n    if: github.event_name == 'pull_request' || github.event_name == 'push'\n";
+    expect(findPullRequestTestJob(pushOnly)).toBeNull();
+    expect(findPullRequestTestJob(mainOnly)).toBeNull();
+    expect(findPullRequestTestJob(prAllowed)).toBe('test');
+  });
+
   it('ignores pushes the feature branch never makes, and non-test jobs', () => {
     expect(findPullRequestTestJob('on:\n  push:\n    branches: [main]\njobs:\n  test: {}\n')).toBeNull();
     expect(findPullRequestTestJob('on:\n  push:\n    tags: ["v*"]\njobs:\n  test: {}\n')).toBeNull();

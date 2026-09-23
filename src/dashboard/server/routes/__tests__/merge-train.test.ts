@@ -123,6 +123,12 @@ vi.mock('../../../../lib/flywheel-merge-order.js', () => mergeOrderMocks);
 vi.mock('../../../../lib/overdeck/merge-sync.js', () => mergeSyncMocks);
 vi.mock('../../services/uat-train.js', () => uatTrainMocks);
 vi.mock('../../../../lib/cloister/merge-batch.js', () => mergeBatchMocks);
+// Review of #4017: a lone queued feature's UAT hold is read per issue (labels).
+const mockIssueHoldsForUat = vi.hoisted(() => vi.fn(async () => false));
+vi.mock('../../../../lib/cloister/auto-merge-eligibility.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../../lib/cloister/auto-merge-eligibility.js')>(),
+  issueHoldsForUat: mockIssueHoldsForUat,
+}));
 vi.mock('../specialists.js', () => ({ firePostMergeLifecycle: vi.fn(() => true) }));
 
 const {
@@ -250,6 +256,22 @@ describe('PAN-1696 merge-train-routes', () => {
       ]);
       const entries = await getMergeTrainQueuesPayload();
       expect(entries.find((e) => e.projectKey === 'overdeck')?.holdsForUat).toBe(false);
+      expect(entries.find((e) => e.projectKey === 'myn')?.holdsForUat).toBe(true);
+    });
+
+    it('reports a lone queued feature\'s own UAT hold: its label beats an auto project (review of #4017)', async () => {
+      projectsMocks.listProjectsSync.mockReturnValue([
+        { key: 'myn', config: { ...MYN, auto_merge_default: 'auto' } },
+      ]);
+      mergeOrderMocks.listEligibleCandidatesByProject.mockImplementation(() => [{ issueId: 'MIN-831', title: 'MIN-831' }]);
+      mergeOrderMocks.computeMergeQueueFromCandidates.mockImplementation((candidates: readonly { issueId: string }[]) =>
+        Effect.succeed(candidates.map((c, i) => ({ issueId: c.issueId, title: c.issueId, mergeOrder: i }))),
+      );
+      mockIssueHoldsForUat.mockResolvedValueOnce(true);
+
+      const entries = await getMergeTrainQueuesPayload();
+
+      expect(mockIssueHoldsForUat).toHaveBeenCalledWith('MIN-831', expect.objectContaining({ auto_merge_default: 'auto' }), expect.any(Boolean));
       expect(entries.find((e) => e.projectKey === 'myn')?.holdsForUat).toBe(true);
     });
 

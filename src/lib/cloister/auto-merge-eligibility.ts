@@ -14,6 +14,10 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
+import { Effect } from 'effect';
+
+import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
+import type { TrackerType } from '../tracker/interface.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { getProjectAutoMergeDefault, projectAutoMergeDefault, shouldHoldForUat } from './auto-merge-policy.js';
 import { evaluateMergeReadiness, getPrFacts, type PrFacts } from './pr-facts.js';
@@ -42,9 +46,23 @@ export function autoMergeFromLabels(labels: readonly string[]): boolean | undefi
   return undefined;
 }
 
+/**
+ * The issue's labels from its own tracker (review of #4017). A project whose
+ * tracker is not GitHub (Linear, GitLab, Rally) may still have a `github_repo`
+ * for its code; reading `<github_repo>#<n>` there would read an unrelated
+ * GitHub issue, so a non-GitHub tracker is asked through its tracker client,
+ * and a GitHub lookup must resolve to the project's own `github_repo`.
+ */
 async function defaultGetIssueLabels(issueId: string): Promise<string[]> {
+  const project = resolveProjectFromIssueSync(issueId);
+  const config = project ? getProjectSync(project.projectKey) : null;
+  if (config?.tracker && config.tracker !== 'github') return readTrackerIssueLabels(issueId, config.tracker);
+
   const resolved = resolveGitHubIssueSync(issueId);
   if (!resolved.isGitHub) return [];
+  if (config?.github_repo && `${resolved.owner}/${resolved.repo}`.toLowerCase() !== config.github_repo.toLowerCase()) {
+    return [];
+  }
 
   const { stdout } = await execFileAsync('gh', [
     'issue',
@@ -59,6 +77,18 @@ async function defaultGetIssueLabels(issueId: string): Promise<string[]> {
   ], { encoding: 'utf-8' });
 
   return stdout.trim().split('\n').filter(Boolean);
+}
+
+/** Labels read through the configured tracker client; [] when it is not configured. */
+async function readTrackerIssueLabels(issueId: string, tracker: TrackerType): Promise<string[]> {
+  const [{ loadConfigSync }, { createTrackerFromConfig }] = await Promise.all([
+    import('../config.js'),
+    import('../tracker/factory.js'),
+  ]);
+  const trackers = loadConfigSync().trackers;
+  if (!trackers?.[tracker]) return [];
+  const issue = await Effect.runPromise(createTrackerFromConfig(trackers, tracker).getIssue(issueId));
+  return [...(issue.labels ?? [])];
 }
 
 async function defaultIsGlobalUatRequired(): Promise<boolean> {
