@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-23T11:02:39.314Z · model: claude-opus-5 · open: 851_
+_Last sequenced: 2026-09-23T12:20:22.518Z · model: claude-opus-5 · open: 850_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -67,7 +67,6 @@ _Last sequenced: 2026-09-23T11:02:39.314Z · model: claude-opus-5 · open: 851_
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
-| 70 | PAN-3964 | L | high | ok |  |  | Restore the Flywheel page as a derived view (cut by PAN-3917 FR-13 against operator intent); no stored run record |
 | 71 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
 | 72 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
 | 73 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
@@ -1107,10 +1106,6 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
 
 New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.
 
-### PAN-3964 (rank 70)
-
-Operator: "I didn't want it cut." Every v1 affordance gets a home derived from the flywheel conversation, .pan/ files, the pipeline journal and merge-train endpoints; no new SQLite table. Larger UI work; ranked below the pipeline breakers.
-
 ### PAN-3557 (rank 71)
 
 New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
@@ -1179,6 +1174,10 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
 
 Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (502) after pan reload.
 
+### PAN-2935 (rank 88)
+
+Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of API calls 504 in real MYN workspaces.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1186,10 +1185,10 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-23T11:02:39.314Z",
+  "generatedAt": "2026-09-23T12:20:22.518Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 851,
+  "openCount": 850,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -2000,19 +1999,6 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       "dependsOn": [],
       "why": "Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin.",
       "rationale": "New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3964",
-      "rank": 70,
-      "size": "L",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Restore the Flywheel page as a derived view (cut by PAN-3917 FR-13 against operator intent); no stored run record",
-      "rationale": "Operator: \"I didn't want it cut.\" Every v1 affordance gets a home derived from the flywheel conversation, .pan/ files, the pipeline journal and merge-train endpoints; no new SQLite table. Larger UI work; ranked below the pipeline breakers.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12528,20 +12514,6 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       "confidence": 1
     },
     {
-      "from": "PAN-3964",
-      "to": "PAN-3920",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3964",
-      "to": "PAN-3940",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-3958",
       "to": "PAN-3920",
       "type": "informs",
@@ -12820,13 +12792,6 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-3920",
-      "to": "PAN-3964",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
     },
     {
       "from": "PAN-3946",
