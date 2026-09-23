@@ -135,7 +135,7 @@ export function AgentsDirectory() {
       onKeyDown={onRootKeyDown}
       className="@container h-full min-h-0 w-full"
     >
-      <div className="grid h-full min-h-0 grid-cols-[260px_minmax(0,1fr)] grid-rows-[minmax(200px,2fr)_minmax(0,3fr)] @[1100px]:grid-cols-[minmax(220px,260px)_minmax(320px,1fr)_minmax(420px,1.4fr)] @[1100px]:grid-rows-1">
+      <div className="grid h-full min-h-0 grid-cols-[260px_minmax(0,1fr)] grid-rows-[minmax(200px,2fr)_minmax(0,3fr)] @[960px]:grid-cols-[minmax(200px,240px)_minmax(300px,1fr)_minmax(400px,1.3fr)] @[960px]:grid-rows-1">
         <DirectoryTree
           ref={treeRef}
           nodes={nodes}
@@ -167,7 +167,7 @@ export function AgentsDirectory() {
           aria-label="Agent detail"
           tabIndex={0}
           onKeyDown={onDetailKeyDown}
-          className="col-span-2 min-h-0 min-w-0 overflow-hidden border-t border-border outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring @[1100px]:col-span-1 @[1100px]:border-t-0"
+          className="col-span-2 min-h-0 min-w-0 overflow-hidden border-t border-border outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring @[960px]:col-span-1 @[960px]:border-t-0"
         >
           <DirectoryDetail entry={selectedEntry} entriesById={entriesById} onSelectEntry={selectEntry} />
         </div>

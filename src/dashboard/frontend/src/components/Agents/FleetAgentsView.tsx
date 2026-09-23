@@ -440,7 +440,12 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
   const cumulativeRuntimeMs = fleetAgents
     .filter(isRunningAgent)
     .reduce((total, agent) => total + Math.max(0, now.getTime() - new Date(agent.startedAt).getTime()), 0);
-  const metaString = `${runningCount} active · ${stuckCount} stuck · ${formatDuration(cumulativeRuntimeMs)} cumulative runtime`;
+  const baseMeta = `${runningCount} active · ${stuckCount} stuck · ${formatDuration(cumulativeRuntimeMs)} cumulative runtime`;
+  // The directory has no metric tiles, so the header carries the 24h cost the
+  // grid's tiles show (same /api/costs/summary query, already fetched).
+  const metaString = viewMode === 'directory' && costSummary?.today
+    ? `${baseMeta} · ${formatCost(costSummary.today.totalCost ?? 0)} · ${formatTokens(costSummary.today.totalTokens ?? 0)} tokens 24h`
+    : baseMeta;
 
   const content = (() => {
     if (viewMode === 'directory') {

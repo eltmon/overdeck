@@ -10,6 +10,7 @@ vi.mock('./DirectoryDetail', () => ({
   DirectoryDetail: ({ entry }: { entry: DirectoryEntry | null }) => <div data-testid="detail">{entry?.id ?? 'none'}</div>,
 }));
 
+import { useDashboardStore } from '../../../lib/store';
 import { AgentsDirectory } from './AgentsDirectory';
 
 function entry(overrides: Partial<DirectoryEntry> & { id: string }): DirectoryEntry {
@@ -19,6 +20,7 @@ function entry(overrides: Partial<DirectoryEntry> & { id: string }): DirectoryEn
     location: 'local',
     projectKey: 'overdeck',
     issueId: null,
+    issueTitle: null,
     parentId: null,
     role: 'work',
     harness: 'claude-code',
@@ -34,7 +36,7 @@ function entry(overrides: Partial<DirectoryEntry> & { id: string }): DirectoryEn
 }
 
 const ENTRIES: DirectoryEntry[] = [
-  entry({ id: 'agent-pan-2', issueId: 'PAN-2', label: 'work · PAN-2', lastActivityAt: '2026-09-23T11:30:00.000Z' }),
+  entry({ id: 'agent-pan-2', issueId: 'PAN-2', issueTitle: 'Agents page as a directory', label: 'work · PAN-2', lastActivityAt: '2026-09-23T11:30:00.000Z' }),
   entry({ id: 'agent-pan-1', issueId: 'PAN-1', label: 'work · PAN-1', state: 'stopped' }),
   entry({ id: 'conv:notes', kind: 'conversation', label: 'Notes', role: null, state: 'idle' }),
 ];
@@ -45,6 +47,7 @@ function rowIds(): string[] {
 
 beforeEach(() => {
   window.history.replaceState(null, '', '/agents');
+  useDashboardStore.setState({ derivedIssueStateByIssueId: {} } as Parameters<typeof useDashboardStore.setState>[0]);
   useAgentDirectory.mockReset();
   useAgentDirectory.mockReturnValue({ data: { generatedAt: '', windowHours: 24, entries: ENTRIES }, isLoading: false, isError: false });
 });
@@ -99,12 +102,49 @@ describe('AgentsDirectory', () => {
     expect(new URLSearchParams(window.location.search).get('window')).toBe('168');
   });
 
-  it('renders a working agent with the info dot and a stopped one with the muted dot', () => {
+  it('renders a working agent with the info badge and a stopped one with the muted badge', () => {
     render(<AgentsDirectory />);
-    const working = document.querySelector('[data-entry-id="agent-pan-2"]') as HTMLElement;
-    const stopped = document.querySelector('[data-entry-id="agent-pan-1"]') as HTMLElement;
-    expect(within(working).getByRole('img', { name: 'working' }).className).toContain('bg-info');
-    expect(within(stopped).getByRole('img', { name: 'stopped' }).className).toContain('bg-muted-foreground');
+    const badge = (id: string) => within(document.querySelector(`[data-entry-id="${id}"]`) as HTMLElement)
+      .getByText((_, node) => node?.getAttribute('data-component') === 'directory-state-badge');
+    expect(badge('agent-pan-2')).toHaveTextContent('working');
+    expect(badge('agent-pan-2').className).toContain('badge-bg-info');
+    expect(badge('agent-pan-1')).toHaveTextContent('stopped');
+    expect(badge('agent-pan-1').className).toContain('text-muted-foreground');
+  });
+
+  it('marks the idle work agent of a stuck issue as stuck in red', () => {
+    useAgentDirectory.mockReturnValue({
+      data: { generatedAt: '', windowHours: 24, entries: [entry({ id: 'agent-pan-9', issueId: 'PAN-9', state: 'idle', lastActivityAt: '2026-09-20T11:00:00.000Z' })] },
+      isLoading: false,
+      isError: false,
+    });
+    useDashboardStore.setState({
+      derivedIssueStateByIssueId: { 'PAN-9': { issueId: 'PAN-9', state: 'working', attention: 'stuck' } },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+    render(<AgentsDirectory />);
+    const row = document.querySelector('[data-entry-id="agent-pan-9"]') as HTMLElement;
+    expect(row).toHaveAttribute('data-state', 'stuck');
+    const badge = row.querySelector('[data-component="directory-state-badge"]') as HTMLElement;
+    expect(badge).toHaveTextContent(/^stuck · \d+h$/);
+    expect(badge.className).toContain('badge-bg-destructive');
+  });
+
+  it("shows an agent's issue title after its label and never the word unknown", () => {
+    useAgentDirectory.mockReturnValue({
+      data: {
+        generatedAt: '', windowHours: 24,
+        entries: [entry({ id: 'agent-pan-2', issueId: 'PAN-2', issueTitle: 'Agents page as a directory', label: 'work · PAN-2', harness: 'unknown', model: 'unknown' })],
+      },
+      isLoading: false,
+      isError: false,
+    });
+    render(<AgentsDirectory />);
+    const row = document.querySelector('[data-entry-id="agent-pan-2"]') as HTMLElement;
+    expect(row).toHaveTextContent('work · PAN-2 · Agents page as a directory');
+    expect(row.querySelector('[title="work · PAN-2 · Agents page as a directory"]')).not.toBeNull();
+    expect(row.textContent).not.toMatch(/unknown/);
+    const node = screen.getByRole('treeitem', { name: /PAN-2/ });
+    expect(node).toHaveTextContent('PAN-2 · Agents page as a directory');
   });
 
   it('/ focuses the filter, not the app-wide search, and the filter narrows the list', () => {

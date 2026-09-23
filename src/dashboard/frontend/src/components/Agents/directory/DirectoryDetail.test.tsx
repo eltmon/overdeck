@@ -32,6 +32,7 @@ function entry(overrides: Partial<DirectoryEntry> & { id: string }): DirectoryEn
     location: 'local',
     projectKey: 'overdeck',
     issueId: null,
+    issueTitle: null,
     parentId: null,
     role: 'work',
     harness: 'claude-code',

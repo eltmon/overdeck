@@ -18,6 +18,8 @@ export interface DirectoryNode {
   kind: DirectoryNodeKind;
   /** 'Local', 'Remote (Fly)', project key, issue id, 'Conversations' */
   label: string;
+  /** An issue node's title from the tracker cache; null when unknown or not an issue node. */
+  title: string | null;
   liveCount: number;
   totalCount: number;
   children: DirectoryNode[];
@@ -83,7 +85,14 @@ export function leafNodesOf(entry: DirectoryEntry, byId: ReadonlyMap<string, Dir
   return [...nodes];
 }
 
-interface LeafInfo { kind: 'issue' | 'conversations'; location: string; projectKey: string; label: string; ids: Set<string> }
+interface LeafInfo {
+  kind: 'issue' | 'conversations';
+  location: string;
+  projectKey: string;
+  label: string;
+  title: string | null;
+  ids: Set<string>;
+}
 
 function leafIndex(entries: readonly DirectoryEntry[]): Map<string, LeafInfo> {
   const byId = new Map(entries.map((entry) => [entry.id, entry]));
@@ -101,10 +110,12 @@ function leafIndex(entries: readonly DirectoryEntry[]): Map<string, LeafInfo> {
           location: owner.location,
           projectKey: owner.projectKey,
           label: isIssue ? nodeId.slice(`issue:${owner.location}:`.length) : 'Conversations',
+          title: null,
           ids: new Set(),
         };
         leaves.set(nodeId, leaf);
       }
+      if (leaf.kind === 'issue' && !leaf.title && entry.issueTitle && entry.issueId === leaf.label) leaf.title = entry.issueTitle;
       leaf.ids.add(entry.id);
     }
   }
@@ -141,12 +152,13 @@ export function buildDirectoryTree(entries: readonly DirectoryEntry[]): Director
       const convNodes = projectLeaves.filter(([, leaf]) => leaf.kind === 'conversations');
       const children = [...issueNodes, ...convNodes].map(([id, leaf]) => {
         for (const entryId of leaf.ids) { projectIds.add(entryId); locationIds.add(entryId); }
-        return { id, kind: leaf.kind, label: leaf.label, ...counts(leaf.ids, byId), children: [] } satisfies DirectoryNode;
+        return { id, kind: leaf.kind, label: leaf.label, title: leaf.title, ...counts(leaf.ids, byId), children: [] } satisfies DirectoryNode;
       });
       return {
         id: projectNodeId(location, projectKey),
         kind: 'project' as const,
         label: projectLabel(projectKey),
+        title: null,
         ...counts(projectIds, byId),
         children,
       };
@@ -155,6 +167,7 @@ export function buildDirectoryTree(entries: readonly DirectoryEntry[]): Director
       id: locationNodeId(location),
       kind: 'location',
       label: location === 'local' ? 'Local' : 'Remote (Fly)',
+      title: null,
       ...counts(locationIds, byId),
       children: projects,
     });

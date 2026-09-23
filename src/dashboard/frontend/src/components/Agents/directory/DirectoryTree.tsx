@@ -93,8 +93,12 @@ export const DirectoryTree = forwardRef<HTMLDivElement, DirectoryTreeProps>(func
               ) : (
                 <span className="w-4" aria-hidden="true" />
               )}
-              <span className={cn('min-w-0 flex-1 truncate', node.kind === 'issue' && 'font-mono-ui text-[11px]')}>
-                {node.label}
+              <span
+                className="min-w-0 flex-1 truncate"
+                title={node.title ? `${node.label} · ${node.title}` : node.label}
+              >
+                <span className={cn(node.kind === 'issue' && 'font-mono-ui text-[11px]')}>{node.label}</span>
+                {node.title && <span className="text-muted-foreground"> · {node.title}</span>}
               </span>
               <span className="shrink-0 font-mono-ui text-[11px] tabular-nums text-muted-foreground">
                 {node.liveCount}/{node.totalCount}

@@ -10,6 +10,7 @@ function entry(overrides: Partial<DirectoryEntry> & { id: string }): DirectoryEn
     location: 'local',
     projectKey: 'overdeck',
     issueId: null,
+    issueTitle: null,
     parentId: null,
     role: 'work',
     harness: 'claude-code',
@@ -25,7 +26,7 @@ function entry(overrides: Partial<DirectoryEntry> & { id: string }): DirectoryEn
 }
 
 const ENTRIES: DirectoryEntry[] = [
-  entry({ id: 'agent-pan-3920', issueId: 'PAN-3920', label: 'work · PAN-3920' }),
+  entry({ id: 'agent-pan-3920', issueId: 'PAN-3920', issueTitle: 'Agents page as a directory', label: 'work · PAN-3920' }),
   entry({ id: 'agent-pan-41', issueId: 'PAN-41', state: 'stopped', label: 'work · PAN-41' }),
   entry({ id: 'conv:orchestrator', kind: 'conversation', label: 'Orchestrator', role: null, model: 'gpt-5.5' }),
   // Issue-linked worker spawned by an issue-less conversation (D6).
@@ -44,6 +45,15 @@ describe('buildDirectoryTree', () => {
       ['conversations', 'Conversations'],
     ]);
     expect(local?.children[1]?.label).toBe('No project');
+  });
+
+  it('gives an issue node its title and leaves it null when unknown', () => {
+    const [local] = buildDirectoryTree(ENTRIES);
+    const issues = local?.children[0]?.children.filter((node) => node.kind === 'issue');
+    expect(issues?.map((node) => [node.label, node.title])).toEqual([
+      ['PAN-3920', 'Agents page as a directory'],
+      ['PAN-41', null],
+    ]);
   });
 
   it('omits the Remote node when no entry is remote', () => {

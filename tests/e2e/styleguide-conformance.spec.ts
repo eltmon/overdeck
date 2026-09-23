@@ -221,7 +221,7 @@ async function newContext(): Promise<BrowserContext> {
         windowHours: 24,
         entries: [{
           id: 'agent-pan-1148', kind: 'agent', label: 'work · PAN-1148', location: 'local', projectKey: 'overdeck',
-          issueId: 'PAN-1148', parentId: null, role: 'work', harness: 'claude-code', model: 'claude-opus-4-7',
+          issueId: 'PAN-1148', issueTitle: 'Styleguide conformance issue', parentId: null, role: 'work', harness: 'claude-code', model: 'claude-opus-4-7',
           state: 'working', startedAt: new Date().toISOString(), lastActivityAt: new Date().toISOString(),
           costUsd: null, source: 'overdeck', transcript: { route: 'agent', agentId: 'agent-pan-1148' },
         }],

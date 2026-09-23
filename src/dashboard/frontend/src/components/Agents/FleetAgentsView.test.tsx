@@ -436,6 +436,8 @@ describe('FleetAgentsView', () => {
     expect(document.querySelector('[data-component="agents-directory"]')).not.toBeNull();
     expect(document.querySelector('[data-component="agent-card"]')).toBeNull();
     expect(document.querySelector('[data-component="metric-tile"]')).toBeNull();
+    // No tiles in the directory, so the header carries the 24h cost the tiles showed.
+    expect(screen.getByText(/cumulative runtime · \$12\.3 · 456K tokens 24h/)).toBeInTheDocument();
   });
 
   it('?view=grid still renders the card grid, MetricStrip and filters', () => {

@@ -9,11 +9,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import type { DirectoryEntry } from '@overdeck/contracts';
 
 import { formatRelativeTime } from '../../../lib/formatRelativeTime';
+import { useDerivedIssueState } from '../../../lib/store';
 import { useSharedTick } from '../../../lib/useSharedTick';
 import { conversationMessagesQueryKey } from '../../chat/useConversationMessagesStream';
 import { TellComposer } from '../../issue-view/TellComposer';
 import { DirectoryIssueContext } from './DirectoryIssueContext';
-import { DirectoryStateDot } from './DirectoryStateDot';
+import { DirectoryStateBadge } from './DirectoryStateBadge';
+import { displayStateOf, hoursSince, known } from './directory-state';
 import { DirectoryTranscript } from './DirectoryTranscript';
 import { isLiveState } from './directory-tree';
 
@@ -61,18 +63,20 @@ function DirectoryDetailBody({ entry, entriesById, onSelectEntry }: { entry: Dir
   const [tellOpen, setTellOpen] = useState(false);
   const parent = entry.parentId ? entriesById.get(entry.parentId) : undefined;
   const isWorker = entry.role === 'worker' && entry.kind === 'agent' && entry.source === 'overdeck';
+  const attention = useDerivedIssueState(entry.issueId)?.attention;
+  const state = displayStateOf(entry, attention);
+  const runtime = [known(entry.harness), known(entry.model)].filter(Boolean).join(' · ');
 
   return (
     <div className="flex h-full min-h-0 flex-col @container/detail" data-component="directory-detail">
       <header className="shrink-0 border-b border-border px-4 py-3">
         <div className="flex min-w-0 items-center gap-2">
-          <DirectoryStateDot state={entry.state} />
-          <h2 className="min-w-0 flex-1 truncate text-[14px] font-medium text-foreground">{entry.label}</h2>
-          <span className="shrink-0 text-[12px] text-muted-foreground">{entry.state}</span>
+          <h2 className="min-w-0 flex-1 truncate text-[14px] font-medium text-foreground" title={entry.label}>{entry.label}</h2>
+          <DirectoryStateBadge state={state} stuckHours={hoursSince(entry.lastActivityAt, now)} />
         </div>
         <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-muted-foreground">
           <span className="font-mono-ui">{entry.id}</span>
-          <span className="font-mono-ui">· {entry.harness} · {entry.model}</span>
+          {runtime && <span className="font-mono-ui">· {runtime}</span>}
           {entry.startedAt && <span>· started {formatRelativeTime(entry.startedAt, now)}</span>}
           {entry.lastActivityAt && <span>· active {formatRelativeTime(entry.lastActivityAt, now)}</span>}
           {cost !== null && <span className="font-mono-ui tabular-nums text-signal-cost">· {formatCost(cost)}</span>}
@@ -82,7 +86,8 @@ function DirectoryDetailBody({ entry, entriesById, onSelectEntry }: { entry: Dir
             type="button"
             onClick={() => parent && onSelectEntry(parent.id)}
             disabled={!parent}
-            className="mt-1 text-[11px] text-muted-foreground hover:text-foreground disabled:cursor-default disabled:hover:text-muted-foreground"
+            className="mt-1 max-w-full truncate text-left text-[11px] text-muted-foreground hover:text-foreground disabled:cursor-default disabled:hover:text-muted-foreground"
+            title={`Spawned by ${parent?.label ?? entry.parentId}`}
           >
             Spawned by {parent?.label ?? entry.parentId}
           </button>
@@ -101,7 +106,7 @@ function DirectoryDetailBody({ entry, entriesById, onSelectEntry }: { entry: Dir
           </div>
         )}
       </header>
-      {entry.issueId && <DirectoryIssueContext issueId={entry.issueId} />}
+      {entry.issueId && <DirectoryIssueContext issueId={entry.issueId} issueTitle={entry.issueTitle} />}
       <div className="flex min-h-0 flex-1 flex-col">
         <DirectoryTranscript entry={entry} onSelectEntry={onSelectEntry} />
       </div>

@@ -6,10 +6,15 @@
  */
 import { forwardRef, type KeyboardEvent, type RefObject } from 'react';
 
+import type { DirectoryEntry } from '@overdeck/contracts';
+
 import { formatRelativeTime } from '../../../lib/formatRelativeTime';
+import { compactModelName } from '../../../lib/model-names';
+import { useDashboardStore } from '../../../lib/store';
 import { useSharedTick } from '../../../lib/useSharedTick';
 import { cn } from '../../../lib/utils';
-import { DirectoryStateDot } from './DirectoryStateDot';
+import { DirectoryStateBadge } from './DirectoryStateBadge';
+import { displayStateOf, hoursSince, known } from './directory-state';
 import type { DirectoryRow } from './directory-tree';
 import type { DirectoryWindowHours } from './useAgentDirectory';
 
@@ -19,6 +24,11 @@ export function directoryRowDomId(entryId: string): string {
 
 function age(iso: string | null, now: Date): string {
   return formatRelativeTime(iso, now).replace(/ ago$/, '') || '—';
+}
+
+/** An agent's label gains its issue's title: `work · PAN-3920 · Agents page as a directory`. */
+export function rowTitle(entry: DirectoryEntry): string | null {
+  return entry.kind === 'agent' && entry.issueTitle ? entry.issueTitle : null;
 }
 
 interface DirectoryListProps {
@@ -40,6 +50,7 @@ export const DirectoryList = forwardRef<HTMLDivElement, DirectoryListProps>(func
   ref,
 ) {
   const now = useSharedTick();
+  const derivedByIssue = useDashboardStore((state) => state.derivedIssueStateByIssueId);
   const windowLabel = windowHours === 168 ? '7 days' : '24 hours';
   const empty = loading
     ? 'Loading agents…'
@@ -76,6 +87,12 @@ export const DirectoryList = forwardRef<HTMLDivElement, DirectoryListProps>(func
           <div className="px-4 py-8 text-center text-[12px] text-muted-foreground">{empty}</div>
         ) : rows.map(({ entry, depth, spawnedByLabel }) => {
           const selected = entry.id === selectedEntryId;
+          const state = displayStateOf(entry, entry.issueId ? derivedByIssue[entry.issueId]?.attention : undefined);
+          const title = rowTitle(entry);
+          const harness = known(entry.harness);
+          const model = known(entry.model);
+          const runtime = [harness, model && compactModelName(model)].filter(Boolean).join(' · ');
+          const runtimeFull = [harness, model].filter(Boolean).join(' · ');
           return (
             <div
               key={entry.id}
@@ -84,6 +101,7 @@ export const DirectoryList = forwardRef<HTMLDivElement, DirectoryListProps>(func
               aria-selected={selected}
               data-component="directory-row"
               data-entry-id={entry.id}
+              data-state={state}
               onClick={() => onSelect(entry.id)}
               className={cn(
                 'cursor-pointer border-b border-border/60 py-2 pr-3 hover:bg-accent',
@@ -93,21 +111,26 @@ export const DirectoryList = forwardRef<HTMLDivElement, DirectoryListProps>(func
             >
               <div role="gridcell" className="flex min-w-0 items-center gap-2">
                 {depth > 0 && <span className="text-[12px] text-muted-foreground" aria-hidden="true">↳</span>}
-                <DirectoryStateDot state={entry.state} />
-                <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">{entry.label}</span>
+                <DirectoryStateBadge state={state} stuckHours={hoursSince(entry.lastActivityAt, now)} />
+                <span
+                  className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground"
+                  title={title ? `${entry.label} · ${title}` : entry.label}
+                >
+                  {entry.label}
+                  {title && <span className="font-normal text-muted-foreground"> · {title}</span>}
+                </span>
                 <span className="shrink-0 font-mono-ui text-[11px] tabular-nums text-muted-foreground" title={entry.lastActivityAt ?? undefined}>
                   {entry.lastActivityAt ? formatRelativeTime(entry.lastActivityAt, now) : '—'}
                 </span>
               </div>
-              <div role="gridcell" className="mt-0.5 flex min-w-0 items-center gap-1.5 pl-3.5 text-[11px] text-muted-foreground">
-                <span className="max-w-[60%] shrink-0 truncate font-mono-ui">{entry.id}</span>
+              <div role="gridcell" className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
+                <span className="max-w-[55%] shrink-0 truncate font-mono-ui" title={entry.id}>{entry.id}</span>
                 {entry.role && <span className="shrink-0">· {entry.role}</span>}
-                <span className="min-w-0 truncate font-mono-ui">· {entry.harness} · {entry.model}</span>
-                <span className="ml-auto shrink-0">{entry.state}</span>
-                {entry.startedAt && <span className="shrink-0 font-mono-ui tabular-nums">· {age(entry.startedAt, now)}</span>}
+                {runtime && <span className="min-w-0 truncate font-mono-ui" title={runtimeFull}>· {runtime}</span>}
+                {entry.startedAt && <span className="ml-auto shrink-0 font-mono-ui tabular-nums" title={`started ${entry.startedAt}`}>{age(entry.startedAt, now)}</span>}
               </div>
               {spawnedByLabel && (
-                <div className="mt-0.5 truncate pl-3.5 text-[11px] text-muted-foreground">spawned by {spawnedByLabel}</div>
+                <div className="mt-0.5 truncate text-[11px] text-muted-foreground" title={`spawned by ${spawnedByLabel}`}>spawned by {spawnedByLabel}</div>
               )}
             </div>
           );

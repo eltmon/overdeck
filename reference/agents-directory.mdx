@@ -26,14 +26,18 @@ is read-only: it has no input channel of its own.
 
 ## What the colors mean
 
-The dot beside each entry is the only color in a row.
+The state badge at the start of each row is the only color in it.
 
-| Dot | State |
+| Badge | State |
 | --- | --- |
 | Blue | **working** — a machine is running a turn |
 | Amber | **blocked** — it is waiting for you (a question or an approval) |
+| Red | **stuck · Nh** — the issue's work agent has sat idle with unpushed commits past the stuck threshold, N hours since it last did anything; **API error** — the provider, not the agent, is failing |
 | Emerald | **done** — a subagent finished |
-| Grey | **idle**, **stopped**, or **unknown** (a remote agent, whose terminal runs on the Fly machine) |
+| Grey | **idle**, **stopped**, or **remote** (an agent on a Fly machine, whose terminal runs there) |
+
+Agents and issue nodes show the issue's title after its id (`work · PAN-3920 · Agents
+page as a directory`). Hover any truncated id, model, branch or title to see it in full.
 
 ## The time window
 
