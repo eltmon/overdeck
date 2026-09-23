@@ -174,8 +174,8 @@ async function killConversationRuntimeProcesses(conv: Conversation): Promise<voi
   await terminatePids(pids);
 }
 export async function stopConversationRuntime(conv: Conversation, name: string): Promise<void> {
-  await closeCompanionTerminalForOwner(conv.tmuxSession); // PAN-3974: before the shared-session early return
   if (hasOtherActiveConversationOnTmuxSession(conv.tmuxSession, name)) return;
+  await closeCompanionTerminalForOwner(conv.tmuxSession); // PAN-3974: the companion goes with its runtime
   await Effect.runPromise(killSession(conv.tmuxSession).pipe(Effect.catch(() => Effect.succeed(undefined))));
   try {
     await killConversationRuntimeProcesses(conv);

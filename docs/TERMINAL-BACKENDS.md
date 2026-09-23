@@ -370,8 +370,9 @@ the tmux session is the authority and nothing else is stored. Rules:
 - An owner whose tmux session is gone makes open reap any companion (`owner-not-running`).
 
 **Owner teardown.** `closeCompanionTerminalForOwner(ownerSession)` never throws and is called from
-`stopConversationRuntime` (stop, delete, archive, resume/restart failure, flywheel archive; before
-the shared-session early return), from `spawnConversationSession` right before it kills the owner
+`stopConversationRuntime` (stop, delete, archive, resume/restart failure, flywheel archive; after
+the shared-session early return, so a runtime another conversation still owns keeps its companion),
+from `spawnConversationSession` right before it kills the owner
 session (every resume and restart-all), and from the conversation lifecycle poll for owners that
 exited on their own.
 
@@ -684,3 +685,30 @@ agent-fix14-exits      liveness {"kind":"exited","paneId":"wK:p3"}   ← shell b
 ```
 
 Teardown: both panes closed, `workspace.close wK` → `{ok:true}`, no app-server host survived.
+
+## Live verification record — OpenCode companion terminal (PAN-3974)
+
+2026-09-23, OpenCode 1.18.31, tmux 3.4. Everything ran on a private socket (`tmux -L pan3974-test`)
+against a throwaway owner: `opencode acp --hostname 127.0.0.1 --port 54333` in a scratch directory,
+with an ACP session created over stdio (`ses_f31392699ffePn4CdhKK6zUR0E`). The real lifecycle,
+OpenCode adapter, and tmux host drove it, with the host's `exec`/`createSession` bound to that socket.
+No live conversation or dashboard was touched.
+
+```
+GET /session/<ACP session id>           → 200 (an ACP-created session is visible over HTTP)
+open ×2 concurrently                    → one companion created, second answer reused:true
+pane command                            → opencode "exec '<abs>/opencode' 'attach' 'http://127.0.0.1:54333'
+                                            '--session' 'ses_…' '--dir' '<scratch>/oc-acp'"
+OVERDECK_COMPANION_GENERATION           → 9bd653f22a0eef0992eb340f
+capture-pane -e                         → native OpenCode TUI (prompt box, "Build · <model> · xhigh",
+                                            "tab agents / ctrl+p commands"), 162 ANSI escape runs, truecolor
+OpenCode sessions before/after attach   → 13 → 13 (no second session)
+PTY tmux client attached, then killed   → companion still alive (browser disconnect)
+reopen                                  → reused:true
+close with a stale generation           → stale-generation; companion still alive
+close with the current generation       → closed; companion gone; owner alive; GET /session/<id> 200
+owner teardown after reopening          → companion gone
+opencode-port removed                   → restart-required; no companion created
+```
+
+Teardown: `tmux -L pan3974-test kill-server`; port 54333 no longer answers.
