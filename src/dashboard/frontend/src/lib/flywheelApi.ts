@@ -24,17 +24,21 @@ async function fetchFlywheelStatus(): Promise<FlywheelDerivedStatus> {
   return res.json() as Promise<FlywheelDerivedStatus>;
 }
 
-export function useFlywheelStatus() {
+export function useFlywheelStatus(opts: { refetchInterval?: number } = {}) {
   return useQuery({
     queryKey: FLYWHEEL_STATUS_QUERY_KEY,
     queryFn: fetchFlywheelStatus,
-    refetchInterval: 5_000,
+    refetchInterval: opts.refetchInterval ?? 5_000,
   });
 }
 
-/** The sidebar's `live` marker: true only when the derived run is `running`. */
+/**
+ * The sidebar's `live` marker: true only when the derived run is `running`.
+ * The sidebar is on every page, so it polls every 30 s; the Flywheel page's
+ * own 5 s observer takes over while the page is open.
+ */
 export function useFlywheelRunning(): boolean {
-  const { data } = useFlywheelStatus();
+  const { data } = useFlywheelStatus({ refetchInterval: 30_000 });
   return data?.run === 'running';
 }
 
