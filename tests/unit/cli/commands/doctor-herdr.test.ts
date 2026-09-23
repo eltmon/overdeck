@@ -147,6 +147,40 @@ describe('checkHerdr (PAN-3956 W9)', () => {
     expect(row(rows, 'Herdr server')).toMatchObject({ status: 'warn', fix: 'Run: pan sync' });
   });
 
+  it('does not ask a non-default home for a unit pan sync never installs', async () => {
+    const rows = await checkHerdr(deps({
+      unitActive: false,
+      probe: { binary: BINARY, session: 'overdeck-1a2b3c4d', socket: SOCKET, socketExists: true, available: true },
+    }));
+    expect(row(rows, 'Herdr server').status).toBe('ok');
+  });
+
+  it('warns with pan sync for an outdated or needs-repair pilot integration', async () => {
+    const rows = await checkHerdr(deps({
+      integrationRows: parseIntegrationStatus('pi: needs repair (/p)\nkimi: outdated (v1 < v2)\n'),
+    }));
+    expect(row(rows, 'Herdr integration: pi')).toMatchObject({ status: 'warn', fix: 'Run: pan sync' });
+    expect(row(rows, 'Herdr integration: kimi')).toMatchObject({ status: 'warn', fix: 'Run: pan sync' });
+  });
+
+  it('warns, without a fix pan sync cannot deliver, when status is unreadable or a target is unlisted', async () => {
+    const unreadable = await checkHerdr(deps({ integrationRows: [] }));
+    expect(unreadable.filter((r) => r.status === 'error')).toEqual([]);
+    expect(row(unreadable, 'Herdr integration: pi')).toEqual({
+      name: 'Herdr integration: pi',
+      status: 'warn',
+      message: 'status unknown: `herdr integration status` gave no readable output',
+    });
+    expect(row(unreadable, 'Herdr integration: codex').status).toBe('ok');
+
+    const unlisted = await checkHerdr(deps({ integrationRows: parseIntegrationStatus('pi: current (/p)\n') }));
+    expect(row(unlisted, 'Herdr integration: kimi')).toEqual({
+      name: 'Herdr integration: kimi',
+      status: 'warn',
+      message: 'status unknown: not listed by `herdr integration status`',
+    });
+  });
+
   it('warns when herdr resolves only from ~/.local/bin and that dir is not on PATH', async () => {
     const rows = await checkHerdr(deps({ pathEnv: '/usr/bin' }));
     expect(row(rows, 'Herdr binary')).toMatchObject({ status: 'warn', fix: 'Add ~/.local/bin to PATH' });

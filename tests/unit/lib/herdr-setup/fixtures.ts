@@ -22,10 +22,24 @@ export const INTEGRATION_STATUS_TEXT = [
   '',
 ].join('\n');
 
-/** The same targets after install. The `installed (` wording is inferred (see W8 checkpoint). */
+/**
+ * The same targets after install. The `current (` status word is the 0.9.1
+ * binary's own literal (`strings ~/.local/bin/herdr`: `current (`,
+ * `outdated (`, ` < v`, `needs repair (`); no live install was run, so the
+ * text inside the parentheses (kept as the path here) is inferred.
+ */
 export function integrationStatusAllInstalled(): string {
-  return INTEGRATION_STATUS_TEXT.replaceAll(': not installed (', ': installed (');
+  return INTEGRATION_STATUS_TEXT.replaceAll(': not installed (', ': current (');
 }
+
+/** An outdated and a broken install, in the binary's wording (parenthetical inferred). */
+export const INTEGRATION_STATUS_MIXED = [
+  'pi: current (/home/eltmon/.pi/agent/extensions/herdr-agent-state.ts)',
+  'omp: current (/home/eltmon/.omp/agent/extensions/herdr-omp-agent-state.ts)',
+  'kimi: outdated (v1 < v2)',
+  'opencode: needs repair (/home/eltmon/.config/opencode/plugins/herdr-agent-state.js)',
+  '',
+].join('\n');
 
 /** The hand-written unit on this host before PAN-3956. */
 export const HAND_WRITTEN_UNIT = [

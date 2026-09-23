@@ -29,7 +29,7 @@ import {
   readIntegrationStatus,
   type IntegrationStatusRow,
 } from '../../lib/herdr-setup/integrations.js';
-import { herdrUnitName } from '../../lib/herdr-setup/service.js';
+import { herdrPersistentUnitWanted, herdrUnitName } from '../../lib/herdr-setup/service.js';
 import { readHerdrStatus, type HerdrStatus } from '../../lib/herdr-setup/status.js';
 import {
   probeHerdrAvailability,
@@ -192,7 +192,9 @@ function serverRow(deps: HerdrDoctorDeps): CheckResult {
       fix: `Restart at a quiet moment: systemctl --user restart ${unit} (closes every agent pane)`,
     };
   }
-  if (deps.systemdAvailable && !deps.unitActive) {
+  // Only the default home (or an opted-in one) gets a unit; `pan sync` never
+  // installs one for a throwaway home, so do not ask for it here.
+  if (deps.systemdAvailable && !deps.unitActive && herdrPersistentUnitWanted(deps.probe.session)) {
     return { name: 'Herdr server', status: 'warn', message: `${message}; ${unit} is not active`, fix: FIX_SYNC };
   }
   return { name: 'Herdr server', status: 'ok', message };
@@ -246,9 +248,21 @@ async function integrationRow(
 ): Promise<CheckResult> {
   const name = `Herdr integration: ${target}`;
   const row = deps.integrationRows.find((candidate) => candidate.target === target);
-  const state = row?.state ?? 'not-installed';
-  const detail = row ? `${row.detail}${row.path ? ` (${row.path})` : ''}` : 'not listed by herdr';
   const pilot = HERDR_PILOT_INTEGRATIONS.includes(target);
+
+  // Unlisted (or `herdr integration status` unreadable): `pan sync` skips such
+  // a target too, so naming it as the fix would never converge. Warn, no fix.
+  if (!row) {
+    const why = deps.integrationRows.length === 0
+      ? '`herdr integration status` gave no readable output'
+      : 'not listed by `herdr integration status`';
+    return pilot
+      ? { name, status: 'warn', message: `status unknown: ${why}` }
+      : { name, status: 'ok', message: `status unknown: ${why} (not managed by Overdeck)` };
+  }
+
+  const state = row.state;
+  const detail = `${row.detail}${row.path ? ` (${row.path})` : ''}`;
 
   if (state === 'unknown') {
     return { name, status: 'warn', message: `unrecognized status: ${detail}` };
@@ -270,7 +284,7 @@ async function integrationRow(
   }
 
   if (state === 'installed') return { name, status: 'ok', message: detail };
-  if (state === 'outdated') return { name, status: 'warn', message: detail, fix: FIX_SYNC };
+  if (state === 'outdated' || state === 'needs-repair') return { name, status: 'warn', message: detail, fix: FIX_SYNC };
 
   const binaryName = HERDR_INTEGRATION_BINARY[target];
   if (!(await deps.resolveBinary(binaryName))) {
