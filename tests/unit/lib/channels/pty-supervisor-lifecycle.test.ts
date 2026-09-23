@@ -46,6 +46,23 @@ describe('postAgentLifecycleEvent (PAN-3849)', () => {
     expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 
+  it('falls back to the loopback API port, never the public DASHBOARD_URL', async () => {
+    vi.stubEnv('OVERDECK_DASHBOARD_URL', '');
+    vi.stubEnv('DASHBOARD_URL', 'https://overdeck.localhost');
+    vi.stubEnv('API_PORT', '4555');
+    try {
+      const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+      const { dashboardUrl: _omit, ...deps } = depsWith(fetchImpl);
+
+      await expect(postAgentLifecycleEvent(AGENT, 'session-started', {}, deps)).resolves.toBe(true);
+
+      const [url] = fetchImpl.mock.calls[0] as unknown as [string];
+      expect(url).toBe(`http://127.0.0.1:4555/api/agents/${AGENT}/lifecycle`);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('includes exitCode for the exited event', async () => {
     const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200 });
 
