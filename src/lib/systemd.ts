@@ -203,3 +203,58 @@ export async function systemdUserAvailable(): Promise<boolean> {
     return false;
   }
 }
+
+// ─── generic user units (PAN-3956: the Herdr session server) ──────────────────
+
+const SAFE_UNIT_NAME = /^[A-Za-z0-9@._-]+\.service$/;
+
+function assertSafeUnitName(unitName: string): void {
+  if (!SAFE_UNIT_NAME.test(unitName)) throw new Error(`Invalid systemd unit name: ${unitName}`);
+}
+
+/** Write `unitText` to `<unitDir>/<unitName>` when it differs, then daemon-reload. */
+export async function installUserUnit(
+  unitName: string,
+  unitText: string,
+  unitDir = userUnitDir(),
+): Promise<{ path: string; written: boolean }> {
+  assertSafeUnitName(unitName);
+  const path = join(unitDir, unitName);
+  let existing: string | null = null;
+  try {
+    existing = await readFile(path, 'utf-8');
+  } catch {
+    existing = null;
+  }
+  if (existing === unitText) return { path, written: false };
+
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, unitText, 'utf-8');
+  await systemctl('daemon-reload');
+  return { path, written: true };
+}
+
+/** `systemctl --user enable <unit>` — start it at login/boot; starts nothing now. */
+export async function enableUserUnit(unitName: string): Promise<void> {
+  assertSafeUnitName(unitName);
+  await systemctl(`enable ${unitName}`);
+}
+
+/**
+ * `systemctl --user enable --now <unit>`. On an already-active unit this only
+ * enables it: `--now` starts an inactive unit and never restarts a running one.
+ */
+export async function enableUserUnitNow(unitName: string): Promise<void> {
+  assertSafeUnitName(unitName);
+  await systemctl(`enable --now ${unitName}`);
+}
+
+export async function isUserUnitActive(unitName: string): Promise<boolean> {
+  assertSafeUnitName(unitName);
+  try {
+    await systemctl(`is-active --quiet ${unitName}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
