@@ -71,14 +71,24 @@ jobs:
           node dist/cli/index.js --version
           node dist/cli/index.js --help
 
-  lint:
+  # `npm run lint` took ~9 min as one job, almost all of it in three steps.
+  # scripts/run-lint-group.mjs splits the lint script's steps into groups that
+  # run as parallel jobs; any step it doesn't name as heavy runs in `core`.
+  lint-group:
+    name: lint-group (${{ matrix.group }})
     runs-on: ubuntu-latest
     timeout-minutes: 20  # PAN-1651: cap wall-clock so a hung step can't wedge the required check.
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [core, effect, skills, state]
 
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # PAN-2227: lint:ratchet-audit diffs the last baseline/allowlist commit against its parent
+          # PAN-2227: lint:ratchet-audit (core) diffs the last baseline/allowlist
+          # commit against its parent. The other groups read no history.
+          fetch-depth: ${{ matrix.group == 'core' && '0' || '1' }}
 
       - name: Use Node.js 22
         uses: actions/setup-node@v4
@@ -101,11 +111,27 @@ jobs:
           sudo install "/tmp/ripgrep-${RG_VERSION}-x86_64-unknown-linux-musl/rg" /usr/local/bin/rg
           rg --version
 
+      # lint:no-state-layer is a source grep and needs no build.
       - name: Build
+        if: matrix.group != 'state'
         run: npm run build
 
-      - name: Lint
-        run: npm run lint
+      - name: Lint (${{ matrix.group }})
+        run: node scripts/run-lint-group.mjs ${{ matrix.group }}
+
+  # `lint` is a check name the close-out gate requires on main
+  # (DEFAULT_MAIN_VERIFY_REQUIRED_CHECKS in src/lib/lifecycle/dod-gate.ts), so
+  # it stays one job: green only when every lint group passed.
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [lint-group]
+    if: always()
+    steps:
+      - name: All lint groups passed
+        run: |
+          echo "lint-group: ${{ needs.lint-group.result }}"
+          test "${{ needs.lint-group.result }}" = success
 
   prompt-gate:
     runs-on: ubuntu-latest
