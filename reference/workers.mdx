@@ -1,0 +1,138 @@
+---
+title: Workers
+description: Delegate a brief to a registered, issue-linked agent with pan worker run and get its report back
+---
+
+# Workers
+
+A **worker** is a separate agent that one agent or conversation starts for a
+single brief. `pan worker run` starts it for an issue, waits, and prints its
+report. The worker is a real Overdeck agent with the role `worker`:
+
+- It has its own `~/.overdeck/agents/<id>/state.json`, transcript, cost, and
+  model routing (`roles.worker.model` in `config.yaml`; the default is the
+  same workhorse as `work`).
+- It runs in a persistent pane on the host's terminal backend (Herdr by
+  default, tmux when `terminal.backend: tmux`). It is never a one-shot
+  `claude -p` or `codex exec` run.
+- It appears in the [Agents Directory](/reference/agents-directory) under the
+  agent or conversation that started it and under its issue, and in the
+  issue's session tree as **Worker &lt;n&gt;**.
+- `pan tell`, `pan kill`, and the other lifecycle verbs work on it.
+
+A worker never runs the issue's lifecycle: it does not run `pan done`,
+`pan review`, or `pan task done`, and it does not push unless the brief says
+to. Pipeline patrols that act on the `work` role never act on it.
+
+`--issue` is required. Issue-less workers are not supported yet.
+
+## Commands
+
+```bash
+pan worker run --issue <id> (--prompt <text> | --brief <file>)
+               [--model <m>] [--harness <h>] [--read-only] [--cwd <path>]
+               [--parent <id>] [--name <label>]
+               [--detach] [--timeout <seconds>] [--stop-after-report]
+pan worker wait <worker-id> [--after <seq>] [--timeout <seconds>]
+pan worker report <worker-id> (--file <path> | --stdin) [--status done|blocked|failed]
+pan worker list [--issue <id>] [--parent <id>] [--json]
+```
+
+| Command | What it does |
+| --- | --- |
+| `run` | Starts a worker and waits for its first report. `--detach` prints only the worker id and returns once the pane exists. `--stop-after-report` stops the worker after its first report. |
+| `wait` | Waits for the next report. By default "next" means newer than the newest report present when the wait starts; `--after <seq>` sets it. |
+| `report` | Records a report. The worker runs this itself; its brief ends with the exact command. |
+| `list` | Lists workers with their issue, parent, live state (`running`, `stopped`, `unknown`), and newest report. |
+
+Worker ids are `agent-<issue>-worker-<n>`, for example `agent-pan-123-worker-2`.
+
+## Exit codes
+
+`run` and `wait` print the report body on stdout and every status line on
+stderr.
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Report with status `done`. |
+| `4` | Report with status `blocked` or `failed`. The body is still printed. |
+| `2` | The worker exited, or sat idle for 10 minutes, without a report. Its last assistant message is printed, prefixed `[no report — last assistant message]`. When the dashboard cannot be reached, the transcript path is printed instead. |
+| `3` | Timeout. The worker is still running; the hint names `pan worker wait <id>`. |
+| `1` | Usage or spawn error. |
+
+The wait polls every two seconds and never messages the worker. A worker
+that was never seen alive is not called dead during its first minute, while
+the harness is still starting.
+
+## The report contract
+
+The worker writes its report as Markdown to a file and runs
+`pan worker report <id> --file <path>`. The command writes
+`~/.overdeck/agents/<id>/reports/<seq>.json`:
+
+```json
+{ "seq": 1, "at": "2026-09-23T12:00:00.000Z", "status": "done", "body": "<markdown>" }
+```
+
+`seq` is 1-based and zero-padded to four digits in the file name. Each report
+is written to a temporary file and renamed into place, so a reader never sees
+half a report. Overdeck never rewrites or deletes reports. The body limit is
+1 MiB.
+
+Reporting does not signal the pipeline. The directory derives a worker's
+**done** state from its newest report: an idle worker whose newest report was
+written in the turn that just ended is **done**.
+
+## Working directory and read-only mode
+
+| Flags | Where the worker runs |
+| --- | --- |
+| none | Its own git worktree at `<workspace>/.swarm/worker-<n>/`, on branch `<feature-branch>/worker-<n>`. |
+| `--read-only` | The issue workspace, behind a git guard in read-only mode. |
+| `--cwd <path>` | That directory. It must be inside the issue workspace; anything else is refused. |
+
+The read-only guard lets read subcommands through (`status`, `diff`, `log`,
+`show`, `fetch`, `rev-parse`, `rev-list`, `ls-files`, `ls-tree`, `blame`,
+`cat-file`, `merge-base`, `describe`, `grep`, `shortlog`, `for-each-ref`,
+`show-ref`, `remote`, `config`) and refuses every other git subcommand inside
+the worker's directory. Git in another repository is not affected. The guard
+covers git only: it is not a file-system or network sandbox.
+
+## Parent and `pan tell`
+
+The parent is `--parent`, else `$OVERDECK_AGENT_ID`, else
+`$OVERDECK_CONVERSATION`. Every conversation launcher exports
+`OVERDECK_CONVERSATION`. When an agent (a caller whose stdin is not a
+terminal) has none of these, `run` fails and asks for `--parent`. An
+interactive operator shell may start a worker without a parent.
+
+The parent is recorded in `state.json` (`parentId`) and stamped on the pane as
+the `parent` token. The prompt guard lets a worker pane accept messages from:
+
+- the issue's `work` agent,
+- its parent,
+- an operator conversation.
+
+Everyone else is refused. A worker stays running after it reports; to give it
+more work, run `pan tell <worker-id> "<message>"` and then
+`pan worker wait <worker-id>`.
+
+## Waiting from each harness
+
+- **Claude Code:** run `pan worker run …` with the Bash tool's
+  `run_in_background: true`. The foreground limit is 10 minutes; a background
+  command notifies the conversation when it exits, and its stdout is the
+  report.
+- **Codex and other harnesses:** run `pan worker run … --detach`, then
+  `pan worker wait <id> --timeout 540` in a loop until the exit code is not
+  `3`.
+
+## Where the files are
+
+| Path | Contents |
+| --- | --- |
+| `~/.overdeck/agents/<id>/state.json` | The agent state: role `worker`, `parentId`, `startedBy: pan-worker`. |
+| `~/.overdeck/agents/<id>/worker.json` | Write-once launch facts: issue, parent, read-only, cwd, branch, name, start time. |
+| `~/.overdeck/agents/<id>/reports/<seq>.json` | The reports. |
+
+See also: [Harnesses — Use Overdeck workers instead of harness plugins](/configuration/harnesses#use-overdeck-workers-instead-of-harness-plugins).
