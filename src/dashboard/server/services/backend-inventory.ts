@@ -96,6 +96,9 @@ export function parseAgentSessionName(session: string): ParsedSessionName | null
   // `agent-pan-3917-slot-2` is an item pane created by `pan spawn` (FR-5 `worker`).
   const slot = /^(.*)-slot-\d+$/.exec(rest);
   if (slot?.[1]) return { issue: slot[1].toUpperCase(), role: 'worker' };
+  // `agent-pan-3920-worker-1` is a registered worker from `pan worker run` (PAN-3920).
+  const worker = /^(.*)-worker-\d+$/.exec(rest);
+  if (worker?.[1]) return { issue: worker[1].toUpperCase(), role: 'worker' };
 
   for (const [suffix, role] of ROLE_SUFFIXES) {
     if (rest.endsWith(suffix)) {

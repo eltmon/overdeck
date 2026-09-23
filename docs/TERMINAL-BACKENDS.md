@@ -226,6 +226,7 @@ the backend the host selects **now** and stamps the same four tokens. None of th
 | --- | --- | --- |
 | Work agents (`pan start`, `pan strike`) | `spawnAgent` in `src/lib/agents/spawn.ts` | `work`, `strike` |
 | Specialists (review, test, ship, plan) and `pan review spawn-reviewer` | `spawnRun` in `src/lib/agents/spawn.ts` | `review`, `test`, `uat`, `plan` |
+| Registered workers (`pan worker run`, PAN-3920) | `startWorker` in `src/lib/agents/worker/start.ts` → `spawnRun` | `worker` (plus a `parent` token when the worker has a parent) |
 | Planning (`pan plan`, the plan phase of `pan start`, dashboard Start Planning) | `spawnPlanningSession` in `src/lib/planning/spawn-planning-session.ts` | `plan` |
 | Planning continuation (a user message to a dead planner) | `POST /api/planning/:issueId/message` in `src/dashboard/server/routes/misc/planning.ts` | `plan` |
 | Resume (`pan resume`, dashboard Resume, auto-resume) | `resumeAgent` in `src/lib/agents/resume.ts` | the agent's role |
@@ -289,9 +290,11 @@ still runs).
    which is where the repeated deliveries came from. A retry of a *failed* delivery must use a new
    id — the guard records an id when it admits it.
 2. **Authority.** A pane whose tokens say issue X and role `worker` accepts prompts only from the
-   pane whose tokens say issue X and role `work`, or from an operator conversation (a `conv-` id
-   with no `issue` token). Anything else gets `{ refused: true, reason }`. Other roles keep today's
-   open delivery.
+   pane whose tokens say issue X and role `work`, from the sender whose id equals the pane's
+   `parent` token (the agent or conversation that ran `pan worker run`, PAN-3920), or from an
+   operator conversation (a `conv-` id with no `issue` token). Anything else gets
+   `{ refused: true, reason }`. Other roles keep today's open delivery. On tmux the `parent` token
+   comes from `state.json`'s `parentId`.
 
 Sender identity: the Herdr adapter reads the target's tokens from `agent.get`; on tmux the sender is
 `OVERDECK_AGENT_ID` and the target's tokens come from the agent's launch metadata

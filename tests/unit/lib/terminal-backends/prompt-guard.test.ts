@@ -6,6 +6,7 @@ import {
   isOperatorConversation,
   resetPromptGuard,
   senderFromEnv,
+  tokensFromLaunchMetadata,
   PROMPT_DEDUPE_WINDOW_MS,
 } from '../../../../src/lib/terminal-backends/prompt-guard.js';
 import type { PaneTokens, PromptSender } from '../../../../src/lib/terminal-backends/types.js';
@@ -122,6 +123,41 @@ describe('prompt guard — authority', () => {
         messageId: 'm',
       }),
     ).toEqual({ allow: true });
+  });
+
+  // PAN-3920 Q5: the agent or conversation that ran `pan worker run` may steer its worker.
+  it('allows the worker’s parent to prompt it', () => {
+    const tokens: Partial<PaneTokens> = { ...WORKER_TOKENS, parent: 'agent-min-1039-review' };
+    expect(checkPrompt({ targetId: 'w1:p3', targetTokens: tokens, sender: REVIEWER, messageId: 'm' }))
+      .toEqual({ allow: true });
+    // A parent conversation that carries an issue token is not an operator, but is still the parent.
+    const convTokens: Partial<PaneTokens> = { ...WORKER_TOKENS, parent: 'conv-orchestrator' };
+    expect(
+      checkPrompt({
+        targetId: 'w1:p4',
+        targetTokens: convTokens,
+        sender: { id: 'CONV-orchestrator', issue: 'MIN-1039' },
+        messageId: 'm',
+      }),
+    ).toEqual({ allow: true });
+  });
+
+  it('still refuses an unrelated agent', () => {
+    const tokens: Partial<PaneTokens> = { ...WORKER_TOKENS, parent: 'agent-min-1039-review' };
+    const verdict = checkPrompt({
+      targetId: 'w1:p3',
+      targetTokens: tokens,
+      sender: { id: 'agent-min-1039-test', issue: 'MIN-1039', role: 'test' },
+      messageId: 'm',
+    });
+    expect(verdict).toMatchObject({ refused: true });
+    expect('reason' in verdict && verdict.reason).toContain("the worker's parent");
+  });
+
+  it('carries parentId from launch metadata into the tmux target tokens', () => {
+    expect(tokensFromLaunchMetadata({ issueId: 'MIN-1039', role: 'worker', parentId: 'conv-7' }))
+      .toMatchObject({ role: 'worker', parent: 'conv-7' });
+    expect(tokensFromLaunchMetadata({ issueId: 'MIN-1039', role: 'worker' })).not.toHaveProperty('parent');
   });
 
   it('does not spend a ring slot on a refused message', () => {

@@ -8,7 +8,7 @@ import { provisionOhmypiProviderForModel } from './ohmypi-models.js';
 import { shellQuoteModelIdSync } from './model-validation.js';
 import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
 import { getOverdeckHome, packageRoot } from './paths.js';
-import { buildGitGuardLines } from './launcher-git-guard.js';
+import { buildGitGuardLines, type GitGuardMode } from './launcher-git-guard.js';
 import { buildCodexCommand, type CodexNativeEndpointOption } from './launcher-codex-command.js';
 import { shellQuote } from './shell-quote.js';
 import { resolveKimiNativeEffort } from './kimi-effort.js';
@@ -124,6 +124,7 @@ export interface LauncherConfig extends CodexNativeEndpointOption {
   promptFile?: string;
   promptFileMode?: 'argument' | 'stdin';
   promptInline?: string;
+  gitGuardMode?: GitGuardMode; // PAN-3920: `read-only` refuses every git write in `workingDir`
 
   /**
    * PAN-1201: absolute path to the workspace's assembled context bundle
@@ -352,7 +353,7 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
   }
 
   if (config.overdeckEnv?.agentId && config.spawnMode !== 'conversation') {
-    lines.push(...buildGitGuardLines(config.overdeckEnv.agentId, config.workingDir));
+    lines.push(...buildGitGuardLines(config.overdeckEnv.agentId, config.workingDir, config.gitGuardMode ?? 'default'));
   }
 
   // Extra env exports

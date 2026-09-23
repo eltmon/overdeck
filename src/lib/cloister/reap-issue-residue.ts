@@ -9,6 +9,7 @@ import { AGENTS_DIR } from '../paths.js';
 import { killSession, listSessionNames } from '../tmux.js';
 import { teardownWorkspaceDockerByNamePromise } from '../workspace-manager/docker.js';
 import { pruneAgentStateDir } from '../agents/state-dir-removal.js';
+import { reapWorkerWorktrees } from '../workspaces/worker-worktrees.js';
 
 const execAsync = promisify(exec);
 
@@ -75,6 +76,14 @@ export async function reapIssueResidue(projectPath: string, issueId: string): Pr
   if (merged.status === 'unmerged') {
     actions.push(`skipped disk reap for ${issueId} — branch unmerged`);
     return actions;
+  }
+
+  // PAN-3920: registered workers' `.swarm/worker-<n>` worktrees and their
+  // `<feature>-worker-<n>` branches go with the issue.
+  try {
+    actions.push(...await reapWorkerWorktrees(projectPath, issueId, { removeWorktrees: true }));
+  } catch {
+    // Git unavailable — the workspace removal below still runs.
   }
 
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);

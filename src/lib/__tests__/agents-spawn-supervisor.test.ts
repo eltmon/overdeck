@@ -614,6 +614,40 @@ describe('spawnAgent PTY supervisor wiring', () => {
     );
   });
 
+  it('PAN-3920: launches a codex worker with its parent, the read-only guard, and a post-launch brief', async () => {
+    const { spawnRun } = await import('../agents.js');
+    const agentId = 'agent-pan-1405-worker-1';
+    mkdirSync(join(tmpHome, 'agents', agentId), { recursive: true });
+
+    await spawnRun('PAN-1405', 'worker', {
+      workspace,
+      agentId,
+      model: 'gpt-5.5',
+      harness: 'codex',
+      prompt: 'Review the diff and report.',
+      parentId: 'conv-orchestrator',
+      gitGuardMode: 'read-only',
+      registerConversation: false,
+      startedBy: 'pan-worker',
+    });
+
+    // Codex reads no prompt file on this path: the brief goes in after launch, sent as the parent.
+    expect(existsSync(join(tmpHome, 'agents', agentId, 'initial-prompt.md'))).toBe(false);
+    expect(deliverAgentMessageMock).toHaveBeenCalledWith(
+      agentId,
+      expect.stringContaining('Review the diff and report.'),
+      'spawnRun:initial-prompt',
+      undefined,
+      { sender: { id: 'conv-orchestrator' } },
+    );
+    const persisted = JSON.parse(readFileSync(join(tmpHome, 'agents', agentId, 'state.json'), 'utf8')) as AgentState;
+    expect(persisted).toMatchObject({ role: 'worker', parentId: 'conv-orchestrator', startedBy: 'pan-worker' });
+    const launcher = readFileSync(join(tmpHome, 'agents', agentId, 'launcher.sh'), 'utf8');
+    expect(launcher).toContain('This worker is read-only');
+    // The pane launches in the worker's own directory.
+    expect(createSessionMock).toHaveBeenCalledWith(agentId, workspace, expect.any(String), expect.anything());
+  });
+
   it.each(['acp', 'opencode'] as const)('stops and rejects a %s role when its initial prompt fails', async (harness) => {
     deliverAgentMessageMock.mockRejectedValueOnce(new Error('provider rejected prompt'));
     const { spawnRun } = await import('../agents.js');

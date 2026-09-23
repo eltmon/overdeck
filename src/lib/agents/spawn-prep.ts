@@ -162,6 +162,10 @@ export interface SpawnRunOptions {
   slotBranch?: string;
   /** Optional per-spawn cap for registered work-agent slots. Defaults to the work-agent governor cap. */
   maxRegisteredSlots?: number;
+  /** PAN-3920: agent or conversation that spawned this run (workers); stamped as the `parent` pane token. */
+  parentId?: string;
+  /** PAN-3920: `read-only` blocks git writes inside the run's workspace. */
+  gitGuardMode?: 'default' | 'read-only';
 }
 
 export interface RegisteredSlotSpawn {
@@ -985,7 +989,7 @@ export async function assertWorkspaceStackHealthyForSpawn(
   allowHost = false,
   workspacePath?: string,
 ): Promise<void> {
-  if (role === 'plan' || role === 'knowledge') return;
+  if (role === 'plan' || role === 'knowledge' || role === 'worker') return;
 
   // PAN-1872: guard against an undefined issueId so workspace health checks do
   // not crash with `Cannot read properties of undefined (reading 'toUpperCase')`

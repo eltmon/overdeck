@@ -139,6 +139,11 @@ function getSlotWorkSessionPattern(issueLower: string): RegExp {
   return new RegExp(`^agent-${escapeRegExp(issueLower)}-slot-(\\d+)$`, 'i');
 }
 
+/** PAN-3920: registered workers (`pan worker run`) of this issue. */
+function getWorkerSessionPattern(issueLower: string): RegExp {
+  return new RegExp(`^agent-${escapeRegExp(issueLower)}-worker-(\\d+)$`, 'i');
+}
+
 function issueIdsWithLiveTmuxSessions(sessionNames: ReadonlySet<string>): Set<string> {
   const issueIds = new Set<string>();
   for (const sessionName of sessionNames) {
@@ -199,6 +204,7 @@ async function collectSessionTreeNodes(
   const strikeAgentId = `strike-${issueLower}`;
   const knowledgeAgentId = `agent-${issueLower}-knowledge`;
   const slotWorkSessionPattern = getSlotWorkSessionPattern(issueLower);
+  const workerSessionPattern = getWorkerSessionPattern(issueLower);
   const sections: SessionNode[] = [];
   let hasPlanningSection = false;
 
@@ -218,7 +224,7 @@ async function collectSessionTreeNodes(
 
   for (const entry of agentEntries) {
     if (!entry.isDirectory()) continue;
-    if (slotWorkSessionPattern.test(entry.name)) {
+    if (slotWorkSessionPattern.test(entry.name) || workerSessionPattern.test(entry.name)) {
       candidateSessionIds.add(entry.name);
     }
   }
@@ -254,7 +260,9 @@ async function collectSessionTreeNodes(
         : context.tmuxSessionNames.has(checkId)
           ? await Effect.runPromise(detectAwaitingInputForAgent(checkId, { isPlanning }))
           : null;
-      const sessionWorkspacePath = getSessionTreeWorkspacePath(issueLower, workspacePath, projectPath, checkId);
+      const sessionWorkspacePath = state.role === 'worker' && state.workspace
+        ? state.workspace // a worker runs in its own .swarm worktree or the workspace itself
+        : getSessionTreeWorkspacePath(issueLower, workspacePath, projectPath, checkId);
       const jsonlPath = await resolveJsonlPath(checkId, sessionWorkspacePath);
 
       // Terminal-end signal: endedAt is populated only when the session has

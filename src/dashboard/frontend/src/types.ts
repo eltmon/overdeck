@@ -118,7 +118,7 @@ export interface Agent {
    * PAN-1048 role primitive. Replaces the legacy agentPhase string.
    * 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'knowledge'.
    */
-  role?: 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer' | 'knowledge';
+  role?: 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer' | 'knowledge' | 'worker';
   /**
    * @deprecated PAN-1048 — server stopped emitting this; kept on the type
    * temporarily so older test fixtures still compile while their references

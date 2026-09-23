@@ -258,3 +258,6 @@ __pycache__/
 
 # pan reload keeps a rollback copy of the previous build next to dist/
 dist.rollback.*/
+
+# Item and worker worktrees under a workspace (pan spawn, pan worker run, PAN-3920)
+.swarm/

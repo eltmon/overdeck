@@ -34,6 +34,14 @@ already goes through.
   This creates a worker pane inside the issue's workspace, stamped with
   backend metadata `issue=<id>`, `role=worker`, `harness=<h>`, `model=<m>`.
 
+`pan spawn` is the foreman's pane-only item worker: it has no `state.json`,
+returns only a pane id, and reports through `pan task done`. `pan worker run`
+(PAN-3920, [reference/workers.mdx](../reference/workers.mdx)) is the registered
+worker: a native agent with role `worker`, its own state, transcript and cost,
+a parent that may steer it, and a report that comes back to the caller on
+stdout. Use `pan spawn` for xBRIEF items inside a wave; use `pan worker run`
+to delegate a bounded brief and read its answer.
+
 Every worker gets an exact file-ownership map in its dispatch prompt. Items
 whose maps overlap run serially in the same wave; disjoint items run
 concurrently.
@@ -61,8 +69,8 @@ A worker never calls `pan done`.
   branch (cherry-pick or merge; re-add the `Item:` trailer if you squash)
   and push. A `pan spawn` pane already pushed the shared branch itself —
   just confirm it landed.
-- **Own messaging.** Only the foreman's own pane, or an operator, may
-  `pan tell` a worker pane — a worker pane refuses a prompt from anywhere
+- **Own messaging.** Only the foreman's own pane, the worker's parent (for a
+  `pan worker run` worker), or an operator, may `pan tell` a worker pane — a worker pane refuses a prompt from anywhere
   else (backend-enforced). Workers do not message each other; route
   cross-item questions through the foreman.
 - **Sequence waves.** Don't start wave N+1 items until wave N's

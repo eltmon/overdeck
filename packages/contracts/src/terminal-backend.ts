@@ -28,6 +28,8 @@ export interface PaneTokens {
   readonly role: AgentRole
   readonly harness: string
   readonly model: string
+  /** Agent or conversation that spawned this pane (PAN-3920 workers); it may prompt the pane. */
+  readonly parent?: string
 }
 
 /** One agent pane as the backend reports it. */

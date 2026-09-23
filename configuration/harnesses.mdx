@@ -543,6 +543,24 @@ configuration, so harness routing for autonomous role runs lives alongside the
 rest of the orchestrator's defaults — set the harness once per role here and
 every pipeline spawn for that role inherits it.
 
+## Use Overdeck workers instead of harness plugins
+
+To hand a task to another agent, run `pan worker run` (skill `/pan-worker`)
+rather than a harness plugin such as the Codex plugin. A bundled rule tells
+agents the same. See [Workers](/reference/workers) for the commands.
+
+| | Overdeck worker (`pan worker run`) | Harness plugin (for example the Codex plugin) |
+| --- | --- | --- |
+| Visibility | In the Agents Directory, under its parent and its issue | None, unless something registers it with Overdeck |
+| Issue link | Always linked to an issue | None |
+| Transcript | On the agent transcript route, like any agent | Only in the plugin's own files |
+| Cost | Attributed to the issue | Not attributed |
+| Control | `pan tell`, `pan kill`, restart | None from Overdeck |
+| Harness and model | Any harness through role routing (`roles.worker`), or `--harness` / `--model` | The plugin's own |
+| Result | The report comes back to the caller on stdout | The plugin returns its result as a tool result |
+| Sandbox | None. `--read-only` adds a PATH shim against accidental git writes to the issue's repository; it restricts no file or network writes | The plugin's file-system and network sandbox |
+| Setup | Needs the issue's workspace (`pan start` first) | None |
+
 ## ToS rules
 
 There is exactly **one blocked combination**, gated by
