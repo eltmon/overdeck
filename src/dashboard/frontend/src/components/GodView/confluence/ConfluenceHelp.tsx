@@ -5,7 +5,7 @@ interface ConfluenceHelpProps {
   onClose: () => void;
 }
 
-const HELP_ROLES = ['plan', 'work', 'review', 'test', 'ship', 'strike', 'flywheel', 'sequencer'] as const;
+const HELP_ROLES = ['plan', 'work', 'worker', 'review', 'test', 'ship', 'strike', 'flywheel', 'sequencer'] as const;
 const HELP_HOOKS: HookFamilyKey[][] = [
   ['tool_read', 'tool_write', 'tool_exec'],
   ['tool_web', 'tool_agent', 'lifecycle'],

@@ -93,6 +93,62 @@ describe('companion terminal lifecycle', () => {
     });
   });
 
+  it('routes a Codex conversation to the codex adapter and passes its pane env through (PAN-3835)', async () => {
+    const { host, created } = fakeHost();
+    const codexTarget: CompanionTargetResolution = {
+      ok: true,
+      argv: ['/usr/bin/codex', 'resume', '--remote', 'unix:///a/app.sock', '01a0cf2b-92d3-7260-9919-e020c0c91104'],
+      cwd: '/work/repo',
+      env: { CODEX_HOME: '/a/codex-home-v2' },
+      fingerprint: 'gen-1:01a0cf2b-92d3-7260-9919-e020c0c91104:0',
+    };
+    const codex: CompanionTerminalAdapter = { kind: 'codex-resume-remote', resolveTarget: vi.fn(async () => codexTarget) };
+    const opencode = adapterReturning(TARGET);
+    const lifecycle = createCompanionTerminalLifecycle({
+      host,
+      adapters: { 'opencode-attach': opencode, 'codex-resume-remote': codex },
+      log: () => undefined,
+    });
+
+    const state = await lifecycle.open({ ...OWNER, harness: 'codex' });
+
+    expect(state).toMatchObject({ status: 'attached', kind: 'codex-resume-remote', reused: false });
+    expect(opencode.resolveTarget).not.toHaveBeenCalled();
+    expect(created[0]?.spec).toEqual({
+      cwd: '/work/repo',
+      argv: codexTarget.argv,
+      env: { CODEX_HOME: '/a/codex-home-v2' },
+      generation: (state as { generation: string }).generation,
+    });
+  });
+
+  it('replaces the Codex companion when the fingerprint moves (host restart or native navigation)', async () => {
+    const { host, created, killed } = fakeHost();
+    const base = {
+      ok: true as const,
+      argv: ['/usr/bin/codex', 'resume', '--remote', 'unix:///a/app.sock', 't'],
+      cwd: '/work/repo',
+    };
+    const codex: CompanionTerminalAdapter = {
+      kind: 'codex-resume-remote',
+      resolveTarget: vi.fn()
+        .mockResolvedValueOnce({ ...base, fingerprint: 'gen-1:t:0' })
+        .mockResolvedValueOnce({ ...base, fingerprint: 'gen-1:t:0' })
+        .mockResolvedValue({ ...base, fingerprint: 'gen-1:t:1' }),
+    };
+    const lifecycle = createCompanionTerminalLifecycle({ host, adapters: { 'codex-resume-remote': codex }, log: () => undefined });
+    const owner = { ...OWNER, harness: 'codex' };
+
+    const first = await lifecycle.open(owner);
+    // The TUI ran /new: the next open returns to the conversation's own thread.
+    const second = await lifecycle.open(owner);
+
+    expect(created).toHaveLength(2);
+    expect(killed).toEqual([COMPANION]);
+    expect(second).toMatchObject({ status: 'attached', reused: false });
+    expect((second as { generation: string }).generation).not.toBe((first as { generation: string }).generation);
+  });
+
   it('reuses the companion on reopen instead of creating another', async () => {
     const { host, created } = fakeHost();
     const lifecycle = lifecycleWith(host, adapterReturning(TARGET));

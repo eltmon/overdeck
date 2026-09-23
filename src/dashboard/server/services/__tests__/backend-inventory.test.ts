@@ -79,6 +79,7 @@ describe('parseAgentSessionName', () => {
     expect(parseAgentSessionName('agent-pan-3917-test')).toEqual({ issue: 'PAN-3917', role: 'test' });
     expect(parseAgentSessionName('agent-pan-3917-uat')).toEqual({ issue: 'PAN-3917', role: 'uat' });
     expect(parseAgentSessionName('agent-pan-3917-slot-2')).toEqual({ issue: 'PAN-3917', role: 'worker' });
+    expect(parseAgentSessionName('agent-pan-3920-worker-3')).toEqual({ issue: 'PAN-3920', role: 'worker' });
     expect(parseAgentSessionName('strike-pan-3844')).toEqual({ issue: 'PAN-3844', role: 'strike' });
     expect(parseAgentSessionName('planning-pan-4000')).toEqual({ issue: 'PAN-4000', role: 'plan' });
   });

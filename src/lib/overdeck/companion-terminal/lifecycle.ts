@@ -43,6 +43,8 @@ export type CompanionTargetResolution =
       readonly ok: true;
       readonly argv: readonly string[];
       readonly cwd: string;
+      /** Extra environment for the companion pane (e.g. the owner's CODEX_HOME). */
+      readonly env?: Readonly<Record<string, string>>;
       /** Identity of the owner runtime the argv points at (e.g. `<port>:<sessionId>`). */
       readonly fingerprint: string;
     }
@@ -84,7 +86,13 @@ const STALE_GENERATION_MESSAGE =
   'This terminal belongs to an earlier run of the conversation, so it was left alone. Reopen Terminal.';
 
 type Resolved =
-  | { readonly ok: true; readonly generation: string; readonly argv: readonly string[]; readonly cwd: string }
+  | {
+      readonly ok: true;
+      readonly generation: string;
+      readonly argv: readonly string[];
+      readonly cwd: string;
+      readonly env?: Readonly<Record<string, string>>;
+    }
   | { readonly ok: false; readonly reason: CompanionTerminalUnavailableReason; readonly message: string };
 
 export function createCompanionTerminalLifecycle(deps: {
@@ -117,6 +125,7 @@ export function createCompanionTerminalLifecycle(deps: {
       generation: companionGeneration(owner.ownerSession, stamp, target.fingerprint),
       argv: target.argv,
       cwd: target.cwd,
+      ...(target.env ? { env: target.env } : {}),
     };
   }
 
@@ -153,7 +162,12 @@ export function createCompanionTerminalLifecycle(deps: {
           return { status: 'attached', kind: adapter.kind, sessionName, generation: before.generation, reused: true };
         }
         if (existing !== undefined) await host.kill(sessionName);
-        await host.create(sessionName, { cwd: before.cwd, argv: before.argv, generation: before.generation });
+        await host.create(sessionName, {
+          cwd: before.cwd,
+          argv: before.argv,
+          generation: before.generation,
+          ...(before.env ? { env: before.env } : {}),
+        });
 
         const after = await resolve(adapter, owner);
         if (!after.ok || after.generation !== before.generation) {

@@ -91,6 +91,7 @@ pan-tts
 pan-unpause
 pan-up
 pan-wipe
+pan-worker
 pan-workspace
 pan-workspace-config
 pipeline-list

@@ -2,8 +2,9 @@
  * The conversation TERMINAL view (PAN-3974).
  *
  * Harnesses without a companion terminal render exactly what TERMINAL always
- * rendered: the owner session's pane. Harnesses with one (OpenCode today;
- * Codex `resume --remote` next, PAN-3835) get two panes:
+ * rendered: the owner session's pane. Harnesses with one (OpenCode's
+ * `opencode attach`, PAN-3974; Codex's `codex resume --remote`, PAN-3835) get
+ * two panes:
  *
  * - Native CLI — a companion terminal the server opens (or reuses) running
  *   the harness's own client attached to the same session. Leaving the view or
@@ -53,6 +54,8 @@ export function ConversationTerminalView({ conversation }: ConversationTerminalV
 
 function CompanionTerminalView({ conversation }: ConversationTerminalViewProps) {
   const [pane, setPane] = useState<Pane>('native');
+  const [ownPaneFirst, setOwnPaneFirst] = useState(false);
+  const runtimeFirst = useRef(false);
   const [state, setState] = useState<CompanionPhase>({ phase: 'opening' });
   const [closing, setClosing] = useState(false);
   // Only the newest request may write state: a slow response from an earlier
@@ -69,6 +72,15 @@ function CompanionTerminalView({ conversation }: ConversationTerminalViewProps) 
         setState({ phase: 'attached', sessionName: result.sessionName, generation: result.generation });
       } else if (result.status === 'unavailable') {
         setState({ phase: 'unavailable', reason: result.reason, message: result.message });
+        // A harness whose own pane is the interactive CLI (legacy
+        // `codex.transport: tui`) opens straight on Runtime log, as before the
+        // companion existed. Only on the first answer, so choosing Native CLI
+        // afterwards still shows why it is unavailable.
+        if (result.reason === 'unsupported' && !runtimeFirst.current) {
+          runtimeFirst.current = true;
+          setOwnPaneFirst(true);
+          setPane('runtime');
+        }
       } else {
         setState({ phase: 'closed' });
       }
@@ -110,7 +122,7 @@ function CompanionTerminalView({ conversation }: ConversationTerminalViewProps) 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="companion-terminal-view">
       <div className="flex items-center gap-2 border-b border-border px-3 py-1.5">
-        <ViewToggle ariaLabel="Terminal pane" value={pane} onChange={setPane} options={PANE_OPTIONS} />
+        <ViewToggle ariaLabel="Terminal pane" value={pane} onChange={setPane} options={ownPaneFirst ? [...PANE_OPTIONS].reverse() : PANE_OPTIONS} />
         {pane === 'native' && state.phase === 'attached' && (
           <button
             type="button"
@@ -177,6 +189,13 @@ function CompanionNotice({
   );
 }
 
+function unavailableTitle(reason: CompanionTerminalUnavailableReason): string {
+  if (reason === 'restart-required') return 'Restart required for the native CLI';
+  if (reason === 'cli-unsupported') return 'Upgrade required for the native CLI';
+  if (reason === 'session-not-started') return 'Native CLI not available yet';
+  return 'Native CLI unavailable';
+}
+
 function noticeCopy(state: Exclude<CompanionPhase, { phase: 'attached' | 'opening' }>): {
   title: string;
   message: string;
@@ -195,11 +214,11 @@ function noticeCopy(state: Exclude<CompanionPhase, { phase: 'attached' | 'openin
       return { title: 'Could not attach the native CLI', message: state.message, canOpen: true };
     case 'unavailable':
       return {
-        title: state.reason === 'restart-required' ? 'Restart required for the native CLI' : 'Native CLI unavailable',
+        title: unavailableTitle(state.reason),
         message: state.message,
-        // A restart-required conversation needs the operator to restart it;
-        // retrying the attach cannot help. Everything else can be retried.
-        canOpen: state.reason !== 'restart-required' && state.reason !== 'unsupported',
+        // Restarting, upgrading, or a harness without a companion cannot be
+        // fixed by retrying the attach. Everything else can be retried.
+        canOpen: state.reason !== 'restart-required' && state.reason !== 'unsupported' && state.reason !== 'cli-unsupported',
       };
   }
 }

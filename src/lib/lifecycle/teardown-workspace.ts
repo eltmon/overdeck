@@ -26,6 +26,7 @@ import { findAllWorkspacePaths, findWorkspacePath } from './archive-planning.js'
 import { getContainersReferencingWorkspacePath } from '../workspace-manager.js';
 import { DEVCONTAINER_DIRNAME } from '../workspace/devcontainer-renderer.js';
 import { pruneAgentStateDir } from '../agents/state-dir-removal.js';
+import { reapWorkerWorktrees } from '../workspaces/worker-worktrees.js';
 import { listAgentStatesSync, saveAgentStateSync } from '../agents/agent-state.js';
 
 const execAsync = promisify(exec);
@@ -320,6 +321,22 @@ async function removeWorktreeImpl(
       return stepFailed(step, `Failed to remove workspace: ${(err as Error).message}`);
     }
   }
+}
+
+/**
+ * Registered workers' residue (PAN-3920). Their `.swarm/worker-<n>` worktrees
+ * are removed only when the workspace itself is deleted: a kept workspace keeps
+ * them, uncommitted changes included. Worker branches are deleted only when
+ * already contained in the default or feature branch (`reapWorkerWorktrees`).
+ */
+export function removeWorkerWorktrees(projectPath: string, issueId: string, deletingWorkspace: boolean): Effect.Effect<StepResult> {
+  const step = 'teardown:worker-worktrees';
+  // The promise never rejects: a cleanup failure is reported as a skipped step.
+  return Effect.promise(() =>
+    reapWorkerWorktrees(projectPath, issueId, { removeWorktrees: deletingWorkspace }).then(
+      (details) => (details.length > 0 ? stepOk(step, details) : stepSkipped(step, ['No worker worktrees'])),
+      (err: unknown) => stepSkipped(step, [`Worker worktree cleanup failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`]),
+    ));
 }
 
 /**
@@ -751,6 +768,9 @@ export function teardownWorkspace(
           results.push(yield* removeHumeEviConfig(opts.workspaceConfig.hume, placeholders));
         }
       }
+
+      // 8b. PAN-3920: registered workers' worktrees go only with the workspace.
+      results.push(yield* removeWorkerWorktrees(ctx.projectPath, ctx.issueId, shouldDeleteWorkspace));
 
       // 9. Remove worktree + workspace directory (only if deleting workspace).
       if (shouldDeleteWorkspace) {

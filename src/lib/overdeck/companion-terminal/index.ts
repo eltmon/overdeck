@@ -1,8 +1,8 @@
 /**
  * Companion terminals (PAN-3974): the process-wide lifecycle wired to the
  * managed tmux socket and the registered adapters, plus the owner-teardown
- * hook the conversation runtime calls. PAN-3835 registers its Codex adapter in
- * `DEFAULT_ADAPTERS`; nothing else changes.
+ * hook the conversation runtime calls. OpenCode (PAN-3974) and Codex (PAN-3835)
+ * each register one adapter in `defaultAdapters()`; nothing else changes.
  */
 import type { CompanionTerminalKind } from '@overdeck/contracts';
 import { createTmuxCompanionHost } from './host.js';
@@ -12,6 +12,7 @@ import {
   type CompanionTerminalLifecycle,
 } from './lifecycle.js';
 import { createOpenCodeCompanionAdapter } from './opencode-adapter.js';
+import { createCodexCompanionAdapter } from './codex-adapter.js';
 
 export {
   companionSessionName,
@@ -25,11 +26,15 @@ export {
 } from './lifecycle.js';
 export { createTmuxCompanionHost, type CompanionTerminalHost } from './host.js';
 export { createOpenCodeCompanionAdapter } from './opencode-adapter.js';
+export { createCodexCompanionAdapter } from './codex-adapter.js';
 
 let lifecycle: CompanionTerminalLifecycle | undefined;
 
 function defaultAdapters(): Partial<Record<CompanionTerminalKind, CompanionTerminalAdapter>> {
-  return { 'opencode-attach': createOpenCodeCompanionAdapter() };
+  return {
+    'opencode-attach': createOpenCodeCompanionAdapter(),
+    'codex-resume-remote': createCodexCompanionAdapter(),
+  };
 }
 
 export function getCompanionTerminalLifecycle(): CompanionTerminalLifecycle {

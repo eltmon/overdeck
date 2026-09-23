@@ -359,7 +359,7 @@ export interface WeightedModelRef {
 
 /** Top-level role model: either a scalar model string or a weighted distribution list. */
 export type RoleModelRef = ModelRef | WeightedModelRef[];
-export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer' | 'knowledge';
+export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer' | 'knowledge' | 'worker';
 
 
 /**

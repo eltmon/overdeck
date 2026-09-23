@@ -243,6 +243,7 @@ async function spawnRunWithoutConsentClaim(
     reviewSynthesisAgentId: options.reviewSynthesisAgentId,
     reviewOutputPath: options.reviewOutputPath,
     reviewDeadlineAt: options.reviewDeadlineAt,
+    parentId: options.parentId,
   };
   // PAN-1048 P1: spawnRun is on the dashboard hot path (Effect routes,
   // reactive Cloister scheduler). All disk I/O here uses async fs/promises
@@ -255,7 +256,9 @@ async function spawnRunWithoutConsentClaim(
   // ship), not on stdin to a headless `claude --print`.
   const shouldDeliverPromptViaTmux = shouldRegisterConversation && resolvedHarness === 'claude-code';
   const shouldDeliverPromptViaPi = shouldRegisterConversation && resolvedHarness === 'ohmypi';
-  const shouldDeliverPromptViaCodexTui = shouldRegisterConversation && resolvedHarness === 'codex';
+  // PAN-3920: codex reads no prompt file, so a worker's brief is delivered after launch, as its parent.
+  const shouldDeliverPromptViaCodexTui = (shouldRegisterConversation || role === 'worker') && resolvedHarness === 'codex';
+  const kickoffOpts = options.parentId ? { sender: { id: options.parentId } } : {};
   const shouldDeliverPromptViaKimiCode = resolvedHarness === 'muse' || resolvedHarness === 'kimi-code';
   const shouldDeliverPromptViaAcp = resolvedHarness === 'acp' || resolvedHarness === 'opencode';
   const prompt = options.prompt
@@ -396,6 +399,7 @@ async function spawnRunWithoutConsentClaim(
     promptFileMode: undefined,
     overdeckEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
     extraEnvExports,
+    gitGuardMode: options.gitGuardMode,
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole, options.effort),
     appendSystemPromptFiles: await claudeSystemPromptFiles(workspace, resolvedHarness),
     sessionId,
@@ -450,6 +454,7 @@ async function spawnRunWithoutConsentClaim(
       role: toPaneRole(role),
       harness: resolvedHarness,
       model: selectedModel,
+      ...(options.parentId ? { parent: options.parentId } : {}),
     },
   }).then((pane) => { launchedPane = pane; });
   if (resolvedHarness === 'kimi-code') {
@@ -489,7 +494,7 @@ async function spawnRunWithoutConsentClaim(
     if (shouldDeliverPromptViaAcp) {
       try {
         await waitForPromptReady(agentId, resolvedHarness, 30);
-        const delivery = await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt');
+        const delivery = await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt', undefined, kickoffOpts);
         if (!delivery.ok) {
           throw new Error(delivery.failure ?? `ACP delivery returned ok=false via ${delivery.path}`);
         }
@@ -551,7 +556,7 @@ async function spawnRunWithoutConsentClaim(
         if (ready) {
           await new Promise<void>((resolve) => setTimeout(resolve, 500));
           try {
-            const delivery = await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt');
+            const delivery = await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt', undefined, kickoffOpts);
             if (resolvedHarness === 'kimi-code' && !delivery.ok) {
               throw new Error(delivery.failure ?? `delivery returned ok=false via ${delivery.path}`);
             }

@@ -14,6 +14,10 @@
  *   4. subagents       — Claude/Codex subagents of every non-stopped parent
  *   5. external        — Phase C registrations (none yet)
  *
+ * Workers (Phase B, role `worker`) are native agents with a parent: their
+ * `parentId` names an agent id or a conversation tmux session, which maps to
+ * that conversation's `conv:<name>` entry so the worker nests under it.
+ *
  * State vocabulary and window rules are D3/D4 of `.pan/drafts/pan-3920.md`;
  * docs/DASHBOARD-ARCHITECTURE.md "Agents Directory" restates them.
  */
@@ -30,6 +34,9 @@ import type {
 import { getHarnessBehavior } from '@overdeck/contracts';
 
 import { listAgentStatesAsync, type AgentState } from '../../../lib/agents/agent-state-read.js';
+import { latestWorkerReportAt as defaultLatestWorkerReportAt } from '../../../lib/agents/worker/report.js';
+import { readWorkerFacts } from '../../../lib/agents/worker/facts.js';
+import { workerNumber } from '../../../lib/agents/worker/ids.js';
 import { createSettledTtlPromiseCache, withConcurrencyLimitPromise } from '../../../lib/concurrency.js';
 import { getEnrichedConversationList } from '../../../lib/overdeck/conversation-list.js';
 import { resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js';
@@ -45,6 +52,12 @@ export const DIRECTORY_MEMO_MS = 3_000;
 /** Same limit the frontend's GET /api/conversations uses, so both share one coalesced enrichment. */
 export const DIRECTORY_CONVERSATION_LIMIT = 500;
 export const DIRECTORY_SUBAGENT_CONCURRENCY = 8;
+/**
+ * D3 worker rule: an idle worker whose newest report belongs to its last turn
+ * is `done`. A worker reports as the last step of a turn and goes idle right
+ * after, so the report is at most this much older than the idle transition.
+ */
+export const WORKER_REPORT_TURN_GRACE_MS = 120_000;
 export { SUBAGENT_WORKING_MTIME_MS };
 
 const UNASSIGNED_PROJECT = 'unassigned';
@@ -87,6 +100,10 @@ export interface AgentDirectoryDeps {
   readonly readRemoteState?: (agentId: string) => Promise<RemoteStateFacts | null>;
   readonly listConversationSubagents?: (row: DirectoryConversationRow) => Promise<readonly DirectorySubagent[]>;
   readonly listAgentSubagents?: (agentId: string, workspace: string) => Promise<readonly DirectorySubagent[]>;
+  /** Mtime (epoch ms) of a worker's newest report (PAN-3920 W15). */
+  readonly latestWorkerReportAt?: (agentId: string) => Promise<number | null>;
+  /** The optional `--name` label from a worker's worker.json. */
+  readonly readWorkerName?: (agentId: string) => Promise<string | null>;
   /** Phase C (external registrations). */
   readonly listExternalEntries?: (now: number) => Promise<readonly DirectoryEntry[]>;
   readonly projectKeyForIssue?: (issueId: string) => string | null;
@@ -140,6 +157,10 @@ async function defaultIssueTitles(): Promise<ReadonlyMap<string, string>> {
 
 /** Directory reads never write lifecycle log lines (D1). */
 const QUIET_RESOLVE = { resolveOptions: { logDiagnostic: () => {} } } as const;
+
+async function defaultReadWorkerName(agentId: string): Promise<string | null> {
+  return (await readWorkerFacts(agentId))?.name ?? null;
+}
 
 function defaultListAgentStates(): Promise<readonly AgentState[]> {
   return listAgentStatesAsync({ skip: (name) => name.startsWith('conv-') });
@@ -197,6 +218,18 @@ function paneState(pane: BackendPane | undefined): DirectoryEntryState {
   return pane.state === 'exited' ? 'stopped' : pane.state;
 }
 
+/**
+ * D3 worker rule: as a native agent, except an idle pane whose newest report
+ * belongs to the turn that just ended is `done`.
+ */
+function workerState(pane: BackendPane | undefined, latestReportAt: number | null): DirectoryEntryState {
+  const state = paneState(pane);
+  if (state !== 'idle' || latestReportAt === null) return state;
+  const idleSince = pane?.stateSince;
+  if (idleSince === undefined || latestReportAt >= idleSince - WORKER_REPORT_TURN_GRACE_MS) return 'done';
+  return state;
+}
+
 function conversationState(row: DirectoryConversationRow): DirectoryEntryState {
   if (!row.sessionAlive) return 'stopped';
   if (row.pendingInputCount > 0) return 'blocked';
@@ -216,7 +249,11 @@ function truncate(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`;
 }
 
-function nativeLabel(state: AgentState): string {
+function nativeLabel(state: AgentState, workerName: string | null): string {
+  if (state.role === 'worker') {
+    const issue = state.issueId ? state.issueId.toUpperCase() : state.id;
+    return `worker · ${issue} · ${workerName ?? workerNumber(state.id) ?? state.id}`;
+  }
   const role = state.role === 'review' && state.reviewSubRole ? `review/${state.reviewSubRole}` : state.role;
   return state.issueId ? `${role} · ${state.issueId.toUpperCase()}` : `${role} · ${state.id}`;
 }
@@ -260,7 +297,17 @@ export async function buildAgentDirectory(
 
   // 1. Native agents (never conversation agent dirs).
   const natives = states.filter((state) => !state.id.startsWith('conv-'));
-  const remotes = await Promise.all(natives.map((state) => readRemoteState(state.id)));
+  const latestReportAt = deps.latestWorkerReportAt ?? defaultLatestWorkerReportAt;
+  const readWorkerName = deps.readWorkerName ?? defaultReadWorkerName;
+  const [remotes, workerFacts] = await Promise.all([
+    Promise.all(natives.map((state) => readRemoteState(state.id))),
+    Promise.all(natives.map(async (state) => state.role === 'worker'
+      ? {
+          reportAt: await latestReportAt(state.id).catch(() => null),
+          name: await readWorkerName(state.id).catch(() => null),
+        }
+      : null)),
+  ]);
   natives.forEach((state, index) => {
     const matching = panes.filter((pane) => pane.agentId === state.id || (!pane.agentId && pane.id === state.id));
     const pane = matching.find((candidate) => candidate.state !== 'exited') ?? matching[0];
@@ -270,19 +317,21 @@ export async function buildAgentDirectory(
     // A remote agent's terminal is on the Fly VM: unknown while it runs, stopped once
     // remote-state.json says it stopped or failed, so it windows out (D3/D4).
     const remoteStopped = remote && (remoteState?.status === 'stopped' || remoteState?.status === 'error');
+    const worker = workerFacts[index];
+    const localState = worker ? workerState(pane, worker.reportAt) : paneState(pane);
     const entry: DirectoryEntry = {
       id: state.id,
       kind: 'agent',
-      label: nativeLabel(state),
+      label: nativeLabel(state, worker?.name ?? null),
       location: remote ? 'remote' : 'local',
       projectKey: UNASSIGNED_PROJECT,
       issueId: state.issueId ? state.issueId.toUpperCase() : null,
       issueTitle: null,
-      parentId: (state as { parentId?: string }).parentId ?? null,
+      parentId: state.parentId ?? null,
       role: state.role,
       harness: state.harness ?? pane?.harness ?? 'unknown',
       model: state.model || pane?.model || 'unknown',
-      state: remoteStopped ? 'stopped' : remote ? 'unknown' : paneState(pane),
+      state: remoteStopped ? 'stopped' : remote ? 'unknown' : localState,
       startedAt: state.startedAt ?? null,
       lastActivityAt: state.lastActivity ?? state.stoppedAt ?? state.startedAt ?? null,
       costUsd: null,
@@ -327,7 +376,10 @@ export async function buildAgentDirectory(
 
   // 3. Conversations.
   const conversationParents: Array<{ entry: DirectoryEntry; row: DirectoryConversationRow }> = [];
+  const conversationIdBySession = new Map<string, string>();
   for (const row of conversationRows.filter(isConversationRow)) {
+    conversationIdBySession.set(row.tmuxSession.toLowerCase(), `conv:${row.name}`);
+    conversationIdBySession.set(row.name.toLowerCase(), `conv:${row.name}`);
     const entry: DirectoryEntry = {
       id: `conv:${row.name}`,
       kind: 'conversation',
@@ -349,6 +401,14 @@ export async function buildAgentDirectory(
     };
     candidates.push({ entry, cwd: row.cwd || null, explicitProjectKey: row.projectKey });
     if (entry.state !== 'stopped') conversationParents.push({ entry, row });
+  }
+
+  // A worker spawned by a conversation names its tmux session (OVERDECK_CONVERSATION);
+  // point it at that conversation's entry so the worker nests under it (D6).
+  for (const candidate of candidates) {
+    const parent = candidate.entry.parentId;
+    const conversationId = parent ? conversationIdBySession.get(parent.toLowerCase()) : undefined;
+    if (conversationId) candidate.entry = { ...candidate.entry, parentId: conversationId };
   }
 
   // 4. Subagents of every non-stopped parent.

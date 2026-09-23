@@ -14,10 +14,8 @@
  * liveness and is read live.
  */
 
-import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { promisify } from 'node:util';
 
 import chalk from 'chalk';
 import type { Command } from 'commander';
@@ -27,6 +25,7 @@ import { exitCli } from '../exit.js';
 import { resolveIssueIdSync } from '../../lib/issue-id.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { readWorkspacePlanSync } from '../../lib/xbrief/io.js';
+import { createItemWorktree } from '../../lib/workspaces/item-worktree.js';
 // launch.js registers both adapters at import time and owns the one backend
 // resolution (policy + Herdr availability probe, PAN-3956).
 import { resolveLaunchBackend } from '../../lib/terminal-backends/launch.js';
@@ -35,8 +34,6 @@ import {
   type AgentPaneRef,
   type TerminalBackend,
 } from '../../lib/terminal-backends/types.js';
-
-const execFileAsync = promisify(execFile);
 
 export interface SpawnOptions {
   issue?: string;
@@ -58,36 +55,6 @@ export interface SpawnDeps {
  */
 async function defaultResolveBackend(): Promise<TerminalBackend> {
   return resolveLaunchBackend();
-}
-
-/**
- * `<workspace>/.swarm/<item>/` as a git worktree on its own item branch, cut
- * from the issue's feature branch. The branch matters: a detached worktree
- * orphans everything the worker commits. An existing worktree is reused.
- * Async git only.
- */
-async function defaultCreateWorktree(workspacePath: string, itemId: string): Promise<string> {
-  const path = join(workspacePath, '.swarm', itemId);
-  if (existsSync(path)) return path;
-
-  const { stdout } = await execFileAsync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: workspacePath });
-  const featureBranch = stdout.trim();
-  const itemBranch = `${featureBranch}/${itemId}`;
-
-  const branchExists = await execFileAsync(
-    'git',
-    ['rev-parse', '--verify', '--quiet', `refs/heads/${itemBranch}`],
-    { cwd: workspacePath },
-  ).then(() => true, () => false);
-
-  await execFileAsync(
-    'git',
-    branchExists
-      ? ['worktree', 'add', path, itemBranch]
-      : ['worktree', 'add', '-b', itemBranch, path, featureBranch],
-    { cwd: workspacePath },
-  );
-  return path;
 }
 
 export async function spawnCommand(options: SpawnOptions, deps: SpawnDeps = {}): Promise<void> {
@@ -127,7 +94,7 @@ export async function spawnCommand(options: SpawnOptions, deps: SpawnDeps = {}):
   const harness = options.harness ?? 'claude-code';
   const filesScope = item.metadata?.files_scope;
   const cwd = filesScope?.length
-    ? await (deps.createWorktree ?? defaultCreateWorktree)(workspacePath, item.id)
+    ? await (deps.createWorktree ?? createItemWorktree)(workspacePath, item.id)
     : workspacePath;
 
   const backend = await (deps.resolveBackend ?? defaultResolveBackend)();

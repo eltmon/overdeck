@@ -135,6 +135,7 @@
               "reference/architecture",
               "reference/god-view",
               "reference/agents-directory",
+              "reference/workers",
               "reference/state-model",
               "reference/harness-landscape",
               "reference/posthog-agents",
