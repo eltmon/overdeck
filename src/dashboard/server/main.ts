@@ -24,6 +24,7 @@ import {
 import { whenDashboardListening } from './dashboard-listening.js';
 import { startAgentOutputService, stopAgentOutputService } from './services/agent-output-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
+import { startCodexPluginImporter, stopCodexPluginImporter } from './services/codex-plugin-importer.js';
 import { startRestartAnnouncer, stopRestartAnnouncer } from './services/restart-announcer.js';
 import { startUatTrainReconciler, stopUatTrainReconciler } from './services/uat-train.js';
 import { startTtsSummarizer, stopTtsSummarizer } from './services/tts-summarizer.js';
@@ -501,6 +502,13 @@ console.log('[overdeck] Agent stopped/status notifiers → domain events wired')
 startConversationLifecycleService();
 console.log('[overdeck] ConversationLifecycleService started');
 
+// PAN-3920 W20: register Codex-plugin jobs as external agents the first time
+// they are seen (the plugin deletes its job records when the parent session
+// ends). Read-only over the plugin's files; a peer dashboard registers nothing.
+if (!isPeerDashboard && startCodexPluginImporter()) {
+  console.log('[overdeck] Codex-plugin job importer started');
+}
+
 // PAN-1737 UAT batch trains: keep one assembled, testable batch ready at all
 // times. Gated per-tick on the merge-train setting; there is no flywheel run
 // to wait for (PAN-3917 D12).
@@ -688,6 +696,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopAgentEnrichmentService();
   stopAgentOutputService();
   stopConversationLifecycleService();
+  stopCodexPluginImporter();
   stopUatTrainReconciler();
   stopTtsSummarizer();
   stopTtsPlayback();

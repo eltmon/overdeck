@@ -21,6 +21,7 @@ import { promisify } from 'node:util';
 import { listOpenGitLabMergeRequests, type GitLabMergeRequestRow } from '../gitlab-merge-requests.js';
 import { fetchIssuePullRequest, type IssuePullRequestData } from '../overdeck/pull-requests.js';
 import { resolveProjectReposForIssueSync, type ResolvedProjectRepo } from '../project-repos.js';
+import { parseUatVerdict } from './uat-verdict-marker.js';
 import { isCiTestCheckName } from './verification-tests-mode.js';
 
 const execFileAsync = promisify(execFile);
@@ -64,8 +65,31 @@ export interface PrFacts {
    * failure. Absent when the forge reports no per-check detail (GitLab).
    */
   testCheckFailures?: readonly FailedCheck[];
+  /**
+   * #4021: at least one CI test-job check on the head concluded `SUCCESS`.
+   * `testChecks` alone reads a skipped-only test job as green; in
+   * `verification.tests: ci` mode merge readiness needs a test run that passed.
+   */
+  testJobSucceeded?: boolean;
+  /**
+   * #4036: the newest browser-UAT verdict posted on the PR for the current
+   * head commit, read from the verdict comments. `null` when no UAT verdict
+   * applies to this head (none was posted, or the head moved since).
+   */
+  uatVerdict?: UatVerdict | null;
   /** Set when the forge lookup itself failed; every flag is then conservative. */
   error?: string;
+}
+
+export { formatUatMarker, parseUatVerdict } from './uat-verdict-marker.js';
+
+/** A browser-UAT verdict read back from a PR comment (#4036). */
+export interface UatVerdict {
+  status: 'passed' | 'failed';
+  /** The commit UAT exercised, from the comment's marker; null on a legacy comment. */
+  sha: string | null;
+  /** When the verdict comment was posted. */
+  postedAt: string | null;
 }
 
 /** A failing check as the forge reported it (conclusion or status state, upper-cased). */
@@ -79,6 +103,20 @@ export interface PrFactsDeps {
   resolveRepos?: typeof resolveProjectReposForIssueSync;
   listGitLabMrs?: typeof listOpenGitLabMergeRequests;
   viewGitLabMr?: (projectPath: string, iid: number) => Promise<GitLabMrView>;
+  /**
+   * The GitHub logins Overdeck posts verdict comments as (the `gh` user, the
+   * GitHub App bot). Read only when a verdict marker comes from an author
+   * whose association alone does not make it trusted.
+   */
+  overdeckLogins?: () => Promise<readonly string[]>;
+}
+
+export interface PrFactsOptions {
+  /**
+   * #4016: read the PR on this head branch first (a strike landing reads
+   * `strike/<issue>`), so an open feature PR cannot stand in for it.
+   */
+  preferBranch?: string;
 }
 
 export interface GitLabMrView {
@@ -112,9 +150,9 @@ export function formatVerdictMarker(verdict: MarkerVerdict): string {
   return `<!-- overdeck-verdict: ${verdict} -->`;
 }
 
-const VERDICT_MARKER_RE = /^\s*<!--\s*overdeck-verdict:\s*(APPROVED|CHANGES_REQUESTED)\s*-->/i;
+const VERDICT_MARKER_RE = /^[ \t]*<!--[ \t]*overdeck-verdict:[ \t]*(APPROVED|CHANGES_REQUESTED)[ \t]*-->[ \t]*(?:\r?\n|$)/i;
 
-/** The verdict a comment body declares in its first line, or null. */
+/** The verdict a comment body declares as its whole first line, or null. */
 export function parseVerdictMarker(body: string | null | undefined): MarkerVerdict | null {
   const match = body?.match(VERDICT_MARKER_RE);
   return match ? (match[1].toUpperCase() as MarkerVerdict) : null;
@@ -140,6 +178,8 @@ export function emptyPrFacts(issueId: string, error?: string): PrFacts {
     mergeableState: null,
     checks: 'none',
     testChecks: 'none',
+    testJobSucceeded: false,
+    uatVerdict: null,
     ...(error ? { error } : {}),
   };
 }
@@ -196,6 +236,19 @@ export function summarizeTestChecks(
   return summarizeStatusCheckRollup((rollup ?? []).filter((check) => isCiTestCheckName(check.name)));
 }
 
+/**
+ * #4021: true when at least one CI test-job check concluded `SUCCESS`. A
+ * `SKIPPED` or `NEUTRAL` test job ran no tests, so it does not count.
+ */
+export function testJobSucceeded(
+  rollup: IssuePullRequestData['statusCheckRollup'] | null | undefined,
+): boolean {
+  return (rollup ?? []).some((check) => (
+    isCiTestCheckName(check.name)
+    && (normalize(check.conclusion) === 'SUCCESS' || normalize(check.state) === 'SUCCESS')
+  ));
+}
+
 /** Epoch ms of the PR's head commit, used to age out a stale approval marker. */
 function headCommitTime(pr: IssuePullRequestData): number | null {
   const commits = pr.commits ?? [];
@@ -206,6 +259,35 @@ function headCommitTime(pr: IssuePullRequestData): number | null {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
+type PrComment = NonNullable<IssuePullRequestData['comments']>[number];
+
+/** GitHub author associations whose comments carry verdicts (#4040 review). */
+const TRUSTED_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+
+/** The logins Overdeck posts as, lower-cased with any `[bot]` suffix dropped. */
+export type TrustedAuthors = ReadonlySet<string>;
+
+function normalizeLogin(login: string): string {
+  return login.trim().toLowerCase().replace(/\[bot\]$/, '');
+}
+
+/**
+ * Whether a comment may declare a verdict. The repository is public and anyone
+ * can comment, so a verdict marker counts only from an author GitHub reports
+ * as `OWNER`, `MEMBER` or `COLLABORATOR`, or from the identity Overdeck posts
+ * verdicts as. Everything else is ignored — a pass, a failure, an approval.
+ */
+export function isTrustedComment(comment: PrComment | undefined, trusted: TrustedAuthors): boolean {
+  if (!comment) return false;
+  if (TRUSTED_ASSOCIATIONS.has(normalize(comment.authorAssociation))) return true;
+  const login = comment.author?.login;
+  return Boolean(login) && trusted.has(normalizeLogin(login!));
+}
+
+function carriesMarker(comment: PrComment | undefined): boolean {
+  return parseVerdictMarker(comment?.body) !== null || parseUatVerdict(comment?.body) !== null;
+}
+
 /**
  * The verdict declared by the newest marker comment on the PR.
  *
@@ -213,9 +295,10 @@ function headCommitTime(pr: IssuePullRequestData): number | null {
  * approval must never merge commits it never saw. A stale CHANGES_REQUESTED
  * still counts — rework stays owed until a newer verdict says otherwise.
  */
-function markerVerdictFromComments(pr: IssuePullRequestData): MarkerVerdict | null {
+function markerVerdictFromComments(pr: IssuePullRequestData, trusted: TrustedAuthors): MarkerVerdict | null {
   const comments = pr.comments ?? [];
   for (let index = comments.length - 1; index >= 0; index -= 1) {
+    if (!isTrustedComment(comments[index], trusted)) continue;
     const verdict = parseVerdictMarker(comments[index]?.body);
     if (!verdict) continue;
     if (verdict === 'APPROVED') {
@@ -228,7 +311,44 @@ function markerVerdictFromComments(pr: IssuePullRequestData): MarkerVerdict | nu
   return null;
 }
 
-function gitHubFacts(issueId: string, pr: IssuePullRequestData): PrFacts {
+/** True when `sha` (full or abbreviated) names the same commit as `head`. */
+function sameCommit(sha: string, head: string): boolean {
+  const a = sha.toLowerCase();
+  const b = head.toLowerCase();
+  return a.startsWith(b) || b.startsWith(a);
+}
+
+/**
+ * #4036: the newest UAT verdict, from a trusted author, that applies to the
+ * PR's current head.
+ *
+ * Only the `overdeck-uat` marker counts. It carries the commit UAT exercised,
+ * so it applies when that commit is the head. A marker posted without a commit
+ * (the PR head was unreadable) applies when it is at least as new as the head
+ * commit, the dating the approval marker uses. A verdict comment posted before
+ * the marker existed declares nothing: it reads as no verdict.
+ */
+function uatVerdictAtHead(pr: IssuePullRequestData, trusted: TrustedAuthors): UatVerdict | null {
+  const comments = pr.comments ?? [];
+  const head = pr.headRefOid ?? null;
+  const headAt = headCommitTime(pr);
+  for (let index = comments.length - 1; index >= 0; index -= 1) {
+    if (!isTrustedComment(comments[index], trusted)) continue;
+    const verdict = parseUatVerdict(comments[index]?.body);
+    if (!verdict) continue;
+    const postedAt = comments[index]?.createdAt ?? null;
+    if (verdict.sha) {
+      if (head && !sameCommit(verdict.sha, head)) continue;
+    } else if (headAt !== null) {
+      const commentAt = Date.parse(postedAt ?? '');
+      if (Number.isNaN(commentAt) || commentAt < headAt) continue;
+    }
+    return { status: verdict.status, sha: verdict.sha, postedAt };
+  }
+  return null;
+}
+
+function gitHubFacts(issueId: string, pr: IssuePullRequestData, trusted: TrustedAuthors = new Set()): PrFacts {
   const state = normalize(pr.state);
   const merged = state === 'MERGED' || Boolean(pr.mergedAt);
   const mergeable = normalize(pr.mergeable);
@@ -236,7 +356,7 @@ function gitHubFacts(issueId: string, pr: IssuePullRequestData): PrFacts {
   const forgeDecision = decision === 'APPROVED' || decision === 'CHANGES_REQUESTED' ? decision : null;
   // Only consult the marker when the forge itself reached no decision.
   const effective: PrReviewDecision = forgeDecision
-    ?? markerVerdictFromComments(pr)
+    ?? markerVerdictFromComments(pr, trusted)
     ?? (decision === 'REVIEW_REQUIRED' ? 'REVIEW_REQUIRED' : null);
   return {
     issueId: issueId.toUpperCase(),
@@ -258,6 +378,8 @@ function gitHubFacts(issueId: string, pr: IssuePullRequestData): PrFacts {
     checks: summarizeStatusCheckRollup(pr.statusCheckRollup),
     testChecks: summarizeTestChecks(pr.statusCheckRollup),
     testCheckFailures: listFailedTestChecks(pr.statusCheckRollup),
+    testJobSucceeded: testJobSucceeded(pr.statusCheckRollup),
+    uatVerdict: uatVerdictAtHead(pr, trusted),
   };
 }
 
@@ -280,7 +402,9 @@ export function parseGitLabProjectPath(url: string | undefined | null): string |
 function gitLabChecks(view: GitLabMrView): ChecksVerdict {
   const status = (view.head_pipeline?.status ?? view.pipeline?.status ?? '').toLowerCase();
   if (!status) return 'none';
-  if (status === 'success' || status === 'manual') return 'green';
+  // `skipped` is green, as the board reads it (`toChecksStateFromPipeline`):
+  // a pipeline whose jobs all skipped is not one that will ever finish.
+  if (status === 'success' || status === 'manual' || status === 'skipped') return 'green';
   if (status === 'failed' || status === 'canceled') return 'red';
   return 'pending';
 }
@@ -319,6 +443,9 @@ function gitLabFacts(issueId: string, row: GitLabMergeRequestRow, view: GitLabMr
     mergeableState: detailed ?? view?.merge_status ?? null,
     checks: view ? gitLabChecks(view) : 'none',
     testChecks: 'none',
+    testJobSucceeded: false,
+    // GitLab MR notes are not read here, so no UAT verdict is observed there.
+    uatVerdict: null,
   };
 }
 
@@ -353,24 +480,74 @@ export function resetPrFactsCache(): void {
   prFactsCache.clear();
 }
 
-export async function getPrFacts(issueId: string, deps: PrFactsDeps = {}): Promise<PrFacts> {
-  const cacheable = Object.keys(deps).length === 0;
+export async function getPrFacts(
+  issueId: string,
+  deps: PrFactsDeps = {},
+  options: PrFactsOptions = {},
+): Promise<PrFacts> {
+  const cacheable = Object.keys(deps).length === 0 && !options.preferBranch;
   const key = issueId.toUpperCase();
   if (cacheable) {
     const hit = prFactsCache.get(key);
     if (hit && Date.now() - hit.at < PR_FACTS_TTL_MS) return hit.facts;
   }
-  const facts = await readPrFacts(issueId, deps);
+  const facts = await readPrFacts(issueId, deps, options);
   // An error is a lookup failure, not an answer — never cache it.
   if (cacheable && !facts.error) prFactsCache.set(key, { at: Date.now(), facts });
   return facts;
 }
 
-async function readPrFacts(issueId: string, deps: PrFactsDeps): Promise<PrFacts> {
+/**
+ * The logins Overdeck posts verdicts as: the authenticated `gh` user and, when
+ * the GitHub App is configured, its bot. Resolved once per process; an empty
+ * answer (gh unreachable) is not cached, so the next read tries again.
+ */
+let overdeckLoginsPromise: Promise<readonly string[]> | null = null;
+
+async function readOverdeckLogins(): Promise<readonly string[]> {
+  const logins: string[] = [];
+  try {
+    const { stdout } = await execFileAsync('gh', ['api', 'user', '--jq', '.login'], {
+      encoding: 'utf-8', timeout: 15_000,
+    });
+    if (stdout.trim()) logins.push(stdout.trim());
+  } catch {
+    // Not authenticated as a user (or offline): association alone decides.
+  }
+  try {
+    const { getBotIdentity, isGitHubAppConfigured } = await import('../github-app.js');
+    if (isGitHubAppConfigured()) logins.push(getBotIdentity().name);
+  } catch {
+    // No app configuration readable.
+  }
+  return logins;
+}
+
+async function defaultOverdeckLogins(): Promise<readonly string[]> {
+  overdeckLoginsPromise ??= readOverdeckLogins();
+  const logins = await overdeckLoginsPromise;
+  if (logins.length === 0) overdeckLoginsPromise = null;
+  return logins;
+}
+
+/** Resolve Overdeck's own logins only when some marker's author needs it. */
+async function trustedAuthorsFor(pr: IssuePullRequestData, deps: PrFactsDeps): Promise<TrustedAuthors> {
+  const needsIdentity = (pr.comments ?? []).some((comment) => (
+    carriesMarker(comment) && !TRUSTED_ASSOCIATIONS.has(normalize(comment.authorAssociation))
+  ));
+  if (!needsIdentity) return new Set();
+  try {
+    return new Set((await (deps.overdeckLogins ?? defaultOverdeckLogins)()).map(normalizeLogin));
+  } catch {
+    return new Set();
+  }
+}
+
+async function readPrFacts(issueId: string, deps: PrFactsDeps, options: PrFactsOptions = {}): Promise<PrFacts> {
   const fetchGitHubPr = deps.fetchGitHubPr ?? fetchIssuePullRequest;
   try {
-    const gh = await fetchGitHubPr(issueId);
-    if (gh.pr) return gitHubFacts(issueId, gh.pr);
+    const gh = await fetchGitHubPr(issueId, options.preferBranch ? { preferBranch: options.preferBranch } : {});
+    if (gh.pr) return gitHubFacts(issueId, gh.pr, await trustedAuthorsFor(gh.pr, deps));
     if (gh.error) return emptyPrFacts(issueId, gh.error);
   } catch (cause) {
     return emptyPrFacts(issueId, `GitHub PR lookup failed: ${cause instanceof Error ? cause.message : String(cause)}`);
@@ -393,8 +570,18 @@ async function readPrFacts(issueId: string, deps: PrFactsDeps): Promise<PrFacts>
     const row = rows.find((candidate) => candidate.source_branch === branch);
     if (!row?.iid) return emptyPrFacts(issueId);
     const projectPath = parseGitLabProjectPath(row.web_url);
-    const view = projectPath ? await viewGitLabMr(projectPath, row.iid).catch(() => null) : null;
-    return gitLabFacts(issueId, row, view);
+    if (!projectPath) return gitLabFacts(issueId, row, null);
+    try {
+      return gitLabFacts(issueId, row, await viewGitLabMr(projectPath, row.iid));
+    } catch (cause) {
+      // Without the MR view there is no approval, pipeline or mergeability to
+      // judge. Keep the row's identity but say why, so a refusal names the
+      // lookup failure instead of a missing approval.
+      return {
+        ...gitLabFacts(issueId, row, null),
+        error: `GitLab MR view failed for !${row.iid}: ${cause instanceof Error ? cause.message : String(cause)}`,
+      };
+    }
   } catch (cause) {
     return emptyPrFacts(issueId, `GitLab MR lookup failed: ${cause instanceof Error ? cause.message : String(cause)}`);
   }
@@ -407,10 +594,33 @@ export interface MergeReadiness {
 }
 
 /**
- * FR-9's ready set: approved + checks green + forge `mergeable`. One reason is
- * returned, in the order an operator would want to see it.
+ * Project and issue policy the forge facts are judged against. Both default to
+ * off, so a caller that passes nothing gets FR-9's approved + green + mergeable.
+ * `cloister/merge-gate.ts` resolves both for an issue.
  */
-export function evaluateMergeReadiness(facts: PrFacts): MergeReadiness {
+export interface MergeReadinessPolicy {
+  /**
+   * #4021: the project runs `verification.tests: ci`, so CI is the only place
+   * tests run and the CI test job must have passed on the head. Only GitHub
+   * reports per-job checks; a GitLab pipeline is judged by `checks` alone.
+   */
+  ciTestsRequired?: boolean;
+  /**
+   * #4036: UAT is required for the issue (`issueHoldsForUat`: its
+   * `auto-merge` / `hold-for-uat` label, else the project's
+   * `auto_merge_default`, else the global `flywheel.require_uat_before_merge`),
+   * so a failed UAT verdict at the current head blocks the merge.
+   */
+  uatRequired?: boolean;
+}
+
+/**
+ * FR-9's ready set: approved + checks green + forge `mergeable`, plus the CI
+ * test job (#4021) and a failed required UAT (#4036) when `policy` asks for
+ * them. One reason is returned, in the order an operator would want to see it.
+ */
+export function evaluateMergeReadiness(facts: PrFacts, policy: MergeReadinessPolicy = {}): MergeReadiness {
+  const head = facts.headSha ?? 'unknown';
   if (facts.error) return { ready: false, reason: facts.error };
   if (!facts.exists) return { ready: false, reason: 'no pull request for this issue' };
   if (facts.merged) return { ready: false, reason: 'PR is already merged' };
@@ -422,9 +632,24 @@ export function evaluateMergeReadiness(facts: PrFacts): MergeReadiness {
   // commit) and `null` (the forge has not computed mergeability yet) are the
   // absence of evidence, not evidence of readiness. Merging on either is how a
   // red or conflicting branch reaches main.
-  if (facts.checks === 'red') return { ready: false, reason: `CI checks failing on PR HEAD ${facts.headSha ?? 'unknown'}` };
-  if (facts.checks === 'pending') return { ready: false, reason: `CI checks still pending on PR HEAD ${facts.headSha ?? 'unknown'}` };
-  if (facts.checks !== 'green') return { ready: false, reason: `no CI checks reported on PR HEAD ${facts.headSha ?? 'unknown'}` };
+  if (facts.checks === 'red') return { ready: false, reason: `CI checks failing on PR HEAD ${head}` };
+  if (facts.checks === 'pending') return { ready: false, reason: `CI checks still pending on PR HEAD ${head}` };
+  if (facts.checks !== 'green') return { ready: false, reason: `no CI checks reported on PR HEAD ${head}` };
+  // #4021: with tests on CI, "every present check is green" is not enough. A
+  // workflow change that renames or drops the test job, or a path filter or
+  // job-level `if:` that skips it, would otherwise merge code no test ran on.
+  if (policy.ciTestsRequired && facts.forge === 'github' && !facts.testJobSucceeded) {
+    return {
+      ready: false,
+      reason: facts.testChecks === 'none'
+        ? `no CI test job reported on PR HEAD ${head} (verification.tests: ci)`
+        : `the CI test job was skipped on PR HEAD ${head} (verification.tests: ci)`,
+    };
+  }
+  // #4036: a failed UAT at this head is evidence the code does not work.
+  if (policy.uatRequired && facts.uatVerdict?.status === 'failed') {
+    return { ready: false, reason: `browser UAT failed on PR HEAD ${facts.uatVerdict.sha ?? head}` };
+  }
   if (facts.mergeable !== true) {
     return {
       ready: false,

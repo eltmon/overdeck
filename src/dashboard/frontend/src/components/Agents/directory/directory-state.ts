@@ -33,6 +33,11 @@ export function displayStateOf(entry: DirectoryEntry, attention?: IssueAttention
   return entry.state;
 }
 
+/** Who launched an external agent, in words (PAN-3920 Phase C). */
+export function externalSourceLabel(source: DirectoryEntry['source']): string {
+  return source === 'codex-plugin' ? 'a Codex plugin job' : 'a registered external agent';
+}
+
 /** A known field value, or null for the server's `unknown` placeholder (never displayed). */
 export function known(value: string | null | undefined): string | null {
   return value && value !== 'unknown' ? value : null;

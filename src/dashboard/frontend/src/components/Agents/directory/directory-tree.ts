@@ -41,6 +41,19 @@ export function projectNodeId(location: string, projectKey: string): string { re
 export function issueNodeId(location: string, issueId: string): string { return `issue:${location}:${issueId}`; }
 export function conversationsNodeId(location: string, projectKey: string): string { return `convs:${location}:${projectKey}`; }
 
+const CLAUDE_SESSION_PARENT = 'claude-session:';
+
+/**
+ * What "spawned by" shows for a parent id: the parent entry's label when it is
+ * listed, `Claude session <first 8>` for a `claude-session:<uuid>` parent (an
+ * external agent's Claude parent Overdeck does not know), else the raw id.
+ */
+export function parentLabel(parentId: string, parent: DirectoryEntry | undefined): string {
+  if (parent) return parent.label;
+  if (parentId.startsWith(CLAUDE_SESSION_PARENT)) return `Claude session ${parentId.slice(CLAUDE_SESSION_PARENT.length, CLAUDE_SESSION_PARENT.length + 8)}`;
+  return parentId;
+}
+
 export function projectLabel(projectKey: string): string {
   return projectKey === UNASSIGNED_PROJECT ? 'No project' : projectKey;
 }
@@ -214,7 +227,7 @@ export function entriesForNode(entries: readonly DirectoryEntry[], nodeId: strin
     rows.push({
       entry,
       depth,
-      spawnedByLabel: depth === 0 && entry.parentId ? parent?.label ?? entry.parentId : null,
+      spawnedByLabel: depth === 0 && entry.parentId ? parentLabel(entry.parentId, parent) : null,
     });
     for (const child of [...(childrenOf.get(entry.id) ?? [])].sort(compareEntries)) visit(child, depth + 1);
   };

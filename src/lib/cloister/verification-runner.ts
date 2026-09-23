@@ -31,6 +31,7 @@ import {
   isFinalVerificationAttempt,
   shouldEscalateVerificationFailure,
   skipMergedVerification,
+  liftVerificationStuckPause,
   VERIFICATION_MAX_CYCLES,
 } from './verification-escalation.js';
 import {
@@ -44,7 +45,7 @@ import { postVerificationCheckRun } from './verification-check-run.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { appendPipelineEntry } from './pipeline-journal.js';
 import { resolveIssueFeedbackTarget } from './feedback-target.js';
-import { clearAgentPaused, getAgentStateSync, messageAgent } from '../agents.js';
+import { messageAgent } from '../agents.js';
 import { findProjectByPathSync, resolveProjectFromIssueSync } from '../projects.js';
 import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
 import { getXBriefACStatusSync } from '../xbrief/acceptance-criteria.js';
@@ -880,19 +881,8 @@ export async function runVerificationForIssueInProcess(
         : 'Every required gate passed (changed-file scope).',
       logPrefix,
     );
-    // PAN-3847 (FR-10), re-pointed by PAN-3917: a verification pass lifts the
-    // pause escalateVerificationStuck set. There is no stuck flag left to clear
-    // — the pause IS the state, and the gate that set it clears it.
-    const stuckAgentId = `agent-${issueId.toLowerCase()}`;
-    const agentState = getAgentStateSync(stuckAgentId);
-    if (agentState?.pausedReason?.startsWith('needs-you: verification stuck')) {
-      try {
-        await Effect.runPromise(clearAgentPaused(stuckAgentId));
-        console.log(`[${logPrefix}] Lifted verification-stuck pause for ${stuckAgentId}`);
-      } catch (err: any) {
-        console.error(`[${logPrefix}] Failed to lift verification-stuck pause for ${stuckAgentId}: ${err?.message ?? err}`);
-      }
-    }
+    // PAN-3847 (FR-10): a verification pass lifts the stuck pause.
+    await liftVerificationStuckPause(issueId, logPrefix);
     void capturePipelineStageForIssue(issueId, 'verification_passed');
     console.log(`[${logPrefix}] Verification passed for ${issueId}${lastVerifiedCommit ? ` (HEAD=${lastVerifiedCommit.slice(0, 8)})` : ''} — proceeding to review-agent`);
 

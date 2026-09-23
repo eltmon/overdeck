@@ -27,11 +27,11 @@
  * workflow: a `uses:` job named `test` counts, and its checks
  * (`test / <inner job>`) match the test-check matcher.
  */
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { isAbsolute, join, relative } from 'node:path';
 import yaml from 'js-yaml';
 
-import type { ProjectConfig } from '../projects.js';
+import { getProjectSync, resolveProjectFromIssueSync, type ProjectConfig } from '../projects.js';
 import type { QualityGateConfig } from '../workspace-config.js';
 
 export type VerificationTestsMode = 'ci' | 'local';
@@ -206,6 +206,16 @@ function prBaseBranch(project: Pick<ProjectConfig, 'workspace'>): string {
   return project.workspace?.pr_target ?? project.workspace?.default_branch ?? 'main';
 }
 
+/** The project root and every polyrepo member: where `.github/workflows` may live. */
+function workflowRoots(project: Pick<ProjectConfig, 'path' | 'workspace'>): string[] {
+  return [
+    project.path,
+    ...(project.workspace?.repos ?? [])
+      .filter((repo) => typeof repo.path === 'string' && repo.path.length > 0)
+      .map((repo) => (isAbsolute(repo.path) ? repo.path : join(project.path, repo.path))),
+  ];
+}
+
 export function detectGitHubActionsTestJobSync(
   project: Pick<ProjectConfig, 'github_repo' | 'path' | 'workspace'>,
   deps: VerificationTestsModeDeps = {},
@@ -213,12 +223,7 @@ export function detectGitHubActionsTestJobSync(
   if (!project.github_repo) return { found: false, reason: 'no github_repo configured' };
   if (!project.path) return { found: false, reason: 'no project path configured' };
   const readWorkflows = deps.readWorkflowFiles ?? defaultReadWorkflowFiles;
-  const roots = [
-    project.path,
-    ...(project.workspace?.repos ?? [])
-      .filter((repo) => typeof repo.path === 'string' && repo.path.length > 0)
-      .map((repo) => (isAbsolute(repo.path) ? repo.path : join(project.path, repo.path))),
-  ];
+  const roots = workflowRoots(project);
   const baseBranch = prBaseBranch(project);
   let sawWorkflow = false;
   for (const root of roots) {
@@ -267,6 +272,61 @@ export function resolveVerificationTestsMode(
   deps: VerificationTestsModeDeps = {},
 ): VerificationTestsMode {
   return resolveVerificationTestsModeDecision(project, deps).mode;
+}
+
+/**
+ * What detection depends on, cheaply: the config that feeds it plus each
+ * workflow file's name and mtime. Listing and `stat`ing a directory costs far
+ * less than reading and YAML-parsing every workflow on every merge-gate read.
+ */
+function detectionSignature(project: ProjectConfig): string {
+  const parts = [
+    project.github_repo ?? '',
+    project.path ?? '',
+    String(project.verification?.tests ?? ''),
+    prBaseBranch(project),
+  ];
+  if (!project.path) return parts.join('|');
+  for (const root of workflowRoots(project)) {
+    const dir = join(root, '.github', 'workflows');
+    try {
+      for (const name of readdirSync(dir).sort()) {
+        if (!name.endsWith('.yml') && !name.endsWith('.yaml')) continue;
+        parts.push(`${dir}/${name}@${statSync(join(dir, name)).mtimeMs}`);
+      }
+    } catch {
+      parts.push(`${dir}:absent`);
+    }
+  }
+  return parts.join('|');
+}
+
+/** Per-project test mode, reused while its workflow files are unchanged. */
+const ciModeCache = new Map<string, { signature: string; ci: boolean }>();
+
+/**
+ * #4021: true when the issue's project runs its tests on CI, so merge readiness
+ * requires the CI test job to have passed on the PR head. An issue no project
+ * claims, or a config that cannot be read, keeps the local test gate (false).
+ * The answer is cached per project and recomputed when `projects.yaml` or a
+ * workflow file changes.
+ */
+export function issueRunsTestsOnCi(issueId: string): boolean {
+  try {
+    const resolved = resolveProjectFromIssueSync(issueId);
+    const project = resolved ? getProjectSync(resolved.projectKey) : null;
+    if (!resolved || !project) return false;
+    const explicit = project.verification?.tests;
+    if (explicit === 'ci' || explicit === 'local') return explicit === 'ci';
+    const signature = detectionSignature(project);
+    const hit = ciModeCache.get(resolved.projectKey);
+    if (hit && hit.signature === signature) return hit.ci;
+    const ci = resolveVerificationTestsMode(project) === 'ci';
+    ciModeCache.set(resolved.projectKey, { signature, ci });
+    return ci;
+  } catch {
+    return false;
+  }
 }
 
 /**

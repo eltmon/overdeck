@@ -495,9 +495,7 @@ describe('W7 caller escalation fixtures (scenario b callers)', () => {
       confirmed: false,
       reason: 'message was injected but no turn appeared in transcript session-1 within the confirmation window (2 attempts)',
     });
-    const { relayUatFailureFeedback, resetUatFailureFeedbackStateForTests } =
-      await import('../../../../src/lib/cloister/uat-failure-feedback.js');
-    resetUatFailureFeedbackStateForTests();
+    const { relayUatFailureFeedback } = await import('../../../../src/lib/cloister/uat-failure-feedback.js');
 
     const result = await relayUatFailureFeedback({
       issueId: 'PAN-3846',

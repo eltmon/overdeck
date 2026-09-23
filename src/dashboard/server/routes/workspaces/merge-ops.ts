@@ -42,7 +42,7 @@ import { _serverManagedMerges } from '../specialists.js';
 import { completePendingOperation, getPendingOperation, getProjectPath, getWorkspaceInfoForIssue, readJsonBody, setPendingOperation } from '../workspaces.js';
 import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
 import { postInternalPipelineNotifyRoute } from './internal-pipeline-notify.js';
-import { activeStrikeMerge, advanceMergeQueue, mergeVerificationOptions, normalMergeEligibility, prepareWorkAgentForRebase, readStrikeHead, rebaseWithAgentFallback, validateStrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
+import { activeStrikeMerge, advanceMergeQueue, forgeMergeGateRefusal, mergeVerificationOptions, normalMergeEligibility, prepareWorkAgentForRebase, rebaseWithAgentFallback, validateStrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
@@ -332,9 +332,7 @@ function dequeueNextMerge(projectKey: string, completedIssueId?: string): void {
   void advanceMergeQueue({
     dequeue: dequeueMerge,
     getDerivedState: (issueId) => getDerivedIssueState(issueId),
-    getProjectPath: (issueId) => getProjectPath(undefined, extractPrefixSync(issueId) ?? issueId.split('-')[0]),
-    getStrikeHead: (issueId, projectPath) => readStrikeHead(issueId, projectPath, gitIn),
-    triggerMerge,
+    triggerMerge: (issueId) => triggerMerge(issueId),
     log: (message) => console.log(message),
     warn: (message) => console.warn(message),
   }, projectKey, completedIssueId).catch((err: unknown) =>
@@ -361,6 +359,8 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     const ineligible = normalMergeEligibility(derived, pendingOp?.type === 'merge' && pendingOp?.status === 'running', run);
     if (ineligible) return ineligible;
   }
+  const gateRefusal = await forgeMergeGateRefusal(issueId, request.kind === 'strike' ? request.branchName : undefined);
+  if (gateRefusal) return { ...gateRefusal, state: derived.state };
 
   if (run?.phase === 'merging') {
     const pendingOp = getPendingOperation(issueId);
