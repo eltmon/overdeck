@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-23T02:40:28.120Z · model: claude-opus-5 · open: 858_
+_Last sequenced: 2026-09-23T03:07:16.923Z · model: claude-opus-5 · open: 857_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -8,7 +8,6 @@ _Last sequenced: 2026-09-23T02:40:28.120Z · model: claude-opus-5 · open: 858_
 | 1 | PAN-3921 | M | critical | ok |  |  | Conversations and pan handoff still spawn on tmux under the PTY supervisor; Herdr never detects them — route through launchAgentPane |
 | 2 | PAN-3956 | M | high | ok |  |  | pan install/sync/doctor must install Herdr + agent integrations and refuse a silent tmux fallback; Herdr resume_agents_on_restore=false |
 | 3 | PAN-3923 | S | high | ok |  |  | Sequencer pane counts as running (fixed for sequencer in 3760a5d); role runs should close their pane; sequence commits never pushed |
-| 4 | PAN-3959 | M | high | ok |  |  | Record the transcript path in the session index at session start so the resolver stops guessing per harness; unblocks PAN-3958 |
 | 5 | PAN-3922 | S | high | ok |  |  | Deacon-lite status is read from the wrong process: dashboard always shows running:false; relay patrol-done from the child |
 | 6 | PAN-3926 | S | high | ok |  |  | isAliveSync is tmux-only; swarm concurrency counts tmuxActive; swarmJanitorPass unscheduled — make backend-aware before swarm re-enable |
 | 7 | PAN-3925 | S | medium | ok |  |  | /api/parked and /api/merge-train/auto-merge take 10s+ deriving state per request; batch through the issue-data cache |
@@ -646,7 +645,7 @@ _Last sequenced: 2026-09-23T02:40:28.120Z · model: claude-opus-5 · open: 858_
 | 639 | PAN-2630 | M | low | ok |  |  | pan binary not on PATH for operator shells or spawned work agents; pan doctor can't be run to diagnose it |
 | 640 | PAN-2629 | M | low | ok |  |  | pan start kickoff delivery never lands: "Claude Code did not become ready within 30s" (both attempts), agent sits idle at empty prompt |
 | 641 | PAN-3443 | L | low | ok |  |  | God View 'Spectrum Deck' visualizer concept with mockup and PRD; pure exploration, no substrate impact. |
-| 642 | PAN-3958 | XL | medium | ok |  | PAN-3959 | Parked: bloat cut — undo Effect façades (49 sites), delete ~400 sync/async twins, collapse duplicate harness adapters; audit first |
+| 642 | PAN-3958 | XL | medium | ok |  |  | Parked: bloat cut — undo Effect façades (49 sites), delete ~400 sync/async twins, collapse duplicate harness adapters; audit first |
 | 643 | PAN-2628 | M | low | ok |  |  | pan close aborts at close-issue:transition: "No tracker available and cannot determine issue type" for GitHub-tracker project |
 | 644 | PAN-2622 | M | low | ok |  |  | cloister.toml materializes ALL defaults into the user file |
 | 645 | PAN-2600 | XS | low | ok |  |  | Retire the Codex TUI path after app-server burn-in (no-loss audit gate) |
@@ -877,10 +876,6 @@ In pipeline — rank pinned. Herdr is the default backend on paper but nothing i
 ### PAN-3923 (rank 3)
 
 In pipeline — rank pinned. The sequencer half landed on main (reap through the backend); the general role-run pane close and the never-pushed sequence commit remain.
-
-### PAN-3959 (rank 4)
-
-In pipeline — rank pinned. Operator sequencing: PAN-3950 (closed) → this → PAN-3958 bloat cut.
 
 ### PAN-3922 (rank 5)
 
@@ -1186,6 +1181,10 @@ Triage: verify "running at $0.00 with no capacity fallback" against the current 
 
 New this pass. shouldHoldForUat is consulted on exactly one merge path, so every other path merges a ready issue without asking whether its project holds for UAT — verified at code level on a real MIN-901 merge. This defeats the batch-train model directly: issues merge one at a time before a generation can assemble them.
 
+### PAN-3100 (rank 81)
+
+New this pass. The test role evaluates the workspace working tree rather than the reviewed commit, so a live work agent's in-progress uncommitted edits are counted against the issue — the gate's own artifact diagnosed it exactly, failing on a file the reviewed commit never touched. Combined with PAN-3104, which replays the stale artifact, it becomes a durable trap.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1193,10 +1192,10 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-23T02:40:28.120Z",
+  "generatedAt": "2026-09-23T03:07:16.923Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 858,
+  "openCount": 857,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1234,19 +1233,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "dependsOn": [],
       "why": "Sequencer pane counts as running (fixed for sequencer in 3760a5d); role runs should close their pane; sequence commits never pushed",
       "rationale": "In pipeline — rank pinned. The sequencer half landed on main (reap through the backend); the general role-run pane close and the never-pushed sequence commit remain.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3959",
-      "rank": 4,
-      "size": "M",
-      "importance": "high",
-      "score": 78,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Record the transcript path in the session index at session start so the resolver stops guessing per harness; unblocks PAN-3958",
-      "rationale": "In pipeline — rank pinned. Operator sequencing: PAN-3950 (closed) → this → PAN-3958 bloat cut.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -9182,11 +9168,9 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "importance": "medium",
       "score": 30,
       "condition": "ok",
-      "dependsOn": [
-        "PAN-3959"
-      ],
+      "dependsOn": [],
       "why": "Parked: bloat cut — undo Effect façades (49 sites), delete ~400 sync/async twins, collapse duplicate harness adapters; audit first",
-      "rationale": "Parked pending operator scheduling; sequenced after PAN-3959 proves the path-in-index design. Huge refactor; audit is the first work item.",
+      "rationale": "Dependency cleared: PAN-3959 closed COMPLETED on 2026-09-23, so the path-in-index design it was waiting on has shipped and the audit can start whenever scheduled. Rank holds at 642 because the binding constraint is the operator `parked` label, not the dependency — the cut is an XL refactor nobody has scheduled. Unpark it and it climbs on its own merits.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12607,13 +12591,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "confidence": 1
     },
     {
-      "from": "PAN-3959",
-      "to": "PAN-3958",
-      "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-3942",
       "to": "PAN-3943",
       "type": "unblocks",
@@ -12658,13 +12635,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
     {
       "from": "PAN-3962",
       "to": "PAN-3921",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3959",
-      "to": "PAN-3920",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
@@ -13104,13 +13074,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "confidence": 0.4
     },
     {
-      "from": "PAN-3959",
-      "to": "PAN-3968",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.7
-    },
-    {
       "from": "PAN-3947",
       "to": "PAN-3973",
       "type": "informs",
@@ -13135,13 +13098,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "from": "PAN-3974",
       "to": "PAN-3835",
       "type": "unblocks",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3968",
-      "to": "PAN-3959",
-      "type": "informs",
       "source": "github-ref",
       "confidence": 1
     },
@@ -13200,13 +13156,6 @@ New this pass. shouldHoldForUat is consulted on exactly one merge path, so every
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.7
-    },
-    {
-      "from": "PAN-3959",
-      "to": "PAN-3982",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
     },
     {
       "from": "PAN-3982",
