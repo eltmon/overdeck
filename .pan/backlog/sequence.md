@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-23T04:48:21.375662Z · model: claude-opus-5 · open: 853_
+_Last sequenced: 2026-09-23T05:02:45.914Z · model: claude-opus-5 · open: 853_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1188,7 +1188,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-23T04:48:21.375662Z",
+  "generatedAt": "2026-09-23T05:02:45.914Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 853,
@@ -6426,6 +6426,7 @@ Triage: verify days-stale "running" against the current liveness definition (idl
       "condition": "ok",
       "dependsOn": [],
       "why": "Settings permission-mode can desync from resolved config",
+      "rationale": "Rank unchanged: the 2026-09-23 update is an external comment restating the body — no new cross-references, and resolvePermissionModeSync plus the bypass branch are still live in src/lib/claude-permissions.ts, so condition stays ok.",
       "gate": "auto",
       "planning": "auto"
     },
