@@ -326,6 +326,82 @@ Spawn guards are backend-aware too: "is this agent already running" is `agentPan
 tmux session or a live Herdr agent of that name, and the tmux-only session options
 (`destroy-unattached`, `remain-on-exit`) are applied only when the pane really is a tmux session.
 
+## Companion terminals (PAN-3974)
+
+A **companion terminal** is a second terminal session next to a conversation's own (owner)
+session, running a harness's native client attached to the owner's live runtime and exact
+session. It exists only so the operator can use the native CLI from the conversation TERMINAL
+view; dashboard delivery never goes through it (the composer keeps the ACP socket, app-server
+socket, and so on). OpenCode is the first adapter; Codex `codex resume --remote` (PAN-3835)
+reuses the same seam.
+
+| Piece | Where |
+| --- | --- |
+| Shared vocabulary (`CompanionTerminalKind`, `CompanionTerminalState`, `companionTerminalKindFor`, body whitelists) | `packages/contracts/src/companion-terminal.ts` |
+| Lifecycle (open / close / owner teardown, per-owner lock, generation checks) | `src/lib/overdeck/companion-terminal/lifecycle.ts` |
+| Host port + tmux implementation (async `tmuxExecAsync` / `createSession`, no keystrokes) | `src/lib/overdeck/companion-terminal/host.ts` |
+| OpenCode adapter | `src/lib/overdeck/companion-terminal/opencode-adapter.ts` |
+| Wiring + `closeCompanionTerminalForOwner` | `src/lib/overdeck/companion-terminal/index.ts` |
+| Routes | `src/dashboard/server/routes/conversation-companion-terminal.ts` |
+| UI | `src/dashboard/frontend/src/components/chat/ConversationTerminalView.tsx` |
+
+**Session.** One companion per owner, named `companion-<ownerSession>` on the managed tmux
+socket (conversations are tmux on every host until PAN-3921). The prefix is ignored by the
+backend inventory, `isAgentSessionName`, and every reaper. The pane runs
+`exec <absolute binary> …`, so the session ends when the native client exits. The dashboard
+streams it through the ordinary `/ws/terminal?session=` path; a browser disconnect only drops the
+PTY client, and no `destroy-unattached` is set, so the companion survives.
+
+**Generation.** `sha256(ownerSession, owner #{session_created}, adapter fingerprint)`, 24 hex. The
+OpenCode fingerprint is `<port>:<sessionId>`, so any owner respawn (new tmux session, new port)
+changes it. It is stamped on the companion at creation as the session env var
+`OVERDECK_COMPANION_GENERATION` (`new-session -e`, atomic) and read back with `show-environment`;
+the tmux session is the authority and nothing else is stored. Rules:
+
+- Every operation on one owner runs through a per-owner promise lock, so concurrent opens create
+  one companion.
+- Open reuses a companion only when its stamp equals the current generation; any other session
+  under that name is killed and replaced. When unsure, kill and recreate: the companion holds no
+  state, the harness session does.
+- After creating, open resolves the generation again. If the owner changed meanwhile, it kills the
+  companion it created (only if the stamp is still its own) and answers `owner-changed` (409).
+- Close must carry the generation the browser was given; a mismatch answers `stale-generation`
+  (409) and kills nothing.
+- An owner whose tmux session is gone makes open reap any companion (`owner-not-running`).
+
+**Owner teardown.** `closeCompanionTerminalForOwner(ownerSession)` never throws and is called from
+`stopConversationRuntime` (stop, delete, archive, resume/restart failure, flywheel archive; before
+the shared-session early return), from `spawnConversationSession` right before it kills the owner
+session (every resume and restart-all), and from the conversation lifecycle poll for owners that
+exited on their own.
+
+**OpenCode adapter.** Reads `~/.overdeck/agents/<ownerSession>/opencode-port` and `acp-session-id`
+(PAN-3937), the cwd from the conversation record, and the binary from `resolveHarnessBinary`, then
+asks `GET http://127.0.0.1:<port>/session/<id>` (2 s timeout) before handing out
+`opencode attach http://127.0.0.1:<port> --session <id> --dir <cwd>`. Attach only; never `--fork`,
+`--continue`, `serve`, or a second `acp`.
+
+| owner tmux | `opencode-port` | `acp-session-id` | `GET /session/<id>` | result |
+| --- | --- | --- | --- | --- |
+| gone | – | – | – | `owner-not-running` |
+| alive | any | missing | – | `owner-starting` |
+| alive | missing | present | – | `restart-required` (pre-PAN-3937 host) |
+| alive | malformed | or malformed | – | `restart-required` |
+| alive | present | present | error / non-2xx | `owner-starting` |
+| alive | present | present | 404 | `session-missing` |
+| alive | present | present | 2xx | attach |
+
+**Routes.** `POST /api/conversations/:name/companion-terminal/open` (body `{}`) and
+`…/close` (body `{ generation }`), both behind `rejectUnsafeDashboardMutationRequest`. Any other
+body key or any query parameter is a 400: the browser can never name a URL, command, session id,
+cwd, binary, or terminal target. Responses are `CompanionTerminalState` bodies; `unsupported` is
+400, `owner-changed` / `stale-generation` are 409, everything else 200.
+
+**Adding a harness (PAN-3835).** Add a kind to `CompanionTerminalKind`, map it in
+`companionTerminalKindFor`, write an adapter whose `resolveTarget` returns argv, cwd, and a
+fingerprint from server-side records, and register it in `defaultAdapters()` in `index.ts`. The
+lifecycle, routes, and UI need no change.
+
 ## Herdr wire facts (v0.9.1, protocol 22)
 
 Verified live on 2026-09-18 against the running `overdeck` session.

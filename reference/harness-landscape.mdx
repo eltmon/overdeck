@@ -390,6 +390,9 @@ model discovery, resume behavior, and current transport limitations.
 - **Transport:** persistent `opencode acp`, verified with session creation,
   message delivery, and resume on 1.18.29. Overdeck reuses its ACP transcript and
   message transport while retaining the OpenCode harness identity.
+- **Native terminal:** the conversation Terminal view runs `opencode attach` against
+  the same server and session (verified on 1.18.31), next to the ACP host's
+  Runtime log.
 - **Provider scope:** Go and Zen. Other OpenCode providers are outside this integration.
 
 ### Goose (Block) — Not supported (strongest "bundle" primitive)
