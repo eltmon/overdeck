@@ -15,7 +15,8 @@ import {
 import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { stopWorkspaceDocker } from '../../../../lib/workspace-manager.js';
-import { killSession, sessionExists } from '../../../../lib/tmux.js';
+import { sessionExists } from '../../../../lib/tmux.js';
+import { agentPaneExists, closeAgentPane } from '../../../../lib/terminal-backends/launch.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
 import { saveAgentStateAndEmitEventProgram } from '../../services/agent-projection.js';
 import { EventStoreService } from '../../services/domain-services.js';
@@ -150,7 +151,8 @@ export const postAgentSuspendRoute = HttpRouter.add(
     // PAN-1048 review feedback 004 (C1): resolve issueId before kill so we can
     // include it on the agent.stopped payload (the contract requires it).
     const suspendIssueId = (yield* getAgentState(id))?.issueId ?? '';
-    yield* killSession(id).pipe(Effect.catch(() => Effect.void));
+    // PAN-3947: close through the terminal backend (tmux session or Herdr pane).
+    yield* Effect.promise(() => closeAgentPane(id));
     saveAgentRuntimeState(id, {
       state: 'suspended',
       lastActivity: new Date().toISOString(),
@@ -201,7 +203,10 @@ export const postAgentPauseRoute = HttpRouter.add(
     }
 
     const previousStatus = toAgentStatusPayload(stateBeforePause.status);
-    const hasLiveSession = yield* sessionExists(id);
+    // PAN-3947: a live terminal on the host's backend — a tmux session or a
+    // Herdr pane. `sessionExists` alone is always false on Herdr, so a paused
+    // agent's pane and harness used to stay alive.
+    const hasLiveSession = yield* Effect.promise(() => agentPaneExists(id).catch(() => false));
     const stoppedByPause = hasLiveSession || stateBeforePause.status === 'running' || stateBeforePause.status === 'starting';
     let updatedState = yield* setAgentPaused(id, reason, stoppedByPause);
     if (!updatedState) {
@@ -210,7 +215,7 @@ export const postAgentPauseRoute = HttpRouter.add(
 
     if (hasLiveSession) {
       yield* Effect.promise(() => captureAgentOutputBeforeKill(id));
-      yield* killSession(id);
+      yield* Effect.promise(() => closeAgentPane(id));
     }
 
     if (hasLiveSession || updatedState.status === 'running' || updatedState.status === 'starting') {

@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   confirmLiveAgentTerminality,
-  pruneStoppedAgentsForIssue,
   resolveLiveAgentTerminalityEvidence,
   pruneTerminalStoppedAgents,
   type AgentGcDeps,
@@ -46,22 +45,6 @@ function gcDeps(overrides: Partial<AgentGcDeps> = {}): AgentGcDeps {
 }
 
 describe('PAN-2543 event-driven agent row GC', () => {
-  it('prunes stopped rows only after their transcript-preserving cleanup is complete', async () => {
-    const cleanStateDir = vi.fn(async () => ({
-      removedFiles: 1,
-      preservedTranscripts: 0,
-      removedDir: true,
-    }));
-    const result = await pruneStoppedAgentsForIssue('PAN-2503', [
-      agent('agent-pan-2503', 'stopped', 'work'),
-      agent('planning-pan-2503', 'stopped', 'plan'),
-      agent('agent-pan-2503-review', 'running', 'review'),
-      { ...agent('agent-pan-9999', 'stopped', 'work'), issueId: 'PAN-9999' },
-    ], gcDeps({ cleanStateDir }));
-
-    expect(result).toEqual({ removed: ['agent-pan-2503', 'planning-pan-2503'], preserved: ['agent-pan-2503-review'] });
-  });
-
   it('excludes already-retired agents before terminal issue resolution', async () => {
     const isTerminalAgent = vi.fn(() => true);
     const cleanStateDir = vi.fn();

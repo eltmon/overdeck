@@ -4,6 +4,8 @@
  * `sessions.json` is append-only, including explicit reset boundaries. The
  * separate reset marker prevents compatibility fallbacks from reviving an old
  * transcript before the next launch has established a new session identity.
+ * Entries may also carry the absolute transcript path recorded at session
+ * start, letting resolvers skip per-harness path guessing.
  */
 import { randomUUID } from 'crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
@@ -34,6 +36,8 @@ export interface SessionIndexEntry {
   source: string;
   harness?: string;
   model?: string;
+  /** Absolute transcript path recorded at session start, when known. */
+  path?: string;
 }
 
 export type TranscriptCandidateKind = 'claude' | 'codex' | 'pi' | 'ohmypi' | 'acp' | 'kimi' | 'muse';
@@ -43,7 +47,7 @@ export interface TranscriptCandidateSources {
   entries: readonly SessionIndexEntry[];
   currentHarness?: string | null;
   indexedPaths: ReadonlyMap<string, string>;
-  launcherPinned?: TranscriptCandidate | null;
+  /** Fallback candidate for the current harness when no indexed entry has a path yet. */
   stateDerived?: readonly TranscriptCandidate[];
 }
 
@@ -85,7 +89,6 @@ export function orderedTranscriptCandidates(sources: TranscriptCandidateSources)
       } else candidates.push(candidate);
     }
   }
-  if (sources.launcherPinned) candidates.push(sources.launcherPinned);
   candidates.push(...sources.stateDerived ?? []);
   candidates.push(...legacyClaudeFallbacks);
 
@@ -111,6 +114,7 @@ function normalizeSessionEntry(value: unknown, legacy = false): SessionIndexEntr
     source: typeof entry.source === 'string' ? entry.source : 'unknown',
     ...(typeof entry.harness === 'string' && entry.harness.trim() ? { harness: entry.harness.trim() } : {}),
     ...(typeof entry.model === 'string' && entry.model.trim() ? { model: entry.model.trim() } : {}),
+    ...(typeof entry.path === 'string' && entry.path.trim() ? { path: entry.path.trim() } : {}),
   };
 }
 
@@ -148,8 +152,9 @@ export function parseSessionIndex(contents: string): SessionIndexEntry[] {
 
   const newestById = new Map<string, SessionIndexEntry>();
   for (const entry of entries) {
+    const prev = newestById.get(entry.sessionId);
     newestById.delete(entry.sessionId);
-    newestById.set(entry.sessionId, entry);
+    newestById.set(entry.sessionId, !entry.path && prev?.path ? { ...entry, path: prev.path } : entry);
   }
   return [...newestById.values()];
 }
@@ -198,7 +203,7 @@ export function appendSessionIdToHistory(
   agentId: string,
   sessionId: string,
   source = 'observed',
-  metadata: { harness?: string; model?: string } = {},
+  metadata: { harness?: string; model?: string; path?: string } = {},
 ): void {
   sessionId = sessionId.trim();
   if (!sessionId) return;
@@ -212,7 +217,8 @@ export function appendSessionIdToHistory(
   const model = metadata.model?.trim()
     || (typeof recorded.model === 'string' ? recorded.model.trim() : '')
     || 'unknown';
-  const line = `${JSON.stringify({ sessionId, at: new Date().toISOString(), source, harness, model })}\n`;
+  const path = metadata.path?.trim();
+  const line = `${JSON.stringify({ sessionId, at: new Date().toISOString(), source, harness, model, ...(path ? { path } : {}) })}\n`;
   if (Buffer.byteLength(line) > 4096) throw new Error('sessions.json entry exceeds PIPE_BUF');
   appendFileSync(join(dir, 'sessions.json'), line, { flag: 'a' });
 }

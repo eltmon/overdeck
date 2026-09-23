@@ -23,6 +23,7 @@ import { findProjectByTeamSync, getProjectSync, resolveProjectFromIssueSync } fr
 import { requireModelOverrideSync } from '../model-validation.js';
 import { resolveGitHubIssueSync, resolveTrackerTypeSync } from '../tracker-utils.js';
 import { killSession, listSessionNames, sessionExists } from '../tmux.js';
+import { closeAgentPane } from '../terminal-backends/launch.js';
 import { canUseHarnessSync } from '../harness-policy.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { AuthMode } from '../subscription-types.js';
@@ -501,9 +502,10 @@ export function abortPlanningForIssue(options: {
       revertedState = 'Todo';
     }
 
-    // Kill tmux sessions
-    yield* killSession(sessionName).pipe(Effect.ignore);
-    yield* killSession(`planning-${id.toLowerCase()}`).pipe(Effect.ignore);
+    // Close the planner's pane or tmux session through the terminal backend
+    // (PAN-3960: planners launch through it, so a Herdr planner has no session).
+    yield* Effect.promise(() => closeAgentPane(sessionName));
+    yield* Effect.promise(() => closeAgentPane(`planning-${id.toLowerCase()}`));
 
     // Clean up agent state files (non-fatal, so absorbed inside the promise)
     const agentStateDir = join(homedir(), '.overdeck', 'agents', sessionName);

@@ -24,7 +24,6 @@ const {
   activeStrikeMerge,
   mergeVerificationOptions,
   normalMergeEligibility,
-  parseStrikeMergeRequest,
   readStrikeHead,
   strikeRequestForQueueEntry,
   validateStrikeMergeRequest,
@@ -63,12 +62,6 @@ function git(remoteHead = markerHead) {
 }
 
 describe('strike merge-door eligibility', () => {
-  it('accepts only complete strike transport requests', () => {
-    expect(parseStrikeMergeRequest(request)).toEqual(request);
-    expect(parseStrikeMergeRequest({ ...request, markerHead: undefined })).toBeNull();
-    expect(parseStrikeMergeRequest({ kind: 'normal' })).toBeNull();
-  });
-
   it('skips only the nonexistent strike checklist during merge verification', () => {
     expect(mergeVerificationOptions(request)).toEqual({
       syncTargetBranch: false,

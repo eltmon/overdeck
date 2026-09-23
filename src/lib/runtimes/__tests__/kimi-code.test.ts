@@ -38,6 +38,7 @@ import {
   withKimiSessionCaptureLock,
   writeKimiSessionId,
 } from '../kimi-code.js';
+import { readSessionIndexSync } from '../../session-history.js';
 
 const tempHomes: string[] = [];
 
@@ -55,17 +56,22 @@ function writeWireFixture(kimiHome: string, workDir: string, sessionId: string, 
   return path;
 }
 
+let originalOverdeckHome: string | undefined;
+
 beforeEach(() => {
   tmuxMocks.createSession.mockReset();
   tmuxMocks.killSession.mockReset();
   tmuxMocks.sessionExists.mockReset();
   agentStateMocks.getAgentStateSync.mockReset();
   agentStateMocks.saveAgentStateSync.mockReset();
+  originalOverdeckHome = process.env.OVERDECK_HOME;
 });
 
 afterEach(() => {
   vi.useRealTimers();
   tempHomes.splice(0).forEach((home) => rmSync(home, { recursive: true, force: true }));
+  if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = originalOverdeckHome;
 });
 
 describe('kimiWorkDirKey (D2 — verified against installed kimi 0.29.2)', () => {
@@ -115,6 +121,7 @@ describe('launchAndCaptureManagedKimiSession', () => {
   it('captures and persists a fresh native identity before launch delivery can continue', async () => {
     const kimiHome = makeHome();
     const overdeckHome = makeHome();
+    process.env.OVERDECK_HOME = overdeckHome;
     const workspace = '/tmp/kimi-managed-fresh';
     const agentId = 'agent-kimi-managed-fresh';
     mkdirSync(join(overdeckHome, 'agents', agentId), { recursive: true });
@@ -131,11 +138,20 @@ describe('launchAndCaptureManagedKimiSession', () => {
     expect(sessionId).toBe('session-managed-fresh');
     expect(readFileSync(join(overdeckHome, 'agents', agentId, 'kimi-session-id'), 'utf8'))
       .toBe('session-managed-fresh');
+    expect(readSessionIndexSync(agentId)).toEqual([
+      expect.objectContaining({
+        sessionId: 'session-managed-fresh',
+        source: 'capture',
+        harness: 'kimi-code',
+        path: join(kimiSessionsRoot(kimiHome, workspace), 'session-managed-fresh', 'agents', 'main', 'wire.jsonl'),
+      }),
+    ]);
   });
 
   it('persists the exact -S resume identity without waiting for a new session directory', async () => {
     const kimiHome = makeHome();
     const overdeckHome = makeHome();
+    process.env.OVERDECK_HOME = overdeckHome;
     const workspace = '/tmp/kimi-managed-resume';
     const agentId = 'agent-kimi-managed-resume';
     mkdirSync(join(overdeckHome, 'agents', agentId), { recursive: true });
@@ -155,6 +171,14 @@ describe('launchAndCaptureManagedKimiSession', () => {
     expect(readFileSync(join(overdeckHome, 'agents', agentId, 'kimi-session-id'), 'utf8'))
       .toBe('session-existing-resume');
     expect(existsSync(kimiSessionsRoot(kimiHome, workspace))).toBe(false);
+    expect(readSessionIndexSync(agentId)).toEqual([
+      expect.objectContaining({
+        sessionId: 'session-existing-resume',
+        source: 'capture',
+        harness: 'kimi-code',
+        path: join(kimiSessionsRoot(kimiHome, workspace), 'session-existing-resume', 'agents', 'main', 'wire.jsonl'),
+      }),
+    ]);
   });
 });
 
@@ -247,6 +271,7 @@ describe('KimiCodeRuntimeSync', () => {
   it('spawns via the wi6 launcher command, captures the newly-appeared session id, and persists it (AC1/AC2)', async () => {
     const kimiHome = makeHome();
     const overdeckHome = makeHome();
+    process.env.OVERDECK_HOME = overdeckHome;
     const workspace = '/tmp/kimi-spawn-workspace';
     // A pre-existing session in the bucket must NOT be mistaken for the new one.
     writeWireFixture(kimiHome, workspace, 'session_preexisting');
@@ -313,6 +338,14 @@ describe('KimiCodeRuntimeSync', () => {
 
     const persistedId = readFileSync(join(overdeckHome, 'agents', 'agent-kimi-spawn', 'kimi-session-id'), 'utf-8');
     expect(persistedId).toBe('session_fresh');
+    expect(readSessionIndexSync('agent-kimi-spawn')).toEqual([
+      expect.objectContaining({
+        sessionId: 'session_fresh',
+        source: 'capture',
+        harness: 'kimi-code',
+        path: join(kimiSessionsRoot(kimiHome, workspace), 'session_fresh', 'agents', 'main', 'wire.jsonl'),
+      }),
+    ]);
     expect(deliverMessage).toHaveBeenCalledTimes(1);
     expect(deliverMessage).toHaveBeenCalledWith(
       'agent-kimi-spawn',

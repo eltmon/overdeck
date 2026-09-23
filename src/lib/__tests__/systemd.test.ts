@@ -245,3 +245,45 @@ describe('supervisor systemd unit helpers', () => {
     expect(execAsyncMock).not.toHaveBeenCalled();
   });
 });
+
+describe('generic user units (PAN-3956 W7)', () => {
+  it('installs a user unit idempotently and daemon-reloads only when content changes', async () => {
+    const unitDir = mkdtempSync(join(tmpdir(), 'overdeck-systemd-test-'));
+    const unitText = '[Unit]\nDescription=herdr\n';
+    const { installUserUnit } = await import('../systemd.js');
+    try {
+      const first = await installUserUnit('overdeck-herdr.service', unitText, unitDir);
+      const second = await installUserUnit('overdeck-herdr.service', unitText, unitDir);
+      expect(first).toEqual({ path: join(unitDir, 'overdeck-herdr.service'), written: true });
+      expect(second.written).toBe(false);
+      expect(readFileSync(join(unitDir, 'overdeck-herdr.service'), 'utf-8')).toBe(unitText);
+      expect(execAsyncMock).toHaveBeenCalledTimes(1);
+      expect(execAsyncMock).toHaveBeenCalledWith('systemctl --user daemon-reload', expect.any(Object));
+    } finally {
+      rmSync(unitDir, { recursive: true, force: true });
+    }
+  });
+
+  it('enables (with and without --now) and queries activity, never restarting', async () => {
+    const { enableUserUnit, enableUserUnitNow, isUserUnitActive } = await import('../systemd.js');
+    await enableUserUnit('overdeck-herdr.service');
+    await enableUserUnitNow('overdeck-herdr.service');
+    await expect(isUserUnitActive('overdeck-herdr.service')).resolves.toBe(true);
+    execAsyncMock.mockRejectedValueOnce(new Error('inactive'));
+    await expect(isUserUnitActive('overdeck-herdr.service')).resolves.toBe(false);
+    const commands = execAsyncMock.mock.calls.map((call) => call[0]);
+    expect(commands).toEqual([
+      'systemctl --user enable overdeck-herdr.service',
+      'systemctl --user enable --now overdeck-herdr.service',
+      'systemctl --user is-active --quiet overdeck-herdr.service',
+      'systemctl --user is-active --quiet overdeck-herdr.service',
+    ]);
+  });
+
+  it('rejects a unit name that could smuggle shell syntax', async () => {
+    const { enableUserUnitNow, installUserUnit } = await import('../systemd.js');
+    await expect(enableUserUnitNow('x.service; rm -rf ~')).rejects.toThrow(/Invalid systemd unit name/);
+    await expect(installUserUnit('../evil.service', 'x', '/tmp')).rejects.toThrow(/Invalid systemd unit name/);
+    expect(execAsyncMock).not.toHaveBeenCalled();
+  });
+});

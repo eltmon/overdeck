@@ -22,6 +22,7 @@ import {
   readPersistedAcpSessionId,
 } from "../host.js";
 import type { AcpSessionRuntimeEvent } from "../session-runtime.js";
+import { readSessionIndexSync } from "../../session-history.js";
 
 interface StubRuntimeOptions {
   readonly sessionId?: string;
@@ -226,6 +227,7 @@ function makeOutput(): { readonly writable: Writable; readonly text: () => strin
 
 const hosts: AcpHost[] = [];
 const tempHomes: string[] = [];
+const originalOverdeckHome = process.env.OVERDECK_HOME;
 
 async function makeHome(): Promise<string> {
   const home = await mkdtemp(join(tmpdir(), "overdeck-acp-host-"));
@@ -236,6 +238,8 @@ async function makeHome(): Promise<string> {
 afterEach(async () => {
   await Promise.all(hosts.splice(0).map((host) => host.stop()));
   await Promise.all(tempHomes.splice(0).map((home) => rm(home, { recursive: true, force: true })));
+  if (originalOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = originalOverdeckHome;
   vi.useRealTimers();
 });
 
@@ -248,11 +252,13 @@ describe("AcpHost", () => {
 
   it("binds its socket and writes mode-0600 token and session files", async () => {
     const overdeckHome = await makeHome();
+    process.env.OVERDECK_HOME = overdeckHome;
     const stub = await makeStubRuntime();
     const host = new AcpHost({
       agentId: "agent-pan-2858",
       provider: "kimi",
       workspace: process.cwd(),
+      model: "kimi-k2.6",
       overdeckHome,
       runtime: stub.runtime,
     });
@@ -268,6 +274,15 @@ describe("AcpHost", () => {
     expect(await readPersistedAcpSessionId(overdeckHome, "agent-pan-2858")).toBe(
       "acp-session-1",
     );
+    expect(readSessionIndexSync("agent-pan-2858")).toEqual([
+      expect.objectContaining({
+        sessionId: "acp-session-1",
+        source: "acp-host",
+        harness: "acp",
+        model: "kimi-k2.6",
+        path: join(agentDir, "acp-session.jsonl"),
+      }),
+    ]);
   });
 
   it("publishes readiness only after replacing stale state and binding the current socket", async () => {

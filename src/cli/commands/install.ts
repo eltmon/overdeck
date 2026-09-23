@@ -26,6 +26,10 @@ import { refreshCacheSync, syncStatuslineSync } from '../../lib/sync.js';
 import { ensureGlobalLayer } from '../../lib/context-layers/index.js';
 import { setupHooksCommand } from './setup/hooks.js';
 import { installTtsDaemonDependencies } from '../../lib/tts-daemon.js';
+import { ensureHerdr } from '../../lib/herdr-setup/ensure.js';
+import { readHerdrVersion } from '../../lib/herdr-setup/binary.js';
+import { probeHerdrAvailability } from '../../lib/terminal-backends/select.js';
+import { renderHerdrReport } from '../herdr-report.js';
 
 export function registerInstallCommand(program: Command): void {
   program
@@ -37,6 +41,7 @@ export function registerInstallCommand(program: Command): void {
     .option('--skip-docker', 'Skip Docker network setup')
     .option('--skip-moonshine', 'Skip Moonshine voice sidecar build (AutoPreso + Voice STT will not work without it)')
     .option('--skip-tts-daemon', 'Skip Qwen TTS daemon venv install (CUDA torch download is large)')
+    .option('--skip-herdr', 'Skip Herdr terminal backend install/verify (tmux-only hosts)')
     .action(installCommand);
 }
 
@@ -47,6 +52,7 @@ interface InstallOptions {
   skipDocker?: boolean;
   skipMoonshine?: boolean;
   skipTtsDaemon?: boolean;
+  skipHerdr?: boolean;
 }
 
 interface PrereqResult {
@@ -91,7 +97,18 @@ function checkCommand(cmd: string): boolean {
   }
 }
 
-function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
+/** The `herdr` binary as the launch path's probe sees it (PAN-3956). */
+interface HerdrPrereq {
+  readonly binary: string | null;
+  readonly version: string | null;
+}
+
+async function probeHerdrPrereq(): Promise<HerdrPrereq> {
+  const { binary } = await probeHerdrAvailability();
+  return { binary, version: binary ? await readHerdrVersion(binary) : null };
+}
+
+function checkPrerequisites(herdr: HerdrPrereq): { results: PrereqResult[]; allPassed: boolean } {
   const results: PrereqResult[] = [];
 
   // Node.js
@@ -174,11 +191,19 @@ function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
     fix: 'npm install -g @ast-grep/cli',
   });
 
+  // Herdr (default terminal backend — auto-installed by Step 5e, PAN-3956)
+  results.push({
+    name: 'Herdr',
+    passed: herdr.binary !== null,
+    message: herdr.binary ? (herdr.version ?? 'installed') : 'not found (will auto-install)',
+    fix: 'curl -fsSL https://herdr.dev/install.sh | sh',
+  });
+
   return {
     results,
     // These are auto-installed later or optional. jq must not block before
     // setupHooksCommand gets the chance to install it.
-    allPassed: results.filter((r) => !['mkcert', 'ttyd', 'jq'].includes(r.name)).every((r) => r.passed),
+    allPassed: results.filter((r) => !['mkcert', 'ttyd', 'jq', 'Herdr'].includes(r.name)).every((r) => r.passed),
   };
 }
 
@@ -203,7 +228,7 @@ async function installCommand(options: InstallOptions): Promise<void> {
   console.log(`Platform: ${chalk.cyan(plat)}\n`);
 
   // Step 1: Check prerequisites
-  const prereqs = checkPrerequisites();
+  const prereqs = checkPrerequisites(await probeHerdrPrereq());
 
   if (options.check) {
     printPrereqStatus(prereqs);
@@ -403,6 +428,16 @@ async function installCommand(options: InstallOptions): Promise<void> {
     }
   } else {
     spinner.info('ast-grep already installed');
+  }
+
+  // Step 5e: Herdr — the default terminal backend (PAN-3956). Binary from
+  // herdr.dev, resume_agents_on_restore = false, the session server, and the
+  // pilot integrations. Never restarts a running session server.
+  spinner.start('Installing and verifying Herdr terminal backend...');
+  try {
+    renderHerdrReport(spinner, await ensureHerdr({ mode: 'install', skip: options.skipHerdr }));
+  } catch (error) {
+    spinner.fail(`Herdr setup failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   // Step 5d: Build Moonshine voice sidecar (AutoPreso + Voice STT)

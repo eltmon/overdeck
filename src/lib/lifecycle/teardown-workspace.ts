@@ -114,6 +114,17 @@ async function killTmuxSessionsImpl(issueLower: string): Promise<StepResult> {
     // Session listing may fail if tmux server is not running
   }
 
+  // PAN-3947: on a Herdr host none of the names above exist — every agent of
+  // the issue lives in a pane stamped with its `issue` token. Close them all
+  // through the terminal backend. No-op on a tmux host.
+  let closedPanes = 0;
+  try {
+    const { closeIssuePanes } = await import('../terminal-backends/launch.js');
+    closedPanes = (await closeIssuePanes(issueLower)).length;
+  } catch {
+    // Backend unavailable — nothing more this step can close.
+  }
+
   // The state directory is durable after close-out. Persist the terminal
   // lifecycle fact before pruning so a closed Session tab never projects a
   // retained agent as writable/live after the terminal has been killed.
@@ -123,10 +134,13 @@ async function killTmuxSessionsImpl(issueLower: string): Promise<StepResult> {
   // They belong to the project, not the issue, and accumulate context across issues via --resume.
   // Their grace period / idle timeout handles cleanup when no new work arrives.
 
-  if (killed > 0) {
-    return stepOk(step, [`Killed ${killed} tmux session(s)`]);
+  if (killed > 0 || closedPanes > 0) {
+    const details: string[] = [];
+    if (killed > 0) details.push(`Killed ${killed} tmux session(s)`);
+    if (closedPanes > 0) details.push(`Closed ${closedPanes} Herdr pane(s)`);
+    return stepOk(step, details);
   }
-  return stepSkipped(step, ['No tmux sessions found']);
+  return stepSkipped(step, ['No tmux sessions or Herdr panes found']);
 }
 
 /**

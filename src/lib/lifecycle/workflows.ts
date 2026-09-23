@@ -32,7 +32,6 @@ import { extractNumberSync, extractPrefixSync } from '../issue-id.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 import { getForgeAdapter } from '../forge.js';
 import { resolveProjectReposForIssueSync } from '../project-repos.js';
-import { pruneStoppedAgentsForIssue } from '../cloister/agent-gc.js';
 import { isTrackerIssueClosed } from '../cloister/issue-closed.js';
 import { clearAgentOperatorGatesForIssueSync } from '../agents/agent-state.js';
 import { evaluateDodGate, readCompletedCloseOut } from './dod-gate.js';
@@ -382,11 +381,6 @@ export function closeOut(
     ]);
     allSteps.push(markTerminal);
     {
-      const pruned = yield* Effect.promise(() => pruneStoppedAgentsForIssue(ctx.issueId));
-      allSteps.push(pruned.preserved.length > 0
-        ? stepSkipped('close-out:prune-agent-rows', [`Preserved live agents or terminal rows with retained transcripts: ${pruned.preserved.join(', ')}`])
-        : stepOk('close-out:prune-agent-rows', [`Pruned ${pruned.removed.length} stopped agent row(s)`]));
-
       // PAN-3727: clear operator-gate residue (stoppedByUser/paused/troubled)
       // so a terminal issue's preserved agent rows stop reappearing in the
       // parked population. Non-blocking — a bookkeeping failure must never

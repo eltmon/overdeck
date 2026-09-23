@@ -16,7 +16,9 @@ import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/type
 import { getOverdeckHome } from '../../../../lib/paths.js';
 import { extractTeamPrefix, findProjectByTeamSync } from '../../../../lib/projects.js';
 import { loadRemoteAgentState } from '../../../../lib/remote/remote-agents.js';
-import { createSession, killSession, resizeWindow, sendKeys, sessionExists } from '../../../../lib/tmux.js';
+import { deliverAgentMessage } from '../../../../lib/agents/delivery.js';
+import { agentPaneExists, closeAgentPane, launchAgentPane } from '../../../../lib/terminal-backends/launch.js';
+import { resizeWindow } from '../../../../lib/tmux.js';
 import { findPlan, readPlan } from '../../../../lib/xbrief/io.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -72,12 +74,8 @@ const getPlanningStatusRoute = HttpRouter.add(
         const pane = (await getBackendPanes()).find((candidate) => candidate.id === sessionName);
         const agentStarting = pane?.state === 'unknown';
 
-        let tmuxSessionAlive = false;
-        if (!isRemote) {
-          try {
-            tmuxSessionAlive = await Effect.runPromise(sessionExists(sessionName));
-          } catch {}
-        }
+        // PAN-3960: a live tmux session or a live Herdr agent, on this host's backend.
+        const paneAlive = isRemote ? false : await agentPaneExists(sessionName).catch(() => false);
 
         const panDir = join(workspacePath, PAN_DIRNAME);
         const panContinueFile = join(panDir, PAN_CONTINUE_FILENAME);
@@ -96,7 +94,7 @@ const getPlanningStatusRoute = HttpRouter.add(
           : false;
 
         return jsonResponse({
-          active: tmuxSessionAlive || agentStarting,
+          active: paneAlive || agentStarting,
           sessionName,
           workspacePath: existsSync(workspacePath) ? workspacePath : undefined,
           planningCompleted,
@@ -193,16 +191,16 @@ const postPlanningMessageRoute = HttpRouter.add(
         // Check if session is remote
         const isRemote = !!loadRemoteAgentState(sessionName);
 
-        // Check if local session exists (skip remote for now)
-        let tmuxSessionAlive = false;
-        if (!isRemote) {
-          try {
-            tmuxSessionAlive = await Effect.runPromise(sessionExists(sessionName));
-          } catch {}
-        }
+        // Check if the local planner is live (skip remote for now). PAN-3960:
+        // backend-aware — a Herdr planner has no tmux session, and reading it
+        // as dead would launch a second planner next to it.
+        const paneAlive = isRemote ? false : await agentPaneExists(sessionName).catch(() => false);
 
-        if (tmuxSessionAlive) {
-          await Effect.runPromise(sendKeys(sessionName, message, 'planning user message'));
+        if (paneAlive) {
+          const delivery = await deliverAgentMessage(sessionName, message, 'planning user message');
+          if (!delivery.ok) {
+            throw new Error(delivery.failure ?? `delivery via ${delivery.path} failed`);
+          }
           await Effect.runPromise(eventStore.append({
             type: 'planning.sync',
             timestamp: new Date().toISOString(),
@@ -312,11 +310,31 @@ Continue the PLANNING session. Do NOT implement anything.
           { mode: 0o755 },
         );
 
-        await Effect.runPromise(createSession(sessionName, agentCwd, `bash '${launcherScript}'`));
+        // PAN-3960: the continuation planner launches through the host's
+        // terminal backend like every other agent, stamped role=plan.
+        const pane = await launchAgentPane({
+          issueId,
+          cwd: agentCwd,
+          agentId: sessionName,
+          argv: ['bash', launcherScript],
+          env: {
+            OVERDECK_AGENT_ID: sessionName,
+            OVERDECK_ISSUE_ID: issueId,
+            OVERDECK_SESSION_TYPE: 'plan',
+          },
+          tokens: {
+            issue: issueId,
+            role: 'plan',
+            harness: 'claude-code',
+            model: msgPlanningModel,
+          },
+        });
 
-        try {
-          await Effect.runPromise(resizeWindow(sessionName, 200, 50));
-        } catch {}
+        if (pane.backend === 'tmux') {
+          try {
+            await Effect.runPromise(resizeWindow(sessionName, 200, 50));
+          } catch {}
+        }
 
         await Effect.runPromise(eventStore.append({
           type: 'planning.sync',
@@ -355,21 +373,12 @@ const deletePlanningSessionRoute = HttpRouter.add(
     const sessionName = `planning-${issueId.toLowerCase()}`;
 
     return yield* Effect.promise(async () => {
-      try {
-        await Effect.runPromise(killSession(sessionName));
-        return jsonResponse({ success: true });
-      } catch (error: unknown) {
-        const msg = error instanceof Error ? error.message : String(error);
-        // tmux reports "can't find session" when the session is already gone — treat as success.
-        if (/can't find session|session not found|no session found/i.test(msg)) {
-          return jsonResponse({ success: true, alreadyStopped: true });
-        }
-        console.error(`[delete-planning] kill-session failed for ${sessionName}:`, msg);
-        return jsonResponse(
-          { error: 'Failed to stop planning: ' + msg },
-          { status: 500 },
-        );
-      }
+      // PAN-3960: close the planner through the terminal backend — a Herdr pane
+      // has no tmux session to kill. Never throws; false = nothing was running.
+      const closed = await closeAgentPane(sessionName);
+      return closed
+        ? jsonResponse({ success: true })
+        : jsonResponse({ success: true, alreadyStopped: true });
     });
   }),
 );

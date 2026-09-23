@@ -30,7 +30,12 @@ import { parseArtifactRef } from '../../../lib/forge.js';
 import { validateOrigin } from './origin-validation.js';
 import { AUTO_MERGE_COOLDOWN_MS } from '../../../lib/cloister/auto-merge-config.js';
 import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
-import { getProjectAutoMergeDefault, shouldHoldForUat, type ProjectAutoMergeDefault } from '../../../lib/cloister/auto-merge-policy.js';
+import {
+  getProjectAutoMergeDefault,
+  projectHoldsForUat,
+  shouldHoldForUat,
+  type ProjectAutoMergeDefault,
+} from '../../../lib/cloister/auto-merge-policy.js';
 import { getMergeBlockersPayload } from '../../../lib/cloister/merge-blockers.js';
 import {
   isFlywheelAutoPickupBacklog,
@@ -75,6 +80,11 @@ export interface MergeTrainQueueEntry {
   projectName: string;
   /** Effective per-project flag: the project override, else the global setting. */
   enabled: boolean;
+  /**
+   * PAN-3965: the project holds merges for UAT, so one ready feature still
+   * gets a batch (its UAT stack). False = one ready feature merges directly.
+   */
+  holdsForUat: boolean;
   queue: MergeQueueItem[];
 }
 
@@ -96,7 +106,8 @@ async function queueEntryForProject(
   config: ProjectConfig,
   enabled: boolean,
 ): Promise<MergeTrainQueueEntry> {
-  const base = { projectKey: key, projectName: config.name, enabled };
+  const holdsForUat = projectHoldsForUat(config, isFlywheelRequireUatBeforeMerge());
+  const base = { projectKey: key, projectName: config.name, enabled, holdsForUat };
   if (!enabled) return { ...base, queue: [] };
 
   const projectPath = resolve(config.path);
@@ -133,7 +144,7 @@ export async function getMergeTrainQueuesPayload(): Promise<MergeTrainQueueEntry
     if (!entry) return [];
     const reason = outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason);
     console.warn(`[merge-train] queue for project ${entry.key} failed: ${reason}`);
-    return [{ projectKey: entry.key, projectName: entry.config.name, enabled: true, queue: [] }];
+    return [{ projectKey: entry.key, projectName: entry.config.name, enabled: true, holdsForUat: projectHoldsForUat(entry.config, isFlywheelRequireUatBeforeMerge()), queue: [] }];
   });
 }
 

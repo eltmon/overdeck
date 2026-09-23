@@ -1,0 +1,216 @@
+import { describe, expect, it, vi } from 'vitest';
+
+import {
+  ensureHerdr,
+  isHerdrSetupSkipped,
+  type EnsureHerdrDeps,
+  type EnsureHerdrRunReport,
+} from '../../../../src/lib/herdr-setup/ensure.js';
+import { parseHerdrStatus, type HerdrExec, type HerdrStatus } from '../../../../src/lib/herdr-setup/status.js';
+import type { HerdrAvailability } from '../../../../src/lib/terminal-backends/select.js';
+import { STATUS_NOT_RUNNING_JSON, STATUS_RUNNING_JSON } from './fixtures.js';
+
+const BINARY = '/home/op/.local/bin/herdr';
+const SOCKET = '/home/op/.config/herdr/sessions/overdeck/herdr.sock';
+
+const RUNNING = parseHerdrStatus(STATUS_RUNNING_JSON) as HerdrStatus;
+const NOT_RUNNING = parseHerdrStatus(STATUS_NOT_RUNNING_JSON) as HerdrStatus;
+
+function probe(binary: string | null): HerdrAvailability {
+  return {
+    binary,
+    session: 'overdeck',
+    socket: SOCKET,
+    socketExists: binary !== null,
+    available: binary !== null,
+  };
+}
+
+interface Harness {
+  deps: EnsureHerdrDeps;
+  spies: {
+    exec: ReturnType<typeof vi.fn<HerdrExec>>;
+    installBinary: ReturnType<typeof vi.fn>;
+    updateBinary: ReturnType<typeof vi.fn>;
+    ensureChannel: ReturnType<typeof vi.fn>;
+    ensureConfig: ReturnType<typeof vi.fn>;
+    ensureServer: ReturnType<typeof vi.fn>;
+    ensureIntegrations: ReturnType<typeof vi.fn>;
+  };
+}
+
+function harness(options: {
+  binary?: string | null;
+  version?: string;
+  latest?: string | null;
+  serverRunning?: boolean;
+  policy?: 'herdr' | 'tmux';
+  configChanged?: boolean;
+  integrationsInstalled?: string[];
+} = {}): Harness {
+  const binaryPresent = options.binary !== null;
+  const spies = {
+    // Any real subprocess would go through here — the orchestrator must not
+    // reach it when every step is injected.
+    exec: vi.fn<HerdrExec>(async () => ({ stdout: '', stderr: '', exitCode: 0 })),
+    installBinary: vi.fn(async () => ({ binary: BINARY })),
+    updateBinary: vi.fn(async () => {}),
+    ensureChannel: vi.fn(async () => 'stable' as const),
+    ensureConfig: vi.fn(async () => ({ changed: options.configChanged ?? false, path: '/home/op/.config/herdr/config.toml' })),
+    ensureServer: vi.fn(async () => ({
+      running: true,
+      managedBy: 'already-running' as const,
+      unit: 'overdeck-herdr.service',
+    })),
+    ensureIntegrations: vi.fn(async () => ({
+      installed: options.integrationsInstalled ?? [],
+      already: [],
+      skipped: [],
+    })),
+  };
+  const deps: EnsureHerdrDeps = {
+    env: {},
+    home: '/home/op',
+    exec: spies.exec,
+    selection: async () => ({
+      backend: options.policy ?? 'herdr',
+      source: options.policy === 'tmux' ? 'config' : 'default',
+      diagnostic: options.policy === 'tmux' ? "terminal.backend is set to 'tmux' in config.yaml." : 'default',
+    }),
+    probe: async () => probe(binaryPresent ? (options.binary ?? BINARY) : null),
+    fetchLatest: async () => (options.latest === undefined ? '0.9.1' : options.latest),
+    installBinary: spies.installBinary,
+    updateBinary: spies.updateBinary,
+    readVersion: async () => options.version ?? '0.9.1',
+    readStatus: async () => ((options.serverRunning ?? true) ? RUNNING : NOT_RUNNING),
+    ensureChannel: spies.ensureChannel,
+    ensureConfig: spies.ensureConfig,
+    ensureServer: spies.ensureServer,
+    ensureIntegrations: spies.ensureIntegrations,
+  };
+  return { deps, spies };
+}
+
+async function run(mode: 'install' | 'sync' | 'up', h: Harness): Promise<EnsureHerdrRunReport> {
+  const report = await ensureHerdr({ mode, deps: h.deps });
+  if (isHerdrSetupSkipped(report)) throw new Error(`unexpectedly skipped: ${report.skipped}`);
+  return report;
+}
+
+describe('ensureHerdr — D10 skip conditions', () => {
+  it('(a) skips under an explicit tmux policy and touches nothing', async () => {
+    const h = harness({ policy: 'tmux' });
+    const report = await ensureHerdr({ mode: 'install', deps: h.deps });
+    expect(isHerdrSetupSkipped(report) && report.skipped).toContain('terminal backend is tmux');
+    expect(h.spies.installBinary).not.toHaveBeenCalled();
+    expect(h.spies.ensureServer).not.toHaveBeenCalled();
+  });
+
+  it('skips on --skip-herdr, CI and Vitest', async () => {
+    const h = harness();
+    expect(await ensureHerdr({ mode: 'install', skip: true, deps: h.deps })).toEqual({
+      skipped: 'Herdr setup skipped (--skip-herdr)',
+    });
+    expect(await ensureHerdr({ mode: 'sync', deps: { ...h.deps, env: { CI: 'true' } } }))
+      .toEqual({ skipped: 'Herdr setup skipped: running under CI' });
+    expect(await ensureHerdr({ mode: 'up', deps: { ...h.deps, env: { VITEST: 'true' } } }))
+      .toEqual({ skipped: 'Herdr setup skipped: running under Vitest' });
+    expect(h.spies.ensureServer).not.toHaveBeenCalled();
+  });
+});
+
+describe('ensureHerdr — install / sync / up (PAN-3956 W8)', () => {
+  it('(b) installs an absent binary, then runs every other step', async () => {
+    const h = harness({ binary: null, integrationsInstalled: ['pi', 'omp'] });
+    const report = await run('install', h);
+    expect(h.spies.installBinary).toHaveBeenCalledTimes(1);
+    expect(report.binary).toMatchObject({ path: BINARY, action: 'installed', version: '0.9.1' });
+    expect(h.spies.ensureChannel).toHaveBeenCalled();
+    expect(h.spies.ensureConfig).toHaveBeenCalledWith({ binary: BINARY, session: 'overdeck', serverRunning: true });
+    expect(h.spies.ensureServer).toHaveBeenCalledWith({ binary: BINARY, session: 'overdeck', socket: SOCKET });
+    expect(report.integrations.installed).toEqual(['pi', 'omp']);
+    expect(report.server).toMatchObject({ running: true, endpointCompatible: true, restartNeeded: false });
+  });
+
+  it('(c) sync with a running server and a newer manifest does not update, and warns once', async () => {
+    const h = harness({ latest: '0.10.0', serverRunning: true });
+    const report = await run('sync', h);
+    expect(h.spies.updateBinary).not.toHaveBeenCalled();
+    expect(report.binary.action).toBe('update-available');
+    expect(report.warnings).toHaveLength(1);
+    expect(report.warnings[0]).toContain('herdr 0.10.0 is available');
+    expect(report.warnings[0]).toContain('systemctl --user restart overdeck-herdr.service');
+    expect(report.warnings[0]).toContain('restarting closes every agent pane');
+  });
+
+  it('sync updates when no session server runs for this home', async () => {
+    const h = harness({ latest: '0.10.0', serverRunning: false });
+    const report = await run('sync', h);
+    expect(h.spies.updateBinary).toHaveBeenCalledWith(BINARY);
+    expect(report.binary.action).toBe('updated');
+  });
+
+  it('(d) install with a newer manifest runs `herdr update`', async () => {
+    const h = harness({ latest: '0.10.0', serverRunning: true });
+    const report = await run('install', h);
+    expect(h.spies.updateBinary).toHaveBeenCalledWith(BINARY);
+    expect(report.binary.action).toBe('updated');
+  });
+
+  it('(e) a re-run with everything present installs nothing and changes no config', async () => {
+    const h = harness();
+    const report = await run('sync', h);
+    expect(h.spies.installBinary).not.toHaveBeenCalled();
+    expect(h.spies.updateBinary).not.toHaveBeenCalled();
+    expect(report.config.changed).toBe(false);
+    expect(report.binary.action).toBe('present');
+    expect(report.warnings).toEqual([]);
+    expect(h.spies.exec).not.toHaveBeenCalled();
+  });
+
+  it('an unreachable manifest is an info warning, never a failure', async () => {
+    const h = harness({ latest: null });
+    const report = await run('sync', h);
+    expect(report.warnings).toEqual(['Could not read https://herdr.dev/latest.json; skipped the Herdr update check.']);
+    expect(report.server.running).toBe(true);
+  });
+
+  it('up never installs, updates or touches integrations — only config and the server', async () => {
+    const h = harness({ latest: '0.10.0', serverRunning: false });
+    const report = await run('up', h);
+    expect(h.spies.updateBinary).not.toHaveBeenCalled();
+    expect(h.spies.ensureChannel).not.toHaveBeenCalled();
+    expect(h.spies.ensureIntegrations).not.toHaveBeenCalled();
+    expect(h.spies.ensureConfig).toHaveBeenCalled();
+    expect(h.spies.ensureServer).toHaveBeenCalled();
+    expect(report.channel).toBe('unchecked');
+  });
+
+  it('up with no binary reports the server down and names pan install, without installing', async () => {
+    const h = harness({ binary: null });
+    const report = await run('up', h);
+    expect(h.spies.installBinary).not.toHaveBeenCalled();
+    expect(report.server.running).toBe(false);
+    expect(report.server.reason).toContain('pan install');
+  });
+
+  it('warns naming both versions when the running server is not endpoint-compatible', async () => {
+    const h = harness();
+    const incompatible = parseHerdrStatus(
+      STATUS_RUNNING_JSON.replace('"endpoint_compatible":true', '"endpoint_compatible":false')
+        .replace('"running":true,"version":"0.9.1"', '"running":true,"version":"0.8.0"'),
+    ) as HerdrStatus;
+    const report = await run('sync', { ...h, deps: { ...h.deps, readStatus: async () => incompatible } });
+    expect(report.server.endpointCompatible).toBe(false);
+    expect(report.warnings.join('\n')).toMatch(/0\.8\.0.*0\.9\.1/);
+  });
+
+  it('a failing install is a server-down report, not a throw', async () => {
+    const h = harness({ binary: null });
+    h.spies.installBinary.mockRejectedValueOnce(new Error('curl: (6) Could not resolve host'));
+    const report = await run('install', h);
+    expect(report.binary.action).toBe('missing');
+    expect(report.server).toEqual({ running: false, reason: 'Herdr install failed: curl: (6) Could not resolve host' });
+    expect(h.spies.ensureServer).not.toHaveBeenCalled();
+  });
+});

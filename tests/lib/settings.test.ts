@@ -343,7 +343,7 @@ describe('settings', () => {
 
   describe('getAvailableModels', () => {
     it('should always return Anthropic models', async () => {
-      const { getAvailableModelsSync, getDefaultSettingsSync } = await import('../../src/lib/settings.js');
+      const { getAvailableModelsSync, getClaudeModelFlagSync, getDefaultSettingsSync } = await import('../../src/lib/settings.js');
 
       const settings = getDefaultSettingsSync();
       const available = getAvailableModelsSync(settings);
@@ -351,6 +351,7 @@ describe('settings', () => {
       expect(available.anthropic).toEqual([
         'claude-fable-5-1',
         'claude-fable-5',
+        'claude-opus-5-5',
         'claude-opus-5',
         'claude-opus-4-8',
         'claude-opus-4-7',
@@ -359,6 +360,7 @@ describe('settings', () => {
         'claude-sonnet-4-6',
         'claude-haiku-4-5',
       ]);
+      expect(getClaudeModelFlagSync('claude-opus-5-5')).toBe('claude-opus-5-5');
     });
 
     it('should return empty arrays for providers without API keys', async () => {

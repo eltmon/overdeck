@@ -34,8 +34,10 @@ import {
 import { checkDeployedHooksDrift } from './doctor-hooks-drift.js';
 import { checkCliGenerationLink } from './doctor-cli-generation.js';
 import { checkInotify } from './doctor-inotify.js';
+import { checkHerdr } from './doctor-herdr.js';
 import { checkTierFitnessConfig } from './doctor-tier-fitness.js';
 import { checkDuplicateComposeStacks } from './doctor-duplicate-stacks.js';
+import { checkPlanHomePanIgnore } from './doctor-plan-home-ignore.js';
 import {
   assessBridgePoolPressure,
   bridgePoolLimitFromPools,
@@ -767,6 +769,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
 
   // Kimi Code CLI (ACP harness). Resolve the same configured executable used at launch.
   for (const c of await checkKimi()) checks.push(c);
+  for (const c of await checkHerdr()) checks.push(c); // PAN-3956: terminal backend + Herdr
 
   // Check Overdeck directories
   const directories = [
@@ -859,11 +862,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
       message: `${agentSessions} agent sessions`,
     });
   } catch {
-    checks.push({
-      name: 'Running Agents',
-      status: 'ok',
-      message: '0 agent sessions',
-    });
+    checks.push({ name: 'Running Agents', status: 'ok', message: '0 agent sessions' });
   }
 
   checks.push(await checkClosedIssueOrphanAgentDirs(getCachedIssueRowsForDoctor()));
@@ -874,6 +873,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   checks.push(checkOrphanProposedSpecs());
   checks.push(checkTierFitnessConfig()); // PAN-3842
   checks.push(...await checkMainDivergence());
+  checks.push(await checkPlanHomePanIgnore()); // PAN-3996
   try {
     const { isSmeeProcessRunningSync } = await import('../../lib/smee.js');
     const smeeUrlPath = join(homedir(), '.overdeck', 'github-app', 'smee-url');

@@ -27,8 +27,9 @@ pan admin migrate-plan-home lexerra --commit    # copy + commit in the plan home
 
 Options:
 
-- `--commit` — commit the copied artifacts in the plan home once something copied
-- `--dry-run` — report what would be copied without writing anything
+- `--commit` — commit the migrated artifacts in the plan home (copied now, or already in place
+  from an earlier run but never committed), and repair a legacy `.pan/` ignore rule (below)
+- `--dry-run` — report what would be copied, and whether `.pan/` is ignored, without writing anything
 - `--state-root <dir>` / `--plan-home <dir>` — override resolution (tests, odd setups)
 - `--open-issues <file>` — read open issue ids from a file instead of calling the tracker
 
@@ -48,6 +49,28 @@ the cutover.
 Idempotent: run it again and it copies nothing and reports `0 remaining`.
 It never writes to the state worktree, never deletes anything, and never
 pushes.
+
+## A plan home that ignores `.pan/` (PAN-3996)
+
+Before the Cut, Overdeck wrote `.pan/` into project `.gitignore` files. Before
+copying anything, the command runs `git check-ignore` against `.pan/` in the
+plan home:
+
+- **Overdeck's legacy line** (an exact `.pan/` or `.pan` line in the repo's
+  top-level `.gitignore`): with `--commit` that line is removed and
+  `.gitignore` is committed together with the artifacts through
+  `git add -- <paths>` + `git commit --only -- <paths>`, so unrelated staged or
+  unstaged work stays out of the commit. If `.gitignore` already has
+  uncommitted changes, `--commit` refuses before copying. Without `--commit`
+  nothing is edited and it warns that the copies are ignored by git.
+  `--dry-run` names the rule.
+- **Any other rule** (nested `.gitignore`, `.git/info/exclude`,
+  `core.excludesFile`, a broader pattern): never edited. It is reported with
+  its `file:line`; `--commit` refuses before copying.
+
+A refused run or a git failure prints one `migrate-plan-home: …` line and
+exits 1. `pan doctor`'s `Plan home .pan/ tracking` row flags the same
+condition for every registered project.
 
 ## When to Use
 

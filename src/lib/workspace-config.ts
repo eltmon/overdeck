@@ -102,6 +102,18 @@ export interface TestConfig {
   env?: Record<string, string>;
 }
 
+/**
+ * PAN-3965: `projects.yaml` `verification:` block. `tests` says where the
+ * verification gate's `test` gate runs: `ci` skips the local `test` quality
+ * gate and treats the CI test job on the PR head (a check named `test`/`tests`,
+ * with or without a matrix suffix) as the test gate; `local` runs it on the
+ * host. Unset = `ci` when the project has a `github_repo` and a
+ * `.github/workflows/` directory, else `local`.
+ */
+export interface ProjectVerificationConfig {
+  tests?: 'ci' | 'local';
+}
+
 export interface QualityGateConfig {
   /** Command to run (e.g., 'pnpm lint', 'pnpm typecheck') */
   command: string;

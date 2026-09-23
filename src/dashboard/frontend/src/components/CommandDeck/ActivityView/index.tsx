@@ -38,8 +38,9 @@ async function fetchActivity(issueId: string): Promise<{ issueId: string; sectio
 
 function statusDotColor(status: string): string {
   if (status === 'Done' || status === 'Completed' || status === 'Closed') return 'var(--success)';
-  if (status === 'In Progress' || status === 'Started' || status === 'Active') return 'var(--warning)';
-  if (status === 'In Review' || status === 'Review' || status === 'QA' || status === 'Testing') return '#ec4899';
+  if (status === 'In Progress' || status === 'Started' || status === 'Active') return 'var(--info)';
+  if (status === 'In Review') return 'var(--warning)';
+  if (status === 'Review' || status === 'QA' || status === 'Testing') return 'var(--signal-review)';
   return 'var(--muted-foreground)';
 }
 
@@ -64,7 +65,6 @@ function RallyStoriesSection({ feature, issues }: { feature: ProjectFeature; iss
       <div style={{
         background: 'var(--muted)',
         border: '1px solid var(--border)',
-        borderLeft: '3px solid #6366f1',
         borderRadius: 6,
         padding: '12px 16px',
         marginBottom: 12,
@@ -79,23 +79,19 @@ function RallyStoriesSection({ feature, issues }: { feature: ProjectFeature; iss
             </a>
           )}
           {feature.rawTrackerState && (
-            <span style={{
+            <span className="bg-muted text-muted-foreground" style={{
               fontSize: 11,
               padding: '1px 6px',
               borderRadius: 3,
-              background: 'rgba(107,114,128,0.15)',
-              color: 'var(--muted-foreground)',
             }}>
               Rally: {feature.rawTrackerState}
             </span>
           )}
           {feature.stateLabel && feature.stateLabel !== feature.rawTrackerState && (
-            <span style={{
+            <span className={feature.stateLabel === 'In Progress' ? 'badge-bg-primary text-primary' : 'badge-bg-success text-success-foreground'} style={{
               fontSize: 11,
               padding: '1px 6px',
               borderRadius: 3,
-              background: feature.stateLabel === 'In Progress' ? 'rgba(168,85,247,0.15)' : 'rgba(34,197,94,0.15)',
-              color: feature.stateLabel === 'In Progress' ? '#a855f7' : '#22c55e',
             }}>
               Derived: {feature.stateLabel}
             </span>
@@ -113,11 +109,13 @@ function RallyStoriesSection({ feature, issues }: { feature: ProjectFeature; iss
               overflow: 'hidden',
             }}>
               <div style={{
-                width: `${progressPct}%`,
+                width: '100%',
                 height: '100%',
-                background: progressPct === 100 ? 'var(--success)' : '#6366f1',
+                background: progressPct === 100 ? 'var(--success)' : 'var(--primary)',
                 borderRadius: 3,
-                transition: 'width 0.3s ease',
+                transform: `scaleX(${progressPct / 100})`,
+                transformOrigin: 'left',
+                transition: 'transform 0.3s ease',
               }} />
             </div>
             <span style={{ fontSize: 11, color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>
@@ -173,9 +171,9 @@ function RallyStoriesSection({ feature, issues }: { feature: ProjectFeature; iss
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
-                  color: '#6366f1',
+                  color: 'var(--primary)',
                   textDecoration: 'none',
-                  fontFamily: "var(--font-mono), 'SF Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace",
+                  fontFamily: 'var(--font-mono)',
                   fontSize: 11,
                   flexShrink: 0,
                 }}
@@ -207,12 +205,10 @@ function RallyStoriesSection({ feature, issues }: { feature: ProjectFeature; iss
 
               {/* Rally state badge */}
               {story.rawTrackerState && (
-                <span style={{
+                <span className="bg-muted text-muted-foreground" style={{
                   fontSize: 10,
                   padding: '1px 5px',
                   borderRadius: 3,
-                  background: 'rgba(107,114,128,0.12)',
-                  color: 'var(--muted-foreground)',
                   flexShrink: 0,
                 }}>
                   {story.rawTrackerState}

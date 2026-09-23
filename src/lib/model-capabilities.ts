@@ -95,6 +95,30 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     notes: 'Mythos-class flagship (June 2026). Tuned for long-horizon autonomous work spanning millions of tokens. Beats Opus 4.8 across effort levels; same effort set (high is the default, xhigh between high and max). Adaptive thinking always on. Premium pricing (~2× Opus 4.8) — opt-in for the most demanding planning/coding.',
   },
 
+  'claude-opus-5-5': {
+    model: 'claude-opus-5-5',
+    provider: 'anthropic',
+    displayName: 'Claude Opus 5.5',
+    costPer1MTokens: 12, // Equal input/output blend of published API prices.
+    contextWindow: 1000000,
+    maxOutputTokens: 128000,
+    skills: {
+      'code-generation': 99,
+      'code-review': 99,
+      debugging: 99,
+      planning: 99,
+      documentation: 97,
+      testing: 96,
+      security: 99,
+      performance: 94,
+      synthesis: 99,
+      speed: 45,
+      'context-length': 100,
+    },
+    effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    notes: 'Released 2026-09-22 for long-running agentic coding and knowledge work. Native 1M context, 128K max output, always-on adaptive thinking, Medium default effort, and $4/$20 per MTok API pricing. Skill scores inherit the Opus 5 baseline until benchmarked.',
+  },
+
   'claude-opus-5': {
     model: 'claude-opus-5',
     provider: 'anthropic',

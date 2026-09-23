@@ -115,6 +115,18 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
   capturePane: vi.fn(() => Effect.succeed('')),
 }));
 
+// PAN-3947: post-merge closes terminals through the terminal backend. Model a
+// tmux host: closing an agent's terminal kills its tmux session, and there are
+// no Herdr panes to close by issue token.
+vi.mock('../../../../src/lib/terminal-backends/launch.js', () => ({
+  closeAgentPane: vi.fn(async (agentId: string) => {
+    if (!(await Effect.runPromise(mockSessionExists(agentId)))) return false;
+    await Effect.runPromise(mockKillSession(agentId));
+    return true;
+  }),
+  closeIssuePanes: vi.fn(async () => []),
+}));
+
 vi.mock('../../../../src/lib/paths.js', () => ({
   OVERDECK_HOME: '/tmp/overdeck-test',
   AGENTS_DIR: '/tmp/overdeck-test/agents',

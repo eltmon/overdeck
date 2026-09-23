@@ -24,7 +24,9 @@ does:
 
 1. `pan task claim <issue-id> <item-id>` — claim it in the continue file
    (`.pan/continues/<issue-id>.xbrief.json`).
-2. Implement only that item.
+2. Implement only that item, then run only the tests it touched:
+   `npx vitest run <test files you changed or whose subjects you changed>`.
+   Never run the full suite (`npm test`) on the host — it runs on CI after `pan done`.
 3. One commit, with the trailer `Item: <item-id>` in the commit body.
 4. Push the feature branch — `git push -u origin "$(git branch --show-current)"`.
    An unpushed commit does not exist as far as Overdeck is concerned.
@@ -39,12 +41,14 @@ Never batch multiple items into one commit; each commit's trailer is how
 When every item is done and the tree is clean:
 
 ```bash
-npm test
+npx vitest run <test files you changed or whose subjects you changed>
 git push -u origin "$(git branch --show-current)"
 pan done <ISSUE-ID> -c "<terse summary>"
 ```
 
-`pan done` runs quality gates, opens or updates the PR, and requests review
+`pan done` runs typecheck and lint, opens or updates the PR, and requests review;
+the full test suite runs once, on CI, against the PR head. A red CI test job
+comes back to you as `VERIFICATION FAILED … Failed check: test`
 — once, from the foreman's pane, after the last item lands. It writes
 nothing else. Stay on standby afterward: review feedback arrives as PR
 comments and a `pan tell` nudge; address it on the branch and push again.

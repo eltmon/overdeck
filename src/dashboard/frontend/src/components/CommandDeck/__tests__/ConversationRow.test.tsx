@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ConversationRow } from '../ConversationRow';
@@ -120,5 +120,32 @@ describe('ConversationRow handoff-fallback badge (PAN-3736)', () => {
 
     expect(screen.queryByText(/fallback:/i)).not.toBeInTheDocument();
     expect(screen.getByText('Spawning...')).toBeInTheDocument();
+  });
+});
+
+describe('ConversationRow overflow-menu focus return (PAN-3941)', () => {
+  it('returns focus to the kebab when the menu was opened from the kebab', () => {
+    renderRow({});
+
+    const kebab = screen.getByLabelText('More actions for Test conversation');
+    fireEvent.click(kebab);
+    const menu = screen.getByRole('menu', { name: 'Actions for Test conversation' });
+
+    fireEvent.keyDown(menu, { key: 'Escape' });
+    expect(screen.queryByRole('menu', { name: 'Actions for Test conversation' })).not.toBeInTheDocument();
+    expect(kebab).toHaveFocus();
+  });
+
+  it('returns focus to the row when the menu was opened by right-click', () => {
+    renderRow({});
+
+    const row = screen.getByText('Test conversation').closest('button');
+    expect(row).not.toBeNull();
+    fireEvent.contextMenu(row!);
+    const menu = screen.getByRole('menu', { name: 'Actions for Test conversation' });
+
+    fireEvent.keyDown(menu, { key: 'Escape' });
+    expect(screen.queryByRole('menu', { name: 'Actions for Test conversation' })).not.toBeInTheDocument();
+    expect(row).toHaveFocus();
   });
 });

@@ -1,15 +1,30 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Effect } from 'effect';
 import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
 import { join } from 'path';
 import { registerTerminalBackend, registeredTerminalBackends, resolveTerminalBackend } from '../../../../src/lib/terminal-backends/registry.js';
-import { herdrSessionName, herdrSocketPath, selectTerminalBackend, type SelectTerminalBackendDeps } from '../../../../src/lib/terminal-backends/select.js';
+import {
+  describeTerminalBackendBoot,
+  herdrSessionName,
+  herdrSocketPath,
+  hostTerminalBackendName,
+  probeHerdrAvailability,
+  resetHostTerminalBackendName,
+  selectTerminalBackend,
+  type SelectTerminalBackendDeps,
+} from '../../../../src/lib/terminal-backends/select.js';
+
+// `hostTerminalBackendName` imports config-yaml lazily; the mock stands in for
+// `loadConfigSync`, which returns the `{ config, migration }` wrapper.
+const { loadConfigSyncMock } = vi.hoisted(() => ({ loadConfigSyncMock: vi.fn() }));
+vi.mock('../../../../src/lib/config-yaml.js', () => ({ loadConfigSync: loadConfigSyncMock }));
 import { isUnsupported, unsupported, type TerminalBackend } from '../../../../src/lib/terminal-backends/types.js';
 
 /**
- * PAN-3917 W2. Two invariants: selection follows D10 (explicit config wins,
- * else herdr only when the binary and the session socket are both present),
+ * PAN-3917 W2 / PAN-3956 W1. Two invariants: selection follows D10 as POLICY
+ * (env, then explicit config, else herdr — never a host probe; availability is
+ * the separate `probeHerdrAvailability`),
  * and an operation an adapter cannot perform is a value the caller can branch
  * on, never a throw (FR-3).
  */
@@ -42,47 +57,58 @@ function deps(overrides: {
     configHome: join(HOME, '.config'),
     overdeckHome: overrides.overdeckHome ?? DEFAULT_OVERDECK_HOME,
     // Empty string = "no OVERDECK_TERMINAL_BACKEND in play", so these cases
-    // exercise the host probe even when the runner exports one.
+    // exercise the default even when the runner exports one.
     backendEnv: '',
     isExecutable: async (path) => (overrides.binary ?? true) && path === HERDR_BIN,
     exists: async (path) => (overrides.socket ?? true) && path === socketPath,
   };
 }
 
-describe('selectTerminalBackend — D10 selection matrix', () => {
+describe('selectTerminalBackend — D10 selection matrix (policy only, PAN-3956 D1)', () => {
   it('honors an explicit terminal.backend even when herdr is available', async () => {
     const selection = await selectTerminalBackend({ terminal: { backend: 'tmux' } }, deps());
-    expect(selection.backend).toBe('tmux');
+    expect(selection).toMatchObject({ backend: 'tmux', source: 'config' });
     expect(selection.diagnostic).toContain('terminal.backend');
     expect(selection.diagnostic).toContain('config.yaml');
   });
 
   it('honors an explicit herdr setting without probing the host', async () => {
+    const probed: string[] = [];
     const selection = await selectTerminalBackend(
       { terminal: { backend: 'herdr' } },
-      { ...deps({ binary: false, socket: false }) },
+      {
+        ...deps({ binary: false, socket: false }),
+        isExecutable: async (path) => { probed.push(path); return false; },
+        exists: async (path) => { probed.push(path); return false; },
+      },
     );
-    expect(selection.backend).toBe('herdr');
+    expect(selection).toMatchObject({ backend: 'herdr', source: 'config' });
+    expect(probed).toEqual([]);
   });
 
-  it('selects herdr when the binary is on PATH and the session socket exists', async () => {
+  it('defaults to herdr when the binary and socket are present', async () => {
     const selection = await selectTerminalBackend({}, deps());
-    expect(selection.backend).toBe('herdr');
-    expect(selection.diagnostic).toContain(HERDR_BIN);
-    expect(selection.diagnostic).toContain(SOCKET);
+    expect(selection).toMatchObject({ backend: 'herdr', source: 'default' });
   });
 
-  it('falls back to tmux when the herdr binary is not on PATH', async () => {
+  it('still selects herdr when the herdr binary is not on PATH — never a tmux fallback', async () => {
     const selection = await selectTerminalBackend({}, deps({ binary: false }));
-    expect(selection.backend).toBe('tmux');
-    expect(selection.diagnostic).toContain('not on PATH');
+    expect(selection).toMatchObject({ backend: 'herdr', source: 'default' });
   });
 
-  it('falls back to tmux when the session socket is missing, naming the socket path', async () => {
+  it('still selects herdr when the session socket is missing — never a tmux fallback', async () => {
     const selection = await selectTerminalBackend({}, deps({ socket: false }));
-    expect(selection.backend).toBe('tmux');
-    expect(selection.diagnostic).toContain(SOCKET);
-    expect(selection.diagnostic).toContain('does not exist');
+    expect(selection).toMatchObject({ backend: 'herdr', source: 'default' });
+  });
+
+  it('never touches the filesystem', async () => {
+    const probed: string[] = [];
+    await selectTerminalBackend({}, {
+      ...deps(),
+      isExecutable: async (path) => { probed.push(path); return true; },
+      exists: async (path) => { probed.push(path); return true; },
+    });
+    expect(probed).toEqual([]);
   });
 
   it('derives the session socket under the configured home', () => {
@@ -100,35 +126,141 @@ describe('selectTerminalBackend — D10 selection matrix', () => {
     expect(herdrSessionName({ overdeckHome: OTHER_OVERDECK_HOME })).toBe(OTHER_SESSION);
   });
 
-  it('selects herdr for a non-default home only when THAT session socket exists', async () => {
-    const selection = await selectTerminalBackend({}, deps({ overdeckHome: OTHER_OVERDECK_HOME }));
-    expect(selection.backend).toBe('herdr');
-    expect(selection.diagnostic).toContain(OTHER_SESSION);
-  });
-
-  it('falls back to tmux for a non-default home while the default session socket is live', async () => {
-    const selection = await selectTerminalBackend({}, {
-      ...deps({ overdeckHome: OTHER_OVERDECK_HOME }),
-      // The DEFAULT session's socket is present; this home's is not.
-      exists: async (path) => path === SOCKET,
-    });
-    expect(selection.backend).toBe('tmux');
-    expect(selection.diagnostic).toContain(OTHER_SOCKET);
-    expect(selection.diagnostic).toContain('does not exist');
-  });
-
-  it('honors OVERDECK_TERMINAL_BACKEND above config and the host probe', async () => {
+  it('honors OVERDECK_TERMINAL_BACKEND above config', async () => {
     const forced = await selectTerminalBackend(
       { terminal: { backend: 'herdr' } },
       { ...deps(), backendEnv: 'tmux' },
     );
-    expect(forced.backend).toBe('tmux');
+    expect(forced).toMatchObject({ backend: 'tmux', source: 'env' });
     expect(forced.diagnostic).toContain('OVERDECK_TERMINAL_BACKEND');
   });
 
   it('ignores an unknown OVERDECK_TERMINAL_BACKEND value', async () => {
     const selection = await selectTerminalBackend({}, { ...deps(), backendEnv: 'screen' });
-    expect(selection.backend).toBe('herdr');
+    expect(selection).toMatchObject({ backend: 'herdr', source: 'default' });
+  });
+});
+
+describe('probeHerdrAvailability (PAN-3956 FR-2)', () => {
+  it('is unavailable with the binary reason when herdr is not on PATH or in ~/.local/bin', async () => {
+    const probe = await probeHerdrAvailability(deps({ binary: false }));
+    expect(probe.available).toBe(false);
+    expect(probe.binary).toBeNull();
+    expect(probe.reason).toBe(`The 'herdr' binary is not on PATH or in ~/.local/bin.`);
+  });
+
+  it('is unavailable with a reason naming the socket path when the socket is missing', async () => {
+    const probe = await probeHerdrAvailability(deps({ socket: false }));
+    expect(probe).toMatchObject({ available: false, binary: HERDR_BIN, socket: SOCKET, socketExists: false });
+    expect(probe.reason).toContain(SOCKET);
+    expect(probe.reason).toContain('does not exist');
+  });
+
+  it("is available when both the binary and this home's socket exist", async () => {
+    const probe = await probeHerdrAvailability(deps());
+    expect(probe).toEqual({
+      binary: HERDR_BIN,
+      session: 'overdeck',
+      socket: SOCKET,
+      socketExists: true,
+      available: true,
+    });
+  });
+
+  it('finds the binary in ~/.local/bin when PATH does not carry it', async () => {
+    const localBin = join(HOME, '.local', 'bin', 'herdr');
+    const probe = await probeHerdrAvailability({
+      ...deps(),
+      pathEnv: '/usr/bin',
+      isExecutable: async (path) => path === localBin,
+    });
+    expect(probe).toMatchObject({ available: true, binary: localBin });
+  });
+
+  it('is available for a non-default home when THAT session socket exists', async () => {
+    const probe = await probeHerdrAvailability(deps({ overdeckHome: OTHER_OVERDECK_HOME }));
+    expect(probe).toMatchObject({ available: true, session: OTHER_SESSION, socket: OTHER_SOCKET });
+  });
+
+  it('is unavailable for a non-default home while only the default session socket is live', async () => {
+    const probe = await probeHerdrAvailability({
+      ...deps({ overdeckHome: OTHER_OVERDECK_HOME }),
+      exists: async (path) => path === SOCKET,
+    });
+    expect(probe.available).toBe(false);
+    expect(probe.reason).toContain(OTHER_SOCKET);
+  });
+
+  it('is never memoized: a socket that appears later is seen on the next call', async () => {
+    let socketUp = false;
+    const probeDeps = { ...deps(), exists: async (path: string) => socketUp && path === SOCKET };
+    expect((await probeHerdrAvailability(probeDeps)).available).toBe(false);
+    socketUp = true;
+    expect((await probeHerdrAvailability(probeDeps)).available).toBe(true);
+  });
+});
+
+describe('hostTerminalBackendName — config.yaml wrapper (PAN-3956 W1)', () => {
+  const savedEnv = process.env.OVERDECK_TERMINAL_BACKEND;
+  beforeEach(() => {
+    delete process.env.OVERDECK_TERMINAL_BACKEND;
+    resetHostTerminalBackendName();
+    loadConfigSyncMock.mockReset();
+  });
+  afterEach(() => {
+    if (savedEnv === undefined) delete process.env.OVERDECK_TERMINAL_BACKEND;
+    else process.env.OVERDECK_TERMINAL_BACKEND = savedEnv;
+    resetHostTerminalBackendName();
+  });
+
+  it('reads terminal.backend from the { config, migration } wrapper loadConfigSync returns', async () => {
+    loadConfigSyncMock.mockReturnValue({ config: { terminal: { backend: 'tmux' } }, migration: null });
+    await expect(hostTerminalBackendName()).resolves.toBe('tmux');
+  });
+
+  it('defaults to herdr when config.yaml sets no backend', async () => {
+    loadConfigSyncMock.mockReturnValue({ config: {}, migration: null });
+    await expect(hostTerminalBackendName()).resolves.toBe('herdr');
+  });
+
+  it('defaults to herdr when config.yaml cannot be read', async () => {
+    loadConfigSyncMock.mockImplementation(() => { throw new Error('unreadable'); });
+    await expect(hostTerminalBackendName()).resolves.toBe('herdr');
+  });
+});
+
+describe('describeTerminalBackendBoot (PAN-3956 FR-9)', () => {
+  const herdrDefault = {
+    backend: 'herdr',
+    source: 'default',
+    diagnostic: 'Herdr is the default terminal backend.',
+  } as const;
+
+  it('logs session, socket and binary when herdr is available', async () => {
+    const probe = await probeHerdrAvailability(deps());
+    expect(describeTerminalBackendBoot(herdrDefault, probe)).toEqual({
+      level: 'log',
+      line: `[terminal] backend=herdr source=default session=overdeck socket=${SOCKET} binary=${HERDR_BIN}`,
+    });
+  });
+
+  it('is an error naming the reason and pan install when herdr is unavailable', async () => {
+    const probe = await probeHerdrAvailability(deps({ socket: false }));
+    const { level, line } = describeTerminalBackendBoot(herdrDefault, probe);
+    expect(level).toBe('error');
+    expect(line).toContain('[terminal] backend=herdr source=default UNAVAILABLE: ');
+    expect(line).toContain(SOCKET);
+    expect(line).toContain('`pan install`');
+    expect(line).toContain("terminal.backend is set to 'tmux'");
+  });
+
+  it('logs the diagnostic under an explicit tmux policy', () => {
+    const { level, line } = describeTerminalBackendBoot(
+      { backend: 'tmux', source: 'config', diagnostic: "terminal.backend is set to 'tmux' in config.yaml." },
+      null,
+    );
+    expect(level).toBe('log');
+    expect(line).toBe("[terminal] backend=tmux source=config — terminal.backend is set to 'tmux' in config.yaml.");
   });
 });
 

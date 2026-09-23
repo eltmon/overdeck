@@ -12,6 +12,7 @@ import { Effect } from 'effect';
 import { getAgentRuntimeState, spawnAgent, stopAgent } from '../../lib/agents.js';
 import { ACTIVITY_STALLED_MS } from '../../lib/agents/health.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
+import { resolveGitHubIssueSync } from '../../lib/tracker-utils.js';
 import { isHarnessProcessAlive, sessionExists } from '../../lib/tmux.js';
 import type { RoleEffort } from '../../lib/config-yaml.js';
 
@@ -30,6 +31,8 @@ interface StrikePlan {
   branch: string;
   sessionName: string;
   projectRoot: string;
+  /** Set when the issue lives in GitHub Issues, so the strike PR can close it. */
+  githubIssue?: { repo: string; number: number };
 }
 
 async function registeredWorktreeBranch(projectRoot: string, workspace: string): Promise<string | null | undefined> {
@@ -63,12 +66,14 @@ function planStrike(issueId: string): StrikePlan {
     throw new Error(`No Overdeck project is configured for issue prefix in "${issueId}". Add the project to projects.yaml first.`);
   }
   const workspace = join(project.projectPath, 'workspaces', `feature-${normalized}-strike`);
+  const github = resolveGitHubIssueSync(issueId);
   return {
     issueId: issueId.toUpperCase(),
     workspace,
     branch: `strike/${normalized}`,
     sessionName: `strike-${normalized}`,
     projectRoot: project.projectPath,
+    ...(github.isGitHub ? { githubIssue: { repo: `${github.owner}/${github.repo}`, number: github.number } } : {}),
   };
 }
 
@@ -122,6 +127,14 @@ async function ensureStrikeWorktree(plan: StrikePlan): Promise<void> {
 }
 
 function buildStrikePrompt(plan: StrikePlan): string {
+  const repoFlag = plan.githubIssue ? ` --repo ${plan.githubIssue.repo}` : '';
+  // A closing keyword is deliberate here. Pipeline PRs use a non-closing
+  // reference (see buildRichPRBody) because close-out owns closing their
+  // issues; a strike has no xBRIEF and never calls `pan done`, so nothing else
+  // closes its issue. PR #3972 closed PAN-3963 this way.
+  const issueReference = plan.githubIssue
+    ? `Closes #${plan.githubIssue.number}`
+    : `Issue: ${plan.issueId}`;
   return [
     `# Strike: ${plan.issueId}`,
     '',
@@ -143,7 +156,7 @@ function buildStrikePrompt(plan: StrikePlan): string {
     `   pan sync-main ${plan.issueId}`,
     '   ```',
     '   This is the sanctioned merge-based sync path; do not run raw `git rebase`.',
-    '5. Run the full workspace quality gates before signaling readiness:',
+    '5. Run the full workspace quality gates before opening the pull request:',
     '   ```bash',
     '   npm run typecheck && npm run lint && npm test',
     '   ```',
@@ -151,15 +164,22 @@ function buildStrikePrompt(plan: StrikePlan): string {
     '   ```bash',
     `   git push origin ${plan.branch}`,
     '   ```',
-    '7. Signal readiness, then stop:',
+    '7. Open a pull request against `main` from the strike branch:',
     '   ```bash',
-    `   pan strike-ready ${plan.issueId}`,
+    `   gh pr create --base main --head ${plan.branch}${repoFlag} \\`,
+    '     --title "<conventional-commit summary of the strike>" \\',
+    "     --body-file - <<'EOF'",
+    '   <what changed and why, and how you verified it>',
+    '',
+    `   ${issueReference}`,
+    '   EOF',
     '   ```',
-    '   This durable signal is the only completion handoff. Do not send a Flywheel message or issue comment.',
+    `   Keep \`${issueReference}\` as the last line of the body. If \`origin\` is not hosted on GitHub, open the equivalent merge request with that forge's CLI (for example \`glab mr create --target-branch main --source-branch ${plan.branch}\`).`,
+    '8. Print the pull request URL as your final message, then stop. The pull request is the completion handoff; do not send a Flywheel message.',
     '',
-    'The Deacon owns landing the strike through the server merge door and the post-merge handoff. Do NOT switch to `main`. Do NOT merge into `main`. Do NOT push `origin main`. Do NOT call `pan done`. Do NOT call `pan done <id> --strike`.',
+    'The operator reviews and merges the pull request. Nothing else lands a strike: no background routine picks up the pushed branch. Do NOT switch to `main`. Do NOT merge into `main` or merge the pull request yourself. Do NOT push `origin main`. Do NOT call `pan done`. Do NOT call `pan done <id> --strike`.',
     '',
-    'If mid-strike you discover the issue is broader than a precision fix, abort, do not push, and report why so the issue can run through the normal pipeline instead.',
+    'If mid-strike you discover the issue is broader than a precision fix, abort, do not push or open a pull request, and report why so the issue can run through the normal pipeline instead.',
   ].join('\n');
 }
 
@@ -264,7 +284,8 @@ async function runOne(issueId: string, options: StrikeOptions): Promise<void> {
 
 /**
  * `pan strike <id> [<id>...]` — spawn one or more strike agents.
- * Each strike skips the normal pipeline and merges directly to main.
+ * Each strike skips the normal pipeline and ends with a pull request against
+ * main that the operator merges.
  */
 export async function strikeCommand(ids: string[], options: StrikeOptions = {}): Promise<void> {
   if (!ids || ids.length === 0) {

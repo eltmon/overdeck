@@ -119,7 +119,7 @@ pan_release_singleflight_lock() {
 # Append one structured JSON line. O_APPEND plus a single write keeps concurrent
 # writers from interleaving; readers resolve duplicate session ids.
 pan_append_session_index() {
-  local agent_dir="$1" session_id="$2" observed_at="$3" source="$4" harness="${5:-}" model="${6:-}"
+  local agent_dir="$1" session_id="$2" observed_at="$3" source="$4" harness="${5:-}" model="${6:-}" path="${7:-}"
   [ -n "$session_id" ] && command -v jq >/dev/null 2>&1 || return 1
   mkdir -p "$agent_dir" 2>/dev/null || return 1
   if [ -f "$agent_dir/state.json" ]; then
@@ -130,8 +130,8 @@ pan_append_session_index() {
   [ -n "$model" ] || model="unknown"
   local line byte_count
   line=$(jq -cn --arg sid "$session_id" --arg at "$observed_at" --arg source "$source" \
-    --arg harness "$harness" --arg model "$model" \
-    '{sessionId: $sid, at: $at, source: $source, harness: $harness, model: $model}') || return 1
+    --arg harness "$harness" --arg model "$model" --arg path "$path" \
+    '{sessionId: $sid, at: $at, source: $source, harness: $harness, model: $model} + (if $path == "" then {} else {path: $path} end)') || return 1
   byte_count=$(printf '%s' "$line" | LC_ALL=C wc -c) || return 1
   [ "$byte_count" -le 4095 ] || return 1
   printf '%s\n' "$line" >> "$agent_dir/sessions.json"

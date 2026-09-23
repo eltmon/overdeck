@@ -40,6 +40,25 @@ describe('observeSessionIndexEvent', () => {
       failure,
     );
   });
+
+  it('passes a transcriptPath-carrying model_set event through as the recorded path', () => {
+    const append = vi.fn();
+    observeSessionIndexEvent({
+      type: 'agent.model_set',
+      timestamp: '2026-09-20T00:00:00.000Z',
+      payload: {
+        agentId: 'agent-pan-3950',
+        model: 'claude-sonnet-4-6',
+        claudeSessionId: 'session-1',
+        transcriptPath: '/abs/path/to/session-1.jsonl',
+      },
+    } as DomainEvent, append);
+
+    expect(append).toHaveBeenCalledWith('agent-pan-3950', 'session-1', 'session-start', {
+      model: 'claude-sonnet-4-6',
+      path: '/abs/path/to/session-1.jsonl',
+    });
+  });
 });
 
 describe('mergeRuntimeBySequence', () => {
