@@ -265,7 +265,7 @@ export async function buildCavemanExports(
   // Planning agents: never compress — output is user-facing
   if (isPlanning || !config.enabled) return '';
 
-  const variant = await Effect.runPromise(readCavemanVariant(workspacePath));
+  const variant = await readCavemanVariant(workspacePath);
 
   // If this workspace's A/B variant is 'disabled', set variant for tracking but no mode
   if (variant === 'off') return '';

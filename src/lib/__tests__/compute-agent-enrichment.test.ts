@@ -50,9 +50,9 @@ describe('computeAgentEnrichment hasActiveSpecialist suppression', () => {
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
     getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'review' } as ReturnType<typeof agentState.getAgentStateSync>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
-    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed({ reason: 'rate_limit', prompt: 'Switch model?' }))
+    detectAwaitingInputForAgentMock.mockResolvedValue({ reason: 'rate_limit', prompt: 'Switch model?' })
 
-    const enrichment = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, true, EMPTY_PENDING_INPUTS_SCAN))
+    const enrichment = await computeAgentEnrichment(agentId, undefined, true, EMPTY_PENDING_INPUTS_SCAN)
 
     expect(enrichment.role).toBe('review')
     expect(enrichment.hasPendingQuestion).toBe(true)
@@ -68,9 +68,9 @@ describe('computeAgentEnrichment hasActiveSpecialist suppression', () => {
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
     getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentStateSync>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
-    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed({ reason: 'tool_permission', prompt: 'Allow background operator?' }))
+    detectAwaitingInputForAgentMock.mockResolvedValue({ reason: 'tool_permission', prompt: 'Allow background operator?' })
 
-    const enrichment = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, true, EMPTY_PENDING_INPUTS_SCAN))
+    const enrichment = await computeAgentEnrichment(agentId, undefined, true, EMPTY_PENDING_INPUTS_SCAN)
 
     expect(enrichment.role).toBe('work')
     expect(enrichment.hasPendingQuestion).toBe(true)
@@ -88,14 +88,14 @@ describe('computeAgentEnrichment hasActiveSpecialist suppression', () => {
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
     getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentStateSync>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
-    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed({ reason: 'tool_permission', prompt: 'Allow background operator?' }))
+    detectAwaitingInputForAgentMock.mockResolvedValue({ reason: 'tool_permission', prompt: 'Allow background operator?' })
     const scanWithStalePlan = {
       ...EMPTY_PENDING_INPUTS_SCAN,
       exitPlanModePending: true,
       pendingProposedPlan: { toolUseId: 'toolu_stale_plan', askedAt: '2026-07-28T11:00:00.000Z', plan: 'Stale cached plan' },
     }
 
-    const enrichment = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, true, scanWithStalePlan))
+    const enrichment = await computeAgentEnrichment(agentId, undefined, true, scanWithStalePlan)
 
     expect(enrichment.hasPendingQuestion).toBe(true)
     expect(enrichment.pendingInputKinds).toEqual(['permissionRequest'])
@@ -110,7 +110,7 @@ describe('computeAgentEnrichment hasActiveSpecialist suppression', () => {
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
     getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentStateSync>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
-    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed(null))
+    detectAwaitingInputForAgentMock.mockResolvedValue(null)
     const scanWithQuestion = {
       ...EMPTY_PENDING_INPUTS_SCAN,
       askUserQuestions: [
@@ -124,7 +124,7 @@ describe('computeAgentEnrichment hasActiveSpecialist suppression', () => {
       ],
     }
 
-    const enrichment = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, true, scanWithQuestion))
+    const enrichment = await computeAgentEnrichment(agentId, undefined, true, scanWithQuestion)
 
     expect(enrichment.role).toBe('work')
     expect(enrichment.hasPendingQuestion).toBe(false)
@@ -140,7 +140,7 @@ describe('computeAgentEnrichment hasActiveSpecialist suppression', () => {
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
     getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentStateSync>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
-    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed(null))
+    detectAwaitingInputForAgentMock.mockResolvedValue(null)
     const scanWithQuestion = {
       ...EMPTY_PENDING_INPUTS_SCAN,
       askUserQuestions: [
@@ -154,7 +154,7 @@ describe('computeAgentEnrichment hasActiveSpecialist suppression', () => {
       ],
     }
 
-    const enrichment = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, true, scanWithQuestion))
+    const enrichment = await computeAgentEnrichment(agentId, undefined, true, scanWithQuestion)
 
     expect(enrichment.hasPendingQuestion).toBe(false)
     expect(enrichment.pendingQuestionCount).toBe(0)
@@ -176,9 +176,9 @@ describe('computeAgentEnrichment pendingQuestionCount folding', () => {
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
     getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentStateSync>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
-    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed({ reason: 'tool_permission', prompt: 'Allow?' }))
+    detectAwaitingInputForAgentMock.mockResolvedValue({ reason: 'tool_permission', prompt: 'Allow?' })
 
-    const enrichment = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN))
+    const enrichment = await computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN)
 
     expect(enrichment.pendingQuestionCount).toBe(1)
 
@@ -191,9 +191,9 @@ describe('computeAgentEnrichment pendingQuestionCount folding', () => {
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
     getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentStateSync>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'needs_input', resolutionCount: 0 }))
-    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed(null))
+    detectAwaitingInputForAgentMock.mockResolvedValue(null)
 
-    const enrichment = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN))
+    const enrichment = await computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN)
 
     expect(enrichment.pendingQuestionReason).toBe('other')
     expect(enrichment.pendingQuestionCount).toBe(0)
@@ -207,7 +207,7 @@ describe('computeAgentEnrichment pendingQuestionCount folding', () => {
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
     getAgentStateSyncMock.mockReturnValue({ id: agentId, role: 'work' } as ReturnType<typeof agentState.getAgentStateSync>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
-    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed(null))
+    detectAwaitingInputForAgentMock.mockResolvedValue(null)
     const scanWithQuestion = {
       ...EMPTY_PENDING_INPUTS_SCAN,
       askUserQuestions: [
@@ -221,7 +221,7 @@ describe('computeAgentEnrichment pendingQuestionCount folding', () => {
       ],
     }
 
-    const enrichment = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, false, scanWithQuestion))
+    const enrichment = await computeAgentEnrichment(agentId, undefined, false, scanWithQuestion)
 
     expect(enrichment.pendingQuestionCount).toBe(1)
 
@@ -242,9 +242,9 @@ describe('computeAgentEnrichment paneQuestion kind', () => {
     getAgentRuntimeStateMock.mockReturnValue(
       Effect.succeed({ state: 'waiting-on-human', waitingReason: 'user_question', resolution: 'working', resolutionCount: 0 }),
     )
-    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed(null))
+    detectAwaitingInputForAgentMock.mockResolvedValue(null)
 
-    const enrichment = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN))
+    const enrichment = await computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN)
 
     expect(enrichment.hasPendingQuestion).toBe(true)
     expect(enrichment.pendingInputKinds).toEqual(['paneQuestion'])
@@ -290,7 +290,7 @@ describe('computeAgentEnrichment cached-scan replay', () => {
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
     getAgentStateSyncMock.mockReturnValue({ id: agentId, role } as ReturnType<typeof agentState.getAgentStateSync>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'idle', resolution: 'working', resolutionCount: 0 }))
-    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed(null))
+    detectAwaitingInputForAgentMock.mockResolvedValue(null)
     return agentDir
   }
 
@@ -298,9 +298,7 @@ describe('computeAgentEnrichment cached-scan replay', () => {
     const agentId = 'agent-cached-scan-1'
     const agentDir = arrange('work', agentId)
 
-    const enrichment = await Effect.runPromise(
-      computeAgentEnrichment(agentId, undefined, false, scanWithQuestion),
-    )
+    const enrichment = await computeAgentEnrichment(agentId, undefined, false, scanWithQuestion)
 
     expect(enrichment.pendingAskUserQuestion?.toolUseId).toBe('toolu_cached_auq')
     expect(enrichment.pendingInputKinds).toContain('askUserQuestion')
@@ -314,17 +312,13 @@ describe('computeAgentEnrichment cached-scan replay', () => {
     const agentDir = arrange('work', agentId)
 
     // A review/test/merge specialist parks the work agent: the payload is suppressed.
-    const suppressed = await Effect.runPromise(
-      computeAgentEnrichment(agentId, undefined, true, scanWithQuestion),
-    )
+    const suppressed = await computeAgentEnrichment(agentId, undefined, true, scanWithQuestion)
     expect(suppressed.pendingAskUserQuestion).toBeUndefined()
     expect(suppressed.hasPendingQuestion).toBe(false)
 
     // Specialist finishes. The JSONL never changed, so only the cached scan is
     // available — the question must come back rather than stay latched off.
-    const restored = await Effect.runPromise(
-      computeAgentEnrichment(agentId, undefined, false, scanWithQuestion),
-    )
+    const restored = await computeAgentEnrichment(agentId, undefined, false, scanWithQuestion)
     expect(restored.pendingAskUserQuestion?.toolUseId).toBe('toolu_cached_auq')
     expect(restored.hasPendingQuestion).toBe(true)
 
@@ -335,9 +329,7 @@ describe('computeAgentEnrichment cached-scan replay', () => {
     const agentId = 'agent-cached-scan-3'
     const agentDir = arrange('work', agentId)
 
-    const enrichment = await Effect.runPromise(
-      computeAgentEnrichment(agentId, undefined, false, scanWithQuestion),
-    )
+    const enrichment = await computeAgentEnrichment(agentId, undefined, false, scanWithQuestion)
     expect(enrichment.jsonlScan).toEqual(scanWithQuestion)
 
     rmSync(agentDir, { recursive: true, force: true })
@@ -347,9 +339,7 @@ describe('computeAgentEnrichment cached-scan replay', () => {
     const agentId = 'agent-cached-scan-4'
     const agentDir = arrange('work', agentId)
 
-    const enrichment = await Effect.runPromise(
-      computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN),
-    )
+    const enrichment = await computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN)
     expect(enrichment.pendingAskUserQuestion).toBeUndefined()
     expect(enrichment.pendingInputKinds).toEqual([])
 
@@ -374,7 +364,7 @@ describe('computeAgentEnrichment interactive turn-end', () => {
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(agentDir)
     getAgentStateSyncMock.mockReturnValue({ id: agentId, role } as ReturnType<typeof agentState.getAgentStateSync>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state, resolution: 'working', resolutionCount: 0 }))
-    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed(null))
+    detectAwaitingInputForAgentMock.mockResolvedValue(null)
     return agentDir
   }
 
@@ -382,9 +372,7 @@ describe('computeAgentEnrichment interactive turn-end', () => {
     const agentId = 'planning-pan-2760'
     const dir = arrange('plan', agentId, 'idle')
 
-    const e = await Effect.runPromise(
-      computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN),
-    )
+    const e = await computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN)
 
     expect(e.pendingInputKinds).toContain('agentTurnEnded')
     expect(e.hasPendingQuestion).toBe(true)
@@ -395,9 +383,7 @@ describe('computeAgentEnrichment interactive turn-end', () => {
     const agentId = 'agent-pan-2760'
     const dir = arrange('work', agentId, 'idle')
 
-    const e = await Effect.runPromise(
-      computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN),
-    )
+    const e = await computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN)
 
     expect(e.pendingInputKinds).not.toContain('agentTurnEnded')
     expect(e.hasPendingQuestion).toBe(false)
@@ -408,9 +394,7 @@ describe('computeAgentEnrichment interactive turn-end', () => {
     const agentId = 'planning-pan-2761'
     const dir = arrange('plan', agentId, 'active')
 
-    const e = await Effect.runPromise(
-      computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN),
-    )
+    const e = await computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN)
 
     expect(e.pendingInputKinds).not.toContain('agentTurnEnded')
     rmSync(dir, { recursive: true, force: true })
@@ -429,7 +413,7 @@ describe('computeAgentEnrichment interactive turn-end', () => {
       enterPlanModeOpen: false,
       exitPlanModePending: false,
     }
-    const e = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, false, scan))
+    const e = await computeAgentEnrichment(agentId, undefined, false, scan)
 
     expect(e.pendingInputKinds).toContain('askUserQuestion')
     expect(e.pendingInputKinds).not.toContain('agentTurnEnded')
@@ -461,7 +445,7 @@ describe('computeAgentEnrichment plan payload', () => {
     vi.spyOn(agentState, 'getAgentDir').mockReturnValue(dir)
     getAgentStateSyncMock.mockReturnValue({ id: agentId, role } as ReturnType<typeof agentState.getAgentStateSync>)
     getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'active', resolution: 'working', resolutionCount: 0 }))
-    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed(null))
+    detectAwaitingInputForAgentMock.mockResolvedValue(null)
     return dir
   }
 
@@ -469,7 +453,7 @@ describe('computeAgentEnrichment plan payload', () => {
     const agentId = 'agent-pan-2748'
     const dir = arrange('work', agentId)
 
-    const e = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, false, scanWithPlan))
+    const e = await computeAgentEnrichment(agentId, undefined, false, scanWithPlan)
 
     expect(e.pendingProposedPlan?.toolUseId).toBe('toolu_plan')
     expect(e.pendingInputKinds).toContain('exitPlanMode')
@@ -480,7 +464,7 @@ describe('computeAgentEnrichment plan payload', () => {
     const agentId = 'agent-pan-2749'
     const dir = arrange('work', agentId)
 
-    const e = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, true, scanWithPlan))
+    const e = await computeAgentEnrichment(agentId, undefined, true, scanWithPlan)
 
     expect(e.pendingProposedPlan).toBeUndefined()
     rmSync(dir, { recursive: true, force: true })
@@ -511,11 +495,9 @@ describe('computeAgentEnrichment blocking-prompt resolution', () => {
   it('reports needs_input and a permissionRequest kind for a parked permission prompt', async () => {
     const agentId = 'agent-min-896'
     const dir = arrange(agentId)
-    detectAwaitingInputForAgentMock.mockReturnValue(
-      Effect.succeed({ reason: 'tool_permission', prompt: 'Allow .devcontainer edit?' }),
-    )
+    detectAwaitingInputForAgentMock.mockResolvedValue({ reason: 'tool_permission', prompt: 'Allow .devcontainer edit?' })
 
-    const e = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN))
+    const e = await computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN)
 
     expect(e.hasPendingQuestion).toBe(true)
     expect(e.pendingQuestionReason).toBe('tool_permission')
@@ -528,9 +510,9 @@ describe('computeAgentEnrichment blocking-prompt resolution', () => {
   it('leaves a genuinely working agent alone', async () => {
     const agentId = 'agent-pan-3070'
     const dir = arrange(agentId)
-    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed(null))
+    detectAwaitingInputForAgentMock.mockResolvedValue(null)
 
-    const e = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN))
+    const e = await computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN)
 
     expect(e.hasPendingQuestion).toBe(false)
     expect(e.resolution).toBe('working')
@@ -544,9 +526,9 @@ describe('computeAgentEnrichment blocking-prompt resolution', () => {
     getAgentRuntimeStateMock.mockReturnValue(
       Effect.succeed({ state: 'active', resolution: 'needs_input', resolutionCount: 8 }),
     )
-    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed(null))
+    detectAwaitingInputForAgentMock.mockResolvedValue(null)
 
-    const e = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN))
+    const e = await computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN)
 
     expect(e.hasPendingQuestion).toBe(false)
     expect(e.pendingQuestionPrompt).toBeUndefined()

@@ -5,24 +5,10 @@
  */
 
 import { Effect } from 'effect';
-import { FsError, ProcessSpawnError } from './errors.js';
-import { createWorkspacePromise } from './workspace-manager/create.js';
-import { addNewRepoToWorkspacePromise, addReposToWorkspacePromise } from './workspace-manager/repos.js';
-import { getContainersReferencingWorkspacePathPromise, stopWorkspaceDockerPromise } from './workspace-manager/docker.js';
-import { removeWorkspacePromise } from './workspace-manager/remove.js';
+import { FsError } from './errors.js';
 import {
   preTrustDirectorySync,
 } from './workspace-manager/worktree-ops.js';
-import type {
-  AddNewRepoToWorkspaceOptions,
-  AddReposToWorkspaceOptions,
-  AddReposToWorkspaceResult,
-  DockerCleanupResult,
-  WorkspaceCreateOptions,
-  WorkspaceCreateResult,
-  WorkspaceRemoveOptions,
-  WorkspaceRemoveResult,
-} from './workspace-manager/types.js';
 export type {
   AddNewRepoToWorkspaceOptions,
   AddReposToWorkspaceOptions,
@@ -37,33 +23,19 @@ export type {
 } from './workspace-manager/types.js';
 export { copyOverdeckSettingsToWorkspaceSync, ensurePanGitignoreSync, migrateOverdeckToPanSync } from './workspace-manager/migration.js';
 export { installPreRebaseHook, preTrustDirectorySync, relocateVenvScripts } from './workspace-manager/worktree-ops.js';
+export { createWorkspace } from './workspace-manager/create.js';
+export { addNewRepoToWorkspace, addReposToWorkspace } from './workspace-manager/repos.js';
+export { getContainersReferencingWorkspacePath, stopWorkspaceDocker } from './workspace-manager/docker.js';
+export { removeWorkspace } from './workspace-manager/remove.js';
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 //
-// workspace-manager.ts is a multi-thousand-line orchestration surface. Per the
-// migration plan we prioritise *additive* Effect wrappers over the
-// public-facing entry points; the file's many internal helpers stay as-is
-// because they're called from within the wrapped functions.
+// The workspace entry points above are plain async functions (PAN-3958 CH-3).
+// `preTrustDirectory` is a sync wrapper that stays until CH-6 settles the
+// live Shape B wrappers.
 
 const toWmFsError = (op: string, path: string, cause: unknown): FsError =>
   new FsError({ path, operation: op, cause });
-
-const toWmProcessError = (op: string, cause: unknown): ProcessSpawnError =>
-  new ProcessSpawnError({
-    command: 'workspace-manager',
-    args: [op],
-    message: cause instanceof Error ? cause.message : String(cause),
-    cause,
-  });
-
-/** Create a new workspace (git worktree + scaffolding). */
-export const createWorkspace = (
-  options: WorkspaceCreateOptions,
-): Effect.Effect<WorkspaceCreateResult, ProcessSpawnError> =>
-  Effect.tryPromise({
-    try: () => createWorkspacePromise(options),
-    catch: (cause) => toWmProcessError('createWorkspace', cause),
-  });
 
 /** Mark a directory as pre-trusted for Claude Code (idempotent). */
 export const preTrustDirectory = (
@@ -72,50 +44,4 @@ export const preTrustDirectory = (
   Effect.try({
     try: () => preTrustDirectorySync(dirPath),
     catch: (cause) => toWmFsError('preTrustDirectory', dirPath, cause),
-  });
-
-/** Add additional configured repos (worktrees / symlinks) to an existing workspace. */
-export const addReposToWorkspace = (
-  options: AddReposToWorkspaceOptions,
-): Effect.Effect<AddReposToWorkspaceResult, ProcessSpawnError> =>
-  Effect.tryPromise({
-    try: () => addReposToWorkspacePromise(options),
-    catch: (cause) => toWmProcessError('addReposToWorkspace', cause),
-  });
-
-/** Register a newly-created repository and add its feature worktree to a workspace. */
-export const addNewRepoToWorkspace = (
-  options: AddNewRepoToWorkspaceOptions,
-): Effect.Effect<AddReposToWorkspaceResult, ProcessSpawnError> =>
-  Effect.tryPromise({
-    try: () => addNewRepoToWorkspacePromise(options),
-    catch: (cause) => toWmProcessError('addNewRepoToWorkspace', cause),
-  });
-
-/** Enumerate Docker containers whose compose files live under a workspace. */
-export const getContainersReferencingWorkspacePath = (
-  ...args: Parameters<typeof getContainersReferencingWorkspacePathPromise>
-): Effect.Effect<Awaited<ReturnType<typeof getContainersReferencingWorkspacePathPromise>>, ProcessSpawnError> =>
-  Effect.tryPromise({
-    try: () => getContainersReferencingWorkspacePathPromise(...args),
-    catch: (cause) =>
-      toWmProcessError('getContainersReferencingWorkspacePath', cause),
-  });
-
-/** Stop every Docker resource associated with the supplied workspace. */
-export const stopWorkspaceDocker = (
-  ...args: Parameters<typeof stopWorkspaceDockerPromise>
-): Effect.Effect<DockerCleanupResult, ProcessSpawnError> =>
-  Effect.tryPromise({
-    try: () => stopWorkspaceDockerPromise(...args),
-    catch: (cause) => toWmProcessError('stopWorkspaceDocker', cause),
-  });
-
-/** Remove a workspace (worktrees, branches, Docker, DNS, tunnel ingress). */
-export const removeWorkspace = (
-  options: WorkspaceRemoveOptions,
-): Effect.Effect<WorkspaceRemoveResult, ProcessSpawnError> =>
-  Effect.tryPromise({
-    try: () => removeWorkspacePromise(options),
-    catch: (cause) => toWmProcessError('removeWorkspace', cause),
   });

@@ -12,7 +12,7 @@ vi.mock('node:fs/promises', async (importOriginal) => ({
 
 vi.mock('../../../../src/lib/tmux.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../src/lib/tmux.js')>()),
-  capturePaneText: capturePaneTextMock,
+  capturePane: capturePaneTextMock,
 }));
 
 const {

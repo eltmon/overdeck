@@ -24,7 +24,7 @@ vi.mock('../../../../../src/lib/tmux.js', () => ({
   listSessionsSync: () => [],
   listPaneValuesSync: () => [],
   listSessionNames: vi.fn(),
-  capturePane: vi.fn(() => Effect.succeed('')),
+  capturePane: vi.fn(async () => ''),
 }));
 
 const mockAgentStates = vi.hoisted(() => new Map<string, Partial<AgentState>>());

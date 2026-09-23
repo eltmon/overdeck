@@ -69,7 +69,7 @@ export const getAgentOutputRoute = HttpRouter.add(
             const { getRemoteAgentOutput } = await import('../../../../lib/remote/remote-agents.js');
             stdout = await getRemoteAgentOutput(id, vmName, parseInt(String(lines), 10) || 100);
           } else {
-            stdout = await Effect.runPromise(capturePane(id, parseInt(String(lines), 10) || 100));
+            stdout = await capturePane(id, parseInt(String(lines), 10) || 100);
           }
 
           if (!stdout || stdout.trim() === '' || stdout.trim() === 'Session not found') {
@@ -110,7 +110,7 @@ export const getAgentOutputRoute = HttpRouter.add(
  */
 async function agentWorkspaceFor(id: string): Promise<string | null> {
   if (isExternalAgentId(id)) return (await readExternalRegistration(id))?.cwd ?? null;
-  return Effect.runPromise(getAgentWorkspace(id));
+  return getAgentWorkspace(id);
 }
 
 const EMPTY_CONVERSATION: ConversationResponse = { messages: [], workLog: [], streaming: false, totalCost: 0, byteOffset: 0 };

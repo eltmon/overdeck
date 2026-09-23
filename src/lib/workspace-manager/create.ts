@@ -35,7 +35,7 @@ import {
 } from './worktree-ops.js';
 import type { WorkspaceCreateOptions, WorkspaceCreateResult } from './types.js';
 import { getProjectByPath, getWorkspaceForIssue } from '../workspaces/resolver.js';
-import { createWorkspace, deleteWorkspace, upsertProjectFromConfig } from '../workspaces/writer.js';
+import { createWorkspace as createWorkspaceRow, deleteWorkspace, upsertProjectFromConfig } from '../workspaces/writer.js';
 import { listProjectsSync } from '../projects.js';
 import {
   createWorkspacePlaceholdersSync as createPlaceholders,
@@ -157,7 +157,8 @@ export async function commitPolyrepoWorkspaceGitignoreAsync(workspacePath: strin
   }
 }
 
-export async function createWorkspacePromise(options: WorkspaceCreateOptions): Promise<WorkspaceCreateResult> {
+/** Create a new workspace (git worktree + scaffolding). */
+export async function createWorkspace(options: WorkspaceCreateOptions): Promise<WorkspaceCreateResult> {
   const { projectConfig, featureName, startDocker, dryRun, onProgress } = options;
   const progress = (label: string, detail: string, status: 'active' | 'complete' | 'error' = 'active') => {
     onProgress?.({ label, detail, status });
@@ -235,7 +236,7 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
       upsertProjectFromConfig(projectKey, projectConfig);
       project = getProjectByPath(projectConfig.path);
     }
-    createdWorkspaceRowId = await createWorkspace({
+    createdWorkspaceRowId = await createWorkspaceRow({
       projectId: project!.id,
       kind: 'issue',
       name: featureFolder,
@@ -776,7 +777,7 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
     const yamlConfig = loadYamlConfig();
     const cavemanConfig = yamlConfig.config.caveman;
     const variant = determineCavemanVariant(cavemanConfig);
-    await Effect.runPromise(injectCavemanSettings(workspacePath, variant));
+    await injectCavemanSettings(workspacePath, variant);
     if (variant === 'enabled') {
       result.steps.push('Injected caveman compression hooks into .claude/settings.json');
     } else if (variant === 'disabled') {

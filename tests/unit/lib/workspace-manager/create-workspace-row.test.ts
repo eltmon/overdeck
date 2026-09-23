@@ -24,7 +24,7 @@ const isWorktreeAddCall = (command: unknown, args?: unknown): boolean =>
   (typeof command === 'string' && command.includes('git worktree add'))
   || (command === 'git' && Array.isArray(args) && args[0] === 'worktree' && args[1] === 'add');
 
-import { createWorkspacePromise } from '../../../../src/lib/workspace-manager/create.js';
+import { createWorkspace } from '../../../../src/lib/workspace-manager/create.js';
 import { getWorkspaceForIssue, getProjectByPath } from '../../../../src/lib/workspaces/resolver.js';
 import { upsertProjectFromConfig } from '../../../../src/lib/workspaces/writer.js';
 import { registerProjectSync, unregisterProjectSync } from '../../../../src/lib/projects.js';
@@ -44,7 +44,7 @@ afterEach(() => {
   rmSync(tempDir, { recursive: true, force: true });
 });
 
-describe('createWorkspacePromise: workspace row creation (PAN-1990)', () => {
+describe('createWorkspace: workspace row creation (PAN-1990)', () => {
   it('creates a kind=issue row via the writer before the worktree directory exists', async () => {
     upsertProjectFromConfig('test-project', { name: 'Test', path: tempDir });
 
@@ -56,7 +56,7 @@ describe('createWorkspacePromise: workspace row creation (PAN-1990)', () => {
       return { stdout: '', stderr: '' };
     });
 
-    const result = await createWorkspacePromise({
+    const result = await createWorkspace({
       projectConfig: { name: 'Test', path: tempDir },
       featureName: 'pan-2050',
     });
@@ -73,7 +73,7 @@ describe('createWorkspacePromise: workspace row creation (PAN-1990)', () => {
   it('reuses an existing row for the same issue and creates no duplicates', async () => {
     upsertProjectFromConfig('test-project', { name: 'Test', path: tempDir });
 
-    await createWorkspacePromise({
+    await createWorkspace({
       projectConfig: { name: 'Test', path: tempDir },
       featureName: 'pan-3000',
     });
@@ -83,7 +83,7 @@ describe('createWorkspacePromise: workspace row creation (PAN-1990)', () => {
     // Simulate the workspace already existing on disk and being re-created
     // (e.g. a retried `pan start`) by clearing the mocked side effects only —
     // the row itself should be reused, not duplicated.
-    await createWorkspacePromise({
+    await createWorkspace({
       projectConfig: { name: 'Test', path: tempDir },
       featureName: 'pan-3000',
     }).catch(() => undefined); // second call may fail at the "already exists" guard; that's fine
@@ -110,7 +110,7 @@ describe('createWorkspacePromise: workspace row creation (PAN-1990)', () => {
         return { stdout: '', stderr: '' };
       });
 
-      const result = await createWorkspacePromise({
+      const result = await createWorkspace({
         projectConfig: { name: 'Unseeded', path: tempDir },
         featureName: 'pan-4000',
       });
@@ -125,7 +125,7 @@ describe('createWorkspacePromise: workspace row creation (PAN-1990)', () => {
 
   it('fails workspace creation (never reaching worktree creation) when the project has no projects.yaml entry at all (FR-6/AC-4)', async () => {
     // Deliberately skip both upsertProjectFromConfig and registerProjectSync.
-    const result = await createWorkspacePromise({
+    const result = await createWorkspace({
       projectConfig: { name: 'Unregistered', path: tempDir },
       featureName: 'pan-4001',
     });
@@ -145,7 +145,7 @@ describe('createWorkspacePromise: workspace row creation (PAN-1990)', () => {
       return { stdout: '', stderr: '' };
     });
 
-    const result = await createWorkspacePromise({
+    const result = await createWorkspace({
       projectConfig: { name: 'Test', path: tempDir },
       featureName: 'pan-5000',
     });
@@ -168,7 +168,7 @@ describe('createWorkspacePromise: workspace row creation (PAN-1990)', () => {
       return { stdout: '', stderr: '' };
     });
 
-    const result = await createWorkspacePromise({
+    const result = await createWorkspace({
       // An inverted port range (start > end) makes assignPort's search loop
       // never execute, throwing immediately — a real post-worktree failure
       // path (ports/devcontainer/tunnel/Docker) that pushes to result.errors
@@ -196,7 +196,7 @@ describe('createWorkspacePromise: workspace row creation (PAN-1990)', () => {
       return { stdout: '', stderr: '' };
     });
 
-    const result = await createWorkspacePromise({
+    const result = await createWorkspace({
       projectConfig: {
         name: 'Test',
         path: tempDir,

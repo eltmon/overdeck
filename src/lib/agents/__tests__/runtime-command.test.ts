@@ -115,8 +115,8 @@ describe('waitForPromptReady — kimi-code TUI (PAN-1837)', () => {
     vi.useFakeTimers();
     tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
     tmuxMocks.capturePane
-      .mockReturnValueOnce(Effect.succeed(BOOTING_PANE))
-      .mockReturnValueOnce(Effect.succeed(READY_PANE));
+      .mockResolvedValueOnce(BOOTING_PANE)
+      .mockResolvedValueOnce(READY_PANE);
 
     const pending = waitForPromptReady('agent-kimi-ready', 'kimi-code', 5);
     await vi.advanceTimersByTimeAsync(500);
@@ -126,7 +126,7 @@ describe('waitForPromptReady — kimi-code TUI (PAN-1837)', () => {
 
   it('resolves false when the session disappears before the TUI ever renders ready', async () => {
     tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(false));
-    tmuxMocks.capturePane.mockReturnValue(Effect.succeed(BOOTING_PANE));
+    tmuxMocks.capturePane.mockResolvedValue(BOOTING_PANE);
 
     await expect(waitForPromptReady('agent-kimi-gone', 'kimi-code', 1)).resolves.toBe(false);
   });
@@ -134,7 +134,7 @@ describe('waitForPromptReady — kimi-code TUI (PAN-1837)', () => {
   it('resolves false on timeout when the TUI never shows its ready prompt', async () => {
     vi.useFakeTimers();
     tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
-    tmuxMocks.capturePane.mockReturnValue(Effect.succeed(BOOTING_PANE));
+    tmuxMocks.capturePane.mockResolvedValue(BOOTING_PANE);
 
     const pending = waitForPromptReady('agent-kimi-stuck', 'kimi-code', 1);
     await vi.advanceTimersByTimeAsync(1_500);
@@ -182,15 +182,15 @@ describe('waitForPromptReady — Muse Code', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
     tmuxMocks.capturePane
-      .mockReturnValueOnce(Effect.succeed('Muse Code is starting'))
-      .mockReturnValue(Effect.succeed('Muse Code\n⟩ \n muse-spark-1.3'));
+      .mockResolvedValueOnce('Muse Code is starting')
+      .mockResolvedValue('Muse Code\n⟩ \n muse-spark-1.3');
     await expect(settleStepwise(waitForPromptReady('agent-muse-ready', 'muse', 5))).resolves.toBe(true);
   });
 
   it('times out when the native prompt never appears', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
-    tmuxMocks.capturePane.mockReturnValue(Effect.succeed('Muse Code is starting'));
+    tmuxMocks.capturePane.mockResolvedValue('Muse Code is starting');
     await expect(settleStepwise(waitForPromptReady('agent-muse-timeout', 'muse', 1))).resolves.toBe(false);
   });
 

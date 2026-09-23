@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const execMock = vi.hoisted(() => vi.fn());
@@ -140,7 +139,7 @@ describe('stashes', () => {
       throw new Error(`unexpected command: ${cmd}`);
     });
 
-    await expect(Effect.runPromise(listStashes('/tmp/workspace'))).resolves.toMatchObject([
+    await expect(listStashes('/tmp/workspace')).resolves.toMatchObject([
       {
         ref: 'abc123def456abc123def456abc123def456abcd',
         stackRef: 'stash@{1}',
@@ -162,7 +161,7 @@ describe('stashes', () => {
       throw new Error(`unexpected command: ${cmd}`);
     });
 
-    await expect(Effect.runPromise(listStashes('/tmp/wrapper-workspace'))).resolves.toEqual([]);
+    await expect(listStashes('/tmp/wrapper-workspace')).resolves.toEqual([]);
   });
 
   it('re-resolves a stable stash sha before destructive operations', async () => {
@@ -178,8 +177,8 @@ describe('stashes', () => {
       throw new Error(`unexpected command: ${cmd}`);
     });
 
-    await Effect.runPromise(dropStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd'));
-    await expect(Effect.runPromise(createRecoveryBranchFromStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd', 'PAN-879', 'UI Draft + notes'))).resolves.toBe('recovery/PAN-879-ui-draft-notes');
+    await dropStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd');
+    await expect(createRecoveryBranchFromStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd', 'PAN-879', 'UI Draft + notes')).resolves.toBe('recovery/PAN-879-ui-draft-notes');
   });
 
   it('uses the provided stack ref to avoid rescanning the stash list', async () => {
@@ -189,7 +188,7 @@ describe('stashes', () => {
       throw new Error(`unexpected command: ${cmd}`);
     });
 
-    await Effect.runPromise(dropStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd', 'stash@{7}'));
+    await dropStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd', 'stash@{7}');
 
     expect(execMock).not.toHaveBeenCalledWith(
       'git stash list --format="%gd%x09%H%x09%cI%x09%gs"',
@@ -204,9 +203,7 @@ describe('stashes', () => {
       throw new Error(`unexpected command: ${cmd}`);
     });
 
-    await expect(Effect.runPromise(
-      createRecoveryBranchFromStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd', 'PAN-879; touch /tmp/pwned', 'UI Draft + notes', 'stash@{3}'),
-    )).rejects.toMatchObject({ stderr: expect.stringContaining('Invalid issue ID format') });
+    await expect(createRecoveryBranchFromStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd', 'PAN-879; touch /tmp/pwned', 'UI Draft + notes', 'stash@{3}')).rejects.toThrow('Invalid issue ID format');
   });
 
   it('identifies salvageable stash entries', () => {

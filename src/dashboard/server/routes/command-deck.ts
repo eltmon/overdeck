@@ -309,7 +309,7 @@ export async function fetchActivityDataWithContext(
       let transcriptFromPane = false;
       if (includeTranscripts) {
         try {
-          transcript = (await Effect.runPromise(capturePane(checkId, 500))).trim();
+          transcript = (await capturePane(checkId, 500)).trim();
           transcriptFromPane = transcript.length > 0;
         } catch { /* agent may not be running */ }
 
@@ -336,7 +336,7 @@ export async function fetchActivityDataWithContext(
         : transcriptFromPane
           ? detectAwaitingInputFromPaneSync(transcript, { isPlanning })
           : tmuxSessionNames.has(checkId)
-            ? await Effect.runPromise(detectAwaitingInputForAgent(checkId, { isPlanning }))
+            ? await detectAwaitingInputForAgent(checkId, { isPlanning })
             : null;
       const agentSnapshot = context.agentSnapshotsById?.get(checkId);
 
@@ -519,7 +519,7 @@ export async function fetchActivityDataWithContext(
     const transcriptParts: string[] = [`${nodeType.toUpperCase()} ${status === 'running' ? 'IN PROGRESS...' : 'PASSED'}`];
     if (includeTranscripts && status === 'running') {
       try {
-        const output = (await Effect.runPromise(capturePane(sessionId, 100))).trim();
+        const output = (await capturePane(sessionId, 100)).trim();
         if (output) transcriptParts.push(`\n--- Live Output ---\n${output}`);
       } catch { /* pane may not be a tmux session */ }
     }

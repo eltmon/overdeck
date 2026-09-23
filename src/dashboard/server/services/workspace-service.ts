@@ -135,10 +135,10 @@ export const WorkspaceServiceLive = Layer.effect(
               ([, p]) => p.path === project.projectPath,
             )?.[0] ?? project.projectName;
 
-            const result = await Effect.runPromise(createWorkspace({
+            const result = await createWorkspace({
               projectConfig: { name: projectName, path: project.projectPath },
               featureName: issueLower,
-            }));
+            });
 
             if (!result.success) {
               throw new WorkspaceCreateError({
@@ -175,10 +175,10 @@ export const WorkspaceServiceLive = Layer.effect(
               throw new WorkspaceCreateError({ id: issueId, message: 'No project found' });
             }
 
-            const result = await Effect.runPromise(removeWorkspace({
+            const result = await removeWorkspace({
               projectConfig: { name: project.projectName, path: project.projectPath },
               featureName: issueLower,
-            }));
+            });
 
             if (!result.success) {
               throw new WorkspaceCreateError({
@@ -203,7 +203,7 @@ export const WorkspaceServiceLive = Layer.effect(
             const { workspacePath } = getWorkspacePath(issueId);
             const issueLower = issueId.toLowerCase();
             const { stopWorkspaceDocker } = await import('../../../lib/workspace-manager.js');
-            await Effect.runPromise(stopWorkspaceDocker(workspacePath, issueLower));
+            await stopWorkspaceDocker(workspacePath, issueLower);
           },
           catch: () => undefined, // non-fatal
         }).pipe(Effect.ignore),

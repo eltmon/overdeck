@@ -231,7 +231,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
     projectMocks.findProjectByTeamSync.mockReset();
     projectMocks.findProjectByTeamSync.mockReturnValue(null);
     workspaceMocks.stopWorkspaceDocker.mockReset();
-    workspaceMocks.stopWorkspaceDocker.mockReturnValue(Effect.succeed({ containersFound: false, steps: [] }));
+    workspaceMocks.stopWorkspaceDocker.mockResolvedValue({ containersFound: false, steps: [] });
     workspaceMocks.findWorkspacePath.mockReset();
     workspaceMocks.findWorkspacePath.mockReturnValue(null);
     interventionMocks.appendOperatorInterventionEvent.mockReset();

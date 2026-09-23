@@ -9,7 +9,8 @@ import { composeProjectNameForWorkspace } from '../workspace/stack-health.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
-export async function getContainersReferencingWorkspacePathPromise(
+/** Enumerate Docker containers whose compose files live under a workspace. */
+export async function getContainersReferencingWorkspacePath(
   workspacePath: string,
 ): Promise<string[]> {
   const { stdout } = await execAsync(
@@ -29,7 +30,8 @@ export async function getContainersReferencingWorkspacePathPromise(
   return containers;
 }
 
-export async function stopWorkspaceDockerPromise(
+/** Stop every Docker resource associated with the supplied workspace. */
+export async function stopWorkspaceDocker(
   workspacePath: string,
   featureName: string,
 ): Promise<DockerCleanupResult> {
@@ -92,7 +94,7 @@ export async function stopWorkspaceDockerPromise(
   } else {
     // No compose files on disk — check if containers still reference the missing path.
     // This can happen when .devcontainer/ was deleted after containers were created.
-    const orphanedContainers = await getContainersReferencingWorkspacePathPromise(workspacePath);
+    const orphanedContainers = await getContainersReferencingWorkspacePath(workspacePath);
     if (orphanedContainers.length > 0) {
       result.containersFound = true;
       try {

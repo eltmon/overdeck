@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, existsSync, rmSync } from 'fs';
 import { join } from 'path';
@@ -48,7 +47,7 @@ describe('git-utils', () => {
       expect(existsSync(lockFile)).toBe(true);
 
       // Run cleanup
-      const result = await Effect.runPromise(cleanupStaleLocks(testRepoPath));
+      const result = await cleanupStaleLocks(testRepoPath);
 
       // Debug output
       console.log('Cleanup result:', JSON.stringify(result, null, 2));
@@ -63,7 +62,7 @@ describe('git-utils', () => {
     });
 
     it('should return empty arrays when no locks exist', async () => {
-      const result = await Effect.runPromise(cleanupStaleLocks(testRepoPath));
+      const result = await cleanupStaleLocks(testRepoPath);
 
       expect(result.found).toHaveLength(0);
       expect(result.removed).toHaveLength(0);
@@ -84,7 +83,7 @@ describe('git-utils', () => {
       }
       writeFileSync(refLock, '');
 
-      const result = await Effect.runPromise(cleanupStaleLocks(testRepoPath));
+      const result = await cleanupStaleLocks(testRepoPath);
 
       expect(result.found.length).toBeGreaterThanOrEqual(2);
       expect(result.removed.length).toBeGreaterThanOrEqual(2);

@@ -347,7 +347,7 @@ async function handleRemoteWorkspace(
     spinner.text = 'Remote workspace not found, creating...';
     try {
       const { createRemoteWorkspace } = await import('../../lib/remote-workspace.js');
-      remoteMetadata = await Effect.runPromise(createRemoteWorkspace(issueId, { spinner, tier: options.tier as 'ephemeral' | 'durable' | undefined }));
+      remoteMetadata = await createRemoteWorkspace(issueId, { spinner, tier: options.tier as 'ephemeral' | 'durable' | undefined });
     } catch (error: any) {
       spinner.fail(`Failed to create remote workspace: ${error.message}`);
       return exitCli(1);
@@ -529,7 +529,7 @@ async function ensureRemoteWorkspace(
   const { createRemoteWorkspace } = await import('../../lib/remote-workspace.js');
 
   try {
-    const metadata = await Effect.runPromise(createRemoteWorkspace(issueId));
+    const metadata = await createRemoteWorkspace(issueId);
     return metadata;
   } catch (error: any) {
     throw new Error(`Failed to create remote workspace: ${error.message}`);

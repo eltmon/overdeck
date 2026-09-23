@@ -1,6 +1,6 @@
 import { deliverAgentMessage } from '../agents.js';
 import { paneHasBlockingChoiceMenu } from '../pane-choice-menu.js';
-import { capturePaneText } from '../tmux.js';
+import { capturePane } from '../tmux.js';
 
 export type ResumeContractDeliveryResult = 'delivered' | 'skipped-user' | 'skipped-gated' | 'failed';
 
@@ -10,7 +10,7 @@ export async function deliverMandatoryKimiResumeContext(
   workspace: string,
   method: Parameters<typeof deliverAgentMessage>[3],
 ): Promise<void> {
-  const resumeGatePane = await capturePaneText(tmuxSession, 90).catch(() => '');
+  const resumeGatePane = await capturePane(tmuxSession, 90).catch(() => '');
   if (resumeGatePane && paneHasBlockingChoiceMenu(resumeGatePane)) {
     throw new Error(`Managed Kimi resume blocked for ${tmuxSession}: the native resume choice gate must be answered before context delivery.`);
   }
@@ -46,7 +46,7 @@ export async function deliverResumeContractUnlessGated(
 ): Promise<ResumeContractDeliveryResult> {
   if (!requested) return 'skipped-user';
 
-  const resumeGatePane = await capturePaneText(tmuxSession, 90).catch(() => '');
+  const resumeGatePane = await capturePane(tmuxSession, 90).catch(() => '');
   if (resumeGatePane && paneHasBlockingChoiceMenu(resumeGatePane)) {
     console.log(`[conversations] resume contract skipped for ${tmuxSession} — the harness is showing a blocking choice menu; the operator answers it`);
     return 'skipped-gated';

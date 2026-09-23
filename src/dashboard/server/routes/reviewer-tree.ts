@@ -21,7 +21,6 @@ import { join } from 'node:path';
 import { getAgentStateSync } from '../../../lib/agents.js';
 import { isExtendedReviewEnabled } from '../../../lib/cloister/review-agent.js';
 
-import { Effect } from 'effect';
 import type { AgentStatus, SessionNodePresence, AgentSnapshot } from '@overdeck/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import {
@@ -65,7 +64,7 @@ function awaitingInputFromProjection(
 
 async function detectApiError(sessionId: string): Promise<boolean> {
   try {
-    const pane = await Effect.runPromise(capturePane(sessionId, 15));
+    const pane = await capturePane(sessionId, 15);
     return API_ERROR_PATTERNS.some(p => p.test(pane));
   } catch {
     return false;

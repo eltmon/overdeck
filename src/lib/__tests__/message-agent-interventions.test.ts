@@ -34,10 +34,10 @@ vi.mock('../tmux.js', () => ({
   sessionExistsSync: vi.fn(() => true),
   getAgentSessions: vi.fn(() => Effect.succeed([])),
   getAgentSessionsSync: vi.fn(() => []),
-  capturePane: vi.fn(() => Effect.succeed('')),
+  capturePane: vi.fn(async () => ''),
   capturePaneSync: vi.fn(() => ''),
   // PAN-3849: one live pane row ('<pid>\t<dead>') so the liveness oracle reads alive.
-  listPaneValues: vi.fn(() => Effect.succeed(['4242\t0'])),
+  listPaneValues: vi.fn(async () => ['4242\t0']),
   listPaneValuesSync: vi.fn(() => []),
   setOption: vi.fn(() => Effect.void),
 }));

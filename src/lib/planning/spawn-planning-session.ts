@@ -425,7 +425,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         if (projectConfig?.workspace) {
           // Use library directly for real-time progress streaming
           console.log(`[start-planning] Creating workspace via library for ${issue.identifier}, projectConfig=${projectConfig.name}`);
-          const wsResult = await Effect.runPromise(createWorkspace({
+          const wsResult = await createWorkspace({
             projectConfig,
             featureName: issueLower,
             startDocker,
@@ -434,7 +434,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
               // Forward workspace sub-step progress as step 1 sub-step events
               progress(1, event.label, event.detail, event.status);
             },
-          }));
+          });
           console.log(`[start-planning] Workspace result: success=${wsResult.success}, steps=${wsResult.steps.length}, errors=${wsResult.errors.length}`);
           if (wsResult.errors.length > 0) {
             console.error(`[start-planning] Workspace errors:`, wsResult.errors);

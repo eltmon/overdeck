@@ -155,7 +155,7 @@ describe('messageAgent', () => {
     mocks.sessionExists.mockReturnValue(Effect.succeed(true));
     // PAN-3849: the liveness oracle reads pane rows as '<pid>\t<dead>'; one
     // live pane plus a runtime pid in its subtree means a live agent.
-    mocks.listPaneValues.mockReturnValue(Effect.succeed(['4242\t0']));
+    mocks.listPaneValues.mockResolvedValue(['4242\t0']);
     mocks.findAgentRuntimePidInSubtree.mockResolvedValue(4242);
     mocks.waitForAgentIdle.mockResolvedValue(true);
     mocks.deliverAgentMessage.mockResolvedValue({ ok: true });
@@ -432,7 +432,7 @@ describe('messageAgent', () => {
     // hasAgentRuntimeInSubtree seam is no longer on this path.
     function mockLiveConvPane() {
       mocks.getCodexAppServerStatus.mockRejectedValue(new Error('no app-server'));
-      mocks.listPaneValues.mockReturnValue(Effect.succeed(['4242\t0']));
+      mocks.listPaneValues.mockResolvedValue(['4242\t0']);
     }
 
     it('resolves an opencode conversation harness from the conversation row', async () => {
@@ -502,7 +502,7 @@ describe('messageAgent', () => {
         sessionId: 'session-2262',
       });
       mocks.getCodexAppServerStatus.mockRejectedValue(new Error('no app-server'));
-      mocks.listPaneValues.mockReturnValue(Effect.succeed(['4242\t0']));
+      mocks.listPaneValues.mockResolvedValue(['4242\t0']);
       mocks.findAgentRuntimePidInSubtree.mockResolvedValue(null);
       mocks.resumeAgent.mockResolvedValue({ success: true, messageDelivered: true });
 

@@ -159,7 +159,7 @@ function mockSpawnDependencies(): void {
     PiNotReady: class PiNotReady extends Error {
       readonly code = 'PI_NOT_READY';
     },
-    createPiFifo: vi.fn((agentId: string) => Effect.succeed(join(tmpHome, 'agents', agentId, 'rpc.in'))),
+    createPiFifo: vi.fn(async (agentId: string) => join(tmpHome, 'agents', agentId, 'rpc.in')),
     piFifoPaths: vi.fn((agentId: string) => ({
       agentDir: join(tmpHome, 'agents', agentId),
       readyPath: join(tmpHome, 'agents', agentId, 'ready.json'),
@@ -189,9 +189,9 @@ function mockSpawnDependencies(): void {
     getAgentSessionsSync: vi.fn(() => []),
     getAgentSessions: vi.fn(() => Effect.succeed([])),
     capturePaneSync: vi.fn(() => capturePaneText),
-    capturePane: vi.fn(() => Effect.succeed(capturePaneText)),
+    capturePane: vi.fn(async () => capturePaneText),
     listPaneValuesSync: vi.fn(() => []),
-    listPaneValues: vi.fn(() => Effect.succeed([])),
+    listPaneValues: vi.fn(async () => []),
     waitForClaudePrompt: vi.fn(async () => true),
     setOption: vi.fn(() => Effect.void),
     exactPaneTarget: vi.fn((name: string) => `=${name}:`),

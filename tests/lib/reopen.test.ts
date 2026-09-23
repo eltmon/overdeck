@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 /**
  * Tests for src/lib/reopen.ts — reopenWorkspaceState()
  *
@@ -83,7 +82,7 @@ describe('reopenWorkspaceState', () => {
   it('clears the closed-issue cache for the reopened issue', async () => {
     const wsDir = createWorkspace();
 
-    await Effect.runPromise(reopenWorkspaceState('PAN-999', wsDir));
+    await reopenWorkspaceState('PAN-999', wsDir);
 
     expect(mockClearIssueClosedCache).toHaveBeenCalledWith('PAN-999');
 
@@ -93,7 +92,7 @@ describe('reopenWorkspaceState', () => {
   it('skips the continue breadcrumb when the issue resolves to no project', async () => {
     const wsDir = createWorkspace();
 
-    const result = await Effect.runPromise(reopenWorkspaceState('PAN-999', wsDir, { reason: 'regression' }));
+    const result = await reopenWorkspaceState('PAN-999', wsDir, { reason: 'regression' });
 
     expect(result.continueFileUpdated).toBe(false);
     expect(result.reason).toBe('regression');

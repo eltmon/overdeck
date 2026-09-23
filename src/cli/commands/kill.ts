@@ -194,7 +194,7 @@ export async function killCommand(id: string, options: KillOptions): Promise<voi
     const projectPath = project?.projectPath ?? process.cwd();
     const workspacePath = findWorkspacePath(projectPath, lower);
     if (workspacePath) {
-      const dockerResult = await Effect.runPromise(stopWorkspaceDocker(workspacePath, lower));
+      const dockerResult = await stopWorkspaceDocker(workspacePath, lower);
       if (dockerResult.containersFound) {
         console.log(chalk.gray(`Stopped Docker stack: ${dockerResult.steps.join('; ')}`));
       }

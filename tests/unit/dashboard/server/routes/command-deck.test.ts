@@ -21,12 +21,12 @@ vi.mock('../../../../../src/lib/tmux.js', () => ({
   listSessionsSync: () => [],
   listPaneValuesSync: () => [],
   listSessionNames: vi.fn(() => Effect.succeed([])),
-  capturePane: vi.fn(() => Effect.succeed('')),
+  capturePane: vi.fn(async () => ''),
 }));
 
 vi.mock('../../../../../src/lib/agent-input-detection.js', () => ({
   detectAwaitingInputFromPaneSync: vi.fn(() => null),
-  detectAwaitingInputForAgent: vi.fn(() => Effect.succeed(null)),
+  detectAwaitingInputForAgent: vi.fn(async () => null),
 }));
 
 vi.mock('../../../../../src/dashboard/server/services/session-presence.js', () => ({

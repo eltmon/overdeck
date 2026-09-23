@@ -75,7 +75,7 @@ beforeEach(() => {
   mocks.probeHerdrAgentLiveness.mockResolvedValue(HERDR_ALIVE);
   mocks.findHerdrAgentPane.mockResolvedValue({ paneId: 'w1:p3', terminalId: 'term-3', workspaceId: 'w1' });
   mocks.tmuxSessionExists.mockReturnValue(Effect.succeed(false));
-  mocks.tmuxCapturePane.mockReturnValue(Effect.succeed(''));
+  mocks.tmuxCapturePane.mockResolvedValue('');
 });
 
 afterEach(() => {

@@ -77,7 +77,8 @@ export function getRuntimeAdapter(type: RuntimeType): RuntimeAdapterLegacy {
   return createClaudeAdapterSync();
 }
 
-async function isRuntimeInstalledPromise(type: RuntimeType): Promise<boolean> {
+/** Whether the runtime of the given type is installed on this host. */
+export async function isRuntimeInstalled(type: RuntimeType): Promise<boolean> {
   const adapter = getRuntimeAdapter(type);
   return adapter.isAvailable();
 }
@@ -86,12 +87,6 @@ async function isRuntimeInstalledPromise(type: RuntimeType): Promise<boolean> {
 //
 // Additive Effect-channel variants of the registry/install helpers. Sync and
 // promise variants above remain the canonical API for existing callers.
-
-/** Effect variant of {@link isRuntimeInstalled}. */
-export const isRuntimeInstalled = (
-  type: RuntimeType,
-): Effect.Effect<boolean> =>
-  Effect.promise(() => isRuntimeInstalledPromise(type));
 
 /** Effect variant of {@link RuntimeRegistry.getAvailable}. */
 export const registryGetAvailable = (

@@ -386,7 +386,7 @@ export async function migrateLocalToRemote(
     // the local workspace.
     spinner.text = 'Creating remote workspace...';
     const { createRemoteWorkspace } = await import('../../lib/remote-workspace.js');
-    const metadata = await Effect.runPromise(createRemoteWorkspace(issueId, { spinner }));
+    const metadata = await createRemoteWorkspace(issueId, { spinner });
     result.steps.push(`Remote workspace ready on ${metadata.vmName}`);
 
     // 9. Copy remaining workspace .pan state (feature context, feedback,
@@ -419,10 +419,10 @@ export async function migrateLocalToRemote(
       spinner.text = 'Cleaning up local workspace...';
       try {
         if (projectConfig) {
-          const removeResult = await Effect.runPromise(removeWorkspace({
+          const removeResult = await removeWorkspace({
             projectConfig,
             featureName: issueId.toLowerCase(),
-          }));
+          });
           result.steps.push(...removeResult.steps);
           if (removeResult.errors.length > 0) {
             result.errors.push(...removeResult.errors);
@@ -511,11 +511,11 @@ export async function migrateRemoteToLocal(
       return result;
     }
 
-    const workspaceResult = await Effect.runPromise(createWorkspace({
+    const workspaceResult = await createWorkspace({
       projectConfig,
       featureName: issueId.toLowerCase(),
       startDocker: !options.noDocker,
-    }));
+    });
 
     if (!workspaceResult.success) {
       spinner.fail('Failed to create local workspace');

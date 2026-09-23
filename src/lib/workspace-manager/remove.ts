@@ -11,7 +11,7 @@ import { removeDnsEntry } from '../dns.js';
 import { removeTunnelIngress } from '../tunnel.js';
 import { deleteHumeConfig } from '../hume.js';
 import { releasePort, removeWorktree } from './worktree-ops.js';
-import { getContainersReferencingWorkspacePathPromise, stopWorkspaceDockerPromise } from './docker.js';
+import { getContainersReferencingWorkspacePath, stopWorkspaceDocker } from './docker.js';
 import type { WorkspaceRemoveOptions, WorkspaceRemoveResult } from './types.js';
 import {
   createWorkspacePlaceholdersSync as createPlaceholders,
@@ -20,7 +20,8 @@ import {
 
 const execAsync = promisify(exec);
 
-export async function removeWorkspacePromise(options: WorkspaceRemoveOptions): Promise<WorkspaceRemoveResult> {
+/** Remove a workspace (worktrees, branches, Docker, DNS, tunnel ingress). */
+export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<WorkspaceRemoveResult> {
   const { projectConfig, featureName, dryRun } = options;
   const result: WorkspaceRemoveResult = {
     success: true,
@@ -59,7 +60,7 @@ export async function removeWorkspacePromise(options: WorkspaceRemoveOptions): P
   }
 
   // Stop Docker containers and clean up Docker-created files
-  const dockerResult = await stopWorkspaceDockerPromise(workspacePath, featureName);
+  const dockerResult = await stopWorkspaceDocker(workspacePath, featureName);
   result.steps.push(...dockerResult.steps);
 
   // Remove worktrees
@@ -139,7 +140,7 @@ export async function removeWorkspacePromise(options: WorkspaceRemoveOptions): P
   }
 
   // Guard: never delete workspace while containers still reference its compose path
-  const orphanedContainers = await getContainersReferencingWorkspacePathPromise(workspacePath);
+  const orphanedContainers = await getContainersReferencingWorkspacePath(workspacePath);
   if (orphanedContainers.length > 0) {
     result.errors.push(
       `Cannot remove workspace directory: ${orphanedContainers.length} Docker container(s) still reference compose paths in ${DEVCONTAINER_DIRNAME}/. ` +

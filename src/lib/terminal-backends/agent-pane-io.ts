@@ -32,7 +32,7 @@ export async function readAgentPaneText(
   const resolved = backend ?? (await resolveLaunchBackend());
   if (resolved.name !== 'herdr') {
     const { capturePane } = await import('../tmux.js');
-    return await Effect.runPromise(capturePane(agentId, lines));
+    return await capturePane(agentId, lines);
   }
   const { findHerdrAgentPane, readHerdrPaneText } = await import('./herdr.js');
   const pane = await findHerdrAgentPane(agentId);

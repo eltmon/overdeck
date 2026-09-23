@@ -348,7 +348,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
   }
 
   if (!options.force) {
-    const failures = await Effect.runPromise(runPreflightChecks(workspacePath, issueId, options.testWaived));
+    const failures = await runPreflightChecks(workspacePath, issueId, options.testWaived);
     if (failures.length > 0) {
       console.error(chalk.red(`\n✖ Work completion checks failed for ${issueId}:\n`));
       for (const line of failures) console.error(line);
@@ -379,7 +379,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     if (mergeSet && mergeSet.repos.length > 0) {
       const { rebaseAndPushRepos } = await import('../../lib/rebase-helper.js');
       spinner.text = 'Rebasing onto target branch and pushing...';
-      const rebaseResult = await Effect.runPromise(rebaseAndPushRepos(workspacePath, mergeSet));
+      const rebaseResult = await rebaseAndPushRepos(workspacePath, mergeSet);
       if (!rebaseResult.success) {
         const failure = rebaseResult.firstFailure!;
         spinner.fail(`Rebase failed in ${failure.repoKey}`);

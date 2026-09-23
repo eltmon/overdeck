@@ -473,7 +473,7 @@ describe('AgentState role persistence', () => {
       sessionExists: vi.fn(() => Effect.succeed(false)),
       sessionExistsSync: vi.fn(() => false),
       createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
-      capturePane: vi.fn(() => Effect.succeed('Claude Code')),
+      capturePane: vi.fn(async () => 'Claude Code'),
       setOption: vi.fn(() => Effect.void),
     }));
     // PAN-3917 FR-5/W8: launchAgentPane auto-selects Herdr when the dev host has
@@ -556,7 +556,7 @@ describe('AgentState role persistence', () => {
       sessionExistsSync: vi.fn(() => sessionAlive),
       createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
       killSession: vi.fn(() => Effect.promise(() => killSessionAsync())),
-      capturePane: vi.fn(() => Effect.succeed('')),
+      capturePane: vi.fn(async () => ''),
       setOption: vi.fn(() => Effect.void),
     }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
@@ -781,8 +781,8 @@ describe('AgentState role persistence', () => {
       sessionExistsSync: vi.fn(() => false),
       isPaneDead: vi.fn(() => Effect.succeed(true)),
       createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
-      listPaneValues: vi.fn(() => Effect.succeed([])),
-      capturePane: vi.fn(() => Effect.succeed('')),
+      listPaneValues: vi.fn(async () => []),
+      capturePane: vi.fn(async () => ''),
       setOption: vi.fn(() => Effect.void),
     }));
     vi.doMock('../agent-runtime-mirror.js', () => ({
@@ -893,8 +893,8 @@ describe('AgentState role persistence', () => {
       sessionExistsSync: vi.fn(() => true),
       killSession: vi.fn(() => Effect.promise(() => killSessionAsync())),
       createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
-      listPaneValues: vi.fn(() => Effect.succeed([])),
-      capturePane: vi.fn(() => Effect.succeed('')),
+      listPaneValues: vi.fn(async () => []),
+      capturePane: vi.fn(async () => ''),
       setOption: vi.fn(() => Effect.void),
     }));
     vi.doMock('../agent-runtime-mirror.js', () => ({
@@ -986,8 +986,8 @@ describe('AgentState role persistence', () => {
       sessionExistsSync: vi.fn(() => false),
       killSession: vi.fn(() => Effect.promise(() => killSessionAsync())),
       createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
-      listPaneValues: vi.fn(() => Effect.succeed([])),
-      capturePane: vi.fn(() => Effect.succeed('')),
+      listPaneValues: vi.fn(async () => []),
+      capturePane: vi.fn(async () => ''),
       setOption: vi.fn(() => Effect.void),
     }));
     vi.doMock('../agent-runtime-mirror.js', () => ({

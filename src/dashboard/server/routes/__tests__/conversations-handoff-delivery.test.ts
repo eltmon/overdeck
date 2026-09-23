@@ -13,7 +13,6 @@ import { promisify } from 'node:util';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Effect } from 'effect';
 
 const execFileAsync = promisify(execFile);
 
@@ -32,7 +31,7 @@ vi.mock('../../../../lib/tmux.js', async () => {
   const actual = await vi.importActual('../../../../lib/tmux.js');
   return {
     ...(actual as object),
-    capturePane: vi.fn(() => Effect.succeed(paneSnapshots.values.shift() ?? '')),
+    capturePane: vi.fn(async () => paneSnapshots.values.shift() ?? ''),
   };
 });
 

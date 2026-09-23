@@ -71,7 +71,7 @@ vi.mock('../tmux.js', async (importOriginal) => {
   return {
     ...actual,
     sessionExists: vi.fn((name: string) => E.succeed(tmux.live.has(name))),
-    capturePane: vi.fn(() => E.succeed('')),
+    capturePane: vi.fn(async () => ''),
     killSession: vi.fn((name: string) => E.sync(() => {
       tmux.killed.push(name);
       tmux.live.delete(name);

@@ -27,9 +27,9 @@ vi.mock('../tmux.js', () => ({
   getAgentSessions: vi.fn(() => Effect.succeed([])),
   getAgentSessionsSync: vi.fn(() => Effect.succeed([])),
   capturePane: vi.fn(),
-  capturePane: vi.fn(() => Effect.succeed('')),
+  capturePane: vi.fn(async () => ''),
   listPaneValues: vi.fn(),
-  listPaneValues: vi.fn(() => Effect.succeed([])),
+  listPaneValues: vi.fn(async () => []),
   setOption: vi.fn(() => Effect.void),
   waitForClaudePrompt: vi.fn(async () => true),
 }));

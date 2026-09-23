@@ -580,7 +580,7 @@ export function reopenIssueTransition(options: {
           ? join(projectPath, 'workspaces', `feature-${id.toLowerCase()}`)
           : '';
         if (workspacePath) {
-          await Effect.runPromise(reopenWorkspaceState(id.toUpperCase(), workspacePath, { reason: (body as any)?.reason }));
+          await reopenWorkspaceState(id.toUpperCase(), workspacePath, { reason: (body as any)?.reason });
         }
       } catch { /* non-fatal */ }
 

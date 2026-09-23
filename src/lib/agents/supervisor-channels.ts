@@ -400,7 +400,7 @@ export async function dismissDevChannelsDialog(agentId: string): Promise<void> {
   const start = Date.now();
   while (Date.now() - start < TIMEOUT_MS) {
     try {
-      const pane = await Effect.runPromise(capturePane(agentId, 50));
+      const pane = await capturePane(agentId, 50);
       if (pane.includes(NEEDLE)) {
         // Dialog is up. Send Enter, then keep re-sending until the needle
         // clears — the first keystroke can land before the TUI is ready to
@@ -409,9 +409,7 @@ export async function dismissDevChannelsDialog(agentId: string): Promise<void> {
         while (Date.now() - dismissStart < DISMISS_BUDGET_MS) {
           await Effect.runPromise(sendRawKeystroke(agentId, 'C-m', 'channels:dismiss-dev-dialog'));
           await new Promise((r) => setTimeout(r, RESEND_INTERVAL_MS));
-          const after = await Effect.runPromise(
-            capturePane(agentId, 50).pipe(Effect.catch(() => Effect.succeed(''))),
-          );
+          const after = await capturePane(agentId, 50).catch(() => '');
           if (!after.includes(NEEDLE)) return;
         }
         console.log(`[${agentId}] channels:dismiss:dialog-still-present-after-budget`);

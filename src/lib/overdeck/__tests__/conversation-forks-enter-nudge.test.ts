@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../tmux.js', async (importOriginal) => ({
   ...await importOriginal<typeof import('../../tmux.js')>(),
-  capturePaneText: mocks.capturePaneText,
+  capturePane: mocks.capturePaneText,
   capturePaneViewport: mocks.capturePaneViewport,
   sendKeysAsync: mocks.sendKeysAsync,
 }));

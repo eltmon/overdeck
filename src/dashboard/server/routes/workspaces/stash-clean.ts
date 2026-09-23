@@ -21,7 +21,7 @@ import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import type { ProcessSpawnError } from '../../../../lib/errors.js';
+import { ProcessSpawnError, VcsError } from '../../../../lib/errors.js';
 import { parseIssueIdSync, extractPrefixSync } from '../../../../lib/issue-id.js';
 import {
   listStashes,
@@ -51,7 +51,15 @@ export type WorkspaceRemovalGuard =
 export const checkWorkspaceRemovalGuard = (
   workspacePath: string,
 ): Effect.Effect<WorkspaceRemovalGuard> =>
-  getContainersReferencingWorkspacePath(workspacePath).pipe(
+  Effect.tryPromise({
+    try: () => getContainersReferencingWorkspacePath(workspacePath),
+    catch: (cause) => new ProcessSpawnError({
+      command: 'workspace-manager',
+      args: ['getContainersReferencingWorkspacePath'],
+      message: cause instanceof Error ? cause.message : String(cause),
+      cause,
+    }),
+  }).pipe(
     Effect.map((orphanedContainers) => {
       if (orphanedContainers.length > 0) {
         return {
@@ -68,6 +76,18 @@ export const checkWorkspaceRemovalGuard = (
       error: `Cannot remove workspace: failed to enumerate Docker containers referencing ${workspacePath}: ${error.message}`,
     })),
   );
+
+/**
+ * Map a rejected stash operation to a typed failure that keeps git's error text,
+ * which httpHandler returns in the 500 body.
+ */
+function stashFailure(op: string): (cause: unknown) => VcsError {
+  return (cause) => new VcsError({
+    operation: `git stash ${op}`,
+    message: cause instanceof Error ? cause.message : String(cause),
+    cause,
+  });
+}
 
 function resolveWorkspacePath(issueId: string): string | null {
   const info = getWorkspaceInfoForIssue(issueId);
@@ -89,7 +109,7 @@ const getWorkspaceStashesRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
     }
 
-    const stashes = yield* listStashes(workspacePath);
+    const stashes = yield* Effect.tryPromise({ try: () => listStashes(workspacePath), catch: stashFailure('list') });
     const salvageableStashes = stashes
       .filter(isSalvageableStash)
       .filter((entry) => entry.issueId === issueId.toUpperCase())
@@ -125,18 +145,21 @@ const postWorkspaceRecoverStashRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
     }
 
-    const stashes = yield* listStashes(workspacePath);
+    const stashes = yield* Effect.tryPromise({ try: () => listStashes(workspacePath), catch: stashFailure('list') });
     const stash = stashes.find((entry) => entry.ref === stashRef);
     if (!stash || !isSalvageableStash(stash) || stash.issueId !== issueId.toUpperCase()) {
       return jsonResponse({ error: 'Salvageable stash not found for this workspace' }, { status: 404 });
     }
 
-    const branchName = yield* createRecoveryBranchFromStash(
-      workspacePath,
-      stash.ref,
-      stash.issueId,
-      stash.shortDescription,
-    );
+    const branchName = yield* Effect.tryPromise({
+      try: () => createRecoveryBranchFromStash(
+        workspacePath,
+        stash.ref,
+        stash.issueId,
+        stash.shortDescription,
+      ),
+      catch: stashFailure('branch'),
+    });
 
     return jsonResponse({ success: true, branchName });
   }))
@@ -161,13 +184,13 @@ const deleteWorkspaceStashRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
     }
 
-    const stashes = yield* listStashes(workspacePath);
+    const stashes = yield* Effect.tryPromise({ try: () => listStashes(workspacePath), catch: stashFailure('list') });
     const stash = stashes.find((entry) => entry.ref === stashRef);
     if (!stash || !isSalvageableStash(stash) || stash.issueId !== issueId.toUpperCase()) {
       return jsonResponse({ error: 'Salvageable stash not found for this workspace' }, { status: 404 });
     }
 
-    yield* dropStash(workspacePath, stash.ref);
+    yield* Effect.tryPromise({ try: () => dropStash(workspacePath, stash.ref), catch: stashFailure('drop') });
     return jsonResponse({ success: true });
   }))
 );

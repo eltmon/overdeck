@@ -11,8 +11,6 @@ import {
   type ExecException,
 } from 'child_process';
 import { promisify } from 'util';
-import { Effect } from 'effect';
-import { FsError } from './errors.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -221,9 +219,14 @@ function findGitLockFiles(repoPath: string): string[] {
   return lockFiles;
 }
 
-async function cleanupStaleLocksPromise(
+/**
+ * Remove stale `*.lock` files in `.git/` when no git process holds the repo.
+ * Per-file failures are reported in `errors`; it rejects only when lock removal
+ * throws unexpectedly (e.g. permission denied at unlink).
+ */
+export async function cleanupStaleLocks(
   repoPath: string,
-  options: StaleLockCleanupOptions,
+  options: StaleLockCleanupOptions = {},
 ): Promise<{
   found: string[];
   removed: string[];
@@ -411,28 +414,3 @@ export async function snapshotWorkspaceHeadsPromise(issueId: string, workspacePa
   }
   return heads.length > 0 ? heads.join(' ') as HeadAnchor : undefined;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Effect-native cleanupStaleLocks. Removes stale `*.lock` files in `.git/`
- * when no git processes hold the repo. Fails with FsError if lock removal
- * throws unexpectedly (e.g. permission denied at unlink); per-file errors
- * are reported in the `errors` payload like the original.
- */
-export const cleanupStaleLocks = (
-  repoPath: string,
-  options: StaleLockCleanupOptions = {},
-): Effect.Effect<
-  {
-    found: string[];
-    removed: string[];
-    errors: Array<{ file: string; error: string }>;
-  },
-  FsError
-> =>
-  Effect.tryPromise({
-    try: () => cleanupStaleLocksPromise(repoPath, options),
-    catch: (cause) =>
-      new FsError({ path: repoPath, operation: 'cleanupStaleLocks', cause }),
-  });

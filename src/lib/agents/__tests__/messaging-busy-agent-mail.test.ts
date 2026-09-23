@@ -52,9 +52,9 @@ vi.mock('../../tmux.js', () => ({
   sessionExistsSync: vi.fn(() => true),
   getAgentSessions: vi.fn(() => Effect.succeed([])),
   getAgentSessionsSync: vi.fn(() => []),
-  capturePane: vi.fn(() => Effect.succeed('')),
+  capturePane: vi.fn(async () => ''),
   capturePaneSync: vi.fn(() => ''),
-  listPaneValues: vi.fn(() => Effect.succeed([])),
+  listPaneValues: vi.fn(async () => []),
   listPaneValuesSync: vi.fn(() => []),
   setOption: vi.fn(() => Effect.void),
 }));

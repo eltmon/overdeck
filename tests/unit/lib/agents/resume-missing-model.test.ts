@@ -51,7 +51,7 @@ vi.mock('../../../../src/lib/tmux.js', async (importOriginal) => ({
   isPaneDead: vi.fn(() => Effect.succeed(true)),
   killSession: vi.fn(() => Effect.succeed(undefined)),
   createSession: vi.fn(() => Effect.succeed(undefined)),
-  listPaneValues: vi.fn(() => Effect.succeed([])),
+  listPaneValues: vi.fn(async () => []),
 }));
 
 import { resumeAgent } from '../../../../src/lib/agents/resume.js';

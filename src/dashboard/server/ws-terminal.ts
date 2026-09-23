@@ -164,7 +164,7 @@ async function captureFreshSnapshot(
   if (!dims) {
     return { cols: requestedCols, rows: requestedRows, data: '' };
   }
-  const data = await Effect.runPromise(capturePane(sessionName, SNAPSHOT_SCROLLBACK_LINES, { escapeSequences: true }));
+  const data = await capturePane(sessionName, SNAPSHOT_SCROLLBACK_LINES, { escapeSequences: true });
   return { cols: dims.cols, rows: dims.rows, data };
 }
 
@@ -176,7 +176,7 @@ async function captureFreshSnapshot(
  * naturally covers it. `-S 0` starts capture from the first visible line.
  */
 async function captureViewportSnapshot(sessionName: string): Promise<string> {
-  return Effect.runPromise(capturePane(sessionName, 0, { escapeSequences: true }));
+  return capturePane(sessionName, 0, { escapeSequences: true });
 }
 
 /**

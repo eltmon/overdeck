@@ -2,7 +2,6 @@
  * Tests for syncMainIntoWorkspace and scanForConflictMarkers (PAN-242)
  */
 
-import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync, existsSync } from 'fs';
 import { join } from 'path';
@@ -30,7 +29,7 @@ vi.mock('../../src/lib/projects.js', () => ({
 }));
 
 vi.mock('../../src/lib/git-utils.js', () => ({
-  cleanupStaleLocks: vi.fn().mockReturnValue(Effect.succeed({ found: [], removed: [], errors: [] })),
+  cleanupStaleLocks: vi.fn().mockResolvedValue({ found: [], removed: [], errors: [] }),
 }));
 
 // Hoist tmux mock so factory can reference it
@@ -228,7 +227,7 @@ describe('syncMainIntoWorkspace', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     operationHeads.clear();
-    (cleanupStaleLocks as any).mockReturnValue(Effect.succeed({ found: [], removed: [], errors: [] }));
+    (cleanupStaleLocks as any).mockResolvedValue({ found: [], removed: [], errors: [] });
   });
 
   describe('pre-flight: uncommitted changes', () => {
@@ -437,11 +436,11 @@ describe('syncMainIntoWorkspace', () => {
 
   describe('git lock cleanup', () => {
     it('blocks when git processes are running (detected via lock cleanup)', async () => {
-      (cleanupStaleLocks as any).mockReturnValue(Effect.succeed({
+      (cleanupStaleLocks as any).mockResolvedValue({
         found: ['/fake/.git/index.lock'],
         removed: [],
         errors: [{ file: '/fake/.git/index.lock', error: 'Git processes are running - not safe to remove locks' }],
-      }));
+      });
 
       execMock.mockImplementation(async (cmd: string) => {
         if (cmd.includes('git status --porcelain')) return { stdout: '', stderr: '' };

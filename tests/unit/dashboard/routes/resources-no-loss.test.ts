@@ -18,7 +18,7 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
   listSessionsSync: () => [],
   listPaneValuesSync: () => [],
   listSessions: () => Effect.succeed(mockListSessions()),
-  listPaneValues: () => Effect.succeed([]),
+  listPaneValues: async () => [],
 }));
 
 vi.mock('../../../../src/lib/runtime-census.js', () => ({

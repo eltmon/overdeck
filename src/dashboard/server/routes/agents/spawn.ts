@@ -624,7 +624,7 @@ export const postAgentsRoute = HttpRouter.add(
       role,
     }));
 
-    const agentLifecycle = yield* getWorkAgentLifecycleState(agentSessionName);
+    const agentLifecycle = yield* Effect.promise(() => getWorkAgentLifecycleState(agentSessionName));
     yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_lifecycle_evaluated', {
       issueId,
       lifecycle: agentLifecycle,

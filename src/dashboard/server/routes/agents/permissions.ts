@@ -117,7 +117,7 @@ export const getAgentPendingQuestionsRoute = HttpRouter.add(
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
 
-    const questions = yield* getAgentPendingQuestions(id);
+    const questions = yield* Effect.promise(() => getAgentPendingQuestions(id));
     return jsonResponse({ pending: questions.length > 0, questions });
   })),
 );
@@ -153,7 +153,7 @@ export const postAgentAnswerQuestionRoute = HttpRouter.add(
       return jsonResponse({ error: 'every answer must be a non-empty string' }, { status: 400 });
     }
 
-    const pendingQuestions = yield* getAgentPendingQuestions(id);
+    const pendingQuestions = yield* Effect.promise(() => getAgentPendingQuestions(id));
     if (pendingQuestions.length === 0) {
       return jsonResponse({ error: 'No pending questions found for this agent' }, { status: 404 });
     }
@@ -201,7 +201,7 @@ export const postAgentPlanActionRoute = HttpRouter.add(
       return jsonResponse({ error: 'Agent not found' }, { status: 404 });
     }
 
-    const jsonlPath = yield* getAgentJsonlPath(id).pipe(Effect.catch(() => Effect.succeed(null)));
+    const jsonlPath = yield* Effect.promise(() => getAgentJsonlPath(id));
     const scan = jsonlPath
       ? yield* Effect.promise(() => scanPendingInputsPromise(jsonlPath))
       : null;

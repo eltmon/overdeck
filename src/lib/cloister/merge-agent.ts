@@ -985,7 +985,7 @@ function announceMerge(
  */
 export async function captureTmuxOutput(sessionName: string): Promise<string> {
   try {
-    return await Effect.runPromise(capturePane(sessionName));
+    return await capturePane(sessionName);
   } catch {
     return '';
   }
@@ -1125,7 +1125,7 @@ export async function salvageStrandedMerge(
     logActivity('merge_salvage', `Pushing stranded merge commit ${currentHead.slice(0, 8)} for ${issueId}`);
 
     try {
-      await Effect.runPromise(gitPush(projectPath, 'origin', targetBranch, { issueId }));
+      await gitPush(projectPath, 'origin', targetBranch, { issueId });
     } catch (pushErr: unknown) {
       if (pushErr instanceof MainDivergedError) {
         // origin has advanced past our local ancestor — a hotfix landed. Report
@@ -1230,7 +1230,7 @@ async function syncMainIntoRepo(
     }
 
     try {
-      const lockCleanup = await Effect.runPromise(cleanupStaleLocks(repoDir, { signal, processProbeTimeoutMs: SYNC_GIT_STATUS_TIMEOUT_MS }));
+      const lockCleanup = await cleanupStaleLocks(repoDir, { signal, processProbeTimeoutMs: SYNC_GIT_STATUS_TIMEOUT_MS });
       if (lockCleanup.found.length > 0) console.log(`[sync-main] Found ${lockCleanup.found.length} lock file(s)`);
       if (lockCleanup.removed.length > 0) {
         console.log(`[sync-main] Cleaned up ${lockCleanup.removed.length} stale lock file(s)`); logActivity('git_lock_cleanup', `Removed ${lockCleanup.removed.length} stale lock file(s)`);

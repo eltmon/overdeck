@@ -46,7 +46,6 @@ import { saveAgentStateAndEmitEvent } from './services/agent-projection.js';
 import { resumeQueuedMerges } from './services/merge-queue-service.js';
 import { mkdir } from 'node:fs/promises';
 import { getOverdeckHome } from '../../lib/paths.js';
-import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
 import { startCliproxyWatchdogForDashboard } from './routes/cliproxy.js';
 import { startResourcesSnapshotService } from './routes/resources/snapshot.js';
 import { cleanupOrphanedConversationAttachments } from './services/conversation-attachments.js';
@@ -120,12 +119,13 @@ await mkdir(getOverdeckHome(), { recursive: true });
 // on first start; reused on subsequent starts. Used by /api/internal/pipeline/notify.
 ensureInternalTokenSync();
 
-// Prepare the managed tmux context exactly once, before any code path can spawn
-// tmux. After this call `buildTmuxArgs`, `buildTmuxCommandString`, and
-// `tmuxExecAsync` are effectively free — no per-call file writes, no per-call
-// `start-server`/`source-file` round-trips. Critical for terminal attach latency
-// and agent message delivery (PAN-785).
-await ensureManagedTmuxContextOnce();
+// PAN-785 prepared the managed tmux context here, before any code path could spawn
+// tmux. Since PAN-1379 made `ensureManagedTmuxContextOnce` an Effect, the
+// `await` here returned the unrun Effect and prepared nothing: the context has
+// been prepared lazily by the first `tmuxExecAsync` call instead. PAN-3958 CH-3
+// removed the dead call rather than start running it. Running it would start a
+// persistent (`exit-empty off`) managed tmux server at boot on Herdr hosts,
+// through a sync `execFileSync` path. Restoring it is an operator decision.
 // Cache .overdeck.env content at startup to avoid blocking FS reads during request handling (PAN-70)
 await initTrackerConfigCache().catch(err => {
   console.log('[tracker-config] Warning: failed to cache .overdeck.env:', err.message);
@@ -211,10 +211,10 @@ if (isPeerDashboard) {
     console.log('[overdeck] IssueDataService background fetch complete');
     // PAN-3917: there are no review-status rows to prune. A manually-closed
     // issue derives to `closed` on the next read, so nothing stale survives it.
-    void Effect.runPromise(cleanupClosedIssueAgentDirectories({
+    void cleanupClosedIssueAgentDirectories({
       issues: getSharedIssueService().getIssues({ cycle: 'all', includeCompleted: true }),
       force: true,
-    })).then((result) => {
+    }).then((result) => {
       if (result.removed.length > 0) {
         console.log(`[overdeck] Pruned ${result.removed.length} old closed-issue agent dir${result.removed.length === 1 ? '' : 's'} (state and transcripts kept): ${result.removed.join(', ')}`);
       }

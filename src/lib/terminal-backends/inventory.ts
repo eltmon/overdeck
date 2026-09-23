@@ -103,7 +103,7 @@ export async function captureLiveAgentPaneText(
       return await readHerdrPaneText(pane.paneId, lines);
     }
     const { capturePane } = await import('../tmux.js');
-    return await Effect.runPromise(capturePane(pane.agentId, lines));
+    return await capturePane(pane.agentId, lines);
   } catch {
     return null;
   }

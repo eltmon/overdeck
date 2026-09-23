@@ -1,5 +1,4 @@
 import { exitCli } from '../exit.js';
-import { Effect } from 'effect';
 /**
  * `pan workspace deep-clean <issueId>` — interactive, user-only entry point
  * for `git clean -fd` against a workspace.
@@ -86,7 +85,7 @@ export async function workspaceDeepCleanCommand(
 
   let toDelete: string[];
   try {
-    toDelete = await Effect.runPromise(dryRunGitClean({ workspacePath }));
+    toDelete = await dryRunGitClean({ workspacePath });
   } catch (err: any) {
     console.error(chalk.red(`✗ git clean dry-run failed: ${err.message ?? err}`));
     return exitCli(1);
@@ -128,11 +127,11 @@ export async function workspaceDeepCleanCommand(
   }
 
   try {
-    await Effect.runPromise(runGitClean({
+    await runGitClean({
       workspacePath,
       userInvoked: true,
       reason: `pan workspace deep-clean ${issueId} (TTY-confirmed)`,
-    }));
+    });
   } catch (err: any) {
     if (err instanceof DangerousOpBlockedError) {
       console.error(chalk.red(`\n✗ ${err.message}\n  ${err.recovery}\n`));

@@ -86,7 +86,10 @@ export function saveAgentHealth(health: AgentHealth): void {
   const dir = join(AGENTS_DIR, health.agentId);
   mkdirSync(dir, { recursive: true });
   writeFileSync(getHealthFile(health.agentId), JSON.stringify(health, null, 2));
-}async function isAgentAlivePromise(agentId: string): Promise<boolean> {
+}
+
+/** Tmux session liveness probe for an agent; never rejects. */
+export async function isAgentAlive(agentId: string): Promise<boolean> {
   return Effect.runPromise(sessionExists(agentId));
 }
 
@@ -95,7 +98,7 @@ export function saveAgentHealth(health: AgentHealth): void {
  */
 export async function getAgentOutput(agentId: string, lines: number = 20): Promise<string | null> {
   try {
-    const output = await Effect.runPromise(capturePane(agentId, lines));
+    const output = await capturePane(agentId, lines);
     return output.trim();
   } catch {
     return null;
@@ -107,7 +110,7 @@ export async function getAgentOutput(agentId: string, lines: number = 20): Promi
  * Returns true if we detect activity, false otherwise
  */
 export async function sendHealthNudge(agentId: string): Promise<boolean> {
-  if (!(await Effect.runPromise(isAgentAlive(agentId)))) {
+  if (!(await isAgentAlive(agentId))) {
     return false;
   }
 
@@ -123,7 +126,9 @@ export async function sendHealthNudge(agentId: string): Promise<boolean> {
   } catch {
     return false;
   }
-}async function pingAgentPromise(
+}
+
+async function pingAgentPromise(
   agentId: string,
   config: HealthConfig = {
     pingTimeoutMs: DEFAULT_PING_TIMEOUT_MS,
@@ -138,7 +143,7 @@ export async function sendHealthNudge(agentId: string): Promise<boolean> {
 
   const state = getAgentStateSync(agentId);
   const runtime = getAgentRuntimeStateSync(agentId);
-  const alive = await Effect.runPromise(isAgentAlive(agentId));
+  const alive = await isAgentAlive(agentId);
   const runtimeLastActivity = runtime?.lastActivity ? new Date(runtime.lastActivity) : null;
   const stateLastActivity = state?.lastActivity ? new Date(state.lastActivity) : null;
   // PAN-3546: prefer the effective activity resolver (runtime mirror + tmux
@@ -213,7 +218,9 @@ export async function sendHealthNudge(agentId: string): Promise<boolean> {
 
   saveAgentHealth(health);
   return health;
-}async function handleStuckAgentPromise(
+}
+
+async function handleStuckAgentPromise(
   agentId: string,
   config: HealthConfig = {
     pingTimeoutMs: DEFAULT_PING_TIMEOUT_MS,
@@ -270,7 +277,9 @@ export async function sendHealthNudge(agentId: string): Promise<boolean> {
   } catch {}
 
   return { action: 'recovered', reason: 'Force killed (respawn failed)' };
-}async function runHealthCheckPromise(
+}
+
+async function runHealthCheckPromise(
   config: HealthConfig = {
     pingTimeoutMs: DEFAULT_PING_TIMEOUT_MS,
     consecutiveFailures: DEFAULT_CONSECUTIVE_FAILURES,
@@ -448,10 +457,6 @@ const healthCatch = (agentId: string, operation: string) => (cause: unknown) =>
     message: cause instanceof Error ? cause.message : String(cause),
     cause,
   });
-
-/** Effect-native isAgentAlive — tmux session liveness probe, never fails. */
-export const isAgentAlive = (agentId: string): Effect.Effect<boolean, never> =>
-  Effect.promise(() => isAgentAlivePromise(agentId));
 
 /**
  * Effect-native pingAgent — full classify + persist cycle.

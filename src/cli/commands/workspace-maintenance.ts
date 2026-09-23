@@ -3,7 +3,6 @@ import chalk from 'chalk';
 import ora from 'ora';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { Effect } from 'effect';
 import { listRunningAgentsSync } from '../../lib/agents.js';
 import {
   extractTeamPrefix,
@@ -232,14 +231,14 @@ export async function addRepoCommand(workspaceId: string, repoNames: string[], o
         return exitCli(1);
       }
 
-      const result = await Effect.runPromise(addNewRepoToWorkspace({
+      const result = await addNewRepoToWorkspace({
         projectKey,
         projectConfig,
         featureName: normalizedId,
         gitUrl: options.new,
         repoName: repoNames[0],
         dryRun: options.dryRun,
-      }));
+      });
       if (!result.success) {
         spinner.fail(`Failed to register new repo: ${result.errors.join(', ')}`);
         for (const step of result.steps) console.log(chalk.dim(`  ${step}`));
@@ -289,12 +288,12 @@ export async function addRepoCommand(workspaceId: string, repoNames: string[], o
     }
 
     // Add repos to workspace
-    const result = await Effect.runPromise(addReposToWorkspace({
+    const result = await addReposToWorkspace({
       projectConfig,
       featureName: normalizedId,
       repoNames: targetRepoNames,
       dryRun: options.dryRun,
-    }));
+    });
 
     if (!result.success) {
       spinner.fail(`Failed to add repos: ${result.errors.join(', ')}`);

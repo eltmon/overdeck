@@ -78,7 +78,7 @@ export const postAgentResumeRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
     // Snapshot lifecycle state BEFORE taking any action so callers can see the
     // temporal context (why was this resume allowed) without recomputing state.
-    const lifecycleBefore = yield* getWorkAgentLifecycleState(id);
+    const lifecycleBefore = yield* Effect.promise(() => getWorkAgentLifecycleState(id));
     console.log(`[agents/resume] ${id} lifecycle: canResume=${lifecycleBefore.canResumeSession} hasSavedSession=${lifecycleBefore.hasSavedSession} hasLiveTmux=${lifecycleBefore.hasLiveTmuxSession} isCrashed=${lifecycleBefore.isCrashed} isStopped=${lifecycleBefore.isStopped}`);
     // PAN-1675: a compact-resume targets a context-wedged agent that is usually
     // still 'running' (a live but stuck session), which the normal gate rejects.
@@ -152,7 +152,7 @@ export const postAgentResumeRoute = HttpRouter.add(
         hint: delivered
           ? 'Continue prompt delivered to the agent.'
           : 'The continue prompt was queued in the agent mail/ folder because the live delivery path did not confirm in time. The agent will read it on its next session start.',
-        lifecycle: { before: lifecycleBefore, after: yield* getWorkAgentLifecycleState(id) },
+        lifecycle: { before: lifecycleBefore, after: yield* Effect.promise(() => getWorkAgentLifecycleState(id)) },
       });
     } else {
       yield* Effect.promise(() => appendAgentLifecycleLog(id, 'agent.resume_failed', {
@@ -161,7 +161,7 @@ export const postAgentResumeRoute = HttpRouter.add(
       }));
       return jsonResponse({
         error: result.error,
-        lifecycle: { before: lifecycleBefore, after: yield* getWorkAgentLifecycleState(id) },
+        lifecycle: { before: lifecycleBefore, after: yield* Effect.promise(() => getWorkAgentLifecycleState(id)) },
       }, { status: 400 });
     }
   })),
@@ -506,7 +506,7 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
       }
     }
 
-    const lifecycle = yield* getWorkAgentLifecycleState(id);
+    const lifecycle = yield* Effect.promise(() => getWorkAgentLifecycleState(id));
     if (lifecycle.hasLiveTmuxSession) {
       return jsonResponse({
         error: `Agent ${id} has a live tmux session. Run 'pan kill ${id}' to stop only this work agent, then retry.`,
@@ -716,7 +716,7 @@ export const postAgentResetSessionRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     const eventStore = yield* EventStoreService;
 
-    const lifecycle = yield* getWorkAgentLifecycleState(id);
+    const lifecycle = yield* Effect.promise(() => getWorkAgentLifecycleState(id));
     const agentState = yield* getAgentState(id);
     if (!agentState) {
       return jsonResponse({ error: `Agent ${id} not found`, lifecycle }, { status: 404 });
@@ -761,7 +761,7 @@ export const postAgentResetSessionRoute = HttpRouter.add(
     const priorSession = previousSessionId ?? agentState.sessionId ?? 'unknown';
     console.log(`[reset-session] Cleared session for ${id} (was: ${priorSession.slice(0, 8)}...)`);
     invalidateAgentsCache();
-    return jsonResponse({ success: true, agentId: id, previousSessionId: previousSessionId ?? agentState.sessionId, lifecycle: yield* getWorkAgentLifecycleState(id) });
+    return jsonResponse({ success: true, agentId: id, previousSessionId: previousSessionId ?? agentState.sessionId, lifecycle: yield* Effect.promise(() => getWorkAgentLifecycleState(id)) });
   })),
 );
 

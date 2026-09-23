@@ -112,7 +112,7 @@ vi.mock('../../../../src/lib/tmux.js', () => ({
   killSession: mockKillSession,
   killSessionSync: vi.fn(() => Effect.void),
   killSessionAsync: vi.fn().mockResolvedValue(undefined),
-  capturePane: vi.fn(() => Effect.succeed('')),
+  capturePane: vi.fn(async () => ''),
 }));
 
 // PAN-3947: post-merge closes terminals through the terminal backend. Model a

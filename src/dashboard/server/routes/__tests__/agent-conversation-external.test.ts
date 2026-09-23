@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const getAgentWorkspace = vi.fn(() => Effect.succeed('/should/not/be/used'));
+const getAgentWorkspace = vi.fn(async () => '/should/not/be/used');
 vi.mock('../../../../lib/agent-enrichment.js', () => ({
   getClaudeProjectDir: vi.fn(),
   getAgentWorkspace: (...args: unknown[]) => getAgentWorkspace(...(args as [])),

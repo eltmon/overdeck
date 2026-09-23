@@ -30,11 +30,11 @@ import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { getGitHubConfig } from '../../services/tracker-config.js';
 import { recordFeatureRegistryLifecycle } from '../../../../lib/registry/feature-registry-population.js';
 import {
-  getClaudeProjectDir as getClaudeProjectDirShared,
-  getAgentWorkspace as getAgentWorkspaceShared,
-  getAgentJsonlPath as getAgentJsonlPathShared,
-  getPendingQuestions as getPendingQuestionsShared,
-  getAgentPendingQuestions as getAgentPendingQuestionsShared,
+  getClaudeProjectDir,
+  getAgentWorkspace,
+  getAgentJsonlPath,
+  getPendingQuestions,
+  getAgentPendingQuestions,
 } from '../../../../lib/agent-enrichment.js';
 import type { WorkAgentLifecycleState, WorkAgentRecommendedAction } from '../../../../lib/work-agent-lifecycle.js';
 import { hasCompletionMarkerForAgent } from '../../../../lib/agents/supervisor-channels.js';
@@ -368,9 +368,7 @@ async function readRemoteAgentState(agentId: string): Promise<Record<string, unk
 }
 
 async function captureAgentOutputBeforeKill(agentId: string): Promise<void> {
-  const output = await Effect.runPromise(
-    capturePane(agentId, 5000).pipe(Effect.catch(() => Effect.succeed(''))),
-  );
+  const output = await capturePane(agentId, 5000).catch(() => '');
   if (!output) return;
 
   const agentDir = getAgentDir(agentId);
@@ -644,13 +642,6 @@ export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuar
     },
   };
 }
-
-// Shared enrichment utilities (PAN-440) — aliases for readability
-const getClaudeProjectDir = getClaudeProjectDirShared;
-const getAgentWorkspace = getAgentWorkspaceShared;
-const getAgentJsonlPath = getAgentJsonlPathShared;
-const getPendingQuestions = getPendingQuestionsShared;
-const getAgentPendingQuestions = getAgentPendingQuestionsShared;
 
 function flyExecCmd(vmName: string, command: string): string {
   const appName = vmName.replace(/\/.*$/, ''); // simplified: use vmName as app name

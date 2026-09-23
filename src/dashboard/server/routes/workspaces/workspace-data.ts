@@ -39,6 +39,7 @@ import { listSessionNames, capturePane } from '../../../../lib/tmux.js';
 import { getActiveSessionModelSync } from '../../../../lib/cost-parsers/jsonl-parser.js';
 import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import { listStashes, isSalvageableStash } from '../../../../lib/stashes.js';
+import { VcsError } from '../../../../lib/errors.js';
 import { findPlan, isPlanningComplete, mergeContinueItemStatuses, readPlan, serializeXBriefDocument } from '../../../../lib/xbrief/io.js';
 import { getCostsForIssueSync } from '../../../../lib/costs/index.js';
 import { resolveIssueHeadlineCost } from '../../services/issue-cost-resolver.js';
@@ -658,7 +659,7 @@ const getWorkspaceRoute = HttpRouter.add(
         // unconditionally inside the Promise.all above, on every request).
         const git = shellGit ?? (yield* Effect.promise(() => getPersistedBranchFallbackAsync(issueId)));
         const sessionNames = yield* listSessionNames();
-        const paneOutput = yield* capturePane(agentSession, 50).pipe(Effect.orElseSucceed(() => ''));
+        const paneOutput = yield* Effect.promise(() => capturePane(agentSession, 50).catch(() => ''));
 
         let hasAgent = false;
         let agentSessionId: string | null = null;
@@ -687,7 +688,14 @@ const getWorkspaceRoute = HttpRouter.add(
         // `services/derived-issue-state.ts` reads the PR every time, so a
         // merge that actually landed shows as `merged` on the next read.
 
-        const stashes = yield* listStashes(workspacePath);
+        const stashes = yield* Effect.tryPromise({
+          try: () => listStashes(workspacePath),
+          catch: (cause) => new VcsError({
+            operation: 'git stash list',
+            message: cause instanceof Error ? cause.message : String(cause),
+            cause,
+          }),
+        });
         const salvageableStashes = stashes
           .filter(isSalvageableStash)
           .filter((entry) => entry.issueId === issueId.toUpperCase());

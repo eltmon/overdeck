@@ -1,7 +1,5 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import { Effect } from 'effect';
-import { GitError } from './errors.js';
 
 const execAsync = promisify(exec);
 
@@ -163,7 +161,10 @@ export function parseStashListLine(line: string): ParsedStashEntry | null {
   const message = legacyMatch[2].trim();
   const parsed = parseCanonicalStashMessage(message);
   return { ...parsed, ref: stackRef, stackRef, message };
-}async function listStashesPromise(repoPath: string): Promise<ParsedStashEntry[]> {
+}
+
+/** List parsed stash entries (newest first per git's natural ordering). */
+export async function listStashes(repoPath: string): Promise<ParsedStashEntry[]> {
   let stdout: string;
   try {
     ({ stdout } = await execAsync('git stash list --format="%gd%x09%H%x09%cI%x09%gs"', {
@@ -201,7 +202,7 @@ async function resolveStashOperationRef(repoPath: string, ref: string, stackRef?
     throw new Error(`Stash ${ref} no longer matches ${candidateRef}`);
   }
 
-  const stashes = await Effect.runPromise(listStashes(repoPath));
+  const stashes = await listStashes(repoPath);
   const matchingEntry = stashes.find((entry) => entry.ref === ref);
   if (!matchingEntry?.stackRef) {
     throw new Error(`Stash ${ref} not found`);
@@ -218,12 +219,14 @@ async function resolveStashOperationRef(repoPath: string, ref: string, stackRef?
   return matchingEntry.stackRef;
 }
 
-async function dropStashPromise(repoPath: string, ref: string, stackRef?: string): Promise<void> {
+/** Drop a stash by SHA (preferred) or stack ref. */
+export async function dropStash(repoPath: string, ref: string, stackRef?: string): Promise<void> {
   const operationRef = await resolveStashOperationRef(repoPath, ref, stackRef);
   await execAsync(`git stash drop ${JSON.stringify(operationRef)}`, { cwd: repoPath, encoding: 'utf-8' });
 }
 
-async function createRecoveryBranchFromStashPromise(
+/** Materialise a recovery branch from a stash. Returns the new branch name. */
+export async function createRecoveryBranchFromStash(
   repoPath: string,
   stashRef: string,
   issueId: string,
@@ -259,47 +262,3 @@ export function isOlderThanDays(entry: ParsedStashEntry, days: number, now = new
 export function isSalvageableStash(entry: ParsedStashEntry): entry is SalvageableStashEntry {
   return entry.kind === 'salvageable' && !!entry.issueId && !!entry.shortDescription;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-const toGitError = (op: string, cause: unknown): GitError =>
-  new GitError({
-    command: ['git', 'stash', op],
-    stderr: cause instanceof Error ? cause.message : String(cause),
-    exitCode: 1,
-    cause,
-  });
-
-/** List parsed stash entries (newest first per git's natural ordering). */
-export const listStashes = (
-  repoPath: string,
-): Effect.Effect<readonly ParsedStashEntry[], GitError> =>
-  Effect.tryPromise({
-    try: () => listStashesPromise(repoPath),
-    catch: (cause) => toGitError('list', cause),
-  });
-
-/** Drop a stash by SHA (preferred) or stack ref. */
-export const dropStash = (
-  repoPath: string,
-  ref: string,
-  stackRef?: string,
-): Effect.Effect<void, GitError> =>
-  Effect.tryPromise({
-    try: () => dropStashPromise(repoPath, ref, stackRef),
-    catch: (cause) => toGitError('drop', cause),
-  });
-
-/** Materialise a recovery branch from a stash. Returns the new branch name. */
-export const createRecoveryBranchFromStash = (
-  repoPath: string,
-  stashRef: string,
-  issueId: string,
-  shortDescription: string,
-  stackRef?: string,
-): Effect.Effect<string, GitError> =>
-  Effect.tryPromise({
-    try: () =>
-      createRecoveryBranchFromStashPromise(repoPath, stashRef, issueId, shortDescription, stackRef),
-    catch: (cause) => toGitError('branch', cause),
-  });

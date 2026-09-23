@@ -193,7 +193,8 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
   };
 }
 
-async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promise<WorkAgentLifecycleState> {
+/** Snapshot an agent's lifecycle: running, resumable, restartable, and the recommended action. */
+export async function getWorkAgentLifecycleState(agentOrIssueId: string): Promise<WorkAgentLifecycleState> {
   const agentId = normalizeAgentId(agentOrIssueId);
   const agentState = await Effect.runPromise(getAgentState(agentId));
   const runtimeState = await Effect.runPromise(getAgentRuntimeState(agentId));
@@ -352,11 +353,6 @@ export class WorkAgentLifecycleViolation extends Data.TaggedError('WorkAgentLife
   readonly agentId: string;
   readonly reason: string;
 }> {}
-
-export const getWorkAgentLifecycleState = (
-  agentOrIssueId: string,
-): Effect.Effect<WorkAgentLifecycleState> =>
-  Effect.promise(() => getWorkAgentLifecycleStateSnapshot(agentOrIssueId));
 
 /** Assert the agent can start fresh; lifts the synchronous throw to a typed error. */
 export const assertCanStartFresh = (

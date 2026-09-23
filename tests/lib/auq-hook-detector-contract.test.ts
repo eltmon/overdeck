@@ -7,7 +7,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { Effect } from 'effect'
 import { spawn } from 'node:child_process'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
@@ -132,7 +131,7 @@ describe('AUQ deny hook → detector contract', () => {
       { timestamp: '2026-05-26T01:00:01Z', message: { content: [toolResult('t1', reason!, true)] } },
     ])
 
-    const result = await Effect.runPromise(getPendingQuestions(path))
+    const result = await getPendingQuestions(path)
     expect(result).toHaveLength(1)
     expect(result[0].toolId).toBe('t1')
   })

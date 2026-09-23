@@ -71,7 +71,7 @@ vi.mock('../../../../lib/tmux.js', () => ({
   listPaneValuesSync: () => [],
   sendRawKeystroke: vi.fn(),
   MessageDeliveryFailed: class MessageDeliveryFailed extends Error {},
-  capturePane: vi.fn(() => Effect.succeed('')),
+  capturePane: vi.fn(async () => ''),
   sessionExists: vi.fn(() => Effect.succeed(true)),
   isHarnessProcessAlive: vi.fn(() => Effect.succeed(true)),
   killSession: killSessionMock,

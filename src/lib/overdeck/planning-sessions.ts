@@ -712,11 +712,11 @@ export function restartFromPlan(options: {
           };
         }
 
-        await Effect.runPromise(runGitResetHard({
+        await runGitResetHard({
           workspacePath,
           ref: found.sha,
           reason: `restart-from-plan ${id} (${found.method})`,
-        }));
+        });
         console.log(`[restart-from-plan] Reset branch to planning commit ${found.sha} for ${id}`);
         return { success: true, commit: found.sha, method: found.method };
       } catch (err: any) {

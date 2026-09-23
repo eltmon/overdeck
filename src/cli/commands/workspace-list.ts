@@ -422,10 +422,10 @@ export async function destroyCommand(issueId: string, options: DestroyOptions): 
       const steps: string[] = [];
       const errors: string[] = [];
       for (const target of targets) {
-        const result = await Effect.runPromise(removeWorkspaceFromConfig({
+        const result = await removeWorkspaceFromConfig({
           projectConfig,
           featureName: target.name.replace(/^feature-/, ''),
-        }));
+        });
         steps.push(...result.steps.map((step) => `${target.name}: ${step}`));
         errors.push(...result.errors);
         const branchStep = await deleteBranchBestEffort(projectConfig.path, target.branch);

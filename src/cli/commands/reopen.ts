@@ -577,10 +577,10 @@ export async function resetWorkspaceState(
   }
 
   const resetSpinner = ora('Clearing cached issue state...').start();
-  const result = await Effect.runPromise(reopenWorkspaceState(id, workspacePath, {
+  const result = await reopenWorkspaceState(id, workspacePath, {
     reason: options.reason,
     trackerContext,
-  }));
+  });
   resetSpinner.succeed('Cached issue state cleared');
 
   console.log('');

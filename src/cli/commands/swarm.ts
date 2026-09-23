@@ -896,11 +896,11 @@ async function ensureFeatureWorkspace(issueId: string, project: ResolvedProjectL
     name: project.projectName,
     path: project.projectPath,
   };
-  const result = await Effect.runPromise(createWorkspace({
+  const result = await createWorkspace({
     projectConfig,
     featureName,
     startDocker: false,
-  }));
+  });
   if (!result.success) {
     throw new Error(`Failed to create workspace for ${issueId}: ${result.errors.join('; ') || 'unknown error'}`);
   }

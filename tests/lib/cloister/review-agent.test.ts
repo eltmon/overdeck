@@ -96,7 +96,7 @@ vi.mock('../../../src/lib/tmux.js', async () => {
     killSessionSync: (...args: Parameters<typeof mockKillSessionAsync>) => Effect.promise(() => mockKillSessionAsync(...args)),
     setOption: vi.fn(() => Effect.void),
     isPaneDead: vi.fn(() => Effect.succeed(false)),
-    listPaneValues: vi.fn(() => Effect.succeed([])),
+    listPaneValues: vi.fn(async () => []),
   };
 });
 
