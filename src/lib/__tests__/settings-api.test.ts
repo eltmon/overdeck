@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { ApiSettingsConfig } from '../settings-api.js';
 
@@ -329,7 +328,7 @@ describe('loadSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       roles: {
         ...settings.roles,
@@ -338,7 +337,7 @@ describe('loadSettingsApi', () => {
           harness: null,
         },
       },
-    } as never));
+    } as never);
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).not.toContain('harness: ohmypi');
@@ -433,7 +432,7 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       workhorses: { ...settings.workhorses, mid: 'gpt-5.5-mini' },
       roles: {
@@ -455,7 +454,7 @@ describe('saveSettingsApi', () => {
         rollup_pending_threshold: 6,
         sidebar_refresh_interval_ms: 15000,
       },
-    }));
+    });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('# user comment');
@@ -478,13 +477,13 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       models: {
         ...settings.models,
         provider_harnesses: { openai: 'ohmypi' },
       },
-    }));
+    });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('openai:');
@@ -499,26 +498,26 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       models: {
         ...settings.models,
         provider_harnesses: { openai: '' },
       },
-    }));
+    });
 
     let written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).not.toContain('harness: ohmypi');
     expect(written).not.toContain('harness: ""');
 
     mockWriteFile.mockClear();
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       models: {
         ...settings.models,
         provider_harnesses: {},
       },
-    }));
+    });
 
     written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).not.toContain('harness: ohmypi');
@@ -528,7 +527,7 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       roles: {
         ...settings.roles,
@@ -541,7 +540,7 @@ describe('saveSettingsApi', () => {
           },
         },
       },
-    }));
+    });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('security:');
@@ -563,7 +562,7 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       experimental: {
         ...settings.experimental,
@@ -571,7 +570,7 @@ describe('saveSettingsApi', () => {
         streamdownRenderer: true,
         showHarnessModelPermutations: true,
       },
-    }));
+    });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('experimental:');
@@ -586,7 +585,7 @@ describe('saveSettingsApi', () => {
 
     expect(settings.conversationSearch?.enabled).toBe(false);
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       conversationSearch: {
         enabled: true,
@@ -595,7 +594,7 @@ describe('saveSettingsApi', () => {
         apiKeyRef: 'OPENAI_SEARCH_KEY',
         dbPath: '/tmp/search.db',
       },
-    }));
+    });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('conversationSearch:');
@@ -609,7 +608,7 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       models: {
         ...settings.models,
@@ -622,7 +621,7 @@ describe('saveSettingsApi', () => {
         ...settings.api_keys,
         dashscope: 'dashscope-test-key',
       },
-    }));
+    });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('dashscope: true');
@@ -637,10 +636,10 @@ describe('saveSettingsApi', () => {
 
     expect(settings.agents?.rtk?.enabled).toBe(true);
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       agents: { rtk: { enabled: false } },
-    }));
+    });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('caveman:');
@@ -652,13 +651,13 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await expect(Effect.runPromise(saveSettingsApi({
+    await expect(saveSettingsApi({
       ...settings,
       tts: {
         ...settings.tts,
         daemonHost: '169.254.169.254',
       } as typeof settings.tts,
-    }))).rejects.toThrow('Unknown tts setting(s): daemonHost');
+    })).rejects.toThrow('Unknown tts setting(s): daemonHost');
 
     expect(mockWriteFile).not.toHaveBeenCalled();
   });
@@ -668,7 +667,7 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       tts: {
         ...settings.tts,
@@ -683,7 +682,7 @@ describe('saveSettingsApi', () => {
         utteranceTemplates: { mergeReady: '{issueId} ready' },
         mutedIssues: ['PAN-123'],
       },
-    }));
+    });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('summarizer:');
@@ -698,7 +697,7 @@ describe('saveSettingsApi', () => {
   it('saveDesignLanguage persists a valid ui.theme value (PAN-3410)', async () => {
     const { saveDesignLanguage } = await import('../settings-api.js');
 
-    await Effect.runPromise(saveDesignLanguage('ledger'));
+    await saveDesignLanguage('ledger');
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('ui:');
@@ -719,10 +718,10 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       ui: { theme: 'broadsheet' },
-    }));
+    });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('theme: ledger');
@@ -735,7 +734,7 @@ describe('saveSettingsApi', () => {
     }));
     const { saveDesignLanguage } = await import('../settings-api.js');
 
-    await Effect.runPromise(saveDesignLanguage('broadsheet'));
+    await saveDesignLanguage('broadsheet');
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('open_in_editor_command: cursor {path}');
@@ -755,7 +754,7 @@ describe('saveSettingsApi', () => {
     }));
     const { saveDesignLanguage } = await import('../settings-api.js');
 
-    await Effect.runPromise(saveDesignLanguage('ledger'));
+    await saveDesignLanguage('ledger');
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('mid: gpt-5.5');
@@ -791,8 +790,8 @@ describe('saveSettingsApi', () => {
     const settings = loadSettingsApi();
 
     await Promise.all([
-      Effect.runPromise(saveSettingsApi({ ...settings, workhorses: { ...settings.workhorses, mid: 'gpt-5.5' } })),
-      Effect.runPromise(saveDesignLanguage('ledger')),
+      saveSettingsApi({ ...settings, workhorses: { ...settings.workhorses, mid: 'gpt-5.5' } }),
+      saveDesignLanguage('ledger'),
     ]);
 
     expect(state.workhorses.mid).toBe('gpt-5.5');
@@ -818,13 +817,13 @@ describe('saveSettingsApi', () => {
 
     expect(settings.conversations?.handoff_author_model).toBe('claude-sonnet-4-6');
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       models: {
         ...settings.models,
         providers: { ...settings.models.providers, openai: true },
       },
-    }));
+    });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('handoff_author_model: claude-sonnet-4-6');
@@ -852,13 +851,13 @@ describe('saveSettingsApi', () => {
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
-    await Effect.runPromise(saveSettingsApi({
+    await saveSettingsApi({
       ...settings,
       models: {
         ...settings.models,
         providers: { ...settings.models.providers, openai: true },
       },
-    }));
+    });
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('future_swarm_key: keep-me');

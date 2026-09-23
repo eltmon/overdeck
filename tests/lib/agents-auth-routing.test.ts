@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -46,7 +45,6 @@ vi.mock('../../src/lib/openai-auth.js', () => ({
 vi.mock('../../src/lib/cliproxy.js', () => ({
   CLIPROXY_BASE_URL: 'http://127.0.0.1:8317',
   bridgeGeminiAuthToCliproxy: (...args: Parameters<typeof mockBridgeGeminiAuth>) => mockBridgeGeminiAuth(...args),
-  bridgeGeminiAuthToCliproxyProgram: (...args: Parameters<typeof mockBridgeGeminiAuth>) => Effect.promise(() => mockBridgeGeminiAuth(...args)),
   getCliproxyClientEnv: () => ({
     ANTHROPIC_BASE_URL: 'http://127.0.0.1:8317',
     ANTHROPIC_AUTH_TOKEN: 'overdeck-local-cliproxy-key',

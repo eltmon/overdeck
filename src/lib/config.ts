@@ -7,7 +7,6 @@ import { parse, stringify } from '@iarna/toml';
 import { CONFIG_FILE } from './paths.js';
 import { loadConfigSync as loadYamlConfigSync } from './config-yaml.js';
 import type { TrackerType } from './tracker/interface.js';
-import { FsError } from './errors.js';
 
 // Individual tracker configuration
 export interface LinearConfig {
@@ -353,7 +352,8 @@ export function saveConfigSync(config: OverdeckConfig): void {
   writeFileSync(CONFIG_FILE, content, 'utf8');
 }
 
-async function loadConfigFromFile(): Promise<OverdeckConfig> {
+/** Load config.toml (async; dashboard-safe). */
+export async function loadConfig(): Promise<OverdeckConfig> {
   let config: OverdeckConfig;
 
   try {
@@ -510,36 +510,17 @@ export function getConversationsConfigSync(): ConversationsConfig {
   return resolveConversationsConfig(loadConfigSync());
 }
 
-async function readConversationsConfig(): Promise<ConversationsConfig> {
-  return resolveConversationsConfig(await loadConfigFromFile());
+/** Resolve the conversations sub-config from config.toml (async). */
+export async function getConversationsConfig(): Promise<ConversationsConfig> {
+  return resolveConversationsConfig(await loadConfig());
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Both sync and async config IO surfaces get Effect variants. The async paths
-// (preferred in dashboard-reachable code) wrap the existing Promise functions
-// via Effect.tryPromise; the sync paths route through Effect.try.
-
-/** Load config.toml (async; dashboard-safe). */
-export const loadConfig = (): Effect.Effect<OverdeckConfig, FsError> =>
-  Effect.tryPromise({
-    try: () => loadConfigFromFile(),
-    catch: (cause) =>
-      new FsError({ path: CONFIG_FILE, operation: 'load-config-async', cause }),
-  });
+// Config IO is plain async (`loadConfig`, `getConversationsConfig`; preferred in
+// dashboard-reachable code) or sync (`…Sync`); callers inside an Effect bridge
+// with Effect.promise/tryPromise (PAN-3958). Only the pure getter below keeps
+// an Effect variant.
 
 /** Compute the dashboard's external API URL. Pure (reads env). */
 export const getDashboardApiUrl = (): Effect.Effect<string> =>
   Effect.sync(() => getDashboardApiUrlSync());
-
-/** Resolve conversations sub-config (async). */
-export const getConversationsConfig =
-  (): Effect.Effect<ConversationsConfig, FsError> =>
-    Effect.tryPromise({
-      try: () => readConversationsConfig(),
-      catch: (cause) =>
-        new FsError({
-          path: CONFIG_FILE,
-          operation: 'get-conversations-config-async',
-          cause,
-        }),
-    });

@@ -1,6 +1,5 @@
 import { open, stat } from 'fs/promises';
 import type { MemoryIdentity } from '@overdeck/contracts';
-import { Effect } from 'effect';
 import { getTranscriptCheckpoint } from './checkpoint-client.js';
 import type { TranscriptCheckpoint } from './checkpoints.js';
 import { extractFromTranscriptDelta, type ExtractFromTranscriptDeltaInput, type ExtractFromTranscriptDeltaResult } from './pipeline.js';
@@ -75,7 +74,7 @@ export class TranscriptPoller {
     this.getActiveEntries = options.getActiveTranscriptEntries ?? getActiveTranscriptEntries;
     this.statTranscript = options.statTranscript ?? stat;
     this.readTranscriptSlice = options.readTranscriptSlice ?? readTranscriptSlice;
-    this.getCheckpoint = options.getTranscriptCheckpoint ?? ((sessionId) => Effect.runPromise(getTranscriptCheckpoint(sessionId)));
+    this.getCheckpoint = options.getTranscriptCheckpoint ?? ((sessionId) => getTranscriptCheckpoint(sessionId));
     this.enqueueDelta = options.enqueueTranscriptDelta ?? options.extractFromTranscriptDelta ?? ((input) => { enqueueMemoryPipelineJob(input); });
     this.areObservationsEnabled = options.areObservationsEnabled ?? areMemoryObservationsEnabled;
   }

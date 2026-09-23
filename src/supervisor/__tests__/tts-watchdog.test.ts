@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readTtsWatchdogConfig, TtsWatchdog } from '../tts-watchdog.js';
 import type { NormalizedTtsDaemonConfig } from '../../lib/config-yaml.js';
@@ -25,12 +24,9 @@ const mocks = vi.hoisted(() => ({
   startDaemon: vi.fn(),
 }));
 
-vi.mock('../../lib/config-yaml.js', async () => {
-  const { Effect: EffectHoisted } = await import('effect');
-  return {
-    loadConfigNoMigration: () => EffectHoisted.succeed({ config: { tts: mocks.ttsConfig } }),
-  };
-});
+vi.mock('../../lib/config-yaml.js', () => ({
+  loadConfigNoMigration: async () => ({ config: { tts: mocks.ttsConfig } }),
+}));
 
 vi.mock('../../lib/tts-daemon.js', () => ({
   getTtsDaemonStatus: mocks.getStatus,

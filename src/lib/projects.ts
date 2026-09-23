@@ -1136,27 +1136,26 @@ export async function listProjectsAsync(): Promise<Array<{ key: string; config: 
  * Rename a project's display name by registration key or exact display name.
  * Loads and persists the registry once so long-lived callers avoid sync I/O.
  */
-export const renameProject = (
+export async function renameProject(
   projectIdentifier: string,
   newName: string,
-): Effect.Effect<
-  { key: string; name: string },
-  ProjectRenameError | ConfigParseError | FsError
-> => Effect.tryPromise({
-  try: () => updateProjectsConfigAsync(config => {
-    const plan = prepareProjectRename(config, projectIdentifier, newName);
-    if (plan instanceof ProjectRenameError) throw plan;
-    return {
-      config: plan.config,
-      result: { key: plan.key, name: plan.name },
-      changed: plan.changed,
-    };
-  }),
-  catch: cause => {
-    if (cause instanceof ProjectRenameError || cause instanceof ConfigParseError) return cause;
-    return new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'renameProject', cause });
-  },
-});
+): Promise<{ key: string; name: string }> {
+  try {
+    return await updateProjectsConfigAsync(config => {
+      const plan = prepareProjectRename(config, projectIdentifier, newName);
+      if (plan instanceof ProjectRenameError) throw plan;
+      return {
+        config: plan.config,
+        result: { key: plan.key, name: plan.name },
+        changed: plan.changed,
+      };
+    });
+  } catch (cause) {
+    // Rejects only with ProjectRenameError, ConfigParseError or FsError.
+    if (cause instanceof ProjectRenameError || cause instanceof ConfigParseError) throw cause;
+    throw new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'renameProject', cause });
+  }
+}
 
 /** Effect variant of {@link resolveProjectFromIssueSync}. */
 export const resolveProjectFromIssue = (

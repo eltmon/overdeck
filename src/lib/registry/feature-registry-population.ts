@@ -1,5 +1,5 @@
 import { basename } from 'node:path';
-import { Effect, Result, Schema } from 'effect';
+import { Result, Schema } from 'effect';
 import type { FeatureRegistryEntry, FeatureRegistryStatus, FeatureRegistryOwnershipUpdate, MemoryIdentity } from '@overdeck/contracts';
 import { loadConfigNoMigration, type NormalizedFeatureRegistryConfig } from '../config-yaml.js';
 import { extractWithProviderPolicy, type MemoryExtractionPolicyResult } from '../memory/providers/index.js';
@@ -81,7 +81,7 @@ export interface ApplyIssueFeatureClassificationDeps {
 }
 
 export async function classifyIssueFeatures(input: IssueFeatureClassificationInput): Promise<IssueFeatureClassificationResult> {
-  const config = input.config ?? (await Effect.runPromise(loadConfigNoMigration())).config.registry.classification;
+  const config = input.config ?? (await loadConfigNoMigration()).config.registry.classification;
   if (!config.enabled) return { status: 'disabled', features: [] };
 
   const classify = input.classify ?? ((prompt, jsonSchema, options) => extractWithProviderPolicy(prompt, jsonSchema, {

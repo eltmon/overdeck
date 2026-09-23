@@ -241,7 +241,8 @@ export interface XBriefTransitionResult {
   moved: boolean;
 }
 
-async function transitionXBriefOnMainPromise(
+/** Move an issue's xBRIEF to `targetDir` with `newStatus` and commit the move on main. */
+export async function transitionXBriefOnMain(
   projectRoot: string,
   issueId: string,
   targetDir: XBriefLifecycleDir,
@@ -401,17 +402,4 @@ export const findXBriefByIssue = (
   Effect.try({
     try: () => findXBriefByIssueSync(projectRoot, issueId),
     catch: (cause) => new FsError({ path: projectRoot, operation: 'findXBriefByIssue', cause }),
-  });
-
-/** Effect variant of `transitionXBriefOnMain`. */
-export const transitionXBriefOnMain = (
-  projectRoot: string,
-  issueId: string,
-  targetDir: XBriefLifecycleDir,
-  newStatus: string,
-  commitMessage: string,
-): Effect.Effect<XBriefTransitionResult, FsError> =>
-  Effect.tryPromise({
-    try: () => transitionXBriefOnMainPromise(projectRoot, issueId, targetDir, newStatus, commitMessage),
-    catch: (cause) => new FsError({ path: projectRoot, operation: 'transitionXBriefOnMain', cause }),
   });

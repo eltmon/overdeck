@@ -867,7 +867,7 @@ const putSettingsRoute = HttpRouter.add(
         if (!validation.valid) {
           return jsonResponse({ error: validation.errors.join('; ') }, { status: 400 });
         }
-        await Effect.runPromise(saveSettingsApi(newSettings));
+        await saveSettingsApi(newSettings);
         await refreshTtsRuntimeConfig();
         await syncTtsPlaybackWithConfig();
         await syncConversationSearchWatcher();
@@ -928,7 +928,7 @@ const putDesignLanguageRoute = HttpRouter.add(
       if (theme !== 'ledger' && theme !== 'broadsheet') {
         return jsonResponse({ error: "theme must be 'ledger' or 'broadsheet'" }, { status: 400 });
       }
-      await Effect.runPromise(saveDesignLanguage(theme));
+      await saveDesignLanguage(theme);
       return jsonResponse({ success: true });
     });
   })),
@@ -963,7 +963,7 @@ const putOpenRouterFavoritesRoute = HttpRouter.add(
     const modelIds = favorites.filter((f): f is string => typeof f === 'string');
     return yield* Effect.promise(async () => {
       try {
-        await Effect.runPromise(saveOpenRouterFavorites(modelIds));
+        await saveOpenRouterFavorites(modelIds);
         return jsonResponse({ success: true, favorites: modelIds });
       } catch (err) {
         throw new Error(err instanceof Error ? err.message : String(err));
@@ -987,7 +987,7 @@ const putOpenRouterApiKeyRoute = HttpRouter.add(
 
     return yield* Effect.promise(async () => {
       try {
-        const settings = await Effect.runPromise(updateProviderApiKey('openrouter', apiKey?.trim() || undefined));
+        const settings = await updateProviderApiKey('openrouter', apiKey?.trim() || undefined);
         return jsonResponse({
           success: true,
           apiKey: settings.api_keys.openrouter,

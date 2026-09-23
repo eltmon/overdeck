@@ -157,7 +157,7 @@ async function isLinearIssueClosed(issueId: string): Promise<boolean> {
 export async function isIssueClosed(issueId: string, closedIssueIds?: Set<string>): Promise<boolean> {
   if (closedIssueIds) return closedIssueIds.has(issueId);
 
-  const shadowState = await Effect.runPromise(getShadowState(issueId).pipe(Effect.catch(() => Effect.succeed(null))));
+  const shadowState = await getShadowState(issueId).catch(() => null);
   return shadowState?.trackerStatus === 'closed'
     || shadowState?.shadowStatus === 'closed'
     || shadowState?.targetCanonicalState === 'done'

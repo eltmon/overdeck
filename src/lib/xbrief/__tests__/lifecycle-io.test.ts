@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { execSync } from 'child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
@@ -296,13 +295,13 @@ describe('transitionXBriefOnMain', () => {
     execSync('git add vbrief/', { cwd: TEST_DIR });
     execSync('git -c commit.gpgsign=false commit -q -m "add proposed"', { cwd: TEST_DIR });
 
-    const result = await Effect.runPromise(transitionXBriefOnMain(
+    const result = await transitionXBriefOnMain(
       TEST_DIR,
       'PAN-1',
       'active',
       'approved',
       'scope: approve PAN-1 xBRIEF',
-    ));
+    );
 
     expect(result.fromDir).toBe('proposed');
     expect(result.toDir).toBe('active');
@@ -334,13 +333,13 @@ describe('transitionXBriefOnMain', () => {
     execSync('git add .pan/specs/', { cwd: TEST_DIR });
     execSync('git -c commit.gpgsign=false commit -q -m "seed pan spec"', { cwd: TEST_DIR });
 
-    const result = await Effect.runPromise(transitionXBriefOnMain(
+    const result = await transitionXBriefOnMain(
       TEST_DIR,
       'PAN-1',
       'active',
       'approved',
       'scope: approve PAN-1 xBRIEF',
-    ));
+    );
 
     expect(result.moved).toBe(false);
     expect(result.statusUpdated).toBe(false);
@@ -363,13 +362,13 @@ describe('transitionXBriefOnMain', () => {
     execSync('git add vbrief/', { cwd: TEST_DIR });
     execSync('git -c commit.gpgsign=false commit -q -m "seed active proposed"', { cwd: TEST_DIR });
 
-    const result = await Effect.runPromise(transitionXBriefOnMain(
+    const result = await transitionXBriefOnMain(
       TEST_DIR,
       'PAN-1',
       'active',
       'approved',
       'scope: approve PAN-1 xBRIEF',
-    ));
+    );
 
     expect(result.moved).toBe(false);
     expect(result.statusUpdated).toBe(true);
@@ -391,13 +390,13 @@ describe('transitionXBriefOnMain', () => {
     execSync('git add vbrief/', { cwd: TEST_DIR });
     execSync('git -c commit.gpgsign=false commit -q -m "seed"', { cwd: TEST_DIR });
 
-    const result = await Effect.runPromise(transitionXBriefOnMain(
+    const result = await transitionXBriefOnMain(
       TEST_DIR,
       'PAN-1',
       'active',
       'approved',
       'scope: approve PAN-1 xBRIEF',
-    ));
+    );
 
     expect(result.moved).toBe(true);
     expect(result.statusUpdated).toBe(true);
@@ -407,9 +406,7 @@ describe('transitionXBriefOnMain', () => {
   it('throws when no xBRIEF exists for the issue', async () => {
     initGitRepo(TEST_DIR);
     ensureXBriefDirsSync(TEST_DIR);
-    await expect(Effect.runPromise(
-      transitionXBriefOnMain(TEST_DIR, 'PAN-999', 'active', 'approved', 'scope: approve PAN-999 xBRIEF'),
-    )).rejects.toThrow();
+    await expect(transitionXBriefOnMain(TEST_DIR, 'PAN-999', 'active', 'approved', 'scope: approve PAN-999 xBRIEF')).rejects.toThrow();
   });
 
   it('does NOT commit when projectRoot is not on main', async () => {
@@ -425,13 +422,13 @@ describe('transitionXBriefOnMain', () => {
     execSync('git -c commit.gpgsign=false commit -q -m "seed proposed"', { cwd: TEST_DIR });
     execSync('git checkout -q -b feature/test', { cwd: TEST_DIR });
 
-    const result = await Effect.runPromise(transitionXBriefOnMain(
+    const result = await transitionXBriefOnMain(
       TEST_DIR,
       'PAN-1',
       'active',
       'approved',
       'scope: approve PAN-1 xBRIEF',
-    ));
+    );
 
     // The on-disk move + status update happens regardless of branch.
     expect(result.moved).toBe(true);

@@ -15,7 +15,6 @@
 import { existsSync } from 'fs';
 import { access, readFile, readdir } from 'node:fs/promises';
 import { join } from 'path';
-import { Effect } from 'effect';
 import {
   PROJECT_DOCS_SUBDIR,
   PROJECT_PRDS_SUBDIR,
@@ -118,7 +117,8 @@ export function findDraftPrdSync(projectPath: string, issueId: string): PrdLocat
   return null;
 }
 
-export async function findDraftPrdAsync(projectPath: string, issueId: string): Promise<PrdLocation | null> {
+/** Find an issue's draft PRD under the project's `.pan/drafts/`, or null. */
+export async function findDraftPrd(projectPath: string, issueId: string): Promise<PrdLocation | null> {
   for (const candidate of draftPrdCandidates(projectPath, issueId)) {
     try {
       await access(candidate.path);
@@ -144,15 +144,3 @@ export function findPrdAnywhereSync(
   }
   return findDraftPrdSync(projectPath, issueId)
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// Path-only helpers stay synchronous. Draft discovery uses the promise-based
-// filesystem door so resource refreshes never block the dashboard event loop.
-
-/** Async Effect variant of {@link findDraftPrdAsync}. */
-export const findDraftPrd = (
-  projectPath: string,
-  issueId: string,
-): Effect.Effect<PrdLocation | null, never> =>
-  Effect.promise(() => findDraftPrdAsync(projectPath, issueId));

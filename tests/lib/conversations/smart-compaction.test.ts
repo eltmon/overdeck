@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Effect } from 'effect';
 import * as smartCompaction from '../../../src/lib/conversations/smart-compaction.js';
 
 const { generateSummaryFromPrompt, truncateHeadTail } = smartCompaction;
@@ -40,8 +39,8 @@ describe('generateSummaryFromPrompt', () => {
 
   it('truncates head+tail and retries once on context overflow', async () => {
     runModelSummarySpy
-      .mockImplementationOnce(() => Effect.fail(OVERFLOW_ERROR))
-      .mockImplementationOnce(() => Effect.succeed('degraded summary'));
+      .mockImplementationOnce(() => Promise.reject(OVERFLOW_ERROR))
+      .mockImplementationOnce(async () => 'degraded summary');
 
     const serialized = 'x'.repeat(500_000);
     const previousSummary = 'prev'.repeat(10_000);
@@ -60,7 +59,7 @@ describe('generateSummaryFromPrompt', () => {
   });
 
   it('rejects when the truncated retry also overflows', async () => {
-    runModelSummarySpy.mockImplementation(() => Effect.fail(OVERFLOW_ERROR),
+    runModelSummarySpy.mockImplementation(() => Promise.reject(OVERFLOW_ERROR),
     );
 
     await expect(
@@ -70,7 +69,7 @@ describe('generateSummaryFromPrompt', () => {
   });
 
   it('returns the first successful summary and does not retry', async () => {
-    runModelSummarySpy.mockImplementation(() => Effect.succeed('full summary'));
+    runModelSummarySpy.mockImplementation(async () => 'full summary');
 
     const result = await generateSummaryFromPrompt('small transcript', undefined, undefined, false);
 
@@ -79,7 +78,7 @@ describe('generateSummaryFromPrompt', () => {
   });
 
   it('does not retry on non-overflow errors', async () => {
-    runModelSummarySpy.mockImplementationOnce(() => Effect.fail(new Error('ENOENT: no such file')));
+    runModelSummarySpy.mockImplementationOnce(() => Promise.reject(new Error('ENOENT: no such file')));
 
     await expect(
       generateSummaryFromPrompt('small transcript', undefined, undefined, false),

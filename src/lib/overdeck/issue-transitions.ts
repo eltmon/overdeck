@@ -199,13 +199,13 @@ export async function runDestructiveIssueLifecycle(
   if (mode === 'cancel') {
     try {
       const { transitionXBriefOnMain } = await import('../xbrief/lifecycle-io.js');
-      const tx = await Effect.runPromise(transitionXBriefOnMain(
+      const tx = await transitionXBriefOnMain(
         ctx.projectPath,
         id,
         'cancelled',
         'cancelled',
         `scope: cancel ${id.toUpperCase()} xBRIEF`,
-      ));
+      );
       if (tx.moved) cleanupLog.push(`xBRIEF moved ${tx.fromDir} → cancelled`);
       if (tx.committed) cleanupLog.push(`Committed xBRIEF cancellation on main`);
     } catch (err: any) {
@@ -639,14 +639,23 @@ export function moveIssueStatus(options: {
       );
     }
 
-    const { updateShadowState } = yield* Effect.promise(() => import('../shadow-state.js'));
+    const { updateShadowState, ShadowStateError } = yield* Effect.promise(() => import('../shadow-state.js'));
 
     const canonicalToIssueState: Record<string, 'open' | 'in_progress' | 'closed'> = {
       backlog: 'open', todo: 'open', in_progress: 'in_progress', in_review: 'in_progress', done: 'closed',
     };
     const issueState = canonicalToIssueState[targetStatus];
 
-    const shadowResult = yield* updateShadowState(id, issueState, 'dashboard-drag-drop', targetStatus);
+    const shadowResult = yield* Effect.tryPromise({
+      try: () => updateShadowState(id, issueState, 'dashboard-drag-drop', targetStatus),
+      catch: (cause) =>
+        new ShadowStateError({
+          operation: 'updateShadowState',
+          issueId: id,
+          message: cause instanceof Error ? cause.message : String(cause),
+          cause,
+        }),
+    });
 
     const issueDataService = getIssueDataService();
     // Refresh the in-memory shadow-state cache so subsequent getIssues() calls

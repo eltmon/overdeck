@@ -8,8 +8,8 @@ vi.mock('../../../lib/agents.js', () => ({
   getAgentDir: vi.fn(() => '/tmp/nonexistent'),
 }))
 vi.mock('../../../lib/shadow-state.js', () => ({
-  isShadowed: vi.fn(() => Effect.succeed(false)),
-  getShadowState: vi.fn(() => Effect.succeed(null)),
+  isShadowed: vi.fn(async () => false),
+  getShadowState: vi.fn(async () => null),
 }))
 vi.mock('../../../lib/tldr-daemon.js', () => ({
   getTldrMetrics: vi.fn(() => ({ interceptions: 0, bypasses: 0, estimatedTokensSaved: 0 })),

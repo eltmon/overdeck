@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockGetTrackerContext, mockReopenWorkspaceState, mockSpinnerSucceed } = vi.hoisted(() => ({
@@ -29,9 +28,9 @@ describe('resetWorkspaceState', () => {
     mockSpinnerSucceed.mockReset();
     mockGetTrackerContext.mockReset();
     mockGetTrackerContext.mockResolvedValue('tracker context');
-    mockReopenWorkspaceState.mockReturnValue(Effect.succeed({
+    mockReopenWorkspaceState.mockResolvedValue({
       continueFileUpdated: false,
-    }));
+    });
   });
 
   it('clears cached issue state when no local feature workspace exists', async () => {

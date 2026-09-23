@@ -801,3 +801,121 @@ All paths are relative to `src/lib/`.
 None are deleted, and the diff adds and removes no `it()`/`test()` calls. Tests await the functions, and mocks return
 Promises. That includes `(fn as unknown as Mock).mockReturnValue(Effect.succeed(…))` casts and arrow-forwarded mock keys
 (`getPullRequestState: (...a) => mocks.getPullRequestState(...a)`). Tests of the exported bodies now import the plain names.
+
+## CH-5: Promise-native cluster K3b (#4011)
+
+Every Shape A façade in cluster K3b is gone, leaving only the Oh My Pi row (`runtimes/ohmypi-fifo.ts`, #4003). The issue
+counts 37 façades; the ratchet had 41 rows in 16 modules, and the four extra are this cluster's CH-1b "kept although dead"
+rows (`getShadowModeSummary`, `updateTrackerStatusCache`, `markAsSynced`, `getDisplayStatus`). Each name survives as an
+exported function returning a Promise. Callers moved per PRD D2, and every call site that recovered from or reported a
+typed failure keeps that mapping. Evidence: `node scripts/audit-effect-boundary.mjs --json --usage`, `tsc --noEmit` on the
+root, dashboard and frontend projects, and the touched and adjacent test files.
+
+Ratchet: A 42 → 1 (only the Oh My Pi row remains), B 38 unchanged, C 48 → 52. The C rows rise by hand as PRD W6 step 3
+predicts: `loadConfig` and `getConversationsConfig` in `config.ts` (C 0 → 2), `findDraftPrd` in `prd-locations.ts` (C 0 → 1)
+and `renameProject` in `projects.ts` (C 4 → 5). Across A, B and C the total drops from 128 to 91. Effect diagnostics: 264 → 254.
+
+### Shape A façades (41) → Promise functions
+
+| Module | Name | Body formerly | Note |
+| --- | --- | --- | --- |
+| `config-yaml/load.ts` | `loadConfigNoMigration` | `loadConfigWithoutMigration` | the genuine Effect `getConversationsConfig` in the same module now bridges it with a two-argument `Effect.tryPromise` that keeps `ConfigError` |
+| `config.ts` | `getConversationsConfig` | `readConversationsConfig` | no production caller: the six route callers and four ws-rpc callers use the genuine Effect `getConversationsConfig` in `config-yaml/load.ts` (the audit counted them by name). With `getConversationsConfigSync`, now a Shape C pair; a CH-8 dead-export candidate |
+| `config.ts` | `loadConfig` | `loadConfigFromFile` | with `loadConfigSync`, now a Shape C pair (CH-6) |
+| `conversations/enrichment/enrich-session.ts` | `enrichSession` | `enrichSessionPromise` |  |
+| `conversations/smart-compaction.ts` | `generateSmartSummary` | `generateSmartSummaryPromise` |  |
+| `conversations/smart-compaction.ts` | `runModelSummary` | `runModelSummaryPromise` | in-module callers still go through `self.runModelSummary` (the `import * as self` seam tests spy on) |
+| `conversations/summary-fork.ts` | `copySessionFromCompactBoundary` | `copySessionFromCompactBoundaryPromise` |  |
+| `conversations/summary-fork.ts` | `generateFallbackSummary` | `generateFallbackSummaryPromise` |  |
+| `conversations/summary-fork.ts` | `reserveSummaryForkSession` | `reserveSummaryForkSessionPromise` |  |
+| `costs/reconciler.ts` | `reconcile` | `reconcilePromise` |  |
+| `costs/sync-wal.ts` | `syncWalFromAllProjects` | `syncWalFromAllProjectsPromise` |  |
+| `memory/checkpoint-client.ts` | `claimTranscriptRange` | `postWorkerRequest` | body is the shared `postWorkerRequest`; a private `request()` keeps the façade's `toError` mapping |
+| `memory/checkpoint-client.ts` | `commitTranscriptRange` | `postWorkerRequest` | same `request()` path |
+| `memory/checkpoint-client.ts` | `getTranscriptCheckpoint` | `postWorkerRequest` | same `request()` path |
+| `memory/checkpoint-client.ts` | `listTranscriptCheckpoints` | `postWorkerRequest` | same `request()` path |
+| `memory/checkpoint-client.ts` | `releaseTranscriptRange` | `postWorkerRequest` | same `request()` path |
+| `prd-draft.ts` | `hasPRDDraft` | `hasPRDDraftPromise` | the body was a non-async function returning a Promise |
+| `prd-locations.ts` | `findDraftPrd` | `findDraftPrdAsync` | the exported body `findDraftPrdAsync` is retired; with `findDraftPrdSync`, now a Shape C pair (CH-6) |
+| `projects.ts` | `renameProject` | `updateProjectsConfigAsync` | body is the shared `updateProjectsConfigAsync` (atomic `projects.yaml` write, unchanged); the function keeps the façade's error mapping (rejects only with `ProjectRenameError`, `ConfigParseError` or `FsError`). With `renameProjectSync`, now a Shape C pair (CH-6) |
+| `review-artifacts.ts` | `buildRichReviewArtifactBody` | `buildRichReviewArtifactBodyPromise` |  |
+| `review-artifacts.ts` | `createReviewArtifactsForIssue` | `createReviewArtifactsForIssuePromise` |  |
+| `settings-api.ts` | `saveDesignLanguage` | `saveDesignLanguagePromise` | the body still runs through `runSettingsWriteSerialized` |
+| `settings-api.ts` | `saveOpenRouterFavorites` | `saveOpenRouterFavoritesPromise` |  |
+| `settings-api.ts` | `saveSettingsApi` | `saveSettingsApiPromise` | the body still runs through `runSettingsWriteSerialized` (write queue unchanged) |
+| `settings-api.ts` | `updateProviderApiKey` | `updateProviderApiKeyPromise` |  |
+| `settings-api.ts` | `updateSettingsApi` | `updateSettingsApiPromise` |  |
+| `shadow-mode.ts` | `getShadowModeSummary` | `getShadowModeSummaryPromise` | CH-1b row: still test-only (CH-8 candidate) |
+| `shadow-mode.ts` | `isShadowModeEnabled` | `isShadowModeEnabledPromise` |  |
+| `shadow-mode.ts` | `resolveShadowMode` | `resolveShadowModePromise` |  |
+| `shadow-mode.ts` | `shouldSkipTrackerUpdate` | `shouldSkipTrackerUpdatePromise` |  |
+| `shadow-state.ts` | `createShadowState` | `createShadowStatePromise` |  |
+| `shadow-state.ts` | `getDisplayStatus` | `getDisplayStatusPromise` | CH-1b row: still test-only (CH-8 candidate) |
+| `shadow-state.ts` | `getPendingSyncCount` | `getPendingSyncCountPromise` |  |
+| `shadow-state.ts` | `getShadowState` | `getShadowStatePromise` |  |
+| `shadow-state.ts` | `isShadowed` | `isShadowedPromise` |  |
+| `shadow-state.ts` | `listShadowedIssues` | `listShadowedIssuesPromise` |  |
+| `shadow-state.ts` | `markAsSynced` | `markAsSyncedPromise` | CH-1b row: still test-only (CH-8 candidate) |
+| `shadow-state.ts` | `needsSync` | `needsSyncPromise` |  |
+| `shadow-state.ts` | `updateShadowState` | `updateShadowStatePromise` |  |
+| `shadow-state.ts` | `updateTrackerStatusCache` | `updateTrackerStatusCachePromise` | CH-1b row: still test-only (CH-8 candidate) |
+| `xbrief/lifecycle-io.ts` | `transitionXBriefOnMain` | `transitionXBriefOnMainPromise` |  |
+
+All paths are relative to `src/lib/`.
+
+### Laziness, writes, queues
+
+- **No eager work at module load.** No converted function is called at the top level of any module (the audit's `top`
+  column is 0 for every row). Every call site that is not immediately awaited is either a lazy arrow
+  (`() => reconcileClaudeTranscripts()`, the memory pipeline's `?? ((…) => claimTranscriptRange(…))` defaults) or a
+  genuine Effect with the same name in `config-yaml/load.ts`.
+- **Writes.** `renameProject` still writes `projects.yaml` through `updateProjectsConfigAsync`. `saveSettingsApi` and
+  `saveDesignLanguage` still go through `runSettingsWriteSerialized`. No function body changed, so atomicity and ordering are
+  unchanged.
+- **Typed recoveries kept.** `POST /api/projects/:projectKey/rename` still maps `ProjectRenameError` to 404/400/409 (the route bridges with
+  a two-argument `Effect.tryPromise`). The drag-drop shadow update in `issue-transitions.ts` keeps its `ShadowStateError`.
+  `issue-closed` keeps its `null` fallback. The orphan-dashboard reaper keeps its `3011` fallback. The start route keeps its
+  non-fatal xBRIEF transition logging.
+
+### Also deleted because only deleted code used them
+
+| Name | Where |
+| --- | --- |
+| `ReviewArtifactError` | `review-artifacts.ts` |
+| `SettingsApiError` | `settings-api.ts` |
+| `ShadowModeError` | `shadow-mode.ts` |
+| private `wrapConfigErr` | `prd-draft.ts` |
+
+### Behaviour notes for reviewers
+
+- Rejections carry the underlying error instead of the façade's wrapper (`FsError`, `ConfigError`, `ShadowStateError`, …).
+  No caller inspected those wrappers except the sites listed above, which keep their mapping.
+- One log line changed: the start route's "xBRIEF running transition failed (non-fatal)" warning now prints the underlying
+  message instead of `FsError`'s "transitionXBriefOnMain failed for <root>: …" text.
+- Several façades mapped rejections to an `FsError` whose message is "<operation> failed for <path>: <cause>"
+  (`generateFallbackSummary`, `reserveSummaryForkSession`, `copySessionFromCompactBoundary`, `generateSmartSummary`,
+  `reconcile`, `loadConfig`). On the rare filesystem failure that reaches a 500 body (conversation compaction, the handoff
+  and fork routes, the cost reconcile route), the body now shows the underlying cause without that prefix. Status codes are
+  unchanged, and no body falls back to Effect's generic "An error occurred in Effect.tryPromise".
+
+### Tests
+
+None are deleted, and the diff adds and removes no `it()`/`test()` calls. Tests await the functions, and mocks return
+Promises, including `vi.spyOn(smartCompaction, 'runModelSummary')` chains and the TTS watchdog's config mock. Mocks of
+same-named genuine Effects (`config-yaml` `loadConfig` / `getConversationsConfig`, `CostWriter.reconcile`) are left alone.
+
+Review follow-up, a sweep of every test file for mocks of a CH-2..CH-5 converted name that still return an Effect (`await`
+on an Effect yields the Effect object, so such a test passes by accident or tests nothing; typecheck skips test files):
+
+- `conversations-fork-pipeline.test.ts`: the three `generateFallbackSummary` mocks now resolve or reject. The
+  "heuristic fallback also fails" test now asserts the rejection is logged and `prependFallbackFocus` gets the `''` seed
+  (it fails if the mock returns `Effect.fail` again).
+- `reopen-reset.test.ts`: the `reopenWorkspaceState` mock (CH-3) resolves instead of returning `Effect.succeed`.
+- `agents-auth-routing.test.ts`: dropped a stale `bridgeGeminiAuthToCliproxyProgram` mock entry; no such export exists.
+
+No other hit: the remaining `Effect.*` mocks in test files target functions that are still Effects.
+
+### CH-4 follow-up
+
+The `cliproxy.ts` docs for `installCliproxy`, `stopCliproxy` and `restartCliproxy` get back the detail the deleted façade docs
+carried (download + unpack from GitHub releases; best-effort SIGTERM via the pidfile; stop, wait 500ms, start).

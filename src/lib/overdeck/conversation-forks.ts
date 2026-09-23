@@ -437,7 +437,7 @@ export async function runForkPipeline(
     if (!reusableSession) {
       const forkSessionFile = resolvePlainForkTargetSessionFile(conv);
       if (!forkSessionFile) throw new Error(`Fork conversation ${convName} has no session file`);
-      await Effect.runPromise(copySessionFromCompactBoundary(parentSessionFile, forkSessionFile));
+      await copySessionFromCompactBoundary(parentSessionFile, forkSessionFile);
     }
     updateForkStatus(convName, 'spawning');
     await ensureForkSessionReady(conv, sessionId, true, true);
@@ -452,7 +452,7 @@ export async function runForkPipeline(
   const buildSummary = async (): Promise<string> => {
     if (localSummaryOnly) {
       try {
-        return await Effect.runPromise(generateFallbackSummary(parentSessionFile, parentConv.harness ?? undefined));
+        return await generateFallbackSummary(parentSessionFile, parentConv.harness ?? undefined);
       } catch (error) {
         console.warn(
           `[fork-pipeline] Heuristic fallback summary failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -477,7 +477,7 @@ export async function runForkPipeline(
         `[fork-pipeline] LLM summary failed, falling back to heuristic: ${error instanceof Error ? error.message : String(error)}`,
       );
       try {
-        return await Effect.runPromise(generateFallbackSummary(parentSessionFile, parentConv.harness ?? undefined));
+        return await generateFallbackSummary(parentSessionFile, parentConv.harness ?? undefined);
       } catch (heuristicError) {
         console.warn(
           `[fork-pipeline] Heuristic fallback also failed: ${heuristicError instanceof Error ? heuristicError.message : String(heuristicError)}`,
@@ -810,7 +810,7 @@ export async function handleConversationSummaryFork(
       explicitIssueId === undefined && conv.issueId == null
         ? await detectIssueIdFromBranch(effectiveCwd)
         : undefined;
-    const { sessionId } = await Effect.runPromise(reserveSummaryForkSession(effectiveCwd));
+    const { sessionId } = await reserveSummaryForkSession(effectiveCwd);
     const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const suffix = randomUUID().slice(0, 4);
     const newName = `${timestamp}-${suffix}`;

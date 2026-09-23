@@ -7,7 +7,6 @@
 export { getAvailableModelsApi } from './settings-model-catalog.js';
 import { readFile, writeFile } from 'fs/promises';
 import { parseDocument } from 'yaml';
-import { Data, Effect } from 'effect';
 import {
   DEFAULT_CONFIG,
   DEFAULT_ROLES,
@@ -925,7 +924,7 @@ function providerConfigForSave(
  * theme changes) could still interleave their own read-modify-write, since
  * both read the pre-write config before either finished writing it. Callers
  * must do their OWN `loadConfigSync()`/`loadSettingsApi()` read *inside* the
- * queued callback (see `saveDesignLanguagePromise` below) — reading before
+ * queued callback (see `saveDesignLanguage` below) — reading before
  * enqueueing bakes in the same staleness a queue further down cannot undo.
  */
 let settingsWriteQueue: Promise<unknown> = Promise.resolve();
@@ -941,13 +940,14 @@ function runSettingsWriteSerialized<T>(fn: () => Promise<T>): Promise<T> {
   return turn;
 }
 
-async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void> {
+/** Persist API settings through the serialized settings write queue. */
+export async function saveSettingsApi(settings: ApiSettingsConfig): Promise<void> {
   return runSettingsWriteSerialized(() => saveSettingsApiPromiseUnlocked(settings));
 }
 
 /**
  * `honorThemeFromSettings` gates whether `settings.ui?.theme` is allowed to
- * reach disk (PAN-3410 review finding, cycle 8). Only `saveDesignLanguagePromise`
+ * reach disk (PAN-3410 review finding, cycle 8). Only `saveDesignLanguage`
  * passes `true`, immediately after its own fresh `loadSettingsApi()` read
  * inside the write queue. Every other caller — chiefly the general
  * `PUT /api/settings` route, whose `settings` argument is a whole-document
@@ -1019,7 +1019,7 @@ async function saveSettingsApiPromiseUnlocked(
     // blank a non-default theme the operator set outside this save. Beyond
     // omission, `honorThemeFromSettings` (see the doc comment above) governs
     // whether an EXPLICITLY-present `settings.ui.theme` is trusted at all —
-    // only saveDesignLanguagePromise's fresh-inside-the-queue read may set it.
+    // only saveDesignLanguage's fresh-inside-the-queue read may set it.
     ui: ((honorThemeFromSettings && settings.ui?.theme !== undefined)
       || currentConfig.ui.theme !== DEFAULT_CONFIG.ui.theme
       || currentConfig.ui.openInEditorCommand !== null)
@@ -1083,7 +1083,8 @@ async function saveSettingsApiPromiseUnlocked(
   await synchronizeAnalyticsServices();
 }
 
-async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Promise<ApiSettingsConfig> {
+/** Merge `updates` into the current API settings and persist them. */
+export async function updateSettingsApi(updates: Partial<ApiSettingsConfig>): Promise<ApiSettingsConfig> {
   const current = loadSettingsApi();
 
   // Merge updates
@@ -1189,7 +1190,7 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
   };
 
   // Save and return
-  await Effect.runPromise(saveSettingsApi(merged));
+  await saveSettingsApi(merged);
   return merged;
 }
 
@@ -1197,15 +1198,16 @@ export function getRoleConfig(role: Role): RoleConfig | undefined {
   return loadSettingsApi().roles?.[role];
 }
 
-async function updateProviderApiKeyPromise(
+/** Set (or clear) one provider's API key in the API settings. */
+export async function updateProviderApiKey(
   provider: 'openai' | 'voyage' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous' | 'dashscope',
   apiKey?: string
 ): Promise<ApiSettingsConfig> {
-  return Effect.runPromise(updateSettingsApi({
+  return updateSettingsApi({
     api_keys: {
       [provider]: apiKey,
     },
-  }));
+  });
 }
 
 /**
@@ -1464,12 +1466,13 @@ export function getMiniMaxDefaultsApi(): ApiSettingsConfig {
   };
 }
 
-async function saveOpenRouterFavoritesPromise(favorites: string[]): Promise<void> {
+/** Persist the OpenRouter favourite model ids in the API settings. */
+export async function saveOpenRouterFavorites(favorites: string[]): Promise<void> {
   const current = loadSettingsApi();
-  await Effect.runPromise(saveSettingsApi({
+  await saveSettingsApi({
     ...current,
     openrouter: { ...current.openrouter, favorites },
-  }));
+  });
 }
 
 /**
@@ -1490,7 +1493,7 @@ async function saveOpenRouterFavoritesPromise(favorites: string[]): Promise<void
  * defaults to `false` and can never write a client-materialized theme snapshot,
  * however fresh it looked when constructed (cycle 8).
  */
-async function saveDesignLanguagePromise(theme: DesignLanguage): Promise<void> {
+export async function saveDesignLanguage(theme: DesignLanguage): Promise<void> {
   await runSettingsWriteSerialized(async () => {
     const current = loadSettingsApi();
     await saveSettingsApiPromiseUnlocked({
@@ -1507,87 +1510,3 @@ export function getOpenRouterFavorites(): string[] {
   const settings = loadSettingsApi();
   return settings.openrouter?.favorites ?? [];
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// Additive Effect-channel variants for the genuinely-async settings-api
-// surfaces. Sync helpers (`loadSettingsApi`, `getRoleConfig`, validation,
-// defaults) remain unwrapped — they're pure reads of an in-memory parsed
-// config. Only the disk-writing helpers receive Effect variants.
-
-/** Tagged error for settings-api Effect variants. */
-export class SettingsApiError extends Data.TaggedError('SettingsApiError')<{
-  readonly operation: string;
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
-
-/** Effect variant of `saveSettingsApi`. */
-export const saveSettingsApi = (
-  settings: ApiSettingsConfig,
-): Effect.Effect<void, SettingsApiError> =>
-  Effect.tryPromise({
-    try: () => saveSettingsApiPromise(settings),
-    catch: (cause) =>
-      new SettingsApiError({
-        operation: 'saveSettingsApi',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `updateSettingsApi`. */
-export const updateSettingsApi = (
-  updates: Partial<ApiSettingsConfig>,
-): Effect.Effect<ApiSettingsConfig, SettingsApiError> =>
-  Effect.tryPromise({
-    try: () => updateSettingsApiPromise(updates),
-    catch: (cause) =>
-      new SettingsApiError({
-        operation: 'updateSettingsApi',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `updateProviderApiKey`. */
-export const updateProviderApiKey = (
-  ...args: Parameters<typeof updateProviderApiKeyPromise>
-): Effect.Effect<Awaited<ReturnType<typeof updateProviderApiKeyPromise>>, SettingsApiError> =>
-  Effect.tryPromise({
-    try: () => updateProviderApiKeyPromise(...args),
-    catch: (cause) =>
-      new SettingsApiError({
-        operation: 'updateProviderApiKey',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `saveOpenRouterFavorites`. */
-export const saveOpenRouterFavorites = (
-  favorites: string[],
-): Effect.Effect<void, SettingsApiError> =>
-  Effect.tryPromise({
-    try: () => saveOpenRouterFavoritesPromise(favorites),
-    catch: (cause) =>
-      new SettingsApiError({
-        operation: 'saveOpenRouterFavorites',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `saveDesignLanguage` — single-field `ui.theme` write. */
-export const saveDesignLanguage = (
-  theme: DesignLanguage,
-): Effect.Effect<void, SettingsApiError> =>
-  Effect.tryPromise({
-    try: () => saveDesignLanguagePromise(theme),
-    catch: (cause) =>
-      new SettingsApiError({
-        operation: 'saveDesignLanguage',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
