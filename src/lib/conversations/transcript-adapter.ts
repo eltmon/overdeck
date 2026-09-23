@@ -30,7 +30,6 @@ import { parseMuseRecords } from '../cost-parsers/muse-parser.js';
  */
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { Effect } from 'effect';
 
 import { readCodexRolloutMessage } from '../codex-rollout-message.js';
 import {
@@ -128,16 +127,14 @@ const claudeCodeAdapter: ConversationTranscriptAdapter = {
     // Claude Code keeps the entry-aware smart-compaction flow: it parses the
     // JSONL into typed entries, finds compact boundaries, and carries file-op
     // detail into the summary. This is richer than text-only chunking.
-    const result = await Effect.runPromise(
-      generateSmartSummary({
+    const result = await generateSmartSummary({
         jsonlPath: sessionFile,
         model: options?.model,
         richMode: options?.richMode ?? false,
         mode: 'fork',
         includeThinkingInSummary: options?.includeThinking ?? true,
         harness: options?.harness ?? 'claude-code',
-      }),
-    );
+      });
     return { summary: result.summary, summaryModel: result.summaryModel };
   },
 };

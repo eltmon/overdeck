@@ -65,7 +65,7 @@ describe('issue closed detection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearIssueClosedCache();
-    mocks.getShadowState.mockReturnValue(Effect.succeed(null));
+    mocks.getShadowState.mockResolvedValue(null);
     mocks.resolveGitHubIssueSync.mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
@@ -83,7 +83,7 @@ describe('issue closed detection', () => {
     ['done canonical state', { targetCanonicalState: 'done' }],
     ['canceled canonical state', { targetCanonicalState: 'canceled' }],
   ])('returns true for closed shadow state via %s', async (_label, shadowState) => {
-    mocks.getShadowState.mockReturnValue(Effect.succeed(shadowState));
+    mocks.getShadowState.mockResolvedValue(shadowState);
 
     await expect(isIssueClosed('PAN-1613')).resolves.toBe(true);
     expect(mocks.execFileAsync).not.toHaveBeenCalled();
@@ -145,7 +145,7 @@ describe('linear closed detection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearIssueClosedCache();
-    mocks.getShadowState.mockReturnValue(Effect.succeed(null));
+    mocks.getShadowState.mockResolvedValue(null);
     // Non-GitHub resolution so the Linear branch runs.
     mocks.resolveGitHubIssueSync.mockReturnValue({ isGitHub: false });
     mocks.resolveTrackerTypeSync.mockReturnValue('linear');

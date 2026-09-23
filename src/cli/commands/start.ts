@@ -434,11 +434,11 @@ async function handleRemoteWorkspace(
     spinner.succeed(`Remote agent spawned: ${remoteAgent.id}`);
 
     // Handle shadow mode
-    const skipTrackerUpdate = await Effect.runPromise(shouldSkipTrackerUpdate(issueId, options.shadow));
+    const skipTrackerUpdate = await shouldSkipTrackerUpdate(issueId, options.shadow);
 
     if (skipTrackerUpdate) {
-      await Effect.runPromise(createShadowState(issueId, 'open', 'pan start'));
-      await Effect.runPromise(updateShadowState(issueId, 'in_progress', 'pan start'));
+      await createShadowState(issueId, 'open', 'pan start');
+      await updateShadowState(issueId, 'in_progress', 'pan start');
       console.log(chalk.cyan(`  👻 Shadow mode: tracking status locally`));
     } else if (isGitHubIssueSync(issueId)) {
       // GitHub issue — add in-progress label
@@ -1082,7 +1082,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       // Show what context would be included
       const planningContext = await readPlanningContext(workspace);
       const taskCount = readWorkspacePlanSync(workspace)?.plan.items.length ?? 0;
-      const hasPreWorkspacePRD = await Effect.runPromise(hasPRDDraft(id));
+      const hasPreWorkspacePRD = await hasPRDDraft(id);
       console.log('');
       console.log(chalk.bold('Context:'));
       console.log(`  Planning:   ${planningContext ? 'Found (.pan/continue.json)' : 'None'}`);
@@ -1224,11 +1224,11 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       console.warn(chalk.dim(`  ⚠ Could not set workspace xBRIEF status=running: ${err?.message ?? String(err)}`));
     }
 
-    const skipTrackerUpdate = await Effect.runPromise(shouldSkipTrackerUpdate(id, options.shadow));
+    const skipTrackerUpdate = await shouldSkipTrackerUpdate(id, options.shadow);
 
     if (skipTrackerUpdate) {
-      await Effect.runPromise(createShadowState(id, 'open', 'pan start'));
-      await Effect.runPromise(updateShadowState(id, 'in_progress', 'pan start'));
+      await createShadowState(id, 'open', 'pan start');
+      await updateShadowState(id, 'in_progress', 'pan start');
       console.log(chalk.cyan(`  👻 Shadow mode: tracking status locally`));
     }
 

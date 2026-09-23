@@ -1,22 +1,6 @@
 # Effect façade ratchet baseline (PAN-3958). Rows: <shape> <count> <path>. Shapes: A=Promise façade,
 # B=sync façade, C=sync/async twin pair. Lower with: bash scripts/lint-effect-facades.sh --update
-A 1 src/lib/config-yaml/load.ts
-A 1 src/lib/conversations/enrichment/enrich-session.ts
-A 1 src/lib/costs/reconciler.ts
-A 1 src/lib/costs/sync-wal.ts
-A 1 src/lib/prd-draft.ts
-A 1 src/lib/prd-locations.ts
-A 1 src/lib/projects.ts
 A 1 src/lib/runtimes/ohmypi-fifo.ts
-A 1 src/lib/xbrief/lifecycle-io.ts
-A 10 src/lib/shadow-state.ts
-A 2 src/lib/config.ts
-A 2 src/lib/conversations/smart-compaction.ts
-A 2 src/lib/review-artifacts.ts
-A 3 src/lib/conversations/summary-fork.ts
-A 4 src/lib/shadow-mode.ts
-A 5 src/lib/memory/checkpoint-client.ts
-A 5 src/lib/settings-api.ts
 B 1 src/lib/activity-logger.ts
 B 1 src/lib/agents/agent-state.ts
 B 1 src/lib/backup.ts
@@ -54,6 +38,7 @@ C 1 src/lib/agents/termination.ts
 C 1 src/lib/cloister/handoff-logger.ts
 C 1 src/lib/config-yaml/load.ts
 C 1 src/lib/openai-auth.ts
+C 1 src/lib/prd-locations.ts
 C 1 src/lib/projects-config-lock.ts
 C 1 src/lib/runtimes/muse-session.ts
 C 1 src/lib/runtimes/ohmypi.ts
@@ -61,10 +46,11 @@ C 1 src/lib/ui-theme.ts
 C 1 src/lib/work-agent-lifecycle.ts
 C 1 src/lib/xbrief/acceptance-criteria.ts
 C 2 src/lib/cloister/config.ts
+C 2 src/lib/config.ts
 C 3 src/lib/overdeck/control-settings.ts
 C 3 src/lib/projects-config-write.ts
 C 4 src/lib/agents/agent-state.ts
-C 4 src/lib/projects.ts
 C 4 src/lib/xbrief/io.ts
 C 5 src/lib/cliproxy.ts
+C 5 src/lib/projects.ts
 C 8 src/lib/tmux.ts

@@ -182,7 +182,7 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
       return;
     }
     const { id: sessionId } = session;
-    const sessionResult = await Effect.runPromise(enrichSession({
+    const sessionResult = await enrichSession({
       sessionId,
       jsonlPath: session.jsonlPath,
       tier,
@@ -192,7 +192,7 @@ export async function enrichSessions(opts: EnrichOptions = {}): Promise<EnrichRe
       config: tierConfig,
       callApi,
       resolveModel,
-    }));
+    });
 
     processed++;
     state.accounted = true;

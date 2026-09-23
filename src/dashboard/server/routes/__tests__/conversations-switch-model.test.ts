@@ -48,7 +48,7 @@ vi.mock('../../../../lib/background-ai/features.js', () => ({
 }));
 
 vi.mock('../../../../lib/conversations/smart-compaction.js', () => ({
-  generateSmartSummary: vi.fn(() => Effect.succeed({
+  generateSmartSummary: vi.fn(async () => ({
     summary: 'Mocked compact summary for switch-model coverage.',
     summaryModel: 'claude-haiku-4-5',
   })),

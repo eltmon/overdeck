@@ -389,49 +389,49 @@ async function showCommand(issueId: string, options: { project?: string }): Prom
 
 async function proposeCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await Effect.runPromise(transitionXBriefOnMain(
+  const result = await transitionXBriefOnMain(
     projectPath,
     issueId,
     'proposed',
     'proposed',
     `scope: propose ${issueId.toUpperCase()} xBRIEF`,
-  ));
+  );
   console.log(formatTransition(result, issueId));
 }
 
 async function approveCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await Effect.runPromise(transitionXBriefOnMain(
+  const result = await transitionXBriefOnMain(
     projectPath,
     issueId,
     'active',
     'approved',
     `scope: approve ${issueId.toUpperCase()} xBRIEF`,
-  ));
+  );
   console.log(formatTransition(result, issueId));
 }
 
 async function completeCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await Effect.runPromise(transitionXBriefOnMain(
+  const result = await transitionXBriefOnMain(
     projectPath,
     issueId,
     'completed',
     'completed',
     `scope: complete ${issueId.toUpperCase()} xBRIEF`,
-  ));
+  );
   console.log(formatTransition(result, issueId));
 }
 
 async function cancelCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await Effect.runPromise(transitionXBriefOnMain(
+  const result = await transitionXBriefOnMain(
     projectPath,
     issueId,
     'cancelled',
     'cancelled',
     `scope: cancel ${issueId.toUpperCase()} xBRIEF`,
-  ));
+  );
   console.log(formatTransition(result, issueId));
 }
 
@@ -446,13 +446,13 @@ async function restoreCommand(issueId: string, options: { project?: string }): P
     console.log(chalk.yellow(`xBRIEF is in ${found.lifecycleDir} — restore only works from completed/ or cancelled/`));
     return exitCli(1);
   }
-  const result = await Effect.runPromise(transitionXBriefOnMain(
+  const result = await transitionXBriefOnMain(
     projectPath,
     issueId,
     'active',
     'approved',
     `scope: restore ${issueId.toUpperCase()} xBRIEF`,
-  ));
+  );
   console.log(formatTransition(result, issueId));
 }
 

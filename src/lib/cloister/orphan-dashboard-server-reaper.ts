@@ -17,7 +17,6 @@
 import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { Effect } from 'effect';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
@@ -139,11 +138,9 @@ export async function reapOrphanedDashboardServers(deps: ReapDeps = {}): Promise
   const selfPid = deps.selfPid ?? process.pid;
   const kill = deps.kill ?? ((pid, signal) => process.kill(pid, signal));
   const graceMs = deps.graceMs ?? REAP_GRACE_MS;
-  const apiPort = deps.apiPort ?? await Effect.runPromise(
-    loadConfig().pipe(
-      Effect.map((c) => c.dashboard.api_port ?? 3011),
-      Effect.catch(() => Effect.succeed(3011)),
-    ),
+  const apiPort = deps.apiPort ?? await loadConfig().then(
+    (c) => c.dashboard.api_port ?? 3011,
+    () => 3011,
   );
 
   const listServers = deps.listServers ?? listDashboardServers;

@@ -30,7 +30,6 @@ import { runModelSummary } from './smart-compaction.js';
 import { getTranscriptAdapter } from './transcript-adapter.js';
 import { createHandoffPaths, ensureHandoffsDir, type HandoffPaths } from './handoff-paths.js';
 import type { RuntimeName } from '../runtimes/types.js';
-import { FsError } from '../errors.js';
 import { getWorkspaceStackHealth } from '../workspace/stack-health.js';
 
 export type SummaryForkMode = 'summary' | 'plain' | 'handoff';
@@ -254,7 +253,7 @@ export async function authorHandoffExternal(
   // permission to write…" to stdout, no file is written, and the whole fork
   // falls back to a plain summary with reason `handoff-validation` (PAN-1582).
   // Pi runs in rpc mode and auto-executes tools, so the allowlist is a no-op there.
-  const stdout = await Effect.runPromise(runModelSummary(prompt, effectiveModel, HANDOFF_AUTHOR_TIMEOUT_MS, effectiveHarness, ['Write']));
+  const stdout = await runModelSummary(prompt, effectiveModel, HANDOFF_AUTHOR_TIMEOUT_MS, effectiveHarness, ['Write']);
   console.log(`[claude-invoke] purpose=handoff-author-external acknowledgement | model=${effectiveModel} | stdoutChars=${stdout.length} | stdoutPreview=${JSON.stringify(stdout.slice(0, 120))}`);
 
   let docText: string;
@@ -425,7 +424,8 @@ function buildFallbackSummary(
   return summary;
 }
 
-async function generateFallbackSummaryPromise(jsonlPath: string, harness?: RuntimeName): Promise<string> {
+/** Build a deterministic, model-free summary of a session transcript (the fallback when the model summary fails). */
+export async function generateFallbackSummary(jsonlPath: string, harness?: RuntimeName): Promise<string> {
   const adapter = getTranscriptAdapter(harness);
   if (adapter.name !== 'claude-code') {
     const serialized = await adapter.serializeTranscript(jsonlPath, { includeThinking: false });
@@ -535,7 +535,10 @@ export async function generateSummaryForFork(
     console.error(`[claude-invoke] FAILED purpose=summary-fork | model=${summaryModel} | error="${err.message}"`);
     throw err;
   }
-}async function reserveSummaryForkSessionPromise(
+}
+
+/** Reserve a new session id and file for a summary fork in `cwd`. */
+export async function reserveSummaryForkSession(
   cwd: string,
 ): Promise<{ sessionId: string; sessionFile: string }> {
   // Delegate session reservation to the shared conversation-fork primitive.
@@ -543,7 +546,8 @@ export async function generateSummaryForFork(
   return reserveForkSession(cwd);
 }
 
-async function copySessionFromCompactBoundaryPromise(
+/** Copy a session transcript from its last compact boundary into a fork's session file. */
+export async function copySessionFromCompactBoundary(
   sourcePath: string,
   destPath: string,
 ): Promise<void> {
@@ -553,45 +557,3 @@ async function copySessionFromCompactBoundaryPromise(
 
 // Re-export runModelSummary for any callers that need it directly
 export { runModelSummary };
-
-// ─── Effect variants (PAN-1249, additive) ────────────────────────────────────
-//
-// Additive Effect surface for fork helpers. Failures from the underlying
-// fs ops or LLM calls surface as FsError (filesystem failures) or Error
-// (LLM / generation failures). The existing Promise functions remain
-// canonical; these are wrappers for Effect-native callers.
-
-/** Effect variant of generateFallbackSummary. */
-export function generateFallbackSummary(
-  jsonlPath: string,
-  harness?: RuntimeName,
-): Effect.Effect<string, FsError> {
-  return Effect.tryPromise({
-    try: () => generateFallbackSummaryPromise(jsonlPath, harness),
-    catch: (cause) =>
-      new FsError({ path: jsonlPath, operation: 'fallback-summary', cause }),
-  });
-}
-
-/** Effect variant of reserveSummaryForkSession. */
-export function reserveSummaryForkSession(
-  cwd: string,
-): Effect.Effect<{ sessionId: string; sessionFile: string }, FsError> {
-  return Effect.tryPromise({
-    try: () => reserveSummaryForkSessionPromise(cwd),
-    catch: (cause) =>
-      new FsError({ path: cwd, operation: 'reserve-session', cause }),
-  });
-}
-
-/** Effect variant of copySessionFromCompactBoundary. */
-export function copySessionFromCompactBoundary(
-  sourcePath: string,
-  destPath: string,
-): Effect.Effect<void, FsError> {
-  return Effect.tryPromise({
-    try: () => copySessionFromCompactBoundaryPromise(sourcePath, destPath),
-    catch: (cause) =>
-      new FsError({ path: sourcePath, operation: 'copy-session', cause }),
-  });
-}

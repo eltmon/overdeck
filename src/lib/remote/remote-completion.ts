@@ -440,7 +440,7 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
 
       // 5. Review artifacts + completed marker — same entries pan done uses.
       const { createReviewArtifactsForIssue } = await import('../review-artifacts.js');
-      const artifactResult = await Effect.runPromise(createReviewArtifactsForIssue(issueId, workspacePath));
+      const artifactResult = await createReviewArtifactsForIssue(issueId, workspacePath);
       const primaryArtifact = artifactResult.mergeSet?.repos.find((repo) => !!repo.artifactUrl);
       if (primaryArtifact?.artifactUrl) {
         details.push(`Review artifact: ${primaryArtifact.artifactUrl}`);

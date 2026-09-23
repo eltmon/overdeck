@@ -3,13 +3,11 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Effect } from 'effect';
 import * as self from './smart-compaction.js';
 import { buildSpawnEnvForModel, getProviderEnvForModel } from '../agents.js';
 import { getClaudePermissionFlagsSync } from '../claude-permissions.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
-import { FsError, ProcessSpawnError } from '../errors.js';
 import { recordBackgroundAiCost } from '../background-ai/cost.js';
 import type { AIProvider } from '../cost.js';
 import { isContextOverflowError } from '../context-overflow.js';
@@ -692,7 +690,10 @@ async function runPiModelSummary(prompt: string, model: string, timeoutMs?: numb
   } finally {
     await rm(sessionDir, { recursive: true, force: true }).catch(() => undefined);
   }
-}async function runModelSummaryPromise(prompt: string, model?: string, timeoutMs?: number, harness: RuntimeName = 'claude-code', allowedTools?: string[]): Promise<string> {
+}
+
+/** Run a summarisation prompt through the given harness and return the model's text output. */
+export async function runModelSummary(prompt: string, model?: string, timeoutMs?: number, harness: RuntimeName = 'claude-code', allowedTools?: string[]): Promise<string> {
   const useModel = model || DEFAULT_SUMMARY_MODEL;
   console.log(`[claude-invoke] purpose=smart-summary | model=${useModel} | harness=${harness} | source=smart-compaction.ts:runModelSummary | promptChars=${prompt.length} | timeoutMs=${timeoutMs ?? SUMMARY_TIMEOUT_MS}`);
 
@@ -830,7 +831,7 @@ export async function generateSummaryFromPrompt(
   const fullPrompt = `${SUMMARIZATION_SYSTEM_PROMPT}\n\n${messages[0].content[0].text}`;
 
   try {
-    return (await Effect.runPromise(self.runModelSummary(fullPrompt, model, timeoutMs, harness)));
+    return (await self.runModelSummary(fullPrompt, model, timeoutMs, harness));
   } catch (err) {
     if (!isContextOverflowError(err)) throw err;
 
@@ -846,7 +847,7 @@ export async function generateSummaryFromPrompt(
       retryPromptText += initPrompt;
     }
     const retryFullPrompt = `${SUMMARIZATION_SYSTEM_PROMPT}\n\n${retryPromptText}`;
-    return (await Effect.runPromise(self.runModelSummary(retryFullPrompt, model, timeoutMs, harness)));
+    return (await self.runModelSummary(retryFullPrompt, model, timeoutMs, harness));
   }
 }
 
@@ -858,7 +859,7 @@ async function generateTurnPrefixSummary(
 ): Promise<string> {
   const promptText = `<conversation>\n${serialized}\n</conversation>\n\n${TURN_PREFIX_PROMPT}`;
   const fullPrompt = `${SUMMARIZATION_SYSTEM_PROMPT}\n\n${promptText}`;
-  return (await Effect.runPromise(self.runModelSummary(fullPrompt, model, timeoutMs, harness)));
+  return (await self.runModelSummary(fullPrompt, model, timeoutMs, harness));
 }
 
 // ============================================================================
@@ -999,7 +1000,8 @@ export async function summarizeSerializedText(
   return running ?? '';
 }
 
-async function generateSmartSummaryPromise(options: CompactionOptions): Promise<CompactionResult> {
+/** Generate a model-written summary of a session for compaction or a fork. */
+export async function generateSmartSummary(options: CompactionOptions): Promise<CompactionResult> {
   const entries = await parseEntries(options.jsonlPath);
   if (entries.length === 0) {
     throw new Error(`Session file is empty: ${options.jsonlPath}`);
@@ -1142,54 +1144,4 @@ async function generateSmartSummaryPromise(options: CompactionOptions): Promise<
     readFiles,
     modifiedFiles,
   };
-}
-
-// ─── Effect variants (PAN-1249, additive) ────────────────────────────────────
-//
-// Additive Effect surface for smart-compaction. The underlying Promise
-// functions remain canonical; these wrappers map failures to typed errors
-// (ProcessSpawnError for spawn / generation failures, FsError for IO).
-
-/** Effect variant of runModelSummary. */
-export function runModelSummary(
-  prompt: string,
-  model?: string,
-  timeoutMs?: number,
-  harness: RuntimeName = 'claude-code',
-  allowedTools?: string[],
-): Effect.Effect<string, ProcessSpawnError> {
-  return Effect.tryPromise({
-    try: () => runModelSummaryPromise(prompt, model, timeoutMs, harness, allowedTools),
-    catch: (cause) =>
-      new ProcessSpawnError({
-        command: getHarnessBehavior(harness).deliveryKind === 'rpc-fifo' ? getHarnessBehavior(harness).executableName : 'claude',
-        args: ['-p', model ?? 'default'],
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-}
-
-/** Effect variant of generateSmartSummary. */
-export function generateSmartSummary(
-  options: CompactionOptions,
-): Effect.Effect<CompactionResult, FsError | ProcessSpawnError> {
-  return Effect.tryPromise({
-    try: () => generateSmartSummaryPromise(options),
-    catch: (cause) => {
-      const msg = cause instanceof Error ? cause.message : String(cause);
-      // Distinguish between fs failures (read jsonl) and spawn failures (LLM).
-      // The underlying impl throws plain Error in both cases; we map to
-      // FsError when the message hints at file IO, otherwise spawn.
-      if (msg.toLowerCase().includes('enoent') || msg.toLowerCase().includes('no such file')) {
-        return new FsError({ path: options.jsonlPath, operation: 'smart-summary-read', cause });
-      }
-      return new ProcessSpawnError({
-        command: 'claude',
-        args: ['-p', options.model ?? 'default'],
-        message: msg,
-        cause,
-      });
-    },
-  });
 }

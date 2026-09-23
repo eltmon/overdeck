@@ -1,7 +1,6 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { generateFallbackSummary } from '../summary-fork.js';
@@ -39,7 +38,7 @@ describe('generateFallbackSummary', () => {
       }),
     ].join('\n') + '\n', 'utf-8');
 
-    const summary = await Effect.runPromise(generateFallbackSummary(file, 'codex'));
+    const summary = await generateFallbackSummary(file, 'codex');
 
     expect(summary).toContain('### User Messages:\n- Fix the Codex fallback summary');
     expect(summary).toContain('### Tools Used: apply_patch, exec_command');
@@ -52,7 +51,7 @@ describe('generateFallbackSummary', () => {
       message: { role: 'user', content: 'Keep the Claude fallback behavior' },
     })}\n`, 'utf-8');
 
-    const summary = await Effect.runPromise(generateFallbackSummary(file));
+    const summary = await generateFallbackSummary(file);
 
     expect(summary).toContain('### User Messages:\n- Keep the Claude fallback behavior');
   });

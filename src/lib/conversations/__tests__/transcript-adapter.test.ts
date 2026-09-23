@@ -15,8 +15,7 @@ vi.mock('../smart-compaction.js', async (importOriginal) => {
   return {
     ...actual,
     summarizeSerializedText: vi.fn(async (serialized: string) => `SUMMARY-OF:\n${serialized}`),
-    generateSmartSummary: vi.fn((opts: { model?: string }) =>
-      Effect.succeed({
+    generateSmartSummary: vi.fn(async (opts: { model?: string }) => ({
         summary: `CC-SUMMARY model=${opts.model ?? 'default'}`,
         tokensBefore: 0,
         firstKeptEntryIndex: 0,

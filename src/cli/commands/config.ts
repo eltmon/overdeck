@@ -1,5 +1,4 @@
 import { exitCli } from '../exit.js';
-import { Effect } from 'effect';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { loadConfigSync, saveConfigSync, OverdeckConfig } from '../../lib/config.js';
@@ -107,8 +106,8 @@ async function configShadowCommand(options: ShadowOptions): Promise<void> {
     }
 
     // Current shadowed issues
-    const shadowedIssues = await Effect.runPromise(listShadowedIssues());
-    const pendingSync = await Effect.runPromise(getPendingSyncCount());
+    const shadowedIssues = await listShadowedIssues();
+    const pendingSync = await getPendingSyncCount();
 
     if (shadowedIssues.length > 0) {
       console.log(chalk.bold(`\nShadowed issues: ${shadowedIssues.length}`));

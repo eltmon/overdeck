@@ -296,7 +296,7 @@ const postCostsSyncWalRoute = HttpRouter.add(
   '/api/costs/sync-wal',
   httpHandler(Effect.gen(function* () {
     const result = yield* Effect.tryPromise({
-      try: () => Effect.runPromise(syncWalFromAllProjects()),
+      try: () => syncWalFromAllProjects(),
       catch: (err) => new Error(err instanceof Error ? err.message : String(err)),
     });
     return jsonResponse({ success: true, ...result });
@@ -315,7 +315,7 @@ const runOverdeckCostReconcileSource: ReconcileSourceRunner = (source) =>
   );
 
 const runClaudeTranscriptReconcile: ClaudeReconcileRunner = () =>
-  Effect.runPromise(reconcileClaudeTranscripts());
+  reconcileClaudeTranscripts();
 
 export async function runCostReconcileSources(
   runSource: ReconcileSourceRunner = runOverdeckCostReconcileSource,

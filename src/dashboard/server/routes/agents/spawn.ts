@@ -560,30 +560,28 @@ export const postAgentsRoute = HttpRouter.add(
     const markWorkStartAccepted = async (): Promise<void> => {
       if (workStartAccepted) return;
       workStartAccepted = true;
-      await Effect.runPromise(transitionXBriefOnMain(
+      await transitionXBriefOnMain(
         projectPath,
         issueId,
         'active',
         'running',
         `chore(state): start ${issueId.toUpperCase()} xBRIEF (status=running)`,
-      ).pipe(
-        Effect.match({
-          onSuccess: (result) => {
-            if (result.moved) {
-              console.log(`[start-agent] xBRIEF moved ${result.fromDir} → active for ${issueId}`);
-            }
-            if (result.statusUpdated) {
-              console.log(`[start-agent] Set plan.status=running for ${issueId}`);
-            }
-            if (result.committed) {
-              console.log(`[start-agent] Committed running transition for ${issueId}`);
-            }
-          },
-          onFailure: (err) => {
-            console.warn(`[start-agent] xBRIEF running transition failed (non-fatal): ${err?.message ?? err}`);
-          },
-        }),
-      ));
+      ).then(
+        (result) => {
+          if (result.moved) {
+            console.log(`[start-agent] xBRIEF moved ${result.fromDir} → active for ${issueId}`);
+          }
+          if (result.statusUpdated) {
+            console.log(`[start-agent] Set plan.status=running for ${issueId}`);
+          }
+          if (result.committed) {
+            console.log(`[start-agent] Committed running transition for ${issueId}`);
+          }
+        },
+        (err: unknown) => {
+          console.warn(`[start-agent] xBRIEF running transition failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
+        },
+      );
 
       if (planPath.startsWith(workspacePath + sep)) {
         try {

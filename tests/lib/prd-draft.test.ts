@@ -72,7 +72,7 @@ describe('prd-draft', () => {
       const { hasPRDDraft } = await import('../../src/lib/prd-draft.js');
       await registerTestProject();
 
-      expect(await Effect.runPromise(hasPRDDraft('PAN-NONEXISTENT'))).toBe(false);
+      expect(await hasPRDDraft('PAN-NONEXISTENT')).toBe(false);
     });
 
     it('should return true when draft exists', async () => {
@@ -82,7 +82,7 @@ describe('prd-draft', () => {
 
       await Effect.runPromise(writeIssueDraft(tempDir, 'PAN-123', '# Test PRD'));
 
-      expect(await Effect.runPromise(hasPRDDraft('PAN-123'))).toBe(true);
+      expect(await hasPRDDraft('PAN-123')).toBe(true);
     });
   });
 

@@ -571,13 +571,13 @@ async function completeXBriefStep(ctx: LifecycleContext): Promise<StepResult> {
   const step = 'close-out:vbrief-completed';
   try {
     const { transitionXBriefOnMain } = await import('../xbrief/lifecycle-io.js');
-    const result = await Effect.runPromise(transitionXBriefOnMain(
+    const result = await transitionXBriefOnMain(
       ctx.projectPath,
       ctx.issueId,
       'completed',
       'completed',
       `scope: complete ${ctx.issueId.toUpperCase()} xBRIEF`,
-    ));
+    );
     const details = [
       result.moved ? 'Updated xBRIEF lifecycle to completed' : 'xBRIEF lifecycle already completed',
       result.statusUpdated ? 'Updated plan.status to completed' : 'plan.status already completed',

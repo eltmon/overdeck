@@ -9,7 +9,6 @@
 import { promises as fs } from 'fs';
 import * as readline from 'readline';
 import { createReadStream } from 'fs';
-import { Effect } from 'effect';
 
 import { getDiscoveredSessionById, updateEnrichment, markEnrichmentFailed } from '../../overdeck/discovered-sessions.js';
 import { calculateCostSync, getPricingSync, type AIProvider } from '../../cost.js';
@@ -25,7 +24,6 @@ function providerForModel(model: string): AIProvider {
 import { applyFallbackSync, selectEnrichmentModelForTier } from '../../model-fallback.js';
 import { loadConfigSync as loadYamlConfig } from '../../config-yaml.js';
 import { getProviderEnvSync, getProviderForModelSync } from '../../providers.js';
-import { FsError } from '../../errors.js';
 import { redactSensitiveText } from '../../secret-redaction.js';
 import type { TokenUsage } from '../../cost.js';
 import type { EnrichmentTier, EnrichmentTierConfig, ModelProvider } from '../../model-fallback.js';
@@ -478,7 +476,10 @@ export async function callClaudeApi(
   prompt: string,
 ): Promise<EnrichmentResponse> {
   return callClaudeApiWithConfig(model, prompt);
-}async function enrichSessionPromise(opts: EnrichSessionOptions): Promise<EnrichSessionResult> {
+}
+
+/** Enrich one conversation session using the model selected for its tier. */
+export async function enrichSession(opts: EnrichSessionOptions): Promise<EnrichSessionResult> {
   const { sessionId, jsonlPath, tier, config } = opts;
   const requestedModel = opts.modelOverride ?? selectEnrichmentModelForTier(tier, config);
   let model = requestedModel;
@@ -545,22 +546,4 @@ export async function callClaudeApi(
     markEnrichmentFailed(sessionId);
     return { sessionId, tier, model, error: message };
   }
-}
-
-// ─── Effect variant (PAN-1249, additive) ─────────────────────────────────────
-//
-// Additive Effect surface. The underlying `enrichSession` already catches
-// internally and returns a result with `error` set on failure, so this
-// Effect variant rarely fails — FsError is declared for the rare case of
-// an unexpected throw from updateEnrichment / DB mutation.
-
-/** Effect variant of enrichSession. */
-export function enrichSession(
-  opts: EnrichSessionOptions,
-): Effect.Effect<EnrichSessionResult, FsError> {
-  return Effect.tryPromise({
-    try: () => enrichSessionPromise(opts),
-    catch: (cause) =>
-      new FsError({ path: opts.jsonlPath, operation: 'enrich-session', cause }),
-  });
 }

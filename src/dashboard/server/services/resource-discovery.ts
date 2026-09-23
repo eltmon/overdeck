@@ -727,7 +727,7 @@ async function computeResourceAllocatedIssues(
   await Promise.all([...issueMap.values()].map(async (issue) => {
     const project = resolveProjectRef(issue.issueId);
     if (!project) return;
-    const draft = await Effect.runPromise(findDraftPrd(project.config.path, issue.issueId)).catch(() => null);
+    const draft = await findDraftPrd(project.config.path, issue.issueId).catch(() => null);
     if (!draft) return;
     issue.resourceSources.add('prd');
     issue.resourceDetails.prdPath = draft.path;

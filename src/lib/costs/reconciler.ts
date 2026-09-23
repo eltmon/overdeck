@@ -25,7 +25,6 @@ import { join, basename } from 'path';
 import { homedir } from 'os';
 import { Effect } from 'effect';
 import { calculateCostSync, getPricingSync, type AIProvider, type TokenUsage } from '../cost.js';
-import { FsError } from '../errors.js';
 import { CostDoorLive, CostWriter, type CostEvent as OverdeckCostEvent } from '../overdeck/cost.js';
 import { findConversationForCostSessionSync } from '../overdeck/conversations.js';
 import type { IssueId } from '../overdeck/issues.js';
@@ -649,7 +648,12 @@ function mergeCoverage(
   }
 }
 
-async function reconcilePromise(opts: { dryRun?: boolean; includePi?: boolean } = {}): Promise<ReconcileResult> {
+/**
+ * Catch-up sweep of Claude transcripts into the cost store. Per-file errors are
+ * reported in `result.errors`; it rejects only on a catastrophic failure (for
+ * example, the SQLite open failing).
+ */
+export async function reconcile(opts: { dryRun?: boolean; includePi?: boolean } = {}): Promise<ReconcileResult> {
   const result: ReconcileResult = {
     sessionsScanned: 0,
     cacheSkipped: 0,
@@ -821,16 +825,3 @@ async function reconcilePromise(opts: { dryRun?: boolean; includePi?: boolean } 
 
   return result;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Effect variant of reconcile. Per-file errors are still surfaced via
- * `result.errors`; only catastrophic failures (e.g. SQLite open failure)
- * surface on the Effect error channel.
- */
-export const reconcile = (opts: { dryRun?: boolean; includePi?: boolean } = {}): Effect.Effect<ReconcileResult, FsError> =>
-  Effect.tryPromise({
-    try: () => reconcilePromise(opts),
-    catch: (cause) => new FsError({ path: '<reconciler>', operation: 'reconcile', cause }),
-  });

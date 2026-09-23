@@ -35,7 +35,7 @@ import { getAgentRollup, getCostForIssueAggregateSync, type IssueAggregate } fro
 export async function runCostSync(): Promise<void> {
   try {
     console.log(chalk.bold('Syncing cost events from project WAL files...'));
-    const result = await Effect.runPromise(syncWalFromAllProjects());
+    const result = await syncWalFromAllProjects();
 
     if (result.filesScanned === 0) {
       console.log(chalk.yellow('No WAL files found. Make sure projects are registered and have cost events.'));
@@ -130,7 +130,7 @@ export async function runCostBackfill(options: { write?: boolean } = {}): Promis
   const codexSessionRoot = join(process.env.CODEX_HOME ?? join(homedir(), '.codex'), 'sessions');
   const piSessionRoot = join(homedir(), '.pi', 'agent', 'sessions');
   const legacyPiAgentsRoot = join(homedir(), '.panopticon', 'agents');
-  const claude = await Effect.runPromise(reconcileClaudeTranscripts({ dryRun, includePi: false }));
+  const claude = await reconcileClaudeTranscripts({ dryRun, includePi: false });
   const ohmypi = await Effect.runPromise(
     CostWriter.use((writer) => writer.reconcile({
       source: 'ohmypi',

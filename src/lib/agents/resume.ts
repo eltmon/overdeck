@@ -1,7 +1,6 @@
 import { existsSync, unlinkSync } from 'fs';
 import { randomUUID } from 'crypto';
 import { join } from 'path';
-import { Effect } from 'effect';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { buildCompactRecoverySeedMessage } from '../context-overflow.js';
@@ -97,19 +96,19 @@ export async function buildCompactRecoverySeed(agentId: string): Promise<{ seed:
         import('../conversations/smart-compaction.js'),
       ]);
       const settings = getConversationCompactionSettings();
-      const result = await Effect.runPromise(generateSmartSummary({
+      const result = await generateSmartSummary({
         jsonlPath: sessionFile,
         model: settings.model,
         richMode: settings.richCompaction,
         mode: 'fork',
-      }));
+      });
       summary = result.summary;
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
       logAgentLifecycleSync(normalizedId, `compact-recovery smart summary failed (${error}); trying heuristic fallback`);
       try {
         const { generateFallbackSummary } = await import('../conversations/summary-fork.js');
-        summary = await Effect.runPromise(generateFallbackSummary(sessionFile));
+        summary = await generateFallbackSummary(sessionFile);
       } catch (fallbackErr) {
         const fallbackError = fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
         logAgentLifecycleSync(normalizedId, `compact-recovery fallback summary failed (${fallbackError}); seeding with reseed instructions only`);

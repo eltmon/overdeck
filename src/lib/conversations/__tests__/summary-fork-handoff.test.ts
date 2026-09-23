@@ -72,7 +72,6 @@ import {
   runModelSummary as mockedRunModelSummary,
   summarizeSerializedText as mockedSummarizeSerializedText,
 } from '../smart-compaction.js';
-import { Effect as EffectMod } from 'effect';
 
 const originalOverdeckHome = process.env.OVERDECK_HOME;
 const originalHome = process.env.HOME;
@@ -374,7 +373,7 @@ describe('authorHandoffExternal', { timeout: 20_000 }, () => {
         mkdirSync(dirname(outputPath), { recursive: true });
         writeFileSync(outputPath, docText, 'utf-8');
       }
-      return EffectMod.succeed('done');
+      return Promise.resolve('done');
     });
   }
 

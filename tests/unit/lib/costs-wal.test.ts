@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 /**
  * Tests for WAL writer (wal.ts) and WAL importer (sync-wal.ts)
  */
@@ -186,7 +185,7 @@ describe('syncWalFromAllProjects', () => {
   it('returns empty result when no projects are registered', async () => {
     listProjects.mockReturnValue([]);
     const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
-    const result = await Effect.runPromise(syncWalFromAllProjects());
+    const result = await syncWalFromAllProjects();
 
     expect(result.imported).toBe(0);
     expect(result.duplicates).toBe(0);
@@ -199,7 +198,7 @@ describe('syncWalFromAllProjects', () => {
       { key: 'PAN', config: { path: join(tmpDir, 'no-such-repo') } },
     ]);
     const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
-    const result = await Effect.runPromise(syncWalFromAllProjects());
+    const result = await syncWalFromAllProjects();
 
     expect(result.filesScanned).toBe(0);
   });
@@ -221,7 +220,7 @@ describe('syncWalFromAllProjects', () => {
       { key: 'MIN', config: { path: repo2 } },
     ]);
     const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
-    const result = await Effect.runPromise(syncWalFromAllProjects());
+    const result = await syncWalFromAllProjects();
 
     expect(result.filesScanned).toBe(2);
     expect(result.imported).toBe(2);
@@ -246,7 +245,7 @@ describe('syncWalFromAllProjects', () => {
     odb.raw().prepare('DROP TABLE cost_events').run();
 
     const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
-    const result = await Effect.runPromise(syncWalFromAllProjects());
+    const result = await syncWalFromAllProjects();
 
     expect(result.errors.length).toBeGreaterThan(0);
     expect(result.errors[0]).toContain('import failed');
@@ -268,7 +267,7 @@ describe('syncWalFromAllProjects', () => {
     writeFileSync(join(eventsDir, 'PAN-335.jsonl'), JSON.stringify(makeCostEvent()) + '\n');
 
     const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
-    const result = await Effect.runPromise(syncWalFromAllProjects());
+    const result = await syncWalFromAllProjects();
 
     expect(result.imported).toBe(1);
     expect(result.duplicates).toBe(0);
@@ -283,7 +282,7 @@ describe('syncWalFromAllProjects', () => {
     writeFileSync(walFile, JSON.stringify(event) + '\n');
 
     const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
-    await Effect.runPromise(syncWalFromAllProjects());
+    await syncWalFromAllProjects();
 
     const rows = odb.raw().prepare('SELECT source_file FROM cost_events WHERE request_id = ?').all(event.requestId) as Array<{ source_file: string }>;
     expect(rows).toHaveLength(1);
@@ -295,8 +294,8 @@ describe('syncWalFromAllProjects', () => {
     writeFileSync(join(eventsDir, 'PAN-335.jsonl'), JSON.stringify(makeCostEvent()) + '\n');
 
     const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
-    await Effect.runPromise(syncWalFromAllProjects());
-    const result = await Effect.runPromise(syncWalFromAllProjects());
+    await syncWalFromAllProjects();
+    const result = await syncWalFromAllProjects();
 
     expect(result.imported).toBe(0);
     expect(result.duplicates).toBe(1);
@@ -307,7 +306,7 @@ describe('syncWalFromAllProjects', () => {
     writeFileSync(join(eventsDir, 'PAN-335.jsonl'), 'not-valid-json\n' + JSON.stringify(makeCostEvent()) + '\n');
 
     const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
-    const result = await Effect.runPromise(syncWalFromAllProjects());
+    const result = await syncWalFromAllProjects();
 
     expect(result.imported).toBe(1);
     expect(result.errors).toHaveLength(0);
@@ -318,7 +317,7 @@ describe('syncWalFromAllProjects', () => {
     writeFileSync(join(eventsDir, 'PAN-335.jsonl'), '{"ts":"2026-01-01"}\n');
 
     const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
-    const result = await Effect.runPromise(syncWalFromAllProjects());
+    const result = await syncWalFromAllProjects();
 
     expect(result.imported).toBe(0);
   });
@@ -328,7 +327,7 @@ describe('syncWalFromAllProjects', () => {
     writeFileSync(join(eventsDir, 'README.txt'), 'not events');
 
     const { syncWalFromAllProjects } = await import('../../../src/lib/costs/sync-wal.js');
-    const result = await Effect.runPromise(syncWalFromAllProjects());
+    const result = await syncWalFromAllProjects();
 
     expect(result.filesScanned).toBe(0);
   });

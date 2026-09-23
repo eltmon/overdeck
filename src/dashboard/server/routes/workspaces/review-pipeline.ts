@@ -476,7 +476,7 @@ const postWorkspaceReviewRoute = HttpRouter.add(
 	            let artifactUrl: string | undefined;
 	            try {
 	              const { createReviewArtifactsForIssue } = await import('../../../../lib/review-artifacts.js');
-	              const artifactResult = await Effect.runPromise(createReviewArtifactsForIssue(issueId, workspacePath));
+	              const artifactResult = await createReviewArtifactsForIssue(issueId, workspacePath);
 	              const primaryArtifact = artifactResult.mergeSet?.repos.find(repo => !!repo.artifactUrl);
 	              reviewTargetBranch = artifactResult.mergeSet?.repos.find(repo => repo.repoMerge !== 'skipped')?.targetBranch;
 	              if (primaryArtifact?.artifactUrl) {

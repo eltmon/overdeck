@@ -381,7 +381,11 @@ async function getMtimeFromDisk(filePath: string): Promise<number> {
   }
 }
 
-async function loadConfigWithoutMigration(): Promise<ConfigLoadResult> {
+/**
+ * Read global and project config, merge with defaults and apply env fallbacks,
+ * without running config migrations. Cached by file mtime. Rejects on a parse error.
+ */
+export async function loadConfigNoMigration(): Promise<ConfigLoadResult> {
   const mtimes = await getConfigMtimesFromDisk();
   if (
     configCache &&
@@ -544,41 +548,30 @@ export function isTldrEnabledSync(): boolean {
  *
  * Async on purpose — dashboard request handlers read this, and the sync loader
  * stats and parses config files on the event loop, which would stall HTTP and
- * terminal traffic on a slow filesystem. It shares `loadConfigWithoutMigration`'s
+ * terminal traffic on a slow filesystem. It shares `loadConfigNoMigration`'s
  * cache, so a warm read costs one async mtime check.
  */
 export const getOpenInEditorCommand = (): Effect.Effect<string | null> =>
   Effect.tryPromise({
-    try: async () => (await loadConfigWithoutMigration()).config.ui.openInEditorCommand,
+    try: async () => (await loadConfigNoMigration()).config.ui.openInEditorCommand,
     catch: (cause) => cause,
   }).pipe(Effect.catchCause(() => Effect.succeed(DEFAULT_CONFIG.ui.openInEditorCommand)));
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Effect-native loadConfigWithoutMigration. Reads global + project config,
- * merges with defaults, applies env fallbacks. Fails with ConfigParseError
- * for malformed YAML or ConfigError for other I/O failures.
- */
-export const loadConfigNoMigration = (): Effect.Effect<
-  ConfigLoadResult,
-  ConfigError | ConfigParseError
-> =>
-  Effect.tryPromise({
-    try: () => loadConfigWithoutMigration(),
-    catch: (cause) =>
-      new ConfigError({
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
 
 export const getConversationsConfig = (): Effect.Effect<
   RuntimeConversationsConfig,
   ConfigError | ConfigParseError
 > =>
   Effect.gen(function* () {
-    const { config } = yield* loadConfigNoMigration();
+    const { config } = yield* Effect.tryPromise({
+      try: () => loadConfigNoMigration(),
+      catch: (cause) =>
+        new ConfigError({
+          message: cause instanceof Error ? cause.message : String(cause),
+          cause,
+        }),
+    });
     return resolveConversationWatchDirs({
       ...config.conversations,
       apiKeys: config.apiKeys,
@@ -611,7 +604,7 @@ export const updateConversationsConfig = (
 ): Effect.Effect<void, ConfigError | ConfigParseError> =>
   Effect.tryPromise({
     try: async () => {
-      await loadConfigWithoutMigration();
+      await loadConfigNoMigration();
       let existingContent = '{}\n';
       try {
         const content = await readFileAsync(GLOBAL_CONFIG_PATH, 'utf-8');

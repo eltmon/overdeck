@@ -569,7 +569,9 @@ export function installCliproxySync(force = false): void {
 
 /**
  * Async counterpart of installCliproxySync — safe for the event loop.
- * Uses execAsync instead of execSync so it won't block the dashboard server.
+ * Downloads and unpacks the cliproxy binary from GitHub releases; rejects on a
+ * network or extraction failure. Uses execAsync instead of execSync so it won't
+ * block the dashboard server.
  */
 export async function installCliproxy(force = false): Promise<void> {
   ensureDirs();
@@ -787,7 +789,7 @@ export async function isCliproxyRunning(): Promise<boolean> {
   return checkCliproxyPortTask();
 }
 
-/** Async counterpart of stopCliproxySync — safe for the event loop. */
+/** Async counterpart of stopCliproxySync — best-effort SIGTERM via the pidfile; safe for the event loop. */
 export async function stopCliproxy(): Promise<void> {
   const pid = readPidFile();
   if (pid && isProcessAlive(pid)) {
@@ -842,7 +844,7 @@ export async function startCliproxy(): Promise<void> {
   }
 }
 
-/** Restart cliproxy asynchronously. Safe for the event loop. */
+/** Restart cliproxy asynchronously: stop, wait 500ms, start. Safe for the event loop. */
 export async function restartCliproxy(): Promise<void> {
   await stopCliproxy();
   await new Promise((r) => setTimeout(r, 500));
