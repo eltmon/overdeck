@@ -98,3 +98,21 @@ Selection accepts only safe IDs and requires membership in the parent's verified
 descendant tree. It never interprets an ID as a path, follows directory/file
 symlinks during discovery, or searches another Codex home. Missing or unrelated
 IDs cannot fall back to the parent transcript. All discovery and reads are asynchronous.
+
+## Agent subagents (PAN-3920)
+
+Overdeck agents (work, review, plan, …) spawn subagents too — the foreman's same-family workers
+among them. Two routes read them, beside the agent's own transcript as the session index
+resolves it (`resolveAgentTranscriptCandidate`):
+
+- `GET /api/agents/:id/subagents` lists `{ subagents: [...] }` with each subagent's summary and
+  transcript `mtimeMs`. Transcript paths stay on the server.
+- `GET /api/agents/:id/conversation?subagentId=<id>` returns one subagent transcript in the
+  agent conversation response shape. An id that fails `^[A-Za-z0-9_-]+$` answers 400; an id that
+  is not that agent's subagent answers 404.
+
+A Claude subagent is `running` while its transcript changed in the last 120 s and `done`
+otherwise; a Codex child keeps the rollout's own task status. Only `claude` and `codex`
+transcripts have subagents; other harnesses answer an empty list. The Agents Directory lists
+these as `subagent` entries under their parent (`src/dashboard/server/services/agent-subagents.ts`).
+

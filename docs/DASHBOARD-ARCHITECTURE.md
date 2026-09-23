@@ -219,3 +219,34 @@ marker so the no-loss gate proves that no existing surface disappeared.
 - The planning launcher script MUST export TERM/COLORTERM/LANG for Claude Code rendering.
 - Planning sessions use `remain-on-exit on` + `destroy-unattached off` so the session
   survives after the agent exits, until the user clicks Done.
+
+## Agents Directory (PAN-3920)
+
+`/agents` opens the Agents Directory by default: a tree (location → project → issue, plus one
+"Conversations" group per project), a list of the selected node's entries, and a detail pane
+with the entry's transcript and issue context. The card grid, table and timeline stay behind
+`?view=grid|table|timeline`. The page is still behind the experimental-features gate.
+
+**Derived on read; stores nothing.** `GET /api/agent-directory?windowHours=<1..168>` (default
+24) recomputes the entries from `~/.overdeck/agents/*/state.json`, the backend pane inventory,
+the conversation list (300 rows), transcript files and `remote-state.json`
+(`src/dashboard/server/services/agent-directory.ts`). Nothing it computes is written, and no
+`agent_directory.*` event exists. The server memoizes each window's response for 3 s and shares
+one in-flight build between concurrent callers. `windowHours` outside 1–168 answers 400.
+
+Sources: native agents (every `state.json` except `conv-*` dirs), pane-only agents (panes with an
+`agentId` or `issue` token but no `state.json`, i.e. `pan spawn` panes), conversations, and the
+Claude/Codex subagents of every non-stopped conversation and agent. Agents are joined to panes by
+`BackendPane.agentId` (see TERMINAL-BACKENDS.md "Pane metadata").
+
+| Entry | `working` / `idle` / `blocked` / `done` / `unknown` | `stopped` |
+| --- | --- | --- |
+| Agent (native or pane-only) | the pane's state; a remote agent is `unknown` | pane `exited`, or no pane |
+| Conversation | `blocked` when input is pending, else `working` when a turn runs, else `idle` | session not alive |
+| Subagent | `working` when its transcript changed in the last 120 s and the parent is not stopped; else `done` | — |
+
+Live entries (not `stopped`/`done`) are always listed; the rest only when their last activity is
+inside the window, and a parent is kept whenever one of its children is. The frontend polls every
+5 s while the tab is visible and refetches (at most every 2 s) when the pane inventory changes.
+Transcripts reuse existing routes: `/api/agents/:id/conversation` (with `?subagentId=` for an
+agent's subagent) and the conversation routes. User guide: `reference/agents-directory.mdx`.

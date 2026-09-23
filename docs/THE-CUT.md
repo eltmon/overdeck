@@ -211,6 +211,7 @@ blank means the row came from the docs grep, which doesn't carry a line count.
 | Doc | `docs/master-plan-cicd-and-refactoring.md` |  | Documented deacon/patrol/merge-train/swarm/overdeck-state behavior | dropped — historical planning doc, superseded by PAN-3917 and `docs/THE-CUT.md` |
 | Doc | `docs/workflow-orchestration-landscape-kimi-k2.6.md` |  | Documented deacon/patrol/merge-train/swarm/overdeck-state behavior | dropped — historical planning doc, superseded by PAN-3917 and `docs/THE-CUT.md` |
 | Doc | `docs/workflow-orchestration-landscape.md` |  | Documented deacon/patrol/merge-train/swarm/overdeck-state behavior | dropped — historical planning doc, superseded by PAN-3917 and `docs/THE-CUT.md` |
+| View | Agents page card grid (`FleetAgentsView` default) | | The `/agents` page opened on the agent card grid | kept as `/agents?view=grid`; the default view is the Agents Directory (PAN-3920) — tree, list and transcript detail, see [DASHBOARD-ARCHITECTURE.md](DASHBOARD-ARCHITECTURE.md) "Agents Directory" |
 
 ## Notes on surviving features (not deletions, but behavior worth knowing)
 
