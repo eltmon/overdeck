@@ -457,19 +457,6 @@ export function isPlanningProposed(workspacePath: string, planningDir?: string):
   return checkPlanStatus(workspacePath, planningDir, status => status === 'proposed');
 }
 
-
-/**
- * Check whether planning has finished for this workspace — i.e., tasks have
- * been generated and the agent can (or already did) start work.
- *
- * Returns true when `plan.status` is any of: 'proposed', 'approved', 'pending',
- * 'running', 'completed', or 'blocked'.
- */
-export function isPlanningCompleteSync(workspacePath: string, planningDir?: string): boolean {
-  return checkPlanStatus(workspacePath, planningDir, status => PLANNING_FINISHED_STATUSES.has(status));
-}
-
-
 function checkPlanStatus(
   workspacePath: string,
   _planningDir: string | undefined,

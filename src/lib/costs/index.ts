@@ -67,10 +67,8 @@ export {
 export {
   appendToWalSync,
   resolveWalDir,
-  appendToWal,
 } from './wal.js';
 export {
   syncWalFromAllProjects,
-  syncWalFromDir,
   type SyncResult,
 } from './sync-wal.js';

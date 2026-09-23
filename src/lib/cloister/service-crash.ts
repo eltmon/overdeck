@@ -85,8 +85,8 @@ export function nonRestartableReason(role: string, sessionId: string | undefined
 /**
  * Poke an agent (send "are you stuck?" message).
  *
- * NOTE: runtime.sendMessage() is async — both ClaudeCodeRuntime and PiRuntime
- * are declared `async sendMessage(): Promise<void>`. A `throw` inside an
+ * NOTE: runtime.sendMessage() is async — ClaudeCodeRuntimeSync.sendMessage()
+ * is declared `async sendMessage(): Promise<void>`. A `throw` inside an
  * async function before any await still returns a rejected Promise, so the
  * surrounding try/catch CANNOT catch it. Without explicit `.catch()`, the
  * rejection becomes an UnhandledPromiseRejection and crashes the dashboard

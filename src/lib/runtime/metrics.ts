@@ -332,13 +332,6 @@ export class MetricsParseError extends Data.TaggedError('MetricsParseError')<{
   readonly cause?: unknown;
 }> {}
 
-/** Effect variant of `loadMetrics`. Returns DEFAULT_METRICS on any failure. */
-export const loadMetrics = (): Effect.Effect<MetricsData> =>
-  Effect.try({
-    try: () => loadMetricsSync(),
-    catch: () => null,
-  }).pipe(Effect.orElseSucceed(() => ({ ...DEFAULT_METRICS })));
-
 /** Effect variant of `getIssueTasks`. */
 export const getIssueTasks = (
   issueId: string,

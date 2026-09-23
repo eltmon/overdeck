@@ -155,23 +155,6 @@ export function formatAcceptanceCriteria(criteria: AcceptanceCriterion[]): strin
   return lines.join('\n').trimEnd();
 }
 
-/**
- * Check whether all acceptance criteria in a workspace plan are completed.
- *
- * @returns { allCompleted: true, incomplete: [] } when all AC are done or
- *          no plan/AC exist (legacy workspace compatibility).
- */
-export function checkAllCriteriaCompletedSync(workspacePath: string): ACCompletionResult {
-  const criteria = extractAcceptanceCriteriaSync(workspacePath);
-  if (criteria.length === 0) return { allCompleted: true, incomplete: [] };
-
-  const incomplete = criteria.filter(
-    ac => ac.status !== 'completed' && ac.status !== 'cancelled'
-  );
-
-  return { allCompleted: incomplete.length === 0, incomplete };
-}
-
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 //
 // Compose with `readWorkspacePlanProgram` from io.ts so AC extraction and AC
@@ -187,17 +170,4 @@ export const extractAcceptanceCriteria = (
     const doc = yield* readWorkspacePlan(workspacePath);
     if (!doc) return [];
     return extractACFromDocument(doc);
-  });
-
-/** Effect variant of `checkAllCriteriaCompleted`. */
-export const checkAllCriteriaCompleted = (
-  workspacePath: string,
-): Effect.Effect<ACCompletionResult, XBriefReadError> =>
-  Effect.gen(function* () {
-    const criteria = yield* extractAcceptanceCriteria(workspacePath);
-    if (criteria.length === 0) return { allCompleted: true, incomplete: [] };
-    const incomplete = criteria.filter(
-      (ac) => ac.status !== 'completed' && ac.status !== 'cancelled',
-    );
-    return { allCompleted: incomplete.length === 0, incomplete };
   });

@@ -502,16 +502,9 @@ async function stopDashboardPromise(
     await sleep(pollIntervalMs);
   }
   return false;
-}async function isTraefikContainerRunningPromise(): Promise<boolean> {
-  try {
-    const { stdout } = await execAsync(
-      'docker ps --filter "name=overdeck-traefik" --format "{{.Names}}" 2>/dev/null',
-    );
-    return stdout.trim().includes('overdeck-traefik');
-  } catch {
-    return false;
-  }
-}async function startTraefikPromise(config: PlatformConfig): Promise<void> {
+}
+
+async function startTraefikPromise(config: PlatformConfig): Promise<void> {
   if (!config.traefikEnabled) return;
   if (!existsSync(config.traefikDir)) {
     throw new StageError({
@@ -710,10 +703,6 @@ export const waitForTraefikHealth = (
   opts: { timeoutMs?: number; pollIntervalMs?: number } = {},
 ): Effect.Effect<boolean, never> =>
   Effect.promise(() => waitForTraefikHealthPromise(traefikDomain, opts));
-
-/** Effect variant of {@link isTraefikContainerRunning}. */
-export const isTraefikContainerRunning = (): Effect.Effect<boolean, never> =>
-  Effect.promise(() => isTraefikContainerRunningPromise());
 
 /** Effect variant of {@link startTraefik}. */
 export const startTraefik = (config: PlatformConfig): Effect.Effect<void, StageError> =>

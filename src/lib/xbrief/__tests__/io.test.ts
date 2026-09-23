@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { Effect } from 'effect';
 import { mkdirSync, writeFileSync, existsSync, rmSync, readFileSync } from 'fs';
 import { createHash } from 'crypto';
 import { dirname, join } from 'path';
@@ -6,7 +7,7 @@ import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
 import { applyEffectiveDifficulty } from '../../agents/tier-escalation.js';
 import { resolveTier } from '../../agents/resolve-tier.js';
-import { findPlanSync, isPlanningCompleteSync, isPlanningProposed, normalizeXBriefEnvelope, readPlanSync, readTierOverrides, readWorkspacePlanSync, recordTierPromotion, serializeXBriefDocument, updateItemStatus, updateSubItemStatus } from '../io.js';
+import { findPlanSync, isPlanningComplete, isPlanningProposed, normalizeXBriefEnvelope, readPlanSync, readTierOverrides, readWorkspacePlanSync, recordTierPromotion, serializeXBriefDocument, updateItemStatus, updateSubItemStatus } from '../io.js';
 import { planBuilder } from '../builder.js';
 import { subItemsOf, type XBriefDocument, type XBriefSubItem } from '../types.js';
 
@@ -704,58 +705,58 @@ describe('isPlanningComplete', () => {
     ['completed', 'completed'],
   ] as const)(
     'returns true when plan.status is "%s" (valid PanSpecStatus)',
-    (planStatus, specStatus) => {
+    async (planStatus, specStatus) => {
       writeMainSpec({ ...makePlanDoc(), plan: { ...makePlanDoc().plan, status: planStatus } }, specStatus);
-      expect(isPlanningCompleteSync(WORKSPACE_PATH)).toBe(true);
+      expect(await Effect.runPromise(isPlanningComplete(WORKSPACE_PATH))).toBe(true);
     },
   );
 
   it.each(['approved', 'pending', 'running', 'blocked'])(
     'returns true when plan.status is "%s" (non-PanSpecStatus, needs top-level status)',
-    (planStatus) => {
+    async (planStatus) => {
       const doc = makePlanDoc();
       doc.plan.status = planStatus;
       const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
       mkdirSync(specsDir, { recursive: true });
       writeFileSync(join(specsDir, SPEC_FILENAME), JSON.stringify({ ...doc, status: 'active' }, null, 2));
-      expect(isPlanningCompleteSync(WORKSPACE_PATH)).toBe(true);
+      expect(await Effect.runPromise(isPlanningComplete(WORKSPACE_PATH))).toBe(true);
     },
   );
 
-  it('returns false when plan.status is "draft"', () => {
+  it('returns false when plan.status is "draft"', async () => {
     const doc = makePlanDoc();
     doc.plan.status = 'draft';
     const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
     mkdirSync(specsDir, { recursive: true });
     writeFileSync(join(specsDir, SPEC_FILENAME), JSON.stringify({ ...doc, status: 'active' }, null, 2));
-    expect(isPlanningCompleteSync(WORKSPACE_PATH)).toBe(false);
+    expect(await Effect.runPromise(isPlanningComplete(WORKSPACE_PATH))).toBe(false);
   });
 
-  it('returns false when plan.status is "cancelled"', () => {
+  it('returns false when plan.status is "cancelled"', async () => {
     writeMainSpec({ ...makePlanDoc(), plan: { ...makePlanDoc().plan, status: 'cancelled' } }, 'cancelled');
-    expect(isPlanningCompleteSync(WORKSPACE_PATH)).toBe(false);
+    expect(await Effect.runPromise(isPlanningComplete(WORKSPACE_PATH))).toBe(false);
   });
 
-  it('returns false when plan has no status field', () => {
+  it('returns false when plan has no status field', async () => {
     const doc = makePlanDoc();
     delete (doc.plan as Partial<typeof doc.plan>).status;
     const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
     mkdirSync(specsDir, { recursive: true });
     writeFileSync(join(specsDir, SPEC_FILENAME), JSON.stringify({ ...doc, status: 'active' }, null, 2));
-    expect(isPlanningCompleteSync(WORKSPACE_PATH)).toBe(false);
+    expect(await Effect.runPromise(isPlanningComplete(WORKSPACE_PATH))).toBe(false);
   });
 
-  it('returns false when no plan exists', () => {
-    expect(isPlanningCompleteSync(WORKSPACE_PATH)).toBe(false);
+  it('returns false when no plan exists', async () => {
+    expect(await Effect.runPromise(isPlanningComplete(WORKSPACE_PATH))).toBe(false);
   });
 
-  it('returns false when plan.status is an explicit non-finished value', () => {
+  it('returns false when plan.status is an explicit non-finished value', async () => {
     const doc = makePlanDoc();
     doc.plan.status = 'draft';
     const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
     mkdirSync(specsDir, { recursive: true });
     writeFileSync(join(specsDir, SPEC_FILENAME), JSON.stringify({ ...doc, status: 'active' }, null, 2));
-    expect(isPlanningCompleteSync(WORKSPACE_PATH)).toBe(false);
+    expect(await Effect.runPromise(isPlanningComplete(WORKSPACE_PATH))).toBe(false);
   });
 });
 

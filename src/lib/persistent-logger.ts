@@ -10,9 +10,7 @@
  */
 
 import { appendFileSync, mkdirSync } from 'fs';
-import { appendFile, mkdir } from 'fs/promises';
 import { join } from 'path';
-import { Effect } from 'effect';
 import { getOverdeckHome } from './paths.js';
 
 function logsDir(): string {
@@ -61,35 +59,3 @@ export function logAgentLifecycleSync(agentId: string, message: string): void {
     // Non-fatal
   }
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// Logging must NEVER break recovery logic, so both Effect variants swallow all
-// errors and return Effect<void, never> — they never fail the parent Effect.
-
-/** Effect variant of {@link logDeaconEventSync}. Failures are swallowed silently. */
-export const logDeaconEvent = (message: string): Effect.Effect<void, never> =>
-  Effect.promise(async () => {
-    try {
-      const dir = logsDir();
-      await mkdir(dir, { recursive: true });
-      await appendFile(join(dir, 'deacon.log'), `[${timestamp()}] ${message}\n`);
-    } catch {
-      // Non-fatal
-    }
-  });
-
-/** Effect variant of {@link logAgentLifecycleSync}. Failures are swallowed silently. */
-export const logAgentLifecycle = (agentId: string, message: string): Effect.Effect<void, never> =>
-  Effect.promise(async () => {
-    try {
-      const dir = agentDir(agentId);
-      await mkdir(dir, { recursive: true });
-      await appendFile(
-        join(dir, 'lifecycle.log'),
-        `[${timestamp()}] ${message}\n`,
-      );
-    } catch {
-      // Non-fatal
-    }
-  });

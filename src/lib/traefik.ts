@@ -9,11 +9,9 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync, readdirSync } from 'fs';
 import { join, basename } from 'path';
 import { execSync } from 'child_process';
-import { Effect } from 'effect';
 import { TRAEFIK_DYNAMIC_DIR, TRAEFIK_CERTS_DIR, TRAEFIK_DIR, SYNC_SOURCES } from './paths.js';
 import { loadConfigSync } from './config.js';
 import { loadProjectsConfigSync } from './projects.js';
-import { FsError } from './errors.js';
 
 /**
 /**
@@ -238,19 +236,3 @@ export function cleanupStaleTlsSectionsSync(): void {
     }
   }
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Render the dashboard Traefik config from the template. */
-export const generateOverdeckTraefikConfig = (
-  mode?: TraefikRenderMode,
-): Effect.Effect<boolean, FsError> =>
-  Effect.try({
-    try: () => generateOverdeckTraefikConfigSync(mode),
-    catch: (cause) =>
-      new FsError({
-        path: TRAEFIK_DYNAMIC_DIR,
-        operation: 'generateOverdeckTraefikConfig',
-        cause,
-      }),
-  });

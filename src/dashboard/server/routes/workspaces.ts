@@ -88,7 +88,6 @@ import { findXBriefByIssue, readXBriefDocument } from '../../../lib/xbrief/xbrie
 import { criticalPath, actionableDoc } from '../../../lib/xbrief/dag.js';
 import { getChangedFiles, getDiffBase, getDiffStat, type ChangedFile } from '../../../lib/cloister/review-context.js';
 import { capturePane, listSessionNames, sessionExists } from '../../../lib/tmux.js';
-import { getUnblockedItemsSync } from '../../../lib/cloister/task-readiness.js';
 import { runVerificationForIssue } from '../../../lib/cloister/verification-runner.js';
 import { getTldrDaemonServiceSync } from '../../../lib/tldr-daemon.js';
 import { loadWorkspaceMetadataSync, listWorkspaceMetadataSync } from '../../../lib/remote/workspace-metadata.js';

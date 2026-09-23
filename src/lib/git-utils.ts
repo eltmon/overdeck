@@ -12,7 +12,7 @@ import {
 } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
-import { GitError, FsError } from './errors.js';
+import { FsError } from './errors.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -274,17 +274,6 @@ async function cleanupStaleLocksPromise(
   return result;
 }
 
-/**
- * Result of getWorkspaceGitInfo.
- * Note: `branch` is the branch name (not a hash) despite the parent function name.
- */
-export interface WorkspaceCommitInfo {
-  /** Full SHA of the HEAD commit */
-  HEAD: string;
-  /** Current branch name (e.g. "feature/pan-342") */
-  branch: string;
-}
-
 export interface WorkspaceHeadAnchorEntry {
   repoKey: string;
   sha: string;
@@ -356,22 +345,6 @@ export async function renderWorkspaceGitShowPromise(
   return sections.join('\n');
 }
 
-async function getWorkspaceGitInfoPromise(workspacePath: string): Promise<WorkspaceCommitInfo> {
-  try {
-    const [headResult, branchResult] = await Promise.all([
-      execAsync('git rev-parse HEAD', { cwd: workspacePath }),
-      execAsync('git rev-parse --abbrev-ref HEAD', { cwd: workspacePath }),
-    ]);
-    return {
-      HEAD: headResult.stdout.trim(),
-      branch: branchResult.stdout.trim(),
-    };
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`getWorkspaceGitInfo failed for ${workspacePath}: ${msg}`);
-  }
-}
-
 declare const headAnchorBrand: unique symbol;
 
 /** A producer-issued snapshot of every code HEAD in a workspace. */
@@ -439,16 +412,6 @@ export async function snapshotWorkspaceHeadsPromise(issueId: string, workspacePa
   return heads.length > 0 ? heads.join(' ') as HeadAnchor : undefined;
 }
 
-async function hasStaleLocksPromise(repoPath: string): Promise<boolean> {
-  const lockFiles = findGitLockFiles(repoPath);
-  if (lockFiles.length === 0) {
-    return false;
-  }
-
-  const processProbe = await hasRunningGitProcesses(repoPath, {});
-  return processProbe.status === 'idle';
-}
-
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /**
@@ -473,31 +436,3 @@ export const cleanupStaleLocks = (
     catch: (cause) =>
       new FsError({ path: repoPath, operation: 'cleanupStaleLocks', cause }),
   });
-
-/**
- * Effect-native getWorkspaceGitInfo. Returns the HEAD SHA and current branch
- * name. Fails with GitError if rev-parse exits non-zero (e.g. path is not a
- * git repository).
- */
-export const getWorkspaceGitInfo = (
-  workspacePath: string,
-): Effect.Effect<WorkspaceCommitInfo, GitError> =>
-  Effect.tryPromise({
-    try: () => getWorkspaceGitInfoPromise(workspacePath),
-    catch: (cause) =>
-      new GitError({
-        command: ['rev-parse', 'HEAD'],
-        stderr: cause instanceof Error ? cause.message : String(cause),
-        exitCode: -1,
-        cause,
-      }),
-  });
-
-/**
- * Effect-native hasStaleLocks — predicate variant. Never fails; defers to
- * the Promise implementation which already swallows errors conservatively.
- */
-export const hasStaleLocks = (
-  repoPath: string,
-): Effect.Effect<boolean, never> =>
-  Effect.promise(() => hasStaleLocksPromise(repoPath));

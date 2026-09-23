@@ -324,15 +324,9 @@ export function removeShadowState(
   }
 
   return state.shadowStatus !== state.trackerStatus;
-}async function getUnsyncedHistoryPromise(issueId: string): Promise<ShadowHistoryEntry[]> {
-  const state = await Effect.runPromise(getShadowState(issueId));
+}
 
-  if (!state) {
-    return [];
-  }
-
-  return state.history.filter(entry => !entry.syncedToTracker);
-}async function getPendingSyncCountPromise(): Promise<number> {
+async function getPendingSyncCountPromise(): Promise<number> {
   const states = await Effect.runPromise(listShadowedIssues());
   return states.filter(state =>
     state.shadowStatus !== state.trackerStatus
@@ -480,21 +474,6 @@ export const needsSync = (issueId: string): Effect.Effect<boolean, ShadowStateEr
     catch: (cause) =>
       new ShadowStateError({
         operation: 'needsSync',
-        issueId,
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `getUnsyncedHistory`. */
-export const getUnsyncedHistory = (
-  issueId: string,
-): Effect.Effect<ShadowHistoryEntry[], ShadowStateError> =>
-  Effect.tryPromise({
-    try: () => getUnsyncedHistoryPromise(issueId),
-    catch: (cause) =>
-      new ShadowStateError({
-        operation: 'getUnsyncedHistory',
         issueId,
         message: cause instanceof Error ? cause.message : String(cause),
         cause,

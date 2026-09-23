@@ -20,7 +20,6 @@ import {
   listShadowedIssues,
   isShadowed,
   needsSync,
-  getUnsyncedHistory,
   updateTrackerStatusCache,
   removeShadowState,
   getPendingSyncCount,
@@ -192,28 +191,6 @@ describe('shadow-state', () => {
 
     it('should return false for non-shadowed issues', async () => {
       expect(await Effect.runPromise(needsSync(getUniqueId('notshadowed')))).toBe(false);
-    });
-  });
-
-  describe('getUnsyncedHistory', () => {
-    it('should return empty array for non-shadowed issue', async () => {
-      const history = await Effect.runPromise(getUnsyncedHistory(getUniqueId('noexist')));
-      expect(history).toEqual([]);
-    });
-
-    it('should return only unsynced entries', async () => {
-      const id = getUniqueId('history');
-      await Effect.runPromise(createShadowState(id, 'open'));
-      await Effect.runPromise(updateShadowState(id, 'in_progress', 'cmd1'));
-      await Effect.runPromise(updateShadowState(id, 'closed', 'cmd2'));
-
-      let unsynced = await Effect.runPromise(getUnsyncedHistory(id));
-      expect(unsynced.length).toBe(2);
-
-      await Effect.runPromise(markAsSynced(id, 'closed'));
-
-      unsynced = await Effect.runPromise(getUnsyncedHistory(id));
-      expect(unsynced.length).toBe(0);
     });
   });
 

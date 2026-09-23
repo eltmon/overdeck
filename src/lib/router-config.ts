@@ -1,9 +1,6 @@
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
-import { mkdir, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
-import { Effect } from 'effect';
-import { FsError } from './errors.js';
 import { loadConfigSync, resolveModel } from './config-yaml.js';
 
 // claude-code-router config directory
@@ -104,22 +101,3 @@ export function writeRouterConfigSync(config: RouterConfig): void {
 export function getRouterConfigPath(): string {
   return ROUTER_CONFIG_FILE;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Effect variant of `writeRouterConfig`. Uses fs/promises so it's safe in
- *  dashboard-server-reachable code paths (no event-loop blocking). */
-export const writeRouterConfig = (
-  config: RouterConfig,
-): Effect.Effect<void, FsError> =>
-  Effect.gen(function* () {
-    yield* Effect.tryPromise({
-      try: () => mkdir(ROUTER_CONFIG_DIR, { recursive: true }),
-      catch: (cause) => new FsError({ path: ROUTER_CONFIG_DIR, operation: 'mkdir', cause }),
-    });
-    const content = JSON.stringify(config, null, 2);
-    yield* Effect.tryPromise({
-      try: () => writeFile(ROUTER_CONFIG_FILE, content, 'utf8'),
-      catch: (cause) => new FsError({ path: ROUTER_CONFIG_FILE, operation: 'write', cause }),
-    });
-  });

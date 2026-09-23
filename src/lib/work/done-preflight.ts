@@ -98,8 +98,5 @@ const processError = (op: string, cause: unknown) => new ProcessSpawnError({
   command: 'done-preflight', args: [op], message: cause instanceof Error ? cause.message : String(cause), cause,
 });
 
-export const checkUncommittedChanges = (workspacePath: string): Effect.Effect<string[], ProcessSpawnError> =>
-  Effect.tryPromise({ try: () => checkUncommittedChangesPromise(workspacePath), catch: (cause) => processError('checkUncommittedChanges', cause) });
-
 export const runPreflightChecks = (workspacePath: string, issueId: string, testWaived?: string): Effect.Effect<string[], ProcessSpawnError> =>
   Effect.tryPromise({ try: () => runPreflightChecksPromise(workspacePath, issueId, testWaived), catch: (cause) => processError('runPreflightChecks', cause) });

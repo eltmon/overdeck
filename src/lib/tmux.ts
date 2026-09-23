@@ -1,6 +1,6 @@
-import { execSync, execFileSync, execFile } from 'child_process';
+import { execFileSync, execFile } from 'child_process';
 import { promisify } from 'util';
-import { writeFileSync, chmodSync, appendFileSync, mkdirSync, existsSync, unlinkSync, readFileSync } from 'fs';
+import { writeFileSync, appendFileSync, mkdirSync, existsSync, readFileSync } from 'fs';
 import { writeFile, mkdir, unlink } from 'fs/promises';
 import { join, resolve } from 'path';
 import { homedir, tmpdir } from 'os';
@@ -688,69 +688,11 @@ export function sessionExistsSync(name: string): boolean {
   return querySessionSync(name).status === 'exists';
 }
 
-/**
- * @deprecated Legacy sync function — blocks the event loop. Use `createSession` instead.
- * Kept for CLI-only callers. Never call from server-reachable code.
- */
-export function createSessionSync(
-  name: string,
-  cwd: string,
-  initialCommand?: string,
-  options?: { env?: Record<string, string>; width?: number; height?: number }
-): void {
-  // PAN-1798: every spawn path must ensure the shared server lives in its
-  // dedicated unit before creating a session, so no client becomes the founder.
-  ensureOverdeckTmuxServerSync(buildChildEnvSync());
-  if (initialCommand && (initialCommand.includes('`') || initialCommand.includes('\n') || initialCommand.length > 500)) {
-    tmuxExecSync(buildNewSessionArgs(name, cwd, undefined, options));
-    execSync('sleep 0.5');
-
-    const tmpFile = join(tmpdir(), `pan-cmd-${name}.sh`);
-    writeFileSync(tmpFile, initialCommand);
-    chmodSync(tmpFile, '755');
-
-    try {
-      tmuxExecSync(['send-keys', '-t', name, `bash ${tmpFile}`]);
-      tmuxExecSync(['send-keys', '-t', name, 'C-m']);
-      execSync('sleep 2');
-    } finally {
-      try { unlinkSync(tmpFile); } catch {}
-    }
-    return;
-  }
-
-  tmuxExecSync(buildNewSessionArgs(name, cwd, initialCommand, options));
-}
-
 export function killSessionSync(name: string): void {
   // Exact-match target — a bare name prefix-matches and would kill e.g.
   // `agent-pan-977-review` when asked to kill `agent-pan-977`.
   // Explicit stdio — killing a maybe-dead session is routine; see querySessionSync.
   tmuxExecSync(['kill-session', '-t', exactSession(name)], { stdio: ['ignore', 'pipe', 'pipe'] });
-}
-
-
-/**
- * Send keys to a tmux session (sync, blocks event loop).
- * Only use from CLI commands — NEVER from the dashboard server.
- */
-export function sendKeysSync(sessionName: string, keys: string, caller?: string): void {
-  validateSessionName(sessionName);
-  logSendKeys(sessionName, keys, caller);
-
-  const sendId = randomUUID();
-  const tmpFile = join(tmpdir(), `pan-sendkeys-${sendId}.txt`);
-  const bufferName = `pan-${sendId}`;
-  try {
-    writeFileSync(tmpFile, keys);
-    tmuxExecSync(['load-buffer', '-b', bufferName, tmpFile]);
-    tmuxExecSync(['paste-buffer', '-b', bufferName, '-t', sessionName]);
-    try { tmuxExecSync(['delete-buffer', '-b', bufferName], { stdio: 'ignore' }); } catch {}
-    execSync('sleep 0.6');
-    tmuxExecSync(['send-keys', '-t', sessionName, 'C-m']);
-  } finally {
-    try { unlinkSync(tmpFile); } catch {}
-  }
 }
 
 export function capturePaneSync(sessionName: string, lines: number = 50): string {

@@ -286,6 +286,9 @@ export type AgentRuntimeError =
 /**
  * Runtime interface whose side-effecting methods return typed Effects. Pure-sync
  * introspection methods stay sync because they read in-memory state.
+ *
+ * Its only remaining implementor is OhmypiRuntime (never constructed); delete this
+ * interface and AgentRuntimeError together with it in #4003 (PAN-3958).
  */
 export interface AgentRuntime {
   readonly name: RuntimeName;

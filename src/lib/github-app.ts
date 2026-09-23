@@ -70,13 +70,6 @@ export interface GitHubPullRequestState extends GitHubPullRequestRef {
   checksFailed: boolean;
 }
 
-export interface GitHubPullRequestHeadState extends GitHubPullRequestRef {
-  url?: string;
-  state: 'OPEN' | 'CLOSED';
-  merged: boolean;
-  headSha: string;
-}
-
 export interface GitHubPullRequestForHead {
   number: number;
   state: 'open' | 'closed';
@@ -549,29 +542,6 @@ async function getCommitCheckState(
   };
 }
 
-async function getPullRequestHeadStatePromise(
-  owner: string,
-  repo: string,
-  number: number,
-): Promise<GitHubPullRequestHeadState> {
-  const pull = await githubApi<{
-    html_url?: string;
-    state: 'open' | 'closed';
-    merged?: boolean;
-    head?: { sha?: string };
-  }>(`/repos/${owner}/${repo}/pulls/${number}`);
-
-  return {
-    owner,
-    repo,
-    number,
-    url: pull.html_url,
-    state: pull.state === 'open' ? 'OPEN' : 'CLOSED',
-    merged: pull.merged === true,
-    headSha: pull.head?.sha || '',
-  };
-}
-
 export async function listPullRequestsForHeadPromise(
   owner: string,
   repo: string,
@@ -911,17 +881,6 @@ export const getPullRequestState = (
   Effect.tryPromise({
     try: () => getPullRequestStatePromise(owner, repo, number),
     catch: apiCatch('getPullRequestState'),
-  });
-
-/** Effect-native lightweight PR state fetch without commit status/check aggregation. */
-export const getPullRequestHeadState = (
-  owner: string,
-  repo: string,
-  number: number,
-): Effect.Effect<GitHubPullRequestHeadState, GitHubApiError> =>
-  Effect.tryPromise({
-    try: () => getPullRequestHeadStatePromise(owner, repo, number),
-    catch: apiCatch('getPullRequestHeadState'),
   });
 
 /** Effect-native listPullRequestsForHead — App REST head lookup, no GraphQL. */

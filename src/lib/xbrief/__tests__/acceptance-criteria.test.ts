@@ -6,7 +6,6 @@ import {
   extractAcceptanceCriteriaSync,
   extractACFromDocument,
   formatAcceptanceCriteria,
-  checkAllCriteriaCompletedSync,
 } from '../acceptance-criteria.js';
 import type { XBriefDocument } from '../types.js';
 
@@ -201,83 +200,3 @@ describe('formatAcceptanceCriteria', () => {
   });
 });
 
-describe('checkAllCriteriaCompleted', () => {
-  it('returns allCompleted=true when no plan exists (legacy compat)', () => {
-    const result = checkAllCriteriaCompletedSync(WORKSPACE_PATH);
-    expect(result.allCompleted).toBe(true);
-    expect(result.incomplete).toEqual([]);
-  });
-
-  it('returns allCompleted=true when all AC are completed', () => {
-    const doc = makePlanWithAC([{
-      id: 'item-1',
-      title: 'Task',
-      subItems: [
-        { id: 'item-1.ac1', title: 'Done', status: 'completed' },
-        { id: 'item-1.ac2', title: 'Also done', status: 'completed' },
-      ],
-    }]);
-    writePlan(doc);
-
-    const result = checkAllCriteriaCompletedSync(WORKSPACE_PATH);
-    expect(result.allCompleted).toBe(true);
-    expect(result.incomplete).toEqual([]);
-  });
-
-  it('returns incomplete AC when some are pending', () => {
-    const doc = makePlanWithAC([{
-      id: 'item-1',
-      title: 'Task',
-      subItems: [
-        { id: 'item-1.ac1', title: 'Done', status: 'completed' },
-        { id: 'item-1.ac2', title: 'Not done', status: 'pending' },
-      ],
-    }]);
-    writePlan(doc);
-
-    const result = checkAllCriteriaCompletedSync(WORKSPACE_PATH);
-    expect(result.allCompleted).toBe(false);
-    expect(result.incomplete).toHaveLength(1);
-    expect(result.incomplete[0].title).toBe('Not done');
-  });
-
-  it('treats cancelled AC as completed (not blocking)', () => {
-    const doc = makePlanWithAC([{
-      id: 'item-1',
-      title: 'Task',
-      subItems: [
-        { id: 'item-1.ac1', title: 'Done', status: 'completed' },
-        { id: 'item-1.ac2', title: 'Cancelled', status: 'cancelled' },
-      ],
-    }]);
-    writePlan(doc);
-
-    const result = checkAllCriteriaCompletedSync(WORKSPACE_PATH);
-    expect(result.allCompleted).toBe(true);
-  });
-
-  it('does not block completion on deferred item acceptance criteria', () => {
-    const doc = makePlanWithAC([{
-      id: 'deferred-item',
-      title: 'Deferred task',
-      status: 'deferred',
-      metadata: { deferred: true },
-      subItems: [
-        { id: 'deferred-item.ac1', title: 'Deferred and not done', status: 'pending' },
-      ],
-    }]);
-    writePlan(doc);
-
-    const result = checkAllCriteriaCompletedSync(WORKSPACE_PATH);
-    expect(result.allCompleted).toBe(true);
-    expect(result.incomplete).toEqual([]);
-  });
-
-  it('returns allCompleted=true when items have no AC subItems', () => {
-    const doc = makePlanWithAC([{ id: 'item-1', title: 'Task' }]);
-    writePlan(doc);
-
-    const result = checkAllCriteriaCompletedSync(WORKSPACE_PATH);
-    expect(result.allCompleted).toBe(true);
-  });
-});

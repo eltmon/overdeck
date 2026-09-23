@@ -512,16 +512,6 @@ function applyAgentFailure(state: AgentState, reason: string): void {
   }
 }
 
-/** Records one failed resume/crash observation for later backoff and troubled gating. */
-export function recordAgentFailureSync(agentId: string, reason: string): boolean {
-  const state = getAgentStateSync(agentId);
-  if (!state) return false;
-
-  applyAgentFailure(state, reason);
-  saveAgentStateSync(state);
-  return true;
-}
-
 export const recordAgentFailure = (agentId: string, reason: string): Effect.Effect<AgentState | null, FsError> =>
   Effect.gen(function* () {
     const state = yield* getAgentState(agentId);

@@ -2,15 +2,7 @@
  * xBRIEF DAG utilities — critical path, graph analysis, wave scheduling, per-item dispatch
  */
 import { existsSync } from 'fs';
-import { mkdir, readdir, readFile, rename, rm, writeFile } from 'fs/promises';
-import { dirname, join } from 'path';
-import { Data, Effect } from 'effect';
 import { subItemsOf, type XBriefDocument, type XBriefItem, type XBriefItemStatus, type XBriefSubItem } from './types.js';
-import {
-  getProjectConfigFromWorkspacePath,
-  resolveProjectForIssue,
-} from '../overdeck/issue-projects.js';
-import { normalizeXBriefEnvelope, serializeXBriefDocument } from './io.js';
 
 export interface WaveItem {
   id: string;
@@ -680,22 +672,6 @@ export interface PersistedTaskOperation extends TaskOperation {
 
 export const activePlanWriters = new Map<string, string>();
 
-export class XBriefDagError extends Data.TaggedError('XBriefDagError')<{
-  readonly planPath: string;
-  readonly operation: string;
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
-
-function liftDagError(planPath: string, operation: string, cause: unknown): XBriefDagError {
-  return new XBriefDagError({
-    planPath,
-    operation,
-    message: cause instanceof Error ? cause.message : String(cause),
-    cause,
-  });
-}
-
 export type TaskCommand = 'next' | 'show' | TaskOperationType;
 
 export interface TaskCommandOptions {
@@ -707,16 +683,6 @@ export interface TaskCommandOptions {
   reason?: string;
   mergedItemIds?: Set<string>;
 }
-
-async function readPlanFileFromDisk(planPath: string): Promise<XBriefDocument> {
-  return normalizeXBriefEnvelope(JSON.parse(await readFile(planPath, 'utf-8'))) as XBriefDocument;
-}
-
-export const readPlanFile = (planPath: string): Effect.Effect<XBriefDocument, XBriefDagError> =>
-  Effect.tryPromise({
-    try: () => readPlanFileFromDisk(planPath),
-    catch: (cause) => liftDagError(planPath, 'readPlanFile', cause),
-  });
 
 export interface PromptSizeVerification {
   fullPlanBytes: number;

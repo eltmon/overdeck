@@ -25,13 +25,10 @@ import { homedir } from 'node:os'
 import { promisify } from 'node:util'
 import { exec } from 'node:child_process'
 import { request as httpRequest } from 'node:http'
-import { Effect } from 'effect'
 import { findRolloutPath } from './codex-rollout-path.js'
 import yaml from 'js-yaml'
 import type {
-  AgentRuntime,
   AgentRuntimeSync,
-  AgentRuntimeError,
   HarnessBehavior,
   Heartbeat,
   TokenUsage,
@@ -43,7 +40,6 @@ import type {
 import { CODEX_BEHAVIOR } from './behavior.js'
 import { syncCodexSkillsIntoHome } from './codex-skills.js'
 import { tmuxCreateSession, tmuxKillSession, tmuxSessionExists } from './tmux-cli.js'
-import { TmuxError, ProcessSpawnError, ProcessTimeoutError } from '../errors.js'
 import { prepareHarnessLaunch } from '../harness-binary.js'
 import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js'
 import { appendSessionIdToHistory } from '../session-history.js'
@@ -866,90 +862,4 @@ function collectRollouts(dir: string, out: Session[]): void {
 
 export function createCodexRuntimeSync(): CodexRuntimeSync {
   return new CodexRuntimeSync()
-}
-
-// ─── Effect variant ────────────────────────────────────────────────────────────
-
-export class CodexRuntime implements AgentRuntime {
-  readonly name = 'codex' as const
-  private readonly inner: CodexRuntimeSync
-
-  constructor(inner: CodexRuntimeSync = new CodexRuntimeSync()) {
-    this.inner = inner
-  }
-
-  getSessionPath(agentId: string): string | null {
-    return this.inner.getSessionPath(agentId)
-  }
-  getHarnessBehavior(): HarnessBehavior {
-    return this.inner.getHarnessBehavior()
-  }
-  getLastActivity(agentId: string): Date | null {
-    return this.inner.getLastActivity(agentId)
-  }
-  getHeartbeat(agentId: string): Heartbeat | null {
-    return this.inner.getHeartbeat(agentId)
-  }
-  getTokenUsage(agentId: string): TokenUsage | null {
-    return this.inner.getTokenUsage(agentId)
-  }
-  getSessionCost(agentId: string): CostBreakdown | null {
-    return this.inner.getSessionCost(agentId)
-  }
-  listSessions(workspace?: string): Session[] {
-    return this.inner.listSessions(workspace)
-  }
-
-  sendMessage(agentId: string, message: string): Effect.Effect<void, AgentRuntimeError> {
-    return Effect.tryPromise({
-      try: () => this.inner.sendMessage(agentId, message),
-      catch: (cause) =>
-        new TmuxError({
-          command: 'codex-exec-resume',
-          message: cause instanceof Error ? cause.message : String(cause),
-          cause,
-        }),
-    })
-  }
-
-  killAgent(agentId: string): Effect.Effect<void, AgentRuntimeError> {
-    return Effect.tryPromise({
-      try: () => this.inner.killAgent(agentId),
-      catch: (cause) =>
-        new TmuxError({
-          command: 'kill-session',
-          message: cause instanceof Error ? cause.message : String(cause),
-          cause,
-        }),
-    })
-  }
-
-  spawnAgent(config: SpawnConfig): Effect.Effect<Agent, AgentRuntimeError> {
-    return Effect.tryPromise({
-      try: () => this.inner.spawnAgent(config),
-      catch: (cause) => {
-        if (cause instanceof CodexSpawnTimeout) {
-          return new ProcessTimeoutError({
-            command: 'codex',
-            args: ['exec'],
-            timeoutMs: 60_000,
-          })
-        }
-        return new ProcessSpawnError({
-          command: 'codex',
-          args: ['exec'],
-          message: cause instanceof Error ? cause.message : String(cause),
-          cause,
-        })
-      },
-    })
-  }
-
-  isRunning(agentId: string): Effect.Effect<boolean> {
-    return Effect.promise(() => this.inner.isRunning(agentId))
-  }
-}
-
-export function createCodexRuntime(): CodexRuntime {
-  return new CodexRuntime()
 }

@@ -7,7 +7,6 @@ import { CodexRuntimeSync, findRolloutPath, writeThreadId, recordCodexRolloutSes
 import { readSessionIndexSync } from '../../session-history.js'
 import { getGlobalRegistry, getRuntime, setGlobalRegistry, RuntimeRegistry } from '../index.js'
 import { createClaudeCodeRuntimeSync } from '../claude-code.js'
-import { createPiRuntimeSync } from '../pi.js'
 import { createCodexRuntimeSync } from '../codex.js'
 
 function withFakeCodexHome(): { codexHome: string; agentsHome: string; sharedSkills: string; cleanup: () => void } {
@@ -632,7 +631,6 @@ describe('getRuntimeForAgent — codex dispatch', () => {
   it('returns the Codex runtime for an agent whose state has harness=codex', () => {
     const registry = new RuntimeRegistry()
     registry.register(createClaudeCodeRuntimeSync())
-    registry.register(createPiRuntimeSync())
     registry.register(createCodexRuntimeSync())
     setGlobalRegistry(registry)
 

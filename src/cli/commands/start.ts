@@ -79,7 +79,7 @@ async function updateLinearToInProgress(apiKey: string, issueIdentifier: string)
   }
 }
 
-import { shouldSkipTrackerUpdate, getShadowModeStatus } from '../../lib/shadow-mode.js';
+import { shouldSkipTrackerUpdate } from '../../lib/shadow-mode.js';
 import { createShadowState, updateShadowState } from '../../lib/shadow-state.js';
 import { getDashboardApiUrlSync, loadConfigSync } from '../../lib/config.js';
 import {

@@ -129,19 +129,6 @@ function dangerBanner(operation: DangerousOp, cwd: string, reason: string): void
     encoding: 'utf-8',
     timeout: opts.timeoutMs ?? 15_000,
   });
-}async function runGitCheckoutOverwritePromise(opts: {
-  workspacePath: string;
-  /** Ref to read files from (e.g. "main", "HEAD"). */
-  ref: string;
-  reason: string;
-  timeoutMs?: number;
-}): Promise<{ stdout: string; stderr: string }> {
-  dangerBanner('git_checkout_overwrite', opts.workspacePath, `${opts.reason} ← ${opts.ref}`);
-  return execAsync(`git checkout ${shellEscape(opts.ref)} -- .`, {
-    cwd: opts.workspacePath,
-    encoding: 'utf-8',
-    timeout: opts.timeoutMs ?? 30_000,
-  });
 }
 
 function shellEscape(s: string): string {
@@ -230,23 +217,6 @@ export const runGitResetHard = (opts: {
     catch: (cause) =>
       new DangerousGitOpError({
         operation: 'git_reset_hard',
-        reason: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `runGitCheckoutOverwrite`. */
-export const runGitCheckoutOverwrite = (opts: {
-  workspacePath: string;
-  ref: string;
-  reason: string;
-  timeoutMs?: number;
-}): Effect.Effect<{ stdout: string; stderr: string }, DangerousGitOpError> =>
-  Effect.tryPromise({
-    try: () => runGitCheckoutOverwritePromise(opts),
-    catch: (cause) =>
-      new DangerousGitOpError({
-        operation: 'git_checkout_overwrite',
         reason: cause instanceof Error ? cause.message : String(cause),
         cause,
       }),

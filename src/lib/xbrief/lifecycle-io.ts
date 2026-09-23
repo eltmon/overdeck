@@ -232,32 +232,6 @@ export function updatePlanStatus(filePath: string, newStatus: string): void {
   renameSync(tmp, filePath);
 }
 
-async function moveXBriefPromise(
-  projectRoot: string,
-  issueId: string,
-  targetDir: XBriefLifecycleDir,
-): Promise<{ from: FoundXBrief; toPath: string }> {
-  const found = findXBriefByIssueSync(projectRoot, issueId);
-  if (!found) {
-    throw new Error(`No xBRIEF found for issue ${issueId} under ${projectRoot}`);
-  }
-
-  ensureXBriefDirsSync(projectRoot);
-  const ensured = ensurePanSpecForIssue(projectRoot, found);
-  const updatedSpec = updateSpecStatusSync(projectRoot, issueId, targetDir);
-  if (!updatedSpec) {
-    throw new Error(`Failed to update pan spec status for ${issueId}`);
-  }
-
-  // PAN-3917: the spec is a tracked file in the plan home; the agent that
-  // changed it commits it on its feature branch.
-  invalidateXBriefIndex(projectRoot);
-  return {
-    from: found,
-    toPath: updatedSpec.path,
-  };
-}
-
 export interface XBriefTransitionResult {
   fromDir: XBriefLifecycleDir;
   toDir: XBriefLifecycleDir;
@@ -427,17 +401,6 @@ export const findXBriefByIssue = (
   Effect.try({
     try: () => findXBriefByIssueSync(projectRoot, issueId),
     catch: (cause) => new FsError({ path: projectRoot, operation: 'findXBriefByIssue', cause }),
-  });
-
-/** Effect variant of `moveXBrief`. */
-export const moveXBrief = (
-  projectRoot: string,
-  issueId: string,
-  targetDir: XBriefLifecycleDir,
-): Effect.Effect<{ from: FoundXBrief; toPath: string }, FsError> =>
-  Effect.tryPromise({
-    try: () => moveXBriefPromise(projectRoot, issueId, targetDir),
-    catch: (cause) => new FsError({ path: projectRoot, operation: 'moveXBrief', cause }),
   });
 
 /** Effect variant of `transitionXBriefOnMain`. */
