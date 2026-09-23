@@ -7,7 +7,7 @@ import { readdir } from 'node:fs/promises';
 
 import { agentsRoot, isWorkerId } from './ids.js';
 import { latestWorkerReport, type WorkerReport } from './report.js';
-import { readWorkerFacts, type WorkerFacts } from './start.js';
+import { readWorkerFacts, type WorkerFacts } from './facts.js';
 
 export interface WorkerListing {
   readonly id: string;

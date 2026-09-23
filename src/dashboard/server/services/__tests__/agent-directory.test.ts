@@ -296,6 +296,75 @@ describe('buildAgentDirectory', () => {
     expect(projectKeyForIssue).toHaveBeenCalledTimes(1);
     expect(projectKeyForPath).toHaveBeenCalledTimes(1);
   });
+
+  // PAN-3920 W15: registered workers.
+  it('shows a worker under its parent conversation and its issue', async () => {
+    const result = await buildAgentDirectory(24, deps({
+      listAgentStates: () => [agent({
+        id: 'agent-pan-1-worker-2',
+        role: 'worker',
+        parentId: 'conv-orchestrator',
+        workspace: '/home/op/Projects/overdeck/workspaces/feature-pan-1/.swarm/worker-2',
+      })],
+      getBackendPanes: async () => [pane({ id: 'w1:p9', agentId: 'agent-pan-1-worker-2', issue: 'PAN-1', role: 'worker', state: 'working' })],
+      listConversations: async () => [conversation({ name: 'orchestrator', tmuxSession: 'conv-orchestrator' })],
+      readWorkerName: async () => 'second-opinion',
+      latestWorkerReportAt: async () => null,
+    }));
+    const worker = result.entries.find((entry) => entry.id === 'agent-pan-1-worker-2');
+    expect(worker).toMatchObject({
+      kind: 'agent',
+      role: 'worker',
+      label: 'worker · PAN-1 · second-opinion',
+      issueId: 'PAN-1',
+      parentId: 'conv:orchestrator',
+      state: 'working',
+      projectKey: 'overdeck',
+      transcript: { route: 'agent', agentId: 'agent-pan-1-worker-2' },
+    });
+    expect(result.entries.map((entry) => entry.id)).toContain('conv:orchestrator');
+  });
+
+  it('labels a worker by number and keeps an agent parent id as is', async () => {
+    const result = await buildAgentDirectory(24, deps({
+      listAgentStates: () => [
+        agent({ id: 'agent-pan-1-review', role: 'review' }),
+        agent({ id: 'agent-pan-1-worker-3', role: 'worker', parentId: 'agent-pan-1-review' }),
+      ],
+      readWorkerName: async () => null,
+      latestWorkerReportAt: async () => null,
+    }));
+    expect(result.entries.find((entry) => entry.id === 'agent-pan-1-worker-3')).toMatchObject({
+      label: 'worker · PAN-1 · 3',
+      parentId: 'agent-pan-1-review',
+    });
+  });
+
+  it('marks an idle worker done when its latest report is newer than the idle transition', async () => {
+    const idleSince = NOW - 30_000;
+    const build = (reportAt: number | null) => buildAgentDirectory(24, deps({
+      listAgentStates: () => [agent({ id: 'agent-pan-1-worker-1', role: 'worker', parentId: 'agent-pan-1' })],
+      getBackendPanes: async () => [pane({ id: 'w1:p3', agentId: 'agent-pan-1-worker-1', role: 'worker', state: 'idle', stateSince: idleSince })],
+      readWorkerName: async () => null,
+      latestWorkerReportAt: async () => reportAt,
+    }));
+
+    // Newer than the idle transition, or written in the turn that just ended.
+    expect((await build(idleSince + 1_000)).entries[0]!.state).toBe('done');
+    expect((await build(idleSince - 20_000)).entries[0]!.state).toBe('done');
+    // A report from an earlier turn: the follow-up went idle without reporting.
+    expect((await build(idleSince - 30 * 60_000)).entries[0]!.state).toBe('idle');
+    expect((await build(null)).entries[0]!.state).toBe('idle');
+  });
+
+  it('never marks a non-worker done from a report', async () => {
+    const result = await buildAgentDirectory(24, deps({
+      listAgentStates: () => [agent({ id: 'agent-pan-1' })],
+      getBackendPanes: async () => [pane({ id: 'w1:p1', agentId: 'agent-pan-1', state: 'idle' })],
+      latestWorkerReportAt: async () => NOW,
+    }));
+    expect(result.entries[0]!.state).toBe('idle');
+  });
 });
 
 describe('getAgentDirectory', () => {

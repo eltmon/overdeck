@@ -12,14 +12,17 @@
  * resolve inside the issue workspace. The project's primary checkout is never
  * a worker's directory.
  */
-import { access, readFile, writeFile } from 'node:fs/promises';
+import { access } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import type { RuntimeName } from '../../runtimes/types.js';
 import { createItemWorktree, worktreeBranch } from '../../workspaces/item-worktree.js';
 import type { AgentState } from '../agent-state-read.js';
 import { removeAgentStateDir } from '../state-dir-removal.js';
-import { agentsRoot, allocateWorkerId, workerDir, workerFactsPath, workerNumber } from './ids.js';
+import { writeWorkerFacts as writeFacts, type WorkerFacts } from './facts.js';
+import { agentsRoot, allocateWorkerId, workerDir, workerNumber } from './ids.js';
+
+export { readWorkerFacts, type WorkerFacts } from './facts.js';
 
 export interface StartWorkerOptions {
   issueId: string;
@@ -40,18 +43,6 @@ export interface StartedWorker {
   cwd: string;
   branch: string | null;
   paneReady: true;
-}
-
-/** The write-once launch facts in `worker.json`. No live state. */
-export interface WorkerFacts {
-  id: string;
-  issueId: string;
-  parentId: string | null;
-  readOnly: boolean;
-  cwd: string;
-  branch: string | null;
-  name: string | null;
-  startedAt: string;
 }
 
 export type SpawnRunForWorker = (
@@ -111,19 +102,6 @@ async function defaultSpawnRun(...args: Parameters<SpawnRunForWorker>): Promise<
 async function defaultResolveWorkspace(issueId: string): Promise<string> {
   const { defaultRunWorkspace } = await import('../spawn-prep.js');
   return defaultRunWorkspace(issueId);
-}
-
-async function writeFacts(facts: WorkerFacts): Promise<void> {
-  await writeFile(workerFactsPath(facts.id), `${JSON.stringify(facts, null, 2)}\n`, { flag: 'wx' });
-}
-
-/** Read a worker's `worker.json`; null when it is missing or unreadable. */
-export async function readWorkerFacts(id: string): Promise<WorkerFacts | null> {
-  try {
-    return JSON.parse(await readFile(workerFactsPath(id), 'utf8')) as WorkerFacts;
-  } catch {
-    return null;
-  }
 }
 
 export async function startWorker(options: StartWorkerOptions, deps: StartWorkerDeps = {}): Promise<StartedWorker> {
