@@ -46,7 +46,6 @@ const KNOWN_CALL_SITES = new Set([
   'lib/cloister/ci-failure-feedback.ts|await messageAgent(agentId, message);',
   'lib/cloister/deacon-api-recovery.ts|await deliverAgentMessage(pane.agentId, CONTINUE_MSG, \'deacon-lite:checkApiErrorAgents\');',
   'lib/cloister/deacon-lite.ts|await deliverAgentMessage(',
-  'lib/cloister/deacon-strike-landing.ts|deliverRecovery: (agentId, message, dedupKey) => messageAgent(agentId, message, \'deacon-strike-landing\', { owesRework: true, dedupKey }),',
   'lib/cloister/deacon-swarm-completion.ts|await messageAgent(',
   'lib/cloister/deacon-swarm.ts|sendStallEvent: (agentId, message) => messageAgent(agentId, message, \'deacon:swarm-stall\'),',
   'lib/cloister/feedback-target.ts|const result = await resumeAgent(agentId);',

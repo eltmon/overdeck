@@ -87,7 +87,8 @@ export interface SpawnOptions {
   prompt?: string;
   /**
    * Spawn role. Defaults to 'work'. The 'strike' role is the bypass path that
-   * skips plan/review/test/ship and lands directly on main — see roles/strike.md.
+   * skips plan/review/test/ship and ends with a PR the operator merges — see
+   * roles/strike.md.
    * Strike sessions are named `strike-<issue-id>` instead of `agent-<issue-id>`.
    */
   role?: 'work' | 'strike' | 'knowledge';
