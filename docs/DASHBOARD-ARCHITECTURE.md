@@ -259,8 +259,11 @@ top of the entry state: the issue's idle work agent shows `stuck` or `API error`
 `deriveIssueState` reports that attention. The UI never prints `unknown`.
 
 Sources: native agents (every `state.json` except `conv-*` dirs), pane-only agents (panes with an
-`agentId` or `issue` token but no `state.json`, i.e. `pan spawn` panes), conversations, and the
-Claude/Codex subagents of every non-stopped conversation and agent. Agents are joined to panes by
+`agentId` or `issue` token but no `state.json`, i.e. `pan spawn` panes), conversations, the
+Claude/Codex subagents of every non-stopped conversation and agent, and external agents (every
+`~/.overdeck/agents/ext-*/registration.json`, `src/dashboard/server/services/agent-directory-external.ts`).
+An external agent's `parentId` naming a conversation's tmux session nests it under that
+conversation, like a worker's. Agents are joined to panes by
 `BackendPane.agentId` (see TERMINAL-BACKENDS.md "Pane metadata").
 
 | Entry | `working` / `idle` / `blocked` / `done` / `unknown` | `stopped` |
@@ -268,9 +271,28 @@ Claude/Codex subagents of every non-stopped conversation and agent. Agents are j
 | Agent (native or pane-only) | the pane's state; a remote agent is `unknown` | pane `exited`, or no pane; a remote agent whose `remote-state.json` status is `stopped` or `error` |
 | Conversation | `blocked` when input is pending, else `working` when a turn runs, else `idle` | session not alive |
 | Subagent | `working` when its transcript changed in the last 120 s and the parent is not stopped; else `done` | — |
+| External agent | `working` when the recorded pid is alive with its recorded start time (D21); else `done` when the transcript's last turn is complete; a pid-less registration is `working` while its transcript changed in the last 120 s | dead pid (or none) and an incomplete transcript |
 
 Live entries (not `stopped`/`done`) are always listed; the rest only when their last activity is
 inside the window, and a parent is kept whenever one of its children is. The frontend polls every
 5 s while the tab is visible and refetches (at most every 2 s) when the pane inventory changes.
 Transcripts reuse existing routes: `/api/agents/:id/conversation` (with `?subagentId=` for an
 agent's subagent) and the conversation routes. User guide: `reference/agents-directory.mdx`.
+
+**External agents (PAN-3920 Phase C).** An agent another tool launched is recorded, never
+inferred, by a write-once `~/.overdeck/agents/ext-<source>-<slug>/registration.json` (flag `wx`)
+plus the append-only `sessions.json`, whose `path` makes the agent transcript route serve it
+unchanged (the route takes the registration's `cwd` as the workspace and makes no tmux lookup).
+The registration holds facts only: who launched it, the external id, harness, model, cwd, issue,
+parent, label, pid and the pid's start time (field 22 of `/proc/<pid>/stat`). Liveness (D21) is
+`/proc/<pid>/stat` existing with the same start time, `kill(pid, 0)` without `/proc`, and no
+subprocess. Two writers share one core (`src/lib/agents/external-register.ts`,
+`external-registry.ts`): `pan worker register` / `POST /api/workers/register` (internal-token
+auth; the `codex-plugin` source is reserved), and the Codex-plugin adapter
+(`services/codex-plugin-importer.ts`), which the primary dashboard starts from `main.ts`. The
+adapter scans `~/.claude/plugins/data/codex-openai-codex/state/*/jobs/*.json` every 15 s
+(`OVERDECK_CODEX_PLUGIN_DATA` overrides the root), registers each job the first time it sees it
+with the parent resolved then (conversation by Claude session, else the agent or conversation
+whose `sessions.json` holds that session, else `claude-session:<uuid>`), and links the job's
+Codex rollout once its thread id is known. It never writes under `~/.claude/plugins`. Cleanup
+keeps `ext-*` directories (`isExternalAgentDirectory`).

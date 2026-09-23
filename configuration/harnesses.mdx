@@ -551,15 +551,20 @@ agents the same. See [Workers](/reference/workers) for the commands.
 
 | | Overdeck worker (`pan worker run`) | Harness plugin (for example the Codex plugin) |
 | --- | --- | --- |
-| Visibility | In the Agents Directory, under its parent and its issue | None, unless something registers it with Overdeck |
-| Issue link | Always linked to an issue | None |
-| Transcript | On the agent transcript route, like any agent | Only in the plugin's own files |
+| Visibility | In the Agents Directory, under its parent and its issue | Codex-plugin jobs appear in the Agents Directory as read-only external agents; other plugins only if something runs `pan worker register` |
+| Issue link | Always linked to an issue | Only when the job ran in a `workspaces/feature-<issue>` directory |
+| Transcript | On the agent transcript route, like any agent | Codex-plugin jobs: the Codex rollout, read-only on the agent transcript route |
 | Cost | Attributed to the issue | Not attributed |
 | Control | `pan tell`, `pan kill`, restart | None from Overdeck |
 | Harness and model | Any harness through role routing (`roles.worker`), or `--harness` / `--model` | The plugin's own |
 | Result | The report comes back to the caller on stdout | The plugin returns its result as a tool result |
 | Sandbox | None. `--read-only` adds a PATH shim against accidental git writes to the issue's repository; it restricts no file or network writes | The plugin's file-system and network sandbox |
 | Setup | Needs the issue's workspace (`pan start` first) | None |
+
+Codex-plugin jobs are registered automatically the first time the dashboard
+sees them, so they are visible, but they stay read-only: Overdeck cannot tell,
+stop or restart them, and their cost is not attributed. See
+[Workers — Externally spawned agents](/reference/workers#externally-spawned-agents).
 
 ## ToS rules
 
