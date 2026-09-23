@@ -58,8 +58,18 @@ beforeEach(() => {
     if (path === '/.dockerenv' || path === '/run/.containerenv') throw new Error('missing');
     return undefined;
   });
-  execAsyncMock.mockResolvedValue({ stdout: '', stderr: '' });
+  execAsyncMock.mockImplementation(async (command: string) => managerAnswer(command));
 });
+
+/** Default systemctl answers: a `running` manager, empty output for everything else. */
+function managerAnswer(command: string, state = 'running'): { stdout: string; stderr: string } {
+  return { stdout: command === 'systemctl --user is-system-running' ? `${state}\n` : '', stderr: '' };
+}
+
+/** How `promisify(exec)` rejects on a non-zero exit: the output rides on the error. */
+function exitError(stdout: string, code = 1): Error {
+  return Object.assign(new Error(`Command failed (exit ${code})`), { code, stdout, stderr: '' });
+}
 
 afterEach(() => {
   process.env = originalEnv;
@@ -79,6 +89,44 @@ describe('systemdUserAvailable', () => {
     expect(execAsyncMock).toHaveBeenNthCalledWith(2, 'systemctl --user is-system-running', expect.objectContaining({
       timeout: expect.any(Number),
     }));
+  });
+
+  it.each(['degraded', 'starting', 'initializing'])(
+    'returns true for a %s user manager (is-system-running exits non-zero)',
+    async (state) => {
+      execAsyncMock.mockImplementation(async (command: string) => {
+        if (command === 'systemctl --user is-system-running') throw exitError(`${state}\n`);
+        return managerAnswer(command);
+      });
+      const { systemdUserAvailable } = await import('../systemd.js');
+
+      await expect(systemdUserAvailable()).resolves.toBe(true);
+    },
+  );
+
+  it.each(['offline', 'stopping', 'maintenance', 'unknown', ''])(
+    'returns false for a %j user manager',
+    async (state) => {
+      execAsyncMock.mockImplementation(async (command: string) => {
+        if (command === 'systemctl --user is-system-running') throw exitError(state ? `${state}\n` : '');
+        return managerAnswer(command);
+      });
+      const { systemdUserAvailable } = await import('../systemd.js');
+
+      await expect(systemdUserAvailable()).resolves.toBe(false);
+    },
+  );
+
+  it('returns false when is-system-running times out', async () => {
+    execAsyncMock.mockImplementation(async (command: string) => {
+      if (command === 'systemctl --user is-system-running') {
+        throw Object.assign(new Error('timed out'), { killed: true, signal: 'SIGTERM', stdout: 'running\n' });
+      }
+      return managerAnswer(command);
+    });
+    const { systemdUserAvailable } = await import('../systemd.js');
+
+    await expect(systemdUserAvailable()).resolves.toBe(false);
   });
 
   it('returns false without throwing when systemctl is missing or unusable', async () => {
@@ -160,8 +208,10 @@ describe('supervisor systemd unit helpers', () => {
       expect(first).toEqual({ path: supervisorUnitPath(unitDir), written: true });
       expect(second).toEqual({ path: supervisorUnitPath(unitDir), written: false });
       expect(readFileSync(supervisorUnitPath(unitDir), 'utf-8')).toBe(unitText);
-      expect(execAsyncMock).toHaveBeenCalledTimes(1);
-      expect(execAsyncMock).toHaveBeenCalledWith('systemctl --user daemon-reload', expect.any(Object));
+      expect(execAsyncMock.mock.calls.map((call) => call[0])).toEqual([
+        'systemctl --user daemon-reload',
+        'systemctl --user show -p NeedDaemonReload --value overdeck-supervisor.service',
+      ]);
     } finally {
       rmSync(unitDir, { recursive: true, force: true });
     }
@@ -182,7 +232,7 @@ describe('supervisor systemd unit helpers', () => {
     const unitText = '[Unit]\nDescription=test\n\n[Service]\nType=simple\n';
     execAsyncMock.mockImplementation(async (command: string) => {
       if (command.includes('is-active')) throw new Error('inactive');
-      return { stdout: '', stderr: '' };
+      return managerAnswer(command);
     });
     const { startSupervisorUnitIfAvailable } = await import('../systemd.js');
 
@@ -218,7 +268,7 @@ describe('supervisor systemd unit helpers', () => {
   it('does not stop an inactive unit', async () => {
     execAsyncMock.mockImplementation(async (command: string) => {
       if (command.includes('is-active')) throw new Error('inactive');
-      return { stdout: '', stderr: '' };
+      return managerAnswer(command);
     });
     const { stopSupervisorUnitIfActive } = await import('../systemd.js');
 
@@ -257,8 +307,38 @@ describe('generic user units (PAN-3956 W7)', () => {
       expect(first).toEqual({ path: join(unitDir, 'overdeck-herdr.service'), written: true });
       expect(second.written).toBe(false);
       expect(readFileSync(join(unitDir, 'overdeck-herdr.service'), 'utf-8')).toBe(unitText);
-      expect(execAsyncMock).toHaveBeenCalledTimes(1);
-      expect(execAsyncMock).toHaveBeenCalledWith('systemctl --user daemon-reload', expect.any(Object));
+      expect(execAsyncMock.mock.calls.map((call) => call[0])).toEqual([
+        'systemctl --user daemon-reload',
+        'systemctl --user show -p NeedDaemonReload --value overdeck-herdr.service',
+      ]);
+    } finally {
+      rmSync(unitDir, { recursive: true, force: true });
+    }
+  });
+
+  it('retries a daemon-reload that failed after an earlier write', async () => {
+    const unitDir = mkdtempSync(join(tmpdir(), 'overdeck-systemd-test-'));
+    const unitText = '[Unit]\nDescription=herdr\n';
+    const { installUserUnit } = await import('../systemd.js');
+    try {
+      execAsyncMock.mockImplementation(async (command: string) => {
+        if (command === 'systemctl --user daemon-reload') throw new Error('reload timed out');
+        return managerAnswer(command);
+      });
+      await expect(installUserUnit('overdeck-herdr.service', unitText, unitDir)).rejects.toThrow(/reload timed out/);
+
+      execAsyncMock.mockReset();
+      execAsyncMock.mockImplementation(async (command: string) => ({
+        stdout: command.includes('NeedDaemonReload') ? 'yes\n' : '',
+        stderr: '',
+      }));
+      const retry = await installUserUnit('overdeck-herdr.service', unitText, unitDir);
+
+      expect(retry.written).toBe(false);
+      expect(execAsyncMock.mock.calls.map((call) => call[0])).toEqual([
+        'systemctl --user show -p NeedDaemonReload --value overdeck-herdr.service',
+        'systemctl --user daemon-reload',
+      ]);
     } finally {
       rmSync(unitDir, { recursive: true, force: true });
     }
