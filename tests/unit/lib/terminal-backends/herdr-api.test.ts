@@ -196,6 +196,29 @@ describe('HerdrApiClient.stream', () => {
     stream.close();
   });
 
+  it('rejects `started` and closes the socket when the subscription is never acknowledged', async () => {
+    // Runs on the client's captured timer (see the call-deadline case above).
+    const socket = new FakeSocket();
+    const client = clientWith(socket, { requestTimeoutMs: 20 });
+    const stream = client.stream('events.subscribe', { subscriptions: [] }, { onEvent: () => {} });
+    socket.connect();
+    await expect(stream.started).rejects.toMatchObject({ code: 'timeout' });
+    expect(socket.destroyed).toBe(true);
+  });
+
+  it('keeps an acknowledged subscription open past the acknowledgement deadline', async () => {
+    const socket = new FakeSocket();
+    const client = clientWith(socket, { requestTimeoutMs: 20 });
+    const stream = client.stream('events.subscribe', { subscriptions: [] }, { onEvent: () => {} });
+    socket.connect();
+    const { id } = JSON.parse(socket.written[0]) as { id: string };
+    socket.feed(`${JSON.stringify({ id, result: { type: 'subscription_started' } })}\n`);
+    await stream.started;
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    expect(socket.destroyed).toBe(false);
+    stream.close();
+  });
+
   it('rejects `started` when the server closes before acknowledging', async () => {
     const socket = new FakeSocket();
     const client = clientWith(socket);

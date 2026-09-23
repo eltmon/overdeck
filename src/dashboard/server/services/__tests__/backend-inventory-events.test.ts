@@ -8,7 +8,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BackendAgentSnapshot } from '@overdeck/contracts';
 
 import {
+  EVENT_STREAM_OPEN_TIMEOUT_MS,
   EVENT_STREAM_RETRY_MAX_MS,
+  EVENT_STREAM_STABLE_MS,
   _resetBackendInventoryForTests,
   onBackendPanesChanged,
   startBackendInventory,
@@ -192,5 +194,102 @@ describe('backend inventory event stream — re-open with backoff', () => {
     expect(b.events).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1_000);
     expect(b.events).toHaveBeenCalledTimes(2);
+  });
+
+  it('abandons an open that is never acknowledged and retries (review of #4020, 4)', async () => {
+    let resolveLate: ((stream: BackendEventStream) => void) | undefined;
+    let attempt = 0;
+    const late = controlledStream();
+    const b = backendWith(() => {
+      attempt += 1;
+      if (attempt === 1) {
+        return Effect.promise(() => new Promise<BackendEventStream>((resolve) => { resolveLate = resolve; })) as unknown as EventsResult;
+      }
+      return failOpen();
+    });
+
+    const starting = startBackendInventory({ backend: b.backend });
+    await vi.advanceTimersByTimeAsync(EVENT_STREAM_OPEN_TIMEOUT_MS - 1);
+    expect(b.events).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await starting;
+    expect(warn.mock.calls[0]?.[0]).toContain('was not acknowledged within 15s');
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(b.events).toHaveBeenCalledTimes(2);
+
+    // The abandoned subscription, if it ever arrives, is closed rather than leaked.
+    resolveLate?.(late.stream);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(late.stream.close).toHaveBeenCalled();
+  });
+
+  it('closes a stream whose reader throws before re-opening (review of #4020, 5)', async () => {
+    const replacement = controlledStream();
+    const throwing: BackendEventStream = {
+      events: {
+        async *[Symbol.asyncIterator]() {
+          throw new Error('frame too large');
+        },
+      },
+      close: vi.fn(),
+    };
+    const streams = [throwing, replacement.stream];
+    const b = backendWith(() => Effect.succeed(streams.shift() as BackendEventStream) as unknown as EventsResult);
+
+    await startBackendInventory({ backend: b.backend });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(throwing.close).toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(b.events).toHaveBeenCalledTimes(2);
+  });
+
+  it('closes the new stream when the re-open snapshot fails, then retries', async () => {
+    const first = controlledStream();
+    const second = controlledStream();
+    const third = controlledStream();
+    const streams = [first.stream, second.stream, third.stream];
+    const b = backendWith(() => Effect.succeed(streams.shift() as BackendEventStream) as unknown as EventsResult);
+    let lists = 0;
+    b.list.mockImplementation(() => {
+      lists += 1;
+      if (lists === 2) throw new Error('list exploded');
+      return Effect.succeed(SNAPSHOT);
+    });
+
+    await startBackendInventory({ backend: b.backend });
+    first.end();
+    await vi.advanceTimersByTimeAsync(1_000); // re-open: snapshot throws
+    expect(b.events).toHaveBeenCalledTimes(2);
+    expect(second.stream.close).toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(2_000); // backoff doubled, then succeeds
+    expect(b.events).toHaveBeenCalledTimes(3);
+    expect(third.stream.close).not.toHaveBeenCalled();
+  });
+
+  it('starts the backoff over after a quiet stream that stayed open (review of #4020, 8)', async () => {
+    const opened: ReturnType<typeof controlledStream>[] = [];
+    let attempt = 0;
+    const b = backendWith(() => {
+      attempt += 1;
+      if (attempt === 2 || attempt === 3) return failOpen();
+      const stream = controlledStream();
+      opened.push(stream);
+      return Effect.succeed(stream.stream) as unknown as EventsResult;
+    });
+
+    await startBackendInventory({ backend: b.backend });
+    opened[0]?.end(); // ends at once: 1 s, then fail → 2 s, fail → 4 s
+    await vi.advanceTimersByTimeAsync(1_000 + 2_000 + 4_000);
+    expect(b.events).toHaveBeenCalledTimes(4);
+
+    // This one stays open (no events) past the stable window, then drops.
+    await vi.advanceTimersByTimeAsync(EVENT_STREAM_STABLE_MS);
+    warn.mockClear();
+    opened[1]?.end();
+    await vi.advanceTimersByTimeAsync(999);
+    expect(b.events).toHaveBeenCalledTimes(4);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(b.events).toHaveBeenCalledTimes(5);
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 });

@@ -403,6 +403,45 @@ export async function hasLiveBackendPane(issueId: string, deps: BackendInventory
 export const EVENT_STREAM_RETRY_MIN_MS = 1_000;
 /** Ceiling for the re-open backoff. The retry never gives up. */
 export const EVENT_STREAM_RETRY_MAX_MS = 30_000;
+/** An open that has not produced a stream by now is abandoned and retried. */
+export const EVENT_STREAM_OPEN_TIMEOUT_MS = 15_000;
+/** A stream that stayed open this long counts as healthy: the backoff starts over. */
+export const EVENT_STREAM_STABLE_MS = 10_000;
+
+type OpenedStream = Awaited<ReturnType<typeof openStreamOnce>>;
+
+/** `backend.events()` as a promise: the stream, `unsupported`, or null on failure. */
+function openStreamOnce(backend: TerminalBackend) {
+  return Effect.runPromise(backend.events().pipe(Effect.catch(() => Effect.succeed(null))));
+}
+
+/**
+ * `openStreamOnce` bounded by `EVENT_STREAM_OPEN_TIMEOUT_MS`: a server that
+ * accepts the subscription but never acknowledges it must not leave the
+ * re-open pending forever. A stream that arrives after the deadline is closed.
+ */
+async function openStreamWithDeadline(backend: TerminalBackend): Promise<OpenedStream | 'timeout'> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let timedOut = false;
+  const opening = openStreamOnce(backend);
+  const deadline = new Promise<'timeout'>((resolve) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      resolve('timeout');
+    }, EVENT_STREAM_OPEN_TIMEOUT_MS);
+    timer.unref?.();
+  });
+  try {
+    return await Promise.race([opening, deadline]);
+  } finally {
+    if (timer) clearTimeout(timer);
+    if (timedOut) {
+      void opening.then((late) => {
+        if (late !== null && !isUnsupported(late)) late.close();
+      }, () => {});
+    }
+  }
+}
 
 let inventoryStarted = false;
 let streamGeneration = 0;
@@ -443,9 +482,11 @@ async function openEventStream(deps: BackendInventoryDeps, reopening: boolean): 
   const backend = await resolveBackend(deps);
   if (!backend || !inventoryStarted) return;
 
-  const stream = await Effect.runPromise(
-    backend.events().pipe(Effect.catch(() => Effect.succeed(null))),
-  );
+  const stream = await openStreamWithDeadline(backend);
+  if (stream === 'timeout') {
+    scheduleResubscribe(deps, `was not acknowledged within ${EVENT_STREAM_OPEN_TIMEOUT_MS / 1000}s`);
+    return;
+  }
   if (stream !== null && isUnsupported(stream)) return;
   if (!inventoryStarted) {
     stream?.close();
@@ -456,13 +497,25 @@ async function openEventStream(deps: BackendInventoryDeps, reopening: boolean): 
     return;
   }
 
-  const generation = ++streamGeneration;
-  eventStreamClose = () => stream.close();
   if (reopening) {
     // Events were missed while the stream was down: fold onto a fresh snapshot.
+    // Taken before the stream is published, and the stream is closed if it
+    // fails, so a failed re-open never leaves a subscription nobody reads.
     refreshedAt = 0;
-    await getBackendPanes(deps);
+    try {
+      await getBackendPanes(deps);
+    } catch (error) {
+      stream.close();
+      throw error;
+    }
+    if (!inventoryStarted) {
+      stream.close();
+      return;
+    }
   }
+  const generation = ++streamGeneration;
+  eventStreamClose = () => stream.close();
+  const openedAt = Date.now();
   void (async () => {
     try {
       for await (const event of stream.events) {
@@ -475,10 +528,18 @@ async function openEventStream(deps: BackendInventoryDeps, reopening: boolean): 
       }
     } catch (error) {
       console.warn(`[backend-inventory] event stream ended: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      // However the reader stopped, the subscription is released (idempotent).
+      stream.close();
     }
     // Stopped, or superseded by a newer stream: nothing to re-open.
     if (generation !== streamGeneration || !inventoryStarted) return;
     eventStreamClose = null;
+    if (Date.now() - openedAt >= EVENT_STREAM_STABLE_MS) {
+      // A stream that held (even a quiet one) resets the backoff and the warning.
+      retryDelayMs = EVENT_STREAM_RETRY_MIN_MS;
+      streamRetryWarned = false;
+    }
     scheduleResubscribe(deps, 'ended');
   })();
 }

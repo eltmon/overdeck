@@ -314,7 +314,21 @@ export class HerdrApiClient {
     // A caller that only closes the stream must not trip an unhandled rejection.
     started.catch(() => {});
 
+    // A server that accepts the subscription but never acknowledges it must not
+    // leave `started` (and every caller awaiting it) pending forever.
+    const ackTimer = scheduleTimeout(() => {
+      if (acknowledged || closed) return;
+      rejectStarted(new HerdrApiError({
+        method,
+        code: 'timeout',
+        message: `herdr ${method} was not acknowledged within ${this.requestTimeoutMs}ms`,
+      }));
+      close();
+    }, this.requestTimeoutMs);
+    ackTimer.unref?.();
+
     const close = (): void => {
+      cancelTimeout(ackTimer);
       if (closed) return;
       closed = true;
       try {
@@ -365,6 +379,7 @@ export class HerdrApiClient {
         }
         if (!acknowledged && frame.result) {
           acknowledged = true;
+          cancelTimeout(ackTimer);
           resolveStarted();
           continue;
         }
