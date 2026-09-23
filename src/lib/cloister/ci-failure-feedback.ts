@@ -413,6 +413,7 @@ async function deliverCiTestGateFeedback(
   opts: CiFailureFeedbackOptions,
   feedbackPath: string,
   counted: CiTestGateFailure | undefined,
+  workspacePath: string | undefined,
 ): Promise<boolean> {
   // Lazy: the delivery door pulls in the terminal backend and agent liveness.
   const {
@@ -421,7 +422,11 @@ async function deliverCiTestGateFeedback(
     escalateVerificationStuck,
   } = await import('./verification-escalation.js');
   const head8 = opts.headSha.slice(0, 8);
-  const cycleCount = counted?.cycleCount ?? 1;
+  // A repeat report (e.g. after a restart) is already in both counts; say the
+  // recorded attempt number rather than "1".
+  const cycleCount = counted?.cycleCount ?? (workspacePath && existsSync(workspacePath)
+    ? Math.max(1, readVerificationCycleState(workspacePath, head8).cycleCount, readCiTestFailureStreak(workspacePath).cycleCount)
+    : 1);
   const summary = `CI test job failed on PR head ${head8} (attempt ${cycleCount}/${VERIFICATION_MAX_CYCLES}).\n\nFeedback: ${feedbackPath}`;
   announceVerificationFailure(issueId, TEST_GATE_NAME, summary);
   if (counted?.escalate) {
@@ -539,7 +544,7 @@ async function relayCiFailureFeedbackPromise(
   }
 
   if (testGateFailed) {
-    const agentMessageSent = await deliverCiTestGateFeedback(issueId, opts, fileResult.filePath, counted);
+    const agentMessageSent = await deliverCiTestGateFeedback(issueId, opts, fileResult.filePath, counted, workspacePath);
     lastNotifiedSha.set(issueId, opts.headSha);
     lastNotifiedTestGateSha.set(issueId, opts.headSha);
     return { feedbackPath: fileResult.filePath, agentMessageSent, ...testGateFlag };

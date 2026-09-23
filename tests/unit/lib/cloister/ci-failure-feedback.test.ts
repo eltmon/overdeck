@@ -544,6 +544,23 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
     expect(afterRestart.cycleCount).toBeUndefined();
     expect(failedEntries()).toHaveLength(1);
     expect(mockDeliverVerificationFeedback).toHaveBeenCalledTimes(2); // first report + once after the restart
+    expect(mockDeliverVerificationFeedback).toHaveBeenLastCalledWith(
+      'PAN-1801', expect.stringContaining('(attempt 1/3)'), expect.anything(), 'ci-failure-feedback',
+    );
+  });
+
+  it('a repeat report after a restart states the recorded attempt number', async () => {
+    await redHead('aaaaaaaa1111');
+    await redHead('bbbbbbbb2222');
+    resetCiFailureFeedbackStateForTests();
+
+    const again = await redHead('bbbbbbbb2222');
+
+    expect(again.cycleCount).toBeUndefined();
+    expect(failedEntries()).toHaveLength(2);
+    expect(mockDeliverVerificationFeedback).toHaveBeenLastCalledWith(
+      'PAN-1801', expect.stringContaining('(attempt 2/3)'), expect.anything(), 'ci-failure-feedback',
+    );
   });
 
   it('a red test job still reaches the agent after an earlier non-test failure on the same head', async () => {
