@@ -1,11 +1,35 @@
 /**
- * UAT failure feedback relay (PAN-3575).
+ * UAT failure feedback relay (PAN-3575, re-attached by PAN-4030).
  *
- * A failed UAT verdict blocks merge, so it must use the same feedback-target
- * door as review and verification failures to start work-agent rework or
- * surface a durable needs-you escalation.
+ * A failed browser UAT owes rework, so it uses the same feedback-target door
+ * as review and verification failures to start work-agent rework or surface a
+ * durable needs-you escalation.
+ *
+ * The caller is `pan admin specialists done` (test role with `--uat-status`,
+ * or the uat role): the one place a UAT result is observed after PAN-3917.
+ * That is a fresh CLI process per verdict, so the in-process anchor map below
+ * only guards repeats inside one process. Across processes the message
+ * carries `uat-feedback:<issue>:<anchor hash>`, which the keyed delivery tiers
+ * (PTY supervisor reservation / tmux user options) enforce: a repeat for the
+ * same PR head is reported `deduplicated`, not re-sent. A Herdr-prompted agent
+ * is reached before that keyed cascade, so there the key is not enforced —
+ * the same exposure review-verdict-feedback has.
+ *
+ * Keyed delivery also trades two guarantees, exactly as review feedback does:
+ * for a Claude Code agent it confirms only that the text reached the agent's
+ * input (composer-level), not that a transcript turn followed — the unkeyed
+ * confirmed-turn path cannot enforce a key — and it skips the mail-dir backup,
+ * because a keyed mail file would replay as a second copy. The feedback file
+ * written here is the durable receipt.
+ *
+ * The target is resolved (and a stopped agent revived) before delivery learns
+ * whether the key was already used; the keyed stores expose no read-only probe.
+ * A revived agent is a new session whose store is empty, so it is sent the
+ * feedback rather than woken for nothing; only a still-live session can report
+ * `deduplicated`.
  */
 
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 import { messageAgent } from '../agents/messaging.js';
@@ -17,7 +41,7 @@ export interface UatFailureFeedbackOptions {
   issueId: string;
   uatNotes?: string;
   workspacePath?: string;
-  /** Stable UAT verdict identity used to suppress duplicate status posts. */
+  /** Stable UAT verdict identity (the PR head SHA) used to deliver once per failing anchor. */
   anchor?: string;
 }
 
@@ -26,6 +50,57 @@ export interface UatFailureFeedbackResult {
   agentMessageSent: boolean;
   needsYouSurfaced: boolean;
   deduplicated: boolean;
+  /** Keyed-delivery identity, present whenever an anchor was supplied. */
+  dedupKey?: string;
+}
+
+// PAN-1837: bounded same-key retries for an ambiguous keyed delivery (one that
+// raced an agent resume). The supervisor's dedup store absorbs a duplicate.
+const AMBIGUOUS_DELIVERY_RETRIES = 3;
+export const UAT_AMBIGUOUS_DELIVERY_RETRY_MS = 2_000;
+
+/** Keyed-delivery identity for one failing UAT anchor of one issue. */
+export function uatFeedbackDedupKey(issueId: string, anchor: string): string {
+  const digest = createHash('sha256').update(anchor).digest('hex').slice(0, 16);
+  return `uat-feedback:${issueId.toLowerCase()}:${digest}`;
+}
+
+type DeliveryOutcome = Awaited<ReturnType<typeof messageAgent>>;
+
+/**
+ * Keyed delivery with the same recovery contract review feedback uses: an
+ * ambiguous outcome retries the SAME key, and a transport that cannot enforce
+ * a key (ACP, Channels) falls back to one unkeyed delivery — delivery wins
+ * over deduplication there.
+ */
+async function deliverUatFeedbackMessage(
+  agentId: string,
+  message: string,
+  dedupKey: string | undefined,
+): Promise<DeliveryOutcome> {
+  const baseOpts = { owesRework: true, feedbackRedelivery: true };
+  let ambiguousRetries = 0;
+  for (;;) {
+    try {
+      return await messageAgent(agentId, message, 'internal', dedupKey ? { ...baseOpts, dedupKey } : baseOpts);
+    } catch (err) {
+      if (!dedupKey) throw err;
+      const reason = err instanceof Error ? err.message : String(err);
+      if (
+        err instanceof Error
+        && err.name === 'AmbiguousKeyedDeliveryError'
+        && ambiguousRetries < AMBIGUOUS_DELIVERY_RETRIES
+      ) {
+        ambiguousRetries += 1;
+        console.warn(`[uat-failure-feedback] ambiguous keyed delivery to ${agentId} — retrying the same key (${ambiguousRetries}/${AMBIGUOUS_DELIVERY_RETRIES}): ${reason}`);
+        await new Promise((resolve) => setTimeout(resolve, UAT_AMBIGUOUS_DELIVERY_RETRY_MS));
+        continue;
+      }
+      if (!reason.includes('cannot enforce a dedup key')) throw err;
+      console.warn(`[uat-failure-feedback] ${agentId} cannot enforce keyed delivery; retrying unkeyed`);
+      return messageAgent(agentId, message, 'internal', baseOpts);
+    }
+  }
 }
 
 /** Bound process-local dedup state even if terminal cleanup is delayed. */
@@ -71,10 +146,12 @@ export async function relayUatFailureFeedbackPromise(
 ): Promise<UatFailureFeedbackResult> {
   const issueId = opts.issueId.toUpperCase();
   const uatNotes = opts.uatNotes?.trim() || 'No UAT notes were provided.';
+  const dedupKey = opts.anchor ? uatFeedbackDedupKey(issueId, opts.anchor) : undefined;
   const result: UatFailureFeedbackResult = {
     agentMessageSent: false,
     needsYouSurfaced: false,
     deduplicated: false,
+    ...(dedupKey ? { dedupKey } : {}),
   };
 
   if (lastNotifiedAnchor.has(issueId) && lastNotifiedAnchor.get(issueId) === opts.anchor) {
@@ -138,7 +215,12 @@ Use your Read tool to open this file, read every line, then fix every failed UAT
   }
 
   try {
-    const outcome = await messageAgent(target.agentId, message, 'internal', { owesRework: true, feedbackRedelivery: true });
+    const outcome = await deliverUatFeedbackMessage(target.agentId, message, dedupKey);
+    if (outcome.delivered && outcome.deduplicated) {
+      // The keyed store already holds this anchor: the agent was told once.
+      result.deduplicated = true;
+      return result;
+    }
     if (outcome.delivered) {
       result.agentMessageSent = true;
       return result;

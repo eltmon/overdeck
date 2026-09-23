@@ -64,7 +64,9 @@ const KNOWN_CALL_SITES = new Set([
   'lib/cloister/service-reactive.ts|await (await import(\'../agents/messaging.js\')).messageAgent(',
   'lib/cloister/specialists-feedback.ts|await messageAgent(agentSession, msg);',
   'lib/cloister/swarm-foreman.ts|await deps.messageAgent(agentId, options.prompt ?? `Continue managing ${issue} as its swarm foreman. Run pan swarm status ${issue} --json before acting.`, \'pan-swarm\');',
-  'lib/cloister/uat-failure-feedback.ts|const outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
+  // PAN-4030: UAT feedback is keyed per failing anchor, with review's unkeyed fallback for ACP/Channels.
+  'lib/cloister/uat-failure-feedback.ts|return await messageAgent(agentId, message, \'internal\', dedupKey ? { ...baseOpts, dedupKey } : baseOpts);',
+  'lib/cloister/uat-failure-feedback.ts|return messageAgent(agentId, message, \'internal\', baseOpts);',
   // PAN-3965: verification feedback delivery moved to verification-escalation, shared with the CI test gate.
   'lib/cloister/verification-escalation.ts|outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
   // PAN-3705 follow-up: verification PASS is told to the work agent (no rework owed, no needs-you).
