@@ -21,6 +21,7 @@ import { promisify } from 'node:util';
 import { listOpenGitLabMergeRequests, type GitLabMergeRequestRow } from '../gitlab-merge-requests.js';
 import { fetchIssuePullRequest, type IssuePullRequestData } from '../overdeck/pull-requests.js';
 import { resolveProjectReposForIssueSync, type ResolvedProjectRepo } from '../project-repos.js';
+import { parseUatVerdict } from './uat-verdict-marker.js';
 import { isCiTestCheckName } from './verification-tests-mode.js';
 
 const execFileAsync = promisify(execFile);
@@ -79,6 +80,8 @@ export interface PrFacts {
   /** Set when the forge lookup itself failed; every flag is then conservative. */
   error?: string;
 }
+
+export { formatUatMarker, parseUatVerdict } from './uat-verdict-marker.js';
 
 /** A browser-UAT verdict read back from a PR comment (#4036). */
 export interface UatVerdict {
@@ -139,33 +142,6 @@ const VERDICT_MARKER_RE = /^\s*<!--\s*overdeck-verdict:\s*(APPROVED|CHANGES_REQU
 export function parseVerdictMarker(body: string | null | undefined): MarkerVerdict | null {
   const match = body?.match(VERDICT_MARKER_RE);
   return match ? (match[1].toUpperCase() as MarkerVerdict) : null;
-}
-
-/**
- * The machine marker a UAT verdict comment carries (#4036): the outcome and the
- * commit UAT exercised (`--tested-sha`, else the PR head when the verdict was
- * posted). Merge readiness reads it back to tell a failure at the current head
- * from one a later push already superseded.
- */
-export function formatUatMarker(status: 'passed' | 'failed', sha?: string | null): string {
-  return `<!-- overdeck-uat: ${status}${sha ? ` sha=${sha.toLowerCase()}` : ''} -->`;
-}
-
-const UAT_MARKER_RE = /<!--\s*overdeck-uat:\s*(passed|failed)(?:\s+sha=([0-9a-f]{7,40}))?\s*-->/i;
-/** A verdict comment posted before the marker existed: `**uat verdict: failed**` / `**browser UAT: failed**`. */
-const LEGACY_UAT_RE = /\*\*(?:uat verdict|browser UAT):\s*(passed|failed)\*\*/i;
-
-/** The UAT outcome (and the commit it is anchored on) a comment body declares, or null. */
-export function parseUatVerdict(
-  body: string | null | undefined,
-): { status: 'passed' | 'failed'; sha: string | null } | null {
-  if (!body) return null;
-  const marker = body.match(UAT_MARKER_RE);
-  if (marker) {
-    return { status: marker[1].toLowerCase() as 'passed' | 'failed', sha: marker[2]?.toLowerCase() ?? null };
-  }
-  const legacy = body.match(LEGACY_UAT_RE);
-  return legacy ? { status: legacy[1].toLowerCase() as 'passed' | 'failed', sha: null } : null;
 }
 
 export function emptyPrFacts(issueId: string, error?: string): PrFacts {

@@ -25,7 +25,8 @@ import {
   discoverArtifact,
   type ForgeType,
 } from '../../../lib/forge.js';
-import { formatUatMarker, getPrFacts, resetPrFactsCache } from '../../../lib/cloister/pr-facts.js';
+import { getPrFacts, resetPrFactsCache } from '../../../lib/cloister/pr-facts.js';
+import { formatUatMarker } from '../../../lib/cloister/uat-verdict-marker.js';
 import { bumpIssuePrTabCacheGeneration } from '../../../dashboard/server/services/pr-tab-cache.js';
 import { postReviewVerdict } from '../../../lib/cloister/pr-review-verdict.js';
 import { getIssueWorkspacePath } from '../../../lib/overdeck/issue-projects.js';
