@@ -28,7 +28,7 @@ const mocks = vi.hoisted(() => ({
   detectPendingOperatorDecision: vi.fn(async () => null),
   tmuxCreateSession: vi.fn(() => Effect.succeed(undefined)),
   tmuxSessionExists: vi.fn(() => Effect.succeed(false)),
-  tmuxListPaneValues: vi.fn(() => Effect.succeed([] as string[])),
+  tmuxListPaneValues: vi.fn(async () => [] as string[]),
   tmuxKillSession: vi.fn(() => Effect.succeed(undefined)),
   findRuntimePid: vi.fn(async () => null as number | null | 'indeterminate'),
   queryTmuxSession: vi.fn(async () => 'missing' as 'exists' | 'missing' | 'error'),
@@ -148,7 +148,7 @@ beforeEach(() => {
   registerTerminalBackend(herdr);
   registerTerminalBackend(tmux);
   mocks.tmuxSessionExists.mockReturnValue(Effect.succeed(false));
-  mocks.tmuxListPaneValues.mockReturnValue(Effect.succeed([]));
+  mocks.tmuxListPaneValues.mockResolvedValue([]);
   mocks.findRuntimePid.mockResolvedValue(null);
   mocks.queryTmuxSession.mockResolvedValue('missing');
   mocks.deliverAgentMessage.mockResolvedValue({ ok: true, path: 'herdr' });
@@ -265,7 +265,7 @@ describe('resumeAgent on a Herdr host (review of #3992)', () => {
     writeStoppedAgent(agentId, 'tmux', 'running');
     mocks.tmuxSessionExists.mockReturnValue(Effect.succeed(true));
     mocks.queryTmuxSession.mockResolvedValue('exists');
-    mocks.tmuxListPaneValues.mockReturnValue(Effect.succeed(['4242\t0']));
+    mocks.tmuxListPaneValues.mockResolvedValue(['4242\t0']);
     mocks.findRuntimePid.mockResolvedValue(4243);
 
     const result = await resumeAgent(agentId);

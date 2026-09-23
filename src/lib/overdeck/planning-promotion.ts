@@ -574,7 +574,7 @@ export async function completePlanningForIssue(options: {
     // in a non-active file, and the active-file lookup can transiently fail with
     // ENOENT as files are renamed. Scanning only the active file is exactly how
     // TIN-1 completed planning while the operator's question was still open.
-    const pendingAuq = await Effect.runPromise(countPendingAskUserQuestionsForAgent(sessionName));
+    const pendingAuq = await countPendingAskUserQuestionsForAgent(sessionName);
     if (pendingAuq > 0) {
       console.log(`[complete-planning] ${id} has ${pendingAuq} pending AskUserQuestion(s) — agent is waiting for the operator, not done. No-op.`);
       return jsonResponse({ ok: true, skipped: 'pending-ask-user-question' });

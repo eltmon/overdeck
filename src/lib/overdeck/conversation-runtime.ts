@@ -33,7 +33,6 @@ import {
 } from './conversations.js';
 import {
   capturePane,
-  capturePaneText,
   sessionExists,
   isHarnessProcessAlive,
   killSession,
@@ -233,7 +232,7 @@ async function validateCwdContainment(cwd: string): Promise<boolean> {
 async function waitForClaudeReady(tmuxSession: string): Promise<void> {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
-    const output = await Effect.runPromise(capturePane(tmuxSession, 200));
+    const output = await capturePane(tmuxSession, 200);
     if (output.includes('❯')) {
       console.log(`[conversations] Claude Code ready in ${tmuxSession}`);
       return;
@@ -250,9 +249,7 @@ export async function waitForPiTuiReady(tmuxSession: string, timeoutMs = 60_000)
   const deadline = Date.now() + timeoutMs;
   let stableV17FooterPolls = 0;
   while (Date.now() < deadline) {
-    const snapshot = await Effect.runPromise(
-      capturePane(tmuxSession, 40).pipe(Effect.catch(() => Effect.succeed(''))),
-    );
+    const snapshot = await capturePane(tmuxSession, 40).catch(() => '');
     const mcpConnecting = /Connecting to MCP servers/i.test(snapshot) && !/MCP finished/i.test(snapshot);
     // omp v17 paints its footer before MCP startup and redraws again afterward.
     stableV17FooterPolls = /⬢[^\n]*[◕◉]/.test(snapshot) && !mcpConnecting ? stableV17FooterPolls + 1 : 0;
@@ -441,7 +438,7 @@ export async function waitForPtySupervisorSocket(agentId: string, timeoutMs = PT
     }
     await new Promise(r => setTimeout(r, 250));
   }
-  const failure = extractSupervisorFailure(await capturePaneText(agentId, 40));
+  const failure = extractSupervisorFailure(await capturePane(agentId, 40));
   const detail = failure ? `supervisor output: ${failure}` : 'the supervisor pane shows no error output (a healthy harness statusline); the supervisor may have bound its socket under a different OVERDECK_HOME';
   throw new Error(`Timed out waiting for PTY supervisor socket ${socketPath} — ${detail}`);
 }

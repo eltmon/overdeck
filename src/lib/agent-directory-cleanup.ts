@@ -27,7 +27,6 @@ import { Effect } from 'effect';
 import { AGENTS_DIR } from './paths.js';
 import { listSessionNames } from './tmux.js';
 import { parseIssueIdSync } from './issue-id.js';
-import { FsError } from './errors.js';
 import { getAgentStateSync } from './agents.js';
 import { pruneAgentStateDir } from './agents/state-dir-removal.js';
 
@@ -141,7 +140,11 @@ export interface OrphanedAgentDir {
   hasRunningSession: boolean;
 }
 
-async function findOrphanedAgentDirsPromise(
+/**
+ * Find agent directories with no running session and no issue to keep them.
+ * Rejects when the agents directory or the tmux session listing fails.
+ */
+export async function findOrphanedAgentDirs(
   agentsDir: string = AGENTS_DIR,
 ): Promise<OrphanedAgentDir[]> {
   if (!existsSync(agentsDir)) {
@@ -185,14 +188,18 @@ export interface CleanupResult {
   totalOrphaned: number;
 }
 
-async function cleanupAgentDirectoriesPromise(options: {
+/**
+ * Remove orphaned agent directories. Rejects when the orphan scan fails;
+ * individual removal failures are swallowed, so a partial cleanup is the worst case.
+ */
+export async function cleanupAgentDirectories(options: {
   dryRun?: boolean;
   force?: boolean;
   agentsDir?: string;
 } = {}): Promise<CleanupResult> {
   const { dryRun = false, force = false, agentsDir = AGENTS_DIR } = options;
 
-  const orphaned = await Effect.runPromise(findOrphanedAgentDirs(agentsDir));
+  const orphaned = await findOrphanedAgentDirs(agentsDir);
   const protectedDirs = orphaned.filter((d) => d.hasRunningSession);
   const removable = orphaned.filter((d) => !d.hasRunningSession);
 
@@ -345,7 +352,8 @@ async function directoryContainsJsonl(dirPath: string): Promise<boolean> {
   return false;
 }
 
-async function findClosedIssueAgentDirsPromise(options: {
+/** Find agent directories whose issue is closed and whose grace period has passed. */
+export async function findClosedIssueAgentDirs(options: {
   issues: unknown[];
   agentsDir?: string;
   nowMs?: number;
@@ -391,7 +399,8 @@ async function findClosedIssueAgentDirsPromise(options: {
   return candidates;
 }
 
-async function cleanupClosedIssueAgentDirectoriesPromise(options: {
+/** Remove the agent directories of closed issues (see {@link findClosedIssueAgentDirs}). */
+export async function cleanupClosedIssueAgentDirectories(options: {
   issues: unknown[];
   dryRun?: boolean;
   force?: boolean;
@@ -400,7 +409,7 @@ async function cleanupClosedIssueAgentDirectoriesPromise(options: {
   graceMs?: number;
 }): Promise<ClosedIssueAgentCleanupResult> {
   const agentsDir = options.agentsDir ?? AGENTS_DIR;
-  const candidates = await findClosedIssueAgentDirsPromise(options);
+  const candidates = await findClosedIssueAgentDirs(options);
   const protectedDirs = candidates.filter((dir) => dir.hasRunningSession || dir.containsJsonl);
   const removable = candidates.filter((dir) => !dir.hasRunningSession && !dir.containsJsonl);
   const result: ClosedIssueAgentCleanupResult = {
@@ -430,74 +439,3 @@ async function cleanupClosedIssueAgentDirectoriesPromise(options: {
 
   return result;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Effect-native variant of findOrphanedAgentDirs. Fails with FsError if the
- * agents directory listing fails. The tmux listing is wrapped so listing
- * failures bubble up as FsError too (treats tmux as part of the filesystem
- * for purposes of this check).
- */
-export const findOrphanedAgentDirs = (
-  agentsDir: string = AGENTS_DIR,
-): Effect.Effect<readonly OrphanedAgentDir[], FsError> =>
-  Effect.tryPromise({
-    try: () => findOrphanedAgentDirsPromise(agentsDir),
-    catch: (cause) =>
-      new FsError({ path: agentsDir, operation: 'findOrphanedAgentDirs', cause }),
-  });
-
-/**
- * Effect-native variant of cleanupAgentDirectories. Fails with FsError if the
- * orphan scan fails. Individual removal failures are still swallowed internally
- * so a partial cleanup is the worst case (matches the Promise contract).
- */
-export const cleanupAgentDirectories = (options: {
-  dryRun?: boolean;
-  force?: boolean;
-  agentsDir?: string;
-} = {}): Effect.Effect<CleanupResult, FsError> =>
-  Effect.tryPromise({
-    try: () => cleanupAgentDirectoriesPromise(options),
-    catch: (cause) =>
-      new FsError({
-        path: options.agentsDir ?? AGENTS_DIR,
-        operation: 'cleanupAgentDirectories',
-        cause,
-      }),
-  });
-
-export const findClosedIssueAgentDirs = (options: {
-  issues: unknown[];
-  agentsDir?: string;
-  nowMs?: number;
-  graceMs?: number;
-}): Effect.Effect<readonly ClosedIssueAgentDir[], FsError> =>
-  Effect.tryPromise({
-    try: () => findClosedIssueAgentDirsPromise(options),
-    catch: (cause) =>
-      new FsError({
-        path: options.agentsDir ?? AGENTS_DIR,
-        operation: 'findClosedIssueAgentDirs',
-        cause,
-      }),
-  });
-
-export const cleanupClosedIssueAgentDirectories = (options: {
-  issues: unknown[];
-  dryRun?: boolean;
-  force?: boolean;
-  agentsDir?: string;
-  nowMs?: number;
-  graceMs?: number;
-}): Effect.Effect<ClosedIssueAgentCleanupResult, FsError> =>
-  Effect.tryPromise({
-    try: () => cleanupClosedIssueAgentDirectoriesPromise(options),
-    catch: (cause) =>
-      new FsError({
-        path: options.agentsDir ?? AGENTS_DIR,
-        operation: 'cleanupClosedIssueAgentDirectories',
-        cause,
-      }),
-  });

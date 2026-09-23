@@ -69,7 +69,7 @@ export function createAgentStopHandler(
           const projectPath = project?.projectPath ?? process.cwd();
           const workspacePath = findWorkspacePath(projectPath, issueLower);
           if (workspacePath) {
-            const dockerResult = await Effect.runPromise(stopWorkspaceDocker(workspacePath, issueLower));
+            const dockerResult = await stopWorkspaceDocker(workspacePath, issueLower);
             if (dockerResult.containersFound) {
               console.log(`[agents] ✓ Stopped Docker stack for ${id}: ${dockerResult.steps.join('; ')}`);
             }
@@ -303,7 +303,7 @@ export const postAgentUnpauseRoute = HttpRouter.add(
     // lifecycle says there is actually a session to resume — a plain stopped
     // agent with no session is left for the Start button, same as before.
     let resumeTriggered = false;
-    const lifecycle = yield* getWorkAgentLifecycleState(id);
+    const lifecycle = yield* Effect.promise(() => getWorkAgentLifecycleState(id));
     // Troubled agents are quarantined from auto-resume (the deacon skips them
     // too) — firing resumeAgent would just hit its gate and make
     // resumeTriggered a lie. untroubled + start is the path for those.

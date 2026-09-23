@@ -165,7 +165,7 @@ async function tmuxSessionExists(session: string): Promise<boolean> {
 
 async function captureTmuxTranscript(session: string): Promise<string> {
   if (!actualTmux) throw new Error('tmux module not initialized');
-  return Effect.runPromise(actualTmux.capturePane(session, 200));
+  return actualTmux.capturePane(session, 200);
 }
 
 async function enterTmuxCopyMode(session: string): Promise<void> {

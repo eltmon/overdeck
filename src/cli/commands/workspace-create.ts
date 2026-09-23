@@ -86,12 +86,12 @@ export async function createCommand(issueId: string, options: CreateOptions): Pr
     if (projectConfig?.workspace) {
       spinner.text = 'Creating workspace from config...';
 
-      const result = await Effect.runPromise(createWorkspaceFromConfig({
+      const result = await createWorkspaceFromConfig({
         projectConfig,
         featureName: normalizedId,
         startDocker: options.docker,
         dryRun: options.dryRun,
-      }));
+      });
 
       if (options.dryRun) {
         spinner.info('Dry run - no changes made');

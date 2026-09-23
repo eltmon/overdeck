@@ -67,7 +67,7 @@ export const getAgentOutputRoute = HttpRouter.add(
             const { getRemoteAgentOutput } = await import('../../../../lib/remote/remote-agents.js');
             stdout = await getRemoteAgentOutput(id, vmName, parseInt(String(lines), 10) || 100);
           } else {
-            stdout = await Effect.runPromise(capturePane(id, parseInt(String(lines), 10) || 100));
+            stdout = await capturePane(id, parseInt(String(lines), 10) || 100);
           }
 
           if (!stdout || stdout.trim() === '' || stdout.trim() === 'Session not found') {
@@ -132,7 +132,7 @@ export async function buildAgentConversationResult(
     return { status: 400, body: { error: 'subagentId must match ^[A-Za-z0-9_-]+$' } };
   }
   try {
-    const workspace = await Effect.runPromise(getAgentWorkspace(id));
+    const workspace = await getAgentWorkspace(id);
     if (opts.subagentId !== undefined) return await buildAgentSubagentResult(id, workspace ?? '', opts.subagentId);
     const candidates = await listAgentTranscriptCandidates(id, workspace ?? '');
     const checked = candidates.map(({ path }) => path);
@@ -211,7 +211,7 @@ export const getAgentConversationRoute = HttpRouter.add(
 
 /** The agent's in-harness subagents (PAN-3920 W2). Transcript paths stay server-side. */
 export async function buildAgentSubagentsResult(id: string): Promise<{ subagents: Array<Record<string, unknown>> }> {
-  const workspace = await Effect.runPromise(getAgentWorkspace(id));
+  const workspace = await getAgentWorkspace(id);
   const subagents = await listAgentSubagents(id, workspace ?? '');
   return { subagents: subagents.map(({ transcriptPath: _path, ...summary }) => summary) };
 }

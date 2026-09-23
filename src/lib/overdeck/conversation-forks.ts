@@ -65,7 +65,7 @@ import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getAgentRuntimeStateSync as getAgentRuntimeStateSyncFromAgents } from '../agents.js';
 import { activeComposerRegion } from '../pane-composer.js';
-import { capturePaneText, capturePaneViewport, deliveryVerifyLine, isHarnessProcessAlive, sendKeysAsync, sessionExists } from '../tmux.js';
+import { capturePane, capturePaneViewport, deliveryVerifyLine, isHarnessProcessAlive, sendKeysAsync, sessionExists } from '../tmux.js';
 import {
   readLauncherPinnedSessionId,
   resolveCodexRolloutPath,
@@ -381,7 +381,7 @@ export async function injectForkSummary(conv: Conversation, summary: string, cal
       const composer = activeComposerRegion(viewport);
       if (composer !== null) return normalizePaneVerification(composer).includes(verify);
     }
-    return normalizePaneVerification(await capturePaneText(conv.tmuxSession, 40)).includes(verify);
+    return normalizePaneVerification(await capturePane(conv.tmuxSession, 40)).includes(verify);
   };
 
   for (let nudge = 1; nudge <= 2; nudge++) {

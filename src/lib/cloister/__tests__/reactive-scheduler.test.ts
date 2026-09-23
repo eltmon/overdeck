@@ -243,7 +243,7 @@ vi.mock('../../tmux.js', async () => {
   sessionExists: effectMock(false),
   sessionExistsSync: vi.fn(() => false),
   querySessionSync: vi.fn(() => ({ status: 'missing', detail: 'mock session absent' })),
-  capturePane: effectMock('❯ '),
+  capturePane: vi.fn(async () => '❯ '),
   killSession: effectMock(undefined),
   killSessionSync: vi.fn(() => undefined),
   };

@@ -509,8 +509,8 @@ async function readTmuxPaneText(pane: BackendPane): Promise<string> {
   // adapter happened to reuse a session-like name.
   if (pane.terminalId !== pane.id) return '';
   try {
-    const { capturePaneText } = await import('../tmux.js');
-    return await capturePaneText(pane.id, 40);
+    const { capturePane } = await import('../tmux.js');
+    return await capturePane(pane.id, 40);
   } catch {
     return '';
   }

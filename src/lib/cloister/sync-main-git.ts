@@ -1,5 +1,4 @@
 import { exec, type ChildProcess, type ExecException } from 'child_process';
-import { Effect } from 'effect';
 import { cleanupStaleLocks } from '../git-utils.js';
 
 export const GIT_OPERATION_HEADS = [
@@ -161,10 +160,10 @@ export async function ensureSyncGitQuiescent(
       errors: Array<{ file: string; error: string }>;
     };
     try {
-      lockCleanup = await Effect.runPromise(cleanupStaleLocks(projectPath, {
+      lockCleanup = await cleanupStaleLocks(projectPath, {
         signal: controller.signal,
         processProbeTimeoutMs: remaining('checking Git lock owners'),
-      }));
+      });
     } catch (error) {
       throw new UnsafeSyncMainStateError(
         `Could not verify Git lock state after cancellation: ${

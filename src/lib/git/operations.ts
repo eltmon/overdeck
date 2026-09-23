@@ -17,9 +17,7 @@
 
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { Effect } from 'effect';
 import { appendGitOperationSync } from '../git-activity.js';
-import { GitError, VcsError } from '../errors.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -41,7 +39,10 @@ export class MainDivergedError extends Error {
     this.localSha = localSha;
     this.remoteSha = remoteSha;
   }
-}async function gitRevParsePromise(cwd: string, ref: string): Promise<string | null> {
+}
+
+/** Resolve a git ref to its SHA. Returns null if the ref does not exist. */
+export async function gitRevParse(cwd: string, ref: string): Promise<string | null> {
   const ts = new Date().toISOString();
   try {
     const { stdout } = await execFileAsync('git', ['rev-parse', ref], { cwd, encoding: 'utf-8' });
@@ -51,7 +52,10 @@ export class MainDivergedError extends Error {
   } catch {
     return null;
   }
-}async function gitFetchPromise(
+}
+
+/** Fetch from a remote. */
+export async function gitFetch(
   cwd: string,
   remote = 'origin',
   branch?: string,
@@ -80,7 +84,14 @@ export class MainDivergedError extends Error {
     });
     throw err;
   }
-}async function gitPushPromise(
+}
+
+/**
+ * Push a branch to a remote with a divergence guard. Rejects with
+ * {@link MainDivergedError} when the remote head is not an ancestor of the
+ * local head, and with the git error otherwise.
+ */
+export async function gitPush(
   cwd: string,
   remote = 'origin',
   branch = 'main',
@@ -89,13 +100,13 @@ export class MainDivergedError extends Error {
   const ts = new Date().toISOString();
 
   // Step 1: record the local HEAD before the push
-  const localSha = await Effect.runPromise(gitRevParse(cwd, 'HEAD')) ?? 'unknown';
+  const localSha = await gitRevParse(cwd, 'HEAD') ?? 'unknown';
 
   // Step 2: fetch latest remote state
-  await Effect.runPromise(gitFetch(cwd, remote, branch, opts));
+  await gitFetch(cwd, remote, branch, opts);
 
   // Step 3: read the remote tracking SHA
-  const remoteSha = await Effect.runPromise(gitRevParse(cwd, `${remote}/${branch}`)) ?? '';
+  const remoteSha = await gitRevParse(cwd, `${remote}/${branch}`) ?? '';
 
   // Step 4: ancestor check — is remoteSha an ancestor of localSha?
   if (remoteSha) {
@@ -126,7 +137,7 @@ export class MainDivergedError extends Error {
   // Step 5: push
   try {
     await execFileAsync('git', ['push', remote, branch], { cwd, encoding: 'utf-8', timeout: 60000 });
-    const afterSha = await Effect.runPromise(gitRevParse(cwd, 'HEAD')) ?? localSha;
+    const afterSha = await gitRevParse(cwd, 'HEAD') ?? localSha;
     appendGitOperationSync({
       operation: 'push',
       branch,
@@ -151,69 +162,4 @@ export class MainDivergedError extends Error {
     });
     throw err;
   }
-}
-
-// ─── Effect variants (PAN-1249, additive) ────────────────────────────────────
-//
-// These wrap the existing Promise-based functions with typed Effect error
-// channels (GitError / VcsError). The underlying impl is unchanged; this is
-// an additive surface for callers that already speak Effect. MainDivergedError
-// is thrown by the underlying gitPush; the Effect variant surfaces it
-// preserved as the cause inside a VcsError tagged 'main-diverged'.
-
-/** Resolve a git ref to its SHA. Returns null if the ref does not exist. */
-export function gitRevParse(
-  cwd: string,
-  ref: string,
-): Effect.Effect<string | null> {
-  return Effect.promise(() => gitRevParsePromise(cwd, ref));
-}
-
-/** Fetch from a remote. */
-export function gitFetch(
-  cwd: string,
-  remote = 'origin',
-  branch?: string,
-  opts: { issueId?: string } = {},
-): Effect.Effect<void, GitError> {
-  return Effect.tryPromise({
-    try: () => gitFetchPromise(cwd, remote, branch, opts),
-    catch: (cause) =>
-      new GitError({
-        command: branch ? ['git', 'fetch', remote, branch] : ['git', 'fetch', remote],
-        stderr: cause instanceof Error ? cause.message : String(cause),
-        exitCode: -1,
-        cause,
-      }),
-  });
-}
-
-/**
- * Push a branch to a remote with divergence guard.
- * Fails with VcsError tagged 'main-diverged' when MainDivergedError is thrown.
- */
-export function gitPush(
-  cwd: string,
-  remote = 'origin',
-  branch = 'main',
-  opts: { issueId?: string } = {},
-): Effect.Effect<void, VcsError | GitError> {
-  return Effect.tryPromise({
-    try: () => gitPushPromise(cwd, remote, branch, opts),
-    catch: (cause) => {
-      if (cause instanceof MainDivergedError) {
-        return new VcsError({
-          operation: 'main-diverged',
-          message: cause.message,
-          cause,
-        });
-      }
-      return new GitError({
-        command: ['git', 'push', remote, branch],
-        stderr: cause instanceof Error ? cause.message : String(cause),
-        exitCode: -1,
-        cause,
-      });
-    },
-  });
 }

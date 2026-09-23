@@ -177,7 +177,7 @@ describe('operator intervention CLI emission', () => {
     unpauseMocks.getWorkAgentLifecycleStateSync.mockReturnValue({ canResumeSession: false });
     unpauseMocks.resumeAgent.mockReset();
     unpauseMocks.resumeAgent.mockResolvedValue({ success: true });
-    workspaceMocks.stopWorkspaceDocker.mockReturnValue(Effect.succeed({ containersFound: false, steps: [] }));
+    workspaceMocks.stopWorkspaceDocker.mockResolvedValue({ containersFound: false, steps: [] });
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -232,10 +232,10 @@ describe('operator intervention CLI emission', () => {
     tmuxMocks.sessionExistsSync.mockReturnValue(true);
     projectMocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/overdeck' });
     workspaceMocks.findWorkspacePath.mockReturnValue('/tmp/overdeck/workspaces/feature-pan-1326');
-    workspaceMocks.stopWorkspaceDocker.mockReturnValue(Effect.succeed({
+    workspaceMocks.stopWorkspaceDocker.mockResolvedValue({
       containersFound: true,
       steps: ['docker compose down', 'docker network prune'],
-    }));
+    });
 
     const { killCommand } = await import('../kill.js');
     await killCommand('agent-pan-1326-ship', {});
@@ -257,10 +257,10 @@ describe('operator intervention CLI emission', () => {
     tmuxMocks.sessionExistsSync.mockReturnValue(true);
     projectMocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/overdeck' });
     workspaceMocks.findWorkspacePath.mockReturnValue('/tmp/overdeck/workspaces/feature-pan-1326');
-    workspaceMocks.stopWorkspaceDocker.mockReturnValue(Effect.succeed({
+    workspaceMocks.stopWorkspaceDocker.mockResolvedValue({
       containersFound: true,
       steps: ['docker compose down', 'docker network prune'],
-    }));
+    });
 
     const { killCommand } = await import('../kill.js');
     await killCommand('agent-pan-1326', {});

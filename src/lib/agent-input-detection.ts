@@ -1,6 +1,4 @@
-import { Effect } from 'effect'
 import { capturePane } from './tmux.js'
-import { TmuxError } from './errors.js'
 
 export type AwaitingInputReason = 'tool_permission' | 'user_question' | 'disambiguation' | 'confirmation' | 'planning_done' | 'session_resume' | 'rate_limit' | 'other'
 
@@ -324,7 +322,14 @@ export function detectAwaitingInputFromPaneSync(
   }
 
   return null
-}async function detectAwaitingInputForAgentPromise(
+}
+
+/**
+ * Detect whether an agent's pane is waiting for input (question, menu, rate
+ * limit, …). Concurrent calls for the same pane share one detection unless
+ * `cache: false`. Rejects when the pane capture fails outside the cache path.
+ */
+export async function detectAwaitingInputForAgent(
   agentId: string,
   options: { isPlanning?: boolean; lines?: number; cache?: boolean } = {},
 ): Promise<AwaitingInputDetection | null> {
@@ -347,7 +352,7 @@ export function detectAwaitingInputFromPaneSync(
   }
 
   const detectionPromise = withPaneDetectionSlot(async () => {
-    const pane = await Effect.runPromise(capturePane(agentId, options.lines ?? 90))
+    const pane = await capturePane(agentId, options.lines ?? 90)
     const detection = detectAwaitingInputFromPaneSync(pane, options)
     if (cacheEnabled) {
       paneDetectionCache.set(cacheKey, {
@@ -368,26 +373,6 @@ export function detectAwaitingInputFromPaneSync(
     paneDetectionInFlight.delete(cacheKey)
   }
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Effect-native variant of detectAwaitingInputForAgent. Fails with TmuxError if
- * the pane capture fails outside the in-cache fast path.
- */
-export const detectAwaitingInputForAgent = (
-  agentId: string,
-  options: { isPlanning?: boolean; lines?: number; cache?: boolean } = {},
-): Effect.Effect<AwaitingInputDetection | null, TmuxError> =>
-  Effect.tryPromise({
-    try: () => detectAwaitingInputForAgentPromise(agentId, options),
-    catch: (cause) =>
-      new TmuxError({
-        command: 'capture-pane',
-        message: `failed to detect awaiting input for ${agentId}`,
-        cause,
-      }),
-  })
 
 export interface CodexApprovalPrompt {
   /** The "Would you like to …?" header line. */

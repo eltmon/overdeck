@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 /**
  * Tests for git/operations.ts — gitFetch, gitForcePush, gitMerge (PAN-653).
  *
@@ -85,8 +84,8 @@ describe('gitPush', () => {
     const notAncestorErr = Object.assign(new Error(''), { code: 1 });
     execMock.mockRejectedValueOnce(notAncestorErr);
 
-    await expect(Effect.runPromise(gitPush('/repo', 'origin', 'main', { issueId: 'PAN-10' })))
-      .rejects.toMatchObject({ operation: 'main-diverged', cause: expect.any(MainDivergedError) });
+    await expect(gitPush('/repo', 'origin', 'main', { issueId: 'PAN-10' }))
+      .rejects.toBeInstanceOf(MainDivergedError);
     expect(mockAppend).toHaveBeenCalledWith(expect.objectContaining({
       operation: 'main_diverged',
       status: 'aborted',
@@ -102,8 +101,8 @@ describe('gitPush', () => {
     const badObjectErr = Object.assign(new Error('fatal: not a commit'), { code: 128 });
     execMock.mockRejectedValueOnce(badObjectErr);
 
-    await expect(Effect.runPromise(gitPush('/repo', 'origin', 'main', { issueId: 'PAN-10' })))
-      .rejects.toMatchObject({ stderr: 'fatal: not a commit', cause: badObjectErr });
+    await expect(gitPush('/repo', 'origin', 'main', { issueId: 'PAN-10' }))
+      .rejects.toBe(badObjectErr);
     expect(mockAppend).not.toHaveBeenCalledWith(expect.objectContaining({
       operation: 'main_diverged',
     }));
@@ -121,7 +120,7 @@ describe('gitFetch', () => {
   it('calls git fetch and records a success operation', async () => {
     execMock.mockResolvedValueOnce({ stdout: '' }); // git fetch origin branch
 
-    await Effect.runPromise(gitFetch('/repo', 'origin', 'main', { issueId: 'PAN-1' }));
+    await gitFetch('/repo', 'origin', 'main', { issueId: 'PAN-1' });
 
     expect(execMock).toHaveBeenCalledWith(expect.stringContaining('git fetch origin main'));
     expect(mockAppend).toHaveBeenCalledWith(expect.objectContaining({
@@ -135,8 +134,8 @@ describe('gitFetch', () => {
     const fetchErr = new Error('network error');
     execMock.mockRejectedValueOnce(fetchErr);
 
-    await expect(Effect.runPromise(gitFetch('/repo', 'origin', 'main')))
-      .rejects.toMatchObject({ stderr: 'network error', cause: fetchErr });
+    await expect(gitFetch('/repo', 'origin', 'main'))
+      .rejects.toBe(fetchErr);
     expect(mockAppend).toHaveBeenCalledWith(expect.objectContaining({
       operation: 'fetch',
       status: 'failure',
@@ -145,7 +144,7 @@ describe('gitFetch', () => {
 
   it('fetches the whole remote when no branch is specified', async () => {
     execMock.mockResolvedValueOnce({ stdout: '' });
-    await Effect.runPromise(gitFetch('/repo'));
+    await gitFetch('/repo');
     expect(execMock).toHaveBeenCalledWith(expect.stringMatching(/git fetch origin$/));
   });
 });

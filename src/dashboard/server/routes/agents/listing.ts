@@ -159,7 +159,7 @@ export const getAgentsRoute = HttpRouter.add(
             }
 
             const hasActiveSpecialist = specialistIssues.has(issueId);
-            const enrichment = await Effect.runPromise(computeAgentEnrichment(name, startedAt, hasActiveSpecialist));
+            const enrichment = await computeAgentEnrichment(name, startedAt, hasActiveSpecialist);
             const workspaceLocation = isRemote ? 'remote' : await getWorkspaceLocation(issueId);
             const workspace = isRemote && remoteState.vmName
               ? `/workspace (${String(remoteState.vmName)})`
@@ -315,7 +315,7 @@ export const getAgentHasSessionRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
-    const lifecycle = yield* getWorkAgentLifecycleState(id);
+    const lifecycle = yield* Effect.promise(() => getWorkAgentLifecycleState(id));
     return jsonResponse({
       hasSession: lifecycle.canResumeSession,
       lifecycle,

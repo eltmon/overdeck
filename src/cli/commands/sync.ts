@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import chalk from 'chalk';
 import ora from 'ora';
 import { execSync } from 'child_process';
@@ -215,7 +214,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     }
 
     // Agent directory cleanup preview
-    const agentCleanupPreview = await Effect.runPromise(cleanupAgentDirectories({ dryRun: true }));
+    const agentCleanupPreview = await cleanupAgentDirectories({ dryRun: true });
     if (agentCleanupPreview.totalOrphaned > 0) {
       console.log(chalk.cyan(`\nagent cleanup (~/.overdeck/agents/):`));
       console.log(chalk.dim(`  Found ${agentCleanupPreview.totalOrphaned} orphaned directories`));
@@ -644,7 +643,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
 
   // Agent directory cleanup
   const cleanupSpinner = ora('Checking for orphaned agent directories...').start();
-  const agentCleanupResult = await Effect.runPromise(cleanupAgentDirectories({ dryRun: false, force: options.force }));
+  const agentCleanupResult = await cleanupAgentDirectories({ dryRun: false, force: options.force });
 
   if (agentCleanupResult.totalOrphaned === 0) {
     cleanupSpinner.succeed('No orphaned agent directories found');

@@ -258,7 +258,7 @@ async function collectSessionTreeNodes(
       const awaitingInput = projectedAwaitingInput !== undefined
         ? projectedAwaitingInput
         : context.tmuxSessionNames.has(checkId)
-          ? await Effect.runPromise(detectAwaitingInputForAgent(checkId, { isPlanning }))
+          ? await detectAwaitingInputForAgent(checkId, { isPlanning })
           : null;
       const sessionWorkspacePath = state.role === 'worker' && state.workspace
         ? state.workspace // a worker runs in its own .swarm worktree or the workspace itself

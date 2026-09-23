@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { execSync } from 'child_process';
 import { mkdtempSync, rmSync, writeFileSync, existsSync } from 'fs';
@@ -8,7 +7,6 @@ import {
   runGitClean,
   dryRunGitClean,
   runGitResetHard,
-  DangerousGitOpError,
   DangerousOpBlockedError,
 } from '../dangerous-git-ops.js';
 import { GIT_CLEAN_EXCLUDES, gitCleanExcludeFlags } from '../protected-paths.js';
@@ -61,26 +59,24 @@ describe('runGitClean', () => {
   });
 
   it('hard-fails with DangerousOpBlockedError when userInvoked is false', async () => {
-    await expect(Effect.runPromise(
-      runGitClean({
+    await expect(runGitClean({
         workspacePath: repo,
         userInvoked: false,
         reason: 'agent attempted auto-clean',
-      }),
-    )).rejects.toBeInstanceOf(DangerousGitOpError);
+      })).rejects.toBeInstanceOf(DangerousOpBlockedError);
   });
 
   it('blocked error carries a structured payload for routes to surface', async () => {
     try {
-      await Effect.runPromise(runGitClean({
+      await runGitClean({
         workspacePath: repo,
         userInvoked: false,
         reason: 'agent attempted auto-clean',
-      }));
+      });
       expect.fail('should have thrown');
     } catch (err) {
-      expect(err).toBeInstanceOf(DangerousGitOpError);
-      const blocked = (err as DangerousGitOpError).cause as DangerousOpBlockedError;
+      expect(err).toBeInstanceOf(DangerousOpBlockedError);
+      const blocked = err as DangerousOpBlockedError;
       const payload = blocked.toJSON();
       expect(payload.code).toBe('DANGEROUS_OP_BLOCKED');
       expect(payload.operation).toBe('git_clean');
@@ -92,11 +88,11 @@ describe('runGitClean', () => {
   });
 
   it('with userInvoked=true, deletes only paths NOT in the protected list', async () => {
-    await Effect.runPromise(runGitClean({
+    await runGitClean({
       workspacePath: repo,
       userInvoked: true,
       reason: 'pan workspace deep-clean test',
-    }));
+    });
     expect(existsSync(join(repo, 'untracked.txt'))).toBe(false);
     // Protected paths survived.
     expect(existsSync(join(repo, '.env'))).toBe(true);
@@ -105,7 +101,7 @@ describe('runGitClean', () => {
   });
 
   it('dry-run lists what would be deleted without touching anything', async () => {
-    const out = await Effect.runPromise(dryRunGitClean({ workspacePath: repo }));
+    const out = await dryRunGitClean({ workspacePath: repo });
     expect(out).toContain('untracked.txt');
     expect(out.every(p => !p.includes('.env'))).toBe(true);
     expect(out.every(p => !p.includes('.devcontainer'))).toBe(true);
@@ -128,21 +124,19 @@ describe('runGitResetHard', () => {
   });
 
   it('runs without a userInvoked gate (tracked-only op)', async () => {
-    const result = await Effect.runPromise(runGitResetHard({
+    const result = await runGitResetHard({
       workspacePath: repo,
       ref: 'HEAD',
       reason: 'unit test',
-    }));
+    });
     expect(result).toBeDefined();
   });
 
   it('rejects refs containing shell metacharacters', async () => {
-    await expect(Effect.runPromise(
-      runGitResetHard({
+    await expect(runGitResetHard({
         workspacePath: repo,
         ref: 'HEAD; rm -rf /',
         reason: 'unit test',
-      }),
-    )).rejects.toMatchObject({ reason: expect.stringMatching(/unsafe ref/i) });
+      })).rejects.toThrow(/unsafe ref/i);
   });
 });

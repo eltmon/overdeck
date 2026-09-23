@@ -13,7 +13,6 @@
  * All filesystem I/O uses fs/promises so this is safe on the dashboard event loop.
  */
 
-import { Data, Effect } from 'effect';
 import { appendContinueSessionEntryForIssue } from './xbrief/lifecycle-io.js';
 import { resolveProjectFromIssueSync } from './projects.js';
 import { clearIssueClosedCache } from './cloister/issue-closed.js';
@@ -29,7 +28,8 @@ export interface ReopenOptions {
   trackerContext?: string;
 }
 
-async function reopenWorkspaceStatePromise(
+/** Reset a workspace's pipeline state so a closed issue can re-enter the pipeline. */
+export async function reopenWorkspaceState(
   issueId: string,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   workspacePath: string | null,
@@ -61,28 +61,3 @@ async function reopenWorkspaceStatePromise(
 
   return result;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Tagged error for reopen Effect variants. */
-export class ReopenError extends Data.TaggedError('ReopenError')<{
-  readonly issueId: string;
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
-
-/** Effect variant of `reopenWorkspaceState`. */
-export const reopenWorkspaceState = (
-  issueId: string,
-  workspacePath: string | null,
-  options: ReopenOptions = {},
-): Effect.Effect<ReopenResult, ReopenError> =>
-  Effect.tryPromise({
-    try: () => reopenWorkspaceStatePromise(issueId, workspacePath, options),
-    catch: (cause) =>
-      new ReopenError({
-        issueId,
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });

@@ -67,7 +67,8 @@ async function verifyRepoOrigin(
   return null;
 }
 
-export async function addNewRepoToWorkspacePromise(
+/** Register a newly-created repository and add its feature worktree to a workspace. */
+export async function addNewRepoToWorkspace(
   options: AddNewRepoToWorkspaceOptions,
   deps: AddNewRepoDeps = {},
 ): Promise<AddReposToWorkspaceResult> {
@@ -162,7 +163,7 @@ export async function addNewRepoToWorkspacePromise(
       };
     }
   } else {
-    const addResult = await addReposToWorkspacePromise({
+    const addResult = await addReposToWorkspace({
       projectConfig: updatedProjectConfig,
       featureName,
       repoNames: [repoName],
@@ -187,7 +188,8 @@ export async function addNewRepoToWorkspacePromise(
   return result;
 }
 
-export async function addReposToWorkspacePromise(options: AddReposToWorkspaceOptions): Promise<AddReposToWorkspaceResult> {
+/** Add additional configured repos (worktrees / symlinks) to an existing workspace. */
+export async function addReposToWorkspace(options: AddReposToWorkspaceOptions): Promise<AddReposToWorkspaceResult> {
   const { projectConfig, featureName, repoNames, dryRun } = options;
   const result: AddReposToWorkspaceResult = {
     success: true,

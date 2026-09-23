@@ -1,6 +1,5 @@
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
-import { Effect } from 'effect';
 import type { AgentStatus } from '@overdeck/contracts';
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { exec, execSync } from 'child_process';
@@ -414,11 +413,11 @@ export async function checkClosedIssueOrphanAgentDirs(
   issues: unknown[],
   agentsDir: string = AGENTS_DIR,
 ): Promise<CheckResult> {
-  const result = await Effect.runPromise(cleanupClosedIssueAgentDirectories({
+  const result = await cleanupClosedIssueAgentDirectories({
     issues,
     agentsDir,
     dryRun: true,
-  }));
+  });
 
   if (result.totalCandidates === 0) {
     return {

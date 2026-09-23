@@ -384,11 +384,11 @@ export async function reapCompletedRemoteAgents(opts: { issueId?: string; dryRun
       const workspacePath = join(projectRoot, 'workspaces', `feature-${issueId.toLowerCase()}`);
       if (!existsSync(workspacePath)) {
         if (!projectConfig) throw new Error(`No project config for ${issueId}; cannot create workspace`);
-        const wsResult = await Effect.runPromise(createWorkspace({
+        const wsResult = await createWorkspace({
           projectConfig,
           featureName: issueId.toLowerCase(),
           startDocker: false,
-        }));
+        });
         if (!wsResult.success) {
           throw new Error(`Failed to create local worktree: ${wsResult.errors.join('; ')}`);
         }

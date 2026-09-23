@@ -194,11 +194,11 @@ async function ensureFeatureWorkspace(issueId: string, project: ResolvedProjectL
   const workspacePath = join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
   if (existsSync(workspacePath)) return workspacePath;
   const projectConfig: ProjectConfig = { name: project.projectName, path: project.projectPath };
-  const result = await Effect.runPromise(createWorkspace({
+  const result = await createWorkspace({
     projectConfig,
     featureName: issueId.toLowerCase(),
     startDocker: false,
-  }));
+  });
   if (!result.success) {
     throw new Error(`Failed to create workspace for ${issueId}: ${result.errors.join('; ') || 'unknown error'}`);
   }

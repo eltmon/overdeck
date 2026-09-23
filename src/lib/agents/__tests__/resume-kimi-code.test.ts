@@ -91,7 +91,7 @@ vi.mock('../../tmux.js', async (importOriginal) => {
     sessionExists: vi.fn(() => Effect.succeed(false)),
     killSession: mocks.killSession,
     isPaneDead: vi.fn(() => Effect.succeed(false)),
-    listPaneValues: vi.fn(() => Effect.succeed([])),
+    listPaneValues: vi.fn(async () => []),
   };
 });
 

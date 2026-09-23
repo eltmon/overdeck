@@ -17,7 +17,7 @@ import { Effect } from 'effect'
 
 import { scanPendingInputsPromise, type PendingInputsScan } from './agent-enrichment.js'
 import { resolvePiSessionPath } from './agents/transcript-resolver.js'
-import { capturePaneText, sendRawKeystroke, sessionExists, tmuxExecAsync, exactPaneTarget } from './tmux.js'
+import { capturePane, sendRawKeystroke, sessionExists, tmuxExecAsync, exactPaneTarget } from './tmux.js'
 import { randomUUID } from 'node:crypto'
 import { writeFile, unlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -125,7 +125,7 @@ export async function answerPiAskModal(
     }
     const question = pending.questions[0]!
 
-    const capture = deps.capture ?? capturePaneText
+    const capture = deps.capture ?? capturePane
     const sendKey = deps.sendKey
       ?? ((name: string, key: string) => Effect.runPromise(sendRawKeystroke(name, key, 'pi-ask-answer')))
     const sendText = deps.sendText ?? pasteTextIntoSession

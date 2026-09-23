@@ -131,7 +131,7 @@ describe('getAgentWorkspace()', () => {
     mkdirSync(strikeWorkspace, { recursive: true });
     recordedWorkspaces.set('strike-pan-2857', null);
 
-    const resolved = await Effect.runPromise(getAgentWorkspace('strike-pan-2857'));
+    const resolved = await getAgentWorkspace('strike-pan-2857');
 
     expect(resolved).toBe(strikeWorkspace);
   });
@@ -142,7 +142,7 @@ describe('getAgentJsonlPath()', () => {
     pinSession('flywheel-orchestrator', OWN_SESSION);
     const projectDir = writeTranscripts(OTHER_SESSION, OWN_SESSION);
 
-    const resolved = await Effect.runPromise(getAgentJsonlPath('flywheel-orchestrator'));
+    const resolved = await getAgentJsonlPath('flywheel-orchestrator');
 
     expect(resolved).toBe(join(projectDir, `${OWN_SESSION}.jsonl`));
   });
@@ -150,7 +150,7 @@ describe('getAgentJsonlPath()', () => {
   it('does not adopt the freshest transcript when the agent has no session identity', async () => {
     writeTranscripts(OTHER_SESSION, OWN_SESSION);
 
-    const resolved = await Effect.runPromise(getAgentJsonlPath('agent-pan-2765'));
+    const resolved = await getAgentJsonlPath('agent-pan-2765');
 
     expect(resolved).toBeNull();
   });
@@ -159,7 +159,7 @@ describe('getAgentJsonlPath()', () => {
     pinSession('conv-20260716-6155', 'never-written-to-disk');
     writeTranscripts(OTHER_SESSION);
 
-    const resolved = await Effect.runPromise(getAgentJsonlPath('conv-20260716-6155'));
+    const resolved = await getAgentJsonlPath('conv-20260716-6155');
 
     expect(resolved).toBeNull();
   });
@@ -186,7 +186,7 @@ describe('getAgentJsonlPath()', () => {
       path: recordedPath,
     })}\n`);
 
-    const resolved = await Effect.runPromise(getAgentJsonlPath(agentId));
+    const resolved = await getAgentJsonlPath(agentId);
 
     expect(resolved).toBe(recordedPath);
   });

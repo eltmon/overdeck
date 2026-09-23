@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const existsSyncMock = vi.hoisted(() => vi.fn());
@@ -57,9 +56,9 @@ describe('git stale-lock process probes', () => {
     });
     const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
     let settled = false;
-    const cleanupPromise = Effect.runPromise(cleanupStaleLocks(REPO_PATH, {
+    const cleanupPromise = cleanupStaleLocks(REPO_PATH, {
       processProbeTimeoutMs: 1_000,
-    }));
+    });
     void cleanupPromise.then(() => { settled = true; }, () => { settled = true; });
 
     await vi.advanceTimersByTimeAsync(1_000);
@@ -97,10 +96,10 @@ describe('git stale-lock process probes', () => {
     const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
     const controller = new AbortController();
     let settled = false;
-    const cleanupPromise = Effect.runPromise(cleanupStaleLocks(REPO_PATH, {
+    const cleanupPromise = cleanupStaleLocks(REPO_PATH, {
       signal: controller.signal,
       processProbeTimeoutMs: 30_000,
-    }));
+    });
     void cleanupPromise.then(() => { settled = true; }, () => { settled = true; });
 
     controller.abort();
@@ -131,9 +130,9 @@ describe('git stale-lock process probes', () => {
       return child(4242);
     });
 
-    await expect(Effect.runPromise(cleanupStaleLocks(REPO_PATH, {
+    await expect(cleanupStaleLocks(REPO_PATH, {
       processProbeTimeoutMs: 2_000,
-    }))).resolves.toEqual({
+    })).resolves.toEqual({
       found: [INDEX_LOCK],
       removed: [],
       errors: [{
@@ -166,9 +165,9 @@ describe('git stale-lock process probes', () => {
         return child(8181);
       });
 
-    await expect(Effect.runPromise(cleanupStaleLocks(REPO_PATH, {
+    await expect(cleanupStaleLocks(REPO_PATH, {
       processProbeTimeoutMs: 2_000,
-    }))).resolves.toEqual({
+    })).resolves.toEqual({
       found: [INDEX_LOCK],
       removed: [INDEX_LOCK],
       errors: [],
@@ -205,9 +204,9 @@ describe('git stale-lock process probes', () => {
         return child(1010);
       });
 
-    await expect(Effect.runPromise(cleanupStaleLocks(REPO_PATH, {
+    await expect(cleanupStaleLocks(REPO_PATH, {
       processProbeTimeoutMs: 2_000,
-    }))).resolves.toMatchObject({
+    })).resolves.toMatchObject({
       found: [INDEX_LOCK],
       removed: [],
       errors: [{ file: 'N/A', error: expect.stringContaining('ps failed') }],

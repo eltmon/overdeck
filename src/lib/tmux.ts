@@ -451,7 +451,10 @@ async function ensureManagedTmuxConfigAsync(): Promise<void> {
   await writeFile(getManagedTmuxConfigPath(), MANAGED_TMUX_CONFIG_CONTENT, 'utf-8');
   await reloadManagedTmuxConfigAsync();
   tmuxContextPrepared = true;
-}async function ensureManagedTmuxContextOncePromise(): Promise<void> {
+}
+
+/** Prepare the managed tmux config + server (idempotent). */
+export async function ensureManagedTmuxContextOnce(): Promise<void> {
   const mode = getTmuxConfigMode();
   await ensureTmuxContextPreparedAsync(mode);
 }
@@ -486,8 +489,9 @@ async function ensureTmuxContextPreparedAsync(mode: TmuxConfigMode): Promise<voi
  *
  * Callers that build a tmux command line directly (e.g., `pty.spawn('tmux',
  * buildTmuxArgs(...))`) MUST have `ensureManagedTmuxContextOnce()` awaited
- * earlier in the process lifetime — the dashboard server does this from
- * main.ts before `server.listen`. The `tmuxExecAsync` / `tmuxExecSync`
+ * earlier in the process lifetime, or have run a tmux command through the
+ * helpers below. The dashboard server's boot call in main.ts never ran
+ * (see the PAN-3958 CH-3 note there). The `tmuxExecAsync` / `tmuxExecSync`
  * helpers still call `ensureTmuxContextPrepared*` themselves (cheap after the
  * first call) so CLI entry points that never went through the server init
  * still work on first use.
@@ -705,7 +709,8 @@ export function capturePaneSync(sessionName: string, lines: number = 50): string
   }
 }
 
-export async function capturePaneText(
+/** Capture the last `lines` lines of a pane; empty string on any tmux failure. */
+export async function capturePane(
   sessionName: string,
   lines: number = 50,
   options?: { escapeSequences?: boolean }
@@ -752,7 +757,8 @@ export function listPaneValuesSync(target: string, format: string): string[] {
   }
 }
 
-async function listPaneValuesText(target: string, format: string): Promise<string[]> {
+/** List one `#{format}` value per pane of a target; empty on any tmux failure. */
+export async function listPaneValues(target: string, format: string): Promise<string[]> {
   try {
     const { stdout } = await tmuxExecAsync(['list-panes', '-t', exactPaneTarget(target), '-F', format], { encoding: 'utf-8' });
     return String(stdout).split('\n').map((line: string) => line.trim()).filter(Boolean);
@@ -776,7 +782,7 @@ async function listPaneValuesText(target: string, format: string): Promise<strin
  * (PAN-1769, conv 2701/2707 false-"ended").
  */
 export async function isHarnessProcessAlive(sessionName: string): Promise<boolean> {
-  const panePids = (await listPaneValuesText(sessionName, '#{pane_pid}'))
+  const panePids = (await listPaneValues(sessionName, '#{pane_pid}'))
     .map((value) => Number.parseInt(value, 10))
     .filter((pid) => Number.isInteger(pid) && pid > 0);
   if (panePids.length === 0) return false;
@@ -908,7 +914,7 @@ export async function confirmDelivery(
 
   while (Date.now() - start < timeoutMs) {
     await new Promise(r => setTimeout(r, poll));
-    const after = await Effect.runPromise(capturePane(sessionName, 50));
+    const after = await capturePane(sessionName, 50);
     const afterText = after.trimEnd();
     if (afterText === beforeText) continue;
 
@@ -935,13 +941,6 @@ const toTmuxError = (op: string, cause: unknown): TmuxError =>
     command: op,
     message: cause instanceof Error ? cause.message : String(cause),
     cause,
-  });
-
-/** Prepare the managed tmux config + server (idempotent). */
-export const ensureManagedTmuxContextOnce = (): Effect.Effect<void, TmuxError> =>
-  Effect.tryPromise({
-    try: () => ensureManagedTmuxContextOncePromise(),
-    catch: (cause) => toTmuxError('ensureManagedTmuxContext', cause),
   });
 
 export const listSessions = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
@@ -1186,7 +1185,7 @@ export const sendKeys = (
         // observation is the only uncontaminated one the tier gets. Skipped for
         // short key sequences, which never reach that guard.
         const menuBeforePaste = verifyLine.length >= 3
-          && paneHasBlockingChoiceMenu(await capturePaneText(sessionName, 90).catch(() => ''));
+          && paneHasBlockingChoiceMenu(await capturePane(sessionName, 90).catch(() => ''));
 
         await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-p', '-t', sessionName], { encoding: 'utf-8' });
         // 1.5s per attempt × 2 attempts = 3s worst case. The previous 8s × 2 = 16s
@@ -1202,7 +1201,7 @@ export const sendKeys = (
             const verifyStart = Date.now();
             const deadline = verifyStart + VERIFY_TIMEOUT_MS;
             while (Date.now() < deadline) {
-              const pane = await capturePaneText(sessionName, 10);
+              const pane = await capturePane(sessionName, 10);
               if (pane.includes(verifyLine.slice(0, 40))) {
                 pasteVerified = true;
                 const elapsed = Date.now() - verifyStart;
@@ -1218,7 +1217,7 @@ export const sendKeys = (
             // Wide-window fallback on every attempt (including the last) so we
             // catch pastes that landed off-screen of the 10-line tail before
             // giving up and stranding Enter.
-            const wideCheck = await capturePaneText(sessionName, 200);
+            const wideCheck = await capturePane(sessionName, 200);
             if (wideCheck.includes(verifyLine.slice(0, 40))) {
               pasteVerified = true;
               break attemptLoop;
@@ -1238,7 +1237,7 @@ export const sendKeys = (
         await tmuxExecAsync(['delete-buffer', '-b', bufferName], { encoding: 'utf-8' }).catch(() => {});
 
         if (!pasteVerified) {
-          const snapshot = await capturePaneText(sessionName, 90);
+          const snapshot = await capturePane(sessionName, 90);
           // A blocking menu swallowed the paste, and Enter would confirm ITS
           // highlighted row — at the resume gate, "Resume from summary" over
           // the operator's "as-is" (PAN-3212). Never answer a menu we did not
@@ -1263,7 +1262,7 @@ export const sendKeys = (
           const submitDeadline = Date.now() + SUBMIT_TIMEOUT_MS;
           let stillPendingSubmit = true;
           while (Date.now() < submitDeadline) {
-            const pane = await capturePaneText(sessionName, 5);
+            const pane = await capturePane(sessionName, 5);
             if (!pane.includes(verifyLine.slice(0, 40))) {
               stillPendingSubmit = false;
               break;
@@ -1283,30 +1282,11 @@ export const sendKeys = (
     catch: (cause) => cause instanceof MessageDeliveryFailed ? cause : toTmuxError('send-keys', cause),
   });
 
-export const capturePane = (
-  sessionName: string,
-  lines: number = 50,
-  options?: { escapeSequences?: boolean },
-): Effect.Effect<string, TmuxError> =>
-  Effect.tryPromise({
-    try: () => capturePaneText(sessionName, lines, options),
-    catch: (cause) => toTmuxError('capture-pane', cause),
-  });
-
-export const listPaneValues = (
-  target: string,
-  format: string,
-): Effect.Effect<readonly string[], TmuxError> =>
-  Effect.tryPromise({
-    try: () => listPaneValuesText(target, format),
-    catch: (cause) => toTmuxError('list-pane-values', cause),
-  });
-
 export const isPaneDead = (
   sessionName: string,
 ): Effect.Effect<boolean, TmuxError> =>
   Effect.gen(function* () {
-    const values = yield* listPaneValues(sessionName, '#{pane_dead}');
+    const values = yield* Effect.promise(() => listPaneValues(sessionName, '#{pane_dead}'));
     return values.some(v => v === '1');
   }).pipe(Effect.catch(() => Effect.succeed(false)));
 

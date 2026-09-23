@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../lib/agent-enrichment.js', () => ({
   getClaudeProjectDir: vi.fn(),
-  getAgentWorkspace: vi.fn(() => Effect.succeed('/workspace/feature-pan-473')),
+  getAgentWorkspace: vi.fn(async () => '/workspace/feature-pan-473'),
   getAgentJsonlPath: vi.fn(),
   getPendingQuestions: vi.fn(),
   getAgentPendingQuestions: vi.fn(),
@@ -91,7 +91,7 @@ const PARSE_RESULT_BASE = {
 describe('buildConversationResponse', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetAgentWorkspace.mockReturnValue(Effect.succeed('/workspace/feature-pan-473'));
+    mockGetAgentWorkspace.mockResolvedValue('/workspace/feature-pan-473');
     mockListAgentTranscriptCandidates.mockResolvedValue([]);
     mockAccess.mockResolvedValue(undefined);
   });

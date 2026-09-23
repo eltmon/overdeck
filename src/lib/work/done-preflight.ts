@@ -5,7 +5,6 @@ import { promisify } from 'node:util';
 
 import { Effect } from 'effect';
 
-import { ProcessSpawnError } from '../errors.js';
 import { isOverdeckOwnedOnlyStatus } from '../state-plane.js';
 import { readWorkspacePlan, readWorkspacePlanSync } from '../xbrief/io.js';
 import { subItemsOf, type XBriefDocument } from '../xbrief/types.js';
@@ -86,17 +85,11 @@ async function checkUncommittedChangesPromise(workspacePath: string): Promise<st
   return failures;
 }
 
-async function runPreflightChecksPromise(workspacePath: string, issueId: string, testWaived?: string): Promise<string[]> {
+/** Run the `pan done` preflight checks and return every failure line (empty when clean). */
+export async function runPreflightChecks(workspacePath: string, issueId: string, testWaived?: string): Promise<string[]> {
   return [
     ...checkIncompletePlanItemsSync(workspacePath),
     ...await checkUncommittedChangesPromise(workspacePath),
     ...await Effect.runPromise(runTestRequirementCheck(workspacePath, issueId, testWaived)),
   ];
 }
-
-const processError = (op: string, cause: unknown) => new ProcessSpawnError({
-  command: 'done-preflight', args: [op], message: cause instanceof Error ? cause.message : String(cause), cause,
-});
-
-export const runPreflightChecks = (workspacePath: string, issueId: string, testWaived?: string): Effect.Effect<string[], ProcessSpawnError> =>
-  Effect.tryPromise({ try: () => runPreflightChecksPromise(workspacePath, issueId, testWaived), catch: (cause) => processError('runPreflightChecks', cause) });

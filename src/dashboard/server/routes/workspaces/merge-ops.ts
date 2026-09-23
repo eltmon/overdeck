@@ -235,7 +235,7 @@ export async function pushApproveMain(
   projectPath: string,
 ): Promise<ApprovePushResult> {
   try {
-    await Effect.runPromise(gitPush(projectPath, 'origin', 'main', { issueId }));
+    await gitPush(projectPath, 'origin', 'main', { issueId });
     return { pushed: true };
   } catch (pushErr: unknown) {
     if (pushErr instanceof MainDivergedError) {

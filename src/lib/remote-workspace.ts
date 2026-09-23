@@ -10,7 +10,7 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { Data, Effect } from 'effect';
+import { Effect } from 'effect';
 import { loadConfigSync } from './config.js';
 import { createFlyProviderFromConfig } from './remote/index.js';
 import { writeRemoteFile } from './remote/remote-agents.js';
@@ -24,7 +24,10 @@ export interface CreateRemoteWorkspaceOptions {
   dryRun?: boolean;
   spinner?: { text: string };
   tier?: 'ephemeral' | 'durable';
-}async function createRemoteWorkspacePromise(
+}
+
+/** Create a remote (Fly) workspace for an issue and return its metadata. */
+export async function createRemoteWorkspace(
   issueId: string,
   options: CreateRemoteWorkspaceOptions = {}
 ): Promise<RemoteWorkspaceMetadata> {
@@ -210,29 +213,3 @@ export interface CreateRemoteWorkspaceOptions {
 
   return metadata;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Tagged error for remote-workspace Effect variants. */
-export class RemoteWorkspaceError extends Data.TaggedError('RemoteWorkspaceError')<{
-  readonly issueId: string;
-  readonly stage: string;
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
-
-/** Effect variant of `createRemoteWorkspace`. */
-export const createRemoteWorkspace = (
-  issueId: string,
-  options: CreateRemoteWorkspaceOptions = {},
-): Effect.Effect<RemoteWorkspaceMetadata, RemoteWorkspaceError> =>
-  Effect.tryPromise({
-    try: () => createRemoteWorkspacePromise(issueId, options),
-    catch: (cause) =>
-      new RemoteWorkspaceError({
-        issueId,
-        stage: 'createRemoteWorkspace',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });

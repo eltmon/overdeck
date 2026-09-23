@@ -1,5 +1,4 @@
 import { exitCli } from '../exit.js';
-import { Effect } from 'effect';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
@@ -101,12 +100,12 @@ async function runCommand(target: string | undefined, options: RunOptions): Prom
     spinner.stop();
 
     // Run tests
-    const result = await Effect.runPromise(runTests({
+    const result = await runTests({
       projectConfig,
       featureName,
       testNames,
       notify: options.notify !== false,
-    }));
+    });
 
     // Exit with appropriate code
     return exitCli(result.overallStatus === 'passed' ? 0 : 1);

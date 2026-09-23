@@ -198,7 +198,7 @@ async function stopDockerImpl(
   const step = 'teardown:docker';
   try {
     const { stopWorkspaceDocker } = await import('../workspace-manager.js');
-    await Effect.runPromise(stopWorkspaceDocker(workspacePath, issueLower));
+    await stopWorkspaceDocker(workspacePath, issueLower);
     return stepOk(step, ['Stopped Docker containers']);
   } catch {
     return stepSkipped(step, ['Docker cleanup skipped (not running or failed)']);
@@ -300,7 +300,7 @@ async function removeWorktreeImpl(
 
   // Guard: never delete workspace (and its `.devcontainer/`) while containers
   // still reference compose paths inside it.
-  const orphanedContainers = await Effect.runPromise(getContainersReferencingWorkspacePath(workspacePath));
+  const orphanedContainers = await getContainersReferencingWorkspacePath(workspacePath);
   if (orphanedContainers.length > 0) {
     return stepFailed(
       step,
@@ -835,7 +835,7 @@ function pruneCheckpointRefs(projectPath: string, issueLower: string): Effect.Ef
       const step = 'teardown:checkpoint-refs';
       const { pruneCheckpointRefsForAgents } = await import('../checkpoint/checkpoint-manager.js');
       const agentIds = [`agent-${issueLower}`, `planning-${issueLower}`, `strike-${issueLower}`];
-      const pruned = await Effect.runPromise(pruneCheckpointRefsForAgents(projectPath, agentIds));
+      const pruned = await pruneCheckpointRefsForAgents(projectPath, agentIds);
       return stepOk(step, [`Pruned ${pruned} checkpoint ref(s) for ${agentIds.join(', ')}`]);
     },
     catch: (err) => err,

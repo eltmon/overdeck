@@ -33,7 +33,6 @@ import { existsSync, mkdirSync, openSync, writeSync, closeSync, unlinkSync, cons
 import { join } from 'node:path'
 import { exec } from 'node:child_process'
 import { promisify } from 'node:util'
-import { Data, Effect } from 'effect'
 import { getOverdeckHome } from '../paths.js'
 
 const execAsync = promisify(exec)
@@ -60,7 +59,10 @@ export function piFifoPaths(agentId: string, home?: string): PiFifoPaths {
     readyPath: join(agentDir, 'ready.json'),
     fifoPath: join(agentDir, 'rpc.in'),
   }
-}async function createPiFifoPromise(agentId: string, home?: string): Promise<string> {
+}
+
+/** Create the Pi RPC FIFO for an agent and return its path. */
+export async function createPiFifo(agentId: string, home?: string): Promise<string> {
   const paths = piFifoPaths(agentId, home)
   mkdirSync(paths.agentDir, { recursive: true, mode: 0o700 })
   if (existsSync(paths.fifoPath)) {
@@ -134,31 +136,3 @@ function shellQuote(s: string): string {
   if (/^[A-Za-z0-9._/-]+$/.test(s)) return s
   return `'${s.replace(/'/g, `'\\''`)}'`
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// Additive Effect-channel variants of the fifo helpers above.
-
-/** Tagged error for pi-fifo Effect variants. */
-export class PiFifoError extends Data.TaggedError('PiFifoError')<{
-  readonly agentId: string
-  readonly stage: 'create' | 'write' | 'destroy'
-  readonly message: string
-  readonly cause?: unknown
-}> {}
-
-/** Effect variant of `createPiFifo`. */
-export const createPiFifo = (
-  agentId: string,
-  home?: string,
-): Effect.Effect<string, PiFifoError> =>
-  Effect.tryPromise({
-    try: () => createPiFifoPromise(agentId, home),
-    catch: (cause) =>
-      new PiFifoError({
-        agentId,
-        stage: 'create',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  })

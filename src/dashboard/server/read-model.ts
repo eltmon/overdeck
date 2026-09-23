@@ -450,7 +450,7 @@ export const ReadModelServiceLive = Layer.effect(
           // Run against the first agent's workspace (all worktrees share the same parent .git).
           const firstAgentWithWorkspace = agents.find(a => a.workspace);
           if (firstAgentWithWorkspace?.workspace) {
-            const deleted = await Effect.runPromise(deleteLegacyCheckpointRefs(firstAgentWithWorkspace.workspace));
+            const deleted = await deleteLegacyCheckpointRefs(firstAgentWithWorkspace.workspace);
             if (deleted > 0) {
               console.log(`[ReadModel] Deleted ${deleted} legacy unscoped checkpoint refs`);
             }

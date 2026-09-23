@@ -144,7 +144,7 @@ async function sessionExistsDefault(agentId: string): Promise<boolean> {
 }
 
 async function listPaneRowsDefault(agentId: string): Promise<PaneRow[]> {
-  const values = await Effect.runPromise(listPaneValues(agentId, '#{pane_pid}\t#{pane_dead}')).catch(() => [] as string[]);
+  const values = await listPaneValues(agentId, '#{pane_pid}\t#{pane_dead}').catch(() => [] as string[]);
   return parsePaneRows(values);
 }
 

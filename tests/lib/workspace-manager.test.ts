@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { existsSync, mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
@@ -258,14 +257,14 @@ describe('createWorkspace', () => {
 
     try {
       const { createWorkspace } = await import('../../src/lib/workspace-manager.js');
-      const result = await Effect.runPromise(createWorkspace({
+      const result = await createWorkspace({
         projectConfig: {
           name: 'Test',
           path: tempDir,
           package_manager: 'npm',
         },
         featureName: 'pan-2050',
-      }));
+      });
 
       expect(result.success).toBe(true);
       expect(result.steps).toContain('Staged pre-worktree .pan metadata');
@@ -309,7 +308,7 @@ describe('stopWorkspaceDocker', () => {
     );
 
     const { stopWorkspaceDocker } = await import('../../src/lib/workspace-manager.js');
-    await Effect.runPromise(stopWorkspaceDocker(workspaceDir, 'pan-1140'));
+    await stopWorkspaceDocker(workspaceDir, 'pan-1140');
 
     // PAN-3049 security fix: the compose project name is now passed via
     // execFile's argv array (cmd='docker', args=[...]), never interpolated
@@ -333,7 +332,7 @@ describe('stopWorkspaceDocker', () => {
     // PAN-3049: the message now comes from the canonical resolver
     // (composeProjectNameForWorkspace), which reports "a name ending in
     // <feature folder>" rather than one exact expected literal.
-    await expect(Effect.runPromise(stopWorkspaceDocker(workspaceDir, 'pan-1140'))).rejects.toThrow(
+    await expect(stopWorkspaceDocker(workspaceDir, 'pan-1140')).rejects.toThrow(
       'declares COMPOSE_PROJECT_NAME=victim-project, expected a name ending in feature-pan-1140',
     );
     // The resolver throws before any Docker command is issued at all.

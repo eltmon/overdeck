@@ -41,7 +41,7 @@ import { randomUUID } from 'node:crypto';
 import { unlink, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { capturePaneText, tmuxExecAsync, validateSessionName } from './tmux.js';
+import { capturePane, tmuxExecAsync, validateSessionName } from './tmux.js';
 import { MessageDeliveryFailed } from './errors.js';
 import { paneHasBlockingChoiceMenu } from './pane-choice-menu.js';
 import {
@@ -560,7 +560,7 @@ export async function completeKeyedSubmit(
   const pendingBefore = await read(sessionName, pendingOption);
 
   if (pendingBefore !== '') {
-    const paneSnapshot = await (deps.readPaneText ?? capturePaneText)(sessionName, 90).catch(() => '');
+    const paneSnapshot = await (deps.readPaneText ?? capturePane)(sessionName, 90).catch(() => '');
     if (paneSnapshot && paneHasBlockingChoiceMenu(paneSnapshot)) {
       throw new KeyedSubmitBlockedMenuError(sessionName, dedupKey, paneSnapshot);
     }

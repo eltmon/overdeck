@@ -77,12 +77,10 @@ async function captureInterestedAgent(
         const { getRemoteAgentOutput } = await import('../../../lib/remote/remote-agents.js')
         stdout = await getRemoteAgentOutput(agentId, remoteState.vmName, 50)
       } else {
-        stdout = await Effect.runPromise(capturePane(agentId, 50))
+        stdout = await capturePane(agentId, 50)
       }
     } catch {
-      stdout = await Effect.runPromise(
-        capturePane(agentId, 50).pipe(Effect.catch(() => Effect.succeed(''))),
-      )
+      stdout = await capturePane(agentId, 50).catch(() => '')
     }
 
     if (!hasAgentInterest(state, agentId)) return

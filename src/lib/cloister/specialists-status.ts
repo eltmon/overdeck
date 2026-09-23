@@ -129,7 +129,7 @@ export async function isRunning(name: SpecialistAgentName, projectKey?: string):
     // Session exists — but check if the pane actually has a running process.
     // When Claude Code crashes, the pane's process exits but the tmux session persists,
     // making has-session return success even though nothing is running.
-    const panePid = (await Effect.runPromise(listPaneValues(tmuxSession, '#{pane_pid}')))[0]?.trim() ?? '';
+    const panePid = (await listPaneValues(tmuxSession, '#{pane_pid}'))[0]?.trim() ?? '';
     if (!panePid) return false;
     // Check if the pane's process has any child processes (Claude Code / bash)
     const { stdout: children } = await execAsync(

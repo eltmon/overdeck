@@ -26,7 +26,7 @@ vi.mock('../../../dashboard/server/services/tracker-config.js', () => ({
   getGitHubConfig: () => null,
 }));
 vi.mock('../../agent-enrichment.js', () => ({
-  countPendingAskUserQuestionsForAgent: () => Effect.succeed(0),
+  countPendingAskUserQuestionsForAgent: async () => 0,
 }));
 vi.mock('../../agents.js', () => ({
   getAgentStateSync: vi.fn(() => testState.agentState),

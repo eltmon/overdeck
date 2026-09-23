@@ -6,7 +6,6 @@
  * the layered context into harness CLAUDE.md files via syncContextLayers().
  */
 
-import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Module-level mocks (hoisted before imports) ────────────────────────────
@@ -34,7 +33,7 @@ const mockResolveAlsoSyncTools = vi.fn().mockReturnValue([]);
 const mockEnsurePlaywrightIsolation = vi.fn().mockReturnValue(false);
 const mockEnsureExcalidrawMcp = vi.fn().mockReturnValue(false);
 const mockCreateBackup = vi.fn().mockReturnValue({ targets: [], timestamp: 'now' });
-const mockCleanupAgentDirectories = vi.fn().mockReturnValue(Effect.succeed({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] }));
+const mockCleanupAgentDirectories = vi.fn().mockResolvedValue({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] });
 const mockStartupSyncNeeded = vi.fn().mockReturnValue({ needed: true, reason: 'test' });
 const mockProvisionClaudeHooks = vi.fn().mockResolvedValue({
   ok: true,
@@ -178,7 +177,7 @@ describe('syncCommand — layered sync (PAN-1201)', () => {
       keptModified: [],
     });
     mockSyncContextLayers.mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [], firstInjections: [], legacyBeadsCleanups: [] });
-    mockCleanupAgentDirectories.mockReturnValue(Effect.succeed({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] }));
+    mockCleanupAgentDirectories.mockResolvedValue({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] });
     mockStartupSyncNeeded.mockReturnValue({ needed: true, reason: 'test' });
     mockProvisionClaudeHooks.mockResolvedValue({
       ok: true,

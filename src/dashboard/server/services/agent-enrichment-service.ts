@@ -237,7 +237,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
       // (avoids I/O on static sessions).
       // getAgentJsonlMtime returns an Effect — it MUST be run, not awaited directly
       // (awaiting a non-thenable Effect yields the Effect object, never the value).
-      const currentMtime = await Effect.runPromise(getAgentJsonlMtime(agentId))
+      const currentMtime = await getAgentJsonlMtime(agentId)
       const previousEnrichment = state.lastEnrichment.get(agentId)
       const previousScan = state.lastScan.get(agentId)
       const cachedScan =
@@ -245,11 +245,11 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
 
       let enrichment: AgentEnrichment
       try {
-        // computeAgentEnrichment returns an Effect — it MUST be run, not awaited
-        // directly (awaiting a non-thenable Effect yields the Effect object, so
-        // every enrichment field came back undefined → hasPendingQuestion/
-        // pendingAskUserQuestion silently dropped for every agent). PAN-1395.
-        enrichment = await Effect.runPromise(computeAgentEnrichment(agentId, startedAt, hasActiveSpecialist, cachedScan))
+        // computeAgentEnrichment is a plain async function (PAN-3958 CH-3). It
+        // used to return an Effect, and awaiting that non-thenable value yielded
+        // the Effect object, so every enrichment field came back undefined
+        // (PAN-1395).
+        enrichment = await computeAgentEnrichment(agentId, startedAt, hasActiveSpecialist, cachedScan)
       } catch {
         return
       }

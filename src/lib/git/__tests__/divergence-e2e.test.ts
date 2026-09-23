@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 /**
  * PAN-653: End-to-end divergence guard integration tests.
  *
@@ -108,7 +107,7 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     const { gitPush, MainDivergedError } = await import('../operations.js');
 
     // First push succeeds
-    await expect(Effect.runPromise(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-FIRST' })))
+    await expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-FIRST' }))
       .resolves.not.toThrow();
 
     // Now origin/main has advanced (hotfix landed)
@@ -121,8 +120,8 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     });
 
     // Second push throws MainDivergedError
-    await expect(Effect.runPromise(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-SECOND' })))
-      .rejects.toMatchObject({ cause: expect.any(MainDivergedError) });
+    await expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-SECOND' }))
+      .rejects.toBeInstanceOf(MainDivergedError);
   });
 
   it('Full flow: divergence → mark stuck → Deacon skips → restart persists → unstick clears', async () => {
@@ -138,11 +137,10 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     let divergedErr: InstanceType<typeof MainDivergedError> | undefined;
 
     try {
-      await Effect.runPromise(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-FLOW' }));
+      await gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-FLOW' });
     } catch (err) {
-      const cause = (err as { cause?: unknown }).cause;
-      if (cause instanceof MainDivergedError) {
-        divergedErr = cause;
+      if (err instanceof MainDivergedError) {
+        divergedErr = err;
       }
     }
 
@@ -175,7 +173,7 @@ describe('PAN-653 — concurrent approve divergence guard (E2E)', () => {
     const { gitPush } = await import('../operations.js');
     const { listGitOperationsSync } = await import('../../../lib/git-activity.js');
 
-    await expect(Effect.runPromise(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-OPS' })))
+    await expect(gitPush('/tmp/workspace', 'origin', 'main', { issueId: 'PAN-OPS' }))
       .rejects.toThrow();
 
     const allOps = listGitOperationsSync({ issueId: 'PAN-OPS' });

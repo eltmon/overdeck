@@ -304,7 +304,7 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
     mocks.messageAgentDispatch.mockImplementation((...args: unknown[]) => mocks.realMessageAgent!(...args));
     mocks.getAgentRuntimeStateSync.mockReturnValue({ state: 'idle', lastActivity: new Date().toISOString() });
     mocks.sessionExists.mockReturnValue(Effect.succeed(true));
-    mocks.listPaneValues.mockReturnValue(Effect.succeed(['4242\t0']));
+    mocks.listPaneValues.mockResolvedValue(['4242\t0']);
     mocks.waitForAgentIdle.mockResolvedValue(true);
     mocks.deliverAgentMessage.mockResolvedValue({ ok: true });
     mocks.resumeAgent.mockResolvedValue({ success: true, messageDelivered: true });
@@ -393,7 +393,7 @@ describe('W7 scenario fixtures: confirmed-turn delivery outcomes', () => {
       harness: 'claude-code',
       sessionId: 'session-3846',
     });
-    mocks.listPaneValues.mockReturnValue(Effect.succeed(['4242']));
+    mocks.listPaneValues.mockResolvedValue(['4242']);
     mocks.hasAgentRuntimeInSubtree.mockResolvedValue(false);
     mocks.resumeAgent.mockResolvedValue({ success: false, error: 'session not found' });
 

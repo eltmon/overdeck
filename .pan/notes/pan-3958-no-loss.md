@@ -535,3 +535,130 @@ through `Effect.runPromise` now await the function. Mocks that returned `Effect.
 `async () => v`, `new Promise(() => {})`). `review-context.test.ts` "throws when workspace does not
 exist" now asserts the message on the rejection itself, since there is no `FsError` wrapper; the
 assertion is unchanged.
+
+## CH-3: Promise-native cluster K2 (#4009)
+
+Every Shape A façade in cluster K2 is gone, except the Oh My Pi row (`runtimes/ohmypi-fifo.ts`
+`createOhmypiFifo`, left for #4003). Each name survives as an exported `async` function whose body
+is the former private implementation, so no operation was lost. Callers moved per PRD D2:
+`await Effect.runPromise(foo(…))` became `await foo(…)`. In an `Effect.gen`, a former `Effect.promise`
+façade became `yield* Effect.promise(() => foo(…))` and a former `Effect.tryPromise` façade became
+`yield* Effect.tryPromise(() => foo(…))`. The one call site that mapped a typed failure
+(`checkWorkspaceRemovalGuard`) keeps its `ProcessSpawnError` mapping in a two-argument `tryPromise`.
+Evidence: `node scripts/audit-effect-boundary.mjs --json --usage`, `tsc --noEmit` on the root,
+dashboard and frontend projects, and 333 touched and adjacent test files.
+
+Ratchet: A 161 → 110, B 38 unchanged, C 39 → 42. The C rows rise by hand, as PRD W6 step 3 predicts.
+Three former façades had a `…Sync` sibling. With the façade gone, the pair is an ordinary Shape C
+pair for CH-6 (W8) to decide: `capturePane`/`capturePaneSync` and `listPaneValues`/`listPaneValuesSync`
+in `tmux.ts` (C 6 → 8), and `getWorkAgentLifecycleState`/`getWorkAgentLifecycleStateSync` in
+`work-agent-lifecycle.ts` (C 0 → 1).
+
+### Shape A façades (51) → async functions
+
+| Module | Name (now `async`) | Body formerly | Note |
+| --- | --- | --- | --- |
+| `agent-directory-cleanup.ts` | `cleanupAgentDirectories` | `cleanupAgentDirectoriesPromise` |  |
+| `agent-directory-cleanup.ts` | `cleanupClosedIssueAgentDirectories` | `cleanupClosedIssueAgentDirectoriesPromise` |  |
+| `agent-directory-cleanup.ts` | `findClosedIssueAgentDirs` | `findClosedIssueAgentDirsPromise` | CH-1b "kept although dead" row: still test-only, tests call the async function |
+| `agent-directory-cleanup.ts` | `findOrphanedAgentDirs` | `findOrphanedAgentDirsPromise` |  |
+| `agent-enrichment.ts` | `computeAgentEnrichment` | `computeAgentEnrichmentPromise` |  |
+| `agent-enrichment.ts` | `countPendingAskUserQuestionsForAgent` | `countPendingAskUserQuestionsForAgentPromise` |  |
+| `agent-enrichment.ts` | `countPendingAskUserQuestionsForCurrentAgentSession` | `countPendingAskUserQuestionsForCurrentAgentSessionPromise` |  |
+| `agent-enrichment.ts` | `getAgentJsonlMtime` | `getAgentJsonlMtimePromise` |  |
+| `agent-enrichment.ts` | `getAgentJsonlPath` | `getAgentJsonlPathPromise` |  |
+| `agent-enrichment.ts` | `getAgentPendingQuestions` | `getAgentPendingQuestionsPromise` |  |
+| `agent-enrichment.ts` | `getAgentWorkspace` | `getAgentWorkspacePromise` |  |
+| `agent-enrichment.ts` | `getPendingQuestions` | `getPendingQuestionsPromise` |  |
+| `agent-input-detection.ts` | `detectAwaitingInputForAgent` | `detectAwaitingInputForAgentPromise` | `pending-decision-gate.ts` keeps mapping its rejection to `TmuxError`, which that gate fails open on |
+| `caveman/workspace.ts` | `injectCavemanSettings` | `injectCavemanSettingsPromise` |  |
+| `caveman/workspace.ts` | `readCavemanVariant` | `readCavemanVariantPromise` |  |
+| `checkpoint/checkpoint-manager.ts` | `deleteLegacyCheckpointRefs` | `deleteLegacyCheckpointRefsPromise` |  |
+| `checkpoint/checkpoint-manager.ts` | `diffAgainstMain` | `diffAgainstMainPromise` |  |
+| `checkpoint/checkpoint-manager.ts` | `diffAgainstMainFiles` | `diffAgainstMainFilesPromise` |  |
+| `checkpoint/checkpoint-manager.ts` | `diffFilesAgainstHead` | `diffFilesAgainstHeadPromise` |  |
+| `checkpoint/checkpoint-manager.ts` | `diffPatchFilesAgainstHead` | `diffPatchFilesAgainstHeadPromise` |  |
+| `checkpoint/checkpoint-manager.ts` | `diffPatchSinceCommit` | `diffPatchSinceCommitPromise` |  |
+| `checkpoint/checkpoint-manager.ts` | `findCommitAtTime` | `findCommitAtTimePromise` |  |
+| `checkpoint/checkpoint-manager.ts` | `pruneCheckpointRefsForAgents` | `pruneCheckpointRefsForAgentsPromise` |  |
+| `git-utils.ts` | `cleanupStaleLocks` | `cleanupStaleLocksPromise` | the façade's `options = {}` default moved onto the function |
+| `git/operations.ts` | `gitFetch` | `gitFetchPromise` |  |
+| `git/operations.ts` | `gitPush` | `gitPushPromise` | rejects with `MainDivergedError` itself; see behaviour notes |
+| `git/operations.ts` | `gitRevParse` | `gitRevParsePromise` |  |
+| `health.ts` | `isAgentAlive` | `isAgentAlivePromise` |  |
+| `rebase-helper.ts` | `rebaseAndPushRepos` | `rebaseAndPushReposPromise` |  |
+| `remote-workspace.ts` | `createRemoteWorkspace` | `createRemoteWorkspacePromise` |  |
+| `reopen.ts` | `reopenWorkspaceState` | `reopenWorkspaceStatePromise` |  |
+| `runtime/index.ts` | `isRuntimeInstalled` | `isRuntimeInstalledPromise` |  |
+| `runtimes/pi-fifo.ts` | `createPiFifo` | `createPiFifoPromise` |  |
+| `safety/dangerous-git-ops.ts` | `dryRunGitClean` | `dryRunGitCleanPromise` |  |
+| `safety/dangerous-git-ops.ts` | `runGitClean` | `runGitCleanPromise` | rejects with `DangerousOpBlockedError` itself; see behaviour notes |
+| `safety/dangerous-git-ops.ts` | `runGitResetHard` | `runGitResetHardPromise` |  |
+| `stashes.ts` | `createRecoveryBranchFromStash` | `createRecoveryBranchFromStashPromise` |  |
+| `stashes.ts` | `dropStash` | `dropStashPromise` |  |
+| `stashes.ts` | `listStashes` | `listStashesPromise` |  |
+| `test-runner.ts` | `runTests` | `runTestsPromise` |  |
+| `tmux.ts` | `capturePane` | `capturePaneText` | the exported `capturePaneText` is renamed `capturePane` (its 7 production and 4 test users follow); the body never rejects |
+| `tmux.ts` | `ensureManagedTmuxContextOnce` | `ensureManagedTmuxContextOncePromise` | its only caller (dashboard `main.ts`) awaited the unrun Effect, so it never ran; that dead call is removed, see below |
+| `tmux.ts` | `listPaneValues` | `listPaneValuesText` | private `listPaneValuesText` renamed and exported; never rejects |
+| `work-agent-lifecycle.ts` | `getWorkAgentLifecycleState` | `getWorkAgentLifecycleStateSnapshot` | body formerly `getWorkAgentLifecycleStateSnapshot` |
+| `work/done-preflight.ts` | `runPreflightChecks` | `runPreflightChecksPromise` |  |
+| `workspace-manager.ts` | `addNewRepoToWorkspace` | `addNewRepoToWorkspacePromise` | body lives in `workspace-manager/`; `workspace-manager.ts` re-exports it. |
+| `workspace-manager.ts` | `addReposToWorkspace` | `addReposToWorkspacePromise` | body lives in `workspace-manager/`; `workspace-manager.ts` re-exports it. |
+| `workspace-manager.ts` | `createWorkspace` | `createWorkspacePromise` | body lives in `workspace-manager/`; `workspace-manager.ts` re-exports it. |
+| `workspace-manager.ts` | `getContainersReferencingWorkspacePath` | `getContainersReferencingWorkspacePathPromise` | body lives in `workspace-manager/`; `workspace-manager.ts` re-exports it. |
+| `workspace-manager.ts` | `removeWorkspace` | `removeWorkspacePromise` | body lives in `workspace-manager/`; `workspace-manager.ts` re-exports it. |
+| `workspace-manager.ts` | `stopWorkspaceDocker` | `stopWorkspaceDockerPromise` | body lives in `workspace-manager/`; `workspace-manager.ts` re-exports it. |
+
+All paths are relative to `src/lib/`.
+
+### Also deleted because only deleted code used them
+
+| Name | Why |
+| --- | --- |
+| `DangerousGitOpError` (`safety/dangerous-git-ops.ts`) | the `catch:` mapping of the deleted façades; no other reference |
+| `RebaseError` (`rebase-helper.ts`) | the `catch:` mapping of the deleted façades; no other reference |
+| `RemoteWorkspaceError` (`remote-workspace.ts`) | the `catch:` mapping of the deleted façades; no other reference |
+| `ReopenError` (`reopen.ts`) | the `catch:` mapping of the deleted façades; no other reference |
+| `PiFifoError` (`runtimes/pi-fifo.ts`) | the `catch:` mapping of the deleted façades; no other reference |
+| private `toWmProcessError` (`workspace-manager.ts`), `toGitError` (`stashes.ts`), `processError` (`work/done-preflight.ts`) | the same façades' `catch:` helpers |
+| the `*Shared` aliases in `dashboard/server/routes/agents/shared.ts` | alias shims (issue #4009): a plain import now, and the trailing `export { … }` block keeps the five names |
+
+### Behaviour notes for reviewers
+
+- **`gitPush` divergence handling now fires.** `merge-agent.ts` (stranded-merge salvage) and
+  `pushApproveMain` in `routes/workspaces/merge-ops.ts` check `err instanceof MainDivergedError`. Through
+  the façade, `Effect.runPromise` rejected with the `VcsError` wrapper, so those branches never matched
+  and a diverged push took the generic-failure path (HTTP 400, "push failed"). It now takes the branch
+  the code intends: HTTP 409 with recovery steps, and the salvage reports the divergence.
+- **`pan workspace deep-clean`** checks `err instanceof DangerousOpBlockedError`. That branch never matched
+  either; it now prints the block's recovery hint.
+- **Dashboard boot never prepared the managed tmux context.** `main.ts` did
+  `await ensureManagedTmuxContextOnce()`. Since PAN-1379 that awaited an unrun Effect (not thenable),
+  so the preparation never ran, and tmux is prepared lazily by the first `tmuxExecAsync`. This PR
+  removes the dead call instead of starting to run it. Running it would start a persistent
+  (`exit-empty off`) managed tmux server at boot on Herdr hosts, through `ensureOverdeckTmuxServerSync`
+  (`execFileSync`). Restoring it is an operator decision.
+- **Rejections are the underlying errors, not the tagged wrappers.** Log lines that print `err.message`
+  show the underlying message. A generator call site that bridges with `Effect.tryPromise(() => …)` and
+  does not recover (the stash routes) now returns httpHandler's generic 500 message instead of the
+  wrapper's.
+
+### Tests
+
+None are deleted, and the diff adds and removes no `it()`/`test()` calls. Tests that ran a former façade
+through `Effect.runPromise` now await it. Mocks that returned `Effect.succeed` / `fail` / `void` /
+`sync` / `promise` / `never` now return Promises (`mockResolvedValue`, `mockRejectedValue`,
+`async () => v`, `mockImplementation(() => promise)` for lazy ones). Assertions on the removed wrapper's
+fields now check the underlying error, with the same intent:
+`toMatchObject({ cause: expect.any(MainDivergedError) })` → `toBeInstanceOf(MainDivergedError)`,
+`{ stderr: X }` → `toThrow(X)` / `toBe(err)`, and `DangerousGitOpError` → `DangerousOpBlockedError`
+(`git-operations`, `git/operations`, `divergence-e2e`, `dangerous-git-ops`, `stashes` tests).
+
+### Correction to the CH-2 section
+
+CH-2 said the `Effect.runPromise(getAgentState / saveAgentState / listSessionNames / killSession /
+sessionExists / readFeedback / readPlan …)` calls left in cloister "belong to CH-3". None of those is a
+K2 Shape A row. `getAgentState` is a live Shape B wrapper (W7). `saveAgentState`, `listSessionNames`,
+`sessionExists`, `killSession` and `readPlan` are Shape C twins (§10 / W8). `readFeedback` is a genuine
+Effect export. All of them belong to CH-6, or stay for good under Q2.

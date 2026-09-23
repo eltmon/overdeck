@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { capturePane, sendKeysAsync } from '../tmux.js';
 
 export interface KnownModal {
@@ -57,7 +56,7 @@ export interface ModalHandlerDeps {
 }
 
 const defaultDeps: ModalHandlerDeps = {
-  capturePane: agentId => Effect.runPromise(capturePane(agentId, 100)),
+  capturePane: agentId => capturePane(agentId, 100),
   sendKey: (agentId, key) => sendKeysAsync(agentId, key, 'known-modal-handler'),
   settle: () => new Promise(resolve => setTimeout(resolve, 300)),
 };

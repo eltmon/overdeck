@@ -146,7 +146,7 @@ describe('Claude transcript resumability probe (PAN-3194)', () => {
       configureLifecycle({ transcriptExists });
 
       const syncLifecycle = getWorkAgentLifecycleStateSync('agent-pan-3194');
-      const asyncLifecycle = await Effect.runPromise(getWorkAgentLifecycleState('agent-pan-3194'));
+      const asyncLifecycle = await getWorkAgentLifecycleState('agent-pan-3194');
 
       expect(asyncLifecycle).toMatchObject({
         hasSavedSession: syncLifecycle.hasSavedSession,

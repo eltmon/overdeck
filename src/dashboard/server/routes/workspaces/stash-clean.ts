@@ -21,7 +21,7 @@ import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import type { ProcessSpawnError } from '../../../../lib/errors.js';
+import { ProcessSpawnError } from '../../../../lib/errors.js';
 import { parseIssueIdSync, extractPrefixSync } from '../../../../lib/issue-id.js';
 import {
   listStashes,
@@ -51,7 +51,15 @@ export type WorkspaceRemovalGuard =
 export const checkWorkspaceRemovalGuard = (
   workspacePath: string,
 ): Effect.Effect<WorkspaceRemovalGuard> =>
-  getContainersReferencingWorkspacePath(workspacePath).pipe(
+  Effect.tryPromise({
+    try: () => getContainersReferencingWorkspacePath(workspacePath),
+    catch: (cause) => new ProcessSpawnError({
+      command: 'workspace-manager',
+      args: ['getContainersReferencingWorkspacePath'],
+      message: cause instanceof Error ? cause.message : String(cause),
+      cause,
+    }),
+  }).pipe(
     Effect.map((orphanedContainers) => {
       if (orphanedContainers.length > 0) {
         return {
@@ -89,7 +97,7 @@ const getWorkspaceStashesRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
     }
 
-    const stashes = yield* listStashes(workspacePath);
+    const stashes = yield* Effect.tryPromise(() => listStashes(workspacePath));
     const salvageableStashes = stashes
       .filter(isSalvageableStash)
       .filter((entry) => entry.issueId === issueId.toUpperCase())
@@ -125,18 +133,18 @@ const postWorkspaceRecoverStashRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
     }
 
-    const stashes = yield* listStashes(workspacePath);
+    const stashes = yield* Effect.tryPromise(() => listStashes(workspacePath));
     const stash = stashes.find((entry) => entry.ref === stashRef);
     if (!stash || !isSalvageableStash(stash) || stash.issueId !== issueId.toUpperCase()) {
       return jsonResponse({ error: 'Salvageable stash not found for this workspace' }, { status: 404 });
     }
 
-    const branchName = yield* createRecoveryBranchFromStash(
+    const branchName = yield* Effect.tryPromise(() => createRecoveryBranchFromStash(
       workspacePath,
       stash.ref,
       stash.issueId,
       stash.shortDescription,
-    );
+    ));
 
     return jsonResponse({ success: true, branchName });
   }))
@@ -161,13 +169,13 @@ const deleteWorkspaceStashRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace not found' }, { status: 404 });
     }
 
-    const stashes = yield* listStashes(workspacePath);
+    const stashes = yield* Effect.tryPromise(() => listStashes(workspacePath));
     const stash = stashes.find((entry) => entry.ref === stashRef);
     if (!stash || !isSalvageableStash(stash) || stash.issueId !== issueId.toUpperCase()) {
       return jsonResponse({ error: 'Salvageable stash not found for this workspace' }, { status: 404 });
     }
 
-    yield* dropStash(workspacePath, stash.ref);
+    yield* Effect.tryPromise(() => dropStash(workspacePath, stash.ref));
     return jsonResponse({ success: true });
   }))
 );

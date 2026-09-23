@@ -2,7 +2,6 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { getAgentJsonlPath } from '../../../../src/lib/agent-enrichment.js';
@@ -328,7 +327,7 @@ describe('sessions.json index', () => {
     const olderTranscript = join(projectDir, 'session-with-transcript.jsonl');
     writeFileSync(olderTranscript, '{}\n');
 
-    await expect(Effect.runPromise(getAgentJsonlPath(agentId))).resolves.toBe(olderTranscript);
+    await expect(getAgentJsonlPath(agentId)).resolves.toBe(olderTranscript);
   });
 
   it('enrichment uses the current Kimi transcript ahead of an untagged legacy Claude entry', async () => {
@@ -363,7 +362,7 @@ describe('sessions.json index', () => {
     writeFileSync(join(projectDir, 'legacy-claude.jsonl'), '{}\n');
     writeFileSync(wirePath, '{}\n');
 
-    await expect(Effect.runPromise(getAgentJsonlPath(agentId))).resolves.toBe(wirePath);
+    await expect(getAgentJsonlPath(agentId)).resolves.toBe(wirePath);
   });
 
   it('orders mixed-harness entries newest-first', () => {

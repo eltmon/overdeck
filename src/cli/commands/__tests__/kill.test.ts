@@ -150,10 +150,10 @@ describe('killCommand Docker teardown (PAN-3728)', () => {
     }));
     projectMocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/tmp/overdeck' });
     workspaceMocks.findWorkspacePath.mockReturnValue('/tmp/overdeck/workspaces/feature-pan-3680');
-    workspaceMocks.stopWorkspaceDocker.mockReturnValue(Effect.succeed({
+    workspaceMocks.stopWorkspaceDocker.mockResolvedValue({
       containersFound: true,
       steps: ['docker compose down'],
-    }));
+    });
 
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);

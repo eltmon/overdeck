@@ -118,7 +118,7 @@ export async function getPiLauncherFields(agentId: string, model: string): Promi
   return {
     harness: 'ohmypi',
     piExtensionPath,
-    piFifoPath: await Effect.runPromise(createPiFifo(agentId)),
+    piFifoPath: await createPiFifo(agentId),
     piSessionDir: paths.agentDir,
     model,
   };
@@ -310,7 +310,7 @@ async function waitForKimiCodeTuiReady(agentId: string, timeoutSec = 30): Promis
   while (Date.now() < deadline) {
     try {
       if (!(await Effect.runPromise(sessionExists(agentId)))) return false;
-      const pane = await Effect.runPromise(capturePane(agentId, 80));
+      const pane = await capturePane(agentId, 80);
       const hasInputPrompt = /[│|]\s*>\s*[│|]?/.test(pane);
       const hasStatusLine = /context:\s*\d+%/.test(pane);
       if (hasInputPrompt && hasStatusLine) {

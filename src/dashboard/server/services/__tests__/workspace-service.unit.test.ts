@@ -68,14 +68,14 @@ describe('WorkspaceService — integration', () => {
     mockResolveProjectFromIssue.mockReturnValue(MOCK_PROJECT);
     mockLoadProjectsConfig.mockReturnValue({ projects: { myapp: MOCK_PROJECT } });
     mockExistsSync.mockReturnValue(false);
-    mockCreateWorkspace.mockReturnValue(Effect.succeed({
+    mockCreateWorkspace.mockResolvedValue({
       success: true,
       workspacePath: '/projects/myapp/workspaces/feature-pan-1',
       errors: [],
       steps: ['created'],
-    }));
-    mockRemoveWorkspace.mockReturnValue(Effect.succeed({ success: true, errors: [], steps: [] }));
-    mockStopWorkspaceDocker.mockReturnValue(Effect.void);
+    });
+    mockRemoveWorkspace.mockResolvedValue({ success: true, errors: [], steps: [] });
+    mockStopWorkspaceDocker.mockResolvedValue(undefined);
   });
 
   describe('create', () => {

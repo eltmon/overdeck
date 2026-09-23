@@ -209,9 +209,7 @@ export async function handleConversationCodexApproval(
     }
     // Re-detect uncached so we only send keystrokes when the menu is still
     // up, and so we can bound optionNumber to the options actually shown.
-    const detection = await Effect.runPromise(
-      detectAwaitingInputForAgent(conv.tmuxSession, { isPlanning: false, cache: false }),
-    );
+    const detection = await detectAwaitingInputForAgent(conv.tmuxSession, { isPlanning: false, cache: false });
     const parsed = detection ? parseCodexApprovalPrompt(detection.prompt) : null;
     if (!parsed) {
       return jsonResponse({ error: 'No Codex approval prompt is currently pending' }, { status: 409 });
@@ -470,7 +468,7 @@ export async function codexConversationPendingInput(
         },
       };
     }
-    const detection = await Effect.runPromise(detectAwaitingInputForAgent(conv.tmuxSession, { isPlanning: false }));
+    const detection = await detectAwaitingInputForAgent(conv.tmuxSession, { isPlanning: false });
     if (!detection) return { kinds: [] };
     if (detection.reason === 'session_resume') return { kinds: ['sessionResume'] };
 

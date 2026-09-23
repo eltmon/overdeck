@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
@@ -103,12 +102,12 @@ describe('doctor command', () => {
       return true;
     });
     odb = setupOverdeckTestDb();
-    mocks.cleanupClosedIssueAgentDirectories.mockReturnValue(Effect.succeed({
+    mocks.cleanupClosedIssueAgentDirectories.mockResolvedValue({
       removed: [],
       protected: [],
       wouldRemove: [],
       totalCandidates: 0,
-    }));
+    });
     mocks.getAgentSessionsSync.mockReturnValue([]);
     mocks.listSessionNamesSync.mockReturnValue([]);
   }, 20_000);
@@ -232,12 +231,12 @@ describe('doctor command', () => {
 
   describe('closed issue agent directory checks', () => {
     it('reports stale closed-issue agent directories', async () => {
-      mocks.cleanupClosedIssueAgentDirectories.mockReturnValueOnce(Effect.succeed({
+      mocks.cleanupClosedIssueAgentDirectories.mockResolvedValueOnce({
         removed: [],
         protected: [],
         wouldRemove: ['agent-pan-1052-ship'],
         totalCandidates: 1,
-      }));
+      });
 
       const { checkClosedIssueOrphanAgentDirs } = await import('../../../src/cli/commands/doctor.js');
       const result = await checkClosedIssueOrphanAgentDirs([], '/tmp/agents');

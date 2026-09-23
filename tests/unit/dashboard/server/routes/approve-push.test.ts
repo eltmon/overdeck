@@ -26,7 +26,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Effect } from 'effect';
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
@@ -84,10 +83,7 @@ vi.mock('node:child_process', async (importOriginal) => {
 });
 
 vi.mock('../../../../../src/lib/git/operations.js', () => ({
-  gitPush: (...args: unknown[]) => Effect.tryPromise({
-    try: () => Promise.resolve(mockGitPush(...args)),
-    catch: (cause) => cause as any,
-  }),
+  gitPush: async (...args: unknown[]) => mockGitPush(...args),
   MainDivergedError: MainDivergedErrorClass,
   gitFetch: vi.fn(),
   gitForcePush: vi.fn(),

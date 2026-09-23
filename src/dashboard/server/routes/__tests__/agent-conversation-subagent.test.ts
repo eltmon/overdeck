@@ -2,12 +2,11 @@
  * PAN-3920 W2 — `GET /api/agents/:id/conversation?subagentId=` and
  * `GET /api/agents/:id/subagents`, tested through their async helpers.
  */
-import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../../lib/agent-enrichment.js', () => ({
   getClaudeProjectDir: vi.fn(),
-  getAgentWorkspace: vi.fn(() => Effect.succeed('/workspace/feature-pan-1')),
+  getAgentWorkspace: vi.fn(async () => '/workspace/feature-pan-1'),
   getAgentJsonlPath: vi.fn(),
   getPendingQuestions: vi.fn(),
   getAgentPendingQuestions: vi.fn(),

@@ -658,7 +658,7 @@ const getWorkspaceRoute = HttpRouter.add(
         // unconditionally inside the Promise.all above, on every request).
         const git = shellGit ?? (yield* Effect.promise(() => getPersistedBranchFallbackAsync(issueId)));
         const sessionNames = yield* listSessionNames();
-        const paneOutput = yield* capturePane(agentSession, 50).pipe(Effect.orElseSucceed(() => ''));
+        const paneOutput = yield* Effect.promise(() => capturePane(agentSession, 50).catch(() => ''));
 
         let hasAgent = false;
         let agentSessionId: string | null = null;
@@ -687,7 +687,7 @@ const getWorkspaceRoute = HttpRouter.add(
         // `services/derived-issue-state.ts` reads the PR every time, so a
         // merge that actually landed shows as `merged` on the next read.
 
-        const stashes = yield* listStashes(workspacePath);
+        const stashes = yield* Effect.tryPromise(() => listStashes(workspacePath));
         const salvageableStashes = stashes
           .filter(isSalvageableStash)
           .filter((entry) => entry.issueId === issueId.toUpperCase());

@@ -111,14 +111,14 @@ const defaultDeps: CoordinateSwarmSlotsDeps = {
   listSessionNames: () => Effect.runPromise(listTmuxSessionNames()),
   isPaneDead: (sessionName) => Effect.runPromise(isPaneDead(sessionName)),
   getPaneExitStatus: async (sessionName) => {
-    const values = await Effect.runPromise(listPaneValues(sessionName, '#{pane_dead_status}'));
+    const values = await listPaneValues(sessionName, '#{pane_dead_status}');
     const raw = values[0]?.trim();
     if (!raw) return null;
     const status = Number(raw);
     return Number.isFinite(status) ? status : null;
   },
   getAgentRuntimeState: (agentId) => Effect.runPromise(getAgentRuntimeSnapshot(agentId)),
-  getPaneOutputDigest: async (sessionName) => Effect.runPromise(capturePane(sessionName, 200)),
+  getPaneOutputDigest: async (sessionName) => capturePane(sessionName, 200),
   getBranchTipCommitTime: async (workspacePath, branch) => {
     try {
       const { stdout } = await execAsync(`git log -1 --format=%ct ${JSON.stringify(branch)}`, { cwd: workspacePath });

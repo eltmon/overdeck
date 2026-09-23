@@ -173,7 +173,7 @@ export function conversationTranscriptMissing(
 }
 
 const captureVisiblePane = (sessionName: string): Promise<string> =>
-  Effect.runPromise(capturePane(sessionName, 0));
+  capturePane(sessionName, 0);
 
 /**
  * An alive claude-code session with no transcript file yet may be parked on a

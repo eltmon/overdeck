@@ -23,7 +23,7 @@ async function buildRuntimeCensusMock() {
   const sessions = await Effect.runPromise(mockListSessionNames());
   const panesBySession = new Map<string, Array<{ paneDeadStatus: number | null }>>();
   for (const session of sessions) {
-    const values = await Effect.runPromise(mockListPaneValues(session));
+    const values = await mockListPaneValues(session);
     panesBySession.set(session, values.map((value: string) => ({
       paneDeadStatus: Number.isFinite(Number(value)) ? Number(value) : null,
     })));
@@ -99,7 +99,7 @@ describe('ConversationLifecycleService — pollConversations', () => {
     mockIsHarnessProcessAlive.mockResolvedValue(true);
     mockIsRespawnPending.mockReturnValue(false);
     // Default: no dead-pane status available (corpse-diagnostics cases set it).
-    mockListPaneValues.mockReturnValue(Effect.succeed([]));
+    mockListPaneValues.mockResolvedValue([]);
     mockGetRuntimeCensus.mockImplementation(buildRuntimeCensusMock);
     mockRefreshRuntimeCensus.mockImplementation(buildRuntimeCensusMock);
   });
@@ -431,7 +431,7 @@ describe('ConversationLifecycleService — pollConversations', () => {
     ]);
     mockListSessionNames.mockReturnValue(Effect.succeed(['conv-diag']));
     mockIsHarnessProcessAlive.mockResolvedValue(false);
-    mockListPaneValues.mockReturnValue(Effect.succeed(['1']));
+    mockListPaneValues.mockResolvedValue(['1']);
     mockCleanupUnreferencedConversationAttachments.mockResolvedValue(undefined);
 
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});

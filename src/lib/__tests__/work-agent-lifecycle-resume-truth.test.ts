@@ -75,7 +75,7 @@ describe('canResumeSession truth (PAN-806)', () => {
     mockGetLatestSessionId.mockReturnValue(null);
     mockSessionExists.mockReturnValue(false);
 
-    const lifecycle = await Effect.runPromise(getWorkAgentLifecycleState('agent-pan-806'));
+    const lifecycle = await getWorkAgentLifecycleState('agent-pan-806');
 
     expect(lifecycle.hasSavedSession).toBe(false);
     expect(lifecycle.canResumeSession).toBe(false);
@@ -89,7 +89,7 @@ describe('canResumeSession truth (PAN-806)', () => {
     mockGetLatestSessionId.mockReturnValue('session-abc-123');
     mockSessionExists.mockReturnValue(false);
 
-    const lifecycle = await Effect.runPromise(getWorkAgentLifecycleState('agent-pan-806'));
+    const lifecycle = await getWorkAgentLifecycleState('agent-pan-806');
 
     expect(lifecycle.hasSavedSession).toBe(true);
     expect(lifecycle.canResumeSession).toBe(true);
@@ -104,7 +104,7 @@ describe('canResumeSession truth (PAN-806)', () => {
       mockGetLatestSessionId.mockReturnValue('session-abc-123');
       mockSessionExists.mockReturnValue(false);
 
-      const lifecycle = await Effect.runPromise(getWorkAgentLifecycleState('agent-pan-806'));
+      const lifecycle = await getWorkAgentLifecycleState('agent-pan-806');
 
       expect(lifecycle.handedOff).toBe(true);
       expect(lifecycle.canResumeSession).toBe(true);

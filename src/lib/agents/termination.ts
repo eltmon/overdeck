@@ -212,7 +212,7 @@ export const stopAgent = (
     // A failed probe must not skip the backend close below.
     if (yield* sessionExists(normalizedId).pipe(Effect.catch(() => Effect.succeed(false)))) {
       yield* Effect.gen(function* () {
-        const output = yield* capturePane(normalizedId, 5000);
+        const output = yield* Effect.promise(() => capturePane(normalizedId, 5000));
         if (!output) return;
 
         const agentDir = getAgentDir(normalizedId);
