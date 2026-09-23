@@ -1271,10 +1271,10 @@ export function createConversation(opts: {
   return conv;
 }
 
-export function markConversationEnded(name: string): void {
+export function markConversationEnded(name: string, endedAtMs: number = Date.now()): void {
   overdeckDb()
     .prepare(`UPDATE conversations SET ended_at = ?, status = 'ended' WHERE name = ?`)
-    .run(Date.now(), name);
+    .run(endedAtMs, name);
 }
 
 // PAN-1972/PAN-3671: resurrect a conversation when tmux + the harness are alive,

@@ -186,6 +186,16 @@ door that does not exist; a real record read door would be a separate change.
   delivery failure. Unknown delivery preserves the operator's text; confirmed rejection
   retains the existing recovery actions. The client bounds the request and body read to
   120 seconds, and reconciles late echoes using message identity or text/time matching.
+- The PTY supervisor reports what it observes about its harness to
+  `POST /api/agents/:id/lifecycle` (`session-started`, `turn-started`, `turn-ended`,
+  `exited`), authenticated by the session's pty-token. `:id` is the supervised session
+  id, so one route serves agents and conversations (`conv-<name>`). For an agent it
+  appends `agent.started`/`agent.activity_changed`/`agent.stopped`. For a conversation
+  (no agent state, a `conversations` row whose `tmux_session` is `:id`),
+  `session-started` marks the row active, `exited` marks it ended at the exit time,
+  and each edge appends `agent.activity_changed` under the session id its hooks report
+  under. An exit inside a same-name respawn window is acknowledged and not recorded
+  (PAN-3962). The 10-second conversation poller stays as the backstop.
 - Conversation sends carry `clientMessageId`; retries preserve it and set `retry: true`.
   The server coalesces matching concurrent requests and retains their result, including
   ambiguous failures. Changed text or command confirmation requires a new ID. Receipts

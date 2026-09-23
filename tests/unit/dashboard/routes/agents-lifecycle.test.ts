@@ -9,6 +9,10 @@
  * appends `agent.stopped`; whether the session is alive is the terminal
  * backend's answer, read live, so there is no mirror row and no state.json
  * status for this route to keep in step.
+ *
+ * PAN-3962: the same route records a supervised CONVERSATION's lifecycle.
+ * Conversations have no agent state.json, so the route used to 404 every
+ * `conv-*` event; now it resolves the conversations row by tmux session.
  */
 import { readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -18,6 +22,12 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { writePtyTokenSync } from '../../../../src/lib/pty-token.js';
+import {
+  createConversation,
+  getConversationByName,
+  markConversationEnded,
+} from '../../../../src/lib/overdeck/conversations.js';
+import { markRespawnPending } from '../../../../src/dashboard/server/services/pending-respawn.js';
 import { saveOverdeckAgentStateSync } from '../../../helpers/overdeck-test-db.js';
 import {
   setupOverdeckTestDb,
@@ -36,6 +46,12 @@ vi.mock('../../../../src/lib/persistent-logger.js', () => ({
 const backendPanes: Array<{ id: string; terminalId: string; state: string }> = [];
 vi.mock('../../../../src/dashboard/server/services/backend-inventory.js', () => ({
   getBackendPanes: async () => backendPanes,
+}));
+
+// The exit path runs the poller's attachment cleanup; keep it off disk here.
+const cleanupAttachments = vi.hoisted(() => vi.fn(async () => undefined));
+vi.mock('../../../../src/dashboard/server/services/conversation-attachments.js', () => ({
+  cleanupUnreferencedConversationAttachments: cleanupAttachments,
 }));
 
 import { postAgentLifecycleRoute } from '../../../../src/dashboard/server/routes/agents/lifecycle.js';
@@ -62,8 +78,8 @@ function seedAgent(overrides: Partial<AgentState> = {}): AgentState {
   return state;
 }
 
-async function postLifecycle(body: Record<string, unknown>, token?: string) {
-  const request = HttpServerRequest.fromWeb(new Request(`http://localhost/api/agents/${AGENT}/lifecycle`, {
+async function postLifecycle(body: Record<string, unknown>, token?: string, id: string = AGENT) {
+  const request = HttpServerRequest.fromWeb(new Request(`http://localhost/api/agents/${id}/lifecycle`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -103,6 +119,14 @@ afterEach(() => {
   backendPanes.length = 0;
   vi.clearAllMocks();
 });
+
+/** The events appended since this call, with payloads, for conversation cases. */
+function eventRecordsSince(sequence: number): Array<{ type: string; payload: Record<string, unknown> }> {
+  return getEventStore().readFrom(sequence).map((stored) => ({
+    type: stored.type,
+    payload: (stored as unknown as { payload: Record<string, unknown> }).payload,
+  }));
+}
 
 /** The types appended since this call, so a case can assert what it emitted. */
 function eventsSince(sequence: number): string[] {
@@ -176,6 +200,111 @@ describe('POST /api/agents/:id/lifecycle (PAN-3849 W33)', () => {
     const token = readFileSync(join(odb.home, 'agents', AGENT, 'pty-token'), 'utf8').trim();
 
     const res = await postLifecycle({ event: 'exited', at: '2026-09-17T12:00:00.000Z' }, token);
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('POST /api/agents/:id/lifecycle for a supervised conversation (PAN-3962)', () => {
+  let counter = 0;
+
+  /** A fresh conversation row + pty-token; the supervised id is `conv-<name>`. */
+  function seedConversation(): { name: string; sessionId: string; token: string } {
+    counter += 1;
+    const name = `20260922-l${counter}`;
+    const sessionId = `conv-${name}`;
+    createConversation({
+      name,
+      tmuxSession: sessionId,
+      cwd: '/tmp/conv-pan-3962',
+      harness: 'claude-code',
+      workspaceId: null,
+    });
+    const token = writePtyTokenSync(sessionId);
+    return { name, sessionId, token };
+  }
+
+  it('records the full start → turn → exit lifecycle with 2xx on every event', async () => {
+    const { name, sessionId, token } = seedConversation();
+    // The conversation was ended by a previous run; the new supervisor revives it.
+    markConversationEnded(name);
+    expect(getConversationByName(name)?.status).toBe('ended');
+    const before = currentSequence();
+
+    const started = await postLifecycle({ event: 'session-started', at: '2026-09-22T10:00:00.000Z' }, token, sessionId);
+    expect(started.status).toBe(200);
+    expect(started.body).toMatchObject({ success: true, applied: true, status: 'running' });
+    expect(getConversationByName(name)).toMatchObject({ status: 'active', endedAt: null });
+
+    const turn = await postLifecycle({ event: 'turn-started', at: '2026-09-22T10:00:05.000Z' }, token, sessionId);
+    expect(turn.status).toBe(200);
+    expect(turn.body).toMatchObject({ success: true, applied: true });
+
+    const turnEnded = await postLifecycle({ event: 'turn-ended', at: '2026-09-22T10:00:30.000Z' }, token, sessionId);
+    expect(turnEnded.status).toBe(200);
+
+    const exitAt = '2026-09-22T10:01:00.000Z';
+    const exited = await postLifecycle({ event: 'exited', at: exitAt, exitCode: 1 }, token, sessionId);
+    expect(exited.status).toBe(200);
+    expect(exited.body).toMatchObject({ success: true, applied: true, status: 'stopped' });
+
+    expect(cleanupAttachments).toHaveBeenCalledTimes(1);
+    expect(cleanupAttachments).toHaveBeenCalledWith({ name, sessionFile: null });
+
+    const row = getConversationByName(name);
+    expect(row?.status).toBe('ended');
+    expect(row?.endedAt).not.toBeNull();
+    expect(new Date(row!.endedAt!).getTime()).toBe(Date.parse(exitAt));
+
+    // Runtime activity is appended under the session id the conversation's
+    // hooks already report under; no agent.started/agent.stopped for a
+    // conversation (it is not an agent and has no issue id).
+    const records = eventRecordsSince(before);
+    const activity = records
+      .filter((record) => record.type === 'agent.activity_changed' && record.payload['agentId'] === sessionId)
+      .map((record) => record.payload['activity']);
+    expect(activity).toEqual(['idle', 'working', 'idle', 'stopped']);
+    expect(records.map((record) => record.type)).not.toContain('agent.started');
+    expect(records.map((record) => record.type)).not.toContain('agent.stopped');
+  });
+
+  it('a retried exited POST is a 2xx no-op', async () => {
+    const { sessionId, token } = seedConversation();
+    const body = { event: 'exited', at: '2026-09-22T11:00:00.000Z', exitCode: 0 };
+
+    expect((await postLifecycle(body, token, sessionId)).status).toBe(200);
+    const retry = await postLifecycle(body, token, sessionId);
+    expect(retry.status).toBe(200);
+    expect(retry.body).toMatchObject({ success: true, applied: false, reason: 'duplicate' });
+  });
+
+  it('an exit inside a respawn window does not end the conversation being revived', async () => {
+    const { name, sessionId, token } = seedConversation();
+    const respawn = markRespawnPending(sessionId);
+    try {
+      const res = await postLifecycle({ event: 'exited', at: '2026-09-22T12:00:00.000Z', exitCode: 0 }, token, sessionId);
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ success: true, applied: false, reason: 'respawn-pending' });
+      expect(getConversationByName(name)?.status).toBe('active');
+    } finally {
+      respawn.done();
+    }
+  });
+
+  it('a late session-started after the backend reports the pane exited does not revive the conversation', async () => {
+    const { name, sessionId, token } = seedConversation();
+    markConversationEnded(name);
+    backendPanes.push({ id: sessionId, terminalId: sessionId, state: 'exited' });
+
+    const res = await postLifecycle({ event: 'session-started', at: '2026-09-22T13:00:00.000Z' }, token, sessionId);
+    expect(res.status).toBe(409);
+    expect(getConversationByName(name)?.status).toBe('ended');
+  });
+
+  it('still 404s a conv id with neither agent state nor a conversation row', async () => {
+    const sessionId = 'conv-20260922-nobody';
+    const token = writePtyTokenSync(sessionId);
+
+    const res = await postLifecycle({ event: 'exited', at: '2026-09-22T14:00:00.000Z' }, token, sessionId);
     expect(res.status).toBe(404);
   });
 });

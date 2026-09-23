@@ -11,6 +11,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { AgentState } from '../../../../../src/lib/agents.js';
+import type { LegacyConversation } from '../../../../../src/lib/overdeck/conversations.js';
 
 vi.mock('../../../../../src/lib/persistent-logger.js', () => ({
   logAgentLifecycleSync: vi.fn(),
@@ -155,9 +156,85 @@ describe('applyAgentLifecycleEventWithDeps', () => {
       eventStore,
       'agent-missing',
       { event: 'exited', at },
-      { ...deps, readAgentState: () => null },
+      { ...deps, readAgentState: () => null, readConversation: () => null },
     );
 
     expect(result).toEqual({ applied: false, reason: 'no-state' });
+  });
+});
+
+describe('applyAgentLifecycleEventWithDeps for a supervised conversation (PAN-3962)', () => {
+  const at = '2026-09-22T10:05:00.000Z';
+  const SESSION = 'conv-20260922-abcd';
+  const conversation = {
+    name: '20260922-abcd',
+    tmuxSession: SESSION,
+    cwd: '/tmp/conv-cwd',
+    claudeSessionId: 'session-uuid',
+  } as LegacyConversation;
+
+  function makeConversationDeps(overrides: { isRespawnPending?: (id: string) => boolean } = {}) {
+    return {
+      readAgentState: () => null,
+      readConversation: () => conversation,
+      hasExited: async () => false,
+      isRespawnPending: overrides.isRespawnPending ?? (() => false),
+      markConversationRunning: vi.fn(),
+      markConversationEnded: vi.fn(),
+      cleanupEndedConversation: vi.fn(async () => undefined),
+    };
+  }
+
+  it('exited marks the row ended and runs attachment cleanup exactly once', async () => {
+    const deps = makeConversationDeps();
+    const result = await applyAgentLifecycleEventWithDeps(makeEventStore(), SESSION, { event: 'exited', at }, deps);
+
+    expect(result).toEqual({ applied: true, status: 'stopped' });
+    expect(deps.markConversationEnded).toHaveBeenCalledWith(conversation.name, Date.parse(at));
+    expect(deps.cleanupEndedConversation).toHaveBeenCalledTimes(1);
+    expect(deps.cleanupEndedConversation).toHaveBeenCalledWith(conversation);
+  });
+
+  it('a duplicate exited does not run cleanup again', async () => {
+    const deps = makeConversationDeps();
+    const eventStore = makeEventStore();
+    await applyAgentLifecycleEventWithDeps(eventStore, SESSION, { event: 'exited', at }, deps);
+    const retry = await applyAgentLifecycleEventWithDeps(eventStore, SESSION, { event: 'exited', at }, deps);
+
+    expect(retry).toEqual({ applied: false, reason: 'duplicate' });
+    expect(deps.cleanupEndedConversation).toHaveBeenCalledTimes(1);
+  });
+
+  it('an exit inside a respawn window neither ends the row nor runs cleanup', async () => {
+    const deps = makeConversationDeps({ isRespawnPending: () => true });
+    const result = await applyAgentLifecycleEventWithDeps(makeEventStore(), SESSION, { event: 'exited', at }, deps);
+
+    expect(result).toEqual({ applied: false, reason: 'respawn-pending' });
+    expect(deps.markConversationEnded).not.toHaveBeenCalled();
+    expect(deps.cleanupEndedConversation).not.toHaveBeenCalled();
+  });
+
+  it('a cleanup failure never fails the exit', async () => {
+    const deps = makeConversationDeps();
+    deps.cleanupEndedConversation.mockRejectedValueOnce(new Error('disk gone'));
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const result = await applyAgentLifecycleEventWithDeps(makeEventStore(), SESSION, { event: 'exited', at }, deps);
+      expect(result).toEqual({ applied: true, status: 'stopped' });
+      expect(errorSpy).toHaveBeenCalled();
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('turn and start edges never run cleanup', async () => {
+    const deps = makeConversationDeps();
+    const eventStore = makeEventStore();
+    await applyAgentLifecycleEventWithDeps(eventStore, SESSION, { event: 'session-started', at }, deps);
+    await applyAgentLifecycleEventWithDeps(eventStore, SESSION, { event: 'turn-started', at }, deps);
+    await applyAgentLifecycleEventWithDeps(eventStore, SESSION, { event: 'turn-ended', at }, deps);
+
+    expect(deps.markConversationRunning).toHaveBeenCalledWith(conversation.name);
+    expect(deps.cleanupEndedConversation).not.toHaveBeenCalled();
   });
 });
