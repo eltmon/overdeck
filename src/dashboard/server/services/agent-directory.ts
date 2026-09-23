@@ -29,7 +29,7 @@ import type {
 } from '@overdeck/contracts';
 import { getHarnessBehavior } from '@overdeck/contracts';
 
-import { listAgentStatesSync, type AgentState } from '../../../lib/agents/agent-state-read.js';
+import { listAgentStatesAsync, type AgentState } from '../../../lib/agents/agent-state-read.js';
 import { createSettledTtlPromiseCache, withConcurrencyLimitPromise } from '../../../lib/concurrency.js';
 import { getEnrichedConversationList } from '../../../lib/overdeck/conversation-list.js';
 import { resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js';
@@ -42,7 +42,8 @@ import { getBackendPanes } from './backend-inventory.js';
 export const DIRECTORY_DEFAULT_WINDOW_HOURS = 24;
 export const DIRECTORY_MAX_WINDOW_HOURS = 168;
 export const DIRECTORY_MEMO_MS = 3_000;
-export const DIRECTORY_CONVERSATION_LIMIT = 300;
+/** Same limit the frontend's GET /api/conversations uses, so both share one coalesced enrichment. */
+export const DIRECTORY_CONVERSATION_LIMIT = 500;
 export const DIRECTORY_SUBAGENT_CONCURRENCY = 8;
 export { SUBAGENT_WORKING_MTIME_MS };
 
@@ -78,10 +79,10 @@ export interface DirectorySubagent {
 
 export interface AgentDirectoryDeps {
   readonly now?: () => number;
-  readonly listAgentStates?: () => readonly AgentState[];
+  readonly listAgentStates?: () => readonly AgentState[] | Promise<readonly AgentState[]>;
   readonly getBackendPanes?: () => Promise<readonly BackendPane[]>;
   readonly listConversations?: () => Promise<readonly unknown[]>;
-  readonly readRemoteLocation?: (agentId: string) => Promise<string | null>;
+  readonly readRemoteState?: (agentId: string) => Promise<RemoteStateFacts | null>;
   readonly listConversationSubagents?: (row: DirectoryConversationRow) => Promise<readonly DirectorySubagent[]>;
   readonly listAgentSubagents?: (agentId: string, workspace: string) => Promise<readonly DirectorySubagent[]>;
   /** Phase C (external registrations). */
@@ -90,16 +91,41 @@ export interface AgentDirectoryDeps {
   readonly projectKeyForPath?: (path: string) => string | null;
 }
 
+/** The two `remote-state.json` facts the directory reads. */
+export interface RemoteStateFacts {
+  readonly location: string | null;
+  readonly status: string | null;
+}
+
 // ─── default sources ─────────────────────────────────────────────────────────
 
-async function defaultReadRemoteLocation(agentId: string): Promise<string | null> {
+async function defaultReadRemoteState(agentId: string): Promise<RemoteStateFacts | null> {
   try {
     const raw = await readFile(join(getOverdeckHome(), 'agents', agentId, 'remote-state.json'), 'utf8');
-    const parsed = JSON.parse(raw) as { location?: unknown };
-    return typeof parsed.location === 'string' ? parsed.location : null;
+    const parsed = JSON.parse(raw) as { location?: unknown; status?: unknown };
+    return {
+      location: typeof parsed.location === 'string' ? parsed.location : null,
+      status: typeof parsed.status === 'string' ? parsed.status : null,
+    };
   } catch {
     return null;
   }
+}
+
+/** Directory reads never write lifecycle log lines (D1). */
+const QUIET_RESOLVE = { resolveOptions: { logDiagnostic: () => {} } } as const;
+
+function defaultListAgentStates(): Promise<readonly AgentState[]> {
+  return listAgentStatesAsync({ skip: (name) => name.startsWith('conv-') });
+}
+
+/** Memoize a lookup for one build, so projects.yaml is consulted once per distinct key. */
+function perBuild(lookup: (key: string) => string | null): (key: string) => string | null {
+  const seen = new Map<string, string | null>();
+  return (key) => {
+    if (!seen.has(key)) seen.set(key, lookup(key));
+    return seen.get(key)!;
+  };
 }
 
 async function defaultListConversationSubagents(row: DirectoryConversationRow): Promise<readonly DirectorySubagent[]> {
@@ -190,12 +216,12 @@ export async function buildAgentDirectory(
   const now = (deps.now ?? Date.now)();
   const hours = clampWindowHours(windowHours);
   const windowMs = hours * HOUR_MS;
-  const readRemoteLocation = deps.readRemoteLocation ?? defaultReadRemoteLocation;
-  const projectKeyForIssue = deps.projectKeyForIssue ?? defaultProjectKeyForIssue;
-  const projectKeyForPath = deps.projectKeyForPath ?? defaultProjectKeyForPath;
+  const readRemoteState = deps.readRemoteState ?? defaultReadRemoteState;
+  const projectKeyForIssue = perBuild(deps.projectKeyForIssue ?? defaultProjectKeyForIssue);
+  const projectKeyForPath = perBuild(deps.projectKeyForPath ?? defaultProjectKeyForPath);
 
   const [states, panes, conversationRows] = await Promise.all([
-    Promise.resolve((deps.listAgentStates ?? listAgentStatesSync)()),
+    Promise.resolve((deps.listAgentStates ?? defaultListAgentStates)()),
     (deps.getBackendPanes ?? getBackendPanes)().catch(() => [] as readonly BackendPane[]),
     (deps.listConversations ?? (() => getEnrichedConversationList(DIRECTORY_CONVERSATION_LIMIT, 0)))()
       .catch(() => [] as readonly unknown[]),
@@ -207,12 +233,16 @@ export async function buildAgentDirectory(
 
   // 1. Native agents (never conversation agent dirs).
   const natives = states.filter((state) => !state.id.startsWith('conv-'));
-  const locations = await Promise.all(natives.map((state) => readRemoteLocation(state.id)));
+  const remotes = await Promise.all(natives.map((state) => readRemoteState(state.id)));
   natives.forEach((state, index) => {
     const matching = panes.filter((pane) => pane.agentId === state.id || (!pane.agentId && pane.id === state.id));
     const pane = matching.find((candidate) => candidate.state !== 'exited') ?? matching[0];
     for (const claimed of matching) claimedPanes.add(claimed);
-    const remote = locations[index] === 'remote';
+    const remoteState = remotes[index];
+    const remote = remoteState?.location === 'remote';
+    // A remote agent's terminal is on the Fly VM: unknown while it runs, stopped once
+    // remote-state.json says it stopped or failed, so it windows out (D3/D4).
+    const remoteStopped = remote && (remoteState?.status === 'stopped' || remoteState?.status === 'error');
     const entry: DirectoryEntry = {
       id: state.id,
       kind: 'agent',
@@ -224,7 +254,7 @@ export async function buildAgentDirectory(
       role: state.role,
       harness: state.harness ?? pane?.harness ?? 'unknown',
       model: state.model || pane?.model || 'unknown',
-      state: remote ? 'unknown' : paneState(pane),
+      state: remoteStopped ? 'stopped' : remote ? 'unknown' : paneState(pane),
       startedAt: state.startedAt ?? null,
       lastActivityAt: state.lastActivity ?? state.stoppedAt ?? state.startedAt ?? null,
       costUsd: null,
@@ -293,7 +323,8 @@ export async function buildAgentDirectory(
 
   // 4. Subagents of every non-stopped parent.
   const listConversationSubagents = deps.listConversationSubagents ?? defaultListConversationSubagents;
-  const listNativeSubagents = deps.listAgentSubagents ?? listAgentSubagents;
+  const listNativeSubagents = deps.listAgentSubagents
+    ?? ((agentId: string, workspace: string) => listAgentSubagents(agentId, workspace, QUIET_RESOLVE));
   const subagentTasks: Array<() => Promise<Candidate[]>> = [
     ...conversationParents.map(({ entry, row }) => () => listConversationSubagents(row)
       .then((subs) => subagentCandidates(entry, subs, 'conversation', row.name, row.cwd, now))),

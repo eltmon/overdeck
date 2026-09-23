@@ -15,7 +15,7 @@ import {
   type ResolveJsonlPathOptions,
 } from '../../../lib/agents/transcript-resolver.js';
 import { listSubagentMetas, subagentTranscriptPath } from './conversation/subagents.js';
-import { listCodexSubagents, resolveCodexSubagentTranscript } from './conversation/codex-subagents.js';
+import { listCodexSubagentThreads, resolveCodexSubagentTranscript } from './conversation/codex-subagents.js';
 
 /** A Claude subagent whose transcript changed this recently is still working (D3). */
 export const SUBAGENT_WORKING_MTIME_MS = 120_000;
@@ -63,11 +63,12 @@ export async function listTranscriptSubagents(
   }
 
   if (parent.kind === 'codex') {
+    // One walk of the sessions tree for every child; state comes from mtime (D3).
     const subagents: AgentSubagent[] = [];
-    for (const summary of await listCodexSubagents(parent.path)) {
-      const transcriptPath = await resolveCodexSubagentTranscript(parent.path, summary.agentId);
-      if (!transcriptPath) continue;
-      subagents.push({ ...summary, transcriptPath, mtimeMs: await mtimeOf(transcriptPath) });
+    for (const { file, ...thread } of await listCodexSubagentThreads(parent.path)) {
+      const mtimeMs = await mtimeOf(file);
+      const working = mtimeMs !== null && now - mtimeMs <= SUBAGENT_WORKING_MTIME_MS;
+      subagents.push({ ...thread, status: working ? 'running' : 'done', transcriptPath: file, mtimeMs });
     }
     return subagents;
   }

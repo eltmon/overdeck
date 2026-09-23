@@ -23,6 +23,10 @@ interface ThreadMeta {
   role: string;
   file: string;
 }
+// A rollout's first-line metadata never changes, so a large cap is cheap (a
+// few short strings per entry). At 512 a host with more rollouts re-read every
+// file on every walk (PAN-3920 review).
+const METADATA_CACHE_MAX = 8192;
 const metadata = new Map<string, ThreadMeta>();
 
 async function readMeta(file: string): Promise<ThreadMeta | null> {
@@ -46,7 +50,7 @@ async function readMeta(file: string): Promise<ThreadMeta | null> {
         name: text(spawn.agent_nickname ?? payload.agent_nickname),
         role: text(spawn.agent_role ?? payload.agent_role),
       };
-      if (metadata.size >= 512) metadata.delete(metadata.keys().next().value!);
+      if (metadata.size >= METADATA_CACHE_MAX) metadata.delete(metadata.keys().next().value!);
       metadata.set(file, meta);
       return meta;
     }
@@ -105,10 +109,21 @@ async function descendants(parentFile: string): Promise<Array<{ meta: ThreadMeta
   return children;
 }
 
-export async function listCodexSubagents(parentFile: string, workLog: readonly WorkLogEntry[] = []): Promise<SubagentSummary[]> {
-  const children = await descendants(parentFile);
-  const summaries: SubagentSummary[] = [];
-  for (const { meta, depth } of children) {
+/** One Codex child thread: its summary fields and rollout file, read in a single walk. */
+export interface CodexSubagentThread extends Omit<SubagentSummary, 'status'> {
+  readonly file: string;
+}
+
+/**
+ * Every descendant thread of a parent rollout, from ONE walk of the sessions
+ * tree and without reading any child's task status (PAN-3920: the Agents
+ * Directory derives state from the rollout mtime, so it skips the tail read).
+ */
+export async function listCodexSubagentThreads(
+  parentFile: string,
+  workLog: readonly WorkLogEntry[] = [],
+): Promise<CodexSubagentThread[]> {
+  return (await descendants(parentFile)).map(({ meta, depth }) => {
     const call = depth === 1 ? workLog.find((entry) => {
       if (entry.label !== 'spawn_agent') return false;
       const output = object(entry.result);
@@ -116,14 +131,21 @@ export async function listCodexSubagents(parentFile: string, workLog: readonly W
         || (meta.path !== '' && output.task_name === meta.path);
     }) : undefined;
     const args = object(call?.toolInput ?? call?.detail);
-    summaries.push({
+    return {
       agentId: meta.id,
       agentType: meta.role || meta.name || 'Codex',
       description: text(args.task_name) || meta.path || meta.name || 'Subagent',
       toolUseId: call?.id ?? meta.id,
       spawnDepth: depth,
-      status: await codexThreadStatus(meta.file),
-    });
+      file: meta.file,
+    };
+  });
+}
+
+export async function listCodexSubagents(parentFile: string, workLog: readonly WorkLogEntry[] = []): Promise<SubagentSummary[]> {
+  const summaries: SubagentSummary[] = [];
+  for (const { file, ...thread } of await listCodexSubagentThreads(parentFile, workLog)) {
+    summaries.push({ ...thread, status: await codexThreadStatus(file) });
   }
   return summaries;
 }

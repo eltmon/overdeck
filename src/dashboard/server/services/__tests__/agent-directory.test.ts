@@ -62,7 +62,7 @@ function deps(overrides: AgentDirectoryDeps = {}): AgentDirectoryDeps {
     listAgentStates: () => [],
     getBackendPanes: async () => [],
     listConversations: async () => [],
-    readRemoteLocation: async () => null,
+    readRemoteState: async () => null,
     listConversationSubagents: async () => [],
     listAgentSubagents: async () => [],
     projectKeyForIssue: (issueId) => (issueId.startsWith('PAN-') ? 'overdeck' : null),
@@ -227,12 +227,42 @@ describe('buildAgentDirectory', () => {
         agent({ id: 'agent-pan-1', lastActivity: iso(1_000) }),
         agent({ id: 'agent-pan-2', issueId: 'PAN-2', lastActivity: iso(HOUR) }),
       ],
-      readRemoteLocation: async (id) => (id === 'agent-pan-2' ? 'remote' : null),
+      readRemoteState: async (id) => (id === 'agent-pan-2' ? { location: 'remote', status: 'running' } : null),
     }));
     expect(result.entries.map((entry) => [entry.id, entry.state, entry.location])).toEqual([
       ['agent-pan-2', 'unknown', 'remote'],
       ['agent-pan-1', 'stopped', 'local'],
     ]);
+  });
+
+  it('treats a stopped or failed remote agent as stopped, so it windows out', async () => {
+    const result = await buildAgentDirectory(24, deps({
+      listAgentStates: () => [
+        agent({ id: 'agent-pan-3', issueId: 'PAN-3', lastActivity: iso(HOUR) }),
+        agent({ id: 'agent-pan-4', issueId: 'PAN-4', lastActivity: iso(HOUR) }),
+        agent({ id: 'agent-pan-5', issueId: 'PAN-5', lastActivity: iso(30 * HOUR) }),
+      ],
+      readRemoteState: async (id) => ({ location: 'remote', status: id === 'agent-pan-4' ? 'error' : 'stopped' }),
+    }));
+    expect(result.entries.map((entry) => [entry.id, entry.state])).toEqual([
+      ['agent-pan-3', 'stopped'],
+      ['agent-pan-4', 'stopped'],
+    ]);
+  });
+
+  it('consults the project lookups once per distinct issue and path in a build', async () => {
+    const projectKeyForIssue = vi.fn(() => 'overdeck');
+    const projectKeyForPath = vi.fn(() => 'overdeck');
+    await buildAgentDirectory(24, deps({
+      projectKeyForIssue,
+      projectKeyForPath,
+      listConversations: async () => [
+        conversation({ name: 'a' }), conversation({ name: 'b' }), conversation({ name: 'c', issueId: 'PAN-9' }),
+        conversation({ name: 'd', issueId: 'PAN-9' }),
+      ],
+    }));
+    expect(projectKeyForIssue).toHaveBeenCalledTimes(1);
+    expect(projectKeyForPath).toHaveBeenCalledTimes(1);
   });
 });
 

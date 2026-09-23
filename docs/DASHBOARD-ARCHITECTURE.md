@@ -229,7 +229,7 @@ with the entry's transcript and issue context. The card grid, table and timeline
 
 **Derived on read; stores nothing.** `GET /api/agent-directory?windowHours=<1..168>` (default
 24) recomputes the entries from `~/.overdeck/agents/*/state.json`, the backend pane inventory,
-the conversation list (300 rows), transcript files and `remote-state.json`
+the conversation list (500 rows, the same enrichment `GET /api/conversations` shares), transcript files and `remote-state.json`
 (`src/dashboard/server/services/agent-directory.ts`). Nothing it computes is written, and no
 `agent_directory.*` event exists. The server memoizes each window's response for 3 s and shares
 one in-flight build between concurrent callers. `windowHours` outside 1–168 answers 400.
@@ -241,7 +241,7 @@ Claude/Codex subagents of every non-stopped conversation and agent. Agents are j
 
 | Entry | `working` / `idle` / `blocked` / `done` / `unknown` | `stopped` |
 | --- | --- | --- |
-| Agent (native or pane-only) | the pane's state; a remote agent is `unknown` | pane `exited`, or no pane |
+| Agent (native or pane-only) | the pane's state; a remote agent is `unknown` | pane `exited`, or no pane; a remote agent whose `remote-state.json` status is `stopped` or `error` |
 | Conversation | `blocked` when input is pending, else `working` when a turn runs, else `idle` | session not alive |
 | Subagent | `working` when its transcript changed in the last 120 s and the parent is not stopped; else `done` | — |
 
