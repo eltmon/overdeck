@@ -220,3 +220,90 @@ describe('read-only mode (PAN-3920 workers)', () => {
     expect(runShim(shim, ['commit', '--allow-empty', '-m', 'y'], readOnlyRepo).status).toBe(0);
   });
 });
+
+describe('read-only mode guards the whole repository (review of #4027)', () => {
+  let shim: string;
+  let primary: string;
+  let workspace: string;
+  const env = {
+    ...process.env,
+    OVERDECK_PAN_GIT_OP: '',
+    GIT_AUTHOR_NAME: 'guard', GIT_AUTHOR_EMAIL: 'guard@example.test',
+    GIT_COMMITTER_NAME: 'guard', GIT_COMMITTER_EMAIL: 'guard@example.test',
+  };
+
+  function run(args: string[], cwd: string, extraEnv: Record<string, string> = {}): GuardRunResult {
+    const result = spawnSync(shim, args, { cwd, encoding: 'utf8', env: { ...env, ...extraEnv } });
+    return { status: result.status ?? 1, stderr: result.stderr ?? '' };
+  }
+
+  function realGit(args: string[], cwd: string): string {
+    return execFileSync('git', args, { cwd, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  }
+
+  beforeAll(() => {
+    primary = join(home, 'ro-primary');
+    execFileSync('git', ['init', '--quiet', '-b', 'main', primary], { stdio: 'ignore' });
+    writeFileSync(join(primary, 'README.md'), 'x\n');
+    realGit(['add', 'README.md'], primary);
+    realGit(['commit', '--quiet', '-m', 'init'], primary);
+    workspace = join(primary, 'workspaces', 'feature-pan-1');
+    realGit(['worktree', 'add', '--quiet', '-b', 'feature/pan-1', workspace, 'main'], primary);
+    mkdirSync(join(workspace, 'src'), { recursive: true });
+    execFileSync('bash', ['-ec', buildGitGuardLines('ro-repo-test', workspace, 'read-only').join('\n')], {
+      cwd: home,
+      stdio: 'ignore',
+    });
+    shim = join(home, 'agents', 'ro-repo-test', 'git-guard', 'git');
+  });
+
+  it('refuses a commit in the primary checkout reached with cd ..', () => {
+    const result = run(['commit', '--allow-empty', '-m', 'x'], join(workspace, '..'));
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('read-only');
+  });
+
+  it('refuses git -C .. commit from inside the workspace', () => {
+    expect(run(['-C', '..', 'commit', '--allow-empty', '-m', 'x'], workspace).status).toBe(1);
+  });
+
+  it('refuses git -C <primary> update-ref', () => {
+    expect(run(['-C', primary, 'update-ref', 'refs/heads/sneaky', 'HEAD'], home).status).toBe(1);
+    expect(() => realGit(['rev-parse', '--verify', '--quiet', 'refs/heads/sneaky'], primary)).toThrow();
+  });
+
+  it('refuses a commit from a subdirectory and through GIT_DIR or --git-dir', () => {
+    expect(run(['commit', '--allow-empty', '-m', 'x'], join(workspace, 'src')).status).toBe(1);
+    expect(run(['commit', '--allow-empty', '-m', 'x'], home, { GIT_DIR: join(primary, '.git') }).status).toBe(1);
+    expect(run(['--git-dir', join(primary, '.git'), 'update-ref', 'refs/heads/y', 'HEAD'], home).status).toBe(1);
+  });
+
+  it('refuses config writes, remote add and fetch', () => {
+    expect(run(['config', 'core.hooksPath', '/tmp/hooks'], workspace).status).toBe(1);
+    expect(run(['remote', 'add', 'evil', '/tmp/evil'], workspace).status).toBe(1);
+    expect(run(['fetch', primary, 'HEAD:refs/heads/x'], workspace).status).toBe(1);
+    expect(() => realGit(['rev-parse', '--verify', '--quiet', 'refs/heads/x'], primary)).toThrow();
+    expect(() => realGit(['config', '--get', 'core.hooksPath'], workspace)).toThrow();
+  });
+
+  it('allows config reads, remote listing and branch listing', () => {
+    expect(run(['config', '--list'], workspace).status).toBe(0);
+    expect(run(['config', '--get', 'core.bare'], workspace).status).toBe(0);
+    expect(run(['remote'], workspace).status).toBe(0);
+    expect(run(['remote', '-v'], workspace).status).toBe(0);
+    expect(run(['branch', '--show-current'], workspace).status).toBe(0);
+    expect(run(['branch'], workspace).status).toBe(0);
+    expect(run(['branch', '-a', '-v'], workspace).status).toBe(0);
+    expect(run(['branch', '--list', 'feature/*'], workspace).status).toBe(0);
+    expect(run(['log', '--oneline', '-1'], join(workspace, '..')).status).toBe(0);
+  });
+
+  it('refuses branch creation and deletion', () => {
+    expect(run(['branch', 'newbranch'], workspace).status).toBe(1);
+    expect(run(['branch', '-D', 'main'], workspace).status).toBe(1);
+  });
+
+  it('lets writes through in an unrelated repository', () => {
+    expect(run(['commit', '--allow-empty', '-m', 'x'], fixtureRepo).status).toBe(0);
+  });
+});

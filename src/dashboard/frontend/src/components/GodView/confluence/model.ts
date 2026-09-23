@@ -14,6 +14,8 @@ export const STAGE_COLORS: Record<Stage, string> = {
 export const ROLE_COLORS = {
   plan: '#00d4ff',
   work: '#39ff14',
+  // PAN-3920: a registered worker (pan worker run), a lighter shade of work.
+  worker: '#a8ff8a',
   review: '#ffb800',
   test: '#ff2d7c',
   ship: '#e8edf8',

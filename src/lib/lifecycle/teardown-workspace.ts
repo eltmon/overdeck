@@ -26,6 +26,7 @@ import { findAllWorkspacePaths, findWorkspacePath } from './archive-planning.js'
 import { getContainersReferencingWorkspacePath } from '../workspace-manager.js';
 import { DEVCONTAINER_DIRNAME } from '../workspace/devcontainer-renderer.js';
 import { pruneAgentStateDir } from '../agents/state-dir-removal.js';
+import { reapWorkerWorktrees } from '../workspaces/worker-worktrees.js';
 import { listAgentStatesSync, saveAgentStateSync } from '../agents/agent-state.js';
 
 const execAsync = promisify(exec);
@@ -320,6 +321,20 @@ async function removeWorktreeImpl(
       return stepFailed(step, `Failed to remove workspace: ${(err as Error).message}`);
     }
   }
+}
+
+/**
+ * Remove registered workers' worktrees (PAN-3920). Their branches go too when
+ * the teardown deletes branches; otherwise only the ones with no work of their own.
+ */
+function removeWorkerWorktrees(projectPath: string, issueId: string, deleteBranches: boolean): Effect.Effect<StepResult> {
+  const step = 'teardown:worker-worktrees';
+  // The promise never rejects: a cleanup failure is reported as a skipped step.
+  return Effect.promise(() =>
+    reapWorkerWorktrees(projectPath, issueId, { deleteBranches: deleteBranches ? 'all' : 'merged' }).then(
+      (details) => (details.length > 0 ? stepOk(step, details) : stepSkipped(step, ['No worker worktrees'])),
+      (err: unknown) => stepSkipped(step, [`Worker worktree cleanup failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`]),
+    ));
 }
 
 /**
@@ -751,6 +766,10 @@ export function teardownWorkspace(
           results.push(yield* removeHumeEviConfig(opts.workspaceConfig.hume, placeholders));
         }
       }
+
+      // 8b. PAN-3920: registered workers' `.swarm/worker-<n>` worktrees are
+      // residue once the issue is torn down, whether or not the workspace goes.
+      results.push(yield* removeWorkerWorktrees(ctx.projectPath, ctx.issueId, opts.deleteBranches === true));
 
       // 9. Remove worktree + workspace directory (only if deleting workspace).
       if (shouldDeleteWorkspace) {

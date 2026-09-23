@@ -546,7 +546,7 @@ agents the same. See [Workers](/reference/workers) for the commands.
 | Control | `pan tell`, `pan kill`, restart | None from Overdeck |
 | Harness and model | Any harness through role routing (`roles.worker`), or `--harness` / `--model` | The plugin's own |
 | Result | The report comes back to the caller on stdout | The plugin returns its result as a tool result |
-| Sandbox | Git writes blocked with `--read-only`; no file-system or network sandbox | The plugin's file-system and network sandbox |
+| Sandbox | None. `--read-only` adds a PATH shim against accidental git writes to the issue's repository; it restricts no file or network writes | The plugin's file-system and network sandbox |
 | Setup | Needs the issue's workspace (`pan start` first) | None |
 
 ## ToS rules

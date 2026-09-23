@@ -58,10 +58,11 @@ pan worker list --parent conv-orchestrator --json
 `--name`, `--detach`, `--timeout <seconds>`, `--stop-after-report`.
 
 - **Working directory.** By default the worker gets its own git worktree at
-  `<workspace>/.swarm/worker-<n>/` on branch `<feature-branch>/worker-<n>`. With `--read-only` it runs
-  in the issue workspace behind a git guard that blocks every git write there (read commands such as
-  `status`, `diff`, `log` and `show` still work). The guard covers git only; it is not a file-system
-  sandbox.
+  `<workspace>/.swarm/worker-<n>/` on branch `<feature-branch>-worker-<n>`. With `--read-only` it runs
+  in the issue workspace behind a `git` PATH shim that prevents accidental git writes to the issue's
+  repository (the primary checkout and every worktree of it). Reads such as `status`, `diff`, `log`,
+  `show`, `config --get` and `branch --show-current` still work; `fetch` does not. The shim is not a
+  sandbox: an absolute `/usr/bin/git` bypasses it, and it does not restrict file or network writes.
 - **Parent.** `--parent`, else `$OVERDECK_AGENT_ID`, else `$OVERDECK_CONVERSATION`. Called from an agent
   with none of these, the command fails and asks for `--parent`.
 
@@ -72,18 +73,34 @@ pan worker list --parent conv-orchestrator --json
 | 0 | Report with status `done` | Report body on stdout |
 | 4 | Report with status `blocked` or `failed` | Report body on stdout |
 | 2 | Worker exited, or sat idle 10 minutes, without a report | Its last assistant message on stdout, prefixed `[no report — last assistant message]` |
-| 3 | Timeout; the worker is still running | `pan worker wait <id>` hint on stderr |
+| 3 | Timeout; the worker is still running | The exact `pan worker wait` to run next, on stderr |
 | 1 | Usage or spawn error | Reason on stderr |
 
-Status lines always go to stderr, so stdout is only the report.
+Status lines always go to stderr, so stdout is only the report. A report's status line names its
+sequence number and the next wait, for example
+`worker agent-pan-123-worker-1 report 2: done; next: pan worker wait agent-pan-123-worker-1 --after 2`.
+
+## Which report `wait` returns
+
+- `pan worker wait <id>` with no `--after` returns the newest report the worker has written, even one
+  written while nothing was waiting. Use it for the first report of a `--detach`ed worker.
+- `pan worker wait <id> --after <n>` returns the next report after `n`. Once you have read report `n`,
+  every later wait passes `--after <n>`; otherwise you get report `n` again.
 
 ## How to wait from each harness
 
 - **Claude Code:** run `pan worker run …` with the Bash tool's `run_in_background: true`. The
   foreground limit is 10 minutes; a background command notifies you when it exits, and its stdout is
   the report.
-- **Codex and other harnesses:** run `pan worker run … --detach` to get the id, then run
-  `pan worker wait <id> --timeout 540` in a loop until the exit code is not 3.
+- **Codex and other harnesses:** run `pan worker run … --detach` to get the id, then wait in a loop
+  until the exit code is not 3. A timed-out wait loses nothing: the next one still returns the report.
+
+  ```bash
+  id=$(pan worker run --issue PAN-123 --brief brief.md --detach)
+  pan worker wait "$id" --timeout 540    # repeat while the exit code is 3
+  # after reading report 1, wait for the next one:
+  pan worker wait "$id" --after 1 --timeout 540
+  ```
 
 ## Follow-ups
 
@@ -91,14 +108,16 @@ A worker stays running after it reports. To give it more work:
 
 ```bash
 pan tell agent-pan-123-worker-1 "Also check the tmux adapter."
-pan worker wait agent-pan-123-worker-1
+pan worker wait agent-pan-123-worker-1 --after 1   # 1 = the last report you read
 ```
 
 Only the worker's parent, the issue's work agent, or an operator conversation may `pan tell` a worker.
-Stop a worker you no longer need with `pan kill <worker-id>`.
+Stop a worker you no longer need with `pan kill <worker-id>`. Stopping it (or `--stop-after-report`)
+keeps its `.swarm/worker-<n>` worktree and branch, because you may still need its work; they are
+removed when the issue is closed out or its residue is reaped.
 
 ## Reporting (for the worker itself)
 
 The brief ends with the exact command. Write the report as Markdown to a file, then run
 `pan worker report <your-id> --file <path>`, with `--status blocked` or `--status failed` when you
-could not finish. Put the answer first.
+could not finish. Put the answer first. An agent can record a report only for itself.

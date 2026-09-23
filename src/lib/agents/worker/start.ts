@@ -7,12 +7,12 @@
  * one-shot `claude -p` / `codex exec` run; the caller only observes it.
  *
  * Working directory (D14): a git worktree at `<workspace>/.swarm/worker-<n>/`
- * on branch `<feature-branch>/worker-<n>`, or, with `readOnly`, the issue
+ * on branch `<feature-branch>-worker-<n>`, or, with `readOnly`, the issue
  * workspace itself behind a read-only git guard. `cwd` overrides both and must
  * resolve inside the issue workspace. The project's primary checkout is never
  * a worker's directory.
  */
-import { access } from 'node:fs/promises';
+import { access, realpath } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 
 import type { RuntimeName } from '../../runtimes/types.js';
@@ -114,11 +114,17 @@ export async function startWorker(options: StartWorkerOptions, deps: StartWorker
   if (!(await exists(workspace))) {
     throw new Error(`${issueId} has no workspace at ${workspace}. Run pan start ${issueId} first.`);
   }
-  const explicitCwd = options.cwd ? resolve(options.cwd) : null;
-  if (explicitCwd && !isInside(resolve(workspace), explicitCwd)) {
-    throw new Error(`--cwd ${explicitCwd} is outside ${issueId}'s workspace ${workspace}; a worker runs inside its issue workspace.`);
+  let explicitCwd: string | null = null;
+  if (options.cwd) {
+    const requested = resolve(options.cwd);
+    if (!(await exists(requested))) throw new Error(`--cwd ${requested} does not exist.`);
+    // Both sides canonical: a symlink inside the workspace must not lead out of it.
+    const [realWorkspace, realCwd] = await Promise.all([realpath(workspace), realpath(requested)]);
+    if (!isInside(realWorkspace, realCwd)) {
+      throw new Error(`--cwd ${requested} is outside ${issueId}'s workspace ${workspace}; a worker runs inside its issue workspace.`);
+    }
+    explicitCwd = realCwd;
   }
-  if (explicitCwd && !(await exists(explicitCwd))) throw new Error(`--cwd ${explicitCwd} does not exist.`);
 
   const id = await (deps.allocateWorkerId ?? allocateWorkerId)(issueId);
   const readOnly = options.readOnly === true;

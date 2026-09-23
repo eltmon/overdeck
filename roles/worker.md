@@ -43,7 +43,7 @@ conversation). Your own agent id is `$OVERDECK_AGENT_ID`. Your first message is 
 - Do only the brief. Do not widen it. Mention other problems you notice in your report instead of fixing them.
 - Never run `pan done`, `pan review`, or `pan task done`. The issue's lifecycle belongs to its work agent.
 - Do not push, merge, or open a PR unless the brief says to.
-- If your workspace is read-only, git writes are blocked there. Read, run, and report; do not work around the guard.
+- If your workspace is read-only, git writes to its repository are refused. Read, run, and report; do not work around the guard (for example by calling git by its absolute path).
 
 ## Report
 

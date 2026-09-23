@@ -110,12 +110,24 @@ export function resolveWorkerParent(
 export const MISSING_PARENT_MESSAGE =
   'Cannot tell which conversation or agent is spawning this worker. Pass --parent <conversation-or-agent-id>.';
 
-/** Print a wait outcome per D17 and return the exit code. */
-export function reportOutcome(id: string, outcome: WaitOutcome, deps: Pick<WorkerCliDeps, 'stdout' | 'stderr'>): number {
+/**
+ * Print a wait outcome per D17 and return the exit code. The status line names
+ * the report's seq and the exact next wait (`--after <seq>`), so a caller that
+ * loops never reads the same report twice and never skips one.
+ */
+export function reportOutcome(
+  id: string,
+  outcome: WaitOutcome,
+  deps: Pick<WorkerCliDeps, 'stdout' | 'stderr'>,
+  afterSeq?: number,
+): number {
   switch (outcome.kind) {
     case 'report': {
       deps.stdout(outcome.report.body);
-      deps.stderr(`worker ${id} report ${outcome.report.seq}: ${outcome.report.status}`);
+      deps.stderr(
+        `worker ${id} report ${outcome.report.seq}: ${outcome.report.status}; `
+        + `next: pan worker wait ${id} --after ${outcome.report.seq}`,
+      );
       return outcome.report.status === 'done' ? WORKER_EXIT.done : WORKER_EXIT.blocked;
     }
     case 'exited-without-report':
@@ -131,7 +143,7 @@ export function reportOutcome(id: string, outcome: WaitOutcome, deps: Pick<Worke
       return WORKER_EXIT.noReport;
     }
     case 'timeout':
-      deps.stderr(`worker ${id} is still running; run: pan worker wait ${id}`);
+      deps.stderr(`worker ${id} is still running; run: pan worker wait ${id}${afterSeq !== undefined ? ` --after ${afterSeq}` : ''}`);
       return WORKER_EXIT.timeout;
   }
 }
@@ -253,7 +265,7 @@ export async function workerWaitCommand(
     }
   }
   const outcome = await deps.waitForWorkerReport(id, { afterSeq, timeoutMs });
-  return reportOutcome(id, outcome, deps);
+  return reportOutcome(id, outcome, deps, afterSeq);
 }
 
 export async function workerReportCommand(
@@ -262,6 +274,12 @@ export async function workerReportCommand(
   deps: WorkerCliDeps,
 ): Promise<number> {
   if (!(await requireWorker(id, deps))) return WORKER_EXIT.usage;
+  // An agent may report only as itself; no OVERDECK_AGENT_ID means an operator shell.
+  const caller = deps.env.OVERDECK_AGENT_ID?.trim();
+  if (caller && caller.toLowerCase() !== id.toLowerCase()) {
+    deps.stderr(`${caller} may not record a report for ${id}: a worker reports only for itself.`);
+    return WORKER_EXIT.usage;
+  }
   if (Boolean(options.file) === Boolean(options.stdin)) {
     deps.stderr('Pass exactly one of --file <path> or --stdin.');
     return WORKER_EXIT.usage;
@@ -362,8 +380,8 @@ export function registerWorkerCommands(program: Command, deps: () => WorkerCliDe
 
   worker
     .command('wait <worker-id>')
-    .description('Wait for a worker\'s next report (same exit codes as run)')
-    .option('--after <seq>', 'Return only a report newer than this sequence number (default: the newest present now)')
+    .description('Wait for a worker\'s report (same exit codes as run); the status line names its seq')
+    .option('--after <seq>', 'Return the next report after this seq (default: the newest report, whenever written)')
     .option('--timeout <seconds>', 'Stop waiting after this many seconds (exit 3)')
     .action(async (id: string, options: { after?: string; timeout?: string }) =>
       exitCli(await workerWaitCommand(id, options, deps())));

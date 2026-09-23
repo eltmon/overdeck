@@ -1,8 +1,11 @@
 /**
  * Waiting for a worker's report (PAN-3920 D16, D18).
  *
- * `waitForWorkerReport` polls every 2 s and returns the first report whose
- * `seq` is greater than the baseline. Each poll also asks the one liveness
+ * `waitForWorkerReport` polls every 2 s for a report. Without `afterSeq` any
+ * report counts, and the newest one is returned (so a report written while
+ * nobody was waiting is never missed). With `afterSeq: n` it returns the next
+ * report after `n`, the one a caller that consumed report `n` has not seen.
+ * Each poll also asks the one liveness
  * oracle (`isAlive`): a confirmed death with no report is
  * `exited-without-report`; a worker idle for longer than `idleGraceMs` with no
  * report is `idle-without-report` and is left running. A deadline returns
@@ -31,7 +34,10 @@ export type WaitOutcome =
   | { kind: 'timeout' };
 
 export interface WaitOptions {
-  /** Return only a report with a greater `seq`. Default: the highest `seq` present when the wait starts. */
+  /**
+   * Return the first report with a greater `seq` (the next unconsumed one).
+   * Absent: return the newest report that exists, whenever it was written.
+   */
   afterSeq?: number;
   /** Deadline in ms; null or absent waits without one. */
   timeoutMs?: number | null;
@@ -112,12 +118,16 @@ export async function waitForWorkerReport(id: string, options: WaitOptions = {},
 
   const startedAt = now();
   const deadline = typeof options.timeoutMs === 'number' ? startedAt + options.timeoutMs : null;
-  const baseline = options.afterSeq ?? Math.max(0, ...(await listReports(id)).map((report) => report.seq));
+  const baseline = options.afterSeq ?? 0;
+  const pick = (reports: WorkerReport[]): WorkerReport | undefined => {
+    const fresh = reports.filter((report) => report.seq > baseline);
+    return options.afterSeq === undefined ? fresh.at(-1) : fresh[0];
+  };
   let seenAlive = false;
 
   for (;;) {
     if (options.signal?.aborted) return { kind: 'timeout' };
-    const fresh = (await listReports(id)).find((report) => report.seq > baseline);
+    const fresh = pick(await listReports(id));
     if (fresh) return { kind: 'report', report: fresh };
 
     const verdict = await isAlive(id);
@@ -125,7 +135,7 @@ export async function waitForWorkerReport(id: string, options: WaitOptions = {},
     const current = now();
     if (isConfirmedDead(verdict) && (seenAlive || current - startedAt >= startupGraceMs)) {
       // The worker may have reported in the moment before it exited.
-      const last = (await listReports(id)).find((report) => report.seq > baseline);
+      const last = pick(await listReports(id));
       if (last) return { kind: 'report', report: last };
       return reportlessOutcome('exited-without-report', id, fetchLast, resolvePath);
     }

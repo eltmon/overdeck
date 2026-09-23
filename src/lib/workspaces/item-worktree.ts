@@ -2,7 +2,7 @@
  * Item worktrees under an issue workspace (moved from `pan spawn`, PAN-3920 D14).
  *
  * `<workspace>/.swarm/<item>/` is a git worktree on its own branch
- * `<feature-branch>/<item>`, cut from the issue's feature branch. `pan spawn`
+ * `<feature-branch>-<item>`, cut from the issue's feature branch. `pan spawn`
  * uses it for an xBRIEF item with a `files_scope`; `pan worker run` uses it for
  * every worker that is not read-only. Async git only: the worker library is
  * reachable from the dashboard server.
@@ -25,7 +25,9 @@ export async function createItemWorktree(workspacePath: string, itemId: string):
 
   const { stdout } = await execFileAsync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: workspacePath });
   const featureBranch = stdout.trim();
-  const itemBranch = `${featureBranch}/${itemId}`;
+  // A sibling, not a child: `feature/pan-9/worker-1` cannot coexist with the
+  // branch `feature/pan-9` (git refuses to lock the ref under an existing ref).
+  const itemBranch = `${featureBranch}-${itemId}`;
 
   const branchExists = await execFileAsync(
     'git',
@@ -43,7 +45,7 @@ export async function createItemWorktree(workspacePath: string, itemId: string):
   return path;
 }
 
-/** The branch an item worktree was cut on (`<feature-branch>/<item>`), or null when it cannot be read. */
+/** The branch an item worktree was cut on (`<feature-branch>-<item>`), or null when it cannot be read. */
 export async function worktreeBranch(path: string): Promise<string | null> {
   try {
     const { stdout } = await execFileAsync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: path });

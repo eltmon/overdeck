@@ -40,9 +40,9 @@ pan worker list [--issue <id>] [--parent <id>] [--json]
 
 | Command | What it does |
 | --- | --- |
-| `run` | Starts a worker and waits for its first report. `--detach` prints only the worker id and returns once the pane exists. `--stop-after-report` stops the worker after its first report. |
-| `wait` | Waits for the next report. By default "next" means newer than the newest report present when the wait starts; `--after <seq>` sets it. |
-| `report` | Records a report. The worker runs this itself; its brief ends with the exact command. |
+| `run` | Starts a worker and waits for its first report. `--detach` prints only the worker id and returns once the pane exists. `--stop-after-report` stops the worker after its first report (its worktree stays; see below). |
+| `wait` | Waits for a report. With no `--after` it returns the newest report the worker has written, whenever it was written. With `--after <seq>` it returns the next report after `<seq>`. |
+| `report` | Records a report. The worker runs this itself; its brief ends with the exact command. An agent can record a report only for itself (`OVERDECK_AGENT_ID` must be the worker's id); a shell with no agent id counts as the operator. |
 | `list` | Lists workers with their issue, parent, live state (`running`, `stopped`, `unknown`), and newest report. |
 
 Worker ids are `agent-<issue>-worker-<n>`, for example `agent-pan-123-worker-2`.
@@ -57,8 +57,11 @@ stderr.
 | `0` | Report with status `done`. |
 | `4` | Report with status `blocked` or `failed`. The body is still printed. |
 | `2` | The worker exited, or sat idle for 10 minutes, without a report. Its last assistant message is printed, prefixed `[no report — last assistant message]`. When the dashboard cannot be reached, the transcript path is printed instead. |
-| `3` | Timeout. The worker is still running; the hint names `pan worker wait <id>`. |
+| `3` | Timeout. The worker is still running; the hint names the exact `pan worker wait` to run next. |
 | `1` | Usage or spawn error. |
+
+A report's status line names its sequence number and the next wait, for
+example `worker agent-pan-123-worker-1 report 2: done; next: pan worker wait agent-pan-123-worker-1 --after 2`.
 
 The wait polls every two seconds and never messages the worker. A worker
 that was never seen alive is not called dead during its first minute, while
@@ -87,16 +90,29 @@ written in the turn that just ended is **done**.
 
 | Flags | Where the worker runs |
 | --- | --- |
-| none | Its own git worktree at `<workspace>/.swarm/worker-<n>/`, on branch `<feature-branch>/worker-<n>`. |
+| none | Its own git worktree at `<workspace>/.swarm/worker-<n>/`, on branch `<feature-branch>-worker-<n>`. |
 | `--read-only` | The issue workspace, behind a git guard in read-only mode. |
-| `--cwd <path>` | That directory. It must be inside the issue workspace; anything else is refused. |
+| `--cwd <path>` | That directory. It must be inside the issue workspace, symlinks resolved; anything else is refused. |
 
-The read-only guard lets read subcommands through (`status`, `diff`, `log`,
-`show`, `fetch`, `rev-parse`, `rev-list`, `ls-files`, `ls-tree`, `blame`,
-`cat-file`, `merge-base`, `describe`, `grep`, `shortlog`, `for-each-ref`,
-`show-ref`, `remote`, `config`) and refuses every other git subcommand inside
-the worker's directory. Git in another repository is not affected. The guard
-covers git only: it is not a file-system or network sandbox.
+`--read-only` puts a `git` shim first on the worker's `PATH`. The shim
+prevents accidental git writes to the issue's repository: the primary
+checkout, every worktree of it (the issue workspace included), and their
+subdirectories, however the call reaches them (`cd ..`, `-C`, `--git-dir`,
+`GIT_DIR`, `--work-tree`). Inside that repository it lets only reads through:
+
+- `status`, `diff`, `log`, `show`, `rev-parse`, `rev-list`, `ls-files`,
+  `ls-tree`, `blame`, `cat-file`, `merge-base`, `describe`, `grep`,
+  `shortlog`, `for-each-ref`, `show-ref`;
+- `config` with `--get`, `--get-all`, `--get-regexp` or `--list`;
+- `remote` bare, `remote -v`, `remote show` and `remote get-url`;
+- `branch --show-current`, `branch --list`, and a bare `branch` listing.
+
+Everything else is refused there, including `fetch`, which writes refs.
+
+The shim is not a sandbox. Calling git by its absolute path (`/usr/bin/git`)
+bypasses it, and it does not restrict file writes or network access at all.
+It is there to stop a reviewing worker from changing the branch by mistake,
+not to contain a worker that tries to.
 
 ## Parent and `pan tell`
 
@@ -115,7 +131,8 @@ the `parent` token. The prompt guard lets a worker pane accept messages from:
 
 Everyone else is refused. A worker stays running after it reports; to give it
 more work, run `pan tell <worker-id> "<message>"` and then
-`pan worker wait <worker-id>`.
+`pan worker wait <worker-id> --after <n>`, where `<n>` is the last report you
+read. Without `--after` you would get report `<n>` again.
 
 ## Waiting from each harness
 
@@ -123,9 +140,27 @@ more work, run `pan tell <worker-id> "<message>"` and then
   `run_in_background: true`. The foreground limit is 10 minutes; a background
   command notifies the conversation when it exits, and its stdout is the
   report.
-- **Codex and other harnesses:** run `pan worker run … --detach`, then
-  `pan worker wait <id> --timeout 540` in a loop until the exit code is not
-  `3`.
+- **Codex and other harnesses:** run `pan worker run … --detach`, then wait
+  in a loop until the exit code is not `3`. A timed-out wait loses nothing:
+  a report written between two waits is returned by the next one.
+
+  ```bash
+  id=$(pan worker run --issue PAN-123 --brief brief.md --detach)
+  pan worker wait "$id" --timeout 540              # repeat while the exit code is 3
+  # after reading report 1, wait for the next one:
+  pan worker wait "$id" --after 1 --timeout 540
+  ```
+
+## When the worktree goes away
+
+Stopping a worker (`pan kill`, or `--stop-after-report`) keeps its
+`.swarm/worker-<n>` worktree and its `<feature-branch>-worker-<n>` branch: the
+parent may still need the work. They are removed when the issue is torn down
+(close-out, close, approve) or its residue is reaped: `git worktree remove
+--force`, then `git worktree prune`, then the branch. A teardown that keeps the
+issue's branches deletes only worker branches with no commits of their own.
+`.swarm/` is in the repository's `.gitignore`, so `git add -A` in a workspace
+never commits an embedded worktree.
 
 ## Where the files are
 

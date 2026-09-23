@@ -63,12 +63,27 @@ describe('waitForWorkerReport', () => {
     expect(await settle(promise, 2_000)).toEqual({ kind: 'report', report: report(2, 'blocked') });
   });
 
-  it('defaults the baseline to the newest report present when the wait starts', async () => {
-    const { deps, reports } = harness({ reports: [report(1), report(2)] });
-    const promise = waitForWorkerReport(ID, {}, deps);
-    expect(await settle(promise, 4_000)).toBe('pending');
-    reports.push(report(3));
-    expect(await settle(promise, 2_000)).toMatchObject({ kind: 'report', report: { seq: 3 } });
+  it('without afterSeq returns the newest existing report at once', async () => {
+    const { deps } = harness({ reports: [report(1), report(2)] });
+    expect(await settle(waitForWorkerReport(ID, {}, deps), 0)).toMatchObject({ kind: 'report', report: { seq: 2 } });
+  });
+
+  it('with afterSeq returns the next unconsumed report, not the newest', async () => {
+    const { deps } = harness({ reports: [report(1), report(2), report(3)] });
+    expect(await settle(waitForWorkerReport(ID, { afterSeq: 1 }, deps), 0)).toMatchObject({ kind: 'report', report: { seq: 2 } });
+  });
+
+  it('never misses a report written between a timed-out wait and the next wait', async () => {
+    const { deps, reports } = harness();
+    expect(await settle(waitForWorkerReport(ID, { timeoutMs: 5_000 }, deps), 5_000)).toEqual({ kind: 'timeout' });
+
+    // The worker reports one second after the first wait gave up.
+    await vi.advanceTimersByTimeAsync(1_000);
+    reports.push(report(1));
+
+    expect(await settle(waitForWorkerReport(ID, { timeoutMs: 5_000 }, deps), 0)).toEqual({ kind: 'report', report: report(1) });
+    // A looping caller passes the seq it consumed; the same report is not returned twice.
+    expect(await settle(waitForWorkerReport(ID, { afterSeq: 1, timeoutMs: 5_000 }, deps), 5_000)).toEqual({ kind: 'timeout' });
   });
 
   it('returns exited-without-report with the last assistant message on a confirmed death', async () => {

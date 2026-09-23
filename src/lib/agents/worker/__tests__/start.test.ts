@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -35,7 +35,7 @@ function deps(spawnRun: SpawnRunForWorker, extra: Partial<StartWorkerDeps> = {})
       mkdirSync(path, { recursive: true });
       return path;
     }),
-    worktreeBranch: async () => 'feature/pan-9/worker-1',
+    worktreeBranch: async () => 'feature/pan-9-worker-1',
     now: () => new Date('2026-09-23T12:00:00.000Z'),
     ...extra,
   };
@@ -79,7 +79,7 @@ describe('startWorker (PAN-3920 W13)', () => {
 
     expect(d.createItemWorktree).toHaveBeenCalledWith(workspace, 'worker-1');
     expect(started.cwd).toBe(join(workspace, '.swarm', 'worker-1'));
-    expect(started.branch).toBe('feature/pan-9/worker-1');
+    expect(started.branch).toBe('feature/pan-9-worker-1');
     expect(spawnRun.mock.calls[0]![2]).toMatchObject({ gitGuardMode: 'default', workspace: started.cwd });
     expect(JSON.parse(readFileSync(workerFactsPath(started.id), 'utf8'))).toEqual({
       id: 'agent-pan-9-worker-1',
@@ -87,7 +87,7 @@ describe('startWorker (PAN-3920 W13)', () => {
       parentId: 'conv-7',
       readOnly: false,
       cwd: started.cwd,
-      branch: 'feature/pan-9/worker-1',
+      branch: 'feature/pan-9-worker-1',
       name: 'fixer',
       startedAt: '2026-09-23T12:00:00.000Z',
     });
@@ -112,13 +112,24 @@ describe('startWorker (PAN-3920 W13)', () => {
     expect(existsSync(workerDir('agent-pan-9-worker-1'))).toBe(false);
   });
 
+  it('refuses a --cwd symlink inside the workspace that points outside it', async () => {
+    const outside = join(home, 'elsewhere');
+    mkdirSync(outside, { recursive: true });
+    symlinkSync(outside, join(workspace, 'escape'));
+    const spawnRun = okSpawn();
+    await expect(
+      startWorker({ issueId: 'PAN-9', prompt: 'x', parentId: null, cwd: join(workspace, 'escape') }, deps(spawnRun)),
+    ).rejects.toThrow('outside');
+    expect(spawnRun).not.toHaveBeenCalled();
+  });
+
   it('accepts a --cwd inside the workspace and skips the worktree', async () => {
     const inside = join(workspace, 'packages', 'core');
     mkdirSync(inside, { recursive: true });
     const spawnRun = okSpawn();
     const d = deps(spawnRun);
     const started = await startWorker({ issueId: 'PAN-9', prompt: 'x', parentId: null, cwd: inside }, d);
-    expect(started.cwd).toBe(inside);
+    expect(started.cwd).toBe(realpathSync(inside));
     expect(d.createItemWorktree).not.toHaveBeenCalled();
   });
 

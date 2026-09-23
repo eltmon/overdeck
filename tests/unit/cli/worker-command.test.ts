@@ -154,9 +154,19 @@ describe('parent resolution order', () => {
 
 describe('pan worker wait', () => {
   it('passes --after and --timeout and maps the outcome', async () => {
-    const { deps } = makeDeps({ waitForWorkerReport: vi.fn(async () => ({ kind: 'timeout' as const })) });
+    const { deps, err } = makeDeps({ waitForWorkerReport: vi.fn(async () => ({ kind: 'timeout' as const })) });
     expect(await workerWaitCommand(ID, { after: '2', timeout: '540' }, deps)).toBe(WORKER_EXIT.timeout);
     expect(deps.waitForWorkerReport).toHaveBeenCalledWith(ID, { afterSeq: 2, timeoutMs: 540_000 });
+    expect(err.at(-1)).toBe(`worker ${ID} is still running; run: pan worker wait ${ID} --after 2`);
+  });
+
+  it('without --after waits for any report and names its seq and the next wait', async () => {
+    const { deps, err } = makeDeps({
+      waitForWorkerReport: vi.fn(async () => ({ kind: 'report' as const, report: { ...report(), seq: 3 } })),
+    });
+    expect(await workerWaitCommand(ID, {}, deps)).toBe(0);
+    expect(deps.waitForWorkerReport).toHaveBeenCalledWith(ID, { afterSeq: undefined, timeoutMs: null });
+    expect(err.at(-1)).toBe(`worker ${ID} report 3: done; next: pan worker wait ${ID} --after 3`);
   });
 
   it('rejects a non-worker id and a missing worker', async () => {
@@ -168,16 +178,23 @@ describe('pan worker wait', () => {
 
 describe('pan worker report', () => {
   it('records a report from a file with a status', async () => {
-    const { deps, err } = makeDeps();
+    const { deps, err } = makeDeps({ env: { OVERDECK_AGENT_ID: ID } });
     expect(await workerReportCommand(ID, { file: 'r.md', status: 'blocked' }, deps)).toBe(0);
     expect(deps.writeWorkerReport).toHaveBeenCalledWith(ID, { body: 'brief from file', status: 'blocked' });
     expect(err).toEqual(['report 3 recorded']);
   });
 
-  it('records a report from stdin', async () => {
-    const { deps } = makeDeps();
+  it('records a report from stdin, from an operator shell with no agent id', async () => {
+    const { deps } = makeDeps({ env: {} });
     expect(await workerReportCommand(ID, { stdin: true }, deps)).toBe(0);
     expect(deps.writeWorkerReport).toHaveBeenCalledWith(ID, { body: 'report from stdin', status: 'done' });
+  });
+
+  it('refuses a report from another agent', async () => {
+    const { deps, err } = makeDeps({ env: { OVERDECK_AGENT_ID: 'agent-pan-9-review' } });
+    expect(await workerReportCommand(ID, { file: 'r.md' }, deps)).toBe(WORKER_EXIT.usage);
+    expect(deps.writeWorkerReport).not.toHaveBeenCalled();
+    expect(err[0]).toContain('reports only for itself');
   });
 
   it('rejects a bad status, both sources, and an empty body', async () => {
