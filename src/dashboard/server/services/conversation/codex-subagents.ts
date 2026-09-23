@@ -1,9 +1,10 @@
 /** Read-only Codex child-thread discovery, scoped to the parent's sessions tree. */
 import { createReadStream } from 'node:fs';
-import { open, readdir } from 'node:fs/promises';
+import { readdir } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { createInterface } from 'node:readline';
 import type { SubagentSummary, WorkLogEntry } from '@overdeck/contracts';
+import { codexThreadStatus } from '../../../../lib/conversations/codex-thread-status.js';
 
 type ObjectValue = Record<string, unknown>;
 function object(value: unknown): ObjectValue {
@@ -104,26 +105,6 @@ async function descendants(parentFile: string): Promise<Array<{ meta: ThreadMeta
   return children;
 }
 
-async function threadStatus(file: string): Promise<SubagentSummary['status']> {
-  const handle = await open(file, 'r');
-  try {
-    const { size } = await handle.stat();
-    const start = Math.max(0, size - 128 * 1024);
-    const buffer = Buffer.alloc(size - start);
-    await handle.read(buffer, 0, buffer.length, start);
-    const lines = buffer.toString('utf8').split('\n');
-    if (start > 0) lines.shift();
-    for (const line of lines.reverse()) {
-      const entry = object(line);
-      if (entry.type !== 'event_msg') continue;
-      const payload = object(entry.payload);
-      if (payload.type === 'task_complete' || payload.type === 'turn_aborted') return 'done';
-      if (payload.type === 'task_started') return 'running';
-    }
-    return 'running';
-  } finally { await handle.close(); }
-}
-
 export async function listCodexSubagents(parentFile: string, workLog: readonly WorkLogEntry[] = []): Promise<SubagentSummary[]> {
   const children = await descendants(parentFile);
   const summaries: SubagentSummary[] = [];
@@ -141,7 +122,7 @@ export async function listCodexSubagents(parentFile: string, workLog: readonly W
       description: text(args.task_name) || meta.path || meta.name || 'Subagent',
       toolUseId: call?.id ?? meta.id,
       spawnDepth: depth,
-      status: await threadStatus(meta.file),
+      status: await codexThreadStatus(meta.file),
     });
   }
   return summaries;

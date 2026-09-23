@@ -16,6 +16,7 @@ import {
 import {
   getAgentOutputRoute,
   getAgentConversationRoute,
+  getAgentSubagentsRoute,
   getAgentActivityRoute,
   getAgentFilesRoute,
   getAgentTimelineRoute,
@@ -99,6 +100,7 @@ export const agentsRouteLayer = Layer.mergeAll(
   getAgentsRoute,
   getAgentOutputRoute,
   getAgentConversationRoute,
+  getAgentSubagentsRoute,
   postAgentMessageRoute,
   postAgentTellRoute,
   deleteAgentRoute,
