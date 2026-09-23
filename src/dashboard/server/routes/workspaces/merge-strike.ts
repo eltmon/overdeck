@@ -179,9 +179,11 @@ export async function advanceMergeQueue(
 export async function forgeMergeGateRefusal(
   issueId: string,
   expectedBranch?: string,
-  gate: (issueId: string) => Promise<MergeGateVerdict> = evaluateIssueMergeGate,
+  gate: (issueId: string, options?: { preferBranch?: string }) => Promise<MergeGateVerdict>
+    = (id, options) => evaluateIssueMergeGate(id, {}, options),
 ): Promise<MergeEligibilityResult | null> {
-  return mergeGateRefusal(await gate(issueId), expectedBranch);
+  const verdict = expectedBranch ? await gate(issueId, { preferBranch: expectedBranch }) : await gate(issueId);
+  return mergeGateRefusal(verdict, expectedBranch);
 }
 
 /**

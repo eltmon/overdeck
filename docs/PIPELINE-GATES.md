@@ -198,11 +198,14 @@ Auto-merge eligibility applies the same rule. Nothing is stored; each input is
 read when the question is asked. The PR is merge-ready when, in order:
 
 1. it exists, is open, is not a draft, and is approved (a forge review
-   decision, else the verdict marker comment) with no changes requested;
-2. its checks on the head are all green (`none` and `pending` are not green);
+   decision, else a trusted verdict marker comment, below) with no changes
+   requested;
+2. its checks on the head are all green (`none` and `pending` are not green;
+   a GitLab pipeline that `skipped` is green, as the board reads it);
 3. **the CI test job passed on the head** when the project runs
    `verification.tests: ci` (resolved from `projects.yaml` or detected, as
-   above). GitHub only: a GitLab pipeline is judged by its one verdict;
+   above, and cached per project until `projects.yaml` or a workflow file
+   changes). GitHub only: a GitLab pipeline is judged by its one verdict;
 4. **no required UAT failed at the head**;
 5. the forge reports it `mergeable`.
 
@@ -210,12 +213,26 @@ A refusal names the first failing condition, e.g. `Cannot merge: browser UAT
 failed on PR HEAD <sha>`. The board's derived `ready` state (and so whether
 the Merge button is enabled) is computed from the batched PR listing and
 covers conditions 1, 2 and 5 only; conditions 3 and 4 surface as that
-refusal when the button is clicked.
+refusal when the button is clicked. A forge read that fails is itself the
+refusal, e.g. `Cannot merge: GitLab MR view failed for !77: …`.
 
-**Failed UAT.** The newest UAT verdict that applies to the current head
-decides. A marked verdict applies when its commit is the head (an abbreviated
-SHA matches); a verdict comment posted before the marker existed applies when
-it is at least as new as the head commit. So:
+**Trusted verdict comments.** The repository is public and anyone can comment
+on a PR, so a verdict marker counts only when its comment's author is `OWNER`,
+`MEMBER` or `COLLABORATOR` (GitHub's `authorAssociation`), or is the identity
+Overdeck posts verdicts as: the authenticated `gh` user or the GitHub App bot,
+resolved once per process and only when some marker needs it. Every other
+author's marker is ignored, whether it approves, requests changes, passes UAT
+or fails it. This applies to the `overdeck-verdict` review marker as well as the
+UAT marker. A marker must stand on its own line (the review marker as the
+comment's first line); a quote-reply (`> <!-- … -->`) or a marker inside prose
+declares nothing.
+
+**Failed UAT.** The newest trusted UAT marker that applies to the current
+head decides. A marker applies when its commit is the head (an abbreviated SHA
+matches); a marker posted without a commit (the PR head was unreadable) applies
+when it is at least as new as the head commit. A UAT verdict comment posted
+before the marker existed carries no marker and reads as no verdict: it
+neither blocks nor clears anything. So:
 
 - a failed UAT at the current head blocks the merge;
 - a later passing UAT at that head, or at a newer head, restores readiness;
@@ -232,9 +249,17 @@ the project's `auto_merge_default` (`hold` requires it), else the global
 `flywheel.require_uat_before_merge` (on by default). An `auto-merge` label is
 the operator saying UAT is not required for this issue, so a failed verdict
 there is advisory and does not block. The tiers are read only when a failed
-verdict applies to the head, so the common case costs no tracker read; if
-they cannot be read, the failure blocks. GitLab MR notes are not read, so a
-GitLab MR's UAT verdict does not reach this gate.
+verdict applies to the head, so the common case costs no tracker read. The
+gate reads the labels strictly: if they cannot be read, the failure blocks,
+rather than falling back to the project and global tiers as auto-merge's
+lenient read does. GitLab MR notes are not read, so a GitLab MR's UAT verdict
+does not reach this gate.
+
+**Freshness.** The gate reads PR comments through `fetchIssuePullRequest`,
+whose PR-tab cache a PR webhook invalidates at once and which otherwise
+expires after 60 seconds, like the pr-facts cache on top of it. A verdict
+posted from a CLI process therefore reaches a dashboard server's gate within
+about two minutes even with no webhook.
 
 **Strike branches.** The merge queue used to turn a queued entry into a
 strike landing whenever `origin/strike/<issue>` existed, and skip the gate
@@ -243,8 +268,9 @@ a normal Merge enqueues, and since PAN-3973 a strike opens its own PR that the
 operator merges, so the queue no longer looks for strike branches: every entry
 passes the gate above and merges its feature PR. `triggerMerge` still accepts a
 strike request (nothing sends one now); it passes the same gate against the
-`strike/<issue>` PR and refuses when the PR the forge reports is on any other
-branch.
+`strike/<issue>` PR, read with that branch probed first so an open feature PR
+cannot stand in for it, and refuses when the PR the forge reports is on any
+other branch.
 
 ## Review Convergence Gate (PAN-3151)
 

@@ -63,7 +63,10 @@ verdict, every time it's asked.
    failed browser UAT at the PR head blocks when UAT is required for the
    issue (its `hold-for-uat` / `auto-merge` label, else the project's
    `auto_merge_default`, else the global `require_uat_before_merge`). A
-   passing UAT, at that head or a newer one, restores readiness.
+   passing UAT, at that head or a newer one, restores readiness. Verdict
+   markers in PR comments (review approval, UAT pass or fail) count only
+   from the repository's owners, members and collaborators, or from
+   Overdeck's own posting identity; anyone else's are ignored.
 4. **Human clicks the dashboard Merge button** (or `gh pr merge`). The
    dashboard re-reads readiness from the forge and refuses with the first
    failing condition (`Cannot merge: …`); the board enables the button on

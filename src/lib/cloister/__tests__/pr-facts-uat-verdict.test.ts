@@ -1,7 +1,9 @@
 /**
- * #4036: merge readiness reads the UAT verdict from the forge — the verdict
- * comment `pan admin specialists done` posts, anchored on the commit UAT ran
- * against — and a failed required UAT at the current head is not merge-ready.
+ * #4036: merge readiness reads the UAT verdict from the forge — the marker the
+ * verdict comment `pan admin specialists done` posts carries, anchored on the
+ * commit UAT ran against — and a failed required UAT at the current head is not
+ * merge-ready. The repository is public, so only trusted authors' markers count
+ * (#4040 review).
  */
 import { describe, expect, it } from 'vitest';
 
@@ -55,17 +57,29 @@ function prFixture(head: string, headAt: string, comments: Comment[]): IssuePull
   };
 }
 
-async function factsFor(pr: IssuePullRequestData): Promise<PrFacts> {
+async function factsFor(pr: IssuePullRequestData, logins: readonly string[] = []): Promise<PrFacts> {
   resetPrFactsCache();
-  return getPrFacts('PAN-4036', { fetchGitHubPr: async () => ({ issueId: 'PAN-4036', pr }) });
+  return getPrFacts('PAN-4036', {
+    fetchGitHubPr: async () => ({ issueId: 'PAN-4036', pr }),
+    overdeckLogins: async () => logins,
+  });
 }
 
-function uatComment(status: 'passed' | 'failed', sha: string | null, createdAt: string): Comment {
+/** A verdict comment as `pan admin specialists done` posts it, from the repo owner. */
+function uatComment(
+  status: 'passed' | 'failed',
+  sha: string | null,
+  createdAt: string,
+  author: Pick<Comment, 'author' | 'authorAssociation'> = { author: { login: 'eltmon' }, authorAssociation: 'OWNER' },
+): Comment {
   return {
+    ...author,
     body: `**test verdict: passed**\n\n**browser UAT: ${status}**\n\nnotes\n\n${formatUatMarker(status, sha)}`,
     createdAt,
   };
 }
+
+const OUTSIDER = { author: { login: 'drive-by' }, authorAssociation: 'NONE' };
 
 describe('parseUatVerdict', () => {
   it('reads the marker with its anchored commit', () => {
@@ -74,15 +88,17 @@ describe('parseUatVerdict', () => {
     expect(parseUatVerdict(formatUatMarker('passed'))).toEqual({ status: 'passed', sha: null });
   });
 
-  it('reads a legacy comment posted before the marker, without a commit', () => {
-    expect(parseUatVerdict('**uat verdict: failed**\n\nbutton missing')).toEqual({ status: 'failed', sha: null });
-    expect(parseUatVerdict('**test verdict: passed**\n\n**browser UAT: passed**')).toEqual({ status: 'passed', sha: null });
-  });
-
-  it('ignores comments that carry no UAT verdict', () => {
+  it('reads nothing from a comment without the marker, including a pre-marker verdict', () => {
+    expect(parseUatVerdict('**uat verdict: failed**\n\nbutton missing')).toBeNull();
+    expect(parseUatVerdict('**test verdict: passed**\n\n**browser UAT: passed**')).toBeNull();
     expect(parseUatVerdict('**test verdict: failed**\n\nlint')).toBeNull();
     expect(parseUatVerdict('<!-- overdeck-verdict: APPROVED -->')).toBeNull();
     expect(parseUatVerdict(undefined)).toBeNull();
+  });
+
+  it('ignores a quoted marker and a marker inside prose', () => {
+    expect(parseUatVerdict(`> ${formatUatMarker('passed', OLD_HEAD)}\n\nagreed, ship it`)).toBeNull();
+    expect(parseUatVerdict(`see ${formatUatMarker('passed', OLD_HEAD)} above`)).toBeNull();
   });
 });
 
@@ -134,16 +150,23 @@ describe('merge readiness and a failed required UAT (#4036)', () => {
     expect(evaluateMergeReadiness(facts, { uatRequired: true })).toEqual({ ready: true });
   });
 
-  it('dates a legacy (unanchored) verdict against the head commit', async () => {
+  it('dates a marker posted without a commit against the head commit', async () => {
     const current = await factsFor(prFixture(OLD_HEAD, '2026-09-23T10:00:00Z', [
-      { body: '**uat verdict: failed**\n\nlogin broken', createdAt: '2026-09-23T10:30:00Z' },
+      uatComment('failed', null, '2026-09-23T10:30:00Z'),
     ]));
     expect(evaluateMergeReadiness(current, { uatRequired: true }).ready).toBe(false);
 
     const superseded = await factsFor(prFixture(NEW_HEAD, '2026-09-23T11:00:00Z', [
-      { body: '**uat verdict: failed**\n\nlogin broken', createdAt: '2026-09-23T10:30:00Z' },
+      uatComment('failed', null, '2026-09-23T10:30:00Z'),
     ]));
     expect(superseded.uatVerdict).toBeNull();
+  });
+
+  it('reads a verdict posted before the marker existed as no verdict (fails closed to "none")', async () => {
+    const facts = await factsFor(prFixture(OLD_HEAD, '2026-09-23T10:00:00Z', [
+      { author: { login: 'eltmon' }, authorAssociation: 'OWNER', body: '**uat verdict: failed**\n\nlogin broken', createdAt: '2026-09-23T10:30:00Z' },
+    ]));
+    expect(facts.uatVerdict).toBeNull();
   });
 
   it('leaves a failed UAT advisory when UAT is not required', async () => {
@@ -152,5 +175,44 @@ describe('merge readiness and a failed required UAT (#4036)', () => {
     ]));
     expect(evaluateMergeReadiness(facts)).toEqual({ ready: true });
     expect(evaluateMergeReadiness(facts, { uatRequired: false })).toEqual({ ready: true });
+  });
+});
+
+describe('only trusted authors declare a UAT verdict (#4040 review)', () => {
+  it("ignores an outsider's pass that would clear a failure", async () => {
+    const facts = await factsFor(prFixture(OLD_HEAD, '2026-09-23T10:00:00Z', [
+      uatComment('failed', OLD_HEAD, '2026-09-23T10:30:00Z'),
+      uatComment('passed', OLD_HEAD, '2026-09-23T10:45:00Z', OUTSIDER),
+    ]));
+    expect(facts.uatVerdict?.status).toBe('failed');
+    expect(evaluateMergeReadiness(facts, { uatRequired: true }).ready).toBe(false);
+  });
+
+  it("ignores an outsider's failure that would block a merge", async () => {
+    const facts = await factsFor(prFixture(OLD_HEAD, '2026-09-23T10:00:00Z', [
+      uatComment('failed', OLD_HEAD, '2026-09-23T10:30:00Z', OUTSIDER),
+    ]));
+    expect(facts.uatVerdict).toBeNull();
+    expect(evaluateMergeReadiness(facts, { uatRequired: true })).toEqual({ ready: true });
+  });
+
+  it("honors a verdict posted as Overdeck's own login", async () => {
+    const facts = await factsFor(prFixture(OLD_HEAD, '2026-09-23T10:00:00Z', [
+      uatComment('failed', OLD_HEAD, '2026-09-23T10:30:00Z', { author: { login: 'Overdeck-Bot' }, authorAssociation: 'NONE' }),
+    ]), ['overdeck-bot']);
+    expect(facts.uatVerdict?.status).toBe('failed');
+  });
+
+  it('ignores a trusted quote-reply of an old passing verdict', async () => {
+    const facts = await factsFor(prFixture(OLD_HEAD, '2026-09-23T10:00:00Z', [
+      uatComment('failed', OLD_HEAD, '2026-09-23T10:30:00Z'),
+      {
+        author: { login: 'eltmon' },
+        authorAssociation: 'OWNER',
+        body: `> ${formatUatMarker('passed', OLD_HEAD)}\n\nthis passed before?`,
+        createdAt: '2026-09-23T10:40:00Z',
+      },
+    ]));
+    expect(facts.uatVerdict?.status).toBe('failed');
   });
 });

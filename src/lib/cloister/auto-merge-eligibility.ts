@@ -105,18 +105,21 @@ async function defaultIsGlobalUatRequired(): Promise<boolean> {
  * then the global flag — the same decision {@link isAutoMergeEligible} applies.
  * The merge-train reconciler asks it for a lone ready feature: one held by its
  * label still needs its UAT stack. A label read failure falls back to the
- * project and global tiers.
+ * project and global tiers, unless `strict` is set: the merge gate (#4036)
+ * cannot let an unreadable `auto-merge` label decide for it, so there the
+ * failure is thrown and the gate holds.
  */
 export async function issueHoldsForUat(
   issueId: string,
   project: { auto_merge_default?: unknown } | null | undefined,
   globalRequireUat: boolean,
-  deps: Pick<AutoMergeEligibilityDeps, 'getIssueLabels'> = {},
+  deps: Pick<AutoMergeEligibilityDeps, 'getIssueLabels'> & { strict?: boolean } = {},
 ): Promise<boolean> {
   let labels: string[] = [];
   try {
     labels = await (deps.getIssueLabels ?? defaultGetIssueLabels)(issueId);
   } catch (err) {
+    if (deps.strict) throw err;
     console.warn(
       `[auto-merge] Could not read labels for ${issueId}; using the project/global UAT hold: ${err instanceof Error ? err.message : String(err)}`,
     );

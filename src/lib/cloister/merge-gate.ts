@@ -23,11 +23,12 @@ import {
   getPrFacts,
   type MergeReadiness,
   type PrFacts,
+  type PrFactsOptions,
 } from './pr-facts.js';
 import { issueRunsTestsOnCi } from './verification-tests-mode.js';
 
 export interface MergeGateDeps {
-  getFacts?: (issueId: string) => Promise<PrFacts>;
+  getFacts?: (issueId: string, options?: PrFactsOptions) => Promise<PrFacts>;
   /** True when the issue's project runs `verification.tests: ci`. */
   ciTestsRequired?: (issueId: string) => boolean;
   /** True when UAT is required for the issue (the `issueHoldsForUat` tiers). */
@@ -44,16 +45,31 @@ function projectConfigFor(issueId: string) {
   return resolved ? getProjectSync(resolved.projectKey) : null;
 }
 
+export interface UatRequiredDeps {
+  getIssueLabels?: (issueId: string) => Promise<string[]>;
+  project?: { auto_merge_default?: unknown } | null;
+  globalRequireUat?: boolean;
+}
+
 /**
  * #4036: UAT is required when the issue is held for UAT — the tiers
  * auto-merge eligibility applies: the `auto-merge` / `hold-for-uat` label, else
  * the project's `auto_merge_default`, else the global
  * `flywheel.require_uat_before_merge`. An `auto-merge` label is the operator
  * saying UAT is not required, so a failed verdict there is advisory.
+ *
+ * Strict: a label read that fails throws (the gate then holds) rather than
+ * falling back to the project and global tiers, which could not see an
+ * `auto-merge` or `hold-for-uat` label either way.
  */
-export async function defaultUatRequired(issueId: string): Promise<boolean> {
-  const { isFlywheelRequireUatBeforeMerge } = await import('../overdeck/control-settings.js');
-  return issueHoldsForUat(issueId, projectConfigFor(issueId), isFlywheelRequireUatBeforeMerge());
+export async function defaultUatRequired(issueId: string, deps: UatRequiredDeps = {}): Promise<boolean> {
+  const globalRequireUat = deps.globalRequireUat
+    ?? (await import('../overdeck/control-settings.js')).isFlywheelRequireUatBeforeMerge();
+  const project = deps.project !== undefined ? deps.project : projectConfigFor(issueId);
+  return issueHoldsForUat(issueId, project, globalRequireUat, {
+    strict: true,
+    ...(deps.getIssueLabels ? { getIssueLabels: deps.getIssueLabels } : {}),
+  });
 }
 
 /**
@@ -66,8 +82,11 @@ export async function defaultUatRequired(issueId: string): Promise<boolean> {
 export async function evaluateIssueMergeGate(
   issueId: string,
   deps: MergeGateDeps = {},
+  options: PrFactsOptions = {},
 ): Promise<MergeGateResult> {
-  const facts = await (deps.getFacts ?? getPrFacts)(issueId);
+  const facts = deps.getFacts
+    ? await deps.getFacts(issueId, options)
+    : await getPrFacts(issueId, {}, options);
   const ciTestsRequired = facts.forge === 'github' && (deps.ciTestsRequired ?? issueRunsTestsOnCi)(issueId);
   let uatRequired = false;
   if (facts.uatVerdict?.status === 'failed') {

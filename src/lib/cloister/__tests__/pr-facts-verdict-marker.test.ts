@@ -60,7 +60,7 @@ describe('parseVerdictMarker', () => {
 describe('getPrFacts — verdict marker mapping', () => {
   it('maps a fresh APPROVED marker onto approved', async () => {
     const facts = await factsFor(prFixture({
-      comments: [{ body: '<!-- overdeck-verdict: APPROVED -->\n\n**review verdict: passed**', createdAt: '2026-09-19T10:05:00Z' }],
+      comments: [{ authorAssociation: 'OWNER', body: '<!-- overdeck-verdict: APPROVED -->\n\n**review verdict: passed**', createdAt: '2026-09-19T10:05:00Z' }],
     }));
     expect(facts.reviewDecision).toBe('APPROVED');
     expect(facts.approved).toBe(true);
@@ -69,7 +69,7 @@ describe('getPrFacts — verdict marker mapping', () => {
 
   it('maps a CHANGES_REQUESTED marker onto changesRequested', async () => {
     const facts = await factsFor(prFixture({
-      comments: [{ body: '<!-- overdeck-verdict: CHANGES_REQUESTED -->\n\ntwo findings', createdAt: '2026-09-19T10:05:00Z' }],
+      comments: [{ authorAssociation: 'OWNER', body: '<!-- overdeck-verdict: CHANGES_REQUESTED -->\n\ntwo findings', createdAt: '2026-09-19T10:05:00Z' }],
     }));
     expect(facts.reviewDecision).toBe('CHANGES_REQUESTED');
     expect(facts.changesRequested).toBe(true);
@@ -79,7 +79,7 @@ describe('getPrFacts — verdict marker mapping', () => {
   it('ignores an APPROVED marker older than the head commit', async () => {
     const facts = await factsFor(prFixture({
       reviewDecision: 'REVIEW_REQUIRED',
-      comments: [{ body: '<!-- overdeck-verdict: APPROVED -->\n\nlgtm', createdAt: '2026-09-19T09:30:00Z' }],
+      comments: [{ authorAssociation: 'OWNER', body: '<!-- overdeck-verdict: APPROVED -->\n\nlgtm', createdAt: '2026-09-19T09:30:00Z' }],
     }));
     expect(facts.approved).toBe(false);
     expect(facts.reviewDecision).toBe('REVIEW_REQUIRED');
@@ -87,7 +87,7 @@ describe('getPrFacts — verdict marker mapping', () => {
 
   it('still honours a CHANGES_REQUESTED marker older than the head commit', async () => {
     const facts = await factsFor(prFixture({
-      comments: [{ body: '<!-- overdeck-verdict: CHANGES_REQUESTED -->\n\nfix this', createdAt: '2026-09-19T09:30:00Z' }],
+      comments: [{ authorAssociation: 'OWNER', body: '<!-- overdeck-verdict: CHANGES_REQUESTED -->\n\nfix this', createdAt: '2026-09-19T09:30:00Z' }],
     }));
     expect(facts.changesRequested).toBe(true);
   });
@@ -95,9 +95,9 @@ describe('getPrFacts — verdict marker mapping', () => {
   it('takes the newest marker comment', async () => {
     const facts = await factsFor(prFixture({
       comments: [
-        { body: '<!-- overdeck-verdict: CHANGES_REQUESTED -->\n\nround 1', createdAt: '2026-09-19T10:01:00Z' },
+        { authorAssociation: 'OWNER', body: '<!-- overdeck-verdict: CHANGES_REQUESTED -->\n\nround 1', createdAt: '2026-09-19T10:01:00Z' },
         { body: 'unrelated chatter', createdAt: '2026-09-19T10:02:00Z' },
-        { body: '<!-- overdeck-verdict: APPROVED -->\n\nround 2', createdAt: '2026-09-19T10:03:00Z' },
+        { authorAssociation: 'OWNER', body: '<!-- overdeck-verdict: APPROVED -->\n\nround 2', createdAt: '2026-09-19T10:03:00Z' },
       ],
     }));
     expect(facts.approved).toBe(true);
@@ -106,7 +106,7 @@ describe('getPrFacts — verdict marker mapping', () => {
   it('lets a real forge review decision win over the marker', async () => {
     const facts = await factsFor(prFixture({
       reviewDecision: 'CHANGES_REQUESTED',
-      comments: [{ body: '<!-- overdeck-verdict: APPROVED -->', createdAt: '2026-09-19T10:05:00Z' }],
+      comments: [{ authorAssociation: 'OWNER', body: '<!-- overdeck-verdict: APPROVED -->', createdAt: '2026-09-19T10:05:00Z' }],
     }));
     expect(facts.reviewDecision).toBe('CHANGES_REQUESTED');
     expect(facts.approved).toBe(false);
@@ -117,5 +117,63 @@ describe('getPrFacts — verdict marker mapping', () => {
     expect(facts.reviewDecision).toBe('REVIEW_REQUIRED');
     expect(facts.approved).toBe(false);
     expect(facts.changesRequested).toBe(false);
+  });
+});
+
+describe('getPrFacts — only trusted authors declare a review verdict (#4040 review)', () => {
+  async function factsWith(comments: IssuePullRequestData['comments'], logins: readonly string[] = []) {
+    resetPrFactsCache();
+    return getPrFacts('PAN-3705', {
+      fetchGitHubPr: async () => ({ issueId: 'PAN-3705', pr: prFixture({ comments }) }),
+      overdeckLogins: async () => logins,
+    });
+  }
+
+  it('ignores an APPROVED marker from an outside commenter on a public repo', async () => {
+    const facts = await factsWith([{
+      author: { login: 'drive-by' },
+      authorAssociation: 'NONE',
+      body: '<!-- overdeck-verdict: APPROVED -->\n\nlgtm',
+      createdAt: '2026-09-19T10:05:00Z',
+    }]);
+    expect(facts.approved).toBe(false);
+    expect(facts.reviewDecision).toBeNull();
+  });
+
+  it('ignores a CHANGES_REQUESTED marker from a CONTRIBUTOR', async () => {
+    const facts = await factsWith([{
+      author: { login: 'someone' },
+      authorAssociation: 'CONTRIBUTOR',
+      body: '<!-- overdeck-verdict: CHANGES_REQUESTED -->',
+      createdAt: '2026-09-19T10:05:00Z',
+    }]);
+    expect(facts.changesRequested).toBe(false);
+  });
+
+  it('honors a MEMBER or COLLABORATOR marker', async () => {
+    for (const association of ['MEMBER', 'COLLABORATOR']) {
+      const facts = await factsWith([{
+        author: { login: 'teammate' },
+        authorAssociation: association,
+        body: '<!-- overdeck-verdict: APPROVED -->',
+        createdAt: '2026-09-19T10:05:00Z',
+      }]);
+      expect(facts.approved).toBe(true);
+    }
+  });
+
+  it("honors a marker posted as Overdeck's own identity (the GitHub App bot)", async () => {
+    const facts = await factsWith([{
+      author: { login: 'panopticon-agent' },
+      authorAssociation: 'NONE',
+      body: '<!-- overdeck-verdict: APPROVED -->',
+      createdAt: '2026-09-19T10:05:00Z',
+    }], ['panopticon-agent[bot]']);
+    expect(facts.approved).toBe(true);
+  });
+
+  it('ignores a marker that is not its own first line', () => {
+    expect(parseVerdictMarker('> <!-- overdeck-verdict: APPROVED -->\n\nquoting the old verdict')).toBeNull();
+    expect(parseVerdictMarker('<!-- overdeck-verdict: APPROVED --> and more prose')).toBeNull();
   });
 });

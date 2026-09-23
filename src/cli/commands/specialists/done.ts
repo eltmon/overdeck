@@ -228,7 +228,8 @@ export async function doneCommand(
     if (uatOutcome) {
       // #4036: merge readiness reads this comment. The anchor lookup above
       // filled this process's read caches with the pre-verdict PR, so drop
-      // them; a dashboard server's own pr-facts cache expires within 60s.
+      // them. A dashboard server's caches are its own: the PR webhook bumps
+      // them, and without one both expire within 60s (pr-facts, pr-tab-cache).
       resetPrFactsCache();
       bumpIssuePrTabCacheGeneration(normalizedIssueId);
     }

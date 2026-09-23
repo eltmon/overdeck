@@ -112,7 +112,7 @@ describe('strike readiness is its own PR through the merge gate (#4016)', () => 
   it('lands a strike whose own PR is approved and green', async () => {
     const gate = strikePr(true);
     await expect(forgeMergeGateRefusal('PAN-2702', request.branchName, gate)).resolves.toBeNull();
-    expect(gate).toHaveBeenCalledWith('PAN-2702');
+    expect(gate).toHaveBeenCalledWith('PAN-2702', { preferBranch: 'strike/pan-2702' });
   });
 
   it('refuses a strike whose own PR has red checks', async () => {

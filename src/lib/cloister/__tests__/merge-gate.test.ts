@@ -4,7 +4,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 
-import { evaluateIssueMergeGate } from '../merge-gate.js';
+import { defaultUatRequired, evaluateIssueMergeGate } from '../merge-gate.js';
 import { getMergeReadyIssues } from '../merge-ready-set.js';
 import { emptyPrFacts, type PrFacts } from '../pr-facts.js';
 
@@ -82,6 +82,41 @@ describe('evaluateIssueMergeGate', () => {
       uatRequired: async () => { throw new Error('tracker unreachable'); },
     });
     expect(result.ready).toBe(false);
+  });
+
+  it('holds a failed UAT when the issue labels cannot be read, through the default requirement (#4040 review)', async () => {
+    const failedAtHead = readyFacts('PAN-6', { uatVerdict: { status: 'failed', sha: HEAD, postedAt: null } });
+    const unreadable = async (): Promise<string[]> => { throw new Error('gh: rate limited'); };
+
+    // The requirement itself refuses to guess: no silent project/global fallback.
+    await expect(defaultUatRequired('PAN-6', {
+      getIssueLabels: unreadable, project: { auto_merge_default: 'auto' }, globalRequireUat: false,
+    })).rejects.toThrow('rate limited');
+
+    const result = await evaluateIssueMergeGate('PAN-6', {
+      getFacts: async () => failedAtHead,
+      ciTestsRequired: () => false,
+      uatRequired: (issueId) => defaultUatRequired(issueId, {
+        getIssueLabels: unreadable, project: { auto_merge_default: 'auto' }, globalRequireUat: false,
+      }),
+    });
+    expect(result.ready).toBe(false);
+    expect(result.reason).toBe(`browser UAT failed on PR HEAD ${HEAD}`);
+  });
+
+  it('resolves the requirement from the labels when they can be read', async () => {
+    await expect(defaultUatRequired('PAN-7', {
+      getIssueLabels: async () => ['auto-merge'], project: null, globalRequireUat: true,
+    })).resolves.toBe(false);
+    await expect(defaultUatRequired('PAN-7', {
+      getIssueLabels: async () => ['hold-for-uat'], project: { auto_merge_default: 'auto' }, globalRequireUat: false,
+    })).resolves.toBe(true);
+  });
+
+  it('passes the strike branch through to the forge read (#4016)', async () => {
+    const getFacts = vi.fn(async () => readyFacts('PAN-8', { headBranch: 'strike/pan-8' }));
+    await evaluateIssueMergeGate('PAN-8', { getFacts, ciTestsRequired: () => false }, { preferBranch: 'strike/pan-8' });
+    expect(getFacts).toHaveBeenCalledWith('PAN-8', { preferBranch: 'strike/pan-8' });
   });
 
   it('returns the facts it judged, so a strike landing can pin its own PR (#4016)', async () => {

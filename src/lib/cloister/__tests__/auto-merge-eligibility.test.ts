@@ -175,4 +175,9 @@ describe('issueHoldsForUat (review of #3993: the per-issue tier the merge train 
     await expect(issueHoldsForUat('PAN-1', { auto_merge_default: 'hold' }, false, failing)).resolves.toBe(true);
     await expect(issueHoldsForUat('PAN-1', { auto_merge_default: 'auto' }, true, failing)).resolves.toBe(false);
   });
+
+  it('strict: a label read failure throws instead of guessing (the #4036 merge gate)', async () => {
+    const failing = { getIssueLabels: async () => { throw new Error('gh: rate limited'); }, strict: true };
+    await expect(issueHoldsForUat('PAN-1', { auto_merge_default: 'auto' }, false, failing)).rejects.toThrow('rate limited');
+  });
 });

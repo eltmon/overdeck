@@ -103,6 +103,20 @@ export interface PrFactsDeps {
   resolveRepos?: typeof resolveProjectReposForIssueSync;
   listGitLabMrs?: typeof listOpenGitLabMergeRequests;
   viewGitLabMr?: (projectPath: string, iid: number) => Promise<GitLabMrView>;
+  /**
+   * The GitHub logins Overdeck posts verdict comments as (the `gh` user, the
+   * GitHub App bot). Read only when a verdict marker comes from an author
+   * whose association alone does not make it trusted.
+   */
+  overdeckLogins?: () => Promise<readonly string[]>;
+}
+
+export interface PrFactsOptions {
+  /**
+   * #4016: read the PR on this head branch first (a strike landing reads
+   * `strike/<issue>`), so an open feature PR cannot stand in for it.
+   */
+  preferBranch?: string;
 }
 
 export interface GitLabMrView {
@@ -136,9 +150,9 @@ export function formatVerdictMarker(verdict: MarkerVerdict): string {
   return `<!-- overdeck-verdict: ${verdict} -->`;
 }
 
-const VERDICT_MARKER_RE = /^\s*<!--\s*overdeck-verdict:\s*(APPROVED|CHANGES_REQUESTED)\s*-->/i;
+const VERDICT_MARKER_RE = /^[ \t]*<!--[ \t]*overdeck-verdict:[ \t]*(APPROVED|CHANGES_REQUESTED)[ \t]*-->[ \t]*(?:\r?\n|$)/i;
 
-/** The verdict a comment body declares in its first line, or null. */
+/** The verdict a comment body declares as its whole first line, or null. */
 export function parseVerdictMarker(body: string | null | undefined): MarkerVerdict | null {
   const match = body?.match(VERDICT_MARKER_RE);
   return match ? (match[1].toUpperCase() as MarkerVerdict) : null;
@@ -245,6 +259,35 @@ function headCommitTime(pr: IssuePullRequestData): number | null {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
+type PrComment = NonNullable<IssuePullRequestData['comments']>[number];
+
+/** GitHub author associations whose comments carry verdicts (#4040 review). */
+const TRUSTED_ASSOCIATIONS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+
+/** The logins Overdeck posts as, lower-cased with any `[bot]` suffix dropped. */
+export type TrustedAuthors = ReadonlySet<string>;
+
+function normalizeLogin(login: string): string {
+  return login.trim().toLowerCase().replace(/\[bot\]$/, '');
+}
+
+/**
+ * Whether a comment may declare a verdict. The repository is public and anyone
+ * can comment, so a verdict marker counts only from an author GitHub reports
+ * as `OWNER`, `MEMBER` or `COLLABORATOR`, or from the identity Overdeck posts
+ * verdicts as. Everything else is ignored — a pass, a failure, an approval.
+ */
+export function isTrustedComment(comment: PrComment | undefined, trusted: TrustedAuthors): boolean {
+  if (!comment) return false;
+  if (TRUSTED_ASSOCIATIONS.has(normalize(comment.authorAssociation))) return true;
+  const login = comment.author?.login;
+  return Boolean(login) && trusted.has(normalizeLogin(login!));
+}
+
+function carriesMarker(comment: PrComment | undefined): boolean {
+  return parseVerdictMarker(comment?.body) !== null || parseUatVerdict(comment?.body) !== null;
+}
+
 /**
  * The verdict declared by the newest marker comment on the PR.
  *
@@ -252,9 +295,10 @@ function headCommitTime(pr: IssuePullRequestData): number | null {
  * approval must never merge commits it never saw. A stale CHANGES_REQUESTED
  * still counts — rework stays owed until a newer verdict says otherwise.
  */
-function markerVerdictFromComments(pr: IssuePullRequestData): MarkerVerdict | null {
+function markerVerdictFromComments(pr: IssuePullRequestData, trusted: TrustedAuthors): MarkerVerdict | null {
   const comments = pr.comments ?? [];
   for (let index = comments.length - 1; index >= 0; index -= 1) {
+    if (!isTrustedComment(comments[index], trusted)) continue;
     const verdict = parseVerdictMarker(comments[index]?.body);
     if (!verdict) continue;
     if (verdict === 'APPROVED') {
@@ -275,19 +319,21 @@ function sameCommit(sha: string, head: string): boolean {
 }
 
 /**
- * #4036: the newest UAT verdict that applies to the PR's current head.
+ * #4036: the newest UAT verdict, from a trusted author, that applies to the
+ * PR's current head.
  *
- * A marker carries the commit UAT exercised, so it applies when that commit is
- * the head. A legacy comment carries no commit and applies when it is at least
- * as new as the head commit (the dating the approval marker uses). When the
- * head's date cannot be read, a legacy verdict is taken as current: a failure
- * then holds rather than letting untested code through.
+ * Only the `overdeck-uat` marker counts. It carries the commit UAT exercised,
+ * so it applies when that commit is the head. A marker posted without a commit
+ * (the PR head was unreadable) applies when it is at least as new as the head
+ * commit, the dating the approval marker uses. A verdict comment posted before
+ * the marker existed declares nothing: it reads as no verdict.
  */
-function uatVerdictAtHead(pr: IssuePullRequestData): UatVerdict | null {
+function uatVerdictAtHead(pr: IssuePullRequestData, trusted: TrustedAuthors): UatVerdict | null {
   const comments = pr.comments ?? [];
   const head = pr.headRefOid ?? null;
   const headAt = headCommitTime(pr);
   for (let index = comments.length - 1; index >= 0; index -= 1) {
+    if (!isTrustedComment(comments[index], trusted)) continue;
     const verdict = parseUatVerdict(comments[index]?.body);
     if (!verdict) continue;
     const postedAt = comments[index]?.createdAt ?? null;
@@ -302,7 +348,7 @@ function uatVerdictAtHead(pr: IssuePullRequestData): UatVerdict | null {
   return null;
 }
 
-function gitHubFacts(issueId: string, pr: IssuePullRequestData): PrFacts {
+function gitHubFacts(issueId: string, pr: IssuePullRequestData, trusted: TrustedAuthors = new Set()): PrFacts {
   const state = normalize(pr.state);
   const merged = state === 'MERGED' || Boolean(pr.mergedAt);
   const mergeable = normalize(pr.mergeable);
@@ -310,7 +356,7 @@ function gitHubFacts(issueId: string, pr: IssuePullRequestData): PrFacts {
   const forgeDecision = decision === 'APPROVED' || decision === 'CHANGES_REQUESTED' ? decision : null;
   // Only consult the marker when the forge itself reached no decision.
   const effective: PrReviewDecision = forgeDecision
-    ?? markerVerdictFromComments(pr)
+    ?? markerVerdictFromComments(pr, trusted)
     ?? (decision === 'REVIEW_REQUIRED' ? 'REVIEW_REQUIRED' : null);
   return {
     issueId: issueId.toUpperCase(),
@@ -333,7 +379,7 @@ function gitHubFacts(issueId: string, pr: IssuePullRequestData): PrFacts {
     testChecks: summarizeTestChecks(pr.statusCheckRollup),
     testCheckFailures: listFailedTestChecks(pr.statusCheckRollup),
     testJobSucceeded: testJobSucceeded(pr.statusCheckRollup),
-    uatVerdict: uatVerdictAtHead(pr),
+    uatVerdict: uatVerdictAtHead(pr, trusted),
   };
 }
 
@@ -356,7 +402,9 @@ export function parseGitLabProjectPath(url: string | undefined | null): string |
 function gitLabChecks(view: GitLabMrView): ChecksVerdict {
   const status = (view.head_pipeline?.status ?? view.pipeline?.status ?? '').toLowerCase();
   if (!status) return 'none';
-  if (status === 'success' || status === 'manual') return 'green';
+  // `skipped` is green, as the board reads it (`toChecksStateFromPipeline`):
+  // a pipeline whose jobs all skipped is not one that will ever finish.
+  if (status === 'success' || status === 'manual' || status === 'skipped') return 'green';
   if (status === 'failed' || status === 'canceled') return 'red';
   return 'pending';
 }
@@ -432,24 +480,74 @@ export function resetPrFactsCache(): void {
   prFactsCache.clear();
 }
 
-export async function getPrFacts(issueId: string, deps: PrFactsDeps = {}): Promise<PrFacts> {
-  const cacheable = Object.keys(deps).length === 0;
+export async function getPrFacts(
+  issueId: string,
+  deps: PrFactsDeps = {},
+  options: PrFactsOptions = {},
+): Promise<PrFacts> {
+  const cacheable = Object.keys(deps).length === 0 && !options.preferBranch;
   const key = issueId.toUpperCase();
   if (cacheable) {
     const hit = prFactsCache.get(key);
     if (hit && Date.now() - hit.at < PR_FACTS_TTL_MS) return hit.facts;
   }
-  const facts = await readPrFacts(issueId, deps);
+  const facts = await readPrFacts(issueId, deps, options);
   // An error is a lookup failure, not an answer — never cache it.
   if (cacheable && !facts.error) prFactsCache.set(key, { at: Date.now(), facts });
   return facts;
 }
 
-async function readPrFacts(issueId: string, deps: PrFactsDeps): Promise<PrFacts> {
+/**
+ * The logins Overdeck posts verdicts as: the authenticated `gh` user and, when
+ * the GitHub App is configured, its bot. Resolved once per process; an empty
+ * answer (gh unreachable) is not cached, so the next read tries again.
+ */
+let overdeckLoginsPromise: Promise<readonly string[]> | null = null;
+
+async function readOverdeckLogins(): Promise<readonly string[]> {
+  const logins: string[] = [];
+  try {
+    const { stdout } = await execFileAsync('gh', ['api', 'user', '--jq', '.login'], {
+      encoding: 'utf-8', timeout: 15_000,
+    });
+    if (stdout.trim()) logins.push(stdout.trim());
+  } catch {
+    // Not authenticated as a user (or offline): association alone decides.
+  }
+  try {
+    const { getBotIdentity, isGitHubAppConfigured } = await import('../github-app.js');
+    if (isGitHubAppConfigured()) logins.push(getBotIdentity().name);
+  } catch {
+    // No app configuration readable.
+  }
+  return logins;
+}
+
+async function defaultOverdeckLogins(): Promise<readonly string[]> {
+  overdeckLoginsPromise ??= readOverdeckLogins();
+  const logins = await overdeckLoginsPromise;
+  if (logins.length === 0) overdeckLoginsPromise = null;
+  return logins;
+}
+
+/** Resolve Overdeck's own logins only when some marker's author needs it. */
+async function trustedAuthorsFor(pr: IssuePullRequestData, deps: PrFactsDeps): Promise<TrustedAuthors> {
+  const needsIdentity = (pr.comments ?? []).some((comment) => (
+    carriesMarker(comment) && !TRUSTED_ASSOCIATIONS.has(normalize(comment.authorAssociation))
+  ));
+  if (!needsIdentity) return new Set();
+  try {
+    return new Set((await (deps.overdeckLogins ?? defaultOverdeckLogins)()).map(normalizeLogin));
+  } catch {
+    return new Set();
+  }
+}
+
+async function readPrFacts(issueId: string, deps: PrFactsDeps, options: PrFactsOptions = {}): Promise<PrFacts> {
   const fetchGitHubPr = deps.fetchGitHubPr ?? fetchIssuePullRequest;
   try {
-    const gh = await fetchGitHubPr(issueId);
-    if (gh.pr) return gitHubFacts(issueId, gh.pr);
+    const gh = await fetchGitHubPr(issueId, options.preferBranch ? { preferBranch: options.preferBranch } : {});
+    if (gh.pr) return gitHubFacts(issueId, gh.pr, await trustedAuthorsFor(gh.pr, deps));
     if (gh.error) return emptyPrFacts(issueId, gh.error);
   } catch (cause) {
     return emptyPrFacts(issueId, `GitHub PR lookup failed: ${cause instanceof Error ? cause.message : String(cause)}`);
@@ -472,8 +570,18 @@ async function readPrFacts(issueId: string, deps: PrFactsDeps): Promise<PrFacts>
     const row = rows.find((candidate) => candidate.source_branch === branch);
     if (!row?.iid) return emptyPrFacts(issueId);
     const projectPath = parseGitLabProjectPath(row.web_url);
-    const view = projectPath ? await viewGitLabMr(projectPath, row.iid).catch(() => null) : null;
-    return gitLabFacts(issueId, row, view);
+    if (!projectPath) return gitLabFacts(issueId, row, null);
+    try {
+      return gitLabFacts(issueId, row, await viewGitLabMr(projectPath, row.iid));
+    } catch (cause) {
+      // Without the MR view there is no approval, pipeline or mergeability to
+      // judge. Keep the row's identity but say why, so a refusal names the
+      // lookup failure instead of a missing approval.
+      return {
+        ...gitLabFacts(issueId, row, null),
+        error: `GitLab MR view failed for !${row.iid}: ${cause instanceof Error ? cause.message : String(cause)}`,
+      };
+    }
   } catch (cause) {
     return emptyPrFacts(issueId, `GitLab MR lookup failed: ${cause instanceof Error ? cause.message : String(cause)}`);
   }
