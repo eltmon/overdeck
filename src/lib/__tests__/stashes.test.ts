@@ -165,6 +165,23 @@ describe('stashes', () => {
     await expect(Effect.runPromise(listStashes('/tmp/wrapper-workspace'))).resolves.toEqual([]);
   });
 
+  it('re-resolves a stable stash sha before destructive operations', async () => {
+    mockExecImplementation((cmd) => {
+      if (cmd === 'git stash list --format="%gd%x09%H%x09%cI%x09%gs"') {
+        return {
+          stdout: 'stash@{3}\tabc123def456abc123def456abc123def456abcd\t2026-04-27T14:15:16+00:00\tOn feature/pan-879: pre-merge:PAN-879:2026-04-27T14:15:16Z',
+        };
+      }
+      if (cmd === 'git rev-parse --verify "stash@{3}"') return { stdout: 'abc123def456abc123def456abc123def456abcd\n' };
+      if (cmd === 'git stash drop "stash@{3}"') return { stdout: '' };
+      if (cmd === 'git branch "recovery/PAN-879-ui-draft-notes" "stash@{3}"') return { stdout: '' };
+      throw new Error(`unexpected command: ${cmd}`);
+    });
+
+    await Effect.runPromise(dropStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd'));
+    await expect(Effect.runPromise(createRecoveryBranchFromStash('/tmp/workspace', 'abc123def456abc123def456abc123def456abcd', 'PAN-879', 'UI Draft + notes'))).resolves.toBe('recovery/PAN-879-ui-draft-notes');
+  });
+
   it('uses the provided stack ref to avoid rescanning the stash list', async () => {
     mockExecImplementation((cmd) => {
       if (cmd === 'git rev-parse --verify "stash@{7}"') return { stdout: 'abc123def456abc123def456abc123def456abcd\n' };

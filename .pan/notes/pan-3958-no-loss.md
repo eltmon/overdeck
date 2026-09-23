@@ -441,11 +441,14 @@ Deleted as whole files:
 - `tests/unit/lib/git-utils.test.ts` (only `getWorkspaceGitInfo`).
 
 Blocks deleted:
-- `describe`: `syncWalFromDir`, `convertConversationTranscript`, `checkAllCriteriaCompleted`, `readPlanFile`, `moveXBrief`, `runMergeValidation` (unit, plus five integration scenarios), `hasStaleLocks`, `getShadowModeStatus`, `getUnsyncedHistory`, `gitForcePush`, `gitMerge`, and the prd-draft `read/write/list/delete/getPRDDraftInfo` blocks.
-- `it`: two createSummaryFork route tests; eight summary-fork-handoff tests that drove `createSummaryFork` (the live orchestration is `conversation-forks.ts`); three stash wrappers; the `supervisorProcessAlive` async probe; the pty-token sync API.
+- `describe`: `convertConversationTranscript`, `checkAllCriteriaCompleted`, `readPlanFile`, `moveXBrief`, `runMergeValidation` (unit, plus five integration scenarios), `hasStaleLocks`, `getShadowModeStatus`, `getUnsyncedHistory`, `gitForcePush`, `gitMerge`, and the prd-draft `read/write/list/delete/getPRDDraftInfo` blocks.
+- `it`: two createSummaryFork route tests; seven summary-fork-handoff tests that drove `createSummaryFork` (the live orchestration is `conversation-forks.ts`); two stash tests of `createNamedStash`; the `supervisorProcessAlive` async probe; the pty-token sync API.
 - `src/lib/runtimes/__tests__/pi.test.ts`: every `PiRuntime*` describe; the `PiSpawnTimeout` test stays.
 
 Ported, not deleted:
+- `syncWalFromDir` block → six tests on the live `syncWalFromAllProjects` (WAL parsing, required fields, duplicates, `.jsonl` filter, source_file);
+- the three summary-fork fallback tests (source ended, handshake timeout, validation failure) → `handoffPreconditionFallbackReason` and `handoffFailureReason`, which `runForkPipeline` uses;
+- stash "re-resolves a stable stash sha" → kept, minus the `applyStash`/`popStash` lines (`dropStash` and `createRecoveryBranchFromStash` are live);
 - `isPlanningCompleteSync` → `isPlanningComplete` (io.test.ts);
 - `writePtyTokenSync` → `await writePtyToken` (agents-lifecycle.test.ts);
 - prd-draft `hasPRDDraft` setup → `writeIssueDraft`;

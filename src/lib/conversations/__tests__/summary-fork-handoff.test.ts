@@ -15,6 +15,8 @@ import {
   HandoffAuthorModelNotConfiguredError,
   HandoffStallError,
   authorHandoffExternal,
+  handoffFailureReason,
+  handoffPreconditionFallbackReason,
   prependFallbackFocus,
   requestHandoffFromAgent,
   validateHandoffDoc,
@@ -290,6 +292,51 @@ describe('handoff fork handshake', { timeout: 20_000 }, () => {
     });
 
     await expect(result).rejects.toBeInstanceOf(HandoffStallError);
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  // The fork pipeline (overdeck/conversation-forks.ts runForkPipeline) falls back to a
+  // summary fork using these two helpers; they carry the fallback reason it records.
+  it('falls back to summary fork when the source conversation has ended', async () => {
+    expect(await handoffPreconditionFallbackReason({ ...sourceConversation(), status: 'ended' })).toBe('source-ended');
+    expect(await handoffPreconditionFallbackReason(sourceConversation())).toBeNull();
+    expect(deliverAgentMessage).not.toHaveBeenCalled();
+  });
+
+  it('falls back to summary fork on handshake timeout using fake timers', async () => {
+    vi.useFakeTimers();
+    const home = join(tmpdir(), `pan-handoff-fallback-timeout-${Date.now()}`);
+    process.env.OVERDECK_HOME = home;
+
+    const outcome = requestHandoffFromAgent(sourceConversation(), undefined, {
+      now: fixedNow,
+      timeoutMs: 0,
+      pollIntervalMs: 1,
+    }).then(() => null, (err: unknown) => err);
+    await vi.advanceTimersByTimeAsync(0);
+    const error = await outcome;
+
+    expect(error).toBeInstanceOf(HandoffStallError);
+    expect(handoffFailureReason(error)).toBe('handoff-timeout');
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it('falls back to summary fork when the handoff document fails validation', async () => {
+    const home = join(tmpdir(), `pan-handoff-validation-fallback-${Date.now()}`);
+    process.env.OVERDECK_HOME = home;
+    const paths = createHandoffPaths('conv-source', fixedNow.toISOString());
+
+    vi.mocked(deliverAgentMessage).mockImplementation(async () => {
+      await mkdir(dirname(paths.docPath), { recursive: true });
+      await writeFile(paths.docPath, invalidLongDoc(), 'utf-8');
+      await writeFile(paths.sentinelPath, '', 'utf-8');
+    });
+
+    const error = await requestHandoffFromAgent(sourceConversation(), undefined, { now: fixedNow })
+      .then(() => null, (err: unknown) => err);
+
+    expect(handoffFailureReason(error)).toBe('handoff-validation');
+    expect(handoffFailureReason(new Error('delivery refused'))).toBe('handoff-request-failed');
     rmSync(home, { recursive: true, force: true });
   });
 });
