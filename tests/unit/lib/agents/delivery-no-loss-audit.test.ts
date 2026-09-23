@@ -46,7 +46,9 @@ const KNOWN_CALL_SITES = new Set([
   'dashboard/server/routes/workspaces.ts|await messageAgent(agentId, message);',
   'dashboard/server/routes/workspaces/merge-strike.ts|assertDelivered(agentId, await messageAgent(agentId, rebaseMsg));',
   'dashboard/server/services/agent-spawner.ts|await messageAgent(agentId, msg);',
-  'lib/cloister/ci-failure-feedback.ts|await messageAgent(agentId, message);',
+  // PAN-3965: the generic CI-failure message reads the delivery outcome; a CI
+  // test-gate failure goes through the verification door (verification-escalation).
+  'lib/cloister/ci-failure-feedback.ts|const outcome = await messageAgent(agentId, message, \'internal\', {});',
   'lib/cloister/deacon-api-recovery.ts|await deliverAgentMessage(pane.agentId, CONTINUE_MSG, \'deacon-lite:checkApiErrorAgents\');',
   'lib/cloister/deacon-lite.ts|await deliverAgentMessage(',
   'lib/cloister/deacon-swarm-completion.ts|await messageAgent(',
@@ -63,7 +65,8 @@ const KNOWN_CALL_SITES = new Set([
   'lib/cloister/specialists-feedback.ts|await messageAgent(agentSession, msg);',
   'lib/cloister/swarm-foreman.ts|await deps.messageAgent(agentId, options.prompt ?? `Continue managing ${issue} as its swarm foreman. Run pan swarm status ${issue} --json before acting.`, \'pan-swarm\');',
   'lib/cloister/uat-failure-feedback.ts|const outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
-  'lib/cloister/verification-runner.ts|outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
+  // PAN-3965: verification feedback delivery moved to verification-escalation, shared with the CI test gate.
+  'lib/cloister/verification-escalation.ts|outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
   // PAN-3705 follow-up: verification PASS is told to the work agent (no rework owed, no needs-you).
   'lib/cloister/verification-runner.ts|const outcome = await messageAgent(target.agentId, message, \'internal\');',
 ]);

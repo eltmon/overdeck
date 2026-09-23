@@ -24,9 +24,26 @@ the **CI test job on the PR head is the test gate**:
   `src/lib/cloister/ci-failure-feedback.ts` (fired by the `check_run`,
   `check_suite` and `status` webhooks). For a CI-mode project the relay reads
   the PR's checks, and when the test job is red on the head the webhook
-  reported, it appends `verification.failed { failedCheck: 'test', via: 'ci' }`
-  to the pipeline journal (once per head) and messages the agent
-  `VERIFICATION FAILED … Failed check: test` with the rework re-drive contract.
+  reported, it records the failure once per head as a per-run verification
+  artifact (`via: 'ci'`), appends
+  `verification.failed { failedCheck: 'test', cycleCount, via: 'ci' }` to the
+  pipeline journal, and delivers `VERIFICATION FAILED … Failed check: test`
+  through the same feedback door as the local gate
+  (`cloister/verification-escalation.ts`: rework owed, slot resolution,
+  resurrection, needs-you when nothing is reachable).
+- **Attempt budget.** A CI test failure counts against the local gate's budget
+  (`VERIFICATION_MAX_CYCLES` = 3, `cloister/verification-cycles.ts`), read
+  from the same per-run artifacts. The local count is per head — every commit
+  resets it — and CI runs once per head, so CI failures are also counted
+  across heads: `readCiTestFailureStreak` counts consecutive heads whose CI
+  test job failed, back to the last head whose test job passed. The attempt
+  number is the larger of the two. The stuck pause
+  (`escalateVerificationStuck`) fires on the third consecutive red head, or
+  by the local rule on the per-head count (a second failure of the same check
+  at one head). A green CI test job (`check_run` success for the test job,
+  confirmed against the PR checks) records a passed CI artifact — the reset.
+  Re-requesting review on a head whose CI test job is already red fails the
+  `test` gate again instead of passing on typecheck+lint alone.
 - The verification artifact lists only the gates that ran on the host and
   names the handed-off gate in `deferredToCi: ["test"]`. The `overdeck/test`
   status still posts (branch protection requires the context) with the
@@ -194,7 +211,7 @@ One piece of stored pipeline state came back, and it is not a status.
 | Type | Written by |
 | --- | --- |
 | `verification.started` / `.passed` / `.failed` | `cloister/verification-runner.ts`, at the start and at every outcome return |
-| `verification.failed` (`failedCheck: 'test'`, `via: 'ci'`) | `cloister/ci-failure-feedback.ts`, when a `verification.tests: ci` project's CI test job is red on the PR head (once per head) |
+| `verification.failed` (`failedCheck: 'test'`, `cycleCount`, `via: 'ci'`) | `cloister/ci-failure-feedback.ts`, when a `verification.tests: ci` project's CI test job is red on the PR head (once per head) |
 | `review.requested` | `startRequestReviewPipeline` — the one door the HTTP route, `pan review request`, `pan done` and the PR webhook all pass through |
 | `review.dispatched` | `cloister/review-convoy.ts` `launchConvoyReviewersPromise`, once reviewers exist |
 | `review.redispatched` | deacon-lite's `recoverStalledReviews` |

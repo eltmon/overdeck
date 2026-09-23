@@ -40,6 +40,13 @@ export interface VerificationArtifact {
    * on the PR head is their gate.
    */
   deferredToCi?: string[];
+  /**
+   * PAN-3965: `ci` when this run records the CI test job's result on the PR
+   * head rather than a gate run on the host. Counted by verification-cycles.
+   */
+  via?: 'ci';
+  /** Short head sha a per-run write was recorded against. */
+  head8?: string;
   /** Immutable per-run file this artifact was written to — terminal writes only (PAN-3847). */
   path?: string;
 }
@@ -71,6 +78,10 @@ export function writeVerificationArtifact(
     head8?: string;
     /** PAN-3965: gates handed to CI instead of run on the host. */
     deferredToCi?: string[];
+    /** PAN-3965: the run records a CI result, not a host gate run. */
+    via?: 'ci';
+    /** Per-run writes only: false leaves verification-latest.json untouched. */
+    updateLatest?: boolean;
   },
 ): VerificationArtifact {
   const failed = gateResults.find((r) => !r.passed && r.required !== false);
@@ -98,6 +109,8 @@ export function writeVerificationArtifact(
       ...(r.error ? { error: r.error } : {}),
     })),
     ...(options?.deferredToCi && options.deferredToCi.length > 0 ? { deferredToCi: [...options.deferredToCi] } : {}),
+    ...(options?.via ? { via: options.via } : {}),
+    ...(isRunWrite && options?.head8 ? { head8: options.head8 } : {}),
   };
   mkdirSync(join(workspacePath, '.overdeck'), { recursive: true });
   if (isRunWrite) {
@@ -107,7 +120,7 @@ export function writeVerificationArtifact(
     mkdirSync(join(workspacePath, RUNS_RELATIVE_DIR), { recursive: true });
     const json = JSON.stringify(artifact, null, 2);
     writeFileSync(runPath, json);
-    writeFileSync(verificationArtifactPath(workspacePath), json);
+    if (options?.updateLatest !== false) writeFileSync(verificationArtifactPath(workspacePath), json);
     artifact.path = runPath;
     return artifact;
   }

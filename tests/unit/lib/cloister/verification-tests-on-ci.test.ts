@@ -5,6 +5,7 @@
  * asserted through the verification artifact's gate list — while
  * `verification.tests: local` keeps the local test run.
  */
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -50,12 +51,19 @@ vi.mock('../../../../src/lib/cloister/feedback-target.js', () => ({
   resolveIssueFeedbackTarget: vi.fn(async () => ({ needsYou: true, reason: 'no agent in this test' })),
   surfaceIssueFeedbackNeedsYou: vi.fn(async () => undefined),
 }));
+const { mockSetAgentPaused, mockStopAgent } = vi.hoisted(() => ({
+  mockSetAgentPaused: vi.fn(),
+  mockStopAgent: vi.fn(),
+}));
 vi.mock('../../../../src/lib/agents.js', () => ({
   clearAgentPaused: vi.fn(() => Effect.void),
   getAgentStateSync: vi.fn(() => null),
   messageAgent: vi.fn(async () => ({ delivered: true, queuedToMail: false })),
-  setAgentPaused: vi.fn(() => Effect.void),
-  stopAgent: vi.fn(() => Effect.void),
+  setAgentPaused: (...args: unknown[]) => { mockSetAgentPaused(...args); return Effect.void; },
+  stopAgent: (...args: unknown[]) => { mockStopAgent(...args); return Effect.void; },
+}));
+vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
+  writeFeedbackFile: vi.fn(() => Effect.succeed({ success: true, filePath: '/tmp/feedback.md' })),
 }));
 vi.mock('../../../../src/lib/telemetry/pipeline.js', () => ({ capturePipelineStageForIssue: vi.fn() }));
 vi.mock('../../../../src/lib/github-app.js', () => ({ postOverdeckTestsStatus: vi.fn(async () => undefined) }));
@@ -63,7 +71,7 @@ vi.mock('../../../../src/lib/xbrief/acceptance-criteria.js', () => ({ getXBriefA
 vi.mock('../../../../src/lib/work/done-preflight.js', () => ({ checkIncompletePlanItemsPromise: vi.fn(async () => []) }));
 
 import { runVerificationForIssueInProcess } from '../../../../src/lib/cloister/verification-runner.js';
-import { readVerificationArtifact } from '../../../../src/lib/cloister/verification-artifact.js';
+import { readVerificationArtifact, writeVerificationArtifact } from '../../../../src/lib/cloister/verification-artifact.js';
 import { readPipelineJournal } from '../../../../src/lib/cloister/pipeline-journal.js';
 import {
   isCiTestCheckName,
@@ -140,6 +148,47 @@ describe('verification gate with tests on CI (PAN-3965)', () => {
 
     const gatesRun = Object.keys(mockRunQualityGates.mock.calls[0]![0] as Record<string, unknown>);
     expect(gatesRun).toEqual(['typecheck', 'lint', 'test']);
+  });
+});
+
+describe('a head whose CI test job is already red (PAN-3965)', () => {
+  let head8: string;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    workspacePath = mkdtempSync(join(tmpdir(), 'pan-3965-verify-red-'));
+    const git = (...args: string[]) => execFileSync('git', args, { cwd: workspacePath, encoding: 'utf-8' }).trim();
+    git('init', '-q');
+    git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'init');
+    head8 = git('rev-parse', '--short=8', 'HEAD');
+    mockFindProject.mockReturnValue(project({ tests: 'ci' }));
+    // The CI relay recorded this head's red test job.
+    writeVerificationArtifact(workspacePath, 'PAN-3965', [{ name: 'test', passed: false, required: true, output: 'CI red', durationMs: 0 }], {
+      ranAt: '2026-09-23T00:00:00.000Z', head8, via: 'ci',
+    });
+  });
+
+  afterEach(() => {
+    rmSync(workspacePath, { recursive: true, force: true });
+  });
+
+  it('re-requesting review on the same head fails test and counts against the same budget', async () => {
+    const outcome = await verify();
+
+    // One CI failure already recorded at this head + this run = 2 on `test` → no progress → pause.
+    expect(outcome).toEqual({ outcome: 'failed', failedCheck: 'test', cycleCount: 2, maxCycles: 3 });
+    expect(mockSetAgentPaused).toHaveBeenCalledWith('agent-pan-3965', expect.stringContaining('verification stuck after 2/3'), true);
+    expect(mockStopAgent).toHaveBeenCalledWith('agent-pan-3965');
+    expect(readPipelineJournal(workspacePath).at(-1)).toMatchObject({
+      type: 'verification.failed',
+      data: { failedCheck: 'test', cycleCount: 2 },
+    });
+  });
+
+  it('a local-mode project ignores CI results and passes on its own gates', async () => {
+    mockFindProject.mockReturnValue(project({ tests: 'local' }));
+
+    expect(await verify()).toEqual({ outcome: 'passed' });
   });
 });
 
