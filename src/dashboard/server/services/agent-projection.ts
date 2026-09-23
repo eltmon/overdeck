@@ -21,7 +21,14 @@ import { Effect } from 'effect';
 import { getEventStore, type EventStore } from '../event-store.js';
 import { getAgentStateSync, type AgentState } from '../../../lib/agents.js';
 import { logAgentLifecycleSync } from '../../../lib/persistent-logger.js';
+import {
+  getConversationByTmuxSession,
+  markConversationEnded,
+  markConversationRunning,
+  type LegacyConversation,
+} from '../../../lib/overdeck/conversations.js';
 import { getBackendPanes } from './backend-inventory.js';
+import { isRespawnPending } from './pending-respawn.js';
 import type { DomainEvent } from '@overdeck/contracts';
 
 export interface AgentProjectionResult {
@@ -68,12 +75,16 @@ export function saveAgentStateAndEmitEventProgram(
   return Effect.sync(() => saveAgentStateAndEmitEvent(state, event));
 }
 
-// ─── PTY-supervisor lifecycle events (PAN-3849 W33) ─────────────────────────
+// ─── PTY-supervisor lifecycle events (PAN-3849 W33, PAN-3962) ───────────────
 //
 // The PTY supervisor observes the harness process directly (it owns the PTY
 // master), so ITS events are the source for running/stopped transitions of
-// supervisor-launched agents. Each one appends an event; none of them writes a
-// status anywhere.
+// supervisor-launched sessions. The supervised id is the terminal session
+// name: an agent id (`agent-…`, `planning-…`) or a conversation's tmux session
+// (`conv-<name>`). Agents append an event and write no status anywhere.
+// Conversations still keep `status`/`ended_at` on their overdeck.db row, so a
+// conversation's lifecycle event writes that row and appends the runtime
+// activity keyed by the same id its hooks report under.
 
 export type AgentLifecycleEventName = 'session-started' | 'turn-started' | 'turn-ended' | 'exited';
 
@@ -85,7 +96,7 @@ export interface AgentLifecycleEventInput {
 
 export type AgentLifecycleApplyResult =
   | { applied: true; status: 'running' | 'stopped' | 'unknown' }
-  | { applied: false; reason: 'no-state' | 'already-stopped' | 'duplicate' };
+  | { applied: false; reason: 'no-state' | 'already-stopped' | 'duplicate' | 'respawn-pending' };
 
 /**
  * The event payload's agent snapshot. `status` is the event's own meaning at
@@ -137,6 +148,22 @@ export interface AgentLifecycleDeps {
   readonly readAgentState?: (agentId: string) => AgentState | null;
   /** True when the backend reports this agent's pane already exited. */
   readonly hasExited?: (agentId: string) => Promise<boolean>;
+  /** The conversation supervised under this terminal session id, if any. */
+  readonly readConversation?: (sessionId: string) => LegacyConversation | null;
+  /** True while a respawn (kill → spawn under the same name) is in flight. */
+  readonly isRespawnPending?: (sessionId: string) => boolean;
+  readonly markConversationRunning?: (name: string) => void;
+  readonly markConversationEnded?: (name: string, endedAtMs?: number) => void;
+}
+
+/**
+ * The conversation whose supervised tmux session is `sessionId`. Only an exact
+ * tmux-session match counts: `getConversationByTmuxSession` also resolves a
+ * bare name, and a lifecycle event must never land on a row it does not own.
+ */
+function readSupervisedConversation(sessionId: string): LegacyConversation | null {
+  const conversation = getConversationByTmuxSession(sessionId);
+  return conversation && conversation.tmuxSession === sessionId ? conversation : null;
 }
 
 async function paneAlreadyExited(agentId: string): Promise<boolean> {
@@ -152,7 +179,11 @@ export async function applyAgentLifecycleEventWithDeps(
   deps: AgentLifecycleDeps = {},
 ): Promise<AgentLifecycleApplyResult> {
   const state = (deps.readAgentState ?? getAgentStateSync)(agentId);
-  if (!state) return { applied: false, reason: 'no-state' };
+  if (!state) {
+    const conversation = (deps.readConversation ?? readSupervisedConversation)(agentId);
+    if (!conversation) return { applied: false, reason: 'no-state' };
+    return applyConversationLifecycleEvent(eventStore, agentId, conversation, input, deps);
+  }
   const at = input.at;
 
   if (!rememberLifecycleKey(`${agentId}:${input.event}:${at}`)) {
@@ -193,6 +224,74 @@ export async function applyAgentLifecycleEventWithDeps(
           ...(state.sessionId ? { sessionId: state.sessionId } : {}),
         },
       });
+      return { applied: true, status: 'stopped' };
+    }
+  }
+}
+
+/**
+ * A supervised conversation's lifecycle (PAN-3962). The row's `status` is the
+ * conversation's recorded state, so the supervisor's own observation writes
+ * it: `session-started` marks it active, `exited` marks it ended at the exit
+ * time. Turn edges and the exit are also appended as `agent.activity_changed`
+ * keyed by the tmux session id — the id the conversation's hooks already
+ * report activity under — so the read model can tell idle from working.
+ * `agent.started`/`agent.stopped` are not emitted: conversations are not
+ * agents and carry no issue id.
+ */
+async function applyConversationLifecycleEvent(
+  eventStore: AgentProjectionEventStore,
+  sessionId: string,
+  conversation: LegacyConversation,
+  input: AgentLifecycleEventInput,
+  deps: AgentLifecycleDeps,
+): Promise<AgentLifecycleApplyResult> {
+  const at = input.at;
+  if (!rememberLifecycleKey(`${sessionId}:${input.event}:${at}`)) {
+    return { applied: false, reason: 'duplicate' };
+  }
+
+  const appendActivity = (activity: 'working' | 'idle' | 'stopped') => {
+    const sequence = eventStore.append({
+      type: 'agent.activity_changed',
+      timestamp: at,
+      payload: { agentId: sessionId, activity },
+    });
+    logAgentLifecycleSync(
+      sessionId,
+      `projected agent.activity_changed(${activity}) (seq=${sequence}) for conversation ${conversation.name}`,
+    );
+  };
+
+  switch (input.event) {
+    case 'session-started': {
+      // Same guard as agents: a late event must not resurrect a session whose
+      // pane the backend already reports as exited.
+      if (await (deps.hasExited ?? paneAlreadyExited)(sessionId)) {
+        return { applied: false, reason: 'already-stopped' };
+      }
+      (deps.markConversationRunning ?? markConversationRunning)(conversation.name);
+      appendActivity('idle');
+      return { applied: true, status: 'running' };
+    }
+    case 'turn-started':
+    case 'turn-ended': {
+      appendActivity(input.event === 'turn-started' ? 'working' : 'idle');
+      return { applied: true, status: 'unknown' };
+    }
+    case 'exited': {
+      // A respawn (resume, model switch) kills the old harness and spawns a
+      // new one under the same session name. The old supervisor's exit lands
+      // inside that window and must not end the conversation being revived.
+      if ((deps.isRespawnPending ?? isRespawnPending)(sessionId)) {
+        return { applied: false, reason: 'respawn-pending' };
+      }
+      const exitedAtMs = Date.parse(at);
+      (deps.markConversationEnded ?? markConversationEnded)(
+        conversation.name,
+        Number.isNaN(exitedAtMs) ? undefined : exitedAtMs,
+      );
+      appendActivity('stopped');
       return { applied: true, status: 'stopped' };
     }
   }

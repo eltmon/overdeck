@@ -1,17 +1,25 @@
 /**
- * POST /api/agents/:id/lifecycle (PAN-3849 W33)
+ * POST /api/agents/:id/lifecycle (PAN-3849 W33, PAN-3962)
  *
  * The PTY supervisor observes the harness process directly (it owns the PTY
  * master) and posts lifecycle events here: session-started, turn-started,
- * turn-ended, exited. Each one appends an event (applyAgentLifecycleEvent):
- * an agent's exit emits `agent.stopped` without any patrol inferring it from a
- * missing tmux session, and `agent.started` is emitted when the process
- * actually exists. Nothing is mirrored — liveness is read from the terminal
- * backend (PAN-3917 FR-12).
+ * turn-ended, exited. `:id` is the supervised terminal session id — an agent
+ * id or a conversation's `conv-<name>` tmux session; this one route serves
+ * both (applyAgentLifecycleEvent picks the target).
  *
- * Auth: the per-agent pty-token (x-overdeck-pty-token), the same credential
+ * For an agent, each event appends an event: its exit emits `agent.stopped`
+ * without any patrol inferring it from a missing tmux session, and
+ * `agent.started` is emitted when the process actually exists. Nothing is
+ * mirrored — liveness is read from the terminal backend (PAN-3917 FR-12).
+ *
+ * For a conversation (no agent state, but a conversations row whose
+ * tmux_session is `:id`), session-started marks the row active, exited marks
+ * it ended, and turn/exit edges append `agent.activity_changed` keyed by the
+ * session id.
+ *
+ * Auth: the per-session pty-token (x-overdeck-pty-token), the same credential
  * the delivery socket uses. Only the supervisor process holding the token
- * file may report lifecycle for its agent.
+ * file may report lifecycle for its session.
  */
 import { timingSafeEqual } from 'node:crypto';
 
@@ -79,6 +87,11 @@ export const postAgentLifecycleRoute = HttpRouter.add(
       // supervisor: the event it wanted recorded is recorded.
       if (result.reason === 'duplicate') {
         return jsonResponse({ success: true, applied: false, reason: 'duplicate' });
+      }
+      // A conversation's old harness exiting inside a respawn window is
+      // expected and final — nothing to retry, nothing to record.
+      if (result.reason === 'respawn-pending') {
+        return jsonResponse({ success: true, applied: false, reason: 'respawn-pending' });
       }
       const status = result.reason === 'no-state' ? 404 : 409;
       return jsonResponse({ success: false, error: `lifecycle event not applied: ${result.reason}` }, { status });

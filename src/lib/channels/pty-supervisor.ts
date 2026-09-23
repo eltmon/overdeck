@@ -265,7 +265,10 @@ function sleep(ms: number): Promise<void> {
 // spawns the child, accepts injections (a message that starts a turn), and
 // reaps the exit. It posts those facts to POST /api/agents/:id/lifecycle so
 // the projection writes running/stopped from observed truth instead of a
-// patrol inferring exit from a missing tmux session (FR-21, FR-24).
+// patrol inferring exit from a missing tmux session (FR-21, FR-24). `:id` is
+// the supervised session id (OVERDECK_AGENT_ID): an agent id, or a
+// conversation's `conv-<name>` tmux session — the same route records both
+// (PAN-3962).
 //
 // Posts are retried with backoff and never block the child: session-started
 // and turn-started are fire-and-forget; `exited` is awaited before the
