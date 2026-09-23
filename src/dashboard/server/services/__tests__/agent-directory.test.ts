@@ -65,6 +65,7 @@ function deps(overrides: AgentDirectoryDeps = {}): AgentDirectoryDeps {
     readRemoteState: async () => null,
     listConversationSubagents: async () => [],
     listAgentSubagents: async () => [],
+    issueTitles: () => new Map(),
     projectKeyForIssue: (issueId) => (issueId.startsWith('PAN-') ? 'overdeck' : null),
     projectKeyForPath: (path) => (path.startsWith('/home/op/Projects/overdeck') ? 'overdeck' : null),
     ...overrides,
@@ -162,6 +163,37 @@ describe('buildAgentDirectory', () => {
       costUsd: 1.5,
       transcript: { route: 'conversation', conversationName: 'idle' },
     });
+  });
+
+  it('carries the cached issue title onto every entry of that issue, and null when unknown', async () => {
+    const result = await buildAgentDirectory(24, deps({
+      issueTitles: () => new Map([['PAN-1', 'Agents page as a directory']]),
+      listAgentStates: () => [agent({ id: 'agent-pan-1' }), agent({ id: 'agent-pan-2', issueId: 'pan-2' })],
+      getBackendPanes: async () => [pane({ id: 'w1:p1', agentId: 'agent-pan-1', issue: 'PAN-1' })],
+      listAgentSubagents: async () => [{ agentId: 'a1', agentType: 'Explore', description: 'd', mtimeMs: NOW - 10_000 }],
+      listConversations: async () => [conversation({ name: 'free' })],
+    }));
+    const titles = Object.fromEntries(result.entries.map((entry) => [entry.id, entry.issueTitle]));
+    expect(titles).toEqual({
+      'agent-pan-1': 'Agents page as a directory',
+      'sub:agent-pan-1:a1': 'Agents page as a directory',
+      'agent-pan-2': null,
+      'conv:free': null,
+    });
+  });
+
+  it('takes a subagent model from its transcript, else the parent model', async () => {
+    const result = await buildAgentDirectory(24, deps({
+      listAgentStates: () => [agent({ id: 'agent-pan-1', model: 'claude-opus-5-5' })],
+      getBackendPanes: async () => [pane({ id: 'w1:p1', agentId: 'agent-pan-1', issue: 'PAN-1' })],
+      listAgentSubagents: async () => [
+        { agentId: 'a1', agentType: 'Explore', description: 'd', mtimeMs: NOW, model: 'claude-haiku-5' },
+        { agentId: 'a2', agentType: 'Explore', description: 'd', mtimeMs: NOW, model: null },
+      ],
+    }));
+    const models = Object.fromEntries(result.entries.map((entry) => [entry.id, entry.model]));
+    expect(models['sub:agent-pan-1:a1']).toBe('claude-haiku-5');
+    expect(models['sub:agent-pan-1:a2']).toBe('claude-opus-5-5');
   });
 
   it('lists subagents only under non-stopped parents and inherits the parent issue', async () => {

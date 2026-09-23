@@ -46,7 +46,7 @@ beforeEach(async () => {
   await writeFile(parentFile, '');
   await mkdir(join(root, 'session-1', 'subagents'), { recursive: true });
   subagentFile = join(root, 'session-1', 'subagents', 'agent-a1.jsonl');
-  await writeFile(subagentFile, '{}\n');
+  await writeFile(subagentFile, `${JSON.stringify({ type: 'assistant', message: { model: 'claude-haiku-5' } })}\n`);
   await writeFile(
     join(root, 'session-1', 'subagents', 'agent-a1.meta.json'),
     JSON.stringify({ agentType: 'Explore', description: 'find the route', toolUseId: 'toolu_1', spawnDepth: 1 }),
@@ -65,7 +65,7 @@ describe('listAgentSubagents', () => {
     await setMtime(subagentFile, 10_000);
     const subagents = await listAgentSubagents('agent-pan-1', '/w');
     expect(subagents).toHaveLength(1);
-    expect(subagents[0]).toMatchObject({ agentId: 'a1', agentType: 'Explore', transcriptPath: subagentFile });
+    expect(subagents[0]).toMatchObject({ agentId: 'a1', agentType: 'Explore', transcriptPath: subagentFile, model: 'claude-haiku-5' });
   });
 
   it('is running when the transcript changed 10 s ago and done after 10 min', async () => {

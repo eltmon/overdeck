@@ -75,6 +75,8 @@ export interface DirectorySubagent {
   readonly agentType: string;
   readonly description: string;
   readonly mtimeMs: number | null;
+  /** The model the subagent's transcript names; the parent's model is used when null. */
+  readonly model?: string | null;
 }
 
 export interface AgentDirectoryDeps {
@@ -88,6 +90,8 @@ export interface AgentDirectoryDeps {
   /** Phase C (external registrations). */
   readonly listExternalEntries?: (now: number) => Promise<readonly DirectoryEntry[]>;
   readonly projectKeyForIssue?: (issueId: string) => string | null;
+  /** Issue id (uppercase) → title, from the tracker cache the dashboard already holds. */
+  readonly issueTitles?: () => ReadonlyMap<string, string> | Promise<ReadonlyMap<string, string>>;
   readonly projectKeyForPath?: (path: string) => string | null;
 }
 
@@ -109,6 +113,28 @@ async function defaultReadRemoteState(agentId: string): Promise<RemoteStateFacts
     };
   } catch {
     return null;
+  }
+}
+
+/**
+ * Issue titles from the shared issue service's cache (the same tracker data the
+ * read model serves the dashboard). Never a live tracker call: an issue the
+ * cache does not hold simply has no title.
+ */
+async function defaultIssueTitles(): Promise<ReadonlyMap<string, string>> {
+  try {
+    const { getSharedIssueService } = await import('./issue-service-singleton.js');
+    const titles = new Map<string, string>();
+    for (const issue of getSharedIssueService().getIssues({ includeCompleted: true }) as unknown[]) {
+      if (typeof issue !== 'object' || issue === null) continue;
+      const { identifier, title } = issue as { identifier?: unknown; title?: unknown };
+      if (typeof identifier === 'string' && typeof title === 'string' && title.trim()) {
+        titles.set(identifier.toUpperCase(), title.trim());
+      }
+    }
+    return titles;
+  } catch {
+    return new Map();
   }
 }
 
@@ -220,11 +246,12 @@ export async function buildAgentDirectory(
   const projectKeyForIssue = perBuild(deps.projectKeyForIssue ?? defaultProjectKeyForIssue);
   const projectKeyForPath = perBuild(deps.projectKeyForPath ?? defaultProjectKeyForPath);
 
-  const [states, panes, conversationRows] = await Promise.all([
+  const [states, panes, conversationRows, issueTitles] = await Promise.all([
     Promise.resolve((deps.listAgentStates ?? defaultListAgentStates)()),
     (deps.getBackendPanes ?? getBackendPanes)().catch(() => [] as readonly BackendPane[]),
     (deps.listConversations ?? (() => getEnrichedConversationList(DIRECTORY_CONVERSATION_LIMIT, 0)))()
       .catch(() => [] as readonly unknown[]),
+    Promise.resolve((deps.issueTitles ?? defaultIssueTitles)()).catch(() => new Map<string, string>()),
   ]);
 
   const candidates: Candidate[] = [];
@@ -250,6 +277,7 @@ export async function buildAgentDirectory(
       location: remote ? 'remote' : 'local',
       projectKey: UNASSIGNED_PROJECT,
       issueId: state.issueId ? state.issueId.toUpperCase() : null,
+      issueTitle: null,
       parentId: (state as { parentId?: string }).parentId ?? null,
       role: state.role,
       harness: state.harness ?? pane?.harness ?? 'unknown',
@@ -280,6 +308,7 @@ export async function buildAgentDirectory(
         location: 'local',
         projectKey: UNASSIGNED_PROJECT,
         issueId: pane.issue ? pane.issue.toUpperCase() : null,
+        issueTitle: null,
         parentId: null,
         role: pane.role,
         harness: pane.harness,
@@ -306,6 +335,7 @@ export async function buildAgentDirectory(
       location: 'local',
       projectKey: UNASSIGNED_PROJECT,
       issueId: row.issueId ? row.issueId.toUpperCase() : null,
+      issueTitle: null,
       parentId: null,
       role: null,
       harness: row.harness ?? 'unknown',
@@ -349,7 +379,7 @@ export async function buildAgentDirectory(
       ?? (cwd ? projectKeyForPath(cwd) : null)
       ?? UNASSIGNED_PROJECT;
     projectKeys.set(entry.id, projectKey);
-    return { ...entry, projectKey };
+    return { ...entry, projectKey, issueTitle: entry.issueId ? issueTitles.get(entry.issueId) ?? null : null };
   });
   all.push(...external);
 
@@ -396,10 +426,11 @@ function subagentCandidates(
         location: parent.location,
         projectKey: UNASSIGNED_PROJECT,
         issueId: parent.issueId,
+        issueTitle: null,
         parentId: parent.id,
         role: null,
         harness: parent.harness,
-        model: 'unknown',
+        model: sub.model || parent.model,
         state: working ? 'working' : 'done',
         startedAt: null,
         lastActivityAt: activity,

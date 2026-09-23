@@ -47,6 +47,8 @@ export const DirectoryEntry = Schema.Struct({
   projectKey: Schema.String,
   /** Uppercase issue id, e.g. `PAN-3920`. */
   issueId: Schema.NullOr(Schema.String),
+  /** The issue's title from the dashboard's tracker cache; null when unknown. */
+  issueTitle: Schema.NullOr(Schema.String),
   parentId: Schema.NullOr(Schema.String),
   role: Schema.NullOr(Schema.String),
   /** `unknown` when not known. */

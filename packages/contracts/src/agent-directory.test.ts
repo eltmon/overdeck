@@ -12,6 +12,7 @@ const entry = {
   location: "local",
   projectKey: "overdeck",
   issueId: "PAN-3920",
+  issueTitle: "Agents page as a directory",
   parentId: null,
   role: "work",
   harness: "claude-code",

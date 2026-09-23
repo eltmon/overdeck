@@ -234,6 +234,13 @@ the conversation list (500 rows, the same enrichment `GET /api/conversations` sh
 `agent_directory.*` event exists. The server memoizes each window's response for 3 s and shares
 one in-flight build between concurrent callers. `windowHours` outside 1–168 answers 400.
 
+Each entry with an issue carries `issueTitle` from the shared issue service's tracker cache
+(never a live tracker call; `null` when the cache does not hold the issue). A subagent's `model`
+is read from the tail of its own transcript (`src/lib/conversations/transcript-model.ts`,
+memoized per file mtime), else its parent's. The row badge adds the issue's derived attention on
+top of the entry state: the issue's idle work agent shows `stuck` or `API error` exactly when
+`deriveIssueState` reports that attention. The UI never prints `unknown`.
+
 Sources: native agents (every `state.json` except `conv-*` dirs), pane-only agents (panes with an
 `agentId` or `issue` token but no `state.json`, i.e. `pan spawn` panes), conversations, and the
 Claude/Codex subagents of every non-stopped conversation and agent. Agents are joined to panes by

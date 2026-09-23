@@ -14,6 +14,7 @@ import {
   resolveAgentTranscriptCandidate,
   type ResolveJsonlPathOptions,
 } from '../../../lib/agents/transcript-resolver.js';
+import { readTranscriptModel } from '../../../lib/conversations/transcript-model.js';
 import { listSubagentMetas, subagentTranscriptPath } from './conversation/subagents.js';
 import { listCodexSubagentThreads, resolveCodexSubagentTranscript } from './conversation/codex-subagents.js';
 
@@ -25,6 +26,8 @@ const SAFE_SUBAGENT_ID = /^[A-Za-z0-9_-]+$/;
 export interface AgentSubagent extends SubagentSummary {
   readonly transcriptPath: string;
   readonly mtimeMs: number | null;
+  /** The model the subagent's transcript last named; null when none is recorded. */
+  readonly model: string | null;
 }
 
 export interface AgentSubagentOptions {
@@ -57,7 +60,8 @@ export async function listTranscriptSubagents(
       if (!transcriptPath) continue;
       const mtimeMs = await mtimeOf(transcriptPath);
       const working = mtimeMs !== null && now - mtimeMs <= SUBAGENT_WORKING_MTIME_MS;
-      subagents.push({ ...meta, status: working ? 'running' : 'done', transcriptPath, mtimeMs });
+      const model = await readTranscriptModel(transcriptPath, mtimeMs);
+      subagents.push({ ...meta, status: working ? 'running' : 'done', transcriptPath, mtimeMs, model });
     }
     return subagents;
   }
@@ -68,7 +72,8 @@ export async function listTranscriptSubagents(
     for (const { file, ...thread } of await listCodexSubagentThreads(parent.path)) {
       const mtimeMs = await mtimeOf(file);
       const working = mtimeMs !== null && now - mtimeMs <= SUBAGENT_WORKING_MTIME_MS;
-      subagents.push({ ...thread, status: working ? 'running' : 'done', transcriptPath: file, mtimeMs });
+      const model = await readTranscriptModel(file, mtimeMs);
+      subagents.push({ ...thread, status: working ? 'running' : 'done', transcriptPath: file, mtimeMs, model });
     }
     return subagents;
   }
