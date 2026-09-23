@@ -55,9 +55,9 @@ exit 1
         { mode: 0o755 },
       );
 
-      const [result] = await Effect.runPromise(runQualityGates({
+      const [result] = await runQualityGates({
         test: { command: scriptPath },
-      }, testDir));
+      }, testDir);
 
       expect(result.passed).toBe(false);
       expect(result.output).toContain('leading stdout 1');
@@ -82,9 +82,9 @@ echo "pass stderr diagnostic" >&2
         { mode: 0o755 },
       );
 
-      const [result] = await Effect.runPromise(runQualityGates({
+      const [result] = await runQualityGates({
         test: { command: scriptPath },
-      }, testDir));
+      }, testDir);
 
       expect(result.passed).toBe(true);
       expect(result.output).toContain('pass output starts here');

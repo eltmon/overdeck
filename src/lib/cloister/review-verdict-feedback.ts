@@ -15,8 +15,6 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
-import { Effect } from 'effect';
-
 import { messageAgent } from '../agents/messaging.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
@@ -118,7 +116,13 @@ export async function postPrComment(prUrl: string | undefined, body: string): Pr
   return true;
 }
 
-async function deliverReviewVerdictFeedbackPromise(
+/**
+ * Deliver a review verdict to the work agent: PR comment, feedback file, and
+ * agent message. Recoverable failures (PR comment, messaging, synthesis
+ * lookup) are swallowed and reported through the result flags; only the
+ * feedback-file write reports its error in the result.
+ */
+export async function deliverReviewVerdictFeedback(
   opts: DeliverReviewVerdictFeedbackOptions,
 ): Promise<DeliverReviewVerdictFeedbackResult> {
   const issueId = opts.issueId.toUpperCase();
@@ -162,14 +166,14 @@ async function deliverReviewVerdictFeedbackPromise(
     console.warn(`[review-verdict-feedback] Failed to post PR comment for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  const fileResult = await Effect.runPromise(writeFeedbackFile({
+  const fileResult = await writeFeedbackFile({
     issueId,
     workspacePath,
     specialist: 'review-agent',
     outcome: opts.verdict === 'blocked' ? 'changes-requested' : 'failed',
     summary: `Review ${opts.verdict.toUpperCase()}: ${(opts.notes ?? synthesis?.body ?? '').slice(0, 80)}`,
     markdownBody,
-  }));
+  });
 
   let agentMessageSent = false;
   if (fileResult.success && fileResult.filePath) {
@@ -325,18 +329,3 @@ async function deliverReviewVerdictFeedbackPromise(
     agentMessageSent,
   };
 }
-
-// ─── Effect variant (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Effect variant of {@link deliverReviewVerdictFeedback}. The Promise version
- * already swallows recoverable errors (PR comment failures, agent messaging,
- * synthesis lookup), so the Effect form mirrors that contract: callers see a
- * successful Effect carrying the same result shape and inspect the flags to
- * decide what surfaced. The single non-recoverable boundary — feedback file
- * write — keeps its existing error reporting through {@link writeFeedbackFile}.
- */
-export const deliverReviewVerdictFeedback = (
-  opts: DeliverReviewVerdictFeedbackOptions,
-): Effect.Effect<DeliverReviewVerdictFeedbackResult> =>
-  Effect.promise(() => deliverReviewVerdictFeedbackPromise(opts));

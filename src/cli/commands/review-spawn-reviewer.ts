@@ -1,5 +1,4 @@
 import { exitCli } from '../exit.js';
-import { Effect } from 'effect';
 import chalk from 'chalk';
 import { join } from 'path';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
@@ -46,7 +45,7 @@ export async function reviewSpawnReviewerCommand(
   const outputPath = opts.output ?? reviewerOutputPath(workspace, opts.runId, subRole);
   const contextManifestPath = opts.context ?? join(workspace, PAN_DIRNAME, 'review', opts.runId, 'context.json');
 
-  const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
+  const result = await spawnReviewSubRoleForIssue({
     issueId,
     workspace,
     subRole,
@@ -54,7 +53,7 @@ export async function reviewSpawnReviewerCommand(
     outputPath,
     contextManifestPath,
     model: opts.model,
-  }));
+  });
 
   if (!result.success) {
     console.error(chalk.red(`Error: ${result.error ?? result.message}`));

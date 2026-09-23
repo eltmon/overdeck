@@ -71,7 +71,7 @@ describe('PAN-4030: UAT failure feedback reaches the work agent', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     mocks.getPrFacts.mockResolvedValue({ issueId: 'PAN-4030', forge: 'github', open: true, headSha: 'sha-a' });
-    mocks.writeFeedbackFile.mockReturnValue(Effect.succeed({ success: true, filePath: FEEDBACK_PATH }));
+    mocks.writeFeedbackFile.mockResolvedValue({ success: true, filePath: FEEDBACK_PATH });
     mocks.resolveIssueFeedbackTarget.mockResolvedValue({ agentId: 'agent-pan-4030' });
     mocks.surfaceIssueFeedbackNeedsYou.mockResolvedValue(undefined);
     // The keyed store outlives the CLI process, like the PTY supervisor's.

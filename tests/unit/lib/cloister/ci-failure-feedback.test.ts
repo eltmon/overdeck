@@ -6,7 +6,6 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync }
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { Effect } from 'effect';
 import {
   recordCiTestGatePass,
   relayCiFailureFeedback,
@@ -96,11 +95,11 @@ beforeEach(() => {
   mockResolveProjectFromIssueSync.mockReturnValue({
     projectPath: '/tmp/overdeck',
   });
-  mockWriteFeedbackFile.mockReturnValue(Effect.succeed({
+  mockWriteFeedbackFile.mockResolvedValue({
     success: true,
     filePath: '/tmp/overdeck/workspaces/feature-pan-1801/.pan/feedback/001-ci-monitor-failed.md',
     relativePath: '.pan/feedback/001-ci-monitor-failed.md',
-  }));
+  });
   mockMessageAgent.mockResolvedValue({ delivered: true, queuedToMail: false });
   // No project config → the local test gate; the CI test-gate path stays off.
   mockFindProjectByPathSync.mockReturnValue(null);
@@ -162,7 +161,7 @@ describe('relayCiFailureFeedback', () => {
   it('writes feedback and messages the work agent', async () => {
     makeGhMocks();
 
-    const result = await Effect.runPromise(relayCiFailureFeedback({
+    const result = await relayCiFailureFeedback({
       issueId: 'PAN-1801',
       repo: 'test-owner/test-repo',
       prNumber: 42,
@@ -170,7 +169,7 @@ describe('relayCiFailureFeedback', () => {
       headRef: 'feature/pan-1801',
       prUrl: 'https://github.com/test-owner/test-repo/pull/42',
       source: 'check_run:test',
-    }));
+    });
 
     expect(result.agentMessageSent).toBe(true);
     expect(result.feedbackPath).toBe('/tmp/overdeck/workspaces/feature-pan-1801/.pan/feedback/001-ci-monitor-failed.md');
@@ -190,7 +189,7 @@ describe('relayCiFailureFeedback', () => {
   it('labels failures inherited from main', async () => {
     makeGhMocks();
 
-    await Effect.runPromise(relayCiFailureFeedback({
+    await relayCiFailureFeedback({
       issueId: 'PAN-1801',
       repo: 'test-owner/test-repo',
       prNumber: 42,
@@ -198,7 +197,7 @@ describe('relayCiFailureFeedback', () => {
       headRef: 'feature/pan-1801',
       prUrl: 'https://github.com/test-owner/test-repo/pull/42',
       source: 'check_run:test',
-    }));
+    });
 
     const markdownBody = mockWriteFeedbackFile.mock.calls[0][0].markdownBody as string;
     expect(markdownBody).toContain('### pr-test');
@@ -218,8 +217,8 @@ describe('relayCiFailureFeedback', () => {
       source: 'check_run:test',
     };
 
-    await Effect.runPromise(relayCiFailureFeedback(opts));
-    await Effect.runPromise(relayCiFailureFeedback(opts));
+    await relayCiFailureFeedback(opts);
+    await relayCiFailureFeedback(opts);
 
     expect(execFile).toHaveBeenCalledTimes(4); // 2 list + 2 view (only once because debounced)
     expect(mockMessageAgent).toHaveBeenCalledTimes(1);
@@ -228,14 +227,14 @@ describe('relayCiFailureFeedback', () => {
   it('skips feedback when no work agent exists', async () => {
     mockGetAgentStateSync.mockReturnValue(null);
 
-    const result = await Effect.runPromise(relayCiFailureFeedback({
+    const result = await relayCiFailureFeedback({
       issueId: 'PAN-1801',
       repo: 'test-owner/test-repo',
       prNumber: 42,
       headSha: 'abc123def456',
       headRef: 'feature/pan-1801',
       source: 'check_run:test',
-    }));
+    });
 
     expect(result.agentMessageSent).toBe(false);
     expect(execFile).not.toHaveBeenCalled();
@@ -253,14 +252,14 @@ describe('relayCiFailureFeedback', () => {
       startedAt: new Date().toISOString(),
     });
 
-    const result = await Effect.runPromise(relayCiFailureFeedback({
+    const result = await relayCiFailureFeedback({
       issueId: 'PAN-1801',
       repo: 'test-owner/test-repo',
       prNumber: 42,
       headSha: 'abc123def456',
       headRef: 'feature/pan-1801',
       source: 'check_run:test',
-    }));
+    });
 
     expect(result.agentMessageSent).toBe(false);
     expect(execFile).not.toHaveBeenCalled();
@@ -289,14 +288,14 @@ describe('relayCiFailureFeedback', () => {
     ]);
     (execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(execFileMock);
 
-    const result = await Effect.runPromise(relayCiFailureFeedback({
+    const result = await relayCiFailureFeedback({
       issueId: 'PAN-1801',
       repo: 'test-owner/test-repo',
       prNumber: 42,
       headSha: 'abc123def456',
       headRef: 'feature/pan-1801',
       source: 'check_run:test',
-    }));
+    });
 
     expect(result.agentMessageSent).toBe(true);
     const markdownBody = mockWriteFeedbackFile.mock.calls[0][0].markdownBody as string;
@@ -318,14 +317,14 @@ describe('relayCiFailureFeedback', () => {
     ]);
     (execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(execFileMock);
 
-    const result = await Effect.runPromise(relayCiFailureFeedback({
+    const result = await relayCiFailureFeedback({
       issueId: 'PAN-1801',
       repo: 'test-owner/test-repo',
       prNumber: 42,
       headSha: 'abc123def456',
       headRef: 'feature/pan-1801',
       source: 'status:ci',
-    }));
+    });
 
     expect(result.agentMessageSent).toBe(true);
     const markdownBody = mockWriteFeedbackFile.mock.calls[0][0].markdownBody as string;
@@ -347,14 +346,14 @@ describe('relayCiFailureFeedback', () => {
     ]);
     (execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(execFileMock);
 
-    const result = await Effect.runPromise(relayCiFailureFeedback({
+    const result = await relayCiFailureFeedback({
       issueId: 'PAN-1801',
       repo: 'test-owner/test-repo',
       prNumber: 42,
       headSha: 'abc123def456',
       headRef: 'feature/pan-1801',
       source: 'polling_reconciliation',
-    }));
+    });
 
     expect(result.agentMessageSent).toBe(true);
     const markdownBody = mockWriteFeedbackFile.mock.calls[0][0].markdownBody as string;
@@ -376,14 +375,14 @@ describe('relayCiFailureFeedback', () => {
     ]);
     (execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(execFileMock);
 
-    const result = await Effect.runPromise(relayCiFailureFeedback({
+    const result = await relayCiFailureFeedback({
       issueId: 'PAN-1801',
       repo: 'test-owner/test-repo',
       prNumber: 42,
       headSha: 'abc123def456',
       headRef: 'feature/pan-1801',
       source: 'check_run:test',
-    }));
+    });
 
     expect(result.agentMessageSent).toBe(false);
     expect(mockWriteFeedbackFile).not.toHaveBeenCalled();
@@ -421,13 +420,13 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
     tick();
     makeGhMocksForHead(headSha);
     const readPrFacts = vi.fn(async () => facts({ headSha, checks: 'red', testChecks: 'red' }));
-    return Effect.runPromise(relayCiFailureFeedback({ ...relayOpts, headSha }, { readPrFacts }));
+    return relayCiFailureFeedback({ ...relayOpts, headSha }, { readPrFacts });
   }
 
   async function greenHead(headSha: string) {
     tick();
     const readPrFacts = vi.fn(async () => facts({ headSha, checks: 'green', testChecks: 'green' }));
-    return Effect.runPromise(recordCiTestGatePass({ issueId: 'PAN-1801', headSha, headRef: 'feature/pan-1801', source: 'check_run:test' }, { readPrFacts }));
+    return recordCiTestGatePass({ issueId: 'PAN-1801', headSha, headRef: 'feature/pan-1801', source: 'check_run:test' }, { readPrFacts });
   }
 
   /** Per-run artifacts are named and ordered by timestamp; advance it between events. */
@@ -541,10 +540,10 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
   it('a green report that the PR checks do not confirm records nothing', async () => {
     tick();
     const readPrFacts = vi.fn(async () => facts({ headSha: 'cccccccc3333', testChecks: 'pending' }));
-    const recorded = await Effect.runPromise(recordCiTestGatePass(
+    const recorded = await recordCiTestGatePass(
       { issueId: 'PAN-1801', headSha: 'cccccccc3333', headRef: 'feature/pan-1801', source: 'check_run:test (22)' },
       { readPrFacts },
-    ));
+    );
     expect(recorded).toBe(false);
   });
 
@@ -563,10 +562,10 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
 
   it('counts and delivers a head once however many webhooks report its red test job', async () => {
     await redHead('abc123def456');
-    const again = await Effect.runPromise(relayCiFailureFeedback(
+    const again = await relayCiFailureFeedback(
       { ...relayOpts, source: 'check_suite' },
       { readPrFacts: vi.fn(async () => facts({ checks: 'red', testChecks: 'red' })) },
-    ));
+    );
     // A restart loses the in-memory memo; the per-run artifact still says this head was counted.
     resetCiFailureFeedbackStateForTests();
     const afterRestart = await redHead('abc123def456');
@@ -608,9 +607,9 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
       return facts({ checks: 'red', testChecks: 'red' });
     });
 
-    const a = Effect.runPromise(relayCiFailureFeedback({ ...relayOpts, source: 'check_run:test-shard (1/4)' }, { readPrFacts }));
-    const b = Effect.runPromise(relayCiFailureFeedback({ ...relayOpts, source: 'check_run:test-shard (2/4)' }, { readPrFacts }));
-    const c = Effect.runPromise(relayCiFailureFeedback({ ...relayOpts, source: 'check_suite' }, { readPrFacts }));
+    const a = relayCiFailureFeedback({ ...relayOpts, source: 'check_run:test-shard (1/4)' }, { readPrFacts });
+    const b = relayCiFailureFeedback({ ...relayOpts, source: 'check_run:test-shard (2/4)' }, { readPrFacts });
+    const c = relayCiFailureFeedback({ ...relayOpts, source: 'check_suite' }, { readPrFacts });
     release();
     const [ra, rb, rc] = await Promise.all([a, b, c]);
 
@@ -648,11 +647,11 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
       ]));
       const readPrFacts = vi.fn(async () => facts({ headBranch: headRef, checks: 'red', testChecks: 'red' }));
 
-      const result = await Effect.runPromise(relayCiFailureFeedback({ ...relayOpts, headRef }, { readPrFacts }));
-      const passRecorded = await Effect.runPromise(recordCiTestGatePass(
+      const result = await relayCiFailureFeedback({ ...relayOpts, headRef }, { readPrFacts });
+      const passRecorded = await recordCiTestGatePass(
         { issueId: 'PAN-1801', headSha: 'abc123def456', headRef, source: 'check_run:test' },
         { readPrFacts: vi.fn(async () => facts({ headBranch: headRef, testChecks: 'green' })) },
-      ));
+      );
 
       expect(result.testGateFailed).toBeUndefined();
       expect(result.cycleCount).toBeUndefined();
@@ -678,7 +677,7 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
       }));
       const readDefaultBranchFailingTestChecks = vi.fn(async () => new Set<string>());
 
-      const result = await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts, readDefaultBranchFailingTestChecks }));
+      const result = await relayCiFailureFeedback(relayOpts, { readPrFacts, readDefaultBranchFailingTestChecks });
 
       expect(result.testGateFailed).toBeUndefined();
       expect(failedEntries()).toEqual([]);
@@ -698,7 +697,7 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
     }));
     const readDefaultBranchFailingTestChecks = vi.fn(async () => new Set(['test-shard (1/4)']));
 
-    const result = await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts, readDefaultBranchFailingTestChecks }));
+    const result = await relayCiFailureFeedback(relayOpts, { readPrFacts, readDefaultBranchFailingTestChecks });
 
     expect(readDefaultBranchFailingTestChecks).toHaveBeenCalledWith('test-owner/test-repo');
     expect(result.testGateFailed).toBeUndefined();
@@ -718,7 +717,7 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
     }));
     const readDefaultBranchFailingTestChecks = vi.fn(async () => null);
 
-    const result = await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts, readDefaultBranchFailingTestChecks }));
+    const result = await relayCiFailureFeedback(relayOpts, { readPrFacts, readDefaultBranchFailingTestChecks });
 
     expect(result.testGateFailed).toBeUndefined();
     expect(failedEntries()).toEqual([]);
@@ -757,7 +756,7 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
       testCheckFailures: [{ name: 'test-shard (1/4)', conclusion: 'FAILURE' }],
     }));
 
-    const result = await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts }));
+    const result = await relayCiFailureFeedback(relayOpts, { readPrFacts });
 
     expect(result.testGateFailed).toBeUndefined();
     expect(failedEntries()).toEqual([]);
@@ -766,12 +765,12 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
 
   it('a feedback-file write failure records nothing, surfaces needs-you, and the next report retries (review of #4017)', async () => {
     const surfaceNeedsYou = vi.fn(async () => undefined);
-    mockWriteFeedbackFile.mockReturnValueOnce(Effect.succeed({ success: false, error: 'EACCES' }));
+    mockWriteFeedbackFile.mockResolvedValueOnce({ success: false, error: 'EACCES' });
     tick();
     makeGhMocksForHead('abc123def456');
     const readPrFacts = vi.fn(async () => facts({ checks: 'red', testChecks: 'red' }));
 
-    const failed = await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts, surfaceNeedsYou }));
+    const failed = await relayCiFailureFeedback(relayOpts, { readPrFacts, surfaceNeedsYou });
 
     expect(failed).toEqual({ agentMessageSent: false });
     expect(surfaceNeedsYou).toHaveBeenCalledWith('PAN-1801', expect.stringContaining('could not write the feedback file (EACCES)'), expect.objectContaining({ failedCheck: 'test' }));
@@ -781,7 +780,7 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
 
     // A restart in between changes nothing: there is no record to replay.
     resetCiFailureFeedbackStateForTests();
-    const retried = await Effect.runPromise(relayCiFailureFeedback({ ...relayOpts, source: 'check_suite' }, { readPrFacts, surfaceNeedsYou }));
+    const retried = await relayCiFailureFeedback({ ...relayOpts, source: 'check_suite' }, { readPrFacts, surfaceNeedsYou });
 
     expect(retried).toMatchObject({ testGateFailed: true, cycleCount: 1, agentMessageSent: true });
     expect(failedEntries()).toHaveLength(1);
@@ -796,7 +795,7 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
     makeGhMocksForHead('abc123def456');
     const readPrFacts = vi.fn(async () => facts({ checks: 'red', testChecks: 'red' }));
 
-    const result = await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts, surfaceNeedsYou }));
+    const result = await relayCiFailureFeedback(relayOpts, { readPrFacts, surfaceNeedsYou });
 
     expect(result).toMatchObject({ testGateFailed: true, agentMessageSent: false });
     expect(surfaceNeedsYou).toHaveBeenCalledWith('PAN-1801', expect.stringContaining('was not delivered: forge unreachable'), expect.anything());
@@ -812,7 +811,7 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
     }));
     const readDefaultBranchFailingTestChecks = vi.fn(async () => new Set(['test-shard (1/4)']));
 
-    const result = await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts, readDefaultBranchFailingTestChecks }));
+    const result = await relayCiFailureFeedback(relayOpts, { readPrFacts, readDefaultBranchFailingTestChecks });
 
     expect(result).toMatchObject({ testGateFailed: true, cycleCount: 1 });
     expect(failedEntries()).toHaveLength(1);
@@ -824,9 +823,9 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
       .mockResolvedValueOnce(facts({ checks: 'red', testChecks: 'pending' }))
       .mockResolvedValue(facts({ checks: 'red', testChecks: 'red' }));
 
-    const first = await Effect.runPromise(relayCiFailureFeedback({ ...relayOpts, source: 'check_run:lint' }, { readPrFacts }));
+    const first = await relayCiFailureFeedback({ ...relayOpts, source: 'check_run:lint' }, { readPrFacts });
     tick();
-    const second = await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts }));
+    const second = await relayCiFailureFeedback(relayOpts, { readPrFacts });
 
     expect(first.testGateFailed).toBeUndefined();
     expect(mockMessageAgent).toHaveBeenCalledWith('agent-pan-1801', expect.stringContaining('SPECIALIST FEEDBACK'), 'internal', {});
@@ -848,7 +847,7 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
     makeGhMocks();
     const readPrFacts = vi.fn(async () => facts({ checks: 'red', testChecks: 'green' }));
 
-    const result = await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts }));
+    const result = await relayCiFailureFeedback(relayOpts, { readPrFacts });
 
     expect(result.testGateFailed).toBeUndefined();
     expect(readPipelineJournal(workspacePath)).toEqual([]);
@@ -859,7 +858,7 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
     makeGhMocks();
     const readPrFacts = vi.fn(async () => facts({ headSha: 'newer0000000', checks: 'red', testChecks: 'red' }));
 
-    const result = await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts }));
+    const result = await relayCiFailureFeedback(relayOpts, { readPrFacts });
 
     expect(result.testGateFailed).toBeUndefined();
     expect(readPipelineJournal(workspacePath)).toEqual([]);
@@ -870,11 +869,11 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
     mockFindProjectByPathSync.mockReturnValue({ name: 'Overdeck', path: projectPath, verification: { tests: 'local' } });
     const readPrFacts = vi.fn(async () => facts({ checks: 'red', testChecks: 'red' }));
 
-    const result = await Effect.runPromise(relayCiFailureFeedback(relayOpts, { readPrFacts }));
-    const passRecorded = await Effect.runPromise(recordCiTestGatePass(
+    const result = await relayCiFailureFeedback(relayOpts, { readPrFacts });
+    const passRecorded = await recordCiTestGatePass(
       { issueId: 'PAN-1801', headSha: 'abc123def456', headRef: 'feature/pan-1801', source: 'check_run:test' },
       { readPrFacts },
-    ));
+    );
 
     expect(readPrFacts).not.toHaveBeenCalled();
     expect(result.testGateFailed).toBeUndefined();

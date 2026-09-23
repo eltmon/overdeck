@@ -485,7 +485,7 @@ describe('W7 caller escalation fixtures (scenario b callers)', () => {
     mocks.resolveProjectFromIssueSync.mockReturnValue(undefined);
     mocks.resolveIssueFeedbackTarget.mockResolvedValue({ agentId: 'agent-pan-3846' });
     mocks.surfaceIssueFeedbackNeedsYou.mockResolvedValue(undefined);
-    mocks.writeFeedbackFile.mockReturnValue(Effect.succeed({ success: true, filePath: '/tmp/feedback.md' }));
+    mocks.writeFeedbackFile.mockResolvedValue({ success: true, filePath: '/tmp/feedback.md' });
   });
 
   it('uat-failure-feedback surfaces a needs-you when delivery is not confirmed', async () => {
@@ -495,11 +495,11 @@ describe('W7 caller escalation fixtures (scenario b callers)', () => {
       confirmed: false,
       reason: 'message was injected but no turn appeared in transcript session-1 within the confirmation window (2 attempts)',
     });
-    const { relayUatFailureFeedbackPromise, resetUatFailureFeedbackStateForTests } =
+    const { relayUatFailureFeedback, resetUatFailureFeedbackStateForTests } =
       await import('../../../../src/lib/cloister/uat-failure-feedback.js');
     resetUatFailureFeedbackStateForTests();
 
-    const result = await relayUatFailureFeedbackPromise({
+    const result = await relayUatFailureFeedback({
       issueId: 'PAN-3846',
       uatNotes: 'login flow broken',
       workspacePath: '/tmp/ws',
@@ -524,12 +524,12 @@ describe('W7 caller escalation fixtures (scenario b callers)', () => {
     mocks.findVerdictReport.mockResolvedValue(null);
     const { deliverReviewVerdictFeedback } = await import('../../../../src/lib/cloister/review-verdict-feedback.js');
 
-    const result = await Effect.runPromise(deliverReviewVerdictFeedback({
+    const result = await deliverReviewVerdictFeedback({
       issueId: 'PAN-3846',
       verdict: 'blocked',
       notes: 'two findings',
       workspacePath: '/tmp/ws',
-    }));
+    });
 
     expect(result.agentMessageSent).toBe(false);
     expect(mocks.surfaceIssueFeedbackNeedsYou).toHaveBeenCalledWith(

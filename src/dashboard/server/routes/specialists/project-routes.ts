@@ -317,7 +317,7 @@ const postProjectSpecialistContextRegenerateRoute = HttpRouter.add(
 
     const { regenerateContextDigest } =
       yield* Effect.promise(() => import('../../../../lib/cloister/specialist-context.js'));
-    const digest = yield* regenerateContextDigest(project, type);
+    const digest = yield* Effect.promise(() => regenerateContextDigest(project, type));
 
     if (digest) {
       return jsonResponse({ digest, message: 'Context digest regenerated' });
@@ -460,7 +460,7 @@ const postProjectReviewRestartRoute = HttpRouter.add(
     const { killAllReviewerSessions } = yield* Effect.promise(
       () => import('../../../../lib/cloister/review-agent.js'),
     );
-    const killResult = yield* killAllReviewerSessions(project, issueId);
+    const killResult = yield* Effect.promise(() => killAllReviewerSessions(project, issueId));
 
     // PAN-1862: do NOT wipe here. The review session (state.json + saved session id) is preserved
     // so spawnReviewRoleForIssue can RESUME it — keeping the prior review's context so a restart
@@ -611,7 +611,7 @@ const postProjectReviewerRoleRestartRoute = HttpRouter.add(
     const { spawnReviewSubRoleForIssue } = yield* Effect.promise(
       () => import('../../../../lib/cloister/review-agent.js'),
     );
-    const result = yield* spawnReviewSubRoleForIssue({
+    const spawnOptions = {
       issueId,
       workspace: parent.workspace,
       subRole: role as ReviewSubRole,
@@ -623,7 +623,8 @@ const postProjectReviewerRoleRestartRoute = HttpRouter.add(
       synthesisAgentId: parentId,
       ...(model ? { model } : {}),
       allowHost: parent.hostOverride ?? false,
-    });
+    };
+    const result = yield* Effect.promise(() => spawnReviewSubRoleForIssue(spawnOptions));
 
     return jsonResponse(
       {

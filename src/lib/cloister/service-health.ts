@@ -1,5 +1,4 @@
 /** Cloister health monitoring seam. */
-import { Effect } from 'effect';
 import { getAgentStateSync, listRunningAgentsSync } from '../agents.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
 import type { HealthState } from '../runtimes/types.js';
@@ -170,7 +169,7 @@ export async function performHealthCheck(host: HealthHost): Promise<void> {
  */
 export async function checkSpecialistRotations(host: HealthHost): Promise<void> {
     // Check merge-agent (the main candidate for rotation)
-    const mergeAgentResult = await Effect.runPromise(checkAndRotateIfNeeded('merge-agent', process.cwd()));
+    const mergeAgentResult = await checkAndRotateIfNeeded('merge-agent', process.cwd());
     if (mergeAgentResult) {
       host.emit({ type: 'session_rotated', specialistName: 'merge-agent', result: mergeAgentResult });
 
@@ -244,14 +243,14 @@ export async function checkHandoffTriggers(host: HealthHost, agentHealths: Agent
         if (!agentState.workspace) continue;
 
         // Check all triggers
-        const triggers = await Effect.runPromise(checkAllTriggers(
+        const triggers = await checkAllTriggers(
           health.agentId,
           agentState.workspace,
           agentState.issueId,
           agentState.model,
           health,
           host.config
-        ));
+        );
 
         // Execute handoff for first triggered condition
         // (Priority: stuck > planning > test > completion)
@@ -273,10 +272,10 @@ export async function checkHandoffTriggers(host: HealthHost, agentHealths: Agent
           console.log(`🔔 Handoff triggered for ${health.agentId}: ${trigger.reason}`);
 
           // Perform handoff
-          const result = await Effect.runPromise(performHandoff(health.agentId, {
+          const result = await performHandoff(health.agentId, {
             targetModel: trigger.suggestedModel || 'sonnet',
             reason: trigger.reason,
-          }));
+          });
 
           host.emit({ type: 'handoff_completed', agentId: health.agentId, result });
 

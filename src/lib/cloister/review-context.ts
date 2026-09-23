@@ -19,7 +19,6 @@ import { scanStubUi, type StubUiFinding } from './lint-stub-ui.js';
 import { fetchCodeRabbitFindings, type CodeRabbitFinding } from './coderabbit-ingestion.js';
 import { findXBriefByIssueSync } from '../xbrief/lifecycle-io.js';
 import { getDevrootPathSync } from '../config.js';
-import { FsError } from '../errors.js';
 import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
 
 const execAsync = promisify(exec);
@@ -470,7 +469,15 @@ export function formatTier1Summary(
   lines.push(`Diff stat: ${manifest.diff.stat}`);
 
   return lines.join('\n');
-}export async function buildReviewContextPromise(opts: BuildReviewContextOpts): Promise<ReviewContextManifest> {
+}
+
+/**
+ * Build and write the shared review context manifest (diff, acceptance
+ * criteria, advisory findings) that every reviewer reads. The git probes are
+ * best-effort and fall back to sentinel strings; the only rejection is a
+ * missing workspace directory.
+ */
+export async function buildReviewContext(opts: BuildReviewContextOpts): Promise<ReviewContextManifest> {
   const { runId, issueId, workspace } = opts;
 
   if (!existsSync(workspace)) {
@@ -584,26 +591,3 @@ export function formatTier1Summary(
 
   return manifest;
 }
-
-// ─── Effect variant (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Effect variant of {@link buildReviewContext}. Wraps the Promise-based
- * implementation in `Effect.tryPromise` so callers in Effect pipelines can
- * compose it with typed error channels. The git probes inside
- * {@link buildReviewContext} are best-effort — they fall back to sentinel
- * strings instead of failing — so the only error this Effect can surface is
- * the workspace-not-found {@link FsError}.
- */
-export const buildReviewContext = (
-  opts: BuildReviewContextOpts,
-): Effect.Effect<ReviewContextManifest, FsError> =>
-  Effect.tryPromise({
-    try: () => buildReviewContextPromise(opts),
-    catch: (cause) =>
-      new FsError({
-        path: opts.workspace,
-        operation: 'buildReviewContext',
-        cause,
-      }),
-  });

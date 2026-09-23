@@ -26,7 +26,7 @@ vi.mock('../../../src/dashboard/server/services/tracker-config.js', () => ({
 }));
 
 vi.mock('../../../src/lib/cloister/ci-failure-feedback.js', () => ({
-  relayCiFailureFeedback: () => Effect.succeed({ agentMessageSent: false }),
+  relayCiFailureFeedback: async () => ({ agentMessageSent: false }),
 }));
 
 vi.mock('../../../src/lib/github-app.js', () => ({

@@ -308,14 +308,7 @@ async function spawnReviewRoleForIssuePromise(
   // Force mode (human override from dashboard) kills the old session and
   // respawns so the review runs against current HEAD, not stale state.
   if (opts.force) {
-    const stopped = await Effect.runPromise(
-      killAllReviewerSessions(undefined, opts.issueId).pipe(
-        Effect.catch(() => Effect.succeed({
-          killed: [],
-          failed: [reviewSessionName],
-        })),
-      ),
-    );
+    const stopped = await killAllReviewerSessions(undefined, opts.issueId);
     if (stopped.failed.length > 0) {
       return {
         success: false,
@@ -402,14 +395,7 @@ async function spawnReviewRoleForIssuePromise(
         : staleRunId ? 'stale runId'
         : 'finished-idle (warm reuse for new cycle)';
       console.log(`[review-agent] ${reviewSessionName} ${reason} — respawning convoy`);
-      const stopped = await Effect.runPromise(
-        killAllReviewerSessions(undefined, opts.issueId).pipe(
-          Effect.catch(() => Effect.succeed({
-            killed: [],
-            failed: [reviewSessionName],
-          })),
-        ),
-      );
+      const stopped = await killAllReviewerSessions(undefined, opts.issueId);
       if (stopped.failed.length > 0) {
         return {
           success: false,
@@ -450,7 +436,7 @@ async function spawnReviewRoleForIssuePromise(
   // sees current-cycle feedback when it reads .pan/feedback/.
   try {
     const { archiveFeedbackFiles } = await import('./feedback-writer.js');
-    await Effect.runPromise(archiveFeedbackFiles(opts.workspace));
+    await archiveFeedbackFiles(opts.workspace);
   } catch {
     // Non-fatal: archiving is best-effort
   }
@@ -487,12 +473,12 @@ async function spawnReviewRoleForIssuePromise(
     let contextManifestPath: string | undefined;
     let tier1Summary: string | undefined;
     try {
-      const manifest = await Effect.runPromise(buildReviewContext({
+      const manifest = await buildReviewContext({
         runId,
         issueId: opts.issueId,
         workspace: opts.workspace,
         branch: opts.branch,
-      }));
+      });
       contextManifestPath = manifest.manifestPath;
       tier1Summary = formatTier1Summary(manifest);
       console.log(`[review-agent] Context manifest built: ${contextManifestPath} (${manifest.changedFiles.length} files)`);
@@ -649,6 +635,8 @@ async function spawnReviewRoleForIssuePromise(
   }
 }
 
+export { isReviewSessionForIssue };
+
 /**
  * Kill all canonical reviewer sessions for one issue.
  *
@@ -662,10 +650,9 @@ async function spawnReviewRoleForIssuePromise(
  *
  * Matches the parent review role, convoy children, and legacy coordinator
  * sessions so callers do not need to know which review phase has started.
+ * Session-kill failures are aggregated into `failed`; this never rejects.
  */
-export { isReviewSessionForIssue };
-
-async function killAllReviewerSessionsPromise(
+export async function killAllReviewerSessions(
   projectKey: string | undefined,
   issueId: string,
 ): Promise<{ killed: string[]; failed: string[] }> {
@@ -697,7 +684,13 @@ async function killAllReviewerSessionsPromise(
     }),
   );
   return { killed, failed };
-}async function killAllReviewSessionsPromise(): Promise<{ killed: string[]; failed: string[] }> {
+}
+
+/**
+ * Kill every review session (any issue) during shutdown. Session-kill failures
+ * are aggregated into `failed`; this never rejects.
+ */
+export async function killAllReviewSessions(): Promise<{ killed: string[]; failed: string[] }> {
   const killed: string[] = [];
   const failed: string[] = [];
 
@@ -741,11 +734,6 @@ async function killAllReviewerSessionsPromise(
 
 // ─── Effect variants (PAN-1249) ──────────────────────────────────────────────
 
-/**
- * Effect variant of {@link buildConvoyPrompt}. Template reads are the only
- * fallible step; any failure here is fatal and propagates via Effect's defect
- * channel through `Effect.promise`.
- */
 // PAN-2695: dispatch has multiple legitimate callers (request route, deacon
 // reconcile, dispatch reconcile) that can fire near-simultaneously. An
 // uncoalesced second invocation sees the first's milliseconds-old agent state,
@@ -767,24 +755,6 @@ export const spawnReviewRoleForIssue = (
       () => withReviewLifecycleGuard(key, () => spawnReviewRoleForIssuePromise(opts)),
     );
   });
-
-/**
- * Effect variant of {@link killAllReviewerSessions}. Session-kill failures are
- * already aggregated into the `failed` array — this wrapper preserves that
- * contract.
- */
-export const killAllReviewerSessions = (
-  projectKey: string | undefined,
-  issueId: string,
-): Effect.Effect<{ killed: string[]; failed: string[] }> =>
-  Effect.promise(() => killAllReviewerSessionsPromise(projectKey, issueId));
-
-/**
- * Effect variant of {@link killAllReviewSessions}. Same aggregation semantics
- * as the Promise version.
- */
-export const killAllReviewSessions = (): Effect.Effect<{ killed: string[]; failed: string[] }> =>
-  Effect.promise(() => killAllReviewSessionsPromise());
 
 // PAN-1862 resume-vs-fresh decision lives in its own pure module (review-resume-decision.ts) so
 // it is unit-testable without importing this heavy file. Re-exported for external callers.
@@ -845,7 +815,7 @@ export async function purgeReviewAgentsForIssue(
   projectKey: string | undefined,
   issueId: string,
 ): Promise<{ killed: string[]; removed: string[] }> {
-  const killResult = await killAllReviewerSessionsPromise(projectKey, issueId);
+  const killResult = await killAllReviewerSessions(projectKey, issueId);
   const removed: string[] = [];
   for (const agentId of listAgentIdsByPrefixSync(`agent-${issueId.toLowerCase()}-review`)) {
     await removeAgent(agentId);

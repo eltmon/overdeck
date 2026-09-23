@@ -31,10 +31,10 @@ vi.mock('../../../../src/lib/cloister/validation.js', () => ({
   },
   // Stand-in for the real gate runner: every gate it is handed "passes", and
   // the result list is exactly the gates that would have run on the host.
-  runQualityGates: (gates: Record<string, unknown>, ...rest: unknown[]) => Effect.sync(() => {
+  runQualityGates: async (gates: Record<string, unknown>, ...rest: unknown[]) => {
     mockRunQualityGates(gates, ...rest);
     return Object.keys(gates).map((name) => ({ name, passed: true, required: true, output: '', durationMs: 1 }));
-  }),
+  },
 }));
 
 vi.mock('../../../../src/lib/cloister/pr-facts.js', () => ({
@@ -63,7 +63,7 @@ vi.mock('../../../../src/lib/agents.js', () => ({
   stopAgent: (...args: unknown[]) => { mockStopAgent(...args); return Effect.void; },
 }));
 vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
-  writeFeedbackFile: vi.fn(() => Effect.succeed({ success: true, filePath: '/tmp/feedback.md' })),
+  writeFeedbackFile: vi.fn(async () => ({ success: true, filePath: '/tmp/feedback.md' })),
 }));
 vi.mock('../../../../src/lib/telemetry/pipeline.js', () => ({ capturePipelineStageForIssue: vi.fn() }));
 vi.mock('../../../../src/lib/github-app.js', () => ({ postOverdeckTestsStatus: vi.fn(async () => undefined) }));
@@ -152,9 +152,9 @@ function project(verification?: { tests?: 'ci' | 'local' }) {
 }
 
 async function verify() {
-  return Effect.runPromise(runVerificationForIssueInProcess(
+  return runVerificationForIssueInProcess(
     'PAN-3965', workspacePath, { isRemote: false }, 'test', { syncTargetBranch: false, skipPlanChecklist: true },
-  ));
+  );
 }
 
 describe('verification gate with tests on CI (PAN-3965)', () => {

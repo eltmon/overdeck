@@ -68,12 +68,12 @@ vi.mock('../../../../src/lib/cloister/conflict-gate.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/cloister/review-context.js', () => ({
-  buildReviewContext: vi.fn(() => Effect.succeed({ manifestPath: '/tmp/manifest.json', changedFiles: [] })),
+  buildReviewContext: vi.fn(async () => ({ manifestPath: '/tmp/manifest.json', changedFiles: [] })),
   formatTier1Summary: vi.fn(() => ''),
 }));
 
 vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
-  archiveFeedbackFiles: vi.fn(() => Effect.succeed(undefined)),
+  archiveFeedbackFiles: vi.fn(async () => undefined),
 }));
 
 
@@ -156,7 +156,7 @@ describe('guard-advancing-dispatch', () => {
     mockShouldSkipDispatchAsMerged.mockResolvedValue({ skip: true, reason: 'GitHub PR #2420 is merged' });
     mockSpawnRun.mockRejectedValue(new Error('spawnRun should not be called'));
 
-    await Effect.runPromise(onIssueStateChange('PAN-2420', 'in_progress'));
+    await onIssueStateChange('PAN-2420', 'in_progress');
 
     expect(mockShouldSkipDispatchAsMerged).toHaveBeenCalledWith('PAN-2420');
     expect(mockSpawnRun).not.toHaveBeenCalled();
@@ -166,7 +166,7 @@ describe('guard-advancing-dispatch', () => {
     mockShouldSkipDispatchAsMerged.mockResolvedValue({ skip: false, reason: 'open' });
     mockSpawnRun.mockResolvedValue({ id: 'work-run-123' });
 
-    await Effect.runPromise(onIssueStateChange('PAN-2420', 'in_progress'));
+    await onIssueStateChange('PAN-2420', 'in_progress');
 
     expect(mockSpawnRun).toHaveBeenCalledWith('PAN-2420', 'work', expect.objectContaining({
       prompt: expect.stringContaining('in_progress'),

@@ -27,7 +27,6 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { Effect } from 'effect';
 import { getAgentStateSync, messageAgent } from '../agents.js';
 import { findProjectByPathSync, resolveProjectFromIssueSync } from '../projects.js';
 import { writeFeedbackFile } from './feedback-writer.js';
@@ -339,7 +338,7 @@ async function surfaceNeedsYou(
  * count. Recorded as a passed per-run artifact (`via: 'ci'`); the dashboard's
  * latest verification record is left as the local gate wrote it.
  */
-async function recordCiTestGatePassPromise(
+async function recordCiTestGatePassInQueue(
   opts: CiTestGatePassOptions,
   deps: CiFailureFeedbackDeps = {},
 ): Promise<boolean> {
@@ -385,12 +384,13 @@ export interface CiTestGatePassOptions {
   source: string;
 }
 
-/** Effect variant of {@link recordCiTestGatePassPromise}. */
-export const recordCiTestGatePass = (
+/** Record a green CI test job on the PR head; one CI record per issue at a time. */
+export function recordCiTestGatePass(
   opts: CiTestGatePassOptions,
   deps: CiFailureFeedbackDeps = {},
-): Effect.Effect<boolean> => Effect.promise(() =>
-  withIssueQueue(opts.issueId.toUpperCase(), () => recordCiTestGatePassPromise(opts, deps)));
+): Promise<boolean> {
+  return withIssueQueue(opts.issueId.toUpperCase(), () => recordCiTestGatePassInQueue(opts, deps));
+}
 
 function agentIdForIssue(issueId: string): string {
   return `agent-${issueId.toLowerCase()}`;
@@ -582,7 +582,7 @@ async function deliverCiTestGateFeedback(
   }
 }
 
-async function relayCiFailureFeedbackPromise(
+async function relayCiFailureFeedbackInQueue(
   opts: CiFailureFeedbackOptions,
   deps: CiFailureFeedbackDeps = {},
 ): Promise<CiFailureFeedbackResult> {
@@ -663,16 +663,14 @@ async function relayCiFailureFeedbackPromise(
     testGateFailed,
   });
 
-  const fileResult = await Effect.runPromise(
-    writeFeedbackFile({
+  const fileResult = await writeFeedbackFile({
       issueId,
       workspacePath,
       specialist: 'ci-monitor',
       outcome: 'failed',
       summary: `CI failure: ${failures.map((f) => f.name).join(', ') || opts.source}`.slice(0, 120),
       markdownBody,
-    }),
-  );
+    });
 
   if (!fileResult.success || !fileResult.filePath) {
     console.error(`[ci-failure-feedback] Failed to write feedback for ${issueId}: ${fileResult.error}`);
@@ -719,9 +717,10 @@ async function relayCiFailureFeedbackPromise(
   return { feedbackPath: fileResult.filePath, agentMessageSent, ...testGateFlag };
 }
 
-/** Effect variant of {@link relayCiFailureFeedbackPromise}; one relay per issue at a time. */
-export const relayCiFailureFeedback = (
+/** Relay failing CI checks to the work agent; one relay per issue at a time. */
+export function relayCiFailureFeedback(
   opts: CiFailureFeedbackOptions,
   deps: CiFailureFeedbackDeps = {},
-): Effect.Effect<CiFailureFeedbackResult> => Effect.promise(() =>
-  withIssueQueue(opts.issueId.toUpperCase(), () => relayCiFailureFeedbackPromise(opts, deps)));
+): Promise<CiFailureFeedbackResult> {
+  return withIssueQueue(opts.issueId.toUpperCase(), () => relayCiFailureFeedbackInQueue(opts, deps));
+}

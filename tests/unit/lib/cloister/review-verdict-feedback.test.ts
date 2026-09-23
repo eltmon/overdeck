@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { execFile } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -82,11 +81,11 @@ describe('deliverReviewVerdictFeedback', () => {
     mockResolveProjectFromIssue.mockReturnValue(null);
     mockMessageAgent.mockResolvedValue({ delivered: true, queuedToMail: false });
     mockGetPrFacts.mockResolvedValue(prFacts());
-    mockWriteFeedbackFile.mockReturnValue(Effect.succeed({
+    mockWriteFeedbackFile.mockResolvedValue({
       success: true,
       filePath: '/tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md',
       relativePath: '.pan/feedback/001-review-agent-changes-requested.md',
-    }));
+    });
     mockResolveIssueFeedbackTarget.mockResolvedValue({ agentId: 'agent-pan-1059' });
     vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
@@ -102,13 +101,13 @@ describe('deliverReviewVerdictFeedback', () => {
     await writeFile(join(reviewDir, 'synthesis.md'), '## Verdict\n\nRequest changes for correctness.');
 
     const { deliverReviewVerdictFeedback } = await import('../../../../src/lib/cloister/review-verdict-feedback.js');
-    const result = await Effect.runPromise(deliverReviewVerdictFeedback({
+    const result = await deliverReviewVerdictFeedback({
       issueId: 'pan-1059',
       verdict: 'blocked',
       notes: 'correctness blocker',
       workspacePath: workspace,
       runId: 'agent-pan-1059-review-abcdef12',
-    }));
+    });
 
     expect(result.prCommentPosted).toBe(true);
     expect(result.agentMessageSent).toBe(true);
@@ -160,8 +159,8 @@ describe('deliverReviewVerdictFeedback', () => {
       runId: 'agent-pan-1059-review-abcdef12',
     };
 
-    await Effect.runPromise(deliverReviewVerdictFeedback(options));
-    await Effect.runPromise(deliverReviewVerdictFeedback(options));
+    await deliverReviewVerdictFeedback(options);
+    await deliverReviewVerdictFeedback(options);
 
     const firstKey = mockMessageAgent.mock.calls[0]![3].dedupKey;
     const secondKey = mockMessageAgent.mock.calls[1]![3].dedupKey;
@@ -176,16 +175,16 @@ describe('deliverReviewVerdictFeedback', () => {
       '../../../../src/lib/cloister/review-verdict-feedback.js'
     );
 
-    const firstResult = await Effect.runPromise(deliverReviewVerdictFeedback({
+    const firstResult = await deliverReviewVerdictFeedback({
       issueId: 'PAN-1059',
       verdict: 'blocked',
       runId: 'agent-pan-1059-review-abcdef12',
-    }));
-    const secondResult = await Effect.runPromise(deliverReviewVerdictFeedback({
+    });
+    const secondResult = await deliverReviewVerdictFeedback({
       issueId: 'PAN-1059',
       verdict: 'blocked',
       runId: 'agent-pan-1059-review-fedcba98',
-    }));
+    });
 
     expect(firstResult.agentMessageSent).toBe(true);
     expect(secondResult.agentMessageSent).toBe(true);
@@ -202,14 +201,14 @@ describe('deliverReviewVerdictFeedback', () => {
       '../../../../src/lib/cloister/review-verdict-feedback.js'
     );
 
-    await Effect.runPromise(deliverReviewVerdictFeedback({
+    await deliverReviewVerdictFeedback({
       issueId: 'PAN-1059',
       verdict: 'blocked',
-    }));
-    await Effect.runPromise(deliverReviewVerdictFeedback({
+    });
+    await deliverReviewVerdictFeedback({
       issueId: 'PAN-1059',
       verdict: 'blocked',
-    }));
+    });
 
     expect(mockMessageAgent.mock.calls[0]![3].dedupKey).not.toBe(
       mockMessageAgent.mock.calls[1]![3].dedupKey,
@@ -222,10 +221,10 @@ describe('deliverReviewVerdictFeedback', () => {
       '../../../../src/lib/cloister/review-verdict-feedback.js'
     );
 
-    const result = await Effect.runPromise(deliverReviewVerdictFeedback({
+    const result = await deliverReviewVerdictFeedback({
       issueId: 'PAN-1059',
       verdict: 'blocked',
-    }));
+    });
 
     expect(result.agentMessageSent).toBe(true);
     expect(mockMessageAgent).toHaveBeenCalledWith(
@@ -251,10 +250,10 @@ describe('deliverReviewVerdictFeedback', () => {
       runId: 'agent-pan-2059-review-abcdef12',
     };
 
-    await Effect.runPromise(deliverReviewVerdictFeedback(options));
+    await deliverReviewVerdictFeedback(options);
     expect(mockSurfaceIssueFeedbackNeedsYou).not.toHaveBeenCalled();
 
-    await Effect.runPromise(deliverReviewVerdictFeedback(options));
+    await deliverReviewVerdictFeedback(options);
     expect(mockSurfaceIssueFeedbackNeedsYou).toHaveBeenCalledOnce();
     expect(mockSurfaceIssueFeedbackNeedsYou).toHaveBeenCalledWith(
       'PAN-2059',
@@ -265,7 +264,7 @@ describe('deliverReviewVerdictFeedback', () => {
       },
     );
 
-    await Effect.runPromise(deliverReviewVerdictFeedback(options));
+    await deliverReviewVerdictFeedback(options);
     expect(mockSurfaceIssueFeedbackNeedsYou).toHaveBeenCalledOnce();
   });
 
@@ -284,12 +283,12 @@ describe('deliverReviewVerdictFeedback', () => {
       runId: 'agent-pan-3059-review-abcdef12',
     };
 
-    await Effect.runPromise(deliverReviewVerdictFeedback(options));
-    await Effect.runPromise(deliverReviewVerdictFeedback(options));
+    await deliverReviewVerdictFeedback(options);
+    await deliverReviewVerdictFeedback(options);
     expect(mockSurfaceIssueFeedbackNeedsYou).toHaveBeenCalledOnce();
 
-    await Effect.runPromise(deliverReviewVerdictFeedback(options));
-    await Effect.runPromise(deliverReviewVerdictFeedback(options));
+    await deliverReviewVerdictFeedback(options);
+    await deliverReviewVerdictFeedback(options);
 
     expect(mockSurfaceIssueFeedbackNeedsYou).toHaveBeenCalledOnce();
   });
@@ -304,11 +303,11 @@ describe('deliverReviewVerdictFeedback', () => {
       '../../../../src/lib/cloister/review-verdict-feedback.js'
     );
 
-    const result = await Effect.runPromise(deliverReviewVerdictFeedback({
+    const result = await deliverReviewVerdictFeedback({
       issueId: 'PAN-1059',
       verdict: 'blocked',
       runId: 'agent-pan-1059-review-abcdef12',
-    }));
+    });
 
     expect(result.agentMessageSent).toBe(true);
     expect(mockMessageAgent).toHaveBeenCalledTimes(2);
@@ -326,11 +325,11 @@ describe('ambiguous keyed delivery retry (PAN-1837)', () => {
     vi.clearAllMocks();
     mockResolveProjectFromIssue.mockReturnValue(null);
     mockGetPrFacts.mockResolvedValue(prFacts());
-    mockWriteFeedbackFile.mockReturnValue(Effect.succeed({
+    mockWriteFeedbackFile.mockResolvedValue({
       success: true,
       filePath: '/tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md',
       relativePath: '.pan/feedback/001-review-agent-changes-requested.md',
-    }));
+    });
     mockResolveIssueFeedbackTarget.mockResolvedValue({ agentId: 'agent-pan-1059' });
     vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
@@ -401,13 +400,13 @@ describe('ambiguous keyed delivery retry (PAN-1837)', () => {
         .mockResolvedValueOnce({ delivered: true, queuedToMail: false });
 
       const { deliverReviewVerdictFeedback } = await import('../../../../src/lib/cloister/review-verdict-feedback.js');
-      const promise = Effect.runPromise(deliverReviewVerdictFeedback({
+      const promise = deliverReviewVerdictFeedback({
         issueId: 'pan-1059',
         verdict: 'blocked',
         notes: 'correctness blocker',
         workspacePath: workspace,
         runId: 'agent-pan-1059-review-abcdef12',
-      }));
+      });
       const result = await settleWithFakeTimers(promise);
 
       expect(result.agentMessageSent).toBe(true);
@@ -429,13 +428,13 @@ describe('ambiguous keyed delivery retry (PAN-1837)', () => {
       mockMessageAgent.mockRejectedValue(ambiguousError());
 
       const { deliverReviewVerdictFeedback } = await import('../../../../src/lib/cloister/review-verdict-feedback.js');
-      const promise = Effect.runPromise(deliverReviewVerdictFeedback({
+      const promise = deliverReviewVerdictFeedback({
         issueId: 'pan-1059',
         verdict: 'blocked',
         notes: 'correctness blocker',
         workspacePath: workspace,
         runId: 'agent-pan-1059-review-abcdef12',
-      }));
+      });
       const result = await settleWithFakeTimers(promise);
 
       expect(result.agentMessageSent).toBe(false);

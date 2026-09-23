@@ -1164,7 +1164,7 @@ program
     console.log(chalk.dim('Stopping review sessions...'));
     try {
       const { killAllReviewSessions } = await import('../lib/cloister/review-agent.js');
-      const { killed, failed } = await Effect.runPromise(killAllReviewSessions());
+      const { killed, failed } = await killAllReviewSessions();
       if (killed.length > 0) {
         console.log(chalk.green(`✓ Stopped ${killed.length} review session(s)`));
       }

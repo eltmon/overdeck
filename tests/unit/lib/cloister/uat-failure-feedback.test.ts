@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -30,7 +29,6 @@ import {
   clearUatFailureFeedbackAnchor,
   MAX_UAT_FAILURE_FEEDBACK_ANCHORS,
   relayUatFailureFeedback,
-  relayUatFailureFeedbackPromise,
   resetUatFailureFeedbackStateForTests,
   UAT_AMBIGUOUS_DELIVERY_RETRY_MS,
   uatFeedbackDedupKey,
@@ -43,11 +41,11 @@ describe('relayUatFailureFeedback', () => {
     vi.clearAllMocks();
     resetUatFailureFeedbackStateForTests();
     mocks.resolveProjectFromIssueSync.mockReturnValue(null);
-    mocks.writeFeedbackFile.mockReturnValue(Effect.succeed({
+    mocks.writeFeedbackFile.mockResolvedValue({
       success: true,
       filePath: feedbackPath,
       relativePath: '.pan/feedback/001-uat-agent-failed.md',
-    }));
+    });
     mocks.resolveIssueFeedbackTarget.mockResolvedValue({ agentId: 'agent-pan-3575' });
     mocks.messageAgent.mockResolvedValue({ delivered: true, queuedToMail: false });
     mocks.surfaceIssueFeedbackNeedsYou.mockResolvedValue(undefined);
@@ -55,12 +53,12 @@ describe('relayUatFailureFeedback', () => {
   });
 
   it('writes UAT notes and delivers the feedback file to the resolved work agent', async () => {
-    const result = await Effect.runPromise(relayUatFailureFeedback({
+    const result = await relayUatFailureFeedback({
       issueId: 'pan-3575',
       uatNotes: 'The save button did not persist the record.',
       workspacePath: '/tmp/workspace',
       anchor: 'head-one',
-    }));
+    });
 
     expect(result).toEqual({
       feedbackPath,
@@ -90,10 +88,10 @@ describe('relayUatFailureFeedback', () => {
       reason: 'No live feedback target for PAN-3575',
     });
 
-    const result = await Effect.runPromise(relayUatFailureFeedback({
+    const result = await relayUatFailureFeedback({
       issueId: 'PAN-3575',
       anchor: 'head-one',
-    }));
+    });
 
     expect(result).toEqual(expect.objectContaining({
       agentMessageSent: false,
@@ -110,10 +108,10 @@ describe('relayUatFailureFeedback', () => {
   it('escalates a resolved agent delivery failure with the agent id and error', async () => {
     mocks.messageAgent.mockRejectedValue(new Error('PTY supervisor unavailable'));
 
-    const result = await Effect.runPromise(relayUatFailureFeedback({
+    const result = await relayUatFailureFeedback({
       issueId: 'PAN-3575',
       anchor: 'head-one',
-    }));
+    });
 
     expect(result).toEqual(expect.objectContaining({
       agentMessageSent: false,
@@ -133,10 +131,10 @@ describe('relayUatFailureFeedback', () => {
       reason: 'target session is unavailable',
     });
 
-    const result = await Effect.runPromise(relayUatFailureFeedback({
+    const result = await relayUatFailureFeedback({
       issueId: 'PAN-3575',
       anchor: 'head-one',
-    }));
+    });
 
     expect(result).toEqual(expect.objectContaining({
       agentMessageSent: false,
@@ -152,10 +150,10 @@ describe('relayUatFailureFeedback', () => {
   it('surfaces needs-you when feedback target resolution fails after persistence', async () => {
     mocks.resolveIssueFeedbackTarget.mockRejectedValue(new Error('agent registry unavailable'));
 
-    const result = await Effect.runPromise(relayUatFailureFeedback({
+    const result = await relayUatFailureFeedback({
       issueId: 'PAN-3575',
       anchor: 'head-one',
-    }));
+    });
 
     expect(result).toEqual(expect.objectContaining({
       feedbackPath,
@@ -170,9 +168,9 @@ describe('relayUatFailureFeedback', () => {
   });
 
   it('deduplicates repeated verdict anchors and accepts a later anchor', async () => {
-    const first = await Effect.runPromise(relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one' }));
-    const duplicate = await Effect.runPromise(relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one' }));
-    const later = await Effect.runPromise(relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-two' }));
+    const first = await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one' });
+    const duplicate = await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one' });
+    const later = await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-two' });
 
     expect(first.deduplicated).toBe(false);
     expect(duplicate).toEqual({
@@ -187,31 +185,31 @@ describe('relayUatFailureFeedback', () => {
 
   it('bounds dedup state so terminal-cleanup delays cannot retain historical failures indefinitely', async () => {
     for (let index = 0; index <= MAX_UAT_FAILURE_FEEDBACK_ANCHORS; index++) {
-      await Effect.runPromise(relayUatFailureFeedback({
+      await relayUatFailureFeedback({
         issueId: `PAN-${index}`,
         anchor: `head-${index}`,
-      }));
+      });
     }
 
-    const replayed = await Effect.runPromise(relayUatFailureFeedback({
+    const replayed = await relayUatFailureFeedback({
       issueId: 'PAN-0',
       anchor: 'head-0',
-    }));
+    });
 
     expect(replayed.deduplicated).toBe(false);
     expect(mocks.writeFeedbackFile).toHaveBeenCalledTimes(MAX_UAT_FAILURE_FEEDBACK_ANCHORS + 2);
   });
 
   it('clears an anchor for a new UAT cycle and retries a failed feedback write', async () => {
-    await Effect.runPromise(relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one' }));
+    await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one' });
     clearUatFailureFeedbackAnchor('pan-3575');
-    await Effect.runPromise(relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one' }));
+    await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one' });
     expect(mocks.writeFeedbackFile).toHaveBeenCalledTimes(2);
 
     resetUatFailureFeedbackStateForTests();
-    mocks.writeFeedbackFile.mockReturnValue(Effect.succeed({ success: false, error: 'disk unavailable' }));
-    const failed = await Effect.runPromise(relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-two' }));
-    const retry = await Effect.runPromise(relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-two' }));
+    mocks.writeFeedbackFile.mockResolvedValue({ success: false, error: 'disk unavailable' });
+    const failed = await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-two' });
+    const retry = await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-two' });
 
     const key = uatFeedbackDedupKey('PAN-3575', 'head-two');
     expect(failed).toEqual({ agentMessageSent: false, needsYouSurfaced: false, deduplicated: false, dedupKey: key });
@@ -238,7 +236,7 @@ describe('relayUatFailureFeedback', () => {
       // keyed store reports the message was already delivered.
       mocks.messageAgent.mockResolvedValue({ delivered: true, queuedToMail: false, deduplicated: true });
 
-      const result = await relayUatFailureFeedbackPromise({
+      const result = await relayUatFailureFeedback({
         issueId: 'PAN-3575',
         uatNotes: 'Criterion 2 unmet.',
         anchor: 'abc123',
@@ -253,7 +251,7 @@ describe('relayUatFailureFeedback', () => {
     });
 
     it('omits the key when no anchor is known', async () => {
-      const result = await relayUatFailureFeedbackPromise({ issueId: 'PAN-3575', uatNotes: 'x' });
+      const result = await relayUatFailureFeedback({ issueId: 'PAN-3575', uatNotes: 'x' });
 
       expect(result.dedupKey).toBeUndefined();
       expect(mocks.messageAgent).toHaveBeenCalledWith(
@@ -271,7 +269,7 @@ describe('relayUatFailureFeedback', () => {
         .mockRejectedValueOnce(ambiguous)
         .mockResolvedValueOnce({ delivered: true, queuedToMail: false });
 
-      const pending = relayUatFailureFeedbackPromise({ issueId: 'PAN-3575', uatNotes: 'x', anchor: 'abc123' });
+      const pending = relayUatFailureFeedback({ issueId: 'PAN-3575', uatNotes: 'x', anchor: 'abc123' });
       await vi.advanceTimersByTimeAsync(UAT_AMBIGUOUS_DELIVERY_RETRY_MS);
       const result = await pending;
 
@@ -288,7 +286,7 @@ describe('relayUatFailureFeedback', () => {
         .mockRejectedValueOnce(new Error('MessageDeliveryFailed: keyed delivery failed for agent-pan-3575 (internal): the ACP tier cannot enforce a dedup key'))
         .mockResolvedValueOnce({ delivered: true, queuedToMail: false });
 
-      const result = await relayUatFailureFeedbackPromise({ issueId: 'PAN-3575', uatNotes: 'x', anchor: 'abc123' });
+      const result = await relayUatFailureFeedback({ issueId: 'PAN-3575', uatNotes: 'x', anchor: 'abc123' });
 
       expect(result.agentMessageSent).toBe(true);
       expect(mocks.messageAgent).toHaveBeenLastCalledWith(

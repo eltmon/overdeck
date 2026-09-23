@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { join } from 'path';
 
@@ -40,7 +39,7 @@ const PASSING_GATE_RESULT = [{ name: 'lint', passed: true, required: true, outpu
 describe('runProjectQualityGates — polyrepo path filtering', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRunQualityGates.mockReturnValue(Effect.succeed(PASSING_GATE_RESULT) as any);
+    mockRunQualityGates.mockResolvedValue(PASSING_GATE_RESULT as any);
   });
 
   it('runs all gates in monorepo context (repoRelPath is empty)', async () => {

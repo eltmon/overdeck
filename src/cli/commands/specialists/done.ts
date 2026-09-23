@@ -234,13 +234,13 @@ export async function doneCommand(
     // session, so a hung delivery leaves that agent waiting forever. Bound it.
     try {
       const { deliverReviewVerdictFeedback } = await import('../../../lib/cloister/review-verdict-feedback.js');
-      await withFeedbackDeadline(Effect.runPromise(deliverReviewVerdictFeedback({
+      await withFeedbackDeadline(deliverReviewVerdictFeedback({
         issueId: normalizedIssueId,
         verdict: options.status,
         notes: options.notes,
         prUrl: artifact.url,
         ...(options.runId ? { runId: options.runId } : {}),
-      })));
+      }));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (err instanceof FeedbackDeliveryTimeoutError) {
@@ -269,7 +269,7 @@ export async function doneCommand(
   if (uatOutcome === 'failed') {
     const uatNotes = role === 'test' ? options.uatNotes : options.notes;
     try {
-      const { relayUatFailureFeedbackPromise } = await import('../../../lib/cloister/uat-failure-feedback.js');
+      const { relayUatFailureFeedback } = await import('../../../lib/cloister/uat-failure-feedback.js');
       // Anchor on the commit UAT actually exercised (pre-Cut: reviewedAtCommit).
       // The test agent records it before running the gates and passes it as
       // --tested-sha. Its workspace HEAD at verdict time is no better than the
@@ -279,7 +279,7 @@ export async function doneCommand(
       // An unreadable PR head still relays; it only loses cross-run dedup.
       const anchor = options.testedSha?.toLowerCase() ?? await getPrFacts(normalizedIssueId)
         .then((facts) => facts.headSha ?? undefined, () => undefined);
-      await withFeedbackDeadline(relayUatFailureFeedbackPromise({
+      await withFeedbackDeadline(relayUatFailureFeedback({
         issueId: normalizedIssueId,
         uatNotes,
         workspacePath,

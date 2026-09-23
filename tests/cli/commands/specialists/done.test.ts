@@ -33,7 +33,7 @@ const {
 }));
 
 vi.mock('../../../../src/lib/cloister/uat-failure-feedback.js', () => ({
-  relayUatFailureFeedbackPromise: mockRelayUatFailureFeedback,
+  relayUatFailureFeedback: mockRelayUatFailureFeedback,
   clearUatFailureFeedbackAnchor: mockClearUatFailureFeedbackAnchor,
 }));
 
@@ -103,11 +103,11 @@ describe('specialists done command', () => {
     mockRelayUatFailureFeedback.mockResolvedValue({
       agentMessageSent: true, needsYouSurfaced: false, deduplicated: false,
     });
-    mockDeliverReviewVerdictFeedback.mockReturnValue(Effect.succeed({
+    mockDeliverReviewVerdictFeedback.mockResolvedValue({
       feedbackPath: '/workspace/.pan/feedback/001-review-agent-changes-requested.md',
       prCommentPosted: true,
       agentMessageSent: true,
-    }));
+    });
   });
 
   afterEach(() => {
@@ -407,7 +407,7 @@ describe('specialists done command', () => {
 
   it('PAN-2524/PAN-3642: surfaces needs-you when feedback delivery exceeds the advisory deadline', async () => {
     vi.useFakeTimers();
-    mockDeliverReviewVerdictFeedback.mockReturnValue(Effect.never);
+    mockDeliverReviewVerdictFeedback.mockReturnValue(new Promise(() => {}));
     const {
       doneCommand,
       FEEDBACK_DELIVERY_TIMEOUT_MS,

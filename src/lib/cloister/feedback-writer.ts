@@ -8,7 +8,7 @@
 import { existsSync } from 'fs';
 import { readdir } from 'fs/promises';
 import { join } from 'path';
-import { Data, Effect } from 'effect';
+import { Effect } from 'effect';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { clearFeedback, getWorkspacePanPaths, readFeedback, writeFeedback } from '../pan-dir/index.js';
 import { appendContinueSessionEntryForIssue, appendFeedbackEntryForIssue, clearFeedbackForIssue, readContinueStateForIssue } from '../xbrief/lifecycle-io.js';
@@ -49,7 +49,13 @@ async function getNextSequenceNumber(feedbackDir: string): Promise<number> {
   } catch {
     return 1;
   }
-}async function clearFeedbackFilesPromise(workspacePath: string): Promise<void> {
+}
+
+/**
+ * Clear the previous cycle's feedback: the scope continue file's feedback[]
+ * and the workspace `.pan/feedback/` mirror.
+ */
+export async function clearFeedbackFiles(workspacePath: string): Promise<void> {
   const { feedbackDir } = getWorkspacePanPaths(workspacePath);
 
   // Also clear the continue file's feedback[] (Layer 1+).
@@ -88,7 +94,13 @@ async function getNextSequenceNumber(feedbackDir: string): Promise<number> {
  * @deprecated Alias kept for backward compatibility with in-flight code paths.
  * Prefer `clearFeedbackFiles` directly.
  */
-async function writeFeedbackFilePromise(opts: WriteFeedbackOptions): Promise<WriteFeedbackResult> {
+export const archiveFeedbackFiles = clearFeedbackFiles;
+
+/**
+ * Write one specialist feedback entry to the scope continue file and mirror it
+ * into the workspace `.pan/feedback/NNN-<specialist>-<outcome>.md`.
+ */
+export async function writeFeedbackFile(opts: WriteFeedbackOptions): Promise<WriteFeedbackResult> {
   const timestamp = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   const shortTimestamp = timestamp.replace(/:\d{2}Z$/, 'Z');
 
@@ -173,43 +185,3 @@ async function writeFeedbackFilePromise(opts: WriteFeedbackOptions): Promise<Wri
   );
   return { success: true, relativePath, filePath };
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Tagged error for feedback-writer Effect variants. */
-export class FeedbackWriteError extends Data.TaggedError('FeedbackWriteError')<{
-  readonly issueId: string;
-  readonly stage: string;
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
-
-/** Effect variant of `clearFeedbackFiles`. */
-export const clearFeedbackFiles = (workspacePath: string): Effect.Effect<void, FeedbackWriteError> =>
-  Effect.tryPromise({
-    try: () => clearFeedbackFilesPromise(workspacePath),
-    catch: (cause) =>
-      new FeedbackWriteError({
-        issueId: workspacePath,
-        stage: 'clearFeedbackFiles',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-export const archiveFeedbackFiles = clearFeedbackFiles;
-
-/** Effect variant of `writeFeedbackFile`. */
-export const writeFeedbackFile = (
-  opts: WriteFeedbackOptions,
-): Effect.Effect<WriteFeedbackResult, FeedbackWriteError> =>
-  Effect.tryPromise({
-    try: () => writeFeedbackFilePromise(opts),
-    catch: (cause) =>
-      new FeedbackWriteError({
-        issueId: opts.issueId,
-        stage: 'writeFeedbackFile',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });

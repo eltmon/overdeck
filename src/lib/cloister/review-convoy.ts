@@ -77,9 +77,8 @@ function reviewerAgentOutputPath(workspace: string, runId: string, subRole: Revi
   return join(workspace, PAN_DIRNAME, 'review', runId, `${subRole}.md`);
 }
 
-
-
-async function buildConvoyPromptPromise(opts: {
+/** Render the prompt for one convoy sub-reviewer. Template read failures reject. */
+export async function buildConvoyPrompt(opts: {
   issueId: string;
   subRole: string;
   outputPath: string;
@@ -137,9 +136,11 @@ async function buildConvoyPromptPromise(opts: {
   return prompt;
 }
 
-
-
-async function spawnReviewSubRoleForIssuePromise(opts: {
+/**
+ * Spawn (or resume) one convoy sub-reviewer. Errors are aggregated into the
+ * structured result instead of rejecting.
+ */
+export async function spawnReviewSubRoleForIssue(opts: {
   issueId: string;
   workspace: string;
   subRole: ReviewSubRole;
@@ -177,14 +178,14 @@ async function spawnReviewSubRoleForIssuePromise(opts: {
       }
     }
 
-    const prompt = await Effect.runPromise(buildConvoyPrompt({
+    const prompt = await buildConvoyPrompt({
       issueId: opts.issueId,
       subRole: opts.subRole,
       outputPath,
       synthesisAgentId,
       contextManifestPath: opts.contextManifestPath,
       tier1Summary,
-    }));
+    });
 
     // PAN-1862: convoy sub-reviewers RESUME by default too — same rule as quick review. Each
     // lane keeps its prior round's context so a re-review checks the fix instead of re-reading
@@ -310,7 +311,7 @@ export async function launchConvoyReviewersPromise(params: ConvoyLaunchParams): 
   const reviewerResults = await Promise.all((params.subRoles ?? REVIEW_SUB_ROLES).map(async (subRole) => {
     const outputPath = reviewerAgentOutputPath(params.workspace, params.runId, subRole);
 
-    const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
+    const result = await spawnReviewSubRoleForIssue({
       issueId: params.issueId,
       workspace: params.workspace,
       subRole,
@@ -321,7 +322,7 @@ export async function launchConvoyReviewersPromise(params: ConvoyLaunchParams): 
       ...(params.model ? { model: params.model } : {}),
       ...(params.harness ? { harness: params.harness } : {}),
       allowHost: params.allowHost ?? false,
-    }));
+    });
     if (!result.success) {
       try {
         const { messageAgent } = await import('../agents.js');
@@ -353,43 +354,6 @@ export async function launchConvoyReviewersPromise(params: ConvoyLaunchParams): 
   });
   return reviewerResults;
 }
-
-
-
-export const buildConvoyPrompt = (opts: {
-  issueId: string;
-  subRole: string;
-  outputPath: string;
-  synthesisAgentId: string;
-  contextManifestPath?: string;
-  tier1Summary?: string;
-}): Effect.Effect<string> => Effect.promise(() => buildConvoyPromptPromise(opts));
-
-/**
- * Effect variant of {@link spawnReviewSubRoleForIssue}. The Promise version
- * already aggregates errors into the structured result shape, so the Effect
- * form lifts via `Effect.promise`.
- */
-export const spawnReviewSubRoleForIssue = (opts: {
-  issueId: string;
-  workspace: string;
-  subRole: ReviewSubRole;
-  runId: string;
-  outputPath?: string;
-  contextManifestPath?: string;
-  synthesisAgentId?: string;
-  model?: string;
-  harness?: RuntimeName;
-  allowHost?: boolean;
-}): Effect.Effect<{ success: boolean; message: string; error?: string; sessionId?: string }> =>
-  Effect.promise(() => spawnReviewSubRoleForIssuePromise(opts));
-
-/**
- * Effect variant of {@link spawnReviewRoleForIssue}. The Promise version
- * returns a structured result instead of throwing, so the Effect form lifts
- * via `Effect.promise`.
- */
-
 
 /**
  * Re-launch only convoy lanes whose report and session are both absent for the

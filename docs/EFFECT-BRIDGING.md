@@ -9,10 +9,10 @@ its fiber runs and its typed error channel remains available to the caller.
 const module = yield* Effect.promise(() => import('./module.js'));
 
 // Correct: the callee already returns an Effect.
-const result = yield* writeFeedbackFile(options);
+yield* autoRevertMerge(projectPath);
 
 // Incorrect: this creates an Effect that tries to await another Effect.
-const result = yield* Effect.promise(() => writeFeedbackFile(options));
+yield* Effect.promise(() => autoRevertMerge(projectPath));
 ```
 
 ## Failure mode

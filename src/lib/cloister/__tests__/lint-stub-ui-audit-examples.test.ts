@@ -11,7 +11,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildReviewContextPromise, formatTier1Summary } from '../review-context.js';
+import { buildReviewContext, formatTier1Summary } from '../review-context.js';
 
 vi.mock('../coderabbit-ingestion.js', () => ({
   fetchCodeRabbitFindings: vi.fn(() => Promise.resolve([])),
@@ -86,7 +86,7 @@ describe('PAN-1389 audit example: Files/Comments stub tabs', () => {
       ].join('\n') + '\n',
     );
 
-    const manifest = await buildReviewContextPromise({
+    const manifest = await buildReviewContext({
       runId: 'audit-pan-1389',
       issueId: 'PAN-1500',
       workspace,
@@ -137,7 +137,7 @@ describe('PAN-1231 audit example: Table/Timeline segmented-control modes', () =>
       ].join('\n') + '\n',
     );
 
-    const manifest = await buildReviewContextPromise({
+    const manifest = await buildReviewContext({
       runId: 'audit-pan-1231',
       issueId: 'PAN-1500',
       workspace,

@@ -455,3 +455,83 @@ Ported, not deleted:
 - settings-api: the `setRoleConfig` halves are gone, and the `getRoleConfig` and `saveSettingsApi` halves stay.
 
 The whole diff removes more `it()` calls than it adds, so the PR asks for `pan verify waive-test-removal 4007`.
+
+## CH-2: Promise-native cluster K1, `src/lib/cloister` (#4008)
+
+Every live Shape A façade in `src/lib/cloister` is gone. The name survives as an exported `async`
+function whose body is the former private implementation, so no operation was lost; only its
+calling convention changed. Callers moved per PRD D2: `await Effect.runPromise(foo(…))` became
+`await foo(…)`, and a `yield* foo(…)` inside `Effect.gen` became `yield* Effect.promise(() => foo(…))`.
+Evidence: `node scripts/audit-effect-boundary.mjs --json --usage`, `tsc --noEmit` on the root,
+dashboard and frontend projects, and the touched plus adjacent test files. Ratchet: A 187 → 161, with
+B and C unchanged.
+
+The issue title counts 24 used façades in 15 modules. The ratchet had 26 rows in 16 modules, and the
+two extra rows are the CH-1b "kept although dead" façades in this cluster: `getSpecialistHandoffStats`
+and `relayUatFailureFeedback`. Both are converted, not deleted, and their tests now call the body
+directly (D4). The CH-1b operator row for `relayUatFailureFeedback` is resolved. PAN-4030 (#4033)
+re-attached the relay in `pan admin specialists done` (`src/cli/commands/specialists/done.ts`),
+where it now runs as a plain `async` function, so the relay has a production caller again.
+
+### Shape A façades (26) → async functions
+
+| Module | Name (now `async`) | Body formerly | Note |
+| --- | --- | --- | --- |
+| `ci-failure-feedback.ts` | `recordCiTestGatePass` | `recordCiTestGatePassPromise` | body renamed `recordCiTestGatePassInQueue` (private); the public function keeps the per-issue `withIssueQueue` serialisation |
+| `ci-failure-feedback.ts` | `relayCiFailureFeedback` | `relayCiFailureFeedbackPromise` | body renamed `relayCiFailureFeedbackInQueue` (private); same queue |
+| `feedback-writer.ts` | `clearFeedbackFiles` | `clearFeedbackFilesPromise` | `archiveFeedbackFiles` alias kept (CH-8) |
+| `feedback-writer.ts` | `writeFeedbackFile` | `writeFeedbackFilePromise` | |
+| `handoff-context.ts` | `captureHandoffContext` | `captureHandoffContextPromise` | |
+| `handoff.ts` | `performHandoff` | `performHandoffPromise` | |
+| `review-agent.ts` | `killAllReviewerSessions` | `killAllReviewerSessionsPromise` | |
+| `review-agent.ts` | `killAllReviewSessions` | `killAllReviewSessionsPromise` | |
+| `review-context.ts` | `buildReviewContext` | `buildReviewContextPromise` (was exported) | tests that imported `buildReviewContextPromise` now import `buildReviewContext` |
+| `review-convoy.ts` | `buildConvoyPrompt` | `buildConvoyPromptPromise` | |
+| `review-convoy.ts` | `spawnReviewSubRoleForIssue` | `spawnReviewSubRoleForIssuePromise` | still re-exported by `review-agent.ts` |
+| `review-verdict-feedback.ts` | `deliverReviewVerdictFeedback` | `deliverReviewVerdictFeedbackPromise` | |
+| `service-reactive.ts` | `onIssueStateChange` | `onIssueStateChangePromise` | still re-exported by `service.ts` |
+| `service-reactive.ts` | `handleCloisterDomainEvent` | `handleCloisterDomainEventPromise` | still re-exported by `service.ts` |
+| `session-rotation.ts` | `buildMergeAgentMemory` | `buildMergeAgentMemoryPromise` | |
+| `session-rotation.ts` | `rotateSpecialistSession` | `rotateSpecialistSessionPromise` | |
+| `session-rotation.ts` | `checkAndRotateIfNeeded` | `checkAndRotateIfNeededPromise` | |
+| `specialist-context.ts` | `generateContextDigest` | `generateContextDigestPromise` | |
+| `specialist-context.ts` | `regenerateContextDigest` | `regenerateContextDigestPromise` | |
+| `specialist-handoff-logger.ts` | `getSpecialistHandoffStats` | `getSpecialistHandoffStatsPromise` | CH-1b kept row: test-only consumer, tests ported to the body |
+| `specialist-handoff-logger.ts` | `updateSpecialistHandoffStatus` | `updateSpecialistHandoffStatusPromise` | |
+| `triggers.ts` | `checkTaskCompletion` | `checkTaskCompletionPromise` | |
+| `triggers.ts` | `checkAllTriggers` | `checkAllTriggersPromise` | |
+| `uat-failure-feedback.ts` | `relayUatFailureFeedback` | `relayUatFailureFeedbackPromise` (was exported) | CH-1b operator row resolved: `specialists/done.ts` (#4033) calls it; its callers, tests and docs (`THE-CUT.md`, `PIPELINE-GATES.md`) use the plain name |
+| `validation.ts` | `runQualityGates` | `runQualityGatesPromise` | |
+| `verification-runner.ts` | `runVerificationForIssueInProcess` | `runVerificationForIssuePromise` | `runVerificationForIssue` (genuine Effect dispatcher, Q2) now bridges it with `Effect.promise` |
+
+All paths are relative to `src/lib/cloister/`.
+
+### Also deleted because only deleted code used them
+
+| Name | Why |
+| --- | --- |
+| `FeedbackWriteError` (`feedback-writer.ts`) | the `catch:` mapping of the two feedback-writer façades; no other reference |
+| `HandoffContextError` (`handoff-context.ts`) | the `catch:` mapping of the `captureHandoffContext` façade; no other reference |
+
+`HandoffError` (`handoff.ts`) stays. `POST /api/agents/:id/handoff` is the one Effect caller that
+bridged a former `Effect.tryPromise` façade, so it applies D2's safety-net row: it copies the old
+`catch:` mapping into `Effect.tryPromise({ try, catch: → HandoffError })`. The failure stays a
+typed failure, and the 500 body keeps the underlying message.
+
+### Not converted, with the reason
+
+`autoRevertMerge` (`validation.ts`), `spawnReviewRoleForIssue` (`review-agent.ts`) and
+`runVerificationForIssue` (`verification-runner.ts`) are not Shape A rows. Each has a body of its own
+(an `ok` check, the dispatch coalescer, the env dispatcher), so they stay Effect for Q2. Calls to
+K2-cluster façades inside these modules (`getAgentState`, `saveAgentState`, `listSessionNames`,
+`killSession`, `sessionExists`, `readFeedback`, `readPlan`, …) still use `Effect.runPromise`. CH-3
+removes them.
+
+### Tests
+
+None are deleted. The diff adds and removes no `it()`/`test()` calls. Tests that ran a former façade
+through `Effect.runPromise` now await the function. Mocks that returned `Effect.succeed(v)` /
+`Effect.void` / `Effect.sync(…)` / `Effect.never` now return a Promise (`mockResolvedValue(v)`,
+`async () => v`, `new Promise(() => {})`). `review-context.test.ts` "throws when workspace does not
+exist" now asserts the message on the rejection itself, since there is no `FsError` wrapper; the
+assertion is unchanged.

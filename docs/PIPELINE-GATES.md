@@ -166,7 +166,7 @@ evidence.
 A failed browser UAT is observed where the test agent records it:
 `pan admin specialists done test <id> --uat-status failed` (or the `uat`
 role). After posting the verdict comment, that command relays the UAT notes
-through `relayUatFailureFeedbackPromise` (`cloister/uat-failure-feedback.ts`)
+through `relayUatFailureFeedback` (`cloister/uat-failure-feedback.ts`)
 to the work agent, or to a needs-you when no agent can be reached. Delivery
 carries a key derived from the tested commit (`--tested-sha`, else the PR
 head), which the tmux/PTY-supervisor tiers

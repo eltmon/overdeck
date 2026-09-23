@@ -71,7 +71,7 @@ const {
   mockGetCachedConflictGateMergeability: vi.fn(() => undefined),
   mockSetReviewStatus: vi.fn(),
   mockGetReviewStatus: vi.fn(() => null),
-  mockArchiveFeedbackFiles: vi.fn(() => Effect.void),
+  mockArchiveFeedbackFiles: vi.fn(async () => undefined),
   mockLoadConfigSync: vi.fn(() => ({ config: {} })),
   mockGetLatestSessionIdSync: vi.fn(() => null),
   mockResumeAgent: vi.fn().mockResolvedValue({ success: false, error: 'no session' }),
@@ -187,7 +187,7 @@ beforeEach(() => {
   mockBuildRealConflictGateDeps.mockReturnValue({ real: true });
   mockResolveConflictGate.mockResolvedValue({ gated: false });
   mockGetCachedConflictGateMergeability.mockReturnValue(undefined);
-  mockArchiveFeedbackFiles.mockReturnValue(Effect.void);
+  mockArchiveFeedbackFiles.mockResolvedValue(undefined);
   mockConvergeRowFromVerdictOfRecord.mockResolvedValue({ converged: false });
 });
 
@@ -291,7 +291,7 @@ describe('killAllReviewSessions', () => {
       'agent-pan-999-work',
     ]));
 
-    const result = await Effect.runPromise(killAllReviewSessions());
+    const result = await killAllReviewSessions();
 
     expect(result.killed).toEqual(expect.arrayContaining([
       'agent-pan-999-review',
@@ -310,7 +310,7 @@ describe('killAllReviewSessions', () => {
       'agent-pan-999',
     ]));
 
-    const result = await Effect.runPromise(killAllReviewSessions());
+    const result = await killAllReviewSessions();
 
     expect(result.killed).toContain('review-coordinator-PAN-999-1234567890000');
     expect(result.killed).toContain('review-coordinator-PAN-888-1234567890001');
@@ -326,7 +326,7 @@ describe('killAllReviewSessions', () => {
       'agent-pan-999',
     ]));
 
-    const result = await Effect.runPromise(killAllReviewSessions());
+    const result = await killAllReviewSessions();
 
     expect(result.killed).toContain('specialist-overdeck-PAN-999-review-correctness');
     expect(result.killed).toContain('specialist-overdeck-PAN-999-review-security');
@@ -340,7 +340,7 @@ describe('killAllReviewSessions', () => {
       'review-PAN-999-1713456789000-security',
     ]));
 
-    const result = await Effect.runPromise(killAllReviewSessions());
+    const result = await killAllReviewSessions();
 
     expect(result.killed).toContain('review-PAN-999-1713456789000-correctness');
     expect(result.killed).toContain('review-PAN-999-1713456789000-security');
@@ -354,7 +354,7 @@ describe('killAllReviewSessions', () => {
       'overdeck-dashboard',
     ]));
 
-    const result = await Effect.runPromise(killAllReviewSessions());
+    const result = await killAllReviewSessions();
 
     expect(result.killed).toHaveLength(0);
     expect(result.failed).toHaveLength(0);
@@ -368,7 +368,7 @@ describe('killAllReviewSessions', () => {
     ]));
     mockKillSessionAsync.mockRejectedValueOnce(new Error('session not found'));
 
-    const result = await Effect.runPromise(killAllReviewSessions());
+    const result = await killAllReviewSessions();
 
     expect(result.killed).toHaveLength(0);
     expect(result.failed).toContain('review-coordinator-PAN-999-1234567890000');
@@ -391,7 +391,7 @@ describe('killAllReviewerSessions', () => {
       'agent-pan-999-review',
     ]));
 
-    const result = await Effect.runPromise(killAllReviewerSessions('overdeck', 'PAN-1080'));
+    const result = await killAllReviewerSessions('overdeck', 'PAN-1080');
 
     expect(result.killed).toEqual(['agent-pan-1080-review']);
     expect(mockKillSessionAsync).toHaveBeenCalledWith('agent-pan-1080-review');
@@ -409,7 +409,7 @@ describe('killAllReviewerSessions', () => {
       'agent-pan-1080',
     ]));
 
-    const result = await Effect.runPromise(killAllReviewerSessions('overdeck', 'PAN-1080'));
+    const result = await killAllReviewerSessions('overdeck', 'PAN-1080');
 
     expect(result.killed).toEqual(expect.arrayContaining([
       'agent-pan-1080-review',
@@ -738,13 +738,13 @@ describe('convoy orchestration', () => {
   });
 
   it('builds a manifest-scoped convoy prompt for one sub-role', async () => {
-    const prompt = await Effect.runPromise(buildConvoyPrompt({
+    const prompt = await buildConvoyPrompt({
       issueId: 'PAN-1059',
       subRole: 'security',
       outputPath: '/home/test/.overdeck/agents/agent-pan-1059-review-security/review-security.md',
       synthesisAgentId: 'agent-pan-1059-review',
       contextManifestPath: '/workspace/.pan/review/run-1/context.json',
-    }));
+    });
 
     expect(prompt).toContain('REVIEW TASK for PAN-1059 — SECURITY REVIEW');
     expect(prompt).toContain('/home/test/.overdeck/agents/agent-pan-1059-review-security/review-security.md');
@@ -761,13 +761,13 @@ describe('convoy orchestration', () => {
   it('uses run-scoped output paths by default', async () => {
     const manifestPath = writeReviewManifest(REVIEW_AGENT_DEFAULT_WORKSPACE);
 
-    const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
+    const result = await spawnReviewSubRoleForIssue({
       issueId: 'PAN-1059',
       workspace: REVIEW_AGENT_DEFAULT_WORKSPACE,
       subRole: 'security',
       runId: REVIEW_AGENT_RUN_ID,
       contextManifestPath: manifestPath,
-    }));
+    });
 
     expect(result.success).toBe(true);
     const expectedOutput = `${REVIEW_AGENT_DEFAULT_WORKSPACE}/.pan/review/${REVIEW_AGENT_RUN_ID}/security.md`;
@@ -781,14 +781,14 @@ describe('convoy orchestration', () => {
   it('spawns a reviewer as a review sub-role session with the resolved model', async () => {
     const manifestPath = writeReviewManifest(REVIEW_AGENT_SUBROLE_WORKSPACE);
 
-    const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
+    const result = await spawnReviewSubRoleForIssue({
       issueId: 'PAN-1059',
       workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
       subRole: 'security',
       runId: REVIEW_AGENT_RUN_ID,
       outputPath: '/tmp/pan-review-agent-test-security.md',
       contextManifestPath: manifestPath,
-    }));
+    });
 
     expect(result).toMatchObject({
       success: true,
@@ -821,14 +821,14 @@ describe('convoy orchestration', () => {
     );
     mockListSessionNames.mockReturnValue([reviewerId]);
 
-    const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
+    const result = await spawnReviewSubRoleForIssue({
       issueId: 'PAN-1059',
       workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
       subRole: 'security',
       runId: REVIEW_AGENT_RUN_ID,
       outputPath: '/tmp/pan-review-agent-test-security.md',
       contextManifestPath: writeReviewManifest(REVIEW_AGENT_SUBROLE_WORKSPACE),
-    }));
+    });
 
     expect(result).toEqual({
       success: true,
@@ -852,13 +852,13 @@ describe('convoy orchestration', () => {
         .mockRejectedValueOnce(new Error(`write failed for agents-db:${reviewerId}: SQLITE_BUSY`))
         .mockResolvedValueOnce({ id: reviewerId });
 
-      const resultPromise = Effect.runPromise(spawnReviewSubRoleForIssue({
+      const resultPromise = spawnReviewSubRoleForIssue({
         issueId: 'PAN-1059',
         workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
         subRole: 'security',
         runId: REVIEW_AGENT_RUN_ID,
         outputPath: '/tmp/pan-review-agent-test-security.md',
-      }));
+      });
       while (mockSpawnRun.mock.calls.length === 0) {
         await new Promise<void>((resolve) => { setImmediate(resolve); });
       }
@@ -888,13 +888,13 @@ describe('convoy orchestration', () => {
       error: `Cannot resume ${reviewerId}: it appears healthy (tmux session up, harness process alive) — there is nothing to resume. Stop it first if you intend to restart it.`,
     });
 
-    const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
+    const result = await spawnReviewSubRoleForIssue({
       issueId: 'PAN-1059',
       workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
       subRole: 'security',
       runId: REVIEW_AGENT_RUN_ID,
       contextManifestPath: writeReviewManifest(REVIEW_AGENT_SUBROLE_WORKSPACE),
-    }));
+    });
 
     expect(result.success).toBe(true);
     expect(mockStopAgent).toHaveBeenCalledWith(reviewerId);
@@ -917,13 +917,13 @@ describe('convoy orchestration', () => {
     mockGetLatestSessionIdSync.mockReturnValue('saved-session');
     mockResumeAgent.mockResolvedValue({ success: true, messageDelivered: true });
 
-    const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
+    const result = await spawnReviewSubRoleForIssue({
       issueId: 'PAN-1059',
       workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
       subRole: 'security',
       runId: REVIEW_AGENT_RUN_ID,
       contextManifestPath: writeReviewManifest(REVIEW_AGENT_SUBROLE_WORKSPACE),
-    }));
+    });
 
     expect(result.success).toBe(true);
     expect(mockSpawnRun).not.toHaveBeenCalled();
@@ -945,13 +945,13 @@ describe('convoy orchestration', () => {
     mockGetLatestSessionIdSync.mockReturnValue('saved-session');
     mockResumeAgent.mockResolvedValue({ success: true, messageDelivered: false });
 
-    const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
+    const result = await spawnReviewSubRoleForIssue({
       issueId: 'PAN-1059',
       workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
       subRole: 'security',
       runId: REVIEW_AGENT_RUN_ID,
       contextManifestPath: writeReviewManifest(REVIEW_AGENT_SUBROLE_WORKSPACE),
-    }));
+    });
 
     expect(result.success).toBe(true);
     expect(mockStopAgent).toHaveBeenCalledWith(reviewerId);

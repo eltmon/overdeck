@@ -8,7 +8,7 @@
 
 import { existsSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { Data, Effect } from 'effect';
+import { Data } from 'effect';
 import type { AgentState } from '../agents.js';
 import { getAgentStateSync, saveAgentStateSync, stopAgentSync, spawnAgent, spawnRun, getAgentDir } from '../agents.js';
 import type { HandoffContext } from './handoff-context.js';
@@ -43,7 +43,14 @@ export interface HandoffOptions {
   waitForIdle?: boolean; // Wait for agent to be idle before killing (default: true)
   idleTimeoutMs?: number; // How long to wait for idle (default: 30000)
   additionalInstructions?: string; // Extra instructions for new agent
-}async function performHandoffPromise(
+}
+
+/**
+ * Hand a running agent off to another model: capture its context, stop it, and
+ * spawn the replacement with a handoff prompt. Returns `success: false` when the
+ * agent is not found or the model override is invalid.
+ */
+export async function performHandoff(
   agentId: string,
   options: HandoffOptions
 ): Promise<HandoffResult> {
@@ -118,7 +125,7 @@ async function performKillAndSpawn(
     }
 
     // Step 3: Capture handoff context
-    const context = await Effect.runPromise(captureHandoffContext(state, options.targetModel, options.reason));
+    const context = await captureHandoffContext(state, options.targetModel, options.reason);
 
     // Step 4: Kill current agent
     stopAgentSync(state.id);
@@ -210,38 +217,14 @@ export function shouldHandoff(agentId: string): boolean {
   return false;
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// The handoff orchestration touches multiple subsystems (model validation,
-// agent state, tmux session detection, prompt persistence) — failures from any
-// of them surface here. The Effect variant collapses these into a single typed
-// error channel so callers can `Effect.catchTag` the relevant case.
-
-/** Tagged error for `performHandoffProgram` failures. */
+/**
+ * Tagged error for a rejected {@link performHandoff}, raised where an Effect
+ * caller bridges it (the dashboard handoff route). `message` is the underlying
+ * error's message.
+ */
 export class HandoffError extends Data.TaggedError('HandoffError')<{
   readonly agentId: string;
   readonly stage: string;
   readonly message: string;
   readonly cause?: unknown;
 }> {}
-
-/**
- * Effect variant of `performHandoff`. Wraps the Promise-based implementation
- * and maps any thrown error into a typed `HandoffError`. The success result is
- * the same `HandoffResult` shape as the sync variant — including `success:
- * false` results when the agent isn't found or the model override is invalid.
- */
-export const performHandoff = (
-  agentId: string,
-  options: HandoffOptions,
-): Effect.Effect<HandoffResult, HandoffError> =>
-  Effect.tryPromise({
-    try: () => performHandoffPromise(agentId, options),
-    catch: (cause) =>
-      new HandoffError({
-        agentId,
-        stage: 'performHandoff',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
