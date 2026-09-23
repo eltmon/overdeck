@@ -4,6 +4,7 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
 import { getAgentState, messageAgent, spawnAgent } from '../../../../lib/agents.js';
+import { isAlive, isConfirmedDead } from '../../../../lib/agents/liveness.js';
 import {
   clearYieldForResumeSync,
   decideResumeGate,
@@ -339,9 +340,16 @@ export async function rebaseWithAgentFallback(options: {
   agentId: string;
   rebaseMsg: string;
   allowFreshStart: boolean;
+  /**
+   * Hand the request only to an agent that is running now; never resume one
+   * that has exited. A finished strike sits idle at its prompt and still takes
+   * a PR update request, but once its session has exited, resuming it would
+   * revive an agent whose contract ended with the PR URL.
+   */
+  liveAgentOnly?: boolean;
   setStatus: (update: MergeRunPatch) => void;
 }): Promise<RebaseEscalationResult> {
-  const { issueId, workspacePath, branchName, targetBranch, agentId, rebaseMsg, allowFreshStart, setStatus } = options;
+  const { issueId, workspacePath, branchName, targetBranch, agentId, rebaseMsg, allowFreshStart, liveAgentOnly, setStatus } = options;
   let serverRebaseReason: string | undefined;
   let conflictFiles: string[] = [];
 
@@ -361,6 +369,18 @@ export async function rebaseWithAgentFallback(options: {
         : message || 'Server-side rebase failed';
       console.warn(`[merge] ${serverRebaseReason} — escalating to the work agent for ${issueId}`);
     }
+  }
+
+  if (liveAgentOnly && isConfirmedDead(await isAlive(agentId))) {
+    const agentReason = `${agentId} has exited, so no agent can update ${branchName}; `
+      + `update its pull request by hand or run \`pan strike ${issueId}\` again`;
+    console.log(`[merge] ${agentReason} — not resuming it`);
+    return {
+      success: false,
+      reason: serverRebaseReason ? `${serverRebaseReason}; ${agentReason}` : agentReason,
+      conflictFiles,
+      retryable: false,
+    };
   }
 
   try {

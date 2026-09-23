@@ -930,7 +930,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     } else {
       const agentId = request.kind === 'strike' ? request.recoveryTarget : `agent-${issueId.toLowerCase()}`;
       const rebaseMsg = request.kind === 'strike'
-        ? `STRIKE LANDING REQUEST: Rebase ${branchName} onto ${targetBranch}, resolve conflicts, run the full quality gates, and push ${branchName}. Do NOT merge or push main.`
+        ? `STRIKE PR UPDATE REQUEST: bring ${branchName} up to date with ${targetBranch} (\`pan sync-main ${issueId}\`), resolve conflicts, run the full quality gates, and push only ${branchName}. Do NOT merge the pull request or push ${targetBranch}.`
         : `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Please rebase onto ${targetBranch} and push:\n\n1. git fetch origin ${targetBranch}\n2. git rebase origin/${targetBranch}\n3. If conflicts: resolve them, git add, git rebase --continue\n4. git push --force-with-lease\n\nAfter pushing, the server will handle verification and merge automatically. Do NOT run gh pr merge yourself.`;
 
       setStatus(issueId, { step: 'rebasing' });
@@ -954,6 +954,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
           agentId,
           rebaseMsg,
           allowFreshStart: request.kind !== 'strike',
+          liveAgentOnly: request.kind === 'strike',
           setStatus: update => setStatus(issueId, update),
         });
       }

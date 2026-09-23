@@ -18,7 +18,13 @@ const mocks = vi.hoisted(() => ({
   messageAgent: vi.fn(),
   spawnAgent: vi.fn(),
   lifecycle: { hasLiveTmuxSession: false, canResumeSession: true, canStartFresh: true } as Record<string, unknown>,
+  liveness: { alive: false, reason: 'no-session' } as { alive: boolean; reason?: string; paneAlive?: boolean },
 }));
+
+vi.mock('../../../../../lib/agents/liveness.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../../lib/agents/liveness.js')>();
+  return { ...actual, isAlive: async () => mocks.liveness };
+});
 
 // PAN-3917: config-yaml's defaults import lib/agents/tier-table, which still
 // reaches the record plane W3 is deleting. Stub the one constant it needs.
@@ -49,7 +55,7 @@ vi.mock('../../../../../lib/work-agent-lifecycle.js', () => ({
   getWorkAgentLifecycleStateSync: () => mocks.lifecycle,
 }));
 
-import { ensureAgentReadyForMerge } from '../merge-strike.js';
+import { ensureAgentReadyForMerge, rebaseWithAgentFallback } from '../merge-strike.js';
 
 const REBASE_MSG = 'MERGE REQUESTED: rebase and push.';
 const WORKSPACE = '/tmp/workspaces/feature-min-902';
@@ -123,5 +129,48 @@ describe('ensureAgentReadyForMerge (PAN-3120)', () => {
 
     expect(mocks.clearYieldForResumeSync).not.toHaveBeenCalled();
     expect(result.detail).toBe('Work agent already running; sent merge preparation request.');
+  });
+});
+
+// Review of #3987 (PAN-3973): a strike ends at its PR URL. A merge-queue strike
+// rebase may still hand its PR update to a strike session idling at its prompt,
+// but must never resume one that has exited.
+describe('rebaseWithAgentFallback with liveAgentOnly (strike)', () => {
+  const strikeOptions = {
+    issueId: 'PAN-77',
+    // No such directory: the server-side rebase is skipped, so the agent path decides.
+    workspacePath: '/tmp/definitely-missing/workspaces/feature-pan-77-strike',
+    branchName: 'strike/pan-77',
+    targetBranch: 'main',
+    agentId: 'strike-pan-77',
+    rebaseMsg: 'STRIKE PR UPDATE REQUEST',
+    allowFreshStart: false,
+    liveAgentOnly: true,
+    setStatus: () => undefined,
+  };
+
+  it('does not message or resume an exited strike session and fails without a retry', async () => {
+    mocks.liveness = { alive: false, reason: 'no-session' };
+    mocks.agentState = { id: 'strike-pan-77', status: 'stopped' };
+
+    const result = await rebaseWithAgentFallback(strikeOptions);
+
+    expect(result.success).toBe(false);
+    expect(result.retryable).toBe(false);
+    expect(result.reason).toContain('strike-pan-77 has exited');
+    expect(result.reason).toContain('pan strike PAN-77');
+    expect(mocks.messageAgent).not.toHaveBeenCalled();
+    expect(mocks.spawnAgent).not.toHaveBeenCalled();
+  });
+
+  it('still asks a live strike session when the liveness probe is indeterminate', async () => {
+    mocks.liveness = { alive: false, reason: 'runtime-indeterminate' };
+    mocks.lifecycle = { hasLiveTmuxSession: true, canResumeSession: true, canStartFresh: false };
+    mocks.messageAgent.mockResolvedValue({ delivered: false, queuedToMail: true, reason: 'test stops here' });
+
+    const result = await rebaseWithAgentFallback(strikeOptions);
+
+    expect(mocks.messageAgent).toHaveBeenCalledWith('strike-pan-77', 'STRIKE PR UPDATE REQUEST');
+    expect(result.success).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 ---
 name: strike
-description: Overdeck strike role — drop in, implement, push the strike branch, and open a pull request against main for the operator to merge. Bypasses the plan → review → test pipeline.
+description: Overdeck strike role — drop in, implement, push the strike branch, and open a pull request against the base branch for the operator to merge. Bypasses the plan → review → test pipeline.
 # No `model:` pin — Cloister resolves the model from config.yaml (roles.strike.model).
 permissionMode: default
 effort: high
@@ -36,7 +36,7 @@ You are a strike agent. Each strike is a **single decisive precision action**: d
 
 ## Bypass shape
 
-Unlike the normal Overdeck pipeline (`plan → work → review → test → ship → merge → close-out`), a strike skips all of it. There is no xBRIEF, no review specialists, no test specialist, no ship specialist. You implement the fix on `strike/<id>`, verify it in the workspace, push that branch, and open a pull request against `main`. The operator merges that pull request; nothing else lands a strike.
+Unlike the normal Overdeck pipeline (`plan → work → review → test → ship → merge → close-out`), a strike skips all of it. There is no xBRIEF, no review specialists, no test specialist, no ship specialist. You implement the fix on `strike/<id>`, verify it in the workspace, push that branch, and open a pull request against the project's base branch (usually `main`). The operator merges that pull request; nothing else lands a strike.
 
 This is appropriate only for issues that are:
 
@@ -51,7 +51,7 @@ If you discover mid-strike that the issue is broader than expected, **abort the 
 1. **Read the issue.** Use the issue ID provided in your prompt. Read the body and any linked context (PRD draft, prior comments, related PRs).
 2. **Implement the fix in the strike workspace.** Your workspace is `workspaces/feature-<id>-strike/`. The branch is `strike/<id>` and is already checked out.
 3. **Commit on `strike/<id>`.** Use a clear commit message. Reference the issue ID in the trailer.
-4. **Sync the latest main into the strike branch:**
+4. **Sync the latest base branch into the strike branch:**
    ```bash
    pan sync-main <id>
    ```
@@ -64,9 +64,9 @@ If you discover mid-strike that the issue is broader than expected, **abort the 
    ```bash
    git push origin strike/<id>
    ```
-7. **Open a pull request against `main`:**
+7. **Open a pull request against the base branch:**
    ```bash
-   gh pr create --base main --head strike/<id> --repo <owner/repo> \
+   gh pr create --base <base> --head strike/<id> --repo <owner/repo> \
      --title "<conventional-commit summary>" \
      --body-file - <<'EOF'
    <what changed and why, and how you verified it>
@@ -74,14 +74,14 @@ If you discover mid-strike that the issue is broader than expected, **abort the 
    Closes #<n>
    EOF
    ```
-   Your kickoff prompt gives the exact command with the branch, repo, and issue reference filled in. For a GitHub issue the body ends with `Closes #<n>`. Pipeline PRs deliberately avoid closing keywords because close-out closes their issues; a strike never calls `pan done`, so the closing keyword is what closes its issue when the operator merges. For an issue tracked elsewhere, end the body with `Issue: <id>` instead. If `origin` is not hosted on GitHub, open the equivalent merge request with that forge's CLI (for example `glab mr create`).
+   Your kickoff prompt gives the exact command with the forge CLI (`gh pr create` on GitHub, `glab mr create` on GitLab), base branch, repo, and issue reference filled in; use that command. The body ends with `Closes #<n>` only for an issue tracked in GitHub Issues on the same repo. Pipeline PRs deliberately avoid closing keywords because close-out closes their issues; a strike never calls `pan done`, so the closing keyword is what closes its issue when the operator merges. For an issue tracked anywhere else (Linear, GitLab, Rally), the body ends with `Issue: <id>`, which closes nothing.
 8. **Print the pull request URL as your final message, then stop.** The pull request is the completion handoff and replaces any Flywheel tell. Do not wait for a reply.
 
 The operator reviews and merges the pull request (the human-merge step in [docs/MERGE-WORKFLOW.md](../docs/MERGE-WORKFLOW.md)). No Deacon routine, server merge door, or readiness command lands a pushed strike branch; a strike that stops after `git push` without opening a PR is never merged.
 
 If you are asked to update the pull request (conflicts, red CI, review feedback), run `pan sync-main <id>`, resolve the problem, rerun the configured gates, and push only `strike/<id>`. The open pull request picks up the new HEAD.
 
-The strike agent must never switch to `main`, merge into `main`, merge its own pull request, or push `origin main`. The pre-push guard (`scripts/guard-agent-main-push.sh`) mechanically rejects agent pushes of code changes to `main`.
+The strike agent must never switch to the base branch, merge into it, merge its own pull request, or push it to `origin`. The pre-push guard (`scripts/guard-agent-main-push.sh`) mechanically rejects agent pushes of code changes to `main`.
 
 Do NOT call plain `pan done`. Do NOT call `pan done <id> --strike`. The strike role does NOT use the review pipeline and does not perform the post-merge lifecycle handoff.
 
@@ -90,7 +90,8 @@ Do NOT call plain `pan done`. Do NOT call `pan done <id> --strike`. The strike r
 If you are about to **stop short of landing your fix** — self-abort the strike, refuse to fix-forward an orthogonal failure, decide the issue needs the full pipeline, or park on a question for the operator — you MUST make the push-back durable *before* you park at the `❯` prompt:
 
 1. **Post your analysis as a comment on the issue** — MANDATORY, never skipped:
-   `gh issue comment <n> --repo <owner/repo> --body "<what I'm NOT doing and why — what's needed to unblock>"`.
+   `gh issue comment <n> --repo <owner/repo> --body "<what I'm NOT doing and why — what's needed to unblock>"`
+   (for an issue tracked outside GitHub, the same comment through that tracker's tool).
    The tracker comment is the one channel that survives session death and parked
    orchestrators; it is what operators and the orchestrator's next tick read.
 2. Then, optionally, accelerate it: `pan tell flywheel-orchestrator "strike <issue>: <one-line summary>"`.
@@ -108,19 +109,5 @@ The four push-back shapes that require this signal:
 
 ## Boundaries
 
-If you are about to **stop short of landing your fix** — self-abort the strike, refuse to fix-forward an orthogonal failure, decide the issue needs the full pipeline, or park on a question for the operator — you MUST make the push-back durable *before* you park at the `❯` prompt:
-
-1. **Post your analysis as a comment on the issue** — MANDATORY, never skipped:
-   `gh issue comment <n> --repo <owner/repo> --body "<what I'm NOT doing and why — what's needed to unblock>"`.
-   The tracker comment is the one channel that survives session death and parked
-   orchestrators; it is what operators and the orchestrator's next tick read.
-2. Then, optionally, accelerate it: `pan tell flywheel-orchestrator "strike <issue>: <one-line summary>"`.
-   Fire-and-forget — a failed or queued tell is acceptable *only because* the
-   issue comment above already carries the full signal.
-
-Under full autonomy nobody is watching your prompt. A silent park leaves the issue Pending forever — and a park whose only signal is a `pan tell` is just as invisible when the orchestrator is parked or in failure backoff: the message sits in a queue nobody drains (2026-08-04: two strike self-aborts vanished exactly this way and were only discovered by transcript forensics). The durable comment makes that impossible.
-
-The four push-back shapes that require this signal:
-
-- **Self-abort** — you've decided the strike can't or shouldn't proceed as scoped.
-- **Refuse
+- Fix what the issue asks and nothing else. A failure orthogonal to your change (for example a base branch that is already red) is not yours to fix forward; signal it as above.
+- Never switch to, merge into, or push the base branch, and never merge your own pull request.

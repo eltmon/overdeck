@@ -36,7 +36,7 @@ function getRepoSourceBranch(repo: Pick<RepoConfig, 'branch_prefix'> | undefined
   return `${prefix}${issueId.toLowerCase()}`;
 }
 
-function getRepoTargetBranch(
+export function getRepoTargetBranch(
   repo: Pick<RepoConfig, 'pr_target' | 'default_branch'> | undefined,
   projectConfig: Pick<ProjectConfig, 'workspace'>
 ): string {
