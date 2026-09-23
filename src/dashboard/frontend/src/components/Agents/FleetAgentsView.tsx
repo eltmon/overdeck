@@ -27,6 +27,7 @@ const ROLE_ORDER = {
   flywheel: 6,
   sequencer: 7,
   knowledge: 8,
+  worker: 9,
 } satisfies Record<AgentCardRole, number>;
 
 const FLEET_STATUSES = new Set<Agent['status']>(['healthy', 'warning', 'stuck', 'stalled', 'starting', 'running', 'failed', 'error', 'unknown']);
@@ -198,6 +199,7 @@ function agentPhase(agent: Agent): AgentPhaseFilter {
   if (role === 'flywheel') return 'work';
   if (role === 'sequencer') return 'work';
   if (role === 'knowledge') return 'work';
+  if (role === 'worker') return 'work';
   if (role === 'strike') return 'strike';
   return role;
 }

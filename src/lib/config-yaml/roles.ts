@@ -27,6 +27,7 @@ export const DEFAULT_MODEL_REFS: Record<Role, ModelRef> = {
   strike: 'workhorse:expensive',
   sequencer: 'workhorse:expensive',
   knowledge: 'workhorse:expensive',
+  worker: 'workhorse:mid',
 };
 
 export const DEFAULT_WORKHORSES: Required<WorkhorsesConfig> = {
@@ -62,6 +63,7 @@ export const DEFAULT_ROLES: Record<Role, RoleConfig> = {
   strike: { model: 'workhorse:expensive' },
   sequencer: { model: 'workhorse:expensive' },
   knowledge: { model: 'workhorse:expensive' },
+  worker: { model: 'workhorse:mid' },
   flywheel: {
     model: 'claude-opus-4-8',
     effort: 'high',
