@@ -373,8 +373,9 @@ the tmux session is the authority and nothing else is stored. Rules:
 `stopConversationRuntime` (stop, delete, archive, resume/restart failure, flywheel archive; after
 the shared-session early return, so a runtime another conversation still owns keeps its companion),
 from `spawnConversationSession` right before it kills the owner
-session (every resume and restart-all), and from the conversation lifecycle poll for owners that
-exited on their own.
+session (every resume and restart-all), and for owners that exited on their own from both the
+conversation lifecycle poll and the PTY supervisor's `exited` event (`agent-projection.ts`). Those
+two close the companion before marking the row ended, because later writers skip ended rows.
 
 **OpenCode adapter.** Reads `~/.overdeck/agents/<ownerSession>/opencode-port` and `acp-session-id`
 (PAN-3937), the cwd from the conversation record, and the binary from `resolveHarnessBinary`, then

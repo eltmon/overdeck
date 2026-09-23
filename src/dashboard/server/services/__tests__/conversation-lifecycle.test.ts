@@ -81,7 +81,7 @@ vi.mock('../pending-respawn.js', () => ({
   isRespawnPending: mockIsRespawnPending,
 }));
 
-const mockCloseCompanionTerminalForOwner = vi.fn(async () => undefined);
+const mockCloseCompanionTerminalForOwner = vi.fn(async (_ownerSession: string) => undefined);
 vi.mock('../../../../lib/overdeck/companion-terminal/index.js', () => ({
   closeCompanionTerminalForOwner: mockCloseCompanionTerminalForOwner,
 }));
@@ -325,6 +325,48 @@ describe('ConversationLifecycleService — pollConversations', () => {
     expect(mockCleanupUnreferencedConversationAttachments).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'gone' }),
     );
+  });
+
+  it('closes each ended row\'s companion before marking it, so a later throw cannot leak it (PAN-3974)', async () => {
+    const order: string[] = [];
+    mockCloseCompanionTerminalForOwner.mockImplementation(async (ownerSession: string) => {
+      order.push(`companion:${ownerSession}`);
+    });
+    mockMarkConversationEnded.mockImplementation((name: string) => {
+      order.push(`ended:${name}`);
+    });
+    mockListConversations.mockReturnValue([
+      { name: 'first', tmuxSession: 'conv-first', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+      { name: 'second', tmuxSession: 'conv-second', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed([]));
+    // The loop throws on the second row, after the first was already marked.
+    mockGetConversationByName.mockImplementation((name: string) => {
+      if (name === 'second') throw new Error('row read failed');
+      return undefined;
+    });
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+
+    expect(order).toEqual(['companion:conv-first', 'ended:first']);
+    expect(mockCloseCompanionTerminalForOwner).not.toHaveBeenCalledWith('conv-second');
+    mockCloseCompanionTerminalForOwner.mockReset();
+    mockCloseCompanionTerminalForOwner.mockImplementation(async () => undefined);
+    mockMarkConversationEnded.mockReset();
+  });
+
+  it('a failed companion close never blocks marking the row ended (PAN-3974)', async () => {
+    mockCloseCompanionTerminalForOwner.mockRejectedValueOnce(new Error('tmux down'));
+    mockListConversations.mockReturnValue([
+      { name: 'gone', tmuxSession: 'conv-gone', status: 'active', cwd: '/tmp/work', claudeSessionId: null },
+    ]);
+    mockListSessionNames.mockReturnValue(Effect.succeed([]));
+
+    const { pollConversations } = await import('../conversation-lifecycle.js');
+    await pollConversations();
+
+    expect(mockMarkConversationEnded).toHaveBeenCalledWith('gone');
   });
 
   it('marks a session that is alive but whose harness process has exited (keep-alive corpse)', async () => {

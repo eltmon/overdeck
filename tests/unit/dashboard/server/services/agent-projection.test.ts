@@ -188,6 +188,7 @@ describe('applyAgentLifecycleEventWithDeps for a supervised conversation (PAN-39
       markConversationRunning: vi.fn(),
       markConversationEnded: vi.fn(),
       cleanupEndedConversation: vi.fn(async () => undefined),
+      closeCompanionTerminal: vi.fn(async (_ownerSession: string) => undefined),
     };
   }
 
@@ -199,6 +200,32 @@ describe('applyAgentLifecycleEventWithDeps for a supervised conversation (PAN-39
     expect(deps.markConversationEnded).toHaveBeenCalledWith(conversation.name, Date.parse(at));
     expect(deps.cleanupEndedConversation).toHaveBeenCalledTimes(1);
     expect(deps.cleanupEndedConversation).toHaveBeenCalledWith(conversation);
+  });
+
+  it('exited closes the companion terminal before marking the row ended (PAN-3974)', async () => {
+    const order: string[] = [];
+    const deps = makeConversationDeps();
+    deps.closeCompanionTerminal.mockImplementation(async (ownerSession: string) => {
+      order.push(`companion:${ownerSession}`);
+    });
+    deps.markConversationEnded.mockImplementation((name: string) => {
+      order.push(`ended:${name}`);
+    });
+
+    await applyAgentLifecycleEventWithDeps(makeEventStore(), SESSION, { event: 'exited', at }, deps);
+
+    expect(order).toEqual([`companion:${SESSION}`, `ended:${conversation.name}`]);
+  });
+
+  it('a failed companion close never blocks marking the row ended (PAN-3974)', async () => {
+    const deps = makeConversationDeps();
+    deps.closeCompanionTerminal.mockRejectedValue(new Error('tmux down'));
+
+    const result = await applyAgentLifecycleEventWithDeps(makeEventStore(), SESSION, { event: 'exited', at }, deps);
+
+    expect(result).toEqual({ applied: true, status: 'stopped' });
+    expect(deps.markConversationEnded).toHaveBeenCalledWith(conversation.name, Date.parse(at));
+    expect(deps.cleanupEndedConversation).toHaveBeenCalledTimes(1);
   });
 
   it('a duplicate exited does not run cleanup again', async () => {
@@ -226,6 +253,8 @@ describe('applyAgentLifecycleEventWithDeps for a supervised conversation (PAN-39
       expect(result).toEqual({ applied: false, reason: 'respawn-pending' });
       expect(deps.markConversationEnded).not.toHaveBeenCalled();
       expect(deps.cleanupEndedConversation).not.toHaveBeenCalled();
+      // The replacing generation owns the companion now; an ignored exit leaves it.
+      expect(deps.closeCompanionTerminal).not.toHaveBeenCalled();
     });
 
     it('the NEW harness exiting during the respawn window (resume onto a dead model) ends the row', async () => {
