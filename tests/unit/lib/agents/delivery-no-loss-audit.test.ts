@@ -37,6 +37,9 @@ const KNOWN_CALL_SITES = new Set([
   'dashboard/server/routes/agents/lifecycle-stop.ts|.then(({ resumeAgent }) => resumeAgent(id))',
   'dashboard/server/routes/agents/messaging.ts|await messageAgent(id, message, \'dashboard:user-message\');',
   'dashboard/server/routes/agents/messaging.ts|yield* Effect.promise(() => messageAgent(id, pokeMsg));',
+  // PAN-3960: a live planner's user message goes through the backend-aware
+  // delivery door (it was a raw tmux sendKeys, which cannot reach a Herdr pane).
+  'dashboard/server/routes/misc/planning.ts|const delivery = await deliverAgentMessage(sessionName, message, \'planning user message\');',
   'dashboard/server/routes/agents/permissions.ts|yield* Effect.promise(() => deliverAgentMessage(id, message, \'ask-user-question-answer\'));',
   'dashboard/server/routes/linear-mcp-auth.ts|yield* Effect.promise(() => messageAgent(',
   'dashboard/server/routes/specialists/legacy-routes.ts|await messageAgent(workAgentId, rebaseMsg);',

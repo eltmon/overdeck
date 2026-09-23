@@ -1,0 +1,203 @@
+/**
+ * PAN-3960: resumeAgent relaunches an agent through `launchAgentPane` on the
+ * terminal backend the host selects NOW — never on the backend the agent's
+ * previous pane used, and never with a direct tmux `createSession`. Both
+ * backends are recording fakes registered over the real adapters; nothing here
+ * touches a real tmux server or Herdr socket.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { dirname, join } from 'node:path';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { Effect } from 'effect';
+import type { TerminalBackendName } from '../../terminal-backends/types.js';
+import { fakeTerminalBackend, type FakeTerminalBackend } from '../../../../tests/helpers/fake-terminal-backend.js';
+
+const mocks = vi.hoisted(() => ({
+  host: 'herdr' as 'herdr' | 'tmux',
+  assertWorkspaceStackHealthyForSpawn: vi.fn(async () => undefined),
+  prepareHarnessLaunch: vi.fn(async () => ({ binaryPath: '/opt/claude/bin/claude', pathExport: 'export PATH="$PATH"' })),
+  prepareSupervisorForRelaunch: vi.fn(async () => ({ useSupervisor: false, supervisorScriptPath: undefined })),
+  resolveHarness: vi.fn(async () => 'claude-code'),
+  waitForPromptReady: vi.fn(async () => true),
+  deliverAgentMessage: vi.fn(async () => ({ ok: true, path: 'herdr' })),
+  deliverResumeMessageWithTranscriptConfirmation: vi.fn(async () => ({ delivered: true, attempts: 1 })),
+  prepareAutonomousAgentResumePane: vi.fn(async () => ({ ready: true, action: 'clear' })),
+  waitForReadySignal: vi.fn(async () => true),
+  stopAgent: vi.fn(() => Effect.succeed(undefined)),
+  detectPendingOperatorDecision: vi.fn(async () => null),
+  tmuxCreateSession: vi.fn(() => Effect.succeed(undefined)),
+  tmuxSessionExists: vi.fn(() => Effect.succeed(false)),
+}));
+
+vi.mock('../../terminal-backends/select.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../terminal-backends/select.js')>();
+  return { ...actual, hostTerminalBackendName: vi.fn(async () => mocks.host) };
+});
+
+// No Herdr socket: the host has no agent, no pane, nothing alive.
+vi.mock('../../terminal-backends/herdr.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../terminal-backends/herdr.js')>();
+  return {
+    ...actual,
+    findHerdrAgent: vi.fn(async () => null),
+    findHerdrAgentPane: vi.fn(async () => null),
+    probeHerdrAgentLiveness: vi.fn(async () => ({ kind: 'absent' })),
+  };
+});
+
+vi.mock('../../tmux.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../tmux.js')>();
+  return {
+    ...actual,
+    createSession: mocks.tmuxCreateSession,
+    createSessionSync: vi.fn(() => { throw new Error('createSessionSync must not be called'); }),
+    sessionExists: mocks.tmuxSessionExists,
+    killSession: vi.fn(() => Effect.succeed(undefined)),
+    isPaneDead: vi.fn(() => Effect.succeed(false)),
+    listPaneValues: vi.fn(() => Effect.succeed([])),
+    sendKeys: vi.fn(() => Effect.succeed(undefined)),
+  };
+});
+
+vi.mock('../spawn-prep.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../spawn-prep.js')>();
+  return { ...actual, assertWorkspaceStackHealthyForSpawn: mocks.assertWorkspaceStackHealthyForSpawn };
+});
+
+vi.mock('../../harness-binary.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../harness-binary.js')>();
+  return { ...actual, prepareHarnessLaunch: mocks.prepareHarnessLaunch };
+});
+
+vi.mock('../supervisor-channels.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../supervisor-channels.js')>();
+  return { ...actual, prepareSupervisorForRelaunch: mocks.prepareSupervisorForRelaunch };
+});
+
+vi.mock('../../harness-resolve.js', () => ({ resolveHarness: mocks.resolveHarness }));
+
+vi.mock('../runtime-command.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../runtime-command.js')>();
+  return { ...actual, waitForPromptReady: mocks.waitForPromptReady };
+});
+
+vi.mock('../delivery.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../delivery.js')>();
+  return {
+    ...actual,
+    deliverAgentMessage: mocks.deliverAgentMessage,
+    deliverResumeMessageWithTranscriptConfirmation: mocks.deliverResumeMessageWithTranscriptConfirmation,
+  };
+});
+
+vi.mock('../resume-pane-choice.js', () => ({
+  prepareAutonomousAgentResumePane: mocks.prepareAutonomousAgentResumePane,
+}));
+
+vi.mock('../identity.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../identity.js')>();
+  return { ...actual, waitForReadySignal: mocks.waitForReadySignal };
+});
+
+vi.mock('../termination.js', () => ({ stopAgent: mocks.stopAgent }));
+
+vi.mock('../pending-decision-gate.js', () => ({
+  detectPendingOperatorDecision: mocks.detectPendingOperatorDecision,
+}));
+
+import { resumeAgent } from '../resume.js';
+import { registerTerminalBackend } from '../../terminal-backends/registry.js';
+import { getAgentDir, getAgentStateSync, saveAgentStateSync } from '../agent-state.js';
+import { appendSessionIdToHistory } from '../../session-history.js';
+import { sessionFilePath } from '../../paths.js';
+
+let herdr: FakeTerminalBackend;
+let tmux: FakeTerminalBackend;
+let tempHome: string;
+let workspace: string;
+let prevHome: string | undefined;
+let prevOverdeckHome: string | undefined;
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  herdr = fakeTerminalBackend('herdr');
+  tmux = fakeTerminalBackend('tmux');
+  registerTerminalBackend(herdr);
+  registerTerminalBackend(tmux);
+  mocks.tmuxSessionExists.mockReturnValue(Effect.succeed(false));
+  mocks.deliverAgentMessage.mockResolvedValue({ ok: true, path: 'herdr' });
+  mocks.waitForPromptReady.mockResolvedValue(true);
+
+  tempHome = mkdtempSync(join(tmpdir(), 'pan-3960-relaunch-home-'));
+  workspace = mkdtempSync(join(tmpdir(), 'pan-3960-relaunch-ws-'));
+  prevHome = process.env.HOME;
+  prevOverdeckHome = process.env.OVERDECK_HOME;
+  process.env.HOME = tempHome;
+  process.env.OVERDECK_HOME = tempHome;
+});
+
+afterEach(() => {
+  if (prevHome === undefined) delete process.env.HOME;
+  else process.env.HOME = prevHome;
+  if (prevOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = prevOverdeckHome;
+  rmSync(tempHome, { recursive: true, force: true });
+  rmSync(workspace, { recursive: true, force: true });
+});
+
+/** A stopped claude-code agent whose last pane lived on `previousBackend`. */
+function writeStoppedAgent(agentId: string, previousBackend: TerminalBackendName): void {
+  const sessionId = `${agentId}-session`;
+  const transcriptPath = sessionFilePath(workspace, sessionId);
+  mkdirSync(dirname(transcriptPath), { recursive: true });
+  writeFileSync(transcriptPath, '{"type":"summary","summary":"prior work"}\n');
+  mkdirSync(getAgentDir(agentId), { recursive: true });
+  appendSessionIdToHistory(agentId, sessionId, 'launcher');
+  saveAgentStateSync({
+    id: agentId,
+    issueId: 'PAN-3960',
+    workspace,
+    harness: 'claude-code',
+    role: 'work',
+    model: 'claude-sonnet-5',
+    status: 'stopped',
+    startedAt: new Date().toISOString(),
+    kickoffDelivered: true,
+    sessionId,
+    backend: previousBackend,
+    paneId: previousBackend === 'tmux' ? agentId : 'w9:p9',
+  });
+}
+
+const cases: Array<{ host: TerminalBackendName; previous: TerminalBackendName }> = [
+  { host: 'herdr', previous: 'tmux' },
+  { host: 'tmux', previous: 'herdr' },
+];
+
+describe('resumeAgent relaunches on the host backend (PAN-3960)', () => {
+  it.each(cases)('$host host, agent previously on $previous', async ({ host, previous }) => {
+    mocks.host = host;
+    const agentId = `agent-pan-3960-resume-${host}`;
+    writeStoppedAgent(agentId, previous);
+
+    const result = await resumeAgent(agentId);
+
+    expect(result).toEqual({ success: true, messageDelivered: true });
+    const selected = host === 'herdr' ? herdr : tmux;
+    const other = host === 'herdr' ? tmux : herdr;
+    expect(other.starts).toHaveLength(0);
+    expect(selected.starts).toHaveLength(1);
+    expect(selected.starts[0]!.spec).toMatchObject({
+      name: agentId,
+      cwd: workspace,
+      argv: ['bash', join(getAgentDir(agentId), 'launcher.sh')],
+      tokens: { issue: 'PAN-3960', role: 'work', harness: 'claude-code', model: 'claude-sonnet-5' },
+      env: expect.objectContaining({ OVERDECK_AGENT_ID: agentId, OVERDECK_ISSUE_ID: 'PAN-3960' }),
+    });
+    expect(selected.starts[0]!.workspace.issueId).toBe('PAN-3960');
+    expect(mocks.tmuxCreateSession).not.toHaveBeenCalled();
+    expect(getAgentStateSync(agentId)?.backend).toBe(host);
+  });
+});
+

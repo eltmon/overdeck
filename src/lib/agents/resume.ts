@@ -14,7 +14,8 @@ import { resolveProjectFromIssueSync } from '../projects.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { appendContinueSessionEntryForIssue } from '../xbrief/lifecycle-io.js';
-import { createSession, isPaneDead, killSession, listPaneValues, sessionExists } from '../tmux.js';
+import { closeAgentPane, launchAgentPane } from '../terminal-backends/launch.js';
+import { toPaneRole } from '../terminal-backends/prompt-guard.js';
 import {
   decideResumeGate,
   getAgentDir,
@@ -31,6 +32,7 @@ import {
   resilientDeliveryMethod,
 } from './delivery.js';
 import { clearReadySignal, normalizeAgentId, waitForReadySignal } from './identity.js';
+import { isAlive, isConfirmedDead } from './liveness.js';
 import {
   getAgentRuntimeStateSync,
   saveAgentRuntimeState,
@@ -39,7 +41,6 @@ import {
 import { decideResumeSpawnPlan } from './resume-spawn-plan.js';
 import { prepareAutonomousAgentResumePane } from './resume-pane-choice.js';
 import {
-  hasAgentRuntimeInSubtree,
   writeLauncherScriptAtomic,
   writeOhmypiAgentPrompt,
 } from './runtime-command.js';
@@ -59,7 +60,8 @@ import { withReviewLifecycleGuardForAgent } from '../review-lifecycle-guard.js';
 /**
  * Resume a suspended agent (PAN-80)
  *
- * Reads saved session ID and creates new tmux session with --resume flag.
+ * Reads saved session ID and relaunches the agent's pane with --resume, on the
+ * terminal backend the host selects now (PAN-3960).
  * Optionally sends a message after resuming.
  *
  * Auto-resume triggers:
@@ -176,10 +178,11 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
   // dead) was misclassified as a healthy running agent and refused resume with a
   // reasonless "Cannot resume … runtime=active, status=running". Treat a dead pane
   // as crashed too, matching the start path (flywheel-actions.ts isPaneDead).
+  // PAN-3960: the verdict comes from liveness.ts, the one backend-aware oracle —
+  // a Herdr agent has no tmux session, so a tmux probe would call every healthy
+  // Herdr agent crashed. `runtime-indeterminate` is never a crash.
   const isRunningOrStarting = agentState?.status === 'running' || agentState?.status === 'starting';
-  const sessionAlive = isRunningOrStarting ? await Effect.runPromise(sessionExists(normalizedId)) : false;
-  const paneDead = isRunningOrStarting && (!sessionAlive || await Effect.runPromise(isPaneDead(normalizedId)));
-  const isCrashed = isRunningOrStarting && paneDead;
+  const isCrashed = isRunningOrStarting && isConfirmedDead(await isAlive(normalizedId));
 
   // PAN-1675 (keystone): a `compact` resume exists specifically to recover a
   // context-wedged agent, which is typically status='running' with a LIVE (but
@@ -203,7 +206,7 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
     // that reached here has a live session AND a live pane (a crash would have set
     // isCrashed above), so it is genuinely healthy and there is nothing to resume.
     const reason = isRunningOrStarting
-      ? `Cannot resume ${normalizedId}: it appears healthy (tmux session up, harness process alive) — there is nothing to resume. Stop it first if you intend to restart it.`
+      ? `Cannot resume ${normalizedId}: it appears healthy (its pane is up and the harness process is alive) — there is nothing to resume. Stop it first if you intend to restart it.`
       : `Cannot resume ${normalizedId}: runtime=${runtimeState?.state || 'unknown'}, status=${agentState?.status || 'unknown'} is not a resumable state.`;
     logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
     return {
@@ -273,15 +276,13 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
   // protect, so it must be fresh-launched (recovery, not rotation). A live
   // (suspended) omp process stays on the normal resume path.
   const piProcessWasAlive = getHarnessBehavior(agentState.harness).usesRpcFifo
-    ? await hasAgentRuntimeInSession(normalizedId, 'ohmypi')
+    ? (await isAlive(normalizedId)).alive
     : false;
 
-  // Kill any zombie tmux session (crashed agent left behind)
-  if (await Effect.runPromise(sessionExists(normalizedId))) {
-    try {
-      await Effect.runPromise(killSession(normalizedId));
-    } catch { /* non-fatal */ }
-  }
+  // Close any zombie pane or tmux session (crashed agent left behind). On a
+  // Herdr host this also closes a tmux session the agent had before the host
+  // moved to Herdr — the relaunch below lands on the backend selected now.
+  await closeAgentPane(normalizedId);
 
   // Remove completed marker so the agent can work again
   const completedFile = join(getAgentDir(normalizedId), 'completed');
@@ -440,9 +441,15 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     await writeLauncherScriptAtomic(launcherScript, launcherContent);
-    const claudeCmd = `bash ${launcherScript}`;
 
-    await Effect.runPromise(createSession(normalizedId, agentState.workspace, claudeCmd, {
+    // PAN-3960: relaunch through the terminal backend the host selects NOW —
+    // never the backend the agent's previous pane used — with the same four
+    // pane tokens spawn.ts stamps.
+    const pane = await launchAgentPane({
+      issueId,
+      cwd: agentState.workspace,
+      agentId: normalizedId,
+      argv: ['bash', launcherScript],
       env: {
         ...BLANKED_PROVIDER_ENV,
         OVERDECK_AGENT_ID: normalizedId,
@@ -451,8 +458,17 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
         OVERDECK_AGENT_STARTED_BY: startedBy,
         CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
         ...providerEnv
-      }
-    }));
+      },
+      tokens: {
+        issue: issueId,
+        role: toPaneRole(agentState.role),
+        harness: effectiveHarness,
+        model,
+      },
+    });
+    agentState.backend = pane.backend;
+    agentState.paneId = pane.paneId;
+    saveAgentStateSync(agentState);
     if (freshSessionId) {
       await saveAgentRuntimeState(normalizedId, {
         claudeSessionId: freshSessionId,
@@ -488,7 +504,7 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
       messageDelivered = delivery.ok;
       if (delivery.ok && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
       if (!delivery.ok) {
-        await Effect.runPromise(killSession(normalizedId));
+        await closeAgentPane(normalizedId);
         return {
           success: false,
           error: `ACP continue prompt did not land: ${delivery.failure ?? 'unknown failure'}`,
@@ -524,7 +540,7 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
       messageDelivered = delivery.ok;
       if (delivery.ok && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
       if (!delivery.ok) {
-        await Effect.runPromise(killSession(normalizedId));
+        await closeAgentPane(normalizedId);
         return {
           success: false,
           error: `Kimi Code continue prompt did not land: ${delivery.failure ?? 'unknown failure'}`,
@@ -592,7 +608,7 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
     }
 
     if (!messageDelivered) {
-      await Effect.runPromise(killSession(normalizedId)).catch(() => undefined);
+      await closeAgentPane(normalizedId);
       const error = `Resume continue prompt did not become a confirmed turn for ${normalizedId}`;
       logAgentLifecycleSync(normalizedId, `resumeAgent FAILED: ${error}`);
       return { success: false, messageDelivered: false, error };
@@ -652,16 +668,3 @@ async function resumeAgentWithinLifecycle(normalizedId: string, message?: string
   }
 }
 
-/**
- * Check whether a tmux session has an active agent runtime.
- * A session may exist with only a bare bash shell after Claude exits.
- */
-async function hasAgentRuntimeInSession(sessionName: string, harness: RuntimeName): Promise<boolean> {
-  try {
-    const panePids = await Effect.runPromise(listPaneValues(sessionName, '#{pane_pid}'));
-    if (panePids.length === 0) return false;
-    return hasAgentRuntimeInSubtree(panePids[0]!, harness);
-  } catch {
-    return false;
-  }
-}

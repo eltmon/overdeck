@@ -25,7 +25,8 @@ import { extractTeamPrefix, findProjectByPathSync, findProjectByTeamSync, resolv
 import { commitPlanArtifacts, planArtifactCommitMessage } from './plan-artifact-commit.js';
 import { loadRemoteAgentState } from '../remote/remote-agents.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
-import { killSession, sessionExists } from '../tmux.js';
+import { sessionExists } from '../tmux.js';
+import { agentPaneExists, closeAgentPane } from '../terminal-backends/launch.js';
 import { findPlan, findWorkspaceDraftPlan, readPlan } from '../xbrief/io.js';
 import { assertPlanQuality, PlanQualityLintError } from '../xbrief/quality-lint.js';
 import { isPreWorktreeMetadataOnlyDir } from '../workspace-manager/worktree-ops.js';
@@ -484,7 +485,10 @@ export async function completePlanningAutoSpawnAndKill(options: {
 
   if (options.skipKill) return autoSpawnResult;
 
-  const killSessionImpl = options.killSessionImpl ?? ((target: string) => Effect.runPromise(killSession(target)));
+  // PAN-3960: planners launch through the host's terminal backend, so the
+  // planner is closed through it too — a Herdr pane has no tmux session.
+  const killSessionImpl = options.killSessionImpl
+    ?? (async (target: string) => { await closeAgentPane(target); });
   const logError = options.logError ?? console.error;
   const runKill = async (): Promise<void> => {
     try {
@@ -747,7 +751,7 @@ export async function completePlanningForIssue(options: {
         const planningState = getAgentStateSync(sessionName);
         if (!planningState) return;
         const previousStatus = planningState.status;
-        const hasLiveTmuxSession = await Effect.runPromise(sessionExists(sessionName));
+        const hasLiveTmuxSession = await agentPaneExists(sessionName).catch(() => false);
         saveAgentStateAndEmitEvent(
           { ...planningState, status: 'stopped', stoppedAt: planningState.stoppedAt ?? new Date().toISOString() },
           {

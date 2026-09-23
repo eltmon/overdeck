@@ -1,9 +1,13 @@
 /**
  * Launch path shared by every spawner (PAN-3917 FR-5, W8).
  *
- * `pan start`, `pan spawn`, the review and test specialists, and `pan strike`
- * place their pane in the issue's workspace and stamp the same four metadata
- * tokens: `issue`, `role`, `harness`, `model`. This module is the one place
+ * `pan start`, `pan spawn`, the review and test specialists, `pan strike`,
+ * planning (`pan plan` and the dashboard's planning continuation), resume,
+ * restart, crash recovery, and the message-triggered fallback relaunch place
+ * their pane in the issue's workspace and stamp the same four metadata
+ * tokens: `issue`, `role`, `harness`, `model` (PAN-3960). A resume or restart
+ * relaunches on the backend the host selects now, never the one the agent's
+ * previous pane used. This module is the one place
  * that resolves the backend (D10 selection), finds or creates the workspace,
  * and starts the pane — so a launcher is three lines and cannot forget the
  * tokens. `pan handoff --issue` does not route through here yet — the forked
@@ -13,6 +17,8 @@
  *
  * Importing it registers both adapters.
  */
+
+import { homedir } from 'node:os';
 
 import { Effect } from 'effect';
 
@@ -121,6 +127,51 @@ export async function launchAgentPane(
     throw new Error(`${resolved.name} could not start ${request.agentId}: ${pane.reason}`);
   }
   return pane;
+}
+
+/**
+ * Keep a tmux agent session open after its clients detach and after its
+ * harness exits (`destroy-unattached off`, `remain-on-exit on`), exactly as the
+ * spawners always did on tmux. A no-op for any other backend: Herdr owns its
+ * panes' lifetime itself, and a Herdr pane already outlives its process.
+ */
+export async function keepTmuxSessionOpen(pane: AgentPaneRef | null): Promise<void> {
+  if (pane?.backend !== 'tmux') return;
+  const { exactPaneTarget, setOption } = await import('../tmux.js');
+  await Effect.runPromise(setOption(pane.paneId, 'destroy-unattached', 'off'));
+  await Effect.runPromise(setOption(exactPaneTarget(pane.paneId), 'remain-on-exit', 'on'));
+}
+
+/**
+ * Prepare the tmux server before a launch on it (PAN-3960, moved here from the
+ * planning spawner so no launcher imports tmux directly).
+ *
+ * Starts the server with a parked `overdeck-init` session when none is running,
+ * then removes `unsetGlobalEnv` from the server's global environment. The tmux
+ * server inherits the environment of whatever process first started it (the
+ * dashboard carries all of `~/.overdeck.env`), and every session inherits the
+ * server's; `-e` overrides can set a variable but never unset one.
+ *
+ * A no-op for any backend other than tmux. Never throws.
+ */
+export async function prepareTmuxServer(
+  backend: TerminalBackend,
+  unsetGlobalEnv: readonly string[],
+): Promise<void> {
+  if (backend.name !== 'tmux') return;
+  const { createSession, sessionExists, tmuxExecAsync } = await import('../tmux.js');
+  try {
+    if (!(await Effect.runPromise(sessionExists('overdeck-init')))) {
+      await Effect.runPromise(createSession('overdeck-init', homedir(), undefined));
+    }
+  } catch (cause) {
+    console.error('[launch] Failed to start the tmux server:', cause);
+  }
+  for (const name of unsetGlobalEnv) {
+    await tmuxExecAsync(['set-environment', '-g', '-u', name]).catch(() => {
+      // Variable was not set — fine.
+    });
+  }
 }
 
 /**
