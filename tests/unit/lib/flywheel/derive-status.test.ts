@@ -148,6 +148,25 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
     ]);
   });
 
+  it('leaves merged and closed workspaces out of in-flight', async () => {
+    const states = new Map<string, DerivedIssueState>([
+      ['PAN-1', { issueId: 'PAN-1', state: 'working' }],
+      ['PAN-2', { issueId: 'PAN-2', state: 'merged' }],
+      ['PAN-3', { issueId: 'PAN-3', state: 'closed' }],
+    ]);
+    const status = await deriveFlywheelStatus({
+      deps: baseDeps({
+        listWorkspaces: () => ['PAN-1', 'PAN-2', 'PAN-3'].map((issueId) => ({
+          issueId,
+          workspacePath: `/ws/feature-${issueId.toLowerCase()}`,
+        })),
+        loadStates: async () => states,
+        lastJournal: () => null,
+      }),
+    });
+    expect(status.inFlight.map((row) => row.issueId)).toEqual(['PAN-1']);
+  });
+
   it('scopes to the conversation cwd project and surfaces the running order book', async () => {
     const runningBook = vi.fn(() => ({ id: 'book-1', name: 'Sept', status: 'running', landed: 1, total: 4 }));
     const status = await deriveFlywheelStatus({
