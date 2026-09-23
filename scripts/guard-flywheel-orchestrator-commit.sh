@@ -23,7 +23,7 @@ if [[ -z "$staged_paths" ]]; then
   exit 0
 fi
 
-offending_paths=$(printf '%s\n' "$staged_paths" | grep -Ev '^(docs/FLYWHEEL-STATE\.md$|\.pan/records/|\.pan/continues/|\.pan/backlog/|\.beads/)' || true)
+offending_paths=$(printf '%s\n' "$staged_paths" | grep -Ev '^(docs/FLYWHEEL-STATE\.md$|\.pan/flywheel/|\.pan/records/|\.pan/continues/|\.pan/backlog/|\.beads/)' || true)
 if [[ -z "$offending_paths" ]]; then
   exit 0
 fi
@@ -34,6 +34,7 @@ printf '%s\n' "$offending_paths" | sed 's/^/  /' >&2
 echo "" >&2
 echo "Allowed flywheel-orchestrator commit paths are:" >&2
 echo "  docs/FLYWHEEL-STATE.md" >&2
+echo "  .pan/flywheel/ (PAN-3964 state and report)" >&2
 echo "  .pan/records/" >&2
 echo "  .pan/continues/" >&2
 echo "  .pan/backlog/" >&2

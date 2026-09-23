@@ -4,7 +4,7 @@ import {
   Home, LayoutGrid, Bot, Server,
   Terminal, BarChart3, DollarSign, HeartPulse, Cpu, Settings,
   Zap, Compass, GitBranch, GitMerge, ChevronsLeft, ChevronsRight, Sun, Moon, Menu,
-  Hammer, Loader2, History, Mic, FileText, BookOpen, ChevronDown, ChevronRight, MoreHorizontal, Shield, ListOrdered,
+  Hammer, Loader2, History, Mic, FileText, BookOpen, ChevronDown, ChevronRight, MoreHorizontal, Shield, ListOrdered, Activity,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { fetchProjects, filterSpecOnlyPlanned, isUnscopedConversation, resolveEffectiveProjectKey, NO_PROJECT_KEY, NO_PROJECT_LABEL, type RegisteredProjectLite } from './CommandDeck/projectsData';
@@ -17,6 +17,7 @@ import { usePlannedBacklogVisibility } from '../hooks/usePlannedBacklogVisibilit
 import { useDashboardStore, selectIssues } from '../lib/store';
 import { getPipelineIssuePhase } from '../lib/pipeline-state';
 import { fetchExperimentalFeaturesEnabled, isExperimentalTab } from '../lib/experimentalFeatures';
+import { useFlywheelRunning } from '../lib/flywheelApi';
 import type { Issue } from '../types';
 import type { Tab } from './Header';
 
@@ -71,11 +72,12 @@ interface NavGroup {
   items: NavItem[];
 }
 
-// PAN-1561: the primary rail is Home · Order Book · Projects. Everything else
+// PAN-1561: the primary rail is Home · Flywheel · Order Book · Projects (PAN-3964). Everything else
 // moves into the collapsible "More" section (MORE_GROUPS) below the Projects
 // list — every route stays reachable, no feature is lost.
 const PRIMARY_ITEMS: NavItem[] = [
   { id: 'home' as Tab, label: 'Home', icon: Home },
+  { id: 'flywheel' as Tab, label: 'Flywheel', icon: Activity },
   { id: 'orders' as Tab, label: 'Order Book', icon: BookOpen },
 ];
 
@@ -331,6 +333,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [visibleWorkspaces, projectNameByKey]);
 
+  const flywheelRunning = useFlywheelRunning();
   const issues = useDashboardStore(selectIssues) as Issue[];
   const derivedByIssueId = useDashboardStore((state) => state.derivedIssueStateByIssueId);
 
@@ -439,6 +442,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
   }, [toggleCollapsed]);
 
   const renderNavItem = ({ id, label, icon: Icon, title }: NavItem) => {
+    const live = id === 'flywheel' && flywheelRunning;
     const isActive = activeTab === id;
     return (
       <button
@@ -457,6 +461,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
       >
         <Icon className="shrink-0 w-4 h-4" />
         {!collapsed && <span className="truncate">{label}</span>}
+        {!collapsed && live && <span className="ml-auto text-[10px] text-muted-foreground" data-testid="sidebar-flywheel-live">live</span>}
       </button>
     );
   };

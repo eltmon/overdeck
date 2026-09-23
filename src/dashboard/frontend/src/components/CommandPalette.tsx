@@ -494,6 +494,12 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
       alsoScopes: ['workspaces' as const],
       onSelect: onNewWorkspace,
     }] : []),
+    { // PAN-3964: the Flywheel page
+      id: 'pan-flywheel', label: 'Open Flywheel', icon: RefreshCw, group: 'Actions',
+      description: 'The /pan-flywheel loop: status, controls, and its conversation',
+      keywords: ['flywheel', 'loop', 'pan-flywheel', 'pause', 'resume'],
+      onSelect: () => onNavigate('flywheel'),
+    },
     {
       id: 'start-cloister',
       label: 'Start Cloister',

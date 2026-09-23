@@ -15,7 +15,7 @@ vi.mock('../hooks/useTheme', () => ({
   useTheme: () => ({ theme: 'dark', toggleTheme: vi.fn() }),
 }));
 
-function renderSidebar(options: { activeTab?: Tab; experimentalFeatures?: boolean; onOpenUpdater?: () => void } = {}) {
+function renderSidebar(options: { activeTab?: Tab; experimentalFeatures?: boolean; onOpenUpdater?: () => void; flywheelRun?: string } = {}) {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -35,17 +35,20 @@ function renderSidebar(options: { activeTab?: Tab; experimentalFeatures?: boolea
     if (url === '/api/settings') {
       return Response.json({ experimental: { experimentalFeatures: options.experimentalFeatures ?? false } });
     }
+    if (url === '/api/flywheel/status' && options.flywheelRun) {
+      return Response.json({ run: options.flywheelRun, inFlight: [] });
+    }
     return Response.json({});
   });
   vi.stubGlobal('fetch', fetchMock);
 
-  const { container } = render(
+  const { container, unmount } = render(
     <QueryClientProvider client={client}>
       <Sidebar activeTab={options.activeTab ?? 'pipeline'} onTabChange={onTabChange} onSearchOpen={onSearchOpen} onOpenUpdater={options.onOpenUpdater} />
     </QueryClientProvider>,
   );
 
-  return { container, onTabChange, fetchMock };
+  return { container, onTabChange, fetchMock, unmount };
 }
 
 function issue(overrides: Partial<Issue>): Issue {
@@ -75,16 +78,15 @@ describe('Sidebar navigation', () => {
     }));
   });
 
-  it('shows Home and Order Book as the primary rail, with other views under More (PAN-1561)', () => {
+  it('shows Home, Flywheel, and Order Book as the primary rail, with other views under More (PAN-1561, PAN-3964)', () => {
     const { container, onTabChange } = renderSidebar({ activeTab: 'command-deck' });
 
-    // Primary rail: the first two nav buttons are Home and Order Book. The
-    // Flywheel page went with the state layer (PAN-3917).
+    // Primary rail: Home · Flywheel · Order Book. PAN-3964 restored the
+    // Flywheel page as a derived view after the PAN-3917 cut.
     const navButtons = Array.from(container.querySelectorAll('nav button[data-testid^="sidebar-"]'));
     const labels = navButtons.map((button) => button.textContent?.trim());
-    expect(labels[0]).toBe('Home');
-    expect(labels[1]).toBe('Order Book');
-    expect(labels).not.toContain('Flywheel');
+    expect(labels.slice(0, 3)).toEqual(['Home', 'Flywheel', 'Order Book']);
+    expect(screen.queryByTestId('sidebar-flywheel-live')).toBeNull();
 
     // Secondary views are relocated into the "More" section but still reachable.
     expect(screen.getByTestId('sidebar-more')).toBeInTheDocument();
@@ -93,6 +95,17 @@ describe('Sidebar navigation', () => {
 
     fireEvent.click(screen.getByTestId('sidebar-command-deck'));
     expect(onTabChange).toHaveBeenCalledWith('command-deck');
+  });
+
+  it('marks Flywheel live only while the derived run is running (PAN-3964)', async () => {
+    const { unmount, fetchMock } = renderSidebar({ activeTab: 'home', flywheelRun: 'paused' });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/flywheel/status'));
+    await waitFor(() => expect(fetchMock.mock.results.some((r) => r.type === 'return')).toBe(true));
+    expect(screen.queryByTestId('sidebar-flywheel-live')).toBeNull();
+    unmount();
+
+    renderSidebar({ activeTab: 'home', flywheelRun: 'running' });
+    expect(await screen.findByTestId('sidebar-flywheel-live')).toHaveTextContent('live');
   });
 
   it('routes the expanded logo to Home', () => {

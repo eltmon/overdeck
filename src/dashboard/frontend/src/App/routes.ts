@@ -10,6 +10,7 @@ export const TAB_PATHS: Record<Tab, string> = {
   'command-deck': '/command-deck',
   agents: '/agents',
   orders: '/orders',
+  flywheel: '/flywheel',
   backlog: '/backlog',
   resources: '/resources',
   knowledge: '/knowledge',
