@@ -500,7 +500,10 @@ export class CodexAppServerManager extends EventEmitter {
    * codex-cli 0.153.4 does not send `thread/started` for a sub-agent thread.
    * The spawn is visible only as a `collabAgentToolCall` item on the spawning
    * thread (`receiverThreadIds`), verified live. Receivers of a call made from
-   * inside the owner tree join the tree.
+   * inside the owner tree join the tree. The item is positive evidence, so it
+   * overrides a `foreign` classification (PAN-4031): a sub-agent whose
+   * `thread/started` arrived before its parent joined the tree would otherwise
+   * stay foreign, and its approvals would only be logged while the turn hangs.
    */
   private adoptSpawnedAgents(message: AppServerMessage, threadId: string): void {
     if (message.method !== 'item/started' && message.method !== 'item/completed') return;
@@ -509,7 +512,11 @@ export class CodexAppServerManager extends EventEmitter {
     const scope = this.threadScope(threadId);
     if (scope !== 'owner' && scope !== 'descendant') return;
     for (const receiver of item.receiverThreadIds) {
-      if (typeof receiver === 'string' && this.threadScope(receiver) === 'unknown') this.descendantThreads.add(receiver);
+      if (typeof receiver !== 'string') continue;
+      const receiverScope = this.threadScope(receiver);
+      if (receiverScope !== 'unknown' && receiverScope !== 'foreign') continue;
+      this.foreignThreads.delete(receiver);
+      this.descendantThreads.add(receiver);
     }
   }
 

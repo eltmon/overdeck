@@ -95,10 +95,12 @@ export class CodexAppServerHost {
   private ownerRolloutPath: string | undefined;
   /** Foreign threads that are not native navigation (Codex title threads). */
   private readonly incidentalThreads = new Set<string>();
+  /** Native navigation seen so far; it only ever grows (PAN-4031). */
   private readonly navigatedThreads = new Set<string>();
-  private readonly unclassifiedThreads = new Set<string>();
   /** Latest running cost total per owner/sub-agent thread. */
   private readonly threadCosts = new Map<string, number>();
+  /** Model each sub-agent thread runs on, when Codex named one (PAN-4031). */
+  private readonly subAgentModels = new Map<string, string>();
   /** True once the host itself is stopping the app-server. */
   private stopping = false;
   private exitHandling: Promise<void> = Promise.resolve();
@@ -436,7 +438,7 @@ export class CodexAppServerHost {
       // threads it cannot classify; foreign threads arrive as foreign-thread.
       // Thread-id recording happens only in openOwnerThread.
       this.applyOwnerNotification(message);
-      this.trackUnknownThread(message);
+      this.trackSubAgentModel(message);
       this.renderNotification(message);
       this.recordObservedActivity(message);
       void this.appendEvent('notification', message as JsonRecord);
@@ -530,10 +532,11 @@ export class CodexAppServerHost {
 
   /**
    * A thread outside this conversation's tree, positively identified by its
-   * `thread/started` (PAN-3835). Ephemeral ones are Codex title threads;
-   * anything else is native navigation (`/new`, `/fork` in the attached TUI).
-   * Counting navigated threads lets the companion adapter replace a TUI that
-   * left the owner thread instead of reusing it.
+   * `thread/started` (PAN-3835). Ephemeral ones are Codex title threads, and
+   * one with a parent is some thread's sub-agent (PAN-4031); anything else is
+   * native navigation (`/new`, `/fork` in the attached TUI). Counting navigated
+   * threads lets the companion adapter replace a TUI that left the owner
+   * thread instead of reusing it.
    */
   private trackForeignThread(message: AppServerMessage): void {
     const threadId = messageThreadId(message);
@@ -545,7 +548,9 @@ export class CodexAppServerHost {
       return;
     }
     if (message.method !== 'thread/started') return;
-    if (asRecord(asRecord(message.params).thread).ephemeral === true) {
+    const thread = asRecord(asRecord(message.params).thread);
+    const parentThreadId = typeof thread.parentThreadId === 'string' && thread.parentThreadId ? thread.parentThreadId : undefined;
+    if (thread.ephemeral === true || parentThreadId) {
       this.incidentalThreads.add(threadId);
       return;
     }
@@ -553,22 +558,15 @@ export class CodexAppServerHost {
   }
 
   /**
-   * A thread the manager has not classified (for example one the attached TUI
-   * reopened with `/resume`). Its events still flow, fail open. A sub-agent's
-   * first status events arrive before the spawn item that adopts it, so the
-   * epoch counts only threads that are still unclassified when it is read.
+   * Part of the companion Terminal fingerprint (PAN-4031). It counts only
+   * positively identified navigation, so it never goes down: a sub-agent whose
+   * status events arrive before the spawn item that adopts it is not counted
+   * at all, and cannot make a later Terminal open replace an attached CLI.
+   * The cost: a `/resume` of another thread in the TUI announces no
+   * `thread/started`, so it is not counted either.
    */
-  private trackUnknownThread(message: AppServerMessage): void {
-    const threadId = messageThreadId(message);
-    if (threadId && this.scopeOf(threadId) === 'unknown') this.unclassifiedThreads.add(threadId);
-  }
-
   private navigationEpoch(): number {
-    let unclassified = 0;
-    for (const threadId of this.unclassifiedThreads) {
-      if (this.scopeOf(threadId) === 'unknown') unclassified += 1;
-    }
-    return this.navigatedThreads.size + unclassified;
+    return this.navigatedThreads.size;
   }
 
   private noteNavigation(threadId: string, method: string): void {
@@ -578,14 +576,49 @@ export class CodexAppServerHost {
   }
 
   /**
+   * Record the model a sub-agent runs on (PAN-4031). The `spawnAgent`
+   * `collabAgentToolCall` item carries the model requested for the new
+   * thread; a `thread/settings/updated` for the sub-agent overrides it. A
+   * spawn that names no model inherits its spawner's recorded model. With no
+   * recorded model the sub-agent is priced at the owner's model.
+   */
+  private trackSubAgentModel(message: AppServerMessage): void {
+    const params = asRecord(message.params);
+    const threadId = messageThreadId(message);
+    if (message.method === 'thread/settings/updated') {
+      const model = asRecord(params.threadSettings).model;
+      if (threadId && typeof model === 'string' && model && this.scopeOf(threadId) === 'descendant') {
+        this.subAgentModels.set(threadId, model);
+      }
+      return;
+    }
+    if (message.method !== 'item/started' && message.method !== 'item/completed') return;
+    const item = asRecord(params.item);
+    if (item.type !== 'collabAgentToolCall' || item.tool !== 'spawnAgent' || !Array.isArray(item.receiverThreadIds)) return;
+    const sender = typeof item.senderThreadId === 'string' ? item.senderThreadId : threadId;
+    const model = typeof item.model === 'string' && item.model
+      ? item.model
+      : sender ? this.subAgentModels.get(sender) : undefined;
+    if (!model) return;
+    for (const receiver of item.receiverThreadIds) {
+      if (typeof receiver !== 'string' || this.scopeOf(receiver) !== 'descendant') continue;
+      if (!this.subAgentModels.has(receiver)) this.subAgentModels.set(receiver, model);
+    }
+  }
+
+  /**
    * Activity from the owner and its sub-agent threads keeps the conversation
    * alive for liveness; live cost is the sum of each thread's own running
-   * total. Threads outside the tree are not this conversation's cost.
+   * total, each priced at its own model. Threads outside the tree are not
+   * this conversation's cost.
    */
   private recordObservedActivity(message: AppServerMessage): void {
     const threadId = messageThreadId(message);
     const scope = threadId ? this.scopeOf(threadId) : 'owner';
-    const threadCost = codexNotificationCost(message, this.threadModel);
+    const subAgentModel = threadId && scope === 'descendant' ? this.subAgentModels.get(threadId) : undefined;
+    // A sub-agent model with no pricing entry falls back to the owner's price.
+    const threadCost = (subAgentModel ? codexNotificationCost(message, subAgentModel) : undefined)
+      ?? codexNotificationCost(message, this.threadModel);
     if (threadCost !== undefined && (scope === 'owner' || scope === 'descendant')) {
       this.threadCosts.set(threadId ?? '', threadCost);
     }
@@ -642,20 +675,35 @@ export class CodexAppServerHost {
 
   private renderNotification(message: AppServerMessage): void {
     const params = asRecord(message.params);
+    const label = this.threadLabel(message);
     if (message.method === 'turn/started') {
-      this.writePaneLine('[turn] started');
+      this.writePaneLine(`[turn${label}] started`);
       return;
     }
     if (message.method === 'turn/completed') {
-      this.writePaneLine('[turn] completed');
+      this.writePaneLine(`[turn${label}] completed`);
       return;
     }
     if (message.method === 'error') {
-      this.writePaneLine(`[error] ${formatPaneValue(params.error ?? params.message ?? message.params)}`);
+      this.writePaneLine(`[error${label}] ${formatPaneValue(params.error ?? params.message ?? message.params)}`);
       return;
     }
     const text = typeof params.text === 'string' ? params.text : undefined;
-    if (text) this.writePaneLine(`[assistant] ${text}`);
+    if (text) this.writePaneLine(`[assistant${label}] ${text}`);
+  }
+
+  /**
+   * ` sub:<id>` for a sub-agent line, ` thread:<id>` for an unclassified
+   * thread, empty for the owner (PAN-4031). The id is the thread id's last
+   * 8 characters: Codex thread ids are UUIDv7, whose leading characters are a
+   * timestamp shared by threads started together.
+   */
+  private threadLabel(message: AppServerMessage): string {
+    const threadId = messageThreadId(message);
+    if (!threadId) return '';
+    const scope = this.scopeOf(threadId);
+    if (scope === 'owner') return '';
+    return ` ${scope === 'descendant' ? 'sub' : 'thread'}:${threadId.slice(-8)}`;
   }
 
   private renderRequest(message: AppServerMessage): void {

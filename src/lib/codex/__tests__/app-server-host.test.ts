@@ -709,12 +709,98 @@ describe('CodexAppServerHost', () => {
     it('does not count a sub-agent as navigation when its status arrives before its spawn item (live order)', async () => {
       const { app, host } = await startOwner();
       app.send({ method: 'thread/status/changed', params: { threadId: 'sub', status: { type: 'idle' } } });
-      expect(host.status().navigationEpoch).toBe(1);
+      expect(host.status().navigationEpoch).toBe(0);
       app.send({
         method: 'item/completed',
         params: { threadId: 'owner', item: { type: 'collabAgentToolCall', tool: 'spawnAgent', receiverThreadIds: ['sub'] } },
       });
       expect(host.status().navigationEpoch).toBe(0);
+    });
+
+    it('keeps the Terminal navigation epoch stable while sub-agents come and go (PAN-4031)', async () => {
+      const { app, host } = await startOwner();
+      const epochs: number[] = [];
+      const read = () => epochs.push(host.status().navigationEpoch as number);
+      const spawn = (sub: string) => app.send({
+        method: 'item/completed',
+        params: { threadId: 'owner', item: { type: 'collabAgentToolCall', tool: 'spawnAgent', senderThreadId: 'owner', receiverThreadIds: [sub] } },
+      });
+
+      read();
+      app.send({ method: 'thread/status/changed', params: { threadId: 'sub-a', status: { type: 'active' } } });
+      read();
+      spawn('sub-a');
+      read();
+      app.send({ method: 'thread/started', params: { thread: { id: 'tui-new', ephemeral: false, parentThreadId: null } } });
+      read();
+      app.send({ method: 'thread/status/changed', params: { threadId: 'sub-b', status: { type: 'active' } } });
+      read();
+      spawn('sub-b');
+      // A sub-agent of a thread outside the tree is not navigation either.
+      app.send({ method: 'thread/started', params: { thread: { id: 'tui-sub', ephemeral: false, parentThreadId: 'tui-new' } } });
+      read();
+
+      expect(epochs).toEqual([0, 0, 0, 1, 1, 1]);
+    });
+
+    it('prices each sub-agent at the model its spawn item names (PAN-4031)', async () => {
+      const { app, recordActivity } = await startOwner();
+      vi.useFakeTimers({ toFake: ['Date'] });
+      try {
+        const usage = (threadId: string, inputTokens: number) => ({
+          method: 'thread/tokenUsage/updated',
+          params: { threadId, tokenUsage: { total: { inputTokens, cachedInputTokens: 0, outputTokens: 0 } } },
+        });
+        const spawn = (sender: string, receiver: string, model: string | null) => app.send({
+          method: 'item/completed',
+          params: {
+            threadId: sender,
+            item: { type: 'collabAgentToolCall', tool: 'spawnAgent', senderThreadId: sender, receiverThreadIds: [receiver], model },
+          },
+        });
+        spawn('owner', 'luna-sub', 'gpt-5.6-luna');
+        spawn('luna-sub', 'luna-grandchild', null);
+        spawn('owner', 'default-sub', null);
+        spawn('owner', 'unpriced-sub', 'not-a-priced-model');
+        spawn('owner', 'retuned-sub', 'gpt-5.6-luna');
+        app.send({ method: 'thread/settings/updated', params: { threadId: 'retuned-sub', threadSettings: { model: 'gpt-5.6-terra' } } });
+
+        const threads = ['owner', 'luna-sub', 'luna-grandchild', 'default-sub', 'unpriced-sub', 'retuned-sub'];
+        for (const threadId of threads) {
+          vi.setSystemTime(Date.now() + 6_000);
+          app.send(usage(threadId, 1_000_000));
+        }
+        const cost = (model: string) => codexNotificationCost(usage('any', 1_000_000), model) ?? 0;
+        const expected = cost('gpt-5.6-sol') // owner
+          + cost('gpt-5.6-luna') * 2 // luna-sub, and its grandchild inheriting its model
+          + cost('gpt-5.6-sol') * 2 // no model named, and an unpriced model: the owner's price
+          + cost('gpt-5.6-terra'); // settings update overrides the spawn request
+        expect(cost('gpt-5.6-luna')).not.toBeCloseTo(cost('gpt-5.6-sol'), 6);
+        expect(recordActivity.mock.calls.at(-1)?.[1].costSoFar).toBeCloseTo(expected, 10);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('labels sub-agent turn and assistant lines and leaves owner lines unlabeled (PAN-4031)', async () => {
+      const { app, lines } = await startOwner();
+      app.send({
+        method: 'item/completed',
+        params: { threadId: 'owner', item: { type: 'collabAgentToolCall', tool: 'spawnAgent', receiverThreadIds: ['019a0000-0000-7000-8000-00000000beef'] } },
+      });
+      app.send({ method: 'turn/started', params: { threadId: '019a0000-0000-7000-8000-00000000beef', turn: { id: 'sub-turn' } } });
+      app.send({ method: 'item/completed', params: { threadId: '019a0000-0000-7000-8000-00000000beef', text: 'sub says hi' } });
+      app.send({ method: 'turn/completed', params: { threadId: '019a0000-0000-7000-8000-00000000beef', turn: { id: 'sub-turn' } } });
+      app.send({ method: 'turn/started', params: { threadId: 'owner', turn: { id: 'owner-turn' } } });
+      app.send({ method: 'item/completed', params: { threadId: 'owner', text: 'owner says hi' } });
+
+      expect(lines).toEqual(expect.arrayContaining([
+        '[turn sub:0000beef] started',
+        '[assistant sub:0000beef] sub says hi',
+        '[turn sub:0000beef] completed',
+        '[turn] started',
+        '[assistant] owner says hi',
+      ]));
     });
 
     it('surfaces a request from a thread it cannot classify instead of dropping it', async () => {
