@@ -26,6 +26,7 @@ import {
   type ForgeType,
 } from '../../../lib/forge.js';
 import { getPrFacts, resetPrFactsCache } from '../../../lib/cloister/pr-facts.js';
+import { formatUatMarker } from '../../../lib/cloister/uat-verdict-marker.js';
 import { bumpIssuePrTabCacheGeneration } from '../../../dashboard/server/services/pr-tab-cache.js';
 import { postReviewVerdict } from '../../../lib/cloister/pr-review-verdict.js';
 import { getIssueWorkspacePath } from '../../../lib/overdeck/issue-projects.js';
@@ -90,12 +91,16 @@ export function formatVerdictBody(
   status: DoneOptions['status'],
   notes?: string,
   uat?: { status?: string; notes?: string },
+  uatMarker?: { status: 'passed' | 'failed'; sha?: string | null },
 ): string {
   const heading = `**${role} verdict: ${status}**`;
   const lines = [heading];
   if (notes) lines.push('', notes);
   if (uat?.status) lines.push('', `**browser UAT: ${uat.status}**`);
   if (uat?.notes) lines.push('', uat.notes);
+  // #4036: merge readiness reads the UAT outcome and the commit it exercised
+  // back from this marker, so a failure blocks only the head it was run on.
+  if (uatMarker) lines.push('', formatUatMarker(uatMarker.status, uatMarker.sha));
   return lines.join('\n');
 }
 
@@ -155,10 +160,28 @@ export async function doneCommand(
     return exitCli(1);
   }
 
-  const body = formatVerdictBody(role, options.status, options.notes, {
-    status: options.uatStatus,
-    notes: options.uatNotes,
-  });
+  // PAN-4030 / #4036: a browser UAT result is observed here and nowhere else —
+  // the test role's `--uat-status`, or the uat role's own status. It is
+  // anchored on the commit UAT actually exercised (pre-Cut: reviewedAtCommit):
+  // the test agent records it before running the gates and passes it as
+  // --tested-sha. Its workspace HEAD at verdict time is no better than the PR
+  // head — the work agent shares that worktree and may have moved it — so when
+  // the SHA was not reported, fall back to the PR head: a push during the run
+  // then mis-anchors the verdict onto the newer commit. An unreadable PR head
+  // leaves the verdict unanchored (merge readiness then dates it instead).
+  const uatOutcome = role === 'test' ? options.uatStatus : role === 'uat' ? options.status : undefined;
+  const uatAnchor = uatOutcome === 'passed' || uatOutcome === 'failed'
+    ? options.testedSha?.toLowerCase() ?? await getPrFacts(normalizedIssueId)
+      .then((facts) => facts.headSha?.toLowerCase() ?? undefined, () => undefined)
+    : undefined;
+
+  const body = formatVerdictBody(
+    role,
+    options.status,
+    options.notes,
+    { status: options.uatStatus, notes: options.uatNotes },
+    uatOutcome === 'passed' || uatOutcome === 'failed' ? { status: uatOutcome, sha: uatAnchor ?? null } : undefined,
+  );
 
   // FR-7: the reviewer's verdict IS the forge's review decision. A pass is an
   // approval; a blocked or failed verdict is `REQUEST_CHANGES`, not a comment —
@@ -202,6 +225,14 @@ export async function doneCommand(
     await Effect.runPromise(
       commentOnArtifact(forge, { forge, url: artifact.url, body, cwd: workspacePath }),
     );
+    if (uatOutcome) {
+      // #4036: merge readiness reads this comment. The anchor lookup above
+      // filled this process's read caches with the pre-verdict PR, so drop
+      // them. A dashboard server's caches are its own: the PR webhook bumps
+      // them, and without one both expire within 60s (pr-facts, pr-tab-cache).
+      resetPrFactsCache();
+      bumpIssuePrTabCacheGeneration(normalizedIssueId);
+    }
     const tint = options.status === 'passed' ? chalk.green : chalk.yellow;
     console.log(tint(`${options.status === 'passed' ? '✓' : '✗'} ${role} ${options.status} — recorded on ${artifact.url}`));
   }
@@ -260,14 +291,13 @@ export async function doneCommand(
     }
   }
 
-  // PAN-4030: a browser UAT result is observed here and nowhere else — the
-  // test role's `--uat-status`, or the uat role's own status. The verdict is
-  // already on the PR; a failure owes rework, so relay the UAT notes to the
-  // work agent (or a needs-you when none can be reached), once per failing
-  // head per verdict episode. The UAT verdict is journaled here, where it is
-  // observed (#4035): a passing verdict starts a new episode, so a later
-  // failure on the same head is told again.
-  const uatOutcome = role === 'test' ? options.uatStatus : role === 'uat' ? options.status : undefined;
+  // PAN-4030: the UAT verdict is already on the PR; a failure owes rework, so
+  // relay the UAT notes to the work agent (or a needs-you when none can be
+  // reached), once per failing head per verdict episode, keyed on the same
+  // anchor the verdict marker carries. The UAT verdict is journaled here, where
+  // it is observed (#4035): a passing verdict starts a new episode, so a later
+  // failure on the same head is told again. An unreadable PR head still
+  // relays; it only loses cross-run dedup.
   if (uatOutcome) {
     appendPipelineEntry(workspacePath, {
       type: 'uat.verdict',
@@ -284,20 +314,11 @@ export async function doneCommand(
     const uatNotes = role === 'test' ? options.uatNotes : options.notes;
     try {
       const { relayUatFailureFeedback } = await import('../../../lib/cloister/uat-failure-feedback.js');
-      // Anchor on the commit UAT actually exercised (pre-Cut: reviewedAtCommit).
-      // The test agent records it before running the gates and passes it as
-      // --tested-sha. Its workspace HEAD at verdict time is no better than the
-      // PR head — the work agent shares that worktree and may have moved it —
-      // so when the SHA was not reported, fall back to the PR head: a push
-      // during the run then mis-anchors this failure onto the newer commit.
-      // An unreadable PR head still relays; it only loses cross-run dedup.
-      const anchor = options.testedSha?.toLowerCase() ?? await getPrFacts(normalizedIssueId)
-        .then((facts) => facts.headSha ?? undefined, () => undefined);
       await withFeedbackDeadline(relayUatFailureFeedback({
         issueId: normalizedIssueId,
         uatNotes,
         workspacePath,
-        ...(anchor ? { anchor } : {}),
+        ...(uatAnchor ? { anchor: uatAnchor } : {}),
       }));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

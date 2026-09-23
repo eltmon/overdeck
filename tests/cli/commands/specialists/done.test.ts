@@ -293,6 +293,8 @@ describe('specialists done command', () => {
     expect(body).toContain('typecheck, lint, and tests passed');
     expect(body).toContain('browser UAT: failed');
     expect(body).toContain('workspace has no tracker-backed issue data');
+    // #4036: the marker merge readiness reads, anchored where PAN-4030 anchors.
+    expect(body).toContain('<!-- overdeck-uat: failed sha=head-sha-1 -->');
     expect(mockDeliverReviewVerdictFeedback).not.toHaveBeenCalled();
   });
 
@@ -330,6 +332,8 @@ describe('specialists done command', () => {
     });
 
     expect(mockRelayUatFailureFeedback).toHaveBeenCalledWith(expect.objectContaining({ anchor: 'abc1234' }));
+    // #4036: the verdict marker carries the same tested commit.
+    expect(mockCommentOnArtifact.mock.calls[0][1].body).toContain('<!-- overdeck-uat: failed sha=abc1234 -->');
     expect(mockGetPrFacts).not.toHaveBeenCalled();
   });
 

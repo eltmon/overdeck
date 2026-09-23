@@ -140,9 +140,9 @@ vi.mock('../merge-strike.js', () => ({
   activeStrikeMerge: vi.fn(() => false),
   advanceMergeQueue: vi.fn(async () => {}),
   ensureAgentReadyForMerge: mocks.ensureAgentReadyForMerge,
+  forgeMergeGateRefusal: vi.fn(async () => null),
   mergeVerificationOptions: vi.fn(() => ({})),
   normalMergeEligibility: vi.fn(() => null),
-  readStrikeHead: vi.fn(async () => null),
   rebaseWithAgentFallback: vi.fn(async () => {
     try {
       await mocks.ensureAgentReadyForMerge();

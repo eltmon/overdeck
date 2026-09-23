@@ -89,7 +89,13 @@ export interface IssuePullRequestData {
   mergeCommit?: { oid?: string } | string | null;
   body: string;
   /** Optional: absent from the many fixtures that predate the verdict marker. */
-  comments?: Array<{ body?: string; createdAt?: string; author?: { login?: string } | null }>;
+  comments?: Array<{
+    body?: string;
+    createdAt?: string;
+    author?: { login?: string } | null;
+    /** GitHub's `OWNER` / `MEMBER` / `COLLABORATOR` / `CONTRIBUTOR` / `NONE` / …. */
+    authorAssociation?: string;
+  }>;
   commits?: Array<{ oid?: string; committedDate?: string; authoredDate?: string }>;
 }
 
@@ -181,7 +187,7 @@ export interface IssuePrDetailsResponse extends IssuePrEndpointResponse {
   diff: string | null;
 }
 
-async function resolveIssuePullRequestRef(issueId: string): Promise<
+async function resolveIssuePullRequestRef(issueId: string, preferBranch?: string): Promise<
   | { issueId: string; repoArg: string; prNumber: string }
   | { issueId: string; repoArg: null; prNumber: null; error?: string }
 > {
@@ -196,10 +202,15 @@ async function resolveIssuePullRequestRef(issueId: string): Promise<
   // every other state. Among merged candidates, prefer the most recent merge.
   // This keeps active feature PRs stable while allowing a merged strike PR to
   // supersede a closed feature PR during close-out (PAN-2883).
-  const branchCandidates = [
+  // #4016: a caller landing a specific branch (a strike) probes that branch
+  // first, so an open feature PR cannot stand in for the strike PR.
+  const defaultCandidates = [
     `feature/${issueId.toLowerCase()}`,
     `strike/${issueId.toLowerCase()}`,
   ];
+  const branchCandidates = preferBranch
+    ? [preferBranch, ...defaultCandidates.filter((branch) => branch !== preferBranch)]
+    : defaultCandidates;
   const repoArg = `${githubCheck.owner}/${githubCheck.repo}`;
 
   try {
@@ -254,7 +265,14 @@ async function fetchIssuePullRequestFromRef(
   }
 }
 
-export async function fetchIssuePullRequest(issueId: string): Promise<IssuePrEndpointResponse> {
+export async function fetchIssuePullRequest(
+  issueId: string,
+  options: { preferBranch?: string } = {},
+): Promise<IssuePrEndpointResponse> {
+  // A branch-specific read is not the PR tab's answer: never serve or store it.
+  if (options.preferBranch) {
+    return fetchIssuePullRequestFromRef(await resolveIssuePullRequestRef(issueId, options.preferBranch));
+  }
   const generation = getIssuePrTabCacheGeneration(issueId);
   const cached = getCachedIssuePrTabResponse<IssuePrEndpointResponse>('pr', issueId, generation);
   if (cached) return cached;
