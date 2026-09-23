@@ -10,12 +10,12 @@
  *   1. `OVERDECK_INTERNAL_TOKEN` env var (preferred for tests / explicit setup)
  *   2. `<OVERDECK_HOME>/internal-token` (auto-generated on first server start)
  *
- * The dashboard server calls `ensureInternalToken()` once at startup, which
+ * The dashboard server calls `ensureInternalTokenSync()` once at startup, which
  * generates a random token and persists it with mode 0600 if neither source is
  * present. CLI processes (running as the same user) read it via
- * `getInternalToken()` and attach it as the `X-Overdeck-Internal-Token`
+ * `getInternalTokenSync()` and attach it as the `X-Overdeck-Internal-Token`
  * header. If the CLI cannot resolve a token (e.g. dashboard never started),
- * `notifyPipeline()` skips the cross-process forward — the SQLite write is
+ * `notifyPipelineSync()` skips the cross-process forward — the SQLite write is
  * already durable, so no domain event is ever lost.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';

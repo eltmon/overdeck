@@ -293,7 +293,7 @@ async function spawnRunWithoutConsentClaim(
   const providerEnv = isAcp ? {} : await getProviderEnvForModel(selectedModel, resolvedHarness);
   // PAN-1048 review feedback 005 (S1): when the resolved harness is ohmypi, thread
   // the per-agent ohmypi launcher fields (--session-dir, --extension, FIFO
-  // redirect) through generateLauncherScript so the role launcher emits the
+  // redirect) through generateLauncherScriptSync so the role launcher emits the
   // correct `omp --mode rpc` command instead of a malformed Claude command.
   // Without this, a config'd `roles.review.harness: ohmypi` produced a launcher
   // that silently fell back to Claude shape.

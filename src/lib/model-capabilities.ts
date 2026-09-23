@@ -1,5 +1,24 @@
 import { MODEL_DEPRECATIONS } from './model-deprecations.js';
 import { AUDITED_MODEL_ADDITIONS } from './model-capability-additions.js';
+/**
+ * Model Capability Matrix
+ *
+ * Defines capability scores for each model across different skill dimensions.
+ * This enables intelligent model selection based on what the user has enabled
+ * rather than static presets.
+ *
+ * Scores: 0-100 where 100 = best in class
+ * Cost: $/1M tokens (input + output average)
+ *
+ * Last updated: 2026-06-30
+ * Sources:
+ * - SWE-bench Verified leaderboard (vals.ai)
+ * - LiveCodeBench v6
+ * - LMSYS Chatbot Arena
+ * - Artificial Analysis
+ * - Official provider pricing pages
+ */
+
 import { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW } from './model-context-windows.js';
 import { ModelId } from './settings.js';
 

@@ -1,3 +1,25 @@
+/**
+ * Single source of truth for the permission flags we pass to spawned Claude Code processes.
+ *
+ * Background: every Overdeck spawn site historically hardcoded
+ * `--dangerously-skip-permissions --permission-mode bypassPermissions`. This module
+ * centralizes that decision so the mode can be switched per-deployment via config or
+ * per-invocation via the `--yolo` flag / `PAN_YOLO` env var.
+ *
+ * Override precedence (highest wins):
+ *   1. PAN_YOLO env var ("1"/"true"/"yes" → bypass, "0"/"false"/"no" → auto)
+ *   2. ClaudePermissionMode argument (callers that have already resolved CLI/env)
+ *   3. config.claude.permissionMode in ~/.overdeck/config.yaml
+ *   4. 'bypass' (default — emits `--permission-mode bypassPermissions`). 'auto'
+ *      (--permission-mode default + the PermissionRequest/PreToolUse
+ *      auto-approve hooks) is opt-in: it only works on machines where the
+ *      hooks are installed, so it must never be the fallback.
+ *
+ * Note: 'auto' is Overdeck's internal mode name, not a Claude Code flag value —
+ * it resolves to `--permission-mode default`. Switch to 'auto' explicitly
+ * (config or `--no-yolo`) when you want hook-moderated execution.
+ */
+
 import type { ClaudePermissionMode } from './config.js';
 import { loadConfigSync as loadYamlConfig } from './config-yaml.js';
 

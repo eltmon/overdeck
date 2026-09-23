@@ -117,9 +117,9 @@ export function normalizeIssueIdSync(issueId: string): string {
  * canonical uppercase issue ID.
  *
  * Examples:
- *   resolveIssueId("PAN-123")       → "PAN-123"
- *   resolveIssueId("pan-123")       → "PAN-123"
- *   resolveIssueId("agent-pan-123") → "PAN-123"
+ *   resolveIssueIdSync("PAN-123")       → "PAN-123"
+ *   resolveIssueIdSync("pan-123")       → "PAN-123"
+ *   resolveIssueIdSync("agent-pan-123") → "PAN-123"
  */
 export function resolveIssueIdSync(input: string): string {
   const stripped = input.replace(/^agent-/i, '');
@@ -132,7 +132,7 @@ export function resolveIssueIdSync(input: string): string {
  *
  * Strategy:
  *   1. If input already has a prefix (PAN-1148, agent-pan-1148, F29698, etc.),
- *      delegate to resolveIssueId and return.
+ *      delegate to resolveIssueIdSync and return.
  *   2. If input is bare digits, scan ~/.overdeck/agents/ for state dirs
  *      matching `agent-<prefix>-<num>` with a valid state.json. If exactly
  *      one matches, return `<PREFIX>-<num>`.
@@ -182,7 +182,7 @@ export function resolveBareNumericIdSync(input: string, overdeckHome?: string): 
 /**
  * Extract prefix from a standard format issue ID (PREFIX-NUMBER).
  * Returns null for non-standard formats like Rally IDs.
- * Use extractPrefix() for unified handling of all formats.
+ * Use extractPrefixSync() for unified handling of all formats.
  */
 export function extractStandardPrefixSync(issueId: string): string | null {
   const match = issueId.match(/^([A-Za-z]+)-\d+$/i);
@@ -192,7 +192,7 @@ export function extractStandardPrefixSync(issueId: string): string | null {
 /**
  * Extract number from a standard format issue ID (PREFIX-NUMBER).
  * Returns null for non-standard formats like Rally IDs.
- * Use extractNumber() for unified handling of all formats.
+ * Use extractNumberSync() for unified handling of all formats.
  */
 export function extractStandardNumberSync(issueId: string): number | null {
   const match = issueId.match(/^([A-Za-z]+)-(\d+)$/i);
@@ -200,9 +200,7 @@ export function extractStandardNumberSync(issueId: string): number | null {
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Pure-sync id parsing — additive Effect.sync wrappers. resolveBareNumericId
-// reads the filesystem but is wrapped sync-only to mirror the existing API
-// (it's used from CLI entry points where sync FS is acceptable).
+// Pure-sync id parsing — additive Effect.sync wrapper.
 
 /** Lowercase filesystem-safe form. Pure. */
 export const normalizeIssueId = (issueId: string): Effect.Effect<string> =>

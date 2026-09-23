@@ -24,7 +24,7 @@
 #   - scripts/lint-permissions.sh        — this file
 #
 # Spawn sites (agents.ts, conversations.ts) must use DSP_FLAG /
-# BYPASS_PERMISSION_MODE / bypassPrefixForAgentFlag / buildClaudeUserSettings
+# BYPASS_PERMISSION_MODE / bypassPrefixForAgentFlagSync / buildClaudeUserSettingsSync
 # from claude-permissions.ts — never the literal token.
 
 set -euo pipefail
@@ -104,7 +104,7 @@ if [[ -n "$violations" ]]; then
   echo "The literal '--dangerously-skip-permissions' and 'bypassPermissions' must" >&2
   echo "only appear in src/lib/claude-permissions.ts (single source of truth) and" >&2
   echo "in tests/UI/docs. Spawn sites must import DSP_FLAG, BYPASS_PERMISSION_MODE," >&2
-  echo "bypassPrefixForAgentFlag, or buildClaudeUserSettings from that module." >&2
+  echo "bypassPrefixForAgentFlagSync, or buildClaudeUserSettingsSync from that module." >&2
   echo "" >&2
   echo "See scripts/lint-permissions.sh for the full allowlist and rationale." >&2
   exit 1

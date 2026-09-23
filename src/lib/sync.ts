@@ -282,7 +282,7 @@ export function refreshCacheSync(): RefreshCacheResult {
   //
   // Both kinds live side by side in the repo's `agents/` directory and both get
   // mirrored into ~/.overdeck/agent-definitions/ here, then on to
-  // <devroot>/.claude/agents/ via planSync/executeSync. The downstream sync
+  // <devroot>/.claude/agents/ via planSyncSync/executeSyncSync. The downstream sync
   // never deletes existing files in the target, so non-Overdeck agent
   // definitions a project may have authored stay intact.
   if (existsSync(SYNC_SOURCES.agents)) {

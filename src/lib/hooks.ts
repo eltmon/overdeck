@@ -1,3 +1,14 @@
+/**
+ * FPP Hooks System - Fixed Point Principle
+ *
+ * "Any runnable action is a fixed point and must resolve before the system can rest."
+ *
+ * Inspired by Doctor Who: a fixed point in time must occur — it cannot be avoided.
+ *
+ * Hooks are persistent work queues for agents. When an agent starts,
+ * it checks its hook for pending work and executes immediately.
+ */
+
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { AGENTS_DIR } from './paths.js';

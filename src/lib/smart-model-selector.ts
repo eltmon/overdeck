@@ -1,3 +1,14 @@
+/**
+ * Smart Model Selector
+ *
+ * Intelligently selects the best model for each work type based on:
+ * 1. What models the user has enabled (API keys configured)
+ * 2. Capability scores for the required skills
+ *
+ * This is an opinionated system - always pick the BEST model for each job.
+ * Users control cost by which providers they enable, not a sensitivity slider.
+ */
+
 import { ModelId } from './settings.js';
 import {
   MODEL_CAPABILITIES,

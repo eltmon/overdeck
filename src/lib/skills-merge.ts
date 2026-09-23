@@ -65,7 +65,7 @@ function copyTree(sourceDir: string, targetDir: string): string[] {
  * 2. Write manifest tracking what was placed
  *
  * Project template overlay is handled separately by workspace-manager.ts
- * (processTemplates + createSymlinks → now also copy-based).
+ * (processTemplatesSync + createSymlinks → now also copy-based).
  */
 export function mergeSkillsIntoWorkspaceSync(workspacePath: string): MergeResult {
   const claudeDir = join(workspacePath, '.claude');
@@ -189,7 +189,7 @@ export function applyProjectTemplateOverlaySync(
 
       // Read template content and check if it's a template file
       if (source.endsWith('.template')) {
-        // Template files are handled by workspace-manager's processTemplates
+        // Template files are handled by workspace-manager's processTemplatesSync
         // We just track them in the manifest after they're processed
         continue;
       }
@@ -303,9 +303,9 @@ export function cleanupWorkspaceGitignoreSync(workspacePath: string): {
  * Precedence (highest wins):
  * 1. .claude/skills/<name>/ already in workspace (user-owned or project template) → skip
  * 2. .pan/skills/<name>/ in project repo → copy into workspace .claude/skills/
- * 3. Global cache (handled by mergeSkillsIntoWorkspace) → baseline
+ * 3. Global cache (handled by mergeSkillsIntoWorkspaceSync) → baseline
  *
- * This should be called AFTER mergeSkillsIntoWorkspace so that project-local skills
+ * This should be called AFTER mergeSkillsIntoWorkspaceSync so that project-local skills
  * can override global cache skills (but never overwrite user-owned content).
  */
 export function mergePanSkillsIntoWorkspaceSync(projectPath: string, workspacePath: string): MergeResult {

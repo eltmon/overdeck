@@ -440,7 +440,7 @@ export function deduplicateEventsSync(): number {
       event = JSON.parse(line) as CostEvent;
     } catch {
       // Preserve malformed lines by skipping them (they won't be re-written,
-      // which is intentional — replaceEventsFile only writes valid events)
+      // which is intentional — replaceEventsFileSync only writes valid events)
       continue;
     }
 

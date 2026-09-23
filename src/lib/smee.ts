@@ -7,12 +7,12 @@
  * Library mode (in-process):
  *   await startSmeeClient();
  *   await stopSmeeClient();
- *   isSmeeRunning();
+ *   isSmeeRunningSync();
  *
  * CLI mode (detached subprocess):
- *   startSmeeProcess();
- *   stopSmeeProcess();
- *   isSmeeProcessRunning();
+ *   startSmeeProcessSync();
+ *   stopSmeeProcessSync();
+ *   isSmeeProcessRunningSync();
  */
 
 import { existsSync, readFileSync, writeFileSync, unlinkSync, openSync, closeSync, readdirSync } from 'node:fs';

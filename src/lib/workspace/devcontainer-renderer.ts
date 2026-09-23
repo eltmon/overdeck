@@ -6,7 +6,7 @@
  * `workspace-manager.ts` (Path 1 in the audit) and was *also* re-implemented
  * by the project-specific `infra/new-feature` shell scripts (Path 4) — a
  * recipe for drift. Anything that needs `.devcontainer/` rendered now goes
- * through `renderDevcontainer()` here.
+ * through `renderDevcontainerSync()` here.
  *
  * The render is **idempotent**: same template + same placeholders → identical
  * output. That means `ensureDevcontainer()` (the self-heal entry point) can
@@ -46,7 +46,7 @@ export const DEVCONTAINER_DIRNAME = '.devcontainer';
 /**
  * Build the canonical placeholder set for a workspace.
  *
- * Used by `renderDevcontainer` and any other code that processes templates
+ * Used by `renderDevcontainerSync` and any other code that processes templates
  * for a workspace. Keeping this in one place stops two renderers from
  * disagreeing on what `{{FEATURE_FOLDER}}` means.
  */

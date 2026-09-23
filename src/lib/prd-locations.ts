@@ -7,8 +7,8 @@
  *   3. docs/prds/<status>/<id-lower>-plan.md — legacy flat file
  *   4. docs/prds/<status>/<ID-UPPER>-plan.md — buggy uppercase flat file
  *
- * All readers MUST go through findPrdAtStatus / findPrdAnywhere so they tolerate
- * every variant. All writers MUST use canonicalPrdSubdir so new artifacts only
+ * All readers MUST go through findPrdAtStatusSync / findPrdAnywhereSync so they tolerate
+ * every variant. All writers MUST use canonicalPrdSubdirSync so new artifacts only
  * land in the canonical lowercase subdirectory format.
  */
 

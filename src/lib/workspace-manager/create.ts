@@ -658,7 +658,7 @@ export async function createWorkspacePromise(options: WorkspaceCreateOptions): P
 
   // Render the workspace's `.devcontainer/` from the project's compose
   // template. All template processing, file copies, $HOME sanitization, and
-  // ./dev symlink wiring lives in `renderDevcontainer` so the same code path
+  // ./dev symlink wiring lives in `renderDevcontainerSync` so the same code path
   // is used here, by `ensureDevcontainer` (self-heal), and by any future
   // re-render command. See `./workspace/devcontainer-renderer.ts`.
   if (workspaceConfig.docker?.compose_template) {

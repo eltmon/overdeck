@@ -1,3 +1,18 @@
+/**
+ * Pipeline Notifier — event bridge between library code and Socket.io
+ *
+ * Lightweight singleton that decouples pipeline events (review convoy progress,
+ * specialist queue) from the dashboard's Socket.io server. Library code calls notifyPipelineSync() which is
+ * fire-and-forget — when an in-process handler is registered (the dashboard server),
+ * the handler is invoked synchronously. Otherwise the call is forwarded to the
+ * dashboard via a best-effort HTTP POST so CLI-process state changes (e.g.
+ * `pan review run`) still propagate to the live WebSocket event stream (PAN-891).
+ *
+ * The HTTP forward exists purely to wake the dashboard so it re-emits the
+ * domain event. If the dashboard is offline the call silently fails; the next
+ * dashboard read derives the current state from the tracker, git and the PR.
+ */
+
 import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from './internal-token.js';
 
 export type PipelineEvent =
