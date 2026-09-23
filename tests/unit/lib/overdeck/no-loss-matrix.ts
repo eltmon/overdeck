@@ -197,6 +197,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'DELETE /api/conversations/:name/favorite',                 kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.unsetFavorite' },
   { surface: 'POST /api/conversations/:name/summary-fork',               kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.forkNewFile + RELOCATE spawn' },
   { surface: 'POST /api/conversations/:name/plan-action',                kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.planAction' },
+  { surface: 'POST /api/conversations/:name/companion-terminal/open',    kind: 'http', disposition: 'RELOCATE',    door: 'CompanionTerminalLifecycle.open (tmux companion session; generation stamped on the session, nothing stored; PAN-3974)' },
+  { surface: 'POST /api/conversations/:name/companion-terminal/close',   kind: 'http', disposition: 'RELOCATE',    door: 'CompanionTerminalLifecycle.close (kills only the companion session; stale generation refused; PAN-3974)' },
   { surface: 'GET /api/conversations/:name/diffs',                       kind: 'http', disposition: 'RELOCATE',    door: 'Diffs' },
   { surface: 'GET /api/conversations/:name/diffs/full',                  kind: 'http', disposition: 'RELOCATE',    door: 'Diffs' },
   { surface: 'GET /api/conversations/:name/diffs/:turnId',               kind: 'http', disposition: 'RELOCATE',    door: 'Diffs' },
