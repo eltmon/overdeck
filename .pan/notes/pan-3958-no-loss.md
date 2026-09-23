@@ -599,7 +599,7 @@ in `tmux.ts` (C 6 → 8), and `getWorkAgentLifecycleState`/`getWorkAgentLifecycl
 | `stashes.ts` | `listStashes` | `listStashesPromise` |  |
 | `test-runner.ts` | `runTests` | `runTestsPromise` |  |
 | `tmux.ts` | `capturePane` | `capturePaneText` | the exported `capturePaneText` is renamed `capturePane` (its 7 production and 4 test users follow); the body never rejects |
-| `tmux.ts` | `ensureManagedTmuxContextOnce` | `ensureManagedTmuxContextOncePromise` | its only caller (dashboard `main.ts`) awaited the unrun Effect, so it never ran; that dead call is removed, see below |
+| `tmux.ts` | `ensureManagedTmuxContextOnce` | `ensureManagedTmuxContextOncePromise` | its only caller (dashboard `main.ts`) awaited the unrun Effect, so it never ran; that dead call is removed, see below. It now has no production caller: a CH-8 dead-export candidate unless the operator restores the boot call |
 | `tmux.ts` | `listPaneValues` | `listPaneValuesText` | private `listPaneValuesText` renamed and exported; never rejects |
 | `work-agent-lifecycle.ts` | `getWorkAgentLifecycleState` | `getWorkAgentLifecycleStateSnapshot` | body formerly `getWorkAgentLifecycleStateSnapshot` |
 | `work/done-preflight.ts` | `runPreflightChecks` | `runPreflightChecksPromise` |  |
