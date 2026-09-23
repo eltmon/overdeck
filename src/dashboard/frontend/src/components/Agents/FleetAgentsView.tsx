@@ -440,12 +440,29 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
   const cumulativeRuntimeMs = fleetAgents
     .filter(isRunningAgent)
     .reduce((total, agent) => total + Math.max(0, now.getTime() - new Date(agent.startedAt).getTime()), 0);
-  const baseMeta = `${runningCount} active · ${stuckCount} stuck · ${formatDuration(cumulativeRuntimeMs)} cumulative runtime`;
-  // The directory has no metric tiles, so the header carries the 24h cost the
-  // grid's tiles show (same /api/costs/summary query, already fetched).
-  const metaString = viewMode === 'directory' && costSummary?.today
-    ? `${baseMeta} · ${formatCost(costSummary.today.totalCost ?? 0)} · ${formatTokens(costSummary.today.totalTokens ?? 0)} tokens 24h`
-    : baseMeta;
+  // The header stats stay on one line and drop their lower-priority parts as
+  // the bar narrows (runtime first, then tokens); the full line is the tooltip.
+  // The directory has no metric tiles, so there the line also carries the 24h
+  // cost and tokens (the cost summary query the page already fetches).
+  const directoryCost = viewMode === 'directory' ? costSummary?.today : undefined;
+  const metaParts: Array<{ key: string; text: string; className?: string }> = [
+    { key: 'counts', text: `${runningCount} active · ${stuckCount} stuck` },
+    { key: 'runtime', text: `${formatDuration(cumulativeRuntimeMs)} cumulative runtime`, className: 'hidden @[1200px]/topbar:inline' },
+    ...(directoryCost ? [
+      { key: 'cost', text: `${formatCost(directoryCost.totalCost ?? 0)} 24h` },
+      { key: 'tokens', text: `${formatTokens(directoryCost.totalTokens ?? 0)} tokens`, className: 'hidden @[900px]/topbar:inline' },
+    ] : []),
+  ];
+  const metaTitle = metaParts.map((part) => part.text).join(' · ');
+  const meta = (
+    <span data-component="agents-meta" title={metaTitle} className="block truncate whitespace-nowrap">
+      {metaParts.map((part, index) => (
+        <span key={part.key} data-meta-part={part.key} className={part.className}>
+          {index > 0 ? ' · ' : ''}{part.text}
+        </span>
+      ))}
+    </span>
+  );
 
   const content = (() => {
     if (viewMode === 'directory') {
@@ -566,12 +583,13 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
   return (
     <section data-component="fleet-agents-view" className="flex h-full w-full flex-col">
       <TopBar
+        className="@container/topbar"
         breadcrumb="Eltmon / Agents"
-        meta={metaString}
+        meta={meta}
         search={
-          <div className="flex items-center gap-[6px] rounded-[var(--radius-sm)] border border-border bg-card px-[10px] py-[6px] text-[12px] text-muted-foreground">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
-            Search agents by name, issue, model…
+          <div className="flex min-w-[140px] items-center gap-[6px] whitespace-nowrap rounded-[var(--radius-sm)] border border-border bg-card px-[10px] py-[6px] text-[12px] text-muted-foreground">
+            <svg className="shrink-0" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+            <span className="min-w-0 truncate">Search agents by name, issue, model…</span>
           </div>
         }
         segmentedControl={
@@ -581,7 +599,7 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
                 key={mode}
                 type="button"
                 className={cn(
-                  'rounded-[calc(var(--radius-sm)-2px)] px-[10px] py-[5px] text-[11px] font-medium capitalize text-muted-foreground transition-colors hover:text-foreground',
+                  'whitespace-nowrap rounded-[calc(var(--radius-sm)-2px)] px-[10px] py-[5px] text-[11px] font-medium capitalize text-muted-foreground transition-colors hover:text-foreground',
                   viewMode === mode && 'bg-accent text-foreground',
                 )}
                 aria-pressed={viewMode === mode}
@@ -594,7 +612,7 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
         }
         actions={
           onNavigateToIssues && (
-            <Button size="sm" variant="primary" onClick={onNavigateToIssues}>
+            <Button size="sm" variant="primary" className="shrink-0 whitespace-nowrap" onClick={onNavigateToIssues}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="mr-[6px]"><path d="M5 4 19 12 5 20Z" fill="currentColor" /></svg>
               Start agent
             </Button>

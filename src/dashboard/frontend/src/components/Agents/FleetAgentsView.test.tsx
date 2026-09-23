@@ -423,7 +423,11 @@ describe('FleetAgentsView', () => {
     renderFleetView({ onNavigateToIssues: vi.fn() });
 
     expect(screen.getByText('Eltmon / Agents')).toBeInTheDocument();
-    expect(screen.getByText(/1 active · 1 stuck · 3h 0m cumulative runtime/)).toBeInTheDocument();
+    const meta = document.querySelector('[data-component="agents-meta"]') as HTMLElement;
+    expect(meta).toHaveTextContent('1 active · 1 stuck · 3h 0m cumulative runtime');
+    expect(meta).toHaveAttribute('title', '1 active · 1 stuck · 3h 0m cumulative runtime');
+    // Lower-priority parts hide first as the bar narrows (container queries).
+    expect(meta.querySelector('[data-meta-part="runtime"]')?.className).toContain('@[1200px]/topbar:inline');
     expect(screen.getByText('Search agents by name, issue, model…')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start agent' })).toBeInTheDocument();
   });
@@ -437,7 +441,9 @@ describe('FleetAgentsView', () => {
     expect(document.querySelector('[data-component="agent-card"]')).toBeNull();
     expect(document.querySelector('[data-component="metric-tile"]')).toBeNull();
     // No tiles in the directory, so the header carries the 24h cost the tiles showed.
-    expect(screen.getByText(/cumulative runtime · \$12\.3 · 456K tokens 24h/)).toBeInTheDocument();
+    const meta = document.querySelector('[data-component="agents-meta"]') as HTMLElement;
+    expect(meta).toHaveTextContent('cumulative runtime · $12.3 24h · 456K tokens');
+    expect(meta.querySelector('[data-meta-part="tokens"]')?.className).toContain('@[900px]/topbar:inline');
   });
 
   it('?view=grid still renders the card grid, MetricStrip and filters', () => {
