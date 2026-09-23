@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-23T14:36:26.826Z · model: claude-opus-5 · open: 862_
+_Last sequenced: 2026-09-23T14:44:39.134Z · model: claude-opus-5 · open: 863_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -36,6 +36,7 @@ _Last sequenced: 2026-09-23T14:36:26.826Z · model: claude-opus-5 · open: 862_
 | 34 | PAN-2954 | XS | critical | ok |  |  | postMergeLifecycle refuses GitLab projects |
 | 35 | PAN-3935 | S | critical | ok |  |  | PRD draft promotion writes the draft into the primary main checkout and deletes the feature-branch copy; PRDs are stranded untracked |
 | 36 | PAN-3657 | S | critical | ok |  |  | Merge-train queues endpoint runs the monorepo queue builder for polyrepo projects, so MYN/Auricle trains are permanently empty. |
+| 37 | PAN-4021 | S | critical | ok |  |  | CI-mode merge readiness never confirms a test job ran on the head, so a renamed, filtered or skipped test job merges a PR with zero tests |
 | 38 | PAN-3565 | M | critical | ok |  |  | Failed review spawn wedges 'starting', and an all-lanes infra failure is synthesized as a real CHANGES REQUESTED verdict. |
 | 39 | PAN-3554 | M | critical | needs-refinement |  |  | Red main has no mechanical owner: it hid for ~5h because the merge gate renders red main as an empty queue, not an alarm. |
 | 40 | PAN-3532 | S | critical | ok |  |  | CI runs only a hand-picked slice of the frontend suite, so main stayed red on frontend for hours while every run reported green. |
@@ -994,6 +995,10 @@ The PAN-2858 defect in a new shape: complete-planning promotes to the primary ch
 
 New this pass. The merge-train queues endpoint correctly gathers eligible candidates and then hands them to the monorepo queue builder, which does git rev-parse against a polyrepo project root that is not a git repository — so every polyrepo project's train is permanently empty while monorepo projects populate fine. MYN and Auricle cannot use merge trains at all until this lands.
 
+### PAN-4021 (rank 37)
+
+New this run, filed 2026-09-23 as a follow-up from the review of #4017 (PAN-3965, recommendation M2a); the referenced issues are closed, so it carries no open dependency. In verification.tests: ci mode the local test gate is dropped and CI is the only place tests run, but merge readiness only asserts that every check PRESENT on the head is green — it never asserts that a recognized test job was one of them. A workflow edit that renames or removes the test job, a path filter, or a job-level if: skip therefore lets a PR through the merge door with no tests run anywhere, and the gate reports green while doing it. Placed at the free rank 37, inside the merge-gate band beside PAN-3554 (red main has no mechanical owner) and PAN-3532 (CI runs only a hand-picked slice of the frontend suite), because it is the same failure shape those two describe: the gate believes it is enforcing tests that did not run. Exposure is higher than PAN-4016 at 70, whose queue bypass is now a legacy path, since CI mode is the live configuration for this project. The fix is small and mechanically testable — require at least one check matching the test-job matcher, concluded success, on the head, surface a clear blocker in merge readiness and on the dashboard Merge button, and cover the three cases (no test check blocked, skipped test check blocked, green test check allowed).
+
 ### PAN-3565 (rank 38)
 
 New this pass. Three review-lifecycle defects, one of them severe: when all four reviewer lanes died at spawn on a record lock, the supervisor wrote a synthesis declaring CHANGES REQUESTED with every lane marked failed — an infrastructure flake recorded as a real code verdict. It was caught only because a human was watching live. Same integrity family as PAN-3283 and PAN-2746.
@@ -1186,10 +1191,6 @@ Triage: the cited function is deleted; verify whether a never-briefed review ses
 
 Triage: verify days-stale "running" against the current liveness definition (idle = stale work activity). Rank held.
 
-### PAN-1824 (rank 86)
-
-Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass — PAN-3243, PAN-3492, PAN-3520 and PAN-2421 — all trace red or flaky main to real-timer tests under load. This is the shared fix for that family and it is now marked ready, so it should sit with the other CI-integrity work rather than behind it.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1197,10 +1198,10 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-23T14:36:26.826Z",
+  "generatedAt": "2026-09-23T14:44:39.134Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 862,
+  "openCount": 863,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -11921,6 +11922,19 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
       "rationale": "PAN-4003 (opened 2026-09-23) names this issue as a close-as-won't-do or fold-in candidate under the standing operator decision to drop the Oh My Pi harness, so it must not be picked up on its old rank until PAN-4003 is scheduled and decides its fate. gate and planning preserved verbatim.",
       "gate": "auto",
       "planning": "auto"
+    },
+    {
+      "issue": "PAN-4021",
+      "rank": 37,
+      "size": "S",
+      "importance": "critical",
+      "score": 88,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CI-mode merge readiness never confirms a test job ran on the head, so a renamed, filtered or skipped test job merges a PR with zero tests",
+      "rationale": "New this run, filed 2026-09-23 as a follow-up from the review of #4017 (PAN-3965, recommendation M2a); the referenced issues are closed, so it carries no open dependency. In verification.tests: ci mode the local test gate is dropped and CI is the only place tests run, but merge readiness only asserts that every check PRESENT on the head is green — it never asserts that a recognized test job was one of them. A workflow edit that renames or removes the test job, a path filter, or a job-level if: skip therefore lets a PR through the merge door with no tests run anywhere, and the gate reports green while doing it. Placed at the free rank 37, inside the merge-gate band beside PAN-3554 (red main has no mechanical owner) and PAN-3532 (CI runs only a hand-picked slice of the frontend suite), because it is the same failure shape those two describe: the gate believes it is enforcing tests that did not run. Exposure is higher than PAN-4016 at 70, whose queue bypass is now a legacy path, since CI mode is the live configuration for this project. The fix is small and mechanically testable — require at least one check matching the test-job matcher, concluded success, on the head, surface a clear blocker in merge readiness and on the dashboard Merge button, and cover the three cases (no test check blocked, skipped test check blocked, green test check allowed).",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
@@ -13386,6 +13400,20 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.8
+    },
+    {
+      "from": "PAN-3532",
+      "to": "PAN-4021",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.6
+    },
+    {
+      "from": "PAN-4016",
+      "to": "PAN-4021",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.5
     }
   ]
 }
