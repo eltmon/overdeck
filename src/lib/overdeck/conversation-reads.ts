@@ -7,6 +7,7 @@ import { resolveMuseSessionPath } from '../runtimes/muse-session.js';
 import { parseMuseConversationMessages } from '../../dashboard/server/services/muse-conversation-parser.js';
 import { existsSync } from 'node:fs';
 import { access, stat } from 'node:fs/promises';
+import { basename } from 'node:path';
 
 import { Effect } from 'effect';
 
@@ -52,6 +53,7 @@ import { resolveConversationMessageLocator } from '../../dashboard/server/servic
 import { isPiSessionFile, parsePiConversationMessages } from '../../dashboard/server/services/pi-conversation-parser.js';
 import { isOhmypiSessionFile, parseOhmypiConversationMessages } from '../../dashboard/server/services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from '../../dashboard/server/services/codex-conversation-parser.js';
+import { parseAcpConversationMessages } from '../../dashboard/server/services/acp-conversation-parser.js';
 import { isCompacting } from '../../dashboard/server/services/conversation-compaction.js';
 import { listCodexSubagents, resolveCodexSubagentTranscript } from '../../dashboard/server/services/conversation/codex-subagents.js';
 import { listSubagentMetas, subagentTranscriptPath } from '../../dashboard/server/services/conversation/subagents.js';
@@ -213,6 +215,10 @@ function isCodexSessionFile(sessionFile: string): boolean {
   return sessionFile.includes('/codex-home/sessions/') || /\/rollout-[^/]+\.jsonl$/.test(sessionFile);
 }
 
+function isAcpSessionFile(sessionFile: string): boolean {
+  return basename(sessionFile) === 'acp-session.jsonl';
+}
+
 /** Native Kimi Code CLI's own wire.jsonl, under .../agents/main/wire.jsonl. */
 function isKimiWireSessionFile(sessionFile: string): boolean {
   return sessionFile.endsWith('/agents/main/wire.jsonl');
@@ -233,6 +239,8 @@ export async function getCachedMessages(
 
   if (isCodexSessionFile(sessionFile)) {
     parsed = await parseCodexConversationMessages(sessionFile);
+  } else if (isAcpSessionFile(sessionFile)) {
+    parsed = await parseAcpConversationMessages(sessionFile);
   } else if (isOhmypiSessionFile(sessionFile)) {
     parsed = await parseOhmypiConversationMessages(sessionFile);
   } else if (sessionFile.includes('/muse-data/muse/sessions/') && sessionFile.endsWith('/session.jsonl')) {
