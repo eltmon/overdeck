@@ -125,7 +125,9 @@ export const DirectoryList = forwardRef<HTMLDivElement, DirectoryListProps>(func
               </div>
               <div role="gridcell" className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
                 <span className="max-w-[55%] shrink-0 truncate font-mono-ui" title={entry.id}>{entry.id}</span>
-                {entry.role && <span className="shrink-0">· {entry.role}</span>}
+                {entry.kind === 'external'
+                  ? <span className="shrink-0">· external</span>
+                  : entry.role && <span className="shrink-0">· {entry.role}</span>}
                 {runtime && <span className="min-w-0 truncate font-mono-ui" title={runtimeFull}>· {runtime}</span>}
                 {entry.startedAt && <span className="ml-auto shrink-0 font-mono-ui tabular-nums" title={`started ${entry.startedAt}`}>{age(entry.startedAt, now)}</span>}
               </div>

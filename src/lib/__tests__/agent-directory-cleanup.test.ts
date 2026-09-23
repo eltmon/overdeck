@@ -10,6 +10,7 @@ import { tmpdir } from 'os';
 import {
   isValidAgentDirectoryName,
   isConversationDirectory,
+  isExternalAgentDirectory,
   getPlanningIssueId,
   getAgentDirectoryIssueId,
   findOrphanedAgentDirs,
@@ -212,6 +213,19 @@ describe('findOrphanedAgentDirs', () => {
     // even with no running tmux session (2026-07-05 transcript-loss incident).
     expect(names).toEqual(['agent-108', 'specialist-test-agent', 'work-pan-208']);
     expect(result.every((d) => !d.hasRunningSession)).toBe(true);
+  });
+
+  it('never reports ext-* external agent registrations as orphaned (PAN-3920 D20)', async () => {
+    vi.mocked(listSessionNames).mockReturnValue(Effect.succeed([]));
+
+    mkdirSync(join(TEST_DIR, 'ext-codex-plugin-x'), { recursive: true });
+    mkdirSync(join(TEST_DIR, 'ext-my-tool-job-1'), { recursive: true });
+    mkdirSync(join(TEST_DIR, 'work-pan-208'), { recursive: true });
+
+    const result = await Effect.runPromise(findOrphanedAgentDirs(TEST_DIR));
+    expect(result.map((d) => d.name)).toEqual(['work-pan-208']);
+    expect(isExternalAgentDirectory('ext-codex-plugin-x')).toBe(true);
+    expect(isExternalAgentDirectory('agent-pan-1')).toBe(false);
   });
 
   it('preserves ended planning directories as durable history', async () => {

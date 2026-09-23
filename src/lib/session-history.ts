@@ -9,6 +9,7 @@
  */
 import { randomUUID } from 'crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
+import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'path';
 import { getOverdeckHome } from './paths.js';
 import { getHarnessBehavior } from './runtimes/behavior.js';
@@ -199,11 +200,18 @@ export function readLatestIndexedSessionIdSync(agentId: string): string | null {
   return readSessionIndexWithLegacySync(agentId).at(-1)?.sessionId ?? null;
 }
 
+type SessionEntryMetadata = { harness?: string; model?: string; path?: string };
+
+/**
+ * Append one session to the agent's append-only index. Sync: its callers are
+ * the synchronous launch and capture paths (launcher session pinning, hooks).
+ * Dashboard-server request paths use `appendSessionIdToHistoryAsync`.
+ */
 export function appendSessionIdToHistory(
   agentId: string,
   sessionId: string,
   source = 'observed',
-  metadata: { harness?: string; model?: string; path?: string } = {},
+  metadata: SessionEntryMetadata = {},
 ): void {
   sessionId = sessionId.trim();
   if (!sessionId) return;
@@ -211,6 +219,35 @@ export function appendSessionIdToHistory(
   mkdirSync(dir, { recursive: true });
   let recorded: { harness?: unknown; model?: unknown } = {};
   try { recorded = JSON.parse(readFileSync(join(dir, 'state.json'), 'utf8')); } catch { /* legacy/no state */ }
+  appendFileSync(join(dir, 'sessions.json'), sessionIndexLine(sessionId, source, metadata, recorded), { flag: 'a' });
+}
+
+/**
+ * `appendSessionIdToHistory` for async callers (the external registration
+ * door, PAN-3920): the same line into the same append-only file.
+ */
+export async function appendSessionIdToHistoryAsync(
+  agentId: string,
+  sessionId: string,
+  source = 'observed',
+  metadata: SessionEntryMetadata = {},
+): Promise<void> {
+  sessionId = sessionId.trim();
+  if (!sessionId) return;
+  const dir = join(getOverdeckHome(), 'agents', agentId);
+  await mkdir(dir, { recursive: true });
+  let recorded: { harness?: unknown; model?: unknown } = {};
+  try { recorded = JSON.parse(await readFile(join(dir, 'state.json'), 'utf8')); } catch { /* legacy/no state */ }
+  await appendFile(join(dir, 'sessions.json'), sessionIndexLine(sessionId, source, metadata, recorded), { flag: 'a' });
+}
+
+/** One sessions.json line; harness and model fall back to the agent's recorded state. */
+function sessionIndexLine(
+  sessionId: string,
+  source: string,
+  metadata: SessionEntryMetadata,
+  recorded: { harness?: unknown; model?: unknown },
+): string {
   const harness = metadata.harness?.trim()
     || (typeof recorded.harness === 'string' ? recorded.harness.trim() : '')
     || 'unknown';
@@ -220,7 +257,7 @@ export function appendSessionIdToHistory(
   const path = metadata.path?.trim();
   const line = `${JSON.stringify({ sessionId, at: new Date().toISOString(), source, harness, model, ...(path ? { path } : {}) })}\n`;
   if (Buffer.byteLength(line) > 4096) throw new Error('sessions.json entry exceeds PIPE_BUF');
-  appendFileSync(join(dir, 'sessions.json'), line, { flag: 'a' });
+  return line;
 }
 
 /**

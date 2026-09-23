@@ -99,6 +99,12 @@ descendant tree. It never interprets an ID as a path, follows directory/file
 symlinks during discovery, or searches another Codex home. Missing or unrelated
 IDs cannot fall back to the parent transcript. All discovery and reads are asynchronous.
 
+Jobs launched through the Codex plugin for Claude Code (`codex:codex-rescue` and friends) are
+not subagents: they are separate `codex` processes with their own rollouts, outside the
+conversation's transcript. Overdeck records them as **external agents** (`~/.overdeck/agents/ext-*`)
+and lists them in the Agents Directory under the conversation that launched them. See
+`reference/workers.mdx` "Externally spawned agents" and DASHBOARD-ARCHITECTURE.md "Agents Directory".
+
 ## Agent subagents (PAN-3920)
 
 Overdeck agents (work, review, plan, …) spawn subagents too — the foreman's same-family workers
