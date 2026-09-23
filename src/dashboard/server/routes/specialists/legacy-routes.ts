@@ -230,12 +230,12 @@ const postSpecialistsDoneRoute = HttpRouter.add(
 
         // Update specialist handoff log so success-rate metrics reflect actual outcome
         const { updateSpecialistHandoffStatus } = await import('../../../../lib/cloister/specialist-handoff-logger.js');
-        const updated = await Effect.runPromise(updateSpecialistHandoffStatus(
+        const updated = await updateSpecialistHandoffStatus(
           normalizedIssueId,
           `${specialist}-agent`,
           status === 'passed' ? 'completed' : 'failed',
           status === 'passed' ? 'success' : 'failure',
-        ));
+        );
         if (updated) {
           console.log(`[specialists/done] Updated handoff log: ${specialist}-agent ${normalizedIssueId} → ${status}`);
         }
@@ -374,14 +374,14 @@ const postSpecialistsDoneRoute = HttpRouter.add(
           const { deliverReviewVerdictFeedback } = await import(
             '../../../../lib/cloister/review-verdict-feedback.js'
           );
-          const result = await Effect.runPromise(deliverReviewVerdictFeedback({
+          const result = await deliverReviewVerdictFeedback({
             issueId: normalizedIssueId,
             verdict: status === 'failed' ? 'failed' : 'blocked',
             notes,
             workspacePath,
             ...(prUrl ? { prUrl } : {}),
             ...(runId ? { runId } : {}),
-          }));
+          });
           console.log(
             `[specialists/done] Delivered review verdict feedback for ${normalizedIssueId}` +
               ` (feedback=${result.feedbackPath ?? 'none'}, synthesis=${result.synthesisPath ?? 'none'}, prComment=${result.prCommentPosted})`,

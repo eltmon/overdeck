@@ -233,7 +233,14 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
   test: {
     command: 'OVERDECK_VERIFICATION=1 npx vitest run --changed {{CHANGED_BASE}} && npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.no-actions-lost.test.ts src/lib/__tests__/issueActions.parity.test.tsx',
   },
-};async function runQualityGatesPromise(
+};
+
+/**
+ * Run the configured quality gates for a phase. Per-gate failures are
+ * aggregated into the returned array; it rejects only on invalid remote
+ * options (missing or unsafe `vmName`/`projectPath`).
+ */
+export async function runQualityGates(
   gates: Record<string, QualityGateConfig>,
   projectPath: string,
   phase: 'pre_push' | 'post_push' = 'pre_push',
@@ -574,16 +581,3 @@ export const autoRevertMerge = (
         cause,
       }),
   });
-
-/**
- * Effect variant of {@link runQualityGates}. Wraps the Promise implementation
- * with `Effect.promise` because the existing function already aggregates per-
- * gate failures into the returned array — it does not throw on gate failure.
- */
-export const runQualityGates = (
-  gates: Record<string, QualityGateConfig>,
-  projectPath: string,
-  phase: 'pre_push' | 'post_push' = 'pre_push',
-  opts: QualityGateRunOptions = {},
-): Effect.Effect<QualityGateResult[]> =>
-  Effect.promise(() => runQualityGatesPromise(gates, projectPath, phase, opts));

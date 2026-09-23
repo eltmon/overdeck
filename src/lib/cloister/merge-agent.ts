@@ -487,7 +487,7 @@ export async function postMergeLifecycle(
       const resolved = resolveProjectFromIssueSync(issueId);
       const projectKey = resolved?.projectKey;
       if (projectKey) {
-        const { killed } = await Effect.runPromise(killAllReviewerSessions(projectKey, issueId));
+        const { killed } = await killAllReviewerSessions(projectKey, issueId);
         if (killed.length > 0) {
           console.log(`[merge-agent] ✓ Killed ${killed.length} canonical reviewer session(s) for ${issueId}`);
           logActivity('reviewer_sessions_killed', `Killed ${killed.length} reviewer session(s) for ${issueId} on merge`);
@@ -1366,7 +1366,7 @@ export async function runProjectQualityGates(
     }
 
     console.log(`[merge-agent] Running ${phase} quality gates for project "${project.name}"`);
-    return await Effect.runPromise(runQualityGates(gatesToRun, projectPath, phase));
+    return await runQualityGates(gatesToRun, projectPath, phase);
   } catch (error: any) {
     console.error(`[merge-agent] Failed to load quality gates: ${error.message}`);
     return [];

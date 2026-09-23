@@ -1,5 +1,5 @@
 /**
- * PAN-2948: buildReviewContextPromise must aggregate per-sub-repo diffs for
+ * PAN-2948: buildReviewContext must aggregate per-sub-repo diffs for
  * polyrepo workspaces instead of diffing the (empty) wrapper repo at the
  * workspace root.
  */
@@ -25,7 +25,7 @@ vi.mock('../../../../src/lib/cloister/coderabbit-ingestion.js', () => ({
   fetchCodeRabbitFindings: vi.fn().mockResolvedValue([]),
 }));
 
-import { buildReviewContextPromise } from '../../../../src/lib/cloister/review-context.js';
+import { buildReviewContext } from '../../../../src/lib/cloister/review-context.js';
 
 const git = (cwd: string, cmd: string) =>
   execSync(`git ${cmd}`, { cwd, encoding: 'utf-8', env: { ...process.env, GIT_AUTHOR_NAME: 't', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 't', GIT_COMMITTER_EMAIL: 't@t' } });
@@ -46,7 +46,7 @@ function makeRepo(dir: string, featureFile: string, withFeatureCommit: boolean):
   }
 }
 
-describe('buildReviewContextPromise (polyrepo)', () => {
+describe('buildReviewContext (polyrepo)', () => {
   let workspace: string;
 
   beforeEach(() => {
@@ -69,7 +69,7 @@ describe('buildReviewContextPromise (polyrepo)', () => {
       { repoKey: 'api', dir: apiDir, sourceBranch: 'feature/min-999', targetBranch: 'main', isPolyrepo: true },
     ]);
 
-    const manifest = await buildReviewContextPromise({
+    const manifest = await buildReviewContext({
       runId: 'agent-min-999-review-test',
       issueId: 'MIN-999',
       workspace,
@@ -102,7 +102,7 @@ describe('buildReviewContextPromise (polyrepo)', () => {
       { repoKey: 'code', dir: repoDir, sourceBranch: 'feature/min-999', targetBranch: 'main', isPolyrepo: false },
     ]);
 
-    const manifest = await buildReviewContextPromise({
+    const manifest = await buildReviewContext({
       runId: 'agent-min-999-review-test',
       issueId: 'MIN-999',
       workspace: repoDir,

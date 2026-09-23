@@ -156,7 +156,7 @@ const postWorkspaceAbortReviewRoute = HttpRouter.add(
       import('../../../../lib/cloister/review-agent.js'),
     );
     const resolved = resolveProjectFromIssueSync(issueId);
-    const { killed, failed } = yield* killAllReviewerSessions(resolved?.projectKey, issueId);
+    const { killed, failed } = yield* Effect.promise(() => killAllReviewerSessions(resolved?.projectKey, issueId));
 
     console.log(
       `[abort-review] Aborted ${killed.length} reviewer session(s) for ${issueId}` +

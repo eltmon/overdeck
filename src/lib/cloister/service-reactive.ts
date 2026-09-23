@@ -190,7 +190,13 @@ async function resolveWorkspaceForIssue(issueId: string): Promise<string | null>
   const resolved = resolveProjectFromIssueSync(issueId);
   if (!resolved) return null;
   return `${resolved.projectPath}/workspaces/feature-${issueLower}`;
-}async function onIssueStateChangePromise(issueId: string, newState: string): Promise<void> {
+}
+
+/**
+ * Dispatch the role for an issue's new lifecycle state. Never rejects: failures
+ * surface through `emitActivityEntry`.
+ */
+export async function onIssueStateChange(issueId: string, newState: string): Promise<void> {
   const normalizedIssueId = normalizeIssueId(issueId);
   const role = stateToRole(newState);
   if (!role) {
@@ -376,7 +382,8 @@ export function issueStateChangeFromDomainEvent(event: CloisterDomainEventLike):
   }
 }
 
-async function handleCloisterDomainEventPromise(event: CloisterDomainEventLike): Promise<void> {
+/** Route one Cloister domain event to its handler. Never rejects. */
+export async function handleCloisterDomainEvent(event: CloisterDomainEventLike): Promise<void> {
   if (event.type === 'linear_mcp_auth.healthy') {
     const { processLinearMcpAuthWake } = await import('../linear-mcp-auth.js');
     await processLinearMcpAuthWake();
@@ -438,36 +445,5 @@ async function handleCloisterDomainEventPromise(event: CloisterDomainEventLike):
 
   const change = issueStateChangeFromDomainEvent(event);
   if (!change) return;
-  await Effect.runPromise(onIssueStateChange(change.issueId, change.state));
-}
-
-
-// ─── PAN-1249: additive Effect variants ───────────────────────────────────────
-// service.ts is the top-level Cloister orchestrator (1817 lines, heavy use of
-// closures and direct fs IO). A full Effect rewrite would cascade into half
-// the codebase (review-agent, test-agent-queue, agents.ts) so for the
-// batch-C migration we expose Effect variants only at the two domain-event
-// entry points. The legacy Promise surfaces stay live for existing callers;
-// Effect callers should prefer the *Effect variants. The internal
-// implementations swallow errors (logging via emitActivityEntry instead),
-// so the error channel is `never`.
-
-/**
- * Effect-typed variant of {@link onIssueStateChange}. Never fails — failures
- * surface through `emitActivityEntry` inside the legacy implementation.
- */
-export function onIssueStateChange(
-  issueId: string,
-  newState: string,
-): Effect.Effect<void> {
-  return Effect.promise(() => onIssueStateChangePromise(issueId, newState));
-}
-
-/**
- * Effect-typed variant of {@link handleCloisterDomainEvent}. Never fails.
- */
-export function handleCloisterDomainEvent(
-  event: CloisterDomainEventLike,
-): Effect.Effect<void> {
-  return Effect.promise(() => handleCloisterDomainEventPromise(event));
+  await onIssueStateChange(change.issueId, change.state);
 }

@@ -223,7 +223,7 @@ export async function runDestructiveIssueLifecycle(
     const resolved = resolveProjectFromIssueSync(id);
     const projectKey = resolved?.projectKey;
     if (projectKey) {
-      const { killed } = await Effect.runPromise(killAllReviewerSessions(projectKey, id.toUpperCase()));
+      const { killed } = await killAllReviewerSessions(projectKey, id.toUpperCase());
       if (killed.length > 0) {
         cleanupLog.push(`Killed ${killed.length} reviewer session(s)`);
       }

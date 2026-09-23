@@ -10,7 +10,6 @@
 
 import { existsSync } from 'fs';
 import { join } from 'path';
-import { Effect } from 'effect';
 import type { AgentHealth } from './health.js';
 import type { CloisterConfig } from './config.js';
 import { loadCloisterConfigSync } from './config.js';
@@ -225,7 +224,13 @@ function detectTestFailure(workspace: string): {
     reason: 'Test result detection not yet implemented',
     confidence: 'low',
   };
-}async function checkTaskCompletionPromise(
+}
+
+/**
+ * Detect whether an issue's tasks are complete. Never rejects: failures
+ * return a "not triggered" detection.
+ */
+export async function checkTaskCompletion(
   issueId: string,
   config?: CloisterConfig,
   workspace?: string,
@@ -307,7 +312,10 @@ function detectTestFailure(workspace: string): {
   } finally {
     taskCompletionInflight.delete(cacheKey);
   }
-}async function checkAllTriggersPromise(
+}
+
+/** Run every handoff trigger check for an agent. Never rejects. */
+export async function checkAllTriggers(
   agentId: string,
   workspace: string,
   issueId: string,
@@ -324,38 +332,8 @@ function detectTestFailure(workspace: string): {
   const testCheck = checkTestFailure(workspace, currentModel, config);
   if (testCheck.triggered) triggers.push(testCheck);
 
-  const completionCheck = await Effect.runPromise(checkTaskCompletion(issueId, config, workspace));
+  const completionCheck = await checkTaskCompletion(issueId, config, workspace);
   if (completionCheck.triggered) triggers.push(completionCheck);
 
   return triggers;
-}
-
-// ─── PAN-1249: additive Effect variants ───────────────────────────────────────
-
-/**
- * Effect-typed variant of {@link checkTaskCompletion}. Wraps the Promise-based
- * implementation; never fails (the underlying function swallows errors and
- * returns a "not triggered" detection on failure).
- */
-export function checkTaskCompletion(
-  issueId: string,
-  config?: CloisterConfig,
-  workspace?: string,
-): Effect.Effect<TriggerDetection> {
-  return Effect.promise(() => checkTaskCompletionPromise(issueId, config, workspace));
-}
-
-/**
- * Effect-typed variant of {@link checkAllTriggers}. Never fails — uses
- * `Effect.promise` because the underlying async path absorbs bd / fs errors.
- */
-export function checkAllTriggers(
-  agentId: string,
-  workspace: string,
-  issueId: string,
-  currentModel: string,
-  health: AgentHealth,
-  config?: CloisterConfig,
-): Effect.Effect<TriggerDetection[]> {
-  return Effect.promise(() => checkAllTriggersPromise(agentId, workspace, issueId, currentModel, health, config));
 }

@@ -6,7 +6,6 @@
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { Effect } from 'effect';
 import { OVERDECK_HOME } from '../paths.js';
 import { type SpecialistAgentName } from './specialists-registry.js';
 
@@ -90,13 +89,13 @@ export async function sendFeedbackToAgent(
   const specialist = specialistMap[fromSpecialist] || 'review-agent';
   const outcome = feedback.feedbackType === 'success' ? 'approved' : feedback.feedbackType === 'failure' ? 'failed' : feedback.feedbackType;
 
-  const fileResult = await Effect.runPromise(writeFeedbackFile({
+  const fileResult = await writeFeedbackFile({
     issueId: toIssueId,
     specialist,
     outcome,
     summary: summary.slice(0, 100),
     markdownBody: feedbackMessage,
-  }));
+  });
 
   if (!fileResult.success) {
     console.error(`[specialist] Failed to write feedback file for ${toIssueId}: ${fileResult.error}`);

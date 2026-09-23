@@ -7,7 +7,6 @@
  */
 
 import { join } from 'node:path';
-import { Effect } from 'effect';
 import { messageAgent } from '../agents/messaging.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { writeFeedbackFile } from './feedback-writer.js';
@@ -66,7 +65,11 @@ Read the failed UAT acceptance criteria above, reproduce each failure, then impl
 `;
 }
 
-export async function relayUatFailureFeedbackPromise(
+/**
+ * Relay a failed UAT verdict to the work agent: write the feedback file,
+ * message the agent, or surface a needs-you escalation when delivery fails.
+ */
+export async function relayUatFailureFeedback(
   opts: UatFailureFeedbackOptions,
 ): Promise<UatFailureFeedbackResult> {
   const issueId = opts.issueId.toUpperCase();
@@ -87,14 +90,14 @@ export async function relayUatFailureFeedbackPromise(
 
   let fileResult;
   try {
-    fileResult = await Effect.runPromise(writeFeedbackFile({
+    fileResult = await writeFeedbackFile({
       issueId,
       workspacePath,
       specialist: 'uat-agent',
       outcome: 'failed',
       summary: `UAT FAILED: ${uatNotes.slice(0, 80)}`,
       markdownBody: buildUatFailureFeedbackBody(issueId, uatNotes),
-    }));
+    });
   } catch (err) {
     console.warn(`[uat-failure-feedback] Failed to write feedback for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
     return result;
@@ -163,8 +166,3 @@ Use your Read tool to open this file, read every line, then fix every failed UAT
 
   return result;
 }
-
-/** Effect variant of {@link relayUatFailureFeedbackPromise}. */
-export const relayUatFailureFeedback = (
-  opts: UatFailureFeedbackOptions,
-): Effect.Effect<UatFailureFeedbackResult> => Effect.promise(() => relayUatFailureFeedbackPromise(opts));

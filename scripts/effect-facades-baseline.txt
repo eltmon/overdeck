@@ -1,13 +1,6 @@
 # Effect façade ratchet baseline (PAN-3958). Rows: <shape> <count> <path>. Shapes: A=Promise façade,
 # B=sync façade, C=sync/async twin pair. Lower with: bash scripts/lint-effect-facades.sh --update
 A 1 src/lib/agent-input-detection.ts
-A 1 src/lib/cloister/handoff-context.ts
-A 1 src/lib/cloister/handoff.ts
-A 1 src/lib/cloister/review-context.ts
-A 1 src/lib/cloister/review-verdict-feedback.ts
-A 1 src/lib/cloister/uat-failure-feedback.ts
-A 1 src/lib/cloister/validation.ts
-A 1 src/lib/cloister/verification-runner.ts
 A 1 src/lib/codex-auth.ts
 A 1 src/lib/config-yaml/load.ts
 A 1 src/lib/conversations/enrichment/enrich-session.ts
@@ -34,14 +27,6 @@ A 1 src/lib/xbrief/lifecycle-io.ts
 A 10 src/lib/shadow-state.ts
 A 15 src/lib/tts-daemon.ts
 A 2 src/lib/caveman/workspace.ts
-A 2 src/lib/cloister/ci-failure-feedback.ts
-A 2 src/lib/cloister/feedback-writer.ts
-A 2 src/lib/cloister/review-agent.ts
-A 2 src/lib/cloister/review-convoy.ts
-A 2 src/lib/cloister/service-reactive.ts
-A 2 src/lib/cloister/specialist-context.ts
-A 2 src/lib/cloister/specialist-handoff-logger.ts
-A 2 src/lib/cloister/triggers.ts
 A 2 src/lib/config.ts
 A 2 src/lib/conversations/smart-compaction.ts
 A 2 src/lib/hume.ts
@@ -50,7 +35,6 @@ A 2 src/lib/restart-lock.ts
 A 2 src/lib/review-artifacts.ts
 A 2 src/lib/smee.ts
 A 2 src/lib/tunnel.ts
-A 3 src/lib/cloister/session-rotation.ts
 A 3 src/lib/conversations/summary-fork.ts
 A 3 src/lib/git/operations.ts
 A 3 src/lib/restart-status.ts

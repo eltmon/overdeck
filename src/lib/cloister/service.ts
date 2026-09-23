@@ -392,7 +392,7 @@ export class CloisterService {
         this.eventStore = injected;
         if (injected.subscribe) {
           this.domainEventUnsubscribe = injected.subscribe((event) => {
-            void Effect.runPromise(handleCloisterDomainEvent(event)).catch((error) => {
+            void handleCloisterDomainEvent(event).catch((error) => {
               console.error('[cloister] Reactive lifecycle event handling failed:', error);
               emitActivityEntrySync({
                 source: 'cloister',
@@ -410,7 +410,7 @@ export class CloisterService {
       const store = await initEventStore();
       this.eventStore = store;
       this.domainEventUnsubscribe = store.subscribe((event) => {
-        void Effect.runPromise(handleCloisterDomainEvent(event)).catch((error) => {
+        void handleCloisterDomainEvent(event).catch((error) => {
           console.error('[cloister] Reactive lifecycle event handling failed:', error);
           emitActivityEntrySync({
             source: 'cloister',

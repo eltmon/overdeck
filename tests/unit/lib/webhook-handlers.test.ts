@@ -32,8 +32,8 @@ const mockPostMergeLifecycle = vi.fn();
 const mockAppendDomainEventAsync = vi.fn(async () => true);
 const mockResolveDefaultBranchHead = vi.fn(async () => 'abc123');
 const mockEnqueueProjectResourceRefresh = vi.fn();
-const mockRelayCiFailureFeedback = vi.fn(() => Effect.succeed({ agentMessageSent: false }));
-const mockRecordCiTestGatePass = vi.fn(() => Effect.succeed(true));
+const mockRelayCiFailureFeedback = vi.fn(async () => ({ agentMessageSent: false }));
+const mockRecordCiTestGatePass = vi.fn(async () => true);
 const mockGetPrFacts = vi.fn();
 
 vi.mock('../../../src/dashboard/server/services/pr-tab-cache.js', () => ({

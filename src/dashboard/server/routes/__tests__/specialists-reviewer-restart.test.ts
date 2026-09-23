@@ -31,7 +31,7 @@ vi.mock('../../../../lib/tmux.js', () => ({
 }));
 
 vi.mock('../../../../lib/cloister/review-agent.js', () => ({
-  spawnReviewSubRoleForIssue: (opts: unknown) => Effect.promise(() => mocks.spawnReviewSubRoleForIssue(opts)),
+  spawnReviewSubRoleForIssue: (opts: unknown) => mocks.spawnReviewSubRoleForIssue(opts),
 }));
 
 async function requestRoute(path: string, init: RequestInit): Promise<{ status: number; body: unknown }> {

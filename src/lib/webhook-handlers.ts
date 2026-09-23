@@ -182,7 +182,7 @@ async function handleCheckSuitePromise(payload: WebhookPayload): Promise<void> {
 
     if (suite.conclusion && FAILING_CHECK_CONCLUSIONS.has(suite.conclusion.toUpperCase())) {
       if (pr.head.sha && pr.number != null) {
-        await Effect.runPromise(relayCiFailureFeedback({
+        await relayCiFailureFeedback({
           issueId,
           repo,
           prNumber: pr.number,
@@ -190,7 +190,7 @@ async function handleCheckSuitePromise(payload: WebhookPayload): Promise<void> {
           headRef: pr.head.ref,
           prUrl: prUrlFor(repo, pr.number),
           source: 'check_suite',
-        }));
+        });
       }
     }
   }
@@ -215,7 +215,7 @@ async function handleCheckRunPromise(payload: WebhookPayload): Promise<void> {
 
     if (run.conclusion && FAILING_CHECK_CONCLUSIONS.has(run.conclusion.toUpperCase())) {
       if (pr.head.sha && pr.number != null) {
-        await Effect.runPromise(relayCiFailureFeedback({
+        await relayCiFailureFeedback({
           issueId,
           repo,
           prNumber: pr.number,
@@ -223,13 +223,13 @@ async function handleCheckRunPromise(payload: WebhookPayload): Promise<void> {
           headRef: pr.head.ref,
           prUrl: prUrlFor(repo, pr.number),
           source: sourceKey,
-        }));
+        });
       }
     } else if (run.conclusion?.toUpperCase() === 'SUCCESS' && isCiTestCheckName(run.name) && pr.head.sha) {
       // PAN-3965: a green CI test job resets the verification attempt count
       // for a `verification.tests: ci` project (a no-op for any other project,
       // and for a strike or bypass PR, whose head is not the feature branch).
-      await Effect.runPromise(recordCiTestGatePass({ issueId, headSha: pr.head.sha, headRef: pr.head.ref, source: sourceKey }));
+      await recordCiTestGatePass({ issueId, headSha: pr.head.sha, headRef: pr.head.ref, source: sourceKey });
     }
   }
 }
@@ -389,7 +389,7 @@ async function handleStatusPromise(payload: WebhookPayload): Promise<void> {
     // A commit status carries no PR identity. The forge does.
     const facts = await getPrFacts(issueId);
     if (!facts.open || facts.number == null || !facts.url) continue;
-    await Effect.runPromise(relayCiFailureFeedback({
+    await relayCiFailureFeedback({
       issueId,
       repo,
       prNumber: facts.number,
@@ -397,7 +397,7 @@ async function handleStatusPromise(payload: WebhookPayload): Promise<void> {
       headRef: branch.name,
       prUrl: facts.url,
       source: sourceKey,
-    }));
+    });
   }
 }
 

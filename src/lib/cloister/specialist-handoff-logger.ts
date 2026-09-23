@@ -8,7 +8,6 @@
 import { existsSync, mkdirSync, appendFileSync, readFileSync } from 'fs';
 import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { Effect } from 'effect';
 import { getOverdeckHome } from '../paths.js';
 
 /**
@@ -149,7 +148,10 @@ export function readSpecialistHandoffs(limit?: number): SpecialistHandoff[] {
 export function readIssueSpecialistHandoffs(issueId: string): SpecialistHandoff[] {
   const allEvents = readSpecialistHandoffs();
   return allEvents.filter(e => e.issueId === issueId);
-}async function getSpecialistHandoffStatsPromise(options?: { agentsDir?: string }): Promise<{
+}
+
+/** Aggregate specialist handoff statistics. Read-only and best-effort; never rejects. */
+export async function getSpecialistHandoffStats(options?: { agentsDir?: string }): Promise<{
   totalHandoffs: number;
   todayCount: number;
   bySpecialist: Record<string, { sent: number; received: number }>;
@@ -221,7 +223,13 @@ export function getTodaySpecialistHandoffs(): SpecialistHandoff[] {
   const events = readSpecialistHandoffs();
   const today = new Date().toISOString().split('T')[0];
   return events.filter(e => e.timestamp.startsWith(today));
-}async function updateSpecialistHandoffStatusPromise(
+}
+
+/**
+ * Update the most recent queued/processing handoff for an issue and specialist.
+ * Resolves to `false` (never rejects on a malformed record) when nothing matched.
+ */
+export async function updateSpecialistHandoffStatus(
   issueId: string,
   toSpecialist: string,
   status: 'processing' | 'completed' | 'failed',
@@ -270,29 +278,4 @@ export function getTodaySpecialistHandoffs(): SpecialistHandoff[] {
   }
 }
 
-// ─── Effect variants (PAN-1249) ──────────────────────────────────────────────
-
-export type SpecialistHandoffStats = Awaited<ReturnType<typeof getSpecialistHandoffStatsPromise>>;
-
-/**
- * Effect variant of {@link getSpecialistHandoffStats}. Underlying I/O is
- * read-only and best-effort; this wrapper preserves the original contract
- * (never throws) by lifting via `Effect.promise`.
- */
-export const getSpecialistHandoffStats = (
-  options?: { agentsDir?: string },
-): Effect.Effect<SpecialistHandoffStats> =>
-  Effect.promise(() => getSpecialistHandoffStatsPromise(options));
-
-/**
- * Effect variant of {@link updateSpecialistHandoffStatus}. The Promise version
- * already returns `false` rather than throwing on every failure mode, so the
- * Effect form mirrors that contract.
- */
-export const updateSpecialistHandoffStatus = (
-  issueId: string,
-  toSpecialist: string,
-  status: 'processing' | 'completed' | 'failed',
-  result?: 'success' | 'failure',
-): Effect.Effect<boolean> =>
-  Effect.promise(() => updateSpecialistHandoffStatusPromise(issueId, toSpecialist, status, result));
+export type SpecialistHandoffStats = Awaited<ReturnType<typeof getSpecialistHandoffStats>>;

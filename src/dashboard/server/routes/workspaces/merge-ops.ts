@@ -745,9 +745,9 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
           continue;
         }
 
-        const gateResults = await Effect.runPromise(runQualityGates(gates, workspacePath, 'pre_push', {
+        const gateResults = await runQualityGates(gates, workspacePath, 'pre_push', {
           placeholders: { ...gatePlaceholders, CHANGED_BASE: `origin/${repo.targetBranch}` },
-        }));
+        });
         const failedGate = gateResults.find(result => !result.passed && result.required !== false);
         if (failedGate) {
           const error = `Polyrepo post-rebase verification failed for ${repo.repoKey} at ${failedGate.name}`;

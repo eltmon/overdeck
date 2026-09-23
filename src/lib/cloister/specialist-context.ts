@@ -8,7 +8,6 @@
  *   ~/.overdeck/specialists/{projectKey}/{specialistType}/context/latest-digest.md
  */
 
-import { Effect } from 'effect';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
@@ -130,7 +129,13 @@ function getDigestModel(projectKey: string, specialistType: string): string {
     // Default to Sonnet if can't resolve
     return 'claude-sonnet-4-6';
   }
-}async function generateContextDigestPromise(
+}
+
+/**
+ * Generate a specialist's context digest from its recent runs. Resolves to
+ * `null` on every failure mode (claude unavailable, no runs, write error).
+ */
+export async function generateContextDigest(
   projectKey: string,
   specialistType: string,
   options: {
@@ -305,11 +310,14 @@ Generate a context digest that summarizes the key insights from these runs. Form
 Keep it concise, actionable, and focused on helping the specialist be more effective.`;
 
   return prompt;
-}async function regenerateContextDigestPromise(
+}
+
+/** Regenerate a specialist's context digest even without recent runs; `null` on failure. */
+export async function regenerateContextDigest(
   projectKey: string,
   specialistType: string
 ): Promise<string | null> {
-  return (await Effect.runPromise(generateContextDigest(projectKey, specialistType, { force: true })));
+  return generateContextDigest(projectKey, specialistType, { force: true });
 }
 
 /**
@@ -323,7 +331,7 @@ Keep it concise, actionable, and focused on helping the specialist be more effec
  */
 export function scheduleDigestGeneration(projectKey: string, specialistType: string): void {
   // Run async without awaiting
-  Effect.runPromise(generateContextDigest(projectKey, specialistType)).catch((error) => {
+  generateContextDigest(projectKey, specialistType).catch((error) => {
     console.error(
       `[specialist-context] Background digest generation failed for ${projectKey}/${specialistType}:`,
       error
@@ -367,27 +375,3 @@ export function deleteContextDigest(projectKey: string, specialistType: string):
     return false;
   }
 }
-
-// ─── Effect variants (PAN-1249) ──────────────────────────────────────────────
-
-/**
- * Effect variant of {@link generateContextDigest}. The Promise version already
- * resolves to `null` on every failure mode (claude unavailable, empty runs,
- * write error), so the Effect form mirrors that contract via `Effect.promise`.
- */
-export const generateContextDigest = (
-  projectKey: string,
-  specialistType: string,
-  options: { runCount?: number; model?: string; force?: boolean } = {},
-): Effect.Effect<string | null> =>
-  Effect.promise(() => generateContextDigestPromise(projectKey, specialistType, options));
-
-/**
- * Effect variant of {@link regenerateContextDigest}. Same swallowed-failure
- * semantics as the Promise version.
- */
-export const regenerateContextDigest = (
-  projectKey: string,
-  specialistType: string,
-): Effect.Effect<string | null> =>
-  Effect.promise(() => regenerateContextDigestPromise(projectKey, specialistType));

@@ -34,7 +34,7 @@ const mockSessionExists = vi.hoisted(() => vi.fn((agentId: string) => Effect.suc
 const mockKillSession = vi.hoisted(() => vi.fn(() => Effect.void));
 const mockCreateResetMarker = vi.hoisted(() => vi.fn(async (input: unknown) => ({ id: 'reset-1', ...(input as Record<string, unknown>) })));
 const mockSetReviewStatusSync = vi.hoisted(() => vi.fn());
-const mockKillAllReviewerSessions = vi.hoisted(() => vi.fn(() => Effect.succeed({ killed: [] as string[] })));
+const mockKillAllReviewerSessions = vi.hoisted(() => vi.fn(async () => ({ killed: [] as string[] })));
 const mockEnqueueMergedDockerCleanup = vi.hoisted(() => vi.fn());
 const mockTeardownWorkspaceDockerByNamePromise = vi.hoisted(() =>
   vi.fn().mockResolvedValue({ networkRemoved: true, steps: ['Removed network'] }),

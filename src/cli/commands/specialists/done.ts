@@ -211,13 +211,13 @@ export async function doneCommand(
     // session, so a hung delivery leaves that agent waiting forever. Bound it.
     try {
       const { deliverReviewVerdictFeedback } = await import('../../../lib/cloister/review-verdict-feedback.js');
-      const delivery = Effect.runPromise(deliverReviewVerdictFeedback({
+      const delivery = deliverReviewVerdictFeedback({
         issueId: normalizedIssueId,
         verdict: options.status,
         notes: options.notes,
         prUrl: artifact.url,
         ...(options.runId ? { runId: options.runId } : {}),
-      }));
+      });
       let timer: ReturnType<typeof setTimeout> | undefined;
       const timeout = new Promise<never>((_, reject) => {
         timer = setTimeout(

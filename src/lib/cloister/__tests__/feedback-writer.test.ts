@@ -45,14 +45,14 @@ describe('writeFeedbackFile', () => {
   });
 
   it('falls back to the workspace path when project resolution is unavailable', async () => {
-    const result = await Effect.runPromise(writeFeedbackFile({
+    const result = await writeFeedbackFile({
       issueId: 'PAN-1917',
       workspacePath: '/tmp/overdeck/workspaces/feature-pan-1917',
       specialist: 'review-agent',
       outcome: 'failed',
       summary: 'Review failed',
       markdownBody: '# Review FAILED for PAN-1917',
-    }));
+    });
     const generatedFilename = result.relativePath?.split('/').pop();
 
     expect(result.success).toBe(true);

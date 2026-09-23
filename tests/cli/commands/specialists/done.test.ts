@@ -91,11 +91,11 @@ describe('specialists done command', () => {
       issueId: 'PAN-1059', forge: 'github', url: ARTIFACT_URL, open: true,
       approved: false, changesRequested: true,
     });
-    mockDeliverReviewVerdictFeedback.mockReturnValue(Effect.succeed({
+    mockDeliverReviewVerdictFeedback.mockResolvedValue({
       feedbackPath: '/workspace/.pan/feedback/001-review-agent-changes-requested.md',
       prCommentPosted: true,
       agentMessageSent: true,
-    }));
+    });
   });
 
   afterEach(() => {
@@ -287,7 +287,7 @@ describe('specialists done command', () => {
 
   it('PAN-2524/PAN-3642: surfaces needs-you when feedback delivery exceeds the advisory deadline', async () => {
     vi.useFakeTimers();
-    mockDeliverReviewVerdictFeedback.mockReturnValue(Effect.never);
+    mockDeliverReviewVerdictFeedback.mockReturnValue(new Promise(() => {}));
     const {
       doneCommand,
       FEEDBACK_DELIVERY_TIMEOUT_MS,

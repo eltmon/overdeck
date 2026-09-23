@@ -7,7 +7,7 @@ import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { getAgentHealth } from '../../../../lib/cloister/health.js';
-import { performHandoff } from '../../../../lib/cloister/handoff.js';
+import { HandoffError, performHandoff } from '../../../../lib/cloister/handoff.js';
 import { loadCloisterConfigSync } from '../../../../lib/cloister/config.js';
 import { getCloisterService } from '../../../../lib/cloister/service.js';
 import { checkAllTriggers } from '../../../../lib/cloister/triggers.js';
@@ -63,14 +63,14 @@ export const getAgentHandoffSuggestionRoute = HttpRouter.add(
     }
 
     const health = getAgentHealth(id, runtime);
-    const triggers = yield* checkAllTriggers(
+    const triggers = yield* Effect.promise(() => checkAllTriggers(
       id,
       agentState.workspace,
       agentState.issueId,
       agentState.model,
       health,
       loadCloisterConfigSync()
-    );
+    ));
 
     if (triggers.length > 0) {
       const trigger = triggers[0];
@@ -111,9 +111,18 @@ export const postAgentHandoffRoute = HttpRouter.add(
       return jsonResponse({ error: err instanceof Error ? err.message : String(err) }, { status: 400 });
     }
 
-    const result = yield* performHandoff(id, {
-      targetModel,
-      reason: reason || 'Manual handoff from dashboard',
+    const result = yield* Effect.tryPromise({
+      try: () => performHandoff(id, {
+        targetModel,
+        reason: reason || 'Manual handoff from dashboard',
+      }),
+      catch: (cause) =>
+        new HandoffError({
+          agentId: id,
+          stage: 'performHandoff',
+          message: cause instanceof Error ? cause.message : String(cause),
+          cause,
+        }),
     });
 
     if (result.success) {

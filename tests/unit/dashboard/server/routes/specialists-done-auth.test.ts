@@ -30,7 +30,7 @@ vi.mock('../../../../../src/lib/cloister/specialists.js', () => ({
 }));
 
 vi.mock('../../../../../src/lib/cloister/specialist-handoff-logger.js', () => ({
-  updateSpecialistHandoffStatus: vi.fn(() => Effect.succeed(false)),
+  updateSpecialistHandoffStatus: vi.fn(async () => false),
 }));
 
 const eventStoreLayer = Layer.succeed(EventStoreService, {
