@@ -13,7 +13,8 @@ import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { ALLOW_SESSION_ROTATION_ON_RESUME } from '../session-rotation.js';
 import type { ModelId } from '../settings.js';
-import { createSession, killSession } from '../tmux.js';
+import { closeAgentPane, launchAgentPane } from '../terminal-backends/launch.js';
+import { toPaneRole } from '../terminal-backends/prompt-guard.js';
 import { isAlive, isConfirmedDead } from './liveness.js';
 import {
   clearReadySignal,
@@ -384,9 +385,9 @@ export async function messageAgent(
     }
 
     clearReadySignal(normalizedId);
-    // Kill any leftover session unconditionally — killSession on a missing
-    // session throws and is ignored; no separate existence check needed.
-    try { await Effect.runPromise(killSession(normalizedId)); } catch { /* ignore */ }
+    // Close any leftover pane or session unconditionally — closeAgentPane is a
+    // no-op when there is none and never throws.
+    await closeAgentPane(normalizedId);
 
     const providerExports = await getProviderExportsForModel(agentState.model || 'claude-sonnet-4-6');
     const fallbackLauncher = join(getAgentDir(normalizedId), 'launcher.sh');
@@ -443,7 +444,13 @@ export async function messageAgent(
       ...fallbackCodexFields,
     });
     writeFileSync(fallbackLauncher, fallbackContent, { mode: 0o755 });
-    await Effect.runPromise(createSession(normalizedId, agentState.workspace, `bash ${fallbackLauncher}`, {
+    // PAN-3960: relaunch on the backend the host selects now, stamped like a spawn.
+    const fallbackIssueId = agentState.issueId || normalizedId.replace(/^(agent|planning)-/, '').toUpperCase();
+    const fallbackPane = await launchAgentPane({
+      issueId: fallbackIssueId,
+      cwd: agentState.workspace,
+      agentId: normalizedId,
+      argv: ['bash', fallbackLauncher],
       env: {
         ...BLANKED_PROVIDER_ENV,
         OVERDECK_AGENT_ID: normalizedId,
@@ -451,8 +458,16 @@ export async function messageAgent(
         OVERDECK_SESSION_TYPE: agentState.role,
         CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
         ...providerEnv
-      }
-    }));
+      },
+      tokens: {
+        issue: fallbackIssueId,
+        role: toPaneRole(resumeRole),
+        harness: fallbackHarness,
+        model: resumeModel,
+      },
+    });
+    agentState.backend = fallbackPane.backend;
+    agentState.paneId = fallbackPane.paneId;
 
     markAgentRunning(agentState);
     saveAgentStateSync(agentState);

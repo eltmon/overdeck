@@ -45,7 +45,7 @@ nothing registered it.
 
 `src/lib/terminal-backends/launch.ts` is the one launch path: it resolves the backend, finds or
 creates the issue workspace, starts the pane, and stamps the tokens. Every launcher goes through
-it, so none of them can forget a token.
+it, so none of them can forget a token — see "Spawn paths" below for the full list.
 
 ### Session naming and isolation
 
@@ -164,9 +164,67 @@ the Overdeck agent id. `role` is one of
 `issue` token — that absence is also how the prompt guard recognizes an operator sender.
 Overdeck's own `ship` role maps to the `uat` token role (`toPaneRole`).
 
-Launch sites, all routed: `spawnAgent` and `spawnRun` in `src/lib/agents/spawn.ts` (work agents,
-`pan start`, `pan strike`, the review/test/ship/plan specialists, and `pan review spawn-reviewer`
-through `spawnRun`).
+## Spawn paths (PAN-3960)
+
+Every path that starts an agent or a planner goes through `launchAgentPane`, so each one lands on
+the backend the host selects **now** and stamps the same four tokens. None of them calls tmux
+`createSession` directly; tmux lives only inside the tmux adapter.
+
+| Path | Code | `role` token |
+| --- | --- | --- |
+| Work agents (`pan start`, `pan strike`) | `spawnAgent` in `src/lib/agents/spawn.ts` | `work`, `strike` |
+| Specialists (review, test, ship, plan) and `pan review spawn-reviewer` | `spawnRun` in `src/lib/agents/spawn.ts` | `review`, `test`, `uat`, `plan` |
+| Planning (`pan plan`, the plan phase of `pan start`, dashboard Start Planning) | `spawnPlanningSession` in `src/lib/planning/spawn-planning-session.ts` | `plan` |
+| Planning continuation (a user message to a dead planner) | `POST /api/planning/:issueId/message` in `src/dashboard/server/routes/misc/planning.ts` | `plan` |
+| Resume (`pan resume`, dashboard Resume, auto-resume) | `resumeAgent` in `src/lib/agents/resume.ts` | the agent's role |
+| Restart (dashboard Restart and restart-all) | `restartAgent` in `src/lib/agents/recovery.ts` | the agent's role |
+| Crash recovery (`pan recover`, dashboard Recover, the health force-kill path) | `recoverAgent` in `src/lib/agents/recovery.ts` | the agent's role |
+| Message-triggered fallback relaunch (only while `ALLOW_SESSION_ROTATION_ON_RESUME` is on; it is off) | `messageAgent` in `src/lib/agents/messaging.ts` | the agent's role |
+
+**Resume, restart and recovery relaunch on the host's backend, not the old pane's.** An agent that
+last ran in a tmux session is relaunched as a Herdr pane on a Herdr host, and the other way round.
+Before the relaunch, `closeAgentPane` closes whatever is left of the old one — on Herdr that
+includes a same-name tmux session from before the host moved. Recorded `backend` / `paneId` on the
+agent state are overwritten from the pane `launchAgentPane` returns; nothing reads them to choose a
+backend.
+
+Liveness on these paths comes from `src/lib/agents/liveness.ts` (`isAlive`), like every other
+reader: resume treats a confirmed death as a crash, recovery leaves an `alive` agent alone, and a
+`runtime-indeterminate` probe is never a death, so neither reaps on it.
+
+Two tmux-only behaviors the planning path always had are kept, and are no-ops on Herdr
+(`src/lib/terminal-backends/launch.ts`):
+
+- `prepareTmuxServer(backend, vars)` starts the tmux server with a parked `overdeck-init` session
+  and removes leaked variables (`GITHUB_TOKEN`, `LINEAR_API_KEY`, `CLAUDECODE`, provider keys) from
+  its global environment — `-e` can set a variable but never unset one.
+- `keepTmuxSessionOpen(pane)` sets `destroy-unattached off` and `remain-on-exit on`.
+
+The planner's launcher keeps its `while true; do sleep 60; done` keep-alive tail on tmux only: in a
+Herdr pane that loop is a non-shell foreground process, so the Herdr liveness probe would read a
+finished planner as alive forever. A Herdr pane already outlives its process.
+
+The planner's stop and status paths follow the same backend: finalize (`planning-promotion.ts`),
+abort (`planning-sessions.ts`), and the dashboard's planning status, message and Stop routes use
+`closeAgentPane`, `agentPaneExists` and `deliverAgentMessage` rather than tmux calls.
+
+**Not yet routed** (tracked elsewhere): operator conversations and `pan handoff` (#3921); the
+runtime-class `spawnAgent` of the muse and kimi-code runtimes (#3936) and of the codex, acp, ohmypi
+and pi runtimes, reached only from Cloister's session rotation and crash respawn
+(`session-rotation.ts`, `service-crash.ts`) — the claude-code runtime delegates to `spawnAgent` and
+is routed. Remote Fly agents run tmux on the remote VM, not the local backend. Workspace run
+commands, plain dashboard terminals and the codex auth login are not agents.
+
+A graceful restart's 60-second warning reaches a Herdr agent through `deliverAgentMessage`; on tmux
+it is still Escape twice and a tmux paste (`src/lib/graceful-restart.ts`).
+
+**Known gaps on Herdr** (readers, not spawners): `detectCrashedAgents` (`pan recover --all`,
+`autoRecoverAgents`) still filters on the sync, tmux-only `tmuxActive`, so on Herdr it lists live
+agents as crashed — `recoverAgent`'s `isAlive` gate then answers `already-running` for them, so
+nothing is double-spawned, but they are reported as failed. The Claude resume-summary gate crossing
+(`prepareAutonomousAgentResumePane`) and the pane half of `detectPendingOperatorDecision` read the
+tmux pane, so on Herdr they see no menu and fall through (the AskUserQuestion transcript check
+still runs).
 
 ## The prompt guard (FR-17)
 

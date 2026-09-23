@@ -19,14 +19,12 @@ import { normalizeHarness } from '../overdeck/conversations.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import {
-  createSession,
-  createSessionSync,
-  killSessionSync,
-  listPaneValues,
-  sendKeys,
-  sessionExists,
-  sessionExistsSync,
-} from '../tmux.js';
+  agentPaneExists,
+  closeAgentPane,
+  launchAgentPane,
+} from '../terminal-backends/launch.js';
+import { toPaneRole } from '../terminal-backends/prompt-guard.js';
+import type { AgentPaneRef } from '../terminal-backends/types.js';
 import {
   decideResumeGate,
   getAgentDir,
@@ -39,6 +37,7 @@ import {
 } from './agent-state.js';
 import { deliverAgentMessage, deliverInitialPromptWithRetry, resilientDeliveryMethod } from './delivery.js';
 import { clearReadySignal, normalizeAgentId } from './identity.js';
+import { isAlive } from './liveness.js';
 import {
   detectPendingOperatorDecision,
   type PendingOperatorDecision,
@@ -50,7 +49,6 @@ import {
   claudeSystemPromptFiles,
   getCodexLauncherFields,
   getRoleRuntimeBaseCommand,
-  hasAgentRuntimeInSubtree,
   waitForPromptReady,
   writeLauncherScriptAtomic,
   writeOhmypiAgentPrompt,
@@ -117,6 +115,43 @@ export function resolveRecoveryResumeSessionId(agentId: string, harness: Runtime
   return getLatestSessionIdSync(agentId, { getAgentState: () => resolutionState }) ?? undefined;
 }
 
+/**
+ * Relaunch an agent's pane through the terminal backend the host selects NOW
+ * (PAN-3960) — never the one its previous pane used, so a restart or recovery
+ * on a Herdr host lands on Herdr and one on a tmux-only host lands on tmux.
+ * Stamps the same four tokens `spawn.ts` does and records the pane on the
+ * state so a failure after this point is still addressable.
+ */
+async function relaunchAgentPane(input: {
+  agentId: string;
+  state: AgentState;
+  role: string | undefined;
+  harness: RuntimeName;
+  model: string;
+  launcherScript: string;
+  env: Record<string, string>;
+}): Promise<AgentPaneRef> {
+  const issueId = input.state.issueId
+    || input.agentId.replace(/^(agent|planning)-/, '').toUpperCase();
+  const pane = await launchAgentPane({
+    issueId,
+    cwd: input.state.workspace,
+    agentId: input.agentId,
+    argv: ['bash', input.launcherScript],
+    env: input.env,
+    tokens: {
+      issue: issueId,
+      role: toPaneRole(input.role),
+      harness: input.harness,
+      model: input.model,
+    },
+  });
+  input.state.backend = pane.backend;
+  input.state.paneId = pane.paneId;
+  saveAgentStateSync(input.state);
+  return pane;
+}
+
 export async function restartAgent(
   agentId: string,
   opts: RestartAgentOptions = {},
@@ -132,8 +167,8 @@ export async function restartAgent(
     ?? assertWorkspaceStackHealthyForSpawn;
   const resolveRestartHarness = deps.resolveHarness ?? resolveHarness;
   const prepareRestartHarness = deps.prepareHarnessLaunch ?? prepareHarnessLaunch;
-  const restartSessionExists = deps.sessionExists
-    ?? ((id: string) => Effect.runPromise(sessionExists(id)));
+  // Backend-aware (PAN-3960): a live tmux session or a live Herdr agent.
+  const restartSessionExists = deps.sessionExists ?? ((id: string) => agentPaneExists(id));
   const sendRestartWarning = deps.sendGracefulRestartWarning ?? sendGracefulRestartWarning;
   const stopRestartAgent = deps.stopAgent
     ?? ((id: string) => Effect.runPromise(stopAgent(id)));
@@ -197,7 +232,7 @@ export async function restartAgent(
   if (graceful && await restartSessionExists(normalizedId)) {
     const warningPendingDecision = await checkPendingDecision();
     if (warningPendingDecision) return warningPendingDecision;
-    await sendRestartWarning(normalizedId, agentState.harness, agentState.workspace);
+    await sendRestartWarning(normalizedId, agentState.harness, agentState.workspace, deliverAgentMessage);
   }
 
   const stopPendingDecision = await checkPendingDecision();
@@ -245,11 +280,10 @@ export async function restartAgent(
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     await writeLauncherScriptAtomic(launcherScript, launcherContent);
-    const claudeCmd = `bash ${launcherScript}`;
 
     // PAN-1837: restartAgent always kills and fresh-launches (no resumeSessionId
     // above), so a kimi-code relaunch always starts a brand-new Kimi session —
-    // snapshot the bucket before the tmux session exists so the capture below
+    // snapshot the bucket before the pane exists so the capture below
     // can diff against it (mirrors spawnAgent's fresh-launch capture in
     // spawn.ts).
     //
@@ -257,7 +291,7 @@ export async function restartAgent(
     // fresh launch, so a failed/timed-out capture leaves NO pointer
     // (findKimiWirePath's safe newest-session-by-mtime fallback) rather than a
     // WRONG pointer still pinned to the pre-restart transcript. Review cycle 6:
-    // snapshot, createSession, and capture/persist all run inside
+    // snapshot, the pane launch, and capture/persist all run inside
     // withKimiSessionCaptureLock — merely awaiting the capture (the cycle-5
     // fix) is not enough on its own, since it only proves *some* new same-cwd
     // directory appeared, not that it's THIS relaunch's. Only the per-
@@ -276,7 +310,13 @@ export async function restartAgent(
         }
       }
 
-      await Effect.runPromise(createSession(normalizedId, agentState.workspace, claudeCmd, {
+      await relaunchAgentPane({
+        agentId: normalizedId,
+        state: agentState,
+        role: agentState.role,
+        harness: effectiveHarness,
+        model: effectiveModel,
+        launcherScript,
         env: {
           ...BLANKED_PROVIDER_ENV,
           TERM: 'xterm-256color',
@@ -287,7 +327,7 @@ export async function restartAgent(
           GIT_SEQUENCE_EDITOR: 'false',
           ...providerEnv,
         },
-      }));
+      });
 
       if (kimiExistingSessionsBefore) {
         const { waitForNewKimiSessionAsync, recordKimiSessionCapture } = await import('../runtimes/kimi-code.js');
@@ -332,21 +372,17 @@ export async function restartAgent(
         throw new Error(`${getHarnessBehavior(effectiveHarness).displayName} did not become ready within ${timeout}s for ${normalizedId}`);
       }
       await new Promise(r => setTimeout(r, 500));
-      if (effectiveHarness === 'codex' || effectiveHarness === 'acp' || effectiveHarness === 'kimi-code' || effectiveHarness === 'opencode' || effectiveHarness === 'muse') {
-        // PAN-1837: kimi-code's deliveryKind is pty-supervisor, same as codex/acp —
-        // it must not fall through to the legacy sync sendKeys() branch below,
-        // which bypasses the supervisor cascade entirely.
-        const delivery = await deliverAgentMessage(
-          normalizedId,
-          prompt,
-          'restartAgent:continue-prompt',
-          effectiveHarness === 'codex' ? resilientDeliveryMethod(agentState.deliveryMethod) : undefined,
-        );
-        if (!delivery.ok) {
-          throw new Error(`${getHarnessBehavior(effectiveHarness).displayName} continue prompt delivery failed`);
-        }
-      } else {
-        await Effect.runPromise(sendKeys(normalizedId, prompt));
+      // PAN-1837: kimi-code's deliveryKind is pty-supervisor, same as codex/acp.
+      // PAN-3960: claude-code goes through the same backend-aware delivery —
+      // a direct tmux paste cannot reach a Herdr pane.
+      const delivery = await deliverAgentMessage(
+        normalizedId,
+        prompt,
+        'restartAgent:continue-prompt',
+        effectiveHarness === 'codex' ? resilientDeliveryMethod(agentState.deliveryMethod) : undefined,
+      );
+      if (!delivery.ok) {
+        throw new Error(`${getHarnessBehavior(effectiveHarness).displayName} continue prompt delivery failed`);
       }
     }
 
@@ -368,19 +404,6 @@ export async function restartAgent(
   }
 }
 
-/**
- * Check whether a tmux session has an active agent runtime.
- * A session may exist with only a bare bash shell after Claude exits.
- */
-async function hasAgentRuntimeInSession(sessionName: string, harness: RuntimeName): Promise<boolean> {
-  try {
-    const panePids = await Effect.runPromise(listPaneValues(sessionName, '#{pane_pid}'));
-    if (panePids.length === 0) return false;
-    return hasAgentRuntimeInSubtree(panePids[0]!, harness);
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Detect crashed agents (state shows running but tmux session is gone)
@@ -449,16 +472,22 @@ export async function recoverAgent(
     return null;
   }
 
-  // Check if already running — session may exist with only a bare shell
-  // after Claude exited (zombie session). Kill it and recover.
-  if (sessionExistsSync(normalizedId)) {
-    const recoveryHarness: RuntimeName = normalizeHarness(state.harness ?? null) ?? 'claude-code';
-    if (await hasAgentRuntimeInSession(normalizedId, recoveryHarness)) {
-      logAgentLifecycleSync(normalizedId, 'recoverAgent NO_ACTION: live harness runtime is already running');
-      return { action: 'already-running', state };
-    }
-    console.log(`[agents] ${normalizedId} tmux session is a zombie (no ${recoveryHarness} runtime) — killing and recovering`);
-    try { killSessionSync(normalizedId); } catch { /* ignore */ }
+  // Check if already running. A pane may still exist with only a bare shell
+  // after the harness exited (a zombie). liveness.ts is the one oracle and is
+  // backend-aware (PAN-3960): alive → nothing to do; a confirmed death → close
+  // whatever pane or session is left and recover. A probe that could not answer
+  // (`runtime-indeterminate`) is never a death, so nothing is reaped on it.
+  const liveness = await isAlive(normalizedId);
+  if (liveness.alive) {
+    logAgentLifecycleSync(normalizedId, 'recoverAgent NO_ACTION: live harness runtime is already running');
+    return { action: 'already-running', state };
+  }
+  if (liveness.reason === 'runtime-indeterminate') {
+    logAgentLifecycleSync(normalizedId, 'recoverAgent NO_ACTION: liveness probe was indeterminate — not reaping a possibly-live agent');
+    return { action: 'already-running', state };
+  }
+  if (await closeAgentPane(normalizedId)) {
+    console.log(`[agents] ${normalizedId} pane was a zombie (${liveness.reason}) — closed it and recovering`);
   }
 
   // Update crash count in health file
@@ -516,7 +545,13 @@ export async function recoverAgent(
     });
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     await writeLauncherScriptAtomic(launcherScript, launcherContent);
-    await Effect.runPromise(createSession(normalizedId, state.workspace, `bash ${launcherScript}`, {
+    await relaunchAgentPane({
+      agentId: normalizedId,
+      state,
+      role: recoveryRole,
+      harness: 'ohmypi',
+      model: state.model,
+      launcherScript,
       env: {
         ...BLANKED_PROVIDER_ENV,
         OVERDECK_AGENT_ID: normalizedId,
@@ -525,7 +560,7 @@ export async function recoverAgent(
         CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
         ...piProviderEnv,
       },
-    }));
+    });
     try {
       await writeOhmypiAgentPrompt(normalizedId, recoveryPrompt);
     } catch (err) {
@@ -555,7 +590,13 @@ export async function recoverAgent(
     });
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     await writeLauncherScriptAtomic(launcherScript, launcherContent);
-    await Effect.runPromise(createSession(normalizedId, state.workspace, `bash ${launcherScript}`, {
+    await relaunchAgentPane({
+      agentId: normalizedId,
+      state,
+      role: recoveryRole,
+      harness: recoveryHarness,
+      model: state.model,
+      launcherScript,
       env: {
         ...BLANKED_PROVIDER_ENV,
         OVERDECK_AGENT_ID: normalizedId,
@@ -564,7 +605,7 @@ export async function recoverAgent(
         CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
         ...acpProviderEnv,
       },
-    }));
+    });
     if (recoveryHarness === 'muse' && !await waitForPromptReady(normalizedId, recoveryHarness, getHarnessBehavior(recoveryHarness).readyTimeoutSeconds)) {
       await Effect.runPromise(stopAgent(normalizedId));
       throw new Error(`Muse recovery readiness timed out for ${normalizedId}`);
@@ -607,15 +648,15 @@ export async function recoverAgent(
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     await writeLauncherScriptAtomic(launcherScript, launcherContent);
 
-    // PAN-1837 review fix: snapshot, createSession, and capture/persist all run
+    // PAN-1837 review fix: snapshot, the pane launch, and capture/persist all run
     // inside withKimiSessionCaptureLock (review cycle 6) — a fire-and-forget or
     // merely-awaited capture outside the per-workDirKey mutex only proves *some*
     // new same-cwd directory appeared, not that it's THIS recovery's, so a
     // concurrent same-cwd Kimi launch (a work agent, a restart, or a
     // conversation) could otherwise claim this session or vice versa. When
     // there is no captured session id to resume, this recovery is a fresh
-    // Kimi launch — snapshot the workspace's session bucket BEFORE the tmux
-    // session exists so the capture below can diff against it and persist the
+    // Kimi launch — snapshot the workspace's session bucket BEFORE the pane
+    // exists so the capture below can diff against it and persist the
     // new session id for the NEXT recovery.
     const launchAndCaptureKimiSession = async (): Promise<void> => {
       let kimiExistingSessionsBefore: Set<string> | undefined;
@@ -628,7 +669,13 @@ export async function recoverAgent(
         }
       }
 
-      await Effect.runPromise(createSession(normalizedId, state.workspace, `bash ${launcherScript}`, {
+      await relaunchAgentPane({
+        agentId: normalizedId,
+        state,
+        role: recoveryRole,
+        harness: 'kimi-code',
+        model: state.model,
+        launcherScript,
         env: {
           ...BLANKED_PROVIDER_ENV,
           OVERDECK_AGENT_ID: normalizedId,
@@ -637,7 +684,7 @@ export async function recoverAgent(
           CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
           ...kimiProviderEnv,
         },
-      }));
+      });
 
       if (kimiExistingSessionsBefore) {
         const { waitForNewKimiSessionAsync, recordKimiSessionCapture } = await import('../runtimes/kimi-code.js');
@@ -707,7 +754,13 @@ export async function recoverAgent(
   });
   const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
   await writeLauncherScriptAtomic(launcherScript, recoveryLauncherContent);
-  createSessionSync(normalizedId, state.workspace, `bash ${launcherScript}`, {
+  await relaunchAgentPane({
+    agentId: normalizedId,
+    state,
+    role: recoveryRole,
+    harness: recoveryHarness,
+    model: state.model,
+    launcherScript,
     env: {
       ...BLANKED_PROVIDER_ENV,
       OVERDECK_AGENT_ID: normalizedId,
@@ -715,10 +768,8 @@ export async function recoverAgent(
       OVERDECK_SESSION_TYPE: state.role ?? (normalizedId.startsWith('planning-') ? 'plan' : 'work'),
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
       ...providerEnv
-    }
+    },
   });
-
-  saveAgentStateSync(state);
   if (recoveryHarness === 'codex') {
     const delivery = await deliverInitialPromptWithRetry(normalizedId, recoveryPrompt, 'recoverAgent:recovery-prompt', state.deliveryMethod);
     if (!delivery.ok) {
