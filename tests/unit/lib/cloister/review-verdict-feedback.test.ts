@@ -75,6 +75,9 @@ vi.mock('../../../../src/lib/cloister/swarm-slot-reconcile.js', () => ({
   listSlotOwnership: vi.fn(() => []),
 }));
 
+// The pipeline journal is real (temp workspaces); only its event fan-out is silenced.
+vi.mock('../../../../src/lib/pipeline-notifier.js', () => ({ notifyPipelineSync: vi.fn() }));
+
 describe('deliverReviewVerdictFeedback', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -447,5 +450,99 @@ describe('ambiguous keyed delivery retry (PAN-1837)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('#4035: review feedback delivery is journaled per verdict episode', () => {
+  let workspace: string;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { mkdtemp } = await import('node:fs/promises');
+    workspace = await mkdtemp(join(tmpdir(), 'review-feedback-4035-'));
+    mockResolveProjectFromIssue.mockReturnValue(null);
+    mockMessageAgent.mockResolvedValue({ delivered: true, queuedToMail: false });
+    mockGetPrFacts.mockResolvedValue(prFacts({ headSha: 'head-one' }));
+    mockWriteFeedbackFile.mockResolvedValue({ success: true, filePath: join(workspace, 'feedback.md') });
+    mockResolveIssueFeedbackTarget.mockResolvedValue({ agentId: 'agent-pan-1059' });
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    const { rm } = await import('node:fs/promises');
+    await rm(workspace, { recursive: true, force: true });
+  });
+
+  async function relay(runId?: string) {
+    const { deliverReviewVerdictFeedback } = await import('../../../../src/lib/cloister/review-verdict-feedback.js');
+    return deliverReviewVerdictFeedback({
+      issueId: 'PAN-1059', verdict: 'blocked', workspacePath: workspace, ...(runId ? { runId } : {}),
+    });
+  }
+
+  it('a repeat of one review run skips target resolution and delivery (Herdr ignores the key)', async () => {
+    const { readPipelineJournal } = await import('../../../../src/lib/cloister/pipeline-journal.js');
+
+    const first = await relay('agent-pan-1059-review-abcdef12');
+    const repeat = await relay('agent-pan-1059-review-abcdef12');
+
+    expect(first.agentMessageSent).toBe(true);
+    expect(repeat.agentMessageSent).toBe(true);
+    expect(mockResolveIssueFeedbackTarget).toHaveBeenCalledTimes(1);
+    expect(mockMessageAgent).toHaveBeenCalledTimes(1);
+    expect(readPipelineJournal(workspace)).toEqual([
+      expect.objectContaining({
+        type: 'feedback.delivered',
+        data: expect.objectContaining({ kind: 'review', agentId: 'agent-pan-1059' }),
+      }),
+    ]);
+  });
+
+  it('a journal-suppressed repeat still feeds the repeated-delivery loop detector', async () => {
+    const runId = 'agent-pan-1059-review-loop4035';
+    await relay(runId);
+    await relay(runId);
+    expect(mockSurfaceIssueFeedbackNeedsYou).not.toHaveBeenCalled();
+
+    await relay(runId);
+
+    expect(mockMessageAgent).toHaveBeenCalledTimes(1);
+    expect(mockSurfaceIssueFeedbackNeedsYou).toHaveBeenCalledTimes(1);
+    expect(mockSurfaceIssueFeedbackNeedsYou).toHaveBeenCalledWith(
+      'PAN-1059',
+      expect.stringContaining('possible stuck loop'),
+      expect.objectContaining({ specialist: 'review-agent' }),
+    );
+  });
+
+  it('keeps the pre-#4035 head key when no approval is journaled', async () => {
+    const { createHash } = await import('node:crypto');
+    await relay();
+
+    const expected = `review-feedback:pan-1059:${createHash('sha256').update('anchor:head-one').digest('hex').slice(0, 16)}`;
+    expect(mockMessageAgent.mock.calls[0]![3].dedupKey).toBe(expected);
+  });
+
+  it('fail, approve, fail on one head delivers twice under distinct keys', async () => {
+    const { appendPipelineEntry } = await import('../../../../src/lib/cloister/pipeline-journal.js');
+
+    await relay();
+    await relay();
+    appendPipelineEntry(workspace, { type: 'review.verdict', issueId: 'PAN-1059', data: { verdict: 'APPROVED' } });
+    await relay();
+
+    expect(mockMessageAgent).toHaveBeenCalledTimes(2);
+    expect(mockMessageAgent.mock.calls[0]![3].dedupKey).not.toBe(mockMessageAgent.mock.calls[1]![3].dedupKey);
+  });
+
+  it('a delivery that did not land is not journaled, so the next verdict run tries again', async () => {
+    mockMessageAgent.mockResolvedValueOnce({ delivered: false, queuedToMail: false, reason: 'pane gone' });
+
+    await relay('agent-pan-1059-review-abcdef12');
+    await relay('agent-pan-1059-review-abcdef12');
+
+    expect(mockMessageAgent).toHaveBeenCalledTimes(2);
   });
 });

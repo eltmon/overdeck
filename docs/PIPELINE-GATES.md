@@ -40,7 +40,11 @@ the **CI test job on the PR head is the test gate**:
   number is the larger of the two. The stuck pause
   (`escalateVerificationStuck`) fires on the third consecutive red head, or
   by the local rule on the per-head count (a second failure of the same check
-  at one head). A green CI test job (`check_run` success for the test job,
+  at one head). The stuck notice itself never lifts that pause (#4019): while
+  the whole-issue agent holds it, the verification feedback door skips the
+  resurrection ladder, a still-live pane gets the notice queued to its mail
+  (a paused agent is never resumed to receive a message), and a needs-you
+  says the agent is waiting for the operator. A green CI test job (`check_run` success for the test job,
   confirmed against the PR checks) records a passed CI artifact — the reset.
   What is not counted (review of #3993): a red test job on a `strike/` or
   `bypass/` PR (it is not the work agent's branch; the relay falls back to the
@@ -159,19 +163,34 @@ in `local` mode, typecheck+lint in `ci` mode).
 A review `request changes` or a failing test/UAT run returns work to the work
 agent as PR review comments and/or a `pan tell` nudge. Delivery is confirmed
 against the agent's transcript; an unconfirmed delivery surfaces a
-needs-you escalation instead of reporting success (PAN-3846). There is no
-separate feedback record — the PR thread and the transcript are the
-evidence.
+needs-you escalation instead of reporting success (PAN-3846). The PR thread
+and the transcript are the evidence of what the agent was told; the pipeline
+journal records only that a delivery happened (#4035).
+
+Review and UAT feedback are relayed from `pan admin specialists done`, a
+fresh CLI process per verdict, so "already delivered" cannot live in process
+memory: Herdr, which prompts the agent directly, remembers message ids only
+for its own process. After a fresh delivery the relay appends
+`feedback.delivered { kind, dedupKey, agentId }` to the pipeline journal,
+and a later relay with the same key skips target resolution and delivery on
+every backend (`cloister/feedback-delivery-record.ts`). The key names the
+verdict episode: the review run id, or the head plus the count of passing
+verdicts of that kind journaled so far (`review.verdict APPROVED`,
+`uat.verdict passed`). Two failures on one head with no pass between share a
+key and deliver once; fail, pass, fail on one head delivers twice, and the
+keyed tmux/PTY-supervisor stores see the new key too. With no pass
+journaled the key is the pre-#4035 key. A delivery that did not land is not
+journaled, so the next verdict run retries it.
 
 A failed browser UAT is observed where the test agent records it:
 `pan admin specialists done test <id> --uat-status failed` (or the `uat`
 role). After posting the verdict comment, that command relays the UAT notes
 through `relayUatFailureFeedback` (`cloister/uat-failure-feedback.ts`)
 to the work agent, or to a needs-you when no agent can be reached. Delivery
-carries a key derived from the tested commit (`--tested-sha`, else the PR
-head), which the tmux/PTY-supervisor tiers
-enforce across processes (Herdr-prompted agents bypass the keyed cascade, as
-review feedback does); a passing UAT clears the anchor (PAN-4030).
+is keyed on the tested commit (`--tested-sha`, else the PR head) within the
+current UAT pass episode, as above; the command journals every UAT verdict
+as `uat.verdict`, and a passing one starts the next episode (PAN-4030,
+#4035).
 
 ## Review Convergence Gate (PAN-3151)
 

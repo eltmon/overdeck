@@ -263,9 +263,23 @@ export async function doneCommand(
   // PAN-4030: a browser UAT result is observed here and nowhere else — the
   // test role's `--uat-status`, or the uat role's own status. The verdict is
   // already on the PR; a failure owes rework, so relay the UAT notes to the
-  // work agent (or a needs-you when none can be reached), once per failing PR
-  // head. A passing UAT clears that anchor.
+  // work agent (or a needs-you when none can be reached), once per failing
+  // head per verdict episode. The UAT verdict is journaled here, where it is
+  // observed (#4035): a passing verdict starts a new episode, so a later
+  // failure on the same head is told again.
   const uatOutcome = role === 'test' ? options.uatStatus : role === 'uat' ? options.status : undefined;
+  if (uatOutcome) {
+    appendPipelineEntry(workspacePath, {
+      type: 'uat.verdict',
+      issueId: normalizedIssueId,
+      source: 'pan-specialists-done',
+      data: {
+        status: uatOutcome,
+        subRole: role,
+        ...(options.testedSha ? { anchor: options.testedSha.toLowerCase() } : {}),
+      },
+    });
+  }
   if (uatOutcome === 'failed') {
     const uatNotes = role === 'test' ? options.uatNotes : options.notes;
     try {
@@ -297,9 +311,6 @@ export async function doneCommand(
       }
       console.warn(chalk.yellow(`Could not deliver UAT failure feedback: ${message}`));
     }
-  } else if (uatOutcome === 'passed') {
-    const { clearUatFailureFeedbackAnchor } = await import('../../../lib/cloister/uat-failure-feedback.js');
-    clearUatFailureFeedbackAnchor(normalizedIssueId);
   }
 
   // PAN-2579 (warm-by-default lifecycle): the session stays alive so the next

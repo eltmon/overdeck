@@ -15,7 +15,11 @@ export type IssueFeedbackTarget =
 
 export interface ResolveIssueFeedbackTargetOptions {
   itemId?: string;
-  /** Test hook — replaces the default resurrection attempt for non-live targets. */
+  /**
+   * Replaces the default resurrection attempt for non-live targets;
+   * `async () => false` disables it (the verification stuck notice, #4019).
+   * Also a test hook.
+   */
   revivePipelinePausedAgent?: (agentId: string, issueId: string) => Promise<boolean>;
 }
 

@@ -10,7 +10,7 @@
 import { Effect } from 'effect';
 
 import { emitActivityEntrySync } from '../activity-logger.js';
-import { messageAgent, setAgentPaused, stopAgent } from '../agents.js';
+import { getAgentStateSync, messageAgent, setAgentPaused, stopAgent } from '../agents.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 import { getPrFacts } from './pr-facts.js';
 import type { VerificationRunnerOutcome } from './verification-types.js';
@@ -59,6 +59,13 @@ export function announceVerificationFailure(issueId: string, failedCheck: string
   } catch { /* announcement is best-effort */ }
 }
 
+/**
+ * The pause reason prefix `escalateVerificationStuck` writes. A verification
+ * pass lifts a pause with this prefix (verification-runner.ts), and while it
+ * holds, verification feedback never resurrects the agent (#4019).
+ */
+export const VERIFICATION_STUCK_PAUSE_PREFIX = 'needs-you: verification stuck';
+
 export async function escalateVerificationStuck(
   issueId: string,
   failedCheck: string,
@@ -69,7 +76,7 @@ export async function escalateVerificationStuck(
   if (await skipMergedVerification(issueId, logPrefix)) return;
 
   const agentId = `agent-${issueId.toLowerCase()}`;
-  const reason = `needs-you: verification stuck after ${cycleCount}/${VERIFICATION_MAX_CYCLES} attempts (${failedCheck})`;
+  const reason = `${VERIFICATION_STUCK_PAUSE_PREFIX} after ${cycleCount}/${VERIFICATION_MAX_CYCLES} attempts (${failedCheck})`;
 
   announceVerificationFailure(issueId, failedCheck, `${reason}\n\n${summary}`);
 
@@ -96,7 +103,17 @@ export async function deliverVerificationFeedback(
 ): Promise<boolean> {
   if (await skipMergedVerification(issueId, logPrefix)) return false;
 
-  const target = await resolveIssueFeedbackTarget(issueId);
+  // #4019: the stuck escalation paused this agent for the operator a moment
+  // ago. The feedback door's resurrection ladder treats a `needs-you:` pause as
+  // a pipeline pause and lifts it (PAN-2461), so the stuck notice itself would
+  // un-pause the agent it just paused. While the stuck pause holds, nothing is
+  // revived: a live target gets the notice (a paused agent's messageAgent
+  // queues it to mail without resuming), and the operator is told either way.
+  const stuckPaused = isVerificationStuckPaused(issueId);
+  const target = await resolveIssueFeedbackTarget(
+    issueId,
+    stuckPaused ? { revivePipelinePausedAgent: async () => false } : {},
+  );
   if (await skipMergedVerification(issueId, logPrefix)) return false;
 
   if ('agentId' in target) {
@@ -115,6 +132,15 @@ export async function deliverVerificationFeedback(
       return true;
     }
     const reason = outcome.reason ?? 'delivery was not accepted';
+    if (stuckPaused && outcome.queuedToMail) {
+      console.log(`[${logPrefix}] ${target.agentId} is paused for verification stuck; the notice for ${issueId} is queued to its mail`);
+      await surfaceIssueFeedbackNeedsYou(
+        issueId,
+        `Verification stuck: ${target.agentId} is paused for the operator; the stuck notice is queued to its mail (${reason})`,
+        { specialist: 'verification-gate', ...details },
+      );
+      return false;
+    }
     console.warn(`[${logPrefix}] Could not message ${target.agentId}; verification feedback for ${issueId} not delivered: ${reason}`);
     await surfaceIssueFeedbackNeedsYou(issueId, `Feedback delivery to ${target.agentId} failed: ${reason}`, {
       specialist: 'verification-gate',
@@ -123,9 +149,22 @@ export async function deliverVerificationFeedback(
     return false;
   }
 
-  await surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
-    specialist: 'verification-gate',
-    ...details,
-  });
+  await surfaceIssueFeedbackNeedsYou(
+    issueId,
+    stuckPaused
+      ? `Verification stuck: agent-${issueId.toLowerCase()} is paused for the operator and was not resumed to receive the notice. ${target.reason}`
+      : target.reason,
+    { specialist: 'verification-gate', ...details },
+  );
   return false;
+}
+
+/** True while the whole-issue agent holds the stuck pause escalation set. */
+function isVerificationStuckPaused(issueId: string): boolean {
+  try {
+    const state = getAgentStateSync(`agent-${issueId.toLowerCase()}`);
+    return state?.paused === true && (state.pausedReason ?? '').startsWith(VERIFICATION_STUCK_PAUSE_PREFIX);
+  } catch {
+    return false;
+  }
 }

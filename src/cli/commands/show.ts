@@ -99,6 +99,10 @@ export function summarizePipelineEntry(entry: PipelineJournalEntry): string {
     }
     case 'review.verdict':
       return `${data.verdict ?? 'unknown'}${data.subRole ? ` (${data.subRole})` : ''}`;
+    case 'uat.verdict':
+      return `${data.status ?? 'unknown'}${typeof data.anchor === 'string' ? ` head=${shortSha(data.anchor)}` : ''}`;
+    case 'feedback.delivered':
+      return `${data.kind ?? 'verdict'} feedback to ${data.agentId ?? 'the work agent'}`;
     case 'merge.attempted':
       return typeof data.kind === 'string' ? data.kind : '';
     case 'merge.completed':

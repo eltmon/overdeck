@@ -32,6 +32,7 @@ import {
   shouldEscalateVerificationFailure,
   skipMergedVerification,
   VERIFICATION_MAX_CYCLES,
+  VERIFICATION_STUCK_PAUSE_PREFIX,
 } from './verification-escalation.js';
 import {
   isVerificationWorkerActive,
@@ -885,7 +886,7 @@ export async function runVerificationForIssueInProcess(
     // — the pause IS the state, and the gate that set it clears it.
     const stuckAgentId = `agent-${issueId.toLowerCase()}`;
     const agentState = getAgentStateSync(stuckAgentId);
-    if (agentState?.pausedReason?.startsWith('needs-you: verification stuck')) {
+    if (agentState?.pausedReason?.startsWith(VERIFICATION_STUCK_PAUSE_PREFIX)) {
       try {
         await Effect.runPromise(clearAgentPaused(stuckAgentId));
         console.log(`[${logPrefix}] Lifted verification-stuck pause for ${stuckAgentId}`);

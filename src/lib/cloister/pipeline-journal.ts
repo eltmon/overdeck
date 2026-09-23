@@ -33,6 +33,7 @@ import { notifyPipelineSync } from '../pipeline-notifier.js';
 export type PipelineJournalEntryType =
   | 'verification.started' | 'verification.passed' | 'verification.failed'
   | 'review.requested' | 'review.dispatched' | 'review.redispatched' | 'review.verdict'
+  | 'uat.verdict' | 'feedback.delivered'
   | 'merge.attempted' | 'merge.completed' | 'merge.failed';
 
 export interface PipelineJournalEntry {
