@@ -25,21 +25,25 @@ vi.mock('../../../../src/lib/agents/messaging.js', () => ({
   messageAgent: mocks.messageAgent,
 }));
 
+// The journal is real (a temp workspace); only its event fan-out is silenced.
+vi.mock('../../../../src/lib/pipeline-notifier.js', () => ({ notifyPipelineSync: vi.fn() }));
+
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import {
-  clearUatFailureFeedbackAnchor,
-  MAX_UAT_FAILURE_FEEDBACK_ANCHORS,
   relayUatFailureFeedback,
-  resetUatFailureFeedbackStateForTests,
   UAT_AMBIGUOUS_DELIVERY_RETRY_MS,
   uatFeedbackDedupKey,
 } from '../../../../src/lib/cloister/uat-failure-feedback.js';
+import { appendPipelineEntry, readPipelineJournal } from '../../../../src/lib/cloister/pipeline-journal.js';
 
 describe('relayUatFailureFeedback', () => {
   const feedbackPath = '/tmp/workspace/.pan/feedback/001-uat-agent-failed.md';
 
   beforeEach(() => {
     vi.clearAllMocks();
-    resetUatFailureFeedbackStateForTests();
     mocks.resolveProjectFromIssueSync.mockReturnValue(null);
     mocks.writeFeedbackFile.mockResolvedValue({
       success: true,
@@ -167,46 +171,7 @@ describe('relayUatFailureFeedback', () => {
     );
   });
 
-  it('deduplicates repeated verdict anchors and accepts a later anchor', async () => {
-    const first = await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one' });
-    const duplicate = await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one' });
-    const later = await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-two' });
-
-    expect(first.deduplicated).toBe(false);
-    expect(duplicate).toEqual({
-      agentMessageSent: false,
-      needsYouSurfaced: false,
-      deduplicated: true,
-      dedupKey: uatFeedbackDedupKey('PAN-3575', 'head-one'),
-    });
-    expect(later.deduplicated).toBe(false);
-    expect(mocks.writeFeedbackFile).toHaveBeenCalledTimes(2);
-  });
-
-  it('bounds dedup state so terminal-cleanup delays cannot retain historical failures indefinitely', async () => {
-    for (let index = 0; index <= MAX_UAT_FAILURE_FEEDBACK_ANCHORS; index++) {
-      await relayUatFailureFeedback({
-        issueId: `PAN-${index}`,
-        anchor: `head-${index}`,
-      });
-    }
-
-    const replayed = await relayUatFailureFeedback({
-      issueId: 'PAN-0',
-      anchor: 'head-0',
-    });
-
-    expect(replayed.deduplicated).toBe(false);
-    expect(mocks.writeFeedbackFile).toHaveBeenCalledTimes(MAX_UAT_FAILURE_FEEDBACK_ANCHORS + 2);
-  });
-
-  it('clears an anchor for a new UAT cycle and retries a failed feedback write', async () => {
-    await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one' });
-    clearUatFailureFeedbackAnchor('pan-3575');
-    await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one' });
-    expect(mocks.writeFeedbackFile).toHaveBeenCalledTimes(2);
-
-    resetUatFailureFeedbackStateForTests();
+  it('retries a failed feedback write: nothing was delivered, so nothing is deduplicated', async () => {
     mocks.writeFeedbackFile.mockResolvedValue({ success: false, error: 'disk unavailable' });
     const failed = await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-two' });
     const retry = await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-two' });
@@ -214,8 +179,80 @@ describe('relayUatFailureFeedback', () => {
     const key = uatFeedbackDedupKey('PAN-3575', 'head-two');
     expect(failed).toEqual({ agentMessageSent: false, needsYouSurfaced: false, deduplicated: false, dedupKey: key });
     expect(retry).toEqual({ agentMessageSent: false, needsYouSurfaced: false, deduplicated: false, dedupKey: key });
-    expect(mocks.messageAgent).toHaveBeenCalledTimes(2);
-    expect(mocks.writeFeedbackFile).toHaveBeenCalledTimes(4);
+    expect(mocks.messageAgent).not.toHaveBeenCalled();
+    expect(mocks.writeFeedbackFile).toHaveBeenCalledTimes(2);
+  });
+
+  describe('#4035: the journal records a delivery, across processes and backends', () => {
+    let workspace: string;
+
+    beforeEach(() => {
+      workspace = mkdtempSync(join(tmpdir(), 'uat-feedback-4035-'));
+    });
+
+    afterEach(() => {
+      rmSync(workspace, { recursive: true, force: true });
+    });
+
+    it('journals a delivered key, and a repeat skips target resolution and delivery', async () => {
+      const first = await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one', workspacePath: workspace });
+      const repeat = await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one', workspacePath: workspace });
+
+      const key = uatFeedbackDedupKey('PAN-3575', 'head-one');
+      expect(first).toEqual(expect.objectContaining({ agentMessageSent: true, deduplicated: false, dedupKey: key }));
+      expect(repeat).toEqual({ agentMessageSent: false, needsYouSurfaced: false, deduplicated: true, dedupKey: key });
+      expect(mocks.resolveIssueFeedbackTarget).toHaveBeenCalledTimes(1);
+      expect(mocks.messageAgent).toHaveBeenCalledTimes(1);
+      expect(mocks.writeFeedbackFile).toHaveBeenCalledTimes(1);
+      expect(readPipelineJournal(workspace)).toEqual([
+        expect.objectContaining({
+          type: 'feedback.delivered',
+          issueId: 'PAN-3575',
+          data: { kind: 'uat', dedupKey: key, agentId: 'agent-pan-3575' },
+        }),
+      ]);
+    });
+
+    it('a new head is a new delivery', async () => {
+      await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one', workspacePath: workspace });
+      const later = await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-two', workspacePath: workspace });
+
+      expect(later.agentMessageSent).toBe(true);
+      expect(mocks.messageAgent).toHaveBeenCalledTimes(2);
+    });
+
+    it('fail, pass, fail on one head delivers twice, under a new key the keyed stores accept', async () => {
+      const first = await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one', workspacePath: workspace });
+      appendPipelineEntry(workspace, { type: 'uat.verdict', issueId: 'PAN-3575', data: { status: 'passed' } });
+      const second = await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one', workspacePath: workspace });
+      const repeat = await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one', workspacePath: workspace });
+
+      expect(first.dedupKey).toBe(uatFeedbackDedupKey('PAN-3575', 'head-one'));
+      expect(second.agentMessageSent).toBe(true);
+      expect(second.dedupKey).toBe(uatFeedbackDedupKey('PAN-3575', 'head-one', 1));
+      expect(second.dedupKey).not.toBe(first.dedupKey);
+      expect(repeat.deduplicated).toBe(true);
+      expect(mocks.messageAgent).toHaveBeenCalledTimes(2);
+      expect(mocks.messageAgent.mock.calls[1][3]).toEqual(expect.objectContaining({ dedupKey: second.dedupKey }));
+    });
+
+    it('a delivery that did not land is not journaled, so the next relay tries again', async () => {
+      mocks.messageAgent.mockResolvedValueOnce({ delivered: false, queuedToMail: false, reason: 'pane gone' });
+
+      await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one', workspacePath: workspace });
+      const retry = await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one', workspacePath: workspace });
+
+      expect(retry.agentMessageSent).toBe(true);
+      expect(mocks.messageAgent).toHaveBeenCalledTimes(2);
+    });
+
+    it('a delivery the keyed store deduplicated is not journaled again', async () => {
+      mocks.messageAgent.mockResolvedValue({ delivered: true, queuedToMail: false, deduplicated: true });
+
+      await relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-one', workspacePath: workspace });
+
+      expect(readPipelineJournal(workspace)).toEqual([]);
+    });
   });
 
   describe('PAN-4030: once per failing anchor across CLI processes', () => {
@@ -229,11 +266,15 @@ describe('relayUatFailureFeedback', () => {
       expect(uatFeedbackDedupKey('pan-3575', 'abc123')).toBe(key);
       expect(uatFeedbackDedupKey('PAN-3575', 'def456')).not.toBe(key);
       expect(uatFeedbackDedupKey('PAN-9999', 'abc123')).not.toBe(key);
+      // #4035: no pass journaled keeps the pre-#4035 key; each pass episode is new.
+      expect(uatFeedbackDedupKey('PAN-3575', 'abc123', 0)).toBe(key);
+      expect(uatFeedbackDedupKey('PAN-3575', 'abc123', 1)).not.toBe(key);
+      expect(uatFeedbackDedupKey('PAN-3575', 'abc123', 2)).not.toBe(uatFeedbackDedupKey('PAN-3575', 'abc123', 1));
     });
 
     it('a repeat whose key the delivery store already holds is deduplicated, not re-sent or escalated', async () => {
-      // A fresh process (empty in-memory map) re-relays the same anchor: the
-      // keyed store reports the message was already delivered.
+      // No journal to read (no workspace): the keyed store reports the message
+      // was already delivered.
       mocks.messageAgent.mockResolvedValue({ delivered: true, queuedToMail: false, deduplicated: true });
 
       const result = await relayUatFailureFeedback({

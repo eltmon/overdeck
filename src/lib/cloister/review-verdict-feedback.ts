@@ -2,7 +2,9 @@
  * Delivers durable review-verdict feedback to the work agent. Agent messages
  * use a key derived from the issue and review run so one review cycle is
  * model-visible at most once; callers without a run ID fall back to the
- * reviewed anchor, or deliver unkeyed if neither identity exists. ACP and
+ * reviewed anchor (plus the review pass episode), or deliver unkeyed if
+ * neither identity exists. A delivered key is journaled (`feedback.delivered`)
+ * and a repeat is skipped on every backend (#4035). ACP and
  * Channels targets fall back to unkeyed delivery because those transports
  * cannot enforce the key.
  * Repeated keyed suppressions surface a needs-you escalation before duplicate
@@ -20,6 +22,13 @@ import { resolveProjectFromIssueSync } from '../projects.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
+import {
+  feedbackAlreadyDelivered,
+  passingVerdictCount,
+  recordFeedbackDelivered,
+  recordFeedbackSkipped,
+  verdictEpisodeIdentity,
+} from './feedback-delivery-record.js';
 import { findVerdictReport } from './review-verdict-report.js';
 import { getPrFacts } from './pr-facts.js';
 import { assessReviewConvergence } from './review-rounds.js';
@@ -104,6 +113,38 @@ const suppressedReviewFeedbackDeliveries = new Map<string, number>();
 const REPEATED_DELIVERY_LOOP_MESSAGE =
   'Review feedback for this verdict was already delivered to the agent; the pipeline re-triggered delivery 3+ times — possible stuck loop. Investigate before the agent context burns.';
 
+/**
+ * Count a suppressed re-delivery of one verdict key and surface needs-you on
+ * the second: the pipeline is re-triggering delivery in a loop. Fed by both
+ * the journal check (#4035) and a keyed store's `deduplicated` outcome. The
+ * count lives in the pipeline journal (`feedback.skipped`), so it holds across
+ * `pan admin specialists done` processes; with no workspace to journal to it
+ * falls back to this process's memory.
+ */
+async function noteSuppressedReviewDelivery(
+  issueId: string,
+  dedupKey: string,
+  feedbackPath: string,
+  workspacePath: string | undefined,
+): Promise<void> {
+  let suppressedCount = recordFeedbackSkipped(workspacePath, {
+    issueId, kind: 'review', dedupKey, source: 'review-verdict-feedback',
+  });
+  if (suppressedCount === undefined) {
+    suppressedCount = (suppressedReviewFeedbackDeliveries.get(dedupKey) ?? 0) + 1;
+    suppressedReviewFeedbackDeliveries.set(dedupKey, suppressedCount);
+  }
+  if (suppressedCount !== 2) return;
+  try {
+    await surfaceIssueFeedbackNeedsYou(issueId, REPEATED_DELIVERY_LOOP_MESSAGE, {
+      specialist: 'review-agent',
+      feedbackPath,
+    });
+  } catch (err) {
+    console.warn(`[review-verdict-feedback] Could not surface repeated delivery loop for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
 export async function postPrComment(prUrl: string | undefined, body: string): Promise<boolean> {
   const parsed = parseGitHubPrUrl(prUrl);
   if (!parsed) return false;
@@ -137,10 +178,12 @@ export async function deliverReviewVerdictFeedback(
   const convergence = assessReviewConvergence(workspacePath);
   const isReviewNotConverging = !convergence.converging;
 
+  // #4035: without a run id the identity is the head plus the review pass
+  // episode, so a head that fails, passes, then fails again is told twice.
   const deliveryIdentity = opts.runId
     ? `run:${opts.runId}`
     : facts.headSha
-      ? `anchor:${facts.headSha}`
+      ? verdictEpisodeIdentity(`anchor:${facts.headSha}`, passingVerdictCount(workspacePath, 'review'))
       : undefined;
   const dedupKey = deliveryIdentity
     ? `review-feedback:${issueId.toLowerCase()}:${createHash('sha256')
@@ -192,6 +235,14 @@ export async function deliverReviewVerdictFeedback(
         console.warn(`[review-verdict-feedback] Could not surface convergence gate for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
       }
       agentMessageSent = false;
+    } else if (dedupKey && feedbackAlreadyDelivered(workspacePath, dedupKey)) {
+      // #4035: the journal records that this verdict's feedback already
+      // reached the agent. Checked before a target is resolved (or revived)
+      // and before any backend prompt, so it holds on Herdr, whose prompt
+      // path does not enforce the key across processes.
+      console.log(`[review-verdict-feedback] Feedback for ${issueId} (${dedupKey}) was already delivered; not re-sending`);
+      agentMessageSent = true;
+      await noteSuppressedReviewDelivery(issueId, dedupKey, fileResult.filePath, workspacePath);
     } else {
       const message = `SPECIALIST FEEDBACK: review-agent reported ${opts.verdict.toUpperCase()} for ${issueId}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then fix ALL review findings. Do NOT stop at the prompt.`;
       try {
@@ -266,28 +317,19 @@ export async function deliverReviewVerdictFeedback(
               } catch { /* best-effort — the warn above still records the failure */ }
             } else {
             agentMessageSent = true;
-            let repeatedDeliveryLoop = false;
+            if (dedupKey && !deliveryOutcome.deduplicated) {
+              recordFeedbackDelivered(workspacePath, {
+                issueId, kind: 'review', dedupKey, agentId: target.agentId, source: 'review-verdict-feedback',
+              });
+            }
             if (deliveryOutcome.deduplicated && dedupKey) {
-              const suppressedCount = (suppressedReviewFeedbackDeliveries.get(dedupKey) ?? 0) + 1;
-              suppressedReviewFeedbackDeliveries.set(dedupKey, suppressedCount);
-              repeatedDeliveryLoop = suppressedCount >= 2;
-              if (suppressedCount === 2) {
-                try {
-                  await surfaceIssueFeedbackNeedsYou(issueId, REPEATED_DELIVERY_LOOP_MESSAGE, {
-                    specialist: 'review-agent',
-                    feedbackPath: fileResult.filePath,
-                  });
-                } catch (err) {
-                  console.warn(`[review-verdict-feedback] Could not surface repeated delivery loop for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
-                }
-              }
+              await noteSuppressedReviewDelivery(issueId, dedupKey, fileResult.filePath, workspacePath);
             } else if (dedupKey) {
               suppressedReviewFeedbackDeliveries.delete(dedupKey);
             }
             // PAN-3074, re-pointed by PAN-3917: a fresh (non-deduplicated)
             // delivery already reset the counter above. There is no stored
             // feedback-delivery stuck flag left to clear here.
-            void repeatedDeliveryLoop;
             }
           } catch (err) {
             // PAN-2228: a resolved-but-unreachable target is a real delivery failure,
