@@ -256,6 +256,7 @@ describe('handleCheckRun', () => {
     expect(mockRecordCiTestGatePass).toHaveBeenCalledWith(expect.objectContaining({
       issueId: 'PAN-123',
       headSha: 'cafe',
+      headRef: 'feature/pan-123',
     }));
     expect(mockRelayCiFailureFeedback).not.toHaveBeenCalled();
   });

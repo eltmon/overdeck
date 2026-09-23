@@ -15,7 +15,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
-import { getProjectAutoMergeDefault, shouldHoldForUat } from './auto-merge-policy.js';
+import { getProjectAutoMergeDefault, projectAutoMergeDefault, shouldHoldForUat } from './auto-merge-policy.js';
 import { evaluateMergeReadiness, getPrFacts, type PrFacts } from './pr-facts.js';
 
 const execFileAsync = promisify(execFile);
@@ -64,6 +64,31 @@ async function defaultGetIssueLabels(issueId: string): Promise<string[]> {
 async function defaultIsGlobalUatRequired(): Promise<boolean> {
   const { isFlywheelRequireUatBeforeMerge } = await import('../overdeck/control-settings.js');
   return isFlywheelRequireUatBeforeMerge();
+}
+
+/**
+ * Review of #3993 (PAN-3965): whether this issue is held for UAT, all three
+ * tiers — its `auto-merge` / `hold-for-uat` label, then the project default,
+ * then the global flag — the same decision {@link isAutoMergeEligible} applies.
+ * The merge-train reconciler asks it for a lone ready feature: one held by its
+ * label still needs its UAT stack. A label read failure falls back to the
+ * project and global tiers.
+ */
+export async function issueHoldsForUat(
+  issueId: string,
+  project: { auto_merge_default?: unknown } | null | undefined,
+  globalRequireUat: boolean,
+  deps: Pick<AutoMergeEligibilityDeps, 'getIssueLabels'> = {},
+): Promise<boolean> {
+  let labels: string[] = [];
+  try {
+    labels = await (deps.getIssueLabels ?? defaultGetIssueLabels)(issueId);
+  } catch (err) {
+    console.warn(
+      `[auto-merge] Could not read labels for ${issueId}; using the project/global UAT hold: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+  return shouldHoldForUat(autoMergeFromLabels(labels), projectAutoMergeDefault(project), globalRequireUat);
 }
 
 export async function isAutoMergeEligible(

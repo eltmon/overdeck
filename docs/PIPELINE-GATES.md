@@ -42,6 +42,19 @@ the **CI test job on the PR head is the test gate**:
   by the local rule on the per-head count (a second failure of the same check
   at one head). A green CI test job (`check_run` success for the test job,
   confirmed against the PR checks) records a passed CI artifact — the reset.
+  What is not counted (review of #3993): a red test job on a `strike/` or
+  `bypass/` PR (it is not the work agent's branch; the relay falls back to the
+  plain CI FAILED message, which reaches only a live work agent); a test job
+  whose failing checks all ended `CANCELLED`, `TIMED_OUT`, `STARTUP_FAILURE`,
+  `STALE` or `ACTION_REQUIRED` (only `FAILURE`/`ERROR` are verdicts on the
+  code); and a test job whose failing checks are all failing on the default
+  branch's head commit too (inherited from a red `main`). Relays for one issue
+  run one at a time, so concurrent webhooks for one red head (the shards of a
+  matrix, the aggregate job, `check_suite`) count it once. A report for a head
+  already recorded (a duplicate webhook, a replay after a restart) is never
+  re-delivered: the per-run record is the idempotency key, so a replay cannot
+  re-open rework past the budget or lift a stuck pause. CI results are per-run
+  records only; `verification-latest.json` stays the local gate run's record.
   Re-requesting review on a head whose CI test job is already red fails the
   `test` gate again instead of passing on typecheck+lint alone.
 - The verification artifact lists only the gates that ran on the host and
@@ -56,16 +69,23 @@ verification:
   tests: ci      # or: local
 ```
 
-Unset, the mode is `ci` when the project has a `github_repo` and a
-`.github/workflows/` directory with at least one workflow (in the project root
-or a polyrepo member), else `local`. `local` keeps the `test` gate on the host
-exactly as before. The CI-failure relay is GitHub-webhook-driven, so a GitLab
+Unset, the mode is `ci` only when the project has a `github_repo` and a
+GitHub Actions workflow (in the project root or a polyrepo member) that runs on
+`pull_request`/`pull_request_target` (or on `push` for feature branches) and
+defines a job whose check name the test matcher recognizes (`test`, `tests`,
+`test-*`, `test (…)`: its `name:`, else its id). Otherwise the mode is `local`:
+release-only, docs, schedule or dispatch workflows, or a test job named
+something the matcher misses, would otherwise drop the local test gate for a
+CI job that never runs. `local` keeps the `test` gate on the host exactly as
+before. The runner logs the mode with its reason and records both in the
+artifact's `testsMode` field. The CI-failure relay is GitHub-webhook-driven, so a GitLab
 project that sets `tests: ci` gets the merge gate (a green pipeline) but no
 automatic agent feedback for a red test job.
 
-Work agents run only the tests they touched (`npx vitest run <files>`);
-reviewers never run the suite — they read the CI result on the head
-(`gh pr checks <pr>`).
+Work agents run only the tests they touched (the work prompt names
+`npx vitest run <files>` only in a vitest project, and says "the suite runs on
+CI" only in a CI-mode project); reviewers never run the suite — they read the
+CI result on the head (`gh pr checks <pr>`) where tests run on CI.
 
 ## Verification artifacts (FR-8)
 
