@@ -185,6 +185,7 @@ export class TmuxBackend implements TerminalBackend {
         snapshots.push({
           backend: BACKEND,
           paneId: session.name,
+          agentId: session.name,
           terminalId: session.name,
           workspaceId: tokens.issue ? `agent-${tokens.issue.toLowerCase()}` : session.name,
           state,

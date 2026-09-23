@@ -129,6 +129,7 @@ function tmuxProbeToPane(
 
   const pane: { -readonly [K in keyof BackendPane]: BackendPane[K] } = {
     id: probe.session,
+    agentId: probe.session,
     role: parsed.role,
     // FR-3: the tmux adapter reports no metadata tokens.
     harness: 'unknown',

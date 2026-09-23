@@ -539,6 +539,7 @@ export function paneFromBackendSnapshot(
     terminalId: snapshot.terminalId,
   };
   if (tokens.issue) pane.issue = tokens.issue;
+  if (snapshot.agentId) pane.agentId = snapshot.agentId;
   if (snapshot.cwd) pane.workspace = snapshot.cwd;
   return pane;
 }
