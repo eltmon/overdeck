@@ -30,6 +30,7 @@ import { Effect } from 'effect';
 import {
   agentPaneExists,
   closeAgentPane,
+  closeAgentPaneDetailed,
   launchAgentPane,
   resolveLaunchBackend,
 } from '../../../../src/lib/terminal-backends/launch.js';
@@ -136,5 +137,43 @@ describe('closeAgentPane while Herdr is unavailable', () => {
     hostNameMock.mockResolvedValue('herdr');
     probeMock.mockResolvedValue(UNAVAILABLE);
     await expect(closeAgentPane('agent-pan-3956')).resolves.toBe(false);
+  });
+});
+
+// Review of #3992 (L2): the planning Stop route must tell "nothing was
+// running" apart from "the close failed".
+describe('closeAgentPaneDetailed', () => {
+  function tmuxWithClose(close: TerminalBackend['close']): TerminalBackend {
+    return { ...resolveTerminalBackend('tmux'), close };
+  }
+
+  it('reports absent when no session of that name exists', async () => {
+    const close = vi.fn(() => Effect.succeed({ ok: true as const }));
+    await expect(closeAgentPaneDetailed('planning-pan-3960', tmuxWithClose(close)))
+      .resolves.toEqual({ outcome: 'absent' });
+    expect(close).not.toHaveBeenCalled();
+  });
+
+  it('reports closed when the session was killed', async () => {
+    sessionExistsMock.mockImplementation(() => Effect.succeed(true));
+    await expect(closeAgentPaneDetailed('planning-pan-3960', tmuxWithClose(() => Effect.succeed({ ok: true as const }))))
+      .resolves.toEqual({ outcome: 'closed' });
+  });
+
+  it('reports failed when the kill itself failed', async () => {
+    sessionExistsMock.mockImplementation(() => Effect.succeed(true));
+    const failing = tmuxWithClose(() => Effect.fail(new Error('tmux server unreachable')) as never);
+    const result = await closeAgentPaneDetailed('planning-pan-3960', failing);
+    expect(result.outcome).toBe('failed');
+    // closeAgentPane keeps its boolean contract for every other caller.
+    await expect(closeAgentPane('planning-pan-3960', failing)).resolves.toBe(false);
+  });
+
+  it('reports failed, not absent, when Herdr is down and holds the only possible pane', async () => {
+    hostNameMock.mockResolvedValue('herdr');
+    probeMock.mockResolvedValue(UNAVAILABLE);
+    const result = await closeAgentPaneDetailed('planning-pan-3960');
+    expect(result).toMatchObject({ outcome: 'failed' });
+    expect((result as { reason: string }).reason).toContain('pan install');
   });
 });

@@ -148,8 +148,16 @@ function listPaneRowsSyncDefault(agentId: string): PaneRow[] {
  */
 export async function isAlive(agentId: string, deps: LivenessAsyncDeps = {}): Promise<LivenessVerdict> {
   const backend = deps.backend ?? (await hostTerminalBackendName());
-  if (backend === 'herdr') return isAliveOnHerdr(agentId, deps);
-  return isAliveOnTmux(agentId, deps);
+  if (backend !== 'herdr') return isAliveOnTmux(agentId, deps);
+  const verdict = await isAliveOnHerdr(agentId, deps);
+  if (verdict.alive || verdict.reason !== 'no-session') return verdict;
+  // Review of #3992 (M3): an agent launched before the host moved to Herdr
+  // still runs in its tmux session, which Herdr knows nothing about. Herdr's
+  // `absent` must not become a death for it — recover and resume would kill a
+  // live agent and relaunch it. A live (or unprobeable) legacy session answers.
+  const legacy = await isAliveOnTmux(agentId, deps);
+  if (legacy.alive || legacy.reason === 'runtime-indeterminate') return legacy;
+  return verdict;
 }
 
 /**

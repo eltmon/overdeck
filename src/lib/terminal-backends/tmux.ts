@@ -24,6 +24,7 @@ import { Effect } from 'effect';
 // backend computing pane tokens cannot close that cycle.
 import { getAgentStateSync } from '../agents/agent-state-read.js';
 import { isAliveOnTmux, isIdle } from '../agents/liveness.js';
+import { shellQuoteArg } from '../shell-quote.js';
 import { createSession, killSession, listSessions, sendKeys, sessionExists } from '../tmux.js';
 import { checkPrompt, toPaneRole, tokensFromLaunchMetadata } from './prompt-guard.js';
 import { registerTerminalBackend } from './registry.js';
@@ -109,7 +110,10 @@ export class TmuxBackend implements TerminalBackend {
       const sessionName = spec.name;
       if (!sessionName) throw new Error('the tmux backend needs spec.name — the tmux session is named after the agent');
       const cwd = spec.cwd ?? workspace.cwd;
-      await Effect.runPromise(createSession(sessionName, cwd, spec.argv.join(' '), { env: { ...spec.env } }));
+      // tmux runs the command through `sh -c`, so each argument is quoted — an
+      // OVERDECK_HOME with a space must not split the launcher path.
+      const command = spec.argv.map(shellQuoteArg).join(' ');
+      await Effect.runPromise(createSession(sessionName, cwd, command, { env: { ...spec.env } }));
       return {
         backend: BACKEND,
         workspaceId: workspace.workspaceId,

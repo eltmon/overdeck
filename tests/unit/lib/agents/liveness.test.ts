@@ -145,10 +145,54 @@ describe('isAlive on the Herdr backend', () => {
     const deps = aliveDeps({
       backend: 'herdr' as const,
       probeHerdr: vi.fn(async () => ({ kind: 'absent' as const })),
+      sessionExists: vi.fn(async () => false),
     });
     const verdict = await isAlive('agent-x', deps);
     expect(verdict).toEqual({ alive: false, reason: 'no-session' });
     expect(isConfirmedDead(verdict)).toBe(true);
+  });
+
+  // Review of #3992 (M3): an agent launched before the host moved to Herdr
+  // still runs in a tmux session Herdr knows nothing about.
+  it('reports a live legacy tmux agent alive when Herdr does not know it', async () => {
+    const deps = aliveDeps({
+      backend: 'herdr' as const,
+      probeHerdr: vi.fn(async () => ({ kind: 'absent' as const })),
+    });
+    const verdict = await isAlive('agent-legacy', deps);
+    expect(verdict).toEqual({ alive: true, paneAlive: true, runtimePid: 100 });
+    expect(deps.sessionExists).toHaveBeenCalledWith('agent-legacy');
+  });
+
+  it('a legacy tmux session whose probe cannot answer is indeterminate, never a death', async () => {
+    const deps = aliveDeps({
+      backend: 'herdr' as const,
+      probeHerdr: vi.fn(async () => ({ kind: 'absent' as const })),
+      findRuntimePid: vi.fn(async () => 'indeterminate' as const),
+    });
+    const verdict = await isAlive('agent-legacy', deps);
+    expect(verdict).toEqual({ alive: false, reason: 'runtime-indeterminate' });
+    expect(isConfirmedDead(verdict)).toBe(false);
+  });
+
+  it('a legacy tmux corpse (session up, harness gone) stays a confirmed death', async () => {
+    const deps = aliveDeps({
+      backend: 'herdr' as const,
+      probeHerdr: vi.fn(async () => ({ kind: 'absent' as const })),
+      findRuntimePid: vi.fn(async () => null),
+    });
+    const verdict = await isAlive('agent-legacy', deps);
+    expect(verdict).toEqual({ alive: false, reason: 'no-session' });
+    expect(isConfirmedDead(verdict)).toBe(true);
+  });
+
+  it('does not consult tmux when Herdr itself answers (exited)', async () => {
+    const deps = aliveDeps({
+      backend: 'herdr' as const,
+      probeHerdr: vi.fn(async () => ({ kind: 'exited' as const, paneId: 'wE:p2' })),
+    });
+    await isAlive('agent-x', deps);
+    expect(deps.sessionExists).not.toHaveBeenCalled();
   });
 
   it('reports an exited pane as pane-dead', async () => {

@@ -324,12 +324,25 @@ async function waitForKimiCodeTuiReady(agentId: string, timeoutSec = 30): Promis
   return false;
 }
 
+/**
+ * The TUI waiters' pane read, on the host's terminal backend (review of #3992,
+ * L1): null once the agent's pane is gone. A tmux-only probe answered "gone"
+ * for every Herdr pane, so a restart or recovery that now lands on Herdr
+ * never became ready.
+ */
+async function readTuiPane(agentId: string): Promise<string | null> {
+  const { agentPaneExists } = await import('../terminal-backends/launch.js');
+  if (!(await agentPaneExists(agentId))) return null;
+  const { readAgentPaneText } = await import('../terminal-backends/agent-pane-io.js');
+  return await readAgentPaneText(agentId, 80);
+}
+
 async function waitForCodexTuiReady(agentId: string, timeoutSec = 30): Promise<boolean> {
   const deadline = Date.now() + timeoutSec * 1000;
   while (Date.now() < deadline) {
     try {
-      if (!(await Effect.runPromise(sessionExists(agentId)))) return false;
-      const pane = await Effect.runPromise(capturePane(agentId, 80));
+      const pane = await readTuiPane(agentId);
+      if (pane === null) return false;
       // The codex TUI is ready when its input prompt (a line starting with the
       // `›` glyph) AND its status line (`<model> ... · <cwd>`) are both on
       // screen. PAN-1803: the previous check keyed off the first-run
@@ -966,9 +979,13 @@ export async function getRoleRuntimeBaseCommand(
 async function waitForMuseTuiReady(agentId: string, timeoutSec: number): Promise<boolean> {
   const deadline = Date.now() + timeoutSec * 1000;
   while (Date.now() < deadline) {
-    if (!(await Effect.runPromise(sessionExists(agentId)))) return false;
-    const pane = await Effect.runPromise(capturePane(agentId, 80));
-    if (/^\s*⟩\s/m.test(pane) && /(?:muse-spark|Muse Code)/.test(pane)) return true;
+    try {
+      const pane = await readTuiPane(agentId);
+      if (pane === null) return false;
+      if (/^\s*⟩\s/m.test(pane) && /(?:muse-spark|Muse Code)/.test(pane)) return true;
+    } catch {
+      // A probe or read that could not answer is not an exit; keep waiting.
+    }
     await new Promise(resolve => setTimeout(resolve, 250));
   }
   return false;

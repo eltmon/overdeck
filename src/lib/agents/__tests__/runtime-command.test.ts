@@ -155,6 +155,23 @@ describe('shouldUseSupervisorForConversation', () => {
 });
 
 
+/**
+ * The Muse waiter probes the pane through the terminal backend (dynamic
+ * imports, async probes) before each sleep, so one timer jump can land before
+ * the sleep is scheduled. Advance fake time in steps with a real
+ * `setImmediate` turn after each, bounded by wall-clock (Date is not faked).
+ */
+async function settleStepwise<T>(promise: Promise<T>): Promise<T> {
+  let settled = false;
+  const tracked = promise.finally(() => { settled = true; });
+  const deadline = Date.now() + 4000;
+  while (!settled && Date.now() < deadline) {
+    await vi.advanceTimersByTimeAsync(50);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+  }
+  return tracked;
+}
+
 describe('waitForPromptReady — Muse Code', () => {
   afterEach(() => {
     tmuxMocks.sessionExists.mockReset();
@@ -162,23 +179,19 @@ describe('waitForPromptReady — Muse Code', () => {
   });
 
   it('waits for the native prompt after startup', async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
     tmuxMocks.capturePane
       .mockReturnValueOnce(Effect.succeed('Muse Code is starting'))
       .mockReturnValue(Effect.succeed('Muse Code\n⟩ \n muse-spark-1.3'));
-    const pending = waitForPromptReady('agent-muse-ready', 'muse', 5);
-    await vi.advanceTimersByTimeAsync(250);
-    await expect(pending).resolves.toBe(true);
+    await expect(settleStepwise(waitForPromptReady('agent-muse-ready', 'muse', 5))).resolves.toBe(true);
   });
 
   it('times out when the native prompt never appears', async () => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(true));
     tmuxMocks.capturePane.mockReturnValue(Effect.succeed('Muse Code is starting'));
-    const pending = waitForPromptReady('agent-muse-timeout', 'muse', 1);
-    await vi.advanceTimersByTimeAsync(1000);
-    await expect(pending).resolves.toBe(false);
+    await expect(settleStepwise(waitForPromptReady('agent-muse-timeout', 'muse', 1))).resolves.toBe(false);
   });
 
   it('stops waiting when Muse exits', async () => {
