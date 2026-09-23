@@ -217,7 +217,7 @@ projects:
 | `workspace_remove_command` | No | Custom workspace cleanup script |
 | `workspace` | No | Polyrepo/progressive workspace configuration |
 | `release` | No | Coordinated post-merge release configuration |
-| `verification.tests` | No | `ci` or `local`: where the verification gate's `test` gate runs. `ci` skips the local `quality_gates.test` run and treats the CI test job on the PR head as the test gate; `local` runs it on the host. Default: `ci` when the project has `github_repo` and `.github/workflows/`, else `local`. |
+| `verification.tests` | No | `ci` or `local`: where the verification gate's `test` gate runs. `ci` skips the local `quality_gates.test` run and treats the CI test job on the PR head as the test gate; `local` runs it on the host. Default: `ci` when the project has `github_repo` and a GitHub Actions workflow that runs a job named `test`/`tests`/`test-*`/`test (…)` on pull requests, else `local`. |
 
 *Not required if `issue_prefixes` or `issue_pattern` is specified.
 

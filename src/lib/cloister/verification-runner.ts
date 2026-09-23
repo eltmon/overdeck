@@ -16,7 +16,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { runQualityGates, DEFAULT_GATES } from './validation.js';
-import { resolveVerificationTestsMode, selectLocalVerificationGates } from './verification-tests-mode.js';
+import { resolveVerificationTestsModeDecision, selectLocalVerificationGates } from './verification-tests-mode.js';
 import {
   readVerificationArtifact,
   verificationArtifactPath,
@@ -422,10 +422,13 @@ async function runVerificationForIssuePromise(
     // gate is not run here; the CI test job on the PR head is the test gate,
     // merge readiness requires it green, and a red run reaches the agent
     // through ci-failure-feedback.
-    const testsMode = resolveVerificationTestsMode(projectConfig);
+    // Review of #3993: the mode's reason is logged and recorded in the artifact,
+    // so "why did the test gate not run here" has an answer on disk.
+    const testsModeDecision = resolveVerificationTestsModeDecision(projectConfig);
+    const testsMode = testsModeDecision.mode;
     const { gates, deferredToCi } = selectLocalVerificationGates(configuredGates, testsMode);
-    const artifactExtras = deferredToCi.length > 0 ? { deferredToCi } : {};
-    console.log(`[${logPrefix}] Project: ${projectConfig?.name || 'NOT FOUND'}, gates: [${Object.keys(gates).join(', ')}], tests: ${testsMode}${deferredToCi.length > 0 ? ` (deferred to CI: ${deferredToCi.join(', ')})` : ''}, workspace: ${workspacePath}`);
+    const artifactExtras = { testsMode: testsModeDecision, ...(deferredToCi.length > 0 ? { deferredToCi } : {}) };
+    console.log(`[${logPrefix}] Project: ${projectConfig?.name || 'NOT FOUND'}, gates: [${Object.keys(gates).join(', ')}], tests: ${testsMode} (${testsModeDecision.reason})${deferredToCi.length > 0 ? ` (deferred to CI: ${deferredToCi.join(', ')})` : ''}, workspace: ${workspacePath}`);
 
     // Build template placeholders for container name resolution
     const featureFolder = basename(workspacePath);  // e.g., 'feature-min-574'

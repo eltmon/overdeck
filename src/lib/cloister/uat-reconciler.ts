@@ -91,11 +91,14 @@ export interface UatReconcilerDeps {
   /** Chain trim/reap (cleanupUatGenerations wiring). */
   cleanup(): Promise<void>;
   /**
-   * PAN-3965: true when the project holds merges for UAT (`auto_merge_default`,
-   * else the global `flywheel.require_uat_before_merge`). A held project keeps
-   * a batch for one ready feature — it is the UAT stack. Omitted = not held.
+   * PAN-3965: true when the lone ready feature is held for UAT: its issue's
+   * `auto-merge` / `hold-for-uat` label, else the project's
+   * `auto_merge_default`, else the global `flywheel.require_uat_before_merge`
+   * (review of #3993: the per-issue tier counts, as auto-merge eligibility's
+   * does). A held feature keeps a one-member batch — it is the UAT stack.
+   * Omitted = not held.
    */
-  holdsForUat?(): boolean;
+  holdsForUat?(feature: ReadyFeature): boolean | Promise<boolean>;
   now?: () => number;
   log?: (msg: string) => void;
 }
@@ -278,9 +281,9 @@ export async function reconcileUatGenerations(
     // merges directly (Merge button / `gh pr merge`); force does not override
     // this — a one-member batch would only duplicate the PR's own CI run. A
     // batch assembled earlier is left alone (the stale checks above own it).
-    // A project that holds merges for UAT keeps the one-member batch: it is
-    // the UAT stack the operator tests on.
-    if (readySet.length < MIN_BATCH_FEATURES && !(deps.holdsForUat?.() ?? false)) {
+    // A feature held for UAT (its label, else the project, else global) keeps
+    // the one-member batch: it is the UAT stack the operator tests on.
+    if (readySet.length < MIN_BATCH_FEATURES && !((await deps.holdsForUat?.(readySet[0]!)) ?? false)) {
       log(`[uat-reconciler] 1 feature ready (${readySet[0]!.issueId}) — merges directly; batches assemble when ${MIN_BATCH_FEATURES}+ are ready`);
       await deps.cleanup().catch(() => {});
       return { action: 'single-feature', invalidated };

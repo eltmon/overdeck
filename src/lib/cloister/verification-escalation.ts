@@ -82,17 +82,22 @@ export async function escalateVerificationStuck(
   }
 }
 
-/** Exported for focused delivery-outcome tests (PR #3874 review). */
+/**
+ * Deliver verification feedback. Resolves true only when the agent accepted
+ * the message; false when the PR merged, or delivery failed and the failure
+ * was surfaced as needs-you (review of #3993: callers report real delivery).
+ * Exported for focused delivery-outcome tests (PR #3874 review).
+ */
 export async function deliverVerificationFeedback(
   issueId: string,
   message: string,
   details: Record<string, unknown>,
   logPrefix: string,
-): Promise<void> {
-  if (await skipMergedVerification(issueId, logPrefix)) return;
+): Promise<boolean> {
+  if (await skipMergedVerification(issueId, logPrefix)) return false;
 
   const target = await resolveIssueFeedbackTarget(issueId);
-  if (await skipMergedVerification(issueId, logPrefix)) return;
+  if (await skipMergedVerification(issueId, logPrefix)) return false;
 
   if ('agentId' in target) {
     // PAN-2668: verification feedback owes rework — a stopped-by-user agent
@@ -107,7 +112,7 @@ export async function deliverVerificationFeedback(
     }
     if (outcome.delivered) {
       console.log(`[${logPrefix}] Sent verification feedback for ${issueId} to ${target.agentId}`);
-      return;
+      return true;
     }
     const reason = outcome.reason ?? 'delivery was not accepted';
     console.warn(`[${logPrefix}] Could not message ${target.agentId}; verification feedback for ${issueId} not delivered: ${reason}`);
@@ -115,11 +120,12 @@ export async function deliverVerificationFeedback(
       specialist: 'verification-gate',
       ...details,
     });
-    return;
+    return false;
   }
 
   await surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
     specialist: 'verification-gate',
     ...details,
   });
+  return false;
 }

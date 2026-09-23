@@ -58,8 +58,20 @@ export interface PrFacts {
    * GitLab reports one pipeline verdict, not per-job checks, so it is `none` there.
    */
   testChecks: ChecksVerdict;
+  /**
+   * PAN-3965 (review of #3993): the CI test job's failing checks with their
+   * conclusions, so a cancelled or timed-out run can be told from a real test
+   * failure. Absent when the forge reports no per-check detail (GitLab).
+   */
+  testCheckFailures?: readonly FailedCheck[];
   /** Set when the forge lookup itself failed; every flag is then conservative. */
   error?: string;
+}
+
+/** A failing check as the forge reported it (conclusion or status state, upper-cased). */
+export interface FailedCheck {
+  name: string;
+  conclusion: string;
 }
 
 export interface PrFactsDeps {
@@ -158,6 +170,25 @@ export function summarizeStatusCheckRollup(
   return 'green';
 }
 
+/** PAN-3965 (review of #3993): the CI test job's failing checks, each with its conclusion. */
+export function listFailedTestChecks(
+  rollup: IssuePullRequestData['statusCheckRollup'] | null | undefined,
+): FailedCheck[] {
+  const failed: FailedCheck[] = [];
+  for (const check of rollup ?? []) {
+    if (!isCiTestCheckName(check.name)) continue;
+    const status = normalize(check.status);
+    const conclusion = normalize(check.conclusion);
+    const state = normalize(check.state);
+    if (status === 'COMPLETED' && conclusion && !['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(conclusion)) {
+      failed.push({ name: check.name ?? '', conclusion });
+    } else if (state === 'FAILURE' || state === 'ERROR') {
+      failed.push({ name: check.name ?? '', conclusion: state });
+    }
+  }
+  return failed;
+}
+
 /** PAN-3965: the verdict over only the CI test job's checks. */
 export function summarizeTestChecks(
   rollup: IssuePullRequestData['statusCheckRollup'] | null | undefined,
@@ -226,6 +257,7 @@ function gitHubFacts(issueId: string, pr: IssuePullRequestData): PrFacts {
     mergeableState: pr.mergeable ? pr.mergeable.toLowerCase() : null,
     checks: summarizeStatusCheckRollup(pr.statusCheckRollup),
     testChecks: summarizeTestChecks(pr.statusCheckRollup),
+    testCheckFailures: listFailedTestChecks(pr.statusCheckRollup),
   };
 }
 

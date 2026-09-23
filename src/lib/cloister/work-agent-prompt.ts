@@ -1,8 +1,9 @@
-import { existsSync, readdirSync, statSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { Effect } from 'effect';
 import { renderPrompt } from './prompts.js';
-import { extractTeamPrefix, findProjectByTeamSync } from '../projects.js';
+import { extractTeamPrefix, findProjectByPathSync, findProjectByTeamSync } from '../projects.js';
+import { resolveVerificationTestsMode } from './verification-tests-mode.js';
 import { isTldrEnabledSync } from '../config-yaml.js';
 import { getReadableWorkspacePanPaths, readWorkspaceContext, readFeedback, writeWorkspaceContext, readIssueDraft } from '../pan-dir/index.js';
 import { findPlanSync, readWorkspacePlanSync, readPlanSync, readWorkspacePlan } from '../xbrief/io.js';
@@ -75,10 +76,35 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       // the workspace actually has a TLDR .venv (PAN: tldr configurable toggle).
       TLDR_AVAILABLE: isTldrEnabledSync() && existsSync(join(ctx.workspacePath, '.venv')),
       MEMORY_CONTEXT: ctx.memoryContext || '',
+      // Review of #3993 (PAN-3965): the test wording follows the project —
+      // "the suite runs on CI" only where it does, `npx vitest` only for vitest.
+      TESTS_ON_CI: projectRunsTestsOnCi(ctx.projectRoot),
+      USES_VITEST: usesVitest(ctx.workspacePath) || (ctx.projectRoot ? usesVitest(ctx.projectRoot) : false),
     },
   }));
 }
 
+
+/** True when the project at `projectRoot` runs its test gate on CI (`verification.tests`). */
+function projectRunsTestsOnCi(projectRoot: string | undefined): boolean {
+  if (!projectRoot) return false;
+  try {
+    return resolveVerificationTestsMode(findProjectByPathSync(projectRoot)) === 'ci';
+  } catch {
+    return false;
+  }
+}
+
+/** True when the checkout at `dir` tests with vitest (a vitest config, or vitest in package.json). */
+function usesVitest(dir: string): boolean {
+  try {
+    if (readdirSync(dir).some((name) => /^vitest\.(?:config|workspace)\.[cm]?[jt]s$/.test(name))) return true;
+    const packageJson = join(dir, 'package.json');
+    return existsSync(packageJson) && /"vitest"\s*:/.test(readFileSync(packageJson, 'utf-8'));
+  } catch {
+    return false;
+  }
+}
 
 async function buildActiveSliceContext(workspacePath: string, issueId: string): Promise<string> {
   try {

@@ -18,10 +18,12 @@ verdict, every time it's asked.
 > byte-identical to the PR branch and its CI run a duplicate, so a single
 > ready feature merges directly through this flow (Merge button /
 > `gh pr merge`). The Merge train page says so: "1 feature ready — merges
-> directly; batches assemble when 2+ are ready". A project that holds merges
-> for UAT (`auto_merge_default: hold`, or no project default with the global
+> directly; batches assemble when 2+ are ready". A ready feature held for
+> UAT (its issue's `hold-for-uat` label; else the project's
+> `auto_merge_default: hold`; else, with no project default, the global
 > `flywheel.require_uat_before_merge` on — the default) still gets a batch
-> for one ready feature: that batch is the UAT stack the operator tests on.
+> when it is the only one: that batch is the UAT stack the operator tests on.
+> An `auto-merge` label releases the feature in a held project.
 
 ## Flow
 
@@ -184,9 +186,11 @@ ON, a merge-train reconcile pass rebases/re-verifies ready sibling branches
 with `pan sync-main <id>` before it proceeds through review or merge. The
 UAT reconciler (`src/lib/cloister/uat-reconciler.ts`) assembles a batch only
 for 2+ ready features; with exactly one it returns `single-feature` and
-builds nothing, even on a forced rebuild — unless the project holds merges
-for UAT (`projectHoldsForUat` in `cloister/auto-merge-policy.ts`), in which
-case the one-feature batch assembles as before.
+builds nothing, even on a forced rebuild — unless that feature is held for
+UAT (`issueHoldsForUat` in `cloister/auto-merge-eligibility.ts`: the issue's
+label, then the project default, then the global flag — the same tiers
+auto-merge eligibility applies), in which case the one-feature batch
+assembles as before.
 
 ## What This Replaces
 

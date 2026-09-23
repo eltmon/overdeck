@@ -956,7 +956,7 @@ verification:
 | --- | --- |
 | `ci` | Skip the local `test` gate. Merge readiness requires the PR checks green; a red CI job named `test` (or `tests`, `test (22)`, …) is journaled as `verification.failed { failedCheck: 'test' }` and sent to the work agent as verification feedback. |
 | `local` | Run `quality_gates.test` on the host during verification, as before. |
-| unset | `ci` when the project has `github_repo` and a `.github/workflows/*.yml`, else `local`. |
+| unset | `ci` when the project has `github_repo` and a GitHub Actions workflow that runs on pull requests and defines a job named `test`/`tests`/`test-*`/`test (…)`, else `local`. The verification artifact's `testsMode` records the mode and the reason. |
 
 Agent feedback for a red CI test job comes from the GitHub webhooks, so a GitLab project that sets `ci` gets the pipeline merge gate but no automatic feedback message. See [PIPELINE-GATES.md](PIPELINE-GATES.md#one-full-suite-run-per-push-on-ci-pan-3965).
 

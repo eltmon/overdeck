@@ -60,7 +60,7 @@ For every item:
 
 1. `pan task next <ISSUE-ID>` — find the next unblocked item scoped to this issue.
 2. `pan task claim <ISSUE-ID> <item-id>` — claim it.
-3. Implement only that item. Run only the tests it touched: `npx vitest run <test files you changed or whose subjects you changed>`. Never run the full suite on the host — it runs on CI after `pan done`.
+3. Implement only that item. Run only the tests it touched, with the project's test runner scoped to those files (`npx vitest run <files>` in a vitest project). Never run the full suite yourself — the verification gate runs it after `pan done`.
 4. `git add` specific files and `git commit` — one item = one commit.
 5. Immediately push that commit with `git push -u origin "$(git branch --show-current)"`. Every completed item must exist on origin before its status is closed; generic project Git profiles do not override this managed-work invariant.
 6. `pan task done <ISSUE-ID> <item-id> --reason="…"`. (The canonical writer records item status automatically — do **not** write to the record or `.overdeck/continue.json` directly.)
@@ -107,12 +107,12 @@ Summaries lead with anomalies and deviations — never bury them after the wins.
 When all tasks are closed and the tree is clean:
 
 ```bash
-npx vitest run <test files you changed or whose subjects you changed>
+<test runner> <test files you changed or whose subjects you changed>
 git push -u origin "$(git branch --show-current)"
 pan done <ISSUE-ID> -c "<terse summary>"
 ```
 
-`pan done` runs typecheck and lint locally; the full suite runs once, on CI, against the PR head, and a red CI test job returns to you as verification feedback (`Failed check: test`).
+`pan done` runs the verification gate. Where the project's tests run on CI (`verification.tests: ci`), it runs typecheck and lint locally and the full suite runs once, on CI, against the PR head; otherwise it runs the full suite locally. Either way a test failure returns to you as verification feedback (`Failed check: test`).
 
 The final push is a verification pass; every item commit was already pushed before its
 item was closed. Work agents push only their feature branch. Never push to `origin/main` or merge into
