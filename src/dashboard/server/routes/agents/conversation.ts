@@ -21,6 +21,7 @@ import { sharedTranscriptParser } from '../../services/shared-transcript-parser.
 import {
   listAgentTranscriptCandidates,
 } from '../../../../lib/agents/transcript-resolver.js';
+import { isExternalAgentId, readExternalRegistration } from '../../../../lib/agents/external-registry.js';
 import {
   isSafeSubagentId,
   listAgentSubagents,
@@ -101,6 +102,16 @@ export const getAgentOutputRoute = HttpRouter.add(
 
 // ─── Route: GET /api/agents/:id/conversation ─────────────────────────────────
 
+/**
+ * The workspace transcript resolution keys on. An external agent (PAN-3920
+ * W21) has no state.json and no Overdeck pane: its registration's cwd is the
+ * workspace, and no tmux lookup is made for it.
+ */
+async function agentWorkspaceFor(id: string): Promise<string | null> {
+  if (isExternalAgentId(id)) return (await readExternalRegistration(id))?.cwd ?? null;
+  return Effect.runPromise(getAgentWorkspace(id));
+}
+
 const EMPTY_CONVERSATION: ConversationResponse = { messages: [], workLog: [], streaming: false, totalCost: 0, byteOffset: 0 };
 
 type AgentConversationResult =
@@ -132,7 +143,7 @@ export async function buildAgentConversationResult(
     return { status: 400, body: { error: 'subagentId must match ^[A-Za-z0-9_-]+$' } };
   }
   try {
-    const workspace = await Effect.runPromise(getAgentWorkspace(id));
+    const workspace = await agentWorkspaceFor(id);
     if (opts.subagentId !== undefined) return await buildAgentSubagentResult(id, workspace ?? '', opts.subagentId);
     const candidates = await listAgentTranscriptCandidates(id, workspace ?? '');
     const checked = candidates.map(({ path }) => path);
@@ -211,7 +222,7 @@ export const getAgentConversationRoute = HttpRouter.add(
 
 /** The agent's in-harness subagents (PAN-3920 W2). Transcript paths stay server-side. */
 export async function buildAgentSubagentsResult(id: string): Promise<{ subagents: Array<Record<string, unknown>> }> {
-  const workspace = await Effect.runPromise(getAgentWorkspace(id));
+  const workspace = await agentWorkspaceFor(id);
   const subagents = await listAgentSubagents(id, workspace ?? '');
   return { subagents: subagents.map(({ transcriptPath: _path, ...summary }) => summary) };
 }

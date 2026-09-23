@@ -12,11 +12,17 @@
  *   2. pane-only       — panes with Overdeck tokens and no state.json (`pan spawn`)
  *   3. conversations   — overdeck.db rows, enriched with liveness
  *   4. subagents       — Claude/Codex subagents of every non-stopped parent
- *   5. external        — Phase C registrations (none yet)
+ *   5. external        — `~/.overdeck/agents/ext-*` registrations (Phase C):
+ *                        agents another tool launched (`pan worker register`,
+ *                        the Codex-plugin adapter); state from the recorded
+ *                        pid and the transcript (D21), see
+ *                        agent-directory-external.ts
  *
- * Workers (Phase B, role `worker`) are native agents with a parent: their
- * `parentId` names an agent id or a conversation tmux session, which maps to
- * that conversation's `conv:<name>` entry so the worker nests under it.
+ * Workers (Phase B, role `worker`) and external agents are entries with a
+ * parent: their `parentId` names an agent id or a conversation tmux session,
+ * which maps to that conversation's `conv:<name>` entry so they nest under it.
+ * A `claude-session:<uuid>` parent (a Claude session Overdeck does not know)
+ * stays as is.
  *
  * State vocabulary and window rules are D3/D4 of `.pan/drafts/pan-3920.md`;
  * docs/DASHBOARD-ARCHITECTURE.md "Agents Directory" restates them.
@@ -43,6 +49,7 @@ import { resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js'
 import { getOverdeckHome } from '../../../lib/paths.js';
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { findProjectKeyByPathSync } from '../../../lib/projects/project-key.js';
+import { listExternalCandidates, type ExternalDirectoryCandidate } from './agent-directory-external.js';
 import { SUBAGENT_WORKING_MTIME_MS, listAgentSubagents, listTranscriptSubagents } from './agent-subagents.js';
 import { getBackendPanes } from './backend-inventory.js';
 
@@ -104,8 +111,8 @@ export interface AgentDirectoryDeps {
   readonly latestWorkerReportAt?: (agentId: string) => Promise<number | null>;
   /** The optional `--name` label from a worker's worker.json. */
   readonly readWorkerName?: (agentId: string) => Promise<string | null>;
-  /** Phase C (external registrations). */
-  readonly listExternalEntries?: (now: number) => Promise<readonly DirectoryEntry[]>;
+  /** Phase C: external registrations as candidates (default: agent-directory-external.ts). */
+  readonly listExternalEntries?: (now: number) => Promise<readonly ExternalDirectoryCandidate[]>;
   readonly projectKeyForIssue?: (issueId: string) => string | null;
   /** Issue id (uppercase) → title, from the tracker cache the dashboard already holds. */
   readonly issueTitles?: () => ReadonlyMap<string, string> | Promise<ReadonlyMap<string, string>>;
@@ -283,12 +290,13 @@ export async function buildAgentDirectory(
   const projectKeyForIssue = perBuild(deps.projectKeyForIssue ?? defaultProjectKeyForIssue);
   const projectKeyForPath = perBuild(deps.projectKeyForPath ?? defaultProjectKeyForPath);
 
-  const [states, panes, conversationRows, issueTitles] = await Promise.all([
+  const [states, panes, conversationRows, issueTitles, external] = await Promise.all([
     Promise.resolve((deps.listAgentStates ?? defaultListAgentStates)()),
     (deps.getBackendPanes ?? getBackendPanes)().catch(() => [] as readonly BackendPane[]),
     (deps.listConversations ?? (() => getEnrichedConversationList(DIRECTORY_CONVERSATION_LIMIT, 0)))()
       .catch(() => [] as readonly unknown[]),
     Promise.resolve((deps.issueTitles ?? defaultIssueTitles)()).catch(() => new Map<string, string>()),
+    (deps.listExternalEntries ?? listExternalCandidates)(now).catch(() => [] as readonly ExternalDirectoryCandidate[]),
   ]);
 
   const candidates: Candidate[] = [];
@@ -403,15 +411,19 @@ export async function buildAgentDirectory(
     if (entry.state !== 'stopped') conversationParents.push({ entry, row });
   }
 
-  // A worker spawned by a conversation names its tmux session (OVERDECK_CONVERSATION);
-  // point it at that conversation's entry so the worker nests under it (D6).
+  // 4. External agents (Phase C). They join before the parent remap so a
+  //    registration naming a conversation's tmux session nests under it.
+  for (const { entry, cwd } of external) candidates.push({ entry, cwd, explicitProjectKey: null });
+
+  // A worker or external agent spawned by a conversation names its tmux session
+  // (OVERDECK_CONVERSATION); point it at that conversation's entry so it nests under it (D6).
   for (const candidate of candidates) {
     const parent = candidate.entry.parentId;
     const conversationId = parent ? conversationIdBySession.get(parent.toLowerCase()) : undefined;
     if (conversationId) candidate.entry = { ...candidate.entry, parentId: conversationId };
   }
 
-  // 4. Subagents of every non-stopped parent.
+  // 5. Subagents of every non-stopped parent.
   const listConversationSubagents = deps.listConversationSubagents ?? defaultListConversationSubagents;
   const listNativeSubagents = deps.listAgentSubagents
     ?? ((agentId: string, workspace: string) => listAgentSubagents(agentId, workspace, QUIET_RESOLVE));
@@ -424,9 +436,6 @@ export async function buildAgentDirectory(
   for (const batch of await withConcurrencyLimitPromise(subagentTasks, DIRECTORY_SUBAGENT_CONCURRENCY)) {
     candidates.push(...batch);
   }
-
-  // 5. External entries (Phase C).
-  const external = deps.listExternalEntries ? await deps.listExternalEntries(now).catch(() => []) : [];
 
   // 6. Project keys (D5): issue → the row's own project → cwd → unassigned.
   //    A subagent inherits its parent's key (parents precede their subagents).
@@ -441,7 +450,6 @@ export async function buildAgentDirectory(
     projectKeys.set(entry.id, projectKey);
     return { ...entry, projectKey, issueTitle: entry.issueId ? issueTitles.get(entry.issueId) ?? null : null };
   });
-  all.push(...external);
 
   // 7. Window (D4), then re-add every ancestor of a kept entry.
   const byId = new Map(all.map((entry) => [entry.id, entry]));

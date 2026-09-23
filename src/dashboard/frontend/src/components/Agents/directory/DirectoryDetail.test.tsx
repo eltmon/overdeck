@@ -134,6 +134,18 @@ describe('DirectoryDetail', () => {
     expect(screen.getByText('· $2.50')).toBeInTheDocument();
   });
 
+  it('shows an external agent read-only, with its Claude-session parent and no composer', () => {
+    renderDetail(entry({
+      id: 'ext-codex-plugin-task-1', kind: 'external', source: 'codex-plugin', role: null, label: 'Fix the flaky test',
+      parentId: 'claude-session:b4e68a48-1e09', transcript: { route: 'agent', agentId: 'ext-codex-plugin-task-1' },
+    }));
+    const props = conversationPanel.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(props).toMatchObject({ agentId: 'ext-codex-plugin-task-1', hideComposer: true });
+    expect(screen.getByText('Spawned by Claude session b4e68a48')).toBeInTheDocument();
+    expect(screen.getByText(/Launched outside Overdeck as a Codex plugin job/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Message worker' })).not.toBeInTheDocument();
+  });
+
   it('says so when an entry has no transcript', () => {
     renderDetail(entry({ id: 'pane:w1:p1' }));
     expect(screen.getByText('No transcript is recorded for this agent.')).toBeInTheDocument();

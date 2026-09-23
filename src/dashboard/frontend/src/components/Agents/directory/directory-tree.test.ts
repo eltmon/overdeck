@@ -1,7 +1,7 @@
 import type { DirectoryEntry } from '@overdeck/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { buildDirectoryTree, entriesForNode, filterRows } from './directory-tree';
+import { buildDirectoryTree, entriesForNode, filterRows, parentLabel } from './directory-tree';
 
 function entry(overrides: Partial<DirectoryEntry> & { id: string }): DirectoryEntry {
   return {
@@ -88,6 +88,16 @@ describe('entriesForNode', () => {
   it('marks a child whose parent is outside the node with spawnedByLabel', () => {
     const worker = entriesForNode(ENTRIES, 'issue:local:PAN-3920').find((row) => row.entry.id === 'agent-pan-3920-worker-1');
     expect(worker).toMatchObject({ depth: 0, spawnedByLabel: 'Orchestrator' });
+  });
+
+  it('names an unknown Claude-session parent of an external agent by its first 8 characters', () => {
+    const job = entry({
+      id: 'ext-codex-plugin-task-1', kind: 'external', source: 'codex-plugin', role: null, issueId: 'PAN-3920',
+      parentId: 'claude-session:b4e68a48-1e09-4d98-92ef-e522535f1e58',
+    });
+    const rows = entriesForNode([...ENTRIES, job], 'issue:local:PAN-3920');
+    expect(rows.find((row) => row.entry.id === job.id)).toMatchObject({ depth: 0, spawnedByLabel: 'Claude session b4e68a48' });
+    expect(parentLabel('agent-pan-9', undefined)).toBe('agent-pan-9');
   });
 
   it('returns every entry under a location, live first', () => {
