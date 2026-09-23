@@ -13,13 +13,20 @@ verdict, every time it's asked.
 > **promoting a UAT batch** (merging several tested features at once). The
 > per-issue flow below remains the escape hatch (the "Merge one feature to
 > main…" control) and the path for everything outside an active batch-train
-> run.
+> run. A batch assembles only when **two or more** features are ready
+> (PAN-3965): a one-member batch is byte-identical to the PR branch and its CI
+> run a duplicate, so a single ready feature always merges directly through
+> this flow (Merge button / `gh pr merge`). The Merge train page says so:
+> "1 feature ready — merges directly; batches assemble when 2+ are ready".
 
 ## Flow
 
 1. **Work agent calls `pan done`** on a clean tree. The work-agent role
    prompt refuses `pan done` from a dirty worktree. `pan done` runs quality
-   gates, rebases onto the target branch and pushes, opens or updates the PR
+   gates (typecheck and lint on the host; the test suite runs once, on CI, for
+   a `verification.tests: ci` project — see
+   [PIPELINE-GATES.md](PIPELINE-GATES.md#one-full-suite-run-per-push-on-ci-pan-3965)),
+   rebases onto the target branch and pushes, opens or updates the PR
    and marks it ready, moves the tracker to In Review, and finally POSTs
    `/api/review/<id>/request` — the same request `pan review request` makes,
    through the same helper
@@ -170,7 +177,10 @@ deletes only `*.jsonl` transcripts and keeps `state.json`.
 When the merge-train flag (`flywheel.merge_train_enabled`, default off) is
 ON, a merge-train reconcile pass rebases/re-verifies ready sibling branches
 (PAN-1691); with the flag off, reconcile an affected workspace explicitly
-with `pan sync-main <id>` before it proceeds through review or merge.
+with `pan sync-main <id>` before it proceeds through review or merge. The
+UAT reconciler (`src/lib/cloister/uat-reconciler.ts`) assembles a batch only
+for 2+ ready features; with exactly one it returns `single-feature` and
+builds nothing, even on a forced rebuild.
 
 ## What This Replaces
 

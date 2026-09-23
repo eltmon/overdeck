@@ -471,3 +471,39 @@ describe('empty queue', () => {
     expect(result.action).toBe('idle');
   });
 });
+
+describe('PAN-3965 no batch for a single ready feature', () => {
+  it('assembles no generation when exactly one feature is ready', async () => {
+    const proj = freshProject();
+    const deps = makeDeps(proj, { readySet: [READY[0]!] });
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(result.action).toBe('single-feature');
+    expect(result.generation).toBeUndefined();
+    expect(deps.assembled).toEqual([]);
+    expect(deps.rows.size).toBe(0);
+    expect(deps.logs.join('\n')).toContain('merges directly');
+  });
+
+  it('assembles exactly one generation when two features are ready', async () => {
+    const proj = freshProject();
+    const deps = makeDeps(proj, { readySet: READY });
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(result.action).toBe('assembled');
+    expect(deps.assembled).toHaveLength(1);
+    expect(deps.assembled[0]!.map((f) => f.issueId)).toEqual(['PAN-1', 'PAN-2']);
+  });
+
+  it('a forced rebuild with one ready feature still assembles nothing', async () => {
+    const proj = freshProject();
+    const deps = makeDeps(proj, { readySet: [READY[0]!] });
+
+    const result = await reconcileUatGenerations(proj, deps, { force: true });
+
+    expect(result.action).toBe('single-feature');
+    expect(deps.assembled).toEqual([]);
+  });
+});

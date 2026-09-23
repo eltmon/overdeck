@@ -103,6 +103,12 @@ interface MergeBackendStatus {
   detail: string;
 }
 
+/**
+ * PAN-3965: the reconciler assembles no batch for a single ready feature — a
+ * one-member batch is the PR branch itself and its CI run a duplicate.
+ */
+export const SINGLE_FEATURE_READY_LINE = '1 feature ready — merges directly; batches assemble when 2+ are ready.';
+
 /** One project's merged view: its queue, its generations, and its flag. */
 export interface MergeTrainProjectSection {
   projectKey: string;
@@ -376,6 +382,7 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
     onSuccess: (data) => {
       const action = data.projects[0]?.result?.action;
       if (action === 'assembled') toast.success('Rebuilt the UAT batch');
+      else if (action === 'single-feature') toast.info(SINGLE_FEATURE_READY_LINE);
       else toast.info(`Rebuild: ${action ?? data.projects[0]?.error ?? 'no change'}`);
       invalidate();
     },
@@ -637,6 +644,8 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                     <p className="px-1 pb-1 text-[11px] leading-snug text-muted-foreground">
                       {featureCount === 0 && promotedPendingCount > 0 ? (
                         <><span className="font-semibold text-foreground">{promotedPendingCount} promoted batch{promotedPendingCount === 1 ? '' : 'es'}</span> await{promotedPendingCount === 1 ? 's' : ''} version ship. Supply the version below to satisfy each member&apos;s ship row.</>
+                      ) : featureCount === 1 && batchCount === 0 ? (
+                        <span data-testid={`merge-train-single-feature-${section.projectKey}`}>{SINGLE_FEATURE_READY_LINE}</span>
                       ) : (
                         <><span className="font-semibold text-foreground">{featureCount} feature{featureCount === 1 ? '' : 's'}</span> passed review &amp; tests.
                           {batchCount > 0

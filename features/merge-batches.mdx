@@ -47,6 +47,11 @@ On the Flywheel page, the **UAT batches** card shows, newest first:
    conflict resolutions included — in one merge. Each feature then closes out
    through the normal post-merge flow.
 
+A batch assembles only when **two or more** features are ready. With exactly
+one, the page reads "1 feature ready — merges directly; batches assemble when 2+
+are ready": a one-member batch is the PR branch itself and its CI run a
+duplicate, so that feature merges on its own (Merge button or `gh pr merge`).
+
 Merging a single feature on its own is still available as an escape hatch; doing
 so simply restales the live batches and a fresh one reassembles automatically.
 
