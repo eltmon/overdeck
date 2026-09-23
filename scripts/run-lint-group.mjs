@@ -9,6 +9,8 @@
 
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { delimiter, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const HEAVY_STEPS = {
   'npm run lint:effect-diagnostics': 'effect',
@@ -38,8 +40,12 @@ if (!GROUPS.includes(arg)) {
   process.exit(2);
 }
 
+// `npm run` puts node_modules/.bin on PATH; bare steps like `eslint` need it too.
+const binDir = join(fileURLToPath(new URL('..', import.meta.url)), 'node_modules', '.bin');
+const env = { ...process.env, PATH: `${binDir}${delimiter}${process.env.PATH ?? ''}` };
+
 for (const step of steps.filter((s) => groupOf(s) === arg)) {
   console.log(`\n$ ${step}`);
-  const result = spawnSync(step, { shell: true, stdio: 'inherit' });
+  const result = spawnSync(step, { shell: true, stdio: 'inherit', env });
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
