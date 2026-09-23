@@ -225,9 +225,9 @@ export async function doneCommand(
       commentOnArtifact(forge, { forge, url: artifact.url, body, cwd: workspacePath }),
     );
     if (uatOutcome) {
-      // #4036: merge readiness reads this comment. Both read caches may hold
-      // the pre-verdict PR (the anchor lookup above just filled pr-facts'), so
-      // drop them: the next readiness read must see the new UAT verdict.
+      // #4036: merge readiness reads this comment. The anchor lookup above
+      // filled this process's read caches with the pre-verdict PR, so drop
+      // them; a dashboard server's own pr-facts cache expires within 60s.
       resetPrFactsCache();
       bumpIssuePrTabCacheGeneration(normalizedIssueId);
     }
