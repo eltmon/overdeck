@@ -468,9 +468,10 @@ B and C unchanged.
 
 The issue title counts 24 used façades in 15 modules. The ratchet had 26 rows in 16 modules, and the
 two extra rows are the CH-1b "kept although dead" façades in this cluster: `getSpecialistHandoffStats`
-and `relayUatFailureFeedback`. Both are converted, not deleted. Their tests now call the body directly
-(D4), and the CH-1b operator row for `relayUatFailureFeedback` still applies, since it has no
-production caller.
+and `relayUatFailureFeedback`. Both are converted, not deleted, and their tests now call the body
+directly (D4). The CH-1b operator row for `relayUatFailureFeedback` is resolved. PAN-4030 (#4033)
+re-attached the relay in `pan admin specialists done` (`src/cli/commands/specialists/done.ts`),
+where it now runs as a plain `async` function, so the relay has a production caller again.
 
 ### Shape A façades (26) → async functions
 
@@ -499,7 +500,7 @@ production caller.
 | `specialist-handoff-logger.ts` | `updateSpecialistHandoffStatus` | `updateSpecialistHandoffStatusPromise` | |
 | `triggers.ts` | `checkTaskCompletion` | `checkTaskCompletionPromise` | |
 | `triggers.ts` | `checkAllTriggers` | `checkAllTriggersPromise` | |
-| `uat-failure-feedback.ts` | `relayUatFailureFeedback` | `relayUatFailureFeedbackPromise` (was exported) | CH-1b operator row stands: still no production caller |
+| `uat-failure-feedback.ts` | `relayUatFailureFeedback` | `relayUatFailureFeedbackPromise` (was exported) | CH-1b operator row resolved: `specialists/done.ts` (#4033) calls it; its callers, tests and docs (`THE-CUT.md`, `PIPELINE-GATES.md`) use the plain name |
 | `validation.ts` | `runQualityGates` | `runQualityGatesPromise` | |
 | `verification-runner.ts` | `runVerificationForIssueInProcess` | `runVerificationForIssuePromise` | `runVerificationForIssue` (genuine Effect dispatcher, Q2) now bridges it with `Effect.promise` |
 

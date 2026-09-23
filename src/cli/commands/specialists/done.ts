@@ -42,6 +42,8 @@ interface DoneOptions {
   notes?: string;
   uatStatus?: 'passed' | 'failed';
   uatNotes?: string;
+  /** The commit the test/UAT run exercised, recorded before the gates ran. */
+  testedSha?: string;
 }
 
 // PAN-3642: this advisory deadline covers the PR comment, a stopped Claude
@@ -53,6 +55,22 @@ class FeedbackDeliveryTimeoutError extends Error {
   constructor(readonly timeoutMs: number) {
     super(`feedback delivery timed out after ${timeoutMs}ms`);
     this.name = 'FeedbackDeliveryTimeoutError';
+  }
+}
+
+/** Bound an advisory feedback delivery by {@link FEEDBACK_DELIVERY_TIMEOUT_MS}. */
+async function withFeedbackDeadline<T>(delivery: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new FeedbackDeliveryTimeoutError(FEEDBACK_DELIVERY_TIMEOUT_MS)),
+      FEEDBACK_DELIVERY_TIMEOUT_MS,
+    );
+  });
+  try {
+    return await Promise.race([delivery, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 
@@ -106,6 +124,11 @@ export async function doneCommand(
   if (!validStatuses.includes(options.status)) {
     console.error(chalk.red(`Invalid status: ${options.status}`));
     console.error(chalk.dim(`Valid options for ${role}: ${validStatuses.join(', ')}`));
+    return exitCli(1);
+  }
+
+  if (options.testedSha !== undefined && (role === 'review' || !/^[0-9a-f]{7,40}$/i.test(options.testedSha))) {
+    console.error(chalk.red('--tested-sha applies only to test and uat verdicts and must be a commit SHA'));
     return exitCli(1);
   }
 
@@ -211,25 +234,13 @@ export async function doneCommand(
     // session, so a hung delivery leaves that agent waiting forever. Bound it.
     try {
       const { deliverReviewVerdictFeedback } = await import('../../../lib/cloister/review-verdict-feedback.js');
-      const delivery = deliverReviewVerdictFeedback({
+      await withFeedbackDeadline(deliverReviewVerdictFeedback({
         issueId: normalizedIssueId,
         verdict: options.status,
         notes: options.notes,
         prUrl: artifact.url,
         ...(options.runId ? { runId: options.runId } : {}),
-      });
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const timeout = new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new FeedbackDeliveryTimeoutError(FEEDBACK_DELIVERY_TIMEOUT_MS)),
-          FEEDBACK_DELIVERY_TIMEOUT_MS,
-        );
-      });
-      try {
-        await Promise.race([delivery, timeout]);
-      } finally {
-        if (timer) clearTimeout(timer);
-      }
+      }));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (err instanceof FeedbackDeliveryTimeoutError) {
@@ -247,6 +258,48 @@ export async function doneCommand(
       }
       console.warn(chalk.yellow(`Could not deliver review feedback: ${message}`));
     }
+  }
+
+  // PAN-4030: a browser UAT result is observed here and nowhere else — the
+  // test role's `--uat-status`, or the uat role's own status. The verdict is
+  // already on the PR; a failure owes rework, so relay the UAT notes to the
+  // work agent (or a needs-you when none can be reached), once per failing PR
+  // head. A passing UAT clears that anchor.
+  const uatOutcome = role === 'test' ? options.uatStatus : role === 'uat' ? options.status : undefined;
+  if (uatOutcome === 'failed') {
+    const uatNotes = role === 'test' ? options.uatNotes : options.notes;
+    try {
+      const { relayUatFailureFeedback } = await import('../../../lib/cloister/uat-failure-feedback.js');
+      // Anchor on the commit UAT actually exercised (pre-Cut: reviewedAtCommit).
+      // The test agent records it before running the gates and passes it as
+      // --tested-sha. Its workspace HEAD at verdict time is no better than the
+      // PR head — the work agent shares that worktree and may have moved it —
+      // so when the SHA was not reported, fall back to the PR head: a push
+      // during the run then mis-anchors this failure onto the newer commit.
+      // An unreadable PR head still relays; it only loses cross-run dedup.
+      const anchor = options.testedSha?.toLowerCase() ?? await getPrFacts(normalizedIssueId)
+        .then((facts) => facts.headSha ?? undefined, () => undefined);
+      await withFeedbackDeadline(relayUatFailureFeedback({
+        issueId: normalizedIssueId,
+        uatNotes,
+        workspacePath,
+        ...(anchor ? { anchor } : {}),
+      }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (err instanceof FeedbackDeliveryTimeoutError) {
+        const { surfaceIssueFeedbackNeedsYou } = await import('../../../lib/cloister/feedback-target.js');
+        await surfaceIssueFeedbackNeedsYou(
+          normalizedIssueId,
+          `UAT failure feedback delivery exceeded the ${err.timeoutMs}ms advisory deadline; the verdict is on ${artifact.url} and the work agent may not have been told.`,
+          { specialist: 'uat-agent', retryable: true, source: 'specialists-done-timeout' },
+        );
+      }
+      console.warn(chalk.yellow(`Could not deliver UAT failure feedback: ${message}`));
+    }
+  } else if (uatOutcome === 'passed') {
+    const { clearUatFailureFeedbackAnchor } = await import('../../../lib/cloister/uat-failure-feedback.js');
+    clearUatFailureFeedbackAnchor(normalizedIssueId);
   }
 
   // PAN-2579 (warm-by-default lifecycle): the session stays alive so the next
