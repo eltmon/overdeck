@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CodexAppServerManager } from '../app-server-manager.js';
-import { createFakeAppServer } from './fake-app-server.js';
+import { createFakeAppServer, createFakeNativeTransport, type FakeNativeTransport } from './fake-app-server.js';
 
 afterEach(() => vi.useRealTimers());
 
@@ -210,5 +210,180 @@ describe('CodexAppServerManager', () => {
     fake.send({ method: 'turn/completed', params: { turn: { id: 'turn-2' } } });
     expect(manager.getState().state).toBe('idle');
     manager.stop();
+  });
+
+  describe('native endpoint (PAN-3835)', () => {
+    const SOCKET = '/home/op/.overdeck/agents/conv-1/codex-native/app.sock';
+
+    function nativeServer(onMessage?: (message: Record<string, unknown>, fake: FakeNativeTransport) => void): FakeNativeTransport {
+      return createFakeNativeTransport((message, fake) => {
+        if (message.method === 'initialize') fake.send({ id: message.id, result: {} });
+        if (message.method === 'thread/start') fake.send({ id: message.id, result: { thread: { id: 'owner-thread', path: '/rollouts/owner.jsonl' } } });
+        onMessage?.(message, fake);
+      });
+    }
+
+    function killableChild() {
+      const fake = createFakeAppServer();
+      const child = fake.child as unknown as { kill: (signal?: string) => boolean; emit: (event: string, ...args: unknown[]) => boolean };
+      child.kill = () => { queueMicrotask(() => child.emit('exit', null, 'SIGTERM')); return true; };
+      return fake;
+    }
+
+    it('uses_unix_websocket_only_when_requested', async () => {
+      const native = nativeServer();
+      const spawned: Array<readonly string[]> = [];
+      const manager = new CodexAppServerManager({
+        cwd: '/tmp',
+        readVersion: async () => 'codex-cli 0.153.4',
+        nativeSocketPath: SOCKET,
+        spawnProcess: (args) => { spawned.push(args); return killableChild().child; },
+        connectNative: async () => native.transport,
+      });
+      await manager.start();
+      expect(spawned).toEqual([['app-server', '--listen', `unix://${SOCKET}`]]);
+      expect(manager.getTransportInfo()).toEqual({ kind: 'unix', endpoint: `unix://${SOCKET}`, cliVersion: '0.153.4' });
+      expect(native.messages.map(message => message.method)).toEqual(['initialize', 'initialized']);
+      manager.stop();
+      expect(native.closedByClient).toBe(true);
+    });
+
+    it.each([
+      ['an older CLI', '0.153.3', SOCKET, 'cli-unsupported'],
+      ['a socket path over 100 bytes', '0.153.4', `/${'x'.repeat(120)}/app.sock`, 'socket-path-too-long'],
+    ])('retains_stdio_for %s with a visible reason', async (_label, version, socketPath, reason) => {
+      const fake = createFakeAppServer((message, server) => {
+        if (message.method === 'initialize') server.send({ id: message.id, result: {} });
+      });
+      const spawned: Array<readonly string[]> = [];
+      const connectNative = vi.fn();
+      const manager = new CodexAppServerManager({
+        cwd: '/tmp',
+        readVersion: async () => version,
+        nativeSocketPath: socketPath,
+        spawnProcess: (args) => { spawned.push(args); return fake.child; },
+        connectNative,
+      });
+      await manager.start();
+      expect(spawned).toEqual([['app-server']]);
+      expect(connectNative).not.toHaveBeenCalled();
+      expect(manager.getTransportInfo()).toMatchObject({ kind: 'stdio', unavailableReason: reason });
+      manager.stop();
+    });
+
+    it('keeps stdio for work agents that never request the endpoint', async () => {
+      const fake = createFakeAppServer((message, server) => {
+        if (message.method === 'initialize') server.send({ id: message.id, result: {} });
+      });
+      const manager = new CodexAppServerManager({ cwd: '/tmp', readVersion: async () => '0.153.4', spawnProcess: () => fake.child });
+      await manager.start();
+      expect(manager.getTransportInfo()).toMatchObject({ kind: 'stdio', unavailableReason: 'not-requested' });
+      manager.stop();
+    });
+
+    it('cleans_failed_startup_without_second_child: stops the native child before the stdio fallback', async () => {
+      const nativeChild = killableChild();
+      const stdio = createFakeAppServer((message, server) => {
+        if (message.method === 'initialize') server.send({ id: message.id, result: {} });
+      });
+      const events: string[] = [];
+      const manager = new CodexAppServerManager({
+        cwd: '/tmp',
+        readVersion: async () => '0.153.4',
+        nativeSocketPath: SOCKET,
+        spawnProcess: (args) => {
+          events.push(`spawn ${args.join(' ')}`);
+          if (args.includes('--listen')) {
+            nativeChild.child.once('exit', () => events.push('native exited'));
+            return nativeChild.child;
+          }
+          return stdio.child;
+        },
+        connectNative: async () => { throw new Error('ECONNREFUSED'); },
+      });
+      const exits: unknown[] = [];
+      manager.on('exit', exit => exits.push(exit));
+      await manager.start();
+      expect(events).toEqual([`spawn app-server --listen unix://${SOCKET}`, 'native exited', 'spawn app-server']);
+      expect(manager.getTransportInfo()).toMatchObject({ kind: 'stdio', unavailableReason: 'connect-failed' });
+      // The torn-down native child is not reported as the runtime exiting.
+      expect(exits).toEqual([]);
+      manager.stop();
+    });
+
+    it('stops the runtime once when the native connection drops (rejects_pending_rpc_on_disconnect)', async () => {
+      const native = nativeServer();
+      const child = killableChild();
+      const manager = new CodexAppServerManager({
+        cwd: '/tmp',
+        readVersion: async () => '0.153.4',
+        nativeSocketPath: SOCKET,
+        spawnProcess: () => child.child,
+        connectNative: async () => native.transport,
+      });
+      const exits: unknown[] = [];
+      manager.on('exit', exit => exits.push(exit));
+      manager.on('warning', () => undefined);
+      await manager.start();
+      const pending = manager.request('thread/read', {});
+      native.close();
+      await expect(pending).rejects.toThrow('codex app-server stopped.');
+      await vi.waitFor(() => expect(exits).toHaveLength(1));
+      expect(manager.getState().state).toBe('closed');
+    });
+
+    it('foreign_thread_events_do_not_rebind_owner', async () => {
+      const native = nativeServer();
+      const manager = new CodexAppServerManager({
+        cwd: '/tmp',
+        readVersion: async () => '0.153.4',
+        nativeSocketPath: SOCKET,
+        spawnProcess: () => killableChild().child,
+        connectNative: async () => native.transport,
+      });
+      const notifications: string[] = [];
+      const requests: unknown[] = [];
+      const foreign: string[] = [];
+      manager.on('notification', (message: { method: string }) => notifications.push(message.method));
+      manager.on('request', request => requests.push(request));
+      manager.on('foreign-thread', (message: { method: string }) => foreign.push(message.method));
+      await manager.start();
+      await manager.startThread({ model: 'gpt-5.6-luna' });
+
+      // What the attached TUI caused on the shared server, recorded in the
+      // PAN-3835 experiment: a system title thread and a native /new.
+      native.send({ method: 'thread/started', params: { thread: { id: 'title-thread', ephemeral: true } } });
+      native.send({ method: 'thread/started', params: { thread: { id: 'new-thread', ephemeral: false } } });
+      native.send({ method: 'turn/started', params: { threadId: 'new-thread', turn: { id: 't-foreign' } } });
+      native.send({ id: 5, method: 'item/commandExecution/requestApproval', params: { threadId: 'new-thread' } });
+
+      expect(manager.getState()).toEqual({ state: 'idle', threadId: 'owner-thread' });
+      expect(requests).toEqual([]);
+      expect(foreign).toEqual(['thread/started', 'thread/started', 'turn/started', 'item/commandExecution/requestApproval']);
+
+      // Owner-thread events still flow, whichever client started the turn.
+      native.send({ method: 'turn/started', params: { threadId: 'owner-thread', turn: { id: 't-owner' } } });
+      expect(manager.getState()).toEqual({ state: 'running', threadId: 'owner-thread', activeTurnId: 't-owner' });
+      expect(notifications).toEqual(['turn/started']);
+      manager.stop();
+    });
+
+    it('resumes strictly without substituting a fresh thread', async () => {
+      const native = nativeServer((message, fake) => {
+        if (message.method === 'thread/resume') fake.send({ id: message.id, error: { message: 'thread/resume: thread not found' } });
+      });
+      const manager = new CodexAppServerManager({
+        cwd: '/tmp',
+        readVersion: async () => '0.153.4',
+        nativeSocketPath: SOCKET,
+        spawnProcess: () => killableChild().child,
+        connectNative: async () => native.transport,
+      });
+      await manager.start();
+      await expect(manager.resumeThread('gone', { model: 'm' }, { strict: true })).rejects.toThrow('not found');
+      expect(native.messages.some(message => message.method === 'thread/start')).toBe(false);
+      expect(manager.getState().threadId).toBeUndefined();
+      manager.stop();
+    });
   });
 });

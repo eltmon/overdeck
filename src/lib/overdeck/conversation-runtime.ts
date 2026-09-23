@@ -576,6 +576,7 @@ export async function spawnConversationSession(
     codexHome: string;
     codexSessionDir: string;
     codexEffort?: string;
+    codexNativeEndpoint?: boolean;
     resumeSessionId?: string;
   } | undefined;
   let acpFields: (ReturnType<typeof getAcpLauncherFields> & { resumeSessionId?: string }) | undefined;
@@ -665,6 +666,7 @@ export async function spawnConversationSession(
         codexEffort: effort ?? 'high',
         codexHome,
         codexSessionDir: join(codexHome, 'sessions'),
+        ...(codexTransport === 'app-server' ? { codexNativeEndpoint: true } : {}),
         resumeSessionId,
       };
     } else if (behavior.launchCommandKind === 'kimi-code-tui') {

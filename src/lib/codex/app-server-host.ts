@@ -1,22 +1,25 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { appendFile, chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { access, appendFile, chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer, type Server, type ServerResponse } from 'node:http';
 import { homedir } from 'node:os';
-import { basename, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { createInterface, type Interface } from 'node:readline';
 import type { Readable, Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { EventEmitter } from 'node:events';
 import {
   CodexAppServerManager,
+  messageThreadId,
   type AppServerMessage,
   type CodexAppServerState,
+  type CodexAppServerTransportInfo,
   type ThreadOptions,
   type TurnOptions,
 } from './app-server-manager.js';
+import { CODEX_NATIVE_ENDPOINT_FILE, codexNativeSocketPath } from './native-endpoint.js';
 import { BRIDGE_TOKEN_HEADER } from '../bridge-token.js';
-import { codexHome, waitForCodexRollout, writeThreadId } from '../runtimes/codex.js';
+import { codexHome, waitForCodexRollout } from '../runtimes/codex.js';
 import { calculateCostSync, getPricingSync } from '../cost.js';
 import { recordAgentActivitySync } from '../agents/agent-state.js';
 import { appendSessionIdToHistory } from '../session-history.js';
@@ -33,8 +36,10 @@ interface AppServerHostManager extends EventEmitter {
   start(): Promise<void>;
   stop(): void;
   getState(): Readonly<CodexAppServerState>;
+  /** Optional so hosts built on older managers (and test fakes) still type-check. */
+  getTransportInfo?(): Readonly<CodexAppServerTransportInfo>;
   startThread(options: ThreadOptions): Promise<unknown>;
-  resumeThread(threadId: string, options: ThreadOptions): Promise<unknown>;
+  resumeThread(threadId: string, options: ThreadOptions, resumeOptions?: { strict?: boolean }): Promise<unknown>;
   startTurn(text: string, options?: TurnOptions): Promise<unknown>;
   interruptTurn(): Promise<unknown>;
   answerApproval(id: string | number, decision: string): void;
@@ -50,6 +55,11 @@ export interface CodexAppServerHostOptions {
   developerInstructions?: string;
   overdeckHome?: string;
   codexHome?: string;
+  /**
+   * PAN-3835: expose a private native endpoint so the Codex TUI can attach to
+   * this conversation's app-server. Conversation launches only.
+   */
+  nativeEndpoint?: boolean;
   manager?: AppServerHostManager;
   stdin?: Readable;
   stdout?: Writable;
@@ -72,12 +82,22 @@ export class CodexAppServerHost {
   private effort: string;
   private state: 'starting' | 'ready' | 'closed' = 'starting';
   private lastActivityPersistedAt = 0;
+  /** One host process lifetime; a restart is a new generation (PAN-3835). */
+  private readonly generation = randomUUID();
+  /** Serializes thread start/resume between dashboard messages and terminal attach. */
+  private threadReady: Promise<void> | undefined;
+  /** Rollout path Codex reported for the owner thread. */
+  private ownerRolloutPath: string | undefined;
+  /** Threads another client started that are not native navigation (system title threads, sub-agents). */
+  private readonly incidentalThreads = new Set<string>();
+  private readonly navigatedThreads = new Set<string>();
 
   constructor(private readonly options: CodexAppServerHostOptions) {
     this.overdeckHome = options.overdeckHome ?? process.env.OVERDECK_HOME ?? join(homedir(), '.overdeck');
     this.manager = options.manager ?? new CodexAppServerManager({
       cwd: options.cwd,
       codexHome: options.codexHome ?? codexHome(),
+      ...(options.nativeEndpoint ? { nativeSocketPath: codexNativeSocketPath(this.agentDir()) } : {}),
     });
     this.threadModel = options.model;
     this.effort = options.effort ?? 'high';
@@ -87,9 +107,16 @@ export class CodexAppServerHost {
   async start(): Promise<void> {
     await mkdir(this.agentDir(), { recursive: true });
     await mkdir(this.socketDir(), { recursive: true });
+    await rm(this.nativeEndpointFilePath(), { force: true });
+    if (this.options.nativeEndpoint) {
+      const nativeDir = dirname(codexNativeSocketPath(this.agentDir()));
+      await mkdir(nativeDir, { recursive: true, mode: 0o700 });
+      await chmod(nativeDir, 0o700);
+    }
     this.token = randomUUID();
     await writeFile(this.tokenPath(), `${this.token}\n`, { mode: 0o600 });
     await this.manager.start();
+    await this.publishNativeEndpoint();
     await this.listen();
     this.startPaneInput();
     this.state = 'ready';
@@ -100,7 +127,31 @@ export class CodexAppServerHost {
     this.input?.close();
     this.input = undefined;
     this.manager.stop();
+    await rm(this.nativeEndpointFilePath(), { force: true }).catch(() => undefined);
     await this.closeServer();
+  }
+
+  /**
+   * Record the native endpoint for the companion adapter once the manager is
+   * connected through it. The socket is owner-only regardless of the umask
+   * the app-server ran under.
+   */
+  private async publishNativeEndpoint(): Promise<void> {
+    const info = this.transportInfo();
+    if (info.kind !== 'unix' || !info.endpoint) {
+      if (this.options.nativeEndpoint) {
+        this.writePaneLine(`[terminal] native Codex terminal unavailable: ${info.unavailableReason ?? 'unknown'}`);
+        await this.appendEvent('native-endpoint/unavailable', { reason: info.unavailableReason, cliVersion: info.cliVersion });
+      }
+      return;
+    }
+    await chmod(codexNativeSocketPath(this.agentDir()), 0o600);
+    await writeFile(this.nativeEndpointFilePath(), `${info.endpoint}\n`, { mode: 0o600 });
+    await this.appendEvent('native-endpoint/ready', { endpoint: info.endpoint, cliVersion: info.cliVersion });
+  }
+
+  private transportInfo(): Readonly<CodexAppServerTransportInfo> {
+    return this.manager.getTransportInfo?.() ?? { kind: 'stdio', unavailableReason: 'not-requested' };
   }
 
   async shutdownForSignal(signal: 'SIGTERM' | 'SIGINT', graceMs = 5_000): Promise<void> {
@@ -112,6 +163,7 @@ export class CodexAppServerHost {
     }
     await this.appendEvent('lifecycle/child-sigterm', { signal });
     this.manager.stop();
+    await rm(this.nativeEndpointFilePath(), { force: true }).catch(() => undefined);
     await new Promise<void>((resolve) => {
       const timer = setTimeout(resolve, graceMs);
       timer.unref?.();
@@ -135,7 +187,16 @@ export class CodexAppServerHost {
       threadId: managerState.threadId,
       activeTurnId: managerState.activeTurnId,
       pendingRequests: [...this.pendingRequests.values()],
+      generation: this.generation,
+      nativeEndpoint: this.nativeEndpointStatus(),
+      navigationEpoch: this.navigatedThreads.size,
     };
+  }
+
+  private nativeEndpointStatus(): JsonRecord {
+    const info = this.transportInfo();
+    if (info.kind === 'unix' && info.endpoint) return { available: true, endpoint: info.endpoint, cliVersion: info.cliVersion };
+    return { available: false, reason: info.unavailableReason ?? 'not-requested', cliVersion: info.cliVersion };
   }
 
   async handleOp(op: unknown): Promise<HostOpResult> {
@@ -151,6 +212,7 @@ export class CodexAppServerHost {
         return { status: 200, body: { ok: true, effort: this.effort } };
       }
       if (name === 'message') return await this.handleMessageOp(body);
+      if (name === 'prepare-terminal') return await this.handlePrepareTerminalOp();
       if (name === 'interrupt') return await this.handleInterruptOp();
       if (name === 'approval') return this.handleApprovalOp(body);
       if (name === 'user-input') return this.handleUserInputOp(body);
@@ -177,19 +239,7 @@ export class CodexAppServerHost {
     }
 
     const state = this.manager.getState();
-    if (!state.threadId) {
-      const threadOptions: ThreadOptions = {
-        model,
-        cwd: this.options.cwd,
-        runtimeMode: 'default',
-        ...(this.options.developerInstructions
-          ? { developerInstructions: this.options.developerInstructions }
-          : {}),
-      };
-      if (this.options.resumeThreadId) await this.manager.resumeThread(this.options.resumeThreadId, threadOptions);
-      else await this.manager.startThread(threadOptions);
-      this.threadModel = model;
-    }
+    await this.ensureThread(model, { strict: false });
 
     await this.appendEvent('op/message', {
       contentLength: content.length,
@@ -203,6 +253,122 @@ export class CodexAppServerHost {
       ...(requestedEffort ? { effort: requestedEffort } : {}),
     });
     return { status: 200, body: { ok: true, state: this.manager.getState() as JsonRecord } };
+  }
+
+  private threadOptions(model: string): ThreadOptions {
+    return {
+      model,
+      cwd: this.options.cwd,
+      runtimeMode: 'default',
+      ...(this.options.developerInstructions
+        ? { developerInstructions: this.options.developerInstructions }
+        : {}),
+    };
+  }
+
+  /**
+   * Start or resume the owner thread once. Dashboard messages and terminal
+   * attach share this lock, so racing callers never create two threads.
+   * `strict` (terminal attach) never substitutes a fresh thread for a
+   * resume target Codex cannot open.
+   */
+  private async ensureThread(model: string, options: { strict: boolean }): Promise<void> {
+    let attempted = false;
+    for (;;) {
+      if (this.manager.getState().threadId) return;
+      if (this.threadReady) {
+        // Another caller is opening the thread; its failure is its own to report.
+        await this.threadReady.catch(() => undefined);
+        continue;
+      }
+      if (attempted) return;
+      attempted = true;
+      const attempt = this.openOwnerThread(model, options);
+      this.threadReady = attempt;
+      try {
+        await attempt;
+      } finally {
+        if (this.threadReady === attempt) this.threadReady = undefined;
+      }
+    }
+  }
+
+  private async openOwnerThread(model: string, options: { strict: boolean }): Promise<void> {
+    const resumeThreadId = this.options.resumeThreadId;
+    const result = resumeThreadId
+      ? await this.manager.resumeThread(resumeThreadId, this.threadOptions(model), { strict: options.strict })
+      : await this.manager.startThread(this.threadOptions(model));
+    this.threadModel = model;
+    const threadId = this.manager.getState().threadId;
+    if (!threadId) return;
+    const thread = asRecord(asRecord(result).thread);
+    if (typeof thread.path === 'string') this.ownerRolloutPath = thread.path;
+    // The conversation's thread pointer comes only from this host's own
+    // start/resume (PAN-3835): a native client's `/new` must never rewrite it.
+    if (threadId !== resumeThreadId) await this.recordOwnerThread(threadId);
+  }
+
+  private async recordOwnerThread(threadId: string): Promise<void> {
+    try {
+      // The host's own agent dir, so an isolated OVERDECK_HOME is honoured.
+      await writeFile(join(this.agentDir(), 'codex-thread-id'), threadId, { mode: 0o600 });
+    } catch (error) {
+      // The thread exists either way; never fail the turn over the pointer.
+      const message = error instanceof Error ? error.message : String(error);
+      this.writePaneLine(`[warning] could not record thread ${threadId}: ${message}`);
+      await this.appendEvent('thread-id/write-failed', { threadId, message });
+    }
+    const agentId = this.options.agentId;
+    const rolloutPath = this.ownerRolloutPath;
+    const rollout = rolloutPath
+      ? waitForPath(rolloutPath, 120_000).then(found => (found ? rolloutPath : null))
+      : waitForCodexRollout(this.options.codexHome ?? codexHome(), 120_000);
+    void rollout
+      .then(path => path && appendSessionIdToHistory(agentId, threadId, 'app-server', { harness: 'codex', path }))
+      .catch(() => {});
+  }
+
+  /**
+   * Make the owner thread attachable by the native TUI (PAN-3835). Resumes a
+   * saved thread strictly when the host has not loaded it yet; never creates
+   * a thread and never starts a turn. `codex resume --remote` needs the
+   * thread's rollout on disk, which Codex writes with the first turn.
+   */
+  private async handlePrepareTerminalOp(): Promise<HostOpResult> {
+    const native = this.nativeEndpointStatus();
+    if (native.available !== true) {
+      return { status: 422, body: { code: 'native-unavailable', reason: native.reason, cliVersion: native.cliVersion, error: 'native endpoint unavailable' } };
+    }
+    if (!this.manager.getState().threadId) {
+      if (!this.options.resumeThreadId) {
+        return { status: 409, body: { code: 'no-thread', error: 'the conversation has no Codex thread yet' } };
+      }
+      const model = this.threadModel;
+      if (!model) return { status: 409, body: { code: 'no-thread', error: 'no model is known for resuming the thread' } };
+      try {
+        await this.ensureThread(model, { strict: true });
+      } catch (error) {
+        return { status: 409, body: { code: 'resume-failed', error: error instanceof Error ? error.message : String(error) } };
+      }
+    }
+    const threadId = this.manager.getState().threadId;
+    if (!threadId) return { status: 409, body: { code: 'no-thread', error: 'the conversation has no Codex thread yet' } };
+    const materialized = this.ownerRolloutPath
+      ? await access(this.ownerRolloutPath).then(() => true, () => false)
+      : threadId === this.options.resumeThreadId;
+    if (!materialized) {
+      return { status: 409, body: { code: 'no-thread', error: 'the thread has no saved turn yet' } };
+    }
+    return {
+      status: 200,
+      body: {
+        ok: true,
+        threadId,
+        endpoint: native.endpoint,
+        generation: this.generation,
+        navigationEpoch: this.navigatedThreads.size,
+      },
+    };
   }
 
   private async handleInterruptOp(): Promise<HostOpResult> {
@@ -233,6 +399,10 @@ export class CodexAppServerHost {
     if (requestId === undefined || !answers) {
       return { status: 400, body: { error: 'user-input requires requestId and answers' } };
     }
+    // The native TUI may have answered it already (PAN-3835); never answer twice.
+    if (!this.pendingRequests.has(String(requestId))) {
+      return { status: 409, body: { error: `user-input request ${String(requestId)} is not pending` } };
+    }
     this.manager.answerUserInput(requestId, answers);
     this.pendingRequests.delete(String(requestId));
     this.writePaneLine(`[input #${requestId}] answered`);
@@ -242,14 +412,9 @@ export class CodexAppServerHost {
 
   private attachManagerEvents(): void {
     this.manager.on('notification', (message: AppServerMessage) => {
-      const threadId = extractThreadId(message);
-      if (message.method === 'thread/started' && threadId) {
-        writeThreadId(this.options.agentId, threadId);
-        const agentId = this.options.agentId;
-        void waitForCodexRollout(this.options.codexHome ?? codexHome(), 120_000)
-          .then(rollout => rollout && appendSessionIdToHistory(agentId, threadId, 'app-server', { harness: 'codex', path: rollout }))
-          .catch(() => {});
-      }
+      // The manager delivers only the owner thread's notifications (and
+      // thread-less ones); thread-id recording happens in openOwnerThread.
+      this.applyOwnerNotification(message);
       this.renderNotification(message);
       this.recordObservedActivity(message);
       void this.appendEvent('notification', message as JsonRecord);
@@ -260,6 +425,7 @@ export class CodexAppServerHost {
       this.renderRequest(message);
       void this.appendEvent('request', message as JsonRecord);
     });
+    this.manager.on('foreign-thread', (message: AppServerMessage) => this.trackForeignThread(message));
     this.manager.on('warning', (warning: unknown) => {
       this.writePaneLine(`[warning] ${String(warning)}`);
       void this.appendEvent('warning', { message: String(warning) });
@@ -274,6 +440,54 @@ export class CodexAppServerHost {
       void this.appendEvent('exit', asRecord(exit));
       void this.closeServer();
     });
+  }
+
+  /**
+   * Keep host bookkeeping in step with the other client (PAN-3835):
+   * - `serverRequest/resolved`: a request the native TUI answered leaves the
+   *   dashboard's pending list, so no stale card can answer it twice.
+   * - `thread/settings/updated`: a model/effort chosen in the TUI becomes the
+   *   host's current setting, so the next dashboard turn does not revert it.
+   *   The dashboard effort picker still wins when it is used afterwards.
+   */
+  private applyOwnerNotification(message: AppServerMessage): void {
+    const params = asRecord(message.params);
+    if (message.method === 'serverRequest/resolved') {
+      const requestId = parseRequestId(params.requestId);
+      if (requestId !== undefined && this.pendingRequests.delete(String(requestId))) {
+        this.writePaneLine(`[request #${requestId}] resolved`);
+      }
+      return;
+    }
+    if (message.method === 'thread/settings/updated') {
+      const settings = asRecord(params.threadSettings);
+      if (typeof settings.effort === 'string' && settings.effort) this.effort = settings.effort;
+      if (typeof settings.model === 'string' && settings.model) this.threadModel = settings.model;
+    }
+  }
+
+  /**
+   * Another client's thread (PAN-3835). System title threads are ephemeral and
+   * sub-agents carry the owner as parent; anything else is native navigation
+   * (`/new`, `/resume`, `/fork` in the attached TUI). Counting navigated
+   * threads lets the companion adapter replace a TUI that left the owner
+   * thread instead of reusing it.
+   */
+  private trackForeignThread(message: AppServerMessage): void {
+    const threadId = messageThreadId(message);
+    if (!threadId || this.incidentalThreads.has(threadId) || this.navigatedThreads.has(threadId)) return;
+    if (message.method === 'thread/started') {
+      const thread = asRecord(asRecord(message.params).thread);
+      const owner = this.manager.getState().threadId;
+      if (thread.ephemeral === true || (owner && thread.parentThreadId === owner)) {
+        this.incidentalThreads.add(threadId);
+        return;
+      }
+    }
+    // A foreign server request belongs to the client driving that thread.
+    if (message.id !== undefined) return;
+    this.navigatedThreads.add(threadId);
+    void this.appendEvent('foreign-thread', { threadId, method: message.method });
   }
 
   private recordObservedActivity(message: AppServerMessage): void {
@@ -422,6 +636,10 @@ export class CodexAppServerHost {
     return join(this.agentDir(), 'appserver-token');
   }
 
+  private nativeEndpointFilePath(): string {
+    return join(this.agentDir(), CODEX_NATIVE_ENDPOINT_FILE);
+  }
+
   private publicState(managerState: Readonly<CodexAppServerState>): string {
     if (this.state === 'closed') return 'closed';
     if (this.pendingRequests.size > 0) return 'awaiting-approval';
@@ -481,19 +699,33 @@ function parseAnswers(value: unknown): Record<string, string[]> | undefined {
   return answers;
 }
 
-function extractThreadId(message: AppServerMessage): string | undefined {
-  const params = asRecord(message.params);
-  const thread = asRecord(params.thread);
-  return typeof thread.id === 'string' ? thread.id : typeof params.threadId === 'string' ? params.threadId : undefined;
+/** Poll for a file Codex writes asynchronously (the rollout of a new thread). */
+async function waitForPath(path: string, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    if (await access(path).then(() => true, () => false)) return true;
+    if (Date.now() >= deadline) return false;
+    await new Promise(resolve => setTimeout(resolve, 200));
+  }
 }
 
-function parseArgs(argv: string[]): { resumeThreadId?: string; model?: string; effort?: string; developerInstructionFiles: string[] } {
-  const parsed: { resumeThreadId?: string; model?: string; effort?: string; developerInstructionFiles: string[] } = {
+interface HostArgs {
+  resumeThreadId?: string;
+  model?: string;
+  effort?: string;
+  developerInstructionFiles: string[];
+  nativeEndpoint: boolean;
+}
+
+export function parseArgs(argv: string[]): HostArgs {
+  const parsed: HostArgs = {
     developerInstructionFiles: [],
+    nativeEndpoint: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === '--resume') parsed.resumeThreadId = argv[++index];
+    if (arg === '--native-endpoint') parsed.nativeEndpoint = true;
+    else if (arg === '--resume') parsed.resumeThreadId = argv[++index];
     else if (arg === '--model') parsed.model = argv[++index];
     else if (arg === '--developer-instructions-file') {
       const file = argv[++index];
@@ -519,6 +751,7 @@ async function main(): Promise<void> {
     resumeThreadId: args.resumeThreadId,
     developerInstructions: developerInstructions || undefined,
     codexHome: process.env.CODEX_HOME,
+    nativeEndpoint: args.nativeEndpoint,
     stdin: process.stdin,
     stdout: process.stdout,
   });

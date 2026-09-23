@@ -1528,6 +1528,26 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
     expect(script).toMatch(/^exec node '.+\/dist\/codex-app-server-host\.js' --effort 'high' --resume '019ee5e7-thread-abc'$/m);
   });
 
+  it('codex app-server conversations expose the native endpoint only when asked (PAN-3835)', () => {
+    const conversation = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      codexMode: 'app-server',
+      codexNativeEndpoint: true,
+      resumeSessionId: '019ee5e7-thread-abc',
+    });
+    expect(conversation).toMatch(/^exec node '.+\/dist\/codex-app-server-host\.js' --effort 'high' --resume '019ee5e7-thread-abc' --native-endpoint$/m);
+
+    const workAgent = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'codex',
+      codexMode: 'app-server',
+    });
+    expect(workAgent).not.toMatch(/--native-endpoint/);
+  });
+
   it('acp mode launches the authenticated host in an isolated provider environment', () => {
     const script = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,
