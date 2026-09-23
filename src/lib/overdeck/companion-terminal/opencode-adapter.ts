@@ -29,7 +29,10 @@ export interface OpenCodeCompanionAdapterDeps {
   readonly overdeckHome?: () => string;
   readonly readText?: (path: string) => Promise<string | undefined>;
   readonly resolveBinary?: () => Promise<string | null>;
-  readonly fetch?: (url: string, init: { signal: AbortSignal }) => Promise<{ status: number }>;
+  readonly fetch?: (
+    url: string,
+    init: { signal: AbortSignal; redirect: 'manual' },
+  ) => Promise<{ status: number; type?: string }>;
   readonly probeTimeoutMs?: number;
 }
 
@@ -86,15 +89,28 @@ export function createOpenCodeCompanionAdapter(deps: OpenCodeCompanionAdapterDep
 
       const baseUrl = `http://127.0.0.1:${port}`;
       let status: number;
+      let redirected: boolean;
       try {
-        status = (await fetchImpl(`${baseUrl}/session/${encodeURIComponent(sessionId)}`, {
+        // Never follow a redirect: a different process on the recorded port
+        // must not be able to send the probe off loopback and pass it.
+        const response = await fetchImpl(`${baseUrl}/session/${encodeURIComponent(sessionId)}`, {
           signal: AbortSignal.timeout(probeTimeoutMs),
-        })).status;
+          redirect: 'manual',
+        });
+        status = response.status;
+        redirected = response.type === 'opaqueredirect' || (status >= 300 && status < 400);
       } catch {
         return {
           ok: false,
           reason: 'owner-starting',
           message: 'The conversation\'s OpenCode server is not answering yet. Try Terminal again in a moment, or check Runtime log.',
+        };
+      }
+      if (redirected) {
+        return {
+          ok: false,
+          reason: 'owner-starting',
+          message: 'The recorded OpenCode server port answered with a redirect, so it is not this conversation\'s server. Check Runtime log, then stop and resume the conversation.',
         };
       }
       if (status === 404) {

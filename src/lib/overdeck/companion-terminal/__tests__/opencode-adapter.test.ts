@@ -12,12 +12,13 @@ const AGENT_DIR = '/home/op/.overdeck/agents/conv-20260923-0001';
 
 function adapterWith(files: Record<string, string>, options: {
   status?: number;
+  type?: string;
   fetchError?: Error;
   binary?: string | null;
 } = {}) {
   const fetch = vi.fn(async () => {
     if (options.fetchError) throw options.fetchError;
-    return { status: options.status ?? 200 };
+    return { status: options.status ?? 200, ...(options.type ? { type: options.type } : {}) };
   });
   const readText = vi.fn(async (path: string) => files[path]);
   const resolveBinary = vi.fn(async () => (options.binary === undefined ? '/home/op/.opencode/bin/opencode' : options.binary));
@@ -57,7 +58,7 @@ describe('OpenCode companion adapter', () => {
     });
     expect(fetch).toHaveBeenCalledWith(
       'http://127.0.0.1:41234/session/ses_f324d4305ffe8Kx7kiYS2XjnYy',
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      expect.objectContaining({ signal: expect.any(AbortSignal), redirect: 'manual' }),
     );
   });
 
@@ -107,6 +108,16 @@ describe('OpenCode companion adapter', () => {
 
   it('reports an unreachable server as starting, not as a restart', async () => {
     const { adapter, resolveBinary } = adapterWith(RECORDED, { fetchError: new Error('ECONNREFUSED') });
+    expect(await adapter.resolveTarget(OWNER)).toMatchObject({ ok: false, reason: 'owner-starting' });
+    expect(resolveBinary).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a 3xx status', { status: 302 }],
+    ['a 307 status', { status: 307 }],
+    ['an opaque redirect', { status: 0, type: 'opaqueredirect' }],
+  ])('never treats %s from the recorded port as healthy', async (_label, response) => {
+    const { adapter, resolveBinary } = adapterWith(RECORDED, response);
     expect(await adapter.resolveTarget(OWNER)).toMatchObject({ ok: false, reason: 'owner-starting' });
     expect(resolveBinary).not.toHaveBeenCalled();
   });
