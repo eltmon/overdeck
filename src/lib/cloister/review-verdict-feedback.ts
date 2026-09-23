@@ -26,6 +26,7 @@ import {
   feedbackAlreadyDelivered,
   passingVerdictCount,
   recordFeedbackDelivered,
+  recordFeedbackSkipped,
   verdictEpisodeIdentity,
 } from './feedback-delivery-record.js';
 import { findVerdictReport } from './review-verdict-report.js';
@@ -115,11 +116,24 @@ const REPEATED_DELIVERY_LOOP_MESSAGE =
 /**
  * Count a suppressed re-delivery of one verdict key and surface needs-you on
  * the second: the pipeline is re-triggering delivery in a loop. Fed by both
- * the journal check (#4035) and a keyed store's `deduplicated` outcome.
+ * the journal check (#4035) and a keyed store's `deduplicated` outcome. The
+ * count lives in the pipeline journal (`feedback.skipped`), so it holds across
+ * `pan admin specialists done` processes; with no workspace to journal to it
+ * falls back to this process's memory.
  */
-async function noteSuppressedReviewDelivery(issueId: string, dedupKey: string, feedbackPath: string): Promise<void> {
-  const suppressedCount = (suppressedReviewFeedbackDeliveries.get(dedupKey) ?? 0) + 1;
-  suppressedReviewFeedbackDeliveries.set(dedupKey, suppressedCount);
+async function noteSuppressedReviewDelivery(
+  issueId: string,
+  dedupKey: string,
+  feedbackPath: string,
+  workspacePath: string | undefined,
+): Promise<void> {
+  let suppressedCount = recordFeedbackSkipped(workspacePath, {
+    issueId, kind: 'review', dedupKey, source: 'review-verdict-feedback',
+  });
+  if (suppressedCount === undefined) {
+    suppressedCount = (suppressedReviewFeedbackDeliveries.get(dedupKey) ?? 0) + 1;
+    suppressedReviewFeedbackDeliveries.set(dedupKey, suppressedCount);
+  }
   if (suppressedCount !== 2) return;
   try {
     await surfaceIssueFeedbackNeedsYou(issueId, REPEATED_DELIVERY_LOOP_MESSAGE, {
@@ -228,7 +242,7 @@ export async function deliverReviewVerdictFeedback(
       // path does not enforce the key across processes.
       console.log(`[review-verdict-feedback] Feedback for ${issueId} (${dedupKey}) was already delivered; not re-sending`);
       agentMessageSent = true;
-      await noteSuppressedReviewDelivery(issueId, dedupKey, fileResult.filePath);
+      await noteSuppressedReviewDelivery(issueId, dedupKey, fileResult.filePath, workspacePath);
     } else {
       const message = `SPECIALIST FEEDBACK: review-agent reported ${opts.verdict.toUpperCase()} for ${issueId}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, then fix ALL review findings. Do NOT stop at the prompt.`;
       try {
@@ -309,7 +323,7 @@ export async function deliverReviewVerdictFeedback(
               });
             }
             if (deliveryOutcome.deduplicated && dedupKey) {
-              await noteSuppressedReviewDelivery(issueId, dedupKey, fileResult.filePath);
+              await noteSuppressedReviewDelivery(issueId, dedupKey, fileResult.filePath, workspacePath);
             } else if (dedupKey) {
               suppressedReviewFeedbackDeliveries.delete(dedupKey);
             }

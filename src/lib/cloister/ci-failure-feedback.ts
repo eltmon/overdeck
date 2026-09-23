@@ -373,6 +373,17 @@ async function recordCiTestGatePassInQueue(
     );
     return false;
   }
+  // A green test gate is a verification pass: it lifts the stuck pause the
+  // same way a local gate pass does (#4019 review). Lazy: the escalation
+  // module pulls in the agent graph.
+  try {
+    const { liftVerificationStuckPause } = await import('./verification-escalation.js');
+    await liftVerificationStuckPause(issueId, 'ci-failure-feedback');
+  } catch (err) {
+    console.warn(
+      `[ci-failure-feedback] Could not lift the verification-stuck pause for ${issueId}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
   return true;
 }
 

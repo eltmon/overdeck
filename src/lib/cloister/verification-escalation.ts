@@ -10,7 +10,7 @@
 import { Effect } from 'effect';
 
 import { emitActivityEntrySync } from '../activity-logger.js';
-import { getAgentStateSync, messageAgent, setAgentPaused, stopAgent } from '../agents.js';
+import { clearAgentPaused, getAgentStateSync, messageAgent, setAgentPaused, stopAgent } from '../agents.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 import { getPrFacts } from './pr-facts.js';
 import type { VerificationRunnerOutcome } from './verification-types.js';
@@ -60,11 +60,33 @@ export function announceVerificationFailure(issueId: string, failedCheck: string
 }
 
 /**
- * The pause reason prefix `escalateVerificationStuck` writes. A verification
- * pass lifts a pause with this prefix (verification-runner.ts), and while it
- * holds, verification feedback never resurrects the agent (#4019).
+ * The pause reason prefix `escalateVerificationStuck` writes. While it holds,
+ * verification feedback never resurrects the agent (#4019). It is lifted by a
+ * verification pass — the local gate's (verification-runner.ts) or a green CI
+ * test job on the PR head (ci-failure-feedback.ts) — through
+ * `liftVerificationStuckPause`, or by the operator (`pan unpause`,
+ * `pan start --force`).
  */
 export const VERIFICATION_STUCK_PAUSE_PREFIX = 'needs-you: verification stuck';
+
+/**
+ * PAN-3847 (FR-10), re-pointed by PAN-3917: a verification pass lifts the
+ * pause escalateVerificationStuck set. The pause IS the state, and the gate
+ * that set it clears it. Any other pause (operator, governor) is left alone.
+ * Resolves true when a stuck pause was lifted.
+ */
+export async function liftVerificationStuckPause(issueId: string, logPrefix: string): Promise<boolean> {
+  const agentId = `agent-${issueId.toLowerCase()}`;
+  if (!isVerificationStuckPaused(issueId)) return false;
+  try {
+    await Effect.runPromise(clearAgentPaused(agentId));
+    console.log(`[${logPrefix}] Lifted verification-stuck pause for ${agentId}`);
+    return true;
+  } catch (err) {
+    console.error(`[${logPrefix}] Failed to lift verification-stuck pause for ${agentId}: ${err instanceof Error ? err.message : String(err)}`);
+    return false;
+  }
+}
 
 export async function escalateVerificationStuck(
   issueId: string,

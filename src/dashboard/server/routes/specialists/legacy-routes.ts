@@ -7,6 +7,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { getAgentState, getAgentRuntimeState, messageAgent, transitionIssueToInProgress } from '../../../../lib/agents.js';
+import { appendPipelineEntry } from '../../../../lib/cloister/pipeline-journal.js';
 import { commentOnArtifact, parseArtifactRef } from '../../../../lib/forge.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -25,6 +26,22 @@ import {
   type SpecialistAgentName,
   type SpecialistAutoCompleteBody,
 } from './shared.js';
+
+/**
+ * Append a specialist verdict to the issue's pipeline journal, where the
+ * verdict-feedback relays read the pass episode from (#4035). No workspace, no
+ * entry: the journal dies with the workspace.
+ */
+function journalVerdict(
+  issueId: string,
+  entry: { type: 'review.verdict' | 'uat.verdict'; data: Record<string, unknown> },
+): void {
+  const project = resolveProjectFromIssueSync(issueId);
+  if (!project) return;
+  const workspacePath = join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
+  if (!existsSync(workspacePath)) return;
+  appendPipelineEntry(workspacePath, { ...entry, issueId, source: 'dashboard-specialists-done' });
+}
 
 // ─── Route: GET /api/specialists ─────────────────────────────────────────────
 
@@ -187,12 +204,34 @@ const postSpecialistsDoneRoute = HttpRouter.add(
         return jsonResponse({ error: `Pull request URL for ${normalizedIssueId} is not a recognized forge artifact` }, { status: 422 });
       }
       const heading = status === 'passed' ? 'Review passed' : 'Changes requested';
-      yield* commentOnArtifact(artifactRef.forge, {
+      const posted = yield* commentOnArtifact(artifactRef.forge, {
         ...artifactRef,
         body: `## ${heading}\n\n${notes ?? (status === 'passed' ? 'No blocking findings.' : 'See the review artifacts for details.')}`,
-      }).pipe(Effect.catch((error) => Effect.sync(() => {
-        console.warn(`[specialists/done] Could not post the review verdict to ${prUrl}: ${String(error)}`);
-      })));
+      }).pipe(
+        Effect.as(true),
+        Effect.catch((error) => Effect.sync(() => {
+          console.warn(`[specialists/done] Could not post the review verdict to ${prUrl}: ${String(error)}`);
+          return false;
+        })),
+      );
+      // Journal the posted verdict as `pan admin specialists done` does: a
+      // journaled approval starts the next review-feedback episode (#4035).
+      if (posted) {
+        journalVerdict(normalizedIssueId, {
+          type: 'review.verdict',
+          data: {
+            verdict: status === 'passed' ? 'APPROVED' : 'CHANGES_REQUESTED',
+            subRole: 'review',
+            via: 'comment',
+            ...(runId ? { runId } : {}),
+          },
+        });
+      }
+    }
+
+    // A browser UAT verdict reported here also starts the next UAT episode.
+    if (specialist === 'uat') {
+      journalVerdict(normalizedIssueId, { type: 'uat.verdict', data: { status, subRole: 'uat' } });
     }
 
     // Clear the registry write-scope so the next specialist can claim the

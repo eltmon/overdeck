@@ -103,6 +103,8 @@ export function summarizePipelineEntry(entry: PipelineJournalEntry): string {
       return `${data.status ?? 'unknown'}${typeof data.anchor === 'string' ? ` head=${shortSha(data.anchor)}` : ''}`;
     case 'feedback.delivered':
       return `${data.kind ?? 'verdict'} feedback to ${data.agentId ?? 'the work agent'}`;
+    case 'feedback.skipped':
+      return `${data.kind ?? 'verdict'} feedback already delivered; not re-sent`;
     case 'merge.attempted':
       return typeof data.kind === 'string' ? data.kind : '';
     case 'merge.completed':

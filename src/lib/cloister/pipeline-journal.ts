@@ -25,7 +25,7 @@
  * An unwritable journal must never break the action that produced it, so every
  * write failure is logged and swallowed.
  */
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { notifyPipelineSync } from '../pipeline-notifier.js';
@@ -33,7 +33,7 @@ import { notifyPipelineSync } from '../pipeline-notifier.js';
 export type PipelineJournalEntryType =
   | 'verification.started' | 'verification.passed' | 'verification.failed'
   | 'review.requested' | 'review.dispatched' | 'review.redispatched' | 'review.verdict'
-  | 'uat.verdict' | 'feedback.delivered'
+  | 'uat.verdict' | 'feedback.delivered' | 'feedback.skipped'
   | 'merge.attempted' | 'merge.completed' | 'merge.failed';
 
 export interface PipelineJournalEntry {
@@ -71,7 +71,11 @@ export function appendPipelineEntry(
     // skip, not a write.
     if (!existsSync(workspacePath)) throw new Error(`workspace ${workspacePath} no longer exists`);
     mkdirSync(dirname(path), { recursive: true });
-    appendFileSync(path, `${JSON.stringify(stamped)}\n`, 'utf-8');
+    // A crash can leave a torn last line with no newline. Appending straight
+    // after it would glue this entry onto the torn one and both would be
+    // skipped as malformed, so start a fresh line first.
+    const separator = endsWithoutNewline(path) ? '\n' : '';
+    appendFileSync(path, `${separator}${JSON.stringify(stamped)}\n`, 'utf-8');
   } catch (err) {
     console.warn(
       `[pipeline-journal] Could not append ${stamped.type} for ${stamped.issueId} to ${path}: `
@@ -84,6 +88,25 @@ export function appendPipelineEntry(
     console.warn(`[pipeline-journal] Could not notify pipeline.entry for ${stamped.issueId}:`, err);
   }
   return stamped;
+}
+
+/** True when the file exists, is non-empty, and its last byte is not `\n`. */
+function endsWithoutNewline(path: string): boolean {
+  let size: number;
+  try {
+    size = statSync(path).size;
+  } catch {
+    return false;
+  }
+  if (size === 0) return false;
+  const fd = openSync(path, 'r');
+  try {
+    const last = Buffer.alloc(1);
+    readSync(fd, last, 0, 1, size - 1);
+    return last[0] !== 0x0a;
+  } finally {
+    closeSync(fd);
+  }
 }
 
 /**

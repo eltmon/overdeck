@@ -41,10 +41,17 @@ the **CI test job on the PR head is the test gate**:
   (`escalateVerificationStuck`) fires on the third consecutive red head, or
   by the local rule on the per-head count (a second failure of the same check
   at one head). The stuck notice itself never lifts that pause (#4019): while
-  the whole-issue agent holds it, the verification feedback door skips the
-  resurrection ladder, a still-live pane gets the notice queued to its mail
-  (a paused agent is never resumed to receive a message), and a needs-you
-  says the agent is waiting for the operator. A green CI test job (`check_run` success for the test job,
+  the whole-issue agent holds it, the verification feedback door (local gate
+  and CI test gate) skips the resurrection ladder, a still-live pane gets the
+  notice queued to its mail (a paused agent is never resumed to receive a
+  message), and a needs-you says the agent is waiting for the operator.
+  Further verification failures keep holding it. Exactly four things lift
+  the stuck pause: a local verification pass, a CI test-gate pass on the PR
+  head (`recordCiTestGatePass`; both through `liftVerificationStuckPause`),
+  `pan unpause`, and an operator start that clears the start gates
+  (`pan start --force`). Review and UAT feedback still go through the
+  resurrection ladder, which lifts any `needs-you:` pause (PAN-2461), this
+  one included. A green CI test job (`check_run` success for the test job,
   confirmed against the PR checks) records a passed CI artifact — the reset.
   What is not counted (review of #3993): a red test job on a `strike/` or
   `bypass/` PR (it is not the work agent's branch; the relay falls back to the
@@ -180,7 +187,17 @@ verdicts of that kind journaled so far (`review.verdict APPROVED`,
 key and deliver once; fail, pass, fail on one head delivers twice, and the
 keyed tmux/PTY-supervisor stores see the new key too. With no pass
 journaled the key is the pre-#4035 key. A delivery that did not land is not
-journaled, so the next verdict run retries it.
+journaled, so the next verdict run retries it. A repeated verdict is skipped
+before its target is resolved, so it no longer revives a stopped agent; the
+feedback file written for the verdict stays in the workspace as the durable
+record the agent reads on its next start. Both `pan admin specialists done`
+and the dashboard verdict route (`POST /api/specialists/done`) journal the
+verdicts they record. Each skip is journaled as `feedback.skipped`; the
+review relay's repeated-delivery detector counts those since the key's last
+delivery and surfaces a needs-you on the second skip, across processes
+(without a workspace it falls back to an in-process count). A journal line
+torn by a crash is closed off before the next append, so it cannot swallow
+the entry after it.
 
 A failed browser UAT is observed where the test agent records it:
 `pan admin specialists done test <id> --uat-status failed` (or the `uat`

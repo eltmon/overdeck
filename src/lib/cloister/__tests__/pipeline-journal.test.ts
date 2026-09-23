@@ -92,6 +92,23 @@ describe('readPipelineJournal', () => {
     expect(readPipelineJournal(workspace).map((e) => e.type)).toEqual(['review.requested', 'review.dispatched']);
   });
 
+  it('starts a fresh line after a torn last line, so the next entry is not lost (#4035 review)', () => {
+    appendPipelineEntry(workspace, { type: 'uat.verdict', issueId: 'PAN-1', data: { status: 'failed' } });
+    // A crash mid-write: a partial line with no trailing newline.
+    appendFileSync(pipelineJournalPath(workspace), '{"at":"2026-01-01T00:00:00Z","type":"uat.ver', 'utf-8');
+    appendPipelineEntry(workspace, { type: 'uat.verdict', issueId: 'PAN-1', data: { status: 'passed' } });
+
+    expect(readPipelineJournal(workspace).map((e) => e.data?.status)).toEqual(['failed', 'passed']);
+    expect(readFileSync(pipelineJournalPath(workspace), 'utf-8').endsWith('\n')).toBe(true);
+  });
+
+  it('adds no blank line when the file already ends in a newline', () => {
+    appendPipelineEntry(workspace, { type: 'review.requested', issueId: 'PAN-1' });
+    appendPipelineEntry(workspace, { type: 'review.dispatched', issueId: 'PAN-1' });
+
+    expect(readFileSync(pipelineJournalPath(workspace), 'utf-8').split('\n')).toHaveLength(3);
+  });
+
   it('honours limit by keeping the newest entries', () => {
     for (const type of ['review.requested', 'review.dispatched', 'review.verdict'] as const) {
       appendPipelineEntry(workspace, { type, issueId: 'PAN-1' });

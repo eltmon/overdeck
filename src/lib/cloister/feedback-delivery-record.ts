@@ -23,6 +23,8 @@
  * A missing or unreadable journal reads as "not delivered": delivery wins
  * over deduplication.
  */
+import { existsSync } from 'node:fs';
+
 import {
   appendPipelineEntry,
   readPipelineJournal,
@@ -70,4 +72,32 @@ export function recordFeedbackDelivered(
     source: entry.source,
     data: { kind: entry.kind, dedupKey: entry.dedupKey, agentId: entry.agentId },
   });
+}
+
+/**
+ * Record that a relay skipped re-delivering an already-delivered verdict, and
+ * return how many times this key has been skipped since its last delivery
+ * (this skip included). The review relay's loop detector reads this count, so
+ * it holds across `pan admin specialists done` processes. Returns undefined
+ * when there is no workspace to journal to (the caller counts in memory).
+ */
+export function recordFeedbackSkipped(
+  workspacePath: string | undefined,
+  entry: { issueId: string; kind: VerdictFeedbackKind; dedupKey: string; source: string },
+): number | undefined {
+  if (!workspacePath || !existsSync(workspacePath)) return undefined;
+  appendPipelineEntry(workspacePath, {
+    type: 'feedback.skipped',
+    issueId: entry.issueId,
+    source: entry.source,
+    data: { kind: entry.kind, dedupKey: entry.dedupKey },
+  });
+  let skipped = 0;
+  for (const journaled of readPipelineJournal(workspacePath)) {
+    if (journaled.data?.dedupKey !== entry.dedupKey) continue;
+    if (journaled.type === 'feedback.delivered') skipped = 0;
+    else if (journaled.type === 'feedback.skipped') skipped += 1;
+  }
+  // An unwritable journal still counts this skip.
+  return Math.max(skipped, 1);
 }

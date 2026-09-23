@@ -28,6 +28,10 @@ vi.mock('../../../../src/lib/agents.js', () => ({
   setAgentPaused: (id: string, reason: string) => Effect.sync(() => {
     h.states.set(id, { ...(h.states.get(id) ?? { id }), paused: true, pausedReason: reason });
   }),
+  clearAgentPaused: (id: string) => Effect.sync(() => {
+    const state = h.states.get(id);
+    if (state) h.states.set(id, { ...state, paused: false, pausedReason: undefined });
+  }),
   stopAgent: (id: string) => Effect.sync(() => {
     h.states.set(id, { ...(h.states.get(id) ?? { id }), status: 'stopped' });
     h.live.delete(id);
@@ -65,6 +69,7 @@ vi.mock('../../../../src/lib/activity-logger.js', () => ({ emitActivityEntrySync
 import {
   deliverVerificationFeedback,
   escalateVerificationStuck,
+  liftVerificationStuckPause,
   VERIFICATION_STUCK_PAUSE_PREFIX,
 } from '../../../../src/lib/cloister/verification-escalation.js';
 
@@ -144,5 +149,23 @@ describe('#4019: the stuck notice never un-pauses the agent escalation paused', 
 
     expect(h.resumeAgent).toHaveBeenCalledWith(AGENT);
     expect(delivered).toBe(true);
+  });
+
+  it('a verification pass lifts the stuck pause; later feedback then reaches the agent normally', async () => {
+    await escalateVerificationStuck('PAN-4019', 'test', 3, 'three red heads', 'verification');
+
+    await expect(liftVerificationStuckPause('PAN-4019', 'verification')).resolves.toBe(true);
+    expect(h.states.get(AGENT)).toEqual(expect.objectContaining({ paused: false }));
+
+    const delivered = await deliverVerificationFeedback('PAN-4019', 'VERIFICATION FAILED for PAN-4019.', {}, 'verification');
+    expect(h.resumeAgent).toHaveBeenCalledWith(AGENT);
+    expect(delivered).toBe(true);
+  });
+
+  it('a verification pass never lifts an operator pause', async () => {
+    h.states.set(AGENT, { id: AGENT, status: 'stopped', paused: true, pausedReason: 'operator: hold for demo' });
+
+    await expect(liftVerificationStuckPause('PAN-4019', 'verification')).resolves.toBe(false);
+    expect(h.states.get(AGENT)).toEqual(expect.objectContaining({ paused: true, pausedReason: 'operator: hold for demo' }));
   });
 });

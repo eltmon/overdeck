@@ -43,6 +43,7 @@ const mockWriteFeedbackFile = vi.fn();
 const mockEscalate = vi.fn(async () => undefined);
 /** Resolves the door's delivery outcome: true = the agent accepted the message. */
 const mockDeliverVerificationFeedback = vi.fn(async (): Promise<boolean> => true);
+const mockLiftStuckPause = vi.fn(async (): Promise<boolean> => false);
 
 // PAN-3965: the attempt rule (verification-cycles) is the real one; only the
 // side effects — pause, delivery, activity announcement — are observed.
@@ -50,6 +51,7 @@ vi.mock('../../../../src/lib/cloister/verification-escalation.js', () => ({
   announceVerificationFailure: vi.fn(),
   escalateVerificationStuck: (...args: unknown[]) => mockEscalate(...(args as [])),
   deliverVerificationFeedback: (...args: unknown[]) => mockDeliverVerificationFeedback(...(args as [])),
+  liftVerificationStuckPause: (...args: unknown[]) => mockLiftStuckPause(...(args as [])),
 }));
 
 vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
@@ -537,6 +539,19 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
     expect(mockEscalate).not.toHaveBeenCalled();
   });
 
+  it('a green CI test job lifts the stuck pause, as a local gate pass does (#4019 review)', async () => {
+    await redHead('aaaaaaaa1111');
+    await redHead('bbbbbbbb2222');
+    await redHead('cccccccc3333');
+    expect(mockEscalate).toHaveBeenCalledTimes(1);
+    expect(mockLiftStuckPause).not.toHaveBeenCalled();
+
+    expect(await greenHead('dddddddd4444')).toBe(true);
+
+    expect(mockLiftStuckPause).toHaveBeenCalledTimes(1);
+    expect(mockLiftStuckPause).toHaveBeenCalledWith('PAN-1801', 'ci-failure-feedback');
+  });
+
   it('a green report that the PR checks do not confirm records nothing', async () => {
     tick();
     const readPrFacts = vi.fn(async () => facts({ headSha: 'cccccccc3333', testChecks: 'pending' }));
@@ -545,6 +560,7 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
       { readPrFacts },
     );
     expect(recorded).toBe(false);
+    expect(mockLiftStuckPause).not.toHaveBeenCalled();
   });
 
   it('local gate failures at the same head count toward the same budget', async () => {

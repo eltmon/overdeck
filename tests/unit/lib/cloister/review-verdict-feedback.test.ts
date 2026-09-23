@@ -497,10 +497,14 @@ describe('#4035: review feedback delivery is journaled per verdict episode', () 
         type: 'feedback.delivered',
         data: expect.objectContaining({ kind: 'review', agentId: 'agent-pan-1059' }),
       }),
+      expect.objectContaining({
+        type: 'feedback.skipped',
+        data: expect.objectContaining({ kind: 'review' }),
+      }),
     ]);
   });
 
-  it('a journal-suppressed repeat still feeds the repeated-delivery loop detector', async () => {
+  it('the repeated-delivery loop detector counts journaled skips, so it holds across processes', async () => {
     const runId = 'agent-pan-1059-review-loop4035';
     await relay(runId);
     await relay(runId);
@@ -515,6 +519,22 @@ describe('#4035: review feedback delivery is journaled per verdict episode', () 
       expect.stringContaining('possible stuck loop'),
       expect.objectContaining({ specialist: 'review-agent' }),
     );
+
+    // A fresh process has no in-memory count: the next skip is the third
+    // journaled one, not a first, so it does not surface again.
+    vi.resetModules();
+    await relay(runId);
+    expect(mockSurfaceIssueFeedbackNeedsYou).toHaveBeenCalledTimes(1);
+  });
+
+  it('a fresh process reaches the second skip from the journal alone', async () => {
+    const runId = 'agent-pan-1059-review-xproc4035';
+    await relay(runId);
+    await relay(runId);
+    vi.resetModules();
+    await relay(runId);
+
+    expect(mockSurfaceIssueFeedbackNeedsYou).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the pre-#4035 head key when no approval is journaled', async () => {
