@@ -176,6 +176,15 @@ describe('backend inventory event stream — re-open with backoff', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
+  it('retries when opening the stream throws outright instead of failing', async () => {
+    const b = backendWith(() => { throw new Error('adapter defect'); });
+    await expect(startBackendInventory({ backend: b.backend })).resolves.toBeUndefined();
+    expect(b.events).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(b.events).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls[0]?.[0]).toContain('could not be opened (adapter defect)');
+  });
+
   it('is idempotent while a retry is pending', async () => {
     const b = backendWith(failOpen);
     await startBackendInventory({ backend: b.backend });

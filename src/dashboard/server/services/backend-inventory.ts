@@ -491,7 +491,9 @@ export async function startBackendInventory(deps: BackendInventoryDeps = {}): Pr
   if (inventoryStarted) return;
   inventoryStarted = true;
   await getBackendPanes(deps);
-  await openEventStream(deps, false);
+  await openEventStream(deps, false).catch((error: unknown) => {
+    scheduleResubscribe(deps, `could not be opened (${error instanceof Error ? error.message : String(error)})`);
+  });
 }
 
 export function stopBackendInventory(): void {

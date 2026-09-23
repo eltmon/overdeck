@@ -196,6 +196,21 @@ describe('supervisor systemd unit helpers', () => {
     expect(unit).not.toContain('WantedBy=');
   });
 
+  it('doubles % everywhere and $ only in ExecStart, where systemd expands it', async () => {
+    const { renderSupervisorUnit } = await import('../systemd.js');
+
+    const unit = renderSupervisorUnit({
+      nodePath: '/opt/100%/node',
+      supervisorBundle: '/opt/$HOME/server.js',
+      supervisorPort: 3012,
+      workingDirectory: '/opt/overdeck',
+      overdeckHome: '/home/dev/50%$.overdeck',
+    });
+
+    expect(unit).toContain('ExecStart="/opt/100%%/node" "/opt/$$HOME/server.js"');
+    expect(unit).toContain('Environment="OVERDECK_SUPERVISOR_PORT=3012" "OVERDECK_HOME=/home/dev/50%%$.overdeck"');
+  });
+
   it('installs the unit idempotently and reloads systemd only when content changes', async () => {
     const unitDir = mkdtempSync(join(tmpdir(), 'overdeck-systemd-test-'));
     const unitText = '[Unit]\nDescription=test\n\n[Service]\nType=simple\n';

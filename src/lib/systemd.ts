@@ -41,8 +41,14 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
+/** One quoted word; `%` is doubled so systemd's specifier expansion leaves it alone. */
 function systemdQuote(value: string): string {
-  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
+  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('%', '%%')}"`;
+}
+
+/** An ExecStart= word: ExecStart= also expands `$VAR`, so `$` is doubled too (Environment= does not). */
+function execStartQuote(value: string): string {
+  return systemdQuote(value).replaceAll('$', '$$$$');
 }
 
 function systemctl(command: string): Promise<{ stdout: string; stderr: string }> {
@@ -88,7 +94,7 @@ export function renderSupervisorUnit(options: RenderSupervisorUnitOptions = {}):
     // first char is `"`, not `/`). ExecStart= (a command line) and Environment=
     // (word-split assignments) DO support quoting, so those stay quoted.
     `WorkingDirectory=${workingDirectory}`,
-    `ExecStart=${systemdQuote(nodePath)} ${systemdQuote(supervisorBundle)}`,
+    `ExecStart=${execStartQuote(nodePath)} ${execStartQuote(supervisorBundle)}`,
     `Environment=${environment}`,
     'Restart=on-failure',
     `RestartSec=${restartSec}`,
