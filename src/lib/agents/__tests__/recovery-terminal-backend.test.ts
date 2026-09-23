@@ -122,7 +122,12 @@ import { sessionFilePath } from '../../paths.js';
 async function settleWithFakeTimers<T>(promise: Promise<T>): Promise<T> {
   let settled = false;
   const tracked = promise.finally(() => { settled = true; });
-  for (let turn = 0; !settled && turn < 1000; turn++) {
+  // Bounded by wall-clock, not a turn count: the restart path does real I/O
+  // (fs writes, dynamic imports) before it reaches its fake timers, and under
+  // CI load 1000 quick turns ran out first, leaving the timer never advanced.
+  // Date is not faked here (toFake: setTimeout/clearTimeout only).
+  const deadline = Date.now() + 4000;
+  while (!settled && Date.now() < deadline) {
     await vi.advanceTimersByTimeAsync(50);
     await new Promise<void>((resolve) => setImmediate(resolve));
   }
