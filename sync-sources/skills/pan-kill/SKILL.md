@@ -16,7 +16,13 @@ allowed-tools:
 
 ## Overview
 
-This skill guides you through gracefully stopping a running autonomous agent and cleaning up its resources.
+`pan kill` (alias `pan stop`) stops an agent and closes its terminal through the host's terminal
+backend: `pane.close` on Herdr (the default), `kill-session` on tmux. The workspace, branch, and
+xBRIEF are preserved.
+
+Always stop agents with `pan kill`, never with raw `tmux kill-session` or `herdr pane close`. A raw
+terminal kill skips the state write, the orphan-launcher sweep, and the Docker teardown; a raw tmux
+kill on a Herdr host reaches nothing at all (PAN-3947).
 
 ## When to Use
 
@@ -29,28 +35,20 @@ This skill guides you through gracefully stopping a running autonomous agent and
 ## Quick Command
 
 ```bash
-# Using pan CLI
+# Every agent of an issue (work, planning, review/test specialists, strike, swarm slots)
 pan kill ISSUE-123
 
-# Or directly via tmux
-tmux kill-session -t agent-ISSUE-123
+# Exactly one agent
+pan kill agent-issue-123-test
 ```
 
 ## Workflow
 
 ### 1. Check Agent Status First
 
-Before killing, understand what the agent is doing:
-
 ```bash
-# List running agents
 pan status
-
-# Or via tmux
-tmux list-sessions | grep agent
-
-# See recent activity
-tmux capture-pane -t agent-ISSUE-123 -p | tail -30
+pan show ISSUE-123
 ```
 
 ### 2. Graceful Shutdown (Recommended)
@@ -58,115 +56,63 @@ tmux capture-pane -t agent-ISSUE-123 -p | tail -30
 Give the agent a chance to save state:
 
 ```bash
-# Send shutdown message (ALWAYS use pan tell, NOT raw tmux)
-pan tell ISSUE-123 "Please save your progress to STATE.md and stop working."
+# ALWAYS use pan tell, never raw send-keys
+pan tell ISSUE-123 "Please commit your progress and stop working."
 
-# Wait for acknowledgment
-sleep 10
-tmux capture-pane -t agent-ISSUE-123 -p | tail -10
-
-# Then kill the session
-tmux kill-session -t agent-ISSUE-123
+# Then stop it
+pan kill ISSUE-123
 ```
 
-**WARNING:** DO NOT use raw `tmux send-keys` - agents often forget the Enter key. Always use `pan tell` which handles this correctly.
-
-### 3. Immediate Stop (If Needed)
+### 3. Verify Stopped
 
 ```bash
-# Kill immediately
-tmux kill-session -t agent-ISSUE-123
+pan status
 ```
 
-### 4. Verify Stopped
+The agent must no longer be listed as running. If it still is, see Troubleshooting.
 
-```bash
-# Confirm session is gone
-tmux list-sessions | grep agent-ISSUE-123
+## Pause Instead of Kill
 
-# Should return nothing
-```
-
-### 5. Clean Up (Optional)
-
-```bash
-# The workspace remains for inspection
-ls -la /path/to/workspaces/ISSUE-123/
-
-# View any uncommitted work
-cd /path/to/workspaces/ISSUE-123
-git status
-git diff
-```
+`pan pause ISSUE-123 --reason "<why>"` stops the agent the same way and also sets a persistent
+pause gate so nothing restarts it until `pan unpause ISSUE-123`.
 
 ## Kill All Agents
 
-```bash
-# Kill all agent sessions
-tmux list-sessions -F "#{session_name}" | grep "^agent-" | xargs -I {} tmux kill-session -t {}
-
-# Verify all gone
-tmux list-sessions | grep agent
-```
+Use `/pan-stop-all-agents` — it drains every work agent and its specialists while preserving
+conversations and shared sidecars.
 
 ## Preserving Work
 
-Before killing, you may want to preserve the agent's progress:
-
 ```bash
-# Attach and review
-tmux attach -t agent-ISSUE-123
-# Ctrl+b d to detach
-
-# Or capture the full session
-tmux capture-pane -t agent-ISSUE-123 -p -S - > agent-output.txt
-
 # Preserve workspace state (per stash-discipline: agents commit or surface; never stash)
-cd /path/to/workspaces/ISSUE-123
+cd /path/to/workspaces/feature-issue-123
 git add -A && git commit -m "WIP: state before kill"
 ```
 
 ## After Killing
 
-Options for the work:
-
-1. **Resume later** - Use `pan start ISSUE-123` to spawn a new agent
-2. **Do it yourself** - Work in the existing workspace manually
-3. **Abandon** - Remove the workspace if work is no longer needed
+1. **Resume later** — `pan start ISSUE-123` spawns a new agent
+2. **Do it yourself** — work in the existing workspace manually
+3. **Abandon** — remove the workspace if the work is no longer needed
 
 ## Troubleshooting
 
-**Session won't die:**
-```bash
-# Force kill with signal
-tmux kill-session -t agent-ISSUE-123
+**Agent still listed as running after `pan kill`:** the terminal did not close. Find it on the
+host's backend:
 
-# If that fails, find and kill the process
-ps aux | grep "agent-ISSUE-123"
-kill -9 <PID>
+```bash
+# Herdr host: panes carry the agent id in their agentId token
+herdr pane list
+
+# tmux host: agents live on the overdeck socket, never the default one
+tmux -L overdeck list-sessions | grep ISSUE-123
 ```
 
-**Multiple agents for same issue:**
-```bash
-# List all matching sessions
-tmux list-sessions | grep ISSUE-123
-
-# Kill each one
-tmux kill-session -t agent-ISSUE-123
-tmux kill-session -t agent-ISSUE-123-2
-```
-
-**Can't find the session:**
-```bash
-# List ALL tmux sessions
-tmux list-sessions
-
-# Check if process is running outside tmux
-ps aux | grep claude
-```
+Then run `pan kill <agent-id>` again. Close a pane by hand only if the backend is unreachable from
+`pan`, and report it as a bug.
 
 ## Related Skills
 
-- `/pan:status` - Check agent status
-- `/pan:tell` - Send message before killing
-- `/pan:rescue` - Recover work from killed agents
+- `/pan-status` — check agent status
+- `/pan-tell` — send a message before killing
+- `/pan-pause` — stop and hold an agent

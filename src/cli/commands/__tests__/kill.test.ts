@@ -9,7 +9,7 @@ import { Effect } from 'effect';
 
 const agentMocks = vi.hoisted(() => ({
   getAgentStateSync: vi.fn(),
-  stopAgentSync: vi.fn(),
+  stopAgent: vi.fn(),
 }));
 
 const tmuxMocks = vi.hoisted(() => ({
@@ -54,10 +54,16 @@ vi.mock('../../../lib/agents.js', () => {
   };
   return {
     getAgentStateSync: agentMocks.getAgentStateSync,
-    stopAgentSync: agentMocks.stopAgentSync,
+    stopAgent: agentMocks.stopAgent,
     isQualifiedAgentId,
   };
 });
+
+// PAN-3947: pan kill/pause probe liveness through the terminal backend;
+// the fake mirrors the tmux session mock so each case sets liveness once.
+vi.mock('../../../lib/terminal-backends/launch.js', () => ({
+  agentPaneExists: vi.fn(async (id: string) => (tmuxMocks.sessionExistsSync as (name: string) => boolean)(id)),
+}));
 
 vi.mock('../../../lib/tmux.js', () => ({
   sessionExistsSync: tmuxMocks.sessionExistsSync,
@@ -116,7 +122,8 @@ describe('killCommand Docker teardown (PAN-3728)', () => {
 
   beforeEach(() => {
     agentMocks.getAgentStateSync.mockReset();
-    agentMocks.stopAgentSync.mockReset();
+    agentMocks.stopAgent.mockReset();
+    agentMocks.stopAgent.mockReturnValue(Effect.void);
     tmuxMocks.sessionExistsSync.mockReset();
     remoteMocks.isRemoteAvailable.mockReset();
     remoteMocks.killRemoteAgent.mockReset();
@@ -167,8 +174,8 @@ describe('killCommand Docker teardown (PAN-3728)', () => {
     await killCommand('agent-pan-3680-test', {});
 
     // The kill itself still happens — only the shared stack is left alone.
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('agent-pan-3680-test', 'operator');
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledTimes(1);
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('agent-pan-3680-test', 'operator');
+    expect(agentMocks.stopAgent).toHaveBeenCalledTimes(1);
     expect(interventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith({
       issueId: 'PAN-3680',
       kind: 'pause',
@@ -203,8 +210,8 @@ describe('killCommand Docker teardown (PAN-3728)', () => {
     const { killCommand } = await import('../kill.js');
     await killCommand('PAN-3680', {});
 
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('agent-pan-3680', 'operator');
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('agent-pan-3680-test', 'operator');
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('agent-pan-3680', 'operator');
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('agent-pan-3680-test', 'operator');
     expect(workspaceMocks.stopWorkspaceDocker).toHaveBeenCalledTimes(1);
     expect(workspaceMocks.stopWorkspaceDocker).toHaveBeenCalledWith(
       '/tmp/overdeck/workspaces/feature-pan-3680',

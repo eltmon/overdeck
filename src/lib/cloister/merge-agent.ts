@@ -421,10 +421,19 @@ export async function postMergeLifecycle(
       console.warn(`[merge-agent] Async post-merge release trigger failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
     });
 
-    // 3. Pause work/planning/strike agents and kill their tmux panes to free resources.
+    // 3. Pause work/planning/strike agents and close their terminals to free resources.
     try {
       const { setAgentPaused, getAgentState } = await import('../agents.js');
-      const { killSession, sessionExists } = await import('../tmux.js');
+      // A failed backend close must never skip pausing the remaining agents.
+      const closeAgentTerminal = async (agentId: string): Promise<boolean> => {
+        try {
+          const { closeAgentPane } = await import('../terminal-backends/launch.js');
+          return await closeAgentPane(agentId);
+        } catch (err) {
+          console.warn(`[merge-agent] Could not close ${agentId} terminal: ${err}`);
+          return false;
+        }
+      };
       const issueLower = issueId.toLowerCase();
       const reason = 'awaiting close-out (verify on main)';
       for (const agentId of [`agent-${issueLower}`, `planning-${issueLower}`, `strike-${issueLower}`]) {
@@ -454,10 +463,13 @@ export async function postMergeLifecycle(
           );
           logActivity('agent_pause_failed', `Could not persist pause for ${agentId} after merge — may throttle dispatch (PAN-1726)`);
         }
-        if (await Effect.runPromise(sessionExists(agentId))) {
-          await Effect.runPromise(killSession(agentId));
-          console.log(`[merge-agent] ✓ Killed ${agentId} tmux session to free resources`);
-          logActivity('agent_session_killed', `Freed resources: killed tmux session for ${agentId}`);
+        // PAN-3947: close through the terminal backend — `kill-session` on
+        // tmux, `pane.close` on Herdr. A tmux-only kill left every Herdr pane
+        // (and the idle harness in it) alive, so close-out's DoD row 5 still
+        // saw a running work agent.
+        if (await closeAgentTerminal(agentId)) {
+          console.log(`[merge-agent] ✓ Closed ${agentId} terminal to free resources`);
+          logActivity('agent_session_killed', `Freed resources: closed terminal for ${agentId}`);
         }
       }
     } catch (err) {
@@ -613,6 +625,9 @@ function isPostMergeRoleSession(sessionName: string, issueLower: string): boolea
     && /-(review|test|merge|ship)(?:-|$)/.test(sessionName);
 }
 
+/** Pane roles the post-merge lifecycle closes — the specialists; work/plan/strike are closed by agent id in step 3. */
+const POST_MERGE_PANE_ROLES = ['review', 'test', 'uat'] as const;
+
 async function killPostMergeRoleSessions(issueId: string): Promise<void> {
   try {
     const issueLower = issueId.toLowerCase();
@@ -628,7 +643,22 @@ async function killPostMergeRoleSessions(issueId: string): Promise<void> {
   } catch (err) {
     console.warn(`[merge-agent] Could not kill role sessions for ${issueId}: ${err}`);
   }
+
+  // PAN-3947: a Herdr pane has no tmux session name, so the scan above finds
+  // none of them. Close the issue's review/test/uat panes by their stamped
+  // `issue` + `role` tokens. No-op on a tmux host.
+  try {
+    const { closeIssuePanes } = await import('../terminal-backends/launch.js');
+    const closed = await closeIssuePanes(issueId, { roles: POST_MERGE_PANE_ROLES });
+    if (closed.length > 0) {
+      console.log(`[merge-agent] ✓ Closed ${closed.length} review/test/uat pane(s) for ${issueId}: ${closed.join(', ')}`);
+      logActivity('role_sessions_killed', `Closed ${closed.length} review/test/uat pane(s) for ${issueId} on merge`);
+    }
+  } catch (err) {
+    console.warn(`[merge-agent] Could not close role panes for ${issueId}: ${err}`);
+  }
 }
+
 
 function isPostMergeKnowledgeRetroEnabled(): boolean {
   try {

@@ -1,7 +1,9 @@
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
-import { getAgentStateSync, listAgentStates, resolveAgentTargetSync, setAgentPausedSync, stopAgentSync } from '../../lib/agents.js';
-import { listSessionNamesSync, sessionExistsSync } from '../../lib/tmux.js';
+import { Effect } from 'effect';
+import { getAgentStateSync, listAgentStates, resolveAgentTargetSync, setAgentPausedSync, stopAgent } from '../../lib/agents.js';
+import { listSessionNamesSync } from '../../lib/tmux.js';
+import { agentPaneExists } from '../../lib/terminal-backends/launch.js';
 import { appendOperatorInterventionEvent } from '../../lib/operator-interventions.js';
 
 interface PauseOptions {
@@ -29,12 +31,16 @@ export async function pauseCommand(id: string, options: PauseOptions): Promise<v
   }
   const issueId = state.issueId;
 
-  const shouldStop = sessionExistsSync(agentId) || state.status === 'running' || state.status === 'starting';
+  // PAN-3947: a live terminal on the host's backend (tmux session or Herdr pane).
+  const hasLivePane = await agentPaneExists(agentId).catch(() => false);
+  const shouldStop = hasLivePane || state.status === 'running' || state.status === 'starting';
 
   try {
     setAgentPausedSync(agentId, options.reason, shouldStop);
     if (shouldStop) {
-      stopAgentSync(agentId, 'operator');
+      // Async stop terminates through the terminal backend, so a Herdr pane
+      // closes too — the sync variant could only reach a tmux session.
+      await Effect.runPromise(stopAgent(agentId, 'operator'));
     }
     await appendOperatorInterventionEvent({ issueId, kind: 'pause', source: 'pan pause' });
 

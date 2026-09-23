@@ -130,9 +130,14 @@ for the full rule.
 
 The merge agent's post-merge handoff
 ([`src/lib/cloister/merge-agent.ts`](../src/lib/cloister/merge-agent.ts)) is
-non-destructive: it pauses the work/planning agents, preserves
+non-destructive: it pauses the work/planning/strike agents and closes their
+terminals, closes the review/test/uat specialists' terminals, preserves
 workspace/branches/xBRIEF, and removes the workspace's Docker containers and
-`overdeck-feature-<issue>_devnet` network. This must run **at most once per
+`overdeck-feature-<issue>_devnet` network. Terminals close through the terminal
+backend (`closeAgentPane` / `closeIssuePanes` in
+[`src/lib/terminal-backends/launch.ts`](../src/lib/terminal-backends/launch.ts)):
+`kill-session` on tmux, `pane.close` on Herdr. A tmux-only kill left every Herdr
+pane alive, and close-out's DoD row 5 then failed on "running agents" (PAN-3947). This must run **at most once per
 merge** — a concurrency guard prevents the handoff from re-triggering itself
 (a missing guard caused a 24,626-call tracker API loop, PAN-328).
 

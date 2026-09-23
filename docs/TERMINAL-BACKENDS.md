@@ -113,6 +113,49 @@ Everything downstream follows the pane instead of the agent record:
 - **Close** is by pane reference (`AgentState.paneId`, recorded the moment `startAgent` returns), so
   a spawn failure cleans up its own pane on either policy.
 
+## Stopping an agent (PAN-3947)
+
+Every stop path terminates the agent **through the terminal backend** — never by rewriting state
+alone, and never by assuming a tmux session exists. Before PAN-3947, `stopAgent` ran only
+`tmux kill-session`; on a Herdr host there is no such session, so `pan kill`, dashboard Stop and the
+post-merge lifecycle wrote `stopped` while the pane and the idle harness in it stayed alive. Every
+liveness reader still saw the agent, the next start was refused as "already running", and
+close-out's DoD row 5 failed on "running agents" until the panes were closed by hand.
+
+The primitives live in `src/lib/terminal-backends/launch.ts` and go through the adapter's `close`:
+
+| Primitive | Herdr | tmux |
+| --- | --- | --- |
+| `closeAgentPane(agentId)` | `pane.close` on the agent's pane, found by live agent name, then by its `agentId` token — **with no liveness check**, so a residue pane whose shell is back at `$` closes too (`findHerdrAgentPane`). A same-name tmux session left from before the host moved to Herdr is killed as well. | `kill-session` through the tmux adapter, when the session exists. |
+| `closeIssuePanes(issueId, { roles? })` | `pane.close` on every inventory pane whose `issue` token matches, optionally filtered by `role` — never an operator conversation pane (`conv-*`). | No-op — the callers' session-name scans already reach every tmux session, and a tmux pane carries no tokens. |
+
+Both never throw; a Herdr socket failure closes nothing and the stop still completes.
+
+Who uses them:
+
+- **`stopAgent`** (async, `src/lib/agents/termination.ts`) — calls `closeAgentPane` after capturing
+  output and before the orphan-launcher sweep. Every async caller inherits it: the dashboard
+  Stop/Delete routes, recovery and restart, preemption, the closed-issue reaper, spawn-failure
+  cleanup.
+- **`pan kill` / `pan stop` / `pan pause`** — use the async `stopAgent`, and decide "running" and "live
+  sibling" with `agentPaneExists`, not `sessionExistsSync`.
+- **Dashboard Pause and Suspend** — probe with `agentPaneExists` and close with `closeAgentPane`.
+- **Post-merge lifecycle** (`postMergeLifecycle` in `src/lib/cloister/merge-agent.ts`) —
+  `closeAgentPane` for the work, planning and strike agents; `closeIssuePanes` with roles
+  `review`, `test`, `uat` for the specialists.
+- **Close-out teardown** (`teardown-workspace.ts`) and the closed-issue residue reaper
+  (`reap-issue-residue.ts`) — `closeIssuePanes(issueId)` for every pane of the issue, after the
+  tmux session-name sweep.
+
+`stopAgentSync` is **tmux-only**: Herdr is an async socket, so the sync variant can kill a tmux
+session but cannot close a Herdr pane. Its remaining callers are sync internals (`health.ts`
+force-kill, the `concurrency.ts` emergency brake, `handoff.ts`, the memory governor's hard-band
+shed); a new stop path must use `stopAgent`.
+
+Stopping does not infer lifecycle state: supervisor-launched agents still write `stopped` from the
+supervisor's own `exited` event, and liveness stays with `src/lib/agents/liveness.ts`, which now
+sees the pane gone.
+
 ## Pane metadata (FR-5)
 
 Every launcher stamps four tokens on its pane: `issue`, `role`, `harness`, `model`, plus `agentId` —
