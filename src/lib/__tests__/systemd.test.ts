@@ -50,6 +50,8 @@ beforeEach(() => {
     XDG_RUNTIME_DIR: '/run/user/1000',
   };
   delete process.env.CI;
+  delete process.env.OVERDECK_HOME;
+  delete process.env.OVERDECK_SUPERVISOR_UNIT;
   delete process.env.container;
   delete process.env.CONTAINER;
   setPlatform('linux');
@@ -299,6 +301,46 @@ describe('supervisor systemd unit helpers', () => {
     await expect(stopSupervisorUnitIfActive()).resolves.toBe(false);
 
     expect(execAsyncMock).not.toHaveBeenCalled();
+  });
+
+  it('never writes, starts or stops the shared unit from a throwaway OVERDECK_HOME (review of #4020, 1)', async () => {
+    process.env.OVERDECK_HOME = '/tmp/throwaway-overdeck-home';
+    const { startSupervisorUnitIfAvailable, stopSupervisorUnitIfActive, supervisorUnitAllowed } = await import('../systemd.js');
+
+    expect(supervisorUnitAllowed()).toBe(false);
+    await expect(startSupervisorUnitIfAvailable({ unitText: 'unused' })).resolves.toBe(false);
+    await expect(stopSupervisorUnitIfActive()).resolves.toBe(false);
+    expect(execAsyncMock).not.toHaveBeenCalled();
+  });
+
+  it('allows the canonical home, an unset home, and an explicit opt-in', async () => {
+    const { supervisorUnitAllowed } = await import('../systemd.js');
+    const { getCanonicalOverdeckHome } = await import('../paths.js');
+
+    expect(supervisorUnitAllowed({})).toBe(true);
+    expect(supervisorUnitAllowed({ OVERDECK_HOME: getCanonicalOverdeckHome() })).toBe(true);
+    expect(supervisorUnitAllowed({ OVERDECK_HOME: `${getCanonicalOverdeckHome()}/` })).toBe(true);
+    expect(supervisorUnitAllowed({ OVERDECK_HOME: '/tmp/x', OVERDECK_SUPERVISOR_UNIT: '1' })).toBe(true);
+  });
+
+  it('reports a daemon-reload timeout on an active unit as a warning, not a failed start', async () => {
+    const unitDir = mkdtempSync(join(tmpdir(), 'overdeck-systemd-start-test-'));
+    execAsyncMock.mockImplementation(async (command: string) => {
+      if (command === 'systemctl --user daemon-reload') throw new Error('timed out');
+      return managerAnswer(command);
+    });
+    const { startSupervisorUnitIfAvailable } = await import('../systemd.js');
+    const warnings: string[] = [];
+    try {
+      await expect(startSupervisorUnitIfAvailable({ unitDir, unitText: '[Unit]\n', onWarning: (m) => warnings.push(m) }))
+        .resolves.toBe(true);
+      expect(warnings).toEqual([
+        'Could not refresh overdeck-supervisor.service: timed out; the running supervisor is unaffected',
+      ]);
+      expect(execAsyncMock).not.toHaveBeenCalledWith('systemctl --user start overdeck-supervisor.service', expect.any(Object));
+    } finally {
+      rmSync(unitDir, { recursive: true, force: true });
+    }
   });
 
   it('does not install or start the unit when systemd is unavailable', async () => {

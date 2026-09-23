@@ -1,9 +1,9 @@
 import { exec } from 'node:child_process';
 import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { access, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { OVERDECK_HOME } from './paths.js';
+import { OVERDECK_HOME, getCanonicalOverdeckHome } from './paths.js';
 import { getSupervisorPortSync, resolveSupervisorBundle, resolveSupervisorPrimaryRepoRoot } from './supervisor.js';
 
 const execAsync = promisify(exec);
@@ -124,14 +124,45 @@ export async function installSupervisorUnit(options: InstallSupervisorUnitOption
   return { path, written: true };
 }
 
-export async function startSupervisorUnitIfAvailable(options: InstallSupervisorUnitOptions = {}): Promise<boolean> {
+/**
+ * `overdeck-supervisor.service` is one unit per user, and it carries its
+ * home's `OVERDECK_HOME`. Only the canonical home (`~/.overdeck`) may write,
+ * start or stop it; any other home runs its own supervisor as a plain process
+ * unless it opts in with `OVERDECK_SUPERVISOR_UNIT=1`. Without this a shell
+ * with a throwaway `OVERDECK_HOME` rewrites the real unit on `pan up` and stops
+ * the real supervisor on `pan down` (review of #4020, finding 1).
+ */
+export function supervisorUnitAllowed(env: Readonly<Record<string, string | undefined>> = process.env): boolean {
+  const home = env.OVERDECK_HOME?.trim();
+  if (!home || resolve(home) === resolve(getCanonicalOverdeckHome())) return true;
+  return env.OVERDECK_SUPERVISOR_UNIT === '1';
+}
+
+export interface StartSupervisorUnitOptions extends InstallSupervisorUnitOptions {
+  /** Unit upkeep failed but the unit is running: a warning, not a failed start. */
+  onWarning?: (message: string) => void;
+}
+
+export async function startSupervisorUnitIfAvailable(options: StartSupervisorUnitOptions = {}): Promise<boolean> {
+  if (!supervisorUnitAllowed()) return false;
   if (!(await systemdUserAvailable())) return false;
-  await installSupervisorUnit(options);
+  try {
+    await installSupervisorUnit(options);
+  } catch (error) {
+    // A daemon-reload timeout while the unit already runs is not a failed start.
+    if (!(await isSupervisorUnitActive())) throw error;
+    options.onWarning?.(
+      `Could not refresh ${SUPERVISOR_UNIT_NAME}: ${error instanceof Error ? error.message : String(error)}; `
+      + 'the running supervisor is unaffected',
+    );
+    return true;
+  }
   await startSupervisorUnit();
   return true;
 }
 
 export async function stopSupervisorUnitIfActive(): Promise<boolean> {
+  if (!supervisorUnitAllowed()) return false;
   if (!(await systemdUserAvailable())) return false;
   if (!(await isSupervisorUnitActive())) return false;
   await stopSupervisorUnit();

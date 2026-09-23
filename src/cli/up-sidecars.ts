@@ -134,7 +134,8 @@ export async function startPostLaunchSidecars(config: {
   try {
     const { startSupervisorProcessSync, getSupervisorPortSync } = await import('../lib/supervisor.js');
     const { startSupervisorUnitIfAvailable, SUPERVISOR_UNIT_NAME } = await import('../lib/systemd.js');
-    if (await startSupervisorUnitIfAvailable()) {
+    const onWarning = (message: string) => console.log(chalk.dim(`  ⚠ ${message}`));
+    if (await startSupervisorUnitIfAvailable({ onWarning })) {
       console.log(chalk.green(`✓ Supervisor managed by ${SUPERVISOR_UNIT_NAME}`));
     } else {
       startSupervisorProcessSync();
