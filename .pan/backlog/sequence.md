@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-23T09:58:42.949Z · model: claude-opus-5 · open: 851_
+_Last sequenced: 2026-09-23T10:05:20.478Z · model: claude-opus-5 · open: 852_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -26,6 +26,7 @@ _Last sequenced: 2026-09-23T09:58:42.949Z · model: claude-opus-5 · open: 851_
 | 21 | PAN-3968 | S | critical | ok |  |  | Every pan close still deletes state.json/sessions.json (close-out.ts step 5 never moved to pruneAgentStateDir); PAN-3950 AC-1 unmet |
 | 22 | PAN-3939 | S | critical | ok |  |  | Review dispatch never re-fires after a dead reviewer: guards trust state.json + session existence; abort leaves session and row alive |
 | 23 | PAN-3981 | M | critical | ok |  | PAN-3966 | Strike completion must close pane, remove worktree, delete strike/<id>; reaper is fallback and blind to squash merges (operator decision) |
+| 24 | PAN-3996 | M | critical | ok |  |  | Legacy `.pan/` gitignore rule in 5 project repos blocks every post-Cut planning commit; migrate-plan-home crashes on it instead of repairing |
 | 25 | PAN-3977 | S | critical | ok |  |  | pan start's auto-spawn after planning is a no-op for 'todo' issues: stateToRole('todo') is null, so no work agent ever starts |
 | 26 | PAN-3566 | XS | critical | ok |  |  | Test-role launcher execs claude with no user prompt, so the role boots an idle REPL — the deterministic producer of zombie test agents. |
 | 27 | PAN-3952 | S | critical | ok |  |  | Herdr sizes unviewed panes to 1 row: 10 of 13 work panes report nothing to pane read; every pane-text consumer is blind |
@@ -943,6 +944,10 @@ Reproduced on PAN-3705 during the cut e2e: an errored codex reviewer blocked eve
 
 PAN-3973 (strike opens its own PR on completion) closed since the prior run, removing one of this issue's two blockers and freeing rank 23; the remaining blocker PAN-3966 (Herdr-aware stopAgent) still sits above it at rank 18, so the pair stays in build order. The operator-decision framing in the prior rationale is unchanged: the strike itself closes its pane, removes the worktree and deletes strike/<id> on completion, and the strike-workspace reaper stays a fallback that must also recognise squash merges.
 
+### PAN-3996 (rank 24)
+
+New this pass. Before the Cut, Overdeck's own tooling wrote `.pan/` into project .gitignore files; since PAN-3917 planning artifacts live under `.pan/` in the project repo and must be committed, but nothing removes the old rule — myn-cli, lexerra, eltmon-video, tindra and puzzdom all still ignore it, so every draft, spec and continue the post-Cut pipeline writes there is silently uncommittable. `pan admin migrate-plan-home --commit` hits it first and dies on an unhandled execFile error with nothing committed. Ranked in the critical band with the other post-Cut pipeline blockers rather than above them: it spares overdeck's own repo, but it breaks the paved road for every other registered project, and the fix is small and fully specified (detect-and-repair in migrate-plan-home, a doctor repair row for projects that never migrate, temp-repo tests).
+
 ### PAN-3977 (rank 25)
 
 Rank unchanged: PAN-3960 merged (PR #3992) since the last run, which settles the sequencing note but not the defect. The paved road (`pan start` on an unplanned issue) finalizes planning and then silently never spawns the work agent: complete-planning hands autoSpawn to the reactive dispatcher with the tracker state, a fresh GitHub issue is still 'todo', stateToRole('todo') is null, and the dispatcher returns. Reproduced twice with ~3h of dead time on PAN-3968. Pipeline-blocking on the primary entry point, so critical despite the P3 label. The fix is small and well-specified (spawn the work role directly when a readable xBRIEF was just written, or transition to in_progress first, plus a 'todo' finalize test). It touches the planning-spawn path PAN-3960 just rerouted through launchAgentPane — rebase onto main before planning.
@@ -1175,10 +1180,6 @@ Triage: verify days-stale "running" against the current liveness definition (idl
 
 Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass — PAN-3243, PAN-3492, PAN-3520 and PAN-2421 — all trace red or flaky main to real-timer tests under load. This is the shared fix for that family and it is now marked ready, so it should sit with the other CI-integrity work rather than behind it.
 
-### PAN-2932 (rank 87)
-
-Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (502) after pan reload.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1186,10 +1187,10 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-23T09:58:42.949Z",
+  "generatedAt": "2026-09-23T10:05:20.478Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 851,
+  "openCount": 852,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -11740,6 +11741,19 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
       "rationale": "Triage: the flywheel is now a loop skill; the docs page target changes. Rank held.",
       "gate": "auto",
       "planning": "skip"
+    },
+    {
+      "issue": "PAN-3996",
+      "rank": 24,
+      "size": "M",
+      "importance": "critical",
+      "score": 85,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Legacy `.pan/` gitignore rule in 5 project repos blocks every post-Cut planning commit; migrate-plan-home crashes on it instead of repairing",
+      "rationale": "New this pass. Before the Cut, Overdeck's own tooling wrote `.pan/` into project .gitignore files; since PAN-3917 planning artifacts live under `.pan/` in the project repo and must be committed, but nothing removes the old rule — myn-cli, lexerra, eltmon-video, tindra and puzzdom all still ignore it, so every draft, spec and continue the post-Cut pipeline writes there is silently uncommittable. `pan admin migrate-plan-home --commit` hits it first and dies on an unhandled execFile error with nothing committed. Ranked in the critical band with the other post-Cut pipeline blockers rather than above them: it spares overdeck's own repo, but it breaks the paved road for every other registered project, and the fix is small and fully specified (detect-and-repair in migrate-plan-home, a doctor repair row for projects that never migrate, temp-repo tests).",
+      "gate": "auto",
+      "planning": "auto"
     }
   ],
   "edges": [
