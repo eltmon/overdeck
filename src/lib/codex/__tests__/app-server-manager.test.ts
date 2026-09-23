@@ -444,9 +444,75 @@ describe('CodexAppServerManager', () => {
       native.send({ method: 'thread/started', params: { thread: { id: 'tui-new' } } });
       native.send({
         method: 'item/completed',
-        params: { threadId: 'tui-new', item: { type: 'collabAgentToolCall', receiverThreadIds: ['tui-sub'] } },
+        params: { threadId: 'tui-new', item: { type: 'collabAgentToolCall', tool: 'spawnAgent', receiverThreadIds: ['tui-sub'] } },
       });
       expect(manager.threadScope('tui-sub')).toBe('unknown');
+      manager.stop();
+    });
+
+    it('lets a spawn item from the owner tree override a foreign classification (PAN-4031)', async () => {
+      const native = nativeServer();
+      const manager = new CodexAppServerManager({
+        cwd: '/tmp',
+        readVersion: async () => '0.153.4',
+        nativeSocketPath: SOCKET,
+        spawnProcess: () => killableChild().child,
+        connectNative: async () => native.transport,
+      });
+      const requests: Array<{ id?: unknown }> = [];
+      const foreign: Array<{ id?: unknown; method?: string }> = [];
+      manager.on('request', (request: { id?: unknown }) => requests.push(request));
+      manager.on('foreign-thread', (message: { id?: unknown; method?: string }) => foreign.push(message));
+      await manager.start();
+      await manager.startThread({ model: 'gpt-5.6-luna' });
+
+      // A sub-agent announced before its parent joined the tree is foreign.
+      native.send({ method: 'thread/started', params: { thread: { id: 'grandchild', parentThreadId: 'sub-thread', ephemeral: false } } });
+      expect(manager.threadScope('grandchild')).toBe('foreign');
+
+      // Only a spawn adopts: other collab tools naming a foreign thread (a
+      // native /new) leave it foreign, from the owner or from a sub-agent.
+      native.send({ method: 'thread/started', params: { thread: { id: 'tui-new', ephemeral: false } } });
+      for (const tool of ['wait', 'sendInput', 'resumeAgent', 'closeAgent']) {
+        native.send({
+          method: 'item/completed',
+          params: { threadId: 'owner-thread', item: { type: 'collabAgentToolCall', tool, senderThreadId: 'owner-thread', receiverThreadIds: ['tui-new', 'grandchild'] } },
+        });
+      }
+      expect(manager.threadScope('tui-new')).toBe('foreign');
+      expect(manager.threadScope('grandchild')).toBe('foreign');
+
+      // The parent joins through the owner's spawn item, then spawns the grandchild.
+      native.send({
+        method: 'item/completed',
+        params: {
+          threadId: 'owner-thread',
+          item: { type: 'collabAgentToolCall', tool: 'spawnAgent', senderThreadId: 'owner-thread', receiverThreadIds: ['sub-thread'] },
+        },
+      });
+      native.send({
+        method: 'item/completed',
+        params: {
+          threadId: 'sub-thread',
+          item: { type: 'collabAgentToolCall', tool: 'spawnAgent', senderThreadId: 'sub-thread', receiverThreadIds: ['grandchild'] },
+        },
+      });
+      native.send({ id: 5, method: 'item/commandExecution/requestApproval', params: { threadId: 'grandchild', command: 'ls' } });
+
+      expect(manager.threadScope('grandchild')).toBe('descendant');
+      expect(requests.map(request => request.id)).toEqual([5]);
+      expect(foreign.map(message => message.method)).toEqual(['thread/started', 'thread/started']);
+      expect(manager.threadScope('tui-new')).toBe('foreign');
+
+      // The owner thread is never reclassified by a spawn item naming it.
+      native.send({
+        method: 'item/completed',
+        params: {
+          threadId: 'sub-thread',
+          item: { type: 'collabAgentToolCall', tool: 'wait', senderThreadId: 'sub-thread', receiverThreadIds: ['owner-thread'] },
+        },
+      });
+      expect(manager.threadScope('owner-thread')).toBe('owner');
       manager.stop();
     });
 

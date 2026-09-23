@@ -500,16 +500,26 @@ export class CodexAppServerManager extends EventEmitter {
    * codex-cli 0.153.4 does not send `thread/started` for a sub-agent thread.
    * The spawn is visible only as a `collabAgentToolCall` item on the spawning
    * thread (`receiverThreadIds`), verified live. Receivers of a call made from
-   * inside the owner tree join the tree.
+   * inside the owner tree join the tree. The item is positive evidence, so it
+   * overrides a `foreign` classification (PAN-4031): a sub-agent whose
+   * `thread/started` arrived before its parent joined the tree would otherwise
+   * stay foreign, and its approvals would only be logged while the turn hangs.
    */
   private adoptSpawnedAgents(message: AppServerMessage, threadId: string): void {
     if (message.method !== 'item/started' && message.method !== 'item/completed') return;
     const item = asRecord(asRecord(message.params).item);
-    if (item.type !== 'collabAgentToolCall' || !Array.isArray(item.receiverThreadIds)) return;
+    // Only a spawn creates a thread. `wait`, `sendInput`, `resumeAgent` and
+    // `closeAgent` name existing receivers and must not pull a foreign thread
+    // (a native `/new`) into the tree (PAN-4031 review).
+    if (item.type !== 'collabAgentToolCall' || item.tool !== 'spawnAgent' || !Array.isArray(item.receiverThreadIds)) return;
     const scope = this.threadScope(threadId);
     if (scope !== 'owner' && scope !== 'descendant') return;
     for (const receiver of item.receiverThreadIds) {
-      if (typeof receiver === 'string' && this.threadScope(receiver) === 'unknown') this.descendantThreads.add(receiver);
+      if (typeof receiver !== 'string') continue;
+      const receiverScope = this.threadScope(receiver);
+      if (receiverScope !== 'unknown' && receiverScope !== 'foreign') continue;
+      this.foreignThreads.delete(receiver);
+      this.descendantThreads.add(receiver);
     }
   }
 

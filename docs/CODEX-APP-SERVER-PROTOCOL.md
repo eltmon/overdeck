@@ -215,13 +215,29 @@ ignores foreign-thread traffic. No handover or second runtime is needed.
   `thread/started` outside the tree (a title thread, a native `/new` or
   `/fork`) marks that thread **foreign**; its events go out as `foreign-thread`
   and never touch state, pending requests, activity, cost, or
-  `codex-thread-id`. Only the owner thread moves the owner's turn state.
+  `codex-thread-id`. Only the owner thread moves the owner's turn state. A
+  `spawnAgent` `collabAgentToolCall` from inside the tree that names a foreign
+  thread as a receiver moves it into the tree (PAN-4031), so a sub-agent
+  announced before its parent joined does not stay foreign with its approvals
+  unanswered. Other collab tools (`wait`, `sendInput`, `resumeAgent`,
+  `closeAgent`) never adopt.
 - Server requests fail open: a request from the owner, a sub-agent, or a thread
   the manager cannot classify is pending in the host and shown in the pane. Only
   a request for a thread positively known to be foreign is left to the client
   that opened it, with one pane line. Activity and live cost include sub-agent
   threads (cost is the sum of each thread's running total). The host writes
   `codex-thread-id` from its own start only.
+- Live cost prices each sub-agent at its own model (PAN-4031): the model the
+  `spawnAgent` item requested (`item.model`), replaced by a later
+  `thread/settings/updated` for that thread. A spawn with `model: null` takes
+  its spawner's model as it was at spawn time. A sub-agent with no recorded
+  model, or a model with no pricing entry, is priced at the owner's current
+  model. `model/rerouted`
+  is not tracked. This is the live figure only; the final ledger
+  (`codex-collector.ts`) reads each rollout and is exact.
+- Runtime-log lines from a sub-agent carry a thread label, for example
+  `[turn sub:0000beef] started` and `[assistant sub:0000beef] …` (the last
+  8 characters of the thread id). Owner lines are unlabeled.
 - The host kills its app-server on every exit path (SIGTERM, SIGINT, SIGHUP,
   `process.on('exit')`). The manager records the app-server pid in
   `codex-native/app.pid`; on the next start, if that pid is still alive and its
@@ -235,10 +251,21 @@ ignores foreign-thread traffic. No handover or second runtime is needed.
   second answer to user-input requests (approvals already refused one), and adopts
   `thread/settings/updated` model and effort so the next dashboard turn keeps
   a TUI choice. The dashboard effort picker still applies when used afterwards.
-- `navigationEpoch` counts native navigation: non-ephemeral foreign threads
-  (`/new`, `/fork`) plus threads with events that are still unclassified when
-  the epoch is read (a `/resume` of another thread). A sub-agent whose status
-  arrived before its spawn item stops counting once the item adopts it.
+- `navigationEpoch` counts native navigation and only ever goes up, so the
+  companion fingerprint never changes back and forth (PAN-4031). It counts
+  foreign threads from a `thread/started` that are neither ephemeral (title
+  threads) nor have a `parentThreadId` (sub-agents), which is a TUI `/new` or
+  `/fork`. It also counts a TUI `/resume` of an existing thread. Codex 0.153.4
+  sends no `thread/started` or other resume notification for that; the only
+  trace is the thread's `thread/status/changed`, broadcast to every client, and
+  a sub-agent's first status looks the same until its spawn item adopts it. So
+  a thread still unclassified when the epoch is read is counted, unless an
+  in-tree `spawnAgent` call is open (`item/started` seen, `item/completed`
+  not yet, or cleared by the owner's `turn/completed`). A sub-agent status
+  that arrived before its spawn call started, read in that instant, bumps the
+  epoch once and replaces an attached CLI once. That is the chosen failure:
+  missing a `/resume` would leave every later Terminal open on the wrong
+  thread.
 - A new `prepare-terminal` op is the companion adapter's health check. It
   strictly resumes a saved thread the host has not loaded yet (never a fresh
   thread), never starts a turn, and answers only when the pinned thread's rollout
