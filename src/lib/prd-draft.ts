@@ -30,7 +30,10 @@ export function getPRDDraftPathSync(issueId: string): string {
   return getIssueDraftPath(resolveDraftProjectRoot(issueId), issueId);
 }
 
-/** Whether the issue has a draft PRD in its project's `.pan/drafts/`. */
-export function hasPRDDraft(issueId: string): Promise<boolean> {
+/**
+ * Whether the issue has a draft PRD in its project's `.pan/drafts/`. Rejects
+ * (never throws synchronously) when the issue's project cannot be resolved.
+ */
+export async function hasPRDDraft(issueId: string): Promise<boolean> {
   return Effect.runPromise(hasIssueDraft(resolveDraftProjectRoot(issueId), issueId));
 }

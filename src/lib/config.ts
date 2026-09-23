@@ -516,9 +516,10 @@ export async function getConversationsConfig(): Promise<ConversationsConfig> {
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Both sync and async config IO surfaces get Effect variants. The async paths
-// (preferred in dashboard-reachable code) wrap the existing Promise functions
-// via Effect.tryPromise; the sync paths route through Effect.try.
+// Config IO is plain async (`loadConfig`, `getConversationsConfig`; preferred in
+// dashboard-reachable code) or sync (`…Sync`); callers inside an Effect bridge
+// with Effect.promise/tryPromise (PAN-3958). Only the pure getter below keeps
+// an Effect variant.
 
 /** Compute the dashboard's external API URL. Pure (reads env). */
 export const getDashboardApiUrl = (): Effect.Effect<string> =>

@@ -904,6 +904,17 @@ None are deleted, and the diff adds and removes no `it()`/`test()` calls. Tests 
 Promises, including `vi.spyOn(smartCompaction, 'runModelSummary')` chains and the TTS watchdog's config mock. Mocks of
 same-named genuine Effects (`config-yaml` `loadConfig` / `getConversationsConfig`, `CostWriter.reconcile`) are left alone.
 
+Review follow-up, a sweep of every test file for mocks of a CH-2..CH-5 converted name that still return an Effect (`await`
+on an Effect yields the Effect object, so such a test passes by accident or tests nothing; typecheck skips test files):
+
+- `conversations-fork-pipeline.test.ts`: the three `generateFallbackSummary` mocks now resolve or reject. The
+  "heuristic fallback also fails" test now asserts the rejection is logged and `prependFallbackFocus` gets the `''` seed
+  (it fails if the mock returns `Effect.fail` again).
+- `reopen-reset.test.ts`: the `reopenWorkspaceState` mock (CH-3) resolves instead of returning `Effect.succeed`.
+- `agents-auth-routing.test.ts`: dropped a stale `bridgeGeminiAuthToCliproxyProgram` mock entry; no such export exists.
+
+No other hit: the remaining `Effect.*` mocks in test files target functions that are still Effects.
+
 ### CH-4 follow-up
 
 The `cliproxy.ts` docs for `installCliproxy`, `stopCliproxy` and `restartCliproxy` get back the detail the deleted façade docs

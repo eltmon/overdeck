@@ -383,7 +383,8 @@ async function getMtimeFromDisk(filePath: string): Promise<number> {
 
 /**
  * Read global and project config, merge with defaults and apply env fallbacks,
- * without running config migrations. Cached by file mtime. Rejects on a parse error.
+ * without running config migrations. Cached by file mtime. Rejects on a parse
+ * error or on an I/O failure reading either config file.
  */
 export async function loadConfigNoMigration(): Promise<ConfigLoadResult> {
   const mtimes = await getConfigMtimesFromDisk();

@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { Effect } from 'effect';
 import * as forksModule from '../../../../../src/lib/overdeck/conversation-forks.js';
 import { sessionFilePath } from '../../../../../src/lib/paths.js';
 
@@ -40,6 +39,7 @@ const {
   generateFallbackSummary,
   generateSummaryForFork,
   HandoffAuthorModelNotConfiguredError,
+  prependFallbackFocus,
 } = await import('../../../../../src/lib/conversations/summary-fork.js');
 
 const { runForkPipeline, buildForkRequest, handleForkPipelineFailure } = forksModule;
@@ -122,9 +122,7 @@ describe('runForkPipeline fallback resilience', () => {
     );
     vi.mocked(authorHandoffExternal).mockRejectedValue(overflow);
     vi.mocked(generateSummaryForFork).mockRejectedValue(overflow);
-    vi.mocked(generateFallbackSummary).mockImplementation(() =>
-      Effect.succeed('heuristic summary'),
-    );
+    vi.mocked(generateFallbackSummary).mockResolvedValue('heuristic summary');
     const { ensureSpy, injectSpy } = stubSpawnAndInject();
 
     await expect(
@@ -156,9 +154,8 @@ describe('runForkPipeline fallback resilience', () => {
     );
     vi.mocked(authorHandoffExternal).mockRejectedValue(overflow);
     vi.mocked(generateSummaryForFork).mockRejectedValue(overflow);
-    vi.mocked(generateFallbackSummary).mockImplementation(() =>
-      Effect.fail(new Error('fallback failed')),
-    );
+    vi.mocked(generateFallbackSummary).mockClear().mockRejectedValue(new Error('fallback failed'));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { ensureSpy, injectSpy } = stubSpawnAndInject();
 
     await expect(
@@ -181,6 +178,13 @@ describe('runForkPipeline fallback resilience', () => {
     const injectedSummary = injectSpy.mock.calls[0][1] as string;
     expect(injectedSummary).toContain('focus text');
     expect(injectedSummary).not.toContain('heuristic summary');
+    // The heuristic fallback rejected, so the seed is the focus preamble over
+    // an empty summary (buildSummary's '' fallback).
+    expect(generateFallbackSummary).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[fork-pipeline] Heuristic fallback also failed: fallback failed',
+    );
+    expect(vi.mocked(prependFallbackFocus).mock.calls.at(-1)?.[0]).toBe('');
   });
 
   it('persists forkFallbackReason after a fallback', async () => {
@@ -190,9 +194,7 @@ describe('runForkPipeline fallback resilience', () => {
     );
     vi.mocked(authorHandoffExternal).mockRejectedValue(overflow);
     vi.mocked(generateSummaryForFork).mockRejectedValue(overflow);
-    vi.mocked(generateFallbackSummary).mockImplementation(() =>
-      Effect.succeed('heuristic summary'),
-    );
+    vi.mocked(generateFallbackSummary).mockResolvedValue('heuristic summary');
     stubSpawnAndInject();
 
     await runForkPipeline(

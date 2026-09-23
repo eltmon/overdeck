@@ -478,7 +478,12 @@ export async function callClaudeApi(
   return callClaudeApiWithConfig(model, prompt);
 }
 
-/** Enrich one conversation session using the model selected for its tier. */
+/**
+ * Enrich one conversation session using the model selected for its tier.
+ * Catches failures internally and resolves with `error` set (marking the session
+ * failed), so it rarely rejects: only on an unexpected throw outside that guard,
+ * such as the `markEnrichmentFailed` DB mutation itself.
+ */
 export async function enrichSession(opts: EnrichSessionOptions): Promise<EnrichSessionResult> {
   const { sessionId, jsonlPath, tier, config } = opts;
   const requestedModel = opts.modelOverride ?? selectEnrichmentModelForTier(tier, config);
