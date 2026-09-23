@@ -60,7 +60,7 @@ For deliberate exploration, use the CLI via Bash from the checkout root:
 tools (`tldr_context`, `tldr_semantic`, ...) — they are not registered in agent
 sessions and will not exist in your toolset (PAN-3534).
 {{/TLDR_AVAILABLE}}
-**IMPORTANT:** DO NOT run tests. You are the REVIEW agent — the full suite runs on CI against the PR head. Read that result (`gh pr checks <pr-number>`) instead of running the suite.
+**IMPORTANT:** DO NOT run tests. You are the REVIEW agent — the verification gate runs the full suite (on CI against the PR head where the project's tests run on CI, otherwise locally before review). Read that result (`gh pr checks <pr-number>`) instead of running the suite.
 
 {{#ACCEPTANCE_CRITERIA}}
 ## Acceptance Criteria (from xBRIEF plan) — MANDATORY GATE

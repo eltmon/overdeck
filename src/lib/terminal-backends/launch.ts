@@ -214,6 +214,19 @@ async function closeThrough(backend: TerminalBackend, pane: AgentPaneRef): Promi
   }
 }
 
+function tmuxSessionRef(agentId: string): AgentPaneRef {
+  return { backend: 'tmux', workspaceId: agentId, paneId: agentId, terminalId: agentId, agentName: agentId };
+}
+
+/**
+ * What `closeAgentPaneDetailed` did: `closed` a pane or session, found nothing
+ * running (`absent`), or could not stop it (`failed`, with the reason).
+ */
+export type CloseAgentPaneResult =
+  | { readonly outcome: 'closed' }
+  | { readonly outcome: 'absent' }
+  | { readonly outcome: 'failed'; readonly reason: string };
+
 /**
  * Terminate an agent's terminal through the host's terminal backend (PAN-3947).
  *
@@ -229,12 +242,23 @@ async function closeThrough(backend: TerminalBackend, pane: AgentPaneRef): Promi
  *   agent launched before the host moved to Herdr) is killed too.
  * - **tmux:** the agent's session is killed through the tmux adapter's `close`.
  *
- * Never throws. Returns true when a pane or session was closed.
+ * Never throws. Unlike `closeAgentPane`, it tells "nothing was running" apart
+ * from "the close failed" (review of #3992, L2): a caller that reports the stop
+ * to an operator must not call a failed close "already stopped". On Herdr,
+ * `absent` inherits `findHerdrAgentPane`'s answer, which cannot tell "no such
+ * pane" from "the socket did not answer the lookup".
  */
-export async function closeAgentPane(agentId: string, backend?: TerminalBackend): Promise<boolean> {
+export async function closeAgentPaneDetailed(
+  agentId: string,
+  backend?: TerminalBackend,
+): Promise<CloseAgentPaneResult> {
   const { sessionExists } = await import('../tmux.js');
   const tmuxSessionLive = (): Promise<boolean> =>
     Effect.runPromise(sessionExists(agentId)).catch(() => false);
+  const closeTmuxSession = async (): Promise<CloseAgentPaneResult> =>
+    (await closeThrough(resolveTerminalBackend('tmux'), tmuxSessionRef(agentId)))
+      ? { outcome: 'closed' }
+      : { outcome: 'failed', reason: `tmux could not kill session ${agentId}` };
 
   let resolved: TerminalBackend;
   try {
@@ -243,51 +267,50 @@ export async function closeAgentPane(agentId: string, backend?: TerminalBackend)
     // PAN-3956: Herdr is selected but down. Its panes cannot be reached, but a
     // legacy tmux session of this name still can — stop must not regress to a
     // no-op on the host that most needs it.
-    if (!(error instanceof TerminalBackendUnavailableError) || !(await tmuxSessionLive())) return false;
-    return await closeThrough(resolveTerminalBackend('tmux'), {
-      backend: 'tmux',
-      workspaceId: agentId,
-      paneId: agentId,
-      terminalId: agentId,
-      agentName: agentId,
-    });
+    const reason = error instanceof Error ? error.message : String(error);
+    if (!(error instanceof TerminalBackendUnavailableError)) return { outcome: 'failed', reason };
+    if (await tmuxSessionLive()) return await closeTmuxSession();
+    return { outcome: 'failed', reason };
   }
 
   if (resolved.name === 'tmux') {
-    if (!(await tmuxSessionLive())) return false;
-    return await closeThrough(resolved, {
-      backend: 'tmux',
-      workspaceId: agentId,
-      paneId: agentId,
-      terminalId: agentId,
-      agentName: agentId,
-    });
+    if (!(await tmuxSessionLive())) return { outcome: 'absent' };
+    return (await closeThrough(resolved, tmuxSessionRef(agentId)))
+      ? { outcome: 'closed' }
+      : { outcome: 'failed', reason: `tmux could not kill session ${agentId}` };
   }
 
+  const failures: string[] = [];
+  let closed = false;
   const { findHerdrAgentPane } = await import('./herdr.js');
   const ref = await findHerdrAgentPane(agentId);
-  const closedPane = ref
-    ? await closeThrough(resolved, {
-        backend: resolved.name,
-        workspaceId: ref.workspaceId,
-        paneId: ref.paneId,
-        terminalId: ref.terminalId,
-        agentName: agentId,
-      })
-    : false;
-
-  let closedLegacySession = false;
-  if (await tmuxSessionLive()) {
-    const { resolveTerminalBackend: resolve } = await import('./registry.js');
-    closedLegacySession = await closeThrough(resolve('tmux'), {
-      backend: 'tmux',
-      workspaceId: agentId,
-      paneId: agentId,
-      terminalId: agentId,
+  if (ref) {
+    const ok = await closeThrough(resolved, {
+      backend: resolved.name,
+      workspaceId: ref.workspaceId,
+      paneId: ref.paneId,
+      terminalId: ref.terminalId,
       agentName: agentId,
     });
+    if (ok) closed = true;
+    else failures.push(`${resolved.name} could not close pane ${ref.paneId}`);
   }
-  return closedPane || closedLegacySession;
+
+  if (await tmuxSessionLive()) {
+    const legacy = await closeTmuxSession();
+    if (legacy.outcome === 'closed') closed = true;
+    else if (legacy.outcome === 'failed') failures.push(legacy.reason);
+  }
+  if (failures.length > 0) return { outcome: 'failed', reason: failures.join('; ') };
+  return closed ? { outcome: 'closed' } : { outcome: 'absent' };
+}
+
+/**
+ * `closeAgentPaneDetailed` for callers that only need a boolean. Never throws.
+ * Returns true only when a pane or session was closed and no close failed.
+ */
+export async function closeAgentPane(agentId: string, backend?: TerminalBackend): Promise<boolean> {
+  return (await closeAgentPaneDetailed(agentId, backend)).outcome === 'closed';
 }
 
 export interface CloseIssuePanesOptions {

@@ -29,7 +29,7 @@ import { emitActivityTtsSync } from '../../../lib/activity-logger.js';
 import { parseArtifactRef } from '../../../lib/forge.js';
 import { validateOrigin } from './origin-validation.js';
 import { AUTO_MERGE_COOLDOWN_MS } from '../../../lib/cloister/auto-merge-config.js';
-import { isAutoMergeEligible, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
+import { isAutoMergeEligible, issueHoldsForUat, type AutoMergeEligibility } from '../../../lib/cloister/auto-merge-eligibility.js';
 import {
   getProjectAutoMergeDefault,
   projectHoldsForUat,
@@ -81,8 +81,10 @@ export interface MergeTrainQueueEntry {
   /** Effective per-project flag: the project override, else the global setting. */
   enabled: boolean;
   /**
-   * PAN-3965: the project holds merges for UAT, so one ready feature still
-   * gets a batch (its UAT stack). False = one ready feature merges directly.
+   * PAN-3965: one ready feature still gets a batch (its UAT stack). With
+   * exactly one feature queued this is that feature's own hold (its label,
+   * then the project, then global); otherwise the project-level hold.
+   * False = one ready feature merges directly.
    */
   holdsForUat: boolean;
   queue: MergeQueueItem[];
@@ -106,7 +108,8 @@ async function queueEntryForProject(
   config: ProjectConfig,
   enabled: boolean,
 ): Promise<MergeTrainQueueEntry> {
-  const holdsForUat = projectHoldsForUat(config, isFlywheelRequireUatBeforeMerge());
+  const globalRequireUat = isFlywheelRequireUatBeforeMerge();
+  const holdsForUat = projectHoldsForUat(config, globalRequireUat);
   const base = { projectKey: key, projectName: config.name, enabled, holdsForUat };
   if (!enabled) return { ...base, queue: [] };
 
@@ -122,6 +125,12 @@ async function queueEntryForProject(
   const queue = await Effect.runPromise(
     computeMergeQueueFromCandidates(candidates, projectPath).pipe(Effect.provide(nodeServicesLayer)),
   );
+  // Review of #4017: a lone ready feature's hold is its own (label, then
+  // project, then global), the same one the reconciler applies — the page must
+  // not say "merges directly" for a feature that gets a UAT batch.
+  if (queue.length === 1) {
+    return { ...base, holdsForUat: await issueHoldsForUat(queue[0]!.issueId, config, globalRequireUat), queue };
+  }
   return { ...base, queue };
 }
 

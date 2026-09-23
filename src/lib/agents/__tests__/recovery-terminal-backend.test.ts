@@ -29,7 +29,22 @@ const mocks = vi.hoisted(() => ({
   detectPendingOperatorDecision: vi.fn(async () => null),
   tmuxCreateSession: vi.fn(() => Effect.succeed(undefined)),
   tmuxSessionExists: vi.fn(() => Effect.succeed(false)),
+  tmuxListPaneValues: vi.fn(() => Effect.succeed([] as string[])),
+  tmuxKillSession: vi.fn(() => Effect.succeed(undefined)),
+  findRuntimePid: vi.fn(async () => null as number | null | 'indeterminate'),
+  queryTmuxSession: vi.fn(async () => 'missing' as 'exists' | 'missing' | 'error'),
 }));
+
+// The legacy tmux check on a Herdr host (liveness.ts) — never a real tmux call.
+vi.mock('../tmux-session-query.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../tmux-session-query.js')>();
+  return { ...actual, queryTmuxSession: mocks.queryTmuxSession };
+});
+
+vi.mock('../runtime-pid-probe.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../runtime-pid-probe.js')>();
+  return { ...actual, findAgentRuntimePidInSubtree: mocks.findRuntimePid };
+});
 
 vi.mock('../../terminal-backends/select.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../terminal-backends/select.js')>();
@@ -61,9 +76,9 @@ vi.mock('../../tmux.js', async (importOriginal) => {
     createSession: mocks.tmuxCreateSession,
     createSessionSync: vi.fn(() => { throw new Error('createSessionSync must not be called'); }),
     sessionExists: mocks.tmuxSessionExists,
-    killSession: vi.fn(() => Effect.succeed(undefined)),
+    killSession: mocks.tmuxKillSession,
     isPaneDead: vi.fn(() => Effect.succeed(false)),
-    listPaneValues: vi.fn(() => Effect.succeed([])),
+    listPaneValues: mocks.tmuxListPaneValues,
     sendKeys: vi.fn(() => Effect.succeed(undefined)),
   };
 });
@@ -155,6 +170,9 @@ beforeEach(() => {
   registerTerminalBackend(herdr);
   registerTerminalBackend(tmux);
   mocks.tmuxSessionExists.mockReturnValue(Effect.succeed(false));
+  mocks.tmuxListPaneValues.mockReturnValue(Effect.succeed([]));
+  mocks.findRuntimePid.mockResolvedValue(null);
+  mocks.queryTmuxSession.mockResolvedValue('missing');
   mocks.deliverAgentMessage.mockResolvedValue({ ok: true, path: 'herdr' });
   mocks.waitForPromptReady.mockResolvedValue(true);
 
@@ -271,6 +289,8 @@ describe('recoverAgent relaunches on the host backend (PAN-3960)', () => {
     expect(result?.action).toBe('already-running');
     expect(herdr.starts).toHaveLength(0);
     expect(tmux.starts).toHaveLength(0);
+    expect(herdr.closes).toHaveLength(0);
+    expect(tmux.closes).toHaveLength(0);
   });
 
   it('does not reap or relaunch when the liveness probe is indeterminate', async () => {
@@ -284,5 +304,60 @@ describe('recoverAgent relaunches on the host backend (PAN-3960)', () => {
 
     expect(result?.action).toBe('already-running');
     expect(herdr.starts).toHaveLength(0);
+    expect(herdr.closes).toHaveLength(0);
+    expect(tmux.closes).toHaveLength(0);
+  });
+
+  // Review of #3992 (M3): an agent launched before the host moved to Herdr is
+  // still running in its tmux session. Herdr knows nothing about it, and that
+  // must not read as a death — closeAgentPane would kill the live session.
+  it('treats a live same-name tmux session on a Herdr host as already running', async () => {
+    mocks.host = 'herdr';
+    const agentId = 'agent-pan-3960-recover-legacy-tmux';
+    writeStoppedAgent(agentId, 'tmux');
+    mocks.tmuxSessionExists.mockReturnValue(Effect.succeed(true));
+    mocks.queryTmuxSession.mockResolvedValue('exists');
+    mocks.tmuxListPaneValues.mockReturnValue(Effect.succeed(['4242\t0']));
+    mocks.findRuntimePid.mockResolvedValue(4243);
+
+    const result = await recoverAgent(agentId);
+
+    expect(result?.action).toBe('already-running');
+    expect(herdr.starts).toHaveLength(0);
+    expect(tmux.starts).toHaveLength(0);
+    expect(herdr.closes).toHaveLength(0);
+    expect(tmux.closes).toHaveLength(0);
+    expect(mocks.tmuxKillSession).not.toHaveBeenCalled();
+  });
+
+  // Review of #4018 (L2): a tmux probe that errors is not "no session".
+  it('does not reap when the legacy tmux probe on a Herdr host errors', async () => {
+    mocks.host = 'herdr';
+    const agentId = 'agent-pan-3960-recover-legacy-error';
+    writeStoppedAgent(agentId, 'tmux');
+    mocks.queryTmuxSession.mockResolvedValue('error');
+
+    const result = await recoverAgent(agentId);
+
+    expect(result?.action).toBe('already-running');
+    expect(herdr.starts).toHaveLength(0);
+    expect(herdr.closes).toHaveLength(0);
+    expect(tmux.closes).toHaveLength(0);
+  });
+
+  it('still reaps a legacy tmux corpse on a Herdr host and relaunches on Herdr', async () => {
+    mocks.host = 'herdr';
+    const agentId = 'agent-pan-3960-recover-legacy-corpse';
+    writeStoppedAgent(agentId, 'tmux');
+    mocks.tmuxSessionExists.mockReturnValue(Effect.succeed(true));
+    mocks.queryTmuxSession.mockResolvedValue('exists');
+    mocks.tmuxListPaneValues.mockReturnValue(Effect.succeed(['4242\t0']));
+    mocks.findRuntimePid.mockResolvedValue(null);
+
+    const result = await recoverAgent(agentId);
+
+    expect(result?.action).toBe('respawned');
+    expect(tmux.closes).toEqual([expect.objectContaining({ backend: 'tmux', paneId: agentId })]);
+    expect(herdr.starts).toHaveLength(1);
   });
 });

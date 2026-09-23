@@ -13,7 +13,7 @@ PAN-3917 cut the Flywheel page and its `pause`/`resume`/`abort`/`report`/`stats`
 | Run state: `running`, `paused`, `idle` | The `conv-flywheel` row in the `conversations` table and whether its tmux session is alive. `running` means the row is `active`, not mid-fork, and the session is up. `paused` means a row exists but is not running. `idle` means there is no row. | `readFlywheelRun()` |
 | Last tick, pick, phase, needs-you | The newest **assistant** message in the conversation's transcript that contains a tick marker. Its `createdAt` is the tick time. | `findLastTick()`, `parseTickMarker()` |
 | Freshness | The age of the last tick: 60 seconds or less is `live`, 20 minutes or less is `breathing`, and anything older is `stalled`. | `freshnessFor()` |
-| In-flight issues | The project's `workspaces/feature-*` directories (slot workspaces excluded), their derived issue state (`loadIssueStatesForProject`), and the last entry of each `<workspace>/.overdeck/pipeline.jsonl`. | `deriveFlywheelStatus()` |
+| In-flight issues | The project's `workspaces/feature-*` directories (slot workspaces excluded) whose issue is not merged or closed, their derived issue state (`loadIssueStatesForProject`), and the last entry of each `<workspace>/.overdeck/pipeline.jsonl`. | `deriveFlywheelStatus()` |
 | Policies | The control settings `auto_pickup_backlog`, `require_uat_before_merge`, and `merge_train_enabled`. | `control-settings.ts` |
 | Order book | The `running` book under the plan home's `.pan/orders/`, with landed/total from `computeBookProgress`. | `listBooks()` |
 | State tab | `<planHome>/.pan/flywheel/state.md` | `readFlywheelStateFile()` |

@@ -220,7 +220,7 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
     ? await (deps.loadStates ?? defaultLoadStates)(projectRoot, workspaces.map((ws) => ws.issueId))
     : new Map<string, DerivedIssueState>();
   const lastJournal = deps.lastJournal ?? defaultLastJournal;
-  const inFlight: FlywheelInFlightRow[] = await Promise.all(workspaces.map(async (ws) => {
+  const rows: FlywheelInFlightRow[] = await Promise.all(workspaces.map(async (ws) => {
     const derived = states.get(ws.issueId.toUpperCase());
     const entry = await lastJournal(ws.workspacePath);
     return {
@@ -231,6 +231,8 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
       lastJournal: entry ? { at: entry.at, type: entry.type, ...(entry.source ? { source: entry.source } : {}) } : null,
     };
   }));
+  // A merged or closed issue's workspace lingers until close-out; it is not in flight.
+  const inFlight = rows.filter((row) => row.state !== 'merged' && row.state !== 'closed');
 
   const [policies, orderBook] = await Promise.all([
     (deps.policies ?? defaultPolicies)(),

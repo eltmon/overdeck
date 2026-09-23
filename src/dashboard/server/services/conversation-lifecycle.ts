@@ -29,6 +29,7 @@ import {
   setClearedToConvId,
   type LegacyConversation as Conversation,
 } from '../../../lib/overdeck/conversations.js';
+import { closeCompanionTerminalForOwner } from '../../../lib/overdeck/companion-terminal/index.js';
 import {
   getRuntimeCensus,
   refreshRuntimeCensus,
@@ -36,6 +37,7 @@ import {
   type RuntimeCensus,
 } from '../../../lib/runtime-census.js';
 import { isRespawnPending } from './pending-respawn.js';
+import { isHarnessProcessAlive } from '../../../lib/tmux.js';
 import { encodeClaudeProjectDir, sessionFilePath, getOverdeckHome } from '../../../lib/paths.js';
 import { getHarnessBehavior } from '../../../lib/runtimes/behavior.js';
 import type { HarnessName } from '../../../lib/runtimes/types.js';
@@ -122,6 +124,27 @@ interface AgentStateFile {
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
+ * Whether an ended row whose session and harness looked alive in `census`
+ * should be resurrected. The census is up to RUNTIME_CENSUS_TTL_MS old, and
+ * the supervisor's exit event now ends a row within milliseconds, so the
+ * snapshot can predate an exit just recorded (PAN-3962). Never resurrects:
+ * - a /clear-ended parent — its session belongs to the post-/clear sibling;
+ * - a row ended after the snapshot was taken;
+ * - a row whose harness a fresh probe finds gone, or that another writer
+ *   changed while the probe ran.
+ */
+async function shouldResurrect(conv: Conversation, census: RuntimeCensus): Promise<boolean> {
+  if (conv.clearedToConvId != null) return false;
+  const fresh = getConversationByName(conv.name) ?? conv;
+  if (fresh.status !== 'ended' || fresh.clearedToConvId != null) return false;
+  const endedAtMs = fresh.endedAt ? Date.parse(fresh.endedAt) : Number.NaN;
+  if (endedAtMs >= census.sampledAt) return false;
+  if (!(await isHarnessProcessAlive(conv.tmuxSession))) return false;
+  const after = getConversationByName(conv.name) ?? fresh;
+  return after.status === 'ended' && after.endedAt === fresh.endedAt;
+}
+
+/**
  * Poll all active conversations and mark as ended any whose tmux session is gone.
  * Uses a single `tmux list-sessions` call instead of N individual `sessionExists`
  * subprocesses to avoid the N+1 spawn problem.
@@ -167,7 +190,7 @@ export async function pollConversations(): Promise<void> {
         // UI showed a gray dot + "Resume Session" on a conversation in active use.
         // tmux is the liveness oracle: a conversation whose session AND harness are
         // both alive must read 'active'. Resurrect it. Idempotent when already active.
-        if (conv.status === 'ended') {
+        if (conv.status === 'ended' && await shouldResurrect(conv, census)) {
           console.log(`[conversation-lifecycle] Session ${conv.tmuxSession} alive but row marked ended — resurrecting to active`);
           markConversationRunning(conv.name);
         }
@@ -225,6 +248,13 @@ export async function pollConversations(): Promise<void> {
         const diag = await captureCorpseDiagnostics(conv.tmuxSession, revalidationCensus);
         if (diag) keepAliveCorpseDiagnostics.push(`${conv.tmuxSession}${diag}`);
       }
+      // The supervisor's exit event may have ended the row (and run its
+      // cleanup) while this tick awaited the census; do not end it twice.
+      if (getConversationByName(conv.name)?.status === 'ended') continue;
+      // PAN-3974: close the companion terminal before the row is marked ended.
+      // Later ticks skip ended rows, so a close deferred past this point could be
+      // lost for good. Best-effort: a failed close never blocks the mark.
+      await closeCompanionTerminalForOwner(conv.tmuxSession).catch(() => undefined);
       markConversationEnded(conv.name);
       endedConversations.push(conv);
       if (sessionGone) sessionGoneCount++;

@@ -42,6 +42,7 @@ import { pipelineMembershipRouteLayer } from './routes/pipeline-membership.js'
 import { parkedRouteLayer } from './routes/parked.js'
 import { velocityRouteLayer } from './routes/velocity.js'
 import { agentsRouteLayer } from './routes/agents.js'
+import { agentDirectoryRouteLayer } from './routes/agent-directory.js'
 import { workspacesRouteLayer } from './routes/workspaces.js'
 import { workspaceRegistryRouteLayer } from './routes/workspace-registry.js'
 import { specialistsRouteLayer } from './routes/specialists.js'
@@ -58,6 +59,7 @@ import { miscRouteLayer } from './routes/misc.js';
 import { paletteRouteLayer } from './routes/palette.js';
 import { conversationsRouteLayer } from './routes/conversations.js';
 import { conversationsRetrospectiveRouteLayer } from './routes/conversations-retrospective.js';
+import { conversationCompanionTerminalRouteLayer } from './routes/conversation-companion-terminal.js';
 import { eventsRouteLayer } from './routes/events.js';
 import { projectsRouteLayer } from './routes/projects.js';
 import { projectsMergeTrainRouteLayer } from './routes/projects-merge-train.js';
@@ -343,6 +345,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   parkedRouteLayer,
   velocityRouteLayer,
   agentsRouteLayer,
+  agentDirectoryRouteLayer,
   workspacesRouteLayer,
   workspaceRegistryRouteLayer,
   specialistsRouteLayer,
@@ -359,6 +362,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   paletteRouteLayer,
   conversationsRouteLayer,
   conversationsRetrospectiveRouteLayer,
+  conversationCompanionTerminalRouteLayer,
   eventsRouteLayer,
   projectsRouteLayer,
   projectsMergeTrainRouteLayer,

@@ -207,6 +207,15 @@ the Overdeck agent id. `role` is one of
 `issue` token — that absence is also how the prompt guard recognizes an operator sender.
 Overdeck's own `ship` role maps to the `uat` token role (`toPaneRole`).
 
+`BackendPane.agentId` (PAN-3920) carries the Overdeck agent id into the dashboard's pane
+inventory: on Herdr it is the pane's `agentId` token, else Herdr's live agent name — but only on
+a pane that carries Overdeck tokens, because Herdr names every agent it detects (`codex-1`,
+`claude-1`), the operator's own panes included; on tmux it is the session name of an Overdeck
+session (agent state, or an `agent-`/`planning-`/`strike-`/`conv-` name). On Herdr `pane.id` is the
+backend handle (`w1:p1`), not the agent name, so any join from an agent to its pane — the
+Agents Directory's first of all — must match `pane.agentId === agent.id`, never `pane.id`.
+A pane created by a live event gets its `agentId` on the next inventory refresh (at most 5 s).
+
 ## Spawn paths (PAN-3960)
 
 Every path that starts an agent or a planner goes through `launchAgentPane`, so each one lands on
@@ -325,6 +334,84 @@ exited before kickoff.
 Spawn guards are backend-aware too: "is this agent already running" is `agentPaneExists`, a live
 tmux session or a live Herdr agent of that name, and the tmux-only session options
 (`destroy-unattached`, `remain-on-exit`) are applied only when the pane really is a tmux session.
+
+## Companion terminals (PAN-3974)
+
+A **companion terminal** is a second terminal session next to a conversation's own (owner)
+session, running a harness's native client attached to the owner's live runtime and exact
+session. It exists only so the operator can use the native CLI from the conversation TERMINAL
+view; dashboard delivery never goes through it (the composer keeps the ACP socket, app-server
+socket, and so on). OpenCode is the first adapter; Codex `codex resume --remote` (PAN-3835)
+reuses the same seam.
+
+| Piece | Where |
+| --- | --- |
+| Shared vocabulary (`CompanionTerminalKind`, `CompanionTerminalState`, `companionTerminalKindFor`, body whitelists) | `packages/contracts/src/companion-terminal.ts` |
+| Lifecycle (open / close / owner teardown, per-owner lock, generation checks) | `src/lib/overdeck/companion-terminal/lifecycle.ts` |
+| Host port + tmux implementation (async `tmuxExecAsync` / `createSession`, no keystrokes) | `src/lib/overdeck/companion-terminal/host.ts` |
+| OpenCode adapter | `src/lib/overdeck/companion-terminal/opencode-adapter.ts` |
+| Wiring + `closeCompanionTerminalForOwner` | `src/lib/overdeck/companion-terminal/index.ts` |
+| Routes | `src/dashboard/server/routes/conversation-companion-terminal.ts` |
+| UI | `src/dashboard/frontend/src/components/chat/ConversationTerminalView.tsx` |
+
+**Session.** One companion per owner, named `companion-<ownerSession>` on the managed tmux
+socket (conversations are tmux on every host until PAN-3921). The prefix is ignored by the
+backend inventory, `isAgentSessionName`, and every reaper. The pane runs
+`exec <absolute binary> …`, so the session ends when the native client exits. The dashboard
+streams it through the ordinary `/ws/terminal?session=` path; a browser disconnect only drops the
+PTY client, and no `destroy-unattached` is set, so the companion survives.
+
+**Generation.** `sha256(ownerSession, owner #{session_created}, adapter fingerprint)`, 24 hex. The
+OpenCode fingerprint is `<port>:<sessionId>`, so any owner respawn (new tmux session, new port)
+changes it. It is stamped on the companion at creation as the session env var
+`OVERDECK_COMPANION_GENERATION` (`new-session -e`, atomic) and read back with `show-environment`;
+the tmux session is the authority and nothing else is stored. Rules:
+
+- Every operation on one owner runs through a per-owner promise lock, so concurrent opens create
+  one companion.
+- Open reuses a companion only when its stamp equals the current generation; any other session
+  under that name is killed and replaced. When unsure, kill and recreate: the companion holds no
+  state, the harness session does.
+- After creating, open resolves the generation again. If the owner changed meanwhile, it kills the
+  companion it created (only if the stamp is still its own) and answers `owner-changed` (409).
+- Close must carry the generation the browser was given; a mismatch answers `stale-generation`
+  (409) and kills nothing.
+- An owner whose tmux session is gone makes open reap any companion (`owner-not-running`).
+
+**Owner teardown.** `closeCompanionTerminalForOwner(ownerSession)` never throws and is called from
+`stopConversationRuntime` (stop, delete, archive, resume/restart failure, flywheel archive; after
+the shared-session early return, so a runtime another conversation still owns keeps its companion),
+from `spawnConversationSession` right before it kills the owner
+session (every resume and restart-all), and for owners that exited on their own from both the
+conversation lifecycle poll and the PTY supervisor's `exited` event (`agent-projection.ts`). Those
+two close the companion before marking the row ended, because later writers skip ended rows.
+
+**OpenCode adapter.** Reads `~/.overdeck/agents/<ownerSession>/opencode-port` and `acp-session-id`
+(PAN-3937), the cwd from the conversation record, and the binary from `resolveHarnessBinary`, then
+asks `GET http://127.0.0.1:<port>/session/<id>` (2 s timeout) before handing out
+`opencode attach http://127.0.0.1:<port> --session <id> --dir <cwd>`. Attach only; never `--fork`,
+`--continue`, `serve`, or a second `acp`.
+
+| owner tmux | `opencode-port` | `acp-session-id` | `GET /session/<id>` | result |
+| --- | --- | --- | --- | --- |
+| gone | – | – | – | `owner-not-running` |
+| alive | any | missing | – | `owner-starting` |
+| alive | missing | present | – | `restart-required` (pre-PAN-3937 host) |
+| alive | malformed | or malformed | – | `restart-required` |
+| alive | present | present | error / non-2xx | `owner-starting` |
+| alive | present | present | 404 | `session-missing` |
+| alive | present | present | 2xx | attach |
+
+**Routes.** `POST /api/conversations/:name/companion-terminal/open` (body `{}`) and
+`…/close` (body `{ generation }`), both behind `rejectUnsafeDashboardMutationRequest`. Any other
+body key or any query parameter is a 400: the browser can never name a URL, command, session id,
+cwd, binary, or terminal target. Responses are `CompanionTerminalState` bodies; `unsupported` is
+400, `owner-changed` / `stale-generation` are 409, everything else 200.
+
+**Adding a harness (PAN-3835).** Add a kind to `CompanionTerminalKind`, map it in
+`companionTerminalKindFor`, write an adapter whose `resolveTarget` returns argv, cwd, and a
+fingerprint from server-side records, and register it in `defaultAdapters()` in `index.ts`. The
+lifecycle, routes, and UI need no change.
 
 ## Herdr wire facts (v0.9.1, protocol 22)
 
@@ -608,3 +695,30 @@ agent-fix14-exits      liveness {"kind":"exited","paneId":"wK:p3"}   ← shell b
 ```
 
 Teardown: both panes closed, `workspace.close wK` → `{ok:true}`, no app-server host survived.
+
+## Live verification record — OpenCode companion terminal (PAN-3974)
+
+2026-09-23, OpenCode 1.18.31, tmux 3.4. Everything ran on a private socket (`tmux -L pan3974-test`)
+against a throwaway owner: `opencode acp --hostname 127.0.0.1 --port 54333` in a scratch directory,
+with an ACP session created over stdio (`ses_f31392699ffePn4CdhKK6zUR0E`). The real lifecycle,
+OpenCode adapter, and tmux host drove it, with the host's `exec`/`createSession` bound to that socket.
+No live conversation or dashboard was touched.
+
+```
+GET /session/<ACP session id>           → 200 (an ACP-created session is visible over HTTP)
+open ×2 concurrently                    → one companion created, second answer reused:true
+pane command                            → opencode "exec '<abs>/opencode' 'attach' 'http://127.0.0.1:54333'
+                                            '--session' 'ses_…' '--dir' '<scratch>/oc-acp'"
+OVERDECK_COMPANION_GENERATION           → 9bd653f22a0eef0992eb340f
+capture-pane -e                         → native OpenCode TUI (prompt box, "Build · <model> · xhigh",
+                                            "tab agents / ctrl+p commands"), 162 ANSI escape runs, truecolor
+OpenCode sessions before/after attach   → 13 → 13 (no second session)
+PTY tmux client attached, then killed   → companion still alive (browser disconnect)
+reopen                                  → reused:true
+close with a stale generation           → stale-generation; companion still alive
+close with the current generation       → closed; companion gone; owner alive; GET /session/<id> 200
+owner teardown after reopening          → companion gone
+opencode-port removed                   → restart-required; no companion created
+```
+
+Teardown: `tmux -L pan3974-test kill-server`; port 54333 no longer answers.

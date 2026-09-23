@@ -21,6 +21,11 @@ import { sharedTranscriptParser } from '../../services/shared-transcript-parser.
 import {
   listAgentTranscriptCandidates,
 } from '../../../../lib/agents/transcript-resolver.js';
+import {
+  isSafeSubagentId,
+  listAgentSubagents,
+  resolveAgentSubagentTranscript,
+} from '../../services/agent-subagents.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import {
@@ -100,6 +105,7 @@ const EMPTY_CONVERSATION: ConversationResponse = { messages: [], workLog: [], st
 
 type AgentConversationResult =
   | { status: 200; body: ConversationResponse }
+  | { status: 400; body: { error: string } }
   | { status: 404; body: { error: string; checked: string[] } }
   | { status: 500; body: { error: string } };
 
@@ -118,9 +124,16 @@ function missingTranscript(id: string, checked: string[]): AgentConversationResu
  * Dispatches on harness so Pi and Codex agents get their native parsers (PAN-2012).
  * Claude resolution follows the append-only session index, newest first.
  */
-export async function buildAgentConversationResult(id: string): Promise<AgentConversationResult> {
+export async function buildAgentConversationResult(
+  id: string,
+  opts: { subagentId?: string } = {},
+): Promise<AgentConversationResult> {
+  if (opts.subagentId !== undefined && !isSafeSubagentId(opts.subagentId)) {
+    return { status: 400, body: { error: 'subagentId must match ^[A-Za-z0-9_-]+$' } };
+  }
   try {
     const workspace = await Effect.runPromise(getAgentWorkspace(id));
+    if (opts.subagentId !== undefined) return await buildAgentSubagentResult(id, workspace ?? '', opts.subagentId);
     const candidates = await listAgentTranscriptCandidates(id, workspace ?? '');
     const checked = candidates.map(({ path }) => path);
     let selected: (typeof candidates)[number] | null = null;
@@ -156,6 +169,22 @@ export async function buildAgentConversationResult(id: string): Promise<AgentCon
   }
 }
 
+/** One subagent transcript of an agent (PAN-3920 W2, `?subagentId=`). */
+async function buildAgentSubagentResult(
+  id: string,
+  workspace: string,
+  subagentId: string,
+): Promise<AgentConversationResult> {
+  const resolved = await resolveAgentSubagentTranscript(id, workspace, subagentId);
+  if (!resolved) {
+    return { status: 404, body: { error: `No subagent ${subagentId} found for ${id}.`, checked: [] } };
+  }
+  const result = resolved.kind === 'claude'
+    ? await parseEntireConversation(resolved.path)
+    : await parseCodexConversationMessages(resolved.path);
+  return { status: 200, body: { ...result, streaming: false } };
+}
+
 /** Compatibility helper retained for callers that only consume a transcript body. */
 export async function buildConversationResponse(id: string): Promise<ConversationResponse> {
   const result = await buildAgentConversationResult(id);
@@ -168,9 +197,38 @@ export const getAgentConversationRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const urlOpt = HttpServerRequest.toURL(request);
+    const subagentId = Option.isSome(urlOpt) ? urlOpt.value.searchParams.get('subagentId') : null;
     return yield* Effect.promise(async () => {
-      const result = await buildAgentConversationResult(id);
+      const result = await buildAgentConversationResult(id, subagentId === null ? {} : { subagentId });
       return jsonResponse(result.body, { status: result.status });
+    });
+  })),
+);
+
+// ─── Route: GET /api/agents/:id/subagents ────────────────────────────────────
+
+/** The agent's in-harness subagents (PAN-3920 W2). Transcript paths stay server-side. */
+export async function buildAgentSubagentsResult(id: string): Promise<{ subagents: Array<Record<string, unknown>> }> {
+  const workspace = await Effect.runPromise(getAgentWorkspace(id));
+  const subagents = await listAgentSubagents(id, workspace ?? '');
+  return { subagents: subagents.map(({ transcriptPath: _path, ...summary }) => summary) };
+}
+
+export const getAgentSubagentsRoute = HttpRouter.add(
+  'GET',
+  '/api/agents/:id/subagents',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    return yield* Effect.promise(async () => {
+      try {
+        return jsonResponse(await buildAgentSubagentsResult(id));
+      } catch (err) {
+        console.error('[agent-subagents] failed for', id, err);
+        return jsonResponse({ error: `Failed to list subagents for ${id}.` }, { status: 500 });
+      }
     });
   })),
 );

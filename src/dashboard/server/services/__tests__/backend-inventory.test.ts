@@ -110,6 +110,17 @@ describe('listBackendPanes — Herdr fixture', () => {
     expect(HERDR_SNAPSHOT[2]?.tokens.issue).toBeUndefined();
   });
 
+  it('carries the snapshot agentId onto the pane', async () => {
+    // PAN-3920 W1: on Herdr the pane id is `w1:p1`, so joins to agents use agentId.
+    const [first, second] = HERDR_SNAPSHOT;
+    const panes = await listBackendPanes({
+      backend: herdrBackend([{ ...first!, agentId: 'agent-pan-3917' }, second!]),
+      now: () => NOW,
+    });
+    expect(panes[0]?.agentId).toBe('agent-pan-3917');
+    expect(panes[1]).not.toHaveProperty('agentId');
+  });
+
   // PAN-3956 D8: a Herdr host never reads tmux as a fallback inventory.
   it('serves the last-known panes and never reads tmux when the herdr adapter reports unsupported', async () => {
     const previous = new BackendPaneCache(await listBackendPanes({ backend: herdrBackend(), now: () => NOW }));
@@ -206,6 +217,15 @@ describe('listBackendPanes — tmux fixture', () => {
     });
     expect(first?.harness).toBe('unknown');
     expect(first?.model).toBe('unknown');
+  });
+
+  it('uses the session name as the agent id', async () => {
+    const [first] = await listBackendPanes({
+      backend: null,
+      now: () => NOW,
+      listTmuxPanes: async () => TMUX_PROBES,
+    });
+    expect(first?.agentId).toBe('agent-pan-3917');
   });
 });
 

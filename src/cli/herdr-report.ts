@@ -26,8 +26,9 @@ export function renderHerdrReport(spinner: Ora, report: EnsureHerdrReport): void
     return;
   }
   if (!report.server.running) {
-    spinner.fail(`Herdr session server '${report.session}' is not running: ${report.server.reason ?? 'unknown reason'}`);
-    console.log(chalk.dim(`  ${HERDR_DOWN_HINT}`));
+    const state = report.server.stateUnknown ? 'state is unknown' : 'is not running';
+    spinner.fail(`Herdr session server '${report.session}' ${state}: ${report.server.reason ?? 'unknown reason'}`);
+    console.log(chalk.dim(`  ${report.server.hint ?? HERDR_DOWN_HINT}`));
   } else {
     const version = report.binary.version ?? 'unknown version';
     const action = report.binary.action === 'present' ? '' : ` (${report.binary.action})`;

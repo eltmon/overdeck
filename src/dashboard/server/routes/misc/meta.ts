@@ -116,7 +116,9 @@ const postRunSyncRoute = HttpRouter.add(
   Effect.promise(async () => {
     try {
       const invocation = panCliInvocation(['sync']);
-      const { stdout, stderr } = await execFileAsync(invocation.command, invocation.args, { encoding: 'utf-8', timeout: 180_000 });
+      // Light Herdr pass: no minutes-long update/installs that the timeout would orphan (PAN-3956).
+      const env = { ...process.env, OVERDECK_HERDR_SYNC_LIGHT: '1' };
+      const { stdout, stderr } = await execFileAsync(invocation.command, invocation.args, { encoding: 'utf-8', timeout: 180_000, env });
       return jsonResponse({ ok: true, output: `${stdout}${stderr}`.trim() });
     } catch (error: any) {
       const detail = String(error?.stderr || error?.message || error);

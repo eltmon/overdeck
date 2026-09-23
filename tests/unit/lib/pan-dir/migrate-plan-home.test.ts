@@ -157,13 +157,17 @@ describe('migratePanHome', () => {
     expect(second.progressUpdated).toEqual([]);
   });
 
-  it('re-copies a source file that changed after the first run', async () => {
+  // Review of #4015 (4015-1): a destination that differs is someone's work;
+  // it is reported as a conflict and never replaced.
+  it('reports a destination that differs from the state copy as a conflict and leaves it', async () => {
     await migratePanHome({ stateRoot, planHome, openIssues: OPEN });
     write(stateRoot, 'drafts/pan-100.md', '# revised\n');
 
     const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN });
-    expect(result.copied).toEqual(['drafts/pan-100.md']);
-    expect(readFileSync(join(planHome, '.pan/drafts/pan-100.md'), 'utf8')).toBe('# revised\n');
+    expect(result.copied).toEqual([]);
+    expect(result.conflicts).toEqual(['drafts/pan-100.md']);
+    expect(result.remaining).toBe(1);
+    expect(readFileSync(join(planHome, '.pan/drafts/pan-100.md'), 'utf8')).toBe('# open draft\n');
   });
 
   it('creates the continue file and merges item progress from records/ statusOverrides', async () => {
@@ -218,18 +222,18 @@ describe('migratePanHome', () => {
     expect(secondWrite.items).toEqual(firstParsed.items);
   });
 
-  it('merges a later status change into the existing items map without clobbering other items', async () => {
+  it('never replaces an existing continue file whose content differs, even for a later status change', async () => {
     await migratePanHome({ stateRoot, planHome, openIssues: OPEN });
+    const before = readFileSync(join(planHome, '.pan/continues/PAN-100.xbrief.json'), 'utf8');
     writeJson(stateRoot, 'records/pan-100.json', {
       issueId: 'PAN-100',
       statusOverrides: { 'item-b': 'completed' },
     });
 
     const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN });
-    expect(result.progressUpdated).toEqual(['PAN-100']);
-    const dest = JSON.parse(readFileSync(join(planHome, '.pan/continues/PAN-100.xbrief.json'), 'utf8'));
-    expect(dest.items['item-a'].status).toBe('completed');
-    expect(dest.items['item-b'].status).toBe('completed');
+    expect(result.progressUpdated).toEqual([]);
+    expect(result.conflicts).toEqual(['continues/PAN-100.xbrief.json']);
+    expect(readFileSync(join(planHome, '.pan/continues/PAN-100.xbrief.json'), 'utf8')).toBe(before);
   });
 
   it('--dry-run reports what would be copied and writes nothing', async () => {
@@ -376,8 +380,11 @@ describe('migratePanHome: plan home that ignores .pan/ (PAN-3996)', () => {
     expect((failure as Error).message).toContain(`${join(planHome, '.git', 'info', 'exclude')}:1`);
     expect(git(planHome, 'log', '-1', '--format=%s').trim()).toBe('init');
     expect(readFileSync(join(planHome, '.git/info/exclude'), 'utf8')).toBe('.pan/\n');
-    // The legacy line is gone from the working tree (the message says so); nothing was staged.
-    expect(readFileSync(join(planHome, '.gitignore'), 'utf8')).toBe('node_modules/\n# Overdeck state\ndist/\n');
+    // Review of #3998 (L6): the legacy line is put back, so no orphaned
+    // .gitignore edit is left for a later `git add -A` to sweep up.
+    expect((failure as Error).message).toContain('was kept and nothing was committed');
+    expect(readFileSync(join(planHome, '.gitignore'), 'utf8')).toBe(LEGACY_GITIGNORE);
+    expect(git(planHome, 'status', '--porcelain', '--', '.gitignore')).toBe('');
     expect(git(planHome, 'diff', '--cached', '--name-only')).toBe('');
   });
 
@@ -412,6 +419,196 @@ describe('migratePanHome: plan home that ignores .pan/ (PAN-3996)', () => {
     expect((failure as Error).message).toContain('hook says no');
     expect(git(planHome, 'diff', '--cached', '--name-only')).toBe('');
     expect(git(planHome, 'log', '-1', '--format=%s').trim()).toBe('init');
+    // Review of #3998 (L6): the removal is undone, so a rerun finds the legacy
+    // line again and commits its removal together with the artifacts.
+    expect(readFileSync(join(planHome, '.gitignore'), 'utf8')).toBe(LEGACY_GITIGNORE);
+    expect(git(planHome, 'status', '--porcelain', '--', '.gitignore')).toBe('');
+
+    rmSync(join(planHome, '.git/hooks/pre-commit'));
+    const rerun = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, commit: true });
+    expect(rerun.committed).toBe(true);
+    expect(rerun.ignoreLinesRemoved).toEqual([3]);
+    expect(headFiles()).toContain('.gitignore');
+    expect(git(planHome, 'status', '--porcelain')).toBe('');
+  });
+});
+
+// Review of #3998 (M6): --commit commits only what this run wrote, plus what
+// an earlier run provably wrote. A `.pan/` edit someone else left uncommitted
+// is reported and stays out of the migration commit.
+describe('migratePanHome --commit scope (review of #3998)', () => {
+  const OPERATOR_CONTINUE = {
+    version: '1',
+    issueId: 'PAN-100',
+    created: '2026-01-01T00:00:00.000Z',
+    updated: '2026-09-01T00:00:00.000Z',
+    items: { 'item-a': { status: 'in_progress', note: 'live agent progress, not yet committed' } },
+  };
+
+  beforeEach(() => {
+    write(root, 'empty-gitconfig', '');
+    vi.stubEnv('GIT_CONFIG_GLOBAL', join(root, 'empty-gitconfig'));
+    vi.stubEnv('GIT_CONFIG_NOSYSTEM', '1');
+    initGit(planHome);
+    write(planHome, 'README.md', 'repo\n');
+    git(planHome, 'add', '--', 'README.md');
+    git(planHome, 'commit', '-q', '-m', 'init');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const headFiles = (): string[] =>
+    git(planHome, 'show', '--name-only', '--format=', 'HEAD').split('\n').filter(Boolean).sort();
+  const status = (): string => git(planHome, 'status', '--porcelain', '--untracked-files=all');
+
+  it('does not commit a pre-existing uncommitted .pan/ edit it left unchanged', async () => {
+    // No records/ overrides for PAN-100, so the migration has nothing to add to
+    // the continue file and leaves the live one exactly as it is.
+    rmSync(join(stateRoot, 'records/pan-100.json'));
+    writeJson(planHome, '.pan/continues/PAN-100.xbrief.json', OPERATOR_CONTINUE);
+    const before = readFileSync(join(planHome, '.pan/continues/PAN-100.xbrief.json'), 'utf8');
+
+    const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, commit: true });
+
+    expect(result.committed).toBe(true);
+    expect(result.copied).not.toContain('continues/PAN-100.xbrief.json');
+    expect(result.leftUncommitted).toEqual(['continues/PAN-100.xbrief.json']);
+    expect(headFiles()).not.toContain('.pan/continues/PAN-100.xbrief.json');
+    expect(headFiles()).toContain('.pan/drafts/pan-100.md');
+    expect(readFileSync(join(planHome, '.pan/continues/PAN-100.xbrief.json'), 'utf8')).toBe(before);
+    expect(status()).toBe('?? .pan/continues/PAN-100.xbrief.json\n');
+  });
+
+  it('does not commit an uncommitted edit to an already-tracked .pan/ file', async () => {
+    rmSync(join(stateRoot, 'records/pan-100.json'));
+    writeJson(planHome, '.pan/continues/PAN-100.xbrief.json', OPERATOR_CONTINUE);
+    git(planHome, 'add', '--', '.pan/continues/PAN-100.xbrief.json');
+    git(planHome, 'commit', '-q', '-m', 'agent progress');
+    writeJson(planHome, '.pan/continues/PAN-100.xbrief.json', { ...OPERATOR_CONTINUE, items: {} });
+
+    const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, commit: true });
+
+    expect(result.leftUncommitted).toEqual(['continues/PAN-100.xbrief.json']);
+    expect(headFiles()).not.toContain('.pan/continues/PAN-100.xbrief.json');
+    expect(status()).toBe(' M .pan/continues/PAN-100.xbrief.json\n');
+  });
+
+  it('still commits files an earlier run copied when they match the state worktree', async () => {
+    await migratePanHome({ stateRoot, planHome, openIssues: OPEN });
+
+    const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, commit: true });
+
+    expect(result.copied).toEqual([]);
+    expect(result.leftUncommitted).toEqual([]);
+    expect(result.committed).toBe(true);
+    expect(headFiles()).toContain('.pan/drafts/pan-100.md');
+    expect(headFiles()).toContain('.pan/continues/PAN-100.xbrief.json');
+    expect(status()).toBe('');
+  });
+
+  it('leaves unrelated uncommitted .pan/ files alone', async () => {
+    write(planHome, '.pan/drafts/pan-999.md', '# operator draft, not in the state worktree\n');
+
+    await migratePanHome({ stateRoot, planHome, openIssues: OPEN, commit: true });
+
+    expect(headFiles()).not.toContain('.pan/drafts/pan-999.md');
+    expect(status()).toBe('?? .pan/drafts/pan-999.md\n');
+  });
+});
+
+// Review of #4015 (4015-1): a newer plan-home file is never rolled back to the
+// state snapshot.
+describe('migratePanHome never overwrites newer plan-home work (review of #4015)', () => {
+  beforeEach(() => {
+    write(root, 'empty-gitconfig', '');
+    vi.stubEnv('GIT_CONFIG_GLOBAL', join(root, 'empty-gitconfig'));
+    vi.stubEnv('GIT_CONFIG_NOSYSTEM', '1');
+    initGit(planHome);
+    // The plan home moved on after the Cut: a newer, tracked backlog and continue file.
+    write(planHome, '.pan/backlog/sequence.md', '# Backlog Sequence\nopen: 852 (2026-09-23)\n');
+    writeJson(planHome, '.pan/continues/PAN-100.xbrief.json', {
+      version: '1', issueId: 'PAN-100', created: '2026-01-01T00:00:00.000Z', items: { 'item-a': { status: 'completed' } },
+    });
+    git(planHome, 'add', '--', '.pan');
+    git(planHome, 'commit', '-q', '-m', 'newer plan-home state');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('--commit neither overwrites nor commits a newer tracked destination', async () => {
+    const newerBacklog = readFileSync(join(planHome, '.pan/backlog/sequence.md'), 'utf8');
+    const newerContinue = readFileSync(join(planHome, '.pan/continues/PAN-100.xbrief.json'), 'utf8');
+
+    const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, commit: true });
+
+    expect(result.conflicts).toEqual(['backlog/sequence.md', 'continues/PAN-100.xbrief.json']);
+    expect(result.copied).not.toContain('backlog/sequence.md');
+    expect(readFileSync(join(planHome, '.pan/backlog/sequence.md'), 'utf8')).toBe(newerBacklog);
+    expect(readFileSync(join(planHome, '.pan/continues/PAN-100.xbrief.json'), 'utf8')).toBe(newerContinue);
+    const committed = git(planHome, 'show', '--name-only', '--format=', 'HEAD');
+    expect(committed).not.toContain('.pan/backlog/sequence.md');
+    expect(committed).not.toContain('.pan/continues/PAN-100.xbrief.json');
+    expect(committed).toContain('.pan/drafts/pan-100.md');
+    expect(git(planHome, 'status', '--porcelain', '--untracked-files=all')).toBe('');
+  });
+
+  // migration-complete.json records the state worktree's setup (every state
+  // worktree has one), not a plan-home migration: it never blocks a run.
+  it('runs on a state worktree that carries migration-complete.json and still never overwrites', async () => {
+    writeJson(stateRoot, 'migration-complete.json', { completedAt: '2026-07-10T03:30:41.003Z', version: 1 });
+    const newerBacklog = readFileSync(join(planHome, '.pan/backlog/sequence.md'), 'utf8');
+
+    const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, commit: true });
+
+    expect(result.copied).toContain('drafts/pan-100.md');
+    expect(result.conflicts).toContain('backlog/sequence.md');
+    expect(result.committed).toBe(true);
+    expect(readFileSync(join(planHome, '.pan/backlog/sequence.md'), 'utf8')).toBe(newerBacklog);
+    expect(existsSync(join(planHome, '.pan/migration-complete.json'))).toBe(false);
+  });
+});
+
+// Review of #3998 (L7): the ignore check is needed only by a commit. When git
+// cannot answer it, a copy or dry run reports that and carries on.
+describe('migratePanHome when the ignore check fails (review of #3998)', () => {
+  beforeEach(() => {
+    initGit(planHome);
+    // A global config git cannot parse makes every git call in the plan home fail.
+    write(root, 'broken-gitconfig', '[core\n');
+    vi.stubEnv('GIT_CONFIG_GLOBAL', join(root, 'broken-gitconfig'));
+    vi.stubEnv('GIT_CONFIG_NOSYSTEM', '1');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('--dry-run reports the failed check instead of aborting', async () => {
+    const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, dryRun: true });
+
+    expect(result.panIgnore.kind).toBe('check-failed');
+    expect(result.panIgnore.kind === 'check-failed' && result.panIgnore.detail).toMatch(/git rev-parse failed/);
+    expect(result.copied.length).toBeGreaterThan(0);
+    expect(existsSync(join(planHome, '.pan'))).toBe(false);
+  });
+
+  it('a plain copy carries on and copies', async () => {
+    const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN });
+
+    expect(result.panIgnore.kind).toBe('check-failed');
+    expect(result.remaining).toBe(0);
+    expect(existsSync(join(planHome, '.pan/drafts/pan-100.md'))).toBe(true);
+  });
+
+  it('--commit still stops on it before copying anything', async () => {
+    const failure = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, commit: true }).catch((e: unknown) => e);
+
+    expect(failure).toBeInstanceOf(PlanHomeGitError);
+    expect(existsSync(join(planHome, '.pan'))).toBe(false);
   });
 });
 

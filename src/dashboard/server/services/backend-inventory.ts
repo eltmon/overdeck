@@ -129,6 +129,7 @@ function tmuxProbeToPane(
 
   const pane: { -readonly [K in keyof BackendPane]: BackendPane[K] } = {
     id: probe.session,
+    agentId: probe.session,
     role: parsed.role,
     // FR-3: the tmux adapter reports no metadata tokens.
     harness: 'unknown',
@@ -399,26 +400,128 @@ export async function hasLiveBackendPane(issueId: string, deps: BackendInventory
   return (await getBackendPanesForIssue(issueId, deps)).some((pane) => pane.state !== 'exited');
 }
 
+/** First delay before re-opening a failed or ended event stream; doubles per failure. */
+export const EVENT_STREAM_RETRY_MIN_MS = 1_000;
+/** Ceiling for the re-open backoff. The retry never gives up. */
+export const EVENT_STREAM_RETRY_MAX_MS = 30_000;
+/** An open that has not produced a stream by now is abandoned and retried. */
+export const EVENT_STREAM_OPEN_TIMEOUT_MS = 15_000;
+/** A stream that stayed open this long counts as healthy: the backoff starts over. */
+export const EVENT_STREAM_STABLE_MS = 10_000;
+
+type OpenedStream = Awaited<ReturnType<typeof openStreamOnce>>;
+
+/** `backend.events()` as a promise: the stream, `unsupported`, or null on failure. */
+function openStreamOnce(backend: TerminalBackend) {
+  return Effect.runPromise(backend.events().pipe(Effect.catch(() => Effect.succeed(null))));
+}
+
 /**
- * Open the backend event stream and fold it into the cache. Idempotent; a
- * backend that cannot stream events is left to the TTL refresh.
+ * `openStreamOnce` bounded by `EVENT_STREAM_OPEN_TIMEOUT_MS`: a server that
+ * accepts the subscription but never acknowledges it must not leave the
+ * re-open pending forever. A stream that arrives after the deadline is closed.
  */
-export async function startBackendInventory(deps: BackendInventoryDeps = {}): Promise<void> {
-  if (eventStreamClose) return;
-  await getBackendPanes(deps);
+async function openStreamWithDeadline(backend: TerminalBackend): Promise<OpenedStream | 'timeout'> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let timedOut = false;
+  const opening = openStreamOnce(backend);
+  const deadline = new Promise<'timeout'>((resolve) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      resolve('timeout');
+    }, EVENT_STREAM_OPEN_TIMEOUT_MS);
+    timer.unref?.();
+  });
+  try {
+    return await Promise.race([opening, deadline]);
+  } finally {
+    if (timer) clearTimeout(timer);
+    if (timedOut) {
+      void opening.then((late) => {
+        if (late !== null && !isUnsupported(late)) late.close();
+      }, () => {});
+    }
+  }
+}
 
+let inventoryStarted = false;
+let streamGeneration = 0;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+let retryDelayMs = EVENT_STREAM_RETRY_MIN_MS;
+let streamRetryWarned = false;
+
+/**
+ * Re-open the stream after `retryDelayMs` (1 s, 2 s, 4 s … capped at 30 s).
+ * One warning per failure streak.
+ */
+function scheduleResubscribe(deps: BackendInventoryDeps, why: string): void {
+  if (!inventoryStarted || retryTimer) return;
+  const delay = retryDelayMs;
+  retryDelayMs = Math.min(retryDelayMs * 2, EVENT_STREAM_RETRY_MAX_MS);
+  if (!streamRetryWarned) {
+    streamRetryWarned = true;
+    console.warn(`[backend-inventory] pane event stream ${why}; re-opening with backoff (up to every `
+      + `${EVENT_STREAM_RETRY_MAX_MS / 1000}s)`);
+  }
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    void openEventStream(deps, true).catch((error: unknown) => {
+      scheduleResubscribe(deps, `could not be re-opened (${error instanceof Error ? error.message : String(error)})`);
+    });
+  }, delay);
+  retryTimer.unref?.();
+}
+
+/**
+ * Open the event stream and fold it into the cache. A stream that cannot be
+ * opened (Herdr not up yet at dashboard boot) or that ends (Herdr restarted)
+ * is re-opened with backoff; a backend that cannot stream at all is left to
+ * the TTL refresh (PAN-3956 review finding 8).
+ */
+async function openEventStream(deps: BackendInventoryDeps, reopening: boolean): Promise<void> {
+  if (!inventoryStarted) return;
   const backend = await resolveBackend(deps);
-  if (!backend) return;
+  if (!backend || !inventoryStarted) return;
 
-  const stream = await Effect.runPromise(
-    backend.events().pipe(Effect.catch(() => Effect.succeed(null))),
-  );
-  if (stream === null || isUnsupported(stream)) return;
+  const stream = await openStreamWithDeadline(backend);
+  if (stream === 'timeout') {
+    scheduleResubscribe(deps, `was not acknowledged within ${EVENT_STREAM_OPEN_TIMEOUT_MS / 1000}s`);
+    return;
+  }
+  if (stream !== null && isUnsupported(stream)) return;
+  if (!inventoryStarted) {
+    stream?.close();
+    return;
+  }
+  if (stream === null) {
+    scheduleResubscribe(deps, 'could not be opened');
+    return;
+  }
 
+  if (reopening) {
+    // Events were missed while the stream was down: fold onto a fresh snapshot.
+    // Taken before the stream is published, and the stream is closed if it
+    // fails, so a failed re-open never leaves a subscription nobody reads.
+    refreshedAt = 0;
+    try {
+      await getBackendPanes(deps);
+    } catch (error) {
+      stream.close();
+      throw error;
+    }
+    if (!inventoryStarted) {
+      stream.close();
+      return;
+    }
+  }
+  const generation = ++streamGeneration;
   eventStreamClose = () => stream.close();
+  const openedAt = Date.now();
   void (async () => {
     try {
       for await (const event of stream.events) {
+        retryDelayMs = EVENT_STREAM_RETRY_MIN_MS;
+        streamRetryWarned = false;
         if (!cache) continue;
         const before = cache.list();
         cache.apply(event);
@@ -426,11 +529,42 @@ export async function startBackendInventory(deps: BackendInventoryDeps = {}): Pr
       }
     } catch (error) {
       console.warn(`[backend-inventory] event stream ended: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      // However the reader stopped, the subscription is released (idempotent).
+      stream.close();
     }
+    // Stopped, or superseded by a newer stream: nothing to re-open.
+    if (generation !== streamGeneration || !inventoryStarted) return;
+    eventStreamClose = null;
+    if (Date.now() - openedAt >= EVENT_STREAM_STABLE_MS) {
+      // A stream that held (even a quiet one) resets the backoff and the warning.
+      retryDelayMs = EVENT_STREAM_RETRY_MIN_MS;
+      streamRetryWarned = false;
+    }
+    scheduleResubscribe(deps, 'ended');
   })();
 }
 
+/**
+ * Take the first snapshot and open the backend event stream. Idempotent; a
+ * backend that cannot stream events is left to the TTL refresh.
+ */
+export async function startBackendInventory(deps: BackendInventoryDeps = {}): Promise<void> {
+  if (inventoryStarted) return;
+  inventoryStarted = true;
+  await getBackendPanes(deps);
+  await openEventStream(deps, false).catch((error: unknown) => {
+    scheduleResubscribe(deps, `could not be opened (${error instanceof Error ? error.message : String(error)})`);
+  });
+}
+
 export function stopBackendInventory(): void {
+  inventoryStarted = false;
+  streamGeneration++;
+  if (retryTimer) clearTimeout(retryTimer);
+  retryTimer = null;
+  retryDelayMs = EVENT_STREAM_RETRY_MIN_MS;
+  streamRetryWarned = false;
   eventStreamClose?.();
   eventStreamClose = null;
 }
@@ -441,6 +575,6 @@ export function _resetBackendInventoryForTests(): void {
   inventoryDegraded = false;
   refreshedAt = 0;
   inFlight = null;
-  eventStreamClose = null;
+  stopBackendInventory();
   paneListener = null;
 }

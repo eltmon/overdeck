@@ -12,11 +12,19 @@
  * commits in the plan home only with `commit: true`, and never touches the
  * state worktree.
  *
+ * It never replaces a file that already exists in `.pan/`: a destination that
+ * differs from the state copy is newer work in the plan home as often as not
+ * (the state worktree stopped moving at the Cut), so it is reported as a
+ * conflict and left alone.
+ *
  * PAN-3996: pre-Cut tooling wrote `.pan/` into project `.gitignore` files.
  * The plan home is checked for that before anything is written; under
  * `commit: true` Overdeck's exact legacy line is removed and `.gitignore` is
  * committed together with the artifacts. Any other rule ignoring `.pan/` is
- * reported, never edited (see `legacy-pan-ignore.ts`).
+ * reported, never edited (see `legacy-pan-ignore.ts`). The migration commit
+ * holds only what this run wrote, plus files provably left by an earlier run
+ * (identical to what the state worktree produces); other `.pan/` changes in
+ * the plan home are reported and stay uncommitted.
  *
  * This is the ONE place left under `src/` allowed to read the legacy
  * `records/<issue>.json` shape (`tasks.statusOverrides` / `statusOverrides`)
@@ -39,31 +47,26 @@ import {
   type ContinueState,
 } from '../xbrief/continue-state.js';
 import { parseXBriefFilename } from '../xbrief/lifecycle.js';
-import {
-  describePanIgnore,
-  detectPanIgnore,
-  removeLegacyPanIgnore,
-  runPlanHomeGit,
-  type PanIgnoreStatus,
-} from './legacy-pan-ignore.js';
+import { detectPanIgnore, type PanIgnoreStatus } from './legacy-pan-ignore.js';
 import { resolvePlanHome } from './paths.js';
+import {
+  assertCommittable,
+  commitOnly,
+  removeLegacyLineForCommit,
+  uncommittedPaths,
+  type LegacyIgnoreRemoval,
+} from './plan-home-commit.js';
 
 export { PlanHomeGitError } from './legacy-pan-ignore.js';
+export { MigratePlanHomeError } from './plan-home-commit.js';
 
 /**
- * A `--commit` migration refused before it wrote anything, for a reason the
- * operator has to resolve (PAN-3996). Git failures surface as `PlanHomeGitError`.
+ * The ignore check could not run (an old git, a `safe.directory` refusal, …).
+ * Only a run that does not commit carries on past it; it reports the reason.
  */
-export class MigratePlanHomeError extends Error {
-  readonly _tag = 'MigratePlanHomeError' as const;
-
-  constructor(
-    readonly code: 'pan-ignored-by-foreign-rule' | 'gitignore-dirty',
-    message: string,
-  ) {
-    super(message);
-    this.name = 'MigratePlanHomeError';
-  }
+export interface PanIgnoreCheckFailed {
+  readonly kind: 'check-failed';
+  readonly detail: string;
 }
 
 export const MIGRATION_COMMIT_SUBJECT = 'chore(workspace): migrate planning artifacts from overdeck-state';
@@ -96,17 +99,28 @@ export interface MigratePanHomeResult {
   copied: string[];
   /** Source files that were already byte-identical (or content-identical, for continues) at the destination. */
   unchanged: number;
-  /** Source files still not matching the destination after the pass (always 0 on a successful non-dry run). */
+  /** Source files still not matching the destination after the pass: failed copies plus `conflicts`. */
   remaining: number;
+  /**
+   * Destinations that already exist in `.pan/` and differ from what the state
+   * worktree would put there. Never overwritten; relative to `.pan`.
+   */
+  conflicts: string[];
   /** Per-issue files skipped because their issue is not open. */
   skippedClosed: number;
   committed: boolean;
   /** Open issues whose `.pan/continues/<ISSUE>.xbrief.json` item statuses were created or updated from `records/` overrides. */
   progressUpdated: string[];
   /** Whether the plan home ignores `.pan/`, checked before anything is written (PAN-3996). */
-  panIgnore: PanIgnoreStatus;
+  panIgnore: PanIgnoreStatus | PanIgnoreCheckFailed;
   /** Legacy `.pan/` lines removed from the plan home's `.gitignore` (only ever under `commit`). */
   ignoreLinesRemoved: number[];
+  /**
+   * Under `commit`: `.pan/` paths this run manages but left out of the commit
+   * because it did not write them and they differ from what the state
+   * worktree produces (someone else's uncommitted edit). Relative to `.pan`.
+   */
+  leftUncommitted: string[];
 }
 
 /** The issue a per-issue artifact belongs to, or null when the name says nothing. */
@@ -209,6 +223,17 @@ function withoutUpdated(obj: Record<string, unknown> | null): Record<string, unk
   return rest;
 }
 
+/** `base` with the `records/` overrides merged into its `items` map. */
+function withMergedItems(
+  base: Record<string, unknown>,
+  overrides: Record<string, string> | null,
+): Record<string, unknown> {
+  const items = overrides
+    ? mergeItems(base.items as ContinueItemsMap | undefined, overrides)
+    : (base.items as ContinueItemsMap | undefined);
+  return items ? { ...base, items } : { ...base };
+}
+
 function mergeItems(
   base: ContinueItemsMap | undefined,
   overrides: Record<string, string>,
@@ -240,26 +265,44 @@ export async function migratePanHome(options: MigratePanHomeOptions): Promise<Mi
   const panDir = join(planHome, '.pan');
   const commit = Boolean(options.commit) && !dryRun;
 
+
   // Checked before anything is written: an ignored `.pan/` makes the commit
-  // below impossible, and a half-done migration is worse than none.
-  const panIgnore = await detectPanIgnore(planHome);
-  if (commit) await assertCommittable(planHome, panIgnore);
+  // below impossible, and a half-done migration is worse than none. A copy or
+  // a dry run does not need the answer, so a failed check only stops a commit.
+  let panIgnore: PanIgnoreStatus | PanIgnoreCheckFailed;
+  try {
+    panIgnore = await detectPanIgnore(planHome);
+  } catch (error) {
+    if (commit) throw error;
+    panIgnore = { kind: 'check-failed', detail: error instanceof Error ? error.message : String(error) };
+  }
+  if (commit && panIgnore.kind !== 'check-failed') await assertCommittable(planHome, panIgnore, 'Nothing was copied.');
 
   const copied: string[] = [];
-  /** Every destination this run owns, copied or already in place — the commit set. */
-  const managed: string[] = [];
+  /**
+   * Destinations already in place that are provably migration output: byte
+   * copies identical to their source, and continues equal to what the state
+   * worktree produces. A previous run copied them, so a commit takes them.
+   */
+  const provable: string[] = [];
+  /** Destinations already in place that this run did not write and cannot vouch for. */
+  const unprovable: string[] = [];
+  /** Destinations that exist and differ from the state copy: reported, never replaced. */
+  const conflicts: string[] = [];
   let unchanged = 0;
   let skippedClosed = 0;
   const pending: { source: string; dest: string; rel: string }[] = [];
 
   const consider = (source: string, rel: string): void => {
     const dest = join(panDir, rel);
-    managed.push(rel);
-    if (sameBytes(source, dest)) {
+    if (!existsSync(dest)) {
+      pending.push({ source, dest, rel });
+    } else if (sameBytes(source, dest)) {
       unchanged += 1;
-      return;
+      provable.push(rel);
+    } else {
+      conflicts.push(rel);
     }
-    pending.push({ source, dest, rel });
   };
 
   // Byte-copied per-issue artifacts (drafts, specs).
@@ -314,20 +357,32 @@ export async function migratePanHome(options: MigratePanHomeOptions): Promise<Mi
     const destPath = join(panDir, destRel);
     const currentDest = readJson(destPath);
     const sourceJson = sourcePath ? readJson(sourcePath) : null;
+    if (!currentDest && existsSync(destPath)) {
+      conflicts.push(destRel); // unreadable, but someone's file all the same
+      continue;
+    }
 
     const base: Record<string, unknown> = currentDest ?? sourceJson ?? {
       version: '1',
       issueId,
       created: new Date().toISOString(),
     };
-    const mergedItems = overrides
-      ? mergeItems(base.items as ContinueItemsMap | undefined, overrides)
-      : (base.items as ContinueItemsMap | undefined);
-    const desired: Record<string, unknown> = mergedItems ? { ...base, items: mergedItems } : { ...base };
+    const desired = withMergedItems(base, overrides);
 
-    managed.push(destRel);
     if (deepEqual(withoutUpdated(desired), withoutUpdated(currentDest))) {
       unchanged += 1;
+      // `desired` starts from the destination itself, so "unchanged" says
+      // nothing about who wrote it. It is ours only when it equals what the
+      // state worktree alone produces (timestamps aside).
+      const created = currentDest && 'created' in currentDest ? { created: currentDest.created } : {};
+      const fromState = withMergedItems(sourceJson ?? { version: '1', issueId, ...created }, overrides);
+      (deepEqual(withoutUpdated(fromState), withoutUpdated(currentDest)) ? provable : unprovable).push(destRel);
+      continue;
+    }
+    if (currentDest) {
+      // The live continue file carries progress the state worktree never saw;
+      // stale record statuses must not overwrite it.
+      conflicts.push(destRel);
       continue;
     }
 
@@ -338,88 +393,50 @@ export async function migratePanHome(options: MigratePanHomeOptions): Promise<Mi
     }
   }
 
-  const remaining = dryRun
+  const remaining = conflicts.length + (dryRun
     ? copied.length
-    : pending.filter((entry) => !sameBytes(entry.source, entry.dest)).length;
+    : pending.filter((entry) => !sameBytes(entry.source, entry.dest)).length);
 
   let committed = false;
   const ignoreLinesRemoved: number[] = [];
+  let leftUncommitted: string[] = [];
   if (commit) {
-    // The migrated artifacts — copied now, or already in place but never
-    // committed (a run without --commit, or one whose commit failed) — plus
-    // the `.gitignore` repair. Nothing else: the operator's own work, staged
-    // or not, stays out of the migration commit.
-    const commitPaths = managed.map((rel) => join('.pan', rel));
+    // What this run wrote, what an earlier run provably wrote (a run without
+    // --commit, or one whose commit failed), and the `.gitignore` repair.
+    // Nothing else: the operator's or a live agent's `.pan/` edits, and any
+    // other work, staged or not, stay out of the migration commit.
+    const commitPaths = [...copied, ...provable].map((rel) => join('.pan', rel));
+    let removal: LegacyIgnoreRemoval | null = null;
     if (panIgnore.kind === 'legacy') {
-      const repair = await removeLegacyPanIgnore(planHome);
-      if (repair.gitignorePath) commitPaths.push(relative(planHome, repair.gitignorePath));
-      ignoreLinesRemoved.push(...repair.removed.map((entry) => entry.line));
-      if (repair.status.kind === 'foreign') {
-        throw new MigratePlanHomeError(
-          'pan-ignored-by-foreign-rule',
-          `removed Overdeck's legacy .pan/ line from ${repair.gitignorePath ?? '.gitignore'}, but .pan/ is still `
-          + `ignored by ${describePanIgnore(repair.status)}, which is not Overdeck's and was left alone. `
-          + 'Nothing was committed. Remove or narrow that rule, then rerun with --commit.',
-        );
-      }
+      // Restores `.gitignore` itself when a foreign rule still ignores `.pan/`.
+      removal = await removeLegacyLineForCommit(planHome, panIgnore);
+      if (removal.gitignore) commitPaths.push(removal.gitignore);
     }
-    committed = await commitOnly(planHome, [...new Set(commitPaths)]);
+    try {
+      // After the repair: files under a removed ignore rule are visible to git only now.
+      const left = await uncommittedPaths(planHome, unprovable.map((rel) => join('.pan', rel)));
+      leftUncommitted = left.map((path) => relative('.pan', path)).sort();
+      committed = await commitOnly(planHome, [...new Set(commitPaths)], MIGRATION_COMMIT_SUBJECT);
+    } catch (error) {
+      // The legacy line goes only in the commit that also carries it away.
+      await removal?.restore();
+      throw error;
+    }
+    if (removal) ignoreLinesRemoved.push(...removal.lines);
   }
 
   return {
     copied: copied.sort(),
     unchanged,
     remaining,
+    conflicts: conflicts.sort(),
     skippedClosed,
     committed,
     progressUpdated: progressUpdated.sort(),
     panIgnore,
     ignoreLinesRemoved,
+    leftUncommitted,
   };
-}
-
-/**
- * Refuse a `--commit` run that could not commit cleanly, before anything is
- * written: `.pan/` ignored by a rule that is not Overdeck's, or a `.gitignore`
- * with uncommitted changes that `git commit --only -- .gitignore` would sweep
- * into the migration commit along with the legacy-line removal.
- */
-async function assertCommittable(planHome: string, panIgnore: PanIgnoreStatus): Promise<void> {
-  if (panIgnore.kind === 'foreign') {
-    throw new MigratePlanHomeError(
-      'pan-ignored-by-foreign-rule',
-      `.pan/ is ignored by ${describePanIgnore(panIgnore)}, which is not Overdeck's legacy line, so it was not `
-      + 'edited and nothing was copied. Remove or narrow that rule, then rerun with --commit.',
-    );
-  }
-  if (panIgnore.kind !== 'legacy') return;
-  const dirty = await runPlanHomeGit(planHome, ['status', '--porcelain', '--', panIgnore.source]);
-  if (dirty.trim()) {
-    throw new MigratePlanHomeError(
-      'gitignore-dirty',
-      `${panIgnore.source} has uncommitted changes; committing the legacy .pan/ line removal would sweep them `
-      + 'into the migration commit. Commit or revert them, then rerun with --commit. Nothing was copied.',
-    );
-  }
-}
-
-/**
- * Stage exactly `paths` and commit only them (`git commit --only`). Returns
- * false when there was nothing to commit. On a git failure our staging is
- * undone (pathspec-scoped) and the `PlanHomeGitError` is rethrown.
- */
-async function commitOnly(planHome: string, paths: readonly string[]): Promise<boolean> {
-  if (paths.length === 0) return false;
-  try {
-    await runPlanHomeGit(planHome, ['add', '--', ...paths]);
-    const staged = await runPlanHomeGit(planHome, ['diff', '--cached', '--name-only', '--', ...paths]);
-    if (!staged.trim()) return false;
-    await runPlanHomeGit(planHome, ['commit', '--only', '-m', MIGRATION_COMMIT_SUBJECT, '--', ...paths]);
-    return true;
-  } catch (error) {
-    await runPlanHomeGit(planHome, ['reset', '-q', '--', ...paths]).catch(() => undefined);
-    throw error;
-  }
 }
 
 export function readOpenIssuesFile(path: string): string[] {

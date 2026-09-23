@@ -2,10 +2,13 @@
  * POST /api/agents/:id/lifecycle (PAN-3849 W33, PAN-3962)
  *
  * The PTY supervisor observes the harness process directly (it owns the PTY
- * master) and posts lifecycle events here: session-started, turn-started,
- * turn-ended, exited. `:id` is the supervised terminal session id — an agent
- * id or a conversation's `conv-<name>` tmux session; this one route serves
- * both (applyAgentLifecycleEvent picks the target).
+ * master) and posts lifecycle events here: session-started, turn-started (on
+ * a confirmed injection) and exited. `turn-ended` is accepted but the
+ * supervisor does not emit it: it cannot see a turn end without a per-harness
+ * prompt heuristic. Each post carries `launchedAt`, the supervisor's start
+ * time, naming its launch generation. `:id` is the supervised terminal
+ * session id — an agent id or a conversation's `conv-<name>` tmux session;
+ * this one route serves both (applyAgentLifecycleEvent picks the target).
  *
  * For an agent, each event appends an event: its exit emits `agent.stopped`
  * without any patrol inferring it from a missing tmux session, and
@@ -14,8 +17,9 @@
  *
  * For a conversation (no agent state, but a conversations row whose
  * tmux_session is `:id`), session-started marks the row active, exited marks
- * it ended, and turn/exit edges append `agent.activity_changed` keyed by the
- * session id.
+ * it ended, and start/turn/exit edges append `agent.activity_changed` keyed by
+ * the session id. An exit from a launch older than the in-flight respawn or
+ * the newest started launch is acknowledged and not recorded.
  *
  * Auth: the per-session pty-token (x-overdeck-pty-token), the same credential
  * the delivery socket uses. Only the supervisor process holding the token
@@ -76,11 +80,15 @@ export const postAgentLifecycleRoute = HttpRouter.add(
       ? body['at']
       : new Date().toISOString();
     const exitCode = typeof body['exitCode'] === 'number' ? body['exitCode'] : undefined;
+    const launchedAt = typeof body['launchedAt'] === 'string' && !Number.isNaN(Date.parse(body['launchedAt']))
+      ? body['launchedAt']
+      : undefined;
 
     const result = yield* Effect.promise(() => applyAgentLifecycleEvent(id, {
       event: event as AgentLifecycleEventName,
       at,
       ...(exitCode !== undefined ? { exitCode } : {}),
+      ...(launchedAt !== undefined ? { launchedAt } : {}),
     }));
     if (!result.applied) {
       // A retried POST carrying an already-applied event is a success for the
@@ -88,10 +96,11 @@ export const postAgentLifecycleRoute = HttpRouter.add(
       if (result.reason === 'duplicate') {
         return jsonResponse({ success: true, applied: false, reason: 'duplicate' });
       }
-      // A conversation's old harness exiting inside a respawn window is
-      // expected and final — nothing to retry, nothing to record.
-      if (result.reason === 'respawn-pending') {
-        return jsonResponse({ success: true, applied: false, reason: 'respawn-pending' });
+      // A conversation's replaced harness exiting (inside a respawn window,
+      // or after a newer launch started) is expected and final — nothing to
+      // retry, nothing to record.
+      if (result.reason === 'respawn-pending' || result.reason === 'superseded-launch') {
+        return jsonResponse({ success: true, applied: false, reason: result.reason });
       }
       const status = result.reason === 'no-state' ? 404 : 409;
       return jsonResponse({ success: false, error: `lifecycle event not applied: ${result.reason}` }, { status });

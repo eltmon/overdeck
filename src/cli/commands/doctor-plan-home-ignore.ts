@@ -5,8 +5,9 @@
  * artifacts now live under `.pan/` in the plan home and are committed, so that
  * rule makes every planning commit there fail. This row names each affected
  * plan home with the rule's `file:line` and the repair. Doctor has no `--fix`,
- * so it only reports: `pan admin migrate-plan-home <key> --commit` removes
- * Overdeck's legacy line and commits it; any other rule is the operator's.
+ * so it only reports: `pan admin migrate-plan-home <key> --repair-ignore`
+ * removes Overdeck's legacy line and commits `.gitignore` alone, without the
+ * migration or a tracker lookup; any other rule is the operator's.
  *
  * Every input is injectable (the doctor-inotify pattern).
  */
@@ -71,8 +72,8 @@ export async function checkPlanHomePanIgnore(partial: Partial<PlanHomeIgnoreDoct
 
     problems.push(`${key} (${describePanIgnore(status)})`);
     fixes.push(status.kind === 'legacy'
-      ? `${key}: pan admin migrate-plan-home ${key} --commit — removes Overdeck's legacy line `
-        + `${status.source}:${status.line} and commits it (or delete that line and commit it yourself)`
+      ? `${key}: pan admin migrate-plan-home ${key} --repair-ignore — removes Overdeck's legacy line `
+        + `${status.source}:${status.line} and commits .gitignore alone (or delete that line and commit it yourself)`
       : `${key}: ${describePanIgnore(status)} is not Overdeck's legacy line — remove or narrow it yourself`);
   }
 

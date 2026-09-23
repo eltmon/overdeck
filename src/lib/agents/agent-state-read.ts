@@ -19,6 +19,7 @@
  * are unaffected — this is a structural split, not an API change.
  */
 import { existsSync, readFileSync, readdirSync } from 'fs';
+import { readdir, readFile } from 'fs/promises';
 import { join } from 'path';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { TerminalBackendName } from '../terminal-backends/types.js';
@@ -299,4 +300,29 @@ export function listAgentStatesSync(): AgentState[] {
     if (state) states.push(state);
   }
   return states;
+}
+
+/**
+ * Async form of {@link listAgentStatesSync} for request paths (PAN-3920).
+ * `skip` drops directory names before any read (e.g. `conv-*`), and a
+ * `state.json` removed mid-scan (agent GC) is skipped rather than thrown.
+ */
+export async function listAgentStatesAsync(options: { skip?: (name: string) => boolean } = {}): Promise<AgentState[]> {
+  let entries: string[];
+  try {
+    entries = await readdir(join(getOverdeckHome(), 'agents'));
+  } catch {
+    return [];
+  }
+  const states = await Promise.all(entries
+    .filter((name) => !options.skip?.(name))
+    .map(async (name) => {
+      const normalizedId = normalizeAgentId(name);
+      try {
+        return parseAgentState(await readFile(getAgentStateFilePath(normalizedId), 'utf8'), normalizedId);
+      } catch {
+        return null;
+      }
+    }));
+  return states.filter((state): state is AgentState => state !== null);
 }

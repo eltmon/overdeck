@@ -499,6 +499,25 @@ describe('PAN-3965 no batch for a single ready feature', () => {
     expect(deps.assembled[0]!.map((f) => f.issueId)).toEqual(['PAN-1']);
   });
 
+  it('asks about the lone ready feature, so a per-issue UAT hold gets its batch (review of #3993, M4)', async () => {
+    const proj = freshProject();
+    const asked: string[] = [];
+    const deps = {
+      ...makeDeps(proj, { readySet: [READY[0]!] }),
+      // An async per-issue decision: the issue carries `hold-for-uat` in an `auto` project.
+      holdsForUat: async (feature: ReadyFeature) => {
+        asked.push(feature.issueId);
+        return true;
+      },
+    };
+
+    const result = await reconcileUatGenerations(proj, deps);
+
+    expect(asked).toEqual(['PAN-1']);
+    expect(result.action).toBe('assembled');
+    expect(deps.assembled[0]!.map((f) => f.issueId)).toEqual(['PAN-1']);
+  });
+
   it('assembles exactly one generation when two features are ready, held or not', async () => {
     for (const holdsForUat of [false, true]) {
       const proj = freshProject();

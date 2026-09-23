@@ -6,6 +6,7 @@
 import { Effect } from 'effect';
 import type {
   AgentPaneRef,
+  BackendRef,
   StartAgentSpec,
   TerminalBackend,
   TerminalBackendName,
@@ -17,14 +18,20 @@ export interface FakeStartCall {
   readonly spec: StartAgentSpec;
 }
 
-export type FakeTerminalBackend = TerminalBackend & { readonly starts: FakeStartCall[] };
+export type FakeTerminalBackend = TerminalBackend & {
+  readonly starts: FakeStartCall[];
+  /** Every pane or session `close` was called with, in order. */
+  readonly closes: BackendRef[];
+};
 
 export function fakeTerminalBackend(name: TerminalBackendName): FakeTerminalBackend {
   const starts: FakeStartCall[] = [];
+  const closes: BackendRef[] = [];
   const unsupported = () => Effect.succeed({ unsupported: true as const, reason: 'fake backend' });
   const backend = {
     name,
     starts,
+    closes,
     workspaceFor: (issueId: string, cwd: string) =>
       Effect.succeed({ backend: name, workspaceId: `ws-${issueId}`, issueId, cwd }),
     startAgent: (workspace: WorkspaceRef, spec: StartAgentSpec) => {
@@ -49,7 +56,10 @@ export function fakeTerminalBackend(name: TerminalBackendName): FakeTerminalBack
     list: () => Effect.succeed([]),
     events: unsupported,
     reportMetadata: unsupported,
-    close: () => Effect.succeed({ ok: true as const }),
+    close: (ref: BackendRef) => {
+      closes.push(ref);
+      return Effect.succeed({ ok: true as const });
+    },
     resume: unsupported,
   };
   return backend as unknown as FakeTerminalBackend;

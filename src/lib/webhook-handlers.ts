@@ -227,8 +227,9 @@ async function handleCheckRunPromise(payload: WebhookPayload): Promise<void> {
       }
     } else if (run.conclusion?.toUpperCase() === 'SUCCESS' && isCiTestCheckName(run.name) && pr.head.sha) {
       // PAN-3965: a green CI test job resets the verification attempt count
-      // for a `verification.tests: ci` project (a no-op for any other project).
-      await Effect.runPromise(recordCiTestGatePass({ issueId, headSha: pr.head.sha, source: sourceKey }));
+      // for a `verification.tests: ci` project (a no-op for any other project,
+      // and for a strike or bypass PR, whose head is not the feature branch).
+      await Effect.runPromise(recordCiTestGatePass({ issueId, headSha: pr.head.sha, headRef: pr.head.ref, source: sourceKey }));
     }
   }
 }

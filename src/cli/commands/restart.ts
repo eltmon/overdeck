@@ -524,7 +524,9 @@ export async function shouldRunManualSupervisorCycle(env: NodeJS.ProcessEnv = pr
   if (env.OVERDECK_SKIP_SUPERVISOR_CYCLE === '1') return false;
 
   try {
-    const { systemdUserAvailable, isSupervisorUnitActive } = await import('../../lib/systemd.js');
+    const { supervisorUnitAllowed, systemdUserAvailable, isSupervisorUnitActive } = await import('../../lib/systemd.js');
+    // A non-canonical home's supervisor is its own process, never the shared unit.
+    if (!supervisorUnitAllowed(env)) return true;
     return !(await systemdUserAvailable() && await isSupervisorUnitActive());
   } catch {
     return true;
