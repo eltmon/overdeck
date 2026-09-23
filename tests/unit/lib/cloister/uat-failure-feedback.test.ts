@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   resolveProjectFromIssueSync: vi.fn(),
@@ -30,7 +30,10 @@ import {
   clearUatFailureFeedbackAnchor,
   MAX_UAT_FAILURE_FEEDBACK_ANCHORS,
   relayUatFailureFeedback,
+  relayUatFailureFeedbackPromise,
   resetUatFailureFeedbackStateForTests,
+  UAT_AMBIGUOUS_DELIVERY_RETRY_MS,
+  uatFeedbackDedupKey,
 } from '../../../../src/lib/cloister/uat-failure-feedback.js';
 
 describe('relayUatFailureFeedback', () => {
@@ -64,6 +67,7 @@ describe('relayUatFailureFeedback', () => {
       agentMessageSent: true,
       needsYouSurfaced: false,
       deduplicated: false,
+      dedupKey: uatFeedbackDedupKey('PAN-3575', 'head-one'),
     });
     expect(mocks.writeFeedbackFile).toHaveBeenCalledWith(expect.objectContaining({
       issueId: 'PAN-3575',
@@ -76,7 +80,7 @@ describe('relayUatFailureFeedback', () => {
       'agent-pan-3575',
       expect.stringContaining(`MUST READ: ${feedbackPath}`),
       'internal',
-      { owesRework: true, feedbackRedelivery: true },
+      { owesRework: true, feedbackRedelivery: true, dedupKey: uatFeedbackDedupKey('PAN-3575', 'head-one') },
     );
   });
 
@@ -175,6 +179,7 @@ describe('relayUatFailureFeedback', () => {
       agentMessageSent: false,
       needsYouSurfaced: false,
       deduplicated: true,
+      dedupKey: uatFeedbackDedupKey('PAN-3575', 'head-one'),
     });
     expect(later.deduplicated).toBe(false);
     expect(mocks.writeFeedbackFile).toHaveBeenCalledTimes(2);
@@ -208,9 +213,90 @@ describe('relayUatFailureFeedback', () => {
     const failed = await Effect.runPromise(relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-two' }));
     const retry = await Effect.runPromise(relayUatFailureFeedback({ issueId: 'PAN-3575', anchor: 'head-two' }));
 
-    expect(failed).toEqual({ agentMessageSent: false, needsYouSurfaced: false, deduplicated: false });
-    expect(retry).toEqual({ agentMessageSent: false, needsYouSurfaced: false, deduplicated: false });
+    const key = uatFeedbackDedupKey('PAN-3575', 'head-two');
+    expect(failed).toEqual({ agentMessageSent: false, needsYouSurfaced: false, deduplicated: false, dedupKey: key });
+    expect(retry).toEqual({ agentMessageSent: false, needsYouSurfaced: false, deduplicated: false, dedupKey: key });
     expect(mocks.messageAgent).toHaveBeenCalledTimes(2);
     expect(mocks.writeFeedbackFile).toHaveBeenCalledTimes(4);
+  });
+
+  describe('PAN-4030: once per failing anchor across CLI processes', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('keys delivery on the anchor: stable for one anchor, distinct across anchors and issues', () => {
+      const key = uatFeedbackDedupKey('PAN-3575', 'abc123');
+      expect(key).toMatch(/^uat-feedback:pan-3575:[0-9a-f]{16}$/);
+      expect(uatFeedbackDedupKey('pan-3575', 'abc123')).toBe(key);
+      expect(uatFeedbackDedupKey('PAN-3575', 'def456')).not.toBe(key);
+      expect(uatFeedbackDedupKey('PAN-9999', 'abc123')).not.toBe(key);
+    });
+
+    it('a repeat whose key the delivery store already holds is deduplicated, not re-sent or escalated', async () => {
+      // A fresh process (empty in-memory map) re-relays the same anchor: the
+      // keyed store reports the message was already delivered.
+      mocks.messageAgent.mockResolvedValue({ delivered: true, queuedToMail: false, deduplicated: true });
+
+      const result = await relayUatFailureFeedbackPromise({
+        issueId: 'PAN-3575',
+        uatNotes: 'Criterion 2 unmet.',
+        anchor: 'abc123',
+      });
+
+      expect(result).toEqual(expect.objectContaining({
+        agentMessageSent: false,
+        needsYouSurfaced: false,
+        deduplicated: true,
+      }));
+      expect(mocks.surfaceIssueFeedbackNeedsYou).not.toHaveBeenCalled();
+    });
+
+    it('omits the key when no anchor is known', async () => {
+      const result = await relayUatFailureFeedbackPromise({ issueId: 'PAN-3575', uatNotes: 'x' });
+
+      expect(result.dedupKey).toBeUndefined();
+      expect(mocks.messageAgent).toHaveBeenCalledWith(
+        'agent-pan-3575',
+        expect.any(String),
+        'internal',
+        { owesRework: true, feedbackRedelivery: true },
+      );
+    });
+
+    it('retries an ambiguous keyed delivery with the same key', async () => {
+      vi.useFakeTimers();
+      const ambiguous = Object.assign(new Error('socket closed mid-response'), { name: 'AmbiguousKeyedDeliveryError' });
+      mocks.messageAgent
+        .mockRejectedValueOnce(ambiguous)
+        .mockResolvedValueOnce({ delivered: true, queuedToMail: false });
+
+      const pending = relayUatFailureFeedbackPromise({ issueId: 'PAN-3575', uatNotes: 'x', anchor: 'abc123' });
+      await vi.advanceTimersByTimeAsync(UAT_AMBIGUOUS_DELIVERY_RETRY_MS);
+      const result = await pending;
+
+      expect(result.agentMessageSent).toBe(true);
+      expect(mocks.messageAgent).toHaveBeenCalledTimes(2);
+      const key = uatFeedbackDedupKey('PAN-3575', 'abc123');
+      for (const call of mocks.messageAgent.mock.calls) {
+        expect(call[3]).toEqual(expect.objectContaining({ dedupKey: key }));
+      }
+    });
+
+    it('falls back to one unkeyed delivery when the transport cannot enforce a key', async () => {
+      mocks.messageAgent
+        .mockRejectedValueOnce(new Error('MessageDeliveryFailed: keyed delivery failed for agent-pan-3575 (internal): the ACP tier cannot enforce a dedup key'))
+        .mockResolvedValueOnce({ delivered: true, queuedToMail: false });
+
+      const result = await relayUatFailureFeedbackPromise({ issueId: 'PAN-3575', uatNotes: 'x', anchor: 'abc123' });
+
+      expect(result.agentMessageSent).toBe(true);
+      expect(mocks.messageAgent).toHaveBeenLastCalledWith(
+        'agent-pan-3575',
+        expect.any(String),
+        'internal',
+        { owesRework: true, feedbackRedelivery: true },
+      );
+    });
   });
 });

@@ -56,6 +56,22 @@ class FeedbackDeliveryTimeoutError extends Error {
   }
 }
 
+/** Bound an advisory feedback delivery by {@link FEEDBACK_DELIVERY_TIMEOUT_MS}. */
+async function withFeedbackDeadline<T>(delivery: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new FeedbackDeliveryTimeoutError(FEEDBACK_DELIVERY_TIMEOUT_MS)),
+      FEEDBACK_DELIVERY_TIMEOUT_MS,
+    );
+  });
+  try {
+    return await Promise.race([delivery, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 /** The forge that owns a workspace's review artifact, read from its origin remote. */
 export async function forgeForWorkspace(cwd: string): Promise<ForgeType> {
   try {
@@ -211,25 +227,13 @@ export async function doneCommand(
     // session, so a hung delivery leaves that agent waiting forever. Bound it.
     try {
       const { deliverReviewVerdictFeedback } = await import('../../../lib/cloister/review-verdict-feedback.js');
-      const delivery = Effect.runPromise(deliverReviewVerdictFeedback({
+      await withFeedbackDeadline(Effect.runPromise(deliverReviewVerdictFeedback({
         issueId: normalizedIssueId,
         verdict: options.status,
         notes: options.notes,
         prUrl: artifact.url,
         ...(options.runId ? { runId: options.runId } : {}),
-      }));
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      const timeout = new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new FeedbackDeliveryTimeoutError(FEEDBACK_DELIVERY_TIMEOUT_MS)),
-          FEEDBACK_DELIVERY_TIMEOUT_MS,
-        );
-      });
-      try {
-        await Promise.race([delivery, timeout]);
-      } finally {
-        if (timer) clearTimeout(timer);
-      }
+      })));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (err instanceof FeedbackDeliveryTimeoutError) {
@@ -247,6 +251,42 @@ export async function doneCommand(
       }
       console.warn(chalk.yellow(`Could not deliver review feedback: ${message}`));
     }
+  }
+
+  // PAN-4030: a browser UAT result is observed here and nowhere else — the
+  // test role's `--uat-status`, or the uat role's own status. The verdict is
+  // already on the PR; a failure owes rework, so relay the UAT notes to the
+  // work agent (or a needs-you when none can be reached), once per failing PR
+  // head. A passing UAT clears that anchor.
+  const uatOutcome = role === 'test' ? options.uatStatus : role === 'uat' ? options.status : undefined;
+  if (uatOutcome === 'failed') {
+    const uatNotes = role === 'test' ? options.uatNotes : options.notes;
+    try {
+      const { relayUatFailureFeedbackPromise } = await import('../../../lib/cloister/uat-failure-feedback.js');
+      // An unreadable PR head still relays; it only loses cross-run dedup.
+      const anchor = await getPrFacts(normalizedIssueId)
+        .then((facts) => facts.headSha ?? undefined, () => undefined);
+      await withFeedbackDeadline(relayUatFailureFeedbackPromise({
+        issueId: normalizedIssueId,
+        uatNotes,
+        workspacePath,
+        ...(anchor ? { anchor } : {}),
+      }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (err instanceof FeedbackDeliveryTimeoutError) {
+        const { surfaceIssueFeedbackNeedsYou } = await import('../../../lib/cloister/feedback-target.js');
+        await surfaceIssueFeedbackNeedsYou(
+          normalizedIssueId,
+          `UAT failure feedback delivery exceeded the ${err.timeoutMs}ms advisory deadline; the verdict is on ${artifact.url} and the work agent may not have been told.`,
+          { specialist: 'uat-agent', retryable: true, source: 'specialists-done-timeout' },
+        );
+      }
+      console.warn(chalk.yellow(`Could not deliver UAT failure feedback: ${message}`));
+    }
+  } else if (uatOutcome === 'passed') {
+    const { clearUatFailureFeedbackAnchor } = await import('../../../lib/cloister/uat-failure-feedback.js');
+    clearUatFailureFeedbackAnchor(normalizedIssueId);
   }
 
   // PAN-2579 (warm-by-default lifecycle): the session stays alive so the next

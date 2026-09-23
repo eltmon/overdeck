@@ -163,6 +163,14 @@ needs-you escalation instead of reporting success (PAN-3846). There is no
 separate feedback record — the PR thread and the transcript are the
 evidence.
 
+A failed browser UAT is observed where the test agent records it:
+`pan admin specialists done test <id> --uat-status failed` (or the `uat`
+role). After posting the verdict comment, that command relays the UAT notes
+through `relayUatFailureFeedbackPromise` (`cloister/uat-failure-feedback.ts`)
+to the work agent, or to a needs-you when no agent can be reached. Delivery is
+keyed on the PR head SHA, so the agent hears about one failing head once; a
+passing UAT clears the anchor (PAN-4030).
+
 ## Review Convergence Gate (PAN-3151)
 
 When a review round comes back with blocking findings, the finding count is
