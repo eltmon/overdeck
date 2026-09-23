@@ -637,7 +637,15 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
   it.each(['strike/pan-1801', 'bypass/pan-1801'])(
     'does not count or route a red test job on %s to the work agent (review of #3993, M1)',
     async (headRef) => {
-      makeGhMocks();
+      (execFile as unknown as ReturnType<typeof vi.fn>).mockImplementation(makeExecFileMock([
+        { cmd: 'gh', args: ['run', 'list', '--repo', 'test-owner/test-repo', '--branch', 'main', '--status', 'failure'], stdout: '[]' },
+        {
+          cmd: 'gh',
+          args: ['run', 'list', '--repo', 'test-owner/test-repo', '--branch', headRef, '--status', 'failure'],
+          stdout: JSON.stringify([{ databaseId: 40, name: 'test', workflowName: 'CI', headSha: 'abc123def456', conclusion: 'failure' }]),
+        },
+        { cmd: 'gh', args: ['run', 'view', '40'], stdout: 'FAIL src/x.test.ts' },
+      ]));
       const readPrFacts = vi.fn(async () => facts({ headBranch: headRef, checks: 'red', testChecks: 'red' }));
 
       const result = await Effect.runPromise(relayCiFailureFeedback({ ...relayOpts, headRef }, { readPrFacts }));
@@ -654,6 +662,8 @@ describe('PAN-3965: the CI test job is the verification test gate', () => {
       expect(mockDeliverVerificationFeedback).not.toHaveBeenCalled();
       expect(mockEscalate).not.toHaveBeenCalled();
       expect(passRecorded).toBe(false);
+      // Pre-#3993 behaviour: the plain CI FAILED message, only to a live work agent.
+      expect(mockMessageAgent).toHaveBeenCalledWith('agent-pan-1801', expect.stringContaining('SPECIALIST FEEDBACK'), 'internal', {});
     },
   );
 
