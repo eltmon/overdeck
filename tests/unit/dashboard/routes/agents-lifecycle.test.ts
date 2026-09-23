@@ -48,6 +48,12 @@ vi.mock('../../../../src/dashboard/server/services/backend-inventory.js', () => 
   getBackendPanes: async () => backendPanes,
 }));
 
+// The exit path runs the poller's attachment cleanup; keep it off disk here.
+const cleanupAttachments = vi.hoisted(() => vi.fn(async () => undefined));
+vi.mock('../../../../src/dashboard/server/services/conversation-attachments.js', () => ({
+  cleanupUnreferencedConversationAttachments: cleanupAttachments,
+}));
+
 import { postAgentLifecycleRoute } from '../../../../src/dashboard/server/routes/agents/lifecycle.js';
 import { _resetAgentLifecycleDedupeForTests } from '../../../../src/dashboard/server/services/agent-projection.js';
 import { getEventStore, initEventStore } from '../../../../src/dashboard/server/event-store.js';
@@ -240,6 +246,9 @@ describe('POST /api/agents/:id/lifecycle for a supervised conversation (PAN-3962
     const exited = await postLifecycle({ event: 'exited', at: exitAt, exitCode: 1 }, token, sessionId);
     expect(exited.status).toBe(200);
     expect(exited.body).toMatchObject({ success: true, applied: true, status: 'stopped' });
+
+    expect(cleanupAttachments).toHaveBeenCalledTimes(1);
+    expect(cleanupAttachments).toHaveBeenCalledWith({ name, sessionFile: null });
 
     const row = getConversationByName(name);
     expect(row?.status).toBe('ended');

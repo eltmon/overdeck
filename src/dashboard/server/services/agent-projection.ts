@@ -21,6 +21,7 @@ import { Effect } from 'effect';
 import { getEventStore, type EventStore } from '../event-store.js';
 import { getAgentStateSync, type AgentState } from '../../../lib/agents.js';
 import { logAgentLifecycleSync } from '../../../lib/persistent-logger.js';
+import { sessionFilePath } from '../../../lib/paths.js';
 import {
   getConversationByTmuxSession,
   markConversationEnded,
@@ -28,6 +29,7 @@ import {
   type LegacyConversation,
 } from '../../../lib/overdeck/conversations.js';
 import { getBackendPanes } from './backend-inventory.js';
+import { cleanupUnreferencedConversationAttachments } from './conversation-attachments.js';
 import { isRespawnPending } from './pending-respawn.js';
 import type { DomainEvent } from '@overdeck/contracts';
 
@@ -154,6 +156,20 @@ export interface AgentLifecycleDeps {
   readonly isRespawnPending?: (sessionId: string) => boolean;
   readonly markConversationRunning?: (name: string) => void;
   readonly markConversationEnded?: (name: string, endedAtMs?: number) => void;
+  /** Attachment cleanup for a conversation that just ended (the poller's cleanup). */
+  readonly cleanupEndedConversation?: (conversation: LegacyConversation) => Promise<void>;
+}
+
+/**
+ * The cleanup the conversation poller runs on rows it marks ended. The
+ * supervisor's exit now marks the row ended first, and the poller skips rows
+ * already ended, so the exit path must run it. Never throws.
+ */
+async function cleanupEndedConversationAttachments(conversation: LegacyConversation): Promise<void> {
+  const sessionFile = conversation.claudeSessionId
+    ? sessionFilePath(conversation.cwd, conversation.claudeSessionId)
+    : null;
+  await cleanupUnreferencedConversationAttachments({ name: conversation.name, sessionFile });
 }
 
 /**
@@ -292,6 +308,12 @@ async function applyConversationLifecycleEvent(
         Number.isNaN(exitedAtMs) ? undefined : exitedAtMs,
       );
       appendActivity('stopped');
+      try {
+        await (deps.cleanupEndedConversation ?? cleanupEndedConversationAttachments)(conversation);
+      } catch (err: unknown) {
+        // The exit is recorded; a cleanup failure must never fail the route.
+        console.error(`[agent-projection] Attachment cleanup failed for conversation ${conversation.name}:`, err);
+      }
       return { applied: true, status: 'stopped' };
     }
   }
