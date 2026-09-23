@@ -15,6 +15,11 @@
  *   2. The launcher drops any *other* agent's guard directory from PATH before
  *      prepending its own, so a Flywheel-spawned agent never runs behind the
  *      orchestrator's shim inherited through the environment.
+ *
+ * `read-only` mode (PAN-3920 workers, `pan worker run --read-only`) inverts the
+ * first filter: only read subcommands pass through, and every other git
+ * subcommand that targets the guarded worktree is refused. It blocks git
+ * writes only; file-system and network sandboxing are out of scope.
  */
 import { join } from 'node:path';
 import { getOverdeckHome } from './paths.js';
@@ -23,14 +28,22 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
+export type GitGuardMode = 'default' | 'read-only';
+
+/** Git subcommands a read-only worker may run inside its workspace. */
+const READ_ONLY_GIT_COMMANDS =
+  'status|diff|log|show|fetch|rev-parse|rev-list|ls-files|ls-tree|blame|cat-file|merge-base|describe|grep|shortlog|for-each-ref|show-ref|remote|config|help|version|""';
+
 /**
  * Emit the launcher lines that materialize and install the per-agent git guard.
  *
  * @param agentId   Owning agent id — the guard lives in `~/.overdeck/agents/<id>/git-guard`.
  * @param guardRoot The agent's worktree. Only git commands targeting this
  *                  directory (or a descendant) are guarded.
+ * @param mode      `read-only` refuses every non-read git subcommand in `guardRoot`.
  */
-export function buildGitGuardLines(agentId: string, guardRoot: string): string[] {
+export function buildGitGuardLines(agentId: string, guardRoot: string, mode: GitGuardMode = 'default'): string[] {
+  const readOnly = mode === 'read-only';
   const guardDir = join(getOverdeckHome(), 'agents', agentId, 'git-guard');
   const guardPath = join(guardDir, 'git');
   const pathForDoubleQuotes = guardDir.replace(/([\\"$`])/g, '\\$1');
@@ -133,8 +146,10 @@ export function buildGitGuardLines(agentId: string, guardRoot: string): string[]
     '}',
     '_overdeck_git_command="\\$(_overdeck_git_find_command "\\$@")"',
     'case "\\$_overdeck_git_command" in',
-    '  rebase|stash|reset) ;;',
-    '  *) exec "\\$_OVERDECK_REAL_GIT" "\\$@" ;;',
+    readOnly
+      ? `  ${READ_ONLY_GIT_COMMANDS}) exec "\\$_OVERDECK_REAL_GIT" "\\$@" ;;`
+      : '  rebase|stash|reset) ;;',
+    readOnly ? '  *) ;;' : '  *) exec "\\$_OVERDECK_REAL_GIT" "\\$@" ;;',
     'esac',
     // Outside the agent's own worktree the guard has no business firing — that
     // is someone else's repository, most often a test fixture's temp repo.
@@ -144,6 +159,14 @@ export function buildGitGuardLines(agentId: string, guardRoot: string): string[]
     '  *) exec "\\$_OVERDECK_REAL_GIT" "\\$@" ;;',
     'esac',
     'case "\\$_overdeck_git_command" in',
+    ...(readOnly
+      ? [
+          '  *)',
+          '    echo "This worker is read-only: git \\$_overdeck_git_command is blocked inside its workspace." >&2',
+          '    exit 1',
+          '    ;;',
+        ]
+      : []),
     '  rebase)',
     '    echo "Overdeck agents must not run git rebase directly. Use pan sync-main to sync main or pan done to submit." >&2',
     '    exit 1',

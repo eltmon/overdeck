@@ -158,3 +158,65 @@ describe('git-guard PATH hygiene (PAN-3189)', () => {
     expect(shim).not.toContain(foreignGuardDir);
   });
 });
+
+describe('read-only mode (PAN-3920 workers)', () => {
+  let readOnlyGit: string;
+  let readOnlyRepo: string;
+  const identityEnv = {
+    OVERDECK_PAN_GIT_OP: '',
+    GIT_AUTHOR_NAME: 'guard', GIT_AUTHOR_EMAIL: 'guard@example.test',
+    GIT_COMMITTER_NAME: 'guard', GIT_COMMITTER_EMAIL: 'guard@example.test',
+  };
+
+  function runShim(shim: string, args: string[], cwd: string): GuardRunResult {
+    const result = spawnSync(shim, args, { cwd, encoding: 'utf8', env: { ...process.env, ...identityEnv } });
+    return { status: result.status ?? 1, stderr: result.stderr ?? '' };
+  }
+
+  beforeAll(() => {
+    readOnlyRepo = join(home, 'read-only-repo');
+    execFileSync('git', ['init', '--quiet', readOnlyRepo], { stdio: 'ignore' });
+    execFileSync('bash', ['-ec', buildGitGuardLines('read-only-test', readOnlyRepo, 'read-only').join('\n')], {
+      cwd: home,
+      stdio: 'ignore',
+    });
+    readOnlyGit = join(home, 'agents', 'read-only-test', 'git-guard', 'git');
+  });
+
+  it('lets git status through', () => {
+    expect(runShim(readOnlyGit, ['status'], readOnlyRepo).status).toBe(0);
+  });
+
+  it('refuses git commit with a read-only message', () => {
+    const result = runShim(readOnlyGit, ['commit', '--allow-empty', '-m', 'x'], readOnlyRepo);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('read-only');
+  });
+
+  it('refuses git push', () => {
+    const result = runShim(readOnlyGit, ['push', 'origin', 'HEAD'], readOnlyRepo);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('read-only');
+  });
+
+  it('refuses git checkout -b', () => {
+    const result = runShim(readOnlyGit, ['checkout', '-b', 'x'], readOnlyRepo);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('read-only');
+  });
+
+  it('lets git commit through inside a different repository', () => {
+    const result = runShim(readOnlyGit, ['commit', '--allow-empty', '-m', 'x'], fixtureRepo);
+    expect(result.status).toBe(0);
+    expect(result.stderr).not.toContain('read-only');
+  });
+
+  it('leaves default mode unchanged: commit passes in the guarded worktree', () => {
+    execFileSync('bash', ['-ec', buildGitGuardLines('default-mode-test', readOnlyRepo).join('\n')], {
+      cwd: home,
+      stdio: 'ignore',
+    });
+    const shim = join(home, 'agents', 'default-mode-test', 'git-guard', 'git');
+    expect(runShim(shim, ['commit', '--allow-empty', '-m', 'y'], readOnlyRepo).status).toBe(0);
+  });
+});
