@@ -42,6 +42,7 @@ import { ForkProgressView } from './ForkProgressView';
 import { TranscriptLoadingSkeleton } from './TranscriptLoadingSkeleton';
 import { useComposerDeliveryState } from './useComposerDeliveryState';
 import { ViewToggle } from '../shared/ViewToggle';
+import { MenuItemButton, MenuOverlay, MenuSeparator, MenuSurface } from '../shared/ContextMenu';
 import styles from '../CommandDeck/styles/command-deck.module.css';
 
 // PAN-1635: a turn that has shown no transcript progress for this long is
@@ -163,6 +164,7 @@ export function ConversationPanel({
   const [sendResumeContract, setSendResumeContract] = useState(true);
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
   const confirm = useConfirm();
   // Self-hosted mutations + ForkModal so the header can favorite / stop / hand
   // off / fork without threading callbacks through every embed site.
@@ -799,6 +801,7 @@ export function ConversationPanel({
               {/* Overflow menu — long-tail / prefs / config / destructive */}
               <div className={styles.headerMenuWrap}>
                 <button
+                  ref={menuTriggerRef}
                   className={styles.copyLinkButton}
                   onClick={() => setMenuOpen(v => !v)}
                   title="More actions"
@@ -810,20 +813,22 @@ export function ConversationPanel({
                 </button>
                 {menuOpen && (
                   <>
-                    <div className={styles.headerMenuOverlay} onClick={() => setMenuOpen(false)} />
-                    <div role="menu" className={styles.headerMenu}>
-                      <button
-                        role="menuitem"
-                        className={`${styles.headerMenuItem} ${conversation.isFavorited ? styles.headerMenuItemActive : ''}`}
+                    <MenuOverlay onClick={() => setMenuOpen(false)} />
+                    <MenuSurface
+                      aria-label="Conversation actions"
+                      onClose={() => setMenuOpen(false)}
+                      returnFocusRef={menuTriggerRef}
+                      className="absolute right-0 top-full z-[1000] mt-1 min-w-[220px]"
+                    >
+                      <MenuItemButton
+                        active={conversation.isFavorited}
                         onClick={() => { convMutations.toggleFavorite({ name: conversation.name, favorited: !!conversation.isFavorited }); setMenuOpen(false); }}
                       >
                         <Star size={14} style={{ fill: conversation.isFavorited ? 'currentColor' : 'none' }} />
                         {conversation.isFavorited ? 'Unfavorite' : 'Favorite'}
-                      </button>
+                      </MenuItemButton>
 
-                      <button
-                        role="menuitem"
-                        className={styles.headerMenuItem}
+                      <MenuItemButton
                         onClick={() => { retitleMutation.mutate(); setMenuOpen(false); }}
                         disabled={retitleMutation.isPending}
                       >
@@ -831,7 +836,7 @@ export function ConversationPanel({
                           ? <Loader2 size={14} className={styles.spinnerIcon} />
                           : <Sparkles size={14} />}
                         Regenerate title
-                      </button>
+                      </MenuItemButton>
 
                       {conversation.harness === 'claude-code' && (
                         <div className={styles.headerMenuDeliveryRow}>
@@ -851,77 +856,64 @@ export function ConversationPanel({
                         </div>
                       )}
 
-                      <div className={styles.headerMenuDivider} />
+                      <MenuSeparator />
                       {conversation.claudeSessionId && (
-                        <button
-                          role="menuitem"
-                          className={styles.headerMenuItem}
+                        <MenuItemButton
                           onClick={() => { convMutations.openForkModal(conversation, { mode: 'handoff' }); setMenuOpen(false); }}
                         >
                           <Share2 size={14} />
                           Hand off to new conversation
-                        </button>
+                        </MenuItemButton>
                       )}
                       {conversation.claudeSessionId && conversation.harness !== 'pi' && (
-                        <button
-                          role="menuitem"
-                          className={styles.headerMenuItem}
+                        <MenuItemButton
                           onClick={() => { convMutations.openForkModal(conversation); setMenuOpen(false); }}
                         >
                           <GitBranchPlus size={14} />
                           Create summary fork
-                        </button>
+                        </MenuItemButton>
                       )}
-                      <button
-                        role="menuitem"
-                        className={styles.headerMenuItem}
+                      <MenuItemButton
                         onClick={() => { handleExportTranscript(); setMenuOpen(false); }}
                       >
                         <Download size={14} />
                         Export transcript
-                      </button>
+                      </MenuItemButton>
 
                       {(conversation.handoffDocPath || conversation.handoffTargetConvId) && (
-                        <div className={styles.headerMenuDivider} />
+                        <MenuSeparator />
                       )}
                       {conversation.handoffDocPath && (
-                        <button
-                          role="menuitem"
-                          className={styles.headerMenuItem}
+                        <MenuItemButton
                           onClick={() => { openHandoffDoc(); setMenuOpen(false); }}
                         >
                           <FileText size={14} />
                           Open handoff doc
-                        </button>
+                        </MenuItemButton>
                       )}
                       {conversation.handoffTargetConvId && (
-                        <button
-                          role="menuitem"
-                          className={styles.headerMenuItem}
+                        <MenuItemButton
                           onClick={() => { openHandoffTarget(); setMenuOpen(false); }}
                         >
                           <ExternalLink size={14} />
                           Open handoff target
-                        </button>
+                        </MenuItemButton>
                       )}
 
                       {(conversation.sessionAlive || onArchived) && (
-                        <div className={styles.headerMenuDivider} />
+                        <MenuSeparator />
                       )}
                       {conversation.sessionAlive && (
-                        <button
-                          role="menuitem"
-                          className={styles.headerMenuItem}
+                        <MenuItemButton
                           onClick={() => { convMutations.stop(conversation.name); setMenuOpen(false); }}
                         >
                           <Square size={14} />
                           Stop agent
-                        </button>
+                        </MenuItemButton>
                       )}
                       {onArchived && (
-                        <button
-                          role="menuitem"
-                          className={`${styles.headerMenuItem} ${styles.headerMenuItemDestructive}`}
+                        <MenuItemButton
+                          destructive
                           onClick={async () => {
                             setMenuOpen(false);
                             const ok = await confirm({
@@ -938,9 +930,9 @@ export function ConversationPanel({
                         >
                           <Archive size={14} />
                           Archive conversation
-                        </button>
+                        </MenuItemButton>
                       )}
-                    </div>
+                    </MenuSurface>
                   </>
                 )}
               </div>

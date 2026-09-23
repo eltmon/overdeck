@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import { CloisterStatusBar } from './CloisterStatusBar';
+import { PopoverSurface } from './shared/ContextMenu';
 
 /**
  * SystemMenu (PAN-1605) — a compact app-bar dropdown that hosts the Cloister
@@ -33,6 +34,7 @@ export function SystemMenu({ onOpenSettings }: { onOpenSettings?: () => void }) 
         ref={triggerRef}
         type="button"
         aria-label="System controls"
+        aria-haspopup="dialog"
         aria-expanded={open}
         title="System controls — Cloister, restart, emergency stop, settings"
         onClick={() => setOpen((o) => !o)}
@@ -43,12 +45,14 @@ export function SystemMenu({ onOpenSettings }: { onOpenSettings?: () => void }) 
         <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
       </button>
       {open && (
-        <div
-          role="menu"
-          className="absolute right-0 top-full z-50 mt-1 rounded-lg border border-border bg-popover p-2 shadow-lg"
+        <PopoverSurface
+          aria-label="System controls"
+          onClose={() => setOpen(false)}
+          returnFocusRef={triggerRef}
+          className="absolute right-0 top-full z-[1000] mt-1 p-2"
         >
           <CloisterStatusBar onOpenSettings={onOpenSettings} />
-        </div>
+        </PopoverSurface>
       )}
     </div>
   );

@@ -22,6 +22,7 @@ describe('September model catalog no-loss audit', () => {
     ['gpt-5.6-terra', 'openai', 272000],
     ['gpt-5.6-luna', 'openai', 272000],
     ['claude-fable-5-1', 'anthropic', 1000000],
+    ['claude-opus-5-5', 'anthropic', 1000000],
     ['gemini-3.8-flash', 'google', 1048576],
     ['gemini-3.5-flash-lite', 'google', 1048576],
     ['glm-5.3', 'zai', 1000000],
@@ -44,5 +45,11 @@ describe('September model catalog no-loss audit', () => {
     expect(MODEL_CAPABILITIES['kimi-code/kimi-for-coding-highspeed'].effortLevels).toEqual([]);
     // Generic role effort remains valid; the native launcher omits unsupported controls.
     expect(modelSupportsEffortSync('kimi-code/kimi-for-coding', 'high')).toBe(true);
+  });
+
+  it('records the published Opus 5.5 output and effort limits', () => {
+    const capability = MODEL_CAPABILITIES['claude-opus-5-5'];
+    expect(capability.maxOutputTokens).toBe(128000);
+    expect(capability.effortLevels).toEqual(['low', 'medium', 'high', 'xhigh', 'max']);
   });
 });

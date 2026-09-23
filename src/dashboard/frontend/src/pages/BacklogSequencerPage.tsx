@@ -27,44 +27,41 @@ interface BacklogSequencerPageProps {
 }
 
 const CONDITION_BADGE_CLASS: Record<string, string> = {
-  ok:                  'border border-[color-mix(in_srgb,var(--success)_32%,transparent)] bg-[color-mix(in_srgb,var(--success)_10%,transparent)] text-[var(--success-foreground)]',
-  'needs-refinement':  'border border-[color-mix(in_srgb,var(--warning)_36%,transparent)] bg-[color-mix(in_srgb,var(--warning)_12%,transparent)] text-[var(--warning-foreground)]',
-  stale:               'border border-[var(--color-border)] bg-[var(--accent)] text-[var(--muted-foreground)] line-through opacity-70',
+  ok:                  'border border-success/32 bg-success/8 text-success-foreground',
+  'needs-refinement':  'border border-warning/32 bg-warning/8 text-warning-foreground',
+  stale:               'border border-border bg-[var(--accent)] text-[var(--muted-foreground)] line-through opacity-70',
 };
 
 const GATE_BADGE_CLASS: Record<string, string> = {
-  ready:   'border border-[color-mix(in_srgb,var(--success)_32%,transparent)] bg-[color-mix(in_srgb,var(--success)_10%,transparent)] text-[var(--success-foreground)]',
-  blocked: 'border border-[color-mix(in_srgb,var(--destructive)_32%,transparent)] bg-[color-mix(in_srgb,var(--destructive)_10%,transparent)] text-[var(--destructive-foreground)]',
-  auto:    'border border-[var(--color-border)] bg-[var(--accent)] text-[var(--muted-foreground)]',
+  ready:   'border border-success/32 bg-success/8 text-success-foreground',
+  blocked: 'border border-destructive/32 bg-destructive/8 text-destructive-foreground',
+  auto:    'border border-border bg-[var(--accent)] text-[var(--muted-foreground)]',
 };
 
 const IMPORTANCE_DOT: Record<string, string> = {
   critical: 'bg-[var(--destructive)]',
   high:     'bg-[var(--warning)]',
-  medium:   'bg-[var(--color-neutral-400)]',
+  medium:   'bg-muted-foreground/80',
   low:      'bg-[var(--muted-foreground)] opacity-60',
 };
 
-// Filter-chip styling. The pills/banner previously used dark-tuned raw colors
-// (bg-*-900/20 + text-*-400) that read muddy in light mode; these are style-guide
-// signal tints (semantic tokens + color-mix) that work in both themes. NOTE: the
-// class strings must be literals so Tailwind's JIT generates them — never build the
-// arbitrary color-mix values dynamically.
-const CHIP_BASE = 'inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-xs transition-colors';
-const CHIP_OFF = 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-fg-muted)] hover:border-[color-mix(in_srgb,var(--color-fg)_25%,transparent)]';
+// Filter chips use the shared semantic badge formula. They are controls, not
+// status pills, so they keep the dashboard's compact rounded rectangle.
+const CHIP_BASE = 'inline-flex h-7 items-center gap-1.5 rounded-md border px-3 text-xs transition-colors';
+const CHIP_OFF = 'border-border bg-card text-muted-foreground hover:border-foreground/25';
 const CHIP_ON = {
-  info:    'border-[color-mix(in_srgb,var(--info)_45%,transparent)] bg-[color-mix(in_srgb,var(--info)_12%,transparent)] text-[var(--info-foreground)]',
-  success: 'border-[color-mix(in_srgb,var(--success)_45%,transparent)] bg-[color-mix(in_srgb,var(--success)_12%,transparent)] text-[var(--success-foreground)]',
-  warning: 'border-[color-mix(in_srgb,var(--warning)_45%,transparent)] bg-[color-mix(in_srgb,var(--warning)_12%,transparent)] text-[var(--warning-foreground)]',
-  danger:  'border-[color-mix(in_srgb,var(--destructive)_45%,transparent)] bg-[color-mix(in_srgb,var(--destructive)_12%,transparent)] text-[var(--destructive-foreground)]',
-  neutral: 'border-[color-mix(in_srgb,var(--color-fg)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-fg)_8%,transparent)] text-[var(--color-fg)]',
+  info:    'border-info/32 bg-info/8 text-info-foreground',
+  success: 'border-success/32 bg-success/8 text-success-foreground',
+  warning: 'border-warning/32 bg-warning/8 text-warning-foreground',
+  danger:  'border-destructive/32 bg-destructive/8 text-destructive-foreground',
+  neutral: 'border-foreground/25 bg-foreground/8 text-foreground',
 };
 const CHIP_DOT = {
   info:    'bg-[var(--info-foreground)]',
   success: 'bg-[var(--success-foreground)]',
   warning: 'bg-[var(--warning-foreground)]',
   danger:  'bg-[var(--destructive-foreground)]',
-  neutral: 'bg-[var(--color-fg-muted)]',
+  neutral: 'bg-muted-foreground',
 };
 
 const DAG_NODE_BUDGET = 150;
@@ -307,48 +304,48 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
 
 
   const conditionBadge = (condition: string) =>
-    CONDITION_BADGE_CLASS[condition] ?? 'border border-[var(--color-border)] bg-[var(--accent)] text-[var(--muted-foreground)]';
+    CONDITION_BADGE_CLASS[condition] ?? 'border border-border bg-[var(--accent)] text-[var(--muted-foreground)]';
   const gateBadge = (gate: string) =>
-    GATE_BADGE_CLASS[gate] ?? 'border border-[var(--color-border)] bg-[var(--accent)] text-[var(--muted-foreground)]';
+    GATE_BADGE_CLASS[gate] ?? 'border border-border bg-[var(--accent)] text-[var(--muted-foreground)]';
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-[var(--color-bg)] text-[var(--color-fg)]">
+    <div className="flex flex-col h-full overflow-hidden bg-background text-foreground">
       {/* Header */}
-      <div className="flex items-start gap-4 px-6 py-4 border-b border-[var(--color-border)] shrink-0 flex-wrap bg-[var(--color-bg)]">
+      <div className="flex items-start gap-4 px-6 py-4 border-b border-border shrink-0 flex-wrap bg-background">
         <div className="min-w-[280px] flex-1">
           <div className="flex items-center gap-2">
-            <ListOrdered className="w-4 h-4 text-[var(--color-accent)]" />
-            <h1 className="font-display text-[22px] leading-tight font-medium tracking-normal text-[var(--color-fg)]">
+            <ListOrdered className="w-4 h-4 text-primary" />
+            <h1 className="font-display text-[22px] leading-tight font-medium tracking-normal text-foreground">
               Backlog Sequencer
               {allNodes.length > 0 && (
-                <span className="ml-2 font-mono text-sm font-normal text-[var(--color-fg-muted)]">· {allNodes.length} open</span>
+                <span className="ml-2 font-mono text-sm font-normal text-muted-foreground">· {allNodes.length} open</span>
               )}
             </h1>
           </div>
-          <p className="mt-1 max-w-2xl text-[13px] leading-5 text-[var(--color-fg-muted)]">
+          <p className="mt-1 max-w-2xl text-[13px] leading-5 text-muted-foreground">
             Ordered backlog: the sequencer's pickup order with dependency context and operator gates for pickup and planning.
           </p>
         </div>
 
         {/* View toggle */}
-        <div className="flex rounded-md overflow-hidden border border-[var(--color-border)] bg-[var(--color-surface)]">
+        <div className="flex rounded-md overflow-hidden border border-border bg-card">
           <button
             onClick={() => setView('list')}
-            className={`px-3 py-1.5 text-xs flex items-center gap-1 ${view === 'list' ? 'bg-[var(--color-accent)] text-[var(--color-primary-foreground)]' : 'text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]'}`}
+            className={`px-3 py-1.5 text-xs flex items-center gap-1 ${view === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'}`}
           >
             <ListOrdered className="w-3 h-3" />
             List
           </button>
           <button
             onClick={() => setView('dag')}
-            className={`px-3 py-1.5 text-xs flex items-center gap-1 ${view === 'dag' ? 'bg-[var(--color-accent)] text-[var(--color-primary-foreground)]' : 'text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]'}`}
+            className={`px-3 py-1.5 text-xs flex items-center gap-1 ${view === 'dag' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'}`}
           >
             <GitFork className="w-3 h-3" />
             DAG
           </button>
           <button
             onClick={() => setView('forecast')}
-            className={`px-3 py-1.5 text-xs flex items-center gap-1 ${view === 'forecast' ? 'bg-[var(--color-accent)] text-[var(--color-primary-foreground)]' : 'text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]'}`}
+            className={`px-3 py-1.5 text-xs flex items-center gap-1 ${view === 'forecast' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'}`}
           >
             <Play className="w-3 h-3" />
             Forecast
@@ -358,7 +355,7 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
         {/* Filter toggle */}
         <button
           onClick={() => setShowFilters((p) => !p)}
-          className={`px-3 py-1.5 text-xs flex items-center gap-1 rounded-md border ${showFilters ? 'border-[var(--color-accent)] text-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent)_8%,transparent)]' : 'border-[var(--color-border)] text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]'}`}
+          className={`px-3 py-1.5 text-xs flex items-center gap-1 rounded-md border ${showFilters ? 'border-primary/32 bg-primary/8 text-primary' : 'border-border text-muted-foreground hover:bg-accent'}`}
         >
           <Filter className="w-3 h-3" />
           Filters {filteredNodes.length !== allNodes.length && `(${filteredNodes.length})`}
@@ -368,7 +365,7 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
         {staleNodes.length > 0 && (
           <button
             onClick={() => setShowStale((p) => !p)}
-            className={`px-3 py-1.5 text-xs rounded-md border ${showStale ? 'border-[var(--warning)] text-[var(--warning-foreground)] bg-[color-mix(in_srgb,var(--warning)_10%,transparent)]' : 'border-[var(--color-border)] text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]'}`}
+            className={`px-3 py-1.5 text-xs rounded-md border ${showStale ? 'border-warning/32 bg-warning/8 text-warning-foreground' : 'border-border text-muted-foreground hover:bg-accent'}`}
           >
             ⊘ {staleNodes.length} stale
           </button>
@@ -379,7 +376,7 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
           <button
             onClick={handleClearSequence}
             disabled={clearing || spawning || seqRunning}
-            className="px-2.5 py-1.5 text-xs flex items-center gap-1 rounded-md border border-[var(--color-border)] text-[var(--color-fg-muted)] hover:text-[var(--destructive)] hover:border-[color-mix(in_srgb,var(--destructive)_40%,transparent)] disabled:opacity-50"
+            className="px-2.5 py-1.5 text-xs flex items-center gap-1 rounded-md border border-border text-muted-foreground hover:border-destructive/40 hover:text-destructive disabled:opacity-50"
             title="Delete the backlog sequencing (sequence.md + cache). A creation pass then rebuilds it from scratch."
           >
             <Trash2 className="w-3 h-3" />
@@ -388,7 +385,7 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
           <button
             onClick={() => handleRunPass('incremental')}
             disabled={spawning || seqRunning}
-            className="px-3 py-1.5 text-xs flex items-center gap-1 rounded-md border border-[var(--color-accent)] text-[var(--color-accent)] hover:bg-[color-mix(in_srgb,var(--color-accent)_10%,transparent)] disabled:opacity-50"
+            className="px-3 py-1.5 text-xs flex items-center gap-1 rounded-md border border-primary text-primary hover:bg-primary/10 disabled:opacity-50"
             title="Incremental pass: re-reads only issues changed since the last pass and slots them in. Existing ranks are preserved."
           >
             <Play className="w-3 h-3" />
@@ -397,7 +394,7 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
           <button
             onClick={() => handleRunPass('review')}
             disabled={spawning || seqRunning}
-            className="px-3 py-1.5 text-xs flex items-center gap-1 rounded-md border border-[var(--color-border)] text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)] disabled:opacity-50"
+            className="px-3 py-1.5 text-xs flex items-center gap-1 rounded-md border border-border text-muted-foreground hover:bg-accent disabled:opacity-50"
             title="Review pass: re-ranks the whole open backlog. Slower and costlier; use when priorities have shifted, not just when issues changed."
           >
             <RefreshCw className="w-3 h-3" />
@@ -407,7 +404,7 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
 
         <button
           onClick={() => refetch()}
-          className="p-2 rounded-md hover:bg-[var(--color-surface-hover)] text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]"
+          className="p-2 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground"
           title="Refresh"
         >
           <RefreshCw className="w-3.5 h-3.5" />
@@ -416,27 +413,27 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
 
       {/* Sequencer pass in-progress banner */}
       {seqRunning && (
-        <div className="shrink-0 flex items-center gap-2 px-5 py-2 bg-[color-mix(in_srgb,var(--info)_10%,transparent)] border-b border-[color-mix(in_srgb,var(--info)_28%,transparent)] text-xs">
+        <div className="shrink-0 flex items-center gap-2 px-5 py-2 bg-info/8 border-b border-info/32 text-xs">
           <RefreshCw className="w-3.5 h-3.5 animate-spin text-[var(--info-foreground)]" />
           <span className="text-[var(--info-foreground)] font-medium">Sequencing pass running</span>
-          <span className="text-[var(--color-fg)]">
+          <span className="text-foreground">
             ranked <b className="font-mono">{seqStatus?.processed ?? 0}</b> / <b className="font-mono">{seqStatus?.total ?? '…'}</b> issues
           </span>
-          <span className="text-[var(--color-fg-muted)] tabular-nums">
+          <span className="text-muted-foreground tabular-nums">
             · {Math.floor(seqElapsed / 60)}m {String(seqElapsed % 60).padStart(2, '0')}s
           </span>
-          <span className="ml-auto text-[var(--color-fg-muted)]">the new sequence appears automatically when it finishes</span>
+          <span className="ml-auto text-muted-foreground">the new sequence appears automatically when it finishes</span>
         </div>
       )}
 
       {/* Spawn error banner */}
       {spawnError && (
-        <div className="shrink-0 flex items-center gap-2 px-5 py-1.5 bg-[color-mix(in_srgb,var(--destructive)_10%,transparent)] border-b border-[color-mix(in_srgb,var(--destructive)_26%,transparent)] text-xs">
+        <div className="shrink-0 flex items-center gap-2 px-5 py-1.5 bg-destructive/8 border-b border-destructive/32 text-xs">
           <span className="text-[var(--destructive-foreground)] font-medium">Run pass failed</span>
-          <span className="text-[var(--color-fg-muted)] truncate flex-1">{spawnError}</span>
+          <span className="text-muted-foreground truncate flex-1">{spawnError}</span>
           <button
             onClick={() => setSpawnError(null)}
-            className="px-2 py-0.5 rounded border border-[color-mix(in_srgb,var(--destructive)_32%,transparent)] bg-[color-mix(in_srgb,var(--destructive)_16%,transparent)] text-[var(--destructive-foreground)] hover:bg-[color-mix(in_srgb,var(--destructive)_26%,transparent)] shrink-0"
+            className="px-2 py-0.5 rounded border border-destructive/32 bg-destructive/16 text-destructive-foreground hover:bg-destructive/24 shrink-0"
           >
             Dismiss
           </button>
@@ -445,42 +442,42 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
 
       {/* Filter bar */}
       {showFilters && (
-        <div className="flex flex-wrap gap-3 px-6 py-3 bg-[var(--color-surface)] border-b border-[var(--color-border)] text-xs shrink-0">
+        <div className="flex flex-wrap gap-3 px-6 py-3 bg-card border-b border-border text-xs shrink-0">
           <div className="flex items-center gap-1">
-            <span className="text-[var(--color-fg-muted)]">Importance:</span>
+            <span className="text-muted-foreground">Importance:</span>
             {(['all', 'critical', 'high', 'medium', 'low'] as ImportanceFilter[]).map((v) => (
               <button
                 key={v}
                 onClick={() => setImportanceFilter(v)}
-                className={`px-2 py-0.5 rounded-md border ${importanceFilter === v ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-primary-foreground)]' : 'border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]'}`}
+                className={`px-2 py-0.5 rounded-md border ${importanceFilter === v ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:bg-accent'}`}
               >
                 {v === 'all' ? 'All' : v}
               </button>
             ))}
           </div>
           <div className="flex items-center gap-1">
-            <span className="text-[var(--color-fg-muted)]">Condition:</span>
+            <span className="text-muted-foreground">Condition:</span>
             {(['all', 'ok', 'needs-refinement', 'stale'] as ConditionFilter[]).map((v) => (
               <button
                 key={v}
                 onClick={() => setConditionFilter(v)}
-                className={`px-2 py-0.5 rounded-md border ${conditionFilter === v ? 'border-[var(--color-accent)] bg-[var(--color-accent)] text-[var(--color-primary-foreground)]' : 'border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]'}`}
+                className={`px-2 py-0.5 rounded-md border ${conditionFilter === v ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:bg-accent'}`}
               >
                 {v === 'all' ? 'All' : v}
               </button>
             ))}
           </div>
           <label className="flex items-center gap-1 cursor-pointer">
-            <input type="checkbox" checked={inPipelineOnly} onChange={(e) => setInPipelineOnly(e.target.checked)} className="accent-[var(--color-accent)]" />
-            <span className="text-[var(--color-fg-muted)]">In pipeline</span>
+            <input type="checkbox" checked={inPipelineOnly} onChange={(e) => setInPipelineOnly(e.target.checked)} className="accent-primary" />
+            <span className="text-muted-foreground">In pipeline</span>
           </label>
           <label className="flex items-center gap-1 cursor-pointer">
-            <input type="checkbox" checked={readyOnly} onChange={(e) => setReadyOnly(e.target.checked)} className="accent-[var(--color-accent)]" />
-            <span className="text-[var(--color-fg-muted)]">Ready only</span>
+            <input type="checkbox" checked={readyOnly} onChange={(e) => setReadyOnly(e.target.checked)} className="accent-primary" />
+            <span className="text-muted-foreground">Ready only</span>
           </label>
           <label className="flex items-center gap-1 cursor-pointer">
-            <input type="checkbox" checked={hasPrdOnly} onChange={(e) => setHasPrdOnly(e.target.checked)} className="accent-[var(--color-accent)]" />
-            <span className="text-[var(--color-fg-muted)]">Has PRD</span>
+            <input type="checkbox" checked={hasPrdOnly} onChange={(e) => setHasPrdOnly(e.target.checked)} className="accent-primary" />
+            <span className="text-muted-foreground">Has PRD</span>
           </label>
           <div className="ml-auto">
             <input
@@ -488,7 +485,7 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="filter by id / title…"
-              className="h-6 px-2 rounded border border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-fg-muted)] text-xs placeholder:text-[var(--color-fg-muted)]/50 focus:outline-none focus:border-[var(--color-accent)] min-w-[180px]"
+              className="h-6 px-2 rounded border border-border bg-background text-muted-foreground text-xs placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary min-w-[180px]"
             />
           </div>
         </div>
@@ -496,16 +493,16 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
 
       {/* Candidates-to-close summary */}
       {showStale && staleNodes.length > 0 && (
-        <div className="shrink-0 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-5 py-3">
-          <div className="text-xs font-medium text-[var(--color-fg-muted)] mb-2">Candidates to close ({staleNodes.length})</div>
+        <div className="shrink-0 border-b border-border bg-card px-5 py-3">
+          <div className="text-xs font-medium text-muted-foreground mb-2">Candidates to close ({staleNodes.length})</div>
           <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto">
             {staleNodes.map((n) => (
               <div key={n.issueId} className="flex items-center gap-2 text-xs">
-                <span className="font-mono text-[var(--color-accent)] w-24 shrink-0">{n.issueId}</span>
-                <span className="text-[var(--color-fg-muted)] truncate flex-1">{n.why}</span>
+                <span className="font-mono text-primary w-24 shrink-0">{n.issueId}</span>
+                <span className="text-muted-foreground truncate flex-1">{n.why}</span>
                 <button
                   onClick={() => handleCloseIssue(n.issueId)}
-                  className="px-2 py-0.5 rounded text-[10px] border border-[color-mix(in_srgb,var(--destructive)_32%,transparent)] bg-[color-mix(in_srgb,var(--destructive)_14%,transparent)] text-[var(--destructive-foreground)] hover:bg-[color-mix(in_srgb,var(--destructive)_24%,transparent)] shrink-0"
+                  className="shrink-0 rounded border border-destructive/32 bg-destructive/8 px-2 py-0.5 text-[10px] text-destructive-foreground hover:bg-destructive/16"
                 >
                   Close
                 </button>
@@ -517,44 +514,44 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
 
       {/* Needs-refinement banner */}
       {refineNodes.length > 0 && (
-        <div className="shrink-0 flex items-center gap-2 px-5 py-1.5 bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border-b border-[color-mix(in_srgb,var(--warning)_26%,transparent)] text-xs">
-          <span className="text-[var(--warning-foreground)] font-medium">⚠ {refineNodes.length} need refinement</span>
-          <span className="text-[var(--color-fg-muted)]">{refineNodes.slice(0, 5).map((n) => n.issueId).join(', ')}{refineNodes.length > 5 ? ` +${refineNodes.length - 5}` : ''}</span>
+        <div className="shrink-0 flex items-center gap-2 px-5 py-1.5 bg-warning/8 border-b border-warning/32 text-xs">
+          <span className="text-warning-foreground font-medium">⚠ {refineNodes.length} need refinement</span>
+          <span className="text-muted-foreground">{refineNodes.slice(0, 5).map((n) => n.issueId).join(', ')}{refineNodes.length > 5 ? ` +${refineNodes.length - 5}` : ''}</span>
           <button
             onClick={() => handleDraftPrd(refineNodes[0]!.issueId)}
-            className="ml-auto px-2 py-0.5 rounded border border-[color-mix(in_srgb,var(--warning)_32%,transparent)] bg-[color-mix(in_srgb,var(--warning)_16%,transparent)] text-[var(--warning-foreground)] hover:bg-[color-mix(in_srgb,var(--warning)_26%,transparent)] shrink-0"
+            className="ml-auto shrink-0 rounded border border-warning/32 bg-warning/8 px-2 py-0.5 text-warning-foreground hover:bg-warning/16"
           >
             Draft PRD →
           </button>
         </div>
       )}
 
-      {/* Segment pills */}
+      {/* Segment filters */}
       {allNodes.length > 0 && (
-        <div className="flex flex-wrap gap-2 px-6 py-2.5 border-b border-[var(--color-border)] shrink-0">
-          <span className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-fg-muted)]">
-            <b className="text-[var(--color-fg)] font-medium font-mono">{allNodes.length}</b> open issues
+        <div className="flex flex-wrap gap-2 px-6 py-2.5 border-b border-border shrink-0">
+          <span className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-xs text-muted-foreground">
+            <b className="text-foreground font-medium font-mono">{allNodes.length}</b> open issues
           </span>
           <button
             onClick={() => setInPipelineOnly((p) => !p)}
             className={`${CHIP_BASE} ${inPipelineOnly ? CHIP_ON.info : CHIP_OFF}`}
           >
             <span className={`w-2 h-2 rounded-full shrink-0 ${CHIP_DOT.info}`} />
-            In pipeline <b className="font-mono font-medium text-[var(--color-fg)]">{inPipelineCount}</b>
+            In pipeline <b className="font-mono font-medium text-foreground">{inPipelineCount}</b>
           </button>
           <button
             onClick={() => setReadyOnly((p) => !p)}
             className={`${CHIP_BASE} ${readyOnly ? CHIP_ON.success : CHIP_OFF}`}
           >
             <span className={`w-2 h-2 rounded-full shrink-0 ${CHIP_DOT.success}`} />
-            Ready <b className="font-mono font-medium text-[var(--color-fg)]">{readyCount}</b>
+            Ready <b className="font-mono font-medium text-foreground">{readyCount}</b>
           </button>
           <button
             onClick={() => setHasPrdOnly((p) => !p)}
             className={`${CHIP_BASE} ${hasPrdOnly ? CHIP_ON.neutral : CHIP_OFF}`}
           >
             <span className={`w-2 h-2 rounded-full shrink-0 ${CHIP_DOT.neutral}`} />
-            Has PRD <b className="font-mono font-medium text-[var(--color-fg)]">{hasPrdCount}</b>
+            Has PRD <b className="font-mono font-medium text-foreground">{hasPrdCount}</b>
           </button>
           {refineNodes.length > 0 && (
             <button
@@ -562,7 +559,7 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
               className={`${CHIP_BASE} ${conditionFilter === 'needs-refinement' ? CHIP_ON.warning : CHIP_OFF}`}
             >
               <span className={`w-2 h-2 rounded-full shrink-0 ${CHIP_DOT.warning}`} />
-              ⚠ Needs refinement <b className="font-mono font-medium text-[var(--color-fg)]">{refineNodes.length}</b>
+              ⚠ Needs refinement <b className="font-mono font-medium text-foreground">{refineNodes.length}</b>
             </button>
           )}
           {staleNodes.length > 0 && (
@@ -571,7 +568,7 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
               className={`${CHIP_BASE} ${conditionFilter === 'stale' ? CHIP_ON.neutral : CHIP_OFF}`}
             >
               <span className={`w-2 h-2 rounded-full opacity-60 shrink-0 ${CHIP_DOT.neutral}`} />
-              ⊘ Stale candidates <b className="font-mono font-medium text-[var(--color-fg)]">{staleNodes.length}</b>
+              ⊘ Stale candidates <b className="font-mono font-medium text-foreground">{staleNodes.length}</b>
             </button>
           )}
         </div>
@@ -582,24 +579,24 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
         {/* Main area */}
         <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
           {isLoading && (
-            <div className="flex items-center justify-center h-32 text-[var(--color-fg-muted)] text-sm">
+            <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
               Loading sequence…
             </div>
           )}
           {error && (
-            <div className="flex items-center justify-center h-32 text-[var(--destructive-foreground)] text-sm">
+            <div className="flex items-center justify-center h-32 text-destructive-foreground text-sm">
               {String(error)}
             </div>
           )}
           {!isLoading && !error && allNodes.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-48 gap-3 text-[var(--color-fg-muted)]">
+            <div className="flex flex-col items-center justify-center h-48 gap-3 text-muted-foreground">
               <ListOrdered className="w-8 h-8 opacity-40" />
               <p className="text-sm">No backlog sequence yet.</p>
               <p className="text-xs">Run a creation pass to rank the open backlog.</p>
               <button
                 onClick={() => void handleRunPass('creation')}
                 disabled={spawning}
-                className="px-3 py-1.5 text-xs rounded border border-[var(--color-accent)] text-[var(--color-accent)] hover:bg-[var(--color-accent)]/10 disabled:opacity-50 flex items-center gap-1"
+                className="px-3 py-1.5 text-xs rounded border border-primary text-primary hover:bg-primary/10 disabled:opacity-50 flex items-center gap-1"
               >
                 <Play className="w-3 h-3" />
                 {spawning ? 'Spawning…' : 'Run creation pass'}
@@ -611,8 +608,8 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
           {!isLoading && !error && allNodes.length > 0 && view === 'list' && (
             <div className="overflow-y-auto flex-1">
               <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-[var(--color-surface)] border-b border-[var(--color-border)]">
-                  <tr className="text-[var(--color-fg-muted)]">
+                <thead className="sticky top-0 bg-card border-b border-border">
+                  <tr className="text-muted-foreground">
                     <th className="text-right px-3 py-2 font-medium w-8 cursor-help" title="Pickup rank — lower means the Flywheel works it sooner">#</th>
                     <th className="text-left px-2 py-2 font-medium w-6 cursor-help" title="Importance — red = critical, orange = high, gray = medium, dim = low">●</th>
                     <th className="text-left px-2 py-2 font-medium w-28 cursor-help" title="Issue ID. Markers: ▶ in pipeline · ⚠ needs refinement · P has PRD · ✓ planned (spec + tasks)">Issue</th>
@@ -635,20 +632,20 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
                         onClick={() => setSelectedNode((p) => (p?.issueId === node.issueId ? null : node))}
                         className={`group transition-colors cursor-pointer ${isStale ? 'opacity-50' : ''} ${
                           isSelected
-                            ? 'bg-[color-mix(in_srgb,var(--color-accent)_14%,transparent)] ring-inset ring-1 ring-[var(--color-accent)]'
-                            : 'even:bg-[color-mix(in_srgb,var(--color-fg)_3%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-fg)_9%,transparent)]'
+                            ? 'bg-primary/15 ring-inset ring-1 ring-primary'
+                            : 'even:bg-muted/20 hover:bg-accent/60'
                         }`}
                       >
-                        <td className={`text-right px-3 py-2 text-[var(--color-fg-muted)] tabular-nums border-l-2 ${node.inPipeline ? 'border-l-[var(--info)]' : 'border-l-transparent'}`}>
+                        <td className={`text-right px-3 py-2 text-muted-foreground tabular-nums border-l-2 ${node.inPipeline ? 'border-l-[var(--info)]' : 'border-l-transparent'}`}>
                           {node.rank}
                         </td>
                         <td className="px-2 py-2">
                           <span
-                            className={`inline-block w-1.5 h-1.5 rounded-full ${IMPORTANCE_DOT[node.importance] ?? 'bg-[var(--color-fg-muted)]'}`}
+                            className={`inline-block w-1.5 h-1.5 rounded-full ${IMPORTANCE_DOT[node.importance] ?? 'bg-muted-foreground'}`}
                             title={`Importance: ${node.importance}`}
                           />
                         </td>
-                        <td className="px-2 py-2 font-mono text-[var(--color-accent)]">
+                        <td className="px-2 py-2 font-mono text-primary">
                           {node.issueId}
                           {node.inPipeline && (
                             <span className="ml-1 text-[9px] text-[var(--info-foreground)] align-top" title="In pipeline — active work / review / test">▶</span>
@@ -663,10 +660,10 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
                             <span className="ml-1 text-[9px] text-[var(--success-foreground)] align-top" title="Has spec — ready for work">✓</span>
                           )}
                         </td>
-                        <td className={`px-2 py-2 text-[var(--color-fg)] max-w-xs truncate ${isStale ? 'line-through' : ''}`}>
+                        <td className={`px-2 py-2 text-foreground max-w-xs truncate ${isStale ? 'line-through' : ''}`}>
                           {node.why}
                         </td>
-                        <td className="px-2 py-2 text-center text-[var(--color-fg-muted)]">
+                        <td className="px-2 py-2 text-center text-muted-foreground">
                           {node.size}
                         </td>
                         <td className="px-2 py-2 text-center">
@@ -685,34 +682,34 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
                             {node.gate === 'ready' ? (node.inPipeline ? 'auto' : '📌') : node.gate === 'blocked' ? '⛔' : node.gate}
                           </span>
                         </td>
-                        <td className="px-2 py-2 text-center text-[var(--color-fg-muted)] tabular-nums">
+                        <td className="px-2 py-2 text-center text-muted-foreground tabular-nums">
                           {node.score}
                         </td>
                         <td className="relative px-2 py-2 text-right" onClick={(event) => event.stopPropagation()}>
                           {bookByIssue.has(node.issueId.toUpperCase()) || promotedIssues.has(node.issueId.toUpperCase()) ? (
-                            <a href="/orders" className="text-[10px] text-[var(--color-accent)] opacity-0 hover:underline group-hover:opacity-100 focus:opacity-100">Open order book</a>
+                            <a href="/orders" className="text-[10px] text-primary opacity-0 hover:underline group-hover:opacity-100 focus:opacity-100">Open order book</a>
                           ) : (
                             <button
                               type="button"
                               disabled={!promotionTarget}
                               onClick={() => { setPromotionError(null); setPromotionIssueId((current) => current === node.issueId ? null : node.issueId); }}
-                              className="rounded border border-[var(--color-border)] px-2 py-1 text-[10px] text-[var(--color-fg-muted)] opacity-0 transition-opacity hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] focus:opacity-100 disabled:cursor-not-allowed disabled:opacity-30 group-hover:opacity-100"
+                              className="rounded border border-border px-2 py-1 text-[10px] text-muted-foreground opacity-0 transition-opacity hover:border-primary hover:text-primary focus:opacity-100 disabled:cursor-not-allowed disabled:opacity-30 group-hover:opacity-100"
                               title={promotionTarget ? `Add to ${promotionTarget.name}` : 'Create an order book first'}
                             >
                               + Order book
                             </button>
                           )}
                           {promotionIssueId === node.issueId && promotionTarget && (
-                            <div className="absolute right-2 top-full z-30 w-52 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-left shadow-lg" role="dialog" aria-label={`Choose lane for ${node.issueId}`}>
-                              <p className="truncate text-[10px] text-[var(--color-fg-muted)]">Add to {promotionTarget.name}</p>
+                            <div className="absolute right-2 top-full z-30 w-52 rounded-md border border-border bg-card p-2 text-left shadow-lg" role="dialog" aria-label={`Choose lane for ${node.issueId}`}>
+                              <p className="truncate text-[10px] text-muted-foreground">Add to {promotionTarget.name}</p>
                               <div className="mt-2 flex gap-2">
                                 {(['A', 'B'] as const).map((lane) => (
-                                  <button key={lane} type="button" disabled={promotingIssueId === node.issueId} onClick={() => { void handlePromoteToOrderBook(node.issueId, lane); }} className="flex-1 rounded border border-[var(--color-border)] px-2 py-1 text-[10px] text-[var(--color-fg)] hover:border-[var(--color-accent)] disabled:opacity-50">
+                                  <button key={lane} type="button" disabled={promotingIssueId === node.issueId} onClick={() => { void handlePromoteToOrderBook(node.issueId, lane); }} className="flex-1 rounded border border-border px-2 py-1 text-[10px] text-foreground hover:border-primary disabled:opacity-50">
                                     Lane {lane}
                                   </button>
                                 ))}
                               </div>
-                              <a href="/orders" className="mt-2 block text-[10px] text-[var(--color-accent)] hover:underline">Open Order Book</a>
+                              <a href="/orders" className="mt-2 block text-[10px] text-primary hover:underline">Open Order Book</a>
                               {promotionError && <p className="mt-2 text-[10px] text-[var(--destructive)]" role="alert">{promotionError}</p>}
                             </div>
                           )}
@@ -729,7 +726,7 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
           {!isLoading && !error && allNodes.length > 0 && view === 'dag' && data && (
             <div className="flex-1 flex flex-col min-h-0">
               {collapsedCount > 0 && (
-                <div className="shrink-0 text-xs text-center py-1 bg-[var(--color-surface)] border-b border-[var(--color-border)] text-[var(--color-fg-muted)]">
+                <div className="shrink-0 text-xs text-center py-1 bg-card border-b border-border text-muted-foreground">
                   Showing {dagData.nodes.length} of {filteredNodes.length} issues (top 10% by rank + neighbors); {collapsedCount} collapsed
                 </div>
               )}

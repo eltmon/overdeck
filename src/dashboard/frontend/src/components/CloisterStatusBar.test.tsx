@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CloisterStatusBar } from './CloisterStatusBar';
 
@@ -97,5 +97,21 @@ describe('CloisterStatusBar TTS health badge', () => {
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/settings'));
     expect(screen.queryByTestId('tts-health-badge')).not.toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalledWith('/api/tts/health');
+  });
+
+  it('uses the shared restart popover and returns focus after Escape', async () => {
+    mockFetch({ ttsEnabled: false });
+    renderStatusBar();
+
+    const trigger = await screen.findByTitle('Restart sessions');
+    fireEvent.click(trigger);
+
+    const popover = screen.getByRole('dialog', { name: 'Restart sessions' });
+    expect(popover).toHaveClass('bg-popover', 'shadow-floating', 'border-border');
+    expect(screen.getByRole('checkbox', { name: /Conversations/i })).toHaveFocus();
+
+    fireEvent.keyDown(popover, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Restart sessions' })).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
   });
 });
