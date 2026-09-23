@@ -1,12 +1,11 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-23T05:29:03.676Z · model: claude-opus-5 · open: 852_
+_Last sequenced: 2026-09-23T05:32:41.408Z · model: claude-opus-5 · open: 851_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
 |------|-------|------|------------|-----------|------|------------|-----|
 | 1 | PAN-3921 | M | critical | ok |  |  | Conversations and pan handoff still spawn on tmux under the PTY supervisor; Herdr never detects them — route through launchAgentPane |
-| 2 | PAN-3956 | M | high | ok |  |  | pan install/sync/doctor must install Herdr + agent integrations and refuse a silent tmux fallback; Herdr resume_agents_on_restore=false |
 | 3 | PAN-3923 | S | high | ok |  |  | Sequencer pane counts as running (fixed for sequencer in 3760a5d); role runs should close their pane; sequence commits never pushed |
 | 5 | PAN-3922 | S | high | ok |  |  | Deacon-lite status is read from the wrong process: dashboard always shows running:false; relay patrol-done from the child |
 | 6 | PAN-3926 | S | high | ok |  |  | isAliveSync is tmux-only; swarm concurrency counts tmuxActive; swarmJanitorPass unscheduled — make backend-aware before swarm re-enable |
@@ -864,10 +863,6 @@ _Last sequenced: 2026-09-23T05:29:03.676Z · model: claude-opus-5 · open: 852_
 
 In pipeline (workspace exists) — rank pinned at the top tier. The last big spawn path that bypasses the terminal backend: conversations and handoffs land on tmux under a supervisor Herdr cannot see, so handoff reviewers never render as the Review row and two inventories describe one fleet.
 
-### PAN-3956 (rank 2)
-
-In pipeline — rank pinned. Herdr is the default backend on paper but nothing installs it, so every fresh machine silently runs tmux; also must pin resume_agents_on_restore=false so Herdr never relaunches paused agents.
-
 ### PAN-3923 (rank 3)
 
 In pipeline — rank pinned. The sequencer half landed on main (reap through the backend); the general role-run pane close and the never-pushed sequence commit remain.
@@ -1180,6 +1175,10 @@ Triage: verify days-stale "running" against the current liveness definition (idl
 
 Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass — PAN-3243, PAN-3492, PAN-3520 and PAN-2421 — all trace red or flaky main to real-timer tests under load. This is the shared fix for that family and it is now marked ready, so it should sit with the other CI-integrity work rather than behind it.
 
+### PAN-2932 (rank 87)
+
+Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (502) after pan reload.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1187,10 +1186,10 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-23T05:29:03.676Z",
+  "generatedAt": "2026-09-23T05:32:41.408Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 852,
+  "openCount": 851,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1202,19 +1201,6 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
       "dependsOn": [],
       "why": "Conversations and pan handoff still spawn on tmux under the PTY supervisor; Herdr never detects them — route through launchAgentPane",
       "rationale": "In pipeline (workspace exists) — rank pinned at the top tier. The last big spawn path that bypasses the terminal backend: conversations and handoffs land on tmux under a supervisor Herdr cannot see, so handoff reviewers never render as the Review row and two inventories describe one fleet.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3956",
-      "rank": 2,
-      "size": "M",
-      "importance": "high",
-      "score": 80,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "pan install/sync/doctor must install Herdr + agent integrations and refuse a silent tmux fallback; Herdr resume_agents_on_restore=false",
-      "rationale": "In pipeline — rank pinned. Herdr is the default backend on paper but nothing installs it, so every fresh machine silently runs tmux; also must pin resume_agents_on_restore=false so Herdr never relaunches paused agents.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12705,20 +12691,6 @@ Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass �
     {
       "from": "PAN-2008",
       "to": "PAN-1936",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3956",
-      "to": "PAN-3952",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3956",
-      "to": "PAN-3944",
       "type": "informs",
       "source": "github-ref",
       "confidence": 1
