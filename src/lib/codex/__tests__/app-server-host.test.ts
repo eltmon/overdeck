@@ -1,12 +1,19 @@
 import { EventEmitter } from 'node:events';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough, Writable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CodexAppServerHost, codexNotificationCost } from '../app-server-host.js';
-import type { CodexAppServerState, ThreadOptions, TurnOptions } from '../app-server-manager.js';
+import { CodexAppServerHost, codexNotificationCost, installHostExitHandlers } from '../app-server-host.js';
+import {
+  CodexAppServerManager,
+  type CodexAppServerState,
+  type CodexAppServerTransportInfo,
+  type ThreadOptions,
+  type TurnOptions,
+} from '../app-server-manager.js';
+import { createFakeAppServer } from './fake-app-server.js';
 import { readSessionIndexSync } from '../../session-history.js';
 
 const FAKE_ROLLOUT_PATH = '/fake/rollout/for-thread-started.jsonl';
@@ -22,7 +29,7 @@ vi.mock('../../runtimes/codex.js', async (importOriginal) => {
 
 class FakeManager extends EventEmitter {
   readonly startThreadCalls: ThreadOptions[] = [];
-  readonly resumeThreadCalls: Array<{ threadId: string; options: ThreadOptions }> = [];
+  readonly resumeThreadCalls: Array<{ threadId: string; options: ThreadOptions; strict?: boolean }> = [];
   readonly startTurnCalls: Array<{ text: string; options?: TurnOptions }> = [];
   readonly approvals: Array<{ id: string | number; decision: string }> = [];
   readonly userInputs: Array<{ id: string | number; answers: Record<string, string[]> }> = [];
@@ -47,8 +54,8 @@ class FakeManager extends EventEmitter {
     this.emit('notification', { method: 'thread/started', params: { thread: { id: 'thread-started' } } });
   }
 
-  async resumeThread(threadId: string, options: ThreadOptions): Promise<void> {
-    this.resumeThreadCalls.push({ threadId, options });
+  async resumeThread(threadId: string, options: ThreadOptions, resumeOptions?: { strict?: boolean }): Promise<void> {
+    this.resumeThreadCalls.push({ threadId, options, ...(resumeOptions?.strict ? { strict: true } : {}) });
     this.state = { state: 'idle', threadId };
     this.emit('notification', { method: 'thread/started', params: { thread: { id: threadId } } });
   }
@@ -415,5 +422,342 @@ describe('CodexAppServerHost', () => {
 
     await vi.waitFor(() => expect(manager.approvals).toEqual([{ id: 71, decision: 'accept' }]));
     expect(manager.startTurnCalls).toHaveLength(0);
+  });
+
+  describe('native terminal attachment (PAN-3835)', () => {
+    const agentDir = () => join(overdeckHome, 'agents', 'agent-host-test');
+    const socketPath = () => join(agentDir(), 'codex-native', 'app.sock');
+
+    /** A manager connected through the native endpoint whose thread/start reports a rollout path. */
+    class NativeFakeManager extends FakeManager {
+      transport: CodexAppServerTransportInfo = { kind: 'unix', endpoint: `unix://${socketPath()}`, cliVersion: '0.153.4' };
+
+      async start(): Promise<void> {
+        writeFileSync(socketPath(), '', { mode: 0o666 });
+      }
+
+      getTransportInfo(): CodexAppServerTransportInfo {
+        return this.transport;
+      }
+    }
+
+    /** NativeFakeManager whose thread/start response carries the rollout path, like codex does. */
+    function withRollout(manager: NativeFakeManager, rolloutPath: string): NativeFakeManager {
+      const start = manager.startThread.bind(manager);
+      (manager as unknown as { startThread: (options: ThreadOptions) => Promise<unknown> }).startThread = async (options) => {
+        await start(options);
+        return { thread: { id: 'thread-started', path: rolloutPath } };
+      };
+      return manager;
+    }
+
+    it('records a private endpoint and reports live capability', async () => {
+      const manager = new NativeFakeManager();
+      const host = makeHost(manager, { nativeEndpoint: true });
+      startedHosts.push(host);
+      await host.start();
+
+      expect(readFileSync(join(agentDir(), 'codex-native-endpoint'), 'utf8')).toBe(`unix://${socketPath()}\n`);
+      expect(statSync(join(agentDir(), 'codex-native')).mode & 0o777).toBe(0o700);
+      expect(statSync(socketPath()).mode & 0o777).toBe(0o600);
+      expect(host.status()).toMatchObject({
+        generation: expect.stringMatching(/^[0-9a-f-]{36}$/),
+        nativeEndpoint: { available: true, endpoint: `unix://${socketPath()}`, cliVersion: '0.153.4' },
+        navigationEpoch: 0,
+      });
+
+      await host.stop();
+      expect(existsSync(join(agentDir(), 'codex-native-endpoint'))).toBe(false);
+    });
+
+    it('reports why a stdio host cannot attach and leaves no endpoint record', async () => {
+      const manager = new NativeFakeManager();
+      manager.transport = { kind: 'stdio', unavailableReason: 'cli-unsupported', cliVersion: '0.150.0' };
+      manager.start = async () => undefined;
+      const host = makeHost(manager, { nativeEndpoint: true });
+      startedHosts.push(host);
+      await host.start();
+
+      expect(existsSync(join(agentDir(), 'codex-native-endpoint'))).toBe(false);
+      expect(await host.handleOp({ op: 'prepare-terminal' })).toMatchObject({
+        status: 422,
+        body: { code: 'native-unavailable', reason: 'cli-unsupported', cliVersion: '0.150.0' },
+      });
+    });
+
+    it('prepare_terminal_never_starts_turn: no thread yet means no attach', async () => {
+      const manager = new NativeFakeManager();
+      const host = makeHost(manager, { model: 'gpt-5.6-luna' });
+
+      expect(await host.handleOp({ op: 'prepare-terminal' })).toMatchObject({ status: 409, body: { code: 'no-thread' } });
+      expect(manager.startThreadCalls).toHaveLength(0);
+      expect(manager.startTurnCalls).toHaveLength(0);
+    });
+
+    it('strictly resumes a saved thread for the terminal and hands out the exact thread', async () => {
+      const manager = new NativeFakeManager();
+      const host = makeHost(manager, { model: 'gpt-5.6-luna', resumeThreadId: '01a0cf2b-92d3-7260-9919-e020c0c91104' });
+
+      const result = await host.handleOp({ op: 'prepare-terminal' });
+
+      expect(manager.resumeThreadCalls).toEqual([
+        expect.objectContaining({ threadId: '01a0cf2b-92d3-7260-9919-e020c0c91104', strict: true }),
+      ]);
+      expect(manager.startTurnCalls).toHaveLength(0);
+      expect(result).toMatchObject({
+        status: 200,
+        body: { ok: true, threadId: '01a0cf2b-92d3-7260-9919-e020c0c91104', endpoint: `unix://${socketPath()}`, navigationEpoch: 0 },
+      });
+    });
+
+    it('missing_resume_target_never_starts_fresh', async () => {
+      const manager = new NativeFakeManager();
+      manager.resumeThread = async () => { throw new Error('thread/resume failed: no rollout found for thread id x'); };
+      const host = makeHost(manager, { model: 'gpt-5.6-luna', resumeThreadId: 'x' });
+
+      expect(await host.handleOp({ op: 'prepare-terminal' })).toMatchObject({ status: 409, body: { code: 'resume-failed' } });
+      expect(manager.startThreadCalls).toHaveLength(0);
+    });
+
+    it('waits for the first turn to write the rollout before attaching a fresh thread', async () => {
+      const rolloutPath = join(tmpHome, 'rollout-thread-started.jsonl');
+      const manager = withRollout(new NativeFakeManager(), rolloutPath);
+      const host = makeHost(manager);
+      await host.handleOp({ op: 'message', content: 'hello', model: 'gpt-5.6-luna' });
+
+      expect(await host.handleOp({ op: 'prepare-terminal' })).toMatchObject({ status: 409, body: { code: 'no-thread' } });
+      writeFileSync(rolloutPath, '{}\n');
+      expect(await host.handleOp({ op: 'prepare-terminal' })).toMatchObject({ status: 200, body: { threadId: 'thread-started' } });
+    });
+
+    it('concurrent_first_message_and_attach_create_one_thread', async () => {
+      const manager = new NativeFakeManager();
+      let release!: () => void;
+      const gate = new Promise<void>(resolve => { release = resolve; });
+      const resume = manager.resumeThread.bind(manager);
+      manager.resumeThread = async (threadId, options, resumeOptions) => {
+        await gate;
+        return resume(threadId, options, resumeOptions);
+      };
+      const host = makeHost(manager, { model: 'gpt-5.6-luna', resumeThreadId: 'saved-thread' });
+
+      const attach = host.handleOp({ op: 'prepare-terminal' });
+      const message = host.handleOp({ op: 'message', content: 'hi' });
+      release();
+      await Promise.all([attach, message]);
+
+      expect(manager.resumeThreadCalls).toHaveLength(1);
+      expect(manager.startThreadCalls).toHaveLength(0);
+      expect(manager.startTurnCalls).toHaveLength(1);
+    });
+
+    it('external_reply_clears_pending_request', async () => {
+      const manager = new NativeFakeManager();
+      const host = makeHost(manager);
+      manager.emit('request', { id: 0, method: 'item/commandExecution/requestApproval', params: { threadId: 't', command: 'touch x' } });
+      expect(host.status().pendingRequests).toHaveLength(1);
+
+      // The TUI answered: codex tells every client the request is resolved.
+      manager.emit('notification', { method: 'serverRequest/resolved', params: { threadId: 't', requestId: 0 } });
+
+      expect(host.status().pendingRequests).toHaveLength(0);
+      expect(await host.handleOp({ op: 'approval', requestId: 0, decision: 'accept' })).toMatchObject({ status: 409 });
+      expect(manager.approvals).toEqual([]);
+    });
+
+    it('duplicate_input_reply_is_rejected', async () => {
+      const manager = new NativeFakeManager();
+      const host = makeHost(manager);
+
+      expect(await host.handleOp({ op: 'user-input', requestId: 'q-1', answers: { choice: ['a'] } })).toEqual({
+        status: 409,
+        body: { error: 'user-input request q-1 is not pending' },
+      });
+      expect(manager.userInputs).toEqual([]);
+    });
+
+    it('terminal_settings_survive_next_dashboard_turn', async () => {
+      const manager = new NativeFakeManager();
+      const host = makeHost(manager, { effort: 'high' });
+      await host.handleOp({ op: 'message', content: 'first', model: 'gpt-5.6-luna' });
+
+      // The operator picked medium effort with /model in the attached TUI.
+      manager.emit('notification', {
+        method: 'thread/settings/updated',
+        params: { threadId: 'thread-started', threadSettings: { model: 'gpt-5.6-luna', effort: 'medium' } },
+      });
+      await host.handleOp({ op: 'message', content: 'second' });
+      expect(manager.startTurnCalls.at(-1)?.options?.effort).toBe('medium');
+
+      // The dashboard effort picker still applies when used afterwards.
+      await host.handleOp({ op: 'set-effort', effort: 'low' });
+      await host.handleOp({ op: 'message', content: 'third' });
+      expect(manager.startTurnCalls.at(-1)?.options?.effort).toBe('low');
+    });
+
+    it('closes the native CLI and drops the endpoint record when the app-server dies under a live pane', async () => {
+      const manager = new NativeFakeManager();
+      const closeCompanion = vi.fn(async () => undefined);
+      const { stdout, lines } = captureStdout();
+      const host = makeHost(manager, { nativeEndpoint: true, closeCompanion, stdout });
+      startedHosts.push(host);
+      await host.start();
+      expect(existsSync(join(agentDir(), 'codex-native-endpoint'))).toBe(true);
+
+      manager.emit('exit', { code: 1, signal: null });
+      await host.exitHandled();
+
+      expect(closeCompanion).toHaveBeenCalledWith('agent-host-test');
+      expect(existsSync(join(agentDir(), 'codex-native-endpoint'))).toBe(false);
+      expect(lines).toContain('[terminal] native Codex CLI closed: the app-server exited. Restart the conversation to use Terminal again.');
+    });
+
+    it('leaves the companion to the owner-teardown hooks on a deliberate stop', async () => {
+      const manager = new NativeFakeManager();
+      const closeCompanion = vi.fn(async () => undefined);
+      const host = makeHost(manager, { nativeEndpoint: true, closeCompanion });
+      await host.start();
+
+      await host.stop();
+      manager.emit('exit', { code: null, signal: 'SIGTERM' });
+      await host.exitHandled();
+
+      expect(existsSync(join(agentDir(), 'codex-native-endpoint'))).toBe(false);
+      expect(closeCompanion).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('owner thread tree with no native CLI attached (PAN-3835 review)', () => {
+    /** A real manager over a scripted stdio app-server, the way work and review agents run. */
+    async function startOwner() {
+      const app = createFakeAppServer((message, server) => {
+        if (message.method === 'initialize') server.send({ id: message.id, result: {} });
+        if (message.method === 'thread/start') server.send({ id: message.id, result: { thread: { id: 'owner' } } });
+        if (message.method === 'turn/start') server.send({ id: message.id, result: {} });
+      });
+      const manager = new CodexAppServerManager({ cwd: '/tmp', readVersion: async () => '0.153.4', spawnProcess: () => app.child });
+      const recordActivity = vi.fn((_agentId: string, _activity: { at?: string; costSoFar?: number }) => true);
+      const { stdout, lines } = captureStdout();
+      const host = makeHost(manager as unknown as FakeManager, { recordActivity, stdout, model: 'gpt-5.6-sol', effort: 'high' });
+      await manager.start();
+      await host.handleOp({ op: 'message', content: 'delegate this', model: 'gpt-5.6-sol' });
+      return { app, manager, host, recordActivity, lines };
+    }
+
+    it('surfaces a sub-agent approval request so the parent turn can continue', async () => {
+      const { app, host } = await startOwner();
+      app.send({ method: 'thread/started', params: { thread: { id: 'sub', parentThreadId: 'owner', ephemeral: false } } });
+      app.send({ method: 'thread/started', params: { thread: { id: 'grandchild', parentThreadId: 'sub', ephemeral: false } } });
+      app.send({ id: 9, method: 'item/commandExecution/requestApproval', params: { threadId: 'sub', command: 'ls' } });
+      app.send({ id: 10, method: 'item/commandExecution/requestApproval', params: { threadId: 'grandchild', command: 'pwd' } });
+
+      expect(host.status().pendingRequests).toEqual([
+        { id: 9, method: 'item/commandExecution/requestApproval', params: { threadId: 'sub', command: 'ls' } },
+        { id: 10, method: 'item/commandExecution/requestApproval', params: { threadId: 'grandchild', command: 'pwd' } },
+      ]);
+      expect(await host.handleOp({ op: 'approval', requestId: 9, decision: 'accept' })).toEqual({ status: 200, body: { ok: true } });
+      expect(app.messages).toContainEqual({ id: 9, result: { decision: 'accept' } });
+    });
+
+    it('counts sub-agent notifications as activity and cost without moving the owner turn', async () => {
+      const { app, manager, recordActivity } = await startOwner();
+      vi.useFakeTimers({ toFake: ['Date'] });
+      try {
+        app.send({ method: 'thread/started', params: { thread: { id: 'sub', parentThreadId: 'owner' } } });
+        vi.setSystemTime(Date.now() + 6_000);
+        recordActivity.mockClear();
+        app.send({ method: 'turn/started', params: { threadId: 'sub', turn: { id: 'sub-turn' } } });
+        expect(recordActivity).toHaveBeenCalledWith('agent-host-test', expect.objectContaining({ at: expect.any(String) }));
+        expect(manager.getState().activeTurnId).toBeUndefined();
+
+        const usage = (threadId: string, inputTokens: number) => ({
+          method: 'thread/tokenUsage/updated',
+          params: { threadId, tokenUsage: { total: { inputTokens, cachedInputTokens: 0, outputTokens: 0 } } },
+        });
+        vi.setSystemTime(Date.now() + 6_000);
+        app.send(usage('owner', 1_000_000));
+        vi.setSystemTime(Date.now() + 6_000);
+        app.send(usage('sub', 2_000_000));
+        const ownerCost = codexNotificationCost(usage('owner', 1_000_000), 'gpt-5.6-sol') ?? 0;
+        const subCost = codexNotificationCost(usage('sub', 2_000_000), 'gpt-5.6-sol') ?? 0;
+        expect(recordActivity.mock.calls.at(-1)?.[1].costSoFar).toBeCloseTo(ownerCost + subCost, 10);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('never lets a title thread or a native /new move the owner thread, codex-thread-id, or settings', async () => {
+      const { app, manager, host } = await startOwner();
+      const threadIdFile = join(overdeckHome, 'agents', 'agent-host-test', 'codex-thread-id');
+      expect(readFileSync(threadIdFile, 'utf8')).toBe('owner');
+
+      app.send({ method: 'thread/started', params: { thread: { id: 'title', ephemeral: true, parentThreadId: null } } });
+      app.send({ method: 'thread/started', params: { thread: { id: 'new-thread', ephemeral: false, parentThreadId: null } } });
+      app.send({ method: 'turn/started', params: { threadId: 'new-thread', turn: { id: 'foreign-turn' } } });
+      app.send({ method: 'thread/settings/updated', params: { threadId: 'new-thread', threadSettings: { model: 'gpt-6-astra', effort: 'xhigh' } } });
+      app.send({ id: 12, method: 'item/commandExecution/requestApproval', params: { threadId: 'new-thread', command: 'rm x' } });
+
+      expect(manager.getState().threadId).toBe('owner');
+      expect(manager.getState().activeTurnId).toBeUndefined();
+      expect(readFileSync(threadIdFile, 'utf8')).toBe('owner');
+      expect(host.status().navigationEpoch).toBe(1);
+      expect(host.status().pendingRequests).toEqual([]);
+      await host.handleOp({ op: 'message', content: 'next' });
+      expect(app.messages.filter(message => message.method === 'turn/start').at(-1)?.params).toMatchObject({ effort: 'high' });
+    });
+
+    it('does not count a sub-agent as navigation when its status arrives before its spawn item (live order)', async () => {
+      const { app, host } = await startOwner();
+      app.send({ method: 'thread/status/changed', params: { threadId: 'sub', status: { type: 'idle' } } });
+      expect(host.status().navigationEpoch).toBe(1);
+      app.send({
+        method: 'item/completed',
+        params: { threadId: 'owner', item: { type: 'collabAgentToolCall', tool: 'spawnAgent', receiverThreadIds: ['sub'] } },
+      });
+      expect(host.status().navigationEpoch).toBe(0);
+    });
+
+    it('surfaces a request from a thread it cannot classify instead of dropping it', async () => {
+      const { app, host, lines } = await startOwner();
+      app.send({ id: 11, method: 'item/commandExecution/requestApproval', params: { threadId: 'mystery', command: 'ls' } });
+
+      expect(host.status().pendingRequests).toContainEqual(expect.objectContaining({ id: 11 }));
+      expect(lines).toContain('[request #11] from unrecognized thread mystery; showing it anyway');
+    });
+
+    it('logs a request for a known foreign thread instead of dropping it silently', async () => {
+      const { app, host, lines } = await startOwner();
+      app.send({ method: 'thread/started', params: { thread: { id: 'new-thread', ephemeral: false } } });
+      app.send({ id: 13, method: 'item/commandExecution/requestApproval', params: { threadId: 'new-thread', command: 'ls' } });
+
+      expect(host.status().pendingRequests).toEqual([]);
+      expect(lines).toContain('[request #13] for thread new-thread outside this conversation; left to the client that opened it');
+    });
+  });
+
+  describe('host exit handlers (PAN-3835 review)', () => {
+    it('kills the app-server child on every exit path', async () => {
+      const exitCodes: number[] = [];
+      let onExit: () => void = () => undefined;
+      const proc = Object.assign(new EventEmitter(), {
+        exit: vi.fn((code: number) => { exitCodes.push(code); onExit(); }),
+      });
+      const nextExit = () => new Promise<void>(resolve => { onExit = resolve; });
+      const host = { shutdownForSignal: vi.fn(async () => undefined), killRuntimeSync: vi.fn() };
+      installHostExitHandlers(host, proc as unknown as Pick<NodeJS.Process, 'once' | 'on' | 'exit'>);
+
+      let exited = nextExit();
+      proc.emit('SIGHUP');
+      await exited;
+      expect(host.shutdownForSignal).toHaveBeenCalledWith('SIGHUP', 0);
+      exited = nextExit();
+      proc.emit('SIGTERM');
+      await exited;
+      expect(host.shutdownForSignal).toHaveBeenCalledWith('SIGTERM', 5_000);
+      expect(exitCodes).toEqual([129, 0]);
+
+      proc.emit('exit');
+      expect(host.killRuntimeSync).toHaveBeenCalledTimes(1);
+    });
   });
 });

@@ -19,6 +19,8 @@ export interface CompanionCreateSpec {
   /** Exact argv for the native client; element 0 is an absolute binary path. */
   readonly argv: readonly string[];
   readonly generation: string;
+  /** Extra environment for the pane; the generation stamp and TERM always win. */
+  readonly env?: Readonly<Record<string, string>>;
 }
 
 export interface CompanionTerminalHost {
@@ -89,6 +91,7 @@ export function createTmuxCompanionHost(deps: TmuxCompanionHostDeps = defaultDep
     async create(companionSession, spec) {
       validateSessionName(companionSession);
       await deps.createSession(companionSession, spec.cwd, companionPaneCommand(spec.argv), {
+        ...spec.env,
         [COMPANION_GENERATION_ENV]: spec.generation,
         TERM: 'xterm-256color',
       });

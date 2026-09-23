@@ -341,8 +341,8 @@ A **companion terminal** is a second terminal session next to a conversation's o
 session, running a harness's native client attached to the owner's live runtime and exact
 session. It exists only so the operator can use the native CLI from the conversation TERMINAL
 view; dashboard delivery never goes through it (the composer keeps the ACP socket, app-server
-socket, and so on). OpenCode is the first adapter; Codex `codex resume --remote` (PAN-3835)
-reuses the same seam.
+socket, and so on). Adapters: OpenCode `opencode attach` (PAN-3974) and Codex
+`codex resume --remote` (PAN-3835).
 
 | Piece | Where |
 | --- | --- |
@@ -350,6 +350,7 @@ reuses the same seam.
 | Lifecycle (open / close / owner teardown, per-owner lock, generation checks) | `src/lib/overdeck/companion-terminal/lifecycle.ts` |
 | Host port + tmux implementation (async `tmuxExecAsync` / `createSession`, no keystrokes) | `src/lib/overdeck/companion-terminal/host.ts` |
 | OpenCode adapter | `src/lib/overdeck/companion-terminal/opencode-adapter.ts` |
+| Codex adapter; host native endpoint and `prepare-terminal` | `src/lib/overdeck/companion-terminal/codex-adapter.ts`; `src/lib/codex/app-server-host.ts`, `app-server-transport.ts`, `native-endpoint.ts` |
 | Wiring + `closeCompanionTerminalForOwner` | `src/lib/overdeck/companion-terminal/index.ts` |
 | Routes | `src/dashboard/server/routes/conversation-companion-terminal.ts` |
 | UI | `src/dashboard/frontend/src/components/chat/ConversationTerminalView.tsx` |
@@ -408,10 +409,46 @@ body key or any query parameter is a 400: the browser can never name a URL, comm
 cwd, binary, or terminal target. Responses are `CompanionTerminalState` bodies; `unsupported` is
 400, `owner-changed` / `stale-generation` are 409, everything else 200.
 
-**Adding a harness (PAN-3835).** Add a kind to `CompanionTerminalKind`, map it in
-`companionTerminalKindFor`, write an adapter whose `resolveTarget` returns argv, cwd, and a
-fingerprint from server-side records, and register it in `defaultAdapters()` in `index.ts`. The
-lifecycle, routes, and UI need no change.
+**Codex adapter (PAN-3835).** Kind `codex-resume-remote`, for every `harness: codex` conversation.
+The conversation's app-server host runs with `--native-endpoint`: `codex app-server --listen
+unix://~/.overdeck/agents/<ownerSession>/codex-native/app.sock`, with the host itself as the
+first WebSocket client, and the URL recorded in `codex-native-endpoint`. The adapter's health
+check is the host's token-authenticated `prepare-terminal` op over
+`~/.overdeck/sockets/appserver-<ownerSession>.sock` (async client
+`src/lib/codex/app-server-client.ts`, 25 s bound). The op never creates a thread or starts a turn.
+It strictly resumes a saved thread the host has not loaded yet and answers only once the pinned
+thread's rollout exists. The adapter then hands out
+`codex resume -c check_for_update_on_startup=false --remote <endpoint> <threadId>`, with
+`CODEX_HOME` set to the conversation's `codex-home-v2` through the new optional `env` field on the
+target and `CompanionCreateSpec`. The generation stamp and `TERM` always override that env. The
+endpoint must equal the socket Overdeck derives for that owner and the recorded file. The
+fingerprint is `<host generation>:<threadId>:<navigationEpoch>`, so a host restart or a TUI that
+navigated away (`/new`, `/resume`, `/fork`) gets a fresh companion on the conversation's thread at
+the next open. The remote TUI keeps retrying when its app-server dies instead of exiting. The
+owner-teardown hooks above reap it when the owner stops; when the app-server dies but the host's
+pane (and so the owner session) stays alive, the host itself removes `codex-native-endpoint` and
+calls `closeCompanionTerminalForOwner`. The host kills its app-server on every exit path, and the
+manager reaps an app-server orphaned by a SIGKILLed host (recorded in `codex-native/app.pid`,
+matched by `/proc/<pid>/cmdline`) before reusing the socket.
+
+| owner tmux | host answer | result |
+| --- | --- | --- |
+| gone | – | `owner-not-running` |
+| alive | no token, `codex.transport: tui` | `unsupported` (the owner pane is the native TUI) |
+| alive | unreachable / timeout | `owner-starting` |
+| alive | `400 unsupported app-server op` (pre-PAN-3835 host) | `restart-required` |
+| alive | `422 native-unavailable`: `not-requested` / `connect-failed` | `restart-required` |
+| alive | `422 native-unavailable`: `cli-unsupported` (below 0.153.4) | `cli-unsupported` |
+| alive | `422 native-unavailable`: `socket-path-too-long` | `unsupported` |
+| alive | `409 no-thread` (no thread, or no saved turn yet) | `session-not-started` |
+| alive | `409 resume-failed` | `session-missing` |
+| alive | `200`, endpoint not this owner's socket or not the recorded one | `restart-required` |
+| alive | `200` | attach |
+
+**Adding a harness.** Add a kind to `CompanionTerminalKind`, map it in
+`companionTerminalKindFor`, write an adapter whose `resolveTarget` returns argv, cwd, optional env,
+and a fingerprint from server-side records, and register it in `defaultAdapters()` in `index.ts`.
+The lifecycle, routes, and UI need no change.
 
 ## Herdr wire facts (v0.9.1, protocol 22)
 

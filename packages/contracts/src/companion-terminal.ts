@@ -15,7 +15,11 @@
  */
 
 /** The native-client attach strategies Overdeck knows how to run. */
-export type CompanionTerminalKind = "opencode-attach"
+export type CompanionTerminalKind =
+  /** `opencode attach <url> --session <id>` (PAN-3974). */
+  | "opencode-attach"
+  /** `codex resume --remote unix://<socket> <threadId>` (PAN-3835). */
+  | "codex-resume-remote"
 
 /** Why a companion cannot be opened right now. */
 export type CompanionTerminalUnavailableReason =
@@ -29,6 +33,10 @@ export type CompanionTerminalUnavailableReason =
   | "session-missing"
   /** The native client binary is not installed. */
   | "binary-missing"
+  /** The installed CLI is too old to attach its native client. */
+  | "cli-unsupported"
+  /** The conversation has no saved harness session yet; send a message first. */
+  | "session-not-started"
   /** The owner restarted while the companion was being opened. */
   | "owner-changed"
   /** This conversation's harness has no companion terminal. */
@@ -63,13 +71,16 @@ export interface CompanionTerminalOwnerShape {
 
 /**
  * Which companion terminal a conversation gets, or `null` for "keep the
- * owner pane as TERMINAL". Codex app-server conversations stay `null` until
- * PAN-3835 adds `codex resume --remote`.
+ * owner pane as TERMINAL". A Codex conversation still on the legacy
+ * `codex.transport: tui` runs the native TUI in its owner pane; the server
+ * adapter reports that as `unsupported` and points at the runtime pane.
  */
 export function companionTerminalKindFor(
   conversation: CompanionTerminalOwnerShape,
 ): CompanionTerminalKind | null {
-  return conversation.harness === "opencode" ? "opencode-attach" : null
+  if (conversation.harness === "opencode") return "opencode-attach"
+  if (conversation.harness === "codex") return "codex-resume-remote"
+  return null
 }
 
 /** Body keys each mutation accepts. Anything else is rejected as target injection. */
