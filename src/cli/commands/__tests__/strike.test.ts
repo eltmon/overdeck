@@ -243,6 +243,20 @@ describe('strikeCommand', () => {
       expect(plan.closesGithubIssue).toBeUndefined();
     });
 
+    // Review of #4015 (4015-2): a self-hosted GitLab origin is still GitLab.
+    it('reads a self-hosted GitLab origin as GitLab', async () => {
+      for (const url of [
+        'git@gitlab.example.com:group/p.git',
+        'https://gitlab.internal.corp/group/p.git',
+        'ssh://git@gitlab.example.com:2222/group/p.git',
+      ]) {
+        const plan = await __testInternals.resolveStrikePlan(draft, async (_cwd, command) =>
+          command.includes('get-url') ? url : null);
+        expect(plan.forge).toBe('gitlab');
+        expect(__testInternals.buildStrikePrompt(plan)).toContain('glab mr create');
+      }
+    });
+
     it('falls back to GitHub and main when the repository says nothing', async () => {
       const plan = await __testInternals.resolveStrikePlan(draft, async () => null);
       expect(plan.forge).toBe('github');

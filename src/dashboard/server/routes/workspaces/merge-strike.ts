@@ -4,7 +4,7 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
 import { getAgentState, messageAgent, spawnAgent } from '../../../../lib/agents.js';
-import { isAlive, isConfirmedDead } from '../../../../lib/agents/liveness.js';
+import { isAlive } from '../../../../lib/agents/liveness.js';
 import {
   clearYieldForResumeSync,
   decideResumeGate,
@@ -341,10 +341,11 @@ export async function rebaseWithAgentFallback(options: {
   rebaseMsg: string;
   allowFreshStart: boolean;
   /**
-   * Hand the request only to an agent that is running now; never resume one
-   * that has exited. A finished strike sits idle at its prompt and still takes
-   * a PR update request, but once its session has exited, resuming it would
-   * revive an agent whose contract ended with the PR URL.
+   * Hand the request only to an agent the liveness oracle confirms is running
+   * now; never resume one that has exited or whose state cannot be told. A
+   * finished strike sits idle at its prompt and still takes a PR update
+   * request, but once its session has exited, resuming it would revive an
+   * agent whose contract ended with the PR URL.
    */
   liveAgentOnly?: boolean;
   setStatus: (update: MergeRunPatch) => void;
@@ -371,8 +372,13 @@ export async function rebaseWithAgentFallback(options: {
     }
   }
 
-  if (liveAgentOnly && isConfirmedDead(await isAlive(agentId))) {
-    const agentReason = `${agentId} has exited, so no agent can update ${branchName}; `
+  // Positive evidence only: an indeterminate probe (a Herdr socket that does
+  // not answer, a failed ps) is not "live", or the resume path below would
+  // revive an exited strike.
+  const verdict = liveAgentOnly ? await isAlive(agentId) : null;
+  if (verdict && !verdict.alive) {
+    const state = verdict.reason === 'runtime-indeterminate' ? 'cannot be confirmed running' : 'has exited';
+    const agentReason = `${agentId} ${state}, so no agent can update ${branchName}; `
       + `update its pull request by hand or run \`pan strike ${issueId}\` again`;
     console.log(`[merge] ${agentReason} — not resuming it`);
     return {

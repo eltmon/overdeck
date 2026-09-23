@@ -12,7 +12,7 @@ import { Effect } from 'effect';
 import { getAgentRuntimeState, spawnAgent, stopAgent } from '../../lib/agents.js';
 import { ACTIVITY_STALLED_MS } from '../../lib/agents/health.js';
 import type { ForgeType } from '../../lib/forge.js';
-import { getRepoTargetBranch, inferProjectForgeSync, normalizeForgeSync } from '../../lib/project-repos.js';
+import { forgeFromRemoteUrlSync, getRepoTargetBranch, inferProjectForgeSync } from '../../lib/project-repos.js';
 import {
   getProjectSync,
   resolveProjectFromIssueSync,
@@ -155,7 +155,7 @@ async function resolveStrikePlan(
   git: (cwd: string, command: string) => Promise<string | null> = gitOutput,
 ): Promise<StrikePlan> {
   const forge = draft.forge
-    ?? normalizeForgeSync(await git(draft.projectRoot, 'git remote get-url origin'))
+    ?? forgeFromRemoteUrlSync(await git(draft.projectRoot, 'git remote get-url origin'))
     ?? 'github';
   const originHead = draft.baseBranch
     ? null

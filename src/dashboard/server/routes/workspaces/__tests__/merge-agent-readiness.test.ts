@@ -163,8 +163,22 @@ describe('rebaseWithAgentFallback with liveAgentOnly (strike)', () => {
     expect(mocks.spawnAgent).not.toHaveBeenCalled();
   });
 
-  it('still asks a live strike session when the liveness probe is indeterminate', async () => {
+  // Review of #4015 (4015-3): an indeterminate probe is not evidence of life.
+  it('treats an indeterminate liveness probe as not live and does not resume the strike', async () => {
     mocks.liveness = { alive: false, reason: 'runtime-indeterminate' };
+    mocks.agentState = { id: 'strike-pan-77', status: 'stopped' };
+
+    const result = await rebaseWithAgentFallback(strikeOptions);
+
+    expect(result.success).toBe(false);
+    expect(result.retryable).toBe(false);
+    expect(result.reason).toContain('strike-pan-77 cannot be confirmed running');
+    expect(mocks.messageAgent).not.toHaveBeenCalled();
+    expect(mocks.spawnAgent).not.toHaveBeenCalled();
+  });
+
+  it('asks a strike session the liveness oracle confirms is running', async () => {
+    mocks.liveness = { alive: true, paneAlive: true };
     mocks.lifecycle = { hasLiveTmuxSession: true, canResumeSession: true, canStartFresh: false };
     mocks.messageAgent.mockResolvedValue({ delivered: false, queuedToMail: true, reason: 'test stops here' });
 
