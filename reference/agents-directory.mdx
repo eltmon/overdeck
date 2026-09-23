@@ -1,0 +1,65 @@
+---
+title: Agents Directory
+description: Find every agent, conversation and subagent at /agents, see who spawned it, and read its transcript beside its issue and PR
+---
+
+# Agents Directory
+
+Open `/agents` to see every agent Overdeck knows about in one place: work,
+review, plan and strike agents, `pan spawn` panes, your conversations, and the
+subagents they started. The page has three panes. Pick a place on the left,
+pick an agent in the middle, and read it on the right.
+
+The Agents page is an experimental surface. Turn on **Settings → Experimental
+features** to see it in the navigation.
+
+## The three panes
+
+| Pane | What it shows |
+| --- | --- |
+| **Locations** (left) | **Local** and, when an agent runs on Fly, **Remote (Fly)**. Under each: your projects, then each issue (newest number first) and one **Conversations** group for work that has no issue. The numbers on the right are live / total. |
+| **Agents** (middle) | Every entry under the selected place. A subagent or worker sits indented under the agent or conversation that spawned it. When its parent lives somewhere else, the row says **spawned by** that parent instead. Each row shows the id, role, harness and model, last activity and age. |
+| **Detail** (right) | The entry's header (id, harness, model, state, when it started and was last active, cost when known, and a **Spawned by** link), the issue's state, PR, checks and branch with the issue's actions, and the transcript. |
+
+Conversations keep their composer in the detail pane. A subagent's transcript
+is read-only: it has no input channel of its own.
+
+## What the colors mean
+
+The state badge at the start of each row is the only color in it.
+
+| Badge | State |
+| --- | --- |
+| Blue | **working** — a machine is running a turn |
+| Amber | **blocked** — it is waiting for you (a question or an approval) |
+| Red | **stuck · Nh** — the issue's work agent has sat idle with unpushed commits past the stuck threshold, N hours since it last did anything; **API error** — the provider, not the agent, is failing |
+| Emerald | **done** — a subagent finished |
+| Grey | **idle**, **stopped**, or **remote** (an agent on a Fly machine, whose terminal runs there) |
+
+Agents and issue nodes show the issue's title after its id (`work · PAN-3920 · Agents
+page as a directory`). Hover any truncated id, model, branch or title to see it in full.
+
+## The time window
+
+The directory always lists everything that is live. Stopped and finished
+entries stay for **24h** by default; switch the toggle above the tree to **7d**
+to look back a week. An agent that spawned something still in the window stays
+listed so you can see where the child came from.
+
+## Keyboard
+
+| Key | Action |
+| --- | --- |
+| `↑` / `↓` | Move the selection in the focused pane |
+| `←` / `→`, `Tab` / `Shift+Tab` | Move between the panes |
+| `Enter` | On a place, focus its list; on a row, focus its detail |
+| `/` | Focus the **Filter agents** box (matches label, id, harness, model and role) |
+
+The selection is kept in the address bar (`?node=…&entry=…&window=168`), so a
+link opens the same view.
+
+## The card grid
+
+The previous card grid, with its metric strip and phase, project and model
+filters, is still there: choose **grid** in the top bar, or open
+`/agents?view=grid`.

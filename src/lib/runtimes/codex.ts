@@ -26,6 +26,7 @@ import { promisify } from 'node:util'
 import { exec } from 'node:child_process'
 import { request as httpRequest } from 'node:http'
 import { Effect } from 'effect'
+import { findRolloutPath } from './codex-rollout-path.js'
 import yaml from 'js-yaml'
 import type {
   AgentRuntime,
@@ -46,6 +47,8 @@ import { TmuxError, ProcessSpawnError, ProcessTimeoutError } from '../errors.js'
 import { prepareHarnessLaunch } from '../harness-binary.js'
 import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js'
 import { appendSessionIdToHistory } from '../session-history.js'
+
+export { findRolloutPath }
 
 const execAsync = promisify(exec)
 
@@ -219,58 +222,6 @@ export function writeThreadId(agentId: string, threadId: string): void {
 export function recordCodexRolloutSession(agentId: string, threadId: string, rolloutPath: string): void {
   writeThreadId(agentId, threadId)
   appendSessionIdToHistory(agentId, threadId, 'capture', { harness: 'codex', path: rolloutPath })
-}
-
-/** Cache resolved rollout paths to avoid repeated synchronous directory walks. */
-const rolloutPathCache = new Map<string, string>()
-
-/**
- * Walk $CODEX_HOME/sessions looking for a rollout file whose name ends with
- * `-<threadId>.jsonl`.  The directory tree is YYYY/MM/DD/…, so we walk it
- * recursively.
- *
- * Results are cached by (codexHomeDir, threadId) so the walk runs at most once
- * per unique thread; the hot paths (getHeartbeat tier-2, getTokenUsage,
- * getSessionCost) pay only an existsSync check on subsequent calls.
- */
-export function findRolloutPath(codexHomeDir: string, threadId: string): string | null {
-  const cacheKey = `${codexHomeDir}:${threadId}`
-  const cached = rolloutPathCache.get(cacheKey)
-  if (cached) {
-    if (existsSync(cached)) return cached
-    // File was deleted — evict and re-walk.
-    rolloutPathCache.delete(cacheKey)
-  }
-  const sessionsRoot = join(codexHomeDir, 'sessions')
-  if (!existsSync(sessionsRoot)) return null
-  const result = walkForThread(sessionsRoot, threadId)
-  if (result) rolloutPathCache.set(cacheKey, result)
-  return result
-}
-
-function walkForThread(dir: string, threadId: string): string | null {
-  let entries: string[]
-  try {
-    entries = readdirSync(dir)
-  } catch {
-    return null
-  }
-  for (const entry of entries) {
-    const full = join(dir, entry)
-    let isDir = false
-    try {
-      isDir = statSync(full).isDirectory()
-    } catch {
-      continue
-    }
-    if (isDir) {
-      const hit = walkForThread(full, threadId)
-      if (hit) return hit
-    } else if (entry.endsWith(`-${threadId}.jsonl`)) {
-      return full
-    }
-  }
-  return null
 }
 
 const SPAWN_READY_TIMEOUT_MS = 60_000

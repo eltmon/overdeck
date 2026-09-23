@@ -35,6 +35,8 @@ export interface BackendAgentSnapshot {
   readonly backend: TerminalBackendName
   /** Backend-native pane handle (Herdr `w1:p1`, tmux session name). */
   readonly paneId: string
+  /** Overdeck agent id, when the pane carries one (PAN-3920). */
+  readonly agentId?: string
   /** Handle the terminal WebSocket attaches to. */
   readonly terminalId: string
   /** Issue workspace the pane belongs to. */

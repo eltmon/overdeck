@@ -215,6 +215,17 @@ async function newContext(): Promise<BrowserContext> {
       // flag so the route renders its FleetAgentsView instead of redirecting
       // to /home. See src/lib/experimentalFeatures.ts (EXPERIMENTAL_TAB_IDS).
       if (path === '/api/settings') return json({ tts: { enabled: false }, experimental: { experimentalFeatures: true } });
+      // PAN-3920: the Agents Directory is the default /agents view.
+      if (path === '/api/agent-directory') return json({
+        generatedAt: new Date().toISOString(),
+        windowHours: 24,
+        entries: [{
+          id: 'agent-pan-1148', kind: 'agent', label: 'work · PAN-1148', location: 'local', projectKey: 'overdeck',
+          issueId: 'PAN-1148', issueTitle: 'Styleguide conformance issue', parentId: null, role: 'work', harness: 'claude-code', model: 'claude-opus-4-7',
+          state: 'working', startedAt: new Date().toISOString(), lastActivityAt: new Date().toISOString(),
+          costUsd: null, source: 'overdeck', transcript: { route: 'agent', agentId: 'agent-pan-1148' },
+        }],
+      });
       if (path === '/api/tts/health') return json({ ok: true, queue: 0, model: 'test-tts' });
       if (path === '/api/deacon/status') return json({
         isRunning: true,
@@ -420,10 +431,14 @@ describe('styleguide rendered surface conformance', () => {
     await expect.poll(() => commandDeck.page.locator('[data-component="feature-item"][data-issue-id="PAN-1148"]').count(), renderPoll).toBe(1);
     await commandDeck.context.close();
 
-    const agents = await openRoute('/agents');
+    const agents = await openRoute('/agents?view=grid');
     await expect.poll(() => agents.page.locator('[data-component="agent-card"][data-agent-id="agent-pan-1148"]').count(), renderPoll).toBe(1);
     await expect.poll(() => agents.page.locator('[data-component="verb-badge"]').count(), renderPoll).toBeGreaterThan(0);
     await agents.context.close();
+
+    const directory = await openRoute('/agents');
+    await expect.poll(() => directory.page.locator('[data-component="directory-row"][data-entry-id="agent-pan-1148"]').count(), renderPoll).toBe(1);
+    await directory.context.close();
 
     const drawer = await openRoute('/pipeline?issue=PAN-1148&tab=overview');
     await expect.poll(() => drawer.page.locator('[data-component="drawer-action-bar"]').count(), renderPoll).toBe(1);
@@ -441,6 +456,10 @@ describe('styleguide rendered surface conformance', () => {
     const { context, page } = await openRoute('/agents');
 
     await expect.poll(() => page.locator('[data-component="top-bar-segmented-control"]').count(), renderPoll).toBe(1);
+    await expect.poll(() => page.locator('[data-component="agents-directory"]').count(), renderPoll).toBe(1);
+
+    await page.getByRole('button', { name: 'grid' }).click();
+    await expect.poll(() => page.url(), renderPoll).toContain('view=grid');
     await expect.poll(() => page.locator('[data-component="agent-card"]').count(), renderPoll).toBe(1);
 
     await page.getByRole('button', { name: 'table' }).click();
@@ -452,9 +471,9 @@ describe('styleguide rendered surface conformance', () => {
     await expect.poll(() => page.url(), renderPoll).toContain('view=timeline');
     await expect.poll(() => page.locator('[data-component="agents-coming-soon"]').count(), renderPoll).toBe(1);
 
-    await page.getByRole('button', { name: 'grid' }).click();
+    await page.getByRole('button', { name: 'directory' }).click();
     await expect.poll(() => page.url(), renderPoll).not.toContain('view=');
-    await expect.poll(() => page.locator('[data-component="agent-card"]').count(), renderPoll).toBe(1);
+    await expect.poll(() => page.locator('[data-component="agents-directory"]').count(), renderPoll).toBe(1);
 
     await page.getByRole('button', { name: 'Start agent' }).click();
     await expect.poll(() => page.url(), renderPoll).toBe(`${baseUrl}/board`);
@@ -463,7 +482,7 @@ describe('styleguide rendered surface conformance', () => {
   }, 45_000);
 
   it('agents page Open issue scrolls drawer to active-agent section', async () => {
-    const { context, page } = await openRoute('/agents');
+    const { context, page } = await openRoute('/agents?view=grid');
 
     await expect.poll(() => page.locator('[data-component="agent-card"]').count(), renderPoll).toBe(1);
     await page.getByText('Open issue').click();
