@@ -1,5 +1,4 @@
 import { museDataHome } from './runtimes/muse-session.js';
-import { Effect } from 'effect';
 import { prepareClaudeContext } from './launcher-context.js';
 import { dirname, join } from 'node:path';
 import type { Role } from './agents.js';
@@ -10,7 +9,7 @@ import { shellQuoteModelIdSync } from './model-validation.js';
 import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
 import { getOverdeckHome, packageRoot } from './paths.js';
 import { buildGitGuardLines, type GitGuardMode } from './launcher-git-guard.js';
-import { buildCodexCommand } from './launcher-codex-command.js';
+import { buildCodexCommand, type CodexNativeEndpointOption } from './launcher-codex-command.js';
 import { shellQuote } from './shell-quote.js';
 import { resolveKimiNativeEffort } from './kimi-effort.js';
 import { getClaudeCodeLaunchModelSync } from './kimi-claude-routing.js';
@@ -19,7 +18,7 @@ export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
 export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse';
 
-export interface LauncherConfig {
+export interface LauncherConfig extends CodexNativeEndpointOption {
   role: Role;
   spawnMode?: LauncherSpawnMode;
   workingDir: string;
@@ -999,16 +998,6 @@ export function buildPiCommand(config: LauncherConfig, useExec: boolean): string
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 // Pure-sync launcher emission — additive Effect.sync wrappers.
-
-/** Build the bash launcher script body for a Cloister role spawn. Pure. */
-export const generateLauncherScript = (
-  config: LauncherConfig,
-): Effect.Effect<string> => Effect.sync(() => generateLauncherScriptSync(config));
-
-/** Build an optional launcher wrapper (returns null when not needed). Pure. */
-export const generateLauncherWrapper = (
-  config: LauncherConfig,
-): Effect.Effect<string | null> => Effect.sync(() => generateLauncherWrapperSync(config));
 
 /** Persistent native TUI, verified against Muse Code 1.0.2. */
 function buildMuseCommand(config: LauncherConfig, useExec: boolean): string[] {

@@ -23,6 +23,7 @@ fi
 
 CIRCULAR_BASELINE="scripts/circular-deps-baseline.txt"
 EFFECT_DIAG_BASELINE="scripts/effect-diagnostics-baseline.txt"
+EFFECT_FACADES_BASELINE="scripts/effect-facades-baseline.txt"
 ESLINT_ALLOWLIST="eslint-any-allowlist.json"
 ISSUE_REF_RE='([A-Z]+-[0-9]+|#[0-9]+)'
 
@@ -98,6 +99,50 @@ effect_diag_baseline_increases_for_commit() {
   parent_effect_diag_baseline_at "$@" > "$old_file"
   effect_diag_baseline_at "$commit" > "$new_file"
   comm -13 "$old_file" "$new_file" | sed 's/^/effect diagnostics baseline added: /'
+  rm -f "$old_file" "$new_file"
+}
+
+effect_facades_baseline_at() {
+  local rev="$1"
+  { git show "$rev:$EFFECT_FACADES_BASELINE" 2>/dev/null || true; } |
+    sed -E '/^[[:space:]]*(#|$)/d' | sort -u
+}
+
+# Rows are "<shape> <count> <path>" (PAN-3958). Compare by <shape> <path>: a
+# lowered count is free; a raised count or a new row is an increase. Across a
+# merge commit's parents the highest count per key is the old value.
+effect_facades_baseline_increases_for_commit() {
+  local commit="$1"
+  shift
+  local parent has_parent_baseline=false
+  for parent in "$@"; do
+    if git cat-file -e "$parent:$EFFECT_FACADES_BASELINE" 2>/dev/null; then
+      has_parent_baseline=true
+      break
+    fi
+  done
+  # The first baseline is an initialization, not a ratchet increase.
+  if [[ "$has_parent_baseline" != true ]]; then
+    return 0
+  fi
+
+  local old_file new_file
+  old_file=$(mktemp)
+  new_file=$(mktemp)
+  for parent in "$@"; do
+    effect_facades_baseline_at "$parent"
+  done > "$old_file"
+  effect_facades_baseline_at "$commit" > "$new_file"
+  awk '
+    FILENAME == ARGV[1] {
+      if (NF >= 3) { key = $1 " " $3; if (!(key in old) || $2 + 0 > old[key] + 0) old[key] = $2 }
+      next
+    }
+    NF >= 3 {
+      key = $1 " " $3
+      if (!(key in old) || $2 + 0 > old[key] + 0) print "effect facades baseline increased: " $0
+    }
+  ' "$old_file" "$new_file"
   rm -f "$old_file" "$new_file"
 }
 
@@ -192,6 +237,7 @@ audit_commit() {
     eslint_allowlist_increases_for_commit "$commit" "${parents[@]}"
     circular_baseline_increases_for_commit "$commit" "${parents[@]}"
     effect_diag_baseline_increases_for_commit "$commit" "${parents[@]}"
+    effect_facades_baseline_increases_for_commit "$commit" "${parents[@]}"
   )
 
   if [[ -z "$increases" ]]; then
@@ -219,7 +265,7 @@ commits_for_file() {
   fi
 }
 
-for file in "$ESLINT_ALLOWLIST" "$CIRCULAR_BASELINE" "$EFFECT_DIAG_BASELINE"; do
+for file in "$ESLINT_ALLOWLIST" "$CIRCULAR_BASELINE" "$EFFECT_DIAG_BASELINE" "$EFFECT_FACADES_BASELINE"; do
   while IFS= read -r commit; do
     [[ -z "$commit" ]] && continue
     audit_commit "$commit"

@@ -3,7 +3,7 @@
  *
  * Single source of truth for "is this {harness, model, authMode} combination
  * allowed?". Every spawn entry point and every harness/model picker UI MUST
- * call canUseHarness() before showing or accepting an option, so a stale
+ * call canUseHarnessSync() before showing or accepting an option, so a stale
  * setting cannot bypass the rule.
  *
  * Rules:
@@ -22,7 +22,6 @@
  *     subscription is in play, so the ToS bar is not engaged)
  */
 
-import { Effect } from 'effect'
 import type { RuntimeName } from './runtimes/types.js'
 import type { AuthMode } from './subscription-types.js'
 import { getProviderForModelSync } from './providers.js'
@@ -152,21 +151,3 @@ export function canUseHarnessSync(
   // harness === 'pi' (legacy — normalizer converts 'pi' → 'ohmypi' at settings load)
   return ALLOWED
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Pure-sync policy checks — additive Effect.sync wrappers for callers in Effect graphs.
-
-/** Check whether a (model, authMode) pair is allowed. Pure. */
-export const canUseModelWithAuth = (
-  model: string,
-  authMode: AuthMode | undefined,
-): Effect.Effect<HarnessPolicyDecision> =>
-  Effect.sync(() => canUseModelWithAuthSync(model, authMode))
-
-/** Check whether a (harness, model, authMode) triple is allowed. Pure. */
-export const canUseHarness = (
-  harness: RuntimeName,
-  model: string,
-  authMode: AuthMode | undefined,
-): Effect.Effect<HarnessPolicyDecision> =>
-  Effect.sync(() => canUseHarnessSync(harness, model, authMode))

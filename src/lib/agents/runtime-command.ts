@@ -708,7 +708,7 @@ export async function getProviderAuthMode(model: string): Promise<AuthMode | und
  * and ohmypi/Pi. When the harness uses the ohmypi RPC command, the function
  * returns `omp --mode rpc --model <model>`; the launcher generator then layers
  * --session-dir, --extension, --no-context-files, and the stdin-from-fifo
- * redirect on top via generateLauncherScript. The `agentName` (PAN-982:
+ * redirect on top via generateLauncherScriptSync. The `agentName` (PAN-982:
  * --name) and `agentDefinition` (PAN-982: --agent) parameters only apply to the
  * Claude Code path — ohmypi has no agent-definition system.
  */

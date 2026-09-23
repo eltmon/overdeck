@@ -1368,11 +1368,6 @@ export const isPaneDead = (
     return values.some(v => v === '1');
   }).pipe(Effect.catch(() => Effect.succeed(false)));
 
-export const detectTerminalApiError = (
-  paneOutput: string,
-): Effect.Effect<TerminalApiError | null> =>
-  Effect.sync(() => detectTerminalApiErrorSync(paneOutput));
-
 export const getAgentSessions = (): Effect.Effect<readonly TmuxSession[], TmuxError> =>
   listSessions().pipe(
     Effect.map((sessions) => sessions.filter(s => s.name.startsWith('agent-'))),

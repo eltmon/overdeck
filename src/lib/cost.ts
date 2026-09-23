@@ -660,65 +660,6 @@ export function formatCostSync(cost: number, currency: string = 'USD'): string {
 // Cost-tracking helpers — sync FS by design (CLI / cron scripts). Read paths
 // are Effect.sync; write paths surface FsError via Effect.try.
 
-/** Compute the cost of one token-usage record at given pricing. Pure. */
-export const calculateCost = (
-  usage: TokenUsage,
-  pricing: ModelPricing,
-): Effect.Effect<number> => Effect.sync(() => calculateCostSync(usage, pricing));
-
-/** Look up pricing for a (provider, model) pair. Pure. */
-export const getPricing = (
-  provider: AIProvider,
-  model: string,
-): Effect.Effect<ModelPricing | null> => Effect.sync(() => getPricingSync(provider, model));
-
-/** Append a single cost entry to the cost log. */
-export const logCost = (
-  entry: Omit<CostEntry, 'id' | 'timestamp'>,
-): Effect.Effect<CostEntry, FsError> =>
-  Effect.try({
-    try: () => logCostSync(entry),
-    catch: (cause) => new FsError({ path: COSTS_DIR, operation: 'log-cost', cause }),
-  });
-
-/** Convenience wrapper: compute cost then log. */
-export const logUsage = (
-  ...args: Parameters<typeof logUsageSync>
-): Effect.Effect<ReturnType<typeof logUsageSync>, FsError> =>
-  Effect.try({
-    try: () => logUsageSync(...args),
-    catch: (cause) => new FsError({ path: COSTS_DIR, operation: 'log-usage', cause }),
-  });
-
-/** Read entries across an inclusive date range. Pure-ish. */
-export const readCosts = (
-  startDate: string,
-  endDate: string,
-): Effect.Effect<CostEntry[]> => Effect.sync(() => readCostsSync(startDate, endDate));
-
-/** Read today's cost entries. Pure-ish. */
-export const readTodayCosts = (): Effect.Effect<CostEntry[]> =>
-  Effect.sync(() => readTodayCostsSync());
-
-/** Read recent cost entries scoped to an issue. Pure-ish. */
-export const readIssueCosts = (
-  issueId: string,
-  days: number = 30,
-): Effect.Effect<CostEntry[]> => Effect.sync(() => readIssueCostsSync(issueId, days));
-
-/** Summarize a flat list of cost entries. Pure. */
-export const summarizeCosts = (
-  entries: CostEntry[],
-): Effect.Effect<CostSummary> => Effect.sync(() => summarizeCostsSync(entries));
-
-/** Daily / weekly / monthly rollups. Pure-ish. */
-export const getDailySummary = (date?: string): Effect.Effect<CostSummary> =>
-  Effect.sync(() => getDailySummarySync(date));
-export const getWeeklySummary = (): Effect.Effect<CostSummary> =>
-  Effect.sync(() => getWeeklySummarySync());
-export const getMonthlySummary = (): Effect.Effect<CostSummary> =>
-  Effect.sync(() => getMonthlySummarySync());
-
 /** Budget CRUD. */
 export const createBudget = (
   budget: Omit<CostBudget, 'id' | 'spent'>,
@@ -727,19 +668,6 @@ export const createBudget = (
     try: () => createBudgetSync(budget),
     catch: (cause) =>
       new FsError({ path: COSTS_DIR, operation: 'create-budget', cause }),
-  });
-export const getBudget = (id: string): Effect.Effect<CostBudget | null> =>
-  Effect.sync(() => getBudgetSync(id));
-export const getAllBudgets = (): Effect.Effect<CostBudget[]> =>
-  Effect.sync(() => getAllBudgetsSync());
-export const updateBudgetSpent = (
-  id: string,
-  spent: number,
-): Effect.Effect<boolean, FsError> =>
-  Effect.try({
-    try: () => updateBudgetSpentSync(id, spent),
-    catch: (cause) =>
-      new FsError({ path: COSTS_DIR, operation: 'update-budget-spent', cause }),
   });
 export const checkBudget = (
   id: string,

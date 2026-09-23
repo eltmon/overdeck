@@ -9,11 +9,9 @@
  * it checks its hook for pending work and executes immediately.
  */
 
-import { Effect } from 'effect';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { AGENTS_DIR } from './paths.js';
-import { FsError } from './errors.js';
 
 export interface HookItem {
   id: string;
@@ -329,83 +327,3 @@ export function generateFixedPointPromptSync(agentId: string): string | null {
 
   return lines.join('\n');
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Hook (FPP work-queue) IO — sync FS by design. Read paths use Effect.sync;
-// mutating paths surface FsError on disk failure.
-
-/** Initialize an empty hook for an agent (no-op if it exists). */
-export const initHook = (agentId: string): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => initHookSync(agentId),
-    catch: (cause) => new FsError({ path: agentId, operation: 'init-hook', cause }),
-  });
-
-/** Load an agent's hook (null when missing). Pure-ish. */
-export const getHook = (agentId: string): Effect.Effect<Hook | null> =>
-  Effect.sync(() => getHookSync(agentId));
-
-/** Push a new item onto the agent's hook. */
-export const pushToHook = (
-  agentId: string,
-  item: Omit<HookItem, 'id' | 'createdAt'>,
-): Effect.Effect<HookItem, FsError> =>
-  Effect.try({
-    try: () => pushToHookSync(agentId, item),
-    catch: (cause) =>
-      new FsError({ path: agentId, operation: 'push-to-hook', cause }),
-  });
-
-/** Inspect an agent's hook for pending work. Pure-ish. */
-export const checkHook = (
-  agentId: string,
-): Effect.Effect<ReturnType<typeof checkHookSync>> => Effect.sync(() => checkHookSync(agentId));
-
-/** Pop a specific item from the hook by id. */
-export const popFromHook = (
-  agentId: string,
-  itemId: string,
-): Effect.Effect<boolean, FsError> =>
-  Effect.try({
-    try: () => popFromHookSync(agentId, itemId),
-    catch: (cause) =>
-      new FsError({ path: agentId, operation: 'pop-from-hook', cause }),
-  });
-
-/** Clear all items from the hook. */
-export const clearHook = (agentId: string): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => clearHookSync(agentId),
-    catch: (cause) =>
-      new FsError({ path: agentId, operation: 'clear-hook', cause }),
-  });
-
-/** Reorder hook items by id (best-effort, only existing ids). */
-export const reorderHookItems = (
-  agentId: string,
-  orderedItemIds: string[],
-): Effect.Effect<boolean, FsError> =>
-  Effect.try({
-    try: () => reorderHookItemsSync(agentId, orderedItemIds),
-    catch: (cause) =>
-      new FsError({ path: agentId, operation: 'reorder-hook', cause }),
-  });
-
-/** Send a mail item to an agent's mail drop (becomes hook item on collect). */
-export const sendMail = (
-  ...args: Parameters<typeof sendMailSync>
-): Effect.Effect<ReturnType<typeof sendMailSync>, FsError> =>
-  Effect.try({
-    try: () => sendMailSync(...args),
-    catch: (cause) =>
-      new FsError({ path: args[0], operation: 'send-mail', cause }),
-  });
-
-/** Drain an agent's mail drop into hook items. Pure-ish. */
-export const collectMail = (agentId: string): Effect.Effect<HookItem[]> =>
-  Effect.sync(() => collectMailSync(agentId));
-
-/** Build the FPP prompt text for an agent's pending work. Pure-ish. */
-export const generateFixedPointPrompt = (
-  agentId: string,
-): Effect.Effect<string | null> => Effect.sync(() => generateFixedPointPromptSync(agentId));

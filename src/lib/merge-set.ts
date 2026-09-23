@@ -158,63 +158,9 @@ export function patchMergeSetReposSync(issueId: string, patches: MergeSetRepoPat
 // and route exceptions through Effect.try so callers in Effect graphs get a
 // typed error channel instead of an unchecked throw.
 
-/** Insert-or-update a merge-set in the DB. */
-export const upsertMergeSet = (mergeSet: MergeSet): Effect.Effect<void, Error> =>
-  Effect.try({
-    try: () => upsertMergeSetSync(mergeSet),
-    catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
-  });
-
 /** Fetch a merge-set by issue id. */
 export const getMergeSet = (issueId: string): Effect.Effect<MergeSet | null, Error> =>
   Effect.try({
     try: () => getMergeSetSync(issueId),
     catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
   });
-
-/** List all merge-sets (optionally filtered by project). */
-export const getAllMergeSets = (projectKey?: string): Effect.Effect<MergeSet[], Error> =>
-  Effect.try({
-    try: () => getAllMergeSetsSync(projectKey),
-    catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
-  });
-
-/** Delete a merge-set by issue id. */
-export const deleteMergeSet = (issueId: string): Effect.Effect<void, Error> =>
-  Effect.try({
-    try: () => deleteMergeSetSync(issueId),
-    catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
-  });
-
-/** Build a new merge-set from an issue id + labels (no DB write). Pure. */
-export const buildMergeSetForIssue = (
-  issueId: string,
-  labels: string[] = [],
-): Effect.Effect<MergeSet | null> =>
-  Effect.sync(() => buildMergeSetForIssueSync(issueId, labels));
-
-/** Build-or-fetch a merge-set; persists when newly built. */
-export const ensureMergeSetForIssue = (
-  issueId: string,
-  labels: string[] = [],
-): Effect.Effect<MergeSet | null, Error> =>
-  Effect.try({
-    try: () => ensureMergeSetForIssueSync(issueId, labels),
-    catch: (cause) => (cause instanceof Error ? cause : new Error(String(cause))),
-  });
-
-/** Immutably attach an artifact URL/id to a repo entry. Pure. */
-export const withRepoArtifactUrl = (
-  mergeSet: MergeSet,
-  repoKey: string,
-  artifactUrl: string,
-  artifactId?: string,
-): Effect.Effect<MergeSet> =>
-  Effect.sync(() => withRepoArtifactUrlSync(mergeSet, repoKey, artifactUrl, artifactId));
-
-/** Immutably patch a repo state entry. Pure. */
-export const withRepoState = (
-  mergeSet: MergeSet,
-  repoKey: string,
-  patch: Partial<MergeSetRepoState>,
-): Effect.Effect<MergeSet> => Effect.sync(() => withRepoStateSync(mergeSet, repoKey, patch));

@@ -40,6 +40,7 @@
 - The per-issue **pipeline journal** (`src/lib/cloister/pipeline-journal.ts`, `<workspace>/.overdeck/pipeline.jsonl`) is the one piece of stored pipeline state: append-only, written at the moment of the action, event-fired on `pipeline-notifier`, never authority — where it disagrees with the PR, the PR wins. Nothing repairs it and nothing rewrites it. [docs/PIPELINE-GATES.md](docs/PIPELINE-GATES.md)
 - Delegation goes through `pan worker run` (a registered, issue-linked agent that reports back); `pan spawn` stays the foreman's pane-only item worker.
 - One module answers agent liveness and idleness — `src/lib/agents/liveness.ts` (session + live pane + harness process in the pane subtree; idle = stale work activity, never the mirror label alone). Agent state is written only after the terminal-backend session exists — there are no placeholder rows — and supervisor-launched agents write `stopped` from the supervisor's own `exited` lifecycle event, never inferred.
+- **One variant per operation in src/lib.** No exported Effect wrapper around in-repo Promise or sync code (Shapes A/B), no sync/async twin without a documented sync caller; `npm run lint:effect-facades` ratchets it. [docs/EFFECT-BRIDGING.md](docs/EFFECT-BRIDGING.md)
 
 ## Topic Index
 
@@ -54,7 +55,7 @@
 | Workspaces & projects domain, quick actions, memory homes | [docs/WORKSPACES-AND-PROJECTS.md](docs/WORKSPACES-AND-PROJECTS.md) |
 | Merge workflow, post-merge handoff, Docker cleanup, close-out | [docs/MERGE-WORKFLOW.md](docs/MERGE-WORKFLOW.md) |
 | xBRIEF plans, four artifacts, status lifecycle | [docs/XBRIEF.md](docs/XBRIEF.md) |
-| Effect bridging + diagnostics ratchet | [docs/EFFECT-BRIDGING.md](docs/EFFECT-BRIDGING.md), [docs/EFFECT-DIAGNOSTICS.md](docs/EFFECT-DIAGNOSTICS.md) |
+| Effect bridging, façade ratchet, diagnostics ratchet | [docs/EFFECT-BRIDGING.md](docs/EFFECT-BRIDGING.md), [docs/EFFECT-DIAGNOSTICS.md](docs/EFFECT-DIAGNOSTICS.md) |
 | Issue views, God View | [docs/ISSUE-VIEW.md](docs/ISSUE-VIEW.md), [docs/GOD-VIEW.md](docs/GOD-VIEW.md) |
 | Context layers (rules/skills distribution) | [docs/CONTEXT-LAYERS.md](docs/CONTEXT-LAYERS.md) |
 | Flywheel page and loop skill | [docs/FLYWHEEL.md](docs/FLYWHEEL.md) |

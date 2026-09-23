@@ -6,7 +6,6 @@
 
 import { Effect } from 'effect';
 import { FsError, ProcessSpawnError } from './errors.js';
-import { copyOverdeckSettingsToWorkspaceSync, ensurePanGitignoreSync, migrateOverdeckToPanSync } from './workspace-manager/migration.js';
 import { createWorkspacePromise } from './workspace-manager/create.js';
 import { addNewRepoToWorkspacePromise, addReposToWorkspacePromise } from './workspace-manager/repos.js';
 import { getContainersReferencingWorkspacePathPromise, stopWorkspaceDockerPromise } from './workspace-manager/docker.js';
@@ -19,7 +18,6 @@ import type {
   AddReposToWorkspaceOptions,
   AddReposToWorkspaceResult,
   DockerCleanupResult,
-  PanMigrationResult,
   WorkspaceCreateOptions,
   WorkspaceCreateResult,
   WorkspaceRemoveOptions,
@@ -56,34 +54,6 @@ const toWmProcessError = (op: string, cause: unknown): ProcessSpawnError =>
     args: [op],
     message: cause instanceof Error ? cause.message : String(cause),
     cause,
-  });
-
-/** Migrate any pre-PAN-967 .overdeck/* subdirs to the .pan/ layout. */
-export const migrateOverdeckToPan = (
-  projectPath: string,
-): Effect.Effect<PanMigrationResult, FsError> =>
-  Effect.try({
-    try: () => migrateOverdeckToPanSync(projectPath),
-    catch: (cause) => toWmFsError('migrateOverdeckToPan', projectPath, cause),
-  });
-
-/** Mirror ~/.claude settings/agents into the workspace's .claude/ dir. */
-export const copyOverdeckSettingsToWorkspace = (
-  workspacePath: string,
-): Effect.Effect<{ copied: string[]; errors: string[] }, FsError> =>
-  Effect.try({
-    try: () => copyOverdeckSettingsToWorkspaceSync(workspacePath),
-    catch: (cause) =>
-      toWmFsError('copyOverdeckSettingsToWorkspace', workspacePath, cause),
-  });
-
-/** Ensure the project gitignore covers `.pan/continue.json` (PAN-1124). */
-export const ensurePanGitignore = (
-  projectPath: string,
-): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => ensurePanGitignoreSync(projectPath),
-    catch: (cause) => toWmFsError('ensurePanGitignore', projectPath, cause),
   });
 
 /** Create a new workspace (git worktree + scaffolding). */

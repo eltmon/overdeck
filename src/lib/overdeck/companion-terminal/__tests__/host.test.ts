@@ -43,6 +43,29 @@ describe('tmux companion host', () => {
     await expect(host.create('bad name', { cwd: '/w', argv: ['x'], generation: 'g' })).rejects.toThrow(/Invalid tmux session name/);
   });
 
+  it('pins adapter env on the pane without letting it override the generation stamp (PAN-3835)', async () => {
+    const d = deps({});
+    const host = createTmuxCompanionHost(d);
+
+    await host.create('companion-conv-b', {
+      cwd: '/w',
+      argv: ['/bin/codex', 'resume', '--remote', 'unix:///s/app.sock', 'thread-1'],
+      generation: 'g2',
+      env: { CODEX_HOME: '/home/op/.overdeck/agents/conv-b/codex-home-v2', [COMPANION_GENERATION_ENV]: 'forged' },
+    });
+
+    expect(d.createSession).toHaveBeenCalledWith(
+      'companion-conv-b',
+      '/w',
+      `exec '/bin/codex' 'resume' '--remote' 'unix:///s/app.sock' 'thread-1'`,
+      {
+        CODEX_HOME: '/home/op/.overdeck/agents/conv-b/codex-home-v2',
+        [COMPANION_GENERATION_ENV]: 'g2',
+        TERM: 'xterm-256color',
+      },
+    );
+  });
+
   it('reads the owner incarnation only when the owner session exists', async () => {
     const alive = deps({ 'has-session': () => '', 'display-message': () => '1790000000\n' });
     expect(await createTmuxCompanionHost(alive).ownerStamp('conv-a')).toBe('1790000000');

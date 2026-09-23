@@ -9,8 +9,6 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { existsSync, writeFileSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
-import { Effect } from 'effect';
-import { FsError } from './errors.js';
 
 // ============================================================================
 // TLDR Session Metrics (PAN-236)
@@ -492,42 +490,3 @@ export function removeTldrDaemonServiceSync(workspacePath: string): void {
 export function listTldrDaemonServicesSync(): TldrDaemonService[] {
   return Array.from(daemonRegistry.values());
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Read per-session TLDR metrics from log files in a workspace. */
-export const getTldrMetrics = (
-  workspacePath: string,
-  sinceCheckpoint = false,
-): Effect.Effect<TldrSessionMetrics, FsError> =>
-  Effect.try({
-    try: () => getTldrMetricsSync(workspacePath, sinceCheckpoint),
-    catch: (cause) =>
-      new FsError({ path: workspacePath, operation: 'getTldrMetrics', cause }),
-  });
-
-/** Capture-and-checkpoint TLDR metrics; null when nothing new is logged. */
-export const captureTldrMetrics = (
-  workspacePath: string,
-): Effect.Effect<TldrSessionMetrics | null, FsError> =>
-  Effect.try({
-    try: () => captureTldrMetricsSync(workspacePath),
-    catch: (cause) =>
-      new FsError({ path: workspacePath, operation: 'captureTldrMetrics', cause }),
-  });
-
-/** Get-or-create the registry entry for a workspace's TLDR daemon. */
-export const getTldrDaemonService = (
-  workspacePath: string,
-  venvPath: string,
-): Effect.Effect<TldrDaemonService> =>
-  Effect.sync(() => getTldrDaemonServiceSync(workspacePath, venvPath));
-
-/** Remove a daemon service from the registry. */
-export const removeTldrDaemonService = (
-  workspacePath: string,
-): Effect.Effect<void> => Effect.sync(() => removeTldrDaemonServiceSync(workspacePath));
-
-/** Snapshot every registered daemon service. */
-export const listTldrDaemonServices = (): Effect.Effect<readonly TldrDaemonService[]> =>
-  Effect.sync(() => listTldrDaemonServicesSync());

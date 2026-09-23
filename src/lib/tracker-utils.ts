@@ -175,17 +175,6 @@ export function resolveTrackerTypeSync(issueId: string): TrackerTypeResolution {
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
-/**
- * Parse configured GitHub repo entries from env + projects.yaml. Wraps the
- * sync implementation so callers in Effect graphs can stay Effect-native.
- */
-export const parseGitHubRepos = (): Effect.Effect<readonly GitHubRepoConfig[], ConfigError> =>
-  Effect.try({
-    try: () => parseGitHubReposSync(),
-    catch: (cause) =>
-      new ConfigError({ message: 'parseGitHubRepos failed', cause }),
-  });
-
 /** Resolve an issue ID to a GitHub repo, or signal it's not a GitHub issue. */
 export const resolveGitHubIssue = (
   issueId: string,
@@ -202,17 +191,4 @@ export const isGitHubIssue = (issueId: string): Effect.Effect<boolean, ConfigErr
     try: () => isGitHubIssueSync(issueId),
     catch: (cause) =>
       new ConfigError({ message: `isGitHubIssue(${issueId}) failed`, cause }),
-  });
-
-/**
- * Resolve the tracker type for an issue ID via projects.yaml.
- * Falls back to 'linear' for unknown prefixes.
- */
-export const resolveTrackerType = (
-  issueId: string,
-): Effect.Effect<TrackerTypeResolution, ConfigError> =>
-  Effect.try({
-    try: () => resolveTrackerTypeSync(issueId),
-    catch: (cause) =>
-      new ConfigError({ message: `resolveTrackerType(${issueId}) failed`, cause }),
   });

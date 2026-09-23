@@ -76,10 +76,6 @@ const wrapConfigErr = (op: string) => (cause: unknown): ConfigError =>
     cause,
   });
 
-/** Effect variant of {@link getPRDDraftPathSync}. */
-export const getPRDDraftPath = (issueId: string): Effect.Effect<string, ConfigError> =>
-  Effect.try({ try: () => getPRDDraftPathSync(issueId), catch: wrapConfigErr('getPRDDraftPath') });
-
 /** Effect variant of {@link hasPRDDraft}. */
 export const hasPRDDraft = (issueId: string): Effect.Effect<boolean, ConfigError> =>
   Effect.tryPromise({ try: () => hasPRDDraftPromise(issueId), catch: wrapConfigErr('hasPRDDraft') });

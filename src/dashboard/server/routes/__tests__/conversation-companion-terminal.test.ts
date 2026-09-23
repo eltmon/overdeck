@@ -120,6 +120,44 @@ describe('companion terminal routes', () => {
     });
   });
 
+  it('opens a Codex conversation through the same route with only server-resolved fields (PAN-3835)', async () => {
+    const codexConv = { name: '20260923-0002', tmuxSession: 'conv-20260923-0002', cwd: '/work/repo', harness: 'codex' };
+    getConversationByName.mockImplementation((name: string) => (name === codexConv.name ? codexConv : null));
+    lifecycle.open.mockResolvedValue({
+      status: 'attached',
+      kind: 'codex-resume-remote',
+      sessionName: 'companion-conv-20260923-0002',
+      generation: GENERATION,
+      reused: false,
+    });
+
+    const response = await post(`/api/conversations/${codexConv.name}/companion-terminal/open`, {});
+
+    expect(response.status).toBe(200);
+    expect(decode(response)).toMatchObject({ kind: 'codex-resume-remote' });
+    expect(lifecycle.open).toHaveBeenCalledWith({
+      conversationName: codexConv.name,
+      ownerSession: codexConv.tmuxSession,
+      cwd: codexConv.cwd,
+      harness: 'codex',
+    });
+  });
+
+  it.each(['endpoint', 'threadId', 'socket'])('rejects a caller-supplied Codex %s as target injection', async (key) => {
+    const response = await post(OPEN, { [key]: 'unix:///tmp/evil.sock' });
+    expect(response.status).toBe(400);
+    expect(lifecycle.open).not.toHaveBeenCalled();
+  });
+
+  it('returns Codex unavailable reasons as readable states', async () => {
+    for (const reason of ['cli-unsupported', 'session-not-started']) {
+      lifecycle.open.mockResolvedValueOnce({ status: 'unavailable', kind: 'codex-resume-remote', reason, message: 'explained' });
+      const response = await post(OPEN, {});
+      expect(response.status).toBe(200);
+      expect(decode(response)).toMatchObject({ status: 'unavailable', reason });
+    }
+  });
+
   it('returns restart-required as a readable state, not an error', async () => {
     lifecycle.open.mockResolvedValue({ status: 'unavailable', kind: 'opencode-attach', reason: 'restart-required', message: 'Stop and resume' });
     const response = await post(OPEN, {});

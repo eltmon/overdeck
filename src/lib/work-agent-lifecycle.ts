@@ -371,16 +371,3 @@ export const assertCanStartFresh = (
         reason: cause instanceof Error ? cause.message : String(cause),
       }),
   });
-
-/** Assert the agent can resume; lifts the synchronous throw to a typed error. */
-export const assertCanResumeSession = (
-  agentOrIssueId: string,
-): Effect.Effect<WorkAgentLifecycleState, WorkAgentLifecycleViolation> =>
-  Effect.try({
-    try: () => assertCanResumeSessionSync(agentOrIssueId),
-    catch: (cause) =>
-      new WorkAgentLifecycleViolation({
-        agentId: agentOrIssueId,
-        reason: cause instanceof Error ? cause.message : String(cause),
-      }),
-  });

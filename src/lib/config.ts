@@ -542,22 +542,9 @@ export const saveConfig = (
       new FsError({ path: CONFIG_FILE, operation: 'save-config-async', cause }),
   });
 
-/** Default config template. Pure. */
-export const getDefaultConfig = (): Effect.Effect<OverdeckConfig> =>
-  Effect.sync(() => getDefaultConfigSync());
-
 /** Compute the dashboard's external API URL. Pure (reads env). */
 export const getDashboardApiUrl = (): Effect.Effect<string> =>
   Effect.sync(() => getDashboardApiUrlSync());
-
-/** Resolve the configured devroot path. Pure (reads config). */
-export const getDevrootPath = (): Effect.Effect<string | null> =>
-  Effect.sync(() => getDevrootPathSync());
-
-/** Compute the devroot for a project path. Pure. */
-export const findDevrootForProject = (
-  projectPath: string,
-): Effect.Effect<string> => Effect.sync(() => findDevrootForProjectSync(projectPath));
 
 /** Resolve conversations sub-config (async). */
 export const getConversationsConfig =

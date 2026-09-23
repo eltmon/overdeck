@@ -10,7 +10,6 @@ import { existsSync, readFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import { Effect } from 'effect';
-import { ConfigError } from '../errors.js';
 
 export interface FlyMachineConfig {
   image: string;
@@ -364,20 +363,6 @@ const toFlyApiError = (cause: unknown): FlyApiError =>
         0,
         '',
       );
-
-/** Build a FlyApiClient from env or explicit token (Effect variant). */
-export const createFlyApiClient = (
-  token?: string,
-): Effect.Effect<FlyApiClient, ConfigError> =>
-  Effect.try({
-    try: () => createFlyApiClientSync(token),
-    catch: (cause) =>
-      new ConfigError({
-        message:
-          cause instanceof Error ? cause.message : 'Failed to build FlyApiClient',
-        cause,
-      }),
-  });
 
 /** Create a machine in an app (Effect variant). */
 export const createMachine = (

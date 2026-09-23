@@ -696,7 +696,7 @@ export const postAgentsRoute = HttpRouter.add(
     // variable and the workType/harnessOverrides map are gone — the
     // legacy-field guard above (line 1872) blocks any client still sending
     // them. Note: when bodyHarness is set we still run it through
-    // canUseHarness() so we can fail fast on a model+harness incompatibility
+    // canUseHarnessSync() so we can fail fast on a model+harness incompatibility
     // before spawning the subprocess.
     const bodyHarness = (body as any).harness;
     const userPickedHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | 'opencode' | 'muse' | null =

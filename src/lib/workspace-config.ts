@@ -429,25 +429,3 @@ export function getServiceFromTemplateSync(
     port: overrides.port || template.port,
   };
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Pure helpers; Effect wrappers exist solely so consumers can stay in Effect.
-
-import { Effect } from 'effect';
-
-/** Substitute {{KEY}} placeholders. Pure. */
-export const replacePlaceholders = (
-  template: string,
-  placeholders: TemplatePlaceholders,
-): Effect.Effect<string> => Effect.sync(() => replacePlaceholdersSync(template, placeholders));
-
-/** Workspace defaults (ports, services, DNS). Pure. */
-export const getDefaultWorkspaceConfig = (): Effect.Effect<WorkspaceConfig> =>
-  Effect.sync(() => getDefaultWorkspaceConfigSync());
-
-/** Merge a service template with overrides. Pure. */
-export const getServiceFromTemplate = (
-  templateName: string,
-  overrides: Partial<ServiceConfig>,
-): Effect.Effect<ServiceConfig> =>
-  Effect.sync(() => getServiceFromTemplateSync(templateName, overrides));

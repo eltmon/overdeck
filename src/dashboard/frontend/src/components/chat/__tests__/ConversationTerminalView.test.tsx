@@ -1,6 +1,6 @@
 /**
- * PAN-3974 — the conversation TERMINAL view: native companion for OpenCode,
- * unchanged owner pane for every other harness.
+ * PAN-3974 / PAN-3835 — the conversation TERMINAL view: native companion for
+ * OpenCode and Codex, unchanged owner pane for every other harness.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -25,6 +25,7 @@ vi.mock('../../CommandDeck/styles/command-deck.module.css', () => ({
 }));
 
 const OPENCODE = { name: '20260923-0001', tmuxSession: 'conv-20260923-0001', harness: 'opencode' };
+const CODEX = { name: '20260923-0002', tmuxSession: 'conv-20260923-0002', harness: 'codex' };
 const GENERATION = 'abcdefabcdefabcdefabcdef';
 const ATTACHED = {
   status: 'attached',
@@ -46,7 +47,7 @@ describe('ConversationTerminalView', () => {
   });
   afterEach(() => cleanup());
 
-  it.each(['claude-code', 'codex', 'acp', 'kimi-code', 'ohmypi', 'muse', null])(
+  it.each(['claude-code', 'acp', 'kimi-code', 'ohmypi', 'muse', null])(
     'keeps the owner pane for harness %s and never opens a companion',
     (harness) => {
       render(<ConversationTerminalView conversation={{ ...OPENCODE, harness }} />);
@@ -64,6 +65,69 @@ describe('ConversationTerminalView', () => {
     await waitFor(() => expect(terminalSession()).toBe('companion-conv-20260923-0001'));
     expect(api.openCompanionTerminal).toHaveBeenCalledWith('20260923-0001');
     expect(screen.getByRole('tab', { name: 'Native CLI' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('attaches the native Codex CLI companion and keeps the host pane as Runtime log', async () => {
+    api.openCompanionTerminal.mockResolvedValue({
+      ...ATTACHED,
+      kind: 'codex-resume-remote',
+      sessionName: 'companion-conv-20260923-0002',
+    });
+    render(<ConversationTerminalView conversation={CODEX} />);
+
+    await waitFor(() => expect(terminalSession()).toBe('companion-conv-20260923-0002'));
+    expect(api.openCompanionTerminal).toHaveBeenCalledWith('20260923-0002');
+    fireEvent.click(screen.getByRole('tab', { name: 'Runtime log' }));
+    expect(terminalSession()).toBe('conv-20260923-0002');
+  });
+
+  it('explains a Codex CLI too old to attach without offering a retry', async () => {
+    api.openCompanionTerminal.mockResolvedValue({
+      status: 'unavailable',
+      kind: 'codex-resume-remote',
+      reason: 'cli-unsupported',
+      message: 'The native Codex CLI needs codex-cli 0.153.4 or newer (installed: 0.150.0).',
+    });
+    render(<ConversationTerminalView conversation={CODEX} />);
+
+    expect(await screen.findByText('Upgrade required for the native CLI')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Show runtime log' })).toBeInTheDocument();
+  });
+
+  it('opens a legacy codex.transport: tui conversation on Runtime log, its own interactive CLI', async () => {
+    api.openCompanionTerminal.mockResolvedValue({
+      status: 'unavailable',
+      kind: 'codex-resume-remote',
+      reason: 'unsupported',
+      message: 'This Codex conversation runs the native Codex CLI directly in its own terminal.',
+    });
+    render(<ConversationTerminalView conversation={CODEX} />);
+
+    await waitFor(() => expect(terminalSession()).toBe('conv-20260923-0002'));
+    const tabs = screen.getAllByRole('tab').map(tab => tab.textContent);
+    expect(tabs).toEqual(['Runtime log', 'Native CLI']);
+    expect(screen.getByRole('tab', { name: 'Runtime log' })).toHaveAttribute('aria-selected', 'true');
+
+    // Choosing Native CLI still explains why, and does not bounce back.
+    fireEvent.click(screen.getByRole('tab', { name: 'Native CLI' }));
+    expect(await screen.findByText(/runs the native Codex CLI directly/)).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Native CLI' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('offers a retry for a Codex conversation that has no saved turn yet', async () => {
+    api.openCompanionTerminal.mockResolvedValueOnce({
+      status: 'unavailable',
+      kind: 'codex-resume-remote',
+      reason: 'session-not-started',
+      message: 'Send a first message from the dashboard, then open Terminal again.',
+    });
+    render(<ConversationTerminalView conversation={CODEX} />);
+
+    expect(await screen.findByText('Native CLI not available yet')).toBeInTheDocument();
+    api.openCompanionTerminal.mockResolvedValueOnce({ ...ATTACHED, kind: 'codex-resume-remote', sessionName: 'companion-conv-20260923-0002' });
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(terminalSession()).toBe('companion-conv-20260923-0002'));
   });
 
   it('shows the owner pane under Runtime log and reuses the companion on return', async () => {

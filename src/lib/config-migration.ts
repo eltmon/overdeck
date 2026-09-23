@@ -13,7 +13,6 @@ import yaml from 'js-yaml';
 import { loadSettingsSync, type SettingsConfig } from './settings.js';
 import { type YamlConfig } from './config-yaml.js';
 import { type ModelId } from './settings.js';
-import { FsError } from './errors.js';
 
 /** Path to legacy settings file */
 const LEGACY_SETTINGS_PATH = join(homedir(), '.overdeck', 'settings.json');
@@ -299,34 +298,3 @@ export const needsMigration = (): Effect.Effect<boolean> =>
 /** True if any legacy settings.json is present (with or without yaml). Pure. */
 export const hasLegacySettings = (): Effect.Effect<boolean> =>
   Effect.sync(() => hasLegacySettingsSync());
-
-/** Convert a SettingsConfig into a YamlConfig. Pure. */
-export const convertToYamlConfig = (
-  settings: SettingsConfig,
-): Effect.Effect<YamlConfig> => Effect.sync(() => convertToYamlConfigSync(settings));
-
-/** Run the settings.json → config.yaml migration. Surfaces FsError on IO failure. */
-export const migrateConfig = (
-  options: MigrationOptions = {},
-): Effect.Effect<MigrationResult, FsError> =>
-  Effect.try({
-    try: () => migrateConfigSync(options),
-    catch: (cause) =>
-      new FsError({ path: NEW_CONFIG_PATH, operation: 'migrate-config', cause }),
-  });
-
-/** Inspect migration state without modifying anything. Pure. */
-export const getMigrationStatus = (): Effect.Effect<
-  ReturnType<typeof getMigrationStatusSync>
-> => Effect.sync(() => getMigrationStatusSync());
-
-/** Sweep legacy runtime symlinks under ~/.overdeck (idempotent). */
-export const cleanupLegacyRuntimeSymlinks =
-  (): Effect.Effect<LegacyCleanupResult> =>
-    Effect.sync(() => cleanupLegacyRuntimeSymlinksSync());
-
-/** Migrate `targets = [...]` lines out of config.toml. Pure-ish (catches). */
-export const migrateSyncTargets = (): Effect.Effect<{
-  migrated: boolean;
-  hadNonClaudeTargets: boolean;
-}> => Effect.sync(() => migrateSyncTargetsSync());
