@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-23T08:20:08.645Z · model: claude-opus-5 · open: 851_
+_Last sequenced: 2026-09-23T09:58:42.949Z · model: claude-opus-5 · open: 851_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -1186,7 +1186,7 @@ Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-23T08:20:08.645Z",
+  "generatedAt": "2026-09-23T09:58:42.949Z",
   "model": "claude-opus-5",
   "pass": "incremental",
   "openCount": 851,
