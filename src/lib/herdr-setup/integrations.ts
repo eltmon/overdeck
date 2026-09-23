@@ -9,9 +9,12 @@
  * Overdeck neither installs nor uninstalls them (doctor still reports them).
  *
  * `herdr integration status` wording (0.9.1): `<target>: not installed (<path>)`
- * is observed live; the binary also carries `outdated (` for stale installs.
- * The classifier is tolerant: anything it cannot read is `unknown`, which is
- * never reinstalled (doctor warns instead).
+ * is observed live. The other states are the status literals the 0.9.1 binary
+ * carries (`strings`): `current (` for an up-to-date install, `outdated (`
+ * (with a ` < v` version comparison) for a stale one and `needs repair (` for
+ * a broken one. The separator after the target is any whitespace. The
+ * classifier is tolerant: anything it cannot read is `unknown`, which is never
+ * reinstalled (doctor warns instead).
  */
 
 import { compareSemver, extractSemver } from './binary.js';
@@ -36,10 +39,22 @@ export const HERDR_INTEGRATION_BINARY: Record<HerdrIntegrationTarget, string> = 
   hermes: 'hermes',
 };
 
+/**
+ * `herdr integration install` writes into a harness's config and may fetch;
+ * killing it at the 10 s default could leave a half-written install.
+ * Override with `OVERDECK_HERDR_INTEGRATION_TIMEOUT_MS`.
+ */
+export const HERDR_INTEGRATION_INSTALL_TIMEOUT_MS = 120_000;
+
+function integrationInstallTimeoutMs(env: Readonly<Record<string, string | undefined>> = process.env): number {
+  const raw = Number(env.OVERDECK_HERDR_INTEGRATION_TIMEOUT_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : HERDR_INTEGRATION_INSTALL_TIMEOUT_MS;
+}
+
 /** The Kimi integration needs Kimi Code ≥ 0.14.0 (D11). */
 export const KIMI_INTEGRATION_MIN_VERSION = '0.14.0';
 
-export type IntegrationState = 'installed' | 'outdated' | 'not-installed' | 'unknown';
+export type IntegrationState = 'installed' | 'outdated' | 'needs-repair' | 'not-installed' | 'unknown';
 
 export interface IntegrationStatusRow {
   readonly target: string;
@@ -48,13 +63,18 @@ export interface IntegrationStatusRow {
   readonly path?: string;
 }
 
-const STATUS_LINE = /^(\S+?)(?: \(experimental\))?: (.+?)(?: \((.+)\))?$/;
+const STATUS_LINE = /^(\S+?)(?: \(experimental\))?:\s+(.+?)(?: \((.+)\))?$/;
 
 export function classifyIntegrationDetail(detail: string): IntegrationState {
   const text = detail.trim().toLowerCase();
   if (text.startsWith('not installed')) return 'not-installed';
-  if (text.includes('outdated') || text.includes('update')) return 'outdated';
-  if (text.startsWith('installed')) return 'installed';
+  if (text.startsWith('needs repair')) return 'needs-repair';
+  if (text.startsWith('outdated')) return 'outdated';
+  if (text.startsWith('current')) return 'installed';
+  // Not a 0.9.1 literal; kept so a plainer future wording still reads right.
+  if (text.startsWith('installed')) {
+    return text.includes('outdated') || text.includes('update available') ? 'outdated' : 'installed';
+  }
   return 'unknown';
 }
 
@@ -119,6 +139,8 @@ export interface EnsureHerdrIntegrationsDeps {
   readonly kimiVersion?: string | null;
   /** Pre-read status rows (the orchestrator may already have them). */
   readonly statusRows?: readonly IntegrationStatusRow[];
+  /** Per-install timeout; defaults to `OVERDECK_HERDR_INTEGRATION_TIMEOUT_MS` or 120 s. */
+  readonly installTimeoutMs?: number;
 }
 
 export interface EnsureHerdrIntegrationsResult {
@@ -129,7 +151,8 @@ export interface EnsureHerdrIntegrationsResult {
 
 /**
  * Install every pilot integration whose harness binary resolves and whose
- * status is not `installed`. Idempotent: with everything installed it makes no
+ * status is `not-installed`, `outdated` or `needs-repair` (a reinstall is the
+ * repair). Idempotent: with everything installed it makes no
  * `integration install` call. Never touches `claude`, `codex` or `hermes`.
  */
 export async function ensureHerdrIntegrations(
@@ -168,7 +191,9 @@ export async function ensureHerdrIntegrations(
       result.skipped.push({ target, reason: `status not recognized: ${row.detail}` });
       continue;
     }
-    const install = await exec(deps.binary, ['integration', 'install', target]).catch((error: unknown) => ({
+    const install = await exec(deps.binary, ['integration', 'install', target], {
+      timeoutMs: deps.installTimeoutMs ?? integrationInstallTimeoutMs(),
+    }).catch((error: unknown) => ({
       stdout: '',
       stderr: error instanceof Error ? error.message : String(error),
       exitCode: -1,

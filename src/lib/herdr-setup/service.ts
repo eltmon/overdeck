@@ -1,10 +1,13 @@
 /**
  * The Herdr session server for this Overdeck home (PAN-3956 W7, D6).
  *
- * One headless `herdr --session <session> server` per Overdeck home. On a
- * systemd host it runs as the user unit `<session>-herdr.service`
- * (`overdeck-herdr.service` for the default home); elsewhere it is spawned
- * detached with its output in `~/.overdeck/logs/herdr-<session>.log`.
+ * One headless `herdr --session <session> server` per Overdeck home. For the
+ * default home on a systemd host it runs as the user unit
+ * `overdeck-herdr.service`. Any other home gets a boot-persistent unit only
+ * with `OVERDECK_HERDR_PERSISTENT_UNIT=1`: a throwaway `OVERDECK_HOME` must
+ * never leave a server that starts at every login. Everywhere else the server
+ * is spawned fully detached (own session, re-parented away from the caller)
+ * with its output in `~/.overdeck/logs/herdr-<session>.log`.
  *
  * Nothing here ever stops or restarts a server: a restart closes every agent
  * pane. A server that is already running is left alone — the unit is only
@@ -14,9 +17,10 @@
 import { spawn } from 'node:child_process';
 import { mkdir, open } from 'node:fs/promises';
 import { access } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { getOverdeckHome } from '../paths.js';
+import { DEFAULT_HERDR_SESSION_NAME } from '../terminal-backends/select.js';
 import { defaultHerdrExec, readHerdrStatus, type HerdrExec } from './status.js';
 
 export const HERDR_SERVER_WAIT_MS = 10_000;
@@ -27,17 +31,49 @@ export function herdrUnitName(session: string): string {
   return `${session}-herdr.service`;
 }
 
+/**
+ * One ExecStart word. Quotes and backslashes are escaped; `%` (specifiers)
+ * and `$` (variable expansion) are doubled so an odd install path is taken
+ * literally.
+ */
 function systemdQuote(value: string): string {
-  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
+  const escaped = value
+    .replaceAll('\\', '\\\\')
+    .replaceAll('"', '\\"')
+    .replaceAll('%', '%%')
+    .replaceAll('$', '$$$$');
+  return `"${escaped}"`;
 }
 
-/** The unit text. Matches the hand-written host unit except for the quoted absolute ExecStart. */
-export function renderHerdrUnit(binary: string, session: string): string {
+/**
+ * Whether this session's server gets a boot-persistent user unit: the default
+ * home always, any other home only on explicit opt-in
+ * (`OVERDECK_HERDR_PERSISTENT_UNIT=1`). PAN-3956 review finding 6.
+ */
+export function herdrPersistentUnitWanted(
+  session: string,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return session === DEFAULT_HERDR_SESSION_NAME || env.OVERDECK_HERDR_PERSISTENT_UNIT === '1';
+}
+
+/** An Environment= word: `%` is doubled (specifiers); `$` is not expanded there. */
+function environmentQuote(value: string): string {
+  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('%', '%%')}"`;
+}
+
+/**
+ * The unit text. Matches the hand-written host unit except for the quoted
+ * absolute ExecStart. When the operator set `HERDR_CONFIG_PATH`, the unit
+ * carries it (absolute), so the server reads the file Overdeck edits.
+ */
+export function renderHerdrUnit(binary: string, session: string, configPath?: string): string {
   return [
     '[Unit]',
     `Description=Herdr headless server for Overdeck (session: ${session})`,
     '',
     '[Service]',
+    ...(configPath ? [`Environment=${environmentQuote(`HERDR_CONFIG_PATH=${configPath}`)}`] : []),
     `ExecStart=${systemdQuote(binary)} --session ${session} server`,
     'Restart=on-failure',
     'RestartSec=3',
@@ -75,11 +111,27 @@ export function herdrServerLogPath(session: string, overdeckHome: string = getOv
   return join(overdeckHome, 'logs', `herdr-${session}.log`);
 }
 
-async function defaultSpawnDetached(binary: string, args: readonly string[], logPath: string): Promise<void> {
-  await mkdir(join(logPath, '..'), { recursive: true });
+/**
+ * Start the server so nothing that stops the caller can stop it. `detached`
+ * gives the intermediate `sh` a new session and process group; `sh` then
+ * backgrounds the server and exits at once, so the server is re-parented to
+ * init (or the nearest subreaper) and is never a child of the dashboard, the
+ * supervisor or `pan`. Stopping or restarting any of those leaves Herdr and
+ * every agent pane alone (PAN-3956 review finding 7).
+ */
+export async function defaultSpawnDetached(
+  binary: string,
+  args: readonly string[],
+  logPath: string,
+  spawnImpl: typeof spawn = spawn,
+): Promise<void> {
+  await mkdir(dirname(logPath), { recursive: true });
   const log = await open(logPath, 'a');
   try {
-    const child = spawn(binary, [...args], { detached: true, stdio: ['ignore', log.fd, log.fd] });
+    const child = spawnImpl('/bin/sh', ['-c', '"$0" "$@" </dev/null &', binary, ...args], {
+      detached: true,
+      stdio: ['ignore', log.fd, log.fd],
+    });
     child.on('error', () => { /* surfaced by the socket wait */ });
     child.unref();
   } finally {
@@ -107,6 +159,10 @@ export interface EnsureHerdrServerDeps {
   readonly sleep?: (ms: number) => Promise<void>;
   readonly now?: () => number;
   readonly logPath?: string;
+  /** Install and enable a boot-persistent unit. Defaults to `herdrPersistentUnitWanted(session)`. */
+  readonly persistentUnit?: boolean;
+  /** Absolute `HERDR_CONFIG_PATH` to carry into the unit, when the operator set one. */
+  readonly configPathEnv?: string;
 }
 
 export interface EnsureHerdrServerResult {
@@ -114,6 +170,8 @@ export interface EnsureHerdrServerResult {
   readonly managedBy?: 'systemd' | 'detached' | 'already-running';
   readonly unit?: string;
   readonly reason?: string;
+  /** Unit upkeep that failed while the server itself is fine. */
+  readonly warning?: string;
 }
 
 /**
@@ -132,20 +190,32 @@ export async function ensureHerdrServer(deps: EnsureHerdrServerDeps): Promise<En
   const answering = async (): Promise<boolean> =>
     (await exists(deps.socket)) && (await readHerdrStatus(deps.binary, deps.session, exec))?.server.running === true;
 
-  const onSystemd = await systemd.available().catch(() => false);
+  const persistent = deps.persistentUnit ?? herdrPersistentUnitWanted(deps.session);
+  const onSystemd = persistent && (await systemd.available().catch(() => false));
 
   if (await answering()) {
     if (!onSystemd) return { running: true, managedBy: 'already-running' };
     // Keep the unit current and enabled so a reboot brings the server back —
     // plain `enable`: a server started outside the unit must not get a twin.
-    await systemd.installUserUnit(unit, renderHerdrUnit(deps.binary, deps.session));
-    await systemd.enableUserUnit(unit);
+    // Upkeep failures are warnings: the server itself is running.
+    try {
+      await systemd.installUserUnit(unit, renderHerdrUnit(deps.binary, deps.session, deps.configPathEnv));
+      await systemd.enableUserUnit(unit);
+    } catch (error) {
+      return {
+        running: true,
+        managedBy: 'already-running',
+        unit,
+        warning: `Could not refresh or enable ${unit}: ${error instanceof Error ? error.message : String(error)}; `
+          + 'the running server is unaffected, but it may not come back after a reboot',
+      };
+    }
     return { running: true, managedBy: 'already-running', unit };
   }
 
   let managedBy: 'systemd' | 'detached';
   if (onSystemd) {
-    await systemd.installUserUnit(unit, renderHerdrUnit(deps.binary, deps.session));
+    await systemd.installUserUnit(unit, renderHerdrUnit(deps.binary, deps.session, deps.configPathEnv));
     await systemd.enableUserUnitNow(unit);
     managedBy = 'systemd';
   } else {

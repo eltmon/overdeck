@@ -1740,7 +1740,7 @@ const postWorkspaceApproveRoute = HttpRouter.add(
 
         if (isGitHubIssueFlag) {
           try {
-            await execAsync('pan sync', { encoding: 'utf-8', timeout: 30000 });
+            await execAsync('pan sync', { encoding: 'utf-8', timeout: 30000, env: { ...process.env, OVERDECK_HERDR_SYNC_LIGHT: '1' } });
           } catch (syncError: any) {
             console.error('pan sync failed (non-fatal):', syncError.message);
           }
