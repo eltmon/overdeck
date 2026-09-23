@@ -11,7 +11,8 @@ references) is reliable and "LIVE" is an upper bound. `tsc --noEmit` is the orac
 acted on. "ext" = references in other production files, "self" = references inside the defining
 file, "yield*" = references inside an `Effect.gen` generator, "tests" = references in test files.
 
-Regenerate: `node .pan/notes/pan-3958-audit.cjs > /tmp/pan-3958.json` from the repo root, then
+Regenerate: `node scripts/audit-effect-boundary.mjs --json --usage > /tmp/pan-3958.json` (the
+maintained port of the planning script, same classification and JSON keys), then
 compare counts; line numbers drift as phases land.
 
 ## A. Shape A — Promise façades (220)

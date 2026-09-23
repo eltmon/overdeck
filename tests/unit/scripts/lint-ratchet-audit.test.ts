@@ -47,6 +47,14 @@ function writeEffectDiagnosticsBaseline(root: string, findings: string[], header
   );
 }
 
+function writeEffectFacadesBaseline(root: string, rows: string[]): void {
+  mkdirSync(join(root, 'scripts'), { recursive: true });
+  writeFileSync(
+    join(root, 'scripts', 'effect-facades-baseline.txt'),
+    `# Effect façade ratchet baseline (PAN-3958).\n# Lower with --update\n${rows.join('\n')}\n`,
+  );
+}
+
 function commitAll(root: string, message: string): string {
   execFileSync('git', ['add', '-A'], { cwd: root });
   execFileSync('git', ['commit', '-m', message, '--quiet'], { cwd: root });
@@ -312,6 +320,45 @@ describe('lint-ratchet-audit.sh', () => {
       '# Updated Effect diagnostics baseline header',
     );
     commitAll(root, 'clarify baseline header');
+
+    const result = runAudit(root, ['--range', 'HEAD~1..HEAD']);
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('ratchet audit passed');
+  });
+
+  it('requires an issue reference to raise an Effect façade baseline row (PAN-3958)', () => {
+    const seed = ['A 2 src/lib/x.ts', 'B 1 src/lib/y.ts'];
+    const raised = ['A 3 src/lib/x.ts', 'B 1 src/lib/y.ts', 'C 1 src/lib/z.ts'];
+
+    const refLessRoot = setupRepo();
+    writeEffectFacadesBaseline(refLessRoot, seed);
+    commitAll(refLessRoot, 'initialize Effect façade baseline');
+    writeEffectFacadesBaseline(refLessRoot, raised);
+    const commit = commitAll(refLessRoot, 'raise façade row');
+    const refLess = runAudit(refLessRoot, ['--range', 'HEAD~1..HEAD']);
+
+    expect(refLess.ok).toBe(false);
+    expect(refLess.output).toContain(commit.slice(0, 12));
+    expect(refLess.output).toContain('effect facades baseline increased: A 3 src/lib/x.ts');
+    expect(refLess.output).toContain('effect facades baseline increased: C 1 src/lib/z.ts');
+    expect(refLess.output).not.toContain('increased: B 1');
+
+    const refRoot = setupRepo();
+    writeEffectFacadesBaseline(refRoot, seed);
+    commitAll(refRoot, 'initialize Effect façade baseline');
+    writeEffectFacadesBaseline(refRoot, raised);
+    commitAll(refRoot, 'raise façade row PAN-1234');
+
+    expect(runAudit(refRoot, ['--range', 'HEAD~1..HEAD']).ok).toBe(true);
+  });
+
+  it('allows lowering an Effect façade baseline row without an issue reference', () => {
+    const root = setupRepo();
+    writeEffectFacadesBaseline(root, ['A 11 src/lib/x.ts', 'B 2 src/lib/y.ts']);
+    commitAll(root, 'initialize Effect façade baseline');
+    writeEffectFacadesBaseline(root, ['A 10 src/lib/x.ts']);
+    commitAll(root, 'delete dead façades');
 
     const result = runAudit(root, ['--range', 'HEAD~1..HEAD']);
 

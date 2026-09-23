@@ -5,6 +5,6 @@ paths:
 ---
 ### Prefer async tmux primitives — sync versions are legacy debt
 
-`src/lib/tmux.ts` contains both sync (`sendKeys`) and async (`sendKeysAsync`) versions. The sync versions are legacy debt — do not add new sync functions or callers.
+In `src/lib/tmux.ts`, the `*Sync` functions block the event loop and are legacy debt — do not add new sync tmux functions or callers. Server-reachable code never calls one.
 
-Any new tmux interaction must use the async variants. Server-reachable code must ONLY use `sendKeysAsync`.
+New tmux interaction uses the async or Effect variants. To deliver text, use `sendKeys` (Effect: load-buffer + paste with verification); `sendKeysAsync` sends one raw key. `sendKeysSync` has no callers and is slated for deletion (PAN-3958); never call it.
