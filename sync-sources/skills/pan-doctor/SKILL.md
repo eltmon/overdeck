@@ -129,7 +129,7 @@ wrote `.pan/` into project `.gitignore` files, and that rule makes every plannin
 
 | Rule source | Fix |
 | --- | --- |
-| Exact `.pan/` or `.pan` line in the repo's top-level `.gitignore` (Overdeck's legacy line) | `pan admin migrate-plan-home <key> --commit` removes that line and commits `.gitignore` alone (with any artifacts it migrates), or delete the line and commit it yourself |
+| Exact `.pan/` or `.pan` line in the repo's top-level `.gitignore` (Overdeck's legacy line) | `pan admin migrate-plan-home <key> --repair-ignore` removes that line and commits `.gitignore` alone (no migration, no tracker lookup), or delete the line and commit it yourself |
 | Anything else (nested `.gitignore`, `.git/info/exclude`, `core.excludesFile`, a broader pattern) | Not Overdeck's rule: doctor never edits it. Remove or narrow it yourself |
 
 Doctor only reports; it has no `--fix`.
