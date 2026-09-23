@@ -767,6 +767,8 @@ export async function spawnConversationSession(
         extraEnvExports: [
           harnessLaunch.pathExport,
           `export OVERDECK_DASHBOARD_URL="http://127.0.0.1:${process.env['API_PORT'] ?? process.env['PORT'] ?? '3011'}"`,
+          // PAN-3920: every harness knows its conversation, so `pan worker run` can name its parent.
+          `export OVERDECK_CONVERSATION=${JSON.stringify(tmuxSession)}`,
         ],
         providerExports: providerExportsStr || undefined,
         trapHup: true,

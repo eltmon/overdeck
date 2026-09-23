@@ -239,6 +239,8 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     const launcher = launcherFor('conv-supervisor-test');
     expect(launcher).toContain("export PATH='/home/test/.local/bin':\"$PATH\"");
     expect(launcher).toContain("export OVERDECK_AGENT_ID='conv-supervisor-test'");
+    // PAN-3920: every conversation launcher names its own conversation.
+    expect(launcher).toContain('export OVERDECK_CONVERSATION="conv-supervisor-test"');
     expect(launcher).toContain("node '");
     expect(launcher).toContain("/dist/pty-supervisor.js' claude --model claude-sonnet-4-6");
     expect(existsSync(join(overdeckHome, 'agents', 'conv-supervisor-test', 'pty-token'))).toBe(true);
@@ -289,6 +291,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
 
     const launcher = launcherFor('conv-codex-supervisor-test');
     expect(launcher).toContain("export OVERDECK_AGENT_ID='conv-codex-supervisor-test'");
+    expect(launcher).toContain('export OVERDECK_CONVERSATION="conv-codex-supervisor-test"');
     expect(launcher).toContain(`export CODEX_HOME='${join(overdeckHome, 'agents', 'conv-codex-supervisor-test', 'codex-home-v2')}'`);
     expect(launcher).toContain("node '");
     expect(launcher).toContain("/dist/codex-app-server-host.js'");
@@ -406,6 +409,9 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
 
     const launcher = launcherFor('conv-docker-test');
     expect(launcher).not.toContain('pty-supervisor.js');
+    // PAN-3920: a plain Claude conversation has no OVERDECK_AGENT_ID, so this is how `pan worker run` finds its parent.
+    expect(launcher).not.toContain('export OVERDECK_AGENT_ID=');
+    expect(launcher).toContain('export OVERDECK_CONVERSATION="conv-docker-test"');
     expect(existsSync(join(overdeckHome, 'agents', 'conv-docker-test', 'pty-token'))).toBe(false);
   });
 

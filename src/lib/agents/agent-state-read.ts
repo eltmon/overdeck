@@ -190,6 +190,8 @@ export interface AgentState {
   slotIndex?: number;
   /** xBRIEF item id explicitly assigned to this registered swarm slot. */
   slotItemId?: string;
+  /** Conversation or agent that spawned this worker (PAN-3920). */
+  parentId?: string;
 }
 
 export function getAgentDir(agentId: string): string {
@@ -252,6 +254,7 @@ export function cleanAgentState(raw: AgentState): AgentState {
     inspectSubRole: raw.inspectSubRole,
     slotIndex: raw.slotIndex,
     slotItemId: raw.slotItemId,
+    parentId: raw.parentId,
   };
 }
 

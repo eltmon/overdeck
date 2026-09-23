@@ -243,6 +243,7 @@ async function spawnRunWithoutConsentClaim(
     reviewSynthesisAgentId: options.reviewSynthesisAgentId,
     reviewOutputPath: options.reviewOutputPath,
     reviewDeadlineAt: options.reviewDeadlineAt,
+    parentId: options.parentId,
   };
   // PAN-1048 P1: spawnRun is on the dashboard hot path (Effect routes,
   // reactive Cloister scheduler). All disk I/O here uses async fs/promises
@@ -396,6 +397,7 @@ async function spawnRunWithoutConsentClaim(
     promptFileMode: undefined,
     overdeckEnv: { agentId, issueId, sessionType: options.subRole ? `${role}.${options.subRole}` : role },
     extraEnvExports,
+    gitGuardMode: options.gitGuardMode,
     baseCommand: await getRoleRuntimeBaseCommand(selectedModel, agentId, role, resolvedHarness, options.subRole, options.effort),
     appendSystemPromptFiles: await claudeSystemPromptFiles(workspace, resolvedHarness),
     sessionId,
@@ -450,6 +452,7 @@ async function spawnRunWithoutConsentClaim(
       role: toPaneRole(role),
       harness: resolvedHarness,
       model: selectedModel,
+      ...(options.parentId ? { parent: options.parentId } : {}),
     },
   }).then((pane) => { launchedPane = pane; });
   if (resolvedHarness === 'kimi-code') {

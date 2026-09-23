@@ -247,6 +247,31 @@ describe('AgentState role persistence', () => {
     expect(getAgentStateSync('agent-flywheel-orchestrator')?.role).toBe('flywheel');
   });
 
+  it('PAN-3920: persists a worker parentId through save and read', async () => {
+    const { getAgentStateSync, saveAgentStateSync } = await import('../agents.js');
+
+    saveAgentStateSync({
+      id: 'agent-pan-9-worker-1',
+      issueId: 'PAN-9',
+      workspace: '/tmp/workspace',
+      harness: 'claude-code',
+      role: 'worker',
+      model: 'claude-sonnet-5',
+      status: 'running',
+      startedAt: '2026-09-23T00:00:00.000Z',
+      startedBy: 'pan-worker',
+      parentId: 'conv-orchestrator',
+    });
+
+    expect(getAgentStateSync('agent-pan-9-worker-1')).toMatchObject({
+      role: 'worker',
+      parentId: 'conv-orchestrator',
+      startedBy: 'pan-worker',
+    });
+    const raw = JSON.parse(readFileSync(join(tempHome, 'agents', 'agent-pan-9-worker-1', 'state.json'), 'utf-8'));
+    expect(raw.parentId).toBe('conv-orchestrator');
+  });
+
   it('defaults Channels MCP eligibility off for new work-agent spawns', async () => {
     vi.doMock('../config-yaml.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../config-yaml.js')),
