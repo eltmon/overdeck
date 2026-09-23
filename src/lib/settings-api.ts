@@ -1197,10 +1197,6 @@ export function getRoleConfig(role: Role): RoleConfig | undefined {
   return loadSettingsApi().roles?.[role];
 }
 
-async function setRoleConfigPromise(role: Role, roleConfig: RoleConfig): Promise<ApiSettingsConfig> {
-  return Effect.runPromise(updateSettingsApi({ roles: { [role]: roleConfig } }));
-}
-
 async function updateProviderApiKeyPromise(
   provider: 'openai' | 'voyage' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous' | 'dashscope',
   apiKey?: string
@@ -1549,21 +1545,6 @@ export const updateSettingsApi = (
     catch: (cause) =>
       new SettingsApiError({
         operation: 'updateSettingsApi',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `setRoleConfig`. */
-export const setRoleConfig = (
-  role: Role,
-  roleConfig: RoleConfig,
-): Effect.Effect<ApiSettingsConfig, SettingsApiError> =>
-  Effect.tryPromise({
-    try: () => setRoleConfigPromise(role, roleConfig),
-    catch: (cause) =>
-      new SettingsApiError({
-        operation: 'setRoleConfig',
         message: cause instanceof Error ? cause.message : String(cause),
         cause,
       }),

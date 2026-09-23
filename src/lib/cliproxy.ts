@@ -909,10 +909,6 @@ export const installCliproxy = (
 export const isCliproxyRunning = (): Effect.Effect<boolean, never> =>
   Effect.promise(() => isCliproxyRunningTask());
 
-/** Effect-native checkCliproxyPort — TCP probe of the local port, never fails. */
-export const checkCliproxyPort = (): Effect.Effect<boolean, never> =>
-  Effect.promise(() => checkCliproxyPortTask());
-
 /** Effect-native startCliproxy — spawns the sidecar. Fails with ProcessSpawnError. */
 export const startCliproxy = (): Effect.Effect<void, ProcessSpawnError> =>
   Effect.tryPromise({

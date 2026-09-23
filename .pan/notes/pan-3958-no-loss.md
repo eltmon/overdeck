@@ -294,3 +294,161 @@ Kept although the audit lists them as dead:
 | `src/lib/traefik.ts` | `generateOverdeckTraefikConfig` | Reached dynamically from `sync-sources/skills/pan-dev/SKILL.md` (`m.generateOverdeckTraefikConfig()` via `npx tsx -e`). That snippet already does nothing: it builds an Effect and never runs it. CH-1b should point the skill at `generateOverdeckTraefikConfigSync()` and then delete the wrapper. |
 | `src/lib/cost-parsers/ohmypi-parser.ts` | `parseOhmypiSession`, `parseOhmypiSessionCostEvents` | Oh My Pi code, removed wholesale by #4003 |
 | `src/lib/runtimes/ohmypi-fifo.ts` | `writeOhmypiCommand`, `destroyOhmypiFifo` | Oh My Pi code, removed wholesale by #4003 |
+
+## CH-1b: dead Shape A façades, Effect runtime twins, dead Shape C variants (#4007)
+
+Same evidence as CH-1a: `node scripts/audit-effect-boundary.mjs --json --usage`, a word-boundary
+`git grep` over `src packages scripts sync-sources tests apps`, and an AST scan of every `.ts` file
+(tests included) for imports, dynamic imports, `vi.mock` targets, member accesses and destructuring of
+a deleted name. Ratchet: A 220 → 187, B 39 → 38, C 82 → 39.
+
+### Shape A façades (33) and their private bodies (29)
+
+| Module | Deleted façade | Body | Note |
+| --- | --- | --- | --- |
+| `src/lib/checkpoint/checkpoint-manager.ts` | `diffSinceCommit` | `diffSinceCommitPromise` deleted (no other caller) | no production consumer |
+| `src/lib/checkpoint/checkpoint-manager.ts` | `pruneStaleCheckpointRefs` | `pruneStaleCheckpointRefsPromise` deleted (no other caller) | no production consumer |
+| `src/lib/cliproxy.ts` | `checkCliproxyPort` | `checkCliproxyPortTask` kept (other in-file callers) | no production consumer |
+| `src/lib/cloister/validation.ts` | `runMergeValidation` | `runMergeValidationPromise` deleted (no other caller) | no production caller since merge-agent stopped calling it in cfd48b80881 (PAN-1048) |
+| `src/lib/config.ts` | `saveConfig` | `saveConfigToFile` deleted (no other caller) | no production consumer |
+| `src/lib/conversations/summary-fork.ts` | `createSummaryFork` | `createSummaryForkPromise` deleted (no other caller) | replaced by the server fork route, src/lib/overdeck/conversation-forks.ts (PAN-1568, 4678b79c47f) |
+| `src/lib/costs/sync-wal.ts` | `syncWalFromDir` | `syncWalFromDirPromise` deleted (no other caller) | never had a production caller; syncWalFromAllProjects is the live sweep |
+| `src/lib/git-utils.ts` | `getWorkspaceGitInfo` | `getWorkspaceGitInfoPromise` deleted (no other caller) | no production consumer |
+| `src/lib/git-utils.ts` | `hasStaleLocks` | `hasStaleLocksPromise` deleted (no other caller) | no production consumer |
+| `src/lib/git/operations.ts` | `gitForcePush` | `gitForcePushPromise` deleted (no other caller) | no production consumer |
+| `src/lib/git/operations.ts` | `gitMerge` | `gitMergePromise` deleted (no other caller) | no production consumer |
+| `src/lib/github-app.ts` | `getPullRequestHeadState` | `getPullRequestHeadStatePromise` deleted (no other caller) | no production consumer |
+| `src/lib/platform-lifecycle.ts` | `isTraefikContainerRunning` | `isTraefikContainerRunningPromise` deleted (no other caller) | no production consumer |
+| `src/lib/prd-draft.ts` | `deletePRDDraft` | `deletePRDDraftPromise` deleted (no other caller) | no production consumer |
+| `src/lib/prd-draft.ts` | `getPRDDraftInfo` | `getPRDDraftInfoPromise` deleted (no other caller) | no production consumer |
+| `src/lib/prd-draft.ts` | `listPRDDrafts` | `listPRDDraftsPromise` deleted (no other caller) | no production consumer |
+| `src/lib/prd-draft.ts` | `readPRDDraft` | `readPRDDraftPromise` deleted (no other caller) | no production caller since PAN-404 / 488e5d44d83 |
+| `src/lib/prd-draft.ts` | `writePRDDraft` | `writePRDDraftPromise` deleted (no other caller) | callers removed with the prd-agent in a5cbf94b42b (PAN-404) |
+| `src/lib/projects.ts` | `registerProject` | `updateProjectsConfigAsync` kept (other in-file callers) | no production consumer |
+| `src/lib/projects.ts` | `unregisterProject` | `updateProjectsConfigAsync` kept (other in-file callers) | no production consumer |
+| `src/lib/runtime/index.ts` | `getInstalledRuntimes` | `getInstalledRuntimesPromise` deleted (no other caller) | no production consumer |
+| `src/lib/safety/dangerous-git-ops.ts` | `runGitCheckoutOverwrite` | `runGitCheckoutOverwritePromise` deleted (no other caller) | no production consumer |
+| `src/lib/session-format-converter.ts` | `convertConversationTranscript` | `convertConversationTranscriptPromise` deleted (no other caller) | no production consumer |
+| `src/lib/settings-api.ts` | `setRoleConfig` | `setRoleConfigPromise` deleted (no other caller) | no production consumer |
+| `src/lib/shadow-mode.ts` | `getShadowModeStatus` | `getShadowModeStatusPromise` deleted (no other caller) | no production consumer |
+| `src/lib/shadow-state.ts` | `getUnsyncedHistory` | `getUnsyncedHistoryPromise` deleted (no other caller) | no production consumer |
+| `src/lib/stashes.ts` | `applyStash` | `applyStashPromise` deleted (no other caller) | no production consumer |
+| `src/lib/stashes.ts` | `createNamedStash` | `createNamedStashPromise` deleted (no other caller) | no production consumer |
+| `src/lib/stashes.ts` | `popStash` | `popStashPromise` deleted (no other caller) | no production consumer |
+| `src/lib/tts-daemon.ts` | `ttsDaemonInstallState` | `ttsDaemonInstallStatePromise` deleted (no other caller) | no production consumer |
+| `src/lib/work/done-preflight.ts` | `checkUncommittedChanges` | `checkUncommittedChangesPromise` kept (other in-file callers) | no production consumer |
+| `src/lib/xbrief/dag.ts` | `readPlanFile` | `readPlanFileFromDisk` deleted (no other caller) | no production consumer |
+| `src/lib/xbrief/lifecycle-io.ts` | `moveXBrief` | `moveXBriefPromise` deleted (no other caller) | no production consumer |
+
+### Effect runtime twins (PRD W4, D9, Q4)
+
+| Module | Deleted | Survivor |
+| --- | --- | --- |
+| `src/lib/runtimes/claude-code.ts` | `ClaudeCodeRuntime`, `createClaudeCodeRuntime` | `ClaudeCodeRuntimeSync`, `createClaudeCodeRuntimeSync` (the registered runtime) |
+| `src/lib/runtimes/codex.ts` | `CodexRuntime`, `createCodexRuntime` | `CodexRuntimeSync`, `createCodexRuntimeSync` |
+| `src/lib/runtimes/pi.ts` | `PiRuntimeSync`, `PiRuntime`, `createPiRuntimeSync`, `createPiRuntime`, and the private helpers only they used | none: never constructed after PAN-1989. `PiSpawnTimeout`, `PiSpawnConfig`, `piSessionsRoot`, `findPiTranscriptPath` stay |
+| `src/lib/runtimes/index.ts` | re-exports of the eight names above and the unused `createPiRuntimeSync` import | — |
+
+### Shape C variants (PRD §10 rules C1–C3)
+
+| Rule | Module | Deleted | Survivor |
+| --- | --- | --- | --- |
+| C1 | `src/lib/cloister/config.ts` | `updateCloisterConfig` | none (no production caller for either variant) |
+| C1 | `src/lib/cloister/config.ts` | `updateCloisterConfigSync` | none (no production caller for either variant) |
+| C1 | `src/lib/cloister/cost-monitor.ts` | `recordCost` | none (no production caller for either variant) |
+| C1 | `src/lib/cloister/cost-monitor.ts` | `resetCostTracking` | none (no production caller for either variant) |
+| C1 | `src/lib/cloister/handoff-logger.ts` | `getPendingVerificationHandoffs` | none (no production caller for either variant) |
+| C1 | `src/lib/cloister/handoff-logger.ts` | `getPendingVerificationHandoffsSync` | none (no production caller for either variant) |
+| C1 | `src/lib/cloister/handoff-logger.ts` | `readAgentHandoffEvents` | none (no production caller for either variant) |
+| C1 | `src/lib/cloister/handoff-logger.ts` | `readAgentHandoffEventsSync` | none (no production caller for either variant) |
+| C1 | `src/lib/cloister/handoff-logger.ts` | `readIssueHandoffEvents` | none (no production caller for either variant) |
+| C1 | `src/lib/cloister/handoff-logger.ts` | `readIssueHandoffEventsSync` | none (no production caller for either variant) |
+| C1 | `src/lib/cloister/handoff-logger.ts` | `updateHandoffOutcome` | none (no production caller for either variant) |
+| C1 | `src/lib/cloister/handoff-logger.ts` | `updateHandoffOutcomeSync` | none (no production caller for either variant) |
+| C1 | `src/lib/cloister/task-readiness.ts` | `getUnblockedItems` | none (no production caller for either variant) |
+| C1 | `src/lib/cloister/task-readiness.ts` | `getUnblockedItemsSync` | none (no production caller for either variant) |
+| C1 | `src/lib/cloister/task-readiness.ts` | `isTaskReady` | none (no production caller for either variant) |
+| C1 | `src/lib/cloister/task-readiness.ts` | `isTaskReadySync` | none (no production caller for either variant) |
+| C1 | `src/lib/cloister/test-agent.ts` | `detectTestCommand` | none (no production caller for either variant) |
+| C1 | `src/lib/cloister/test-agent.ts` | `detectTestCommandSync` | none (no production caller for either variant) |
+| C1 | `src/lib/projects.ts` | `saveProjectsConfig` | none (no production caller for either variant) |
+| C1 | `src/lib/router-config.ts` | `writeRouterConfig` | none (no production caller for either variant) |
+| C1 | `src/lib/runtimes/pi.ts` | `createPiRuntime` | none (no production caller for either variant) |
+| C1 | `src/lib/runtimes/pi.ts` | `createPiRuntimeSync` | none (no production caller for either variant) |
+| C1 | `src/lib/xbrief/acceptance-criteria.ts` | `checkAllCriteriaCompleted` | none (no production caller for either variant) |
+| C1 | `src/lib/xbrief/acceptance-criteria.ts` | `checkAllCriteriaCompletedSync` | none (no production caller for either variant) |
+| C2 | `src/lib/agents/agent-state.ts` | `recordAgentFailureSync` | `recordAgentFailure` |
+| C2 | `src/lib/projects.ts` | `setProjectAutoMergeDefaultSync` | `setProjectAutoMergeDefault` |
+| C2 | `src/lib/projects.ts` | `setProjectMergeTrainSync` | `setProjectMergeTrain` |
+| C2 | `src/lib/projects.ts` | `setProjectSwarmPolicySync` | `setProjectSwarmPolicy` |
+| C2 | `src/lib/pty-token.ts` | `readPtyTokenSync` | `readPtyToken` |
+| C2 | `src/lib/pty-token.ts` | `writePtyTokenSync` | `writePtyToken` |
+| C2 | `src/lib/tmux.ts` | `createSessionSync` | `createSession` |
+| C2 | `src/lib/tmux.ts` | `sendKeysSync` | `sendKeys` |
+| C2 | `src/lib/xbrief/io.ts` | `isPlanningCompleteSync` | `isPlanningComplete` |
+| C3 | `src/lib/agents/supervisor-liveness.ts` | `supervisorProcessAlive` | `supervisorProcessAliveSync` |
+| C3 | `src/lib/backup.ts` | `restoreBackup` | `restoreBackupSync` |
+| C3 | `src/lib/cloister/handoff-logger.ts` | `logHandoffEvent` | `logHandoffEventSync` |
+| C3 | `src/lib/costs/wal.ts` | `appendToWal` | `appendToWalSync` |
+| C3 | `src/lib/manifest.ts` | `collectSourceFiles` | `collectSourceFilesSync` |
+| C3 | `src/lib/manifest.ts` | `hashFile` | `hashFileSync` |
+| C3 | `src/lib/manifest.ts` | `readManifest` | `readManifestSync` |
+| C3 | `src/lib/manifest.ts` | `writeManifest` | `writeManifestSync` |
+| C3 | `src/lib/persistent-logger.ts` | `logAgentLifecycle` | `logAgentLifecycleSync` |
+| C3 | `src/lib/persistent-logger.ts` | `logDeaconEvent` | `logDeaconEventSync` |
+| C3 | `src/lib/projects.ts` | `findProjectByPath` | `findProjectByPathSync` |
+| C3 | `src/lib/projects.ts` | `findProjectByTeam` | `findProjectByTeamSync` |
+| C3 | `src/lib/projects.ts` | `hasProjects` | `hasProjectsSync` |
+| C3 | `src/lib/providers.ts` | `clearCredentialFileAuth` | `clearCredentialFileAuthSync` |
+| C3 | `src/lib/providers.ts` | `setupCredentialFileAuth` | `setupCredentialFileAuthSync` |
+| C3 | `src/lib/runtime/claude.ts` | `createClaudeAdapter` | `createClaudeAdapterSync` |
+| C3 | `src/lib/runtime/metrics.ts` | `loadMetrics` | `loadMetricsSync` |
+| C3 | `src/lib/runtimes/claude-code.ts` | `createClaudeCodeRuntime` | `createClaudeCodeRuntimeSync` |
+| C3 | `src/lib/runtimes/codex.ts` | `createCodexRuntime` | `createCodexRuntimeSync` |
+| C3 | `src/lib/xbrief/lifecycle.ts` | `ensureXBriefDirs` | `ensureXBriefDirsSync` |
+
+Special cases in C1:
+- `saveProjectsConfig`, `writeRouterConfig`, `recordCost` and `resetCostTracking` lost only their Effect variant. Their `…Sync` twins stay because tests use them as setup for surviving subjects. `writeRouterConfigSync` is also asserted by the PAN-3859 no-loss audit (`tests/unit/lib/overdeck/pan-3859-no-loss-audit.test.ts`). All four are test-only now and belong to CH-8.
+- `src/lib/cloister/task-readiness.ts` and `src/lib/cloister/test-agent.ts` had nothing left, so both modules are deleted with their only test files.
+
+### Shape B (the one kept in CH-1a)
+
+| Module | Deleted | Survivor |
+| --- | --- | --- |
+| `src/lib/traefik.ts` | `generateOverdeckTraefikConfig` | `generateOverdeckTraefikConfigSync`; `sync-sources/skills/pan-dev/SKILL.md` now calls it (the old snippet built an Effect and never ran it) |
+
+### Also deleted because only deleted code used them
+
+Types `ValidationContext`, `SummaryForkOptions`, `SummaryForkResult`, `WorkspaceCommitInfo`,
+`GitHubPullRequestHeadState`, `ConvertOptions`, `ConvertResult`; error classes `SessionConvertError`,
+`XBriefDagError`; `getSupportedRuntimes` (`runtime/index.ts`); and the private helpers, imports and
+empty "Effect variants" headers left behind.
+
+### Kept although dead, with the reason
+
+| Name | Why | Owner |
+| --- | --- | --- |
+| `findClosedIssueAgentDirs`, `getSpecialistHandoffStats`, `listOpenIssuesWithLabels`, `getCiCheckRunsState`, `getShadowModeSummary`, `updateTrackerStatusCache`, `markAsSynced`, `getDisplayStatus` | The façade is dead but its body is live and tested through it. D4: port those tests when W6 exports the body under the bare name | CH-2 … CH-5 |
+| `stopSmeeClient` | Teardown in `tests/unit/lib/smee.test.ts` for the live `startSmeeClient` | CH-4 (K3a) |
+| `relayUatFailureFeedback` (+ `relayUatFailureFeedbackPromise`) | Its last caller (`deliverUatFailureToWorkAgentHostSide` in the review-status family) was removed by PAN-3917 (`c3ec36c29a9`) with no entry in `docs/THE-CUT.md` and no replacement: UAT-failure feedback may no longer reach work agents. Operator decision | operator |
+| `OhmypiRuntime`, `createOhmypiRuntime`, and `AgentRuntime` / `AgentRuntimeError` in `runtimes/types.ts` | Oh My Pi code is off limits; `OhmypiRuntime` still implements the interface | #4003 |
+| `querySession` (`tmux.ts`) | Row 44 is a "+ S" row; W8 converts its server callers to this async variant | CH-6 |
+
+### Tests deleted with their subject
+
+Deleted as whole files:
+- `src/lib/cloister/__tests__/task-readiness.test.ts` and `tests/lib/cloister/test-agent.test.ts` (modules deleted);
+- `tests/unit/lib/git-utils.test.ts` (only `getWorkspaceGitInfo`).
+
+Blocks deleted:
+- `describe`: `syncWalFromDir`, `convertConversationTranscript`, `checkAllCriteriaCompleted`, `readPlanFile`, `moveXBrief`, `runMergeValidation` (unit, plus five integration scenarios), `hasStaleLocks`, `getShadowModeStatus`, `getUnsyncedHistory`, `gitForcePush`, `gitMerge`, and the prd-draft `read/write/list/delete/getPRDDraftInfo` blocks.
+- `it`: two createSummaryFork route tests; eight summary-fork-handoff tests that drove `createSummaryFork` (the live orchestration is `conversation-forks.ts`); three stash wrappers; the `supervisorProcessAlive` async probe; the pty-token sync API.
+- `src/lib/runtimes/__tests__/pi.test.ts`: every `PiRuntime*` describe; the `PiSpawnTimeout` test stays.
+
+Ported, not deleted:
+- `isPlanningCompleteSync` → `isPlanningComplete` (io.test.ts);
+- `writePtyTokenSync` → `await writePtyToken` (agents-lifecycle.test.ts);
+- prd-draft `hasPRDDraft` setup → `writeIssueDraft`;
+- settings-api: the `setRoleConfig` halves are gone, and the `getRoleConfig` and `saveSettingsApi` halves stay.
+
+The whole diff removes more `it()` calls than it adds, so the PR asks for `pan verify waive-test-removal 4007`.

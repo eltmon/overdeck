@@ -7,9 +7,7 @@
 import { existsSync, mkdirSync, readdirSync, symlinkSync, unlinkSync, lstatSync } from 'fs';
 import { join, basename } from 'path';
 import { homedir } from 'os';
-import { Effect } from 'effect';
 import type {
-  RuntimeAdapter,
   RuntimeAdapterLegacy,
   RuntimeConfig,
   RuntimeType,
@@ -18,7 +16,6 @@ import type {
   AgentMessage,
 } from './interface.js';
 import { CLAUDE_FEATURES } from './interface.js';
-import { FsError } from '../errors.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getClaudePermissionFlagsSync } from '../claude-permissions.js';
 import { claudeSystemPromptFiles } from '../agents/runtime-command.js';
@@ -306,66 +303,5 @@ export function createClaudeAdapterSync(): RuntimeAdapterLegacy {
     getCommandsDir(): string {
       return config.commandsDir || '';
     },
-  };
-}
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-//
-// Additive Effect-channel adapter. Wraps the promise-returning methods of the
-// legacy adapter in Effect.promise so callers can compose typed pipelines.
-// Mutation semantics are unchanged.
-
-/**
- * Build a {@link RuntimeAdapter} backed by the legacy
- * {@link RuntimeAdapterLegacy}. Methods that swallow errors in the legacy variant
- * keep that contract; methods that can produce FS errors lift them via
- * {@link Effect.tryPromise}.
- */
-export function createClaudeAdapter(): RuntimeAdapter {
-  const adapter = createClaudeAdapterSync();
-  return {
-    type: adapter.type,
-    config: adapter.config,
-    isAvailable: () => Effect.promise(() => adapter.isAvailable()),
-    getVersion: () => Effect.promise(() => adapter.getVersion()),
-    initialize: () =>
-      Effect.tryPromise({
-        try: () => adapter.initialize(),
-        catch: (cause) =>
-          new FsError({
-            path: adapter.config.skillsDir,
-            operation: 'initialize',
-            cause,
-          }),
-      }),
-    spawnAgent: (id, options) =>
-      Effect.promise(() => adapter.spawnAgent(id, options)),
-    sendMessage: (id, message) =>
-      Effect.promise(() => adapter.sendMessage(id, message)),
-    getAgentStatus: (id) => Effect.promise(() => adapter.getAgentStatus(id)),
-    stopAgent: (id) => Effect.promise(() => adapter.stopAgent(id)),
-    listAgents: () => Effect.promise(() => adapter.listAgents()),
-    syncSkills: (sourceDir, force) =>
-      Effect.tryPromise({
-        try: () => adapter.syncSkills(sourceDir, force),
-        catch: (cause) =>
-          new FsError({ path: sourceDir, operation: 'syncSkills', cause }),
-      }),
-    syncCommands: adapter.syncCommands
-      ? (sourceDir, force) =>
-          Effect.tryPromise({
-            try: () => adapter.syncCommands!(sourceDir, force),
-            catch: (cause) =>
-              new FsError({
-                path: sourceDir,
-                operation: 'syncCommands',
-                cause,
-              }),
-          })
-      : undefined,
-    getSkillsDir: () => adapter.getSkillsDir(),
-    getCommandsDir: adapter.getCommandsDir
-      ? () => adapter.getCommandsDir!()
-      : undefined,
   };
 }

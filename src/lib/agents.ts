@@ -65,7 +65,6 @@ export {
   markAgentStoppedState,
   markAgentTroubled,
   recordAgentFailure,
-  recordAgentFailureSync,
   resetAgentFailureCount,
   saveAgentState,
   saveAgentStateSync,

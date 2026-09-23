@@ -7,7 +7,7 @@
  *   $OVERDECK_HOME/agents/<agentId>/rpc.in
  *
  * The launcher script creates the fifo, then `exec pi --mode rpc ... < <fifo>`.
- * The runtime adapter (PiRuntime.sendMessage) writes JSONL lines to the fifo.
+ * Callers write JSONL command lines to the fifo (writePiCommandSync).
  *
  * Why a fifo and not stdin pipe + tmux paste-buffer:
  *   - tmux paste-buffer is unreliable for JSONL (Enter timing, terminal
@@ -137,8 +137,7 @@ function shellQuote(s: string): string {
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 //
-// Additive Effect-channel variants of the fifo helpers above. Sync/promise
-// variants are preserved so the existing PiRuntime adapter keeps working.
+// Additive Effect-channel variants of the fifo helpers above.
 
 /** Tagged error for pi-fifo Effect variants. */
 export class PiFifoError extends Data.TaggedError('PiFifoError')<{

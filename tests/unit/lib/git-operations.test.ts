@@ -58,13 +58,12 @@ vi.mock('../../../src/lib/git-activity.js', () => ({
 
 // ── Import module under test (after mocks) ────────────────────────────────────
 
-import { gitFetch, gitForcePush, gitMerge, gitPush, MainDivergedError } from '../../../src/lib/git/operations.js';
+import { gitFetch, gitPush, MainDivergedError } from '../../../src/lib/git/operations.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const LOCAL_SHA  = 'aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111';
 const REMOTE_SHA = 'bbbb2222bbbb2222bbbb2222bbbb2222bbbb2222';
-const AFTER_SHA  = 'cccc3333cccc3333cccc3333cccc3333cccc3333';
 
 function mockRevParse(sha: string) {
   execMock.mockResolvedValueOnce({ stdout: sha });
@@ -153,92 +152,5 @@ describe('gitFetch', () => {
 
 // ─── gitForcePush ─────────────────────────────────────────────────────────────
 
-describe('gitForcePush', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    execMock.mockReset();
-  });
-
-  it('calls git push --force-with-lease and records success', async () => {
-    mockRevParse(LOCAL_SHA);   // HEAD before push (gitRevParse)
-    mockRevParse(REMOTE_SHA);  // origin/main (gitRevParse)
-    execMock.mockResolvedValueOnce({ stdout: '' });   // git push --force-with-lease
-    mockRevParse(AFTER_SHA);   // HEAD after push (gitRevParse)
-
-    await Effect.runPromise(gitForcePush('/repo', 'origin', 'main', { issueId: 'PAN-2' }));
-
-    expect(execMock).toHaveBeenCalledWith(
-      expect.stringContaining('--force-with-lease origin main')
-    );
-    expect(mockAppend).toHaveBeenCalledWith(expect.objectContaining({
-      operation: 'force_push',
-      status: 'success',
-      issueId: 'PAN-2',
-      beforeSha: LOCAL_SHA,
-      afterSha: AFTER_SHA,
-      remoteSha: REMOTE_SHA,
-    }));
-  });
-
-  it('records failure and re-throws when force-push is rejected', async () => {
-    mockRevParse(LOCAL_SHA);
-    execMock.mockResolvedValueOnce({ stdout: '' }); // origin/main rev-parse returns empty → null
-    const pushErr = new Error('rejected by remote');
-    execMock.mockRejectedValueOnce(pushErr);
-
-    await expect(Effect.runPromise(gitForcePush('/repo')))
-      .rejects.toMatchObject({ stderr: 'rejected by remote', cause: pushErr });
-    expect(mockAppend).toHaveBeenCalledWith(expect.objectContaining({
-      operation: 'force_push',
-      status: 'failure',
-    }));
-  });
-});
-
 // ─── gitMerge ─────────────────────────────────────────────────────────────────
 
-describe('gitMerge', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    execMock.mockReset();
-  });
-
-  it('calls git merge and records success', async () => {
-    mockRevParse(LOCAL_SHA);   // HEAD before merge
-    execMock.mockResolvedValueOnce({ stdout: '' });   // git merge feature-branch
-    mockRevParse(AFTER_SHA);   // HEAD after merge
-
-    await Effect.runPromise(gitMerge('/repo', 'feature-branch', { issueId: 'PAN-3' }));
-
-    expect(execMock).toHaveBeenCalledWith(expect.stringContaining('git merge feature-branch'));
-    expect(mockAppend).toHaveBeenCalledWith(expect.objectContaining({
-      operation: 'merge',
-      status: 'success',
-      issueId: 'PAN-3',
-      beforeSha: LOCAL_SHA,
-      afterSha: AFTER_SHA,
-    }));
-  });
-
-  it('passes --no-ff flag when noFf option is set', async () => {
-    mockRevParse(LOCAL_SHA);
-    execMock.mockResolvedValueOnce({ stdout: '' });
-    mockRevParse(AFTER_SHA);
-
-    await Effect.runPromise(gitMerge('/repo', 'feature-branch', { noFf: true }));
-    expect(execMock).toHaveBeenCalledWith(expect.stringContaining('--no-ff feature-branch'));
-  });
-
-  it('records failure and re-throws on merge conflict', async () => {
-    mockRevParse(LOCAL_SHA);
-    const mergeErr = new Error('CONFLICT (content): Merge conflict in file.ts');
-    execMock.mockRejectedValueOnce(mergeErr);
-
-    await expect(Effect.runPromise(gitMerge('/repo', 'feature-branch')))
-      .rejects.toMatchObject({ stderr: 'CONFLICT (content): Merge conflict in file.ts', cause: mergeErr });
-    expect(mockAppend).toHaveBeenCalledWith(expect.objectContaining({
-      operation: 'merge',
-      status: 'failure',
-    }));
-  });
-});

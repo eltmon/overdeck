@@ -13,7 +13,7 @@ send a message to a running agent from your own shell, use `pan tell` (see the
 agent-message-delivery rule) — raw `paste-buffer`/`send-keys` from an agent
 shell is deny-listed.
 
-To deliver text, use `sendKeys()` from `src/lib/tmux.ts`: it returns an Effect and runs the pattern below with verification. `sendKeysAsync()` sends one raw key (Enter, Escape). Never call `sendKeysSync()` (sync, no callers, slated for deletion).
+To deliver text, use `sendKeys()` from `src/lib/tmux.ts`: it returns an Effect and runs the pattern below with verification. `sendKeysAsync()` sends one raw key (Enter, Escape).
 
 When code delivers a tmux message, use the `load-buffer` + `paste-buffer` pattern:
 

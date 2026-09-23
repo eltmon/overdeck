@@ -12,27 +12,17 @@
  *    into a new session file. Thinking blocks are sanitized (converted to text)
  *    to prevent signature validation errors on cross-model resumes.
  *
- * Entry point: createSummaryFork()
- * - Reserves a new session ID and file path
- * - Generates summary (LLM, heuristic fallback, or skips for plain fork)
- * - Creates a DB record for the new conversation
- * - Returns the new conversation + session metadata
- *
- * Dashboard API: runForkPipeline() in src/dashboard/server/routes/conversations.ts
- * wires the options through and handles tmux spawn + summary injection.
+ * Entry point: runForkPipeline() in src/lib/overdeck/conversation-forks.ts. It
+ * reserves the session (reserveSummaryForkSession), generates the seed
+ * (generateSummaryForFork, requestHandoffFromAgent / authorHandoffExternal, or
+ * copySessionFromCompactBoundary for a plain fork), and handles the spawn and
+ * summary injection. This module holds those helpers.
  */
-import { randomUUID } from 'node:crypto';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 
 import type { LegacyConversation as Conversation } from '../overdeck/conversations.js';
-import {
-  createConversation,
-  getConversationByName,
-  recordConversationHandoff,
-  updateConversationForkFallbackReason,
-} from '../overdeck/conversations.js';
 import { encodeClaudeProjectDir, packageRoot, sessionFilePath } from '../paths.js';
 import { loadConfigSync } from '../config-yaml.js';
 import { deliverAgentMessage } from '../agents.js';
@@ -45,46 +35,6 @@ import { getWorkspaceStackHealth } from '../workspace/stack-health.js';
 
 export type SummaryForkMode = 'summary' | 'plain' | 'handoff';
 export type HandoffAuthor = 'source' | 'external';
-
-export interface SummaryForkOptions {
-  model?: string;
-  cwd?: string;
-  harness?: RuntimeName;
-  localSummaryOnly?: boolean;
-  forkMode?: SummaryForkMode;
-  focus?: string;
-  handoffTimeoutMs?: number;
-  handoffPollIntervalMs?: number;
-  /** When true, include thinking block content in the serialized conversation sent to the summary model. Default: true. */
-  includeThinkingInSummary?: boolean;
-  /**
-   * Who authors the handoff document when forkMode === 'handoff'.
-   *
-   * - 'source' (legacy): deliver the handoff prompt to the live source agent
-   *   via deliverAgentMessage and wait for it to write the doc + .done sentinel.
-   *   Requires the source conversation to be alive. Pollutes the source's
-   *   context. Uses whatever model/harness the source is running on.
-   * - 'external' (default): spawn a separate authoring session with the chosen
-   *   model/harness that reads the source JSONL transcript and emits the doc.
-   *   Does not touch the source conversation. Works on ended sources.
-   */
-  handoffAuthor?: HandoffAuthor;
-  /** Model for the external handoff authoring session. Ignored when handoffAuthor === 'source'. */
-  handoffAuthorModel?: string;
-  /** Harness for the external handoff authoring session. Ignored when handoffAuthor === 'source'. */
-  handoffAuthorHarness?: RuntimeName;
-}
-
-export interface SummaryForkResult {
-  conversation: Conversation;
-  sessionId: string;
-  sessionFile: string;
-  summary: string;
-  summaryModel: string | null;
-  forkMode: SummaryForkMode;
-  handoffDocPath: string | null;
-  forkFallbackReason: string | null;
-}
 
 const FORK_WAIT_INSTRUCTION = `\n---\n\n**Do not take any action.** This is context from a prior conversation fork. Acknowledge the summary and wait for the user's next instruction.`;
 const DEFAULT_HANDOFF_TIMEOUT_MS = 300_000;
@@ -442,23 +392,6 @@ export function prependFallbackFocus(summary: string, focus: string | undefined,
   return header + summary;
 }
 
-async function generateSummarySeed(
-  sourceSessionFile: string,
-  summaryModel: string | undefined,
-  localSummaryOnly: boolean | undefined,
-  includeThinkingInSummary: boolean | undefined,
-  summaryHarness?: RuntimeName,
-  sourceHarness?: RuntimeName,
-): Promise<{ summary: string; summaryModel: string | null }> {
-  if (localSummaryOnly) {
-    return {
-      summary: await Effect.runPromise(generateFallbackSummary(sourceSessionFile, sourceHarness)),
-      summaryModel: null,
-    };
-  }
-  return generateSummaryForFork(sourceSessionFile, summaryModel, includeThinkingInSummary, summaryHarness, sourceHarness);
-}
-
 function buildFallbackSummary(
   userMessages: string[],
   filesModified: Set<string>,
@@ -618,150 +551,6 @@ async function copySessionFromCompactBoundaryPromise(
   return copySessionForFork(sourcePath, destPath, { fullHistory: false });
 }
 
-async function createSummaryForkPromise(
-  conv: Conversation,
-  options: SummaryForkOptions = {},
-): Promise<SummaryForkResult> {
-  const sourceAdapter = getTranscriptAdapter(conv.harness ?? undefined);
-  const sourceSessionFile = await sourceAdapter.resolveSessionFile(conv);
-  if (!sourceSessionFile) {
-    throw new Error(`No session file found for conversation ${conv.name}`);
-  }
-
-  const cwd = options.cwd || conv.cwd || process.cwd();
-  const launchModel = options.model || conv.model;
-  const summaryModel = options.model || conv.model;
-  const forkMode = options.forkMode ?? 'summary';
-  console.log(`[summary-fork] Forking conv=${conv.name} launchModel=${launchModel || 'default'} summaryModel=${summaryModel || 'default'} localOnly=${options.localSummaryOnly || false} forkMode=${forkMode}`);
-
-  const { sessionId, sessionFile } = await Effect.runPromise(reserveSummaryForkSession(cwd));
-
-  let summary: string;
-  let usedSummaryModel: string | null;
-  let effectiveForkMode = forkMode;
-  let handoffDocPath: string | null = null;
-  let forkFallbackReason: string | null = null;
-
-  if (forkMode === 'plain') {
-    // Plain fork: copy raw JSONL from last compact boundary (or full history)
-    // into the new session file so Claude Code can --resume it directly.
-    await Effect.runPromise(copySessionFromCompactBoundary(sourceSessionFile, sessionFile));
-    summary = '';
-    usedSummaryModel = null;
-  } else if (forkMode === 'handoff') {
-    const handoffAuthor: HandoffAuthor = options.handoffAuthor ?? 'external';
-    if (handoffAuthor === 'external') {
-      // External authoring: read the source JSONL and have a fresh authoring
-      // session write the handoff doc. Source conversation is never touched.
-      // Works on ended source conversations and lets the user pick the
-      // authoring model/harness independently of the source.
-      try {
-        const handoff = await authorHandoffExternal(
-          conv,
-          sourceSessionFile,
-          options.focus,
-          options.handoffAuthorModel,
-          options.handoffAuthorHarness,
-        );
-        summary = handoff.docText;
-        usedSummaryModel = options.handoffAuthorModel ?? loadConfigSync().config.conversations.handoffAuthorModel ?? null;
-        handoffDocPath = handoff.docPath;
-      } catch (error) {
-        // PAN-3860: a missing handoff-author-model config is an operator
-        // error, not a transient authoring failure — never silently degrade
-        // to a plain summary fork over it.
-        if (error instanceof HandoffAuthorModelNotConfiguredError) throw error;
-        forkFallbackReason = handoffFailureReason(error);
-        effectiveForkMode = 'summary';
-        logHandoffFallback(conv, forkFallbackReason);
-        const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary, undefined, conv.harness ?? undefined);
-        summary = prependFallbackFocus(result.summary, options.focus, forkFallbackReason);
-        usedSummaryModel = result.summaryModel;
-      }
-    } else {
-      // Source authoring (legacy): deliver the handoff prompt to the live
-      // source agent and wait for it to write the doc + .done sentinel.
-      // Requires the source conversation to be alive and pollutes its
-      // context with the handoff turn pair.
-      const preconditionFallback = await handoffPreconditionFallbackReason(conv);
-      if (preconditionFallback) {
-        forkFallbackReason = preconditionFallback;
-        effectiveForkMode = 'summary';
-        logHandoffFallback(conv, preconditionFallback);
-        const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary, undefined, conv.harness ?? undefined);
-        summary = prependFallbackFocus(result.summary, options.focus, preconditionFallback);
-        usedSummaryModel = result.summaryModel;
-      } else {
-        try {
-          const handoff = await requestHandoffFromAgent(conv, options.focus, {
-            timeoutMs: options.handoffTimeoutMs,
-            pollIntervalMs: options.handoffPollIntervalMs,
-          });
-          summary = handoff.docText;
-          usedSummaryModel = null;
-          handoffDocPath = handoff.docPath;
-        } catch (error) {
-          forkFallbackReason = handoffFailureReason(error);
-          effectiveForkMode = 'summary';
-          logHandoffFallback(conv, forkFallbackReason);
-          const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary, undefined, conv.harness ?? undefined);
-          summary = prependFallbackFocus(result.summary, options.focus, forkFallbackReason);
-          usedSummaryModel = result.summaryModel;
-        }
-      }
-    }
-  } else {
-    const result = await generateSummarySeed(sourceSessionFile, summaryModel ?? undefined, options.localSummaryOnly, options.includeThinkingInSummary, undefined, conv.harness ?? undefined);
-    summary = result.summary;
-    usedSummaryModel = result.summaryModel;
-  }
-
-  const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const suffix = randomUUID().slice(0, 4);
-  const newName = `${timestamp}-${suffix}`;
-  const newTmux = `conv-${newName}`;
-
-  let newConv = createConversation({
-    name: newName,
-    tmuxSession: newTmux,
-    cwd,
-    issueId: conv.issueId ?? undefined,
-    title: effectiveForkMode === 'plain'
-      ? `Fork: ${conv.title || conv.name}`
-      : effectiveForkMode === 'handoff'
-        ? `Handoff: ${conv.title || conv.name}`
-        : `Summary Fork: ${conv.title || conv.name}`,
-    titleSource: 'manual',
-    titleSeed: effectiveForkMode === 'plain'
-      ? `Fork of ${conv.name}`
-      : effectiveForkMode === 'handoff'
-        ? `Handoff of ${conv.name}`
-        : `Summary Fork of ${conv.name}`,
-    claudeSessionId: sessionId,
-    model: launchModel ?? undefined,
-    effort: conv.effort ?? undefined,
-    harness: options.harness ?? conv.harness ?? undefined,
-  });
-  if (handoffDocPath) {
-    newConv = recordConversationHandoff(conv.name, newConv.name, handoffDocPath);
-  }
-  if (forkFallbackReason) {
-    updateConversationForkFallbackReason(newConv.name, forkFallbackReason);
-    newConv = getConversationByName(newConv.name) ?? newConv;
-  }
-
-  return {
-    conversation: newConv,
-    sessionId,
-    sessionFile,
-    summary,
-    summaryModel: usedSummaryModel,
-    forkMode: effectiveForkMode,
-    handoffDocPath,
-    forkFallbackReason,
-  };
-}
-
 // Re-export runModelSummary for any callers that need it directly
 export { runModelSummary };
 
@@ -804,17 +593,5 @@ export function copySessionFromCompactBoundary(
     try: () => copySessionFromCompactBoundaryPromise(sourcePath, destPath),
     catch: (cause) =>
       new FsError({ path: sourcePath, operation: 'copy-session', cause }),
-  });
-}
-
-/** Effect variant of createSummaryFork. */
-export function createSummaryFork(
-  conv: Conversation,
-  options: SummaryForkOptions = {},
-): Effect.Effect<SummaryForkResult, FsError> {
-  return Effect.tryPromise({
-    try: () => createSummaryForkPromise(conv, options),
-    catch: (cause) =>
-      new FsError({ path: conv.name, operation: 'create-summary-fork', cause }),
   });
 }

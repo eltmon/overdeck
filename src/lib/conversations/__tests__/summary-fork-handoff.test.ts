@@ -1,12 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Effect } from 'effect';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { mkdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import type { LegacyConversation as Conversation } from '../../overdeck/conversations.js';
-import { createConversation, getConversationByName } from '../../overdeck/conversations.js';
+import { createConversation } from '../../overdeck/conversations.js';
 import { createOverdeckDatabase } from '../../../../scripts/create-overdeck-db.js';
 import { closeOverdeckDatabaseSync } from '../../overdeck/infra.js';
 import { resetDiscoveredSessionsSchemaBootstrap } from '../../overdeck/discovered-sessions.js';
@@ -16,7 +15,6 @@ import {
   HandoffAuthorModelNotConfiguredError,
   HandoffStallError,
   authorHandoffExternal,
-  createSummaryFork,
   prependFallbackFocus,
   requestHandoffFromAgent,
   validateHandoffDoc,
@@ -197,45 +195,6 @@ afterEach(() => {
   }
 });
 
-describe('summary fork transcript resolution', { timeout: 20_000 }, () => {
-  it('summarizes an ACP conversation without a Claude session ID', async () => {
-    const home = join(tmpdir(), `pan-summary-fork-acp-${Date.now()}`);
-    const source = await createSourceConversation(home, {
-      tmuxSession: 'conv-acp-source',
-      claudeSessionId: null,
-      harness: 'acp',
-    });
-    const agentDir = join(home, 'agents', source.tmuxSession);
-    const sourceFile = join(agentDir, 'acp-session.jsonl');
-    await mkdir(agentDir, { recursive: true });
-    await writeFile(sourceFile, [
-      JSON.stringify({
-        timestamp: '2026-07-18T00:00:00.000Z',
-        role: 'user',
-        content: 'Continue the native ACP implementation',
-      }),
-      JSON.stringify({
-        timestamp: '2026-07-18T00:00:01.000Z',
-        role: 'assistant',
-        content: 'The ACP host is ready for verification',
-      }),
-    ].join('\n') + '\n', 'utf-8');
-
-    const result = await Effect.runPromise(createSummaryFork(source, {
-      model: 'claude-haiku-4-5',
-    }));
-
-    expect(result.summary).toContain('ACP-SUMMARY:');
-    expect(result.summary).toContain('Continue the native ACP implementation');
-    expect(result.summaryModel).toBe('claude-haiku-4-5');
-    expect(mockedSummarizeSerializedText).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(mockedSummarizeSerializedText).mock.calls[0]?.[0]).toContain(
-      '[assistant]\nThe ACP host is ready for verification',
-    );
-    rmSync(home, { recursive: true, force: true });
-  });
-});
-
 describe('validateHandoffDoc', () => {
   it('rejects an empty document', () => {
     expect(validateHandoffDoc('')).toEqual({
@@ -319,159 +278,6 @@ describe('handoff fork handshake', { timeout: 20_000 }, () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  it('uses the handoff document as the fork seed and records source/target metadata', async () => {
-    const home = join(tmpdir(), `pan-handoff-fork-${Date.now()}`);
-    // Set up a fresh overdeck.db at this test's home directory.
-    closeOverdeckDatabaseSync();
-    resetDiscoveredSessionsSchemaBootstrap();
-    mkdirSync(home, { recursive: true });
-    createOverdeckDatabase({ dbPath: join(home, 'overdeck.db') });
-    _testDbPaths.push(join(home, 'overdeck.db'));
-    process.env.OVERDECK_HOME = home;
-    process.env.HOME = home;
-
-    const cwd = '/home/test/project';
-    const sessionId = 'source-session-123';
-    const sourceFile = sessionFilePath(cwd, sessionId);
-    await mkdir(dirname(sourceFile), { recursive: true });
-    await writeFile(sourceFile, `${JSON.stringify({ type: 'user', message: { role: 'user', content: 'Continue this work' } })}\n`, 'utf-8');
-
-    const source = createConversation({
-      name: 'conv-source',
-      tmuxSession: 'conv-source-session',
-      cwd,
-      issueId: 'PAN-1358',
-      claudeSessionId: sessionId,
-      title: 'Source title',
-      titleSource: 'manual',
-    });
-    const docText = validDoc();
-
-    vi.mocked(deliverAgentMessage).mockImplementation(async (_agentId, message) => {
-      const outputPath = message.match(/`([^`]+\/handoffs\/[^`]+\.md)`/)?.[1];
-      if (!outputPath) throw new Error('missing output path');
-      await mkdir(dirname(outputPath), { recursive: true });
-      await writeFile(outputPath, docText, 'utf-8');
-      await writeFile(`${outputPath}.done`, '', 'utf-8');
-    });
-
-    const result = await Effect.runPromise(createSummaryFork(source, { forkMode: 'handoff', handoffAuthor: 'source' }));
-
-    expect(result.summary).toBe(docText);
-    expect(result.summaryModel).toBeNull();
-    expect(result.forkMode).toBe('handoff');
-    expect(result.handoffDocPath).toBeTruthy();
-    expect(result.conversation.title).toBe('Handoff: Source title');
-    expect(result.conversation.issueId).toBe('PAN-1358');
-    expect(result.conversation.cwd).toBe(cwd);
-
-    const targetRow = getConversationByName(result.conversation.name);
-    const sourceRow = getConversationByName(source.name);
-    expect(targetRow?.handoffDocPath).toBe(result.handoffDocPath);
-    expect(sourceRow?.handoffTargetConvId).toBe(result.conversation.id);
-    rmSync(home, { recursive: true, force: true });
-  });
-
-  it('falls back to summary fork when the source conversation has ended', async () => {
-    const home = join(tmpdir(), `pan-handoff-ended-${Date.now()}`);
-    const source = await createSourceConversation(home, { status: 'ended' });
-
-    const result = await Effect.runPromise(createSummaryFork(source, {
-      forkMode: 'handoff',
-      handoffAuthor: 'source',
-      localSummaryOnly: true,
-    }));
-
-    expect(deliverAgentMessage).not.toHaveBeenCalled();
-    expect(result.forkMode).toBe('summary');
-    expect(result.forkFallbackReason).toBe('source-ended');
-    expect(result.summary).toContain('## Conversation Summary Fork');
-    expect(result.conversation.title).toBe('Summary Fork: Source title');
-    expect(getConversationByName(result.conversation.name)?.forkFallbackReason).toBe('source-ended');
-    rmSync(home, { recursive: true, force: true });
-  });
-
-  it('falls back to summary fork on handshake timeout using fake timers', async () => {
-    vi.useFakeTimers();
-    const home = join(tmpdir(), `pan-handoff-fallback-timeout-${Date.now()}`);
-    const source = await createSourceConversation(home);
-
-    const resultPromise = Effect.runPromise(createSummaryFork(source, {
-      forkMode: 'handoff',
-      handoffAuthor: 'source',
-      localSummaryOnly: true,
-      handoffTimeoutMs: 0,
-      handoffPollIntervalMs: 1,
-    }));
-    await vi.advanceTimersByTimeAsync(0);
-    const result = await resultPromise;
-
-    expect(result.forkMode).toBe('summary');
-    expect(result.forkFallbackReason).toBe('handoff-timeout');
-    expect(result.summary).toContain('## Conversation Summary Fork');
-    expect(getConversationByName(result.conversation.name)?.forkFallbackReason).toBe('handoff-timeout');
-    rmSync(home, { recursive: true, force: true });
-  });
-
-  it.each([
-    ['doc without sentinel', async (outputPath: string, docText: string) => {
-      await writeFile(outputPath, docText, 'utf-8');
-    }],
-    ['sentinel without doc', async (outputPath: string) => {
-      await writeFile(`${outputPath}.done`, '', 'utf-8');
-    }],
-  ])('treats %s as incomplete until timeout', async (_label, writePartial) => {
-    const home = join(tmpdir(), `pan-handoff-partial-${Date.now()}`);
-    const source = await createSourceConversation(home);
-    const docText = validDoc();
-
-    vi.mocked(deliverAgentMessage).mockImplementation(async (_agentId, message) => {
-      const outputPath = message.match(/`([^`]+\/handoffs\/[^`]+\.md)`/)?.[1];
-      if (!outputPath) throw new Error('missing output path');
-      await mkdir(dirname(outputPath), { recursive: true });
-      await writePartial(outputPath, docText);
-    });
-
-    const result = await Effect.runPromise(createSummaryFork(source, {
-      forkMode: 'handoff',
-      handoffAuthor: 'source',
-      localSummaryOnly: true,
-      handoffTimeoutMs: 0,
-      handoffPollIntervalMs: 1,
-    }));
-
-    expect(result.forkMode).toBe('summary');
-    expect(result.forkFallbackReason).toBe('handoff-timeout');
-    expect(result.summary).toContain('## Conversation Summary Fork');
-    rmSync(home, { recursive: true, force: true });
-  }, 15_000);
-
-  it('falls back to summary fork when the handoff document fails validation', async () => {
-    const home = join(tmpdir(), `pan-handoff-validation-fallback-${Date.now()}`);
-    const source = await createSourceConversation(home);
-    const docText = invalidLongDoc();
-
-    vi.mocked(deliverAgentMessage).mockImplementation(async (_agentId, message) => {
-      const outputPath = message.match(/`([^`]+\/handoffs\/[^`]+\.md)`/)?.[1];
-      if (!outputPath) throw new Error('missing output path');
-      await mkdir(dirname(outputPath), { recursive: true });
-      await writeFile(outputPath, docText, 'utf-8');
-      await writeFile(`${outputPath}.done`, '', 'utf-8');
-    });
-
-    const result = await Effect.runPromise(createSummaryFork(source, {
-      forkMode: 'handoff',
-      handoffAuthor: 'source',
-      localSummaryOnly: true,
-    }));
-
-    expect(result.forkMode).toBe('summary');
-    expect(result.forkFallbackReason).toBe('handoff-validation');
-    expect(result.summary).toContain('## Conversation Summary Fork');
-    expect(result.handoffDocPath).toBeNull();
-    rmSync(home, { recursive: true, force: true });
-  });
-
   it('times out distinctly when the document and sentinel do not both appear', async () => {
     vi.useFakeTimers();
     const home = join(tmpdir(), `pan-handoff-timeout-${Date.now()}`);
@@ -523,10 +329,6 @@ describe('authorHandoffExternal', { timeout: 20_000 }, () => {
       }
       return EffectMod.succeed('done');
     });
-  }
-
-  function mockAuthoringSessionThatRefusesToWrite(stdoutText: string) {
-    vi.mocked(mockedRunModelSummary).mockImplementation(() => EffectMod.succeed(stdoutText));
   }
 
   it('writes the doc + sentinel from the authoring session and never touches the source agent', { timeout: 20_000 }, async () => {
@@ -620,47 +422,6 @@ describe('authorHandoffExternal', { timeout: 20_000 }, () => {
     rmSync(home, { recursive: true, force: true });
   });
 
-  it('falls back to summary fork when the file content fails validation', async () => {
-    const home = join(tmpdir(), `pan-handoff-external-invalid-${Date.now()}`);
-    const source = await createSourceConversation(home);
-    const invalid = invalidLongDoc();
-
-    mockAuthoringSessionThatWrites(invalid);
-
-    const result = await Effect.runPromise(createSummaryFork(source, {
-      forkMode: 'handoff',
-      handoffAuthor: 'external',
-      handoffAuthorModel: 'claude-haiku-4-5',
-      localSummaryOnly: true,
-    }));
-
-    expect(result.forkMode).toBe('summary');
-    expect(result.forkFallbackReason).toBe('handoff-validation');
-    expect(deliverAgentMessage).not.toHaveBeenCalled();
-    rmSync(home, { recursive: true, force: true });
-  });
-
-  it('falls back to summary fork when the authoring session never calls Write', async () => {
-    // Pretend the model emitted text to stdout instead of using the Write tool.
-    // The new flow must surface this as a validation error, not a successful
-    // handoff seeded with whatever the model emitted on stdout.
-    const home = join(tmpdir(), `pan-handoff-external-stdout-${Date.now()}`);
-    const source = await createSourceConversation(home);
-    mockAuthoringSessionThatRefusesToWrite('Sure, here is the handoff document:\n\n# Handoff\n\n## Suggested skills\n- /foo');
-
-    const result = await Effect.runPromise(createSummaryFork(source, {
-      forkMode: 'handoff',
-      handoffAuthor: 'external',
-      handoffAuthorModel: 'claude-haiku-4-5',
-      localSummaryOnly: true,
-    }));
-
-    expect(result.forkMode).toBe('summary');
-    expect(result.forkFallbackReason).toBe('handoff-validation');
-    expect(deliverAgentMessage).not.toHaveBeenCalled();
-    rmSync(home, { recursive: true, force: true });
-  });
-
   it('persists the file content to .rejected.md when validation fails', async () => {
     const home = join(tmpdir(), `pan-handoff-rejected-${Date.now()}`);
     const source = await createSourceConversation(home);
@@ -699,25 +460,6 @@ describe('authorHandoffExternal', { timeout: 20_000 }, () => {
     const persisted = await readFile(result.docPath, 'utf-8');
     expect(persisted).toBe(inner);
     await expect(access(`${result.docPath}.done`)).resolves.toBeUndefined();
-    rmSync(home, { recursive: true, force: true });
-  });
-
-  it('preserves the focus in the summary when external authoring falls back', async () => {
-    const home = join(tmpdir(), `pan-handoff-focus-preserved-${Date.now()}`);
-    const source = await createSourceConversation(home);
-    vi.mocked(mockedRunModelSummary).mockImplementation(() => EffectMod.succeed(invalidLongDoc()));
-
-    const result = await Effect.runPromise(createSummaryFork(source, {
-      forkMode: 'handoff',
-      handoffAuthor: 'external',
-      handoffAuthorModel: 'claude-haiku-4-5',
-      focus: 'implement Pi forking for PAN-XXXX',
-      localSummaryOnly: true,
-    }));
-
-    expect(result.forkFallbackReason).toBe('handoff-validation');
-    expect(result.summary).toContain('intended handoff fell back to a summary fork');
-    expect(result.summary).toContain('implement Pi forking for PAN-XXXX');
     rmSync(home, { recursive: true, force: true });
   });
 });

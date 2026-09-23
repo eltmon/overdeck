@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync, cpSync, rmSync, lstatSync } from 'f
 import { join, basename } from 'path';
 import { Effect } from 'effect';
 import { BACKUPS_DIR } from './paths.js';
-import { FsError, FsNotFoundError } from './errors.js';
+import { FsError } from './errors.js';
 
 export interface BackupInfo {
   timestamp: string;
@@ -140,24 +140,4 @@ export const createBackup = (
     try: () => createBackupSync([...sourceDirs]),
     catch: (cause) =>
       new FsError({ path: BACKUPS_DIR, operation: 'createBackup', cause }),
-  });
-
-/**
- * Restore a named backup, replacing each target directory. Fails with
- * FsNotFoundError if the backup does not exist, FsError otherwise.
- */
-export const restoreBackup = (
-  timestamp: string,
-  targetDirs: Record<string, string>,
-): Effect.Effect<void, FsError | FsNotFoundError> =>
-  Effect.gen(function* () {
-    const backupPath = join(BACKUPS_DIR, timestamp);
-    if (!existsSync(backupPath)) {
-      return yield* Effect.fail(new FsNotFoundError({ path: backupPath }));
-    }
-    return yield* Effect.try({
-      try: () => restoreBackupSync(timestamp, targetDirs),
-      catch: (cause) =>
-        new FsError({ path: backupPath, operation: 'restoreBackup', cause }),
-    });
   });

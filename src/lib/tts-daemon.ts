@@ -711,14 +711,6 @@ async function hasCudaGpu(): Promise<boolean> {
   const content = `[Unit]\nDescription=Overdeck Qwen TTS daemon\nAfter=default.target\n\n[Service]\nType=simple\nExecStart=${panBinary} tts start --foreground\nRestart=on-failure\nRestartSec=10\n\n[Install]\nWantedBy=default.target\n`;
   await writeFile(unitPath, content, 'utf8');
   return unitPath;
-}async function ttsDaemonInstallStatePromise(): Promise<{ venvDir: string; installed: boolean }> {
-  const venvDir = await Effect.runPromise(getTtsDaemonVenvDir());
-  try {
-    await stat(join(venvDir, 'bin', 'python'));
-    return { venvDir, installed: true };
-  } catch {
-    return { venvDir, installed: false };
-  }
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
@@ -842,11 +834,4 @@ export const installTtsSystemdUnit = (): Effect.Effect<string, FsError> =>
   Effect.tryPromise({
     try: () => installTtsSystemdUnitPromise(),
     catch: (cause) => ttsFsError('installTtsSystemdUnit', OVERDECK_HOME, cause),
-  });
-
-/** Reports whether the daemon venv is materialised. */
-export const ttsDaemonInstallState = (): Effect.Effect<{ venvDir: string; installed: boolean }, FsError> =>
-  Effect.tryPromise({
-    try: () => ttsDaemonInstallStatePromise(),
-    catch: (cause) => ttsFsError('ttsDaemonInstallState', OVERDECK_HOME, cause),
   });

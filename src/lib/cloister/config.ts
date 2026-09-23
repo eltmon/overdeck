@@ -637,18 +637,6 @@ export function saveCloisterConfigSync(config: CloisterConfig): void {
 }
 
 /**
- * Update Cloister configuration
- *
- * Merges partial config updates with existing config.
- */
-export function updateCloisterConfigSync(updates: Partial<CloisterConfig>): CloisterConfig {
-  const current = loadCloisterConfigSync();
-  const updated = deepMerge(current, updates);
-  saveCloisterConfigSync(updated);
-  return updated;
-}
-
-/**
  * Get the path to the Cloister config file
  */
 export function getCloisterConfigPath(): string {
@@ -742,15 +730,4 @@ export const saveCloisterConfig = (config: CloisterConfig): Effect.Effect<void, 
       try: () => writeFile(CLOISTER_CONFIG_FILE, content, 'utf-8'),
       catch: (cause) => new FsError({ path: CLOISTER_CONFIG_FILE, operation: 'writeFile', cause }),
     });
-  });
-
-/** Effect variant of `updateCloisterConfig`. */
-export const updateCloisterConfig = (
-  updates: Partial<CloisterConfig>,
-): Effect.Effect<CloisterConfig, FsError | ConfigError> =>
-  Effect.gen(function* () {
-    const current = yield* loadCloisterConfig();
-    const updated = deepMerge(current, updates);
-    yield* saveCloisterConfig(updated);
-    return updated;
   });

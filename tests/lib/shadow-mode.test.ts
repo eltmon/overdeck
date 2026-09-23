@@ -15,7 +15,6 @@ import {
   resolveShadowMode,
   isShadowModeEnabled,
   shouldSkipTrackerUpdate,
-  getShadowModeStatus,
   hasProjectShadowConfig,
   getShadowModeSummary,
 } from '../../src/lib/shadow-mode.js';
@@ -135,24 +134,6 @@ describe('shadow-mode', () => {
     it('should respect tracker type parameter', async () => {
       expect(typeof (await Effect.runPromise(shouldSkipTrackerUpdate(getUniqueId('github'), undefined, 'github')))).toBe('boolean');
       expect(typeof (await Effect.runPromise(shouldSkipTrackerUpdate(getUniqueId('gitlab'), undefined, 'gitlab')))).toBe('boolean');
-    });
-  });
-
-  describe('getShadowModeStatus', () => {
-    it('should return disabled message when shadow mode is off', async () => {
-      const status = await Effect.runPromise(getShadowModeStatus({ cliFlag: false }));
-      expect(status).toContain('disabled');
-    });
-
-    it('should return enabled message with source when shadow mode is on', async () => {
-      const status = await Effect.runPromise(getShadowModeStatus({ cliFlag: true }));
-      expect(status).toContain('enabled');
-      expect(status).toContain('CLI flag');
-    });
-
-    it('should include tracker type when provided', async () => {
-      const status = await Effect.runPromise(getShadowModeStatus({ cliFlag: true, trackerType: 'linear' }));
-      expect(status).toContain('linear');
     });
   });
 

@@ -6,12 +6,9 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { Effect } from 'effect';
 import type { ModelId, GrokModel } from './settings.js';
 import type { RuntimeName } from './runtimes/types.js';
-import { FsError } from './errors.js';
 import { getOpenAICompatibleProxyBaseUrl } from './openai-compatible-proxy.js';
 import { MODEL_DEPRECATIONS } from './model-capabilities.js';
 
@@ -686,50 +683,6 @@ export function clearCredentialFileAuthSync(workspacePath: string): void {
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Effect variant of {@link setupCredentialFileAuthSync}. */
-export const setupCredentialFileAuth = (
-  provider: ProviderConfig,
-  workspacePath: string,
-): Effect.Effect<void, FsError> =>
-  Effect.tryPromise({
-    try: async () => {
-      if (provider.authType !== 'credential-file' || !provider.credentialHelper) return;
-
-      const helperPath = provider.credentialHelper.replace('~', process.env.HOME || '');
-      const claudeDir = join(workspacePath, '.claude');
-      const settingsPath = join(claudeDir, 'settings.local.json');
-
-      if (!existsSync(claudeDir)) {
-        await mkdir(claudeDir, { recursive: true });
-      }
-
-      let settings: Record<string, unknown> = {};
-      if (existsSync(settingsPath)) {
-        try {
-          settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
-        } catch { /* start fresh */ }
-      }
-
-      settings.apiKeyHelper = helperPath;
-      await writeFile(settingsPath, JSON.stringify(settings, null, 2) + '\n');
-    },
-    catch: (cause) =>
-      new FsError({ path: workspacePath, operation: 'setupCredentialFileAuth', cause }),
-  });
-
-/** Effect variant of {@link clearCredentialFileAuthSync}. Swallows all errors (non-fatal). */
-export const clearCredentialFileAuth = (workspacePath: string): Effect.Effect<void, never> =>
-  Effect.promise(async () => {
-    const settingsPath = join(workspacePath, '.claude', 'settings.local.json');
-    if (!existsSync(settingsPath)) return;
-    try {
-      const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
-      if (!settings.apiKeyHelper) return;
-      delete settings.apiKeyHelper;
-      await writeFile(settingsPath, JSON.stringify(settings, null, 2) + '\n');
-    } catch { /* non-fatal */ }
-  });
 
 /**
  * Map a Overdeck provider to the Pi harness's provider name for that

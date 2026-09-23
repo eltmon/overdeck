@@ -62,7 +62,6 @@ const EXPECTED_EXPORTS = Object.freeze([
   'messageAgent',
   'normalizeAgentId',
   'recordAgentFailure',
-  'recordAgentFailureSync',
   'recoverAgent',
   'resetAgentFailureCount',
   'resolveAgentTargetSync',

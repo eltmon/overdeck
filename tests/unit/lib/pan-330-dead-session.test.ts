@@ -4,14 +4,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * Tests for PAN-330: Dead-session detection and runtime state reset
  *
  * Covers:
- * 1. ClaudeCodeRuntime.killAgent() resets runtime.json to idle (claude-code.ts:327)
+ * 1. ClaudeCodeRuntimeSync.killAgent() resets runtime.json to idle (claude-code.ts:327)
  * 2. Deacon patrol resets stale active state for stopped specialists (deacon.ts:1741-1752)
  * 3. Merge-agent busy-wait detects dead tmux session and resets to idle (merge-agent.ts:1069-1078)
  * 4. CloisterService.emergencyStop() delegates to runtime.killAgent (service.ts:308)
  */
 
 // ---------------------------------------------------------------------------
-// Section 1: ClaudeCodeRuntime.killAgent() (claude-code.ts:327)
+// Section 1: ClaudeCodeRuntimeSync.killAgent() (claude-code.ts:327)
 // ---------------------------------------------------------------------------
 
 vi.mock('../../../src/lib/agents.js', () => ({
@@ -70,7 +70,7 @@ const mockSaveAgentState = vi.mocked(saveAgentStateSync);
 const mockListRunningAgents = vi.mocked(listRunningAgentsSync);
 const mockGetRuntimeForAgent = vi.mocked(getRuntimeForAgent);
 
-describe('PAN-330: ClaudeCodeRuntime.killAgent() — resets runtime state', () => {
+describe('PAN-330: ClaudeCodeRuntimeSync.killAgent() — resets runtime state', () => {
   let runtime: ClaudeCodeRuntimeSync;
 
   beforeEach(() => {

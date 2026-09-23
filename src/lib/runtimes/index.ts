@@ -11,15 +11,9 @@ export * from './types.js';
 export * from './behavior.js';
 export {
   ClaudeCodeRuntimeSync,
-  ClaudeCodeRuntime,
   createClaudeCodeRuntimeSync,
-  createClaudeCodeRuntime,
 } from './claude-code.js';
 export {
-  PiRuntimeSync,
-  PiRuntime,
-  createPiRuntimeSync,
-  createPiRuntime,
   PiSpawnTimeout,
 } from './pi.js';
 export {
@@ -31,9 +25,7 @@ export {
 } from './ohmypi.js';
 export {
   CodexRuntimeSync,
-  CodexRuntime,
   createCodexRuntimeSync,
-  createCodexRuntime,
 } from './codex.js';
 export {
   AcpRuntimeSync,
@@ -53,7 +45,6 @@ import type {
 } from './types.js';
 import { getAgentStateSync } from '../agents.js';
 import { createClaudeCodeRuntimeSync } from './claude-code.js';
-import { createPiRuntimeSync } from './pi.js';
 import { createOhmypiRuntimeSync } from './ohmypi.js';
 import { createCodexRuntimeSync } from './codex.js';
 import { createAcpRuntimeSync } from './acp.js';

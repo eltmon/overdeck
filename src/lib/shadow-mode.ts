@@ -95,24 +95,6 @@ export interface ShadowModeResult {
     issueId,
     trackerType,
   })));
-}async function getShadowModeStatusPromise(options: ShadowModeOptions = {}): Promise<string> {
-  const result = await Effect.runPromise(resolveShadowMode(options));
-
-  if (!result.enabled) {
-    return 'Shadow mode: disabled';
-  }
-
-  const sourceLabels: Record<string, string> = {
-    'cli': 'CLI flag',
-    existing: 'existing shadow state',
-    project: 'project config',
-    global: 'global config',
-    env: 'environment variable',
-    default: 'default',
-  };
-
-  const trackerLabel = result.trackerType ? ` (${result.trackerType})` : '';
-  return `Shadow mode: enabled (${sourceLabels[result.source]})${trackerLabel}`;
 }
 
 /**
@@ -198,20 +180,6 @@ export const shouldSkipTrackerUpdate = (
       }),
   });
 
-/** Effect variant of `getShadowModeStatus`. */
-export const getShadowModeStatus = (
-  options: ShadowModeOptions = {},
-): Effect.Effect<string, ShadowModeError> =>
-  Effect.tryPromise({
-    try: () => getShadowModeStatusPromise(options),
-    catch: (cause) =>
-      new ShadowModeError({
-        operation: 'getShadowModeStatus',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
 /** Effect variant of `getShadowModeSummary`. */
 export const getShadowModeSummary = (): Effect.Effect<
   Awaited<ReturnType<typeof getShadowModeSummaryPromise>>,
@@ -226,4 +194,3 @@ export const getShadowModeSummary = (): Effect.Effect<
         cause,
       }),
   });
-

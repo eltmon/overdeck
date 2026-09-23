@@ -7,7 +7,6 @@ import { tmpdir } from 'os';
 
 import {
   findXBriefByIssueSync,
-  moveXBrief,
   promoteXBriefToProposed,
   transitionXBriefOnMain,
   updatePlanStatus,
@@ -165,36 +164,6 @@ describe('updatePlanStatus', () => {
     );
     updatePlanStatus(path, 'approved');
     expect(existsSync(path + '.tmp')).toBe(false);
-  });
-});
-
-describe('moveXBrief (with durable git write-through)', () => {
-  it('moves the spec into .pan/specs and leaves the commit to the agent (PAN-3917)', async () => {
-    initGitRepo(TEST_DIR);
-    ensureXBriefDirsSync(TEST_DIR);
-    const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
-    writePlan(
-      resolveXBriefDir(TEST_DIR, 'proposed'),
-      filename,
-      makePlan('PAN-1', 'foo', 'proposed'),
-    );
-    // First commit the proposed/ file so git knows about the source
-    execSync('git add vbrief/', { cwd: TEST_DIR });
-    execSync('git -c commit.gpgsign=false commit -q -m "add proposed"', { cwd: TEST_DIR });
-
-    const result = await Effect.runPromise(moveXBrief(TEST_DIR, 'PAN-1', 'active'));
-    expect(existsSync(result.toPath)).toBe(true);
-    expect(result.toPath).toContain(join('.pan', 'specs'));
-
-    // PAN-3917: the door writes files; the agent commits them on its branch.
-    const status = execSync('git status --porcelain', { cwd: TEST_DIR, encoding: 'utf-8' });
-    expect(status).not.toBe('');
-  });
-
-  it('throws when issue has no xBRIEF', async () => {
-    initGitRepo(TEST_DIR);
-    ensureXBriefDirsSync(TEST_DIR);
-    await expect(Effect.runPromise(moveXBrief(TEST_DIR, 'PAN-999', 'active'))).rejects.toThrow();
   });
 });
 

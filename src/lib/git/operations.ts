@@ -151,81 +151,6 @@ export class MainDivergedError extends Error {
     });
     throw err;
   }
-}async function gitForcePushPromise(
-  cwd: string,
-  remote = 'origin',
-  branch = 'main',
-  opts: { issueId?: string; reason?: string } = {},
-): Promise<void> {
-  const ts = new Date().toISOString();
-  const localSha = await Effect.runPromise(gitRevParse(cwd, 'HEAD')) ?? 'unknown';
-  const remoteSha = await Effect.runPromise(gitRevParse(cwd, `${remote}/${branch}`)) ?? undefined;
-
-  try {
-    await execFileAsync('git', ['push', '--force-with-lease', remote, branch], {
-      cwd,
-      encoding: 'utf-8',
-      timeout: 60000,
-    });
-    const afterSha = await Effect.runPromise(gitRevParse(cwd, 'HEAD')) ?? localSha;
-    appendGitOperationSync({
-      operation: 'force_push',
-      branch,
-      issueId: opts.issueId,
-      beforeSha: localSha,
-      afterSha,
-      remoteSha,
-      status: 'success',
-      error: opts.reason,
-      ts,
-    });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    appendGitOperationSync({
-      operation: 'force_push',
-      branch,
-      issueId: opts.issueId,
-      beforeSha: localSha,
-      remoteSha,
-      status: 'failure',
-      error: msg,
-      ts,
-    });
-    throw err;
-  }
-}async function gitMergePromise(
-  cwd: string,
-  branch: string,
-  opts: { issueId?: string; noFf?: boolean } = {},
-): Promise<void> {
-  const ts = new Date().toISOString();
-  const beforeSha = await Effect.runPromise(gitRevParse(cwd, 'HEAD')) ?? 'unknown';
-  const args = opts.noFf ? ['merge', '--no-ff', branch] : ['merge', branch];
-  try {
-    await execFileAsync('git', args, { cwd, encoding: 'utf-8', timeout: 60000 });
-    const afterSha = await Effect.runPromise(gitRevParse(cwd, 'HEAD')) ?? beforeSha;
-    appendGitOperationSync({
-      operation: 'merge',
-      branch,
-      issueId: opts.issueId,
-      beforeSha,
-      afterSha,
-      status: 'success',
-      ts,
-    });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    appendGitOperationSync({
-      operation: 'merge',
-      branch,
-      issueId: opts.issueId,
-      beforeSha,
-      status: 'failure',
-      error: msg,
-      ts,
-    });
-    throw err;
-  }
 }
 
 // ─── Effect variants (PAN-1249, additive) ────────────────────────────────────
@@ -290,42 +215,5 @@ export function gitPush(
         cause,
       });
     },
-  });
-}
-
-/** Force-push a branch (--force-with-lease). */
-export function gitForcePush(
-  cwd: string,
-  remote = 'origin',
-  branch = 'main',
-  opts: { issueId?: string; reason?: string } = {},
-): Effect.Effect<void, GitError> {
-  return Effect.tryPromise({
-    try: () => gitForcePushPromise(cwd, remote, branch, opts),
-    catch: (cause) =>
-      new GitError({
-        command: ['git', 'push', '--force-with-lease', remote, branch],
-        stderr: cause instanceof Error ? cause.message : String(cause),
-        exitCode: -1,
-        cause,
-      }),
-  });
-}
-
-/** Merge a branch into the current branch. */
-export function gitMerge(
-  cwd: string,
-  branch: string,
-  opts: { issueId?: string; noFf?: boolean } = {},
-): Effect.Effect<void, GitError> {
-  return Effect.tryPromise({
-    try: () => gitMergePromise(cwd, branch, opts),
-    catch: (cause) =>
-      new GitError({
-        command: opts.noFf ? ['git', 'merge', '--no-ff', branch] : ['git', 'merge', branch],
-        stderr: cause instanceof Error ? cause.message : String(cause),
-        exitCode: -1,
-        cause,
-      }),
   });
 }

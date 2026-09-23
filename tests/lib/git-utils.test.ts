@@ -5,7 +5,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { cleanupStaleLocks, hasStaleLocks } from '../../src/lib/git-utils';
+import { cleanupStaleLocks } from '../../src/lib/git-utils';
 
 const execAsync = promisify(exec);
 
@@ -90,25 +90,6 @@ describe('git-utils', () => {
       expect(result.removed.length).toBeGreaterThanOrEqual(2);
       expect(existsSync(indexLock)).toBe(false);
       expect(existsSync(refLock)).toBe(false);
-    });
-  });
-
-  describe('hasStaleLocks', () => {
-    it('should return false when no locks exist', async () => {
-      const result = await Effect.runPromise(hasStaleLocks(testRepoPath));
-      expect(result).toBe(false);
-    });
-
-    it('should return true when stale locks exist', async () => {
-      // Create a fake stale lock file
-      const lockFile = join(testRepoPath, '.git', 'index.lock');
-      writeFileSync(lockFile, '');
-
-      const result = await Effect.runPromise(hasStaleLocks(testRepoPath));
-      expect(result).toBe(true);
-
-      // Clean up
-      rmSync(lockFile);
     });
   });
 });

@@ -81,35 +81,6 @@ export interface SyncResult {
   }
 
   return result;
-}async function syncWalFromDirPromise(eventsDir: string): Promise<{ imported: number; duplicates: number; files: number; errors: string[] }> {
-  const stats = { imported: 0, duplicates: 0, files: 0, errors: [] as string[] };
-
-  if (!existsSync(eventsDir)) return stats;
-
-  let files: string[];
-  try {
-    files = (await readdir(eventsDir)).filter(f => f.endsWith('.jsonl'));
-  } catch (err) {
-    stats.errors.push(`Failed to read dir ${eventsDir}: ${err}`);
-    return stats;
-  }
-
-  for (const file of files) {
-    const filePath = join(eventsDir, file);
-    const events = await parseWalFile(filePath, stats.errors);
-    if (events.length === 0) continue;
-
-    try {
-      const { inserted, duplicates } = await recordCostEventsThroughOverdeck(events, filePath);
-      stats.imported += inserted;
-      stats.duplicates += duplicates;
-      stats.files++;
-    } catch (err) {
-      stats.errors.push(`${file}: import failed: ${err}`);
-    }
-  }
-
-  return stats;
 }
 
 // ============== Helpers ==============
@@ -162,15 +133,6 @@ export const syncWalFromAllProjects = (): Effect.Effect<SyncResult, FsError> =>
   Effect.tryPromise({
     try: () => syncWalFromAllProjectsPromise(),
     catch: (cause) => new FsError({ path: '<all projects>', operation: 'syncWalFromAllProjects', cause }),
-  });
-
-/** Effect variant of syncWalFromDir. */
-export const syncWalFromDir = (
-  eventsDir: string,
-): Effect.Effect<{ imported: number; duplicates: number; files: number; errors: string[] }, FsError> =>
-  Effect.tryPromise({
-    try: () => syncWalFromDirPromise(eventsDir),
-    catch: (cause) => new FsError({ path: eventsDir, operation: 'syncWalFromDir', cause }),
   });
 
 async function parseWalFile(filePath: string, errors: string[]): Promise<CostEvent[]> {

@@ -332,44 +332,9 @@ async function resolveCheckpointCommit(cwd: string, agentId: string, turnId: str
     console.log(`[checkpoint] No checkpoint refs found for agents: ${agentIds.join(', ')}`)
   }
   return totalRefs
-}async function pruneStaleCheckpointRefsPromise(cwd: string, olderThanDays: number): Promise<number> {
-  try {
-    const { stdout } = await execFileAsync('git', [
-      'for-each-ref',
-      '--format=%(creatordate:unix) %(refname)',
-      `${CHECKPOINT_REF_PREFIX}/`,
-    ], { cwd, encoding: 'utf-8' })
+}
 
-    const allRefs = stdout.split('\n').filter(Boolean)
-    const cutoff = Math.floor(Date.now() / 1000) - olderThanDays * 86400
-    const staleRefs = allRefs.flatMap(line => {
-      const spaceIdx = line.indexOf(' ')
-      if (spaceIdx === -1) return []
-      const ts = parseInt(line.slice(0, spaceIdx), 10)
-      const ref = line.slice(spaceIdx + 1).trim()
-      return ts < cutoff && ref ? [ref] : []
-    })
-
-    console.log(`[checkpoint] Global stale sweep: ${allRefs.length} total ref(s), ${staleRefs.length} older than ${olderThanDays} days`)
-
-    let pruned = 0
-    for (const ref of staleRefs) {
-      try {
-        await execFileAsync('git', ['update-ref', '-d', ref], { cwd, encoding: 'utf-8' })
-        pruned++
-      } catch (err) {
-        console.warn(`[checkpoint] Could not delete stale ref ${ref}: ${err}`)
-      }
-    }
-    if (pruned > 0) {
-      console.log(`[checkpoint] Pruned ${pruned} stale checkpoint ref(s) older than ${olderThanDays} days`)
-    }
-    return pruned
-  } catch (err) {
-    console.warn(`[checkpoint] Stale ref sweep failed: ${err}`)
-    return 0
-  }
-}async function deleteLegacyCheckpointRefsPromise(cwd: string): Promise<number> {
+async function deleteLegacyCheckpointRefsPromise(cwd: string): Promise<number> {
   try {
     // Old layout: refs/pan/turn/<turnId> — exactly 3 components (strip=3 gives the turnId directly, no slash)
     // New layout: refs/pan/turn/<agentId>/<turnId> — has a slash in strip=3 output
@@ -444,14 +409,9 @@ async function resolveCheckpointCommit(cwd: string, agentId: string, turnId: str
   } catch {
     return null
   }
-}async function diffSinceCommitPromise(cwd: string, baseCommit: string): Promise<TurnDiffFileChange[]> {
-  const [numstatResult, nameStatusResult] = await Promise.all([
-    execFileAsync('git', ['diff', '--numstat', '--no-color', baseCommit], { cwd, encoding: 'utf-8' }),
-    execFileAsync('git', ['diff', '--name-status', '--no-color', baseCommit], { cwd, encoding: 'utf-8' }),
-  ])
+}
 
-  return parseNumstatWithStatus(numstatResult.stdout, nameStatusResult.stdout)
-}async function diffFilesAgainstHeadPromise(cwd: string, filePaths: string[]): Promise<TurnDiffFileChange[]> {
+async function diffFilesAgainstHeadPromise(cwd: string, filePaths: string[]): Promise<TurnDiffFileChange[]> {
   if (filePaths.length === 0) return []
 
   const [numstatResult, nameStatusResult] = await Promise.all([
@@ -653,14 +613,6 @@ export function pruneCheckpointRefsForAgents(
   return Effect.promise(() => pruneCheckpointRefsForAgentsPromise(cwd, agentIds))
 }
 
-/** Delete all checkpoint refs older than olderThanDays days. */
-export function pruneStaleCheckpointRefs(
-  cwd: string,
-  olderThanDays: number,
-): Effect.Effect<number> {
-  return Effect.promise(() => pruneStaleCheckpointRefsPromise(cwd, olderThanDays))
-}
-
 /** One-time migration: delete legacy unscoped checkpoint refs. */
 export function deleteLegacyCheckpointRefs(cwd: string): Effect.Effect<number> {
   return Effect.promise(() => deleteLegacyCheckpointRefsPromise(cwd))
@@ -695,18 +647,6 @@ export function findCommitAtTime(
   isoTimestamp: string,
 ): Effect.Effect<string | null> {
   return Effect.promise(() => findCommitAtTimePromise(cwd, isoTimestamp))
-}
-
-/** Diff since a given base commit. */
-export function diffSinceCommit(
-  cwd: string,
-  baseCommit: string,
-): Effect.Effect<TurnDiffFileChange[], VcsError> {
-  return Effect.tryPromise({
-    try: () => diffSinceCommitPromise(cwd, baseCommit),
-    catch: (cause) =>
-      new VcsError({ operation: 'diff-since-commit', message: String(cause), cause }),
-  })
 }
 
 /** Diff specific file paths against HEAD. */

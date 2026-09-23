@@ -310,7 +310,7 @@ describe('loadSettingsApi', () => {
 
   it('exposes flywheel role config helpers', async () => {
     mockReadFile.mockResolvedValue('{}\n');
-    const { getRoleConfig, setRoleConfig } = await import('../settings-api.js');
+    const { getRoleConfig } = await import('../settings-api.js');
 
     expect(getRoleConfig('flywheel')).toEqual({
       model: 'claude-opus-4-7',
@@ -318,26 +318,13 @@ describe('loadSettingsApi', () => {
       maxAgents: 8,
       scope: 'pan-only',
     });
-
-    await Effect.runPromise(setRoleConfig('flywheel', {
-      harness: 'ohmypi',
-      model: 'claude-sonnet-4-6',
-      effort: 'medium',
-      maxAgents: 4,
-      scope: 'all-tracked-projects',
-    }));
-
-    const written = String(mockWriteFile.mock.calls[0]?.[1]);
-    expect(written).toContain('flywheel:');
-    expect(written).toContain('harness: ohmypi');
-    expect(written).toContain('maxAgents: 4');
   });
 
   it('removes role harness overrides when saved as null or empty', async () => {
     mockLoadConfig.mockReturnValue(baseConfig({
       roles: { work: { model: 'workhorse:mid', harness: 'ohmypi' } },
     }));
-    const { loadSettingsApi, saveSettingsApi, setRoleConfig } = await import('../settings-api.js');
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
 
     await Effect.runPromise(saveSettingsApi({
@@ -351,19 +338,9 @@ describe('loadSettingsApi', () => {
       },
     } as never));
 
-    let written = String(mockWriteFile.mock.calls[0]?.[1]);
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).not.toContain('harness: ohmypi');
     expect(written).not.toContain('harness: null');
-
-    mockWriteFile.mockClear();
-    await Effect.runPromise(setRoleConfig('work', {
-      model: 'workhorse:mid',
-      harness: '',
-    } as never));
-
-    written = String(mockWriteFile.mock.calls[0]?.[1]);
-    expect(written).not.toContain('harness: ohmypi');
-    expect(written).not.toContain('harness: ""');
   });
 
   it('loads tts daemon settings from normalized config', async () => {

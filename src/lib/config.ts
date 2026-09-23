@@ -387,11 +387,6 @@ async function loadConfigFromFile(): Promise<OverdeckConfig> {
   return config;
 }
 
-async function saveConfigToFile(config: OverdeckConfig): Promise<void> {
-  const content = stringify(config as any);
-  await fs.writeFile(CONFIG_FILE, content, 'utf8');
-}
-
 export function getDefaultConfigSync(): OverdeckConfig {
   return JSON.parse(JSON.stringify(DEFAULT_CONFIG));
 }
@@ -530,16 +525,6 @@ export const loadConfig = (): Effect.Effect<OverdeckConfig, FsError> =>
     try: () => loadConfigFromFile(),
     catch: (cause) =>
       new FsError({ path: CONFIG_FILE, operation: 'load-config-async', cause }),
-  });
-
-/** Persist config.toml (async; dashboard-safe). */
-export const saveConfig = (
-  config: OverdeckConfig,
-): Effect.Effect<void, FsError> =>
-  Effect.tryPromise({
-    try: () => saveConfigToFile(config),
-    catch: (cause) =>
-      new FsError({ path: CONFIG_FILE, operation: 'save-config-async', cause }),
   });
 
 /** Compute the dashboard's external API URL. Pure (reads env). */

@@ -155,7 +155,8 @@ Agent-authored handoff forks use the orchestrator-injected template in `roles/ha
 See `src/lib/conversations/summary-fork.ts` for the fork pipeline implementation.
 
 Key functions:
-- `createSummaryFork()` — entry point, orchestrates session reservation and seed generation
+- `runForkPipeline()` (`src/lib/overdeck/conversation-forks.ts`) — entry point, orchestrates session reservation, seed generation, spawn and summary injection
+- `reserveSummaryForkSession()` — reserves the new session id and file path
 - `requestHandoffFromAgent()` — live-agent handoff prompt delivery, doc/sentinel polling, and validation
 - `validateHandoffDoc()` — handoff document contract check
 - `generateSummaryForFork()` — calls the LLM summarizer with fork-specific settings

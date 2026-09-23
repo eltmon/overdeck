@@ -12,11 +12,9 @@ import { Effect } from 'effect';
 import { ConfigParseError, FsError } from './errors.js';
 import { OVERDECK_HOME } from './paths.js';
 import {
-  atomicWriteProjectsConfig,
   atomicWriteProjectsConfigSync,
   updateProjectsConfigText,
   updateProjectsConfigTextSync,
-  withProjectsConfigWrite,
   withProjectsConfigWriteSync,
 } from './projects-config-write.js';
 import { extractPrefixSync, parseIssueIdSync } from './issue-id.js';
@@ -609,10 +607,6 @@ function setProjectAutoMergeDefaultMutation(
   return { config, result: undefined, changed: true };
 }
 
-export function setProjectAutoMergeDefaultSync(key: string, value: 'auto' | 'hold' | null): void {
-  updateProjectsConfigSync(config => setProjectAutoMergeDefaultMutation(config, key, value));
-}
-
 export async function setProjectAutoMergeDefault(key: string, value: 'auto' | 'hold' | null): Promise<void> {
   await updateProjectsConfigAsync(config => setProjectAutoMergeDefaultMutation(config, key, value));
 }
@@ -686,10 +680,6 @@ function setProjectSwarmPolicyMutation(
   return { config, result: undefined, changed: true };
 }
 
-export function setProjectSwarmPolicySync(key: string, value: Omit<SwarmConfig, 'hotspots'> | null): void {
-  updateProjectsConfigSync(config => setProjectSwarmPolicyMutation(config, key, value));
-}
-
 export async function setProjectSwarmPolicy(
   key: string,
   value: Omit<SwarmConfig, 'hotspots'> | null,
@@ -713,10 +703,6 @@ function setProjectMergeTrainMutation(
   else updated.merge_train = value;
   config.projects[key] = updated;
   return { config, result: undefined, changed: true };
-}
-
-export function setProjectMergeTrainSync(key: string, value: 'enabled' | 'disabled' | null): void {
-  updateProjectsConfigSync(config => setProjectMergeTrainMutation(config, key, value));
 }
 
 export async function setProjectMergeTrain(key: string, value: 'enabled' | 'disabled' | null): Promise<void> {
@@ -1126,20 +1112,6 @@ export const loadProjectsConfig = (): Effect.Effect<ProjectsConfig, ConfigParseE
     return config;
   });
 
-/** Effect variant of {@link saveProjectsConfigSync}. */
-export const saveProjectsConfig = (config: ProjectsConfig): Effect.Effect<void, FsError> =>
-  Effect.tryPromise({
-    try: async () => {
-      const out = stringifyYaml(config, { indent: 2 });
-      await withProjectsConfigWrite(PROJECTS_CONFIG_FILE, () => (
-        atomicWriteProjectsConfig(PROJECTS_CONFIG_FILE, out)
-      ));
-      invalidateProjectsConfigCache();
-    },
-    catch: (cause) =>
-      new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'saveProjectsConfig', cause }),
-  });
-
 /** Effect variant of {@link listProjectsSync}. */
 export const listProjects = (): Effect.Effect<Array<{ key: string; config: ProjectConfig }>, ConfigParseError | FsError> =>
   loadProjectsConfig().pipe(
@@ -1185,62 +1157,6 @@ export const renameProject = (
     return new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'renameProject', cause });
   },
 });
-
-/** Effect variant of {@link registerProjectSync}. */
-export const registerProject = (key: string, projectConfig: ProjectConfig): Effect.Effect<void, ConfigParseError | FsError> =>
-  Effect.tryPromise({
-    try: () => updateProjectsConfigAsync(config => {
-      config.projects[key] = projectConfig;
-      return { config, result: undefined, changed: true };
-    }),
-    catch: cause => cause instanceof ConfigParseError
-      ? cause
-      : new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'registerProject', cause }),
-  });
-
-/** Effect variant of {@link unregisterProjectSync}. */
-export const unregisterProject = (key: string): Effect.Effect<boolean, ConfigParseError | FsError> =>
-  Effect.tryPromise({
-    try: () => updateProjectsConfigAsync(config => {
-      if (!config.projects[key]) return { config, result: false, changed: false };
-      delete config.projects[key];
-      return { config, result: true, changed: true };
-    }),
-    catch: cause => cause instanceof ConfigParseError
-      ? cause
-      : new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'unregisterProject', cause }),
-  });
-
-/** Effect variant of {@link findProjectByTeamSync}. */
-export const findProjectByTeam = (teamPrefix: string): Effect.Effect<ProjectConfig | null, ConfigParseError | FsError> =>
-  loadProjectsConfig().pipe(
-    Effect.map((config) => {
-      for (const [, projectConfig] of Object.entries(config.projects)) {
-        if (getIssuePrefix(projectConfig)?.toUpperCase() === teamPrefix.toUpperCase()) {
-          return projectConfig;
-        }
-      }
-      return null;
-    }),
-  );
-
-/** Effect variant of {@link findProjectByPathSync}. */
-export const findProjectByPath = (workspacePath: string): Effect.Effect<ProjectConfig | null, ConfigParseError | FsError> =>
-  loadProjectsConfig().pipe(
-    Effect.map((config) => {
-      const normalizedTarget = resolve(workspacePath);
-      for (const [, projectConfig] of Object.entries(config.projects)) {
-        const normalizedProject = resolve(projectConfig.path);
-        if (
-          normalizedTarget === normalizedProject ||
-          normalizedTarget.startsWith(normalizedProject + '/')
-        ) {
-          return projectConfig;
-        }
-      }
-      return null;
-    }),
-  );
 
 /** Effect variant of {@link resolveProjectFromIssueSync}. */
 export const resolveProjectFromIssue = (
@@ -1288,7 +1204,3 @@ export const resolveProjectFromIssue = (
 /** Effect variant of {@link getProjectSync}. */
 export const getProject = (key: string): Effect.Effect<ProjectConfig | null, ConfigParseError | FsError> =>
   loadProjectsConfig().pipe(Effect.map((config) => config.projects[key] || null));
-
-/** Effect variant of {@link hasProjectsSync}. */
-export const hasProjects = (): Effect.Effect<boolean, ConfigParseError | FsError> =>
-  loadProjectsConfig().pipe(Effect.map((config) => Object.keys(config.projects).length > 0));
