@@ -544,7 +544,8 @@ is the former private implementation, so no operation was lost. Callers moved pe
 `await Effect.runPromise(foo(…))` became `await foo(…)`. In an `Effect.gen`, a former `Effect.promise`
 façade became `yield* Effect.promise(() => foo(…))` and a former `Effect.tryPromise` façade became
 `yield* Effect.tryPromise(() => foo(…))`. The one call site that mapped a typed failure
-(`checkWorkspaceRemovalGuard`) keeps its `ProcessSpawnError` mapping in a two-argument `tryPromise`.
+(`checkWorkspaceRemovalGuard`) keeps its `ProcessSpawnError` mapping in a two-argument `tryPromise`, and
+the stash routes map to a `VcsError` that keeps git's error text (see behaviour notes).
 Evidence: `node scripts/audit-effect-boundary.mjs --json --usage`, `tsc --noEmit` on the root,
 dashboard and frontend projects, and 333 touched and adjacent test files.
 
@@ -640,9 +641,11 @@ All paths are relative to `src/lib/`.
   (`exit-empty off`) managed tmux server at boot on Herdr hosts, through `ensureOverdeckTmuxServerSync`
   (`execFileSync`). Restoring it is an operator decision.
 - **Rejections are the underlying errors, not the tagged wrappers.** Log lines that print `err.message`
-  show the underlying message. A generator call site that bridges with `Effect.tryPromise(() => …)` and
-  does not recover (the stash routes) now returns httpHandler's generic 500 message instead of the
-  wrapper's.
+  show the underlying message. The six stash-route bridges (`routes/workspaces/stash-clean.ts`,
+  `workspace-data.ts`) use the two-argument `Effect.tryPromise` with a `VcsError` that carries git's
+  error text, so httpHandler's 500 body shows git's message. Before, it showed an empty string,
+  because `GitError` declares no `message`. No converted route's error body falls back to Effect's
+  generic "An error occurred in Effect.tryPromise".
 
 ### Tests
 
