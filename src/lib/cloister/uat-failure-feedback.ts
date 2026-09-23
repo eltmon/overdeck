@@ -8,10 +8,12 @@
  * The caller is `pan admin specialists done` (test role with `--uat-status`,
  * or the uat role): the one place a UAT result is observed after PAN-3917.
  * That is a fresh CLI process per verdict, so the in-process anchor map below
- * only guards repeats inside one process. Once-per-failing-anchor across
- * processes comes from the keyed delivery store (PTY supervisor reservation /
- * tmux user options): the message carries `uat-feedback:<issue>:<anchor hash>`
- * and a repeat for the same PR head is reported `deduplicated`, not re-sent.
+ * only guards repeats inside one process. Across processes the message
+ * carries `uat-feedback:<issue>:<anchor hash>`, which the keyed delivery tiers
+ * (PTY supervisor reservation / tmux user options) enforce: a repeat for the
+ * same PR head is reported `deduplicated`, not re-sent. A Herdr-prompted agent
+ * is reached before that keyed cascade, so there the key is not enforced —
+ * the same exposure review-verdict-feedback has.
  */
 
 import { createHash } from 'node:crypto';

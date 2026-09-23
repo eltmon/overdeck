@@ -167,9 +167,10 @@ A failed browser UAT is observed where the test agent records it:
 `pan admin specialists done test <id> --uat-status failed` (or the `uat`
 role). After posting the verdict comment, that command relays the UAT notes
 through `relayUatFailureFeedbackPromise` (`cloister/uat-failure-feedback.ts`)
-to the work agent, or to a needs-you when no agent can be reached. Delivery is
-keyed on the PR head SHA, so the agent hears about one failing head once; a
-passing UAT clears the anchor (PAN-4030).
+to the work agent, or to a needs-you when no agent can be reached. Delivery
+carries a key derived from the PR head SHA, which the tmux/PTY-supervisor tiers
+enforce across processes (Herdr-prompted agents bypass the keyed cascade, as
+review feedback does); a passing UAT clears the anchor (PAN-4030).
 
 ## Review Convergence Gate (PAN-3151)
 
