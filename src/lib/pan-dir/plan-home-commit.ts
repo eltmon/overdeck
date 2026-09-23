@@ -27,7 +27,7 @@ export class MigratePlanHomeError extends Error {
   readonly _tag = 'MigratePlanHomeError' as const;
 
   constructor(
-    readonly code: 'pan-ignored-by-foreign-rule' | 'gitignore-dirty' | 'state-already-migrated',
+    readonly code: 'pan-ignored-by-foreign-rule' | 'gitignore-dirty',
     message: string,
   ) {
     super(message);

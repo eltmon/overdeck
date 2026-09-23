@@ -147,26 +147,16 @@ describe('runMigratePlanHome --repair-ignore', () => {
   });
 });
 
-// Review of #4015 (4015-1): an already-migrated state worktree is refused
-// without --force-remigrate, and a differing destination is listed, not replaced.
+// Review of #4015 (4015-1): a differing destination is listed, not replaced.
+// The state worktree's migration-complete.json records its setup, not a
+// plan-home migration, so it never blocks a run.
 describe('runMigratePlanHome on an already-migrated plan home', () => {
-  it('refuses a state worktree with migration-complete.json in one line', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    write(stateRoot, 'migration-complete.json', '{"completedAt":"2026-07-10T03:30:41.003Z"}\n');
-
-    const code = await runMigratePlanHome('fixture', { stateRoot, planHome, openIssues });
-
-    expect(code).toBe(1);
-    expect(error).toHaveBeenCalledTimes(1);
-    expect(String(error.mock.calls[0][0])).toMatch(/^migrate-plan-home: .*already migrated.*--force-remigrate/);
-  });
-
   it('lists a differing destination as a conflict and exits 1 without replacing it', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    write(stateRoot, 'migration-complete.json', '{"completedAt":"2026-07-10T03:30:41.003Z"}\n');
     write(planHome, '.pan/drafts/pan-100.md', '# newer plan-home draft\n');
 
-    const code = await runMigratePlanHome('fixture', { stateRoot, planHome, openIssues, forceRemigrate: true });
+    const code = await runMigratePlanHome('fixture', { stateRoot, planHome, openIssues });
 
     expect(code).toBe(1);
     const output = log.mock.calls.map((call) => String(call[0])).join('\n');

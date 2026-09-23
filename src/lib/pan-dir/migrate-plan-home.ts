@@ -15,8 +15,7 @@
  * It never replaces a file that already exists in `.pan/`: a destination that
  * differs from the state copy is newer work in the plan home as often as not
  * (the state worktree stopped moving at the Cut), so it is reported as a
- * conflict and left alone. A state worktree carrying `migration-complete.json`
- * is refused outright unless `forceRemigrate` is set.
+ * conflict and left alone.
  *
  * PAN-3996: pre-Cut tooling wrote `.pan/` into project `.gitignore` files.
  * The plan home is checked for that before anything is written; under
@@ -51,7 +50,6 @@ import { parseXBriefFilename } from '../xbrief/lifecycle.js';
 import { detectPanIgnore, type PanIgnoreStatus } from './legacy-pan-ignore.js';
 import { resolvePlanHome } from './paths.js';
 import {
-  MigratePlanHomeError,
   assertCommittable,
   commitOnly,
   removeLegacyLineForCommit,
@@ -60,7 +58,7 @@ import {
 } from './plan-home-commit.js';
 
 export { PlanHomeGitError } from './legacy-pan-ignore.js';
-export { MigratePlanHomeError };
+export { MigratePlanHomeError } from './plan-home-commit.js';
 
 /**
  * The ignore check could not run (an old git, a `safe.directory` refusal, …).
@@ -70,9 +68,6 @@ export interface PanIgnoreCheckFailed {
   readonly kind: 'check-failed';
   readonly detail: string;
 }
-
-/** Written into a state worktree once its migration is done. */
-export const MIGRATION_COMPLETE_MARKER = 'migration-complete.json';
 
 export const MIGRATION_COMMIT_SUBJECT = 'chore(workspace): migrate planning artifacts from overdeck-state';
 
@@ -97,8 +92,6 @@ export interface MigratePanHomeOptions {
   commit?: boolean;
   /** Preview only: compute what would change but write nothing. */
   dryRun?: boolean;
-  /** Run even though the state worktree carries `migration-complete.json`. */
-  forceRemigrate?: boolean;
 }
 
 export interface MigratePanHomeResult {
@@ -113,8 +106,6 @@ export interface MigratePanHomeResult {
    * worktree would put there. Never overwritten; relative to `.pan`.
    */
   conflicts: string[];
-  /** `migration-complete.json` in the state worktree, when present (a run needs `forceRemigrate`). */
-  migrationComplete: { completedAt?: string } | null;
   /** Per-issue files skipped because their issue is not open. */
   skippedClosed: number;
   committed: boolean;
@@ -274,18 +265,6 @@ export async function migratePanHome(options: MigratePanHomeOptions): Promise<Mi
   const panDir = join(planHome, '.pan');
   const commit = Boolean(options.commit) && !dryRun;
 
-  const marker = readJson(join(stateRoot, MIGRATION_COMPLETE_MARKER));
-  const migrationComplete = marker
-    ? { ...(typeof marker.completedAt === 'string' ? { completedAt: marker.completedAt } : {}) }
-    : existsSync(join(stateRoot, MIGRATION_COMPLETE_MARKER)) ? {} : null;
-  if (migrationComplete && !dryRun && !options.forceRemigrate) {
-    throw new MigratePlanHomeError(
-      'state-already-migrated',
-      `${join(stateRoot, MIGRATION_COMPLETE_MARKER)} says this state worktree was already migrated`
-      + `${migrationComplete.completedAt ? ` (${migrationComplete.completedAt})` : ''}. Nothing was copied. `
-      + 'Preview with --dry-run, then pass --force-remigrate to run anyway; existing .pan/ files are never overwritten.',
-    );
-  }
 
   // Checked before anything is written: an ignored `.pan/` makes the commit
   // below impossible, and a half-done migration is worse than none. A copy or
@@ -451,7 +430,6 @@ export async function migratePanHome(options: MigratePanHomeOptions): Promise<Mi
     unchanged,
     remaining,
     conflicts: conflicts.sort(),
-    migrationComplete,
     skippedClosed,
     committed,
     progressUpdated: progressUpdated.sort(),

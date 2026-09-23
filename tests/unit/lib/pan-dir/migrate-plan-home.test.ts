@@ -519,7 +519,7 @@ describe('migratePanHome --commit scope (review of #3998)', () => {
 });
 
 // Review of #4015 (4015-1): a newer plan-home file is never rolled back to the
-// state snapshot, and an already-migrated state worktree is refused.
+// state snapshot.
 describe('migratePanHome never overwrites newer plan-home work (review of #4015)', () => {
   beforeEach(() => {
     write(root, 'empty-gitconfig', '');
@@ -556,38 +556,19 @@ describe('migratePanHome never overwrites newer plan-home work (review of #4015)
     expect(git(planHome, 'status', '--porcelain', '--untracked-files=all')).toBe('');
   });
 
-  it('refuses a state worktree that carries migration-complete.json, writing nothing', async () => {
+  // migration-complete.json records the state worktree's setup (every state
+  // worktree has one), not a plan-home migration: it never blocks a run.
+  it('runs on a state worktree that carries migration-complete.json and still never overwrites', async () => {
     writeJson(stateRoot, 'migration-complete.json', { completedAt: '2026-07-10T03:30:41.003Z', version: 1 });
-
-    const failure = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, commit: true }).catch((e: unknown) => e);
-
-    expect(failure).toBeInstanceOf(MigratePlanHomeError);
-    expect((failure as MigratePlanHomeError).code).toBe('state-already-migrated');
-    expect((failure as Error).message).toContain('2026-07-10T03:30:41.003Z');
-    expect((failure as Error).message).toContain('--force-remigrate');
-    expect(existsSync(join(planHome, '.pan/drafts/pan-100.md'))).toBe(false);
-    expect(git(planHome, 'log', '-1', '--format=%s').trim()).toBe('newer plan-home state');
-  });
-
-  it('a --dry-run on a migrated state worktree previews and reports the marker', async () => {
-    writeJson(stateRoot, 'migration-complete.json', { completedAt: '2026-07-10T03:30:41.003Z' });
-
-    const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, dryRun: true });
-
-    expect(result.migrationComplete).toEqual({ completedAt: '2026-07-10T03:30:41.003Z' });
-    expect(result.conflicts).toContain('backlog/sequence.md');
-    expect(existsSync(join(planHome, '.pan/drafts/pan-100.md'))).toBe(false);
-  });
-
-  it('--force-remigrate runs past the marker and still never overwrites', async () => {
-    writeJson(stateRoot, 'migration-complete.json', { completedAt: '2026-07-10T03:30:41.003Z' });
     const newerBacklog = readFileSync(join(planHome, '.pan/backlog/sequence.md'), 'utf8');
 
-    const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, forceRemigrate: true });
+    const result = await migratePanHome({ stateRoot, planHome, openIssues: OPEN, commit: true });
 
     expect(result.copied).toContain('drafts/pan-100.md');
     expect(result.conflicts).toContain('backlog/sequence.md');
+    expect(result.committed).toBe(true);
     expect(readFileSync(join(planHome, '.pan/backlog/sequence.md'), 'utf8')).toBe(newerBacklog);
+    expect(existsSync(join(planHome, '.pan/migration-complete.json'))).toBe(false);
   });
 });
 

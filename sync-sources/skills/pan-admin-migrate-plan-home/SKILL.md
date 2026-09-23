@@ -33,8 +33,6 @@ Options:
   ignore rule (below). The commit holds only files this run wrote, plus files an earlier run
   copied that still match the state worktree. Any other uncommitted `.pan/` change (an operator
   or live agent edit) is listed as "left uncommitted" and stays out of the commit.
-- `--force-remigrate` — run even though the state worktree carries `migration-complete.json`
-  (every run otherwise refuses before copying; `--dry-run` still previews and names the marker)
 - `--repair-ignore` — do only the ignore repair: remove Overdeck's legacy `.pan/` line and commit
   `.gitignore` alone. Copies nothing and never calls the tracker. Not combinable with `--commit`.
 - `--dry-run` — report what would be copied, and whether `.pan/` is ignored, without writing anything
