@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-23T03:51:11.856Z · model: claude-opus-5 · open: 855_
+_Last sequenced: 2026-09-23T04:15:42.923Z · model: claude-opus-5 · open: 854_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -33,7 +33,6 @@ _Last sequenced: 2026-09-23T03:51:11.856Z · model: claude-opus-5 · open: 855_
 | 28 | PAN-3285 | M | critical | ok |  |  | A supervisor pinned to a reload generation SIGTERMs every healthy dashboard and cannot start one: 3.5h outage, 1107 silent failures. |
 | 29 | PAN-3960 | M | critical | ok |  |  | Planning, resume and recovery spawns still create tmux sessions directly; route through launchAgentPane so one backend hosts the fleet |
 | 30 | PAN-3524 | M | critical | needs-refinement |  |  | A server-owned --changed verification loop relaunches through deacon freeze, review abort, pause and operator stop; peaked at 78 workers. |
-| 31 | PAN-3962 | S | critical | ok |  |  | PTY supervisor lifecycle POSTs 404 for conv-* ids: conversation exit/turn events never recorded; exit is inferred, not owned |
 | 32 | PAN-3250 | S | critical | ok |  |  | Workspace spawn branches from local HEAD instead of origin/main, so every new feature branch inherits unpushed local-main commits. |
 | 33 | PAN-3946 | S | critical | ok |  |  | Review request treats an APPROVED review on an older commit as "already passed"; newer commits ride an old approval |
 | 34 | PAN-2954 | XS | critical | ok |  |  | postMergeLifecycle refuses GitLab projects |
@@ -975,10 +974,6 @@ Three spawn paths bypass the backend registry, giving two inventories for one fl
 
 Triage: verify the --changed verification-loop relaunch against deacon-lite's smaller suppression surface. Kept in the critical band: an unstoppable server-owned test loop is the worst kind of runaway.
 
-### PAN-3962 (rank 31)
-
-Breaks the CLAUDE.md invariant that supervisor-launched sessions write stopped from their own exited event: a conversation showed active 45s after Claude died and the first message went into a dead shell. Small route fix plus a test.
-
 ### PAN-3250 (rank 32)
 
 New this pass, labelled blocks-main and substrate. Two spawn sites branch from the local HEAD or defaultBranch instead of origin/main, so every new feature branch inherits whatever unpushed commits are sitting on the shared local main. Four branches were already contaminated when it was filed, two of them created after the problem was identified, and their PRs read MERGEABLE/CLEAN. It spreads with each spawn, so the cost of leaving it grows.
@@ -1183,6 +1178,10 @@ Planning agents wedge after a background Explore task finishes; parent never con
 
 New this pass. pan done's preflight blocks on the generated .devcontainer/ and dev artifacts, and with only commit/discard/surface offered, agents invented their own exits: one attempted to delete workspace infrastructure, another committed a wrapper-repo gitignore change that moved HEAD and fed a four-hour review reset loop. A gate that pushes agents toward destructive workarounds needs fixing at the gate.
 
+### PAN-3084 (rank 84)
+
+Triage: the cited function is deleted; verify whether a never-briefed review session can still block its replacement (PAN-3939 shows the post-cut shape). Rank held.
+
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1190,10 +1189,10 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-23T03:51:11.856Z",
+  "generatedAt": "2026-09-23T04:15:42.923Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 855,
+  "openCount": 854,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1558,19 +1557,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "dependsOn": [],
       "why": "A server-owned --changed verification loop relaunches through deacon freeze, review abort, pause and operator stop; peaked at 78 workers.",
       "rationale": "Triage: verify the --changed verification-loop relaunch against deacon-lite's smaller suppression surface. Kept in the critical band: an unstoppable server-owned test loop is the worst kind of runaway.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3962",
-      "rank": 31,
-      "size": "S",
-      "importance": "critical",
-      "score": 84,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "PTY supervisor lifecycle POSTs 404 for conv-* ids: conversation exit/turn events never recorded; exit is inferred, not owned",
-      "rationale": "Breaks the CLAUDE.md invariant that supervisor-launched sessions write stopped from their own exited event: a conversation showed active 45s after Claude died and the first message went into a dead shell. Small route fix plus a test.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -12597,20 +12583,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "confidence": 1
     },
     {
-      "from": "PAN-3962",
-      "to": "PAN-3540",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
-      "from": "PAN-3962",
-      "to": "PAN-3921",
-      "type": "informs",
-      "source": "github-ref",
-      "confidence": 1
-    },
-    {
       "from": "PAN-3960",
       "to": "PAN-3921",
       "type": "informs",
@@ -12931,13 +12903,6 @@ New this pass. pan done's preflight blocks on the generated .devcontainer/ and d
       "type": "unblocks",
       "source": "ai-inferred",
       "confidence": 0.6
-    },
-    {
-      "from": "PAN-3921",
-      "to": "PAN-3962",
-      "type": "informs",
-      "source": "ai-inferred",
-      "confidence": 0.5
     },
     {
       "from": "PAN-3920",
