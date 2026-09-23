@@ -1032,87 +1032,9 @@ export function syncPiSettingsSync(): PiSettingsSyncResult {
 const toSyncFsError = (op: string, cause: unknown): FsError =>
   new FsError({ path: SYNC_TARGET.skills, operation: op, cause });
 
-/** True if `targetPath` is a Overdeck-managed symlink. */
-export const isOverdeckSymlink = (
-  targetPath: string,
-): Effect.Effect<boolean> => Effect.sync(() => isOverdeckSymlinkSync(targetPath));
-
-/** Migrate Overdeck-owned content out of ~/.claude/ (idempotent). */
-export const migrateStalePersonalContent = (): Effect.Effect<MigrationResult, FsError> =>
-  Effect.try({
-    try: () => migrateStalePersonalContentSync(),
-    catch: (cause) => toSyncFsError('migrateStalePersonalContent', cause),
-  });
-
-/** Remove legacy 0.7.0-era skill directories that were renamed/dropped. */
-export const removeLegacySkills070 = (): Effect.Effect<readonly string[], FsError> =>
-  Effect.try({
-    try: () => removeLegacySkills070Sync(),
-    catch: (cause) => toSyncFsError('removeLegacySkills070', cause),
-  });
-
-/** Rebuild the sync cache from sources on disk. */
-export const refreshCache = (): Effect.Effect<RefreshCacheResult, FsError> =>
-  Effect.try({
-    try: () => refreshCacheSync(),
-    catch: (cause) => toSyncFsError('refreshCache', cause),
-  });
-
-/** Compute the plan: which skills, commands, agents, rules need to be synced. */
-export const planSync = (): Effect.Effect<SyncPlan, FsError> =>
-  Effect.try({
-    try: () => planSyncSync(),
-    catch: (cause) => toSyncFsError('planSync', cause),
-  });
-
-/** Apply the sync plan to ~/.claude/. */
-export const executeSync = (options: SyncOptions = {}): Effect.Effect<SyncResult, FsError> =>
-  Effect.try({
-    try: () => executeSyncSync(options),
-    catch: (cause) => toSyncFsError('executeSync', cause),
-  });
-
 /** Render the global + project context layers into harness CLAUDE.md files. */
 export const syncContextLayers = (): Effect.Effect<ContextLayerSyncResult, FsError> =>
   Effect.try({
     try: () => syncContextLayersSync(),
     catch: (cause) => toSyncFsError('syncContextLayers', cause),
-  });
-
-/** Plan hook files to be synced (pure). */
-export const planHooksSync = (): Effect.Effect<readonly HookItem[], FsError> =>
-  Effect.try({
-    try: () => planHooksSyncSync(),
-    catch: (cause) => toSyncFsError('planHooksSync', cause),
-  });
-
-/** Apply the hook sync plan to ~/.claude/. */
-export const syncHooks = (): Effect.Effect<HooksSyncResult, FsError> =>
-  Effect.try({
-    try: () => syncHooksSync(),
-    catch: (cause) => toSyncFsError('syncHooks', cause),
-  });
-
-/** Mirror the statusline binary into ~/.claude/bin/. */
-export const syncStatusline = (): Effect.Effect<{ synced: string[]; errors: string[] }, FsError> =>
-  Effect.try({
-    try: () => syncStatuslineSync(),
-    catch: (cause) => toSyncFsError('syncStatusline', cause),
-  });
-
-/** Mirror a project's `skills/` dir into ~/.claude/skills/. */
-export const mirrorProjectSkills = (
-  cwd: string = process.cwd(),
-  opts?: { manifestDir?: string },
-): Effect.Effect<SkillsMirrorResult, FsError> =>
-  Effect.try({
-    try: () => mirrorProjectSkillsSync(cwd, opts),
-    catch: (cause) => toSyncFsError('mirrorProjectSkills', cause),
-  });
-
-/** Inject the Overdeck skills path into `pi` CLI settings (idempotent). */
-export const syncPiSettings = (): Effect.Effect<PiSettingsSyncResult, FsError> =>
-  Effect.try({
-    try: () => syncPiSettingsSync(),
-    catch: (cause) => toSyncFsError('syncPiSettings', cause),
   });

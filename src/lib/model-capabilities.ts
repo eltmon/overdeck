@@ -1,25 +1,5 @@
 import { MODEL_DEPRECATIONS } from './model-deprecations.js';
 import { AUDITED_MODEL_ADDITIONS } from './model-capability-additions.js';
-/**
- * Model Capability Matrix
- *
- * Defines capability scores for each model across different skill dimensions.
- * This enables intelligent model selection based on what the user has enabled
- * rather than static presets.
- *
- * Scores: 0-100 where 100 = best in class
- * Cost: $/1M tokens (input + output average)
- *
- * Last updated: 2026-06-30
- * Sources:
- * - SWE-bench Verified leaderboard (vals.ai)
- * - LiveCodeBench v6
- * - LMSYS Chatbot Arena
- * - Artificial Analysis
- * - Official provider pricing pages
- */
-
-import { Effect } from 'effect';
 import { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW } from './model-context-windows.js';
 import { ModelId } from './settings.js';
 
@@ -1471,39 +1451,3 @@ export function getAllSkillDimensionsSync(): SkillDimension[] {
     'context-length',
   ];
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// All capability queries are pure lookups — additive Effect.sync wrappers.
-
-/** Resolve a (possibly-deprecated) model id to its canonical id. Pure. */
-export const resolveModelId = (modelId: string): Effect.Effect<ModelId> =>
-  Effect.sync(() => resolveModelIdSync(modelId));
-
-/** Look up a model's capability matrix. Pure. */
-export const getModelCapability = (
-  model: ModelId,
-): Effect.Effect<ModelCapability> => Effect.sync(() => getModelCapabilitySync(model));
-
-/** List models ranked best-first for a given skill. Pure. */
-export const getModelsBySkill = (
-  skill: SkillDimension,
-): Effect.Effect<ModelId[]> => Effect.sync(() => getModelsBySkillSync(skill));
-
-/** List models for a specific provider. Pure. */
-export const getModelsForProvider = (
-  provider: ModelCapability['provider'],
-): Effect.Effect<ModelId[]> => Effect.sync(() => getModelsForProviderSync(provider));
-
-/** List the cheapest models ranked best-first. Pure. */
-export const getCheapestModels = (): Effect.Effect<ModelId[]> =>
-  Effect.sync(() => getCheapestModelsSync());
-
-/** Compute the cost-adjusted value score for a model + skill. Pure. */
-export const getValueScore = (
-  model: ModelId,
-  skill: SkillDimension,
-): Effect.Effect<number> => Effect.sync(() => getValueScoreSync(model, skill));
-
-/** Enumerate all known skill dimensions. Pure. */
-export const getAllSkillDimensions = (): Effect.Effect<SkillDimension[]> =>
-  Effect.sync(() => getAllSkillDimensionsSync());

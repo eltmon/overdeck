@@ -394,25 +394,3 @@ export function emitDashboardLifecycleSync(
 export const emitActivityEntry = (
   options: EmitActivityOptions,
 ): Effect.Effect<void> => Effect.sync(() => emitActivityEntrySync(options));
-
-/** Effect-native variant of emitActivityDetailed. */
-export const emitActivityDetailed = (
-  options: EmitDetailedOptions,
-): Effect.Effect<void> => Effect.sync(() => emitActivityDetailedSync(options));
-
-/** Effect-native variant of emitActivityTts. */
-export const emitActivityTts = (
-  options: EmitTtsOptions,
-): Effect.Effect<void> => Effect.sync(() => emitActivityTtsSync(options));
-
-/** Effect-native variant of emitDashboardLifecycle. */
-export const emitDashboardLifecycle = (
-  status: 'started' | 'completed' | 'failed',
-  options: {
-    reason: string;
-    issueId?: string;
-    trigger?: string;
-    durationMs?: number;
-    error?: string;
-  },
-): Effect.Effect<void> => Effect.sync(() => emitDashboardLifecycleSync(status, options));

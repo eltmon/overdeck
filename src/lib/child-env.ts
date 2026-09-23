@@ -113,10 +113,3 @@ export const buildChildEnv = (
   overrides?: Record<string, string>,
 ): Effect.Effect<Record<string, string>> =>
   Effect.sync(() => buildChildEnvSync(baseEnv, overrides));
-
-/** Effect-native variant of buildChildEnvWithoutTmux. Pure — never fails. */
-export const buildChildEnvWithoutTmux = (
-  baseEnv: NodeJS.ProcessEnv = process.env,
-  overrides?: Record<string, string>,
-): Effect.Effect<Record<string, string>> =>
-  Effect.sync(() => buildChildEnvWithoutTmuxSync(baseEnv, overrides));

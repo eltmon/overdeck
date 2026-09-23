@@ -288,18 +288,6 @@ export function formatCVSync(cv: AgentCV): string {
 // CV file IO is sync by design. Read paths return Effect.sync; write paths
 // surface FsError.
 
-/** Load (or create) the CV for an agent. Pure-ish. */
-export const getAgentCV = (agentId: string): Effect.Effect<AgentCV> =>
-  Effect.sync(() => getAgentCVSync(agentId));
-
-/** Persist a CV to disk. */
-export const saveAgentCV = (cv: AgentCV): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => saveAgentCVSync(cv),
-    catch: (cause) =>
-      new FsError({ path: cv.agentId, operation: 'save-agent-cv', cause }),
-  });
-
 /** Mark the start of a work item on an agent's CV. */
 export const startWork = (
   agentId: string,
@@ -311,22 +299,3 @@ export const startWork = (
     catch: (cause) =>
       new FsError({ path: agentId, operation: 'cv-start-work', cause }),
   });
-
-/** Mark completion (success / failure / abandoned). */
-export const completeWork = (
-  ...args: Parameters<typeof completeWorkSync>
-): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => completeWorkSync(...args),
-    catch: (cause) =>
-      new FsError({ path: args[0], operation: 'cv-complete-work', cause }),
-  });
-
-/** Aggregate rankings across all agents. Pure-ish. */
-export const getAgentRankings = (): Effect.Effect<
-  ReturnType<typeof getAgentRankingsSync>
-> => Effect.sync(() => getAgentRankingsSync());
-
-/** Render a CV as text. Pure. */
-export const formatCV = (cv: AgentCV): Effect.Effect<string> =>
-  Effect.sync(() => formatCVSync(cv));

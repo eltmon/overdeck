@@ -561,56 +561,7 @@ export function getAvailableModelsSync(enabledProviders: Set<ModelProvider>): Mo
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 // Pure-sync provider/fallback resolution — additive Effect.sync wrappers.
 
-/** True if the model id is an OpenRouter id. Pure. */
-export const isOpenRouterModel = (modelId: string): Effect.Effect<boolean> =>
-  Effect.sync(() => isOpenRouterModelSync(modelId));
-
-/** Resolve the provider for a model id. Pure. */
-export const getModelProvider = (
-  modelId: ModelId | string,
-): Effect.Effect<ModelProvider> => Effect.sync(() => getModelProviderSync(modelId));
-
-/** Whether the model requires an external (non-Anthropic) API key. Pure. */
-export const requiresExternalKey = (
-  modelId: ModelId | string,
-): Effect.Effect<boolean> => Effect.sync(() => requiresExternalKeySync(modelId));
-
-/** Models for a specific provider. Pure. */
-export const getModelsByProvider = (
-  provider: ModelProvider,
-): Effect.Effect<ModelId[]> => Effect.sync(() => getModelsByProviderSync(provider));
-
-/** Tier-aware fallback resolution. Pure. */
-export const applyTierAwareFallback = (
-  modelId: ModelId,
-  enabledProviders: Set<ModelProvider>,
-  userTier?: SubscriptionPlan,
-): Effect.Effect<ModelId> =>
-  Effect.sync(() => applyTierAwareFallbackSync(modelId, enabledProviders, userTier));
-
-/** Provider-disabled fallback resolution. Pure. */
-export const applyFallback = (
-  modelId: ModelId,
-  enabledProviders: Set<ModelProvider>,
-): Effect.Effect<ModelId> => Effect.sync(() => applyFallbackSync(modelId, enabledProviders));
-
-/** Map a non-Anthropic model to its Anthropic equivalent. Pure. */
-export const getFallbackModel = (modelId: ModelId): Effect.Effect<AnthropicModel> =>
-  Effect.sync(() => getFallbackModelSync(modelId));
-
 /** Detect enabled providers from configured API keys. Pure. */
 export const detectEnabledProviders = (
   apiKeys: Parameters<typeof detectEnabledProvidersSync>[0],
 ): Effect.Effect<Set<ModelProvider>> => Effect.sync(() => detectEnabledProvidersSync(apiKeys));
-
-/** Filter a model list to the ones whose providers are enabled. Pure. */
-export const filterAvailableModels = (
-  models: ModelId[],
-  enabledProviders: Set<ModelProvider>,
-): Effect.Effect<ModelId[]> =>
-  Effect.sync(() => filterAvailableModelsSync(models, enabledProviders));
-
-/** All available models across enabled providers. Pure. */
-export const getAvailableModels = (
-  enabledProviders: Set<ModelProvider>,
-): Effect.Effect<ModelId[]> => Effect.sync(() => getAvailableModelsSync(enabledProviders));

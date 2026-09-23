@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import {
   existsSync,
   readdirSync,
@@ -18,7 +17,6 @@ import {
   compareFileToManifest,
   pruneStaleManifestEntriesSync,
 } from './manifest.js';
-import { FsError } from './errors.js';
 import { isHarnessNativeTarget } from './context-layers/native-instructions.js';
 
 export interface MergeResult {
@@ -357,66 +355,3 @@ export function mergePanSkillsIntoWorkspaceSync(projectPath: string, workspacePa
   writeManifestSync(manifestPath, manifest);
   return result;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Sync FS by design — CLI install/sync paths. Each mutating helper surfaces
-// FsError; the read-only gitignore inspector stays Effect.sync.
-
-/** Merge ~/.claude/skills into a workspace's .claude/skills tree. */
-export const mergeSkillsIntoWorkspace = (
-  workspacePath: string,
-): Effect.Effect<MergeResult, FsError> =>
-  Effect.try({
-    try: () => mergeSkillsIntoWorkspaceSync(workspacePath),
-    catch: (cause) =>
-      new FsError({ path: workspacePath, operation: 'merge-skills', cause }),
-  });
-
-/** Overlay project-specific template files on top of merged skills. */
-export const applyProjectTemplateOverlay = (
-  ...args: Parameters<typeof applyProjectTemplateOverlaySync>
-): Effect.Effect<ReturnType<typeof applyProjectTemplateOverlaySync>, FsError> =>
-  Effect.try({
-    try: () => applyProjectTemplateOverlaySync(...args),
-    catch: (cause) =>
-      new FsError({ path: args[0], operation: 'apply-template-overlay', cause }),
-  });
-
-/** Inspect (and rewrite) a workspace's .gitignore against drift. */
-export const cleanupGitignore = (
-  gitignorePath: string,
-): Effect.Effect<ReturnType<typeof cleanupGitignoreSync>, FsError> =>
-  Effect.try({
-    try: () => cleanupGitignoreSync(gitignorePath),
-    catch: (cause) =>
-      new FsError({ path: gitignorePath, operation: 'cleanup-gitignore', cause }),
-  });
-
-/** Convenience: locate then clean the workspace .gitignore. */
-export const cleanupWorkspaceGitignore = (
-  workspacePath: string,
-): Effect.Effect<ReturnType<typeof cleanupWorkspaceGitignoreSync>, FsError> =>
-  Effect.try({
-    try: () => cleanupWorkspaceGitignoreSync(workspacePath),
-    catch: (cause) =>
-      new FsError({
-        path: workspacePath,
-        operation: 'cleanup-workspace-gitignore',
-        cause,
-      }),
-  });
-
-/** Merge a project's pan-skills overlay (skills + rules) into a workspace. */
-export const mergePanSkillsIntoWorkspace = (
-  projectPath: string,
-  workspacePath: string,
-): Effect.Effect<MergeResult, FsError> =>
-  Effect.try({
-    try: () => mergePanSkillsIntoWorkspaceSync(projectPath, workspacePath),
-    catch: (cause) =>
-      new FsError({
-        path: workspacePath,
-        operation: 'merge-pan-skills',
-        cause,
-      }),
-  });

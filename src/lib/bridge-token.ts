@@ -1,8 +1,6 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
-import { Effect } from 'effect';
-import { FsError } from './errors.js';
 
 import { getOverdeckHome } from './paths.js';
 
@@ -42,27 +40,3 @@ export function writeBridgeTokenSync(agentId: string): string {
   }
   return token;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Read the bridge token for an agent. Returns `null` if no token exists.
- * Effect-native variant — never fails (errors are swallowed to null like the Promise version).
- */
-export const readBridgeToken = (agentId: string): Effect.Effect<string | null> =>
-  Effect.sync(() => readBridgeTokenSync(agentId));
-
-/**
- * Generate and persist a new bridge token. Returns the new token.
- * Effect-native variant — fails with FsError if the write cannot be persisted.
- */
-export const writeBridgeToken = (agentId: string): Effect.Effect<string, FsError> =>
-  Effect.try({
-    try: () => writeBridgeTokenSync(agentId),
-    catch: (cause) =>
-      new FsError({
-        path: getBridgeTokenPath(agentId),
-        operation: 'writeBridgeToken',
-        cause,
-      }),
-  });

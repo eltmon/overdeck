@@ -8,7 +8,6 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { Data, Effect } from 'effect';
 import { OVERDECK_HOME } from '../paths.js';
-import { FsError } from '../errors.js';
 import { RuntimeType } from './interface.js';
 
 const METRICS_FILE = join(OVERDECK_HOME, 'runtime-metrics.json');
@@ -340,54 +339,7 @@ export const loadMetrics = (): Effect.Effect<MetricsData> =>
     catch: () => null,
   }).pipe(Effect.orElseSucceed(() => ({ ...DEFAULT_METRICS })));
 
-/** Effect variant of `saveMetrics`. Lifts FS errors into the FsError channel. */
-export const saveMetrics = (data: MetricsData): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => saveMetricsSync(data),
-    catch: (cause) =>
-      new FsError({ path: METRICS_FILE, operation: 'write', cause }),
-  });
-
-/** Effect variant of `recordTask`. Lifts FS errors into the FsError channel. */
-export const recordTask = (
-  task: Omit<TaskRecord, 'id'>,
-): Effect.Effect<TaskRecord, FsError> =>
-  Effect.try({
-    try: () => recordTaskSync(task),
-    catch: (cause) =>
-      new FsError({ path: METRICS_FILE, operation: 'recordTask', cause }),
-  });
-
-/** Effect variant of `getRuntimeMetrics`. */
-export const getRuntimeMetrics = (
-  runtime: RuntimeType,
-): Effect.Effect<RuntimeMetrics | null> =>
-  Effect.sync(() => getRuntimeMetricsSync(runtime));
-
-/** Effect variant of `getAllRuntimeMetrics`. */
-export const getAllRuntimeMetrics = (): Effect.Effect<
-  Partial<Record<RuntimeType, RuntimeMetrics>>
-> => Effect.sync(() => getAllRuntimeMetricsSync());
-
-/** Effect variant of `getAggregatedMetrics`. */
-export const getAggregatedMetrics = (): Effect.Effect<
-  ReturnType<typeof getAggregatedMetricsSync>
-> => Effect.sync(() => getAggregatedMetricsSync());
-
 /** Effect variant of `getIssueTasks`. */
 export const getIssueTasks = (
   issueId: string,
 ): Effect.Effect<TaskRecord[]> => Effect.sync(() => getIssueTasksSync(issueId));
-
-/** Effect variant of `getRecentTasks`. */
-export const getRecentTasks = (
-  limit: number = 50,
-): Effect.Effect<TaskRecord[]> => Effect.sync(() => getRecentTasksSync(limit));
-
-/** Effect variant of `clearMetrics`. */
-export const clearMetrics = (): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => clearMetricsSync(),
-    catch: (cause) =>
-      new FsError({ path: METRICS_FILE, operation: 'clearMetrics', cause }),
-  });

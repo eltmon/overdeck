@@ -150,32 +150,9 @@ export function findPrdAnywhereSync(
 // Path-only helpers stay synchronous. Draft discovery uses the promise-based
 // filesystem door so resource refreshes never block the dashboard event loop.
 
-/** Effect variant of {@link canonicalPrdSubdirSync}. */
-export const canonicalPrdSubdir = (
-  projectPath: string,
-  issueId: string,
-  status: Exclude<PrdStatus, 'draft'>,
-): Effect.Effect<string, never> =>
-  Effect.sync(() => canonicalPrdSubdirSync(projectPath, issueId, status));
-
-/** Effect variant of {@link findPrdAtStatusSync}. */
-export const findPrdAtStatus = (
-  projectPath: string,
-  issueId: string,
-  status: Exclude<PrdStatus, 'draft'>,
-): Effect.Effect<PrdLocation | null, never> =>
-  Effect.sync(() => findPrdAtStatusSync(projectPath, issueId, status));
-
 /** Async Effect variant of {@link findDraftPrdAsync}. */
 export const findDraftPrd = (
   projectPath: string,
   issueId: string,
 ): Effect.Effect<PrdLocation | null, never> =>
   Effect.promise(() => findDraftPrdAsync(projectPath, issueId));
-
-/** Effect variant of {@link findPrdAnywhereSync}. */
-export const findPrdAnywhere = (
-  projectPath: string,
-  issueId: string,
-): Effect.Effect<PrdLocation | null, never> =>
-  Effect.sync(() => findPrdAnywhereSync(projectPath, issueId));

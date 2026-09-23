@@ -351,10 +351,6 @@ export function getAgentCommandSync(modelId: ModelId | string): { command: strin
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 // Sync FS wrappers (CLI-only by design); pure helpers stay Effect.sync.
 
-/** Load settings.json (returns defaults if missing). Pure-ish (logs on parse error). */
-export const loadSettings = (): Effect.Effect<SettingsConfig> =>
-  Effect.sync(() => loadSettingsSync());
-
 /** Persist settings.json; surfaces FsError on failure. */
 export const saveSettings = (
   settings: SettingsConfig,
@@ -364,34 +360,3 @@ export const saveSettings = (
     catch: (cause) =>
       new FsError({ path: SETTINGS_FILE, operation: 'save-settings', cause }),
   });
-
-/** Validate a settings object; returns null when valid, error message otherwise. Pure. */
-export const validateSettings = (
-  settings: SettingsConfig,
-): Effect.Effect<string | null> => Effect.sync(() => validateSettingsSync(settings));
-
-/** Default settings template. Pure. */
-export const getDefaultSettings = (): Effect.Effect<SettingsConfig> =>
-  Effect.sync(() => getDefaultSettingsSync());
-
-/** Compute the available-model breakdown for a settings object. Pure. */
-export const getAvailableModels = (
-  settings: SettingsConfig,
-): Effect.Effect<ReturnType<typeof getAvailableModelsSync>> =>
-  Effect.sync(() => getAvailableModelsSync(settings));
-
-/** True if the model id maps to an Anthropic model. Pure. */
-export const isAnthropicModel = (
-  modelId: ModelId | string,
-): Effect.Effect<boolean> => Effect.sync(() => isAnthropicModelSync(modelId));
-
-/** Resolve the `--model` flag value for `claude` CLI. Pure. */
-export const getClaudeModelFlag = (
-  modelId: ModelId | string,
-): Effect.Effect<string> => Effect.sync(() => getClaudeModelFlagSync(modelId));
-
-/** Resolve the full spawn command + args for a model. Pure. */
-export const getAgentCommand = (
-  modelId: ModelId | string,
-): Effect.Effect<{ command: string; args: string[] }> =>
-  Effect.sync(() => getAgentCommandSync(modelId));

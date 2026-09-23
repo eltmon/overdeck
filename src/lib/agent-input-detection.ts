@@ -389,17 +389,6 @@ export const detectAwaitingInputForAgent = (
       }),
   })
 
-/**
- * Capture the pane and return the detection synchronously. This is a pure
- * function over a captured string — exported for symmetry, useful when the
- * caller already has the pane text in hand.
- */
-export const detectAwaitingInputFromPane = (
-  pane: string,
-  options: { isPlanning?: boolean } = {},
-): Effect.Effect<AwaitingInputDetection | null> =>
-  Effect.sync(() => detectAwaitingInputFromPaneSync(pane, options))
-
 export interface CodexApprovalPrompt {
   /** The "Would you like to …?" header line. */
   header: string

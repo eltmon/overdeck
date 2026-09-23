@@ -6,9 +6,7 @@
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { Effect } from 'effect';
 import { OVERDECK_HOME } from '../paths.js';
-import { FsError } from '../errors.js';
 
 const SESSION_MAP_FILE = join(OVERDECK_HOME, 'session-map.json');
 
@@ -263,91 +261,3 @@ export function updateSessionFromJSONLSync(
 
   return session;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Effect variant of loadSessionMap. */
-export const loadSessionMap = (): Effect.Effect<SessionMapData, FsError> =>
-  Effect.try({
-    try: () => loadSessionMapSync(),
-    catch: (cause) => new FsError({ path: SESSION_MAP_FILE, operation: 'loadSessionMap', cause }),
-  });
-
-/** Effect variant of saveSessionMap. */
-export const saveSessionMap = (
-  data: SessionMapData,
-): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => saveSessionMapSync(data),
-    catch: (cause) => new FsError({ path: SESSION_MAP_FILE, operation: 'saveSessionMap', cause }),
-  });
-
-/** Effect variant of linkSessionToIssue. */
-export const linkSessionToIssue = (
-  sessionId: string,
-  issueId: string,
-  options: Parameters<typeof linkSessionToIssueSync>[2] = {},
-): Effect.Effect<SessionRecord, FsError> =>
-  Effect.try({
-    try: () => linkSessionToIssueSync(sessionId, issueId, options),
-    catch: (cause) => new FsError({ path: SESSION_MAP_FILE, operation: 'linkSessionToIssue', cause }),
-  });
-
-/** Effect variant of completeSession. */
-export const completeSession = (
-  sessionId: string,
-  issueId: string,
-  usage?: Parameters<typeof completeSessionSync>[2],
-): Effect.Effect<SessionRecord | null, FsError> =>
-  Effect.try({
-    try: () => completeSessionSync(sessionId, issueId, usage),
-    catch: (cause) => new FsError({ path: SESSION_MAP_FILE, operation: 'completeSession', cause }),
-  });
-
-/** Effect variant of getIssueSessions. */
-export const getIssueSessions = (
-  issueId: string,
-): Effect.Effect<SessionRecord[], FsError> =>
-  Effect.try({
-    try: () => getIssueSessionsSync(issueId),
-    catch: (cause) => new FsError({ path: SESSION_MAP_FILE, operation: 'getIssueSessions', cause }),
-  });
-
-/** Effect variant of getIssueCostSummary. */
-export const getIssueCostSummary = (
-  issueId: string,
-): Effect.Effect<ReturnType<typeof getIssueCostSummarySync>, FsError> =>
-  Effect.try({
-    try: () => getIssueCostSummarySync(issueId),
-    catch: (cause) => new FsError({ path: SESSION_MAP_FILE, operation: 'getIssueCostSummary', cause }),
-  });
-
-/** Effect variant of getAllIssuesWithCosts. */
-export const getAllIssuesWithCosts = (): Effect.Effect<
-  ReturnType<typeof getAllIssuesWithCostsSync>,
-  FsError
-> =>
-  Effect.try({
-    try: () => getAllIssuesWithCostsSync(),
-    catch: (cause) => new FsError({ path: SESSION_MAP_FILE, operation: 'getAllIssuesWithCosts', cause }),
-  });
-
-/** Effect variant of findSessionById. */
-export const findSessionById = (
-  sessionId: string,
-): Effect.Effect<{ issueId: string; session: SessionRecord } | null, FsError> =>
-  Effect.try({
-    try: () => findSessionByIdSync(sessionId),
-    catch: (cause) => new FsError({ path: SESSION_MAP_FILE, operation: 'findSessionById', cause }),
-  });
-
-/** Effect variant of updateSessionFromJSONL. */
-export const updateSessionFromJSONL = (
-  sessionId: string,
-  issueId: string,
-  usage: Parameters<typeof updateSessionFromJSONLSync>[2],
-): Effect.Effect<SessionRecord | null, FsError> =>
-  Effect.try({
-    try: () => updateSessionFromJSONLSync(sessionId, issueId, usage),
-    catch: (cause) => new FsError({ path: SESSION_MAP_FILE, operation: 'updateSessionFromJSONL', cause }),
-  });

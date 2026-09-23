@@ -687,17 +687,6 @@ export function clearCredentialFileAuthSync(workspacePath: string): void {
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
-/** Effect variant of {@link getProviderForModelSync}. Pure lookup; cannot fail. */
-export const getProviderForModel = (modelId: ModelId | string): Effect.Effect<ProviderConfig, never> =>
-  Effect.sync(() => getProviderForModelSync(modelId));
-
-/** Effect variant of {@link getProviderEnvSync}. Pure transform; cannot fail. */
-export const getProviderEnv = (
-  provider: ProviderConfig,
-  apiKey: string,
-): Effect.Effect<Record<string, string>, never> =>
-  Effect.sync(() => getProviderEnvSync(provider, apiKey));
-
 /** Effect variant of {@link setupCredentialFileAuthSync}. */
 export const setupCredentialFileAuth = (
   provider: ProviderConfig,

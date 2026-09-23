@@ -14,11 +14,9 @@
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
-import { Effect } from 'effect';
 
 import { LOGS_DIR, OVERDECK_HOME, packageRoot } from './paths.js';
 import { readPlatformConfigSync } from './platform-lifecycle.js';
-import { ProcessSpawnError } from './errors.js';
 import { readActiveDashboardBundleSync } from './deploy/active-dashboard-bundle.js';
 
 const SUPERVISOR_PID_PATH = join(OVERDECK_HOME, 'supervisor.pid');
@@ -190,38 +188,3 @@ export function stopSupervisorProcessSync(): void {
     // ignore
   }
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Read the configured supervisor port. Pure. */
-export const getSupervisorPort = (): Effect.Effect<number> =>
-  Effect.sync(() => getSupervisorPortSync());
-
-/** Public URL the frontend hits for the Force Restart fallback. Pure. */
-export const getSupervisorUrl = (): Effect.Effect<string> =>
-  Effect.sync(() => getSupervisorUrlSync());
-
-/** Liveness probe — true if the supervisor pid file maps to a live process. */
-export const isSupervisorRunning = (): Effect.Effect<boolean> =>
-  Effect.sync(() => isSupervisorRunningSync());
-
-/**
- * Idempotently start the supervisor sidecar. Fails with ProcessSpawnError
- * if the supervisor bundle could not be resolved or the child failed to
- * detach. Successful no-op when already running.
- */
-export const startSupervisorProcess = (): Effect.Effect<void, ProcessSpawnError> =>
-  Effect.try({
-    try: () => startSupervisorProcessSync(),
-    catch: (cause) =>
-      new ProcessSpawnError({
-        command: process.execPath,
-        args: ['<supervisor-bundle>'],
-        message: 'startSupervisorProcess failed',
-        cause,
-      }),
-  });
-
-/** Stop the supervisor sidecar and remove its pid file. */
-export const stopSupervisorProcess = (): Effect.Effect<void> =>
-  Effect.sync(() => stopSupervisorProcessSync());

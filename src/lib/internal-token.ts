@@ -21,10 +21,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
-import { Effect } from 'effect';
 
 import { getOverdeckHome } from './paths.js';
-import { FsError } from './errors.js';
 
 export const INTERNAL_TOKEN_HEADER = 'x-overdeck-internal-token';
 const TOKEN_FILE_NAME = 'internal-token';
@@ -103,24 +101,3 @@ export function ensureInternalTokenSync(): string {
 export function _resetInternalTokenCacheForTests(): void {
   cachedToken = undefined;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Effect-native variant of getInternalToken. Returns the resolved token or
- * null; never fails — read errors collapse to null like the underlying
- * function. Wrapped to compose with Effect call sites.
- */
-export const getInternalToken = (): Effect.Effect<string | null, never> =>
-  Effect.sync(() => getInternalTokenSync());
-
-/**
- * Effect-native variant of ensureInternalToken. Fails with FsError if the
- * overdeck home directory or token file cannot be written.
- */
-export const ensureInternalToken = (): Effect.Effect<string, FsError> =>
-  Effect.try({
-    try: () => ensureInternalTokenSync(),
-    catch: (cause) =>
-      new FsError({ path: tokenFilePath(), operation: 'ensureInternalToken', cause }),
-  });

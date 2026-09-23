@@ -136,15 +136,6 @@ export function getRetentionStatusSync(retentionDays: number = 90): {
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
-/** Effect variant of pruneOldEvents. */
-export const pruneOldEvents = (
-  retentionDays: number = 90,
-): Effect.Effect<RetentionStats, FsError> =>
-  Effect.try({
-    try: () => pruneOldEventsSync(retentionDays),
-    catch: (cause) => new FsError({ path: '<events>', operation: 'pruneOldEvents', cause }),
-  });
-
 /** Effect variant of needsPruning. */
 export const needsPruning = (
   retentionDays: number = 90,
@@ -152,22 +143,4 @@ export const needsPruning = (
   Effect.try({
     try: () => needsPruningSync(retentionDays),
     catch: (cause) => new FsError({ path: '<events>', operation: 'needsPruning', cause }),
-  });
-
-/** Effect variant of getRetentionStatus. */
-export const getRetentionStatus = (
-  retentionDays: number = 90,
-): Effect.Effect<
-  {
-    totalEvents: number;
-    oldestEventTs: string | null;
-    oldestEventAge: number;
-    needsPruning: boolean;
-    eventsToRemove: number;
-  },
-  FsError
-> =>
-  Effect.try({
-    try: () => getRetentionStatusSync(retentionDays),
-    catch: (cause) => new FsError({ path: '<events>', operation: 'getRetentionStatus', cause }),
   });

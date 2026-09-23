@@ -143,17 +143,6 @@ export const createBackup = (
   });
 
 /**
- * Enumerate existing backups, sorted newest-first.
- * Effect-native. Fails with FsError if the backups directory cannot be read.
- */
-export const listBackups = (): Effect.Effect<readonly BackupInfo[], FsError> =>
-  Effect.try({
-    try: () => listBackupsSync(),
-    catch: (cause) =>
-      new FsError({ path: BACKUPS_DIR, operation: 'listBackups', cause }),
-  });
-
-/**
  * Restore a named backup, replacing each target directory. Fails with
  * FsNotFoundError if the backup does not exist, FsError otherwise.
  */
@@ -171,17 +160,4 @@ export const restoreBackup = (
       catch: (cause) =>
         new FsError({ path: backupPath, operation: 'restoreBackup', cause }),
     });
-  });
-
-/**
- * Trim the backups directory to the most recent `keepCount` entries.
- * Returns the number of backups removed. Fails with FsError on removal error.
- */
-export const cleanOldBackups = (
-  keepCount: number = 10,
-): Effect.Effect<number, FsError> =>
-  Effect.try({
-    try: () => cleanOldBackupsSync(keepCount),
-    catch: (cause) =>
-      new FsError({ path: BACKUPS_DIR, operation: 'cleanOldBackups', cause }),
   });

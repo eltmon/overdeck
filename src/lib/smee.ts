@@ -369,19 +369,3 @@ export const stopSmeeClient = (): Effect.Effect<void, ProcessSpawnError> =>
         cause,
       }),
   });
-
-/** Liveness probe — true if the in-process client is connected. */
-export const isSmeeRunning = (): Effect.Effect<boolean> =>
-  Effect.sync(() => isSmeeRunningSync());
-
-/** Start the detached smee subprocess (idempotent). */
-export const startSmeeProcess = (): Effect.Effect<void> =>
-  Effect.sync(() => startSmeeProcessSync());
-
-/** Stop the detached smee subprocess and clean up the pid file. */
-export const stopSmeeProcess = (): Effect.Effect<void> =>
-  Effect.sync(() => stopSmeeProcessSync());
-
-/** Probe the smee subprocess via its pidfile. */
-export const isSmeeProcessRunning = (): Effect.Effect<boolean> =>
-  Effect.sync(() => isSmeeProcessRunningSync());

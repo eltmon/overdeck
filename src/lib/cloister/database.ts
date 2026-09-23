@@ -406,20 +406,6 @@ export const writeHealthEvent = (
       }),
   });
 
-/** Effect variant of `writeHealthEvents`. */
-export const writeHealthEvents = (
-  events: Omit<HealthEvent, 'id'>[],
-): Effect.Effect<number, CloisterDatabaseError> =>
-  Effect.try({
-    try: () => writeHealthEventsSync(events),
-    catch: (cause) =>
-      new CloisterDatabaseError({
-        operation: 'writeHealthEvents',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
 /** Effect variant of `getHealthHistory`. */
 export const getHealthHistory = (
   agentId: string,
@@ -431,110 +417,6 @@ export const getHealthHistory = (
     catch: (cause) =>
       new CloisterDatabaseError({
         operation: 'getHealthHistory',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `getRecentHealthHistory`. */
-export const getRecentHealthHistory = (
-  agentId: string,
-  limit?: number,
-): Effect.Effect<HealthEventWithMetadata[], CloisterDatabaseError> =>
-  Effect.try({
-    try: () => getRecentHealthHistorySync(agentId, limit),
-    catch: (cause) =>
-      new CloisterDatabaseError({
-        operation: 'getRecentHealthHistory',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `getAllHealthHistory`. */
-export const getAllHealthHistory = (
-  startTime: string,
-  endTime: string,
-): Effect.Effect<HealthEventWithMetadata[], CloisterDatabaseError> =>
-  Effect.try({
-    try: () => getAllHealthHistorySync(startTime, endTime),
-    catch: (cause) =>
-      new CloisterDatabaseError({
-        operation: 'getAllHealthHistory',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `getLatestHealthEvent`. */
-export const getLatestHealthEvent = (
-  agentId: string,
-): Effect.Effect<HealthEventWithMetadata | null, CloisterDatabaseError> =>
-  Effect.try({
-    try: () => getLatestHealthEventSync(agentId),
-    catch: (cause) =>
-      new CloisterDatabaseError({
-        operation: 'getLatestHealthEvent',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `getAgentsWithHistory`. */
-export const getAgentsWithHistory = (): Effect.Effect<string[], CloisterDatabaseError> =>
-  Effect.try({
-    try: () => getAgentsWithHistorySync(),
-    catch: (cause) =>
-      new CloisterDatabaseError({
-        operation: 'getAgentsWithHistory',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `cleanupOldEvents`. */
-export const cleanupOldEvents = (
-  retentionDays?: number,
-): Effect.Effect<number, CloisterDatabaseError> =>
-  Effect.try({
-    try: () => cleanupOldEventsSync(getHealthDatabase(), retentionDays),
-    catch: (cause) =>
-      new CloisterDatabaseError({
-        operation: 'cleanupOldEvents',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `deleteAgentHistory`. */
-export const deleteAgentHistory = (
-  agentId: string,
-): Effect.Effect<number, CloisterDatabaseError> =>
-  Effect.try({
-    try: () => deleteAgentHistorySync(agentId),
-    catch: (cause) =>
-      new CloisterDatabaseError({
-        operation: 'deleteAgentHistory',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/** Effect variant of `getDatabaseStats`. */
-export const getDatabaseStats = (): Effect.Effect<
-  {
-    totalEvents: number;
-    uniqueAgents: number;
-    oldestEvent: string | null;
-    newestEvent: string | null;
-  },
-  CloisterDatabaseError
-> =>
-  Effect.try({
-    try: () => getDatabaseStatsSync(),
-    catch: (cause) =>
-      new CloisterDatabaseError({
-        operation: 'getDatabaseStats',
         message: cause instanceof Error ? cause.message : String(cause),
         cause,
       }),

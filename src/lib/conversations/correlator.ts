@@ -1,12 +1,3 @@
-/**
- * Correlator — links discovered sessions to Overdeck-managed conversations (PAN-457).
- *
- * Queries the `conversations` table for session_file matches and the
- * `cost_events` table for session_id matches to determine if a discovered
- * JSONL file was spawned by Overdeck.
- */
-
-import { Effect } from 'effect';
 import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
 import { sessionFilePath } from '../paths.js';
 
@@ -164,16 +155,4 @@ export function mergeCorrelation(
     actualCost: base?.actualCost ?? override.actualCost,
     costEventCount: base?.costEventCount ?? override.costEventCount,
   };
-}
-
-// ─── Effect variant (PAN-1249, additive) ─────────────────────────────────────
-//
-// Additive Effect wrapper — the existing function is purely synchronous DB
-// access, so this is just a sync lift for callers that compose with Effect.
-
-/** Effect variant of buildCorrelationMap — pure sync lift. */
-export function buildCorrelationMap(
-  jsonlPaths: string[],
-): Effect.Effect<Map<string, CorrelationResult>> {
-  return Effect.sync(() => buildCorrelationMapSync(jsonlPaths));
 }

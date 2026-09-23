@@ -1292,10 +1292,3 @@ export const getProject = (key: string): Effect.Effect<ProjectConfig | null, Con
 /** Effect variant of {@link hasProjectsSync}. */
 export const hasProjects = (): Effect.Effect<boolean, ConfigParseError | FsError> =>
   loadProjectsConfig().pipe(Effect.map((config) => Object.keys(config.projects).length > 0));
-
-/** Effect variant of {@link initializeProjectsConfigSync}. */
-export const initializeProjectsConfig = (): Effect.Effect<void, FsError> =>
-  Effect.try({
-    try: () => initializeProjectsConfigSync(),
-    catch: (cause) => new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'initializeProjectsConfig', cause }),
-  });

@@ -204,42 +204,6 @@ export function extractStandardNumberSync(issueId: string): number | null {
 // reads the filesystem but is wrapped sync-only to mirror the existing API
 // (it's used from CLI entry points where sync FS is acceptable).
 
-/** Parse an issue id into prefix/number/format. Pure. */
-export const parseIssueId = (
-  issueId: string,
-  projectConfig?: ProjectConfig,
-): Effect.Effect<ParsedIssueId | null> =>
-  Effect.sync(() => parseIssueIdSync(issueId, projectConfig));
-
-/** Extract the team/project prefix. Pure. */
-export const extractPrefix = (issueId: string): Effect.Effect<string | null> =>
-  Effect.sync(() => extractPrefixSync(issueId));
-
-/** Extract the numeric portion. Pure. */
-export const extractNumber = (issueId: string): Effect.Effect<number | null> =>
-  Effect.sync(() => extractNumberSync(issueId));
-
 /** Lowercase filesystem-safe form. Pure. */
 export const normalizeIssueId = (issueId: string): Effect.Effect<string> =>
   Effect.sync(() => normalizeIssueIdSync(issueId));
-
-/** Resolve either a raw issue id or an agent session name to canonical id. Pure. */
-export const resolveIssueId = (input: string): Effect.Effect<string> =>
-  Effect.sync(() => resolveIssueIdSync(input));
-
-/** Resolve a bare numeric id by probing local agent state (sync FS). */
-export const resolveBareNumericId = (
-  input: string,
-  overdeckHome?: string,
-): Effect.Effect<string | null> =>
-  Effect.sync(() => resolveBareNumericIdSync(input, overdeckHome));
-
-/** Extract prefix from a standard `PREFIX-NUMBER` id only. Pure. */
-export const extractStandardPrefix = (
-  issueId: string,
-): Effect.Effect<string | null> => Effect.sync(() => extractStandardPrefixSync(issueId));
-
-/** Extract number from a standard `PREFIX-NUMBER` id only. Pure. */
-export const extractStandardNumber = (
-  issueId: string,
-): Effect.Effect<number | null> => Effect.sync(() => extractStandardNumberSync(issueId));
