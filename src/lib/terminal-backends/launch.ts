@@ -25,9 +25,10 @@ import { Effect } from 'effect';
 import { AGENT_ID_TOKEN } from './herdr.js';
 import './tmux.js';
 import { resolveTerminalBackend } from './registry.js';
-import { hostTerminalBackendName } from './select.js';
+import { hostTerminalBackendName, probeHerdrAvailability } from './select.js';
 import {
   isUnsupported,
+  TerminalBackendUnavailableError,
   type AgentDetectionPolicy,
   type AgentPaneRef,
   type AgentRole,
@@ -66,9 +67,22 @@ export function detectionPolicyFor(harness: string): AgentDetectionPolicy {
   return harness === 'claude-code' ? 'required' : 'not-required';
 }
 
-/** The backend this host launches into, with both adapters registered. */
+/**
+ * The backend this host launches into, with both adapters registered.
+ *
+ * PAN-3956 FR-3: when the policy is Herdr and Herdr cannot serve (no binary, or
+ * no session socket for this home), this throws
+ * `TerminalBackendUnavailableError` naming `pan install` — it never resolves
+ * the tmux adapter from a `herdr` policy. The probe runs on every call (never
+ * memoized), so a session server started after boot is picked up at once.
+ */
 export async function resolveLaunchBackend(): Promise<TerminalBackend> {
-  return resolveTerminalBackend(await hostTerminalBackendName());
+  const name = await hostTerminalBackendName();
+  if (name === 'herdr') {
+    const probe = await probeHerdrAvailability();
+    if (!probe.available) throw new TerminalBackendUnavailableError('herdr', probe.reason ?? 'unknown');
+  }
+  return resolveTerminalBackend(name);
 }
 
 /**
@@ -218,15 +232,26 @@ async function closeThrough(backend: TerminalBackend, pane: AgentPaneRef): Promi
  * Never throws. Returns true when a pane or session was closed.
  */
 export async function closeAgentPane(agentId: string, backend?: TerminalBackend): Promise<boolean> {
-  let resolved: TerminalBackend;
-  try {
-    resolved = backend ?? (await resolveLaunchBackend());
-  } catch {
-    return false;
-  }
   const { sessionExists } = await import('../tmux.js');
   const tmuxSessionLive = (): Promise<boolean> =>
     Effect.runPromise(sessionExists(agentId)).catch(() => false);
+
+  let resolved: TerminalBackend;
+  try {
+    resolved = backend ?? (await resolveLaunchBackend());
+  } catch (error) {
+    // PAN-3956: Herdr is selected but down. Its panes cannot be reached, but a
+    // legacy tmux session of this name still can — stop must not regress to a
+    // no-op on the host that most needs it.
+    if (!(error instanceof TerminalBackendUnavailableError) || !(await tmuxSessionLive())) return false;
+    return await closeThrough(resolveTerminalBackend('tmux'), {
+      backend: 'tmux',
+      workspaceId: agentId,
+      paneId: agentId,
+      terminalId: agentId,
+      agentName: agentId,
+    });
+  }
 
   if (resolved.name === 'tmux') {
     if (!(await tmuxSessionLive())) return false;

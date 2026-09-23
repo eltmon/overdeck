@@ -7,14 +7,17 @@
  * directory. The terminal backend owns session liveness and state (D10), so we
  * read it and keep the answer in memory only.
  *
- * Two sources, in order:
- *   1. The registered terminal backend (`list()` for the snapshot, `events()`
- *      folded on top of it). Herdr is the default.
- *   2. The tmux fallback, which reads the same inventory today's
- *      `src/lib/agents/liveness.ts` reads: the managed tmux server's sessions
- *      and their panes. Issue and role come from the session name; the tmux
- *      adapter reports no metadata tokens (FR-3), so harness and model are
- *      `unknown` there.
+ * One source, chosen by the host's backend POLICY (PAN-3956 D8):
+ *   - Herdr (the default): the adapter's `list()` for the snapshot, `events()`
+ *     folded on top of it. When `list()` fails or reports unsupported, the
+ *     last-known panes are served (or `[]` with no cache) and one warning is
+ *     logged per failure streak — a Herdr host NEVER reads tmux, so a Herdr
+ *     outage cannot make every agent look dead or alive by accident.
+ *   - tmux (explicit policy, or no adapter registered): the tmux probe IS the
+ *     inventory. It reads what `src/lib/agents/liveness.ts` reads: the managed
+ *     tmux server's sessions and their panes. Issue and role come from the
+ *     session name; the tmux adapter reports no metadata tokens (FR-3), so
+ *     harness and model are `unknown` there.
  */
 
 import { Effect } from 'effect';
@@ -23,9 +26,13 @@ import type {
   AgentState,
   BackendPane,
 } from '@overdeck/contracts';
-import { isUnsupported, type BackendEvent, type TerminalBackend } from '../../../lib/terminal-backends/types.js';
+import { isUnsupported, type BackendEvent, type TerminalBackend, type Unsupported } from '../../../lib/terminal-backends/types.js';
 import { resolveTerminalBackend } from '../../../lib/terminal-backends/registry.js';
-import { selectTerminalBackend, type TerminalBackendConfig } from '../../../lib/terminal-backends/select.js';
+import {
+  hostTerminalBackendName,
+  selectTerminalBackend,
+  type TerminalBackendConfig,
+} from '../../../lib/terminal-backends/select.js';
 import { paneFromBackendSnapshot } from '../../../lib/overdeck/derived-issue-state.js';
 
 /** How long a pane may sit without output before the tmux fallback calls it idle. */
@@ -43,7 +50,7 @@ export interface TmuxPaneProbe {
 
 export interface BackendInventoryDeps {
   /**
-   * Adapter to read. Pass `null` to force the tmux fallback. Omitted in
+   * Adapter to read. Pass `null` to force the tmux probe. Omitted in
    * production: the inventory selects and resolves the adapter itself.
    */
   readonly backend?: TerminalBackend | null;
@@ -167,19 +174,30 @@ async function probeTmuxPanes(): Promise<readonly TmuxPaneProbe[]> {
 
 /**
  * The adapter to read, or `null` when none is registered (nothing imported
- * `src/lib/terminal-backends/herdr.js`) — then the tmux fallback answers.
+ * `src/lib/terminal-backends/herdr.js`) — then the tmux probe answers. The
+ * name is the host POLICY (`hostTerminalBackendName`: env → config.yaml →
+ * default herdr), never an availability probe; tests may pass `config`.
  */
 async function resolveBackend(deps: BackendInventoryDeps): Promise<TerminalBackend | null> {
   if (deps.backend !== undefined) return deps.backend;
-  const selection = await selectTerminalBackend(deps.config ?? {});
+  const name = deps.config
+    ? (await selectTerminalBackend(deps.config)).backend
+    : await hostTerminalBackendName();
   try {
-    return resolveTerminalBackend(selection.backend);
+    return resolveTerminalBackend(name);
   } catch {
     return null;
   }
 }
 
-/** Every live agent pane, from the backend if it answers and from tmux otherwise. */
+/** True while the Herdr inventory is failing — one warning per failure streak. */
+let inventoryDegraded = false;
+
+/**
+ * Every live agent pane. Under a Herdr policy the adapter is the only source:
+ * a failed read serves the last-known panes, never tmux (PAN-3956 D8). Under a
+ * tmux policy (or with no adapter registered) the tmux probe is the inventory.
+ */
 export async function listBackendPanes(
   deps: BackendInventoryDeps = {},
   previous?: BackendPaneCache,
@@ -187,7 +205,27 @@ export async function listBackendPanes(
   const now = (deps.now ?? Date.now)();
   const backend = await resolveBackend(deps);
 
+  if (backend?.name === 'herdr') {
+    const result = await Effect.runPromise(
+      backend.list().pipe(Effect.catch((error) => Effect.succeed({ failed: String(error) }))),
+    );
+    if (!('failed' in result) && !isUnsupported(result)) {
+      if (inventoryDegraded) {
+        inventoryDegraded = false;
+        console.log('[backend-inventory] herdr inventory restored');
+      }
+      return result.map((snapshot) => paneFromBackendSnapshot(snapshot, now, previous?.get(snapshot.paneId)));
+    }
+    const reason = 'failed' in result ? result.failed : (result as Unsupported).reason;
+    if (!inventoryDegraded) {
+      inventoryDegraded = true;
+      console.warn(`[backend-inventory] herdr inventory unavailable (${reason}); serving last-known panes`);
+    }
+    return previous?.list() ?? [];
+  }
+
   if (backend) {
+    // An explicit non-herdr adapter that can list answers first.
     const result = await Effect.runPromise(
       backend.list().pipe(Effect.catch(() => Effect.succeed(null))),
     );
@@ -196,6 +234,7 @@ export async function listBackendPanes(
     }
   }
 
+  // tmux policy (or no adapter registered): the tmux probe is the inventory.
   const probes = await (deps.listTmuxPanes ?? probeTmuxPanes)();
   const idleThresholdMs = deps.idleThresholdMs ?? TMUX_IDLE_THRESHOLD_MS;
   return probes
@@ -399,6 +438,7 @@ export function stopBackendInventory(): void {
 /** Test seam: drop the process-wide cache. */
 export function _resetBackendInventoryForTests(): void {
   cache = null;
+  inventoryDegraded = false;
   refreshedAt = 0;
   inFlight = null;
   eventStreamClose = null;

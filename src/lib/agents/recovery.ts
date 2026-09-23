@@ -168,7 +168,9 @@ export async function restartAgent(
   const resolveRestartHarness = deps.resolveHarness ?? resolveHarness;
   const prepareRestartHarness = deps.prepareHarnessLaunch ?? prepareHarnessLaunch;
   // Backend-aware (PAN-3960): a live tmux session or a live Herdr agent.
-  const restartSessionExists = deps.sessionExists ?? ((id: string) => agentPaneExists(id));
+  // A liveness read: an unavailable backend (PAN-3956) is "no session" here, and
+  // the launch below reports the TerminalBackendUnavailableError as a failure.
+  const restartSessionExists = deps.sessionExists ?? ((id: string) => agentPaneExists(id).catch(() => false));
   const sendRestartWarning = deps.sendGracefulRestartWarning ?? sendGracefulRestartWarning;
   const stopRestartAgent = deps.stopAgent
     ?? ((id: string) => Effect.runPromise(stopAgent(id)));

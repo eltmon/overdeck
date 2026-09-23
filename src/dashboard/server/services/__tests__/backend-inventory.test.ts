@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BackendAgentSnapshot } from '@overdeck/contracts';
 
 import {
@@ -110,8 +110,56 @@ describe('listBackendPanes — Herdr fixture', () => {
     expect(HERDR_SNAPSHOT[2]?.tokens.issue).toBeUndefined();
   });
 
-  it('falls back to tmux when the adapter reports the inventory unsupported', async () => {
+  // PAN-3956 D8: a Herdr host never reads tmux as a fallback inventory.
+  it('serves the last-known panes and never reads tmux when the herdr adapter reports unsupported', async () => {
+    const previous = new BackendPaneCache(await listBackendPanes({ backend: herdrBackend(), now: () => NOW }));
     const backend = { name: 'herdr', list: () => Effect.succeed(unsupported('no session')) } as unknown as TerminalBackend;
+    const listTmuxPanes = vi.fn(async () => TMUX_PROBES);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const panes = await listBackendPanes({ backend, now: () => NOW, listTmuxPanes }, previous);
+      expect(panes).toEqual(previous.list());
+      expect(listTmuxPanes).not.toHaveBeenCalled();
+      // One warning per failure streak, not per poll.
+      await listBackendPanes({ backend, now: () => NOW, listTmuxPanes }, previous);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]?.[0])).toContain('no session');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('serves the last-known panes when the herdr list() fails outright', async () => {
+    const previous = new BackendPaneCache(await listBackendPanes({ backend: herdrBackend(), now: () => NOW }));
+    const backend = {
+      name: 'herdr',
+      list: () => Effect.fail(new Error('socket refused')),
+    } as unknown as TerminalBackend;
+    const listTmuxPanes = vi.fn(async () => TMUX_PROBES);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const panes = await listBackendPanes({ backend, now: () => NOW, listTmuxPanes }, previous);
+      expect(panes.map((pane) => pane.id)).toEqual(['w1:p1', 'w1:p2', 'w9:p1']);
+      expect(listTmuxPanes).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('returns [] with no cache when the herdr adapter cannot answer', async () => {
+    const backend = { name: 'herdr', list: () => Effect.succeed(unsupported('no session')) } as unknown as TerminalBackend;
+    const listTmuxPanes = vi.fn(async () => TMUX_PROBES);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await expect(listBackendPanes({ backend, now: () => NOW, listTmuxPanes })).resolves.toEqual([]);
+      expect(listTmuxPanes).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('reads tmux when the adapter is tmux', async () => {
+    const backend = { name: 'tmux', list: () => Effect.succeed(unsupported('tmux')) } as unknown as TerminalBackend;
     const panes = await listBackendPanes({
       backend,
       now: () => NOW,

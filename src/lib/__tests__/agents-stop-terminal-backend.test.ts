@@ -40,7 +40,14 @@ vi.mock('../paths.js', async (importOriginal) => {
 
 vi.mock('../terminal-backends/select.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../terminal-backends/select.js')>();
-  return { ...actual, hostTerminalBackendName: vi.fn(async () => backendSelection.name) };
+  return {
+    ...actual,
+    hostTerminalBackendName: vi.fn(async () => backendSelection.name),
+    // PAN-3956: a herdr host in these tests has a live session server.
+    probeHerdrAvailability: vi.fn(async () => ({
+      binary: '/usr/bin/herdr', session: 'overdeck', socket: '/tmp/herdr.sock', socketExists: true, available: true,
+    })),
+  };
 });
 
 // The Herdr adapter singleton captures its client at import time, so the fake

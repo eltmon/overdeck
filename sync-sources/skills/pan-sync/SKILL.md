@@ -51,6 +51,13 @@ Agent receives global, project, workspace, role, and briefing context
 - Claude Code discovers `~/.claude/skills/`; Codex, Pi, and Oh My Pi discover the shared Agent Skills standard directory at `~/.agents/skills/`.
 - New harness sessions see changes after `pan sync`; already-running sessions keep the skill catalog loaded at launch.
 - Invocation syntax belongs to the harness: Claude uses `/skill-name`, while Codex uses `$skill-name` or natural-language skill selection.
+- **Herdr** (the default terminal backend, PAN-3956): sync verifies the `herdr` binary (installs it from
+  https://herdr.dev/install.sh when missing), sets `[session] resume_agents_on_restore = false` in
+  `~/.config/herdr/config.toml`, makes sure this home's session server runs (`overdeck-herdr.service`
+  on systemd hosts), and installs the pilot integrations (`pi`, `omp`, `kimi`, `opencode`) for installed
+  harnesses. It updates the binary only when no session server is running for this home, and never
+  restarts a running server — it prints the manual steps instead. Skipped under an explicit tmux backend,
+  `CI`, or Vitest; `--dry-run` only prints what it would do.
 
 ## Commands
 

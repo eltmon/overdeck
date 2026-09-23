@@ -14,7 +14,7 @@
 
 ## Critical Operational Facts
 
-- **tmux socket:** agents live on `tmux -L overdeck` (the default socket shows nothing). Attach/capture with `-L overdeck`.
+- **Terminal backend:** Herdr is the default and is strict — no binary/socket means launches fail with `pan install` in the error, never a silent tmux fallback; `pan install`/`pan sync` own the binary, `~/.config/herdr/config.toml` (`resume_agents_on_restore = false`), the `<session>-herdr.service` unit and the pilot integrations; `pan doctor` FAILs when Herdr is selected but unavailable. tmux only via `terminal.backend: tmux`; legacy tmux agents live on `tmux -L overdeck`.
 - **Dashboard runs Node 22 dist only — never Bun, never tsx** (`@lydell/node-pty` + circular ESM). `pan up`/`pan reload` handle it; after server changes run `npm run build` first.
 - **Releases:** always `pan release stable --version X.Y.Z`, then push main + tag. Never manual tags, `npm version`, or `--no-verify`; hooks enforce it.
 - **Deep-wipe** (`POST /api/issues/:id/deep-wipe`) destroys workspace, branches, and tracker state irreversibly. Never call it — or any destructive HTTP request — speculatively.
