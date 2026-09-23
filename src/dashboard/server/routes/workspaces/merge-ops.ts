@@ -1704,8 +1704,8 @@ const postWorkspaceApproveRoute = HttpRouter.add(
           return jsonResponse({ error }, { status: 400 });
         }
 
-        // Push merged main (with divergence guard — pushApproveMain catches MainDivergedError
-        // and marks workspace stuck if origin/main advanced past our local ancestor)
+        // Push merged main with the divergence guard: if origin/main advanced past our local
+        // ancestor, pushApproveMain returns a 409 with recovery steps (no stuck flag, PAN-3917).
         const pushResult = await pushApproveMain(issueId, projectPath);
         if (!pushResult.pushed) {
           completePendingOperation(issueId, pushResult.error);

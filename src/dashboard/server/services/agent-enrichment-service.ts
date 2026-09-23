@@ -235,8 +235,6 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
 
       // Replay the previous JSONL scan while the file's mtime is unchanged
       // (avoids I/O on static sessions).
-      // getAgentJsonlMtime returns an Effect — it MUST be run, not awaited directly
-      // (awaiting a non-thenable Effect yields the Effect object, never the value).
       const currentMtime = await getAgentJsonlMtime(agentId)
       const previousEnrichment = state.lastEnrichment.get(agentId)
       const previousScan = state.lastScan.get(agentId)

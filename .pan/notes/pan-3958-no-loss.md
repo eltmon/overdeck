@@ -627,13 +627,15 @@ All paths are relative to `src/lib/`.
 
 ### Behaviour notes for reviewers
 
-- **`gitPush` divergence handling now fires.** `merge-agent.ts` (stranded-merge salvage) and
-  `pushApproveMain` in `routes/workspaces/merge-ops.ts` check `err instanceof MainDivergedError`. Through
-  the façade, `Effect.runPromise` rejected with the `VcsError` wrapper, so those branches never matched
-  and a diverged push took the generic-failure path (HTTP 400, "push failed"). It now takes the branch
-  the code intends: HTTP 409 with recovery steps, and the salvage reports the divergence.
-- **`pan workspace deep-clean`** checks `err instanceof DangerousOpBlockedError`. That branch never matched
-  either; it now prints the block's recovery hint.
+- **`gitPush` divergence handling now fires.** `pushApproveMain` in `routes/workspaces/merge-ops.ts`
+  checks `err instanceof MainDivergedError`. Through the façade, `Effect.runPromise` rejected with the
+  `VcsError` wrapper, so that branch never matched, and a diverged push took the generic-failure path
+  (HTTP 400, "push failed"). It now returns the intended HTTP 409 with recovery steps.
+  `salvageStrandedMerge` (`cloister/merge-agent.ts`) has the same check but no caller. It is a CH-8
+  dead-code candidate.
+- **`pan workspace deep-clean`** checks `err instanceof DangerousOpBlockedError`. That check can now
+  match, but the branch is unreachable today, because the command's only `runGitClean` call passes
+  `userInvoked: true`.
 - **Dashboard boot never prepared the managed tmux context.** `main.ts` did
   `await ensureManagedTmuxContextOnce()`. Since PAN-1379 that awaited an unrun Effect (not thenable),
   so the preparation never ran, and tmux is prepared lazily by the first `tmuxExecAsync`. This PR
