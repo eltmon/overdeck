@@ -84,6 +84,12 @@ describe('unit rendering (PAN-3956 W7)', () => {
     ));
   });
 
+  it('carries HERDR_CONFIG_PATH as Environment= only when given, with % doubled and $ literal', () => {
+    expect(renderHerdrUnit(BINARY, 'overdeck')).not.toContain('Environment=');
+    const rendered = renderHerdrUnit(BINARY, 'overdeck', '/home/op/cfg/100%$x.toml');
+    expect(rendered).toContain('[Service]\nEnvironment="HERDR_CONFIG_PATH=/home/op/cfg/100%%$x.toml"\nExecStart=');
+  });
+
   it('doubles % and $ in ExecStart so systemd takes an odd path literally', () => {
     const rendered = renderHerdrUnit('/opt/100%$HOME/herdr', 'overdeck');
     expect(rendered).toContain('ExecStart="/opt/100%%$$HOME/herdr" --session overdeck server');
@@ -260,4 +266,13 @@ describe('defaultSpawnDetached (review finding 7)', () => {
       }
     },
   );
+
+  it('passes the config path into the unit it installs', async () => {
+    const h = harness({ running: true, systemd: true });
+    await ensureHerdrServer({ binary: BINARY, session: 'overdeck', socket: SOCKET, configPathEnv: '/etc/h.toml', ...h });
+    expect(h.systemd.installUserUnit).toHaveBeenCalledWith(
+      'overdeck-herdr.service',
+      renderHerdrUnit(BINARY, 'overdeck', '/etc/h.toml'),
+    );
+  });
 });

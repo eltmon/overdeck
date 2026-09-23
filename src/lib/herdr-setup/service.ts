@@ -57,13 +57,23 @@ export function herdrPersistentUnitWanted(
   return session === DEFAULT_HERDR_SESSION_NAME || env.OVERDECK_HERDR_PERSISTENT_UNIT === '1';
 }
 
-/** The unit text. Matches the hand-written host unit except for the quoted absolute ExecStart. */
-export function renderHerdrUnit(binary: string, session: string): string {
+/** An Environment= word: `%` is doubled (specifiers); `$` is not expanded there. */
+function environmentQuote(value: string): string {
+  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('%', '%%')}"`;
+}
+
+/**
+ * The unit text. Matches the hand-written host unit except for the quoted
+ * absolute ExecStart. When the operator set `HERDR_CONFIG_PATH`, the unit
+ * carries it (absolute), so the server reads the file Overdeck edits.
+ */
+export function renderHerdrUnit(binary: string, session: string, configPath?: string): string {
   return [
     '[Unit]',
     `Description=Herdr headless server for Overdeck (session: ${session})`,
     '',
     '[Service]',
+    ...(configPath ? [`Environment=${environmentQuote(`HERDR_CONFIG_PATH=${configPath}`)}`] : []),
     `ExecStart=${systemdQuote(binary)} --session ${session} server`,
     'Restart=on-failure',
     'RestartSec=3',
@@ -151,6 +161,8 @@ export interface EnsureHerdrServerDeps {
   readonly logPath?: string;
   /** Install and enable a boot-persistent unit. Defaults to `herdrPersistentUnitWanted(session)`. */
   readonly persistentUnit?: boolean;
+  /** Absolute `HERDR_CONFIG_PATH` to carry into the unit, when the operator set one. */
+  readonly configPathEnv?: string;
 }
 
 export interface EnsureHerdrServerResult {
@@ -187,7 +199,7 @@ export async function ensureHerdrServer(deps: EnsureHerdrServerDeps): Promise<En
     // plain `enable`: a server started outside the unit must not get a twin.
     // Upkeep failures are warnings: the server itself is running.
     try {
-      await systemd.installUserUnit(unit, renderHerdrUnit(deps.binary, deps.session));
+      await systemd.installUserUnit(unit, renderHerdrUnit(deps.binary, deps.session, deps.configPathEnv));
       await systemd.enableUserUnit(unit);
     } catch (error) {
       return {
@@ -203,7 +215,7 @@ export async function ensureHerdrServer(deps: EnsureHerdrServerDeps): Promise<En
 
   let managedBy: 'systemd' | 'detached';
   if (onSystemd) {
-    await systemd.installUserUnit(unit, renderHerdrUnit(deps.binary, deps.session));
+    await systemd.installUserUnit(unit, renderHerdrUnit(deps.binary, deps.session, deps.configPathEnv));
     await systemd.enableUserUnitNow(unit);
     managedBy = 'systemd';
   } else {

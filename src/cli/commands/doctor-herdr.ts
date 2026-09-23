@@ -15,9 +15,12 @@ import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { delimiter, dirname, join, resolve } from 'node:path';
 
-import { parse as parseToml } from '@iarna/toml';
-
-import { herdrConfigPath, planResumeAgentsOnRestore } from '../../lib/herdr-setup/config.js';
+import {
+  herdrConfigPath,
+  lineLevelResumeDisabled,
+  parseHerdrConfigToml,
+  planResumeAgentsOnRestore,
+} from '../../lib/herdr-setup/config.js';
 import { herdrInstallDir } from '../../lib/herdr-setup/binary.js';
 import {
   HERDR_INTEGRATION_BINARY,
@@ -206,7 +209,12 @@ function serverRow(deps: HerdrDoctorDeps): CheckResult {
  * refuse the same file, so naming it would never converge.
  */
 function configFix(configText: string, where: string): string {
-  const plan = planResumeAgentsOnRestore(configText);
+  let plan: ReturnType<typeof planResumeAgentsOnRestore>;
+  try {
+    plan = planResumeAgentsOnRestore(configText);
+  } catch {
+    return FIX_SYNC; // Never let a planner defect abort `pan doctor`.
+  }
   if (plan.kind !== 'refused') return FIX_SYNC;
   return `By hand: ${plan.hint} in ${where} (pan sync cannot edit it safely: ${plan.reason})`;
 }
@@ -218,12 +226,22 @@ function configRow(deps: HerdrDoctorDeps): CheckResult {
   }
   let value: unknown;
   try {
-    value = (parseToml(deps.configText) as { session?: Record<string, unknown> }).session?.resume_agents_on_restore;
+    value = (parseHerdrConfigToml(deps.configText) as { session?: Record<string, unknown> }).session?.resume_agents_on_restore;
   } catch (error) {
+    // Overdeck's parser is not Herdr's: never call the file broken on its say-so.
+    const detail = error instanceof Error ? error.message.split('\n')[0] : String(error);
+    if (lineLevelResumeDisabled(deps.configText)) {
+      return {
+        name: 'Herdr config',
+        status: 'warn',
+        message: `Overdeck cannot parse ${where} (${detail}); its resume_agents_on_restore line reads false`,
+        fix: 'Confirm with: herdr config check',
+      };
+    }
     return {
       name: 'Herdr config',
       status: 'error',
-      message: `${where} does not parse: ${error instanceof Error ? error.message : String(error)}`,
+      message: `Overdeck cannot parse ${where} (${detail}); run \`herdr config check\` to see whether Herdr can`,
       fix: configFix(deps.configText, where),
     };
   }

@@ -17,6 +17,11 @@
  * updates it: a throwaway `OVERDECK_HOME` sees its own session stopped and
  * would otherwise replace the binary under the live default server.
  *
+ * `OVERDECK_HERDR_SYNC_LIGHT=1` (set by the dashboard's own `pan sync`
+ * callers, which kill `pan` after a short timeout) skips the binary update
+ * and the integration installs: those run minutes-long subprocesses that
+ * would outlive a killed parent.
+ *
  * Nothing here stops or restarts a running session server: that closes every
  * agent pane, so it is always the operator's call.
  */
@@ -75,8 +80,13 @@ export interface EnsureHerdrDeps {
     Promise<EnsureHerdrConfigResult>;
   /** True when the on-disk config already says `resume_agents_on_restore = false`. */
   readonly configDisablesResume?: (path: string) => Promise<boolean>;
-  readonly ensureServer?: (input: { binary: string; session: string; socket: string; persistentUnit: boolean }) =>
-    Promise<EnsureHerdrServerResult>;
+  readonly ensureServer?: (input: {
+    binary: string;
+    session: string;
+    socket: string;
+    persistentUnit: boolean;
+    configPathEnv?: string;
+  }) => Promise<EnsureHerdrServerResult>;
   readonly ensureIntegrations?: (input: { binary: string }) => Promise<EnsureHerdrIntegrationsResult>;
 }
 
@@ -109,6 +119,10 @@ export interface EnsureHerdrRunReport {
     readonly reason?: string;
     readonly endpointCompatible?: boolean;
     readonly restartNeeded?: boolean;
+    /** `herdr status` did not answer: running or not is unknown. */
+    readonly stateUnknown?: boolean;
+    /** The next step for the operator when the server is not running. */
+    readonly hint?: string;
   };
   readonly integrations: {
     readonly installed: string[];
@@ -219,7 +233,8 @@ export async function ensureHerdr(options: EnsureHerdrOptions): Promise<EnsureHe
   }
 
   // ── binary update ─────────────────────────────────────────────────────────
-  if (action === 'present' && mode !== 'up') {
+  const light = mode === 'sync' && env.OVERDECK_HERDR_SYNC_LIGHT === '1';
+  if (action === 'present' && mode !== 'up' && !light) {
     latest = await (deps.fetchLatest ?? (() => fetchLatestStableVersion()))();
     if (latest === null) {
       warnings.push('Could not read https://herdr.dev/latest.json; skipped the Herdr update check.');
@@ -253,12 +268,14 @@ export async function ensureHerdr(options: EnsureHerdrOptions): Promise<EnsureHe
 
   // ── config (before the server starts, so it never starts with resume on) ──
   const serverRunningBefore = status?.server.running === true;
+  // Unreadable status: a live socket file means a reload is worth trying.
+  const reloadTarget = status === null ? probe.socketExists : serverRunningBefore;
   let config: EnsureHerdrRunReport['config'];
   try {
     const result = await (deps.ensureConfig ?? ((input) => ensureHerdrConfig({ ...input, exec, path: configPath })))({
       binary,
       session,
-      serverRunning: serverRunningBefore,
+      serverRunning: reloadTarget,
     });
     config = { changed: result.changed, path: result.path };
     if (result.reloadWarning) warnings.push(result.reloadWarning);
@@ -274,15 +291,37 @@ export async function ensureHerdr(options: EnsureHerdrOptions): Promise<EnsureHe
   // server, whose failure is loud and fixed by the one line the error names.
   // A server that is already running is left as it is (nothing here restarts
   // one), and a config that already says `false` on disk never blocks.
+  // `herdr status` can time out under load, so an unreadable status is
+  // re-probed; still unreadable is reported as unknown, never as "down".
   let server: EnsureHerdrRunReport['server'];
-  const unsafeToStart = config.error !== undefined
+  const herdrAccepts = async () => (await exec(binary, ['config', 'check']).catch(() => null))?.exitCode === 0;
+  let unsafeToStart = config.error !== undefined
     && !serverRunningBefore
-    && !(await (deps.configDisablesResume ?? herdrConfigDisablesResume)(config.path));
+    && !(await (deps.configDisablesResume ?? ((path) => herdrConfigDisablesResume(path, undefined, herdrAccepts)))(
+      config.path,
+    ));
+  let stateUnknown = false;
   if (unsafeToStart) {
+    const again = await readStatus(binary, session);
+    if (again?.server.running) unsafeToStart = false; // running after all: the already-running path
+    else stateUnknown = again === null;
+  }
+  const configHint = `Fix ${config.path} as the warning above says (it must set [session] resume_agents_on_restore = `
+    + 'false), then re-run `pan up`; or set terminal.backend to tmux.';
+  if (unsafeToStart && stateUnknown) {
+    server = {
+      running: false,
+      stateUnknown: true,
+      reason: `\`herdr --session ${session} status\` did not answer, so whether the server runs is unknown; none was `
+        + `started because ${config.path} does not set [session] resume_agents_on_restore = false (${config.error})`,
+      hint: `Check with \`pan doctor\`. ${configHint}`,
+    };
+  } else if (unsafeToStart) {
     server = {
       running: false,
       reason: `not started — ${config.path} does not set [session] resume_agents_on_restore = false, and a server `
         + `started now would relaunch paused and stopped agents (${config.error})`,
+      hint: `Agent launches will fail until then. ${configHint}`,
     };
   } else {
     try {
@@ -291,6 +330,7 @@ export async function ensureHerdr(options: EnsureHerdrOptions): Promise<EnsureHe
         session,
         socket: probe.socket,
         persistentUnit: herdrPersistentUnitWanted(session, env),
+        ...(env.HERDR_CONFIG_PATH?.trim() ? { configPathEnv: configPath } : {}),
       });
       server = result;
       if (warning) warnings.push(warning);
@@ -325,7 +365,10 @@ export async function ensureHerdr(options: EnsureHerdrOptions): Promise<EnsureHe
 
   // ── integrations ──────────────────────────────────────────────────────────
   let integrations: EnsureHerdrRunReport['integrations'] = { installed: [], already: [], skipped: [] };
-  if (mode !== 'up') {
+  if (light) {
+    warnings.push('Skipped the Herdr binary update and integration installs (OVERDECK_HERDR_SYNC_LIGHT); '
+      + 'run `pan sync` from a terminal for those.');
+  } else if (mode !== 'up') {
     try {
       integrations = await (deps.ensureIntegrations ?? ((input) => ensureHerdrIntegrations({ ...input, exec })))({ binary });
     } catch (error) {

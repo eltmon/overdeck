@@ -12,9 +12,15 @@
  * result parses, says `false`, and — with that one key removed — parses to
  * exactly what the original did. When no edit passes, the plan is `refused`
  * with the line to add by hand; nothing is written.
+ *
+ * Herdr reads its config with the Rust `toml` 0.8 / `toml_edit` crates (TOML
+ * 1.0: mixed-type arrays and so on), so the parser here is `toml` 4 (TOML
+ * 1.x), not the TOML 0.5 `@iarna/toml`. A leading BOM is skipped. `herdr config
+ * check` stays the authority on validity: a file this parser cannot read is
+ * never called broken on its own say-so (see `ensureHerdrConfig`).
  */
 
-import { parse as parseToml } from '@iarna/toml';
+import { parse as parseToml } from 'toml';
 
 export const RESUME_KEY = 'resume_agents_on_restore';
 export const DESIRED_LINE = `${RESUME_KEY} = false`;
@@ -22,7 +28,22 @@ export const DESIRED_LINE = `${RESUME_KEY} = false`;
 export type ResumeEditPlan =
   | { readonly kind: 'unchanged' }
   | { readonly kind: 'edited'; readonly text: string }
-  | { readonly kind: 'refused'; readonly reason: string; readonly hint: string };
+  | {
+      readonly kind: 'refused';
+      readonly reason: string;
+      readonly hint: string;
+      /** Set when Overdeck's parser could not read the file at all. */
+      readonly parseError?: string;
+    };
+
+/** Parse Herdr config text as TOML 1.x, skipping a leading BOM. Throws on a parse error. */
+export function parseHerdrConfigToml(text: string): Record<string, unknown> {
+  return parseToml(text.startsWith('\uFEFF') ? text.slice(1) : text) as Record<string, unknown>;
+}
+
+function parseErrorMessage(error: unknown): string {
+  return error instanceof Error ? (error.message.split('\n')[0] ?? error.message) : String(error);
+}
 
 const HAND_FIX_HINT = `add \`${DESIRED_LINE}\` under \`[session]\``;
 
@@ -194,7 +215,8 @@ function fullPath(info: Extract<LineInfo, { kind: 'key' }>): string[] | null {
 }
 
 function canonical(value: unknown): string {
-  if (value instanceof Date) return JSON.stringify(value.toISOString());
+  if (typeof value === 'bigint') return `${value}n`;
+  if (value instanceof Date) return JSON.stringify(Number.isNaN(value.getTime()) ? String(value) : value.toISOString());
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   if (value && typeof value === 'object') {
     const record = value as Record<string, unknown>;
@@ -218,7 +240,7 @@ function withoutResumeKey(doc: Record<string, unknown>): string {
 
 function parseDoc(text: string): Record<string, unknown> | null {
   try {
-    return parseToml(text) as Record<string, unknown>;
+    return parseHerdrConfigToml(text);
   } catch {
     return null;
   }
@@ -310,18 +332,16 @@ function* candidates(parts: readonly string[], lines: readonly string[], infos: 
 export function planResumeAgentsOnRestore(text: string): ResumeEditPlan {
   if (text.trim() === '') return { kind: 'edited', text: `[session]\n${DESIRED_LINE}\n` };
 
-  const before = parseDoc(text);
-  if (before === null) {
-    let reason = 'it does not parse as TOML';
-    try {
-      parseToml(text);
-    } catch (error) {
-      reason = `it does not parse as TOML (${error instanceof Error ? error.message.split('\n')[0] : String(error)})`;
-    }
+  let before: Record<string, unknown>;
+  try {
+    before = parseHerdrConfigToml(text);
+  } catch (error) {
+    const parseError = parseErrorMessage(error);
     return {
       kind: 'refused',
-      reason: `${reason}; Herdr ignores a config it cannot parse and runs with ${RESUME_KEY} = true`,
-      hint: `fix the syntax, then ${HAND_FIX_HINT}`,
+      reason: `Overdeck's TOML parser cannot read it (${parseError}), so Overdeck will not edit it`,
+      hint: HAND_FIX_HINT,
+      parseError,
     };
   }
   if (resumeValue(before) === false) return { kind: 'unchanged' };
@@ -350,4 +370,27 @@ export function planResumeAgentsOnRestore(text: string): ResumeEditPlan {
     reason: `no line edit could set ${RESUME_KEY} = false without changing anything else`,
     hint: HAND_FIX_HINT,
   };
+}
+
+/**
+ * Conservative line-level read for a file the TOML parser cannot read: true
+ * only when exactly one live `resume_agents_on_restore` line applies to
+ * `session` (in `[session]` or as a root dotted key), it is single-line and
+ * its value is exactly `false`, and `session` is not an inline table.
+ */
+export function lineLevelResumeDisabled(text: string): boolean {
+  const lines = text.split('\n').map((part) => (part.endsWith('\r') ? part.slice(0, -1) : part));
+  const infos = scanLines(lines);
+  const keyLines: number[] = [];
+  for (let i = 0; i < infos.length; i++) {
+    const info = infos[i] as LineInfo;
+    if (info.kind !== 'key') continue;
+    const path = fullPath(info);
+    if (samePath(path, ['session'])) return false;
+    if (samePath(path, ['session', RESUME_KEY])) keyLines.push(i);
+  }
+  if (keyLines.length !== 1) return false;
+  const index = keyLines[0] as number;
+  const info = infos[index] as Extract<LineInfo, { kind: 'key' }>;
+  return info.singleLine && (lines[index] as string).slice(info.valueStart, info.valueEnd) === 'false';
 }

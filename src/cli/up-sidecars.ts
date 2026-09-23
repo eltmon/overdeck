@@ -62,9 +62,10 @@ export async function ensureHerdrBeforeDashboard(): Promise<void> {
       console.log(chalk.green(`✓ Herdr session server '${herdr.session}' running (${herdr.server.managedBy ?? 'unknown'})`));
       for (const warning of herdr.warnings) console.log(chalk.dim(`  ⚠ ${warning}`));
     } else {
-      console.log(chalk.yellow(`⚠ Herdr session server not running: ${herdr.server.reason ?? 'unknown reason'}`));
+      const state = herdr.server.stateUnknown ? 'state unknown' : 'not running';
+      console.log(chalk.yellow(`⚠ Herdr session server ${state}: ${herdr.server.reason ?? 'unknown reason'}`));
       for (const warning of herdr.warnings) console.log(chalk.dim(`  ⚠ ${warning}`));
-      console.log(chalk.dim(`  ${HERDR_DOWN_HINT}`));
+      console.log(chalk.dim(`  ${herdr.server.hint ?? HERDR_DOWN_HINT}`));
     }
   } catch (error: unknown) {
     console.log(chalk.yellow('⚠ Failed to verify the Herdr session server:'), errorMessage(error));

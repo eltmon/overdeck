@@ -84,6 +84,20 @@ describe('ensureHerdrBeforeDashboard (PAN-3956 review finding 8)', () => {
     expect(text).toContain('By hand: add `resume_agents_on_restore = false`');
   });
 
+  it('says "state unknown" and prints the specific hint instead of the pan install line', async () => {
+    const lines = captureLog();
+    ensureHerdrMock.mockResolvedValueOnce({
+      session: 'overdeck',
+      server: { running: false, stateUnknown: true, reason: 'status did not answer', hint: 'Check with `pan doctor`.' },
+      warnings: [],
+    });
+    await ensureHerdrBeforeDashboard();
+    const text = lines.join('\n');
+    expect(text).toContain('Herdr session server state unknown: status did not answer');
+    expect(text).toContain('Check with `pan doctor`.');
+    expect(text).not.toContain('until pan install succeeds');
+  });
+
   it('never throws, so pan up still starts the dashboard', async () => {
     captureLog();
     ensureHerdrMock.mockRejectedValueOnce(new Error('boom'));

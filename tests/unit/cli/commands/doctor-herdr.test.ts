@@ -120,7 +120,14 @@ describe('checkHerdr (PAN-3956 W9)', () => {
       + '(`session = { … }`), which Overdeck does not rewrite)',
     );
     const broken = await checkHerdr(deps({ configText: '[session\n' }));
-    expect(row(broken, 'Herdr config').fix).toMatch(/^By hand: fix the syntax, then add `resume_agents_on_restore = false`/);
+    expect(row(broken, 'Herdr config').message).toMatch(/^Overdeck cannot parse .*run `herdr config check`/);
+    expect(row(broken, 'Herdr config').fix).toMatch(/^By hand: add `resume_agents_on_restore = false`/);
+    const unreadableButFalse = await checkHerdr(deps({ configText: '[session]\nx = @\nresume_agents_on_restore = false\n' }));
+    expect(row(unreadableButFalse, 'Herdr config')).toMatchObject({ status: 'warn', fix: 'Confirm with: herdr config check' });
+    const mixedArray = await checkHerdr(deps({ configText: 'x = [1, "a"]\n[session]\nresume_agents_on_restore = false\n' }));
+    expect(row(mixedArray, 'Herdr config').status).toBe('ok');
+    const bigInt = await checkHerdr(deps({ configText: 'x = 9007199254740993\n' }));
+    expect(row(bigInt, 'Herdr config')).toMatchObject({ status: 'error', fix: 'Run: pan sync' });
     const dotted = await checkHerdr(deps({ configText: 'session.resume_agents_on_restore = true\n' }));
     expect(row(dotted, 'Herdr config').fix).toBe('Run: pan sync');
   });

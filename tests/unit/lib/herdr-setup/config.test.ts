@@ -9,6 +9,7 @@ import {
   ensureHerdrConfig,
   herdrConfigDisablesResume,
   herdrConfigPath,
+  lineLevelResumeDisabled,
   planResumeAgentsOnRestore,
   setResumeAgentsOnRestore,
 } from '../../../../src/lib/herdr-setup/config.js';
@@ -138,12 +139,35 @@ describe('planResumeAgentsOnRestore — real TOML shapes (review findings 4 and 
     });
   });
 
-  it('refuses a file that does not parse, naming the fallback to resume on', () => {
+  it('refuses a file its parser cannot read without calling it broken (herdr config check decides)', () => {
     const plan = planResumeAgentsOnRestore('[session\nfoo = 1\n');
     expect(plan.kind).toBe('refused');
     if (plan.kind !== 'refused') return;
-    expect(plan.reason).toMatch(/does not parse as TOML .*runs with resume_agents_on_restore = true/);
-    expect(plan.hint).toContain(`add \`${DESIRED}\` under \`[session]\``);
+    expect(plan.reason).toMatch(/^Overdeck's TOML parser cannot read it \(.+\), so Overdeck will not edit it$/);
+    expect(plan.parseError).toBeTruthy();
+    expect(plan.hint).toBe(`add \`${DESIRED}\` under \`[session]\``);
+  });
+
+  it('reads TOML 1.0 the way herdr does: mixed-type arrays and a leading BOM (review of #4020, 3)', () => {
+    expect(edited('x = [1, "a"]\n[session]\nresume_agents_on_restore = true\n'))
+      .toBe(`x = [1, "a"]\n[session]\n${DESIRED}\n`);
+    expect(edited('\uFEFFonboarding = false\n')).toBe(`\uFEFFonboarding = false\n\n[session]\n${DESIRED}\n`);
+    expect(planResumeAgentsOnRestore('\uFEFF[session]\nresume_agents_on_restore = false\n')).toEqual({ kind: 'unchanged' });
+  });
+
+  it('never throws on an integer beyond 2^53 (review of #4020, 6)', () => {
+    expect(() => planResumeAgentsOnRestore('x = 9007199254740993\n')).not.toThrow();
+    expect(edited('x = 9007199254740993\n')).toBe(`x = 9007199254740993\n\n[session]\n${DESIRED}\n`);
+  });
+
+  it('lineLevelResumeDisabled accepts only one live `false` key line for session', () => {
+    expect(lineLevelResumeDisabled('[session]\nresume_agents_on_restore = false # mine\n')).toBe(true);
+    expect(lineLevelResumeDisabled('session.resume_agents_on_restore = false\n')).toBe(true);
+    expect(lineLevelResumeDisabled('[session]\nresume_agents_on_restore = true\n')).toBe(false);
+    expect(lineLevelResumeDisabled('[ui]\nresume_agents_on_restore = false\n')).toBe(false);
+    expect(lineLevelResumeDisabled('session = { resume_agents_on_restore = false }\n')).toBe(false);
+    expect(lineLevelResumeDisabled('[session]\nresume_agents_on_restore = false\nresume_agents_on_restore = true\n'))
+      .toBe(false);
   });
 
   it('setResumeAgentsOnRestore throws HerdrConfigEditError instead of returning an unsafe edit', () => {
@@ -235,6 +259,18 @@ describe('ensureHerdrConfig', () => {
     expect(exec).not.toHaveBeenCalled();
   });
 
+  it('says "fix the syntax" only when herdr config check rejects the file too', async () => {
+    const fs = memoryFs('[session\n');
+    const rejects = vi.fn<HerdrExec>(async () => ({ stdout: '', stderr: 'expected `]`', exitCode: 1 }));
+    await expect(ensureHerdrConfig({ ...fs, exec: rejects, binary: '/b/herdr', session: 'overdeck', serverRunning: false }))
+      .rejects.toThrow(/herdr config check rejects it too \(expected `\]`\).*By hand: fix the syntax, then add/);
+
+    const accepts = vi.fn(ok);
+    await expect(ensureHerdrConfig({ ...fs, exec: accepts, binary: '/b/herdr', session: 'overdeck', serverRunning: false }))
+      .rejects.toThrow(/herdr accepts it, but Overdeck's TOML parser cannot read it .*By hand: add `resume_agents_on_restore/);
+    expect(fs.writeFile).not.toHaveBeenCalled();
+  });
+
   it('reports a reload that exits non-zero, with the file still written (review finding 2)', async () => {
     const fs = memoryFs('onboarding = false\n');
     const exec = vi.fn<HerdrExec>(async (_file, args) => (
@@ -283,6 +319,15 @@ describe('ensureHerdrConfig on a real filesystem (review finding 11)', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it('herdrConfigDisablesResume trusts a line-level false only when herdr accepts the file', async () => {
+    const text = '[session\nresume_agents_on_restore = false\n';
+    const read = async () => '[session]\nweird = @\nresume_agents_on_restore = false\n';
+    await expect(herdrConfigDisablesResume('/x', read)).resolves.toBe(false);
+    await expect(herdrConfigDisablesResume('/x', read, async () => true)).resolves.toBe(true);
+    await expect(herdrConfigDisablesResume('/x', read, async () => false)).resolves.toBe(false);
+    await expect(herdrConfigDisablesResume('/x', async () => text, async () => true)).resolves.toBe(false);
   });
 
   it('herdrConfigDisablesResume is false for a missing, unparseable or resume-on file', async () => {

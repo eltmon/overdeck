@@ -299,4 +299,55 @@ describe('ensureHerdr — review of #3995 (PAN-3956)', () => {
     expect(report.server).not.toHaveProperty('warning');
     expect(report.warnings).toContain('Could not refresh or enable overdeck-herdr.service: boom');
   });
+
+  it('re-probes an unreadable status and reports "unknown", not "down", before refusing (review of #4020, 2)', async () => {
+    const h = harness({ serverRunning: false });
+    h.spies.ensureConfig.mockRejectedValueOnce(new Error('Cannot safely edit config.toml'));
+    const readStatus = vi.fn(async () => null);
+    const report = await run('up', { ...h, deps: { ...h.deps, readStatus } });
+    expect(readStatus.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(h.spies.ensureServer).not.toHaveBeenCalled();
+    expect(report.server).toMatchObject({ running: false, stateUnknown: true });
+    expect(report.server.reason).toContain('did not answer');
+    expect(report.server.hint).toContain('pan doctor');
+    expect(report.server.hint).not.toContain('pan install');
+  });
+
+  it('takes the already-running path when the re-probe finds the server up', async () => {
+    const h = harness({ serverRunning: false });
+    h.spies.ensureConfig.mockRejectedValueOnce(new Error('Cannot safely edit config.toml'));
+    let calls = 0;
+    const readStatus = vi.fn(async () => (++calls === 1 ? null : RUNNING));
+    const report = await run('up', { ...h, deps: { ...h.deps, readStatus } });
+    expect(h.spies.ensureServer).toHaveBeenCalled();
+    expect(report.server.running).toBe(true);
+  });
+
+  it('names the config fix, not pan install, when a definitely-stopped server is not started', async () => {
+    const h = harness({ serverRunning: false });
+    h.spies.ensureConfig.mockRejectedValueOnce(new Error('Cannot safely edit config.toml'));
+    const report = await run('up', h);
+    expect(report.server.stateUnknown).toBeUndefined();
+    expect(report.server.hint).toMatch(/^Agent launches will fail until then\. Fix .*config\.toml/);
+    expect(report.server.hint).not.toContain('pan install');
+  });
+
+  it('light sync (dashboard callers) skips the binary update and integration installs', async () => {
+    const h = harness({ latest: '0.10.0', serverRunning: false });
+    const report = await run('sync', { ...h, deps: { ...h.deps, env: { OVERDECK_HERDR_SYNC_LIGHT: '1' } } });
+    expect(h.spies.updateBinary).not.toHaveBeenCalled();
+    expect(h.spies.ensureIntegrations).not.toHaveBeenCalled();
+    expect(h.spies.ensureConfig).toHaveBeenCalled();
+    expect(h.spies.ensureServer).toHaveBeenCalled();
+    expect(report.warnings.join('\n')).toContain('OVERDECK_HERDR_SYNC_LIGHT');
+  });
+
+  it('carries an operator HERDR_CONFIG_PATH into the unit (review of #4020, 7)', async () => {
+    const h = harness();
+    await run('up', { ...h, deps: { ...h.deps, env: { HERDR_CONFIG_PATH: '/etc/herdr/mine.toml' } } });
+    expect(h.spies.ensureServer).toHaveBeenCalledWith(expect.objectContaining({ configPathEnv: '/etc/herdr/mine.toml' }));
+    const plain = harness();
+    await run('up', plain);
+    expect(plain.spies.ensureServer).toHaveBeenCalledWith(expect.not.objectContaining({ configPathEnv: expect.anything() }));
+  });
 });

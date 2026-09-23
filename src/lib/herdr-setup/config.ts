@@ -18,12 +18,22 @@ import { chmod, mkdir, readFile, realpath, rename, stat, unlink, writeFile } fro
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
-import { parse as parseToml } from '@iarna/toml';
-
-import { DESIRED_LINE, RESUME_KEY, planResumeAgentsOnRestore } from './config-edit.js';
+import {
+  DESIRED_LINE,
+  RESUME_KEY,
+  lineLevelResumeDisabled,
+  parseHerdrConfigToml,
+  planResumeAgentsOnRestore,
+} from './config-edit.js';
 import { defaultHerdrExec, type HerdrExec } from './status.js';
 
-export { DESIRED_LINE, RESUME_KEY, planResumeAgentsOnRestore } from './config-edit.js';
+export {
+  DESIRED_LINE,
+  RESUME_KEY,
+  lineLevelResumeDisabled,
+  parseHerdrConfigToml,
+  planResumeAgentsOnRestore,
+} from './config-edit.js';
 
 /** The edit could not be made safely; nothing was written. */
 export class HerdrConfigEditError extends Error {
@@ -68,16 +78,28 @@ export function setResumeAgentsOnRestore(text: string): string {
   throw new HerdrConfigEditError('config.toml', plan.reason, plan.hint);
 }
 
-/** True only when the file parses and says `[session] resume_agents_on_restore = false`. */
+/**
+ * True only when the file says `[session] resume_agents_on_restore = false`.
+ * A file Overdeck's parser cannot read counts only when its one key line reads
+ * exactly `false` AND `herdrAccepts` (`herdr config check`) passes.
+ */
 export async function herdrConfigDisablesResume(
   path: string,
   read: (path: string) => Promise<string> = (p) => readFile(p, 'utf-8'),
+  herdrAccepts?: () => Promise<boolean>,
 ): Promise<boolean> {
+  let text: string;
   try {
-    const doc = parseToml(await read(path)) as { session?: Record<string, unknown> };
-    return doc.session?.[RESUME_KEY] === false;
+    text = await read(path);
   } catch {
     return false;
+  }
+  try {
+    const doc = parseHerdrConfigToml(text) as { session?: Record<string, unknown> };
+    return doc.session?.[RESUME_KEY] === false;
+  } catch {
+    if (!herdrAccepts || !lineLevelResumeDisabled(text)) return false;
+    return herdrAccepts().catch(() => false);
   }
 }
 
@@ -155,7 +177,25 @@ export async function ensureHerdrConfig(deps: EnsureHerdrConfigDeps): Promise<En
     previous = null;
   }
   const plan = planResumeAgentsOnRestore(previous ?? '');
-  if (plan.kind === 'refused') throw new HerdrConfigEditError(path, plan.reason, plan.hint);
+  if (plan.kind === 'refused') {
+    if (plan.parseError === undefined) throw new HerdrConfigEditError(path, plan.reason, plan.hint);
+    // Overdeck's parser could not read the file: let herdr say whether it is broken.
+    const check = await exec(deps.binary, ['config', 'check']).catch(() => null);
+    if (check && check.exitCode !== 0) {
+      throw new HerdrConfigEditError(
+        path,
+        `herdr config check rejects it too (${lastLine(check)}); Herdr ignores a config it cannot parse and runs `
+          + `with ${RESUME_KEY} = true`,
+        `fix the syntax, then ${plan.hint}`,
+      );
+    }
+    const accepted = check ? 'herdr accepts it, but ' : '';
+    throw new HerdrConfigEditError(
+      path,
+      `${accepted}Overdeck's TOML parser cannot read it (${plan.parseError}), so Overdeck will not edit it`,
+      plan.hint,
+    );
+  }
   if (plan.kind === 'unchanged' && previous !== null) return { changed: false, path };
   const next = plan.kind === 'edited' ? plan.text : `[session]\n${DESIRED_LINE}\n`;
 
