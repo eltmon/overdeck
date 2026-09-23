@@ -424,8 +424,12 @@ target and `CompanionCreateSpec`. The generation stamp and `TERM` always overrid
 endpoint must equal the socket Overdeck derives for that owner and the recorded file. The
 fingerprint is `<host generation>:<threadId>:<navigationEpoch>`, so a host restart or a TUI that
 navigated away (`/new`, `/resume`, `/fork`) gets a fresh companion on the conversation's thread at
-the next open. The remote TUI keeps retrying when its app-server dies instead of exiting, so the
-owner-teardown hooks above are what reap it.
+the next open. The remote TUI keeps retrying when its app-server dies instead of exiting. The
+owner-teardown hooks above reap it when the owner stops; when the app-server dies but the host's
+pane (and so the owner session) stays alive, the host itself removes `codex-native-endpoint` and
+calls `closeCompanionTerminalForOwner`. The host kills its app-server on every exit path, and the
+manager reaps an app-server orphaned by a SIGKILLed host (recorded in `codex-native/app.pid`,
+matched by `/proc/<pid>/cmdline`) before reusing the socket.
 
 | owner tmux | host answer | result |
 | --- | --- | --- |

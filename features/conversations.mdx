@@ -105,7 +105,12 @@ native CLI shows the running turn and the pending prompt. Switching back to
 Conversation, changing conversations, or closing the browser tab leaves the
 native CLI running. **Close native CLI** stops only that terminal; the
 conversation and any running turn continue. Stopping, archiving, deleting, or
-restarting the conversation also stops its native CLI.
+restarting the conversation also stops its native CLI. If the conversation's
+Codex app-server stops on its own, Overdeck closes the native CLI too and says
+so in Runtime log; restart the conversation to use Terminal again.
+
+Sub-agents the conversation spawns belong to it: their approvals show in the
+dashboard, and their activity and cost count toward the conversation.
 
 `/new`, `/resume`, and `/fork` in the native CLI move only that terminal to
 another Codex thread. The dashboard stays on the conversation's thread, and the
@@ -119,7 +124,7 @@ When the native CLI is not available, Terminal says why and nothing restarts:
 | **Restart required for the native CLI** | The conversation started before Overdeck exposed a native endpoint for it. Stop and resume the conversation. |
 | **Upgrade required for the native CLI** | The installed Codex CLI is older than 0.153.4. Upgrade Codex, then stop and resume the conversation. |
 | **Native CLI not available yet** | The conversation has no saved Codex turn yet. Send a first message, then select **Try again**. |
-| **Native CLI unavailable** | For example, the conversation uses the legacy `codex.transport: tui`, where its own terminal already runs the Codex CLI. **Show runtime log** opens it. |
+| **Native CLI unavailable** | For example, the conversation uses the legacy `codex.transport: tui`, where its own terminal already runs the Codex CLI. Terminal opens on **Runtime log** for these conversations, with Native CLI as the second tab. |
 
 ## Attachments
 

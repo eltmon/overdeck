@@ -187,6 +187,15 @@ Decision: simultaneous attachment is safe, including during an active turn and
 with a pending approval, provided the dashboard client pins its own thread and
 ignores foreign-thread traffic. No handover or second runtime is needed.
 
+### Sub-agents and process lifetime (review follow-up, same version)
+
+| Check | Result |
+| --- | --- |
+| Sub-agent threads | `multi_agent` spawns a sub-agent on its own thread. The client gets **no `thread/started`** for it. The only announcement is an `item/started` / `item/completed` of type `collabAgentToolCall` (`tool: "spawnAgent"`) on the spawning thread, whose `receiverThreadIds` names the new thread. The sub-agent's first `thread/status/changed` can arrive before that item. |
+| Sub-agent approvals | The sub-agent's `item/commandExecution/requestApproval` carries the sub-agent's `threadId` and goes to the parent's client. The parent turn waits on it (`collabAgentToolCall` `wait`). A client that drops requests for threads other than its own hangs the turn. Answering it from the dashboard let the parent turn complete. |
+| `--listen unix://` and stdin | The app-server does not exit when its stdin closes (stdio mode does). A host killed with SIGKILL outside tmux leaves the app-server serving the socket. Inside a tmux pane the pane's process group gets SIGHUP, which stops it. |
+| Wrapper signals | `codex` is a Node wrapper around the native binary; it forwards SIGINT, SIGTERM and SIGHUP to it, so signalling the wrapper pid stops the server. |
+
 ### How Overdeck uses it
 
 - Conversation launches pass `--native-endpoint` to `codex-app-server-host.js`;
@@ -199,17 +208,37 @@ ignores foreign-thread traffic. No handover or second runtime is needed.
 - The host records `unix://…` in `~/.overdeck/agents/<id>/codex-native-endpoint`
   and removes it on stop. Its `status` op reports `generation` (random per host
   process), `nativeEndpoint` and `navigationEpoch`.
-- The manager pins the thread from its own `thread/start` or `thread/resume`
-  response. Notifications and server requests for any other thread go out as
-  `foreign-thread` and never touch state, pending requests, activity, cost, or
-  `codex-thread-id`. The host writes `codex-thread-id` from its own start.
+- The manager pins the owner thread from its own `thread/start` or
+  `thread/resume` response and keeps a thread tree: the owner, plus every
+  thread named in a `collabAgentToolCall` `receiverThreadIds` from inside the
+  tree, plus any `thread/started` whose `parentThreadId` is in the tree. A
+  `thread/started` outside the tree (a title thread, a native `/new` or
+  `/fork`) marks that thread **foreign**; its events go out as `foreign-thread`
+  and never touch state, pending requests, activity, cost, or
+  `codex-thread-id`. Only the owner thread moves the owner's turn state.
+- Server requests fail open: a request from the owner, a sub-agent, or a thread
+  the manager cannot classify is pending in the host and shown in the pane. Only
+  a request for a thread positively known to be foreign is left to the client
+  that opened it, with one pane line. Activity and live cost include sub-agent
+  threads (cost is the sum of each thread's running total). The host writes
+  `codex-thread-id` from its own start only.
+- The host kills its app-server on every exit path (SIGTERM, SIGINT, SIGHUP,
+  `process.on('exit')`). The manager records the app-server pid in
+  `codex-native/app.pid`; on the next start, if that pid is still alive and its
+  `/proc/<pid>/cmdline` is a codex app-server on the same socket, it is sent
+  SIGTERM (SIGKILL after 5 s) before the socket is reused.
+- When the app-server exits while the host's pane stays alive, the host removes
+  `codex-native-endpoint`, marks the endpoint unavailable (`exited`), closes the
+  conversation's companion through the companion-terminal lifecycle, and
+  prints a line in Runtime log.
 - The host drops a pending request on `serverRequest/resolved`, refuses a
   second answer to user-input requests (approvals already refused one), and adopts
   `thread/settings/updated` model and effort so the next dashboard turn keeps
   a TUI choice. The dashboard effort picker still applies when used afterwards.
-- A foreign thread that is neither ephemeral nor a sub-agent of the pinned
-  thread counts as native navigation (`/new`, `/resume`, `/fork`) and bumps
-  `navigationEpoch`.
+- `navigationEpoch` counts native navigation: non-ephemeral foreign threads
+  (`/new`, `/fork`) plus threads with events that are still unclassified when
+  the epoch is read (a `/resume` of another thread). A sub-agent whose status
+  arrived before its spawn item stops counting once the item adopts it.
 - A new `prepare-terminal` op is the companion adapter's health check. It
   strictly resumes a saved thread the host has not loaded yet (never a fresh
   thread), never starts a turn, and answers only when the pinned thread's rollout
