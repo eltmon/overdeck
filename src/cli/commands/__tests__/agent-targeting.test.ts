@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const agentMocks = vi.hoisted(() => ({
@@ -5,7 +6,7 @@ const agentMocks = vi.hoisted(() => ({
   setAgentPausedSync: vi.fn(),
   clearAgentPausedSync: vi.fn(),
   clearAgentTroubledSync: vi.fn(),
-  stopAgentSync: vi.fn(),
+  stopAgent: vi.fn(),
 }));
 
 const tmuxMocks = vi.hoisted(() => ({
@@ -50,6 +51,12 @@ vi.mock('../../../lib/agents.js', async (importOriginal) => {
     resolveAgentTargetSync: resolveAgentTargetSyncForTest,
   };
 });
+
+// PAN-3947: pan kill/pause probe liveness through the terminal backend;
+// the fake mirrors the tmux session mock so each case sets liveness once.
+vi.mock('../../../lib/terminal-backends/launch.js', () => ({
+  agentPaneExists: vi.fn(async (id: string) => (tmuxMocks.sessionExistsSync as (name: string) => boolean)(id)),
+}));
 
 vi.mock('../../../lib/tmux.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../lib/tmux.js')>();
@@ -112,6 +119,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  agentMocks.stopAgent.mockReturnValue(Effect.void);
   FAKE_AGENTS_DIR_LISTING.entries = [];
   agentMocks.getAgentStateSync.mockReturnValue(STOPPED_STATE);
   tmuxMocks.sessionExistsSync.mockReturnValue(false);
@@ -167,8 +175,8 @@ describe('killCommand agent targeting (PAN-1760)', () => {
   it('kills exactly the named agent for a fully-qualified agent ID', async () => {
     const { killCommand } = await import('../kill.js');
     await killCommand('strike-pan-1723', {});
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledTimes(1);
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('strike-pan-1723', 'operator');
+    expect(agentMocks.stopAgent).toHaveBeenCalledTimes(1);
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('strike-pan-1723', 'operator');
     expect(interventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith(
       expect.objectContaining({ issueId: 'PAN-1723', kind: 'pause' }),
     );
@@ -182,8 +190,8 @@ describe('killCommand agent targeting (PAN-1760)', () => {
     ];
     const { killCommand } = await import('../kill.js');
     await killCommand('PAN-1723', {});
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('strike-pan-1723', 'operator');
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('inspect-pan-1723-task-slug', 'operator');
-    expect(agentMocks.stopAgentSync).not.toHaveBeenCalledWith('agent-pan-9999');
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('strike-pan-1723', 'operator');
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('inspect-pan-1723-task-slug', 'operator');
+    expect(agentMocks.stopAgent).not.toHaveBeenCalledWith('agent-pan-9999');
   });
 });

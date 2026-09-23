@@ -16,7 +16,7 @@
 
 import { Effect } from 'effect';
 
-import './herdr.js';
+import { AGENT_ID_TOKEN } from './herdr.js';
 import './tmux.js';
 import { resolveTerminalBackend } from './registry.js';
 import { hostTerminalBackendName } from './select.js';
@@ -24,6 +24,8 @@ import {
   isUnsupported,
   type AgentDetectionPolicy,
   type AgentPaneRef,
+  type AgentRole,
+  type BackendAgentSnapshot,
   type PaneTokens,
   type TerminalBackend,
   type TerminalBackendName,
@@ -137,26 +139,136 @@ export async function agentPaneExists(agentId: string, backend?: TerminalBackend
   return await Effect.runPromise(sessionExists(agentId));
 }
 
+/** True when a backend `close` reported success (not `unsupported`, not a failure). */
+async function closeThrough(backend: TerminalBackend, pane: AgentPaneRef): Promise<boolean> {
+  try {
+    const result = await Effect.runPromise(backend.close(pane));
+    return !isUnsupported(result);
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Close the pane `agentPaneExists` sees for an agent. `stopAgent` reaches only
- * a tmux session (plus a launcher-path process sweep that cannot match a Herdr
- * pane's bare `/bin/bash`), so on Herdr a finished agent's pane — and the idle
- * harness inside it — outlives every stop until the pane itself is closed.
- * Returns true when a Herdr pane was closed; false when there was nothing to
- * close or the host runs tmux (where `stopAgent`'s `killSession` already did it).
+ * Terminate an agent's terminal through the host's terminal backend (PAN-3947).
+ *
+ * This is the one termination primitive every stop path uses (`stopAgent`,
+ * `pan kill`/`pan stop`, the dashboard Stop and Pause routes, the post-merge
+ * lifecycle, close-out teardown). A stop that only rewrote `state.json` — or
+ * only ran `tmux kill-session` — left a Herdr pane and the idle harness in it
+ * alive, so every liveness reader still saw the agent and the next start was
+ * refused as "already running".
+ *
+ * - **Herdr:** the agent's pane — live, or residue whose shell is back at its
+ *   prompt — is closed with `pane.close`. A tmux session of the same name (an
+ *   agent launched before the host moved to Herdr) is killed too.
+ * - **tmux:** the agent's session is killed through the tmux adapter's `close`.
+ *
+ * Never throws. Returns true when a pane or session was closed.
  */
 export async function closeAgentPane(agentId: string, backend?: TerminalBackend): Promise<boolean> {
-  const resolved = backend ?? (await resolveLaunchBackend());
-  if (resolved.name !== 'herdr') return false;
-  const { findHerdrAgent } = await import('./herdr.js');
-  const ref = await findHerdrAgent(agentId);
-  if (!ref) return false;
-  await Effect.runPromise(resolved.close({
-    backend: 'herdr',
-    workspaceId: ref.workspaceId,
-    paneId: ref.paneId,
-    terminalId: ref.terminalId,
-    agentName: agentId,
-  })).catch(() => {});
-  return true;
+  let resolved: TerminalBackend;
+  try {
+    resolved = backend ?? (await resolveLaunchBackend());
+  } catch {
+    return false;
+  }
+  const { sessionExists } = await import('../tmux.js');
+  const tmuxSessionLive = (): Promise<boolean> =>
+    Effect.runPromise(sessionExists(agentId)).catch(() => false);
+
+  if (resolved.name === 'tmux') {
+    if (!(await tmuxSessionLive())) return false;
+    return await closeThrough(resolved, {
+      backend: 'tmux',
+      workspaceId: agentId,
+      paneId: agentId,
+      terminalId: agentId,
+      agentName: agentId,
+    });
+  }
+
+  const { findHerdrAgentPane } = await import('./herdr.js');
+  const ref = await findHerdrAgentPane(agentId);
+  const closedPane = ref
+    ? await closeThrough(resolved, {
+        backend: resolved.name,
+        workspaceId: ref.workspaceId,
+        paneId: ref.paneId,
+        terminalId: ref.terminalId,
+        agentName: agentId,
+      })
+    : false;
+
+  let closedLegacySession = false;
+  if (await tmuxSessionLive()) {
+    const { resolveTerminalBackend: resolve } = await import('./registry.js');
+    closedLegacySession = await closeThrough(resolve('tmux'), {
+      backend: 'tmux',
+      workspaceId: agentId,
+      paneId: agentId,
+      terminalId: agentId,
+      agentName: agentId,
+    });
+  }
+  return closedPane || closedLegacySession;
+}
+
+export interface CloseIssuePanesOptions {
+  /** Only close panes whose `role` token is one of these. Omit to close every role. */
+  readonly roles?: readonly AgentRole[];
+}
+
+/**
+ * Close every Herdr pane stamped for an issue (PAN-3947).
+ *
+ * The post-merge lifecycle and close-out teardown find an issue's review, test
+ * and strike terminals by tmux session name. A Herdr pane has no session name —
+ * it carries the issue in its `issue` token — so on Herdr those name scans find
+ * nothing and every pane survives. This reads the backend's live inventory and
+ * closes the panes whose `issue` token matches (optionally filtered by `role`).
+ *
+ * Herdr only: on tmux the callers' existing session-name scans already reach
+ * every session, and a tmux pane carries no stamped tokens. Operator
+ * conversation panes (`conv-*`) are never closed. Returns the agent id
+ * (or pane id when the pane carries none) of every pane it closed.
+ */
+export async function closeIssuePanes(
+  issueId: string,
+  options: CloseIssuePanesOptions = {},
+  backend?: TerminalBackend,
+): Promise<string[]> {
+  let resolved: TerminalBackend;
+  let inventory: readonly BackendAgentSnapshot[];
+  try {
+    resolved = backend ?? (await resolveLaunchBackend());
+    if (resolved.name !== 'herdr') return [];
+    inventory = await listInventory(resolved);
+  } catch {
+    return [];
+  }
+  const wanted = issueId.toLowerCase();
+  const closed: string[] = [];
+  for (const pane of inventory) {
+    if (pane.tokens.issue?.toLowerCase() !== wanted) continue;
+    if (options.roles && (!pane.tokens.role || !options.roles.includes(pane.tokens.role))) continue;
+    const agentName = (pane.tokens as Record<string, string | undefined>)[AGENT_ID_TOKEN] ?? pane.paneId;
+    // An operator conversation is never an issue's agent, even if a pane were
+    // ever stamped with an issue: the tmux sweeps this mirrors never match `conv-*`.
+    if (agentName.toLowerCase().startsWith('conv-')) continue;
+    const ok = await closeThrough(resolved, {
+      backend: resolved.name,
+      workspaceId: pane.workspaceId,
+      paneId: pane.paneId,
+      terminalId: pane.terminalId,
+      agentName,
+    });
+    if (ok) closed.push(agentName);
+  }
+  return closed;
+}
+
+async function listInventory(backend: TerminalBackend): Promise<readonly BackendAgentSnapshot[]> {
+  const result = await Effect.runPromise(backend.list());
+  return isUnsupported(result) ? [] : result;
 }

@@ -42,6 +42,17 @@ export async function reapIssueResidue(projectPath: string, issueId: string): Pr
     // tmux server may not be running.
   }
 
+  // PAN-3947: on a Herdr host the issue's agents live in panes stamped with its
+  // `issue` token, not in named tmux sessions. No-op on a tmux host.
+  try {
+    const { closeIssuePanes } = await import('../terminal-backends/launch.js');
+    for (const agentName of await closeIssuePanes(issueId)) {
+      actions.push(`closed Herdr pane ${agentName}`);
+    }
+  } catch {
+    // Backend unavailable — nothing more to close.
+  }
+
   // Remove Docker stack by name, independent of whether the workspace dir still
   // exists — and independent of the merged check below. Containers and networks
   // are disposable runtime state (rebuildWorkspaceStack no-ops for terminal
