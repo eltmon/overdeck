@@ -1,6 +1,6 @@
 # Backlog Sequence
 
-_Last sequenced: 2026-09-23T14:17:06.642Z · model: claude-opus-5 · open: 852_
+_Last sequenced: 2026-09-23T14:36:26.826Z · model: claude-opus-5 · open: 862_
 
 
 | rank | issue | size | importance | condition | epic | depends-on | why |
@@ -39,6 +39,7 @@ _Last sequenced: 2026-09-23T14:17:06.642Z · model: claude-opus-5 · open: 852_
 | 38 | PAN-3565 | M | critical | ok |  |  | Failed review spawn wedges 'starting', and an all-lanes infra failure is synthesized as a real CHANGES REQUESTED verdict. |
 | 39 | PAN-3554 | M | critical | needs-refinement |  |  | Red main has no mechanical owner: it hid for ~5h because the merge gate renders red main as an empty queue, not an alarm. |
 | 40 | PAN-3532 | S | critical | ok |  |  | CI runs only a hand-picked slice of the frontend suite, so main stayed red on frontend for hours while every run reported green. |
+| 41 | PAN-4019 | S | critical | ok |  |  | Escalation pauses the agent, then the stuck message resumes it via feedback-target: the verification attempt budget stops nobody |
 | 42 | PAN-3685 | S | high | ok |  |  | Swarm GC leaves consumed completion markers that hold slot capacity after assignments are freed |
 | 43 | PAN-3085 | XS | critical | needs-refinement |  |  | Review feedback is written to .overdeck/feedback but agents and the deacon merge gate are pointed at a nonexistent .pan/feedback. |
 | 44 | PAN-3653 | M | critical | ok |  |  | A strike blocked on red main has no owner that wakes it when main goes green; the session stays alive so recover refuses it. |
@@ -67,6 +68,7 @@ _Last sequenced: 2026-09-23T14:17:06.642Z · model: claude-opus-5 · open: 852_
 | 67 | PAN-2940 | M | critical | ok |  |  | Three red-mains in one day from direct-push series bypassing PR CI |
 | 68 | PAN-3708 | M | critical | ok |  |  | pan strike dies at git worktree list on a polyrepo wrapper — the urgent-strike escape hatch is unavailable for MYN-class projects. |
 | 69 | PAN-3605 | XS | high | ok |  |  | Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin. |
+| 70 | PAN-4016 | S | critical | ok |  |  | advanceMergeQueue skips normalMergeEligibility for strike branches, so a strike merges with no approval check and no green-checks gate |
 | 71 | PAN-3557 | S | critical | ok |  |  | Post-merge label writes have no retry; a 403 hides a merged issue from the verify-on-main sweep while lifecycle reports success. |
 | 72 | PAN-3543 | S | critical | ok |  |  | Completed-handoff agents are unstartable: start, --fresh and reset-session all refuse while the refusal itself recommends --fresh. |
 | 73 | PAN-3522 | S | critical | ok |  |  | Supervisor watchdog restart-churns under CPU storm because the probe timeout budget ignores the boot warm phase. |
@@ -216,316 +218,325 @@ _Last sequenced: 2026-09-23T14:17:06.642Z · model: claude-opus-5 · open: 852_
 | 217 | PAN-3046 | XS | high | ok |  |  | pan exits with ERR_UNHANDLED_REJECTION when the PostHog shutdown flush times out, so callers read a successful merge handoff as failure. |
 | 218 | PAN-1711 | S | high | ok |  |  | Dashboard event-loop stalls under load force watchdog restarts; the root cause behind the PAN-3522 churn and the 0.5-1.5s API latencies. |
 | 219 | PAN-3667 | M | high | ok |  |  | CLIProxy has no cross-family remap, so every Anthropic-pinned subagent dies at spawn in a proxied session; stopgap is hand-written. |
-| 221 | PAN-3527 | XS | high | ok |  |  | One failed boot-time fetch leaves the sidebar at CONVERSATIONS 0 / ISSUES 0 for the life of the tab — nothing retries it. |
-| 222 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
-| 223 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
-| 224 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
-| 225 | PAN-3245 | XS | high | ok |  |  | The pan done gate flags workspace .pan/drafts as uncommitted despite its own .pan exclusion, training agents to reach for --force. |
-| 226 | PAN-3218 | S | high | ok |  |  | No release-drift signal: an install-breaking fix sat merged and unpublished for ~9 hours with nothing surfacing it. |
-| 227 | PAN-3210 | XS | high | ok |  |  | Close-out teardown scopes by compose project while the guard scopes by working_dir, so an unprefixed dead init container blocks it. |
-| 228 | PAN-3167 | S | high | ok |  |  | krux and lexerra are permanently unreadable through the membership door: an App-not-installed 404 is typed as retryable forge_unavailable. |
-| 229 | PAN-3113 | M | high | ok |  |  | Blocking agent-pane choice prompts show nothing in the conversation view; surface them as inline decision cards with keystroke delivery. |
-| 230 | PAN-3108 | XS | high | ok |  |  | dashboard.log reached 867MB with no rotation — disk cost and un-greppable incident logs exactly when they're needed. |
-| 231 | PAN-3094 | XS | high | ok |  |  | pan done's merge fallback still force-pushes a fast-forwardable branch, so a rejected push leaves completion half-done. |
-| 232 | PAN-3012 | M | high | ok |  |  | Archiving preserves the pointer, not the data: harnesses delete session JSONL on their own schedule and the conversation is unrecoverable. |
-| 233 | PAN-3627 | XS | high | ok |  |  | backlog-auto-trigger throws on a legitimately empty manifest, so a plain npx @overdeck/core in a non-project dir prints a stack trace. |
-| 234 | PAN-3617 | S | high | needs-refinement |  |  | Three strike dispatches for PAN-3586 died with zero output while a sibling worked; may be stale — re-confirm before picking up. |
-| 235 | PAN-3308 | XS | high | ok |  |  | The file-size guard prints a paste-ready ratchet-up line, so 2 of 3 agents raised the ceiling instead of shrinking the file. |
-| 236 | PAN-3276 | XS | high | ok |  |  | Needs-you rows for pane questions and permission prompts are click-dead, so the list that exists to route the operator routes nowhere. |
-| 237 | PAN-3235 | S | high | ok |  |  | Render and answer agent pane-choice menus on the decision card; PAN-3228 shipped the core and CLI, the dashboard UX remains. |
-| 238 | PAN-3855 | S | medium | ok |  |  | pan start reuses the old agent's recorded model after pan reset-session, so retuned tiers never apply without --fresh |
-| 239 | PAN-3789 | L | medium | needs-refinement |  |  | MCP servers configured in standalone Codex never reach Overdeck conversations; no setup, auth or lifecycle story across harnesses |
-| 240 | PAN-3175 | M | high | ok |  |  | Merge-train ordering derives conflicts from file overlap alone, so semantically dependent members batch in any order and break the schema. |
-| 241 | PAN-3015 | L | high | ok |  |  | Claude Code is the only harness still driven by keystroke injection; a pull-based monitor inbox would retire the whole hardening stack. |
-| 242 | PAN-3518 | M | high | needs-refinement |  | PAN-3517 | Re-review resumes re-bill the whole cold history; make reviewResumeDecision TTL- and size-aware. Needs design sign-off. |
-| 243 | PAN-3445 | XS | high | ok |  |  | projects.yaml TCP lock ports overlap the OS ephemeral range, so an unrelated socket makes an uncontended config write fail. |
-| 244 | PAN-3332 | S | high | ok |  |  | A detached slash-command spawn died in 150ms while the UI kept saying 'running in the background'; the activity must own its outcome. |
-| 245 | PAN-3295 | M | high | ok |  |  | Completion-check LLM is invisible infrastructure that fanned out to 35 concurrent processes; one queued summarizer plus observability. |
-| 246 | PAN-3236 | XS | high | needs-refinement |  |  | ECONNREFUSED on a dead supervisor socket was treated as ambiguous so feedback never crossed to tmux; a fix commit is cited — verify. |
-| 247 | PAN-3013 | XS | high | ok |  |  | Role-spawn wrote 26 session-scoped hook paths into the durable ~/.claude/settings.json; they fail on every Linear tool call forever. |
-| 248 | PAN-3771 | M | high | ok |  |  | Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries. |
-| 249 | PAN-3533 | L | high | ok |  |  | No per-project resource partitioning, so one project's docker stacks and installs starve another project's pipeline and the dashboard. |
-| 250 | PAN-3107 | S | high | ok |  |  | OOM spikes are unattributable after the fact; productize the machine-local memory-attribution census stopgap. |
-| 251 | PAN-3762 | XL | high | needs-refinement |  |  | Overdeck Anywhere direction change: per-machine servers + client-side federation instead of relay-first. Supersedes PAN-2350 plan. |
-| 252 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
-| 253 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
-| 254 | PAN-2188 | M | high | needs-refinement |  |  | Flywheel resilience for the codebase-health flood: substrate-first prioritization + tenets spirit-gate |
-| 255 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
-| 256 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
-| 257 | PAN-2008 | XS | high | needs-refinement |  | PAN-1936 | store-access guard |
-| 258 | PAN-1325 | M | high | ok |  |  | Artifact storage model is unsafe for polyrepo projects |
-| 259 | PAN-1728 | S | medium | needs-refinement |  |  | Specs now live in .pan/ and are committed on the feature branch; the described immutability violation may not be meaningful — verify… |
-| 260 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
-| 261 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
-| 262 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
-| 263 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
-| 264 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
-| 265 | PAN-2195 | M | high | needs-refinement |  |  | pan plan finalize re-plan churn: stale superseded spec on main transiently materializes the old plan |
-| 266 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
-| 267 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
-| 268 | PAN-2469 | M | high | ok |  |  | issue-level assembly owner |
-| 269 | PAN-2212 | M | high | ok |  |  | Swarm slot dispatch has no reserved budget |
-| 270 | PAN-2213 | M | high | ok |  |  | Swarm slot allocator picks an orphaned slot index and refuses instead of skipping to the next free one |
-| 271 | PAN-2211 | M | high | ok |  |  | PAN-2203 follow-up: swarm slot pan done records completion but slot never becomes merge-ready |
-| 272 | PAN-2210 | M | high | ok |  |  | PAN-2203 follow-up: a swarm slot's completion can trigger the issue-level review pipeline |
-| 273 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
-| 274 | PAN-2646 | XS | high | ok |  |  | configurable global/project/issue policy UI with default OFF |
-| 275 | PAN-3751 | M | high | ok |  |  | Post-merge deploy runs a multi-minute build with no dashboard indication — operator reads a silent deploy as a lost notification |
-| 276 | PAN-2652 | M | high | ok |  |  | Conversation view diverges from Terminal: Claude Code backgrounding forks the session file in-process, invisible to all session-id reso… |
-| 277 | PAN-2755 | S | high | ok |  |  | per-issue review-model override never reached convoy sub-reviewers on the discovery-fork path |
-| 278 | PAN-2754 | S | high | ok |  |  | `always` is inert |
-| 279 | PAN-2809 | M | high | ok |  |  | Live-terminal Playwright UAT blocked in containerized workspaces (node-pty musl/glibc mismatch + Vite/Traefik WS Origin 403) |
-| 280 | PAN-2810 | M | high | ok |  |  | Workspace 'vitest --changed' gate diverges from CI: App.test.tsx fails locally on missing selectPendingInputSubjects mock |
-| 281 | PAN-2495 | S | high | ok |  |  | PAN-2487 ci-green merge skip bypassed CI-green gate |
-| 282 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
-| 283 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
-| 284 | PAN-3420 | M | high | needs-refinement |  |  | Pipeline substrate: Dashboard + pan show render a completed, closed-out issue as never-started (post-close-out history wipe) |
-| 285 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
-| 286 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
-| 288 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
-| 289 | PAN-1578 | M | high | ok |  |  | GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
-| 290 | PAN-1538 | M | high | ok |  |  | Unblock Pi source forks |
-| 291 | PAN-687 | M | high | ok |  |  | Support OpenCode as alternative coding agent |
-| 292 | PAN-466 | M | high | ok |  |  | Add QwenCoder CLI as a supported runtime alongside Claude Code and Codex |
-| 293 | PAN-465 | M | high | ok |  |  | Add OpenRouter as a model provider |
-| 294 | PAN-463 | M | high | ok |  |  | Add Qwen 3.6+ model support |
-| 295 | PAN-1142 | M | high | ok |  |  | Add reasoning effort level to per-role / per-conversation model config |
-| 296 | PAN-1424 | M | high | needs-refinement |  |  | Model pool dispatch + work.* subtype taxonomy (follow-up to PAN-1122) |
-| 297 | PAN-1196 | M | high | needs-refinement |  |  | Workhorse routing by bead difficulty + subject-matter (single-agent and swarm) |
-| 298 | PAN-1311 | M | high | needs-refinement |  |  | Swarm: fast-track tier |
-| 299 | PAN-1313 | L | high | ok |  |  | Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces |
-| 300 | PAN-1246 | M | high | ok |  |  | Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586) |
-| 301 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
-| 302 | PAN-1254 | L | high | ok |  |  | Tailscale integration: advertise dashboard + workspace endpoints over tailnet (Effect-native) |
-| 303 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
-| 304 | PAN-1915 | M | high | ok |  |  | enhancement(security): API key at-rest hardening |
-| 305 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
-| 306 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
+| 220 | PAN-3958 | XL | high | ok | ✓ |  | Unparked epic: the Effect façade + sync-twin cut. PRD landed, ratchet PR #4006 open, children CH-1..CH-8 filed in landing order |
+| 221 | PAN-4007 | L | high | ok |  |  | CH-1 lands first: delete 268 dead sync wrappers, 43 dead façades and the never-constructed runtime classes; needs ratchet PR #4006 in |
+| 222 | PAN-4008 | M | high | ok |  | PAN-4007 | CH-2: convert the 24 live Effect façades in 15 src/lib/cloister modules to plain async and update their callers |
+| 223 | PAN-4009 | L | high | ok |  | PAN-4008 | CH-3: convert 51 façades in 21 agent, runtime, tmux, health, git, checkpoint and workspace modules; drop the routes/agents/shared.ts aliases |
+| 224 | PAN-4010 | L | high | ok |  | PAN-4009 | CH-4: convert 65 façades in 16 TTS, platform, cliproxy, tunnel, auth, GitHub-app and webhook modules to plain async |
+| 225 | PAN-4011 | M | high | ok |  | PAN-4010 | CH-5: convert the last 37 façades (config, projects, settings, shadow, costs, conversations, xbrief, memory); clears every Shape A row |
+| 226 | PAN-4012 | L | high | ok |  | PAN-4011 | CH-6: resolve 33 live sync wrappers and 37 live twin pairs; leave no blocking *Sync child-process call in dashboard or cloister code |
+| 227 | PAN-4013 | L | high | ok |  | PAN-4012 | CH-7: one src/lib/runtimes/storage/<harness>.ts owner for transcript, session and home paths now spread over ~50 files, plus a lint |
+| 228 | PAN-4014 | M | high | ok |  | PAN-4013 | CH-8: delete ~222 unreferenced exports and the alias shims, then unexport file-local symbols; marks src/index.ts internal |
+| 229 | PAN-3527 | XS | high | ok |  |  | One failed boot-time fetch leaves the sidebar at CONVERSATIONS 0 / ISSUES 0 for the life of the tab — nothing retries it. |
+| 230 | PAN-3510 | S | high | ok |  |  | Agent stop leaves detached docker-run test containers alive for hours, contending with other agents' quality gates. |
+| 231 | PAN-3355 | XS | high | ok |  |  | sessionExists collapses 'no such session' and 'could not ask' into false, so callers read not-running when liveness is unknown. |
+| 232 | PAN-3289 | S | high | ok |  |  | A sequencer pass ran against an empty manifest while the read model held 1120 issues — a transiently empty read at spawn. |
+| 233 | PAN-3245 | XS | high | ok |  |  | The pan done gate flags workspace .pan/drafts as uncommitted despite its own .pan exclusion, training agents to reach for --force. |
+| 234 | PAN-3218 | S | high | ok |  |  | No release-drift signal: an install-breaking fix sat merged and unpublished for ~9 hours with nothing surfacing it. |
+| 235 | PAN-3210 | XS | high | ok |  |  | Close-out teardown scopes by compose project while the guard scopes by working_dir, so an unprefixed dead init container blocks it. |
+| 236 | PAN-3167 | S | high | ok |  |  | krux and lexerra are permanently unreadable through the membership door: an App-not-installed 404 is typed as retryable forge_unavailable. |
+| 237 | PAN-3113 | M | high | ok |  |  | Blocking agent-pane choice prompts show nothing in the conversation view; surface them as inline decision cards with keystroke delivery. |
+| 238 | PAN-3108 | XS | high | ok |  |  | dashboard.log reached 867MB with no rotation — disk cost and un-greppable incident logs exactly when they're needed. |
+| 239 | PAN-3094 | XS | high | ok |  |  | pan done's merge fallback still force-pushes a fast-forwardable branch, so a rejected push leaves completion half-done. |
+| 240 | PAN-3012 | M | high | ok |  |  | Archiving preserves the pointer, not the data: harnesses delete session JSONL on their own schedule and the conversation is unrecoverable. |
+| 241 | PAN-3627 | XS | high | ok |  |  | backlog-auto-trigger throws on a legitimately empty manifest, so a plain npx @overdeck/core in a non-project dir prints a stack trace. |
+| 242 | PAN-3617 | S | high | needs-refinement |  |  | Three strike dispatches for PAN-3586 died with zero output while a sibling worked; may be stale — re-confirm before picking up. |
+| 243 | PAN-3308 | XS | high | ok |  |  | The file-size guard prints a paste-ready ratchet-up line, so 2 of 3 agents raised the ceiling instead of shrinking the file. |
+| 244 | PAN-3276 | XS | high | ok |  |  | Needs-you rows for pane questions and permission prompts are click-dead, so the list that exists to route the operator routes nowhere. |
+| 245 | PAN-3235 | S | high | ok |  |  | Render and answer agent pane-choice menus on the decision card; PAN-3228 shipped the core and CLI, the dashboard UX remains. |
+| 246 | PAN-3855 | S | medium | ok |  |  | pan start reuses the old agent's recorded model after pan reset-session, so retuned tiers never apply without --fresh |
+| 247 | PAN-3789 | L | medium | needs-refinement |  |  | MCP servers configured in standalone Codex never reach Overdeck conversations; no setup, auth or lifecycle story across harnesses |
+| 248 | PAN-3175 | M | high | ok |  |  | Merge-train ordering derives conflicts from file overlap alone, so semantically dependent members batch in any order and break the schema. |
+| 249 | PAN-3015 | L | high | ok |  |  | Claude Code is the only harness still driven by keystroke injection; a pull-based monitor inbox would retire the whole hardening stack. |
+| 250 | PAN-3518 | M | high | needs-refinement |  | PAN-3517 | Re-review resumes re-bill the whole cold history; make reviewResumeDecision TTL- and size-aware. Needs design sign-off. |
+| 251 | PAN-3445 | XS | high | ok |  |  | projects.yaml TCP lock ports overlap the OS ephemeral range, so an unrelated socket makes an uncontended config write fail. |
+| 252 | PAN-3332 | S | high | ok |  |  | A detached slash-command spawn died in 150ms while the UI kept saying 'running in the background'; the activity must own its outcome. |
+| 253 | PAN-3295 | M | high | ok |  |  | Completion-check LLM is invisible infrastructure that fanned out to 35 concurrent processes; one queued summarizer plus observability. |
+| 254 | PAN-3236 | XS | high | needs-refinement |  |  | ECONNREFUSED on a dead supervisor socket was treated as ambiguous so feedback never crossed to tmux; a fix commit is cited — verify. |
+| 255 | PAN-3013 | XS | high | ok |  |  | Role-spawn wrote 26 session-scoped hook paths into the durable ~/.claude/settings.json; they fail on every Linear tool call forever. |
+| 256 | PAN-3771 | M | high | ok |  |  | Conversation search silently empty end-to-end: palette flag off by default, FTS scan manual-only, no summaries. |
+| 257 | PAN-3533 | L | high | ok |  |  | No per-project resource partitioning, so one project's docker stacks and installs starve another project's pipeline and the dashboard. |
+| 258 | PAN-3107 | S | high | ok |  |  | OOM spikes are unattributable after the fact; productize the machine-local memory-attribution census stopgap. |
+| 259 | PAN-3762 | XL | high | needs-refinement |  |  | Overdeck Anywhere direction change: per-machine servers + client-side federation instead of relay-first. Supersedes PAN-2350 plan. |
+| 260 | PAN-1666 | XL | medium | ok | ✓ |  | Pipeline Throughput Hardening |
+| 261 | PAN-1556 | S | high | ok |  |  | Session/activity feed: coalesce review-spawn spam, supersede re-reviews per issue, keep active conversations most-recent |
+| 262 | PAN-2188 | M | high | needs-refinement |  |  | Flywheel resilience for the codebase-health flood: substrate-first prioritization + tenets spirit-gate |
+| 263 | PAN-2190 | L | high | ok |  |  | Decompose routes/workspaces/merge-ops.ts (1,925 lines) |
+| 264 | PAN-2233 | L | high | ok |  |  | decompose merge-agent.ts (1,414 lines) into focused modules |
+| 265 | PAN-2008 | XS | high | needs-refinement |  | PAN-1936 | store-access guard |
+| 266 | PAN-1325 | M | high | ok |  |  | Artifact storage model is unsafe for polyrepo projects |
+| 267 | PAN-1728 | S | medium | needs-refinement |  |  | Specs now live in .pan/ and are committed on the feature branch; the described immutability violation may not be meaningful — verify… |
+| 268 | PAN-2241 | S | high | ok |  |  | complete-planning is not serialized or idempotent per issue (spec tmp-rename 500s, bead delete-recreate thrash) |
+| 269 | PAN-2242 | S | high | ok |  |  | Unidentified duplicate caller fires complete-planning in pairs every ~2 minutes (perpetual loop while session survives) |
+| 270 | PAN-2240 | S | high | ok |  |  | pan tell contradicts itself on dead ohmypi sessions |
+| 271 | PAN-2243 | S | high | ok |  |  | pan plan finalize: CLI aborts complete-planning at 90s while the server handler legitimately finishes later (false ✖ Failed) |
+| 272 | PAN-2202 | S | high | ok |  |  | complete-planning silently skips spec promotion on a dead session's unanswered AskUserQuestion |
+| 273 | PAN-2195 | M | high | needs-refinement |  |  | pan plan finalize re-plan churn: stale superseded spec on main transiently materializes the old plan |
+| 274 | PAN-2237 | S | high | ok |  |  | pan plan done swallows vbrief quality lint details |
+| 275 | PAN-2487 | M | high | ok |  |  | CI-green merge skip + Ship & Merge cockpit view (live door log + progress) + active-node spinner |
+| 276 | PAN-2469 | M | high | ok |  |  | issue-level assembly owner |
+| 277 | PAN-2212 | M | high | ok |  |  | Swarm slot dispatch has no reserved budget |
+| 278 | PAN-2213 | M | high | ok |  |  | Swarm slot allocator picks an orphaned slot index and refuses instead of skipping to the next free one |
+| 279 | PAN-2211 | M | high | ok |  |  | PAN-2203 follow-up: swarm slot pan done records completion but slot never becomes merge-ready |
+| 280 | PAN-2210 | M | high | ok |  |  | PAN-2203 follow-up: a swarm slot's completion can trigger the issue-level review pipeline |
+| 281 | PAN-2201 | XS | high | ok |  |  | Close-out label step fails atomically when a hardcoded label (e.g. 'in-planning') is absent from the repo |
+| 282 | PAN-2646 | XS | high | ok |  |  | configurable global/project/issue policy UI with default OFF |
+| 283 | PAN-3751 | M | high | ok |  |  | Post-merge deploy runs a multi-minute build with no dashboard indication — operator reads a silent deploy as a lost notification |
+| 284 | PAN-2652 | M | high | ok |  |  | Conversation view diverges from Terminal: Claude Code backgrounding forks the session file in-process, invisible to all session-id reso… |
+| 285 | PAN-2755 | S | high | ok |  |  | per-issue review-model override never reached convoy sub-reviewers on the discovery-fork path |
+| 286 | PAN-2754 | S | high | ok |  |  | `always` is inert |
+| 287 | PAN-2809 | M | high | ok |  |  | Live-terminal Playwright UAT blocked in containerized workspaces (node-pty musl/glibc mismatch + Vite/Traefik WS Origin 403) |
+| 288 | PAN-2810 | M | high | ok |  |  | Workspace 'vitest --changed' gate diverges from CI: App.test.tsx fails locally on missing selectPendingInputSubjects mock |
+| 289 | PAN-2495 | S | high | ok |  |  | PAN-2487 ci-green merge skip bypassed CI-green gate |
+| 290 | PAN-2478 | S | high | ok |  |  | CI flake: Playwright browser install fails on packages.microsoft.com apt (NOSPLIT), red-mains legit merges |
+| 291 | PAN-1710 | S | high | ok |  |  | 'Clean install + server smoke test' hangs (3 consecutive 20-min timeout kills) on feature/pan-1491 and feature/pan-1641 |
+| 292 | PAN-3420 | M | high | needs-refinement |  |  | Pipeline substrate: Dashboard + pan show render a completed, closed-out issue as never-started (post-close-out history wipe) |
+| 293 | PAN-1558 | M | high | ok |  |  | Review/specialist agents should run in the workspace Docker container, not inherit host-override |
+| 294 | PAN-1766 | S | high | ok |  |  | work agents hang on Claude Code settings-file protection when editing .claude/** |
+| 295 | PAN-2266 | M | high | ok |  |  | feat: add zcode harness and make it the default for glm-5.2 |
+| 296 | PAN-1578 | M | high | ok |  |  | GitHub Copilot CLI as a first-class harness (pipeline peer to Claude Code, Pi, Codex) |
+| 297 | PAN-1538 | M | high | ok |  |  | Unblock Pi source forks |
+| 298 | PAN-687 | M | high | ok |  |  | Support OpenCode as alternative coding agent |
+| 299 | PAN-466 | M | high | ok |  |  | Add QwenCoder CLI as a supported runtime alongside Claude Code and Codex |
+| 300 | PAN-465 | M | high | ok |  |  | Add OpenRouter as a model provider |
+| 301 | PAN-463 | M | high | ok |  |  | Add Qwen 3.6+ model support |
+| 302 | PAN-1142 | M | high | ok |  |  | Add reasoning effort level to per-role / per-conversation model config |
+| 303 | PAN-1424 | M | high | needs-refinement |  |  | Model pool dispatch + work.* subtype taxonomy (follow-up to PAN-1122) |
+| 304 | PAN-1196 | M | high | needs-refinement |  |  | Workhorse routing by bead difficulty + subject-matter (single-agent and swarm) |
+| 305 | PAN-1311 | M | high | needs-refinement |  |  | Swarm: fast-track tier |
+| 306 | PAN-1313 | L | high | ok |  |  | Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces |
 | 307 | PAN-3787 | L | medium | ok |  |  | Add a per-child composer and live Working-for indicator to subagent transcripts for Codex and Claude Code |
-| 308 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
-| 309 | PAN-2351 | XS | high | ok |  | PAN-1166 | Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats (security prerequisites) |
-| 310 | PAN-2350 | L | high | needs-refinement | ✓ |  | Epic container for Overdeck Anywhere P0-P3; PAN-3762 proposes replacing the relay-first direction with per-machine server federation. |
-| 311 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
-| 312 | PAN-2079 | M | high | needs-refinement |  |  | Inbox spine: boot reconciliation (producer #1) is gone; may still be worth pursuing for pending AUQ, cost alerts and other producers |
-| 313 | PAN-3934 | S | medium | ok |  | PAN-3929 | roles/*.md and two docs still name deleted status fields outside the guard's Markdown roots; follow-up to PAN-3929 |
-| 314 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
-| 315 | PAN-1209 | S | low | stale |  |  | bd/beads were removed earlier; any drift-detection concern now applies to xBRIEF item status, not bd state |
-| 316 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
-| 317 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
-| 318 | PAN-1454 | M | high | ok |  |  | [META] 9 systemic failure patterns surfaced by 80-issue audit |
-| 319 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
-| 320 | PAN-1504 | M | high | ok |  |  | pan hygiene |
-| 321 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
-| 322 | PAN-1479 | M | high | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
-| 323 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
-| 324 | PAN-2836 | M | high | ok |  |  | okf: in-repo placement presets (okf/, docs/okf/) and /okf migrate to switch placements later |
-| 325 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
-| 326 | PAN-2650 | L | high | ok |  |  | Swarm final ready-to-merge slot wedges when memory-governor sheds the integration stack; pan swarm recover can't recover it |
-| 327 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
-| 328 | PAN-2334 | XS | high | ok |  |  | write a Definition of Ready (DoR) |
-| 329 | PAN-2308 | M | high | needs-refinement |  |  | Compose-file port migration off 3011 still valid; the deacon-quarantine half references the deleted patrol loop — verify an equivalent guard |
-| 330 | PAN-2193 | S | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree |
-| 331 | PAN-1984 | XS | high | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
-| 332 | PAN-1913 | XS | high | ok |  |  | Project description: show on click, edit in dashboard, mirror into the project layer (and document what's in .pan and ~/.panopticon) |
-| 333 | PAN-1906 | M | high | ok |  |  | Enforce harness restrictions with subscription: gray out non-claude-code, validate everywhere |
-| 334 | PAN-1544 | M | high | ok |  |  | Type cleanup: strip 'ship' from the Role union and its ~10 downstream references |
-| 335 | PAN-955 | S | high | ok |  |  | Workspace devcontainer template versioning + re-render on demand |
-| 336 | PAN-807 | L | high | ok |  |  | Epic C: Workspace state sanity on spawn |
-| 337 | PAN-630 | M | high | ok |  |  | Multi-tenant workspace isolation with ACLs |
-| 338 | PAN-471 | M | high | ok |  |  | Cost reconciler: auto-trigger on agent lifecycle events with debounce |
-| 339 | PAN-438 | M | high | ok |  |  | Migrate remaining REST polling endpoints to Effect RPC |
-| 340 | PAN-578 | M | high | ok |  |  | Security: Comment mediation layer to prevent prompt injection via tracker comments |
-| 341 | PAN-2921 | S | medium | ok |  |  | Strike merge door can report fetch failure after merge and land the same head twice |
-| 342 | PAN-3920 | L | medium | needs-refinement |  | PAN-3822 | Agents directory (tree/list/detail) + registration door for plugin-spawned workers + spawn-and-wait primitive; needs PRD |
-| 343 | PAN-2839 | S | medium | ok |  |  | plan→work autoSpawn now 500s with a duplicated workspace prep |
-| 344 | PAN-2824 | S | medium | ok |  |  | pan review pending dies when one project's lens gather fails (non-degrading caller; PAN-2820 class) |
-| 345 | PAN-2792 | S | medium | ok |  |  | Orphan-process sweeps killed the dashboard and live conversations via lsof +D over Bun-hardlinked node_modules |
-| 346 | PAN-2761 | S | medium | ok |  |  | done.test.ts asserts a hardcoded URL without stubbing env, so it fails in any agent shell with OVERDECK_DASHBOARD_URL set and looks lik… |
-| 347 | PAN-2738 | S | medium | ok |  |  | strikes deadlock |
-| 348 | PAN-2717 | S | medium | ok |  |  | conversation permission waits missing from Awareness; strengthen alert pulse |
-| 349 | PAN-2697 | S | medium | ok |  |  | First-review codex parents enter discovery mode and the supervisor session no-ops every discovery-ready signal |
-| 350 | PAN-2696 | XS | medium | needs-refinement |  |  | Task views still speak beads vocabulary |
-| 351 | PAN-2691 | S | medium | ok |  |  | Auto-planned issues park silently when the post-finalize work spawn is gated (stack-unhealthy 422) |
-| 352 | PAN-2686 | XS | medium | needs-refinement |  |  | Policy strip "restart pending" badge never clears after restart-fresh with a new model (record.model is sticky) |
-| 353 | PAN-3701 | L | high | ok |  |  | Four separate first-party LLM client stacks; consolidate onto effect/unstable/ai LanguageModel + ExecutionPlan. PRD written. |
-| 354 | PAN-3090 | M | high | ok |  |  | Simple issue page opens with a 55KB raw kickoff prompt and hides the pending question the operator actually has to answer. |
-| 355 | PAN-2672 | S | medium | ok |  |  | Post-/clear siblings render the same original transcript (per-tmux resolution + frozen launcher pin + null claude_session_id) |
-| 356 | PAN-2670 | S | medium | ok |  |  | Gate the dashboard-server tsconfig in npm run typecheck |
-| 357 | PAN-2664 | S | medium | ok |  |  | auto-commit completes unresolved merge with conflict markers |
-| 358 | PAN-2663 | S | medium | ok |  |  | health probe can accept old dashboard after replacement EADDRINUSE |
-| 359 | PAN-2649 | S | medium | ok |  |  | Ctrl+K conversation search indexes Claude transcripts only |
-| 360 | PAN-2580 | S | medium | ok |  |  | pan tell cannot deliver to codex (GPT) conversations |
-| 361 | PAN-2572 | M | medium | ok |  |  | Noisy EBADENGINE + deprecation warnings on npx/npm install make a healthy install look broken |
-| 362 | PAN-2563 | S | medium | ok |  |  | npm-flavor desktop (npx @overdeck/desktop) lacks node_modules for the server's externalized deps |
-| 363 | PAN-2554 | S | medium | ok |  |  | clicking a project doesn't update the browser URL |
-| 364 | PAN-2550 | XS | medium | ok |  |  | npm test exits 0 despite root-suite failures |
-| 365 | PAN-2547 | S | medium | ok |  |  | pan restart --health-timeout parses seconds as milliseconds |
-| 366 | PAN-2546 | S | medium | ok |  |  | pan tell is codex-conversation-unaware |
-| 367 | PAN-3504 | XS | high | needs-refinement |  |  | Duplicate of PAN-3499 (parked.ts ProjectConfig.projectPath typecheck red on main); confirm landed and close one of the pair. |
-| 368 | PAN-3003 | XS | medium | ok |  |  | Generated launcher.sh files omit the OVERDECK_AGENT_ID export the PTY supervisor requires, so manual re-launch dies instantly. |
-| 369 | PAN-2501 | S | medium | ok |  |  | deleteResourceVenvEffect's HttpRouter.schemaParams call fails typecheck under the root tsconfig (masked by src/dashboard/** exclusion) |
-| 370 | PAN-2492 | S | medium | needs-refinement |  |  | pane-detected waits (rate-limit/session-resume) surface as 'needs you' but cannot be answered from the dashboard |
-| 371 | PAN-2491 | M | medium | ok |  |  | Migrate @xenova/transformers to @huggingface/transformers to eliminate silent npx install failures from sharp 0.32 postinstall |
-| 372 | PAN-2489 | S | medium | ok |  |  | strike agents are invisible in the project issue tree |
-| 373 | PAN-2465 | S | medium | ok |  |  | pan done's PR lookup fails at MYN polyrepo root |
-| 374 | PAN-2454 | S | medium | ok |  |  | ratchet audit fails per-commit on push ranges whose NET baseline delta is zero |
-| 375 | PAN-2428 | XS | medium | ok |  |  | MYN workspace Traefik routing broken post-rebrand |
-| 376 | PAN-2423 | XS | medium | ok |  |  | pan workspace rebuild hardcodes 'overdeck-' compose project prefix |
-| 377 | PAN-2416 | S | medium | ok |  |  | codex agents can wedge on the Codex CLI first-run/consent screen |
-| 378 | PAN-2408 | S | medium | needs-refinement |  |  | pan start --auto commits the spec to main AFTER creating the worktree |
-| 379 | PAN-2395 | S | medium | ok |  |  | one invalid tiered_execution enum poisons every config read |
-| 380 | PAN-2381 | S | medium | ok |  |  | three event types missing from DomainEvent schema union poison the RPC stream |
-| 381 | PAN-2287 | S | medium | ok |  |  | every supervisor.log line written twice |
-| 382 | PAN-3661 | XS | medium | ok |  |  | Secure review-mode dispatch dropped the HTTP-200 semantic-rejection surface; two frontend tests fail locally while CI stays green. |
-| 383 | PAN-3288 | XS | medium | ok |  |  | Dev-checkout preflight: after a git pull that adds a dep, the CLI dies with ERR_MODULE_NOT_FOUND instead of saying 'run bun install'. |
-| 384 | PAN-3164 | XS | medium | ok |  |  | probeUatStack reports readiness from container count, so the UI offers 'Open UAT frontend' while the API is still resolving Maven deps. |
-| 385 | PAN-3121 | S | medium | ok |  |  | The failed-send outbox never reconciles against the transcript, so a delivered message keeps a Retry twin that would double-send. |
-| 386 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
-| 387 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
-| 388 | PAN-3911 | S | medium | needs-refinement |  |  | Issue pause did not stop review convoys; the stranded-review re-dispatch that resumed them was deleted by the cut — re-verify |
-| 389 | PAN-3915 | S | medium | ok |  |  | resume-kimi-code test writes a real transcript under ~/.claude; watcher indexes the deleted file and ENOENT sticks in health |
-| 390 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
-| 391 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
-| 392 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
-| 393 | PAN-2186 | S | medium | needs-refinement |  |  | post-merge lifecycle can leave merged issues in-review and auto-merge rows stuck |
-| 394 | PAN-2069 | XS | medium | ok |  |  | caveman: follow-up gaps |
-| 395 | PAN-1918 | XS | medium | ok |  |  | full frontend vitest suite runs in no CI path |
-| 396 | PAN-1912 | XS | medium | ok |  |  | Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
-| 397 | PAN-1846 | S | medium | needs-refinement |  |  | unbounded log growth |
-| 398 | PAN-1830 | S | medium | ok |  |  | Reviewer stuck on gpt-5.5 rate-limit modal blocks REVIEWER_READY |
-| 399 | PAN-1816 | S | medium | ok |  |  | Scratch/UAT-lifecycle issues (PAN-18031) enter the real pipeline: kanban, review convoys, agent registry |
-| 400 | PAN-1795 | S | medium | ok |  |  | Codebase map bootstrapped in planning worktree is never promoted to main |
-| 401 | PAN-1774 | S | medium | ok |  |  | workspace server container crashloops when dist/dashboard/server.js is missing |
-| 402 | PAN-1769 | S | medium | ok |  |  | Supervisor echo-confirm false negative on long messages → triple-paste delivery (rewrite ×2 + tmux fallback); resumed-conv message stil… |
-| 403 | PAN-1761 | S | medium | ok |  |  | conversations endpoints fetched via relative /api path |
-| 404 | PAN-1755 | S | medium | ok |  |  | uat stuck-assembly cap (30m) kills slow-but-alive assemblies and leaves orphaned conflict agents racing the next generation |
-| 405 | PAN-3516 | XS | medium | ok |  |  | Repo .claude/skills holds stale duplicates of pan-handoff, pan-flywheel and okf, so overdeck-dev sessions load outdated skill text. |
-| 406 | PAN-3455 | XS | medium | ok |  |  | cliproxy --version exits 2, so the up-to-date check always returns false and every ensure re-downloads the pinned release. |
-| 407 | PAN-3117 | XS | medium | ok |  |  | A deterministic 400 renders as the generic 'Failed to send' bubble with a Retry that can never succeed. |
-| 408 | PAN-3036 | XS | medium | ok |  |  | Pane-idle detection reads a completed strike's idle composer as a pending question, so a finished strike shows '! INPUT'. |
-| 409 | PAN-3016 | M | medium | ok |  |  | Operator ask: every view should be URL-addressable; cockpit tabs, stage panes and several drawers are still local state. |
-| 410 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
-| 411 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
-| 412 | PAN-1740 | XS | medium | needs-refinement |  |  | Deacon mislabels SIGTERM workspace container restarts as crashes |
-| 413 | PAN-1674 | S | medium | ok |  |  | TLDR .venv (~7.5G) is duplicated into every workspace |
-| 414 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
-| 415 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
-| 416 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
-| 417 | PAN-1627 | M | medium | ok |  |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-appr… |
-| 418 | PAN-1624 | S | medium | ok |  |  | pan handoff --author external: authored doc is socket_write-ten but never submitted |
-| 419 | PAN-3901 | S | medium | ok |  |  | test-skip gate has no audited exemption for opt-in live suites (skipIf on env/binary); allowlist row with justification |
-| 420 | PAN-3852 | S | medium | ok |  |  | Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping |
-| 421 | PAN-3862 | L | medium | needs-refinement |  |  | /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model |
-| 422 | PAN-1572 | M | medium | ok |  |  | Settings permission-mode can desync from resolved config |
-| 423 | PAN-1571 | S | medium | ok |  |  | Large multi-line pastes (handoff docs) land unsubmitted |
-| 424 | PAN-1565 | S | medium | ok |  |  | Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
-| 425 | PAN-1530 | S | medium | ok |  |  | Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
-| 426 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
-| 427 | PAN-1449 | S | medium | ok |  |  | PAN-1052 follow-up: memory extraction failing 59% on dogfood project + storage layout deviates from spec |
-| 428 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
-| 429 | PAN-1936 | M | medium | needs-refinement |  |  | Read consolidation is substantially advanced by the cut (derived-issue-state.ts); remaining work is tracked in PAN-3909 |
-| 430 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
-| 431 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
-| 432 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
-| 433 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
-| 434 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
-| 435 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
-| 436 | PAN-1440 | S | low | stale |  |  | bd export / dolt are gone; only a "never overwrite non-empty tracked state" concern would survive, now against .pan/ files |
-| 437 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
-| 438 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
-| 439 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
-| 440 | PAN-3974 | L | medium | ok |  | PAN-3937 | Companion TERMINAL runs `opencode attach` on the live ACP session/port from PAN-3937; establishes the seam PAN-3835 reuses |
-| 441 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
-| 442 | PAN-1244 | M | medium | ok |  |  | pan admin cloister start: CLI crashes with SIGSEGV (exit code 139) after handing off to server |
-| 443 | PAN-1227 | S | medium | needs-refinement |  |  | Substrate: bead can be closed without delivering the work |
-| 444 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
-| 445 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
-| 446 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
-| 447 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
-| 448 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
-| 449 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
-| 450 | PAN-3864 | M | medium | needs-refinement |  |  | /agents shows 183 STRIKE RUNNING for stopped strikes; cut made liveness live-read — re-verify what remains before building |
-| 451 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
-| 452 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
-| 453 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
-| 454 | PAN-1130 | S | medium | ok |  |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
-| 455 | PAN-1129 | S | medium | ok |  |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
-| 456 | PAN-1128 | S | medium | ok |  |  | Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
-| 457 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
-| 458 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
-| 459 | PAN-3938 | M | medium | needs-refinement |  |  | Run Muse Spark under Claude Code via cliproxy — only the paid Zen model is routable; free tier is OpenCode-client gated; needs credit… |
-| 460 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
-| 461 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
-| 462 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
-| 463 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
-| 464 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
-| 465 | PAN-778 | M | medium | ok |  |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
-| 466 | PAN-681 | S | medium | ok |  |  | Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
-| 467 | PAN-3732 | S | medium | ok |  |  | Codex handoff serializes a large rollout twice (~286MB peak RSS on 50MB); serialize once or stream. |
-| 468 | PAN-3700 | M | medium | ok |  |  | pan acp serve would let Zed and other ACP clients drive Overdeck conversations through canonical doors. PRD written. |
-| 469 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items sit unanchored in the requirement traceability graph. |
-| 470 | PAN-3132 | M | medium | ok |  |  | xBRIEF v0.9 agentic dispatch fields are half-adopted as a behavior accident; make difficulty/filesScope/verifyCommands a contract. |
-| 471 | PAN-3909 | M | medium | needs-refinement |  |  | One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains |
-| 472 | PAN-3893 | S | medium | ok |  |  | ACP conversations drop agent thoughts: no agent_thought_chunk case and no thought role in the transcript schema |
-| 473 | PAN-3831 | S | medium | ok |  |  | Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver) |
-| 474 | PAN-3867 | S | medium | ok |  |  | /projects/new discards keystrokes typed before the first resolve lands; add a delayed-resolve journey test |
-| 475 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
-| 476 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
-| 477 | PAN-3563 | S | medium | needs-refinement |  |  | pan unstick is gone; verify whether a spawned-but-never-briefed role agent can still read as running forever under liveness.ts |
-| 478 | PAN-1041 | M | medium | ok |  |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
-| 479 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
-| 480 | PAN-3770 | S | medium | ok |  |  | Codex conversations never show the working spinner mid-turn; parser marks every agent_message instantly complete. |
-| 481 | PAN-3731 | S | medium | ok |  |  | Restart-gate banner gives no feedback after approval; dead-requester approvals read as a broken button. |
-| 482 | PAN-3530 | S | medium | ok |  |  | Four God View components poll on 30s timers instead of the documented /ws/rpc event contract. |
-| 483 | PAN-3131 | L | medium | ok |  |  | Support xBRIEF planRef sharding so a 1.1MB/227-item plan stops making every finalize failure whole-plan-fatal. |
-| 484 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
-| 485 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
-| 486 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
-| 487 | PAN-3827 | S | medium | ok |  |  | Dashboard shows the empty welcome state instead of an error when the harness exits before writing a transcript |
-| 488 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
-| 489 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
-| 490 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
-| 491 | PAN-713 | M | medium | ok |  |  | test: add unit tests for doneCommand and approveCommand |
-| 492 | PAN-700 | M | medium | ok |  |  | Detachable terminal for conversation view |
-| 493 | PAN-646 | XS | medium | needs-refinement |  |  | Cancel no longer clears beads or a record; a Recover workflow now means reopening the tracker issue and re-planning |
-| 494 | PAN-532 | M | medium | ok |  |  | Per-project and per-issue model overrides for pipeline roles |
-| 495 | PAN-2896 | M | medium | ok |  |  | Warm resource-discovery and membership caches at boot |
-| 496 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
-| 497 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
-| 498 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
-| 499 | PAN-2609 | M | medium | ok |  |  | Cross-device sync of conversations and tasks via user-owned git remote |
-| 500 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
-| 501 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
-| 502 | PAN-2566 | L | medium | ok | ✓ |  | Triage list of genuine Traycer capability gaps; a container for child issues, not directly workable. |
-| 503 | PAN-2565 | M | medium | ok |  |  | Multi-agent conversations: N agent sessions in one task surface with agent-to-agent messaging |
-| 504 | PAN-3735 | S | medium | ok |  |  | Sandboxed pan CLI reports 'dashboard down, run pan up' when the real cause is no network; sends agents down the wrong path. |
-| 505 | PAN-3335 | XS | medium | ok |  |  | A pasted screenshot can't be viewed anywhere in the dashboard: thumbnail has no click handler and the sent form is a file-link chip. |
-| 506 | PAN-3054 | M | medium | ok |  |  | Benchmark matrix: run one template issue under N crew/model configurations and compare cost, wall-clock and outcome. |
-| 507 | PAN-2977 | M | medium | ok |  | PAN-2976 | Settings surface that detects installed ACP CLIs, renders the capability checklist, and guides login without a manual terminal. |
-| 508 | PAN-2557 | M | medium | ok |  |  | project-level 'Restart All' context action |
-| 509 | PAN-2553 | M | medium | ok |  |  | project-level CI visibility |
-| 510 | PAN-2521 | S | medium | ok |  |  | launch pipeline agents with harness rate-limit model-switch reminder disabled |
-| 511 | PAN-2493 | M | medium | ok |  |  | align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) |
-| 512 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
-| 513 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
-| 514 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
-| 515 | PAN-3863 | L | medium | ok |  | PAN-3762 | Orca-style SSH Hosts + Remote Servers onboarding; UX extension of the PAN-3762 federation model, not a competing design |
-| 516 | PAN-2444 | L | medium | ok |  | PAN-3942 | optional SageOx re-integration |
-| 517 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
-| 518 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
-| 519 | PAN-2409 | M | medium | ok |  |  | enforce the workspace boundary |
-| 520 | PAN-2392 | M | medium | needs-refinement |  |  | Standing Crew cost panel |
-| 521 | PAN-2335 | XS | medium | ok |  |  | chore: review the full open backlog for junk/stale/nonsensical issues |
-| 522 | PAN-2295 | L | medium | needs-refinement |  |  | built-in web browser surface (openable like terminal/Claude Code/Codex) + native Agentation integration |
-| 523 | PAN-3767 | S | medium | ok |  |  | Model switch could hang at 'Saving…'; onError toast landed, remaining work is reproducing the hang on a healthy server. |
-| 524 | PAN-3615 | S | medium | needs-refinement |  |  | TTS silent 9+ days from four stacked failures; three already fixed, only follow-ups remain — rescope to what is left. |
-| 525 | PAN-3558 | S | medium | ok |  |  | Subagent rail shows no model or provider, so mixed-model orchestration needs a transcript open per row to see what it is running. |
-| 526 | PAN-3469 | S | medium | ok |  |  | NewProjectModal violates the PAN-3410 page-not-modal doctrine; migrate the create-project flow to a routed page. |
-| 527 | PAN-3333 | M | medium | ok |  |  | Model pickers show $/1M, which says nothing under a subscription; show relative plan-quota drain among sibling models. |
-| 528 | PAN-3058 | M | medium | ok |  |  | Ship named crew presets that populate the whole tiered_execution block so operators don't hand-build the crew table. |
-| 529 | PAN-2288 | L | medium | ok |  |  | tmux managed-server: lossless auto-migration of dirty-founded servers + boot-time ensure call |
-| 530 | PAN-2065 | M | medium | ok |  |  | unified usage & headroom panel across all provider plans (z.ai, Anthropic, Codex, OpenRouter) |
-| 535 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
+| 308 | PAN-1246 | M | high | ok |  |  | Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586) |
+| 309 | PAN-1253 | M | high | needs-refinement |  |  | Flywheel: respect issue dependencies before autopicking work |
+| 310 | PAN-1254 | L | high | ok |  |  | Tailscale integration: advertise dashboard + workspace endpoints over tailnet (Effect-native) |
+| 311 | PAN-1357 | M | high | ok |  |  | Template conversations: load curated skill bundles into a single conversation |
+| 312 | PAN-1915 | M | high | ok |  |  | enhancement(security): API key at-rest hardening |
+| 313 | PAN-1435 | XS | high | ok |  |  | API keys in ~/.panopticon/config.yaml stored as plaintext |
+| 314 | PAN-1672 | M | high | ok |  |  | GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion |
+| 315 | PAN-1640 | M | high | ok |  |  | Re-platform interactive permission allow/deny onto a PreToolUse hook (provider-agnostic) |
+| 316 | PAN-2351 | XS | high | ok |  | PAN-1166 | Overdeck Anywhere P0: scoped access tokens + WS/SSE heartbeats (security prerequisites) |
+| 317 | PAN-2350 | L | high | needs-refinement | ✓ |  | Epic container for Overdeck Anywhere P0-P3; PAN-3762 proposes replacing the relay-first direction with per-machine server federation. |
+| 318 | PAN-1217 | XS | high | ok |  |  | Requirements reviewer: classify each AC as in_pr_scope vs whole_feature_scope, only !-block in-PR-scope items |
+| 319 | PAN-2079 | M | high | needs-refinement |  |  | Inbox spine: boot reconciliation (producer #1) is gone; may still be worth pursuing for pending AUQ, cost alerts and other producers |
+| 320 | PAN-3934 | S | medium | ok |  | PAN-3929 | roles/*.md and two docs still name deleted status fields outside the guard's Markdown roots; follow-up to PAN-3929 |
+| 321 | PAN-1219 | M | high | needs-refinement |  |  | Promote across-cycle review state to first-class data (cycle SHA, prior findings) instead of prompt-derived |
+| 322 | PAN-1209 | S | low | stale |  |  | bd/beads were removed earlier; any drift-detection concern now applies to xBRIEF item status, not bd state |
+| 323 | PAN-1451 | M | high | needs-refinement |  |  | PAN-1124 follow-up: complete planning-on-main pivot (dropped ACs from scope drift) |
+| 324 | PAN-1452 | M | high | ok |  |  | PAN-1381 follow-up: per-reviewer restart with model override (architectural mismatch with PAN-1048) |
+| 325 | PAN-1454 | M | high | ok |  |  | [META] 9 systemic failure patterns surfaced by 80-issue audit |
+| 326 | PAN-1553 | M | high | ok |  |  | Investigate Claude Code Fast mode support (and fast-tier pricing) |
+| 327 | PAN-1504 | M | high | ok |  |  | pan hygiene |
+| 328 | PAN-1480 | L | high | ok |  |  | TLDR: 93% bypass rate |
+| 329 | PAN-1479 | M | high | ok |  |  | RTK: Add telemetry to measure token savings from bash output compression |
+| 330 | PAN-2950 | L | high | ok |  |  | Refactor god files back under file-size ceilings after the UX overhaul |
+| 331 | PAN-2836 | M | high | ok |  |  | okf: in-repo placement presets (okf/, docs/okf/) and /okf migrate to switch placements later |
+| 332 | PAN-2720 | M | high | ok |  |  | File-size ratchet counts lines, so it rewards line-packing on the god files it means to improve |
+| 333 | PAN-2650 | L | high | ok |  |  | Swarm final ready-to-merge slot wedges when memory-governor sheds the integration stack; pan swarm recover can't recover it |
+| 334 | PAN-2358 | M | high | ok |  |  | PAN-2145 follow-up: restore PAN-1535 hardening in transformMessageForHarness (rewritten during conversations.ts decomposition) |
+| 335 | PAN-2334 | XS | high | ok |  |  | write a Definition of Ready (DoR) |
+| 336 | PAN-2308 | M | high | needs-refinement |  |  | Compose-file port migration off 3011 still valid; the deacon-quarantine half references the deleted patrol loop — verify an equivalent guard |
+| 337 | PAN-2193 | S | high | ok |  |  | Held issues (objection/parked/vetoed/needs-handoff) are invisible in the Command Deck tree |
+| 338 | PAN-1984 | XS | high | ok |  |  | Migrate or delete the 18 dead panopticon.db modules referenced by ~30 test files (#1983 follow-up) |
+| 339 | PAN-1913 | XS | high | ok |  |  | Project description: show on click, edit in dashboard, mirror into the project layer (and document what's in .pan and ~/.panopticon) |
+| 340 | PAN-1906 | M | high | ok |  |  | Enforce harness restrictions with subscription: gray out non-claude-code, validate everywhere |
+| 341 | PAN-1544 | M | high | ok |  |  | Type cleanup: strip 'ship' from the Role union and its ~10 downstream references |
+| 342 | PAN-955 | S | high | ok |  |  | Workspace devcontainer template versioning + re-render on demand |
+| 343 | PAN-807 | L | high | ok |  |  | Epic C: Workspace state sanity on spawn |
+| 344 | PAN-630 | M | high | ok |  |  | Multi-tenant workspace isolation with ACLs |
+| 345 | PAN-471 | M | high | ok |  |  | Cost reconciler: auto-trigger on agent lifecycle events with debounce |
+| 346 | PAN-438 | M | high | ok |  |  | Migrate remaining REST polling endpoints to Effect RPC |
+| 347 | PAN-578 | M | high | ok |  |  | Security: Comment mediation layer to prevent prompt injection via tracker comments |
+| 348 | PAN-2921 | S | medium | ok |  |  | Strike merge door can report fetch failure after merge and land the same head twice |
+| 349 | PAN-3920 | L | medium | needs-refinement |  | PAN-3822 | Agents directory (tree/list/detail) + registration door for plugin-spawned workers + spawn-and-wait primitive; needs PRD |
+| 350 | PAN-2839 | S | medium | ok |  |  | plan→work autoSpawn now 500s with a duplicated workspace prep |
+| 351 | PAN-2824 | S | medium | ok |  |  | pan review pending dies when one project's lens gather fails (non-degrading caller; PAN-2820 class) |
+| 352 | PAN-2792 | S | medium | ok |  |  | Orphan-process sweeps killed the dashboard and live conversations via lsof +D over Bun-hardlinked node_modules |
+| 353 | PAN-2761 | S | medium | ok |  |  | done.test.ts asserts a hardcoded URL without stubbing env, so it fails in any agent shell with OVERDECK_DASHBOARD_URL set and looks lik… |
+| 354 | PAN-2738 | S | medium | ok |  |  | strikes deadlock |
+| 355 | PAN-2717 | S | medium | ok |  |  | conversation permission waits missing from Awareness; strengthen alert pulse |
+| 356 | PAN-2697 | S | medium | ok |  |  | First-review codex parents enter discovery mode and the supervisor session no-ops every discovery-ready signal |
+| 357 | PAN-2696 | XS | medium | needs-refinement |  |  | Task views still speak beads vocabulary |
+| 358 | PAN-2691 | S | medium | ok |  |  | Auto-planned issues park silently when the post-finalize work spawn is gated (stack-unhealthy 422) |
+| 359 | PAN-2686 | XS | medium | needs-refinement |  |  | Policy strip "restart pending" badge never clears after restart-fresh with a new model (record.model is sticky) |
+| 360 | PAN-3701 | L | high | ok |  |  | Four separate first-party LLM client stacks; consolidate onto effect/unstable/ai LanguageModel + ExecutionPlan. PRD written. |
+| 361 | PAN-3090 | M | high | ok |  |  | Simple issue page opens with a 55KB raw kickoff prompt and hides the pending question the operator actually has to answer. |
+| 362 | PAN-2672 | S | medium | ok |  |  | Post-/clear siblings render the same original transcript (per-tmux resolution + frozen launcher pin + null claude_session_id) |
+| 363 | PAN-2670 | S | medium | ok |  |  | Gate the dashboard-server tsconfig in npm run typecheck |
+| 364 | PAN-2664 | S | medium | ok |  |  | auto-commit completes unresolved merge with conflict markers |
+| 365 | PAN-2663 | S | medium | ok |  |  | health probe can accept old dashboard after replacement EADDRINUSE |
+| 366 | PAN-2649 | S | medium | ok |  |  | Ctrl+K conversation search indexes Claude transcripts only |
+| 367 | PAN-2580 | S | medium | ok |  |  | pan tell cannot deliver to codex (GPT) conversations |
+| 368 | PAN-2572 | M | medium | ok |  |  | Noisy EBADENGINE + deprecation warnings on npx/npm install make a healthy install look broken |
+| 369 | PAN-2563 | S | medium | ok |  |  | npm-flavor desktop (npx @overdeck/desktop) lacks node_modules for the server's externalized deps |
+| 370 | PAN-2554 | S | medium | ok |  |  | clicking a project doesn't update the browser URL |
+| 371 | PAN-2550 | XS | medium | ok |  |  | npm test exits 0 despite root-suite failures |
+| 372 | PAN-2547 | S | medium | ok |  |  | pan restart --health-timeout parses seconds as milliseconds |
+| 373 | PAN-2546 | S | medium | ok |  |  | pan tell is codex-conversation-unaware |
+| 374 | PAN-3504 | XS | high | needs-refinement |  |  | Duplicate of PAN-3499 (parked.ts ProjectConfig.projectPath typecheck red on main); confirm landed and close one of the pair. |
+| 375 | PAN-3003 | XS | medium | ok |  |  | Generated launcher.sh files omit the OVERDECK_AGENT_ID export the PTY supervisor requires, so manual re-launch dies instantly. |
+| 376 | PAN-2501 | S | medium | ok |  |  | deleteResourceVenvEffect's HttpRouter.schemaParams call fails typecheck under the root tsconfig (masked by src/dashboard/** exclusion) |
+| 377 | PAN-2492 | S | medium | needs-refinement |  |  | pane-detected waits (rate-limit/session-resume) surface as 'needs you' but cannot be answered from the dashboard |
+| 378 | PAN-2491 | M | medium | ok |  |  | Migrate @xenova/transformers to @huggingface/transformers to eliminate silent npx install failures from sharp 0.32 postinstall |
+| 379 | PAN-2489 | S | medium | ok |  |  | strike agents are invisible in the project issue tree |
+| 380 | PAN-2465 | S | medium | ok |  |  | pan done's PR lookup fails at MYN polyrepo root |
+| 381 | PAN-2454 | S | medium | ok |  |  | ratchet audit fails per-commit on push ranges whose NET baseline delta is zero |
+| 382 | PAN-2428 | XS | medium | ok |  |  | MYN workspace Traefik routing broken post-rebrand |
+| 383 | PAN-2423 | XS | medium | ok |  |  | pan workspace rebuild hardcodes 'overdeck-' compose project prefix |
+| 384 | PAN-2416 | S | medium | ok |  |  | codex agents can wedge on the Codex CLI first-run/consent screen |
+| 385 | PAN-2408 | S | medium | needs-refinement |  |  | pan start --auto commits the spec to main AFTER creating the worktree |
+| 386 | PAN-2395 | S | medium | ok |  |  | one invalid tiered_execution enum poisons every config read |
+| 387 | PAN-2381 | S | medium | ok |  |  | three event types missing from DomainEvent schema union poison the RPC stream |
+| 388 | PAN-2287 | S | medium | ok |  |  | every supervisor.log line written twice |
+| 389 | PAN-3661 | XS | medium | ok |  |  | Secure review-mode dispatch dropped the HTTP-200 semantic-rejection surface; two frontend tests fail locally while CI stays green. |
+| 390 | PAN-3288 | XS | medium | ok |  |  | Dev-checkout preflight: after a git pull that adds a dep, the CLI dies with ERR_MODULE_NOT_FOUND instead of saying 'run bun install'. |
+| 391 | PAN-3164 | XS | medium | ok |  |  | probeUatStack reports readiness from container count, so the UI offers 'Open UAT frontend' while the API is still resolving Maven deps. |
+| 392 | PAN-3121 | S | medium | ok |  |  | The failed-send outbox never reconciles against the transcript, so a delivered message keeps a Retry twin that would double-send. |
+| 393 | PAN-3014 | XS | medium | ok |  |  | Background title/about spawns use --bare, which now skips credential reads, so every one fails 'Not logged in' with empty stderr. |
+| 394 | PAN-3944 | S | medium | needs-refinement |  |  | Main fix landed (host-backed targets skip Herdr agent.prompt); remaining: buffer bracketed paste in the app-server host, placeholder guard |
+| 395 | PAN-3911 | S | medium | needs-refinement |  |  | Issue pause did not stop review convoys; the stranded-review re-dispatch that resumed them was deleted by the cut — re-verify |
+| 396 | PAN-3915 | S | medium | ok |  |  | resume-kimi-code test writes a real transcript under ~/.claude; watcher indexes the deleted file and ENOENT sticks in health |
+| 397 | PAN-3829 | L | medium | ok |  |  | Managed Claude launch home: overlay hooks/settings/plugins/auth without touching native ~/.claude (draft at handoff/20260909/main) |
+| 398 | PAN-2280 | M | medium | ok |  |  | Resumed conversations wedge without writing transcripts when dashboard is black-holed |
+| 399 | PAN-2197 | S | medium | ok |  |  | work agents skip `pan done` (manual push instead) |
+| 400 | PAN-2186 | S | medium | needs-refinement |  |  | post-merge lifecycle can leave merged issues in-review and auto-merge rows stuck |
+| 401 | PAN-2069 | XS | medium | ok |  |  | caveman: follow-up gaps |
+| 402 | PAN-1918 | XS | medium | ok |  |  | full frontend vitest suite runs in no CI path |
+| 403 | PAN-1912 | XS | medium | ok |  |  | Pi agent transcripts hide tool-call detail; agent panes lack the Tools show/hide toggle |
+| 404 | PAN-1846 | S | medium | needs-refinement |  |  | unbounded log growth |
+| 405 | PAN-1830 | S | medium | ok |  |  | Reviewer stuck on gpt-5.5 rate-limit modal blocks REVIEWER_READY |
+| 406 | PAN-1816 | S | medium | ok |  |  | Scratch/UAT-lifecycle issues (PAN-18031) enter the real pipeline: kanban, review convoys, agent registry |
+| 407 | PAN-1795 | S | medium | ok |  |  | Codebase map bootstrapped in planning worktree is never promoted to main |
+| 408 | PAN-1774 | S | medium | ok |  |  | workspace server container crashloops when dist/dashboard/server.js is missing |
+| 409 | PAN-1769 | S | medium | ok |  |  | Supervisor echo-confirm false negative on long messages → triple-paste delivery (rewrite ×2 + tmux fallback); resumed-conv message stil… |
+| 410 | PAN-1761 | S | medium | ok |  |  | conversations endpoints fetched via relative /api path |
+| 411 | PAN-1755 | S | medium | ok |  |  | uat stuck-assembly cap (30m) kills slow-but-alive assemblies and leaves orphaned conflict agents racing the next generation |
+| 412 | PAN-3516 | XS | medium | ok |  |  | Repo .claude/skills holds stale duplicates of pan-handoff, pan-flywheel and okf, so overdeck-dev sessions load outdated skill text. |
+| 413 | PAN-3455 | XS | medium | ok |  |  | cliproxy --version exits 2, so the up-to-date check always returns false and every ensure re-downloads the pinned release. |
+| 414 | PAN-3117 | XS | medium | ok |  |  | A deterministic 400 renders as the generic 'Failed to send' bubble with a Retry that can never succeed. |
+| 415 | PAN-3036 | XS | medium | ok |  |  | Pane-idle detection reads a completed strike's idle composer as a pending question, so a finished strike shows '! INPUT'. |
+| 416 | PAN-3016 | M | medium | ok |  |  | Operator ask: every view should be URL-addressable; cockpit tabs, stage panes and several drawers are still local state. |
+| 417 | PAN-3890 | S | medium | ok |  |  | opencode provider stream errors (rate limit) are invisible in the feed and never retried; first message dies silently |
+| 418 | PAN-3822 | L | medium | ok |  |  | PRD landed (12 items, FR-1..14): link PRs to conversations via branch detection + explicit override; unblocks PAN-3920 |
+| 419 | PAN-1740 | XS | medium | needs-refinement |  |  | Deacon mislabels SIGTERM workspace container restarts as crashes |
+| 420 | PAN-1674 | S | medium | ok |  |  | TLDR .venv (~7.5G) is duplicated into every workspace |
+| 421 | PAN-1673 | S | medium | ok |  |  | Regression: pi + gpt-5.5 fails with 'No API key for provider: openai-codex' (worked previously) |
+| 422 | PAN-1669 | S | medium | ok |  |  | restart-with-model doesn't emit a live event |
+| 423 | PAN-1668 | S | medium | ok |  |  | right-click 'restart with <model>' carries model only, never harness |
+| 424 | PAN-1627 | M | medium | ok |  |  | Substrate: Claude Code's native .claude/** settings-edit protection wedges in-scope work agents (un-overridable by PreToolUse auto-appr… |
+| 425 | PAN-1624 | S | medium | ok |  |  | pan handoff --author external: authored doc is socket_write-ten but never submitted |
+| 426 | PAN-3901 | S | medium | ok |  |  | test-skip gate has no audited exemption for opt-in live suites (skipIf on env/binary); allowlist row with justification |
+| 427 | PAN-3852 | S | medium | ok |  |  | Project creation follow-ups: SSH-port repo URLs, dotted repo names, partial-registration retry, non-duplicate 409 mapping |
+| 428 | PAN-3862 | L | medium | needs-refinement |  |  | /agents-v2 machine session explorer over Herdr + all tmux servers; local first, remote via the PAN-3762 environment model |
+| 429 | PAN-1572 | M | medium | ok |  |  | Settings permission-mode can desync from resolved config |
+| 430 | PAN-1571 | S | medium | ok |  |  | Large multi-line pastes (handoff docs) land unsubmitted |
+| 431 | PAN-1565 | S | medium | ok |  |  | Defensive mitigation: auto-recover conversations poisoned by Claude Code thinking-block resume 400 (upstream #63147) |
+| 432 | PAN-1530 | S | medium | ok |  |  | Investigate: state.json with model='gpt-5.5' (a model that doesn't exist) |
+| 433 | PAN-1461 | S | medium | ok |  |  | Conversation transcript: in-page search (Ctrl+F) only finds text in currently-rendered virtualized rows |
+| 434 | PAN-1449 | S | medium | ok |  |  | PAN-1052 follow-up: memory extraction failing 59% on dogfood project + storage layout deviates from spec |
+| 435 | PAN-1446 | S | medium | ok |  |  | PAN-1231 follow-up: remove or implement Table + Timeline modes in FleetAgentsView (scope-creep stubs) |
+| 436 | PAN-1936 | M | medium | needs-refinement |  |  | Read consolidation is substantially advanced by the cut (derived-issue-state.ts); remaining work is tracked in PAN-3909 |
+| 437 | PAN-1445 | S | medium | ok |  |  | PAN-1389 follow-up: remove or implement Files + Comments tabs in SessionFeedSidebar (scope-creep stubs) |
+| 438 | PAN-3616 | S | medium | ok |  |  | Planned deploy restarts show the alarm-toned Reconnecting banner; use the lifecycle signal for calm 'updating' copy. |
+| 439 | PAN-2982 | XS | medium | ok |  |  | Nothing runs a skill's own selftest when sync-sources/skills/** changes; a convoy passed a PR with its selftest red. |
+| 440 | PAN-2981 | S | medium | ok |  |  | The conversation search index never prunes deleted sessions, so Ctrl-K offers zombie hits that 404 on open. |
+| 441 | PAN-2976 | L | medium | ok |  |  | Generalize the ACP harness to any capability-passing ACP CLI: named adapters plus a config-declared custom-agent escape hatch. |
+| 442 | PAN-1444 | S | medium | ok |  |  | Follow-up to PAN-1416: dashboard port lockfile + pan doctor multi-instance check |
+| 443 | PAN-1440 | S | low | stale |  |  | bd export / dolt are gone; only a "never overwrite non-empty tracked state" concern would survive, now against .pan/ files |
+| 444 | PAN-1433 | S | medium | ok |  |  | Conversation agents can leave host main repo in abandoned git rebase state for hours |
+| 445 | PAN-1416 | S | medium | ok |  |  | Workspace-spawned dashboards must never claim the canonical dashboard port |
+| 446 | PAN-1392 | S | low | stale |  |  | docs/prds/active→completed archive step is superseded by .pan/drafts and .pan/specs on the feature branch |
+| 447 | PAN-3974 | L | medium | ok |  | PAN-3937 | Companion TERMINAL runs `opencode attach` on the live ACP session/port from PAN-3937; establishes the seam PAN-3835 reuses |
+| 448 | PAN-1330 | S | medium | ok |  |  | CLI cannot address planning-*/specialist-* sessions |
+| 449 | PAN-1244 | M | medium | ok |  |  | pan admin cloister start: CLI crashes with SIGSEGV (exit code 139) after handing off to server |
+| 450 | PAN-1227 | S | medium | needs-refinement |  |  | Substrate: bead can be closed without delivering the work |
+| 451 | PAN-1226 | L | medium | ok |  |  | PAN-1148 unified-dashboard redesign |
+| 452 | PAN-1173 | S | medium | ok |  |  | pan show <bare-number> derives wrong agent ID for PAN-prefixed issues |
+| 453 | PAN-1154 | M | medium | ok |  |  | pan up does not kill existing port holders |
+| 454 | PAN-3354 | XS | medium | ok |  |  | The archive write door accepts kind=main, hiding a project's singleton workspace with no unarchive affordance in the UI. |
+| 455 | PAN-3178 | XL | medium | ok |  |  | Make worktrees and diffs first class: +/- badge, dedicated Changes surface, conversation worktrees. PRD and mockup exist. |
+| 456 | PAN-3017 | S | medium | ok |  |  | The issue-page UAT panel renders only inline actions, so restart/rebuild/stop are unreachable outside the rail's context menu. |
+| 457 | PAN-3864 | M | medium | needs-refinement |  |  | /agents shows 183 STRIKE RUNNING for stopped strikes; cut made liveness live-read — re-verify what remains before building |
+| 458 | PAN-3873 | M | medium | ok |  |  | GitHub event delivery: support gh webhook forward alongside smee with guided setup, settings exposure, and docs |
+| 459 | PAN-1150 | S | medium | ok |  |  | Settings: "Anthropic is not configured" warning persists in Model Routing after claude /login (Provider tab disagrees) |
+| 460 | PAN-1149 | S | medium | ok |  |  | v0.9.3 upgraders: stale workhorses.mid: claude-sonnet-4-7 in config.yaml keeps breaking Model Routing saves |
+| 461 | PAN-1130 | S | medium | ok |  |  | Headless review sub-reviewer normal exit misclassified as 'crashed', triggers spurious restart |
+| 462 | PAN-1129 | S | medium | ok |  |  | Review-request route pushes wrong branch name: 'feature/977' instead of 'feature/pan-977' |
+| 463 | PAN-1128 | S | medium | ok |  |  | Channels: spurious 'no MCP server configured with that name' banner at conversation startup |
+| 464 | PAN-1113 | S | medium | ok |  |  | Conversations sidebar lets you message review-specialist sessions, which derails them silently |
+| 465 | PAN-1068 | S | medium | ok |  |  | PAN-1048 deferred findings: security, correctness, and model validation gaps |
+| 466 | PAN-3938 | M | medium | needs-refinement |  |  | Run Muse Spark under Claude Code via cliproxy — only the paid Zen model is routable; free tier is OpenCode-client gated; needs credit… |
+| 467 | PAN-933 | S | medium | ok |  |  | Review poster cannot post to GitLab MRs (only supports GitHub PRs) |
+| 468 | PAN-932 | S | medium | ok |  |  | pan done: polyrepo uncommitted changes check + existing MR handling |
+| 469 | PAN-927 | M | medium | ok |  |  | Rewrite containerize route: dead code, orphan processes, no pending-op tracking |
+| 470 | PAN-900 | S | medium | ok |  |  | Trust devroot for conversations + atomic .claude.json writes |
+| 471 | PAN-886 | S | medium | ok |  |  | pan review request shows 'fetch failed' instead of actual sync-target-branch error |
+| 472 | PAN-778 | M | medium | ok |  |  | Write conflict race: review-agent fails when test-agent write scope not yet released |
+| 473 | PAN-681 | S | medium | ok |  |  | Feedback routing: wrong issueId written to workspace when verification runs for co-active issues |
+| 474 | PAN-3732 | S | medium | ok |  |  | Codex handoff serializes a large rollout twice (~286MB peak RSS on 50MB); serialize once or stream. |
+| 475 | PAN-3700 | M | medium | ok |  |  | pan acp serve would let Zed and other ACP clients drive Overdeck conversations through canonical doors. PRD written. |
+| 476 | PAN-3290 | XS | medium | ok |  |  | xBRIEF items can carry empty metadata.traces, so docs items sit unanchored in the requirement traceability graph. |
+| 477 | PAN-3132 | M | medium | ok |  |  | xBRIEF v0.9 agentic dispatch fields are half-adopted as a behavior accident; make difficulty/filesScope/verifyCommands a contract. |
+| 478 | PAN-3909 | M | medium | needs-refinement |  |  | One agents read door (operator-directed); the cut deleted the agents table and made liveness.ts canonical — re-scope what remains |
+| 479 | PAN-3893 | S | medium | ok |  |  | ACP conversations drop agent thoughts: no agent_thought_chunk case and no thought role in the transcript schema |
+| 480 | PAN-3831 | S | medium | ok |  |  | Model picker: gray out models whose provider has no API key or subscription login (per-provider readiness resolver) |
+| 481 | PAN-3867 | S | medium | ok |  |  | /projects/new discards keystrokes typed before the first resolve lands; add a delayed-resolve journey test |
+| 482 | PAN-538 | S | medium | ok |  |  | pan reload freshness guard must also verify the frontend bundle |
+| 483 | PAN-1164 | M | medium | ok |  |  | Conversation diff summaries update live over WebSocket (drop 5s polling) |
+| 484 | PAN-3563 | S | medium | needs-refinement |  |  | pan unstick is gone; verify whether a spawned-but-never-briefed role agent can still read as running forever under liveness.ts |
+| 485 | PAN-1041 | M | medium | ok |  |  | Audit and consolidate REMOTE/LOCAL gates in work-agent prompt template |
+| 486 | PAN-924 | L | medium | needs-refinement |  |  | Spike: evaluate GitNexus for Panopticon integration |
+| 487 | PAN-3770 | S | medium | ok |  |  | Codex conversations never show the working spinner mid-turn; parser marks every agent_message instantly complete. |
+| 488 | PAN-3731 | S | medium | ok |  |  | Restart-gate banner gives no feedback after approval; dead-requester approvals read as a broken button. |
+| 489 | PAN-3530 | S | medium | ok |  |  | Four God View components poll on 30s timers instead of the documented /ws/rpc event contract. |
+| 490 | PAN-3131 | L | medium | ok |  |  | Support xBRIEF planRef sharding so a 1.1MB/227-item plan stops making every finalize failure whole-plan-fatal. |
+| 491 | PAN-3061 | M | medium | ok |  |  | Deterministic start-vs-swarm recommendation at plan-finalize, derived from plan shape plus recorded outcomes. |
+| 492 | PAN-3057 | S | medium | needs-refinement |  |  | Compaction tracking is gone; remaining bug = GPT-5.6 context window declared twice (372K vs 150K); verify separately |
+| 493 | PAN-3892 | M | medium | needs-refinement |  |  | Substrate review follow-ups deferred from PAN-3845 (minor findings, config clear-sentinel); split into workable items |
+| 494 | PAN-3827 | S | medium | ok |  |  | Dashboard shows the empty welcome state instead of an error when the harness exits before writing a transcript |
+| 495 | PAN-863 | M | medium | ok |  |  | One-shot sweep of stale feature branches and worktrees predating the reaper |
+| 496 | PAN-817 | M | medium | ok |  |  | Improve planning dialog layout and content fit |
+| 497 | PAN-802 | M | medium | ok |  |  | Resume on conversation session forks instead of resuming |
+| 498 | PAN-713 | M | medium | ok |  |  | test: add unit tests for doneCommand and approveCommand |
+| 499 | PAN-700 | M | medium | ok |  |  | Detachable terminal for conversation view |
+| 500 | PAN-646 | XS | medium | needs-refinement |  |  | Cancel no longer clears beads or a record; a Recover workflow now means reopening the tracker issue and re-planning |
+| 501 | PAN-532 | M | medium | ok |  |  | Per-project and per-issue model overrides for pipeline roles |
+| 502 | PAN-2896 | M | medium | ok |  |  | Warm resource-discovery and membership caches at boot |
+| 503 | PAN-2685 | M | medium | ok |  |  | Annotated live preview: Codex-style annotate-the-app feedback delivered to agents |
+| 504 | PAN-2626 | M | medium | ok |  |  | allow composer model switching within the same model family (e.g. Sonnet → Fable) |
+| 505 | PAN-2625 | XS | medium | ok |  |  | auto-run /pan-new-project on project creation + setup banner, checklist, teaching empty states, and a guided demo issue |
+| 506 | PAN-2609 | M | medium | ok |  |  | Cross-device sync of conversations and tasks via user-owned git remote |
+| 507 | PAN-2608 | M | medium | ok |  |  | Persistent collaboration roles (owner/editor/viewer) and organizations |
+| 508 | PAN-2582 | M | medium | ok |  |  | show slot assignments on the vBRIEF DAG + unify swarm/tiered terminology (Lead/Crew or Trunk/Lanes) |
+| 509 | PAN-2566 | L | medium | ok | ✓ |  | Triage list of genuine Traycer capability gaps; a container for child issues, not directly workable. |
+| 510 | PAN-2565 | M | medium | ok |  |  | Multi-agent conversations: N agent sessions in one task surface with agent-to-agent messaging |
+| 511 | PAN-3735 | S | medium | ok |  |  | Sandboxed pan CLI reports 'dashboard down, run pan up' when the real cause is no network; sends agents down the wrong path. |
+| 512 | PAN-3335 | XS | medium | ok |  |  | A pasted screenshot can't be viewed anywhere in the dashboard: thumbnail has no click handler and the sent form is a file-link chip. |
+| 513 | PAN-3054 | M | medium | ok |  |  | Benchmark matrix: run one template issue under N crew/model configurations and compare cost, wall-clock and outcome. |
+| 514 | PAN-2977 | M | medium | ok |  | PAN-2976 | Settings surface that detects installed ACP CLIs, renders the capability checklist, and guides login without a manual terminal. |
+| 515 | PAN-2557 | M | medium | ok |  |  | project-level 'Restart All' context action |
+| 516 | PAN-2553 | M | medium | ok |  |  | project-level CI visibility |
+| 517 | PAN-2521 | S | medium | ok |  |  | launch pipeline agents with harness rate-limit model-switch reminder disabled |
+| 518 | PAN-2493 | M | medium | ok |  |  | align the cockpit Agents-lane and sidebar issue-tree feature sets (two-way gaps) |
+| 519 | PAN-3772 | XS | medium | ok |  |  | Conv view renders Claude Code's synthetic 'no visible output' nudge as an operator message; should read as plumbing. |
+| 520 | PAN-3853 | S | medium | needs-refinement |  |  | Review synthesizer self-declared an operator override; that override door was deleted by the cut — verify on the PR-review path |
+| 521 | PAN-3830 | S | medium | ok |  |  | OpenCode provider: curate picker models via Settings favorites (OpenRouter pattern) instead of listing every discovered model |
+| 522 | PAN-3863 | L | medium | ok |  | PAN-3762 | Orca-style SSH Hosts + Remote Servers onboarding; UX extension of the PAN-3762 federation model, not a competing design |
+| 523 | PAN-2444 | L | medium | ok |  | PAN-3942 | optional SageOx re-integration |
+| 524 | PAN-2443 | M | medium | ok |  |  | OpenTelemetry GenAI semconv |
+| 525 | PAN-2442 | M | medium | ok |  |  | Agent Client Protocol (ACP) as Overdeck's structured control plane |
+| 526 | PAN-2409 | M | medium | ok |  |  | enforce the workspace boundary |
+| 527 | PAN-2392 | M | medium | needs-refinement |  |  | Standing Crew cost panel |
+| 528 | PAN-2335 | XS | medium | ok |  |  | chore: review the full open backlog for junk/stale/nonsensical issues |
+| 529 | PAN-2295 | L | medium | needs-refinement |  |  | built-in web browser surface (openable like terminal/Claude Code/Codex) + native Agentation integration |
+| 530 | PAN-3767 | S | medium | ok |  |  | Model switch could hang at 'Saving…'; onError toast landed, remaining work is reproducing the hang on a healthy server. |
+| 531 | PAN-3615 | S | medium | needs-refinement |  |  | TTS silent 9+ days from four stacked failures; three already fixed, only follow-ups remain — rescope to what is left. |
+| 532 | PAN-3558 | S | medium | ok |  |  | Subagent rail shows no model or provider, so mixed-model orchestration needs a transcript open per row to see what it is running. |
+| 533 | PAN-3469 | S | medium | ok |  |  | NewProjectModal violates the PAN-3410 page-not-modal doctrine; migrate the create-project flow to a routed page. |
+| 534 | PAN-3333 | M | medium | ok |  |  | Model pickers show $/1M, which says nothing under a subscription; show relative plan-quota drain among sibling models. |
+| 535 | PAN-3058 | M | medium | ok |  |  | Ship named crew presets that populate the whole tiered_execution block so operators don't hand-build the crew table. |
+| 536 | PAN-2288 | L | medium | ok |  |  | tmux managed-server: lossless auto-migration of dirty-founded servers + boot-time ensure call |
+| 537 | PAN-2065 | M | medium | ok |  |  | unified usage & headroom panel across all provider plans (z.ai, Anthropic, Codex, OpenRouter) |
+| 538 | PAN-2031 | M | medium | ok |  |  | ohmypi: add Bun 1.3.11 regression test to checkOhmypi doctor gate |
 | 539 | PAN-2026 | M | medium | ok |  |  | ohmypi: surface 35+ provider matrix in dashboard model picker |
 | 540 | PAN-2025 | M | medium | ok |  |  | ohmypi: extend provider credential passthrough for Groq, Cerebras, Fireworks |
 | 542 | PAN-2004 | M | medium | ok |  |  | Resumable Planning node: double-click a planned issue's Planning to resume the planning agent |
@@ -628,7 +639,6 @@ _Last sequenced: 2026-09-23T14:17:06.642Z · model: claude-opus-5 · open: 852_
 | 639 | PAN-2630 | M | low | ok |  |  | pan binary not on PATH for operator shells or spawned work agents; pan doctor can't be run to diagnose it |
 | 640 | PAN-2629 | M | low | ok |  |  | pan start kickoff delivery never lands: "Claude Code did not become ready within 30s" (both attempts), agent sits idle at empty prompt |
 | 641 | PAN-3443 | L | low | ok |  |  | God View 'Spectrum Deck' visualizer concept with mockup and PRD; pure exploration, no substrate impact. |
-| 642 | PAN-3958 | XL | medium | ok |  |  | Parked: bloat cut — undo Effect façades (49 sites), delete ~400 sync/async twins, collapse duplicate harness adapters; audit first |
 | 643 | PAN-4003 | L | medium | ok |  |  | Parked: delete the ohmypi/omp harness, keep Pi; obsoletes 10 open ohmypi issues and shrinks PAN-3958's CH-7 scope |
 | 644 | PAN-4002 | M | low | ok |  | PAN-3958 | Mechanical fooSync -> foo rename deferred out of PAN-3958; blocked until that cut lands, no behavior change |
 | 645 | PAN-2628 | M | low | ok |  |  | pan close aborts at close-issue:transition: "No tracker available and cannot determine issue type" for GitHub-tracker project |
@@ -996,6 +1006,10 @@ New this pass. Main stayed red for about five hours because nothing owns the sta
 
 New this pass. The CI test job runs root npm test, whose frontend leg is a hand-picked list of files, so two frontend test files were red on main for hours while every main CI run reported success. Green CI that does not mean green is worse than no CI, because every downstream gate and every close-out trusts it.
 
+### PAN-4019 (rank 41)
+
+New this run, filed 2026-09-23 out of the PAN-3993 review findings and predating them. The verification attempt budget exists to stop a work agent from grinding the same rework forever and hand it to the operator; escalation calls setAgentPaused and then delivers the "stuck" notice through src/lib/cloister/feedback-target.ts, which resurrects or resumes a paused agent, so the agent walks straight back into the loop. The local verification runner and the CI-failure relay both share the path, so no budget anywhere is enforced. Placed at the free rank 41, in the critical convergence band beside PAN-3580 (UAT relay with no convergence cap) and PAN-3532, because an unenforced budget is the same failure the pipeline keeps paying for in burned tokens and never-converging issues.
+
 ### PAN-3685 (rank 42)
 
 Swarm GC leaves consumed completion markers that hold slot capacity after assignments are freed. Critical: this breaks the substrate the rest of the backlog runs on — a wrong merge, a lost verdict, or a dead pipeline lane — so it ranks ahead of feature work of equal size.
@@ -1108,6 +1122,10 @@ New this pass. pan strike dies at git worktree list --porcelain on a polyrepo wr
 
 New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.
 
+### PAN-4016 (rank 70)
+
+New this run, filed 2026-09-23 out of the PAN-3987 review findings. Any queued issue with an origin/strike/<id> branch bypasses normalMergeEligibility, so the one merge path that is supposed to demand an approved PR and green required checks (including the test and lint aggregates) waves strikes through. Exposure is reduced because since PAN-3987 strikes open a PR the operator merges, which makes the queue path legacy — that is why it sits at 70 rather than the top tier — but an unguarded door onto main is exactly the shape that produced the repeated red-main incidents, and the fix is small: route strikes through the same eligibility checks or drop them from the queue path, with a test that a red-checks strike is not merged.
+
 ### PAN-3557 (rank 71)
 
 New this pass. Post-merge label application has no retry, so a rate-limited 403 leaves a merged issue without its verifying-on-main label — and the verify-on-main phase enumerates by that label, which makes the issue invisible to the phase that owns it. Lifecycle reported 'completed' throughout, so nothing noticed for 45 minutes.
@@ -1172,14 +1190,6 @@ Triage: verify days-stale "running" against the current liveness definition (idl
 
 Re-ranked up (prior rank 83, score 78). Four issues filed since the last pass — PAN-3243, PAN-3492, PAN-3520 and PAN-2421 — all trace red or flaky main to real-timer tests under load. This is the shared fix for that family and it is now marked ready, so it should sit with the other CI-integrity work rather than behind it.
 
-### PAN-2932 (rank 87)
-
-Intermittent dashboard boot wedge between Cloister start and ReadModel bootstrap leaves :3011 unbound (502) after pan reload.
-
-### PAN-2935 (rank 88)
-
-Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of API calls 504 in real MYN workspaces.
-
 
 <!-- machine-readable; do not hand-edit below this line -->
 
@@ -1187,10 +1197,10 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
 {
   "version": 1,
   "project": "overdeck",
-  "generatedAt": "2026-09-23T14:17:06.642Z",
+  "generatedAt": "2026-09-23T14:36:26.826Z",
   "model": "claude-opus-5",
   "pass": "incremental",
-  "openCount": 852,
+  "openCount": 862,
   "nodes": [
     {
       "issue": "PAN-3921",
@@ -1637,6 +1647,19 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
       "planning": "auto"
     },
     {
+      "issue": "PAN-4019",
+      "rank": 41,
+      "size": "S",
+      "importance": "critical",
+      "score": 87,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Escalation pauses the agent, then the stuck message resumes it via feedback-target: the verification attempt budget stops nobody",
+      "rationale": "New this run, filed 2026-09-23 out of the PAN-3993 review findings and predating them. The verification attempt budget exists to stop a work agent from grinding the same rework forever and hand it to the operator; escalation calls setAgentPaused and then delivers the \"stuck\" notice through src/lib/cloister/feedback-target.ts, which resurrects or resumes a paused agent, so the agent walks straight back into the loop. The local verification runner and the CI-failure relay both share the path, so no budget anywhere is enforced. Placed at the free rank 41, in the critical convergence band beside PAN-3580 (UAT relay with no convergence cap) and PAN-3532, because an unenforced budget is the same failure the pipeline keeps paying for in burned tokens and never-converging issues.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
       "issue": "PAN-3685",
       "rank": 42,
       "size": "S",
@@ -2001,6 +2024,19 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
       "dependsOn": [],
       "why": "Supply chain: lint-effect-diagnostics npx fell back to the registry and ran a squatted unscoped package; pin the scoped local bin.",
       "rationale": "New this pass and the only supply-chain finding in the batch. A stale node_modules made npx fall back to the registry, where the unscoped effect-language-service name is claimed by a third party, and npm installed and executed it non-interactively. The payload was benign this time; the name stays third-party-controlled, so a malicious patch release would run on any machine in the same state. The fix is small and the downside is unbounded.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4016",
+      "rank": 70,
+      "size": "S",
+      "importance": "critical",
+      "score": 84,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "advanceMergeQueue skips normalMergeEligibility for strike branches, so a strike merges with no approval check and no green-checks gate",
+      "rationale": "New this run, filed 2026-09-23 out of the PAN-3987 review findings. Any queued issue with an origin/strike/<id> branch bypasses normalMergeEligibility, so the one merge path that is supposed to demand an approved PR and green required checks (including the test and lint aggregates) waves strikes through. Exposure is reduced because since PAN-3987 strikes open a PR the operator merges, which makes the queue path legacy — that is why it sits at 70 rather than the top tier — but an unguarded door onto main is exactly the shape that produced the repeated red-main incidents, and the fix is small: route strikes through the same eligibility checks or drop them from the queue path, with a test that a red-checks strike is not merged.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -3899,8 +3935,140 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
       "planning": "auto"
     },
     {
-      "issue": "PAN-3527",
+      "issue": "PAN-3958",
+      "rank": 220,
+      "size": "XL",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Unparked epic: the Effect façade + sync-twin cut. PRD landed, ratchet PR #4006 open, children CH-1..CH-8 filed in landing order",
+      "rationale": "Rank moves 642 → 220 because the one thing holding it at 642 was the operator `parked` label, and the operator removed it on 2026-09-23: the PRD is written on feature/pan-3958, the five open questions are decided (src/index.ts is internal, the one-version rule is per operation, the Sync rename defers to PAN-4002, the legacy PiRuntime classes get deleted, Oh My Pi is excluded via PAN-4003), and the epic's own landing — the audit tool plus the shrink-only `lint:effect-facades` ratchet — is open as PR #4006. Eight child issues now carry the work in a strict landing order. Ranked with the substrate band at 200-232 rather than with feature work: 49 Effect façades, ~400 sync/async twin pairs and ~50 files that each hardcode where a harness keeps its transcripts are the same class of duplication that produced the PAN-3950 round-4 review blockers and the recurring per-harness boundary gaps. `hasPrd` reads false only because the PRD lives on the feature branch, not main. Epic container — never picked up directly.",
+      "gate": "auto",
+      "planning": "auto",
+      "isEpic": true
+    },
+    {
+      "issue": "PAN-4007",
       "rank": 221,
+      "size": "L",
+      "importance": "high",
+      "score": 74,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "CH-1 lands first: delete 268 dead sync wrappers, 43 dead façades and the never-constructed runtime classes; needs ratchet PR #4006 in",
+      "rationale": "New this run, filed 2026-09-23 as the first child of PAN-3958 and the only one that is not blocked behind a sibling. Pure deletion in two PRs — 268 dead Shape B wrappers, 43 dead Shape A façades, the AgentRuntime/ClaudeCodeRuntime/CodexRuntime/OhmypiRuntime/PiRuntime(Sync) classes nothing constructs, the dead Shape C twins and the uncalled sendKeysSync — so it carries the largest line-count win at the lowest risk. Its real gate is PR #4006 landing the `lint:effect-facades` ratchet, which is a PR and not a backlog node, so `dependsOn` is empty; CH-2…CH-8 hold until this merges and one `pan reload` runs clean.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4008",
+      "rank": 222,
+      "size": "M",
+      "importance": "high",
+      "score": 73,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4007"
+      ],
+      "why": "CH-2: convert the 24 live Effect façades in 15 src/lib/cloister modules to plain async and update their callers",
+      "rationale": "New this run. Second in PAN-3958's landing order and hard-blocked on CH-1; the cloister modules share dashboard route callers, so the epic says to run the children one at a time rather than in a wave.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4009",
+      "rank": 223,
+      "size": "L",
+      "importance": "high",
+      "score": 73,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4008"
+      ],
+      "why": "CH-3: convert 51 façades in 21 agent, runtime, tmux, health, git, checkpoint and workspace modules; drop the routes/agents/shared.ts aliases",
+      "rationale": "New this run. Third in the landing order, blocked on CH-2. Touches the spawn/liveness core where the Effect→Promise→Effect round trips are densest, so it is the largest single conversion in the chain.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4010",
+      "rank": 224,
+      "size": "L",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4009"
+      ],
+      "why": "CH-4: convert 65 façades in 16 TTS, platform, cliproxy, tunnel, auth, GitHub-app and webhook modules to plain async",
+      "rationale": "New this run. Fourth in the landing order, blocked on CH-3; the biggest façade count of any cluster but confined to sidecar and integration modules.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4011",
+      "rank": 225,
+      "size": "M",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4010"
+      ],
+      "why": "CH-5: convert the last 37 façades (config, projects, settings, shadow, costs, conversations, xbrief, memory); clears every Shape A row",
+      "rationale": "New this run. Fifth in the landing order, blocked on CH-4. Completes the Shape A conversion: after it the `lint:effect-facades` baseline carries no façade rows at all, which is the epic's mechanical finish line for the Effect half.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4012",
+      "rank": 226,
+      "size": "L",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4011"
+      ],
+      "why": "CH-6: resolve 33 live sync wrappers and 37 live twin pairs; leave no blocking *Sync child-process call in dashboard or cloister code",
+      "rationale": "New this run. Sixth in the landing order, blocked on CH-5. Carries real behavior value beyond bloat: the no-blocking-sync-in-server-code rule is the project's standing event-loop invariant, and each sync twin that survives on purpose gets a header note saying why.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4013",
+      "rank": 227,
+      "size": "L",
+      "importance": "high",
+      "score": 72,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4012"
+      ],
+      "why": "CH-7: one src/lib/runtimes/storage/<harness>.ts owner for transcript, session and home paths now spread over ~50 files, plus a lint",
+      "rationale": "New this run. Seventh in the landing order, blocked on CH-6. The highest-leverage item for correctness rather than size: per-harness transcript, session-id and home-dir knowledge is duplicated across about 50 files today, which is the direct cause of the recurring non-Claude harness boundary gaps. Scope shrinks if PAN-4003 deletes Oh My Pi first.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-4014",
+      "rank": 228,
+      "size": "M",
+      "importance": "high",
+      "score": 71,
+      "condition": "ok",
+      "dependsOn": [
+        "PAN-4013"
+      ],
+      "why": "CH-8: delete ~222 unreferenced exports and the alias shims, then unexport file-local symbols; marks src/index.ts internal",
+      "rationale": "New this run. Last in PAN-3958's landing order, blocked on CH-7, and deliberately last so the export census runs against the post-cut tree rather than a moving target.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-3527",
+      "rank": 229,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -3912,7 +4080,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3510",
-      "rank": 222,
+      "rank": 230,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -3924,7 +4092,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3355",
-      "rank": 223,
+      "rank": 231,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -3936,7 +4104,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3289",
-      "rank": 224,
+      "rank": 232,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -3948,7 +4116,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3245",
-      "rank": 225,
+      "rank": 233,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -3960,7 +4128,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3218",
-      "rank": 226,
+      "rank": 234,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -3972,7 +4140,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3210",
-      "rank": 227,
+      "rank": 235,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -3984,7 +4152,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3167",
-      "rank": 228,
+      "rank": 236,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -3996,7 +4164,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3113",
-      "rank": 229,
+      "rank": 237,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -4008,7 +4176,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3108",
-      "rank": 230,
+      "rank": 238,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -4020,7 +4188,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3094",
-      "rank": 231,
+      "rank": 239,
       "size": "XS",
       "importance": "high",
       "score": 72,
@@ -4032,7 +4200,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3012",
-      "rank": 232,
+      "rank": 240,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -4044,7 +4212,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3627",
-      "rank": 233,
+      "rank": 241,
       "size": "XS",
       "importance": "high",
       "score": 70,
@@ -4056,7 +4224,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3617",
-      "rank": 234,
+      "rank": 242,
       "size": "S",
       "importance": "high",
       "score": 70,
@@ -4068,7 +4236,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3308",
-      "rank": 235,
+      "rank": 243,
       "size": "XS",
       "importance": "high",
       "score": 70,
@@ -4080,7 +4248,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3276",
-      "rank": 236,
+      "rank": 244,
       "size": "XS",
       "importance": "high",
       "score": 70,
@@ -4092,7 +4260,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3235",
-      "rank": 237,
+      "rank": 245,
       "size": "S",
       "importance": "high",
       "score": 70,
@@ -4104,7 +4272,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3855",
-      "rank": 238,
+      "rank": 246,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -4117,7 +4285,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3789",
-      "rank": 239,
+      "rank": 247,
       "size": "L",
       "importance": "medium",
       "score": 58,
@@ -4130,7 +4298,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3175",
-      "rank": 240,
+      "rank": 248,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -4142,7 +4310,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3015",
-      "rank": 241,
+      "rank": 249,
       "size": "L",
       "importance": "high",
       "score": 70,
@@ -4154,7 +4322,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3518",
-      "rank": 242,
+      "rank": 250,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -4169,7 +4337,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3445",
-      "rank": 243,
+      "rank": 251,
       "size": "XS",
       "importance": "high",
       "score": 68,
@@ -4181,7 +4349,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3332",
-      "rank": 244,
+      "rank": 252,
       "size": "S",
       "importance": "high",
       "score": 68,
@@ -4193,7 +4361,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3295",
-      "rank": 245,
+      "rank": 253,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -4205,7 +4373,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3236",
-      "rank": 246,
+      "rank": 254,
       "size": "XS",
       "importance": "high",
       "score": 68,
@@ -4218,7 +4386,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3013",
-      "rank": 247,
+      "rank": 255,
       "size": "XS",
       "importance": "high",
       "score": 68,
@@ -4230,7 +4398,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3771",
-      "rank": 248,
+      "rank": 256,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -4242,7 +4410,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3533",
-      "rank": 249,
+      "rank": 257,
       "size": "L",
       "importance": "high",
       "score": 66,
@@ -4254,7 +4422,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3107",
-      "rank": 250,
+      "rank": 258,
       "size": "S",
       "importance": "high",
       "score": 66,
@@ -4266,7 +4434,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3762",
-      "rank": 251,
+      "rank": 259,
       "size": "XL",
       "importance": "high",
       "score": 64,
@@ -4279,7 +4447,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1666",
-      "rank": 252,
+      "rank": 260,
       "size": "XL",
       "importance": "medium",
       "score": 63,
@@ -4293,7 +4461,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1556",
-      "rank": 253,
+      "rank": 261,
       "size": "S",
       "importance": "high",
       "score": 77,
@@ -4306,7 +4474,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2188",
-      "rank": 254,
+      "rank": 262,
       "size": "M",
       "importance": "high",
       "score": 76,
@@ -4319,7 +4487,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2190",
-      "rank": 255,
+      "rank": 263,
       "size": "L",
       "importance": "high",
       "score": 76,
@@ -4332,7 +4500,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2233",
-      "rank": 256,
+      "rank": 264,
       "size": "L",
       "importance": "high",
       "score": 76,
@@ -4345,7 +4513,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2008",
-      "rank": 257,
+      "rank": 265,
       "size": "XS",
       "importance": "high",
       "score": 76,
@@ -4360,7 +4528,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1325",
-      "rank": 258,
+      "rank": 266,
       "size": "M",
       "importance": "high",
       "score": 75,
@@ -4372,7 +4540,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1728",
-      "rank": 259,
+      "rank": 267,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -4385,7 +4553,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2241",
-      "rank": 260,
+      "rank": 268,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4397,7 +4565,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2242",
-      "rank": 261,
+      "rank": 269,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4409,7 +4577,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2240",
-      "rank": 262,
+      "rank": 270,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4421,7 +4589,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2243",
-      "rank": 263,
+      "rank": 271,
       "size": "S",
       "importance": "high",
       "score": 75,
@@ -4433,7 +4601,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2202",
-      "rank": 264,
+      "rank": 272,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4445,7 +4613,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2195",
-      "rank": 265,
+      "rank": 273,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4458,7 +4626,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2237",
-      "rank": 266,
+      "rank": 274,
       "size": "S",
       "importance": "high",
       "score": 74,
@@ -4470,7 +4638,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2487",
-      "rank": 267,
+      "rank": 275,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4482,7 +4650,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2469",
-      "rank": 268,
+      "rank": 276,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4494,7 +4662,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2212",
-      "rank": 269,
+      "rank": 277,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4506,7 +4674,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2213",
-      "rank": 270,
+      "rank": 278,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4518,7 +4686,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2211",
-      "rank": 271,
+      "rank": 279,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4530,7 +4698,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2210",
-      "rank": 272,
+      "rank": 280,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4542,7 +4710,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2201",
-      "rank": 273,
+      "rank": 281,
       "size": "XS",
       "importance": "high",
       "score": 73,
@@ -4554,7 +4722,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2646",
-      "rank": 274,
+      "rank": 282,
       "size": "XS",
       "importance": "high",
       "score": 73,
@@ -4566,7 +4734,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3751",
-      "rank": 275,
+      "rank": 283,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -4579,7 +4747,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2652",
-      "rank": 276,
+      "rank": 284,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -4591,7 +4759,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2755",
-      "rank": 277,
+      "rank": 285,
       "size": "S",
       "importance": "high",
       "score": 73,
@@ -4603,7 +4771,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2754",
-      "rank": 278,
+      "rank": 286,
       "size": "S",
       "importance": "high",
       "score": 73,
@@ -4615,7 +4783,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2809",
-      "rank": 279,
+      "rank": 287,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -4627,7 +4795,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2810",
-      "rank": 280,
+      "rank": 288,
       "size": "M",
       "importance": "high",
       "score": 73,
@@ -4639,7 +4807,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2495",
-      "rank": 281,
+      "rank": 289,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4651,7 +4819,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2478",
-      "rank": 282,
+      "rank": 290,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4663,7 +4831,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1710",
-      "rank": 283,
+      "rank": 291,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4675,7 +4843,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3420",
-      "rank": 284,
+      "rank": 292,
       "size": "M",
       "importance": "high",
       "score": 74,
@@ -4688,7 +4856,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1558",
-      "rank": 285,
+      "rank": 293,
       "size": "M",
       "importance": "high",
       "score": 72,
@@ -4700,7 +4868,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1766",
-      "rank": 286,
+      "rank": 294,
       "size": "S",
       "importance": "high",
       "score": 72,
@@ -4712,7 +4880,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2266",
-      "rank": 288,
+      "rank": 295,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -4724,7 +4892,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1578",
-      "rank": 289,
+      "rank": 296,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -4736,7 +4904,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1538",
-      "rank": 290,
+      "rank": 297,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -4748,7 +4916,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-687",
-      "rank": 291,
+      "rank": 298,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -4760,7 +4928,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-466",
-      "rank": 292,
+      "rank": 299,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -4772,7 +4940,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-465",
-      "rank": 293,
+      "rank": 300,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -4784,7 +4952,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-463",
-      "rank": 294,
+      "rank": 301,
       "size": "M",
       "importance": "high",
       "score": 71,
@@ -4796,7 +4964,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1142",
-      "rank": 295,
+      "rank": 302,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -4808,7 +4976,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1424",
-      "rank": 296,
+      "rank": 303,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -4820,7 +4988,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1196",
-      "rank": 297,
+      "rank": 304,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -4832,7 +5000,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1311",
-      "rank": 298,
+      "rank": 305,
       "size": "M",
       "importance": "high",
       "score": 70,
@@ -4844,7 +5012,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1313",
-      "rank": 299,
+      "rank": 306,
       "size": "L",
       "importance": "high",
       "score": 70,
@@ -4853,91 +5021,6 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
       "why": "Finish src/lib Effect migration: remove or justify legacy Promise/sync surfaces",
       "gate": "auto",
       "planning": "interactive"
-    },
-    {
-      "issue": "PAN-1246",
-      "rank": 300,
-      "size": "M",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586)",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1253",
-      "rank": 301,
-      "size": "M",
-      "importance": "high",
-      "score": 70,
-      "condition": "needs-refinement",
-      "dependsOn": [],
-      "why": "Flywheel: respect issue dependencies before autopicking work",
-      "rationale": "Triage: the flywheel is now a loop skill driven by order books / backlog sequence; the dependency-awareness ask may still apply to its pick logic. Rank held.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1254",
-      "rank": 302,
-      "size": "L",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Tailscale integration: advertise dashboard + workspace endpoints over tailnet (Effect-native)",
-      "gate": "auto",
-      "planning": "interactive"
-    },
-    {
-      "issue": "PAN-1357",
-      "rank": 303,
-      "size": "M",
-      "importance": "high",
-      "score": 70,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Template conversations: load curated skill bundles into a single conversation",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1915",
-      "rank": 304,
-      "size": "M",
-      "importance": "high",
-      "score": 69,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "enhancement(security): API key at-rest hardening",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1435",
-      "rank": 305,
-      "size": "XS",
-      "importance": "high",
-      "score": 69,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "API keys in ~/.panopticon/config.yaml stored as plaintext",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-1672",
-      "rank": 306,
-      "size": "M",
-      "importance": "high",
-      "score": 69,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion",
-      "gate": "auto",
-      "planning": "auto"
     },
     {
       "issue": "PAN-3787",
@@ -4953,8 +5036,93 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
       "planning": "auto"
     },
     {
-      "issue": "PAN-1640",
+      "issue": "PAN-1246",
       "rank": 308,
+      "size": "M",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Perf: projection-cached VCS driver for diff/checkpoint reads (port of t3code #2586)",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-1253",
+      "rank": 309,
+      "size": "M",
+      "importance": "high",
+      "score": 70,
+      "condition": "needs-refinement",
+      "dependsOn": [],
+      "why": "Flywheel: respect issue dependencies before autopicking work",
+      "rationale": "Triage: the flywheel is now a loop skill driven by order books / backlog sequence; the dependency-awareness ask may still apply to its pick logic. Rank held.",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-1254",
+      "rank": 310,
+      "size": "L",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Tailscale integration: advertise dashboard + workspace endpoints over tailnet (Effect-native)",
+      "gate": "auto",
+      "planning": "interactive"
+    },
+    {
+      "issue": "PAN-1357",
+      "rank": 311,
+      "size": "M",
+      "importance": "high",
+      "score": 70,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "Template conversations: load curated skill bundles into a single conversation",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-1915",
+      "rank": 312,
+      "size": "M",
+      "importance": "high",
+      "score": 69,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "enhancement(security): API key at-rest hardening",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-1435",
+      "rank": 313,
+      "size": "XS",
+      "importance": "high",
+      "score": 69,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "API keys in ~/.panopticon/config.yaml stored as plaintext",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-1672",
+      "rank": 314,
+      "size": "M",
+      "importance": "high",
+      "score": 69,
+      "condition": "ok",
+      "dependsOn": [],
+      "why": "GPT-5.5/CLIProxy context-window deadlock: conversations get no overflow recovery + 200k window illusion",
+      "gate": "auto",
+      "planning": "auto"
+    },
+    {
+      "issue": "PAN-1640",
+      "rank": 315,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -4966,7 +5134,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2351",
-      "rank": 309,
+      "rank": 316,
       "size": "XS",
       "importance": "high",
       "score": 69,
@@ -4981,7 +5149,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2350",
-      "rank": 310,
+      "rank": 317,
       "size": "L",
       "importance": "high",
       "score": 69,
@@ -4995,7 +5163,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1217",
-      "rank": 311,
+      "rank": 318,
       "size": "XS",
       "importance": "high",
       "score": 69,
@@ -5007,7 +5175,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2079",
-      "rank": 312,
+      "rank": 319,
       "size": "M",
       "importance": "high",
       "score": 60,
@@ -5020,7 +5188,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3934",
-      "rank": 313,
+      "rank": 320,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -5035,7 +5203,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1219",
-      "rank": 314,
+      "rank": 321,
       "size": "M",
       "importance": "high",
       "score": 69,
@@ -5048,7 +5216,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1209",
-      "rank": 315,
+      "rank": 322,
       "size": "S",
       "importance": "low",
       "score": 15,
@@ -5061,7 +5229,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1451",
-      "rank": 316,
+      "rank": 323,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5074,7 +5242,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1452",
-      "rank": 317,
+      "rank": 324,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5086,7 +5254,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1454",
-      "rank": 318,
+      "rank": 325,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5098,7 +5266,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1553",
-      "rank": 319,
+      "rank": 326,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5110,7 +5278,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1504",
-      "rank": 320,
+      "rank": 327,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5122,7 +5290,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1480",
-      "rank": 321,
+      "rank": 328,
       "size": "L",
       "importance": "high",
       "score": 68,
@@ -5134,7 +5302,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1479",
-      "rank": 322,
+      "rank": 329,
       "size": "M",
       "importance": "high",
       "score": 68,
@@ -5146,7 +5314,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2950",
-      "rank": 323,
+      "rank": 330,
       "size": "L",
       "importance": "high",
       "score": 68,
@@ -5158,7 +5326,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2836",
-      "rank": 324,
+      "rank": 331,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5170,7 +5338,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2720",
-      "rank": 325,
+      "rank": 332,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5182,7 +5350,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2650",
-      "rank": 326,
+      "rank": 333,
       "size": "L",
       "importance": "high",
       "score": 67,
@@ -5194,7 +5362,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2358",
-      "rank": 327,
+      "rank": 334,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5206,7 +5374,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2334",
-      "rank": 328,
+      "rank": 335,
       "size": "XS",
       "importance": "high",
       "score": 67,
@@ -5218,7 +5386,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2308",
-      "rank": 329,
+      "rank": 336,
       "size": "M",
       "importance": "high",
       "score": 67,
@@ -5231,7 +5399,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2193",
-      "rank": 330,
+      "rank": 337,
       "size": "S",
       "importance": "high",
       "score": 66,
@@ -5243,7 +5411,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1984",
-      "rank": 331,
+      "rank": 338,
       "size": "XS",
       "importance": "high",
       "score": 66,
@@ -5256,7 +5424,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1913",
-      "rank": 332,
+      "rank": 339,
       "size": "XS",
       "importance": "high",
       "score": 66,
@@ -5268,7 +5436,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1906",
-      "rank": 333,
+      "rank": 340,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -5280,7 +5448,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1544",
-      "rank": 334,
+      "rank": 341,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -5292,7 +5460,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-955",
-      "rank": 335,
+      "rank": 342,
       "size": "S",
       "importance": "high",
       "score": 66,
@@ -5304,7 +5472,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-807",
-      "rank": 336,
+      "rank": 343,
       "size": "L",
       "importance": "high",
       "score": 66,
@@ -5316,7 +5484,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-630",
-      "rank": 337,
+      "rank": 344,
       "size": "M",
       "importance": "high",
       "score": 66,
@@ -5328,7 +5496,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-471",
-      "rank": 338,
+      "rank": 345,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -5340,7 +5508,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-438",
-      "rank": 339,
+      "rank": 346,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -5352,7 +5520,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-578",
-      "rank": 340,
+      "rank": 347,
       "size": "M",
       "importance": "high",
       "score": 65,
@@ -5364,7 +5532,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2921",
-      "rank": 341,
+      "rank": 348,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -5376,7 +5544,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3920",
-      "rank": 342,
+      "rank": 349,
       "size": "L",
       "importance": "medium",
       "score": 58,
@@ -5391,7 +5559,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2839",
-      "rank": 343,
+      "rank": 350,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -5403,7 +5571,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2824",
-      "rank": 344,
+      "rank": 351,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -5415,7 +5583,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2792",
-      "rank": 345,
+      "rank": 352,
       "size": "S",
       "importance": "medium",
       "score": 63,
@@ -5427,7 +5595,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2761",
-      "rank": 346,
+      "rank": 353,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5439,7 +5607,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2738",
-      "rank": 347,
+      "rank": 354,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5451,7 +5619,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2717",
-      "rank": 348,
+      "rank": 355,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5463,7 +5631,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2697",
-      "rank": 349,
+      "rank": 356,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5475,7 +5643,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2696",
-      "rank": 350,
+      "rank": 357,
       "size": "XS",
       "importance": "medium",
       "score": 62,
@@ -5488,7 +5656,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2691",
-      "rank": 351,
+      "rank": 358,
       "size": "S",
       "importance": "medium",
       "score": 62,
@@ -5500,7 +5668,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2686",
-      "rank": 352,
+      "rank": 359,
       "size": "XS",
       "importance": "medium",
       "score": 62,
@@ -5513,7 +5681,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3701",
-      "rank": 353,
+      "rank": 360,
       "size": "L",
       "importance": "high",
       "score": 62,
@@ -5525,7 +5693,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3090",
-      "rank": 354,
+      "rank": 361,
       "size": "M",
       "importance": "high",
       "score": 62,
@@ -5537,7 +5705,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2672",
-      "rank": 355,
+      "rank": 362,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -5549,7 +5717,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2670",
-      "rank": 356,
+      "rank": 363,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -5561,7 +5729,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2664",
-      "rank": 357,
+      "rank": 364,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -5573,7 +5741,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2663",
-      "rank": 358,
+      "rank": 365,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -5585,7 +5753,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2649",
-      "rank": 359,
+      "rank": 366,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -5597,7 +5765,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2580",
-      "rank": 360,
+      "rank": 367,
       "size": "S",
       "importance": "medium",
       "score": 61,
@@ -5609,7 +5777,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2572",
-      "rank": 361,
+      "rank": 368,
       "size": "M",
       "importance": "medium",
       "score": 61,
@@ -5621,7 +5789,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2563",
-      "rank": 362,
+      "rank": 369,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -5633,7 +5801,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2554",
-      "rank": 363,
+      "rank": 370,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -5645,7 +5813,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2550",
-      "rank": 364,
+      "rank": 371,
       "size": "XS",
       "importance": "medium",
       "score": 60,
@@ -5657,7 +5825,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2547",
-      "rank": 365,
+      "rank": 372,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -5669,7 +5837,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2546",
-      "rank": 366,
+      "rank": 373,
       "size": "S",
       "importance": "medium",
       "score": 60,
@@ -5681,7 +5849,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3504",
-      "rank": 367,
+      "rank": 374,
       "size": "XS",
       "importance": "high",
       "score": 60,
@@ -5693,7 +5861,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3003",
-      "rank": 368,
+      "rank": 375,
       "size": "XS",
       "importance": "medium",
       "score": 60,
@@ -5705,7 +5873,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2501",
-      "rank": 369,
+      "rank": 376,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -5717,7 +5885,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2492",
-      "rank": 370,
+      "rank": 377,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -5730,7 +5898,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2491",
-      "rank": 371,
+      "rank": 378,
       "size": "M",
       "importance": "medium",
       "score": 59,
@@ -5742,7 +5910,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2489",
-      "rank": 372,
+      "rank": 379,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -5754,7 +5922,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2465",
-      "rank": 373,
+      "rank": 380,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -5766,7 +5934,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2454",
-      "rank": 374,
+      "rank": 381,
       "size": "S",
       "importance": "medium",
       "score": 59,
@@ -5778,7 +5946,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2428",
-      "rank": 375,
+      "rank": 382,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -5790,7 +5958,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2423",
-      "rank": 376,
+      "rank": 383,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -5802,7 +5970,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2416",
-      "rank": 377,
+      "rank": 384,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -5814,7 +5982,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2408",
-      "rank": 378,
+      "rank": 385,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -5827,7 +5995,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2395",
-      "rank": 379,
+      "rank": 386,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -5839,7 +6007,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2381",
-      "rank": 380,
+      "rank": 387,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -5851,7 +6019,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2287",
-      "rank": 381,
+      "rank": 388,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -5863,7 +6031,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3661",
-      "rank": 382,
+      "rank": 389,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -5875,7 +6043,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3288",
-      "rank": 383,
+      "rank": 390,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -5887,7 +6055,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3164",
-      "rank": 384,
+      "rank": 391,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -5899,7 +6067,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3121",
-      "rank": 385,
+      "rank": 392,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -5911,7 +6079,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3014",
-      "rank": 386,
+      "rank": 393,
       "size": "XS",
       "importance": "medium",
       "score": 58,
@@ -5923,7 +6091,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3944",
-      "rank": 387,
+      "rank": 394,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -5936,7 +6104,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3911",
-      "rank": 388,
+      "rank": 395,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -5949,7 +6117,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3915",
-      "rank": 389,
+      "rank": 396,
       "size": "S",
       "importance": "medium",
       "score": 58,
@@ -5962,7 +6130,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3829",
-      "rank": 390,
+      "rank": 397,
       "size": "L",
       "importance": "medium",
       "score": 58,
@@ -5975,7 +6143,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2280",
-      "rank": 391,
+      "rank": 398,
       "size": "M",
       "importance": "medium",
       "score": 57,
@@ -5987,7 +6155,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2197",
-      "rank": 392,
+      "rank": 399,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -5999,7 +6167,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2186",
-      "rank": 393,
+      "rank": 400,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6012,7 +6180,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2069",
-      "rank": 394,
+      "rank": 401,
       "size": "XS",
       "importance": "medium",
       "score": 57,
@@ -6024,7 +6192,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1918",
-      "rank": 395,
+      "rank": 402,
       "size": "XS",
       "importance": "medium",
       "score": 57,
@@ -6036,7 +6204,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1912",
-      "rank": 396,
+      "rank": 403,
       "size": "XS",
       "importance": "medium",
       "score": 57,
@@ -6048,7 +6216,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1846",
-      "rank": 397,
+      "rank": 404,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6061,7 +6229,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1830",
-      "rank": 398,
+      "rank": 405,
       "size": "S",
       "importance": "medium",
       "score": 57,
@@ -6073,7 +6241,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1816",
-      "rank": 399,
+      "rank": 406,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6085,7 +6253,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1795",
-      "rank": 400,
+      "rank": 407,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6097,7 +6265,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1774",
-      "rank": 401,
+      "rank": 408,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6109,7 +6277,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1769",
-      "rank": 402,
+      "rank": 409,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6121,7 +6289,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1761",
-      "rank": 403,
+      "rank": 410,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6133,7 +6301,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1755",
-      "rank": 404,
+      "rank": 411,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6145,7 +6313,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3516",
-      "rank": 405,
+      "rank": 412,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6157,7 +6325,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3455",
-      "rank": 406,
+      "rank": 413,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6169,7 +6337,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3117",
-      "rank": 407,
+      "rank": 414,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6181,7 +6349,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3036",
-      "rank": 408,
+      "rank": 415,
       "size": "XS",
       "importance": "medium",
       "score": 56,
@@ -6193,7 +6361,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3016",
-      "rank": 409,
+      "rank": 416,
       "size": "M",
       "importance": "medium",
       "score": 56,
@@ -6205,7 +6373,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3890",
-      "rank": 410,
+      "rank": 417,
       "size": "S",
       "importance": "medium",
       "score": 56,
@@ -6218,7 +6386,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3822",
-      "rank": 411,
+      "rank": 418,
       "size": "L",
       "importance": "medium",
       "score": 56,
@@ -6231,7 +6399,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1740",
-      "rank": 412,
+      "rank": 419,
       "size": "XS",
       "importance": "medium",
       "score": 55,
@@ -6244,7 +6412,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1674",
-      "rank": 413,
+      "rank": 420,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6256,7 +6424,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1673",
-      "rank": 414,
+      "rank": 421,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6268,7 +6436,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1669",
-      "rank": 415,
+      "rank": 422,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6280,7 +6448,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1668",
-      "rank": 416,
+      "rank": 423,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6292,7 +6460,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1627",
-      "rank": 417,
+      "rank": 424,
       "size": "M",
       "importance": "medium",
       "score": 55,
@@ -6304,7 +6472,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1624",
-      "rank": 418,
+      "rank": 425,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6316,7 +6484,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3901",
-      "rank": 419,
+      "rank": 426,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6329,7 +6497,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3852",
-      "rank": 420,
+      "rank": 427,
       "size": "S",
       "importance": "medium",
       "score": 55,
@@ -6342,7 +6510,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3862",
-      "rank": 421,
+      "rank": 428,
       "size": "L",
       "importance": "medium",
       "score": 55,
@@ -6355,7 +6523,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1572",
-      "rank": 422,
+      "rank": 429,
       "size": "M",
       "importance": "medium",
       "score": 54,
@@ -6368,7 +6536,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1571",
-      "rank": 423,
+      "rank": 430,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6380,7 +6548,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1565",
-      "rank": 424,
+      "rank": 431,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6392,7 +6560,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1530",
-      "rank": 425,
+      "rank": 432,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6404,7 +6572,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1461",
-      "rank": 426,
+      "rank": 433,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6416,7 +6584,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1449",
-      "rank": 427,
+      "rank": 434,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6428,7 +6596,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1446",
-      "rank": 428,
+      "rank": 435,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6440,7 +6608,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1936",
-      "rank": 429,
+      "rank": 436,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -6453,7 +6621,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1445",
-      "rank": 430,
+      "rank": 437,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6465,7 +6633,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3616",
-      "rank": 431,
+      "rank": 438,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6477,7 +6645,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2982",
-      "rank": 432,
+      "rank": 439,
       "size": "XS",
       "importance": "medium",
       "score": 54,
@@ -6489,7 +6657,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2981",
-      "rank": 433,
+      "rank": 440,
       "size": "S",
       "importance": "medium",
       "score": 54,
@@ -6501,7 +6669,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2976",
-      "rank": 434,
+      "rank": 441,
       "size": "L",
       "importance": "medium",
       "score": 54,
@@ -6513,7 +6681,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1444",
-      "rank": 435,
+      "rank": 442,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6525,7 +6693,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1440",
-      "rank": 436,
+      "rank": 443,
       "size": "S",
       "importance": "low",
       "score": 15,
@@ -6538,7 +6706,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1433",
-      "rank": 437,
+      "rank": 444,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6550,7 +6718,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1416",
-      "rank": 438,
+      "rank": 445,
       "size": "S",
       "importance": "medium",
       "score": 53,
@@ -6562,7 +6730,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1392",
-      "rank": 439,
+      "rank": 446,
       "size": "S",
       "importance": "low",
       "score": 12,
@@ -6575,7 +6743,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3974",
-      "rank": 440,
+      "rank": 447,
       "size": "L",
       "importance": "medium",
       "score": 52,
@@ -6590,7 +6758,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1330",
-      "rank": 441,
+      "rank": 448,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -6602,7 +6770,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1244",
-      "rank": 442,
+      "rank": 449,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -6614,7 +6782,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1227",
-      "rank": 443,
+      "rank": 450,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -6627,7 +6795,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1226",
-      "rank": 444,
+      "rank": 451,
       "size": "L",
       "importance": "medium",
       "score": 52,
@@ -6639,7 +6807,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1173",
-      "rank": 445,
+      "rank": 452,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -6651,7 +6819,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1154",
-      "rank": 446,
+      "rank": 453,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -6663,7 +6831,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3354",
-      "rank": 447,
+      "rank": 454,
       "size": "XS",
       "importance": "medium",
       "score": 52,
@@ -6675,7 +6843,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3178",
-      "rank": 448,
+      "rank": 455,
       "size": "XL",
       "importance": "medium",
       "score": 52,
@@ -6687,7 +6855,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3017",
-      "rank": 449,
+      "rank": 456,
       "size": "S",
       "importance": "medium",
       "score": 52,
@@ -6699,7 +6867,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3864",
-      "rank": 450,
+      "rank": 457,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -6712,7 +6880,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3873",
-      "rank": 451,
+      "rank": 458,
       "size": "M",
       "importance": "medium",
       "score": 52,
@@ -6725,7 +6893,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1150",
-      "rank": 452,
+      "rank": 459,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6737,7 +6905,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1149",
-      "rank": 453,
+      "rank": 460,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6749,7 +6917,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1130",
-      "rank": 454,
+      "rank": 461,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6761,7 +6929,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1129",
-      "rank": 455,
+      "rank": 462,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6773,7 +6941,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1128",
-      "rank": 456,
+      "rank": 463,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6785,7 +6953,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1113",
-      "rank": 457,
+      "rank": 464,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6797,7 +6965,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1068",
-      "rank": 458,
+      "rank": 465,
       "size": "S",
       "importance": "medium",
       "score": 51,
@@ -6809,7 +6977,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3938",
-      "rank": 459,
+      "rank": 466,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -6822,7 +6990,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-933",
-      "rank": 460,
+      "rank": 467,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6834,7 +7002,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-932",
-      "rank": 461,
+      "rank": 468,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6846,7 +7014,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-927",
-      "rank": 462,
+      "rank": 469,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -6858,7 +7026,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-900",
-      "rank": 463,
+      "rank": 470,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6870,7 +7038,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-886",
-      "rank": 464,
+      "rank": 471,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6882,7 +7050,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-778",
-      "rank": 465,
+      "rank": 472,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -6894,7 +7062,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-681",
-      "rank": 466,
+      "rank": 473,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6906,7 +7074,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3732",
-      "rank": 467,
+      "rank": 474,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6918,7 +7086,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3700",
-      "rank": 468,
+      "rank": 475,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -6930,7 +7098,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3290",
-      "rank": 469,
+      "rank": 476,
       "size": "XS",
       "importance": "medium",
       "score": 50,
@@ -6942,7 +7110,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3132",
-      "rank": 470,
+      "rank": 477,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -6954,7 +7122,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3909",
-      "rank": 471,
+      "rank": 478,
       "size": "M",
       "importance": "medium",
       "score": 50,
@@ -6967,7 +7135,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3893",
-      "rank": 472,
+      "rank": 479,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6980,7 +7148,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3831",
-      "rank": 473,
+      "rank": 480,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -6993,7 +7161,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3867",
-      "rank": 474,
+      "rank": 481,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7006,7 +7174,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-538",
-      "rank": 475,
+      "rank": 482,
       "size": "S",
       "importance": "medium",
       "score": 49,
@@ -7018,7 +7186,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1164",
-      "rank": 476,
+      "rank": 483,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7030,7 +7198,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3563",
-      "rank": 477,
+      "rank": 484,
       "size": "S",
       "importance": "medium",
       "score": 50,
@@ -7043,7 +7211,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-1041",
-      "rank": 478,
+      "rank": 485,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7055,7 +7223,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-924",
-      "rank": 479,
+      "rank": 486,
       "size": "L",
       "importance": "medium",
       "score": 48,
@@ -7067,7 +7235,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3770",
-      "rank": 480,
+      "rank": 487,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7079,7 +7247,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3731",
-      "rank": 481,
+      "rank": 488,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7091,7 +7259,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3530",
-      "rank": 482,
+      "rank": 489,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7103,7 +7271,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3131",
-      "rank": 483,
+      "rank": 490,
       "size": "L",
       "importance": "medium",
       "score": 48,
@@ -7115,7 +7283,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3061",
-      "rank": 484,
+      "rank": 491,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7127,7 +7295,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3057",
-      "rank": 485,
+      "rank": 492,
       "size": "S",
       "importance": "medium",
       "score": 40,
@@ -7140,7 +7308,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3892",
-      "rank": 486,
+      "rank": 493,
       "size": "M",
       "importance": "medium",
       "score": 48,
@@ -7153,7 +7321,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3827",
-      "rank": 487,
+      "rank": 494,
       "size": "S",
       "importance": "medium",
       "score": 48,
@@ -7166,7 +7334,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-863",
-      "rank": 488,
+      "rank": 495,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7178,7 +7346,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-817",
-      "rank": 489,
+      "rank": 496,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7190,7 +7358,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-802",
-      "rank": 490,
+      "rank": 497,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7202,7 +7370,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-713",
-      "rank": 491,
+      "rank": 498,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7214,7 +7382,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-700",
-      "rank": 492,
+      "rank": 499,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7226,7 +7394,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-646",
-      "rank": 493,
+      "rank": 500,
       "size": "XS",
       "importance": "medium",
       "score": 47,
@@ -7239,7 +7407,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-532",
-      "rank": 494,
+      "rank": 501,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7251,7 +7419,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2896",
-      "rank": 495,
+      "rank": 502,
       "size": "M",
       "importance": "medium",
       "score": 47,
@@ -7263,7 +7431,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2685",
-      "rank": 496,
+      "rank": 503,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7275,7 +7443,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2626",
-      "rank": 497,
+      "rank": 504,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7287,7 +7455,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2625",
-      "rank": 498,
+      "rank": 505,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7299,7 +7467,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2609",
-      "rank": 499,
+      "rank": 506,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7311,7 +7479,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2608",
-      "rank": 500,
+      "rank": 507,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7323,7 +7491,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2582",
-      "rank": 501,
+      "rank": 508,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7335,7 +7503,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2566",
-      "rank": 502,
+      "rank": 509,
       "size": "L",
       "importance": "medium",
       "score": 46,
@@ -7349,7 +7517,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2565",
-      "rank": 503,
+      "rank": 510,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7362,7 +7530,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3735",
-      "rank": 504,
+      "rank": 511,
       "size": "S",
       "importance": "medium",
       "score": 46,
@@ -7374,7 +7542,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3335",
-      "rank": 505,
+      "rank": 512,
       "size": "XS",
       "importance": "medium",
       "score": 46,
@@ -7386,7 +7554,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3054",
-      "rank": 506,
+      "rank": 513,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7398,7 +7566,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2977",
-      "rank": 507,
+      "rank": 514,
       "size": "M",
       "importance": "medium",
       "score": 46,
@@ -7412,7 +7580,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2557",
-      "rank": 508,
+      "rank": 515,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7424,7 +7592,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2553",
-      "rank": 509,
+      "rank": 516,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7436,7 +7604,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2521",
-      "rank": 510,
+      "rank": 517,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7448,7 +7616,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2493",
-      "rank": 511,
+      "rank": 518,
       "size": "M",
       "importance": "medium",
       "score": 45,
@@ -7460,7 +7628,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3772",
-      "rank": 512,
+      "rank": 519,
       "size": "XS",
       "importance": "medium",
       "score": 45,
@@ -7472,7 +7640,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3853",
-      "rank": 513,
+      "rank": 520,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7485,7 +7653,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3830",
-      "rank": 514,
+      "rank": 521,
       "size": "S",
       "importance": "medium",
       "score": 45,
@@ -7498,7 +7666,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3863",
-      "rank": 515,
+      "rank": 522,
       "size": "L",
       "importance": "medium",
       "score": 45,
@@ -7513,7 +7681,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2444",
-      "rank": 516,
+      "rank": 523,
       "size": "L",
       "importance": "medium",
       "score": 44,
@@ -7528,7 +7696,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2443",
-      "rank": 517,
+      "rank": 524,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7540,7 +7708,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2442",
-      "rank": 518,
+      "rank": 525,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7552,7 +7720,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2409",
-      "rank": 519,
+      "rank": 526,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7564,7 +7732,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2392",
-      "rank": 520,
+      "rank": 527,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7577,7 +7745,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2335",
-      "rank": 521,
+      "rank": 528,
       "size": "XS",
       "importance": "medium",
       "score": 44,
@@ -7589,7 +7757,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2295",
-      "rank": 522,
+      "rank": 529,
       "size": "L",
       "importance": "medium",
       "score": 44,
@@ -7601,7 +7769,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3767",
-      "rank": 523,
+      "rank": 530,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -7613,7 +7781,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3615",
-      "rank": 524,
+      "rank": 531,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -7625,7 +7793,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3558",
-      "rank": 525,
+      "rank": 532,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -7637,7 +7805,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3469",
-      "rank": 526,
+      "rank": 533,
       "size": "S",
       "importance": "medium",
       "score": 44,
@@ -7649,7 +7817,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3333",
-      "rank": 527,
+      "rank": 534,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7661,7 +7829,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-3058",
-      "rank": 528,
+      "rank": 535,
       "size": "M",
       "importance": "medium",
       "score": 44,
@@ -7673,7 +7841,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2288",
-      "rank": 529,
+      "rank": 536,
       "size": "L",
       "importance": "medium",
       "score": 43,
@@ -7685,7 +7853,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2065",
-      "rank": 530,
+      "rank": 537,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -7697,7 +7865,7 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
     },
     {
       "issue": "PAN-2031",
-      "rank": 535,
+      "rank": 538,
       "size": "M",
       "importance": "medium",
       "score": 43,
@@ -8942,19 +9110,6 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
       "condition": "ok",
       "dependsOn": [],
       "why": "God View 'Spectrum Deck' visualizer concept with mockup and PRD; pure exploration, no substrate impact.",
-      "gate": "auto",
-      "planning": "auto"
-    },
-    {
-      "issue": "PAN-3958",
-      "rank": 642,
-      "size": "XL",
-      "importance": "medium",
-      "score": 30,
-      "condition": "ok",
-      "dependsOn": [],
-      "why": "Parked: bloat cut — undo Effect façades (49 sites), delete ~400 sync/async twins, collapse duplicate harness adapters; audit first",
-      "rationale": "Dependency cleared: PAN-3959 closed COMPLETED on 2026-09-23, so the path-in-index design it was waiting on has shipped and the audit can start whenever scheduled. Rank holds at 642 because the binding constraint is the operator `parked` label, not the dependency — the cut is an XL refactor nobody has scheduled. Unpark it and it climbs on its own merits.",
       "gate": "auto",
       "planning": "auto"
     },
@@ -13112,6 +13267,125 @@ Workspace devcontainer duplicate backend hijacks the Traefik router — 50% of A
       "type": "informs",
       "source": "ai-inferred",
       "confidence": 0.85
+    },
+    {
+      "from": "PAN-3958",
+      "to": "PAN-4007",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-3958",
+      "to": "PAN-4008",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-3958",
+      "to": "PAN-4009",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-3958",
+      "to": "PAN-4010",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-3958",
+      "to": "PAN-4011",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-3958",
+      "to": "PAN-4012",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-3958",
+      "to": "PAN-4013",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-3958",
+      "to": "PAN-4014",
+      "type": "contains",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4007",
+      "to": "PAN-4008",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4008",
+      "to": "PAN-4009",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4009",
+      "to": "PAN-4010",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4010",
+      "to": "PAN-4011",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4011",
+      "to": "PAN-4012",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4012",
+      "to": "PAN-4013",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4013",
+      "to": "PAN-4014",
+      "type": "unblocks",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4003",
+      "to": "PAN-4013",
+      "type": "informs",
+      "source": "github-ref",
+      "confidence": 1
+    },
+    {
+      "from": "PAN-4012",
+      "to": "PAN-4002",
+      "type": "informs",
+      "source": "ai-inferred",
+      "confidence": 0.8
     }
   ]
 }
