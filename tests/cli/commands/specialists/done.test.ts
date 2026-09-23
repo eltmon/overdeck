@@ -19,7 +19,7 @@ const {
   mockPostReviewVerdict,
   mockGetPrFacts,
   mockRelayUatFailureFeedback,
-  mockClearUatFailureFeedbackAnchor,
+  mockAppendPipelineEntry,
 } = vi.hoisted(() => ({
   mockDiscoverArtifact: vi.fn(),
   mockCommentOnArtifact: vi.fn(),
@@ -29,12 +29,11 @@ const {
   mockPostReviewVerdict: vi.fn(),
   mockGetPrFacts: vi.fn(),
   mockRelayUatFailureFeedback: vi.fn(),
-  mockClearUatFailureFeedbackAnchor: vi.fn(),
+  mockAppendPipelineEntry: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/cloister/uat-failure-feedback.js', () => ({
   relayUatFailureFeedback: mockRelayUatFailureFeedback,
-  clearUatFailureFeedbackAnchor: mockClearUatFailureFeedbackAnchor,
 }));
 
 vi.mock('../../../../src/lib/forge.js', () => ({
@@ -56,7 +55,7 @@ vi.mock('../../../../src/dashboard/server/services/pr-tab-cache.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/cloister/pipeline-journal.js', () => ({
-  appendPipelineEntry: vi.fn(),
+  appendPipelineEntry: mockAppendPipelineEntry,
 }));
 
 vi.mock('../../../../src/lib/overdeck/issue-projects.js', () => ({
@@ -317,7 +316,11 @@ describe('specialists done command', () => {
       workspacePath: '/project/workspaces/feature-pan-1059',
       anchor: 'head-sha-1',
     });
-    expect(mockClearUatFailureFeedbackAnchor).not.toHaveBeenCalled();
+    expect(mockAppendPipelineEntry).toHaveBeenCalledWith('/project/workspaces/feature-pan-1059', expect.objectContaining({
+      type: 'uat.verdict',
+      issueId: 'PAN-1059',
+      data: expect.objectContaining({ status: 'failed' }),
+    }));
   });
 
   it('PAN-4030: anchors on --tested-sha, not the PR head that moved during the run', async () => {
@@ -358,22 +361,27 @@ describe('specialists done command', () => {
     }));
   });
 
-  it('PAN-4030: a passing UAT clears the anchor and relays nothing', async () => {
+  it('#4035: a passing UAT is journaled (a new verdict episode) and relays nothing', async () => {
     const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
 
     await doneCommand('test', 'pan-1059', { status: 'passed', uatStatus: 'passed', uatNotes: 'all criteria observed' });
 
-    expect(mockClearUatFailureFeedbackAnchor).toHaveBeenCalledWith('PAN-1059');
+    expect(mockAppendPipelineEntry).toHaveBeenCalledWith('/project/workspaces/feature-pan-1059', {
+      type: 'uat.verdict',
+      issueId: 'PAN-1059',
+      source: 'pan-specialists-done',
+      data: { status: 'passed', subRole: 'test' },
+    });
     expect(mockRelayUatFailureFeedback).not.toHaveBeenCalled();
   });
 
-  it('PAN-4030: a test verdict without UAT neither relays nor clears', async () => {
+  it('PAN-4030: a test verdict without UAT neither relays nor journals a UAT verdict', async () => {
     const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
 
     await doneCommand('test', 'pan-1059', { status: 'failed', notes: 'unit tests red' });
 
     expect(mockRelayUatFailureFeedback).not.toHaveBeenCalled();
-    expect(mockClearUatFailureFeedbackAnchor).not.toHaveBeenCalled();
+    expect(mockAppendPipelineEntry).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ type: 'uat.verdict' }));
   });
 
   it('PAN-4030: an unreadable PR head still relays the failure, unanchored', async () => {
