@@ -54,6 +54,8 @@ export function ConversationTerminalView({ conversation }: ConversationTerminalV
 
 function CompanionTerminalView({ conversation }: ConversationTerminalViewProps) {
   const [pane, setPane] = useState<Pane>('native');
+  const [ownPaneFirst, setOwnPaneFirst] = useState(false);
+  const runtimeFirst = useRef(false);
   const [state, setState] = useState<CompanionPhase>({ phase: 'opening' });
   const [closing, setClosing] = useState(false);
   // Only the newest request may write state: a slow response from an earlier
@@ -70,6 +72,15 @@ function CompanionTerminalView({ conversation }: ConversationTerminalViewProps) 
         setState({ phase: 'attached', sessionName: result.sessionName, generation: result.generation });
       } else if (result.status === 'unavailable') {
         setState({ phase: 'unavailable', reason: result.reason, message: result.message });
+        // A harness whose own pane is the interactive CLI (legacy
+        // `codex.transport: tui`) opens straight on Runtime log, as before the
+        // companion existed. Only on the first answer, so choosing Native CLI
+        // afterwards still shows why it is unavailable.
+        if (result.reason === 'unsupported' && !runtimeFirst.current) {
+          runtimeFirst.current = true;
+          setOwnPaneFirst(true);
+          setPane('runtime');
+        }
       } else {
         setState({ phase: 'closed' });
       }
@@ -111,7 +122,7 @@ function CompanionTerminalView({ conversation }: ConversationTerminalViewProps) 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="companion-terminal-view">
       <div className="flex items-center gap-2 border-b border-border px-3 py-1.5">
-        <ViewToggle ariaLabel="Terminal pane" value={pane} onChange={setPane} options={PANE_OPTIONS} />
+        <ViewToggle ariaLabel="Terminal pane" value={pane} onChange={setPane} options={ownPaneFirst ? [...PANE_OPTIONS].reverse() : PANE_OPTIONS} />
         {pane === 'native' && state.phase === 'attached' && (
           <button
             type="button"

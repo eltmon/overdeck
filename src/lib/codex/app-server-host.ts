@@ -15,6 +15,7 @@ import {
   type CodexAppServerState,
   type CodexAppServerTransportInfo,
   type ThreadOptions,
+  type ThreadScope,
   type TurnOptions,
 } from './app-server-manager.js';
 import { CODEX_NATIVE_ENDPOINT_FILE, codexNativeSocketPath } from './native-endpoint.js';
@@ -38,6 +39,8 @@ interface AppServerHostManager extends EventEmitter {
   getState(): Readonly<CodexAppServerState>;
   /** Optional so hosts built on older managers (and test fakes) still type-check. */
   getTransportInfo?(): Readonly<CodexAppServerTransportInfo>;
+  threadScope?(threadId: string): ThreadScope;
+  killChildSync?(): void;
   startThread(options: ThreadOptions): Promise<unknown>;
   resumeThread(threadId: string, options: ThreadOptions, resumeOptions?: { strict?: boolean }): Promise<unknown>;
   startTurn(text: string, options?: TurnOptions): Promise<unknown>;
@@ -60,6 +63,8 @@ export interface CodexAppServerHostOptions {
    * this conversation's app-server. Conversation launches only.
    */
   nativeEndpoint?: boolean;
+  /** Close this conversation's native CLI companion (test seam; defaults to the companion lifecycle). */
+  closeCompanion?: (ownerSession: string) => Promise<void>;
   manager?: AppServerHostManager;
   stdin?: Readable;
   stdout?: Writable;
@@ -88,9 +93,15 @@ export class CodexAppServerHost {
   private threadReady: Promise<void> | undefined;
   /** Rollout path Codex reported for the owner thread. */
   private ownerRolloutPath: string | undefined;
-  /** Threads another client started that are not native navigation (system title threads, sub-agents). */
+  /** Foreign threads that are not native navigation (Codex title threads). */
   private readonly incidentalThreads = new Set<string>();
   private readonly navigatedThreads = new Set<string>();
+  private readonly unclassifiedThreads = new Set<string>();
+  /** Latest running cost total per owner/sub-agent thread. */
+  private readonly threadCosts = new Map<string, number>();
+  /** True once the host itself is stopping the app-server. */
+  private stopping = false;
+  private exitHandling: Promise<void> = Promise.resolve();
 
   constructor(private readonly options: CodexAppServerHostOptions) {
     this.overdeckHome = options.overdeckHome ?? process.env.OVERDECK_HOME ?? join(homedir(), '.overdeck');
@@ -122,7 +133,14 @@ export class CodexAppServerHost {
     this.state = 'ready';
   }
 
+  /** Last resort on process exit: the app-server child must never outlive its host. */
+  killRuntimeSync(): void {
+    this.stopping = true;
+    this.manager.killChildSync?.();
+  }
+
   async stop(): Promise<void> {
+    this.stopping = true;
     this.state = 'closed';
     this.input?.close();
     this.input = undefined;
@@ -154,12 +172,14 @@ export class CodexAppServerHost {
     return this.manager.getTransportInfo?.() ?? { kind: 'stdio', unavailableReason: 'not-requested' };
   }
 
-  async shutdownForSignal(signal: 'SIGTERM' | 'SIGINT', graceMs = 5_000): Promise<void> {
+  async shutdownForSignal(signal: 'SIGTERM' | 'SIGINT' | 'SIGHUP', graceMs = 5_000): Promise<void> {
+    this.stopping = true;
     await this.appendEvent('lifecycle/signal', { signal });
     const state = this.manager.getState();
     if (state.threadId && state.activeTurnId) {
       await this.appendEvent('op/interrupt', { reason: signal });
-      await this.manager.interruptTurn();
+      // A failed interrupt must never skip stopping the child below.
+      await this.manager.interruptTurn().catch(() => undefined);
     }
     await this.appendEvent('lifecycle/child-sigterm', { signal });
     this.manager.stop();
@@ -189,7 +209,7 @@ export class CodexAppServerHost {
       pendingRequests: [...this.pendingRequests.values()],
       generation: this.generation,
       nativeEndpoint: this.nativeEndpointStatus(),
-      navigationEpoch: this.navigatedThreads.size,
+      navigationEpoch: this.navigationEpoch(),
     };
   }
 
@@ -366,7 +386,7 @@ export class CodexAppServerHost {
         threadId,
         endpoint: native.endpoint,
         generation: this.generation,
-        navigationEpoch: this.navigatedThreads.size,
+        navigationEpoch: this.navigationEpoch(),
       },
     };
   }
@@ -412,16 +432,25 @@ export class CodexAppServerHost {
 
   private attachManagerEvents(): void {
     this.manager.on('notification', (message: AppServerMessage) => {
-      // The manager delivers only the owner thread's notifications (and
-      // thread-less ones); thread-id recording happens in openOwnerThread.
+      // The manager delivers the owner thread, its sub-agent threads, and
+      // threads it cannot classify; foreign threads arrive as foreign-thread.
+      // Thread-id recording happens only in openOwnerThread.
       this.applyOwnerNotification(message);
+      this.trackUnknownThread(message);
       this.renderNotification(message);
       this.recordObservedActivity(message);
       void this.appendEvent('notification', message as JsonRecord);
     });
     this.manager.on('request', (message: AppServerMessage) => {
       if (message.id === undefined || !message.method) return;
+      // Fail open: a request from any thread the manager did not positively
+      // classify as foreign is pending until answered. Dropping one would hang
+      // the turn (a sub-agent's approval, PAN-3835 review).
       this.pendingRequests.set(String(message.id), { id: message.id, method: message.method, params: message.params });
+      const threadId = messageThreadId(message);
+      if (threadId && this.scopeOf(threadId) === 'unknown') {
+        this.writePaneLine(`[request #${message.id}] from unrecognized thread ${threadId}; showing it anyway`);
+      }
       this.renderRequest(message);
       void this.appendEvent('request', message as JsonRecord);
     });
@@ -435,11 +464,38 @@ export class CodexAppServerHost {
       void this.appendEvent('stderr', { message: String(stderr) });
     });
     this.manager.on('exit', (exit: unknown) => {
+      const unexpected = !this.stopping;
       this.state = 'closed';
       this.writePaneLine('[exit] codex app-server stopped');
       void this.appendEvent('exit', asRecord(exit));
       void this.closeServer();
+      this.exitHandling = this.retireNativeEndpoint(unexpected).catch(() => undefined);
     });
+  }
+
+  /** Resolves once the work started by an app-server exit is done. */
+  async exitHandled(): Promise<void> {
+    await this.exitHandling;
+  }
+
+  /**
+   * The app-server behind the native endpoint is gone (PAN-3835 review). The
+   * host keeps its pane (and so the owner session) alive, so no owner-teardown
+   * hook fires: remove the endpoint record and close the attached native CLI,
+   * which would otherwise loop on "Reconnecting to app-server…" forever.
+   */
+  private async retireNativeEndpoint(unexpected: boolean): Promise<void> {
+    if (!this.options.nativeEndpoint) return;
+    await rm(this.nativeEndpointFilePath(), { force: true }).catch(() => undefined);
+    if (!unexpected) return; // A deliberate stop runs the owner-teardown hooks.
+    this.writePaneLine('[terminal] native Codex CLI closed: the app-server exited. Restart the conversation to use Terminal again.');
+    try {
+      await (this.options.closeCompanion ?? closeCompanionForOwner)(this.options.agentId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.writePaneLine(`[warning] could not close the native Codex CLI: ${message}`);
+    }
+    await this.appendEvent('native-endpoint/retired', {});
   }
 
   /**
@@ -459,43 +515,88 @@ export class CodexAppServerHost {
       }
       return;
     }
-    if (message.method === 'thread/settings/updated') {
+    const threadId = messageThreadId(message);
+    if (message.method === 'thread/settings/updated' && (!threadId || this.scopeOf(threadId) === 'owner')) {
       const settings = asRecord(params.threadSettings);
       if (typeof settings.effort === 'string' && settings.effort) this.effort = settings.effort;
       if (typeof settings.model === 'string' && settings.model) this.threadModel = settings.model;
     }
   }
 
+  private scopeOf(threadId: string): ThreadScope {
+    return this.manager.threadScope?.(threadId)
+      ?? (threadId === this.manager.getState().threadId ? 'owner' : 'unknown');
+  }
+
   /**
-   * Another client's thread (PAN-3835). System title threads are ephemeral and
-   * sub-agents carry the owner as parent; anything else is native navigation
-   * (`/new`, `/resume`, `/fork` in the attached TUI). Counting navigated
-   * threads lets the companion adapter replace a TUI that left the owner
-   * thread instead of reusing it.
+   * A thread outside this conversation's tree, positively identified by its
+   * `thread/started` (PAN-3835). Ephemeral ones are Codex title threads;
+   * anything else is native navigation (`/new`, `/fork` in the attached TUI).
+   * Counting navigated threads lets the companion adapter replace a TUI that
+   * left the owner thread instead of reusing it.
    */
   private trackForeignThread(message: AppServerMessage): void {
     const threadId = messageThreadId(message);
-    if (!threadId || this.incidentalThreads.has(threadId) || this.navigatedThreads.has(threadId)) return;
-    if (message.method === 'thread/started') {
-      const thread = asRecord(asRecord(message.params).thread);
-      const owner = this.manager.getState().threadId;
-      if (thread.ephemeral === true || (owner && thread.parentThreadId === owner)) {
-        this.incidentalThreads.add(threadId);
-        return;
-      }
+    if (!threadId) return;
+    if (message.id !== undefined) {
+      // The client driving that thread answers it; say so once, never silently.
+      this.writePaneLine(`[request #${message.id}] for thread ${threadId} outside this conversation; left to the client that opened it`);
+      void this.appendEvent('foreign-thread/request', { threadId, id: message.id, method: message.method });
+      return;
     }
-    // A foreign server request belongs to the client driving that thread.
-    if (message.id !== undefined) return;
-    this.navigatedThreads.add(threadId);
-    void this.appendEvent('foreign-thread', { threadId, method: message.method });
+    if (message.method !== 'thread/started') return;
+    if (asRecord(asRecord(message.params).thread).ephemeral === true) {
+      this.incidentalThreads.add(threadId);
+      return;
+    }
+    this.noteNavigation(threadId, message.method);
   }
 
+  /**
+   * A thread the manager has not classified (for example one the attached TUI
+   * reopened with `/resume`). Its events still flow, fail open. A sub-agent's
+   * first status events arrive before the spawn item that adopts it, so the
+   * epoch counts only threads that are still unclassified when it is read.
+   */
+  private trackUnknownThread(message: AppServerMessage): void {
+    const threadId = messageThreadId(message);
+    if (threadId && this.scopeOf(threadId) === 'unknown') this.unclassifiedThreads.add(threadId);
+  }
+
+  private navigationEpoch(): number {
+    let unclassified = 0;
+    for (const threadId of this.unclassifiedThreads) {
+      if (this.scopeOf(threadId) === 'unknown') unclassified += 1;
+    }
+    return this.navigatedThreads.size + unclassified;
+  }
+
+  private noteNavigation(threadId: string, method: string): void {
+    if (this.navigatedThreads.has(threadId) || this.incidentalThreads.has(threadId)) return;
+    this.navigatedThreads.add(threadId);
+    void this.appendEvent('foreign-thread', { threadId, method });
+  }
+
+  /**
+   * Activity from the owner and its sub-agent threads keeps the conversation
+   * alive for liveness; live cost is the sum of each thread's own running
+   * total. Threads outside the tree are not this conversation's cost.
+   */
   private recordObservedActivity(message: AppServerMessage): void {
+    const threadId = messageThreadId(message);
+    const scope = threadId ? this.scopeOf(threadId) : 'owner';
+    const threadCost = codexNotificationCost(message, this.threadModel);
+    if (threadCost !== undefined && (scope === 'owner' || scope === 'descendant')) {
+      this.threadCosts.set(threadId ?? '', threadCost);
+    }
+
     const now = Date.now();
     const force = message.method === 'turn/completed';
     if (!force && now - this.lastActivityPersistedAt < 5_000) return;
 
-    const costSoFar = codexNotificationCost(message, this.threadModel);
+    const costSoFar = this.threadCosts.size > 0
+      ? [...this.threadCosts.values()].reduce((sum, cost) => sum + cost, 0)
+      : undefined;
     const record = this.options.recordActivity ?? recordAgentActivitySync;
     if (record(this.options.agentId, {
       at: new Date(now).toISOString(),
@@ -736,6 +837,35 @@ export function parseArgs(argv: string[]): HostArgs {
   return parsed;
 }
 
+/** Default companion close for an app-server that died under a live pane (loaded lazily). */
+async function closeCompanionForOwner(ownerSession: string): Promise<void> {
+  const { closeCompanionTerminalForOwner } = await import('../overdeck/companion-terminal/index.js');
+  await closeCompanionTerminalForOwner(ownerSession);
+}
+
+type ExitSignal = 'SIGTERM' | 'SIGINT' | 'SIGHUP';
+
+/**
+ * The app-server child must die with its host on every exit path (PAN-3835
+ * review): in `--listen unix://` mode codex does not exit when its stdin
+ * closes, so an orphan would keep the thread loaded. SIGHUP is what tmux sends
+ * when the pane's session is killed; its default action would skip every
+ * handler. `exit` covers uncaught errors and plain returns. SIGKILL cannot be
+ * handled; the manager's `app.pid` check reaps that orphan on the next start.
+ */
+export function installHostExitHandlers(
+  host: Pick<CodexAppServerHost, 'shutdownForSignal' | 'killRuntimeSync'>,
+  proc: Pick<NodeJS.Process, 'once' | 'on' | 'exit'> = process,
+): void {
+  const exitCodes: Record<ExitSignal, number> = { SIGTERM: 0, SIGINT: 130, SIGHUP: 129 };
+  for (const signal of Object.keys(exitCodes) as ExitSignal[]) {
+    proc.once(signal, () => {
+      void host.shutdownForSignal(signal, signal === 'SIGTERM' ? 5_000 : 0).finally(() => proc.exit(exitCodes[signal]));
+    });
+  }
+  proc.on('exit', () => host.killRuntimeSync());
+}
+
 async function main(): Promise<void> {
   const agentId = process.env.OVERDECK_AGENT_ID;
   if (!agentId) throw new Error('OVERDECK_AGENT_ID is required for codex app-server host.');
@@ -755,8 +885,7 @@ async function main(): Promise<void> {
     stdin: process.stdin,
     stdout: process.stdout,
   });
-  process.once('SIGTERM', () => void host.shutdownForSignal('SIGTERM').finally(() => process.exit(0)));
-  process.once('SIGINT', () => void host.shutdownForSignal('SIGINT', 0).finally(() => process.exit(130)));
+  installHostExitHandlers(host);
   await host.start();
 }
 

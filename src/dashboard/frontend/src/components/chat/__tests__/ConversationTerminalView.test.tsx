@@ -95,6 +95,26 @@ describe('ConversationTerminalView', () => {
     expect(screen.getByRole('button', { name: 'Show runtime log' })).toBeInTheDocument();
   });
 
+  it('opens a legacy codex.transport: tui conversation on Runtime log, its own interactive CLI', async () => {
+    api.openCompanionTerminal.mockResolvedValue({
+      status: 'unavailable',
+      kind: 'codex-resume-remote',
+      reason: 'unsupported',
+      message: 'This Codex conversation runs the native Codex CLI directly in its own terminal.',
+    });
+    render(<ConversationTerminalView conversation={CODEX} />);
+
+    await waitFor(() => expect(terminalSession()).toBe('conv-20260923-0002'));
+    const tabs = screen.getAllByRole('tab').map(tab => tab.textContent);
+    expect(tabs).toEqual(['Runtime log', 'Native CLI']);
+    expect(screen.getByRole('tab', { name: 'Runtime log' })).toHaveAttribute('aria-selected', 'true');
+
+    // Choosing Native CLI still explains why, and does not bounce back.
+    fireEvent.click(screen.getByRole('tab', { name: 'Native CLI' }));
+    expect(await screen.findByText(/runs the native Codex CLI directly/)).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Native CLI' })).toHaveAttribute('aria-selected', 'true');
+  });
+
   it('offers a retry for a Codex conversation that has no saved turn yet', async () => {
     api.openCompanionTerminal.mockResolvedValueOnce({
       status: 'unavailable',

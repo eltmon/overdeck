@@ -50,12 +50,11 @@ describe('connectUnixWebSocketTransport', () => {
   it('exchanges one JSON message per frame over the Unix socket without offering compression', async () => {
     const fake = await listenFakeServer();
     const transport = await connectUnixWebSocketTransport(fake.socketPath);
-    const received: string[] = [];
-    transport.onMessage(text => received.push(text));
+    const received = new Promise<string>(resolve => transport.onMessage(resolve));
 
     transport.send({ id: 1, method: 'initialize' });
 
-    await expect.poll(() => received).toEqual([JSON.stringify({ echo: { id: 1, method: 'initialize' } })]);
+    expect(await received).toBe(JSON.stringify({ echo: { id: 1, method: 'initialize' } }));
     // codex app-server 0.153.4 hangs up on a permessage-deflate offer.
     expect(fake.offers).toEqual([undefined]);
     transport.close();
@@ -64,12 +63,11 @@ describe('connectUnixWebSocketTransport', () => {
   it('reports the server closing the connection', async () => {
     const fake = await listenFakeServer();
     const transport = await connectUnixWebSocketTransport(fake.socketPath);
-    const closed: string[] = [];
-    transport.onClose(reason => closed.push(reason));
+    const closed = new Promise<string>(resolve => transport.onClose(resolve));
 
     fake.clients[0]?.close();
 
-    await expect.poll(() => closed.length).toBe(1);
+    expect(await closed).toMatch(/^websocket closed/);
     expect(() => transport.send({ id: 2 })).toThrow('native socket is closed');
   });
 
@@ -109,19 +107,18 @@ describe('connectUnixWebSocketTransport', () => {
 });
 
 describe('createStdioTransport', () => {
-  it('frames newline-delimited JSON on the child pipes', () => {
+  it('frames newline-delimited JSON on the child pipes', async () => {
     const stdout = new PassThrough();
     const stdin = new PassThrough();
     const transport = createStdioTransport(stdout, stdin);
-    const lines: string[] = [];
-    const written: string[] = [];
-    stdin.on('data', chunk => written.push(String(chunk)));
-    transport.onMessage(line => lines.push(line));
+    const written = new Promise<string>(resolve => stdin.once('data', chunk => resolve(String(chunk))));
+    const line = new Promise<string>(resolve => transport.onMessage(resolve));
 
     transport.send({ id: 1 });
     stdout.write('{"id":1,"result":{}}\n');
 
-    return expect.poll(() => [written, lines]).toEqual([['{"id":1}\n'], ['{"id":1,"result":{}}']]);
+    expect(await written).toBe('{"id":1}\n');
+    expect(await line).toBe('{"id":1,"result":{}}');
   });
 
   it('refuses writes after close', () => {

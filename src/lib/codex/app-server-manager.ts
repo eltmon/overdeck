@@ -1,7 +1,8 @@
 import { execFile } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import { rm } from 'node:fs/promises';
+import { readFile, rm, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import {
   connectUnixWebSocketTransport,
@@ -47,13 +48,58 @@ export interface CodexAppServerManagerOptions {
   nativeSocketPath?: string;
   /** Test seam for the native connection. */
   connectNative?: (socketPath: string) => Promise<AppServerTransport>;
+  /** Test seam for the orphaned-server check around `app.pid`. */
+  processOps?: NativeProcessOps;
 }
+
+/** Process and file operations the native endpoint's orphan check uses. */
+export interface NativeProcessOps {
+  readText(path: string): Promise<string | undefined>;
+  writeText(path: string, text: string): Promise<void>;
+  isAlive(pid: number): boolean;
+  /** The process command line with NULs as spaces, or undefined when unreadable. */
+  readCmdline(pid: number): Promise<string | undefined>;
+  kill(pid: number, signal: NodeJS.Signals): void;
+  sleep(ms: number): Promise<void>;
+}
+
+const ORPHAN_TERM_GRACE_MS = 5_000;
+const ORPHAN_POLL_MS = 100;
+
+/** `app.pid` beside the socket: the pid of the app-server serving it. */
+export function nativePidPath(socketPath: string): string {
+  return join(dirname(socketPath), 'app.pid');
+}
+
+const defaultProcessOps: NativeProcessOps = {
+  readText: path => readFile(path, 'utf-8').catch(() => undefined),
+  writeText: (path, text) => writeFile(path, text, { mode: 0o600 }),
+  isAlive: (pid) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === 'EPERM';
+    }
+  },
+  readCmdline: pid => readFile(`/proc/${pid}/cmdline`, 'utf-8').then(text => text.replace(/\0/g, ' ').trim(), () => undefined),
+  kill: (pid, signal) => {
+    try {
+      process.kill(pid, signal);
+    } catch {
+      // Already gone.
+    }
+  },
+  sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),
+};
 
 export type NativeEndpointUnavailableReason =
   | 'not-requested'
   | 'cli-unsupported'
   | 'socket-path-too-long'
-  | 'connect-failed';
+  | 'connect-failed'
+  /** The app-server behind a live native endpoint exited. */
+  | 'exited';
 
 export interface CodexAppServerTransportInfo {
   kind: 'stdio' | 'unix';
@@ -62,6 +108,8 @@ export interface CodexAppServerTransportInfo {
   unavailableReason?: NativeEndpointUnavailableReason;
   cliVersion?: string;
 }
+
+export type ThreadScope = 'owner' | 'descendant' | 'foreign' | 'unknown';
 
 export type CodexRuntimeMode = 'full-access' | 'read-only' | 'default';
 
@@ -102,9 +150,14 @@ export class CodexAppServerManager extends EventEmitter {
   /** A native child being torn down for the stdio fallback; its exit is not the runtime's. */
   private nativeFallbackChild: ChildProcessWithoutNullStreams | undefined;
   private exitEmitted = false;
+  private readonly descendantThreads = new Set<string>();
+  private readonly foreignThreads = new Set<string>();
+
+  private readonly processOps: NativeProcessOps;
 
   constructor(private readonly options: CodexAppServerManagerOptions) {
     super();
+    this.processOps = options.processOps ?? defaultProcessOps;
   }
 
   async start(): Promise<void> {
@@ -280,9 +333,16 @@ export class CodexAppServerManager extends EventEmitter {
    * stdio fallback never runs a second app-server beside the first.
    */
   private async startNative(socketPath: string): Promise<boolean> {
+    // An app-server left by a host that was SIGKILLed keeps serving (it does
+    // not exit when its stdin closes in --listen mode) and would delete the new
+    // socket when it finally exits. Stop it before reusing the path.
+    await this.reapOrphanedNativeServer(socketPath);
     // A socket file left by a crashed earlier run would make the listen fail.
     await rm(socketPath, { force: true });
     const child = this.spawnChild(['app-server', '--listen', nativeEndpointUrl(socketPath)]);
+    if (typeof child.pid === 'number') {
+      await this.processOps.writeText(nativePidPath(socketPath), `${child.pid}\n`).catch(() => undefined);
+    }
     this.nativeFallbackChild = child;
     // The native transport does not use the child's stdio; keep the pipe drained.
     child.stdout.resume();
@@ -298,6 +358,41 @@ export class CodexAppServerManager extends EventEmitter {
       await exited;
       if (this.child === child) this.child = undefined;
       return false;
+    }
+  }
+
+  /**
+   * Stop the app-server a previous host recorded in `app.pid`, but only when
+   * that pid is still a codex app-server listening on this exact socket (a
+   * reused pid belongs to someone else and is left alone).
+   */
+  private async reapOrphanedNativeServer(socketPath: string): Promise<void> {
+    const ops = this.processOps;
+    const raw = await ops.readText(nativePidPath(socketPath)).catch(() => undefined);
+    const pid = Number(raw?.trim());
+    if (!Number.isInteger(pid) || pid <= 1 || pid === process.pid || !ops.isAlive(pid)) return;
+    const cmdline = await ops.readCmdline(pid).catch(() => undefined);
+    if (!cmdline || !cmdline.includes('app-server') || !cmdline.includes(nativeEndpointUrl(socketPath))) return;
+    this.emit('warning', `stopping orphaned codex app-server ${pid} still listening on ${nativeEndpointUrl(socketPath)}`);
+    ops.kill(pid, 'SIGTERM');
+    for (let waited = 0; waited < ORPHAN_TERM_GRACE_MS && ops.isAlive(pid); waited += ORPHAN_POLL_MS) {
+      await ops.sleep(ORPHAN_POLL_MS);
+    }
+    if (ops.isAlive(pid)) {
+      ops.kill(pid, 'SIGKILL');
+      await ops.sleep(ORPHAN_POLL_MS);
+    }
+  }
+
+  /**
+   * Synchronous last resort for the host's `process.on('exit')`: kill the
+   * app-server child so it never outlives its host.
+   */
+  killChildSync(): void {
+    try {
+      this.child?.kill('SIGTERM');
+    } catch {
+      // Already gone.
     }
   }
 
@@ -319,6 +414,10 @@ export class CodexAppServerManager extends EventEmitter {
   private emitExit(exit: { code: number | null; signal: NodeJS.Signals | null }): void {
     if (this.exitEmitted) return;
     this.exitEmitted = true;
+    // The endpoint died with the app-server; never report it as attachable.
+    if (this.transportInfo.kind === 'unix') {
+      this.transportInfo = { kind: 'stdio', unavailableReason: 'exited', cliVersion: this.transportInfo.cliVersion };
+    }
     this.emit('exit', exit);
   }
 
@@ -343,17 +442,22 @@ export class CodexAppServerManager extends EventEmitter {
       this.emit('warning', `Ignoring invalid codex app-server JSON: ${line}`);
       return;
     }
-    if (message.method && this.isForeignThreadMessage(message)) {
-      // PAN-3835: another client of this app-server (the attached native TUI)
-      // owns this thread. Its events and requests never touch the pinned
-      // thread's state, pending requests, activity, or cost.
+    const scope = message.method ? this.routeScope(message) : 'none';
+    if (scope === 'foreign') {
+      // PAN-3835: a thread outside this conversation's tree (a native TUI
+      // `/new` or `/fork`, a Codex title thread). It never touches the owner's
+      // state, pending requests, activity, or cost.
       this.emit('foreign-thread', message);
       return;
     }
     if (message.method && message.id !== undefined) {
+      // Owner, sub-agent, and unclassified threads: a server request is always
+      // surfaced. Dropping one would hang the turn that waits on it.
       this.emit('request', message);
     } else if (message.method) {
-      this.applyNotification(message);
+      // Only the owner thread (or a thread-less event) moves the owner state;
+      // a sub-agent's turn/started must not look like the owner's turn.
+      if (scope === 'owner' || scope === 'none') this.applyNotification(message);
       this.emit('notification', message);
     } else if (message.id !== undefined) {
       const pending = this.pending.get(String(message.id));
@@ -376,19 +480,58 @@ export class CodexAppServerManager extends EventEmitter {
   }
 
   /**
-   * A message scoped to a thread other than the pinned one. The pinned thread
-   * comes only from this manager's own start/resume (PAN-3835): a second
-   * client's `thread/started` (a native `/new`, a system title thread) must
-   * never rebind the conversation.
+   * Which part of this app-server a thread belongs to (PAN-3835):
+   * - `owner`: the pinned thread, taken only from this manager's own
+   *   start/resume, so a second client can never rebind it;
+   * - `descendant`: a thread whose `thread/started` named the owner or another
+   *   descendant as `parentThreadId` (Codex sub-agents);
+   * - `foreign`: announced by `thread/started` outside that tree (a native
+   *   `/new` or `/fork`, a Codex title thread);
+   * - `unknown`: never announced to this client.
    */
-  private isForeignThreadMessage(message: AppServerMessage): boolean {
+  threadScope(threadId: string): ThreadScope {
+    if (threadId === this.sessionState.threadId) return 'owner';
+    if (this.descendantThreads.has(threadId)) return 'descendant';
+    if (this.foreignThreads.has(threadId)) return 'foreign';
+    return 'unknown';
+  }
+
+  /**
+   * codex-cli 0.153.4 does not send `thread/started` for a sub-agent thread.
+   * The spawn is visible only as a `collabAgentToolCall` item on the spawning
+   * thread (`receiverThreadIds`), verified live. Receivers of a call made from
+   * inside the owner tree join the tree.
+   */
+  private adoptSpawnedAgents(message: AppServerMessage, threadId: string): void {
+    if (message.method !== 'item/started' && message.method !== 'item/completed') return;
+    const item = asRecord(asRecord(message.params).item);
+    if (item.type !== 'collabAgentToolCall' || !Array.isArray(item.receiverThreadIds)) return;
+    const scope = this.threadScope(threadId);
+    if (scope !== 'owner' && scope !== 'descendant') return;
+    for (const receiver of item.receiverThreadIds) {
+      if (typeof receiver === 'string' && this.threadScope(receiver) === 'unknown') this.descendantThreads.add(receiver);
+    }
+  }
+
+  /** Classify a message, recording the tree membership a `thread/started` announces. */
+  private routeScope(message: AppServerMessage): ThreadScope | 'none' {
     const threadId = messageThreadId(message);
-    if (!threadId) return false;
-    const pinned = this.sessionState.threadId;
-    if (pinned) return threadId !== pinned;
-    // Before a thread is pinned, only the announcement of our own in-flight
-    // thread/start may pass; any other thread/started belongs to someone else.
-    return message.method === 'thread/started' && (!this.startingOwnThread || asRecord(asRecord(message.params).thread).ephemeral === true);
+    if (!threadId) return 'none';
+    this.adoptSpawnedAgents(message, threadId);
+    if (message.method === 'thread/started' && this.threadScope(threadId) === 'unknown') {
+      const thread = asRecord(asRecord(message.params).thread);
+      const parent = typeof thread.parentThreadId === 'string' ? thread.parentThreadId : undefined;
+      const parentScope = parent ? this.threadScope(parent) : undefined;
+      if (parentScope === 'owner' || parentScope === 'descendant') {
+        this.descendantThreads.add(threadId);
+      } else if (!this.sessionState.threadId && this.startingOwnThread && !parent && thread.ephemeral !== true) {
+        // The announcement of this manager's own in-flight thread/start.
+        return 'owner';
+      } else {
+        this.foreignThreads.add(threadId);
+      }
+    }
+    return this.threadScope(threadId);
   }
 
   private applyNotification(message: AppServerMessage): void {

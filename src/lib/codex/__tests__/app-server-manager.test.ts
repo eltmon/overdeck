@@ -327,9 +327,15 @@ describe('CodexAppServerManager', () => {
       await manager.start();
       const pending = manager.request('thread/read', {});
       native.close();
+      // The close handler stops the runtime and reports the exit synchronously.
+      expect(exits).toHaveLength(1);
       await expect(pending).rejects.toThrow('codex app-server stopped.');
-      await vi.waitFor(() => expect(exits).toHaveLength(1));
       expect(manager.getState().state).toBe('closed');
+      // A dead endpoint is never reported as attachable again.
+      expect(manager.getTransportInfo()).toEqual({ kind: 'stdio', unavailableReason: 'exited', cliVersion: '0.153.4' });
+      // The child's own exit event afterwards is not a second runtime exit.
+      await Promise.resolve();
+      expect(exits).toHaveLength(1);
     });
 
     it('foreign_thread_events_do_not_rebind_owner', async () => {
@@ -365,6 +371,170 @@ describe('CodexAppServerManager', () => {
       native.send({ method: 'turn/started', params: { threadId: 'owner-thread', turn: { id: 't-owner' } } });
       expect(manager.getState()).toEqual({ state: 'running', threadId: 'owner-thread', activeTurnId: 't-owner' });
       expect(notifications).toEqual(['turn/started']);
+      expect(manager.threadScope('title-thread')).toBe('foreign');
+      expect(manager.threadScope('new-thread')).toBe('foreign');
+      manager.stop();
+    });
+
+    it('accepts the owner thread tree: sub-agent requests and events flow without moving the owner turn', async () => {
+      const native = nativeServer();
+      const manager = new CodexAppServerManager({
+        cwd: '/tmp',
+        readVersion: async () => '0.153.4',
+        nativeSocketPath: SOCKET,
+        spawnProcess: () => killableChild().child,
+        connectNative: async () => native.transport,
+      });
+      const notifications: string[] = [];
+      const requests: Array<{ id?: unknown }> = [];
+      const foreign: unknown[] = [];
+      manager.on('notification', (message: { method: string }) => notifications.push(message.method));
+      manager.on('request', (request: { id?: unknown }) => requests.push(request));
+      manager.on('foreign-thread', message => foreign.push(message));
+      await manager.start();
+      await manager.startThread({ model: 'gpt-5.6-luna' });
+
+      native.send({ method: 'thread/started', params: { thread: { id: 'sub', parentThreadId: 'owner-thread' } } });
+      native.send({ method: 'thread/started', params: { thread: { id: 'sub-sub', parentThreadId: 'sub' } } });
+      native.send({ method: 'turn/started', params: { threadId: 'sub-sub', turn: { id: 't-sub' } } });
+      native.send({ id: 7, method: 'item/commandExecution/requestApproval', params: { threadId: 'sub-sub' } });
+      // Never announced to this client: fail open.
+      native.send({ id: 8, method: 'item/commandExecution/requestApproval', params: { threadId: 'unannounced' } });
+
+      expect(manager.threadScope('sub')).toBe('descendant');
+      expect(manager.threadScope('sub-sub')).toBe('descendant');
+      expect(manager.threadScope('unannounced')).toBe('unknown');
+      expect(requests.map(request => request.id)).toEqual([7, 8]);
+      expect(notifications).toEqual(['thread/started', 'thread/started', 'turn/started']);
+      expect(foreign).toEqual([]);
+      expect(manager.getState()).toEqual({ state: 'idle', threadId: 'owner-thread' });
+      manager.stop();
+    });
+
+    it('adopts a sub-agent announced only by its spawnAgent item, as codex-cli 0.153.4 does', async () => {
+      const native = nativeServer();
+      const manager = new CodexAppServerManager({
+        cwd: '/tmp',
+        readVersion: async () => '0.153.4',
+        nativeSocketPath: SOCKET,
+        spawnProcess: () => killableChild().child,
+        connectNative: async () => native.transport,
+      });
+      const requests: Array<{ id?: unknown }> = [];
+      manager.on('request', (request: { id?: unknown }) => requests.push(request));
+      await manager.start();
+      await manager.startThread({ model: 'gpt-5.6-luna' });
+
+      // Shapes recorded live: no thread/started for the sub-agent thread.
+      native.send({
+        method: 'item/completed',
+        params: {
+          threadId: 'owner-thread',
+          item: { type: 'collabAgentToolCall', tool: 'spawnAgent', senderThreadId: 'owner-thread', receiverThreadIds: ['sub-thread'] },
+        },
+      });
+      native.send({ method: 'turn/started', params: { threadId: 'sub-thread', turn: { id: 'sub-turn' } } });
+      native.send({ id: 0, method: 'item/commandExecution/requestApproval', params: { threadId: 'sub-thread', command: 'touch x' } });
+
+      expect(manager.threadScope('sub-thread')).toBe('descendant');
+      expect(requests.map(request => request.id)).toEqual([0]);
+      expect(manager.getState()).toEqual({ state: 'idle', threadId: 'owner-thread' });
+
+      // A spawn made from a foreign thread does not join the tree.
+      native.send({ method: 'thread/started', params: { thread: { id: 'tui-new' } } });
+      native.send({
+        method: 'item/completed',
+        params: { threadId: 'tui-new', item: { type: 'collabAgentToolCall', receiverThreadIds: ['tui-sub'] } },
+      });
+      expect(manager.threadScope('tui-sub')).toBe('unknown');
+      manager.stop();
+    });
+
+    it('stops an orphaned app-server recorded in app.pid before reusing its socket', async () => {
+      const native = nativeServer();
+      const alive = new Set([4242]);
+      const events: string[] = [];
+      const files = new Map([[SOCKET.replace(/app\.sock$/, 'app.pid'), '4242\n']]);
+      const processOps = {
+        readText: async (path: string) => files.get(path),
+        writeText: async (path: string, text: string) => { files.set(path, text); events.push(`write ${text.trim()}`); },
+        isAlive: (pid: number) => alive.has(pid),
+        readCmdline: async (pid: number) => (pid === 4242 ? `node /usr/bin/codex app-server --listen unix://${SOCKET}` : undefined),
+        kill: (pid: number, signal: NodeJS.Signals) => { events.push(`kill ${pid} ${signal}`); },
+        // The orphan exits during the grace period.
+        sleep: async () => { events.push('sleep'); alive.delete(4242); },
+      };
+      const child = killableChild();
+      Object.assign(child.child, { pid: 5151 });
+      const manager = new CodexAppServerManager({
+        cwd: '/tmp',
+        readVersion: async () => '0.153.4',
+        nativeSocketPath: SOCKET,
+        spawnProcess: (args) => { events.push(`spawn ${args.join(' ')}`); return child.child; },
+        connectNative: async () => native.transport,
+        processOps,
+      });
+      manager.on('warning', () => undefined);
+      await manager.start();
+
+      expect(events).toEqual([
+        'kill 4242 SIGTERM',
+        'sleep',
+        `spawn app-server --listen unix://${SOCKET}`,
+        'write 5151',
+      ]);
+      manager.stop();
+    });
+
+    it.each([
+      ['a dead pid', false, `codex app-server --listen unix://${SOCKET}`],
+      ['a reused pid running something else', true, 'vim notes.txt'],
+      ['a codex app-server on another socket', true, 'codex app-server --listen unix:///elsewhere/app.sock'],
+    ])('leaves %s alone', async (_label, isAlive, cmdline) => {
+      const kill = vi.fn();
+      const manager = new CodexAppServerManager({
+        cwd: '/tmp',
+        readVersion: async () => '0.153.4',
+        nativeSocketPath: SOCKET,
+        spawnProcess: () => killableChild().child,
+        connectNative: async () => nativeServer().transport,
+        processOps: {
+          readText: async () => '4242',
+          writeText: async () => undefined,
+          isAlive: () => isAlive,
+          readCmdline: async () => cmdline,
+          kill,
+          sleep: async () => undefined,
+        },
+      });
+      await manager.start();
+      expect(kill).not.toHaveBeenCalled();
+      manager.stop();
+    });
+
+    it('SIGKILLs an orphan that ignores SIGTERM through the whole grace period', async () => {
+      let clock = 0;
+      const kill = vi.fn();
+      const manager = new CodexAppServerManager({
+        cwd: '/tmp',
+        readVersion: async () => '0.153.4',
+        nativeSocketPath: SOCKET,
+        spawnProcess: () => killableChild().child,
+        connectNative: async () => nativeServer().transport,
+        processOps: {
+          readText: async () => '4242',
+          writeText: async () => undefined,
+          isAlive: () => !kill.mock.calls.some(([, signal]) => signal === 'SIGKILL'),
+          readCmdline: async () => `codex app-server --listen unix://${SOCKET}`,
+          kill,
+          sleep: async (ms: number) => { clock += ms; },
+        },
+      });
+      manager.on('warning', () => undefined);
+      await manager.start();
+      expect(kill.mock.calls).toEqual([[4242, 'SIGTERM'], [4242, 'SIGKILL']]);
+      // 5 s of SIGTERM grace, then one poll after SIGKILL.
+      expect(clock).toBe(5_100);
       manager.stop();
     });
 
