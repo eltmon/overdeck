@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -71,14 +70,14 @@ describe('verifyMergedBeforeLifecycle', () => {
     vi.clearAllMocks();
     isGitHubAppConfiguredMock.mockReturnValue(true);
     resolveGitHubIssueMock.mockReturnValue({ isGitHub: true, owner: 'eltmon', repo: 'overdeck' });
-    listPullRequestsForHeadMock.mockReturnValue(Effect.succeed([
+    listPullRequestsForHeadMock.mockResolvedValue([
       {
         number: 2467,
         merged: true,
         mergedAt: '2026-07-25T12:00:00Z',
         mergeCommit: 'abc123',
       },
-    ]));
+    ]);
     getMergeSetMock.mockReturnValue(mergeSet(1));
     assessMergeCompletenessMock.mockResolvedValue({
       complete: true,

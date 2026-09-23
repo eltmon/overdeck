@@ -9,7 +9,7 @@ import { Effect } from 'effect';
 import type { ForgeType } from './forge.js';
 import {
   listIssuesWithAnyLabelPromise,
-  listOpenIssuesWithLabelsPromise,
+  listOpenIssuesWithLabels,
 } from './github-app.js';
 import { createSettledTtlPromiseCache, withConcurrencyLimitPromise } from './concurrency.js';
 import { listOpenGitLabMergeRequests, listGitLabMergedMergeRequestHeads, type GitLabMergeRequestRow } from './gitlab-merge-requests.js';
@@ -287,7 +287,7 @@ export interface PipelineMembershipGatherDeps {
 }
 
 const defaultDeps: PipelineMembershipGatherDeps = {
-  listOpenIssues: listOpenIssuesWithLabelsPromise,
+  listOpenIssues: listOpenIssuesWithLabels,
   listPhaseLabeledIssues: (owner, repo) => listIssuesWithAnyLabelPromise(owner, repo, STALE_PIPELINE_LABELS),
   listOpenPullRequests: listOpenPullRequestsSnapshot,
   listOpenMergeRequests: listOpenGitLabMergeRequests,

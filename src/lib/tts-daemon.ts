@@ -4,10 +4,8 @@ import { access, chmod, mkdir, open, readFile, rm, stat, writeFile } from 'node:
 import { constants } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
-import { Effect } from 'effect';
 import { LOGS_DIR, OVERDECK_HOME, SYNC_SOURCES, activeDeploymentRepoRoot, isDeploymentGenerationRoot, packageRoot } from './paths.js';
 import { loadConfigSync, type NormalizedTtsDaemonConfig } from './config-yaml.js';
-import { ProcessSpawnError, FsError } from './errors.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -111,7 +109,7 @@ export interface QwenTtsPackageDirDeps {
  * PAN-3327), and prefer a directory whose venv actually exists over bare
  * directory existence, because every generation has the venv-less tracked dir.
  */
-export async function resolveQwenTtsPackageDirPromise(deps: QwenTtsPackageDirDeps = {}): Promise<string> {
+export async function resolveQwenTtsPackageDir(deps: QwenTtsPackageDirDeps = {}): Promise<string> {
   const pkgRoot = deps.pkgRoot ?? packageRoot;
   const exists = deps.exists ?? pathExists;
   const ensureDir = deps.ensureDir ?? (async (path: string) => mkdir(path, { recursive: true }));
@@ -134,14 +132,23 @@ export async function resolveQwenTtsPackageDirPromise(deps: QwenTtsPackageDirDep
   }
   await ensureDir(candidates[0]);
   return candidates[0];
-}async function resolveTtsDaemonScriptPromise(): Promise<string> {
+}
+
+/** Path to the daemon entry script inside the qwen-tts package. */
+export async function resolveTtsDaemonScript(): Promise<string> {
   const script = join(SYNC_SOURCES.skills, 'pan-tts', 'scripts', 'tts_daemon.py');
   if (await pathExists(script)) return script;
   throw new Error(`Qwen TTS daemon script not found at ${script}`);
-}async function getTtsDaemonVenvDirPromise(): Promise<string> {
-  return join(await Effect.runPromise(resolveQwenTtsPackageDir()), '.venv');
-}async function getTtsDaemonPythonPromise(): Promise<string> {
-  const venvDir = await Effect.runPromise(getTtsDaemonVenvDir());
+}
+
+/** Resolved venv directory for the TTS daemon. */
+export async function getTtsDaemonVenvDir(): Promise<string> {
+  return join(await resolveQwenTtsPackageDir(), '.venv');
+}
+
+/** Resolved python interpreter inside the TTS daemon venv. */
+export async function getTtsDaemonPython(): Promise<string> {
+  const venvDir = await getTtsDaemonVenvDir();
   return join(venvDir, 'bin', 'python');
 }
 
@@ -182,9 +189,15 @@ async function writeState(state: TtsDaemonState): Promise<void> {
   await mkdir(dirname(QWEN_TTS_PID_PATH), { recursive: true });
   await writeFile(QWEN_TTS_PID_PATH, `${state.pid}\n`, 'utf8');
   await writeFile(QWEN_TTS_STATE_PATH, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
-}async function hasTtsDaemonStatePromise(): Promise<boolean> {
+}
+
+/** True if a daemon state file exists on disk. */
+export async function hasTtsDaemonState(): Promise<boolean> {
   return (await readPid()) !== null || (await readState()) !== null;
-}async function isTtsDaemonManuallyStoppedPromise(): Promise<boolean> {
+}
+
+/** True if the manual-stop sentinel file exists. */
+export async function isTtsDaemonManuallyStopped(): Promise<boolean> {
   return pathExists(QWEN_TTS_MANUAL_STOP_PATH);
 }
 
@@ -195,7 +208,10 @@ async function setTtsDaemonManualStopGate(): Promise<void> {
 
 async function clearTtsDaemonManualStopGate(): Promise<void> {
   await rm(QWEN_TTS_MANUAL_STOP_PATH, { force: true });
-}async function getTtsDaemonAuthTokenPromise(): Promise<string> {
+}
+
+/** Lazily-materialised auth token shared with the daemon. */
+export async function getTtsDaemonAuthToken(): Promise<string> {
   if (process.env.QWEN_TTS_AUTH_TOKEN?.trim()) return process.env.QWEN_TTS_AUTH_TOKEN.trim();
 
   try {
@@ -221,8 +237,11 @@ async function clearTtsDaemonManualStopGate(): Promise<void> {
     await chmod(QWEN_TTS_AUTH_TOKEN_PATH, 0o600).catch(() => undefined);
     return existing;
   }
-}async function getTtsDaemonAuthHeadersPromise(): Promise<Record<string, string>> {
-  return { [QWEN_TTS_AUTH_HEADER]: await Effect.runPromise(getTtsDaemonAuthToken()) };
+}
+
+/** Auth headers (token + content-type) for daemon HTTP calls. */
+export async function getTtsDaemonAuthHeaders(): Promise<Record<string, string>> {
+  return { [QWEN_TTS_AUTH_HEADER]: await getTtsDaemonAuthToken() };
 }
 
 function defaultAllowedOrigins(): string {
@@ -450,7 +469,10 @@ async function fetchDaemonHealth(config: NormalizedTtsDaemonConfig, timeoutMs = 
   } finally {
     clearTimeout(timeout);
   }
-}async function getTtsDaemonStatusPromise(config: NormalizedTtsDaemonConfig): Promise<TtsDaemonStatus> {
+}
+
+/** Query the daemon's live status (health probe + state read). */
+export async function getTtsDaemonStatus(config: NormalizedTtsDaemonConfig): Promise<TtsDaemonStatus> {
   const [state, health] = await Promise.all([
     readState(),
     fetchDaemonHealth(config),
@@ -503,15 +525,21 @@ async function fetchDaemonHealth(config: NormalizedTtsDaemonConfig, timeoutMs = 
     gpuMemoryUsedMb,
     error: health.ok === true ? undefined : initializing ? 'daemon starting' : health.error ?? (managedRunning ? 'daemon unhealthy' : 'daemon not running'),
   };
-}async function waitForTtsDaemonHealthPromise(config: NormalizedTtsDaemonConfig, timeoutMs = 120_000): Promise<TtsDaemonStatus> {
+}
+
+/** Poll until the daemon reports a healthy phase or the timeout elapses. */
+export async function waitForTtsDaemonHealth(config: NormalizedTtsDaemonConfig, timeoutMs = 120_000): Promise<TtsDaemonStatus> {
   const deadline = Date.now() + timeoutMs;
-  let latest = await Effect.runPromise(getTtsDaemonStatus(config));
+  let latest = await getTtsDaemonStatus(config);
   while (!latest.ok && Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, 1_000));
-    latest = await Effect.runPromise(getTtsDaemonStatus(config));
+    latest = await getTtsDaemonStatus(config);
   }
   return latest;
-}async function startTtsDaemonPromise(options: TtsDaemonStartOptions): Promise<TtsDaemonStartResult> {
+}
+
+/** Start the daemon (detached). Idempotent — returns the existing PID when alive. */
+export async function startTtsDaemon(options: TtsDaemonStartOptions): Promise<TtsDaemonStartResult> {
   const { config } = options;
   const detach = options.detach !== false;
   const waitForHealth = options.waitForHealth !== false;
@@ -525,7 +553,7 @@ async function fetchDaemonHealth(config: NormalizedTtsDaemonConfig, timeoutMs = 
   await acquireStartLock();
   try {
     await clearTtsDaemonManualStopGate();
-    const existing = await Effect.runPromise(getTtsDaemonStatus(config));
+    const existing = await getTtsDaemonStatus(config);
     if (existing.ok || existing.initializing) {
       alreadyRunning = true;
       spawnedPid = existing.pid;
@@ -537,13 +565,13 @@ async function fetchDaemonHealth(config: NormalizedTtsDaemonConfig, timeoutMs = 
       } else if (state && !await isManagedProcessAlive(state)) {
         await clearState();
       }
-      const python = await Effect.runPromise(getTtsDaemonPython());
-      const script = await Effect.runPromise(resolveTtsDaemonScript());
+      const python = await getTtsDaemonPython();
+      const script = await resolveTtsDaemonScript();
       if (!(await pathExists(python))) {
         return { ok: false, pid: null, alreadyRunning: false, error: `TTS daemon venv not found at ${python}; run pan install` };
       }
 
-      const authToken = await Effect.runPromise(getTtsDaemonAuthToken());
+      const authToken = await getTtsDaemonAuthToken();
       let logFile: Awaited<ReturnType<typeof open>> | undefined;
       if (detach) {
         await mkdir(LOGS_DIR, { recursive: true });
@@ -579,23 +607,26 @@ async function fetchDaemonHealth(config: NormalizedTtsDaemonConfig, timeoutMs = 
   }
 
   if (!waitForHealth) {
-    return { ok: true, pid: spawnedPid, alreadyRunning, status: await Effect.runPromise(getTtsDaemonStatus(config)) };
+    return { ok: true, pid: spawnedPid, alreadyRunning, status: await getTtsDaemonStatus(config) };
   }
 
-  const status = await Effect.runPromise(waitForTtsDaemonHealth(config, options.timeoutMs));
+  const status = await waitForTtsDaemonHealth(config, options.timeoutMs);
   return { ok: status.ok, pid: status.pid ?? spawnedPid, alreadyRunning, status, error: status.ok ? undefined : status.error };
-}async function runTtsDaemonForegroundPromise(config: NormalizedTtsDaemonConfig): Promise<TtsDaemonForegroundResult> {
+}
+
+/** Run the daemon in the foreground (debugging / CLI mode). */
+export async function runTtsDaemonForeground(config: NormalizedTtsDaemonConfig): Promise<TtsDaemonForegroundResult> {
   if (process.platform !== 'linux') {
     return { pid: null, exitCode: 1, signal: null };
   }
 
-  const python = await Effect.runPromise(getTtsDaemonPython());
-  const script = await Effect.runPromise(resolveTtsDaemonScript());
+  const python = await getTtsDaemonPython();
+  const script = await resolveTtsDaemonScript();
   if (!(await pathExists(python))) {
     throw new Error(`TTS daemon venv not found at ${python}; run pan install`);
   }
 
-  const authToken = await Effect.runPromise(getTtsDaemonAuthToken());
+  const authToken = await getTtsDaemonAuthToken();
   await acquireStartLock();
   let child: ReturnType<typeof spawn>;
   try {
@@ -628,7 +659,10 @@ async function fetchDaemonHealth(config: NormalizedTtsDaemonConfig, timeoutMs = 
       resolve({ pid: child.pid ?? null, exitCode, signal });
     });
   });
-}async function stopTtsDaemonPromise(timeoutMs = 5_000): Promise<TtsDaemonStopResult> {
+}
+
+/** Stop the daemon, waiting up to `timeoutMs` for graceful shutdown. */
+export async function stopTtsDaemon(timeoutMs = 5_000): Promise<TtsDaemonStopResult> {
   await setTtsDaemonManualStopGate();
   const state = await readState();
   if (state) {
@@ -642,7 +676,7 @@ async function fetchDaemonHealth(config: NormalizedTtsDaemonConfig, timeoutMs = 
   }
 
   const config = loadConfigSync().config.tts;
-  const status = await Effect.runPromise(getTtsDaemonStatus(config));
+  const status = await getTtsDaemonStatus(config);
   const pid = status.pid ?? null;
   if (pid === null) return { stopped: false, pid: null, error: 'TTS daemon is not running' };
 
@@ -672,7 +706,10 @@ async function hasCudaGpu(): Promise<boolean> {
   } catch {
     return false;
   }
-}async function installTtsDaemonDependenciesPromise(): Promise<TtsDaemonInstallResult> {
+}
+
+/** Install the daemon's Python dependencies into the venv. */
+export async function installTtsDaemonDependencies(): Promise<TtsDaemonInstallResult> {
   if (process.platform !== 'linux') {
     return { status: 'skipped', reason: `Qwen TTS daemon is Linux-only (current platform: ${process.platform})` };
   }
@@ -683,8 +720,8 @@ async function hasCudaGpu(): Promise<boolean> {
     return { status: 'skipped', reason: 'No CUDA GPU detected with nvidia-smi; skipping Qwen TTS daemon install' };
   }
 
-  const packageDir = await Effect.runPromise(resolveQwenTtsPackageDir());
-  const venvDir = await Effect.runPromise(getTtsDaemonVenvDir());
+  const packageDir = await resolveQwenTtsPackageDir();
+  const venvDir = await getTtsDaemonVenvDir();
   await mkdir(packageDir, { recursive: true });
 
   try {
@@ -703,7 +740,10 @@ async function hasCudaGpu(): Promise<boolean> {
   } catch (error) {
     return { status: 'failed', reason: error instanceof Error ? error.message : String(error) };
   }
-}async function installTtsSystemdUnitPromise(): Promise<string> {
+}
+
+/** Write a systemd unit for the daemon. Returns the unit-file path. */
+export async function installTtsSystemdUnit(): Promise<string> {
   const configDir = join(process.env.HOME ?? '', '.config', 'systemd', 'user');
   await mkdir(configDir, { recursive: true });
   const unitPath = join(configDir, 'overdeck-qwen-tts.service');
@@ -712,126 +752,3 @@ async function hasCudaGpu(): Promise<boolean> {
   await writeFile(unitPath, content, 'utf8');
   return unitPath;
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-const ttsProcessError = (op: string, cause: unknown): ProcessSpawnError =>
-  new ProcessSpawnError({
-    command: 'tts-daemon',
-    args: [op],
-    message: cause instanceof Error ? cause.message : String(cause),
-    cause,
-  });
-
-const ttsFsError = (op: string, path: string, cause: unknown): FsError =>
-  new FsError({ path, operation: op, cause });
-
-/** Path to the bundled qwen-tts package on disk. */
-export const resolveQwenTtsPackageDir = (): Effect.Effect<string, FsError> =>
-  Effect.tryPromise({
-    try: () => resolveQwenTtsPackageDirPromise(),
-    catch: (cause) => ttsFsError('resolveQwenTtsPackageDir', packageRoot, cause),
-  });
-
-/** Path to the daemon entry script inside the qwen-tts package. */
-export const resolveTtsDaemonScript = (): Effect.Effect<string, FsError> =>
-  Effect.tryPromise({
-    try: () => resolveTtsDaemonScriptPromise(),
-    catch: (cause) => ttsFsError('resolveTtsDaemonScript', packageRoot, cause),
-  });
-
-/** Resolved venv directory for the TTS daemon. */
-export const getTtsDaemonVenvDir = (): Effect.Effect<string, FsError> =>
-  Effect.tryPromise({
-    try: () => getTtsDaemonVenvDirPromise(),
-    catch: (cause) => ttsFsError('getTtsDaemonVenvDir', OVERDECK_HOME, cause),
-  });
-
-/** Resolved python interpreter inside the TTS daemon venv. */
-export const getTtsDaemonPython = (): Effect.Effect<string, FsError> =>
-  Effect.tryPromise({
-    try: () => getTtsDaemonPythonPromise(),
-    catch: (cause) => ttsFsError('getTtsDaemonPython', OVERDECK_HOME, cause),
-  });
-
-/** True if a daemon state file exists on disk. */
-export const hasTtsDaemonState = (): Effect.Effect<boolean> =>
-  Effect.promise(() => hasTtsDaemonStatePromise());
-
-/** True if the manual-stop sentinel file exists. */
-export const isTtsDaemonManuallyStopped = (): Effect.Effect<boolean> =>
-  Effect.promise(() => isTtsDaemonManuallyStoppedPromise());
-
-/** Lazily-materialised auth token shared with the daemon. */
-export const getTtsDaemonAuthToken = (): Effect.Effect<string, FsError> =>
-  Effect.tryPromise({
-    try: () => getTtsDaemonAuthTokenPromise(),
-    catch: (cause) => ttsFsError('getTtsDaemonAuthToken', QWEN_TTS_AUTH_TOKEN_PATH, cause),
-  });
-
-/** Auth headers (token + content-type) for daemon HTTP calls. */
-export const getTtsDaemonAuthHeaders = (): Effect.Effect<Record<string, string>, FsError> =>
-  Effect.tryPromise({
-    try: () => getTtsDaemonAuthHeadersPromise(),
-    catch: (cause) => ttsFsError('getTtsDaemonAuthHeaders', QWEN_TTS_AUTH_TOKEN_PATH, cause),
-  });
-
-/** Query the daemon's live status (health probe + state read). */
-export const getTtsDaemonStatus = (
-  config: NormalizedTtsDaemonConfig,
-): Effect.Effect<TtsDaemonStatus, ProcessSpawnError> =>
-  Effect.tryPromise({
-    try: () => getTtsDaemonStatusPromise(config),
-    catch: (cause) => ttsProcessError('status', cause),
-  });
-
-/** Poll until the daemon reports a healthy phase or the timeout elapses. */
-export const waitForTtsDaemonHealth = (
-  config: NormalizedTtsDaemonConfig,
-  timeoutMs = 120_000,
-): Effect.Effect<TtsDaemonStatus, ProcessSpawnError> =>
-  Effect.tryPromise({
-    try: () => waitForTtsDaemonHealthPromise(config, timeoutMs),
-    catch: (cause) => ttsProcessError('wait-health', cause),
-  });
-
-/** Start the daemon (detached). Idempotent — returns the existing PID when alive. */
-export const startTtsDaemon = (
-  options: TtsDaemonStartOptions,
-): Effect.Effect<TtsDaemonStartResult, ProcessSpawnError> =>
-  Effect.tryPromise({
-    try: () => startTtsDaemonPromise(options),
-    catch: (cause) => ttsProcessError('start', cause),
-  });
-
-/** Run the daemon in the foreground (debugging / CLI mode). */
-export const runTtsDaemonForeground = (
-  config: NormalizedTtsDaemonConfig,
-): Effect.Effect<TtsDaemonForegroundResult, ProcessSpawnError> =>
-  Effect.tryPromise({
-    try: () => runTtsDaemonForegroundPromise(config),
-    catch: (cause) => ttsProcessError('foreground', cause),
-  });
-
-/** Stop the daemon, waiting up to `timeoutMs` for graceful shutdown. */
-export const stopTtsDaemon = (
-  timeoutMs = 5_000,
-): Effect.Effect<TtsDaemonStopResult, ProcessSpawnError> =>
-  Effect.tryPromise({
-    try: () => stopTtsDaemonPromise(timeoutMs),
-    catch: (cause) => ttsProcessError('stop', cause),
-  });
-
-/** Install the daemon's Python dependencies into the venv. */
-export const installTtsDaemonDependencies = (): Effect.Effect<TtsDaemonInstallResult, ProcessSpawnError> =>
-  Effect.tryPromise({
-    try: () => installTtsDaemonDependenciesPromise(),
-    catch: (cause) => ttsProcessError('install-deps', cause),
-  });
-
-/** Write a systemd unit for the daemon. Returns the unit-file path. */
-export const installTtsSystemdUnit = (): Effect.Effect<string, FsError> =>
-  Effect.tryPromise({
-    try: () => installTtsSystemdUnitPromise(),
-    catch: (cause) => ttsFsError('installTtsSystemdUnit', OVERDECK_HOME, cause),
-  });

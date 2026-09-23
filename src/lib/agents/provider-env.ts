@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import type { NormalizedCavemanConfig } from '../config-yaml.js';
 import { loadConfigSync as loadYamlConfig, resolveModel } from '../config-yaml.js';
 import { readCavemanVariant } from '../caveman/workspace.js';
@@ -59,7 +58,7 @@ export async function getProviderEnvForModel(model: string, harness?: RuntimeNam
       throw new Error(`Google API key not configured. Add GOOGLE_API_KEY in Settings → Google or ~/.overdeck.env before using model "${model}".`);
     }
 
-    if (!await Effect.runPromise(bridgeGeminiAuthToCliproxy(apiKey))) {
+    if (!await bridgeGeminiAuthToCliproxy(apiKey)) {
       throw new Error(`Failed to bridge Google API key into CLIProxy before using model "${model}".`);
     }
 
@@ -67,7 +66,7 @@ export async function getProviderEnvForModel(model: string, harness?: RuntimeNam
   }
 
   if (provider.name === 'openai') {
-    const authStatus = await Effect.runPromise(getOpenAIAuthStatus());
+    const authStatus = await getOpenAIAuthStatus();
     if (authStatus.loggedIn) {
       // Route through the local CLIProxyAPI sidecar using the user's
       // ChatGPT subscription OAuth tokens. Claude Code sees a normal
@@ -85,9 +84,9 @@ export async function getProviderEnvForModel(model: string, harness?: RuntimeNam
 
   if (apiKey) {
     if (provider.name === 'nous') {
-      await Effect.runPromise(ensureOpenAICompatibleProxyRunning());
+      await ensureOpenAICompatibleProxyRunning();
     }
-    await Effect.runPromise(validateProviderHealth(model, apiKey));
+    await validateProviderHealth(model, apiKey);
     return getProviderEnvSync(provider, apiKey, harness);
   }
 

@@ -126,7 +126,7 @@ export async function reconcileGitHubMergeStatus(issueId: string, prUrl: string 
     const { getPullRequestState, isGitHubAppConfigured } = await import('../../../../lib/github-app.js');
     if (!isGitHubAppConfigured()) return false;
 
-    const prState = await Effect.runPromise(getPullRequestState(prRef.owner, prRef.repo, prRef.number));
+    const prState = await getPullRequestState(prRef.owner, prRef.repo, prRef.number);
     console.log(`[merge] reconcileGitHubMergeStatus: ${issueId} PR #${prRef.number} merged=${prState.merged} state=${prState.state}`);
     if (!prState.merged) return false;
 
@@ -864,7 +864,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       try {
         const { getPullRequestState, isGitHubAppConfigured } = await import('../../../../lib/github-app.js');
         if (isGitHubAppConfigured()) {
-          const prState = await Effect.runPromise(getPullRequestState(githubPrRef.owner, githubPrRef.repo, githubPrRef.number));
+          const prState = await getPullRequestState(githubPrRef.owner, githubPrRef.repo, githubPrRef.number);
           preMergePrState = prState;
           if (prState.state !== 'OPEN' && !prState.merged) {
             const error = `PR #${githubPrRef.number} is ${prState.state} (not OPEN). Overdeck state is out of sync — likely a cancel-flow left a stale prUrl. Re-open the work agent to create a fresh PR, or reset review state.`;
@@ -1030,13 +1030,13 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     let skipLocalVerification = false;
     if (primaryForge === 'github' && artifactUrl) {
       try {
-        const { parsePullRequestRef, getCiCheckRunsStatePromise, isGitHubAppConfigured } = await import('../../../../lib/github-app.js');
+        const { parsePullRequestRef, getCiCheckRunsState, isGitHubAppConfigured } = await import('../../../../lib/github-app.js');
         if (isGitHubAppConfigured()) {
           const ref = parsePullRequestRef({ url: artifactUrl });
           if (ref) {
             const { stdout: tipShaRaw } = await execAsync('git rev-parse HEAD', { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 });
             const tipSha = tipShaRaw.trim();
-            const ci = await getCiCheckRunsStatePromise(ref.owner, ref.repo, tipSha);
+            const ci = await getCiCheckRunsState(ref.owner, ref.repo, tipSha);
             if (ci.green && ci.total > 0) {
               skipLocalVerification = true;
               console.log(`[merge] CI is green on ${tipSha.slice(0, 8)} (${ci.successCount}/${ci.total} checks) — skipping redundant local verification for ${issueId} (PAN-2487)`);
@@ -1107,7 +1107,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     try {
       const { getPullRequestState, isGitHubAppConfigured, reportCommitStatus } = await import('../../../../lib/github-app.js');
       if (githubPrRef && isGitHubAppConfigured()) {
-        const prState = await Effect.runPromise(getPullRequestState(githubPrRef.owner, githubPrRef.repo, githubPrRef.number));
+        const prState = await getPullRequestState(githubPrRef.owner, githubPrRef.repo, githubPrRef.number);
         const sha = prState.headSha.trim();
         if (sha) {
           await reportCommitStatus(githubPrRef.owner, githubPrRef.repo, sha, 'success', 'overdeck/review', 'Review passed');
@@ -1140,7 +1140,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
       try {
         const { getPullRequestState, isGitHubAppConfigured } = await import('../../../../lib/github-app.js');
         if (githubPrRef && isGitHubAppConfigured()) {
-          const prState = await Effect.runPromise(getPullRequestState(githubPrRef.owner, githubPrRef.repo, githubPrRef.number));
+          const prState = await getPullRequestState(githubPrRef.owner, githubPrRef.repo, githubPrRef.number);
           artifactMerged = prState.merged;
           if (artifactMerged) {
             console.log(`[merge] Race-detected: PR #${githubPrRef.number} for ${issueId} was already merged despite thrown error; proceeding`);

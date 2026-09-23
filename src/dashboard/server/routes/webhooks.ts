@@ -81,28 +81,28 @@ export function verifySignature(body: string, signature: string, secret: string)
 async function dispatchWebhook(eventType: string, payload: WebhookPayload): Promise<void> {
   switch (eventType) {
     case 'check_suite':
-      await Effect.runPromise(handleCheckSuite(payload));
+      await handleCheckSuite(payload);
       break;
     case 'check_run':
-      await Effect.runPromise(handleCheckRun(payload));
+      await handleCheckRun(payload);
       break;
     case 'pull_request':
-      await Effect.runPromise(handlePullRequest(payload));
+      await handlePullRequest(payload);
       break;
     case 'pull_request_review':
-      await Effect.runPromise(handlePullRequestReview(payload));
+      await handlePullRequestReview(payload);
       break;
     case 'pull_request_review_comment':
-      await Effect.runPromise(handlePullRequestReviewComment(payload));
+      await handlePullRequestReviewComment(payload);
       break;
     case 'pull_request_review_thread':
-      await Effect.runPromise(handlePullRequestReviewThread(payload));
+      await handlePullRequestReviewThread(payload);
       break;
     case 'issue_comment':
-      await Effect.runPromise(handleIssueComment(payload));
+      await handleIssueComment(payload);
       break;
     case 'status':
-      await Effect.runPromise(handleStatus(payload));
+      await handleStatus(payload);
       break;
     default:
       // Unknown events are silently accepted (GitHub expects 200)

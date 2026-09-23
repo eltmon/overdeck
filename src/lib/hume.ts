@@ -7,15 +7,7 @@
  * Pattern mirrors tunnel.ts — stateless CRUD against external API.
  */
 
-import { Effect, Data } from 'effect';
 import { HumeConfig, TemplatePlaceholders, replacePlaceholdersSync } from './workspace-config.js';
-
-/** A Hume EVI API call failed (HTTP, timeout, or auth). */
-export class HumeApiError extends Data.TaggedError('HumeApiError')<{
-  readonly operation: string;
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
 
 export interface HumeResult {
   success: boolean;
@@ -64,7 +56,14 @@ async function humeFetch(
   } finally {
     clearTimeout(timeout);
   }
-}async function createHumeConfigPromise(
+}
+
+/**
+ * Create the Hume EVI config for a workspace. Step failures are reported in the
+ * `success: false` result with step logs; it rejects only when the call itself
+ * throws (a network exception, or JSON parsing outside humeFetch).
+ */
+export async function createHumeConfig(
   config: HumeConfig,
   placeholders: TemplatePlaceholders,
 ): Promise<HumeResult> {
@@ -167,7 +166,13 @@ async function humeFetch(
   steps.push(`[hume] Created config "${configName}" (ID: ${newId})`);
 
   return { success: true, steps, configId: newId, configName };
-}async function deleteHumeConfigPromise(
+}
+
+/**
+ * Delete the Hume EVI config for a workspace. Step failures stay in the returned
+ * payload; it rejects only on a transport-level throw.
+ */
+export async function deleteHumeConfig(
   config: HumeConfig,
   placeholders: TemplatePlaceholders,
 ): Promise<HumeResult> {
@@ -212,45 +217,3 @@ async function humeFetch(
 
   return { success: allOk, steps };
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Effect-native createHumeConfig. The Promise version reports failure through
- * the `success: false` branch with step logs rather than throwing; this Effect
- * variant wraps it so callers can compose with other Effect work. Only the
- * underlying call itself throwing (network exception, JSON parse outside
- * humeFetch) surfaces as HumeApiError.
- */
-export const createHumeConfig = (
-  config: HumeConfig,
-  placeholders: TemplatePlaceholders,
-): Effect.Effect<HumeResult, HumeApiError> =>
-  Effect.tryPromise({
-    try: () => createHumeConfigPromise(config, placeholders),
-    catch: (cause) =>
-      new HumeApiError({
-        operation: 'createHumeConfig',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });
-
-/**
- * Effect-native deleteHumeConfig. Same shape as createHumeConfig:
- * step-level failures stay in the returned payload, transport-level throws
- * become HumeApiError on the typed error channel.
- */
-export const deleteHumeConfig = (
-  config: HumeConfig,
-  placeholders: TemplatePlaceholders,
-): Effect.Effect<HumeResult, HumeApiError> =>
-  Effect.tryPromise({
-    try: () => deleteHumeConfigPromise(config, placeholders),
-    catch: (cause) =>
-      new HumeApiError({
-        operation: 'deleteHumeConfig',
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });

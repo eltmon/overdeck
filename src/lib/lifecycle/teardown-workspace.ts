@@ -686,7 +686,7 @@ function removeTunnelConfig(
   return Effect.tryPromise({
     try: async () => {
       const { removeTunnelIngress } = await import('../tunnel.js');
-      const result = await Effect.runPromise(removeTunnelIngress(tunnelConfig, placeholders as any));
+      const result = await removeTunnelIngress(tunnelConfig, placeholders as any);
       return stepOk('teardown:tunnel', result.steps || ['Removed tunnel ingress']);
     },
     catch: (err) => err,
@@ -707,7 +707,7 @@ function removeHumeEviConfig(
   return Effect.tryPromise({
     try: async () => {
       const { deleteHumeConfig } = await import('../hume.js');
-      const result = await Effect.runPromise(deleteHumeConfig(humeConfig, placeholders as any));
+      const result = await deleteHumeConfig(humeConfig, placeholders as any);
       return stepOk('teardown:hume', result.steps || ['Removed Hume EVI config']);
     },
     catch: (err) => err,

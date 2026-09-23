@@ -1,6 +1,5 @@
 import { EventEmitter } from 'node:events';
 import { promisify } from 'node:util';
-import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -202,11 +201,11 @@ describe('reloadCommand', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    mocks.acquireRestartLock.mockReturnValue(Effect.succeed({
+    mocks.acquireRestartLock.mockResolvedValue({
       refresh: vi.fn(() => Promise.resolve()),
       release: vi.fn(() => Promise.resolve()),
-    }));
-    mocks.readRestartLockHolder.mockReturnValue(Effect.succeed(null));
+    });
+    mocks.readRestartLockHolder.mockResolvedValue(null);
     mocks.readPlatformConfig.mockReturnValue({
       dashboardPort: 3010,
       dashboardApiPort: 3011,
@@ -214,8 +213,8 @@ describe('reloadCommand', () => {
       traefikDomain: 'overdeck.localhost',
       traefikDir: '/tmp/traefik',
     });
-    mocks.restartDashboard.mockReturnValue(Effect.succeed({ ownershipVerified: true, spawnedPid: 1234 }));
-    mocks.writeRestartStatus.mockReturnValue(Effect.succeed(undefined));
+    mocks.restartDashboard.mockResolvedValue({ ownershipVerified: true, spawnedPid: 1234 });
+    mocks.writeRestartStatus.mockResolvedValue(undefined);
     mocks.refuseNonPrimaryDashboardCwd.mockReturnValue(false);
     mocks.resolveBundledServerPath.mockReturnValue('/tmp/server.js');
     mocks.resolvePrimaryDashboardIdentity.mockReturnValue({ repoRoot: '/repo', mode: 'primary' });
@@ -282,10 +281,8 @@ describe('reloadCommand', () => {
       apiPort: 3011,
       startedAt: '2026-06-07T00:00:00.000Z',
     });
-    mocks.acquireRestartLock.mockReturnValue(Effect.succeed(null));
-    mocks.readRestartLockHolder.mockReturnValue(
-      Effect.succeed({ pid: 777777, caller: 'pan reload', ts: Date.now() }),
-    );
+    mocks.acquireRestartLock.mockResolvedValue(null);
+    mocks.readRestartLockHolder.mockResolvedValue({ pid: 777777, caller: 'pan reload', ts: Date.now() });
     const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
 
     await reloadCommand({});
@@ -302,10 +299,8 @@ describe('reloadCommand', () => {
   });
 
   it('refuses the detached path when the restart lock is already held', async () => {
-    mocks.acquireRestartLock.mockReturnValue(Effect.succeed(null));
-    mocks.readRestartLockHolder.mockReturnValue(
-      Effect.succeed({ pid: 777777, caller: 'pan reload', ts: Date.now() }),
-    );
+    mocks.acquireRestartLock.mockResolvedValue(null);
+    mocks.readRestartLockHolder.mockResolvedValue({ pid: 777777, caller: 'pan reload', ts: Date.now() });
 
     await reloadCommand({});
 
@@ -379,7 +374,7 @@ describe('reloadCommand', () => {
   });
 
   it('qualifies reload success when spawned dashboard ownership was not verified', async () => {
-    mocks.restartDashboard.mockReturnValue(Effect.succeed({ ownershipVerified: false, spawnedPid: null }));
+    mocks.restartDashboard.mockResolvedValue({ ownershipVerified: false, spawnedPid: null });
 
     await reloadCommand({ skipBuild: true });
 
@@ -486,7 +481,7 @@ describe('reloadCommand', () => {
       }
       return { stdout: '', stderr: '' };
     });
-    mocks.restartDashboard.mockReturnValue(Effect.fail(new Error('health failed')));
+    mocks.restartDashboard.mockRejectedValue(new Error('health failed'));
     mockSpawnExits();
 
     await reloadCommand({});
@@ -512,13 +507,13 @@ describe('reloadCommand', () => {
 
   it('preserves a deployment when the lifecycle leaves its dashboard running after health timeout', async () => {
     mocks.statSync.mockReturnValue({ mtimeMs: 2000 });
-    mocks.restartDashboard.mockReturnValue(Effect.fail(Object.assign(new Error('health timed out'), {
+    mocks.restartDashboard.mockRejectedValue(Object.assign(new Error('health timed out'), {
       failure: {
         stage: 'dashboard',
         reason: 'health timed out; dashboard left running',
         recovery: 'dashboard-left-running',
       },
-    })));
+    }));
     mockSpawnExits();
 
     await reloadCommand({});

@@ -187,7 +187,7 @@ vi.mock('../../../../src/lib/git-utils.js', () => ({
 
 vi.mock('../../../../src/lib/github-app.js', () => ({
   isGitHubAppConfigured: vi.fn().mockReturnValue(false),
-  listPullRequestsForHead: vi.fn().mockReturnValue(Effect.succeed([])),
+  listPullRequestsForHead: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../../../../src/lib/merge-set.js', () => ({

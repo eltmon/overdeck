@@ -38,7 +38,7 @@ export async function readLiveTrackerIssueState(issueId: string): Promise<LiveTr
   const resolved = resolveGitHubIssueSync(issueId);
   if (resolved.isGitHub) {
     if (isGitHubAppConfigured()) {
-      const issue = await Effect.runPromise(getIssueState(resolved.owner, resolved.repo, resolved.number));
+      const issue = await getIssueState(resolved.owner, resolved.repo, resolved.number);
       return issue.state === 'closed' ? 'closed' : 'open';
     }
 
@@ -96,7 +96,7 @@ export async function isTrackerIssueClosed(issueId: string): Promise<boolean> {
 
   try {
     if (isGitHubAppConfigured()) {
-      const issue = await Effect.runPromise(getIssueState(resolved.owner, resolved.repo, resolved.number));
+      const issue = await getIssueState(resolved.owner, resolved.repo, resolved.number);
       const closed = issue.state === 'closed';
       trackerClosedCache.set(issueId, { closed, checkedAt: now });
       return closed;

@@ -3,7 +3,6 @@ import { promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -100,12 +99,12 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
-  mocks.acquireRestartLock.mockReturnValue(Effect.succeed({
+  mocks.acquireRestartLock.mockResolvedValue({
     refresh: vi.fn(async () => undefined),
     release: vi.fn(async () => undefined),
-  }));
-  mocks.readRestartLockHolder.mockReturnValue(Effect.succeed(null));
-  mocks.writeRestartStatus.mockReturnValue(Effect.succeed(undefined));
+  });
+  mocks.readRestartLockHolder.mockResolvedValue(null);
+  mocks.writeRestartStatus.mockResolvedValue(undefined);
   mocks.refuseNonPrimaryDashboardCwd.mockReturnValue(false);
   mocks.resolveBundledServerPath.mockReturnValue('/unused/server.js');
   mocks.readDevSupervisorMarker.mockReturnValue(null);

@@ -73,7 +73,7 @@ describe('issue closed detection', () => {
       number: 1613,
     });
     mocks.isGitHubAppConfigured.mockReturnValue(false);
-    mocks.getIssueState.mockReturnValue(Effect.succeed({ state: 'open' }));
+    mocks.getIssueState.mockResolvedValue({ state: 'open' });
     mocks.execFileAsync.mockResolvedValue({ stdout: JSON.stringify({ state: 'OPEN' }), stderr: '' });
   });
 
@@ -106,7 +106,7 @@ describe('issue closed detection', () => {
 
   it('returns true through the GitHub App REST tracker fallback when configured', async () => {
     mocks.isGitHubAppConfigured.mockReturnValue(true);
-    mocks.getIssueState.mockReturnValue(Effect.succeed({ state: 'closed' }));
+    mocks.getIssueState.mockResolvedValue({ state: 'closed' });
 
     await expect(isIssueClosed('PAN-1613')).resolves.toBe(true);
 
@@ -131,7 +131,7 @@ describe('issue closed detection', () => {
 
   it('uses the 5-minute tracker cache for App REST results', async () => {
     mocks.isGitHubAppConfigured.mockReturnValue(true);
-    mocks.getIssueState.mockReturnValue(Effect.succeed({ state: 'closed' }));
+    mocks.getIssueState.mockResolvedValue({ state: 'closed' });
 
     await expect(isTrackerIssueClosed('PAN-1613')).resolves.toBe(true);
     await expect(isTrackerIssueClosed('PAN-1613')).resolves.toBe(true);

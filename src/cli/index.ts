@@ -917,13 +917,13 @@ program
 
     const { stopDashboard, readPlatformConfigSync } = await import('../lib/platform-lifecycle.js');
     const platformConfig = readPlatformConfigSync();
-    await Effect.runPromise(stopDashboard({
+    await stopDashboard({
       ...platformConfig,
       dashboardPort,
       dashboardApiPort,
       traefikEnabled,
       traefikDomain,
-    }));
+    });
 
     // Start dashboard
     if (isProduction) {
@@ -1153,7 +1153,7 @@ program
       const { stopDashboard, readPlatformConfigSync } = await import('../lib/platform-lifecycle.js');
       const platformConfig = readPlatformConfigSync();
       // Respect whatever ports this block already parsed out of config.toml.
-      await Effect.runPromise(stopDashboard({ ...platformConfig, dashboardPort, dashboardApiPort }));
+      await stopDashboard({ ...platformConfig, dashboardPort, dashboardApiPort });
       console.log(chalk.green('✓ Dashboard stopped'));
     } catch {
       console.log(chalk.dim('  No dashboard processes found'));

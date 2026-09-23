@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -30,8 +29,8 @@ describe('restartCommand workspace guard', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(process, 'cwd').mockReturnValue('/repo/workspaces/feature-pan-2727/src/cli');
     mocks.existsSync.mockImplementation((path: string) => path === '/repo/workspaces/feature-pan-2727/.git');
-    mocks.restartDashboard.mockReturnValue(Effect.succeed(undefined));
-    mocks.stopDashboard.mockReturnValue(Effect.succeed(undefined));
+    mocks.restartDashboard.mockResolvedValue(undefined);
+    mocks.stopDashboard.mockResolvedValue(undefined);
   });
 
   it.each([

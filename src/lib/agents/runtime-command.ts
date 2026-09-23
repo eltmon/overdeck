@@ -687,7 +687,7 @@ export async function getProviderAuthMode(model: string): Promise<AuthMode | und
 
   if (provider.name === 'openai') {
     const { config } = loadYamlConfig();
-    const authStatus = await Effect.runPromise(getOpenAIAuthStatus());
+    const authStatus = await getOpenAIAuthStatus();
     return authStatus.loggedIn
       ? 'subscription'
       : (config.providerAuth?.openai ?? 'api-key');

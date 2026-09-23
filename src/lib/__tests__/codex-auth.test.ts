@@ -1,7 +1,6 @@
 import { mkdir, mkdtemp, rm, utimes, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { checkCodexAuthStatus, evaluateBurnedFromLog } from '../codex-auth.js';
 import type { CodexAuthStatus } from '../codex-auth.js';
@@ -114,7 +113,7 @@ const writeCodexFixture = async (logLines: string[] = []) => {
   await writeFile(mockCliproxy.logPath, logLines.join('\n'));
 };
 
-const readCodexStatus = () => Effect.runPromise(checkCodexAuthStatus());
+const readCodexStatus = () => checkCodexAuthStatus();
 
 describe('checkCodexAuthStatus', () => {
   it('reports missing when both the cliproxy and native codex credential files are absent', async () => {

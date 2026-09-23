@@ -2,7 +2,7 @@ import { open, readFile, stat } from 'fs/promises';
 import { readFileSync, statSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
-import { Effect, Data } from 'effect';
+import { Data } from 'effect';
 import { decodeJwtPayload, getCliproxyAuthDir, getCliproxyLogPath } from './cliproxy.js';
 import { getProviderForModelSync } from './providers.js';
 
@@ -55,7 +55,7 @@ export interface CodexAuthUnknown {
 
 export type CodexAuthStatus = CodexAuthValid | CodexAuthExpired | CodexAuthBurned | CodexAuthMissing | CodexAuthUnknown;
 
-interface CheckCodexAuthOptions {
+export interface CheckCodexAuthOptions {
   ignoreBurnBefore?: number;
   agentStates?: ReadonlyArray<CodexAuthBurnFlagState & { id: string }>;
 }
@@ -372,7 +372,12 @@ export function combineCodexAuthStatuses(
   return cliproxySev > nativeSev ? withSource(cliproxy, 'cliproxy') : native;
 }
 
-async function checkCodexAuthStatusPromise(options: CheckCodexAuthOptions = {}): Promise<CodexAuthStatus> {
+/**
+ * Check the Codex (ChatGPT subscription) auth state. I/O errors are swallowed and
+ * reported through the status union; it rejects only if the check itself throws
+ * unexpectedly.
+ */
+export async function checkCodexAuthStatus(options: CheckCodexAuthOptions = {}): Promise<CodexAuthStatus> {
   const now = Date.now();
   const native = await probeNativeCodexAuth(now);
   const cliproxy = await checkCliproxyCodexAuthStatusPromise(options);
@@ -623,24 +628,3 @@ export function evaluateBurnedFromLog(
 
   return { status: 'burned', email, expiresAt };
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/**
- * Effect-native checkCodexAuthStatus. The Promise version is designed to
- * swallow all I/O errors and report the auth state through the typed status
- * union. The Effect variant wraps that to make it composable; it only fails
- * with CodexAuthCheckError if the underlying call itself throws unexpectedly
- * (i.e., not from the documented "missing/unknown" branches).
- */
-export const checkCodexAuthStatus = (
-  options: CheckCodexAuthOptions = {},
-): Effect.Effect<CodexAuthStatus, CodexAuthCheckError> =>
-  Effect.tryPromise({
-    try: () => checkCodexAuthStatusPromise(options),
-    catch: (cause) =>
-      new CodexAuthCheckError({
-        message: cause instanceof Error ? cause.message : String(cause),
-        cause,
-      }),
-  });

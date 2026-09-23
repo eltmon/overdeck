@@ -14,7 +14,6 @@
  * re-announce, and entries older than ANNOUNCE_MAX_AGE_MS are recorded without
  * being announced — a restart from hours ago is history, not news.
  */
-import { Effect } from 'effect';
 import {
   emitActivityEntrySync,
   type EmitActivityOptions,
@@ -176,9 +175,9 @@ async function syncSupervisorUnitFailureStatus(
 /** One announce pass. Exported for tests. Returns true if an entry was emitted. */
 export async function announceNewRestart(deps: RestartAnnouncerDeps = {}): Promise<boolean> {
   const readStatus = deps.readStatus
-    ?? (() => Effect.runPromise(readRestartStatus()).catch(() => null));
+    ?? (() => readRestartStatus().catch(() => null));
   const writeStatus = deps.writeStatus
-    ?? ((status: RestartStatus) => Effect.runPromise(writeRestartStatus(status)));
+    ?? ((status: RestartStatus) => writeRestartStatus(status));
   const readSupervisorUnitFailed = deps.readSupervisorUnitFailed
     ?? (() => isSupervisorUnitFailed());
   const emit = deps.emit ?? emitActivityEntrySync;

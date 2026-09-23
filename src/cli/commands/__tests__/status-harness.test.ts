@@ -26,8 +26,8 @@ vi.mock('../../../lib/workspace/stack-health.js', () => ({
   }),
 }))
 vi.mock('../../../lib/restart-status.js', () => ({
-  readRestartStatus: vi.fn(() => Effect.succeed(null)),
-  readRestartEvents: vi.fn(() => Effect.succeed([])),
+  readRestartStatus: vi.fn(async () => null),
+  readRestartEvents: vi.fn(async () => []),
   detectConcurrentRestartWriters: vi.fn(() => []),
 }))
 // The restart gate (PAN-3729) lives in the dashboard server; keep this test off
@@ -51,8 +51,8 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, json: async () => ({}) })))
     ;(collectDockerContainerLifecycleSnapshot as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed([]))
-    ;(readRestartStatus as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed(null))
-    ;(readRestartEvents as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed([]))
+    ;(readRestartStatus as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(null)
+    ;(readRestartEvents as unknown as ReturnType<typeof vi.fn>).mockResolvedValue([])
     ;(getWorkspaceStackHealth as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed({
       healthy: true,
       reasons: [],
@@ -131,14 +131,14 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
 
   it('prints the latest dashboard restart status', async () => {
     ;(listRunningAgentsSync as unknown as ReturnType<typeof vi.fn>).mockReturnValue([])
-    ;(readRestartStatus as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed({
+    ;(readRestartStatus as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ts: new Date().toISOString(),
       trigger: 'pan reload',
       success: false,
       error: '[dashboard] health check failed',
       durationMs: 2400,
       attempts: 1,
-    }))
+    })
 
     await statusCommand({} as any)
 
@@ -150,7 +150,7 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
 
   it('shows a prominent marker when the watchdog gave up', async () => {
     ;(listRunningAgentsSync as unknown as ReturnType<typeof vi.fn>).mockReturnValue([])
-    ;(readRestartStatus as unknown as ReturnType<typeof vi.fn>).mockReturnValue(Effect.succeed({
+    ;(readRestartStatus as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ts: new Date().toISOString(),
       trigger: 'watchdog',
       success: false,
@@ -158,7 +158,7 @@ describe('pan status — harness column (PAN-636 workspace-dbf)', () => {
       durationMs: 0,
       attempts: 3,
       gaveUp: true,
-    }))
+    })
 
     await statusCommand({} as any)
 

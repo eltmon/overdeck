@@ -21,9 +21,7 @@ import { homedir } from 'node:os';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import SmeeClient from 'smee-client';
-import { Effect } from 'effect';
 import { loadConfigSync } from './config.js';
-import { ProcessSpawnError } from './errors.js';
 
 const SMEE_URL_PATH = join(homedir(), '.overdeck', 'github-app', 'smee-url');
 const SMEE_PID_PATH = join(homedir(), '.overdeck', 'github-app', 'smee.pid');
@@ -77,11 +75,14 @@ function scheduleRestart(): void {
 
   restartTimeout = setTimeout(() => {
     restartTimeout = null;
-    Effect.runPromise(startSmeeClient()).catch((err) => {
+    startSmeeClient().catch((err) => {
       console.error('[smee] Restart failed:', (err as Error)?.message || String(err));
     });
   }, delay);
-}async function startSmeeClientPromise(): Promise<void> {
+}
+
+/** Start the in-process smee client. Library mode. */
+export async function startSmeeClient(): Promise<void> {
   if (activeClient) {
     console.log('[smee] Already running');
     return;
@@ -122,7 +123,10 @@ function scheduleRestart(): void {
     console.error('[smee] Failed to start:', (err as Error)?.message || String(err));
     scheduleRestart();
   }
-}async function stopSmeeClientPromise(): Promise<void> {
+}
+
+/** Stop the in-process smee client. Library mode. */
+export async function stopSmeeClient(): Promise<void> {
   isShuttingDown = true;
 
   if (restartTimeout) {
@@ -341,31 +345,3 @@ export function stopSmeeProcessSync(): void {
 
   console.log('[smee] Process stopped');
 }
-
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-
-/** Start the in-process smee client. Library mode. */
-export const startSmeeClient = (): Effect.Effect<void, ProcessSpawnError> =>
-  Effect.tryPromise({
-    try: () => startSmeeClientPromise(),
-    catch: (cause) =>
-      new ProcessSpawnError({
-        command: 'smee-client',
-        args: [],
-        message: 'startSmeeClient failed',
-        cause,
-      }),
-  });
-
-/** Stop the in-process smee client. Library mode. */
-export const stopSmeeClient = (): Effect.Effect<void, ProcessSpawnError> =>
-  Effect.tryPromise({
-    try: () => stopSmeeClientPromise(),
-    catch: (cause) =>
-      new ProcessSpawnError({
-        command: 'smee-client',
-        args: [],
-        message: 'stopSmeeClient failed',
-        cause,
-      }),
-  });

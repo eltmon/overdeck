@@ -2,7 +2,6 @@ import { existsSync, unlinkSync, lstatSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { Effect } from 'effect';
 import {
   replacePlaceholdersSync,
   getDefaultWorkspaceConfigSync,
@@ -118,14 +117,14 @@ export async function removeWorkspace(options: WorkspaceRemoveOptions): Promise<
   // Remove Cloudflare tunnel entries
   if (workspaceConfig.tunnel) {
     const placeholders = createPlaceholders(projectConfig, featureName, workspacePath);
-    const tunnelResult = await Effect.runPromise(removeTunnelIngress(workspaceConfig.tunnel, placeholders));
+    const tunnelResult = await removeTunnelIngress(workspaceConfig.tunnel, placeholders);
     result.steps.push(...tunnelResult.steps);
   }
 
   // Remove Hume EVI config
   if (workspaceConfig.hume) {
     const placeholders = createPlaceholders(projectConfig, featureName, workspacePath);
-    const humeResult = await Effect.runPromise(deleteHumeConfig(workspaceConfig.hume, placeholders));
+    const humeResult = await deleteHumeConfig(workspaceConfig.hume, placeholders);
     result.steps.push(...humeResult.steps);
   }
 

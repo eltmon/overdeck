@@ -1,5 +1,4 @@
 import { exitCli } from '../exit.js';
-import { Effect } from 'effect';
 /**
  * `pan restart` — scoped restart with explicit dependency isolation.
  *
@@ -392,7 +391,7 @@ async function recordRestartStatus(
   error?: string,
   phase: RestartPhase = success ? 'healthy' : 'failed',
 ): Promise<void> {
-  await Effect.runPromise(writeRestartStatus({
+  await writeRestartStatus({
     ts: new Date().toISOString(),
     trigger: 'pan restart',
     success,
@@ -403,11 +402,11 @@ async function recordRestartStatus(
     pid: process.pid,
     initiator: process.env.OVERDECK_RESTART_INITIATOR ?? process.env.OVERDECK_AGENT_ID,
     issueId: process.env.OVERDECK_ISSUE_ID,
-  }));
+  });
 }
 
 async function reportHeldRestartLock(startedAt: number): Promise<void> {
-  const holder = await Effect.runPromise(readRestartLockHolder());
+  const holder = await readRestartLockHolder();
   const heldBy = holder ? `held by PID ${holder.pid} (${holder.caller})` : 'held by another process';
   const error = `restart in progress (${heldBy})`;
   console.error(chalk.yellow(error));
@@ -460,7 +459,7 @@ async function runRestartNowBypass(
   options: { reloadHandoffOnly?: boolean } = {},
 ): Promise<'restart' | 'handed-off' | 'no-handoff'> {
   const requesterId = restartGateRequesterId('restart');
-  const lockHolder = await Effect.runPromise(readRestartLockHolder());
+  const lockHolder = await readRestartLockHolder();
   if (options.reloadHandoffOnly && lockHolder?.caller !== 'pan reload') return 'no-handoff';
 
   await registerRestartGateRequest({
@@ -603,7 +602,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
 
   let restartLock: RestartLockHandle | null = null;
   if (needsRestartLock) {
-    restartLock = await Effect.runPromise(acquireRestartLock('pan restart'));
+    restartLock = await acquireRestartLock('pan restart');
     if (!restartLock) {
       await reportHeldRestartLock(startedAt);
       return;
@@ -627,10 +626,10 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
           } catch { /* non-fatal */ }
         }
 
-        const result = await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, options), {
+        const result = await restartDashboard(config, () => spawnDashboardDetached(config, options), {
           healthTimeoutMs,
           expectedIdentity: resolvePrimaryDashboardIdentity(),
-        }));
+        });
         await recordRestartStatus(startedAt, true);
         console.log(chalk.green(result.ownershipVerified
           ? '✓ Dashboard restarted and healthy'
@@ -640,12 +639,12 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
       }
       case 'cliproxy': {
         const cliproxy = await import('../../lib/cliproxy.js');
-        await Effect.runPromise(restartCliproxy({
+        await restartCliproxy({
           stopCliproxy: cliproxy.stopCliproxySync,
           startCliproxy: cliproxy.startCliproxySync,
           isCliproxyRunning: cliproxy.isCliproxyRunningSync,
           installCliproxy: cliproxy.installCliproxySync,
-        }, { force: options.force === true }));
+        }, { force: options.force === true });
         if (options.force) {
           console.log(chalk.green('✓ CLIProxy reinstalled at pinned version and restarted'));
         } else {
@@ -655,7 +654,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
         break;
       }
       case 'traefik': {
-        await Effect.runPromise(restartTraefik(config));
+        await restartTraefik(config);
         console.log(chalk.green('✓ Traefik restarted'));
         console.log(chalk.dim('  Dashboard and CLIProxy were left running.'));
         break;
@@ -707,7 +706,7 @@ async function runFullRestart(
 
   // ── Stop phase ──
   // Dashboard first so it doesn't spam errors while sidecars die.
-  await Effect.runPromise(stopDashboard(config));
+  await stopDashboard(config);
 
   try {
     const { stopSupervisorProcessSync } = await import('../../lib/supervisor.js');
@@ -726,7 +725,7 @@ async function runFullRestart(
   }
 
   if (config.traefikEnabled) {
-    await Effect.runPromise(stopTraefik(config));
+    await stopTraefik(config);
   }
 
   // ── Start phase ──
@@ -734,26 +733,26 @@ async function runFullRestart(
   // dashboard so GPT-backed agents have their router from t=0; TLDR last
   // because it's non-critical and shouldn't block the dashboard coming up.
   if (config.traefikEnabled) {
-    await Effect.runPromise(startTraefik(config));
+    await startTraefik(config);
   }
 
   // restartCliproxy handles stop-sleep-start-verify in one shot.
   const cliproxy = await import('../../lib/cliproxy.js');
-  await Effect.runPromise(restartCliproxy({
+  await restartCliproxy({
     stopCliproxy: cliproxy.stopCliproxySync,
     startCliproxy: cliproxy.startCliproxySync,
     isCliproxyRunning: cliproxy.isCliproxyRunningSync,
     installCliproxy: cliproxy.installCliproxySync,
-  }));
+  });
 
   const spawnedDashboard = spawnDashboardDetached(config, opts.bootGateOptions);
   const spawnedPid = await spawnedDashboard.pid?.() ?? null;
   try {
-    await Effect.runPromise(waitForDashboardHealth(config.dashboardApiPort, {
+    await waitForDashboardHealth(config.dashboardApiPort, {
       timeoutMs: opts.healthTimeoutMs,
       expectedIdentity: resolvePrimaryDashboardIdentity(),
       expectedPid: spawnedPid ?? undefined,
-    }));
+    });
   } catch (error) {
     await spawnedDashboard.stop();
     throw error;

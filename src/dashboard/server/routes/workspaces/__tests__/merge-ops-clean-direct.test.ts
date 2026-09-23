@@ -68,7 +68,7 @@ vi.mock('../../../../../lib/cloister/verification-runner.js', () => ({
 }));
 
 vi.mock('../../../../../lib/github-app.js', () => ({
-  getCiCheckRunsStatePromise: vi.fn(async () => ({
+  getCiCheckRunsState: vi.fn(async () => ({
     green: true,
     total: 2,
     successCount: 2,
@@ -189,7 +189,7 @@ describe('triggerMerge clean PR direct merge', () => {
     mocks.derivedState = 'ready';
     mocks.mergeRun = null;
     mocks.runVerificationForIssue.mockReturnValue(Effect.succeed({ outcome: 'passed' }));
-    mocks.getPullRequestState.mockReturnValue(Effect.succeed(pullRequestState()));
+    mocks.getPullRequestState.mockResolvedValue(pullRequestState());
     mocks.mergeReviewArtifact.mockResolvedValue(undefined);
     mocks.ensureAgentReadyForMerge.mockRejectedValue(new Error('rebase flow reached'));
     mocks.exec.mockImplementation(async (command) => ({
@@ -222,7 +222,7 @@ describe('triggerMerge clean PR direct merge', () => {
   });
 
   it('uses the rebase flow when GitHub reports the PR behind', async () => {
-    mocks.getPullRequestState.mockReturnValue(Effect.succeed(pullRequestState({ mergeableState: 'behind' })));
+    mocks.getPullRequestState.mockResolvedValue(pullRequestState({ mergeableState: 'behind' }));
 
     const result = await triggerMerge('PAN-3110');
 
@@ -232,7 +232,7 @@ describe('triggerMerge clean PR direct merge', () => {
   });
 
   it('uses the rebase flow while clean PR checks are pending', async () => {
-    mocks.getPullRequestState.mockReturnValue(Effect.succeed(pullRequestState({ checksPending: true })));
+    mocks.getPullRequestState.mockResolvedValue(pullRequestState({ checksPending: true }));
 
     const result = await triggerMerge('PAN-3110');
 
@@ -242,7 +242,7 @@ describe('triggerMerge clean PR direct merge', () => {
   });
 
   it('falls back to the rebase flow when the PR-state fetch fails', async () => {
-    mocks.getPullRequestState.mockReturnValue(Effect.fail(new Error('GitHub unavailable')));
+    mocks.getPullRequestState.mockRejectedValue(new Error('GitHub unavailable'));
 
     const result = await triggerMerge('PAN-3110');
 

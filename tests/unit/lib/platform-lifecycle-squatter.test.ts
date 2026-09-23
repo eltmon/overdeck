@@ -3,7 +3,6 @@ import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -85,7 +84,7 @@ describe('dashboard restart with a live port squatter', () => {
       traefikDir: tempDir,
     };
 
-    const restart = Effect.runPromise(restartDashboard(
+    const restart = restartDashboard(
       config,
       async () => {
         await listen(server!, port);
@@ -96,7 +95,7 @@ describe('dashboard restart with a live port squatter', () => {
         expectedIdentity: { repoRoot: '/expected/repo', mode: 'primary' },
         eaddrinuseLogPath: join(tempDir, 'dashboard.log'),
       },
-    ));
+    );
     const rejection = expect(restart).rejects.toSatisfy((error: StageError) =>
       error.failure.reason.includes(`pid ${process.pid}`) &&
       error.failure.reason.includes(`pid ${expectedPid}`) &&
@@ -130,7 +129,7 @@ describe('dashboard restart with a live port squatter', () => {
       traefikDir: tempDir,
     };
 
-    await expect(Effect.runPromise(restartDashboard(
+    await expect(restartDashboard(
       config,
       async () => {
         await listen(server!, port);
@@ -140,6 +139,6 @@ describe('dashboard restart with a live port squatter', () => {
         expectedIdentity: { repoRoot: '/expected/repo', mode: 'primary' },
         eaddrinuseLogPath: join(tempDir, 'dashboard.log'),
       },
-    ))).resolves.toEqual({ ownershipVerified: true, spawnedPid: process.pid });
+    )).resolves.toEqual({ ownershipVerified: true, spawnedPid: process.pid });
   });
 });

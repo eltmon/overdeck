@@ -2,7 +2,6 @@ import { Effect } from 'effect';
 import type { NormalizedTtsDaemonConfig } from './config-yaml.js';
 import { getTtsDaemonAuthHeaders } from './tts-daemon.js';
 import { findVoiceById, type TtsVoice } from './tts-voices.js';
-import { TrackerError } from './errors.js';
 
 export type TtsSpeakMode = 'custom' | 'design' | 'clone';
 export type TtsSpeakResult = 'spoken' | 'muted' | 'daemon-unavailable' | 'no-voice';
@@ -140,7 +139,7 @@ async function postSpeakPayload(
   try {
     const response = await (deps.fetch ?? fetch)(`http://${config.daemonHost}:${config.daemonPort}/speak`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...await Effect.runPromise(getTtsDaemonAuthHeaders()) },
+      headers: { 'Content-Type': 'application/json', ...await getTtsDaemonAuthHeaders() },
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
@@ -156,7 +155,13 @@ async function postSpeakPayload(
   } finally {
     clearTimeout(timeout);
   }
-}async function resolveAndSpeakPromise(
+}
+
+/**
+ * Resolve a voice and post a speak request to the TTS daemon. Network failures
+ * collapse to `'daemon-unavailable'` in the result; only synchronous misuse rejects.
+ */
+export async function resolveAndSpeak(
   options: ResolveAndSpeakOptions,
   deps: ResolveAndSpeakDeps,
 ): Promise<TtsSpeakResult> {
@@ -197,23 +202,3 @@ export const buildTtsSpeakPayload = (
   config: NormalizedTtsDaemonConfig,
 ): Effect.Effect<TtsSpeakPayload> =>
   Effect.sync(() => buildTtsSpeakPayloadSync(voice, text, config));
-
-/**
- * Resolve a voice and post a speak request to the TTS daemon. Wraps the
- * Promise variant. Network failures collapse to `'daemon-unavailable'` in
- * the success channel; only synchronous mis-use surfaces as TrackerError.
- */
-export const resolveAndSpeak = (
-  options: ResolveAndSpeakOptions,
-  deps: ResolveAndSpeakDeps,
-): Effect.Effect<TtsSpeakResult, TrackerError> =>
-  Effect.tryPromise({
-    try: () => resolveAndSpeakPromise(options, deps),
-    catch: (cause) =>
-      new TrackerError({
-        tracker: 'tts',
-        operation: 'resolveAndSpeak',
-        message: 'resolveAndSpeak failed',
-        cause,
-      }),
-  });

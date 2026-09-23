@@ -4,7 +4,6 @@ import { join, dirname, basename, resolve } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { Effect } from 'effect';
 import {
   replacePlaceholdersSync,
   getDefaultWorkspaceConfigSync,
@@ -684,7 +683,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
 
   // Set up Cloudflare tunnel for external access (before Docker so containers can use tunnel URLs)
   if (workspaceConfig.tunnel) {
-    const tunnelResult = await Effect.runPromise(addTunnelIngress(workspaceConfig.tunnel, placeholders));
+    const tunnelResult = await addTunnelIngress(workspaceConfig.tunnel, placeholders);
     result.steps.push(...tunnelResult.steps);
     if (!tunnelResult.success) {
       result.errors.push('Tunnel setup had failures (see steps for details)');
@@ -693,7 +692,7 @@ export async function createWorkspace(options: WorkspaceCreateOptions): Promise<
 
   // Create Hume EVI config and write env file for Docker (before Docker so containers pick up the config ID)
   if (workspaceConfig.hume) {
-    const humeResult = await Effect.runPromise(createHumeConfig(workspaceConfig.hume, placeholders));
+    const humeResult = await createHumeConfig(workspaceConfig.hume, placeholders);
     result.steps.push(...humeResult.steps);
     if (humeResult.configId) {
       writeFileSync(

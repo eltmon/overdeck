@@ -667,3 +667,137 @@ sessionExists / readFeedback / readPlan …)` calls left in cloister "belong to 
 K2 Shape A row. `getAgentState` is a live Shape B wrapper (W7). `saveAgentState`, `listSessionNames`,
 `sessionExists`, `killSession` and `readPlan` are Shape C twins (§10 / W8). `readFeedback` is a genuine
 Effect export. All of them belong to CH-6, or stay for good under Q2.
+
+## CH-4: Promise-native cluster K3a (#4010)
+
+Every Shape A façade in cluster K3a is gone. The issue counts 65 façades; the ratchet had 68 rows in 16 modules, and the
+three extra are this cluster's CH-1b "kept although dead" rows (`listOpenIssuesWithLabels`, `getCiCheckRunsState`,
+`stopSmeeClient`). Each name survives as an exported `async` function. Callers moved per PRD D2, and every call site
+that recovered from, or reported, a typed failure keeps that mapping (details below). Evidence:
+`node scripts/audit-effect-boundary.mjs --json --usage`, `tsc --noEmit` on the root, dashboard and frontend projects, and
+the touched and adjacent test files.
+
+Ratchet: A 110 → 42, B 38 unchanged, C 42 → 48. The C rows rise by hand as PRD W6 step 3 predicts: once the façade is
+gone, each former façade with a `…Sync` sibling becomes an ordinary Shape C pair for CH-6. That is five in `cliproxy.ts`
+(`bridgeCodexAuthToCliproxy`, `installCliproxy`, `isCliproxyRunning`, `startCliproxy`, `stopCliproxy`) and one in
+`openai-auth.ts` (`getOpenAIAuthStatus`). Across A, B and C the total drops from 190 to 128. Dashboard type errors: 18 → 14 (the
+`Promise | Effect` unions in `routes/tts.ts` are gone).
+
+### Shape A façades (68) → async functions
+
+| Module | Name (now `async`) | Body formerly | Note |
+| --- | --- | --- | --- |
+| `cliproxy.ts` | `bridgeCodexAuthToCliproxy` | `bridgeCodexAuthToCliproxyTask` | with `bridgeCodexAuthToCliproxySync`, now a Shape C pair (CH-6) |
+| `cliproxy.ts` | `bridgeGeminiAuthToCliproxy` | `bridgeGeminiAuthToCliproxyTask` |  |
+| `cliproxy.ts` | `installCliproxy` | `installCliproxyTask` | with `installCliproxySync`, now a Shape C pair (CH-6) |
+| `cliproxy.ts` | `isCliproxyRunning` | `isCliproxyRunningTask` | with `isCliproxyRunningSync`, now a Shape C pair (CH-6) |
+| `cliproxy.ts` | `restartCliproxy` | `restartCliproxyTask` |  |
+| `cliproxy.ts` | `startCliproxy` | `startCliproxyTask` | with `startCliproxySync`, now a Shape C pair (CH-6) |
+| `cliproxy.ts` | `stopCliproxy` | `stopCliproxyTask` | with `stopCliproxySync`, now a Shape C pair (CH-6) |
+| `codex-auth.ts` | `checkCodexAuthStatus` | `checkCodexAuthStatusPromise` |  |
+| `github-app.ts` | `getCiCheckRunsState` | `getCiCheckRunsStatePromise` | CH-1b row resolved: the body was already exported and used by `merge-ops.ts`, which now calls this name |
+| `github-app.ts` | `getIssueState` | `getIssueStatePromise` | the exported body name is retired; its test imports follow |
+| `github-app.ts` | `getPullRequestState` | `getPullRequestStatePromise` |  |
+| `github-app.ts` | `listOpenIssuesWithLabels` | `listOpenIssuesWithLabelsPromise` | CH-1b row resolved: the body was already exported and used by `pipeline-membership-gather.ts`, which now calls this name |
+| `github-app.ts` | `listPullRequestsForHead` | `listPullRequestsForHeadPromise` | the exported body name is retired; its test imports follow |
+| `github-app.ts` | `mergePullRequestWithApp` | `mergePullRequestWithAppPromise` |  |
+| `hume.ts` | `createHumeConfig` | `createHumeConfigPromise` |  |
+| `hume.ts` | `deleteHumeConfig` | `deleteHumeConfigPromise` |  |
+| `openai-auth.ts` | `getOpenAIAuthStatus` | `getOpenAIAuthStatusPromise` | with `getOpenAIAuthStatusSync`, now a Shape C pair (CH-6) |
+| `openai-compatible-proxy.ts` | `ensureOpenAICompatibleProxyRunning` | `ensureOpenAICompatibleProxyRunningPromise` |  |
+| `platform-lifecycle.ts` | `restartCliproxy` | `restartCliproxyPromise` | body renamed `restartCliproxyBody`; keeps the `StageError` wrapping (not the same function as `cliproxy.ts` `restartCliproxy`) |
+| `platform-lifecycle.ts` | `restartDashboard` | `restartDashboardPromise` | body renamed `restartDashboardBody`; keeps the `StageError` wrapping |
+| `platform-lifecycle.ts` | `restartTraefik` | `restartTraefikPromise` | body renamed `restartTraefikBody`; keeps the `StageError` wrapping |
+| `platform-lifecycle.ts` | `startTraefik` | `startTraefikPromise` | body renamed `startTraefikBody`; keeps the `StageError` wrapping |
+| `platform-lifecycle.ts` | `stopDashboard` | `stopDashboardPromise` | body renamed `stopDashboardBody`; the public function keeps the `StageError` wrapping |
+| `platform-lifecycle.ts` | `stopTraefik` | `stopTraefikPromise` |  |
+| `platform-lifecycle.ts` | `waitForDashboardHealth` | `waitForDashboardHealthPromise` | body renamed `waitForDashboardHealthBody`; keeps the `StageError` wrapping |
+| `platform-lifecycle.ts` | `waitForTraefikHealth` | `waitForTraefikHealthPromise` |  |
+| `provider-health.ts` | `probeProvider` | `probeProviderPromise` |  |
+| `provider-health.ts` | `validateProviderHealth` | `validateProviderHealthPromise` | body renamed `validateProviderHealthBody`; the public function keeps the re-wrap to `ProviderHealthError` (fail closed) |
+| `restart-lock.ts` | `acquireRestartLock` | `acquireRestartLockPromise` |  |
+| `restart-lock.ts` | `readRestartLockHolder` | `readRestartLockHolderPromise` |  |
+| `restart-status.ts` | `readRestartEvents` | `readRestartEventsPromise` |  |
+| `restart-status.ts` | `readRestartStatus` | `readRestartStatusPromise` |  |
+| `restart-status.ts` | `writeRestartStatus` | `writeRestartStatusPromise` |  |
+| `smee.ts` | `startSmeeClient` | `startSmeeClientPromise` |  |
+| `smee.ts` | `stopSmeeClient` | `stopSmeeClientPromise` | CH-1b row: still only test teardown uses it (CH-8 candidate) |
+| `tts-daemon.ts` | `getTtsDaemonAuthHeaders` | `getTtsDaemonAuthHeadersPromise` |  |
+| `tts-daemon.ts` | `getTtsDaemonAuthToken` | `getTtsDaemonAuthTokenPromise` |  |
+| `tts-daemon.ts` | `getTtsDaemonPython` | `getTtsDaemonPythonPromise` |  |
+| `tts-daemon.ts` | `getTtsDaemonStatus` | `getTtsDaemonStatusPromise` |  |
+| `tts-daemon.ts` | `getTtsDaemonVenvDir` | `getTtsDaemonVenvDirPromise` |  |
+| `tts-daemon.ts` | `hasTtsDaemonState` | `hasTtsDaemonStatePromise` |  |
+| `tts-daemon.ts` | `installTtsDaemonDependencies` | `installTtsDaemonDependenciesPromise` |  |
+| `tts-daemon.ts` | `installTtsSystemdUnit` | `installTtsSystemdUnitPromise` |  |
+| `tts-daemon.ts` | `isTtsDaemonManuallyStopped` | `isTtsDaemonManuallyStoppedPromise` |  |
+| `tts-daemon.ts` | `resolveQwenTtsPackageDir` | `resolveQwenTtsPackageDirPromise` | the exported body name is retired; its tests follow |
+| `tts-daemon.ts` | `resolveTtsDaemonScript` | `resolveTtsDaemonScriptPromise` |  |
+| `tts-daemon.ts` | `runTtsDaemonForeground` | `runTtsDaemonForegroundPromise` |  |
+| `tts-daemon.ts` | `startTtsDaemon` | `startTtsDaemonPromise` |  |
+| `tts-daemon.ts` | `stopTtsDaemon` | `stopTtsDaemonPromise` |  |
+| `tts-daemon.ts` | `waitForTtsDaemonHealth` | `waitForTtsDaemonHealthPromise` |  |
+| `tts-speak.ts` | `resolveAndSpeak` | `resolveAndSpeakPromise` |  |
+| `tts-voices.ts` | `addVoice` | `addVoicePromise` |  |
+| `tts-voices.ts` | `clearVoices` | `clearVoicesPromise` |  |
+| `tts-voices.ts` | `deleteVoice` | `deleteVoicePromise` |  |
+| `tts-voices.ts` | `findVoiceById` | `findVoiceByIdPromise` |  |
+| `tts-voices.ts` | `findVoiceByName` | `findVoiceByNamePromise` |  |
+| `tts-voices.ts` | `loadVoices` | `loadVoicesPromise` |  |
+| `tts-voices.ts` | `saveVoices` | `saveVoicesPromise` |  |
+| `tunnel.ts` | `addTunnelIngress` | `addTunnelIngressPromise` |  |
+| `tunnel.ts` | `removeTunnelIngress` | `removeTunnelIngressPromise` |  |
+| `webhook-handlers.ts` | `handleCheckRun` | `handleCheckRunPromise` |  |
+| `webhook-handlers.ts` | `handleCheckSuite` | `handleCheckSuitePromise` |  |
+| `webhook-handlers.ts` | `handleIssueComment` | `handleIssueCommentPromise` |  |
+| `webhook-handlers.ts` | `handlePullRequest` | `handlePullRequestPromise` |  |
+| `webhook-handlers.ts` | `handlePullRequestReview` | `handlePullRequestReviewPromise` |  |
+| `webhook-handlers.ts` | `handlePullRequestReviewComment` | `handlePullRequestReviewCommentPromise` |  |
+| `webhook-handlers.ts` | `handlePullRequestReviewThread` | `handlePullRequestReviewThreadPromise` |  |
+| `webhook-handlers.ts` | `handleStatus` | `handleStatusPromise` |  |
+
+All paths are relative to `src/lib/`.
+
+### Kept typed mappings (no fail-open, no message regression)
+
+- **`StageError` (`platform-lifecycle.ts`).** `pan restart` and `pan reload` branch on `err instanceof StageError` to print
+  `[stage] reason` and the recovery hint. The six façades that wrapped any other throw into a `StageError` now do the same
+  in their exported async functions (`asStage`), so both commands behave as before.
+- **`ProviderHealthError` (`provider-health.ts`).** The spawn route blocks a spawn on any `validateProviderHealth` failure
+  and reads `provider` / `probeResult`. The function still re-wraps any other throw as kind `'unknown'`, so the
+  route fails closed exactly as before. The route bridges it with a two-argument `Effect.tryPromise`.
+- **Route 500 bodies keep their text.** The cliproxy restart route, the codex-auth routes, the spawn route's Codex check, and
+  `GET /api/settings/openai-auth` bridge with a two-argument `Effect.tryPromise` that maps to the same error the façade
+  raised (`CliproxyError`, `CodexAuthCheckError`, `FsError`). The TTS voice routes keep their `FsError` (operation + store
+  path) text through a small `voiceStore` wrapper. `getCodexAuthPath` (`openai-auth.ts`) and `CheckCodexAuthOptions`
+  (`codex-auth.ts`) are now exported so the routes can build those errors.
+- **Webhooks.** The eight handlers run after signature verification and repository authorization, inside a forked
+  `Effect.promise` whose failures are only logged. That path is unchanged. Signature verification, secret loading and
+  `generateInstallationToken` / `refreshWorkspaceToken` (genuine Effect functions) are not touched.
+
+### Also deleted because only deleted code used them
+
+| Name | Where |
+| --- | --- |
+| `HumeApiError` | `hume.ts` |
+| `OpenAICompatibleProxyError` | `openai-compatible-proxy.ts` |
+| `RestartLockError` | `restart-lock.ts` |
+| `RestartStatusError` | `restart-status.ts` |
+| private `cliproxyCatch`, `ttsProcessError`, `ttsFsError`, `toGhError` | `cliproxy.ts`, `tts-daemon.ts`, `webhook-handlers.ts` |
+
+### Behaviour notes for reviewers
+
+- Five façades mapped every rejection to a fixed text: `startSmeeClient failed`, `stopSmeeClient failed`,
+  `resolveAndSpeak failed`, `addTunnelIngress failed` and `removeTunnelIngress failed`. Those rejections now carry the
+  underlying error's message. A failed `POST /api/tts/speak` therefore returns the cause in its 500 body instead of
+  "resolveAndSpeak failed". A workspace create or remove that throws in the tunnel step reports the cause as well.
+- `pan status` reads the restart status and the restart event log with `Promise.all` instead of a sequential `Effect.all`.
+  Both are independent file reads.
+- `tts-speak.ts` and `cli/commands/tts.ts` keep their `runPromiseOrProgram` helper for injected test dependencies that
+  still return an Effect; production values are now always Promises (CH-8 can simplify it).
+
+### Tests
+
+None are deleted, and the diff adds and removes no `it()`/`test()` calls. Tests await the functions, and mocks return
+Promises. That includes `(fn as unknown as Mock).mockReturnValue(Effect.succeed(…))` casts and arrow-forwarded mock keys
+(`getPullRequestState: (...a) => mocks.getPullRequestState(...a)`). Tests of the exported bodies now import the plain names.

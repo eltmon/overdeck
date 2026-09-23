@@ -1,4 +1,3 @@
-import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
@@ -38,7 +37,7 @@ vi.mock('child_process', () => {
 vi.mock('../../../../src/lib/github-app.js', () => ({
   getPullRequestState: vi.fn(),
   isGitHubAppConfigured: isGitHubAppConfiguredMock,
-  listPullRequestsForHead: vi.fn(() => Effect.succeed([])),
+  listPullRequestsForHead: vi.fn(async () => []),
   mergePullRequestWithApp: vi.fn(),
   parsePullRequestRef: vi.fn(),
 }));
