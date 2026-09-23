@@ -37,16 +37,20 @@ const KNOWN_CALL_SITES = new Set([
   'dashboard/server/routes/agents/lifecycle-stop.ts|.then(({ resumeAgent }) => resumeAgent(id))',
   'dashboard/server/routes/agents/messaging.ts|await messageAgent(id, message, \'dashboard:user-message\');',
   'dashboard/server/routes/agents/messaging.ts|yield* Effect.promise(() => messageAgent(id, pokeMsg));',
+  // PAN-3960: a live planner's user message goes through the backend-aware
+  // delivery door (it was a raw tmux sendKeys, which cannot reach a Herdr pane).
+  'dashboard/server/routes/misc/planning.ts|const delivery = await deliverAgentMessage(sessionName, message, \'planning user message\');',
   'dashboard/server/routes/agents/permissions.ts|yield* Effect.promise(() => deliverAgentMessage(id, message, \'ask-user-question-answer\'));',
   'dashboard/server/routes/linear-mcp-auth.ts|yield* Effect.promise(() => messageAgent(',
   'dashboard/server/routes/specialists/legacy-routes.ts|await messageAgent(workAgentId, rebaseMsg);',
   'dashboard/server/routes/workspaces.ts|await messageAgent(agentId, message);',
   'dashboard/server/routes/workspaces/merge-strike.ts|assertDelivered(agentId, await messageAgent(agentId, rebaseMsg));',
   'dashboard/server/services/agent-spawner.ts|await messageAgent(agentId, msg);',
-  'lib/cloister/ci-failure-feedback.ts|await messageAgent(agentId, message);',
+  // PAN-3965: the generic CI-failure message reads the delivery outcome; a CI
+  // test-gate failure goes through the verification door (verification-escalation).
+  'lib/cloister/ci-failure-feedback.ts|const outcome = await messageAgent(agentId, message, \'internal\', {});',
   'lib/cloister/deacon-api-recovery.ts|await deliverAgentMessage(pane.agentId, CONTINUE_MSG, \'deacon-lite:checkApiErrorAgents\');',
   'lib/cloister/deacon-lite.ts|await deliverAgentMessage(',
-  'lib/cloister/deacon-strike-landing.ts|deliverRecovery: (agentId, message, dedupKey) => messageAgent(agentId, message, \'deacon-strike-landing\', { owesRework: true, dedupKey }),',
   'lib/cloister/deacon-swarm-completion.ts|await messageAgent(',
   'lib/cloister/deacon-swarm.ts|sendStallEvent: (agentId, message) => messageAgent(agentId, message, \'deacon:swarm-stall\'),',
   'lib/cloister/feedback-target.ts|const result = await resumeAgent(agentId);',
@@ -61,7 +65,8 @@ const KNOWN_CALL_SITES = new Set([
   'lib/cloister/specialists-feedback.ts|await messageAgent(agentSession, msg);',
   'lib/cloister/swarm-foreman.ts|await deps.messageAgent(agentId, options.prompt ?? `Continue managing ${issue} as its swarm foreman. Run pan swarm status ${issue} --json before acting.`, \'pan-swarm\');',
   'lib/cloister/uat-failure-feedback.ts|const outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
-  'lib/cloister/verification-runner.ts|outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
+  // PAN-3965: verification feedback delivery moved to verification-escalation, shared with the CI test gate.
+  'lib/cloister/verification-escalation.ts|outcome = await messageAgent(target.agentId, message, \'internal\', { owesRework: true, feedbackRedelivery: true });',
   // PAN-3705 follow-up: verification PASS is told to the work agent (no rework owed, no needs-you).
   'lib/cloister/verification-runner.ts|const outcome = await messageAgent(target.agentId, message, \'internal\');',
 ]);

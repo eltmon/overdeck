@@ -22,7 +22,17 @@ const mocks = vi.hoisted(() => ({
   prepareAutonomousAgentResumePane: vi.fn(async () => ({ ready: true, action: 'clear' })),
   waitForReadySignal: vi.fn(async () => true),
   killSession: vi.fn(() => Effect.succeed(undefined)),
+  closeAgentPane: vi.fn(async () => true),
 }));
+
+// PAN-3960: resume closes panes through the terminal backend, not tmux directly.
+vi.mock('../../terminal-backends/launch.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../terminal-backends/launch.js')>();
+  return {
+    ...actual,
+    closeAgentPane: mocks.closeAgentPane,
+  };
+});
 
 vi.mock('../spawn-prep.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../spawn-prep.js')>();
@@ -105,6 +115,7 @@ beforeEach(() => {
   mocks.prepareAutonomousAgentResumePane.mockResolvedValue({ ready: true, action: 'clear' });
   mocks.waitForReadySignal.mockResolvedValue(true);
   mocks.killSession.mockReturnValue(Effect.succeed(undefined));
+  mocks.closeAgentPane.mockResolvedValue(true);
 
   tempHome = mkdtempSync(join(tmpdir(), 'pan-resume-kimi-test-'));
   prevHome = process.env.HOME;
@@ -175,7 +186,8 @@ describe('resumeAgent — Claude resume-summary gate (PAN-3636)', () => {
     }));
     expect(mocks.prepareAutonomousAgentResumePane.mock.invocationCallOrder[0])
       .toBeLessThan(mocks.deliverResumeMessageWithTranscriptConfirmation.mock.invocationCallOrder[0]!);
-    expect(mocks.killSession).not.toHaveBeenCalled();
+    // Only the pre-launch zombie sweep — nothing tears the relaunched pane down.
+    expect(mocks.closeAgentPane).toHaveBeenCalledTimes(1);
   });
 
   it('tears down without injecting when a non-resume choice still owns the pane', async () => {
@@ -191,7 +203,9 @@ describe('resumeAgent — Claude resume-summary gate (PAN-3636)', () => {
     expect(result.success).toBe(false);
     expect(result.error).toContain('Resume continue prompt did not become a confirmed turn');
     expect(mocks.deliverResumeMessageWithTranscriptConfirmation).not.toHaveBeenCalled();
-    expect(mocks.killSession).toHaveBeenCalledWith(agentId);
+    // Pre-launch zombie sweep, then the teardown of the relaunched pane.
+    expect(mocks.closeAgentPane).toHaveBeenCalledTimes(2);
+    expect(mocks.closeAgentPane).toHaveBeenLastCalledWith(agentId);
   });
 });
 
@@ -264,6 +278,7 @@ describe('resumeAgent — native Kimi Code session resume (PAN-1837 review fix)'
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('Kimi Code continue prompt did not land');
-    expect(mocks.killSession).toHaveBeenCalledWith(agentId);
+    expect(mocks.closeAgentPane).toHaveBeenCalledTimes(2);
+    expect(mocks.closeAgentPane).toHaveBeenLastCalledWith(agentId);
   });
 });

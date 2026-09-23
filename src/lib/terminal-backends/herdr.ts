@@ -330,6 +330,41 @@ export async function findHerdrAgent(
 }
 
 /**
+ * The Herdr pane an Overdeck agent id occupies, whether or not anything still
+ * runs in it (PAN-3947).
+ *
+ * `findHerdrAgent` answers "is there a live agent" and so drops a pane whose
+ * shell is back at its prompt. Stopping an agent must close that residue too —
+ * otherwise the pane outlives every stop and blocks the next dispatch — so this
+ * lookup returns the pane by live agent name, then by its `agentId` token, with
+ * no foreground-process check. Null when Herdr holds no such pane or the socket
+ * did not answer.
+ */
+export async function findHerdrAgentPane(
+  agentName: string,
+  api: HerdrApiClient = getHerdrApiClient(),
+): Promise<{ readonly paneId: string; readonly terminalId: string; readonly workspaceId: string } | null> {
+  try {
+    const info = await api.call<{ agent?: HerdrPaneInfo }>(
+      'agent.get',
+      { target: agentName },
+      { timeoutMs: HERDR_PROBE_TIMEOUT_MS },
+    );
+    if (info.agent) {
+      return { paneId: info.agent.pane_id, terminalId: info.agent.terminal_id, workspaceId: info.agent.workspace_id };
+    }
+  } catch {
+    // Pane-bound agents have no Herdr agent record; the token scan finds them.
+  }
+  try {
+    const pane = await findAgentIdPane(agentName, api);
+    return pane ? { paneId: pane.pane_id, terminalId: pane.terminal_id, workspaceId: pane.workspace_id } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Transport codes: the request never reached a server answer. A probe that
  * hits one knows NOTHING about the agent — it must never report a death.
  */

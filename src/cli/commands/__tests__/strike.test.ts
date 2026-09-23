@@ -93,10 +93,44 @@ describe('strikeCommand', () => {
     expect(prompt).not.toContain('git rebase origin/main');
     expect(prompt).toContain('pan sync-main PAN-1234');
     expect(prompt).toContain('git push origin strike/pan-1234');
-    expect(prompt).toContain('pan strike-ready PAN-1234');
     expect(prompt).not.toContain('pan tell flywheel-orchestrator');
     // Strike must explicitly not call the normal review-pipeline form.
     expect(prompt).toContain('Do NOT call `pan done`');
+  });
+
+  // PAN-3973: nothing lands a pushed strike branch after the PAN-3917 cut, so
+  // the strike agent opens the PR itself and the operator merges it.
+  it('buildStrikePrompt tells the agent to open a PR that closes the GitHub issue', () => {
+    const prompt = __testInternals.buildStrikePrompt({
+      issueId: 'PAN-1234',
+      workspace: '/tmp/feature-pan-1234-strike',
+      branch: 'strike/pan-1234',
+      sessionName: 'strike-pan-1234',
+      projectRoot: '/tmp/project',
+      githubIssue: { repo: 'eltmon/overdeck', number: 1234 },
+    });
+    expect(prompt).toContain('gh pr create --base main --head strike/pan-1234 --repo eltmon/overdeck');
+    expect(prompt).toContain('Closes #1234');
+    expect(prompt).toMatch(/Print the pull request URL as your final message/);
+    expect(prompt).not.toMatch(/Deacon/);
+    expect(prompt).not.toContain('strike-ready');
+    expect(prompt).not.toMatch(/merge door/);
+    expect(prompt).toContain('Do NOT call `pan done`');
+  });
+
+  it('buildStrikePrompt references a non-GitHub issue without a closing keyword', () => {
+    const prompt = __testInternals.buildStrikePrompt({
+      issueId: 'MIN-42',
+      workspace: '/tmp/feature-min-42-strike',
+      branch: 'strike/min-42',
+      sessionName: 'strike-min-42',
+      projectRoot: '/tmp/project',
+    });
+    expect(prompt).toContain('gh pr create --base main --head strike/min-42 \\');
+    expect(prompt).not.toContain('--repo');
+    expect(prompt).not.toContain('Closes #');
+    expect(prompt).toContain('Issue: MIN-42');
+    expect(prompt).toContain('glab mr create --target-branch main --source-branch strike/min-42');
   });
 
   it('clears an idle prior strike session so the issue can be struck again', async () => {

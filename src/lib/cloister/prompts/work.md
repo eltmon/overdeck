@@ -304,7 +304,7 @@ writes.
 
 **You are NOT done until ALL of these are true:**
 
-1. **Tests pass** - Run the full test suite (`npm test` or equivalent)
+1. **Touched tests pass** - Run the tests for the files you changed or whose subjects you changed (`npx vitest run <test files you changed or whose subjects you changed>` for vitest). Do NOT run the full suite on the host — it runs on CI after `pan done`, and a red CI test job comes back to you as `VERIFICATION FAILED … Failed check: test`.
 2. **All changes committed** - `git status` shows "nothing to commit, working tree clean"
 3. **Pushed to remote** - `git push -u origin $(git branch --show-current)`
 
@@ -317,7 +317,7 @@ reporting failure. If there are genuinely no anomalies, say "No deviations." fir
 
 **Before declaring work complete, run these as BASH COMMANDS (using the Bash tool):**
 ```bash
-npm test                                         # Run tests
+npx vitest run <changed test files>              # Run only the tests you touched
 git add -A && git commit -m "feat: description"  # Commit ALL changes
 git push -u origin $(git branch --show-current)  # Push
 git status                                       # Must show "nothing to commit"
@@ -343,7 +343,7 @@ pan done {{ISSUE_ID}} -c "Brief summary"      # Signal completion — creates Gi
 {{#REMOTE}}
 When ALL tasks are complete:
 ```bash
-npm test
+npx vitest run <changed test files>   # only the tests you touched; the full suite runs on CI
 pan task done {{ISSUE_ID}} <item-id>   # complete every implemented item
 git add -A && git commit -m "feat: description"
 git push -u origin $(git branch --show-current)

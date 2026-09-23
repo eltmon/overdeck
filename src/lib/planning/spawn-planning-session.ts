@@ -3,11 +3,12 @@ import { materializeMuseContext } from '../runtimes/muse-context.js';
  * Spawn Planning Session — background workspace + agent setup
  *
  * Extracted from the old Express /api/issues/:id/start-planning handler.
- * Creates workspace, writes planning prompt, spawns Claude Code in tmux.
+ * Creates workspace, writes planning prompt, and launches the planning agent's
+ * pane through the host's terminal backend (`launchAgentPane`, PAN-3960).
  * Used by both the dashboard route and CLI.
  *
  * This runs as a background task after the API responds — the UI shows
- * "Waiting for session to start..." until the tmux session is ready.
+ * "Waiting for session to start..." until the pane is ready.
  */
 
 import { existsSync } from 'node:fs';
@@ -20,13 +21,13 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 import { extractTeamPrefix, findProjectByTeamSync, findProjectByPathSync } from '../projects.js';
 import {
-  sessionExists,
-  createSession,
-  killSession,
-  setOption,
-  exactPaneTarget,
-  buildTmuxCommandString,
-} from '../tmux.js';
+  closeAgentPane,
+  keepTmuxSessionOpen,
+  launchAgentPane,
+  prepareTmuxServer,
+  resolveLaunchBackend,
+} from '../terminal-backends/launch.js';
+import type { AgentPaneRef } from '../terminal-backends/types.js';
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
 import { deliverInitialPromptWithRetry, getAgentRuntimeBaseCommand, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath, saveAgentStateSync, getAgentStateSync } from '../agents.js';
@@ -176,35 +177,20 @@ export function buildPlanningAgentState(input: PlanningAgentStateInput): Record<
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-async function ensureTmuxRunning(): Promise<void> {
-  try {
-    const exists = await Effect.runPromise(sessionExists('overdeck-init'));
-    if (!exists) {
-      await Effect.runPromise(createSession('overdeck-init', homedir(), undefined));
-      console.log('Started tmux server');
-    }
-  } catch (startErr) {
-    console.error('Failed to start tmux server:', startErr);
-  }
-  // Strip env vars from tmux global environment that should NOT leak into
-  // agent sessions. The tmux server inherits the dashboard's process.env
-  // (which includes all of .overdeck.env), but agents should only receive
-  // explicitly-passed provider-specific vars via createSession().
-  const varsToStrip = [
-    'CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT',
-    'OPENAI_API_KEY', 'LINEAR_API_KEY', 'GITHUB_TOKEN',
-    'HUME_API_KEY', 'KIMI_API_KEY', 'KIMI_CODING_API_KEY', 'GOOGLE_API_KEY',
-    'MINIMAX_API_KEY', 'ZAI_API_KEY', 'MIMO_API_KEY',
-    'OPENROUTER_API_KEY', 'NOUS_API_KEY', 'DASHSCOPE_API_KEY',
-  ];
-  for (const envVar of varsToStrip) {
-    try {
-      await execAsync(`${buildTmuxCommandString(['set-environment', '-g', '-u', envVar])} 2>/dev/null`, { encoding: 'utf-8' });
-    } catch {
-      // Variable wasn't set — fine
-    }
-  }
-}
+/**
+ * Env vars stripped from the tmux server's global environment before a planning
+ * launch on tmux. The tmux server inherits the dashboard's process.env (which
+ * includes all of .overdeck.env), but agents should only receive the
+ * explicitly-passed provider-specific vars. Applied by `prepareTmuxServer`,
+ * which is a no-op on Herdr.
+ */
+const PLANNING_TMUX_GLOBAL_ENV_TO_UNSET = [
+  'CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT',
+  'OPENAI_API_KEY', 'LINEAR_API_KEY', 'GITHUB_TOKEN',
+  'HUME_API_KEY', 'KIMI_API_KEY', 'KIMI_CODING_API_KEY', 'GOOGLE_API_KEY',
+  'MINIMAX_API_KEY', 'ZAI_API_KEY', 'MIMO_API_KEY',
+  'OPENROUTER_API_KEY', 'NOUS_API_KEY', 'DASHSCOPE_API_KEY',
+] as const;
 
 // ─── Planning prompt builder ─────────────────────────────────────────────────
 
@@ -400,8 +386,11 @@ export function buildPlanningSessionEnv(startedBy: string): Record<string, strin
 /**
  * Spawn a planning agent session in the background.
  *
- * Creates workspace (if needed), writes planning prompt, and spawns Claude Code
- * in a tmux session. The agent state directory at ~/.overdeck/agents/<sessionName>/
+ * Creates workspace (if needed), writes planning prompt, and launches the
+ * planning agent through `launchAgentPane` on the host's terminal backend — a
+ * Herdr pane on a Herdr host, a tmux session on a tmux host — stamped with the
+ * `issue`, `role=plan`, `harness`, `model` tokens (PAN-3960). The agent state
+ * directory at ~/.overdeck/agents/<sessionName>/
  * must already exist with a preliminary state.json (status: 'starting').
  *
  * This function is designed to run as fire-and-forget after the API response
@@ -485,8 +474,8 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // ── Step 2: Prepare planning environment ──────────────────────────────
     progress(2, 'Preparing planning environment', '.overdeck/ workspace artifacts');
 
-    // Kill existing planning session if any
-    await Effect.runPromise(killSession(sessionName)).catch(() => {});
+    // Close an existing planning pane or session if any
+    await closeAgentPane(sessionName);
 
     const workspacePanPaths = await Effect.runPromise(ensureWorkspacePanDir(workspacePath));
     await Promise.all(
@@ -543,6 +532,9 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     // ── Step 4: Configure agent ─────────────────────────────────────────
     progress(4, 'Configuring agent', planningModel);
+
+    // PAN-3960: one backend answer for the launcher and the launch.
+    const launchBackend = await resolveLaunchBackend();
 
     let planningPrompt = await buildPlanningPrompt(issue, workspacePath, planningModel, effort, auto === true, probe === true, '', effectiveHarness);
     const memoryContext = await retrieveSpawnTimeMemoryContext({
@@ -616,7 +608,11 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         appendSystemPromptFiles: await claudePlanningSystemPromptFiles(workspacePath, effectiveHarness),
         trapHup: true,
         debugLog: '/tmp/pan-launcher-debug.log',
-        keepAlive: true,
+        // tmux only: the sleep loop keeps the session around for inspection.
+        // A Herdr pane outlives its process on its own, and a sleep loop in it
+        // would be a non-shell foreground process — the Herdr liveness probe
+        // would read a finished planner as alive forever.
+        keepAlive: launchBackend.name === 'tmux',
         ...piLauncherFields,
         ...codexLauncherFields,
         ...acpLauncherFields,
@@ -633,13 +629,30 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
 
     console.log(`[claude-invoke] purpose=planning-agent | model=${planningModel} | source=spawn-planning-session.ts | session=${sessionName} | command="bash '${launcherScript}'"`);
 
-    await ensureTmuxRunning();
-    const launchPlanningSession = () => Effect.runPromise(createSession(
-      sessionName,
-      workspacePath,
-      `bash '${launcherScript}'`,
-      { env: buildPlanningSessionEnv(startedBy) },
-    ));
+    await prepareTmuxServer(launchBackend, PLANNING_TMUX_GLOBAL_ENV_TO_UNSET);
+    // PAN-3960: the planner goes through the same launch path as every other
+    // agent — the issue workspace on the host's backend, stamped role=plan.
+    const launched: { pane: AgentPaneRef | null } = { pane: null };
+    const launchPlanningSession = async (): Promise<void> => {
+      launched.pane = await launchAgentPane({
+        issueId: issue.identifier,
+        cwd: workspacePath,
+        agentId: sessionName,
+        argv: ['bash', launcherScript],
+        env: {
+          ...buildPlanningSessionEnv(startedBy),
+          OVERDECK_AGENT_ID: sessionName,
+          OVERDECK_ISSUE_ID: issue.identifier,
+          OVERDECK_SESSION_TYPE: 'plan',
+        },
+        tokens: {
+          issue: issue.identifier,
+          role: 'plan',
+          harness: effectiveHarness,
+          model: planningModel,
+        },
+      }, launchBackend);
+    };
     if (behavior.launchCommandKind === 'kimi-code-tui') {
       try {
         await launchAndCaptureManagedKimiSession({
@@ -648,17 +661,16 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
           launch: launchPlanningSession,
         });
       } catch (error) {
-        await Effect.runPromise(killSession(sessionName)).catch(() => {});
+        await closeAgentPane(sessionName);
         throw error;
       }
     } else {
       await launchPlanningSession();
     }
-    // Protect the session from being destroyed when clients disconnect.
+    // Protect a tmux session from being destroyed when clients disconnect.
     // When the dashboard's WebSocket terminal attaches and then detaches,
-    // tmux can destroy the session if destroy-unattached is on.
-    await Effect.runPromise(setOption(sessionName, 'destroy-unattached', 'off'));
-    await Effect.runPromise(setOption(exactPaneTarget(sessionName), 'remain-on-exit', 'on'));
+    // tmux can destroy the session if destroy-unattached is on. No-op on Herdr.
+    await keepTmuxSessionOpen(launched.pane);
 
     // NOTE: No pre-resize of tmux window here. The WebSocket terminal handler
     // defers PTY spawn until the client sends its actual dimensions, so the
@@ -678,6 +690,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         harness: effectiveHarness,
         auto: auto === true,
         startedBy,
+        ...(launched.pane ? { backend: launched.pane.backend, paneId: launched.pane.paneId } : {}),
       });
     }
 
@@ -690,7 +703,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       if (!delivery.ok) {
         const errorMsg = `${behavior.displayName} planning kickoff prompt delivery failed: ${delivery.failure ?? 'unknown error'}`;
         console.error(`[start-planning] ${errorMsg}`);
-        await Effect.runPromise(killSession(sessionName)).catch(() => {});
+        await closeAgentPane(sessionName);
         const existingErrState = getAgentStateSync(sessionName);
         if (existingErrState) saveAgentStateSync({ ...existingErrState, status: 'error' });
         progress(5, 'Launching planning session', errorMsg, 'error');

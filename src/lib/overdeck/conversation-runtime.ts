@@ -318,7 +318,7 @@ export async function waitForConversationRuntimeReady(tmuxSession: string, harne
     return;
   }
   if (harness === 'acp' || harness === 'opencode') {
-    await waitForAcpHostReady(tmuxSession);
+    await waitForAcpHostReady(tmuxSession, 30, { sessionExists: tmuxSessionExists }); // conversations are tmux on every host until PAN-3921
     return;
   }
   const transcriptKind = getHarnessBehavior(harness).transcriptKind;

@@ -41,8 +41,9 @@ faithfully follows a flawed spec. Keep speculative future changes and optional
 hardening advisory; a clean report is valid. Deduplicate by root cause/trigger.
 
 Use existing successful verification tied to the exact HEAD when available.
-Otherwise run focused checks to answer a specific uncertainty, not a repeated
-full suite. Isolated scratch probes may use a temporary directory; do not edit
+Never run the full test suite; it runs on CI against the PR head — read it
+with `gh pr checks <pr-number>`. Otherwise run focused checks to answer a
+specific uncertainty. Isolated scratch probes may use a temporary directory; do not edit
 tracked files or use live operator state as fixtures. Record checks not run.
 Use fake timers for synthetic delays and retries.
 

@@ -15,7 +15,8 @@
 import { Effect } from 'effect';
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js';
 import { GitHubApiError } from './errors.js';
-import { relayCiFailureFeedback } from './cloister/ci-failure-feedback.js';
+import { recordCiTestGatePass, relayCiFailureFeedback } from './cloister/ci-failure-feedback.js';
+import { isCiTestCheckName } from './cloister/verification-tests-mode.js';
 import { getPrFacts } from './cloister/pr-facts.js';
 import { bumpIssuePrTabCacheGeneration } from '../dashboard/server/services/pr-tab-cache.js';
 import { ADVISORY_CHECK_NAMES, isAdvisoryCheckName } from './advisory-checks.js';
@@ -224,6 +225,10 @@ async function handleCheckRunPromise(payload: WebhookPayload): Promise<void> {
           source: sourceKey,
         }));
       }
+    } else if (run.conclusion?.toUpperCase() === 'SUCCESS' && isCiTestCheckName(run.name) && pr.head.sha) {
+      // PAN-3965: a green CI test job resets the verification attempt count
+      // for a `verification.tests: ci` project (a no-op for any other project).
+      await Effect.runPromise(recordCiTestGatePass({ issueId, headSha: pr.head.sha, source: sourceKey }));
     }
   }
 }

@@ -36,6 +36,8 @@ import { ensurePlaywrightIsolationSync, ensureExcalidrawMcpSync } from '../../li
 import { resolveProjectContextFile } from '../../lib/context-layers/layers.js';
 import { provisionClaudeHooks } from '../../lib/claude-hooks-provision.js';
 import { provisionClaudePlugins } from '../../lib/claude-plugins-provision.js';
+import { ensureHerdr } from '../../lib/herdr-setup/ensure.js';
+import { renderHerdrReport } from '../herdr-report.js';
 
 // Bundled git hooks distributed to registered projects (PAN-1201: sync-sources/).
 const BUNDLED_GIT_HOOKS_DIR = SYNC_SOURCES.gitHooks;
@@ -224,6 +226,8 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
         console.log(`  ${chalk.yellow('◆')} ${name} ${chalk.dim('(running session)')}`);
       }
     }
+
+    console.log(chalk.cyan('Herdr: would install/verify binary, config, session server, integrations'));
 
     console.log('');
     console.log(chalk.dim('Run without --dry-run to apply changes.'));
@@ -433,6 +437,17 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     pluginSpinner.info('Claude Code plugins already installed');
   } else {
     pluginSpinner.info('No bundled Claude Code plugins declared');
+  }
+
+  // PAN-3956: Herdr is the default terminal backend. Keep its binary, config
+  // (resume_agents_on_restore = false), session server and pilot
+  // integrations in place. Updates the binary only when no session server
+  // runs for this home; never restarts one.
+  const herdrSpinner = ora('Verifying Herdr terminal backend...').start();
+  try {
+    renderHerdrReport(herdrSpinner, await timeAsync('herdr', () => ensureHerdr({ mode: 'sync' })));
+  } catch (error) {
+    herdrSpinner.warn(`Herdr verification failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   const projects = listProjectsSync();

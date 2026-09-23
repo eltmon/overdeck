@@ -42,7 +42,7 @@ import {
 async function loadTerminalBackendConfig(): Promise<{ terminal?: { backend?: 'herdr' | 'tmux' } }> {
   try {
     const { loadConfigSync } = await import('../config-yaml.js');
-    return loadConfigSync() as { terminal?: { backend?: 'herdr' | 'tmux' } };
+    return loadConfigSync().config as { terminal?: { backend?: 'herdr' | 'tmux' } };
   } catch {
     return {};
   }
@@ -68,9 +68,8 @@ async function isHostBackedTarget(state: AgentState | null): Promise<boolean> {
 
 /**
  * Which backend this host delivers through. Resolved once per process: the
- * answer is a property of the host (binary plus socket, or an explicit
- * `terminal.backend`), not of the message, and a probe per delivery would put
- * filesystem work on every message's hot path.
+ * answer is the host's policy (env, `terminal.backend`, default herdr —
+ * PAN-3956), not a property of the message.
  */
 let backendSelection: Promise<'herdr' | 'tmux'> | null = null;
 
@@ -78,7 +77,7 @@ function deliveryBackendName(): Promise<'herdr' | 'tmux'> {
   backendSelection ??= loadTerminalBackendConfig()
     .then((config) => selectTerminalBackend(config))
     .then((selection) => selection.backend)
-    .catch(() => 'tmux' as const);
+    .catch(() => 'herdr' as const);
   return backendSelection;
 }
 

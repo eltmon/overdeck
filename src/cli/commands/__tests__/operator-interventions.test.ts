@@ -6,7 +6,7 @@ const agentMocks = vi.hoisted(() => ({
   clearAgentPausedSync: vi.fn(),
   clearAgentTroubledSync: vi.fn(),
   setAgentPausedSync: vi.fn(),
-  stopAgentSync: vi.fn(),
+  stopAgent: vi.fn(),
 }));
 
 const tmuxMocks = vi.hoisted(() => ({
@@ -69,7 +69,7 @@ vi.mock('../../../lib/agents.js', () => {
     clearAgentPausedSync: agentMocks.clearAgentPausedSync,
     clearAgentTroubledSync: agentMocks.clearAgentTroubledSync,
     setAgentPausedSync: agentMocks.setAgentPausedSync,
-    stopAgentSync: agentMocks.stopAgentSync,
+    stopAgent: agentMocks.stopAgent,
     isQualifiedAgentId,
     normalizeAgentId: (id: string) => (isQualifiedAgentId(id) ? id : `agent-${id.toLowerCase()}`),
     resolveAgentTargetSync: (input: string) => {
@@ -79,6 +79,12 @@ vi.mock('../../../lib/agents.js', () => {
     },
   };
 });
+
+// PAN-3947: pan kill/pause probe liveness through the terminal backend;
+// the fake mirrors the tmux session mock so each case sets liveness once.
+vi.mock('../../../lib/terminal-backends/launch.js', () => ({
+  agentPaneExists: vi.fn(async (id: string) => (tmuxMocks.sessionExistsSync as (name: string) => boolean)(id)),
+}));
 
 vi.mock('../../../lib/tmux.js', () => ({
   sessionExistsSync: tmuxMocks.sessionExistsSync,
@@ -146,7 +152,8 @@ describe('operator intervention CLI emission', () => {
     agentMocks.clearAgentPausedSync.mockReset();
     agentMocks.clearAgentTroubledSync.mockReset();
     agentMocks.setAgentPausedSync.mockReset();
-    agentMocks.stopAgentSync.mockReset();
+    agentMocks.stopAgent.mockReset();
+    agentMocks.stopAgent.mockReturnValue(Effect.void);
     tmuxMocks.sessionExistsSync.mockReset();
     remoteMocks.isRemoteAvailable.mockReset();
     remoteMocks.killRemoteAgent.mockReset();
@@ -207,7 +214,7 @@ describe('operator intervention CLI emission', () => {
     const { killCommand } = await import('../kill.js');
     await killCommand('PAN-2', {});
 
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('agent-pan-2', 'operator');
+    expect(agentMocks.stopAgent).toHaveBeenCalledWith('agent-pan-2', 'operator');
     expect(interventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith({
       issueId: 'PAN-2',
       kind: 'pause',

@@ -2,8 +2,8 @@ import { exitCli } from '../exit.js';
 import { existsSync, readdirSync } from 'fs';
 import { Effect } from 'effect';
 import chalk from 'chalk';
-import { stopAgentSync, getAgentStateSync, isQualifiedAgentId } from '../../lib/agents.js';
-import { sessionExistsSync } from '../../lib/tmux.js';
+import { stopAgent, getAgentStateSync, isQualifiedAgentId } from '../../lib/agents.js';
+import { agentPaneExists } from '../../lib/terminal-backends/launch.js';
 import { isRemoteAvailable } from '../../lib/remote/index.js';
 import { killRemoteAgent, loadRemoteAgentState } from '../../lib/remote/remote-agents.js';
 import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
@@ -53,6 +53,19 @@ function findAgentIdsForIssue(issueLower: string): string[] {
   );
 }
 
+/**
+ * Does the agent have a live terminal on this host's backend? On tmux that is
+ * its session; on Herdr, its pane (PAN-3947). A probe failure reads as "no" —
+ * the same answer `sessionExistsSync` gave on a host with no tmux server.
+ */
+async function hasLivePane(agentId: string): Promise<boolean> {
+  try {
+    return await agentPaneExists(agentId);
+  } catch {
+    return false;
+  }
+}
+
 export async function killCommand(id: string, options: KillOptions): Promise<void> {
   let issueId: string;
   let agentIds: string[];
@@ -77,12 +90,12 @@ export async function killCommand(id: string, options: KillOptions): Promise<voi
 
     // Discover every agent tied to this issue (work + plan + pipeline specialists
     // + swarm slots + strike/inspect). Fall back to the canonical work-agent name
-    // if disk scan turns up empty so callers can still kill a tmux-only session.
+    // if disk scan turns up empty so callers can still kill a pane-only agent.
     const discovered = findAgentIdsForIssue(issueLower);
     const workCanonical = `agent-${issueLower}`;
     agentIds = discovered.length > 0
       ? discovered
-      : (sessionExistsSync(workCanonical) ? [workCanonical] : []);
+      : ((await hasLivePane(workCanonical)) ? [workCanonical] : []);
   }
 
   if (agentIds.length === 0) {
@@ -101,7 +114,7 @@ export async function killCommand(id: string, options: KillOptions): Promise<voi
     // Remote (fly.io) agents persist remote-state.json, not state.json —
     // without this fallback the remote teardown branch below never fires.
     const state = (getAgentStateSync(agentId) ?? loadRemoteAgentState(agentId)) as any;
-    const isRunning = sessionExistsSync(agentId);
+    const isRunning = await hasLivePane(agentId);
 
     if (!state && !isRunning) {
       console.log(chalk.gray(`  ${agentId}: nothing to do`));
@@ -133,7 +146,10 @@ export async function killCommand(id: string, options: KillOptions): Promise<voi
     }
 
     try {
-      stopAgentSync(agentId, 'operator');
+      // PAN-3947: the async stop terminates through the terminal backend —
+      // `kill-session` on tmux, `pane.close` on Herdr. The sync variant could
+      // only reach tmux, so on a Herdr host the pane and its harness survived.
+      await Effect.runPromise(stopAgent(agentId, 'operator'));
       killedAny = true;
       console.log(chalk.green(`  ${agentId}: killed`));
     } catch (error: any) {
@@ -159,11 +175,13 @@ export async function killCommand(id: string, options: KillOptions): Promise<voi
   // not tear down a compose stack that sibling agents of the same issue are
   // still using — the teardown above was written for the issue-wide path, which
   // kills every discovered agent and therefore has no live siblings left.
-  // Session existence is the operative liveness fact here; state.json status is
-  // known to drift.
+  // A live terminal (tmux session or Herdr pane) is the operative liveness fact
+  // here; state.json status is known to drift.
   const killedSet = new Set(agentIds);
-  const liveSiblings = findAgentIdsForIssue(lower)
-    .filter(siblingId => !killedSet.has(siblingId) && sessionExistsSync(siblingId));
+  const liveSiblings: string[] = [];
+  for (const siblingId of findAgentIdsForIssue(lower)) {
+    if (!killedSet.has(siblingId) && await hasLivePane(siblingId)) liveSiblings.push(siblingId);
+  }
   if (liveSiblings.length > 0) {
     console.log(chalk.gray(
       `Skipping Docker teardown: ${liveSiblings.length} live sibling agent(s) (${liveSiblings.join(', ')}) still using this workspace`,

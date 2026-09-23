@@ -41,7 +41,6 @@ import { httpHandler } from '../http-handler.js';
 import { _serverManagedMerges } from '../specialists.js';
 import { completePendingOperation, getPendingOperation, getProjectPath, getWorkspaceInfoForIssue, readJsonBody, setPendingOperation } from '../workspaces.js';
 import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
-import { internalStrikeMergeRoute } from './internal-strike-merge.js';
 import { postInternalPipelineNotifyRoute } from './internal-pipeline-notify.js';
 import { activeStrikeMerge, advanceMergeQueue, mergeVerificationOptions, normalMergeEligibility, prepareWorkAgentForRebase, readStrikeHead, rebaseWithAgentFallback, validateStrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
 const execAsync = promisify(exec);
@@ -931,7 +930,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     } else {
       const agentId = request.kind === 'strike' ? request.recoveryTarget : `agent-${issueId.toLowerCase()}`;
       const rebaseMsg = request.kind === 'strike'
-        ? `STRIKE LANDING REQUEST: Rebase ${branchName} onto ${targetBranch}, resolve conflicts, run the full quality gates, push ${branchName}, then run pan strike-ready ${issueId} to persist the new HEAD. Do NOT merge or push main.`
+        ? `STRIKE LANDING REQUEST: Rebase ${branchName} onto ${targetBranch}, resolve conflicts, run the full quality gates, and push ${branchName}. Do NOT merge or push main.`
         : `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Please rebase onto ${targetBranch} and push:\n\n1. git fetch origin ${targetBranch}\n2. git rebase origin/${targetBranch}\n3. If conflicts: resolve them, git add, git rebase --continue\n4. git push --force-with-lease\n\nAfter pushing, the server will handle verification and merge automatically. Do NOT run gh pr merge yourself.`;
 
       setStatus(issueId, { step: 'rebasing' });
@@ -1227,8 +1226,6 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
 }
 
 setMergeQueueAdvanceHandler((projectKey) => dequeueNextMerge(projectKey));
-
-const postInternalStrikeMergeRoute = internalStrikeMergeRoute(triggerMerge);
 
 // ─── Route: POST /api/issues/:issueId/merge ───────────────────────────────
 const postWorkspaceMergeRoute = HttpRouter.add(
@@ -1787,7 +1784,6 @@ export const mergeOpsRouteLayer = Layer.mergeAll(
   postForgeMergeRoute,
   postWorkspaceApproveRoute,
   getMergeQueueRoute,
-  postInternalStrikeMergeRoute,
   postInternalPipelineNotifyRoute,
 );
 

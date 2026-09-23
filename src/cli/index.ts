@@ -534,7 +534,7 @@ program
 
 program
   .command('strike <ids...>')
-  .description('Spawn strike agent(s) — implement and push a strike branch for Deacon to land through the verified merge door. Bypasses plan/review/test/ship.')
+  .description('Spawn strike agent(s) — implement a fix on a strike branch and open a PR against main for the operator to merge. Bypasses plan/review/test/ship.')
   .option('--model <model>', 'Model override (defaults to roles.strike.model from config)')
   .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex | acp | kimi-code | opencode | muse (defaults to role/provider settings)')
   .option('--effort <level>', 'Strike effort: low | medium | high | xhigh | max (default high)')

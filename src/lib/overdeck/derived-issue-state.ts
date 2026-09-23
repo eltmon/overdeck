@@ -550,7 +550,6 @@ export function paneFromBackendSnapshot(
 async function listPanesWithBackend(now: number): Promise<readonly BackendPane[]> {
   const { Effect } = await import('effect');
   const { resolveLaunchBackend } = await import('../terminal-backends/launch.js');
-  const { resolveTerminalBackend } = await import('../terminal-backends/registry.js');
 
   const read = async (backend: TerminalBackend): Promise<readonly BackendPane[] | null> => {
     const snapshots = await Effect.runPromise(
@@ -564,10 +563,9 @@ async function listPanesWithBackend(now: number): Promise<readonly BackendPane[]
     const backend = await resolveLaunchBackend();
     const panes = await read(backend);
     if (panes) return panes;
-    // The selected backend could not answer — tmux still owns whatever sessions
-    // are running, so its inventory is the fallback (`launch.js` registered it).
-    if (backend.name === 'tmux') return [];
-    return (await read(resolveTerminalBackend('tmux'))) ?? [];
+    // PAN-3956 D8: a Herdr host never reads tmux as a fallback inventory —
+    // an unreadable Herdr is "no panes known", not whatever tmux happens to hold.
+    return [];
   } catch {
     return [];
   }
