@@ -87,11 +87,12 @@ export async function flywheelStopCommand(options: FlywheelStopOptions = {}): Pr
       process.exitCode = 1;
       return;
     }
-    console.log(chalk.dim('Asking the loop to write .pan/flywheel/report.md…'));
-    const { reportWritten } = await stopFlywheel(timeoutMs !== undefined ? { timeoutMs } : {});
-    console.log(reportWritten
-      ? chalk.green('✓ Report written. Flywheel paused (row and transcript kept).')
-      : chalk.yellow('No report within the timeout. Flywheel paused anyway (row and transcript kept).'));
+    console.log(chalk.dim('Asking the loop to write, commit, and push .pan/flywheel/report.md…'));
+    const { reportWritten, stopped } = await stopFlywheel(timeoutMs !== undefined ? { timeoutMs } : {});
+    console.log(stopped
+      ? chalk.green('✓ The loop confirmed its stop. Flywheel paused (row and transcript kept).')
+      : chalk.yellow('The loop did not confirm its stop within the timeout. Flywheel paused anyway (row and transcript kept).'));
+    if (!reportWritten) console.log(chalk.dim('  .pan/flywheel/report.md was not updated.'));
   });
 }
 

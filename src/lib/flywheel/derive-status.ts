@@ -86,7 +86,8 @@ async function defaultSessionAlive(tmuxSession: string): Promise<boolean> {
   return Effect.runPromise(sessionExists(tmuxSession));
 }
 
-async function defaultReadTranscript(conv: LegacyConversation): Promise<readonly TickMarkerMessage[]> {
+/** The flywheel transcript as parsed messages (lazy default for `readTranscript`). */
+export async function readFlywheelTranscript(conv: LegacyConversation): Promise<readonly TickMarkerMessage[]> {
   const { resolveSessionFile, getCachedMessages } = await import('../overdeck/conversation-reads.js');
   const file = await resolveSessionFile(conv);
   if (!file) return [];
@@ -158,12 +159,14 @@ export interface FlywheelRunRead {
 /**
  * The run-state predicate, shared by the deriver and the actions (D5):
  * `running` = row, `active`, not mid-fork, session alive; `paused` = a row
- * that is not running (stopped, crashed, or ended); `idle` = no row.
+ * that is not running (stopped, crashed, or ended); `idle` = no row, or an
+ * archived one (a failed start is rolled back by archiving its row).
  */
 export async function readFlywheelRun(
   deps: Pick<DeriveFlywheelStatusDeps, 'getConversation' | 'sessionAlive'> = {},
 ): Promise<FlywheelRunRead> {
-  const conv = await (deps.getConversation ?? defaultGetConversation)(FLYWHEEL_CONVERSATION_SESSION);
+  const row = await (deps.getConversation ?? defaultGetConversation)(FLYWHEEL_CONVERSATION_SESSION);
+  const conv = row && !row.archivedAt ? row : null;
   const sessionAlive = conv
     ? conv.status === 'active' && !conv.forkStatus && await (deps.sessionAlive ?? defaultSessionAlive)(conv.tmuxSession)
     : false;
@@ -206,7 +209,7 @@ export async function deriveFlywheelStatus(options: DeriveFlywheelStatusOptions 
       }
     : null;
 
-  const messages = conv ? await (deps.readTranscript ?? defaultReadTranscript)(conv) : [];
+  const messages = conv ? await (deps.readTranscript ?? readFlywheelTranscript)(conv) : [];
   const lastTick = findLastTick(messages);
 
   const { projectRoot, planHome } = await resolveRoots(conv?.cwd ?? options.projectRoot ?? process.cwd(), deps);

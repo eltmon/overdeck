@@ -23,7 +23,12 @@ import {
   type FlywheelStartOptions,
 } from '../../../lib/flywheel/actions.js';
 import { deriveFlywheelStatus, readFlywheelRun, resolveFlywheelProjectRoot } from '../../../lib/flywheel/derive-status.js';
-import { FlywheelAlreadyRunning, FlywheelNotRunning, FlywheelPausedExists } from '../../../lib/flywheel/errors.js';
+import {
+  FlywheelAlreadyRunning,
+  FlywheelNotRunning,
+  FlywheelOrphanSession,
+  FlywheelPausedExists,
+} from '../../../lib/flywheel/errors.js';
 import { readFlywheelReportFile, readFlywheelStateFile } from '../../../lib/flywheel/files.js';
 import { computeSubstrateStats } from '../../../lib/flywheel/substrate-stats.js';
 import { jsonResponse } from '../http-helpers.js';
@@ -58,7 +63,7 @@ const readJsonBody = Effect.gen(function* () {
 
 /** Typed flywheel errors → 409/404; anything else → 500 with its message. */
 export function flywheelErrorResult(error: unknown): RouteResult {
-  if (error instanceof FlywheelAlreadyRunning || error instanceof FlywheelPausedExists) {
+  if (error instanceof FlywheelAlreadyRunning || error instanceof FlywheelPausedExists || error instanceof FlywheelOrphanSession) {
     return { status: 409, body: { error: error.message, code: error._tag } };
   }
   if (error instanceof FlywheelNotRunning) return { status: 404, body: { error: error.message, code: error._tag } };

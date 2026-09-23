@@ -45,7 +45,7 @@ vi.mock('../../../../lib/flywheel/actions.js', () => ({
 }));
 
 const { flywheelRouteLayer } = await import('../flywheel.js');
-const { FlywheelAlreadyRunning, FlywheelNotRunning, FlywheelPausedExists } = await import('../../../../lib/flywheel/errors.js');
+const { FlywheelAlreadyRunning, FlywheelNotRunning, FlywheelOrphanSession, FlywheelPausedExists } = await import('../../../../lib/flywheel/errors.js');
 
 interface RouteResult {
   status: number;
@@ -131,6 +131,8 @@ describe('/api/flywheel routes (PAN-3964 FR-7)', () => {
     expect((await request('/api/flywheel/start', trustedPost())).status).toBe(409);
     mocks.startFlywheel.mockRejectedValue(new FlywheelPausedExists());
     expect((await request('/api/flywheel/start', trustedPost())).status).toBe(409);
+    mocks.startFlywheel.mockRejectedValue(new FlywheelOrphanSession());
+    expect((await request('/api/flywheel/start', trustedPost())).status).toBe(409);
     expect((await request('/api/flywheel/start', trustedPost({ fresh: 'yes' }))).status).toBe(400);
   });
 
@@ -147,7 +149,7 @@ describe('/api/flywheel routes (PAN-3964 FR-7)', () => {
 
   it('POST /stop answers 202 and runs the graceful stop in the background', async () => {
     mocks.readFlywheelRun.mockResolvedValue({ run: 'running' });
-    mocks.stopFlywheel.mockResolvedValue({ reportWritten: true });
+    mocks.stopFlywheel.mockResolvedValue({ reportWritten: true, stopped: true });
     await expect(request('/api/flywheel/stop', trustedPost({ timeoutMs: 1000 }))).resolves.toEqual({ status: 202, body: { stopping: true } });
     expect(mocks.stopFlywheel).toHaveBeenCalledWith({ timeoutMs: 1000 });
 

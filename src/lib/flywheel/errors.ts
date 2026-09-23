@@ -1,7 +1,8 @@
 /**
  * Typed flywheel action errors (PAN-3964 FR-5). The CLI maps each to exit 1
- * with its message; the routes map `FlywheelAlreadyRunning` and
- * `FlywheelPausedExists` to 409 and `FlywheelNotRunning` to 404.
+ * with its message; the routes map `FlywheelAlreadyRunning`,
+ * `FlywheelPausedExists`, and `FlywheelOrphanSession` to 409 and
+ * `FlywheelNotRunning` to 404.
  */
 
 import { FLYWHEEL_CONVERSATION_SESSION } from './constants.js';
@@ -22,6 +23,14 @@ export class FlywheelPausedExists extends Error {
   }
 }
 
+export class FlywheelOrphanSession extends Error {
+  readonly _tag = 'FlywheelOrphanSession';
+  constructor() {
+    super(`A ${FLYWHEEL_CONVERSATION_SESSION} session is up with no flywheel conversation — \`pan flywheel start --fresh\` replaces it`);
+    this.name = 'FlywheelOrphanSession';
+  }
+}
+
 export class FlywheelNotRunning extends Error {
   readonly _tag = 'FlywheelNotRunning';
   constructor(message = 'The flywheel is not running') {
@@ -30,8 +39,9 @@ export class FlywheelNotRunning extends Error {
   }
 }
 
-export type FlywheelActionError = FlywheelAlreadyRunning | FlywheelPausedExists | FlywheelNotRunning;
+export type FlywheelActionError = FlywheelAlreadyRunning | FlywheelPausedExists | FlywheelOrphanSession | FlywheelNotRunning;
 
 export function isFlywheelActionError(error: unknown): error is FlywheelActionError {
-  return error instanceof FlywheelAlreadyRunning || error instanceof FlywheelPausedExists || error instanceof FlywheelNotRunning;
+  return error instanceof FlywheelAlreadyRunning || error instanceof FlywheelPausedExists
+    || error instanceof FlywheelOrphanSession || error instanceof FlywheelNotRunning;
 }

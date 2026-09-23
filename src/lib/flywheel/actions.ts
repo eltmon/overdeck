@@ -17,9 +17,15 @@ import { randomUUID } from 'node:crypto';
 import type { LegacyConversation } from '../overdeck/conversations.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { FLYWHEEL_CONVERSATION_SESSION, FLYWHEEL_SKILL_COMMAND } from './constants.js';
-import { readFlywheelRun, type DeriveFlywheelStatusDeps } from './derive-status.js';
-import { FlywheelAlreadyRunning, FlywheelNotRunning, FlywheelPausedExists } from './errors.js';
+import {
+  readFlywheelRun,
+  readFlywheelTranscript,
+  resolveFlywheelProjectRoot,
+  type DeriveFlywheelStatusDeps,
+} from './derive-status.js';
+import { FlywheelAlreadyRunning, FlywheelNotRunning, FlywheelOrphanSession, FlywheelPausedExists } from './errors.js';
 import { readFlywheelReportFile, type FlywheelFilePayload } from './files.js';
+import { findLastTick } from './tick-marker.js';
 
 export const FLYWHEEL_REPORT_REQUEST =
   'Write your run report to .pan/flywheel/report.md now (what shipped, what is in flight, what is parked, substrate fixes this run), '
@@ -53,9 +59,14 @@ export interface FlywheelStartResult {
 interface HandlerResult {
   status: number;
   error?: string;
+  /** Resume found the harness already alive and only re-attached. */
+  reattached?: boolean;
 }
 
-export interface FlywheelActionDeps extends Pick<DeriveFlywheelStatusDeps, 'getConversation' | 'sessionAlive'> {
+export interface FlywheelActionDeps extends Pick<
+  DeriveFlywheelStatusDeps,
+  'getConversation' | 'sessionAlive' | 'readTranscript' | 'resolveProjectPath' | 'resolvePlanHome'
+> {
   /** Raw tmux session probe — true even for a row-less orphan session. */
   tmuxSessionExists?: (session: string) => Promise<boolean>;
   killSession?: (session: string) => Promise<void>;
@@ -71,9 +82,10 @@ export interface FlywheelActionDeps extends Pick<DeriveFlywheelStatusDeps, 'getC
   /** Paste a message and submit it. */
   sendMessage?: (session: string, message: string, caller: string) => Promise<void>;
   stopConversation?: (name: string) => Promise<HandlerResult>;
+  /** Undo a start that failed after its conversation row was written. */
+  rollbackStart?: (name: string) => Promise<void>;
   resumeConversation?: (name: string) => Promise<HandlerResult>;
   readReport?: (planHome: string) => Promise<FlywheelFilePayload>;
-  resolvePlanHome?: (dir: string) => string | Promise<string>;
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
 }
@@ -129,13 +141,17 @@ async function defaultSendMessage(session: string, message: string, caller: stri
 }
 
 async function handlerResult(response: import('effect/unstable/http').HttpServerResponse.HttpServerResponse): Promise<HandlerResult> {
-  if (response.status < 400) return { status: response.status };
   try {
     const { HttpServerResponse } = await import('effect/unstable/http');
-    const parsed = JSON.parse(await HttpServerResponse.toWeb(response).text()) as { error?: unknown };
-    if (typeof parsed.error === 'string') return { status: response.status, error: parsed.error };
-  } catch { /* keep the status */ }
-  return { status: response.status };
+    const parsed = JSON.parse(await HttpServerResponse.toWeb(response).text()) as { error?: unknown; reattached?: unknown };
+    return {
+      status: response.status,
+      ...(typeof parsed.error === 'string' ? { error: parsed.error } : {}),
+      ...(parsed.reattached === true ? { reattached: true } : {}),
+    };
+  } catch {
+    return { status: response.status };
+  }
 }
 
 async function defaultStopConversation(name: string): Promise<HandlerResult> {
@@ -153,9 +169,15 @@ async function defaultResumeConversation(name: string): Promise<HandlerResult> {
   return handlerResult(await handleConversationResume(name, { sendResumeContract: false }, { resolveSessionFile }));
 }
 
-async function defaultResolvePlanHome(dir: string): Promise<string> {
-  const { resolvePlanHome } = await import('../pan-dir/paths.js');
-  return resolvePlanHome(dir);
+async function defaultRollbackStart(name: string): Promise<void> {
+  const [{ getConversationByName, markConversationEnded, archiveConversation }, { stopConversationRuntime }] = await Promise.all([
+    import('../overdeck/conversations.js'),
+    import('../overdeck/conversation-runtime.js'),
+  ]);
+  const conv = getConversationByName(name);
+  if (conv) await stopConversationRuntime(conv, name);
+  markConversationEnded(name);
+  archiveConversation(name);
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -176,7 +198,7 @@ export async function startFlywheel(opts: FlywheelStartOptions = {}, deps: Flywh
   if (orphanSession) {
     // A session without a running row: an ended row whose idle harness stayed
     // up (paused + --fresh), or a row-less orphan. Only --fresh may replace it.
-    if (!opts.fresh) throw new FlywheelAlreadyRunning();
+    if (!opts.fresh) throw new FlywheelOrphanSession();
     await (deps.killSession ?? defaultKillSession)(FLYWHEEL_CONVERSATION_SESSION);
   }
 
@@ -199,14 +221,22 @@ export async function startFlywheel(opts: FlywheelStartOptions = {}, deps: Flywh
     harness,
   });
 
-  await (deps.spawnSession ?? defaultSpawnSession)(FLYWHEEL_CONVERSATION_SESSION, cwd, claudeSessionId, model, harness);
-  await (deps.waitReady ?? defaultWaitReady)(FLYWHEEL_CONVERSATION_SESSION, harness, 'spawn');
-
   // The loop is the skill. Hand it the slash command and let it run.
   const prompt = opts.orders ? `${FLYWHEEL_SKILL_COMMAND} ${opts.orders}` : FLYWHEEL_SKILL_COMMAND;
-  const sendKeys = deps.sendKeys ?? defaultSendKeys;
-  await sendKeys(FLYWHEEL_CONVERSATION_SESSION, prompt, 'pan flywheel start');
-  await sendKeys(FLYWHEEL_CONVERSATION_SESSION, 'Enter', 'pan flywheel start');
+  try {
+    await (deps.spawnSession ?? defaultSpawnSession)(FLYWHEEL_CONVERSATION_SESSION, cwd, claudeSessionId, model, harness);
+    await (deps.waitReady ?? defaultWaitReady)(FLYWHEEL_CONVERSATION_SESSION, harness, 'spawn');
+    const sendKeys = deps.sendKeys ?? defaultSendKeys;
+    await sendKeys(FLYWHEEL_CONVERSATION_SESSION, prompt, 'pan flywheel start');
+    await sendKeys(FLYWHEEL_CONVERSATION_SESSION, 'Enter', 'pan flywheel start');
+  } catch (error) {
+    // A start that never reached the loop must not leave a row that reads as
+    // `paused` (which would demand --fresh) or a half-started session.
+    await (deps.rollbackStart ?? defaultRollbackStart)(FLYWHEEL_CONVERSATION_SESSION).catch((rollbackError: unknown) => {
+      console.warn('[flywheel] start rollback failed:', rollbackError instanceof Error ? rollbackError.message : String(rollbackError));
+    });
+    throw error;
+  }
 
   return { session: FLYWHEEL_CONVERSATION_SESSION, harness, model, prompt, cwd };
 }
@@ -231,6 +261,9 @@ export async function resumeFlywheel(deps: FlywheelActionDeps = {}): Promise<{ s
   const result = await (deps.resumeConversation ?? defaultResumeConversation)(FLYWHEEL_CONVERSATION_SESSION);
   if (result.status === 404) throw new FlywheelNotRunning('No flywheel conversation to resume — `pan flywheel start`');
   if (result.status >= 400) throw new Error(result.error ?? `Failed to resume the flywheel (${result.status})`);
+  // The harness was already alive (the loop is still running its turn):
+  // re-sending the skill would queue a second `/pan-flywheel` into it.
+  if (result.reattached) return { session: FLYWHEEL_CONVERSATION_SESSION };
   const sendKeys = deps.sendKeys ?? defaultSendKeys;
   await sendKeys(FLYWHEEL_CONVERSATION_SESSION, FLYWHEEL_SKILL_COMMAND, 'pan flywheel resume');
   await sendKeys(FLYWHEEL_CONVERSATION_SESSION, 'Enter', 'pan flywheel resume');
@@ -244,35 +277,40 @@ export async function requestFlywheelReport(deps: FlywheelActionDeps = {}): Prom
 }
 
 /**
- * Graceful stop: ask the loop to write its report, poll the report's mtime
- * every 5 s until it is newer than the request or the timeout elapses, then
- * pause either way.
+ * Graceful stop: ask the loop to write, commit, and push its report, then
+ * poll every 5 s for the loop's `phase=stopping` tick newer than the request
+ * — the skill prints it only after the commit and push, so pausing earlier
+ * could kill the session mid-commit. On timeout it pauses anyway.
+ * `reportWritten` is whether `report.md` (read from the same plan home the
+ * page and `pan flywheel report` read) was modified after the request.
  */
 export async function stopFlywheel(
   opts: { timeoutMs?: number } = {},
   deps: FlywheelActionDeps = {},
-): Promise<{ reportWritten: boolean }> {
+): Promise<{ reportWritten: boolean; stopped: boolean }> {
   const conv = await requireRunning(deps);
   const now = deps.now ?? Date.now;
   const sleep = deps.sleep ?? defaultSleep;
   const readReport = deps.readReport ?? readFlywheelReportFile;
-  const planHome = await (deps.resolvePlanHome ?? defaultResolvePlanHome)(conv.cwd);
+  const readTranscript = deps.readTranscript ?? readFlywheelTranscript;
+  const { planHome } = await resolveFlywheelProjectRoot({ deps: { ...deps, getConversation: () => conv } });
   const timeoutMs = opts.timeoutMs ?? FLYWHEEL_STOP_DEFAULT_TIMEOUT_MS;
 
   const requestedAt = now();
   await (deps.sendMessage ?? defaultSendMessage)(FLYWHEEL_CONVERSATION_SESSION, FLYWHEEL_STOP_REQUEST, 'pan flywheel stop');
 
-  let reportWritten = false;
+  let stopped = false;
   while (now() - requestedAt < timeoutMs) {
     await sleep(Math.min(FLYWHEEL_STOP_POLL_MS, Math.max(0, timeoutMs - (now() - requestedAt))));
-    const report = await readReport(planHome).catch(() => null);
-    const modified = report?.lastModified ? Date.parse(report.lastModified) : Number.NaN;
-    if (Number.isFinite(modified) && modified > requestedAt) {
-      reportWritten = true;
+    const tick = findLastTick(await readTranscript(conv).catch(() => []));
+    if (tick && tick.phase === 'stopping' && Date.parse(tick.at) > requestedAt) {
+      stopped = true;
       break;
     }
   }
 
+  const report = await readReport(planHome).catch(() => null);
+  const modified = report?.lastModified ? Date.parse(report.lastModified) : Number.NaN;
   await pauseFlywheel(deps);
-  return { reportWritten };
+  return { reportWritten: Number.isFinite(modified) && modified > requestedAt, stopped };
 }

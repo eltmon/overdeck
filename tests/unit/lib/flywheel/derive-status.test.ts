@@ -57,6 +57,14 @@ describe('deriveFlywheelStatus (PAN-3964 FR-1)', () => {
     expect(readTranscript).not.toHaveBeenCalled();
   });
 
+  it('is idle when the only row is archived (a rolled-back start)', async () => {
+    const status = await deriveFlywheelStatus({
+      deps: baseDeps({ getConversation: () => conversation({ status: 'ended', archivedAt: '2026-09-23T09:00:00.000Z' }) }),
+    });
+    expect(status.run).toBe('idle');
+    expect(status.conversation).toBeNull();
+  });
+
   it('is paused when the row exists but the session is dead', async () => {
     const status = await deriveFlywheelStatus({ deps: baseDeps({ sessionAlive: async () => false }) });
     expect(status.run).toBe('paused');

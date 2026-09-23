@@ -101,7 +101,7 @@ describe('pan flywheel verbs (PAN-3964 FR-6)', () => {
   });
 
   it('stop parses --timeout', async () => {
-    mocks.stopFlywheel.mockResolvedValue({ reportWritten: true });
+    mocks.stopFlywheel.mockResolvedValue({ reportWritten: true, stopped: true });
     await run('stop', '--timeout', '5000');
     expect(mocks.stopFlywheel).toHaveBeenCalledWith({ timeoutMs: 5000 });
   });
