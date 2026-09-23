@@ -18,6 +18,8 @@ optional:
   - TLDR_AVAILABLE
   - MEMORY_CONTEXT
   - RECORD_CONTEXT
+  - TESTS_ON_CI
+  - USES_VITEST
 ---
 # Working on Issue: {{ISSUE_ID}}
 
@@ -304,7 +306,7 @@ writes.
 
 **You are NOT done until ALL of these are true:**
 
-1. **Touched tests pass** - Run the tests for the files you changed or whose subjects you changed (`npx vitest run <test files you changed or whose subjects you changed>` for vitest). Do NOT run the full suite on the host — it runs on CI after `pan done`, and a red CI test job comes back to you as `VERIFICATION FAILED … Failed check: test`.
+1. **Touched tests pass** - Run the tests for the files you changed or whose subjects you changed ({{#USES_VITEST}}`npx vitest run <test files you changed or whose subjects you changed>`{{/USES_VITEST}}{{^USES_VITEST}}the project's test runner, scoped to those test files or packages{{/USES_VITEST}}). {{#TESTS_ON_CI}}Do NOT run the full suite on the host — it runs on CI after `pan done`, and a red CI test job comes back to you as `VERIFICATION FAILED … Failed check: test`.{{/TESTS_ON_CI}}{{^TESTS_ON_CI}}Do NOT run the full suite yourself — `pan done` runs it as the verification gate's test step, and a failure comes back to you as `VERIFICATION FAILED`.{{/TESTS_ON_CI}}
 2. **All changes committed** - `git status` shows "nothing to commit, working tree clean"
 3. **Pushed to remote** - `git push -u origin $(git branch --show-current)`
 
@@ -317,7 +319,7 @@ reporting failure. If there are genuinely no anomalies, say "No deviations." fir
 
 **Before declaring work complete, run these as BASH COMMANDS (using the Bash tool):**
 ```bash
-npx vitest run <changed test files>              # Run only the tests you touched
+{{#USES_VITEST}}npx vitest run <changed test files>              # Run only the tests you touched{{/USES_VITEST}}{{^USES_VITEST}}<test runner> <changed test files or packages>   # Run only the tests you touched{{/USES_VITEST}}
 git add -A && git commit -m "feat: description"  # Commit ALL changes
 git push -u origin $(git branch --show-current)  # Push
 git status                                       # Must show "nothing to commit"
@@ -343,7 +345,7 @@ pan done {{ISSUE_ID}} -c "Brief summary"      # Signal completion — creates Gi
 {{#REMOTE}}
 When ALL tasks are complete:
 ```bash
-npx vitest run <changed test files>   # only the tests you touched; the full suite runs on CI
+{{#USES_VITEST}}npx vitest run <changed test files>{{/USES_VITEST}}{{^USES_VITEST}}<test runner> <changed test files or packages>{{/USES_VITEST}}   # only the tests you touched; the full suite runs {{#TESTS_ON_CI}}on CI{{/TESTS_ON_CI}}{{^TESTS_ON_CI}}in the verification gate{{/TESTS_ON_CI}}
 pan task done {{ISSUE_ID}} <item-id>   # complete every implemented item
 git add -A && git commit -m "feat: description"
 git push -u origin $(git branch --show-current)

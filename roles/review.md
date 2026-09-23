@@ -127,9 +127,11 @@ are included in the normal project test command, not only runnable manually.
 
 ## Verification budget
 
-Never run the full test suite: it runs once, on CI, against the PR head. Read
-that result (`gh pr checks <pr-number>`) and cite it; a pending or missing CI
-test job is unverified, not green. Reuse other trustworthy successful checks
+Never run the full test suite: the verification gate already ran it. Where the
+project's tests run on CI, that run is the CI test job on the PR head: read it
+(`gh pr checks <pr-number>`) and cite it; a pending or missing CI test job is
+unverified, not green. Otherwise the gate ran it locally before review: cite the
+`overdeck/verification` check. Reuse other trustworthy successful checks
 for this exact HEAD. Otherwise run focused tests or isolated probes needed to
 resolve a concrete uncertainty. Record unavailable checks as unverified.
 Scratch probes belong in an isolated temporary directory; do not edit tracked
