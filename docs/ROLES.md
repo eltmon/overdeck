@@ -14,7 +14,7 @@ See [PAN-1048](./prds/planned/PAN-1048-role-primitive.md) for the migration's mo
 |------|------|---------|
 | `plan` | `roles/plan.md` | Read issue, research codebase, write xBRIEF, create xBRIEF tasks. Instruction source: `roles/plan.md` (system prompt) plus `src/lib/cloister/prompts/planning.md` (issue inputs and plan formats); no other file instructs the planner. |
 | `work` | `roles/work.md` | The foreman for the issue. Claims xBRIEF items, writes code, commits one item at a time with an `Item: <item-id>` trailer. When the plan has parallel waves, dispatches same-family workers as in-harness subagents and cross-family workers as terminal-backend panes via `pan spawn` — see the `pan-foreman` skill and [FOREMAN.md](./FOREMAN.md). |
-| `strike` | `roles/strike.md` | Precision drop-in. Implements an isolated fix on `strike/<id>`, pushes the branch, and signals the spawner to review and land it. Bypasses the plan/work/review/test pipeline and server-side shipping. |
+| `strike` | `roles/strike.md` | Precision drop-in. Implements an isolated fix on `strike/<id>`, pushes the branch, and opens a PR against `main` that the operator merges. Bypasses the plan/work/review/test pipeline and server-side shipping. |
 | `review` | `roles/review.md` | Read manifest, gather convoy findings, approve or request changes as a PR review |
 | `test` | `roles/test.md` | Run project test suite + Playwright UAT, report failures |
 

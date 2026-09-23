@@ -93,18 +93,6 @@ export interface TriggerMergeResult {
   mergeResult?: unknown;
 }
 
-export function parseStrikeMergeRequest(raw: unknown): StrikeMergeRequest | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const request = raw as Record<string, unknown>;
-  return request.kind === 'strike'
-    && typeof request.markerHead === 'string'
-    && typeof request.workspacePath === 'string'
-    && typeof request.branchName === 'string'
-    && typeof request.recoveryTarget === 'string'
-    ? request as unknown as StrikeMergeRequest
-    : null;
-}
-
 export function activeStrikeMerge(currentMerge: string | null, pendingOperation?: { type: string; status: string } | null): boolean {
   return currentMerge !== null || (pendingOperation?.type === 'merge' && pendingOperation.status === 'running');
 }

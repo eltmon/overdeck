@@ -593,9 +593,9 @@ export async function checkPostMergeRow(
     const lifecycleObserved = canonicalState === 'verifying_on_main' || Boolean(mergedAt);
     // PAN-3180: `postMergeLifecycle()` is the work-agent handoff — it pauses the
     // work/planning agents, stops the workspace stack, and applies
-    // `verifying-on-main`. A strike has no work agent to pause and its landing is
-    // owned by the Deacon's merge door, so the marker this row looks for is never
-    // written and its absence proves nothing. What a strike does still owe is
+    // `verifying-on-main`. A strike has no work agent to pause and lands through
+    // an operator-merged PR (PAN-3973), so the marker this row looks for may never
+    // be written and its absence proves nothing. What a strike does still owe is
     // quiescence, so a live work/planning agent remains a real miss.
     if (!lifecycleObserved && merged?.containedStrikeHead) {
       return result(

@@ -39,7 +39,6 @@
     "close": "Lifecycle",
     "issues": "Lifecycle",
     "strike": "Lifecycle",
-    "strike-ready": "Lifecycle",
     "swarm": "Lifecycle",
     "task": "Lifecycle",
     "approve": "Lifecycle",

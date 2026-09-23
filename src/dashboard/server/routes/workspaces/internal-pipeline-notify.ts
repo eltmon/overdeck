@@ -4,7 +4,7 @@
  *
  * Lived in merge-ops.ts by accident of history and has nothing to do with
  * merging; extracted here so the merge god file shrinks and this route reads
- * on its own (same shape as internal-strike-merge.ts).
+ * on its own.
  */
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
