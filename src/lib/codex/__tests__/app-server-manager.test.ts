@@ -444,7 +444,7 @@ describe('CodexAppServerManager', () => {
       native.send({ method: 'thread/started', params: { thread: { id: 'tui-new' } } });
       native.send({
         method: 'item/completed',
-        params: { threadId: 'tui-new', item: { type: 'collabAgentToolCall', receiverThreadIds: ['tui-sub'] } },
+        params: { threadId: 'tui-new', item: { type: 'collabAgentToolCall', tool: 'spawnAgent', receiverThreadIds: ['tui-sub'] } },
       });
       expect(manager.threadScope('tui-sub')).toBe('unknown');
       manager.stop();
@@ -470,6 +470,18 @@ describe('CodexAppServerManager', () => {
       native.send({ method: 'thread/started', params: { thread: { id: 'grandchild', parentThreadId: 'sub-thread', ephemeral: false } } });
       expect(manager.threadScope('grandchild')).toBe('foreign');
 
+      // Only a spawn adopts: other collab tools naming a foreign thread (a
+      // native /new) leave it foreign, from the owner or from a sub-agent.
+      native.send({ method: 'thread/started', params: { thread: { id: 'tui-new', ephemeral: false } } });
+      for (const tool of ['wait', 'sendInput', 'resumeAgent', 'closeAgent']) {
+        native.send({
+          method: 'item/completed',
+          params: { threadId: 'owner-thread', item: { type: 'collabAgentToolCall', tool, senderThreadId: 'owner-thread', receiverThreadIds: ['tui-new', 'grandchild'] } },
+        });
+      }
+      expect(manager.threadScope('tui-new')).toBe('foreign');
+      expect(manager.threadScope('grandchild')).toBe('foreign');
+
       // The parent joins through the owner's spawn item, then spawns the grandchild.
       native.send({
         method: 'item/completed',
@@ -489,7 +501,8 @@ describe('CodexAppServerManager', () => {
 
       expect(manager.threadScope('grandchild')).toBe('descendant');
       expect(requests.map(request => request.id)).toEqual([5]);
-      expect(foreign.map(message => message.method)).toEqual(['thread/started']);
+      expect(foreign.map(message => message.method)).toEqual(['thread/started', 'thread/started']);
+      expect(manager.threadScope('tui-new')).toBe('foreign');
 
       // The owner thread is never reclassified by a spawn item naming it.
       native.send({

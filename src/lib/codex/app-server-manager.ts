@@ -508,7 +508,10 @@ export class CodexAppServerManager extends EventEmitter {
   private adoptSpawnedAgents(message: AppServerMessage, threadId: string): void {
     if (message.method !== 'item/started' && message.method !== 'item/completed') return;
     const item = asRecord(asRecord(message.params).item);
-    if (item.type !== 'collabAgentToolCall' || !Array.isArray(item.receiverThreadIds)) return;
+    // Only a spawn creates a thread. `wait`, `sendInput`, `resumeAgent` and
+    // `closeAgent` name existing receivers and must not pull a foreign thread
+    // (a native `/new`) into the tree (PAN-4031 review).
+    if (item.type !== 'collabAgentToolCall' || item.tool !== 'spawnAgent' || !Array.isArray(item.receiverThreadIds)) return;
     const scope = this.threadScope(threadId);
     if (scope !== 'owner' && scope !== 'descendant') return;
     for (const receiver of item.receiverThreadIds) {

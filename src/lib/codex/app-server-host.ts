@@ -19,6 +19,7 @@ import {
   type TurnOptions,
 } from './app-server-manager.js';
 import { CODEX_NATIVE_ENDPOINT_FILE, codexNativeSocketPath } from './native-endpoint.js';
+import { SubAgentSpawns } from './sub-agent-spawns.js';
 import { BRIDGE_TOKEN_HEADER } from '../bridge-token.js';
 import { codexHome, waitForCodexRollout } from '../runtimes/codex.js';
 import { calculateCostSync, getPricingSync } from '../cost.js';
@@ -97,10 +98,12 @@ export class CodexAppServerHost {
   private readonly incidentalThreads = new Set<string>();
   /** Native navigation seen so far; it only ever grows (PAN-4031). */
   private readonly navigatedThreads = new Set<string>();
+  /** Threads whose events arrived before anything classified them. */
+  private readonly unclassifiedThreads = new Set<string>();
   /** Latest running cost total per owner/sub-agent thread. */
   private readonly threadCosts = new Map<string, number>();
-  /** Model each sub-agent thread runs on, when Codex named one (PAN-4031). */
-  private readonly subAgentModels = new Map<string, string>();
+  /** Open spawn calls and each sub-agent's model (PAN-4031). */
+  private readonly spawns = new SubAgentSpawns(threadId => this.scopeOf(threadId), () => this.threadModel);
   /** True once the host itself is stopping the app-server. */
   private stopping = false;
   private exitHandling: Promise<void> = Promise.resolve();
@@ -438,7 +441,8 @@ export class CodexAppServerHost {
       // threads it cannot classify; foreign threads arrive as foreign-thread.
       // Thread-id recording happens only in openOwnerThread.
       this.applyOwnerNotification(message);
-      this.trackSubAgentModel(message);
+      this.trackUnknownThread(message);
+      this.spawns.observe(message);
       this.renderNotification(message);
       this.recordObservedActivity(message);
       void this.appendEvent('notification', message as JsonRecord);
@@ -558,14 +562,39 @@ export class CodexAppServerHost {
   }
 
   /**
-   * Part of the companion Terminal fingerprint (PAN-4031). It counts only
-   * positively identified navigation, so it never goes down: a sub-agent whose
-   * status events arrive before the spawn item that adopts it is not counted
-   * at all, and cannot make a later Terminal open replace an attached CLI.
-   * The cost: a `/resume` of another thread in the TUI announces no
-   * `thread/started`, so it is not counted either.
+   * A thread the manager has not classified. Its events still flow, fail open.
+   * Codex 0.153.4 announces a TUI `/resume` of an existing thread with no
+   * `thread/started` or other resume notification; the only trace is that
+   * thread's `thread/status/changed`, which is broadcast to every client. A
+   * sub-agent's first status looks the same until its spawn item adopts it.
+   */
+  private trackUnknownThread(message: AppServerMessage): void {
+    const threadId = messageThreadId(message);
+    if (threadId && this.scopeOf(threadId) === 'unknown') this.unclassifiedThreads.add(threadId);
+  }
+
+  /**
+   * Part of the companion Terminal fingerprint (PAN-4031). It only ever goes
+   * up, so the fingerprint never changes back and forth. It counts native
+   * `/new` and `/fork` (see trackForeignThread) and, when it is read, every
+   * thread that is still unclassified: a TUI `/resume` of another thread. A
+   * sub-agent is adopted by its spawn item, which completes before the
+   * spawning turn goes on, so unclassified threads are not counted while an
+   * in-tree `spawnAgent` call is open; they are counted on a later read if no
+   * spawn item adopts them. A sub-agent status that arrived before its spawn
+   * call started, read in that instant, would bump the epoch once and replace
+   * an attached CLI once. That is the safer failure: missing a `/resume`
+   * would leave every later Terminal open on the wrong thread.
    */
   private navigationEpoch(): number {
+    for (const threadId of this.unclassifiedThreads) {
+      if (this.scopeOf(threadId) !== 'unknown') {
+        this.unclassifiedThreads.delete(threadId);
+      } else if (!this.spawns.hasOpenSpawn()) {
+        this.unclassifiedThreads.delete(threadId);
+        this.noteNavigation(threadId, 'thread/status/changed');
+      }
+    }
     return this.navigatedThreads.size;
   }
 
@@ -573,37 +602,6 @@ export class CodexAppServerHost {
     if (this.navigatedThreads.has(threadId) || this.incidentalThreads.has(threadId)) return;
     this.navigatedThreads.add(threadId);
     void this.appendEvent('foreign-thread', { threadId, method });
-  }
-
-  /**
-   * Record the model a sub-agent runs on (PAN-4031). The `spawnAgent`
-   * `collabAgentToolCall` item carries the model requested for the new
-   * thread; a `thread/settings/updated` for the sub-agent overrides it. A
-   * spawn that names no model inherits its spawner's recorded model. With no
-   * recorded model the sub-agent is priced at the owner's model.
-   */
-  private trackSubAgentModel(message: AppServerMessage): void {
-    const params = asRecord(message.params);
-    const threadId = messageThreadId(message);
-    if (message.method === 'thread/settings/updated') {
-      const model = asRecord(params.threadSettings).model;
-      if (threadId && typeof model === 'string' && model && this.scopeOf(threadId) === 'descendant') {
-        this.subAgentModels.set(threadId, model);
-      }
-      return;
-    }
-    if (message.method !== 'item/started' && message.method !== 'item/completed') return;
-    const item = asRecord(params.item);
-    if (item.type !== 'collabAgentToolCall' || item.tool !== 'spawnAgent' || !Array.isArray(item.receiverThreadIds)) return;
-    const sender = typeof item.senderThreadId === 'string' ? item.senderThreadId : threadId;
-    const model = typeof item.model === 'string' && item.model
-      ? item.model
-      : sender ? this.subAgentModels.get(sender) : undefined;
-    if (!model) return;
-    for (const receiver of item.receiverThreadIds) {
-      if (typeof receiver !== 'string' || this.scopeOf(receiver) !== 'descendant') continue;
-      if (!this.subAgentModels.has(receiver)) this.subAgentModels.set(receiver, model);
-    }
   }
 
   /**
@@ -615,8 +613,9 @@ export class CodexAppServerHost {
   private recordObservedActivity(message: AppServerMessage): void {
     const threadId = messageThreadId(message);
     const scope = threadId ? this.scopeOf(threadId) : 'owner';
-    const subAgentModel = threadId && scope === 'descendant' ? this.subAgentModels.get(threadId) : undefined;
-    // A sub-agent model with no pricing entry falls back to the owner's price.
+    const subAgentModel = threadId && scope === 'descendant' ? this.spawns.modelOf(threadId) : undefined;
+    // A sub-agent with no recorded model, or one with no pricing entry, falls
+    // back to the owner's current price.
     const threadCost = (subAgentModel ? codexNotificationCost(message, subAgentModel) : undefined)
       ?? codexNotificationCost(message, this.threadModel);
     if (threadCost !== undefined && (scope === 'owner' || scope === 'descendant')) {

@@ -15,6 +15,9 @@ import {
 } from '../app-server-manager.js';
 import { createFakeAppServer } from './fake-app-server.js';
 import { readSessionIndexSync } from '../../session-history.js';
+import { createCodexCompanionAdapter } from '../../overdeck/companion-terminal/codex-adapter.js';
+import { createCompanionTerminalLifecycle, type CompanionOwner } from '../../overdeck/companion-terminal/lifecycle.js';
+import type { CompanionCreateSpec, CompanionTerminalHost } from '../../overdeck/companion-terminal/host.js';
 
 const FAKE_ROLLOUT_PATH = '/fake/rollout/for-thread-started.jsonl';
 
@@ -510,6 +513,65 @@ describe('CodexAppServerHost', () => {
       });
     });
 
+    it('replaces a CLI that /resumed another thread and re-points it at the owner, but reuses it through sub-agent churn (PAN-4031)', async () => {
+      const ownerThread = '01a0cf2b-92d3-7260-9919-e020c0c91104';
+      /** A native manager that knows the sub-agents it adopted, like the real one. */
+      class TreeFakeManager extends NativeFakeManager {
+        readonly descendants = new Set<string>();
+        threadScope(threadId: string): 'owner' | 'descendant' | 'unknown' {
+          if (threadId === this.getState().threadId) return 'owner';
+          return this.descendants.has(threadId) ? 'descendant' : 'unknown';
+        }
+      }
+      const manager = new TreeFakeManager();
+      const host = makeHost(manager, { nativeEndpoint: true, model: 'gpt-5.6-luna', resumeThreadId: ownerThread });
+      startedHosts.push(host);
+      await host.start();
+
+      const panes = new Map<string, string | null>();
+      const created: CompanionCreateSpec[] = [];
+      const killed: string[] = [];
+      const terminalHost: CompanionTerminalHost = {
+        ownerStamp: async () => '1790000000',
+        readGeneration: async name => (panes.has(name) ? panes.get(name) ?? null : undefined),
+        create: async (name, spec) => { panes.set(name, spec.generation); created.push(spec); },
+        kill: async (name) => { const had = panes.delete(name); if (had) killed.push(name); return had; },
+      };
+      const adapter = createCodexCompanionAdapter({
+        overdeckHome: () => overdeckHome,
+        postHostOp: async (_agentId, body) => ({ ok: true, response: await host.handleOp(body) }),
+        resolveBinary: async () => '/usr/bin/codex',
+        pathExists: async () => false,
+      });
+      const lifecycle = createCompanionTerminalLifecycle({ host: terminalHost, adapters: { 'codex-resume-remote': adapter }, log: () => undefined });
+      const owner: CompanionOwner = { conversationName: 'host-test', ownerSession: 'agent-host-test', cwd: '/tmp/workspace', harness: 'codex' };
+      const status = (threadId: string) => manager.emit('notification', { method: 'thread/status/changed', params: { threadId, status: { type: 'active' } } });
+      const spawnItem = (method: string, receivers: string[]) => manager.emit('notification', {
+        method,
+        params: { threadId: ownerThread, item: { id: 'call-1', type: 'collabAgentToolCall', tool: 'spawnAgent', senderThreadId: ownerThread, receiverThreadIds: receivers } },
+      });
+
+      expect(await lifecycle.open(owner)).toMatchObject({ status: 'attached', reused: false });
+      expect(created.at(-1)?.argv.at(-1)).toBe(ownerThread);
+
+      // A sub-agent comes and goes: the attached CLI is reused.
+      spawnItem('item/started', []);
+      status('sub-agent');
+      expect(await lifecycle.open(owner)).toMatchObject({ reused: true });
+      manager.descendants.add('sub-agent');
+      spawnItem('item/completed', ['sub-agent']);
+      expect(await lifecycle.open(owner)).toMatchObject({ reused: true });
+
+      // The CLI /resumes an existing thread: the next open replaces the pane
+      // and resumes the owner thread again; the one after reuses it.
+      status('019a0000-0000-7000-8000-0000000e15e0');
+      expect(await lifecycle.open(owner)).toMatchObject({ status: 'attached', reused: false });
+      expect(killed).toHaveLength(1);
+      expect(created).toHaveLength(2);
+      expect(created.at(-1)?.argv.at(-1)).toBe(ownerThread);
+      expect(await lifecycle.open(owner)).toMatchObject({ reused: true });
+    });
+
     it('missing_resume_target_never_starts_fresh', async () => {
       const manager = new NativeFakeManager();
       manager.resumeThread = async () => { throw new Error('thread/resume failed: no rollout found for thread id x'); };
@@ -706,41 +768,70 @@ describe('CodexAppServerHost', () => {
       expect(app.messages.filter(message => message.method === 'turn/start').at(-1)?.params).toMatchObject({ effort: 'high' });
     });
 
-    it('does not count a sub-agent as navigation when its status arrives before its spawn item (live order)', async () => {
+    const spawnStarted = (callId: string) => ({
+      method: 'item/started',
+      params: { threadId: 'owner', item: { id: callId, type: 'collabAgentToolCall', tool: 'spawnAgent', senderThreadId: 'owner', receiverThreadIds: [] } },
+    });
+    const spawnCompleted = (callId: string, sub: string) => ({
+      method: 'item/completed',
+      params: { threadId: 'owner', item: { id: callId, type: 'collabAgentToolCall', tool: 'spawnAgent', senderThreadId: 'owner', receiverThreadIds: [sub] } },
+    });
+    const statusOf = (threadId: string) => ({ method: 'thread/status/changed', params: { threadId, status: { type: 'active' } } });
+
+    it('does not count a sub-agent as navigation when its status arrives inside its spawn call (live order)', async () => {
       const { app, host } = await startOwner();
-      app.send({ method: 'thread/status/changed', params: { threadId: 'sub', status: { type: 'idle' } } });
+      app.send(spawnStarted('call-1'));
+      app.send(statusOf('sub'));
       expect(host.status().navigationEpoch).toBe(0);
-      app.send({
-        method: 'item/completed',
-        params: { threadId: 'owner', item: { type: 'collabAgentToolCall', tool: 'spawnAgent', receiverThreadIds: ['sub'] } },
-      });
+      app.send(spawnCompleted('call-1', 'sub'));
       expect(host.status().navigationEpoch).toBe(0);
     });
 
-    it('keeps the Terminal navigation epoch stable while sub-agents come and go (PAN-4031)', async () => {
+    it('keeps the Terminal navigation epoch monotonic and counts a CLI /resume, never sub-agent churn (PAN-4031)', async () => {
       const { app, host } = await startOwner();
       const epochs: number[] = [];
       const read = () => epochs.push(host.status().navigationEpoch as number);
-      const spawn = (sub: string) => app.send({
-        method: 'item/completed',
-        params: { threadId: 'owner', item: { type: 'collabAgentToolCall', tool: 'spawnAgent', senderThreadId: 'owner', receiverThreadIds: [sub] } },
-      });
 
       read();
-      app.send({ method: 'thread/status/changed', params: { threadId: 'sub-a', status: { type: 'active' } } });
+      app.send(spawnStarted('call-a'));
+      app.send(statusOf('sub-a'));
       read();
-      spawn('sub-a');
+      app.send(spawnCompleted('call-a', 'sub-a'));
       read();
       app.send({ method: 'thread/started', params: { thread: { id: 'tui-new', ephemeral: false, parentThreadId: null } } });
       read();
-      app.send({ method: 'thread/status/changed', params: { threadId: 'sub-b', status: { type: 'active' } } });
+      // The CLI /resumes an existing thread: Codex broadcasts only its status.
+      app.send(statusOf('resumed-elsewhere'));
       read();
-      spawn('sub-b');
+      app.send(statusOf('resumed-elsewhere'));
+      read();
+      app.send(spawnStarted('call-b'));
+      app.send(statusOf('sub-b'));
+      read();
+      app.send(spawnCompleted('call-b', 'sub-b'));
       // A sub-agent of a thread outside the tree is not navigation either.
       app.send({ method: 'thread/started', params: { thread: { id: 'tui-sub', ephemeral: false, parentThreadId: 'tui-new' } } });
       read();
 
-      expect(epochs).toEqual([0, 0, 0, 1, 1, 1]);
+      expect(epochs).toEqual([0, 0, 0, 1, 2, 2, 2, 2]);
+    });
+
+    it('never lowers the epoch when a sub-agent status arrived before its spawn call started (documented fallback)', async () => {
+      const { app, host } = await startOwner();
+      app.send(statusOf('early-sub'));
+      expect(host.status().navigationEpoch).toBe(1);
+      app.send(spawnStarted('call-1'));
+      app.send(spawnCompleted('call-1', 'early-sub'));
+      expect(host.status().navigationEpoch).toBe(1);
+    });
+
+    it('stops holding back a /resume once the owner turn ends without the spawn completing', async () => {
+      const { app, host } = await startOwner();
+      app.send(spawnStarted('lost-call'));
+      app.send(statusOf('resumed-elsewhere'));
+      expect(host.status().navigationEpoch).toBe(0);
+      app.send({ method: 'turn/completed', params: { threadId: 'owner', turn: { id: 'owner-turn' } } });
+      expect(host.status().navigationEpoch).toBe(1);
     });
 
     it('prices each sub-agent at the model its spawn item names (PAN-4031)', async () => {
@@ -764,6 +855,8 @@ describe('CodexAppServerHost', () => {
         spawn('owner', 'unpriced-sub', 'not-a-priced-model');
         spawn('owner', 'retuned-sub', 'gpt-5.6-luna');
         app.send({ method: 'thread/settings/updated', params: { threadId: 'retuned-sub', threadSettings: { model: 'gpt-5.6-terra' } } });
+        // The owner moves to another model after the spawns.
+        app.send({ method: 'thread/settings/updated', params: { threadId: 'owner', threadSettings: { model: 'gpt-5.6-terra' } } });
 
         const threads = ['owner', 'luna-sub', 'luna-grandchild', 'default-sub', 'unpriced-sub', 'retuned-sub'];
         for (const threadId of threads) {
@@ -771,9 +864,10 @@ describe('CodexAppServerHost', () => {
           app.send(usage(threadId, 1_000_000));
         }
         const cost = (model: string) => codexNotificationCost(usage('any', 1_000_000), model) ?? 0;
-        const expected = cost('gpt-5.6-sol') // owner
+        const expected = cost('gpt-5.6-terra') // owner, at its current model
           + cost('gpt-5.6-luna') * 2 // luna-sub, and its grandchild inheriting its model
-          + cost('gpt-5.6-sol') * 2 // no model named, and an unpriced model: the owner's price
+          + cost('gpt-5.6-sol') // no model named: the spawner's model at spawn time
+          + cost('gpt-5.6-terra') // an unpriced model: the owner's current price
           + cost('gpt-5.6-terra'); // settings update overrides the spawn request
         expect(cost('gpt-5.6-luna')).not.toBeCloseTo(cost('gpt-5.6-sol'), 6);
         expect(recordActivity.mock.calls.at(-1)?.[1].costSoFar).toBeCloseTo(expected, 10);
